@@ -5,6 +5,7 @@
   import OnboardingPage from '../ui/pages/OnboardingPage.svelte';
   import Icon from '../ui/atoms/Icon.svelte';
   import { generateMockMissions } from '../dev/mocks';
+  import type { LogEntry } from '../dev/bridge-logger';
 
   type Page = 'feed' | 'tjm' | 'settings' | 'onboarding';
 
@@ -12,7 +13,7 @@
   let hasCompletedOnboarding = $state(false);
 
   let DevPanel: typeof import('../dev/DevPanel.svelte').default | null = $state(null);
-  let bridgeLogs: Array<{ direction: string; type: string; summary: string; time: string }> = $state([]);
+  let bridgeLogs: LogEntry[] = $state([]);
 
   if (import.meta.env.DEV) {
     import('../dev/DevPanel.svelte').then(m => { DevPanel = m.default; });
