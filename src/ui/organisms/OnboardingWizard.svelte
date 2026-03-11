@@ -2,6 +2,7 @@
   import type { UserProfile } from '$lib/core/types/profile';
   import Chip from '../atoms/Chip.svelte';
   import Icon from '../atoms/Icon.svelte';
+  import { ripple } from '../actions/ripple';
 
   let {
     onComplete,
@@ -86,7 +87,8 @@
   </div>
 
   <button
-    class="w-full py-3 bg-accent-blue hover:bg-accent-blue-hover text-white font-semibold rounded-xl shadow-glow-blue transition-all duration-200 disabled:opacity-40 disabled:cursor-not-allowed"
+    use:ripple
+    class="w-full py-3 bg-accent-blue hover:bg-accent-blue-hover text-white font-semibold rounded-xl shadow-glow-blue transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
     disabled={!canSubmit}
     onclick={handleComplete}
   >
