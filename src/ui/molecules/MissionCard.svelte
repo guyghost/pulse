@@ -6,10 +6,24 @@
   import { ripple } from '../actions/ripple';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
 
-  let { mission, isSeen = true, onVisible: onVisibleCallback }: {
+  let {
+    mission,
+    isSeen = true,
+    isFavorite = false,
+    isHidden = false,
+    onVisible: onVisibleCallback,
+    onToggleFavorite,
+    onHide,
+    onCopyLink,
+  }: {
     mission: Mission;
     isSeen?: boolean;
+    isFavorite?: boolean;
+    isHidden?: boolean;
     onVisible?: () => void;
+    onToggleFavorite?: () => void;
+    onHide?: () => void;
+    onCopyLink?: () => void;
   } = $props();
 
   let expanded = $state(false);
@@ -31,12 +45,37 @@
   function toggleExpand() {
     expanded = !expanded;
   }
+
+  let copied = $state(false);
+
+  function handleCopyLink(e: MouseEvent) {
+    e.stopPropagation();
+    navigator.clipboard.writeText(mission.url).catch(() => {});
+    copied = true;
+    onCopyLink?.();
+    setTimeout(() => { copied = false; }, 1500);
+  }
+
+  function handleToggleFavorite(e: MouseEvent) {
+    e.stopPropagation();
+    onToggleFavorite?.();
+  }
+
+  function handleHide(e: MouseEvent) {
+    e.stopPropagation();
+    onHide?.();
+  }
+
+  function handleOpenLink(e: MouseEvent) {
+    e.stopPropagation();
+    window.open(mission.url, '_blank');
+  }
 </script>
 
 <div
   use:ripple
   use:onVisibleAction={() => onVisibleCallback?.()}
-  class="bg-white/[0.07] backdrop-blur-md border border-white/10 border-t-white/15 rounded-xl {glowClass} hover:bg-white/[0.12] hover:scale-[1.01] transition-all duration-500 ease-out cursor-pointer p-3 active:scale-[0.99] {isSeen ? '' : 'border-l-2 border-l-accent-blue shadow-[inset_2px_0_8px_rgba(59,130,246,0.1)]'}"
+  class="bg-white/[0.07] backdrop-blur-md border border-white/10 border-t-white/15 rounded-xl {glowClass} hover:bg-white/[0.12] hover:scale-[1.01] transition-all duration-500 ease-out cursor-pointer p-3 active:scale-[0.99] {isSeen ? '' : 'border-l-2 border-l-accent-blue shadow-[inset_2px_0_8px_rgba(59,130,246,0.1)]'} {isHidden ? 'opacity-50' : ''}"
   onclick={toggleExpand}
   role="button"
   tabindex="0"
@@ -80,6 +119,37 @@
       <span>{mission.duration}</span>
     {/if}
     <Badge label={mission.source} variant="source" />
+  </div>
+
+  <div class="flex justify-end gap-1 mt-2">
+    <button
+      class="p-1 rounded-md transition-all duration-200 {isFavorite ? 'text-accent-amber' : 'text-text-muted hover:text-text-primary'}"
+      onclick={handleToggleFavorite}
+      title={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+    >
+      <Icon name="star" size={14} class={isFavorite ? 'fill-accent-amber' : ''} />
+    </button>
+    <button
+      class="p-1 rounded-md text-text-muted hover:text-accent-red transition-all duration-200"
+      onclick={handleHide}
+      title={isHidden ? 'Restaurer' : 'Masquer'}
+    >
+      <Icon name={isHidden ? 'eye' : 'x-circle'} size={14} />
+    </button>
+    <button
+      class="p-1 rounded-md text-text-muted hover:text-text-primary transition-all duration-200"
+      onclick={handleCopyLink}
+      title="Copier le lien"
+    >
+      <Icon name={copied ? 'check' : 'link'} size={14} class={copied ? 'text-accent-emerald' : ''} />
+    </button>
+    <button
+      class="p-1 rounded-md text-text-muted hover:text-text-primary transition-all duration-200"
+      onclick={handleOpenLink}
+      title="Ouvrir"
+    >
+      <Icon name="external-link" size={14} />
+    </button>
   </div>
 
   {#if expanded && mission.description}
