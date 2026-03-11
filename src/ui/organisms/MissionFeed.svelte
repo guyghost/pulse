@@ -18,7 +18,7 @@
 <div class="flex flex-col gap-2 overflow-y-auto">
   {#if isLoading}
     {#each Array(3) as _}
-      <div class="p-3 bg-surface rounded-lg space-y-2">
+      <div class="bg-white/[0.05] backdrop-blur-md border border-white/5 rounded-xl p-3 space-y-2">
         <Skeleton width="70%" height="1rem" />
         <Skeleton width="40%" height="0.75rem" />
         <div class="flex gap-1">
@@ -29,14 +29,18 @@
       </div>
     {/each}
   {:else if error}
-    <div class="flex flex-col items-center justify-center py-8 text-center">
-      <Icon name="x" size={24} class="text-accent-red mb-2" />
+    <div class="flex flex-col items-center justify-center py-12 text-center">
+      <div class="w-10 h-10 rounded-full bg-accent-red/10 flex items-center justify-center mb-3">
+        <Icon name="x" size={20} class="text-accent-red" />
+      </div>
       <p class="text-sm text-text-primary font-medium">Erreur</p>
-      <p class="text-xs text-text-secondary mt-1">{error}</p>
+      <p class="text-xs text-text-secondary mt-1 max-w-[250px]">{error}</p>
     </div>
   {:else if sortedMissions.length === 0}
-    <div class="flex flex-col items-center justify-center py-8 text-center">
-      <Icon name="briefcase" size={24} class="text-text-muted mb-2" />
+    <div class="flex flex-col items-center justify-center py-12 text-center">
+      <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-3">
+        <Icon name="briefcase" size={20} class="text-text-muted" />
+      </div>
       <p class="text-sm text-text-primary font-medium">Aucune mission</p>
       <p class="text-xs text-text-secondary mt-1">Lancez un scan pour trouver des missions</p>
     </div>
