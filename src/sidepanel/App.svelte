@@ -105,7 +105,7 @@
   {/if}
 
   {#if import.meta.env.DEV && DevPanel}
-    <svelte:component this={DevPanel}
+    <DevPanel
       onInjectMissions={devInjectMissions}
       onSetState={devSetState}
       onToggleOnboarding={devToggleOnboarding}

@@ -362,6 +362,52 @@ La clé API Anthropic est stockée dans `chrome.storage.local` (chiffré par Chr
 - Tests d'intégration Shell avec mocks de `chrome.*` APIs (`vitest-chrome` ou mocks manuels)
 - E2E avec Playwright pour les flows critiques : onboarding, scan + feed, settings
 
+## Développement local
+
+### Mode dev (sans extension Chrome)
+
+```bash
+pnpm dev
+# Ouvrir http://localhost:5173/src/sidepanel/index.html
+```
+
+En mode dev, les APIs Chrome sont automatiquement stubées avec des données mock. L'UI est fonctionnelle sans charger l'extension.
+
+### Dev Panel
+
+`Ctrl+Shift+D` ouvre un panel de contrôle avec :
+- **Feed State** : basculer entre empty / loading / loaded / error
+- **Missions** : injecter N missions mock
+- **Onboarding** : toggle l'état onboarding complété
+- **Bridge Logs** : messages bridge en temps réel
+
+### XState Inspector
+
+En mode dev, `@statelyai/inspect` est activé automatiquement. Ouvrir https://stately.ai/inspect pour visualiser les machines XState en temps réel.
+
+### Bridge Logging
+
+Les messages bridge sont loggés automatiquement en mode dev :
+```
+[Bridge] → SCAN_START                    12:34:56.789
+[Bridge] ← SCAN_STATUS {progress: 0.5}  12:34:57.123
+[Bridge] ← MISSIONS_UPDATED [8 items]   12:34:58.456
+```
+Logs visibles dans la console ET dans le Dev Panel.
+
+### Structure dev
+
+```
+src/dev/                    # Tree-shaken en production
+├── index.ts                # Bootstrap dev mode
+├── mocks.ts                # Données mock (profil, missions, TJM)
+├── chrome-stubs.ts         # Stubs chrome.* APIs
+├── DevPanel.svelte         # Drawer overlay (Ctrl+Shift+D)
+└── bridge-logger.ts        # Intercepteur de messages bridge
+```
+
+Tout le code dans `src/dev/` est derrière `import.meta.env.DEV` et n'est jamais inclus dans le build production.
+
 ## Conventions Git
 
 - Conventional commits : `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`

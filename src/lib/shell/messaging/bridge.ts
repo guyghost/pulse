@@ -31,7 +31,7 @@ export type BridgeMessage =
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {
-    import('../../dev/bridge-logger').then(({ logBridgeMessage }) => {
+    import('../../../dev/bridge-logger').then(({ logBridgeMessage }) => {
       logBridgeMessage(direction, type, payload);
     }).catch((err) => console.warn('[Dev] bridge-logger load failed', err));
   }
