@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { scoreMission } from '../../../src/lib/scoring/relevance';
+import { scoreMission } from '../../../src/lib/core/scoring/relevance';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 

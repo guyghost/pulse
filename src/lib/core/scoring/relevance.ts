@@ -1,5 +1,5 @@
-import type { Mission } from '../core/types/mission';
-import type { UserProfile } from '../core/types/profile';
+import type { Mission } from '../types/mission';
+import type { UserProfile } from '../types/profile';
 
 export function scoreMission(mission: Mission, profile: UserProfile): number {
   const stackScore = scoreStack(mission.stack, profile.stack);
