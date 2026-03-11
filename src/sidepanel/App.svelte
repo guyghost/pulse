@@ -91,8 +91,8 @@
   {#if currentPage === 'onboarding' && !hasCompletedOnboarding}
     <OnboardingPage onComplete={completeOnboarding} />
   {:else}
-    <nav aria-label="Main navigation" class="flex border-b border-white/5 bg-navy-900/80 backdrop-blur-xl">
-      {#each navItems as item}
+    <nav aria-label="Main navigation" class="relative flex border-b border-white/5 bg-navy-900/80 backdrop-blur-xl">
+      {#each navItems as item, i}
         <button
           class="flex-1 flex flex-col items-center justify-center gap-0.5 px-3 py-2.5 text-xs font-medium transition-all duration-200
             {currentPage === item.page
@@ -103,9 +103,13 @@
         >
           <Icon name={item.icon} size={16} />
           <span>{item.label}</span>
-          <div class="w-1 h-1 mt-0.5 rounded-full {currentPage === item.page ? 'bg-accent-blue' : ''}"></div>
         </button>
       {/each}
+      <div
+        class="absolute bottom-1 h-1 w-1 rounded-full bg-accent-blue transition-all duration-200 ease-out"
+        style:left="calc({(PAGE_INDEX[currentPage] ?? 0) * 100 / 3 + 100 / 6}%)"
+        style:transform="translateX(-50%)"
+      ></div>
     </nav>
     <main class="flex-1 overflow-hidden relative">
       {#key currentPage}
