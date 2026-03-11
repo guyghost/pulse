@@ -8,10 +8,10 @@
 
   let classes = $derived(
     variant === 'tech'
-      ? 'bg-navy-700 text-accent-blue font-mono text-[11px]'
+      ? 'bg-white/10 text-accent-blue font-mono text-[11px]'
       : variant === 'status'
       ? 'bg-accent-emerald/20 text-accent-emerald text-[11px]'
-      : 'bg-navy-600 text-text-secondary text-[11px]'
+      : 'bg-white/5 text-text-secondary text-[11px]'
   );
 </script>
 

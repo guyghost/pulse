@@ -9,7 +9,6 @@
   let localValue = $state('');
   let debounceTimer: ReturnType<typeof setTimeout> | null = null;
 
-  // Sync with external value prop
   $effect(() => {
     localValue = value;
   });
@@ -37,13 +36,13 @@
   <input
     type="text"
     placeholder="Rechercher..."
-    class="w-full bg-surface border border-border rounded-lg pl-8 pr-8 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue transition-colors"
+    class="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-8 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/50 focus:ring-1 focus:ring-accent-blue/20 transition-all duration-200"
     value={localValue}
     oninput={handleInput}
   />
   {#if localValue}
     <button
-      class="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors"
+      class="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors duration-200"
       onclick={clear}
     >
       <Icon name="x" size={14} />
