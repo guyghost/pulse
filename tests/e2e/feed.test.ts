@@ -69,6 +69,14 @@ test.describe('Feed', () => {
   test('action buttons are visible on mission cards', async ({ page }) => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
+
+    // Inject missions via DevPanel
+    await waitForDevPanel(page);
+    await page.keyboard.press('Control+Shift+D');
+    await expect(page.getByText('DEV PANEL')).toBeVisible();
+    await page.getByRole('button', { name: '5' }).click();
+    await page.keyboard.press('Control+Shift+D');
+
     await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
 
     const firstCard = page.locator('[role="button"]').first();
@@ -79,14 +87,90 @@ test.describe('Feed', () => {
     await expect(firstCard.getByTitle('Ouvrir')).toBeVisible();
   });
 
-  test('favorites toggle filters missions', async ({ page }) => {
+  test('clicking favorite toggles star state', async ({ page }) => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
+
+    await waitForDevPanel(page);
+    await page.keyboard.press('Control+Shift+D');
+    await expect(page.getByText('DEV PANEL')).toBeVisible();
+    await page.getByRole('button', { name: '5' }).click();
+    await page.keyboard.press('Control+Shift+D');
+
     await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
 
+    const firstCard = page.locator('[role="button"]').first();
+    const starBtn = firstCard.getByTitle('Ajouter aux favoris');
+    await expect(starBtn).toBeVisible();
+
+    // Click to favorite
+    await starBtn.click();
+    // After clicking, title should change to 'Retirer des favoris'
+    await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 1000 });
+
+    // Click again to unfavorite
+    await firstCard.getByTitle('Retirer des favoris').click();
+    await expect(firstCard.getByTitle('Ajouter aux favoris')).toBeVisible({ timeout: 1000 });
+  });
+
+  test('clicking hide removes mission and shows toggle link', async ({ page }) => {
+    await page.goto(SIDE_PANEL);
+    await expect(page.getByText('Missions')).toBeVisible();
+
+    await waitForDevPanel(page);
+    await page.keyboard.press('Control+Shift+D');
+    await expect(page.getByText('DEV PANEL')).toBeVisible();
+    await page.getByRole('button', { name: '5' }).click();
+    await page.keyboard.press('Control+Shift+D');
+
+    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 3000 });
+
+    // Hide the first mission
+    const firstCard = page.locator('[role="button"]').first();
+    const hideBtn = firstCard.getByTitle('Masquer');
+    await hideBtn.click();
+
+    // Mission count should decrease
+    await expect(page.getByText('4 missions')).toBeVisible({ timeout: 2000 });
+
+    // "Voir les masquees" link should appear
+    await expect(page.getByText(/Voir les \d+ masquee/)).toBeVisible();
+  });
+
+  test('favorites toggle filters to favorites only', async ({ page }) => {
+    await page.goto(SIDE_PANEL);
+    await expect(page.getByText('Missions')).toBeVisible();
+
+    await waitForDevPanel(page);
+    await page.keyboard.press('Control+Shift+D');
+    await expect(page.getByText('DEV PANEL')).toBeVisible();
+    await page.getByRole('button', { name: '5' }).click();
+    await page.keyboard.press('Control+Shift+D');
+
+    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 3000 });
+
+    // Favorite the first mission
+    const firstCard = page.locator('[role="button"]').first();
+    await firstCard.getByTitle('Ajouter aux favoris').click();
+    await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 1000 });
+
+    // Click favorites filter in header
     await page.getByTitle('Voir favoris').click();
     await page.waitForTimeout(300);
+
+    // Should show only 1 mission (the favorited one)
+    await expect(page.getByText('1 mission')).toBeVisible({ timeout: 2000 });
+
+    // Toggle back to all
     await page.getByTitle('Voir toutes').click();
-    await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 2000 });
+  });
+
+  test('header star button and refresh button are visible', async ({ page }) => {
+    await page.goto(SIDE_PANEL);
+    await expect(page.getByText('Missions')).toBeVisible();
+
+    await expect(page.getByTitle('Voir favoris')).toBeVisible();
+    await expect(page.getByTitle('Rafraichir')).toBeVisible();
   });
 });
