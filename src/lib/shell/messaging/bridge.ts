@@ -27,7 +27,8 @@ export type BridgeMessage =
   | { type: 'TJM_RESULT'; payload: TJMAnalysis }
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
-  | { type: 'SAVE_PROFILE'; payload: UserProfile };
+  | { type: 'SAVE_PROFILE'; payload: UserProfile }
+  | { type: 'MISSIONS_SEEN'; payload: string[] };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

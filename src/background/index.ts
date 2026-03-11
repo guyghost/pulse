@@ -7,6 +7,7 @@ import { scoreMission } from '../lib/core/scoring/relevance';
 import { deduplicateMissions } from '../lib/core/scoring/dedup';
 import type { BridgeMessage } from '../lib/shell/messaging/bridge';
 import type { UserProfile } from '../lib/core/types/profile';
+import { getSeenIds } from '../lib/shell/storage/seen-missions';
 
 console.log('[MissionPulse] Service worker started');
 
@@ -86,6 +87,12 @@ async function startScan() {
   // Broadcast to side panel
   broadcastToSidePanel({ type: 'MISSIONS_UPDATED', payload: scored });
 
+  // Update badge with unseen count
+  const seenIds = await getSeenIds();
+  const unseenCount = scored.filter(m => !seenIds.includes(m.id)).length;
+  chrome.action.setBadgeText({ text: unseenCount > 0 ? String(unseenCount) : '' });
+  chrome.action.setBadgeBackgroundColor({ color: '#3B82F6' });
+
   scanActor.send({ type: 'RESET' });
 }
 
@@ -115,6 +122,14 @@ async function handleMessage(message: BridgeMessage): Promise<BridgeMessage | nu
     case 'SAVE_PROFILE': {
       await saveProfile(message.payload as UserProfile);
       return { type: 'PROFILE_RESULT', payload: message.payload as UserProfile };
+    }
+
+    case 'MISSIONS_SEEN': {
+      const seenIds = message.payload as string[];
+      const missions = await getMissions();
+      const unseenCount = missions.filter(m => !seenIds.includes(m.id)).length;
+      chrome.action.setBadgeText({ text: unseenCount > 0 ? String(unseenCount) : '' });
+      return null;
     }
 
     default:
