@@ -2,8 +2,15 @@ import '../ui/design-tokens.css';
 import App from './App.svelte';
 import { mount } from 'svelte';
 
-const app = mount(App, {
-  target: document.getElementById('app')!,
-});
+async function init() {
+  if (import.meta.env.DEV) {
+    const { bootstrapDevMode } = await import('../dev/index');
+    await bootstrapDevMode();
+  }
 
-export default app;
+  mount(App, {
+    target: document.getElementById('app')!,
+  });
+}
+
+init();
