@@ -91,11 +91,7 @@
         >
           <Icon name={item.icon} size={16} />
           <span>{item.label}</span>
-          {#if currentPage === item.page}
-            <div class="w-1 h-1 rounded-full bg-accent-blue mt-0.5"></div>
-          {:else}
-            <div class="w-1 h-1 mt-0.5"></div>
-          {/if}
+          <div class="w-1 h-1 mt-0.5 rounded-full {currentPage === item.page ? 'bg-accent-blue' : ''}"></div>
         </button>
       {/each}
     </nav>

@@ -23,9 +23,6 @@
   let error = $derived(feedSnapshot.context.error);
   let searchQuery = $derived(feedSnapshot.context.searchQuery);
 
-  let isScanning = $state(false);
-  let scanProgress = $state(0);
-
   function handleSearch(query: string) {
     if (query) {
       feedActor.send({ type: 'SEARCH', query });
@@ -34,11 +31,10 @@
     }
   }
 
-  async function startScan() {
-    isScanning = true;
-    scanProgress = 0;
+  function startScan() {
+    if (isLoading) return;
     feedActor.send({ type: 'LOAD' });
-    await sendMessage({ type: 'SCAN_START' });
+    sendMessage({ type: 'SCAN_START' }).catch(() => {});
   }
 
   // Auto-scan on mount
@@ -50,8 +46,6 @@
     $effect(() => {
       function handleMissions(e: Event) {
         const missions = (e as CustomEvent).detail;
-        isScanning = false;
-        scanProgress = 100;
         feedActor.send({ type: 'MISSIONS_LOADED', missions });
       }
       function handleState(e: Event) {
@@ -76,7 +70,7 @@
 
 <FeedLayout feed={feedContent} header={headerContent}>
   {#snippet headerContent()}
-    <ScanProgress {isScanning} progress={scanProgress} />
+    <ScanProgress isScanning={isLoading} progress={isLoading ? 50 : 100} />
     <div class="flex items-center justify-between px-3 pt-3 pb-2">
       <h2 class="text-sm font-semibold text-white">Missions</h2>
       <button
