@@ -1,0 +1,110 @@
+<script lang="ts">
+  import Icon from '../ui/atoms/Icon.svelte';
+
+  let { onInjectMissions, onSetState, onToggleOnboarding, logs = [] }: {
+    onInjectMissions?: (count: number) => void;
+    onSetState?: (state: 'empty' | 'loading' | 'loaded' | 'error') => void;
+    onToggleOnboarding?: () => void;
+    logs?: Array<{ direction: string; type: string; summary: string; time: string }>;
+  } = $props();
+
+  let isOpen = $state(false);
+  let missionCount = $state(10);
+
+  function handleKeydown(e: KeyboardEvent) {
+    if (e.ctrlKey && e.shiftKey && e.key === 'D') {
+      e.preventDefault();
+      isOpen = !isOpen;
+    }
+  }
+</script>
+
+<svelte:window onkeydown={handleKeydown} />
+
+{#if isOpen}
+  <div class="fixed bottom-0 left-0 right-0 z-50 max-h-[50vh] overflow-y-auto bg-navy-900 border-t-2 border-accent-blue shadow-lg">
+    <div class="flex items-center justify-between px-3 py-2 bg-navy-800 sticky top-0">
+      <span class="text-xs font-bold text-accent-blue font-mono">DEV PANEL</span>
+      <button class="text-text-secondary hover:text-text-primary" onclick={() => isOpen = false}>
+        <Icon name="x" size={14} />
+      </button>
+    </div>
+
+    <div class="p-3 space-y-4">
+      <div>
+        <span class="text-[10px] uppercase font-bold text-text-secondary tracking-wider">Feed State</span>
+        <div class="flex gap-1 mt-1">
+          {#each ['empty', 'loading', 'loaded', 'error'] as state}
+            <button
+              class="px-2 py-1 text-[11px] font-mono rounded bg-surface hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+              onclick={() => onSetState?.(state as 'empty' | 'loading' | 'loaded' | 'error')}
+            >
+              {state}
+            </button>
+          {/each}
+        </div>
+      </div>
+
+      <div>
+        <span class="text-[10px] uppercase font-bold text-text-secondary tracking-wider">Missions</span>
+        <div class="flex items-center gap-2 mt-1">
+          <input
+            type="range"
+            min="0"
+            max="50"
+            bind:value={missionCount}
+            class="flex-1 accent-accent-blue"
+          />
+          <span class="text-xs font-mono text-text-secondary w-6 text-right">{missionCount}</span>
+          <button
+            class="px-2 py-1 text-[11px] font-mono rounded bg-accent-blue/20 text-accent-blue hover:bg-accent-blue/30 transition-colors"
+            onclick={() => onInjectMissions?.(missionCount)}
+          >
+            inject
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <span class="text-[10px] uppercase font-bold text-text-secondary tracking-wider">Onboarding</span>
+        <div class="mt-1">
+          <button
+            class="px-2 py-1 text-[11px] font-mono rounded bg-surface hover:bg-surface-hover text-text-secondary hover:text-text-primary transition-colors"
+            onclick={() => onToggleOnboarding?.()}
+          >
+            toggle onboarding
+          </button>
+        </div>
+      </div>
+
+      <div>
+        <span class="text-[10px] uppercase font-bold text-text-secondary tracking-wider">Bridge Logs</span>
+        <div class="mt-1 max-h-32 overflow-y-auto bg-surface rounded p-2 font-mono text-[10px] space-y-0.5">
+          {#if logs.length === 0}
+            <p class="text-text-muted">No messages yet</p>
+          {:else}
+            {#each logs as log}
+              <div class="flex gap-2">
+                <span class="text-text-muted">{log.time}</span>
+                <span class={log.direction === '\u2192' ? 'text-accent-blue' : 'text-accent-emerald'}>{log.direction}</span>
+                <span class="text-text-primary">{log.type}</span>
+                <span class="text-text-secondary truncate">{log.summary}</span>
+              </div>
+            {/each}
+          {/if}
+        </div>
+      </div>
+    </div>
+  </div>
+{/if}
+
+{#if !isOpen}
+  <div class="fixed bottom-2 right-2 z-50">
+    <button
+      class="px-2 py-1 text-[9px] font-mono rounded bg-navy-800/80 text-text-muted hover:text-accent-blue transition-colors border border-navy-700/50"
+      onclick={() => isOpen = true}
+    >
+      Ctrl+Shift+D
+    </button>
+  </div>
+{/if}

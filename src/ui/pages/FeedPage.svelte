@@ -71,6 +71,31 @@
   $effect(() => {
     feedActor.send({ type: 'LOAD' });
   });
+
+  if (import.meta.env.DEV) {
+    $effect(() => {
+      function handleMissions(e: Event) {
+        const missions = (e as CustomEvent).detail;
+        feedActor.send({ type: 'MISSIONS_LOADED', missions });
+      }
+      function handleState(e: Event) {
+        const state = (e as CustomEvent).detail as string;
+        if (state === 'empty') {
+          feedActor.send({ type: 'MISSIONS_LOADED', missions: [] });
+        } else if (state === 'loading') {
+          feedActor.send({ type: 'LOAD' });
+        } else if (state === 'error') {
+          feedActor.send({ type: 'LOAD_ERROR', error: '[Dev] Simulated error' });
+        }
+      }
+      window.addEventListener('dev:missions', handleMissions);
+      window.addEventListener('dev:feed-state', handleState);
+      return () => {
+        window.removeEventListener('dev:missions', handleMissions);
+        window.removeEventListener('dev:feed-state', handleState);
+      };
+    });
+  }
 </script>
 
 <FeedLayout feed={feedContent} header={headerContent} filters={filterContent}>
