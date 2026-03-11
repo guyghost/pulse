@@ -6,6 +6,7 @@
   import Icon from '../ui/atoms/Icon.svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import { ripple } from '../ui/actions/ripple';
   import { generateMockMissions } from '../dev/mocks';
   import type { LogEntry } from '../dev/bridge-logger';
 
@@ -94,7 +95,8 @@
     <nav aria-label="Main navigation" class="relative flex border-b border-white/5 bg-navy-900/80 backdrop-blur-xl">
       {#each navItems as item, i}
         <button
-          class="flex-1 flex flex-col items-center justify-center gap-0.5 px-3 py-2.5 text-xs font-medium transition-all duration-200
+          use:ripple
+          class="flex-1 flex flex-col items-center justify-center gap-0.5 px-3 py-2.5 text-xs font-medium transition-all duration-200 active:scale-[0.97]
             {currentPage === item.page
               ? 'text-white'
               : 'text-white/40 hover:text-white/70'}"

@@ -3,6 +3,7 @@
   import type { Mission } from '$lib/core/types/mission';
   import Badge from '../atoms/Badge.svelte';
   import Icon from '../atoms/Icon.svelte';
+  import { ripple } from '../actions/ripple';
 
   let { mission }: { mission: Mission } = $props();
 
@@ -28,6 +29,7 @@
 </script>
 
 <div
+  use:ripple
   class="bg-white/[0.07] backdrop-blur-md border border-white/10 border-t-white/15 rounded-xl {glowClass} hover:bg-white/[0.12] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer p-3 active:scale-[0.99]"
   onclick={toggleExpand}
   role="button"
