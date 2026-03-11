@@ -6,10 +6,12 @@
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
 
-  let { missions = [], isLoading = false, error = null }: {
+  let { missions = [], isLoading = false, error = null, seenIds = [], onMissionSeen }: {
     missions?: Mission[];
     isLoading?: boolean;
     error?: string | null;
+    seenIds?: string[];
+    onMissionSeen?: (id: string) => void;
   } = $props();
 
   let sortedMissions = $derived(
@@ -49,7 +51,7 @@
   {:else}
     {#each sortedMissions as mission, i (mission.id)}
       <div in:fly={{ y: 15, duration: 250, delay: Math.min(i * 50, 300), easing: cubicOut }}>
-        <MissionCard {mission} />
+        <MissionCard {mission} isSeen={seenIds.includes(mission.id)} onVisible={() => onMissionSeen?.(mission.id)} />
       </div>
     {/each}
     <p class="text-[10px] text-text-muted text-center py-2">

@@ -4,8 +4,13 @@
   import Badge from '../atoms/Badge.svelte';
   import Icon from '../atoms/Icon.svelte';
   import { ripple } from '../actions/ripple';
+  import { onVisible as onVisibleAction } from '../actions/on-visible';
 
-  let { mission }: { mission: Mission } = $props();
+  let { mission, isSeen = true, onVisible: onVisibleCallback }: {
+    mission: Mission;
+    isSeen?: boolean;
+    onVisible?: () => void;
+  } = $props();
 
   let expanded = $state(false);
 
@@ -30,7 +35,8 @@
 
 <div
   use:ripple
-  class="bg-white/[0.07] backdrop-blur-md border border-white/10 border-t-white/15 rounded-xl {glowClass} hover:bg-white/[0.12] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer p-3 active:scale-[0.99]"
+  use:onVisibleAction={() => onVisibleCallback?.()}
+  class="bg-white/[0.07] backdrop-blur-md border border-white/10 border-t-white/15 rounded-xl {glowClass} hover:bg-white/[0.12] hover:scale-[1.01] transition-all duration-500 ease-out cursor-pointer p-3 active:scale-[0.99] {isSeen ? '' : 'border-l-2 border-l-accent-blue shadow-[inset_2px_0_8px_rgba(59,130,246,0.1)]'}"
   onclick={toggleExpand}
   role="button"
   tabindex="0"
