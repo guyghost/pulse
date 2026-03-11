@@ -15,6 +15,7 @@ export default defineConfig({
     alias: {
       '$lib': resolve(__dirname, './src/lib'),
     },
+    conditions: ['browser', 'import', 'module', 'default'],
   },
   build: {
     outDir: 'dist',
