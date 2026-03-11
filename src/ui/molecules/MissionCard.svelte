@@ -7,20 +7,18 @@
 
   let expanded = $state(false);
 
-  let borderColor = $derived(
-    (mission.score ?? 0) >= 80
-      ? 'border-l-accent-emerald'
-      : (mission.score ?? 0) >= 50
-      ? 'border-l-accent-amber'
-      : 'border-l-navy-600'
-  );
-
   let scoreColor = $derived(
     (mission.score ?? 0) >= 80
-      ? 'text-accent-emerald'
+      ? 'text-accent-emerald bg-accent-emerald/15'
       : (mission.score ?? 0) >= 50
-      ? 'text-accent-amber'
-      : 'text-text-muted'
+      ? 'text-accent-amber bg-accent-amber/15'
+      : 'text-text-muted bg-white/5'
+  );
+
+  let glowClass = $derived(
+    (mission.score ?? 0) >= 80
+      ? 'shadow-glow-emerald'
+      : ''
   );
 
   function toggleExpand() {
@@ -29,7 +27,7 @@
 </script>
 
 <div
-  class="bg-surface rounded-lg border-l-4 {borderColor} shadow-card hover:shadow-card-hover transition-shadow cursor-pointer p-3"
+  class="bg-white/[0.07] backdrop-blur-md border border-white/10 border-t-white/15 rounded-xl {glowClass} hover:bg-white/[0.12] hover:scale-[1.01] transition-all duration-200 ease-out cursor-pointer p-3"
   onclick={toggleExpand}
   role="button"
   tabindex="0"
@@ -43,22 +41,22 @@
       {/if}
     </div>
     {#if mission.score !== null}
-      <span class="text-xs font-mono font-bold {scoreColor}">{mission.score}</span>
+      <span class="text-xs font-mono font-bold px-2 py-0.5 rounded-full {scoreColor}">{mission.score}</span>
     {/if}
   </div>
 
   <div class="flex flex-wrap gap-1 mt-2">
-    {#each mission.stack.slice(0, 5) as tech}
+    {#each mission.stack.slice(0, 3) as tech}
       <Badge label={tech} variant="tech" />
     {/each}
-    {#if mission.stack.length > 5}
-      <Badge label="+{mission.stack.length - 5}" variant="source" />
+    {#if mission.stack.length > 3}
+      <Badge label="+{mission.stack.length - 3}" variant="source" />
     {/if}
   </div>
 
   <div class="flex items-center gap-3 mt-2 text-xs text-text-secondary">
     {#if mission.tjm !== null}
-      <span class="font-mono text-accent-blue font-medium">{mission.tjm}€/j</span>
+      <span class="font-mono text-accent-blue font-semibold">{mission.tjm}€/j</span>
     {/if}
     {#if mission.location}
       <span>{mission.location}</span>
@@ -73,7 +71,7 @@
   </div>
 
   {#if expanded && mission.description}
-    <p class="mt-2 text-xs text-text-secondary leading-relaxed">{mission.description}</p>
+    <p class="mt-3 text-xs text-text-secondary leading-relaxed border-t border-white/5 pt-3">{mission.description}</p>
     <a
       href={mission.url}
       target="_blank"
