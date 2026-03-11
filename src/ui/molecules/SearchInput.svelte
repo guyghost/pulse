@@ -13,6 +13,12 @@
     localValue = value;
   });
 
+  $effect(() => {
+    return () => {
+      if (debounceTimer) clearTimeout(debounceTimer);
+    };
+  });
+
   function handleInput(e: Event) {
     const target = e.target as HTMLInputElement;
     localValue = target.value;
