@@ -4,6 +4,8 @@
   import SettingsPage from '../ui/pages/SettingsPage.svelte';
   import OnboardingPage from '../ui/pages/OnboardingPage.svelte';
   import Icon from '../ui/atoms/Icon.svelte';
+  import { fly, fade } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
   import { generateMockMissions } from '../dev/mocks';
   import type { LogEntry } from '../dev/bridge-logger';
 
@@ -11,6 +13,10 @@
 
   let currentPage: Page = $state('onboarding');
   let hasCompletedOnboarding = $state(false);
+
+  const PAGE_INDEX: Record<Page, number> = { onboarding: -1, feed: 0, tjm: 1, settings: 2 };
+  let previousPageIndex = $state(PAGE_INDEX['onboarding']);
+  let transitionDirection = $state(1);
 
   let DevPanel: typeof import('../dev/DevPanel.svelte').default | null = $state(null);
   let bridgeLogs: LogEntry[] = $state([]);
@@ -34,11 +40,16 @@
   }
 
   function navigate(page: Page) {
+    const newIndex = PAGE_INDEX[page];
+    transitionDirection = newIndex > previousPageIndex ? 1 : -1;
+    previousPageIndex = newIndex;
     currentPage = page;
   }
 
   function completeOnboarding() {
     hasCompletedOnboarding = true;
+    transitionDirection = 1;
+    previousPageIndex = PAGE_INDEX['feed'];
     currentPage = 'feed';
   }
 
@@ -49,6 +60,7 @@
         const response = await chrome.runtime.sendMessage({ type: 'GET_PROFILE' });
         if (response?.payload) {
           hasCompletedOnboarding = true;
+          previousPageIndex = PAGE_INDEX['feed'];
           currentPage = 'feed';
         }
       } catch {
@@ -95,14 +107,22 @@
         </button>
       {/each}
     </nav>
-    <main class="flex-1 overflow-hidden">
-      {#if currentPage === 'feed'}
-        <FeedPage />
-      {:else if currentPage === 'tjm'}
-        <TJMPage />
-      {:else if currentPage === 'settings'}
-        <SettingsPage onBack={() => navigate('feed')} />
-      {/if}
+    <main class="flex-1 overflow-hidden relative">
+      {#key currentPage}
+        <div
+          class="absolute inset-0"
+          in:fly={{ x: transitionDirection * 30, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 100 }}
+        >
+          {#if currentPage === 'feed'}
+            <FeedPage />
+          {:else if currentPage === 'tjm'}
+            <TJMPage />
+          {:else if currentPage === 'settings'}
+            <SettingsPage onBack={() => navigate('feed')} />
+          {/if}
+        </div>
+      {/key}
     </main>
   {/if}
 
