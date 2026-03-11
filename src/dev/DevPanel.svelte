@@ -1,11 +1,12 @@
 <script lang="ts">
   import Icon from '../ui/atoms/Icon.svelte';
+  import type { LogEntry } from './bridge-logger';
 
   let { onInjectMissions, onSetState, onToggleOnboarding, logs = [] }: {
     onInjectMissions?: (count: number) => void;
     onSetState?: (state: 'empty' | 'loading' | 'loaded' | 'error') => void;
     onToggleOnboarding?: () => void;
-    logs?: Array<{ direction: string; type: string; summary: string; time: string }>;
+    logs?: LogEntry[];
   } = $props();
 
   let isOpen = $state(false);
