@@ -7,6 +7,8 @@
   import SearchInput from '../molecules/SearchInput.svelte';
   import Icon from '../atoms/Icon.svelte';
   import { sendMessage } from '$lib/shell/messaging/bridge';
+  import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
+  import { markAsSeen } from '$lib/core/seen/mark-seen';
 
   const feedActor = createActor(feedMachine);
   feedActor.start();
@@ -22,6 +24,19 @@
   let isLoading = $derived(feedSnapshot.matches('loading'));
   let error = $derived(feedSnapshot.context.error);
   let searchQuery = $derived(feedSnapshot.context.searchQuery);
+
+  let seenIds = $state<string[]>([]);
+
+  $effect(() => {
+    getSeenIds().then(ids => { seenIds = ids; }).catch(() => {});
+  });
+
+  function handleMissionSeen(missionId: string) {
+    if (seenIds.includes(missionId)) return;
+    seenIds = markAsSeen(seenIds, [missionId]);
+    saveSeenIds(seenIds).catch(() => {});
+    sendMessage({ type: 'MISSIONS_SEEN', payload: seenIds }).catch(() => {});
+  }
 
   function handleSearch(query: string) {
     if (query) {
@@ -87,6 +102,6 @@
   {/snippet}
 
   {#snippet feedContent()}
-    <MissionFeed {missions} {isLoading} {error} />
+    <MissionFeed {missions} {isLoading} {error} {seenIds} onMissionSeen={handleMissionSeen} />
   {/snippet}
 </FeedLayout>
