@@ -10,11 +10,11 @@ test.describe('Navigation', () => {
     // Navigate to TJM
     await page.getByRole('button', { name: 'TJM' }).click();
     // TJM page should have some content (heading or input)
-    await expect(page.getByRole('button', { name: 'TJM' })).toHaveClass(/text-accent-blue/);
+    await expect(page.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
 
     // Navigate to Settings
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('button', { name: 'Settings' })).toHaveClass(/text-accent-blue/);
+    await expect(page.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
 
     // Navigate back to Feed
     await page.getByRole('button', { name: 'Feed' }).click();
@@ -27,14 +27,14 @@ test.describe('Navigation', () => {
 
     // Feed tab should be active
     const feedTab = page.getByRole('button', { name: 'Feed' });
-    await expect(feedTab).toHaveClass(/text-accent-blue/);
+    await expect(feedTab).toHaveAttribute('aria-current', 'page');
 
     // Click TJM
     await page.getByRole('button', { name: 'TJM' }).click();
     const tjmTab = page.getByRole('button', { name: 'TJM' });
-    await expect(tjmTab).toHaveClass(/text-accent-blue/);
+    await expect(tjmTab).toHaveAttribute('aria-current', 'page');
 
     // Feed should no longer be active
-    await expect(feedTab).not.toHaveClass(/text-accent-blue/);
+    await expect(feedTab).not.toHaveAttribute('aria-current', 'page');
   });
 });
