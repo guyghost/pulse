@@ -65,4 +65,28 @@ test.describe('Feed', () => {
     // After appearing in viewport, the card transitions to "seen" state
     await page.waitForTimeout(500);
   });
+
+  test('action buttons are visible on mission cards', async ({ page }) => {
+    await page.goto(SIDE_PANEL);
+    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
+
+    const firstCard = page.locator('[role="button"]').first();
+    await expect(firstCard).toBeVisible();
+    await expect(firstCard.getByTitle('Ajouter aux favoris')).toBeVisible();
+    await expect(firstCard.getByTitle('Masquer')).toBeVisible();
+    await expect(firstCard.getByTitle('Copier le lien')).toBeVisible();
+    await expect(firstCard.getByTitle('Ouvrir')).toBeVisible();
+  });
+
+  test('favorites toggle filters missions', async ({ page }) => {
+    await page.goto(SIDE_PANEL);
+    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
+
+    await page.getByTitle('Voir favoris').click();
+    await page.waitForTimeout(300);
+    await page.getByTitle('Voir toutes').click();
+    await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 2000 });
+  });
 });
