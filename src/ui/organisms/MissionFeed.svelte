@@ -6,12 +6,28 @@
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
 
-  let { missions = [], isLoading = false, error = null, seenIds = [], onMissionSeen }: {
+  let {
+    missions = [],
+    isLoading = false,
+    error = null,
+    seenIds = [],
+    favorites = {},
+    hidden = {},
+    onMissionSeen,
+    onToggleFavorite,
+    onHide,
+    onCopyLink,
+  }: {
     missions?: Mission[];
     isLoading?: boolean;
     error?: string | null;
     seenIds?: string[];
+    favorites?: Record<string, number>;
+    hidden?: Record<string, number>;
     onMissionSeen?: (id: string) => void;
+    onToggleFavorite?: (id: string) => void;
+    onHide?: (id: string) => void;
+    onCopyLink?: (id: string) => void;
   } = $props();
 
   let sortedMissions = $derived(
@@ -51,7 +67,16 @@
   {:else}
     {#each sortedMissions as mission, i (mission.id)}
       <div in:fly={{ y: 15, duration: 250, delay: Math.min(i * 50, 300), easing: cubicOut }}>
-        <MissionCard {mission} isSeen={seenIds.includes(mission.id)} onVisible={() => onMissionSeen?.(mission.id)} />
+        <MissionCard
+          {mission}
+          isSeen={seenIds.includes(mission.id)}
+          isFavorite={mission.id in favorites}
+          isHidden={mission.id in hidden}
+          onVisible={() => onMissionSeen?.(mission.id)}
+          onToggleFavorite={() => onToggleFavorite?.(mission.id)}
+          onHide={() => onHide?.(mission.id)}
+          onCopyLink={() => onCopyLink?.(mission.id)}
+        />
       </div>
     {/each}
     <p class="text-[10px] text-text-muted text-center py-2">
