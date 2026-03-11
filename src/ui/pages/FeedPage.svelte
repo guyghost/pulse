@@ -9,7 +9,7 @@
   import FilterBar from '../molecules/FilterBar.svelte';
   import Button from '../atoms/Button.svelte';
   import Icon from '../atoms/Icon.svelte';
-  import { sendMessage } from '$lib/messaging/bridge';
+  import { sendMessage } from '$lib/shell/messaging/bridge';
 
   const feedActor = createActor(feedMachine);
   const filtersActor = createActor(filtersMachine);

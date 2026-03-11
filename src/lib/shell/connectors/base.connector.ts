@@ -1,5 +1,5 @@
-import type { PlatformConnector } from '../core/types/connector';
-import type { Mission } from '../core/types/mission';
+import type { PlatformConnector } from '../../core/types/connector';
+import type { Mission } from '../../core/types/mission';
 
 export abstract class BaseConnector implements PlatformConnector {
   abstract readonly id: string;

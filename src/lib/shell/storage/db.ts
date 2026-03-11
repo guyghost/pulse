@@ -1,6 +1,6 @@
-import type { Mission } from '../core/types/mission';
-import type { TJMDataPoint } from '../core/types/tjm';
-import type { UserProfile } from '../core/types/profile';
+import type { Mission } from '../../core/types/mission';
+import type { TJMDataPoint } from '../../core/types/tjm';
+import type { UserProfile } from '../../core/types/profile';
 
 const DB_NAME = 'missionpulse';
 const DB_VERSION = 1;

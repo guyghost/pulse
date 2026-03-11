@@ -1,7 +1,7 @@
-import type { Mission } from '../core/types/mission';
-import type { TJMAnalysis } from '../core/types/tjm';
-import type { UserProfile } from '../core/types/profile';
-import type { SeniorityLevel } from '../core/types/tjm';
+import type { Mission } from '../../core/types/mission';
+import type { TJMAnalysis } from '../../core/types/tjm';
+import type { UserProfile } from '../../core/types/profile';
+import type { SeniorityLevel } from '../../core/types/tjm';
 
 export interface ScanSnapshot {
   state: string;

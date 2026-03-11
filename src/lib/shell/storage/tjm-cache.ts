@@ -1,4 +1,4 @@
-import type { TJMAnalysis } from '../core/types/tjm';
+import type { TJMAnalysis } from '../../core/types/tjm';
 
 interface CacheEntry {
   key: string;
