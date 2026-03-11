@@ -1,4 +1,4 @@
-import type { TJMDataPoint } from '../types/tjm';
+import type { TJMDataPoint } from '../core/types/tjm';
 import { getTJMDataPoints } from '../storage/db';
 
 export interface AggregatedTJM {

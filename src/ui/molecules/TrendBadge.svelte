@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TJMTrend } from '$lib/types/tjm';
+  import type { TJMTrend } from '$lib/core/types/tjm';
   import Icon from '../atoms/Icon.svelte';
 
   let { trend }: { trend: TJMTrend } = $props();

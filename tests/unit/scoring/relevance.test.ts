@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { scoreMission } from '../../../src/lib/scoring/relevance';
-import type { Mission } from '../../../src/lib/types/mission';
-import type { UserProfile } from '../../../src/lib/types/profile';
+import type { Mission } from '../../../src/lib/core/types/mission';
+import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 const profile: UserProfile = {
   stack: ['TypeScript', 'React', 'Node.js'],

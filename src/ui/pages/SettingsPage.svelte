@@ -2,7 +2,7 @@
   import SettingsLayout from '../templates/SettingsLayout.svelte';
   import ConnectorPanel from '../organisms/ConnectorPanel.svelte';
   import Button from '../atoms/Button.svelte';
-  import type { ConnectorStatus } from '$lib/types/connector';
+  import type { ConnectorStatus } from '$lib/core/types/connector';
 
   let { onBack }: { onBack?: () => void } = $props();
 

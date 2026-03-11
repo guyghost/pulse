@@ -1,6 +1,6 @@
 import { setup, assign } from 'xstate';
-import type { Mission } from '../../lib/types/mission';
-import type { ConnectorError } from '../../lib/types/connector';
+import type { Mission } from '../../lib/core/types/mission';
+import type { ConnectorError } from '../../lib/core/types/connector';
 
 type ConnectorContext = {
   connectorId: string;

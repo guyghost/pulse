@@ -1,5 +1,5 @@
 import { setup, assign } from 'xstate';
-import type { UserProfile } from '../lib/types/profile';
+import type { UserProfile } from '../lib/core/types/profile';
 
 type OnboardingContext = {
   profile: Partial<UserProfile>;

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TJMAnalysis } from '$lib/types/tjm';
+  import type { TJMAnalysis } from '$lib/core/types/tjm';
   import TrendBadge from '../molecules/TrendBadge.svelte';
   import Skeleton from '../atoms/Skeleton.svelte';
   import Icon from '../atoms/Icon.svelte';

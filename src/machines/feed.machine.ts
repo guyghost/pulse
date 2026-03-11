@@ -1,5 +1,5 @@
 import { setup, assign } from 'xstate';
-import type { Mission } from '../lib/types/mission';
+import type { Mission } from '../lib/core/types/mission';
 
 type FeedContext = {
   missions: Mission[];

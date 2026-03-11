@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Mission } from '$lib/types/mission';
+  import type { Mission } from '$lib/core/types/mission';
   import MissionCard from '../molecules/MissionCard.svelte';
   import Skeleton from '../atoms/Skeleton.svelte';
   import Icon from '../atoms/Icon.svelte';

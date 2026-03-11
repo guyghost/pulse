@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ConnectorStatus } from '$lib/types/connector';
+  import type { ConnectorStatus } from '$lib/core/types/connector';
   import Indicator from '../atoms/Indicator.svelte';
   import Icon from '../atoms/Icon.svelte';
 

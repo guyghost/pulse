@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { TJMRange } from '$lib/types/tjm';
+  import type { TJMRange } from '$lib/core/types/tjm';
 
   let { missionTjm, range }: {
     missionTjm: number;

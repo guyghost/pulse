@@ -1,6 +1,6 @@
 import { FreeWorkConnector } from './freework.connector';
 import { MaltConnector } from './malt.connector';
-import type { PlatformConnector } from '../types/connector';
+import type { PlatformConnector } from '../core/types/connector';
 
 export const connectorRegistry: PlatformConnector[] = [
   new FreeWorkConnector(),
