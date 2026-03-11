@@ -3,6 +3,8 @@
   import MissionCard from '../molecules/MissionCard.svelte';
   import Skeleton from '../atoms/Skeleton.svelte';
   import Icon from '../atoms/Icon.svelte';
+  import { fly } from 'svelte/transition';
+  import { cubicOut } from 'svelte/easing';
 
   let { missions = [], isLoading = false, error = null }: {
     missions?: Mission[];
@@ -45,8 +47,10 @@
       <p class="text-xs text-text-secondary mt-1">Lancez un scan pour trouver des missions</p>
     </div>
   {:else}
-    {#each sortedMissions as mission (mission.id)}
-      <MissionCard {mission} />
+    {#each sortedMissions as mission, i (mission.id)}
+      <div in:fly={{ y: 15, duration: 250, delay: Math.min(i * 50, 300), easing: cubicOut }}>
+        <MissionCard {mission} />
+      </div>
     {/each}
     <p class="text-[10px] text-text-muted text-center py-2">
       {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''}
