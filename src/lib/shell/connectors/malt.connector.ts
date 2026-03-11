@@ -1,5 +1,5 @@
 import { BaseConnector } from './base.connector';
-import type { Mission } from '../core/types/mission';
+import type { Mission } from '../../core/types/mission';
 
 export class MaltConnector extends BaseConnector {
   readonly id = 'malt';

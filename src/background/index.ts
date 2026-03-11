@@ -1,11 +1,11 @@
 import { createActor } from 'xstate';
 import { scanMachine } from './machines/scan.machine';
-import { getProfile, saveProfile, getMissions, saveMissions } from '../lib/storage/db';
-import { getSettings } from '../lib/storage/chrome-storage';
-import { getConnector } from '../lib/connectors/index';
+import { getProfile, saveProfile, getMissions, saveMissions } from '../lib/shell/storage/db';
+import { getSettings } from '../lib/shell/storage/chrome-storage';
+import { getConnector } from '../lib/shell/connectors/index';
 import { scoreMission } from '../lib/core/scoring/relevance';
 import { deduplicateMissions } from '../lib/core/scoring/dedup';
-import type { BridgeMessage } from '../lib/messaging/bridge';
+import type { BridgeMessage } from '../lib/shell/messaging/bridge';
 import type { UserProfile } from '../lib/core/types/profile';
 
 console.log('[MissionPulse] Service worker started');
