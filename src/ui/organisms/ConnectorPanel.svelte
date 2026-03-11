@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { ConnectorStatus as ConnectorStatusType } from '$lib/types/connector';
+  import type { ConnectorStatus as ConnectorStatusType } from '$lib/core/types/connector';
   import ConnectorStatus from '../molecules/ConnectorStatus.svelte';
   import Icon from '../atoms/Icon.svelte';
 

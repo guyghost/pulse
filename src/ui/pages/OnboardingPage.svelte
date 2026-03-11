@@ -3,7 +3,7 @@
   import { onboardingMachine } from '../../machines/onboarding.machine';
   import OnboardingLayout from '../templates/OnboardingLayout.svelte';
   import OnboardingWizard from '../organisms/OnboardingWizard.svelte';
-  import type { UserProfile } from '$lib/types/profile';
+  import type { UserProfile } from '$lib/core/types/profile';
   import { sendMessage } from '$lib/messaging/bridge';
 
   let { onComplete }: { onComplete?: () => void } = $props();

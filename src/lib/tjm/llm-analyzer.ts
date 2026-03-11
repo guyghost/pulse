@@ -1,4 +1,4 @@
-import type { TJMAnalysis, SeniorityLevel } from '../types/tjm';
+import type { TJMAnalysis, SeniorityLevel } from '../core/types/tjm';
 import type { AggregatedTJM } from './aggregator';
 import { getApiKey } from '../storage/chrome-storage';
 import { getCachedAnalysis, cacheAnalysis } from './cache';

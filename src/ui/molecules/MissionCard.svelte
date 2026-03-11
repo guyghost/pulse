@@ -1,5 +1,5 @@
 <script lang="ts">
-  import type { Mission } from '$lib/types/mission';
+  import type { Mission } from '$lib/core/types/mission';
   import Badge from '../atoms/Badge.svelte';
   import Icon from '../atoms/Icon.svelte';
 

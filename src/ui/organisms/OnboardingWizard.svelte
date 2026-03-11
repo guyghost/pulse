@@ -1,7 +1,7 @@
 <script lang="ts">
-  import type { UserProfile } from '$lib/types/profile';
-  import type { SeniorityLevel } from '$lib/types/tjm';
-  import type { RemoteType } from '$lib/types/mission';
+  import type { UserProfile } from '$lib/core/types/profile';
+  import type { SeniorityLevel } from '$lib/core/types/tjm';
+  import type { RemoteType } from '$lib/core/types/mission';
   import Button from '../atoms/Button.svelte';
   import Chip from '../atoms/Chip.svelte';
   import Icon from '../atoms/Icon.svelte';

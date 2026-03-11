@@ -1,6 +1,6 @@
 <script lang="ts">
   import Chip from '../atoms/Chip.svelte';
-  import type { RemoteType } from '$lib/types/mission';
+  import type { RemoteType } from '$lib/core/types/mission';
 
   let {
     stackOptions = [],

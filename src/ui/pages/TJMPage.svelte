@@ -4,7 +4,7 @@
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
   import Button from '../atoms/Button.svelte';
   import Icon from '../atoms/Icon.svelte';
-  import type { SeniorityLevel } from '$lib/types/tjm';
+  import type { SeniorityLevel } from '$lib/core/types/tjm';
 
   const tjmActor = createActor(tjmMachine);
   tjmActor.start();

@@ -6,7 +6,7 @@ import { getConnector } from '../lib/connectors/index';
 import { scoreMission } from '../lib/scoring/relevance';
 import { deduplicateMissions } from '../lib/scoring/dedup';
 import type { BridgeMessage } from '../lib/messaging/bridge';
-import type { UserProfile } from '../lib/types/profile';
+import type { UserProfile } from '../lib/core/types/profile';
 
 console.log('[MissionPulse] Service worker started');
 

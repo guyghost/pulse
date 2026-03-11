@@ -1,5 +1,5 @@
 import { setup, assign } from 'xstate';
-import type { RemoteType } from '../lib/types/mission';
+import type { RemoteType } from '../lib/core/types/mission';
 
 type FiltersContext = {
   stack: string[];

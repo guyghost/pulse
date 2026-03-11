@@ -1,5 +1,5 @@
 import { setup, assign } from 'xstate';
-import type { TJMAnalysis, TJMDataPoint, SeniorityLevel } from '../lib/types/tjm';
+import type { TJMAnalysis, TJMDataPoint, SeniorityLevel } from '../lib/core/types/tjm';
 
 type TJMContext = {
   query: { title: string; location: string; seniority: SeniorityLevel } | null;

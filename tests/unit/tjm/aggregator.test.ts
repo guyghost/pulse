@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest';
 import { aggregateFromPoints } from '../../../src/lib/tjm/aggregator';
-import type { TJMDataPoint } from '../../../src/lib/types/tjm';
+import type { TJMDataPoint } from '../../../src/lib/core/types/tjm';
 
 function makePoint(overrides: Partial<TJMDataPoint> = {}): TJMDataPoint {
   return {

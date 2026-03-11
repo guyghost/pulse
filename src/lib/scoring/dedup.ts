@@ -1,4 +1,4 @@
-import type { Mission } from '../types/mission';
+import type { Mission } from '../core/types/mission';
 
 function tokenize(text: string): Set<string> {
   return new Set(

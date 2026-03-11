@@ -1,5 +1,5 @@
 import { BaseConnector } from './base.connector';
-import type { Mission, MissionSource } from '../types/mission';
+import type { Mission, MissionSource } from '../core/types/mission';
 import { sendMessage } from '../messaging/bridge';
 
 const SOURCE: MissionSource = 'free-work';
