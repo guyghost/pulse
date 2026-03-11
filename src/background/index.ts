@@ -3,8 +3,8 @@ import { scanMachine } from './machines/scan.machine';
 import { getProfile, saveProfile, getMissions, saveMissions } from '../lib/storage/db';
 import { getSettings } from '../lib/storage/chrome-storage';
 import { getConnector } from '../lib/connectors/index';
-import { scoreMission } from '../lib/scoring/relevance';
-import { deduplicateMissions } from '../lib/scoring/dedup';
+import { scoreMission } from '../lib/core/scoring/relevance';
+import { deduplicateMissions } from '../lib/core/scoring/dedup';
 import type { BridgeMessage } from '../lib/messaging/bridge';
 import type { UserProfile } from '../lib/core/types/profile';
 
