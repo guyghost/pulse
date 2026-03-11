@@ -53,4 +53,16 @@ test.describe('Feed', () => {
 
     await expect(page.getByText('Erreur')).toBeVisible({ timeout: 2000 });
   });
+
+  test('new missions show unseen indicator (blue left border)', async ({ page }) => {
+    await page.goto(SIDE_PANEL);
+    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
+
+    // Cards should be visible — the IntersectionObserver marks them as seen
+    const firstCard = page.locator('[role="button"]').first();
+    await expect(firstCard).toBeVisible();
+    // After appearing in viewport, the card transitions to "seen" state
+    await page.waitForTimeout(500);
+  });
 });

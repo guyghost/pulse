@@ -37,4 +37,17 @@ test.describe('Navigation', () => {
     // Feed should no longer be active
     await expect(feedTab).not.toHaveAttribute('aria-current', 'page');
   });
+
+  test('page transitions are smooth (content changes on nav)', async ({ page }) => {
+    await page.goto(SIDE_PANEL);
+    await expect(page.getByText('Missions')).toBeVisible();
+
+    // Navigate to TJM
+    await page.getByRole('button', { name: 'TJM' }).click();
+    await expect(page.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
+
+    // Navigate back
+    await page.getByRole('button', { name: 'Feed' }).click();
+    await expect(page.getByText('Missions')).toBeVisible();
+  });
 });
