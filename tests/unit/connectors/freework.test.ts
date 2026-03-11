@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseFreeWorkHTML } from '../../../src/lib/connectors/freework.connector';
+import { parseFreeWorkHTML } from '../../../src/lib/core/connectors/freework-parser';
+
+const NOW = new Date('2026-03-11T12:00:00Z');
+const ID_PREFIX = 'fw-test';
 
 const FIXTURE_HTML = `
 <html><body>
@@ -29,44 +32,46 @@ const FIXTURE_HTML = `
 
 describe('parseFreeWorkHTML', () => {
   it('parses mission cards from HTML', () => {
-    const missions = parseFreeWorkHTML(FIXTURE_HTML);
+    const missions = parseFreeWorkHTML(FIXTURE_HTML, NOW, ID_PREFIX);
     expect(missions).toHaveLength(2);
     expect(missions[0]).toMatchObject({
       source: 'free-work',
       title: 'Développeur React Senior',
       client: 'Société ABC',
       url: expect.stringContaining('free-work.com'),
+      id: 'fw-test-0',
+      scrapedAt: NOW,
     });
   });
 
   it('extracts stack tags', () => {
-    const missions = parseFreeWorkHTML(FIXTURE_HTML);
+    const missions = parseFreeWorkHTML(FIXTURE_HTML, NOW, ID_PREFIX);
     expect(missions[0].stack).toEqual(['React', 'TypeScript', 'Node.js']);
   });
 
   it('extracts TJM as number', () => {
-    const missions = parseFreeWorkHTML(FIXTURE_HTML);
+    const missions = parseFreeWorkHTML(FIXTURE_HTML, NOW, ID_PREFIX);
     expect(missions[0].tjm).toBe(550);
     expect(missions[1].tjm).toBe(500);
   });
 
   it('extracts location', () => {
-    const missions = parseFreeWorkHTML(FIXTURE_HTML);
+    const missions = parseFreeWorkHTML(FIXTURE_HTML, NOW, ID_PREFIX);
     expect(missions[0].location).toBe('Paris');
     expect(missions[1].location).toBe('Lyon');
   });
 
   it('detects remote type from text', () => {
-    const missions = parseFreeWorkHTML(FIXTURE_HTML);
+    const missions = parseFreeWorkHTML(FIXTURE_HTML, NOW, ID_PREFIX);
     expect(missions[0].remote).toBe('full');
     expect(missions[1].remote).toBe('hybrid');
   });
 
   it('returns empty array for empty HTML', () => {
-    expect(parseFreeWorkHTML('')).toEqual([]);
+    expect(parseFreeWorkHTML('', NOW, ID_PREFIX)).toEqual([]);
   });
 
   it('returns empty array for HTML with no mission cards', () => {
-    expect(parseFreeWorkHTML('<html><body><p>No results</p></body></html>')).toEqual([]);
+    expect(parseFreeWorkHTML('<html><body><p>No results</p></body></html>', NOW, ID_PREFIX)).toEqual([]);
   });
 });
