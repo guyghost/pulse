@@ -1,10 +1,12 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import { pullToRefresh } from '../actions/pull-to-refresh';
 
-  let { header, feed, sidebar }: {
+  let { header, feed, sidebar, onRefresh }: {
     header?: Snippet;
     feed: Snippet;
     sidebar?: Snippet;
+    onRefresh?: () => void;
   } = $props();
 </script>
 
@@ -14,7 +16,10 @@
       {@render header()}
     </div>
   {/if}
-  <div class="flex-1 overflow-y-auto px-3 pb-3">
+  <div
+    class="flex-1 overflow-y-auto px-3 pb-3"
+    use:pullToRefresh={{ onRefresh: () => onRefresh?.(), threshold: 60 }}
+  >
     {@render feed()}
   </div>
   {#if sidebar}
