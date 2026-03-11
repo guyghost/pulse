@@ -79,17 +79,23 @@
   {#if currentPage === 'onboarding' && !hasCompletedOnboarding}
     <OnboardingPage onComplete={completeOnboarding} />
   {:else}
-    <nav class="flex border-b border-navy-700">
+    <nav aria-label="Main navigation" class="flex border-b border-white/5 bg-navy-900/80 backdrop-blur-xl">
       {#each navItems as item}
         <button
-          class="flex-1 flex items-center justify-center gap-1.5 px-3 py-2.5 text-xs font-medium transition-colors
+          class="flex-1 flex flex-col items-center justify-center gap-0.5 px-3 py-2.5 text-xs font-medium transition-all duration-200
             {currentPage === item.page
-              ? 'text-accent-blue border-b-2 border-accent-blue'
-              : 'text-text-secondary hover:text-text-primary'}"
+              ? 'text-white'
+              : 'text-white/40 hover:text-white/70'}"
+          aria-current={currentPage === item.page ? 'page' : undefined}
           onclick={() => navigate(item.page)}
         >
-          <Icon name={item.icon} size={14} />
-          {item.label}
+          <Icon name={item.icon} size={16} />
+          <span>{item.label}</span>
+          {#if currentPage === item.page}
+            <div class="w-1 h-1 rounded-full bg-accent-blue mt-0.5"></div>
+          {:else}
+            <div class="w-1 h-1 mt-0.5"></div>
+          {/if}
         </button>
       {/each}
     </nav>
