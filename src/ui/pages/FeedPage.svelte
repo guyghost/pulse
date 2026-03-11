@@ -1,46 +1,30 @@
 <script lang="ts">
   import { createActor } from 'xstate';
   import { feedMachine } from '../../machines/feed.machine';
-  import { filtersMachine } from '../../machines/filters.machine';
   import FeedLayout from '../templates/FeedLayout.svelte';
   import MissionFeed from '../organisms/MissionFeed.svelte';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
-  import FilterBar from '../molecules/FilterBar.svelte';
-  import Button from '../atoms/Button.svelte';
   import Icon from '../atoms/Icon.svelte';
   import { sendMessage } from '$lib/shell/messaging/bridge';
 
   const feedActor = createActor(feedMachine);
-  const filtersActor = createActor(filtersMachine);
   feedActor.start();
-  filtersActor.start();
 
   let feedSnapshot = $state(feedActor.getSnapshot());
-  let filtersSnapshot = $state(filtersActor.getSnapshot());
 
   $effect(() => {
-    const feedSub = feedActor.subscribe((s) => { feedSnapshot = s; });
-    const filtersSub = filtersActor.subscribe((s) => { filtersSnapshot = s; });
-    return () => { feedSub.unsubscribe(); filtersSub.unsubscribe(); };
+    const sub = feedActor.subscribe((s) => { feedSnapshot = s; });
+    return () => sub.unsubscribe();
   });
 
   let missions = $derived(feedSnapshot.context.filteredMissions);
   let isLoading = $derived(feedSnapshot.matches('loading'));
   let error = $derived(feedSnapshot.context.error);
   let searchQuery = $derived(feedSnapshot.context.searchQuery);
-  let selectedStack = $derived(filtersSnapshot.context.stack);
 
-  // Scan state (received via messaging)
   let isScanning = $state(false);
   let scanProgress = $state(0);
-  let scanConnector = $state<string | null>(null);
-  let scanMissionsFound = $state(0);
-
-  // Available stack options (derived from missions)
-  let stackOptions = $derived(
-    [...new Set(feedSnapshot.context.missions.flatMap(m => m.stack))].slice(0, 10)
-  );
 
   function handleSearch(query: string) {
     if (query) {
@@ -50,32 +34,24 @@
     }
   }
 
-  function handleToggleStack(item: string) {
-    filtersActor.send({ type: 'TOGGLE_STACK_ITEM', item });
-  }
-
-  function handleClearFilters() {
-    filtersActor.send({ type: 'CLEAR_ALL' });
-    feedActor.send({ type: 'CLEAR_FILTERS' });
-  }
-
   async function startScan() {
     isScanning = true;
     scanProgress = 0;
-    scanMissionsFound = 0;
     feedActor.send({ type: 'LOAD' });
     await sendMessage({ type: 'SCAN_START' });
   }
 
-  // Load missions on mount
+  // Auto-scan on mount
   $effect(() => {
-    feedActor.send({ type: 'LOAD' });
+    startScan();
   });
 
   if (import.meta.env.DEV) {
     $effect(() => {
       function handleMissions(e: Event) {
         const missions = (e as CustomEvent).detail;
+        isScanning = false;
+        scanProgress = 100;
         feedActor.send({ type: 'MISSIONS_LOADED', missions });
       }
       function handleState(e: Event) {
@@ -98,30 +74,22 @@
   }
 </script>
 
-<FeedLayout feed={feedContent} header={headerContent} filters={filterContent}>
+<FeedLayout feed={feedContent} header={headerContent}>
   {#snippet headerContent()}
-    <div class="flex items-center justify-between p-3 border-b border-border">
-      <h2 class="text-sm font-semibold text-text-primary">Missions</h2>
-      <Button variant="secondary" onclick={startScan}>
-        {#snippet children()}<Icon name="refresh-cw" size={14} /> Scanner{/snippet}
-      </Button>
+    <ScanProgress {isScanning} progress={scanProgress} />
+    <div class="flex items-center justify-between px-3 pt-3 pb-2">
+      <h2 class="text-sm font-semibold text-white">Missions</h2>
+      <button
+        class="p-1.5 rounded-lg text-text-muted hover:text-white hover:bg-white/5 transition-all duration-200"
+        onclick={startScan}
+        title="Rafraîchir"
+      >
+        <Icon name="refresh-cw" size={14} />
+      </button>
     </div>
-    <ScanProgress
-      {isScanning}
-      progress={scanProgress}
-      currentConnector={scanConnector}
-      missionsFound={scanMissionsFound}
-    />
-  {/snippet}
-
-  {#snippet filterContent()}
-    <SearchInput value={searchQuery} onSearch={handleSearch} />
-    <FilterBar
-      {stackOptions}
-      {selectedStack}
-      onToggleStack={handleToggleStack}
-      onClear={handleClearFilters}
-    />
+    <div class="px-3 pb-2">
+      <SearchInput value={searchQuery} onSearch={handleSearch} />
+    </div>
   {/snippet}
 
   {#snippet feedContent()}
