@@ -1,6 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { aggregateFromPoints } from '../../../src/lib/tjm/aggregator';
+import { aggregateFromPoints } from '../../../src/lib/core/tjm/aggregator';
 import type { TJMDataPoint } from '../../../src/lib/core/types/tjm';
+
+const NOW = new Date('2026-03-11T12:00:00Z');
 
 function makePoint(overrides: Partial<TJMDataPoint> = {}): TJMDataPoint {
   return {
@@ -8,7 +10,7 @@ function makePoint(overrides: Partial<TJMDataPoint> = {}): TJMDataPoint {
     title: 'Développeur React',
     location: 'Paris',
     source: 'free-work',
-    date: new Date(),
+    date: new Date('2026-03-10T12:00:00Z'),
     ...overrides,
   };
 }
@@ -20,7 +22,7 @@ describe('aggregateFromPoints', () => {
       makePoint({ tjm: 500 }),
       makePoint({ tjm: 600 }),
     ];
-    const result = aggregateFromPoints(points, 'React', 'Paris');
+    const result = aggregateFromPoints(points, 'React', 'Paris', NOW);
     expect(result).not.toBeNull();
     expect(result!.min).toBe(400);
     expect(result!.max).toBe(600);
@@ -32,18 +34,17 @@ describe('aggregateFromPoints', () => {
     const points: TJMDataPoint[] = [
       makePoint({ title: 'Java Developer' }),
     ];
-    const result = aggregateFromPoints(points, 'Angular', 'Paris');
+    const result = aggregateFromPoints(points, 'Angular', 'Paris', NOW);
     expect(result).toBeNull();
   });
 
   it('filters out old data points (> 30 days)', () => {
-    const old = new Date();
-    old.setDate(old.getDate() - 31);
+    const old = new Date('2026-02-01T12:00:00Z');
     const points: TJMDataPoint[] = [
       makePoint({ date: old }),
       makePoint({ tjm: 550 }),
     ];
-    const result = aggregateFromPoints(points, 'React', 'Paris');
+    const result = aggregateFromPoints(points, 'React', 'Paris', NOW);
     expect(result).not.toBeNull();
     expect(result!.count).toBe(1);
     expect(result!.median).toBe(550);
@@ -56,7 +57,7 @@ describe('aggregateFromPoints', () => {
       makePoint({ tjm: 600 }),
       makePoint({ tjm: 700 }),
     ];
-    const result = aggregateFromPoints(points, 'React', 'Paris');
+    const result = aggregateFromPoints(points, 'React', 'Paris', NOW);
     expect(result!.median).toBe(550);
   });
 
@@ -65,7 +66,7 @@ describe('aggregateFromPoints', () => {
       makePoint({ tjm: 500 }),
       makePoint({ tjm: 500 }),
     ];
-    const result = aggregateFromPoints(points, 'React', 'Paris');
+    const result = aggregateFromPoints(points, 'React', 'Paris', NOW);
     expect(result!.stddev).toBe(0);
   });
 
@@ -74,7 +75,7 @@ describe('aggregateFromPoints', () => {
       makePoint({ location: 'Paris', tjm: 600 }),
       makePoint({ location: 'Lyon', tjm: 400 }),
     ];
-    const result = aggregateFromPoints(points, 'React', 'Paris');
+    const result = aggregateFromPoints(points, 'React', 'Paris', NOW);
     expect(result).not.toBeNull();
     expect(result!.count).toBe(1);
     expect(result!.min).toBe(600);
