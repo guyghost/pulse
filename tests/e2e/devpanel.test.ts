@@ -1,16 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const SIDE_PANEL = '/src/sidepanel/index.html';
-
-async function waitForDevPanel(page: import('@playwright/test').Page) {
-  await page.locator('button:has-text("Ctrl+Shift+D")').waitFor({ state: 'visible' });
-}
-
-async function openDevPanel(page: import('@playwright/test').Page) {
-  await waitForDevPanel(page);
-  await page.keyboard.press('Control+Shift+D');
-  await expect(page.getByText('DEV PANEL')).toBeVisible();
-}
+import { SIDE_PANEL, openDevPanel, closeDevPanel } from './helpers';
 
 test.describe('DevPanel', () => {
   test('opens with Ctrl+Shift+D', async ({ page }) => {
@@ -24,8 +13,7 @@ test.describe('DevPanel', () => {
     await expect(page.getByText('Missions')).toBeVisible();
     await openDevPanel(page);
 
-    await page.keyboard.press('Control+Shift+D');
-    await expect(page.getByText('DEV PANEL')).not.toBeVisible();
+    await closeDevPanel(page);
   });
 
   test('shows all control sections', async ({ page }) => {
@@ -44,7 +32,7 @@ test.describe('DevPanel', () => {
     await openDevPanel(page);
 
     await page.getByRole('button', { name: 'inject' }).click();
-    await page.keyboard.press('Control+Shift+D'); // close
+    await closeDevPanel(page);
 
     await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
   });
@@ -66,7 +54,7 @@ test.describe('DevPanel', () => {
     await openDevPanel(page);
 
     await page.getByRole('button', { name: 'empty' }).click();
-    await page.keyboard.press('Control+Shift+D'); // close
+    await closeDevPanel(page);
 
     await expect(page.getByText('Aucune mission')).toBeVisible({ timeout: 2000 });
   });

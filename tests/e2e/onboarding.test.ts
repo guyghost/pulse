@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const SIDE_PANEL = '/src/sidepanel/index.html';
+import { SIDE_PANEL } from './helpers';
 
 async function withNoProfile(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {

@@ -1,25 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const SIDE_PANEL = '/src/sidepanel/index.html';
-
-async function waitForDevPanel(page: import('@playwright/test').Page) {
-  await page.locator('button:has-text("Ctrl+Shift+D")').waitFor({ state: 'visible' });
-}
-
-async function injectMissions(page: import('@playwright/test').Page, count: number) {
-  await waitForDevPanel(page);
-  await page.keyboard.press('Control+Shift+D');
-  await expect(page.getByText('DEV PANEL')).toBeVisible();
-  // Set slider value and inject
-  await page.locator('input[type="range"]').evaluate((el, val) => {
-    const input = el as HTMLInputElement;
-    input.value = String(val);
-    input.dispatchEvent(new Event('input', { bubbles: true }));
-    input.dispatchEvent(new Event('change', { bubbles: true }));
-  }, count);
-  await page.getByRole('button', { name: 'inject' }).click();
-  await page.keyboard.press('Control+Shift+D');
-}
+import { SIDE_PANEL, injectMissions, setFeedState } from './helpers';
 
 test.describe('Feed', () => {
   test('auto-loads missions on mount', async ({ page }) => {
@@ -34,11 +14,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
 
-    await waitForDevPanel(page);
-    await page.keyboard.press('Control+Shift+D');
-    await expect(page.getByText('DEV PANEL')).toBeVisible();
-    await page.getByRole('button', { name: 'empty' }).click();
-    await page.keyboard.press('Control+Shift+D');
+    await setFeedState(page, 'empty');
 
     await expect(page.getByText('Aucune mission')).toBeVisible({ timeout: 2000 });
   });
@@ -60,11 +36,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
 
-    await waitForDevPanel(page);
-    await page.keyboard.press('Control+Shift+D');
-    await expect(page.getByText('DEV PANEL')).toBeVisible();
-    await page.getByRole('button', { name: 'error' }).click();
-    await page.keyboard.press('Control+Shift+D');
+    await setFeedState(page, 'error');
 
     await expect(page.getByText('Erreur')).toBeVisible({ timeout: 2000 });
   });

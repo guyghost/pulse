@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
-
-const SIDE_PANEL = '/src/sidepanel/index.html';
+import { SIDE_PANEL } from './helpers';
 
 test.describe('Navigation', () => {
   test('navigates between tabs: Feed → TJM → Settings → Feed', async ({ page }) => {
