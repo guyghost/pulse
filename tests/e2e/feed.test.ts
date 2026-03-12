@@ -6,6 +6,21 @@ async function waitForDevPanel(page: import('@playwright/test').Page) {
   await page.locator('button:has-text("Ctrl+Shift+D")').waitFor({ state: 'visible' });
 }
 
+async function injectMissions(page: import('@playwright/test').Page, count: number) {
+  await waitForDevPanel(page);
+  await page.keyboard.press('Control+Shift+D');
+  await expect(page.getByText('DEV PANEL')).toBeVisible();
+  // Set slider value and inject
+  await page.locator('input[type="range"]').evaluate((el, val) => {
+    const input = el as HTMLInputElement;
+    input.value = String(val);
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    input.dispatchEvent(new Event('change', { bubbles: true }));
+  }, count);
+  await page.getByRole('button', { name: 'inject' }).click();
+  await page.keyboard.press('Control+Shift+D');
+}
+
 test.describe('Feed', () => {
   test('auto-loads missions on mount', async ({ page }) => {
     await page.goto(SIDE_PANEL);
@@ -70,12 +85,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
 
-    // Inject missions via DevPanel
-    await waitForDevPanel(page);
-    await page.keyboard.press('Control+Shift+D');
-    await expect(page.getByText('DEV PANEL')).toBeVisible();
-    await page.getByRole('button', { name: '5' }).click();
-    await page.keyboard.press('Control+Shift+D');
+    await injectMissions(page, 5);
 
     await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
 
@@ -91,11 +101,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
 
-    await waitForDevPanel(page);
-    await page.keyboard.press('Control+Shift+D');
-    await expect(page.getByText('DEV PANEL')).toBeVisible();
-    await page.getByRole('button', { name: '5' }).click();
-    await page.keyboard.press('Control+Shift+D');
+    await injectMissions(page, 5);
 
     await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
 
@@ -117,11 +123,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
 
-    await waitForDevPanel(page);
-    await page.keyboard.press('Control+Shift+D');
-    await expect(page.getByText('DEV PANEL')).toBeVisible();
-    await page.getByRole('button', { name: '5' }).click();
-    await page.keyboard.press('Control+Shift+D');
+    await injectMissions(page, 5);
 
     await expect(page.getByText('5 missions')).toBeVisible({ timeout: 3000 });
 
@@ -141,11 +143,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
 
-    await waitForDevPanel(page);
-    await page.keyboard.press('Control+Shift+D');
-    await expect(page.getByText('DEV PANEL')).toBeVisible();
-    await page.getByRole('button', { name: '5' }).click();
-    await page.keyboard.press('Control+Shift+D');
+    await injectMissions(page, 5);
 
     await expect(page.getByText('5 missions')).toBeVisible({ timeout: 3000 });
 
