@@ -57,7 +57,7 @@ test.describe('DevPanel', () => {
     await page.getByRole('button', { name: 'toggle onboarding' }).click();
 
     // Should show onboarding
-    await expect(page.getByText('Votre profil')).toBeVisible();
+    await expect(page.getByText('Configurez en 30 secondes')).toBeVisible();
   });
 
   test('set state empty shows "Aucune mission"', async ({ page }) => {
