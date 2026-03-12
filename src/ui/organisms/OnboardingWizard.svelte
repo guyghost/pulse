@@ -12,7 +12,8 @@
     onUpdateProfile?: (profile: Partial<UserProfile>) => void;
   } = $props();
 
-  let title = $state('');
+  let firstName = $state('');
+  let jobTitle = $state('');
   let stack = $state<string[]>([]);
   let stackInput = $state('');
   let tjm = $state(600);
@@ -32,11 +33,11 @@
   }
 
   function handleComplete() {
-    onUpdateProfile?.({ title, stack, tjmMin: tjm, tjmMax: tjm + 150 });
+    onUpdateProfile?.({ firstName, jobTitle, stack, tjmMin: tjm, tjmMax: tjm + 150 });
     onComplete?.();
   }
 
-  let canSubmit = $derived(title.trim().length > 0);
+  let canSubmit = $derived(firstName.trim().length > 0 && jobTitle.trim().length > 0);
 </script>
 
 <div class="space-y-5">
@@ -50,13 +51,24 @@
   </div>
 
   <div>
-    <label for="ob-title" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted">Titre / Poste</label>
+    <label for="ob-firstname" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted">Prenom</label>
     <input
-      id="ob-title"
+      id="ob-firstname"
       type="text"
       class="soft-ring w-full rounded-[1.15rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
-      placeholder="ex: Développeur Fullstack"
-      bind:value={title}
+      placeholder="ex: Guy"
+      bind:value={firstName}
+    />
+  </div>
+
+  <div>
+    <label for="ob-jobtitle" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted">Poste recherche</label>
+    <input
+      id="ob-jobtitle"
+      type="text"
+      class="soft-ring w-full rounded-[1.15rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
+      placeholder="ex: Developpeur React Senior"
+      bind:value={jobTitle}
     />
   </div>
 
