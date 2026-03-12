@@ -4,13 +4,14 @@ import type { Mission } from '../../../src/lib/core/types/mission';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 const profile: UserProfile = {
+  firstName: 'Test',
   stack: ['TypeScript', 'React', 'Node.js'],
   tjmMin: 500,
   tjmMax: 700,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
-  title: 'Développeur Fullstack',
+  jobTitle: 'Développeur Fullstack',
 };
 
 function makeMission(overrides: Partial<Mission> = {}): Mission {

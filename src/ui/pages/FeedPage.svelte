@@ -10,6 +10,7 @@
   import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
   import { markAsSeen } from '$lib/core/seen/mark-seen';
   import { getFavorites, saveFavorites, getHidden, saveHidden } from '$lib/shell/storage/favorites';
+  import { getProfile } from '$lib/shell/storage/db';
   import { toggleFavorite, toggleHidden, filterHidden, filterFavoritesOnly } from '$lib/core/favorites/favorites';
 
   const feedActor = createActor(feedMachine);
@@ -47,6 +48,7 @@
   let favoriteCount = $derived(Object.keys(favorites).length);
   let hiddenCount = $derived(Object.keys(hidden).length);
   let visibleCount = $derived(displayMissions.length);
+  let firstName = $state('');
 
   $effect(() => {
     getSeenIds().then(ids => { seenIds = ids; }).catch(() => {});
@@ -55,6 +57,10 @@
   $effect(() => {
     getFavorites().then(f => { favorites = f; }).catch(() => {});
     getHidden().then(h => { hidden = h; }).catch(() => {});
+  });
+
+  $effect(() => {
+    getProfile().then(p => { if (p?.firstName) firstName = p.firstName; }).catch(() => {});
   });
 
   function handleMissionSeen(missionId: string) {
@@ -140,7 +146,9 @@
         <div class="flex items-start justify-between gap-3">
           <div>
             <p class="eyebrow text-accent-blue/80">MissionPulse</p>
-            <h2 class="mt-2 text-[1.65rem] font-semibold leading-none text-white">Radar freelance</h2>
+            <h2 class="mt-2 text-[1.65rem] font-semibold leading-none text-white">
+              {firstName ? `Bonjour, ${firstName}` : 'Radar freelance'}
+            </h2>
             <p class="mt-3 max-w-[20rem] text-sm leading-relaxed text-text-secondary">
               Surveille les pistes utiles, filtre le bruit et garde les meilleures missions a portee de main.
             </p>

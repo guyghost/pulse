@@ -22,28 +22,36 @@ async function withNoProfile(page: import('@playwright/test').Page) {
 }
 
 test.describe('Onboarding', () => {
-  test('single-screen onboarding completes and shows feed', async ({ page }) => {
+  test('single-screen onboarding completes and shows greeting', async ({ page }) => {
     await withNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    // Single screen: fill title and click "C'est parti"
     await expect(page.getByText('Configurez en 30 secondes')).toBeVisible();
-    await page.locator('#ob-title').fill('Dev React Senior');
+    await page.locator('#ob-firstname').fill('Guy');
+    await page.locator('#ob-jobtitle').fill('Dev React Senior');
     await page.getByRole('button', { name: /C.est parti/ }).click();
 
-    // Should now be on feed page
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByText('Bonjour, Guy')).toBeVisible();
   });
 
-  test('submit button disabled without title', async ({ page }) => {
+  test('submit button disabled without firstName', async ({ page }) => {
     await withNoProfile(page);
     await page.goto(SIDE_PANEL);
 
+    await page.locator('#ob-jobtitle').fill('Dev React');
+    await expect(page.getByRole('button', { name: /C.est parti/ })).toBeDisabled();
+  });
+
+  test('submit button disabled without jobTitle', async ({ page }) => {
+    await withNoProfile(page);
+    await page.goto(SIDE_PANEL);
+
+    await page.locator('#ob-firstname').fill('Guy');
     await expect(page.getByRole('button', { name: /C.est parti/ })).toBeDisabled();
   });
 
   test('auto-skips onboarding when profile exists (default stubs)', async ({ page }) => {
     await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByText(/Bonjour|Missions/)).toBeVisible();
   });
 });
