@@ -19,9 +19,12 @@
   } = $props();
 </script>
 
-<div class="space-y-2">
-  <div class="flex items-center justify-between mb-2">
-    <h3 class="text-sm font-semibold text-text-primary">Connecteurs</h3>
+<div class="section-card rounded-[1.5rem] p-4 space-y-3">
+  <div class="mb-2 flex items-center justify-between">
+    <div>
+      <h3 class="text-sm font-semibold text-text-primary">Connecteurs</h3>
+      <p class="mt-1 text-xs text-text-secondary">Activez les sources que vous voulez scanner.</p>
+    </div>
   </div>
 
   {#each connectors as connector (connector.id)}
@@ -35,7 +38,7 @@
         />
       </div>
       <button
-        class="p-1.5 rounded-md transition-colors {connector.enabled ? 'text-accent-emerald hover:bg-accent-emerald/10' : 'text-text-muted hover:bg-surface-hover'}"
+        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] transition-colors {connector.enabled ? 'text-accent-emerald hover:bg-accent-emerald/10' : 'text-text-muted hover:bg-white/[0.08]'}"
         onclick={() => onToggle?.(connector.id)}
         title={connector.enabled ? 'D\u00e9sactiver' : 'Activer'}
       >
@@ -43,7 +46,7 @@
       </button>
       {#if connector.enabled}
         <button
-          class="p-1.5 rounded-md text-text-secondary hover:bg-surface-hover hover:text-text-primary transition-colors"
+          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-secondary transition-colors hover:bg-white/[0.08] hover:text-text-primary"
           onclick={() => onScan?.(connector.id)}
           title="Scanner"
         >
@@ -54,6 +57,6 @@
   {/each}
 
   {#if connectors.length === 0}
-    <p class="text-xs text-text-muted text-center py-4">Aucun connecteur configur\u00e9</p>
+    <p class="py-4 text-center text-xs text-text-muted">Aucun connecteur configure</p>
   {/if}
 </div>

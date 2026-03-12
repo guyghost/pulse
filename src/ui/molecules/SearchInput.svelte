@@ -36,19 +36,19 @@
 </script>
 
 <div class="relative">
-  <div class="absolute left-2.5 top-1/2 -translate-y-1/2 text-text-muted">
+  <div class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted">
     <Icon name="search" size={14} />
   </div>
   <input
     type="text"
-    placeholder="Rechercher..."
-    class="w-full bg-white/5 border border-white/10 rounded-lg pl-8 pr-8 py-1.5 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/50 focus:ring-1 focus:ring-accent-blue/20 transition-all duration-200"
+    placeholder="Rechercher une mission, une stack, un client..."
+    class="soft-ring w-full rounded-[1.1rem] border border-white/8 bg-white/[0.04] pl-10 pr-10 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:bg-white/[0.06] focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
     value={localValue}
     oninput={handleInput}
   />
   {#if localValue}
     <button
-      class="absolute right-2 top-1/2 -translate-y-1/2 text-text-muted hover:text-text-primary transition-colors duration-200"
+      class="absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-white/[0.06] text-text-muted transition-colors duration-200 hover:text-text-primary"
       onclick={clear}
     >
       <Icon name="x" size={14} />
