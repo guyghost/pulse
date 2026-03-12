@@ -45,6 +45,8 @@
     <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>
   {:else if name === 'minus'}
     <path d="M5 12h14"/>
+  {:else if name === 'plus'}
+    <path d="M12 5v14"/><path d="M5 12h14"/>
   {:else if name === 'arrow-right'}
     <path d="M5 12h14"/><path d="m12 5 7 7-7 7"/>
   {:else if name === 'loader'}
@@ -61,5 +63,7 @@
     <path d="M15 3h6v6"/><path d="M10 14 21 3"/><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/>
   {:else if name === 'eye'}
     <path d="M2.062 12.348a1 1 0 0 1 0-.696 10.75 10.75 0 0 1 19.876 0 1 1 0 0 1 0 .696 10.75 10.75 0 0 1-19.876 0"/><circle cx="12" cy="12" r="3"/>
+  {:else if name === 'eye-off'}
+    <path d="m2 2 20 20"/><path d="M10.58 10.58a2 2 0 1 0 2.84 2.84"/><path d="M9.88 5.09A10.94 10.94 0 0 1 12 5c5 0 9.27 3.11 11 7-.49 1.12-1.17 2.14-2 3"/><path d="M6.61 6.61C4.62 8 3 9.94 2 12c1.73 3.89 6 7 10 7 1.61 0 3.16-.4 4.53-1.11"/>
   {/if}
 </svg>

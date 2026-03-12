@@ -11,13 +11,15 @@
 </script>
 
 {#if isScanning}
-  <div class="w-full h-0.5 bg-white/5 overflow-hidden">
+  <div class="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
     <div
-      class="h-full bg-accent-blue/70 transition-all duration-500 ease-out"
+      class="h-full rounded-full bg-gradient-to-r from-accent-blue via-accent-emerald to-accent-blue transition-all duration-500 ease-out"
       style:width="{Math.max(progress, 10)}%"
     ></div>
   </div>
   {#if missionsFound > 0}
-    <p class="text-[10px] text-text-muted px-3 py-1 transition-opacity duration-300">{missionsFound} mission{missionsFound > 1 ? 's' : ''} trouvee{missionsFound > 1 ? 's' : ''}...</p>
+    <p class="px-1 pt-2 text-[11px] text-text-secondary transition-opacity duration-300">
+      {missionsFound} mission{missionsFound > 1 ? 's' : ''} reperee{missionsFound > 1 ? 's' : ''} pendant le scan
+    </p>
   {/if}
 {/if}
