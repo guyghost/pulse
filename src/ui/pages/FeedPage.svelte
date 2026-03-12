@@ -10,6 +10,7 @@
   import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
   import { markAsSeen } from '$lib/core/seen/mark-seen';
   import { getFavorites, saveFavorites, getHidden, saveHidden } from '$lib/shell/storage/favorites';
+  import { getProfile } from '$lib/shell/storage/db';
   import { toggleFavorite, toggleHidden, filterHidden, filterFavoritesOnly } from '$lib/core/favorites/favorites';
 
   const feedActor = createActor(feedMachine);
@@ -43,6 +44,7 @@
   let hidden = $state<Record<string, number>>({});
   let showFavoritesOnly = $state(false);
   let showHidden = $state(false);
+  let firstName = $state('');
 
   $effect(() => {
     getSeenIds().then(ids => { seenIds = ids; }).catch(() => {});
@@ -51,6 +53,10 @@
   $effect(() => {
     getFavorites().then(f => { favorites = f; }).catch(() => {});
     getHidden().then(h => { hidden = h; }).catch(() => {});
+  });
+
+  $effect(() => {
+    getProfile().then(p => { if (p?.firstName) firstName = p.firstName; }).catch(() => {});
   });
 
   function handleMissionSeen(missionId: string) {
@@ -131,7 +137,7 @@
   {#snippet headerContent()}
     <ScanProgress isScanning={isLoading} progress={isLoading ? 50 : 100} missionsFound={missions.length} />
     <div class="flex items-center justify-between px-3 pt-3 pb-2">
-      <h2 class="text-sm font-semibold text-white">Missions</h2>
+      <h2 class="text-sm font-semibold text-white">{firstName ? `Bonjour, ${firstName}` : 'Missions'}</h2>
       <div class="flex items-center gap-1">
         <button
           class="p-1.5 rounded-lg transition-all duration-200
