@@ -37,8 +37,10 @@
   });
 </script>
 
-<div class="flex items-center gap-3 py-2 px-3 bg-surface rounded-lg">
-  <Icon name={icon} size={16} class="text-text-secondary" />
+<div class="flex items-center gap-3 rounded-[1.2rem] border border-white/8 bg-white/[0.04] px-3 py-3">
+  <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04]">
+    <Icon name={icon} size={16} class="text-text-secondary" />
+  </div>
   <div class="flex-1 min-w-0">
     <p class="text-sm font-medium text-text-primary">{name}</p>
     <p class="text-[11px] text-text-secondary">{statusLabel}</p>

@@ -17,17 +17,17 @@
 
   let classes = $derived(
     variant === 'primary'
-      ? 'bg-accent-blue hover:bg-accent-blue-hover text-white shadow-glow-blue'
+      ? 'border border-accent-blue/30 bg-accent-blue/88 text-navy-900 shadow-[0_16px_28px_rgba(89,198,255,0.22)] hover:bg-accent-blue-hover'
       : variant === 'secondary'
-      ? 'bg-white/5 hover:bg-white/10 text-text-primary border border-white/10'
+      ? 'border border-white/10 bg-white/[0.05] text-text-primary hover:bg-white/[0.1]'
       : variant === 'glass'
-      ? 'bg-white/[0.07] hover:bg-white/[0.12] text-text-primary border border-white/10 backdrop-blur-md'
-      : 'hover:bg-white/5 text-text-secondary hover:text-text-primary'
+      ? 'border border-white/10 bg-white/[0.07] text-text-primary hover:bg-white/[0.12] backdrop-blur-md'
+      : 'text-text-secondary hover:bg-white/5 hover:text-text-primary'
   );
 </script>
 
 <button
-  class="inline-flex items-center justify-center gap-1.5 px-3 py-1.5 text-sm font-medium rounded-lg transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed {classes}"
+  class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[1rem] px-4 py-2.5 text-sm font-semibold transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.985] {classes}"
   {disabled}
   {onclick}
 >

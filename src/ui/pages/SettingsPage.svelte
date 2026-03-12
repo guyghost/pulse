@@ -36,15 +36,16 @@
 <SettingsLayout {onBack} content={settingsContent}>
   {#snippet settingsContent()}
     <div class="space-y-6">
-      <!-- API Key section -->
-      <div class="space-y-2">
-        <h3 class="text-sm font-semibold text-text-primary">Clé API Anthropic</h3>
-        <p class="text-xs text-text-secondary">Nécessaire pour l'analyse TJM par IA</p>
+      <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
+        <div>
+          <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Necessaire pour enrichir l'analyse TJM locale avec le modele.</p>
+        </div>
         <div class="flex gap-2">
           <input
             type="password"
             placeholder="sk-ant-..."
-            class="flex-1 bg-surface border border-border rounded-lg px-3 py-2 text-sm text-text-primary font-mono focus:outline-none focus:border-accent-blue"
+            class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-mono text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
             bind:value={apiKey}
           />
           <Button variant="secondary" onclick={saveApiKey}>
@@ -53,7 +54,6 @@
         </div>
       </div>
 
-      <!-- Connectors section -->
       <ConnectorPanel
         {connectors}
         onToggle={toggleConnector}
