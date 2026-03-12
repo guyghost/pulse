@@ -1,24 +1,24 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-900: #0F172A;
-  --color-navy-800: #1E293B;
-  --color-navy-700: #334155;
-  --color-navy-600: #475569;
-  --color-surface: #1E293B;
-  --color-surface-hover: #273548;
-  --color-surface-active: #2D3F56;
-  --color-text-primary: #F8FAFC;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted: #64748B;
-  --color-accent-blue: #3B82F6;
-  --color-accent-blue-hover: #2563EB;
-  --color-accent-emerald: #10B981;
-  --color-accent-amber: #F59E0B;
-  --color-accent-red: #EF4444;
-  --color-border: #334155;
+  --color-navy-900: #07131d;
+  --color-navy-800: #0e2231;
+  --color-navy-700: #163548;
+  --color-navy-600: #2c556f;
+  --color-surface: #102434;
+  --color-surface-hover: #173247;
+  --color-surface-active: #1f425a;
+  --color-text-primary: #f5f7fb;
+  --color-text-secondary: #b3c4d5;
+  --color-text-muted: #72889c;
+  --color-accent-blue: #59c6ff;
+  --color-accent-blue-hover: #7ed5ff;
+  --color-accent-emerald: #58d9a9;
+  --color-accent-amber: #ffca72;
+  --color-accent-red: #ff8787;
+  --color-border: #28465b;
 
-  --font-sans: 'Inter', system-ui, sans-serif;
+  --font-sans: 'Space Grotesk', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
   --radius-sm: 0.25rem;
@@ -38,4 +38,96 @@
   --spacing-md: 0.75rem;
   --spacing-lg: 1rem;
   --spacing-xl: 1.5rem;
+}
+
+:root {
+  color-scheme: dark;
+}
+
+html,
+body {
+  min-height: 100%;
+}
+
+body {
+  background:
+    radial-gradient(circle at top left, rgb(89 198 255 / 0.22), transparent 30%),
+    radial-gradient(circle at 85% 18%, rgb(88 217 169 / 0.16), transparent 22%),
+    linear-gradient(160deg, #041018 0%, #091724 38%, #07131d 100%);
+}
+
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.26;
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
+  background-size: 28px 28px;
+  mask-image: radial-gradient(circle at center, black 30%, transparent 95%);
+}
+
+#app {
+  min-height: 100vh;
+}
+
+::selection {
+  background: rgb(89 198 255 / 0.28);
+  color: #f5f7fb;
+}
+
+.panel-shell {
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.065), rgb(255 255 255 / 0.02)),
+    linear-gradient(160deg, rgb(7 19 29 / 0.95), rgb(10 28 40 / 0.94));
+  border: 1px solid rgb(255 255 255 / 0.08);
+  box-shadow:
+    0 24px 60px rgb(1 7 12 / 0.48),
+    inset 0 1px 0 rgb(255 255 255 / 0.08);
+  backdrop-filter: blur(24px);
+}
+
+.panel-grid {
+  background-image:
+    linear-gradient(rgb(255 255 255 / 0.018) 1px, transparent 1px),
+    linear-gradient(90deg, rgb(255 255 255 / 0.018) 1px, transparent 1px);
+  background-size: 22px 22px;
+}
+
+.section-card {
+  border: 1px solid rgb(255 255 255 / 0.08);
+  background:
+    linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.02)),
+    rgb(12 29 41 / 0.9);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.05),
+    0 18px 35px rgb(1 7 12 / 0.22);
+  backdrop-filter: blur(20px);
+}
+
+.section-card-strong {
+  border: 1px solid rgb(89 198 255 / 0.18);
+  background:
+    radial-gradient(circle at top right, rgb(89 198 255 / 0.12), transparent 35%),
+    linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.03)),
+    rgb(10 26 37 / 0.96);
+  box-shadow:
+    inset 0 1px 0 rgb(255 255 255 / 0.07),
+    0 24px 40px rgb(1 7 12 / 0.28);
+  backdrop-filter: blur(24px);
+}
+
+.eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+.soft-ring {
+  box-shadow:
+    0 0 0 1px rgb(255 255 255 / 0.06),
+    0 12px 28px rgb(1 7 12 / 0.18);
 }

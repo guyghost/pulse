@@ -35,34 +35,35 @@
   );
 </script>
 
-<div class="flex flex-col gap-2 overflow-y-auto">
+<div class="flex flex-col gap-3 overflow-y-auto">
   {#if isLoading}
     {#each Array(3) as _}
-      <div class="bg-white/[0.05] backdrop-blur-md border border-white/5 rounded-xl p-3 space-y-2">
-        <Skeleton width="70%" height="1rem" />
-        <Skeleton width="40%" height="0.75rem" />
-        <div class="flex gap-1">
+      <div class="section-card rounded-[1.5rem] p-4 space-y-3">
+        <Skeleton width="58%" height="1.15rem" />
+        <Skeleton width="34%" height="0.8rem" />
+        <div class="flex gap-2">
           <Skeleton width="3rem" height="1.25rem" rounded="full" />
           <Skeleton width="4rem" height="1.25rem" rounded="full" />
           <Skeleton width="3.5rem" height="1.25rem" rounded="full" />
         </div>
+        <Skeleton width="100%" height="3rem" />
       </div>
     {/each}
   {:else if error}
-    <div class="flex flex-col items-center justify-center py-12 text-center">
-      <div class="w-10 h-10 rounded-full bg-accent-red/10 flex items-center justify-center mb-3">
+    <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
+      <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-red/12">
         <Icon name="x" size={20} class="text-accent-red" />
       </div>
-      <p class="text-sm text-text-primary font-medium">Erreur</p>
-      <p class="text-xs text-text-secondary mt-1 max-w-[250px]">{error}</p>
+      <p class="text-sm font-semibold text-text-primary">Erreur de synchronisation</p>
+      <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">{error}</p>
     </div>
   {:else if sortedMissions.length === 0}
-    <div class="flex flex-col items-center justify-center py-12 text-center">
-      <div class="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center mb-3">
+    <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
+      <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
         <Icon name="briefcase" size={20} class="text-text-muted" />
       </div>
-      <p class="text-sm text-text-primary font-medium">Aucune mission</p>
-      <p class="text-xs text-text-secondary mt-1">Lancez un scan pour trouver des missions</p>
+      <p class="text-sm font-semibold text-text-primary">Aucune mission pour l’instant</p>
+      <p class="mt-2 text-xs text-text-secondary">Lancez un scan pour alimenter le radar.</p>
     </div>
   {:else}
     {#each sortedMissions as mission, i (mission.id)}
@@ -79,8 +80,8 @@
         />
       </div>
     {/each}
-    <p class="text-[10px] text-text-muted text-center py-2">
-      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''}
+    <p class="py-2 text-center text-[11px] text-text-muted">
+      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} classee{sortedMissions.length > 1 ? 's' : ''} par pertinence
     </p>
   {/if}
 </div>

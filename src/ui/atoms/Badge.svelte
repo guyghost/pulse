@@ -8,13 +8,13 @@
 
   let classes = $derived(
     variant === 'tech'
-      ? 'bg-white/10 text-accent-blue font-mono text-[11px]'
+      ? 'border border-accent-blue/18 bg-accent-blue/12 text-accent-blue font-mono text-[11px]'
       : variant === 'status'
-      ? 'bg-accent-emerald/20 text-accent-emerald text-[11px]'
-      : 'bg-white/5 text-text-secondary text-[11px]'
+      ? 'border border-accent-emerald/18 bg-accent-emerald/14 text-accent-emerald text-[11px]'
+      : 'border border-white/8 bg-white/[0.04] text-text-secondary text-[11px]'
   );
 </script>
 
-<span class="inline-flex items-center px-1.5 py-0.5 rounded-full {classes}">
+<span class="inline-flex items-center rounded-full px-2 py-1 {classes}">
   {label}
 </span>

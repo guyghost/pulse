@@ -19,61 +19,74 @@
 
 <div class="space-y-4">
   {#if isLoading}
-    <div class="space-y-3">
+    <div class="section-card rounded-[1.5rem] space-y-3 p-4">
       <Skeleton width="50%" height="1.25rem" />
       <Skeleton width="100%" height="3rem" />
       <Skeleton width="100%" height="3rem" />
       <Skeleton width="100%" height="3rem" />
     </div>
   {:else if error}
-    <div class="flex flex-col items-center py-6 text-center">
+    <div class="section-card rounded-[1.5rem] flex flex-col items-center py-8 text-center">
       <Icon name="x" size={24} class="text-accent-red mb-2" />
       <p class="text-sm text-text-primary">{error}</p>
     </div>
   {:else if analysis}
-    <div class="flex items-center justify-between">
-      <h3 class="text-sm font-semibold text-text-primary">Analyse TJM</h3>
-      <TrendBadge trend={analysis.trend} />
+    <div class="section-card-strong rounded-[1.75rem] p-4">
+      <div class="flex items-center justify-between">
+        <h3 class="text-sm font-semibold text-text-primary">Analyse TJM</h3>
+        <TrendBadge trend={analysis.trend} />
+      </div>
+      <div class="mt-4 grid grid-cols-2 gap-2 text-[11px]">
+        <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
+          <p class="uppercase tracking-[0.18em] text-text-muted">Confiance</p>
+          <p class="mt-2 text-lg font-semibold text-white">{Math.round(analysis.confidence * 100)}%</p>
+        </div>
+        <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
+          <p class="uppercase tracking-[0.18em] text-text-muted">Points</p>
+          <p class="mt-2 text-lg font-semibold text-white">{analysis.dataPoints}</p>
+        </div>
+      </div>
     </div>
 
-    <div class="space-y-2">
+    <div class="space-y-3">
       {#each levels as level}
         {@const range = analysis[level.key]}
-        <div class="bg-surface rounded-lg p-3">
-          <div class="flex justify-between items-center mb-1">
-            <span class="text-xs font-medium text-text-secondary">{level.label}</span>
-            <span class="text-xs font-mono text-accent-blue">{range.median}\u20AC/j</span>
-          </div>
-          <div class="flex items-center gap-2 text-[10px] text-text-muted font-mono">
-            <span>{range.min}\u20AC</span>
-            <div class="flex-1 h-1.5 bg-navy-700 rounded-full overflow-hidden">
-              <div class="h-full bg-accent-blue/40 rounded-full" style:width="100%"></div>
+        <div class="section-card rounded-[1.5rem] p-4">
+          <div class="flex items-center justify-between gap-3">
+            <div>
+              <p class="text-xs font-medium text-text-secondary">{level.label}</p>
+              <p class="mt-2 text-2xl font-semibold text-white">{range.median}<span class="ml-1 text-sm font-mono text-accent-blue">EUR/j</span></p>
             </div>
-            <span>{range.max}\u20AC</span>
+            <div class="rounded-full border border-accent-blue/18 bg-accent-blue/12 px-3 py-1.5 text-[11px] font-mono text-accent-blue">
+              {range.min}-{range.max}
+            </div>
+          </div>
+
+          <div class="mt-4 flex items-center gap-2 text-[10px] font-mono text-text-muted">
+            <span>{range.min}EUR</span>
+            <div class="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+              <div class="h-full rounded-full bg-gradient-to-r from-accent-blue/45 via-accent-emerald/55 to-accent-blue/45" style:width="100%"></div>
+            </div>
+            <span>{range.max}EUR</span>
           </div>
         </div>
       {/each}
     </div>
 
     {#if analysis.trendDetail}
-      <div class="bg-surface rounded-lg p-3">
-        <p class="text-xs text-text-secondary">{analysis.trendDetail}</p>
+      <div class="section-card rounded-[1.5rem] p-4">
+        <p class="text-xs leading-relaxed text-text-secondary">{analysis.trendDetail}</p>
       </div>
     {/if}
 
     {#if analysis.recommendation}
-      <div class="bg-accent-blue/10 border border-accent-blue/20 rounded-lg p-3">
-        <p class="text-xs font-medium text-accent-blue mb-1">Recommandation</p>
-        <p class="text-xs text-text-secondary">{analysis.recommendation}</p>
+      <div class="section-card-strong rounded-[1.5rem] p-4">
+        <p class="text-[11px] uppercase tracking-[0.2em] text-accent-blue">Recommandation</p>
+        <p class="mt-2 text-sm leading-relaxed text-text-secondary">{analysis.recommendation}</p>
       </div>
     {/if}
-
-    <div class="flex items-center justify-between text-[10px] text-text-muted">
-      <span>Confiance : {Math.round(analysis.confidence * 100)}%</span>
-      <span>{analysis.dataPoints} donn\u00e9es</span>
-    </div>
   {:else}
-    <div class="flex flex-col items-center py-6 text-center">
+    <div class="section-card rounded-[1.5rem] flex flex-col items-center py-8 text-center">
       <Icon name="trending-up" size={24} class="text-text-muted mb-2" />
       <p class="text-sm text-text-primary">TJM Intelligence</p>
       <p class="text-xs text-text-secondary mt-1">Lancez une analyse pour voir les tendances TJM</p>

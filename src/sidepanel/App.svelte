@@ -88,18 +88,27 @@
   }
 </script>
 
-<div class="w-[400px] h-screen flex flex-col bg-navy-900 text-text-primary font-sans">
+<div class="panel-shell relative flex h-screen w-[400px] flex-col overflow-hidden text-text-primary font-sans">
+  <div class="panel-grid pointer-events-none absolute inset-0 opacity-45"></div>
+  <div class="pointer-events-none absolute -left-16 top-10 h-40 w-40 rounded-full bg-accent-blue/12 blur-3xl"></div>
+  <div class="pointer-events-none absolute right-[-2.5rem] top-48 h-36 w-36 rounded-full bg-accent-emerald/10 blur-3xl"></div>
+  <div class="pointer-events-none absolute bottom-0 left-14 h-32 w-32 rounded-full bg-accent-amber/10 blur-3xl"></div>
   {#if currentPage === 'onboarding' && !hasCompletedOnboarding}
     <OnboardingPage onComplete={completeOnboarding} />
   {:else}
-    <nav aria-label="Main navigation" class="relative flex border-b border-white/5 bg-navy-900/80 backdrop-blur-xl">
-      {#each navItems as item, i}
+    <div class="relative z-10 flex h-full flex-col">
+      <div class="px-3 pt-3">
+        <nav
+          aria-label="Main navigation"
+          class="section-card flex items-center gap-1 rounded-[1.5rem] p-1.5"
+        >
+      {#each navItems as item}
         <button
           use:ripple
-          class="flex-1 flex flex-col items-center justify-center gap-0.5 px-3 py-2.5 text-xs font-medium transition-all duration-200 active:scale-[0.97]
+          class="flex flex-1 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-250 active:scale-[0.985]
             {currentPage === item.page
-              ? 'text-white'
-              : 'text-white/40 hover:text-white/70'}"
+              ? 'bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_18px_rgba(1,7,12,0.22)]'
+              : 'text-text-secondary hover:bg-white/[0.04] hover:text-white'}"
           aria-current={currentPage === item.page ? 'page' : undefined}
           onclick={() => navigate(item.page)}
         >
@@ -107,29 +116,26 @@
           <span>{item.label}</span>
         </button>
       {/each}
-      <div
-        class="absolute bottom-1 h-1 w-1 rounded-full bg-accent-blue transition-all duration-200 ease-out"
-        style:left="calc({(PAGE_INDEX[currentPage] ?? 0) * 100 / 3 + 100 / 6}%)"
-        style:transform="translateX(-50%)"
-      ></div>
-    </nav>
-    <main class="flex-1 overflow-hidden relative">
-      {#key currentPage}
-        <div
-          class="absolute inset-0"
-          in:fly={{ x: transitionDirection * 30, duration: 200, easing: cubicOut }}
-          out:fade={{ duration: 100 }}
-        >
-          {#if currentPage === 'feed'}
-            <FeedPage />
-          {:else if currentPage === 'tjm'}
-            <TJMPage />
-          {:else if currentPage === 'settings'}
-            <SettingsPage onBack={() => navigate('feed')} />
-          {/if}
-        </div>
-      {/key}
-    </main>
+        </nav>
+      </div>
+      <main class="relative flex-1 overflow-hidden">
+        {#key currentPage}
+          <div
+            class="absolute inset-0"
+            in:fly={{ x: transitionDirection * 30, duration: 200, easing: cubicOut }}
+            out:fade={{ duration: 100 }}
+          >
+            {#if currentPage === 'feed'}
+              <FeedPage />
+            {:else if currentPage === 'tjm'}
+              <TJMPage />
+            {:else if currentPage === 'settings'}
+              <SettingsPage onBack={() => navigate('feed')} />
+            {/if}
+          </div>
+        {/key}
+      </main>
+    </div>
   {/if}
 
   {#if import.meta.env.DEV && DevPanel}

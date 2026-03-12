@@ -39,6 +39,8 @@
   let glowClass = $derived(
     (mission.score ?? 0) >= 80
       ? 'shadow-glow-emerald'
+      : (mission.score ?? 0) >= 50
+      ? 'shadow-glow-blue'
       : ''
   );
 
@@ -75,28 +77,49 @@
 <div
   use:ripple
   use:onVisibleAction={() => onVisibleCallback?.()}
-  class="bg-white/[0.07] backdrop-blur-md border border-white/10 border-t-white/15 rounded-xl {glowClass} hover:bg-white/[0.12] hover:scale-[1.01] transition-all duration-500 ease-out cursor-pointer p-3 active:scale-[0.99] {isSeen ? '' : 'border-l-2 border-l-accent-blue shadow-[inset_2px_0_8px_rgba(59,130,246,0.1)]'} {isHidden ? 'opacity-50' : ''}"
+  class="section-card relative cursor-pointer rounded-[1.65rem] p-4 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-white/[0.07] active:scale-[0.99] {glowClass} {isSeen ? '' : 'border-accent-blue/30 shadow-[inset_0_0_0_1px_rgba(89,198,255,0.2),0_18px_36px_rgba(1,7,12,0.26)]'} {isHidden ? 'opacity-55' : ''}"
   onclick={toggleExpand}
   role="button"
   tabindex="0"
-  onkeydown={(e) => { if (e.key === 'Enter') toggleExpand(); }}
+  onkeydown={(e) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      toggleExpand();
+    }
+  }}
 >
-  <div class="flex items-start justify-between gap-2">
-    <div class="flex-1 min-w-0">
-      <h3 class="text-sm font-semibold text-text-primary truncate">{mission.title}</h3>
+  <div class="pointer-events-none absolute right-4 top-4 h-20 w-20 rounded-full bg-accent-blue/8 blur-2xl"></div>
+  <div class="relative flex items-start justify-between gap-3">
+    <div class="min-w-0 flex-1">
+      <div class="mb-3 flex flex-wrap items-center gap-2">
+        <Badge label={mission.source} variant="source" />
+        {#if !isSeen}
+          <span class="inline-flex items-center rounded-full border border-accent-blue/18 bg-accent-blue/12 px-2 py-1 text-[11px] font-medium text-accent-blue">
+            Nouveau
+          </span>
+        {/if}
+        {#if mission.remote}
+          <span class="inline-flex items-center rounded-full border border-white/8 bg-white/[0.04] px-2 py-1 text-[11px] capitalize text-text-secondary">
+            {mission.remote}
+          </span>
+        {/if}
+      </div>
+      <h3 class="truncate text-[1rem] font-semibold text-text-primary">{mission.title}</h3>
       {#if mission.client}
-        <p class="text-xs text-text-secondary mt-0.5">{mission.client}</p>
+        <p class="mt-1 text-xs text-text-secondary">{mission.client}</p>
       {/if}
     </div>
-    <div class="flex items-center gap-1">
+    <div class="flex items-center gap-2">
       {#if mission.score !== null}
-        <span class="text-xs font-mono font-bold px-2 py-0.5 rounded-full {scoreColor}">{mission.score}</span>
+        <span class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor}">{mission.score}</span>
       {/if}
-      <Icon name="chevron-down" size={14} class="text-text-muted transition-transform duration-200 {expanded ? 'rotate-180' : ''}" />
+      <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.04]">
+        <Icon name="chevron-down" size={14} class="text-text-muted transition-transform duration-200 {expanded ? 'rotate-180' : ''}" />
+      </div>
     </div>
   </div>
 
-  <div class="flex flex-wrap gap-1 mt-2">
+  <div class="mt-3 flex flex-wrap gap-2">
     {#each mission.stack.slice(0, 3) as tech}
       <Badge label={tech} variant="tech" />
     {/each}
@@ -105,46 +128,61 @@
     {/if}
   </div>
 
-  <div class="flex items-center gap-3 mt-2 text-xs text-text-secondary">
+  {#if mission.description}
+    <p class="mt-3 line-clamp-2 text-xs leading-relaxed text-text-secondary">
+      {mission.description}
+    </p>
+  {/if}
+
+  <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-text-secondary">
     {#if mission.tjm !== null}
-      <span class="font-mono text-accent-blue font-semibold">{mission.tjm}€/j</span>
+      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">TJM</p>
+        <p class="mt-1 font-mono font-semibold text-accent-blue">{mission.tjm}€/j</p>
+      </div>
     {/if}
     {#if mission.location}
-      <span>{mission.location}</span>
-    {/if}
-    {#if mission.remote}
-      <span class="capitalize">{mission.remote}</span>
+      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Zone</p>
+        <p class="mt-1 truncate text-text-primary">{mission.location}</p>
+      </div>
     {/if}
     {#if mission.duration}
-      <span>{mission.duration}</span>
+      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Duree</p>
+        <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
+      </div>
     {/if}
-    <Badge label={mission.source} variant="source" />
+    <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+      <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Source</p>
+      <p class="mt-1 truncate text-text-primary">{mission.source}</p>
+    </div>
   </div>
 
-  <div class="flex justify-end gap-1 mt-2">
+  <div class="mt-4 flex justify-end gap-2">
     <button
-      class="p-1 rounded-md transition-all duration-200 {isFavorite ? 'text-accent-amber' : 'text-text-muted hover:text-text-primary'}"
+      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] transition-all duration-200 {isFavorite ? 'text-accent-amber' : 'text-text-muted hover:text-text-primary'}"
       onclick={handleToggleFavorite}
       title={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
     >
       <Icon name="star" size={14} class={isFavorite ? 'fill-accent-amber' : ''} />
     </button>
     <button
-      class="p-1 rounded-md text-text-muted hover:text-accent-red transition-all duration-200"
+      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-muted transition-all duration-200 hover:text-accent-red"
       onclick={handleHide}
       title={isHidden ? 'Restaurer' : 'Masquer'}
     >
       <Icon name={isHidden ? 'eye' : 'x-circle'} size={14} />
     </button>
     <button
-      class="p-1 rounded-md text-text-muted hover:text-text-primary transition-all duration-200"
+      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-muted transition-all duration-200 hover:text-text-primary"
       onclick={handleCopyLink}
       title="Copier le lien"
     >
       <Icon name={copied ? 'check' : 'link'} size={14} class={copied ? 'text-accent-emerald' : ''} />
     </button>
     <button
-      class="p-1 rounded-md text-text-muted hover:text-text-primary transition-all duration-200"
+      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-muted transition-all duration-200 hover:text-text-primary"
       onclick={handleOpenLink}
       title="Ouvrir"
     >
@@ -154,12 +192,14 @@
 
   {#if expanded && mission.description}
     <div transition:slide={{ duration: 200 }}>
-      <p class="mt-3 text-xs text-text-secondary leading-relaxed border-t border-white/5 pt-3">{mission.description}</p>
+      <div class="mt-4 border-t border-white/6 pt-4">
+        <p class="text-xs leading-relaxed text-text-secondary">{mission.description}</p>
+      </div>
       <a
         href={mission.url}
         target="_blank"
         rel="noopener noreferrer"
-        class="inline-flex items-center gap-1 mt-2 text-xs text-accent-blue hover:underline"
+        class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-blue hover:underline"
         onclick={(e) => e.stopPropagation()}
       >
         Voir la mission <Icon name="arrow-right" size={12} />
