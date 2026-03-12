@@ -52,10 +52,10 @@ describe('onboarding machine', () => {
   it('SET_PROFILE updates context.profile', () => {
     const actor = createActor(onboardingMachine).start();
     actor.send({ type: 'NEXT' });
-    actor.send({ type: 'SET_PROFILE', profile: { title: 'Dev React', stack: ['React'] } });
+    actor.send({ type: 'SET_PROFILE', profile: { jobTitle: 'Dev React', stack: ['React'] } });
 
     expect(actor.getSnapshot().context.profile).toEqual({
-      title: 'Dev React',
+      jobTitle: 'Dev React',
       stack: ['React'],
     });
     actor.stop();
@@ -64,11 +64,11 @@ describe('onboarding machine', () => {
   it('SET_PROFILE merges with existing profile', () => {
     const actor = createActor(onboardingMachine).start();
     actor.send({ type: 'NEXT' });
-    actor.send({ type: 'SET_PROFILE', profile: { title: 'Dev React' } });
+    actor.send({ type: 'SET_PROFILE', profile: { jobTitle: 'Dev React' } });
     actor.send({ type: 'SET_PROFILE', profile: { stack: ['React', 'TS'] } });
 
     expect(actor.getSnapshot().context.profile).toEqual({
-      title: 'Dev React',
+      jobTitle: 'Dev React',
       stack: ['React', 'TS'],
     });
     actor.stop();

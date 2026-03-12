@@ -3,13 +3,14 @@ import type { UserProfile } from '$lib/core/types/profile';
 import type { TJMAnalysis } from '$lib/core/types/tjm';
 
 export const mockProfile: UserProfile = {
+  firstName: 'Alice',
   stack: ['TypeScript', 'React', 'Node.js', 'Svelte'],
   tjmMin: 500,
   tjmMax: 750,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
-  title: 'Développeur Fullstack',
+  jobTitle: 'Développeur Fullstack',
 };
 
 const stacks = [
