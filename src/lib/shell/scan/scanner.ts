@@ -6,6 +6,7 @@ import { getProfile, saveMissions } from '../storage/db';
 import { deduplicateMissions } from '../../core/scoring/dedup';
 import { scoreMission } from '../../core/scoring/relevance';
 import { setScanState } from '../storage/session-storage';
+import { scoreMissionsSemantic } from '../ai/semantic-scorer';
 
 export interface ScanResult {
   missions: Mission[];
@@ -76,6 +77,22 @@ export async function runScan(signal?: AbortSignal): Promise<ScanResult> {
   const scored = profile
     ? deduped.map(m => ({ ...m, score: scoreMission(m, profile!) }))
     : deduped;
+
+  // Semantic scoring (async enrichment, non-blocking)
+  if (profile && !signal?.aborted) {
+    try {
+      const semanticResults = await scoreMissionsSemantic(scored, profile);
+      for (const mission of scored) {
+        const semantic = semanticResults.get(mission.id);
+        if (semantic) {
+          mission.semanticScore = semantic.score;
+          mission.semanticReason = semantic.reason;
+        }
+      }
+    } catch {
+      // Gemini Nano unavailable, continue with basic scoring
+    }
+  }
 
   // Persist
   if (scored.length > 0) {
