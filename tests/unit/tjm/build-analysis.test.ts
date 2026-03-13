@@ -55,15 +55,15 @@ describe('buildAnalysisFromAggregation', () => {
     expect(result.confidence).toBe(1);
   });
 
-  it('tendance stable quand cv < 0.1', () => {
-    // cv = 40/500 = 0.08 < 0.1
+  it('tendance stable quand cv < 0.15', () => {
+    // cv = 40/500 = 0.08 < 0.15
     const result = buildAnalysisFromAggregation(makeAggregated({ stddev: 40 }), NOW);
     expect(result.trend).toBe('stable');
   });
 
-  it('tendance up quand cv >= 0.1', () => {
-    // cv = 50/500 = 0.1 -> pas < 0.1
-    const result = buildAnalysisFromAggregation(makeAggregated({ stddev: 50 }), NOW);
+  it('tendance up quand cv >= 0.15', () => {
+    // cv = 100/500 = 0.2 >= 0.15
+    const result = buildAnalysisFromAggregation(makeAggregated({ stddev: 100 }), NOW);
     expect(result.trend).toBe('up');
   });
 

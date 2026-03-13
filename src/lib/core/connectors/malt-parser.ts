@@ -28,7 +28,8 @@ export function parseMaltHTML(html: string, now: Date, idPrefix: string): Missio
 
     const tjmEl = card.querySelector('.listing-card__rate, .daily-rate, [data-testid="rate"]');
     const tjmText = tjmEl?.textContent?.trim() ?? '';
-    const tjmMatch = tjmText.match(/(\d+)/);
+    const tjmNormalized = tjmText.replace(/[\s\u00A0]/g, '');
+    const tjmMatch = tjmNormalized.match(/(\d+)/);
     const tjm = tjmMatch ? parseInt(tjmMatch[1], 10) : null;
 
     const locationEl = card.querySelector('.listing-card__location, .location, [data-testid="location"]');

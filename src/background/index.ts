@@ -125,7 +125,7 @@ chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendRespo
 async function handleMessage(message: BridgeMessage): Promise<BridgeMessage | null> {
   switch (message.type) {
     case 'SCAN_START':
-      startScan();
+      startScan().catch(err => console.error('[MissionPulse] Scan error:', err));
       return { type: 'SCAN_STATUS', payload: { state: 'scanning', currentConnector: null, progress: 0, missionsFound: 0 } };
 
     case 'GET_PROFILE': {

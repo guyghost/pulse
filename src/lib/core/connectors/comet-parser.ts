@@ -29,7 +29,8 @@ export function parseCometHTML(html: string, now: Date, idPrefix: string): Missi
 
     const tjmEl = card.querySelector('.mission-card__tjm, .daily-rate, [data-testid="tjm"]');
     const tjmText = tjmEl?.textContent?.trim() ?? '';
-    const tjmMatch = tjmText.match(/(\d+)/);
+    const tjmNormalized = tjmText.replace(/[\s\u00A0]/g, '');
+    const tjmMatch = tjmNormalized.match(/(\d+)/);
     const tjm = tjmMatch ? parseInt(tjmMatch[1], 10) : null;
 
     const locationEl = card.querySelector('.mission-card__location, .location, [data-testid="location"]');

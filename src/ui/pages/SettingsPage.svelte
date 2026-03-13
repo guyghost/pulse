@@ -42,12 +42,10 @@
   // --- Reset ---
   let showResetConfirm = $state(false);
 
-  // Chargement initial
-  $effect(() => {
-    loadProfile();
-    loadApiKey();
-    loadSettings();
-  });
+  // Chargement initial (fire-and-forget, pas besoin de reactivite)
+  loadProfile();
+  loadApiKey();
+  loadSettings();
 
   async function loadProfile() {
     try {

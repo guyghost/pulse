@@ -97,7 +97,7 @@
       </div>
     {/each}
     <p class="py-2 text-center text-[11px] text-text-muted">
-      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} classee{sortedMissions.length > 1 ? 's' : ''} par pertinence
+      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triee{sortedMissions.length > 1 ? 's' : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
     </p>
   {/if}
 </div>
