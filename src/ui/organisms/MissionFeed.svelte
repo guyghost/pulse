@@ -13,6 +13,7 @@
     seenIds = [],
     favorites = {},
     hidden = {},
+    sortBy = 'score',
     onMissionSeen,
     onToggleFavorite,
     onHide,
@@ -24,6 +25,7 @@
     seenIds?: string[];
     favorites?: Record<string, number>;
     hidden?: Record<string, number>;
+    sortBy?: 'score' | 'date' | 'tjm';
     onMissionSeen?: (id: string) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
@@ -31,7 +33,11 @@
   } = $props();
 
   let sortedMissions = $derived(
-    [...missions].sort((a, b) => (b.score ?? 0) - (a.score ?? 0))
+    [...missions].sort((a, b) => {
+      if (sortBy === 'date') return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
+      if (sortBy === 'tjm') return (b.tjm ?? 0) - (a.tjm ?? 0);
+      return (b.score ?? 0) - (a.score ?? 0);
+    })
   );
 </script>
 

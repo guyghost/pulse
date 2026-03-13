@@ -43,6 +43,7 @@
   let seenIds = $state<string[]>([]);
   let favorites = $state<Record<string, number>>({});
   let hidden = $state<Record<string, number>>({});
+  let sortBy = $state<'score' | 'date' | 'tjm'>('score');
   let showFavoritesOnly = $state(false);
   let showHidden = $state(false);
   let favoriteCount = $derived(Object.keys(favorites).length);
@@ -212,6 +213,14 @@
             <Icon name={showHidden ? 'eye' : 'eye-off'} size={14} />
             Ignorees
           </button>
+          <select
+            class="rounded-full border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-text-secondary focus:outline-none"
+            bind:value={sortBy}
+          >
+            <option value="score">Pertinence</option>
+            <option value="date">Date</option>
+            <option value="tjm">TJM</option>
+          </select>
         </div>
       </div>
 
@@ -229,6 +238,7 @@
       {seenIds}
       {favorites}
       {hidden}
+      {sortBy}
       onMissionSeen={handleMissionSeen}
       onToggleFavorite={handleToggleFavorite}
       onHide={handleHide}
