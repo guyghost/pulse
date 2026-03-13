@@ -68,6 +68,8 @@ export function parseCometHTML(html: string, now: Date, idPrefix: string): Missi
       source: SOURCE,
       scrapedAt: now,
       score: null,
+      semanticScore: null,
+      semanticReason: null,
     });
   });
 

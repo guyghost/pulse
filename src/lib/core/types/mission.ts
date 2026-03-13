@@ -16,4 +16,6 @@ export interface Mission {
   source: MissionSource;
   scrapedAt: Date;
   score: number | null;
+  semanticScore: number | null;
+  semanticReason: string | null;
 }

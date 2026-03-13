@@ -58,6 +58,8 @@ export function generateMockMissions(count: number): Mission[] {
     source: (i % 3 === 0 ? 'malt' : 'free-work') as 'malt' | 'free-work',
     scrapedAt: now,
     score: Math.floor(Math.random() * 100),
+    semanticScore: null,
+    semanticReason: null,
   }));
 }
 

@@ -61,6 +61,8 @@ export function parseGenericHTML(html: string, source: MissionSource, baseUrl: s
       source,
       scrapedAt: now,
       score: null,
+      semanticScore: null,
+      semanticReason: null,
     });
   });
 

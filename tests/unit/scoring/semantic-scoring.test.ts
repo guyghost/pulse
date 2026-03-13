@@ -28,6 +28,8 @@ const mission: Mission = {
   source: 'free-work',
   scrapedAt: new Date(),
   score: null,
+  semanticScore: null,
+  semanticReason: null,
 };
 
 describe('buildScoringPrompt', () => {
