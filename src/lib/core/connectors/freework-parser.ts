@@ -73,9 +73,7 @@ function buildJobUrl(slug: string, jobSlug: string | null): string {
 export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[] {
   if (!data['hydra:member'] || !Array.isArray(data['hydra:member'])) return [];
 
-  return data['hydra:member']
-    .filter(p => p.contracts?.includes('contractor'))
-    .map((p): Mission => ({
+  return data['hydra:member'].map((p): Mission => ({
       id: `fw-${p.id}`,
       title: p.title,
       client: p.company?.name ?? null,

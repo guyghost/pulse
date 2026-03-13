@@ -128,9 +128,9 @@ const FIXTURE_API: FreeWorkApiResponse = {
 };
 
 describe('parseFreeWorkAPI', () => {
-  it('parses contractor missions from API response', () => {
+  it('parses all missions from API response', () => {
     const missions = parseFreeWorkAPI(FIXTURE_API, NOW);
-    expect(missions).toHaveLength(2);
+    expect(missions).toHaveLength(3);
     expect(missions[0]).toMatchObject({
       source: 'free-work',
       title: 'Développeur React Senior',
@@ -138,12 +138,6 @@ describe('parseFreeWorkAPI', () => {
       id: 'fw-12345',
       scrapedAt: NOW,
     });
-  });
-
-  it('filters out non-contractor postings (CDI)', () => {
-    const missions = parseFreeWorkAPI(FIXTURE_API, NOW);
-    const titles = missions.map(m => m.title);
-    expect(titles).not.toContain('DevOps Engineer CDI');
   });
 
   it('extracts stack from skills', () => {
