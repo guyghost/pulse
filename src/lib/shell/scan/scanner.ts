@@ -13,7 +13,13 @@ export interface ScanResult {
   errors: { connectorId: string; message: string }[];
 }
 
-export async function runScan(signal?: AbortSignal): Promise<ScanResult> {
+export interface ScanProgressInfo {
+  current: number;
+  total: number;
+  connectorName: string;
+}
+
+export async function runScan(signal?: AbortSignal, onProgress?: (info: ScanProgressInfo) => void): Promise<ScanResult> {
   const settings = await getSettings();
   const enabledIds = settings.enabledConnectors;
   const errors: ScanResult['errors'] = [];
@@ -36,31 +42,28 @@ export async function runScan(signal?: AbortSignal): Promise<ScanResult> {
     return { missions: [], errors };
   }
 
-  // Fetch all connectors in parallel
-  const results = await Promise.allSettled(
-    connectors.map(async connector => {
-      if (signal?.aborted) return { connectorId: connector.id, missions: [] as Mission[] };
-      try {
-        const missions = await connector.fetchMissions();
-        return { connectorId: connector.id, missions };
-      } catch (err) {
-        const message = err instanceof Error ? err.message : 'Erreur inconnue';
-        errors.push({ connectorId: connector.id, message });
-        return { connectorId: connector.id, missions: [] as Mission[] };
-      }
-    })
-  );
-
-  if (signal?.aborted) {
-    try { await setScanState('idle'); } catch {}
-    return { missions: [], errors };
+  // Fetch connectors sequentially to report progress
+  const connectorResults: { connectorId: string; missions: Mission[] }[] = [];
+  for (let i = 0; i < connectors.length; i++) {
+    if (signal?.aborted) {
+      try { await setScanState('idle'); } catch {}
+      return { missions: [], errors };
+    }
+    const connector = connectors[i];
+    onProgress?.({ current: i, total: connectors.length, connectorName: connector.name });
+    try {
+      const missions = await connector.fetchMissions();
+      connectorResults.push({ connectorId: connector.id, missions });
+    } catch (err) {
+      const message = err instanceof Error ? err.message : 'Erreur inconnue';
+      errors.push({ connectorId: connector.id, message });
+    }
   }
+  onProgress?.({ current: connectors.length, total: connectors.length, connectorName: '' });
 
   const allMissions: Mission[] = [];
-  for (const result of results) {
-    if (result.status === 'fulfilled') {
-      allMissions.push(...result.value.missions);
-    }
+  for (const result of connectorResults) {
+    allMissions.push(...result.missions);
   }
 
   // Deduplicate
