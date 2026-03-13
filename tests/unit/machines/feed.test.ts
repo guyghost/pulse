@@ -127,6 +127,19 @@ describe('feed machine', () => {
     actor.stop();
   });
 
+  it('accepts SET_SORT event in loaded state', () => {
+    const actor = createActor(feedMachine).start();
+    actor.send({ type: 'LOAD' });
+    actor.send({ type: 'MISSIONS_LOADED', missions: [makeMission()] });
+    expect(actor.getSnapshot().value).toBe('loaded');
+    expect(actor.getSnapshot().context.sortBy).toBe('score');
+
+    actor.send({ type: 'SET_SORT', sortBy: 'date' });
+    expect(actor.getSnapshot().context.sortBy).toBe('date');
+    expect(actor.getSnapshot().value).toBe('loaded');
+    actor.stop();
+  });
+
   it('refreshes from error state', () => {
     const actor = createActor(feedMachine).start();
     actor.send({ type: 'LOAD' });

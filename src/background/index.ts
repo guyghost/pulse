@@ -93,6 +93,20 @@ async function startScan() {
   chrome.action.setBadgeText({ text: unseenCount > 0 ? String(unseenCount) : '' });
   chrome.action.setBadgeBackgroundColor({ color: '#3B82F6' });
 
+  // Notifications pour les nouvelles missions pertinentes
+  if (settings.notifications) {
+    const notifyMissions = scored.filter(m => !seenIds.includes(m.id) && (m.score ?? 0) >= 70);
+    if (notifyMissions.length > 0) {
+      const titles = notifyMissions.slice(0, 3).map(m => m.title).join('\n');
+      chrome.notifications.create(`pulse-scan-${Date.now()}`, {
+        type: 'basic',
+        iconUrl: 'icons/icon-128.png',
+        title: `${notifyMissions.length} nouvelle${notifyMissions.length > 1 ? 's' : ''} mission${notifyMissions.length > 1 ? 's' : ''} pertinente${notifyMissions.length > 1 ? 's' : ''}`,
+        message: titles,
+      });
+    }
+  }
+
   scanActor.send({ type: 'RESET' });
 }
 
