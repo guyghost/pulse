@@ -14,6 +14,7 @@
     favorites = {},
     hidden = {},
     sortBy = 'score',
+    filterActive = false,
     onMissionSeen,
     onToggleFavorite,
     onHide,
@@ -26,6 +27,7 @@
     favorites?: Record<string, number>;
     hidden?: Record<string, number>;
     sortBy?: 'score' | 'date' | 'tjm';
+    filterActive?: boolean;
     onMissionSeen?: (id: string) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
@@ -65,11 +67,19 @@
     </div>
   {:else if sortedMissions.length === 0}
     <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
-      <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
-        <Icon name="briefcase" size={20} class="text-text-muted" />
-      </div>
-      <p class="text-sm font-semibold text-text-primary">Aucune mission pour l’instant</p>
-      <p class="mt-2 text-xs text-text-secondary">Lancez un scan pour alimenter le radar.</p>
+      {#if filterActive}
+        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
+          <Icon name="filter-x" size={20} class="text-text-muted" />
+        </div>
+        <p class="text-sm font-semibold text-text-primary">Aucun resultat</p>
+        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">Essayez d’elargir vos filtres ou de modifier vos criteres de recherche.</p>
+      {:else}
+        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
+          <Icon name="briefcase" size={20} class="text-text-muted" />
+        </div>
+        <p class="text-sm font-semibold text-text-primary">Aucune mission pour l’instant</p>
+        <p class="mt-2 text-xs text-text-secondary">Lancez un scan pour alimenter le radar.</p>
+      {/if}
     </div>
   {:else}
     {#each sortedMissions as mission, i (mission.id)}
