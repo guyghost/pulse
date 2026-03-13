@@ -4,7 +4,10 @@
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
   import Button from '../atoms/Button.svelte';
   import Icon from '../atoms/Icon.svelte';
-  import type { SeniorityLevel } from '$lib/core/types/tjm';
+  import type { SeniorityLevel, TJMDataPoint } from '$lib/core/types/tjm';
+  import { getMissions } from '$lib/shell/storage/db';
+  import { aggregateFromPoints } from '$lib/core/tjm/aggregator';
+  import { buildAnalysisFromAggregation } from '$lib/core/tjm/build-analysis';
 
   const tjmActor = createActor(tjmMachine);
   tjmActor.start();
@@ -14,6 +17,39 @@
   $effect(() => {
     const sub = tjmActor.subscribe((s) => { snapshot = s; });
     return () => sub.unsubscribe();
+  });
+
+  // Quand la machine entre dans l'etat 'aggregating', lancer l'aggregation
+  $effect(() => {
+    if (!snapshot.matches('aggregating') || !snapshot.context.query) return;
+    const query = snapshot.context.query;
+
+    getMissions().then((missions) => {
+      const now = new Date();
+      const points: TJMDataPoint[] = missions
+        .filter((m) => m.tjm !== null)
+        .map((m) => ({
+          tjm: m.tjm as number,
+          title: m.title,
+          location: m.location,
+          source: m.source,
+          date: m.scrapedAt instanceof Date ? m.scrapedAt : new Date(m.scrapedAt),
+        }));
+
+      const aggregated = aggregateFromPoints(points, query.title, query.location, now);
+
+      if (!aggregated) {
+        tjmActor.send({ type: 'ERROR', error: 'Pas assez de donnees pour analyser le TJM.' });
+        return;
+      }
+
+      tjmActor.send({ type: 'AGGREGATION_DONE', data: aggregated.dataPoints });
+
+      const analysis = buildAnalysisFromAggregation(aggregated, now);
+      tjmActor.send({ type: 'LLM_DONE', analysis });
+    }).catch((err) => {
+      tjmActor.send({ type: 'ERROR', error: (err as Error).message ?? 'Erreur lors de l\'aggregation.' });
+    });
   });
 
   let title = $state('');
