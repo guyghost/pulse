@@ -36,16 +36,16 @@ export function buildAnalysisFromAggregation(
   const cvFactor = Math.max(0, 1 - cv);
   const confidence = Math.round((countFactor * 0.6 + cvFactor * 0.4) * 100) / 100;
 
-  // Tendance
-  const trend: TJMTrend = cv < 0.1 ? 'stable' : 'up';
+  // Tendance — sans donnees temporelles, on ne peut que mesurer la dispersion
+  const trend: TJMTrend = cv < 0.15 ? 'stable' : 'up';
 
-  const trendDetail = trend === 'stable'
-    ? `Le marche est stable avec un ecart-type faible (${stddev} EUR). Les tarifs sont homogenes.`
-    : `Le marche montre une tendance haussiere avec une dispersion notable (ecart-type : ${stddev} EUR).`;
+  const trendDetail = cv < 0.15
+    ? `Les TJM sont concentres autour de ${median} EUR/jour (ecart-type : ${stddev} EUR). Marche homogene.`
+    : `Les TJM sont disperses (ecart-type : ${stddev} EUR). Fourchette large, le positionnement depend du contexte mission.`;
 
-  const recommendation = trend === 'stable'
-    ? `Positionnez-vous autour de ${median} EUR/jour. Le marche est coherent et les clients s'attendent a cette fourchette.`
-    : `Le marche est dynamique. Visez ${Math.round(median * 1.1)} EUR/jour pour capitaliser sur la tendance haussiere.`;
+  const recommendation = confidence >= 0.5
+    ? `Basee sur ${count} mission${count > 1 ? 's' : ''}, la fourchette recommandee pour un profil confirme est ${confirmed.min}-${confirmed.max} EUR/jour.`
+    : `Donnees insuffisantes (${count} mission${count > 1 ? 's' : ''}). Elargissez votre recherche pour une analyse plus fiable.`;
 
   return {
     junior,

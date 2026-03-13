@@ -5,7 +5,6 @@ type FeedContext = {
   missions: Mission[];
   filteredMissions: Mission[];
   searchQuery: string;
-  sortBy: 'score' | 'date' | 'tjm';
   error: string | null;
 };
 
@@ -17,7 +16,6 @@ type FeedEvent =
   | { type: 'CLEAR_SEARCH' }
   | { type: 'FILTER'; missions: Mission[] }
   | { type: 'CLEAR_FILTERS' }
-  | { type: 'SET_SORT'; sortBy: 'score' | 'date' | 'tjm' }
   | { type: 'REFRESH' };
 
 export const feedMachine = setup({
@@ -72,12 +70,6 @@ export const feedMachine = setup({
     clearFilters: assign({
       filteredMissions: ({ context }) => context.missions,
     }),
-    setSort: assign({
-      sortBy: ({ event }) => {
-        if (event.type === 'SET_SORT') return event.sortBy;
-        return 'score' as const;
-      },
-    }),
   },
 }).createMachine({
   id: 'feed',
@@ -86,7 +78,6 @@ export const feedMachine = setup({
     missions: [],
     filteredMissions: [],
     searchQuery: '',
-    sortBy: 'score' as const,
     error: null,
   },
   states: {
@@ -117,9 +108,6 @@ export const feedMachine = setup({
           target: 'filtered',
           actions: 'applyFilter',
         },
-        SET_SORT: {
-          actions: 'setSort',
-        },
         REFRESH: 'loading',
       },
     },
@@ -136,9 +124,6 @@ export const feedMachine = setup({
           target: 'filtered',
           actions: 'applyFilter',
         },
-        SET_SORT: {
-          actions: 'setSort',
-        },
         REFRESH: 'loading',
       },
     },
@@ -151,9 +136,6 @@ export const feedMachine = setup({
         SEARCH: {
           target: 'searching',
           actions: 'setSearch',
-        },
-        SET_SORT: {
-          actions: 'setSort',
         },
         REFRESH: 'loading',
       },
