@@ -329,7 +329,7 @@
       </div>
 
       <!-- Intervalle de scan -->
-      <div class="section-card rounded-[1.5rem] p-4 space-y-3">
+      <div class="section-card rounded-[1.5rem] p-4 space-y-3 transition-opacity duration-200" class:opacity-40={!autoScan} class:pointer-events-none={!autoScan}>
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Frequence de scan</h3>
           <p class="mt-1 text-xs leading-relaxed text-text-secondary">Scanner les plateformes toutes les {scanInterval} minutes.</p>
@@ -348,6 +348,9 @@
           <span class="text-xs text-text-muted">120 min</span>
         </div>
         <p class="text-center text-sm font-semibold text-accent-blue">{scanInterval} min</p>
+        {#if !autoScan}
+          <p class="text-center text-[11px] text-text-muted">Activez le scan automatique pour configurer la frequence.</p>
+        {/if}
       </div>
 
       <!-- Notifications -->
