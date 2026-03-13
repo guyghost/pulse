@@ -13,6 +13,7 @@
   import { markAsSeen } from '$lib/core/seen/mark-seen';
   import { getFavorites, saveFavorites, getHidden, saveHidden } from '$lib/shell/storage/favorites';
   import { getProfile } from '$lib/shell/storage/db';
+  import { resetNewMissionCount } from '$lib/shell/storage/session-storage';
   import { toggleFavorite, toggleHidden, filterHidden, filterFavoritesOnly } from '$lib/core/favorites/favorites';
 
   const feedActor = createActor(feedMachine);
@@ -95,6 +96,7 @@
   $effect(() => {
     try {
       chrome.action.setBadgeText({ text: '' });
+      resetNewMissionCount();
     } catch {
       // Outside extension context
     }
