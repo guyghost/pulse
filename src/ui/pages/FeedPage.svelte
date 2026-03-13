@@ -6,6 +6,8 @@
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
   import Icon from '../atoms/Icon.svelte';
+  import FilterBar from '../organisms/FilterBar.svelte';
+  import type { MissionSource, RemoteType } from '$lib/core/types/mission';
   import { sendMessage } from '$lib/shell/messaging/bridge';
   import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
   import { markAsSeen } from '$lib/core/seen/mark-seen';
@@ -37,6 +39,15 @@
     if (!showHidden) {
       result = filterHidden(result, hidden);
     }
+    if (selectedSource) {
+      result = result.filter(m => m.source === selectedSource);
+    }
+    if (selectedRemote) {
+      result = result.filter(m => m.remote === selectedRemote);
+    }
+    if (selectedStacks.length > 0) {
+      result = result.filter(m => selectedStacks.some(s => m.stack.includes(s)));
+    }
     return result;
   });
 
@@ -46,9 +57,25 @@
   let sortBy = $state<'score' | 'date' | 'tjm'>('score');
   let showFavoritesOnly = $state(false);
   let showHidden = $state(false);
+  let showFilters = $state(false);
+  let selectedStacks = $state<string[]>([]);
+  let selectedSource = $state<MissionSource | null>(null);
+  let selectedRemote = $state<RemoteType | null>(null);
   let favoriteCount = $derived(Object.keys(favorites).length);
   let hiddenCount = $derived(Object.keys(hidden).length);
   let visibleCount = $derived(displayMissions.length);
+  let filterActive = $derived(selectedSource !== null || selectedRemote !== null || selectedStacks.length > 0);
+  let availableStacks = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const m of missions) {
+      for (const s of m.stack) {
+        counts.set(s, (counts.get(s) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()]
+      .sort((a, b) => b[1] - a[1])
+      .map(([name]) => name);
+  });
   let firstName = $state('');
 
   $effect(() => {
@@ -221,12 +248,47 @@
             <option value="date">Date</option>
             <option value="tjm">TJM</option>
           </select>
+          <button
+            class="inline-flex min-h-10 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition-all duration-200
+              {showFilters
+                ? 'border-accent-blue/30 bg-accent-blue/12 text-accent-blue'
+                : 'border-white/8 bg-white/[0.03] text-text-secondary hover:bg-white/[0.07] hover:text-white'}"
+            onclick={() => showFilters = !showFilters}
+            title={showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
+          >
+            <Icon name="sliders-horizontal" size={14} />
+          </button>
         </div>
       </div>
 
       <div class="mt-3">
         <SearchInput value={searchQuery} onSearch={handleSearch} />
       </div>
+
+      {#if showFilters}
+        <div class="mt-3">
+          <FilterBar
+            {availableStacks}
+            {selectedStacks}
+            {selectedSource}
+            {selectedRemote}
+            onToggleStack={(stack) => {
+              if (selectedStacks.includes(stack)) {
+                selectedStacks = selectedStacks.filter(s => s !== stack);
+              } else {
+                selectedStacks = [...selectedStacks, stack];
+              }
+            }}
+            onSetSource={(source) => { selectedSource = source; }}
+            onSetRemote={(remote) => { selectedRemote = remote; }}
+            onClearAll={() => {
+              selectedStacks = [];
+              selectedSource = null;
+              selectedRemote = null;
+            }}
+          />
+        </div>
+      {/if}
     </section>
   {/snippet}
 
@@ -239,6 +301,7 @@
       {favorites}
       {hidden}
       {sortBy}
+      {filterActive}
       onMissionSeen={handleMissionSeen}
       onToggleFavorite={handleToggleFavorite}
       onHide={handleHide}
