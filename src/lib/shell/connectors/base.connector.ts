@@ -41,7 +41,13 @@ export abstract class BaseConnector implements PlatformConnector {
 
   /** Fetch HTML directly from the side panel context — no offscreen/messaging needed */
   protected async fetchHTML(url: string): Promise<string> {
-    const response = await fetch(url, { credentials: 'include' });
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 15000);
+    const response = await fetch(url, {
+      credentials: 'include',
+      signal: controller.signal,
+    });
+    clearTimeout(timeout);
     if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
     return response.text();
   }
