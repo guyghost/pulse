@@ -11,6 +11,8 @@ export class CometConnector extends BaseConnector {
   readonly baseUrl = BASE_URL;
   readonly icon = 'https://www.google.com/s2/favicons?domain=comet.co&sz=32';
 
+  protected get sessionCheckUrl() { return `${BASE_URL}/freelance/dashboard`; }
+
   async fetchMissions(): Promise<Mission[]> {
     const html = await this.fetchHTML(MISSIONS_URL);
     const now = new Date();

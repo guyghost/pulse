@@ -11,6 +11,8 @@ export class MaltConnector extends BaseConnector {
   readonly baseUrl = BASE_URL;
   readonly icon = 'https://www.google.com/s2/favicons?domain=malt.fr&sz=32';
 
+  protected get sessionCheckUrl() { return `${BASE_URL}/profile/dashboard`; }
+
   async fetchMissions(): Promise<Mission[]> {
     const html = await this.fetchHTML(MISSIONS_URL);
     const now = new Date();

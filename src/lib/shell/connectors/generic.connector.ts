@@ -9,6 +9,7 @@ interface GenericConnectorConfig {
   missionsPath: string;
   idPrefix: string;
   source: MissionSource;
+  sessionCheckPath?: string;
 }
 
 class GenericConnector extends BaseConnector {
@@ -19,6 +20,7 @@ class GenericConnector extends BaseConnector {
   private readonly missionsUrl: string;
   private readonly idPrefix: string;
   private readonly source: MissionSource;
+  private readonly _sessionCheckUrl: string;
 
   constructor(config: GenericConnectorConfig) {
     super();
@@ -29,7 +31,10 @@ class GenericConnector extends BaseConnector {
     this.missionsUrl = `${config.baseUrl}${config.missionsPath}`;
     this.idPrefix = config.idPrefix;
     this.source = config.source;
+    this._sessionCheckUrl = `${config.baseUrl}${config.sessionCheckPath ?? '/dashboard'}`;
   }
+
+  protected get sessionCheckUrl() { return this._sessionCheckUrl; }
 
   async fetchMissions(): Promise<Mission[]> {
     const html = await this.fetchHTML(this.missionsUrl);

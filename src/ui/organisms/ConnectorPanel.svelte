@@ -23,7 +23,7 @@
   <div class="mb-2 flex items-center justify-between">
     <div>
       <div class="flex items-center gap-2">
-        <Icon name="edit-2" size={12} class="text-accent-blue/60" />
+        <Icon name="plug" size={12} class="text-accent-blue/60" />
         <h3 class="text-sm font-semibold text-text-primary">Connecteurs</h3>
       </div>
       <p class="mt-1 text-xs text-text-secondary">Activez les sources que vous voulez scanner.</p>

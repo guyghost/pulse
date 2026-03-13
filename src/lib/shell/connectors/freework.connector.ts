@@ -11,6 +11,8 @@ export class FreeWorkConnector extends BaseConnector {
   readonly baseUrl = BASE_URL;
   readonly icon = 'https://www.google.com/s2/favicons?domain=free-work.com&sz=32';
 
+  protected get sessionCheckUrl() { return `${BASE_URL}/fr/dashboard`; }
+
   async fetchMissions(): Promise<Mission[]> {
     const html = await this.fetchHTML(MISSIONS_URL);
     const now = new Date();
