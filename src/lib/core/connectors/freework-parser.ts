@@ -63,6 +63,8 @@ export function parseFreeWorkHTML(html: string, now: Date, idPrefix: string): Mi
       source: SOURCE,
       scrapedAt: now,
       score: null,
+      semanticScore: null,
+      semanticReason: null,
     });
   });
 

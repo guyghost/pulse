@@ -29,6 +29,8 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
     source: 'free-work',
     scrapedAt: new Date(),
     score: null,
+    semanticScore: null,
+    semanticReason: null,
     ...overrides,
   };
 }

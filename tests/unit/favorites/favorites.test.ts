@@ -14,6 +14,7 @@ function makeMission(id: string): Mission {
     stack: [], tjm: null, location: null, remote: null,
     duration: null, url: `https://example.com/${id}`,
     source: 'free-work', scrapedAt: new Date(), score: null,
+    semanticScore: null, semanticReason: null,
   };
 }
 

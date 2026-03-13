@@ -64,6 +64,8 @@ export function parseMaltHTML(html: string, now: Date, idPrefix: string): Missio
       source: SOURCE,
       scrapedAt: now,
       score: null,
+      semanticScore: null,
+      semanticReason: null,
     });
   });
 
