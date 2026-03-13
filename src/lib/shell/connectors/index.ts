@@ -11,7 +11,7 @@ export const connectorRegistry: PlatformConnector[] = [
   new FreeWorkConnector(),
   new MaltConnector(),
   new CometConnector(),
-  LeHibouConnector,
+  new LeHibouConnector(),
   HiwayConnector,
   CollectiveConnector,
   CherryPickConnector,
