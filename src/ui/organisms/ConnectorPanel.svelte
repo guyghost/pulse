@@ -12,10 +12,9 @@
     enabled: boolean;
   }
 
-  let { connectors = [], onToggle, onScan }: {
+  let { connectors = [], onToggle }: {
     connectors?: ConnectorInfo[];
     onToggle?: (id: string) => void;
-    onScan?: (id: string) => void;
   } = $props();
 </script>
 
@@ -32,7 +31,7 @@
 
   {#each connectors as connector (connector.id)}
     <div class="flex items-center gap-2">
-      <div class="flex-1">
+      <div class="flex-1 min-w-0">
         <ConnectorStatus
           name={connector.name}
           status={connector.status}
@@ -41,21 +40,13 @@
         />
       </div>
       <button
-        class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] transition-colors {connector.enabled ? 'text-accent-emerald hover:bg-accent-emerald/10' : 'text-text-muted hover:bg-white/[0.08]'}"
+        class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {connector.enabled ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/[0.05]'}"
         onclick={() => onToggle?.(connector.id)}
-        title={connector.enabled ? 'D\u00e9sactiver' : 'Activer'}
+        role="switch"
+        aria-checked={connector.enabled}
       >
-        <Icon name={connector.enabled ? 'check' : 'x'} size={14} />
+        <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {connector.enabled ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
       </button>
-      {#if connector.enabled}
-        <button
-          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-secondary transition-colors hover:bg-white/[0.08] hover:text-text-primary"
-          onclick={() => onScan?.(connector.id)}
-          title="Scanner"
-        >
-          <Icon name="refresh-cw" size={14} />
-        </button>
-      {/if}
     </div>
   {/each}
 
