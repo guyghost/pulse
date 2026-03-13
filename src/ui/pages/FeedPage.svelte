@@ -77,6 +77,7 @@
       .map(([name]) => name);
   });
   let firstName = $state('');
+  let scanController: AbortController | null = null;
 
   $effect(() => {
     getSeenIds().then(ids => { seenIds = ids; }).catch(() => {});
@@ -129,17 +130,30 @@
 
   async function startScan() {
     if (isLoading) return;
+    scanController = new AbortController();
     feedActor.send({ type: 'LOAD' });
     try {
-      const result = await runScan();
+      const result = await runScan(scanController.signal);
+      if (scanController.signal.aborted) return;
       feedActor.send({ type: 'MISSIONS_LOADED', missions: result.missions });
       if (result.errors.length > 0 && result.missions.length === 0) {
         const errorMsg = result.errors.map(e => `${e.connectorId}: ${e.message}`).join('\n');
         feedActor.send({ type: 'LOAD_ERROR', error: errorMsg });
       }
     } catch (err) {
+      if (scanController.signal.aborted) return;
       const msg = err instanceof Error ? err.message : 'Erreur de scan';
       feedActor.send({ type: 'LOAD_ERROR', error: msg });
+    } finally {
+      scanController = null;
+    }
+  }
+
+  function stopScan() {
+    if (scanController) {
+      scanController.abort();
+      scanController = null;
+      feedActor.send({ type: 'MISSIONS_LOADED', missions: feedSnapshot.context.missions });
     }
   }
 
@@ -188,13 +202,36 @@
               Surveille les pistes utiles, filtre le bruit et garde les meilleures missions a portee de main.
             </p>
           </div>
-          <button
-            class="soft-ring inline-flex h-11 w-11 items-center justify-center rounded-2xl border border-white/10 bg-white/[0.06] text-white transition-all duration-200 hover:bg-white/[0.1]"
-            onclick={startScan}
-            title="Rafraichir"
-          >
-            <Icon name="refresh-cw" size={16} class={isLoading ? 'animate-spin text-accent-blue' : ''} />
-          </button>
+          <div class="flex items-center gap-2">
+            {#if isLoading}
+              <button
+                class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10 text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
+                onclick={stopScan}
+                title="Stopper le scan"
+              >
+                <Icon name="square" size={14} />
+              </button>
+            {/if}
+            <button
+              class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
+                {isLoading
+                  ? 'border-accent-blue/30 bg-accent-blue/10'
+                  : 'border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]'}"
+              onclick={startScan}
+              disabled={isLoading}
+              title={isLoading ? 'Scan en cours...' : 'Lancer le scan'}
+            >
+              {#if isLoading}
+                <span class="absolute inset-0 flex items-center justify-center">
+                  <span class="radar-ping absolute h-8 w-8 rounded-full border border-accent-blue/40"></span>
+                  <span class="radar-ping animation-delay-500 absolute h-5 w-5 rounded-full border border-accent-blue/60"></span>
+                  <span class="h-2 w-2 rounded-full bg-accent-blue"></span>
+                </span>
+              {:else}
+                <Icon name="play" size={14} class="ml-0.5" />
+              {/if}
+            </button>
+          </div>
         </div>
 
         <ScanProgress isScanning={isLoading} progress={isLoading ? 50 : 100} missionsFound={totalMissions} />

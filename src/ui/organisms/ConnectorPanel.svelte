@@ -58,6 +58,7 @@
         onclick={() => onToggle?.(connector.id)}
         role="switch"
         aria-checked={connector.enabled}
+        aria-label="Activer {connector.name}"
       >
         <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {connector.enabled ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
       </button>
