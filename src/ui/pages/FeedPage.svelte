@@ -8,7 +8,7 @@
   import Icon from '../atoms/Icon.svelte';
   import FilterBar from '../organisms/FilterBar.svelte';
   import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import { sendMessage } from '$lib/shell/messaging/bridge';
+  import { runScan } from '$lib/shell/scan/scanner';
   import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
   import { markAsSeen } from '$lib/core/seen/mark-seen';
   import { getFavorites, saveFavorites, getHidden, saveHidden } from '$lib/shell/storage/favorites';
@@ -95,7 +95,6 @@
     if (seenIds.includes(missionId)) return;
     seenIds = markAsSeen(seenIds, [missionId]);
     saveSeenIds(seenIds).catch(() => {});
-    sendMessage({ type: 'MISSIONS_SEEN', payload: seenIds }).catch(() => {});
   }
 
   function handleToggleFavorite(id: string) {
@@ -128,16 +127,24 @@
     }
   }
 
-  function startScan() {
+  async function startScan() {
     if (isLoading) return;
     feedActor.send({ type: 'LOAD' });
-    sendMessage({ type: 'SCAN_START' }).catch(() => {});
+    try {
+      const result = await runScan();
+      feedActor.send({ type: 'MISSIONS_LOADED', missions: result.missions });
+      if (result.errors.length > 0 && result.missions.length === 0) {
+        const errorMsg = result.errors.map(e => `${e.connectorId}: ${e.message}`).join('\n');
+        feedActor.send({ type: 'LOAD_ERROR', error: errorMsg });
+      }
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'Erreur de scan';
+      feedActor.send({ type: 'LOAD_ERROR', error: msg });
+    }
   }
 
   // Auto-scan on mount
-  $effect(() => {
-    startScan();
-  });
+  startScan();
 
   if (import.meta.env.DEV) {
     $effect(() => {

@@ -197,9 +197,12 @@
       <!-- Profil -->
       <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
         <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-semibold text-text-primary">Profil</h3>
-            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Vos informations de freelance.</p>
+          <div class="flex items-center gap-2">
+            <Icon name="edit-2" size={12} class="text-accent-blue/60" />
+            <div>
+              <h3 class="text-sm font-semibold text-text-primary">Profil</h3>
+              <p class="mt-1 text-xs leading-relaxed text-text-secondary">Vos informations de freelance.</p>
+            </div>
           </div>
           <button
             class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-secondary transition-colors hover:bg-white/[0.08] hover:text-text-primary"
@@ -261,9 +264,12 @@
 
       <!-- Cle API -->
       <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
-        <div>
-          <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Necessaire pour enrichir l'analyse TJM locale avec le modele.</p>
+        <div class="flex items-center gap-2">
+          <Icon name="edit-2" size={12} class="text-accent-blue/60" />
+          <div>
+            <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
+            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Necessaire pour enrichir l'analyse TJM locale avec le modele.</p>
+          </div>
         </div>
         <div class="flex gap-2">
           <input
