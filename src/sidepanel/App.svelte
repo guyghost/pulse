@@ -1,6 +1,6 @@
 <script lang="ts">
   import FeedPage from '../ui/pages/FeedPage.svelte';
-  import TJMPage from '../ui/pages/TJMPage.svelte';
+
   import SettingsPage from '../ui/pages/SettingsPage.svelte';
   import OnboardingPage from '../ui/pages/OnboardingPage.svelte';
   import Icon from '../ui/atoms/Icon.svelte';
@@ -11,12 +11,12 @@
   import { generateMockMissions } from '../dev/mocks';
   import type { LogEntry } from '../dev/bridge-logger';
 
-  type Page = 'feed' | 'tjm' | 'settings' | 'onboarding';
+  type Page = 'feed' | 'settings' | 'onboarding';
 
   let currentPage: Page = $state('onboarding');
   let hasCompletedOnboarding = $state(false);
 
-  const PAGE_INDEX: Record<Page, number> = { onboarding: -1, feed: 0, tjm: 1, settings: 2 };
+  const PAGE_INDEX: Record<Page, number> = { onboarding: -1, feed: 0, settings: 1 };
   let previousPageIndex = $state(PAGE_INDEX['onboarding']);
   let transitionDirection = $state(1);
 
@@ -92,7 +92,6 @@
 
   const navItems: { page: Page; label: string; icon: string }[] = [
     { page: 'feed', label: 'Feed', icon: 'briefcase' },
-    { page: 'tjm', label: 'TJM', icon: 'trending-up' },
     { page: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
@@ -147,8 +146,6 @@
           >
             {#if currentPage === 'feed'}
               <FeedPage />
-            {:else if currentPage === 'tjm'}
-              <TJMPage />
             {:else if currentPage === 'settings'}
               <SettingsPage onBack={() => navigate('feed')} />
             {/if}
