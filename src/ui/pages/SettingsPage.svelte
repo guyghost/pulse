@@ -175,6 +175,17 @@
     }
   }
 
+  async function toggleAllConnectors(enabled: boolean) {
+    connectors = connectors.map(c => ({ ...c, enabled }));
+    try {
+      const settings = await getSettings();
+      const enabledConnectors = enabled ? connectors.map(c => c.id) : [];
+      await setSettings({ ...settings, enabledConnectors });
+    } catch {
+      // Hors contexte extension
+    }
+  }
+
   async function handleResetAll() {
     try {
       await chrome.storage.local.clear();
@@ -328,6 +339,7 @@
       <ConnectorPanel
         {connectors}
         onToggle={toggleConnector}
+        onToggleAll={toggleAllConnectors}
       />
 
       <!-- Zone de danger -->
