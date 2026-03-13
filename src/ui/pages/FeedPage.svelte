@@ -12,7 +12,8 @@
   import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
   import { markAsSeen } from '$lib/core/seen/mark-seen';
   import { getFavorites, saveFavorites, getHidden, saveHidden } from '$lib/shell/storage/favorites';
-  import { getProfile } from '$lib/shell/storage/db';
+  import { getProfile, getMissions } from '$lib/shell/storage/db';
+  import { getSettings } from '$lib/shell/storage/chrome-storage';
   import { resetNewMissionCount } from '$lib/shell/storage/session-storage';
   import { toggleFavorite, toggleHidden, filterHidden, filterFavoritesOnly } from '$lib/core/favorites/favorites';
   import { getPanelSide, type PanelSide } from '$lib/shell/ui/panel-layout';
@@ -152,6 +153,7 @@
       const result = await runScan(scanController.signal);
       if (scanController.signal.aborted) return;
       feedActor.send({ type: 'MISSIONS_LOADED', missions: result.missions });
+      try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
       if (result.errors.length > 0 && result.missions.length === 0) {
         const errorMsg = result.errors.map(e => `${e.connectorId}: ${e.message}`).join('\n');
         feedActor.send({ type: 'LOAD_ERROR', error: errorMsg });
@@ -173,8 +175,35 @@
     }
   }
 
-  // Auto-scan on mount
-  startScan();
+  // Smart load: use persisted data if fresh, scan only if stale
+  async function smartLoad() {
+    try {
+      const [stored, settings] = await Promise.all([getMissions(), getSettings()]);
+      if (stored.length > 0) {
+        feedActor.send({ type: 'MISSIONS_LOADED', missions: stored });
+        const result = await chrome.storage.local.get('lastGlobalSync');
+        const lastSync = result.lastGlobalSync as number | undefined;
+        const intervalMs = settings.scanIntervalMinutes * 60 * 1000;
+        if (lastSync && Date.now() - lastSync < intervalMs) return;
+      }
+      startScan();
+    } catch {
+      startScan();
+    }
+  }
+  smartLoad();
+
+  // Listen for background scan results from service worker
+  try {
+    const handleBgScan = (message: any) => {
+      if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
+        feedActor.send({ type: 'MISSIONS_LOADED', missions: message.payload });
+      }
+    };
+    chrome.runtime.onMessage.addListener(handleBgScan);
+  } catch {
+    // Outside extension context
+  }
 
   if (import.meta.env.DEV) {
     $effect(() => {
