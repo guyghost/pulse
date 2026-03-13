@@ -5,6 +5,7 @@ const storage: Record<string, unknown> = {
     scanIntervalMinutes: 30,
     enabledConnectors: ['free-work'],
     notifications: true,
+    autoScan: true,
   },
 };
 
