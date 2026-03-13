@@ -16,6 +16,8 @@ export abstract class BaseConnector implements PlatformConnector {
 
   async detectSession(): Promise<boolean> {
     try {
+      // TODO: When `tabs` permission is available, skip detection if platform tab is frozen
+      // (Chrome 132+ tabs.Tab.frozen property) to avoid unnecessary fetch requests.
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
       const response = await fetch(this.sessionCheckUrl, {
