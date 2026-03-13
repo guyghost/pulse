@@ -15,6 +15,7 @@
   import { getProfile } from '$lib/shell/storage/db';
   import { resetNewMissionCount } from '$lib/shell/storage/session-storage';
   import { toggleFavorite, toggleHidden, filterHidden, filterFavoritesOnly } from '$lib/core/favorites/favorites';
+  import { getPanelSide, type PanelSide } from '$lib/shell/ui/panel-layout';
 
   const feedActor = createActor(feedMachine);
   feedActor.start();
@@ -78,6 +79,7 @@
       .map(([name]) => name);
   });
   let firstName = $state('');
+  let panelSide = $state<PanelSide>('right');
   let scanController: AbortController | null = null;
 
   $effect(() => {
@@ -91,6 +93,10 @@
 
   $effect(() => {
     getProfile().then(p => { if (p?.firstName) firstName = p.firstName; }).catch(() => {});
+  });
+
+  $effect(() => {
+    getPanelSide().then(side => { panelSide = side; });
   });
 
   $effect(() => {
@@ -212,7 +218,7 @@
               Surveille les pistes utiles, filtre le bruit et garde les meilleures missions a portee de main.
             </p>
           </div>
-          <div class="flex items-center gap-2">
+          <div class="flex items-center gap-2" class:flex-row-reverse={panelSide === 'left'}>
             {#if isLoading}
               <button
                 class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10 text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
