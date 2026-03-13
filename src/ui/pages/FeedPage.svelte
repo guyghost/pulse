@@ -17,6 +17,7 @@
   import { resetNewMissionCount } from '$lib/shell/storage/session-storage';
   import { toggleFavorite, toggleHidden, filterHidden, filterFavoritesOnly } from '$lib/core/favorites/favorites';
   import { getPanelSide, type PanelSide } from '$lib/shell/ui/panel-layout';
+  import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabilities';
 
   const feedActor = createActor(feedMachine);
   feedActor.start();
@@ -81,7 +82,12 @@
   });
   let firstName = $state('');
   let panelSide = $state<PanelSide>('right');
+  let aiStatus = $state<AiAvailability>('no');
   let scanController: AbortController | null = null;
+  let scanCurrent = $state(0);
+  let scanTotal = $state(0);
+  let scanConnectorName = $state('');
+  let scanPercent = $derived(scanTotal > 0 ? Math.round((scanCurrent / scanTotal) * 100) : 0);
 
   $effect(() => {
     getSeenIds().then(ids => { seenIds = ids; }).catch(() => {});
@@ -149,8 +155,15 @@
     if (isLoading) return;
     scanController = new AbortController();
     feedActor.send({ type: 'LOAD' });
+    scanCurrent = 0;
+    scanTotal = 0;
+    scanConnectorName = '';
     try {
-      const result = await runScan(scanController.signal);
+      const result = await runScan(scanController.signal, (info) => {
+        scanCurrent = info.current;
+        scanTotal = info.total;
+        scanConnectorName = info.connectorName;
+      });
       if (scanController.signal.aborted) return;
       feedActor.send({ type: 'MISSIONS_LOADED', missions: result.missions });
       try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
@@ -279,7 +292,7 @@
           </div>
         </div>
 
-        <ScanProgress isScanning={isLoading} progress={isLoading ? 50 : 100} missionsFound={totalMissions} />
+        <ScanProgress isScanning={isLoading} progress={scanPercent} missionsFound={totalMissions} connectorName={scanConnectorName} current={scanCurrent} total={scanTotal} />
 
         <div class="mt-4 grid grid-cols-3 gap-2">
           <div class="rounded-[1.25rem] border border-white/8 bg-white/[0.05] px-3 py-3">
