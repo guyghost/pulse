@@ -1,72 +1,95 @@
-import type { Mission, MissionSource } from '../types/mission';
+import type { Mission, MissionSource, RemoteType } from '../types/mission';
 
 const SOURCE: MissionSource = 'free-work';
 const BASE_URL = 'https://www.free-work.com';
 
-export function parseFreeWorkHTML(html: string, now: Date, idPrefix: string): Mission[] {
-  if (!html.trim()) return [];
+/** Shape of a job posting from the Free-Work Hydra/JSON-LD API */
+export interface FreeWorkJobPosting {
+  '@id': string;
+  id: number;
+  title: string;
+  slug: string;
+  description: string | null;
+  candidateProfile: string | null;
+  companyDescription: string | null;
+  minDailySalary: number | null;
+  maxDailySalary: number | null;
+  minAnnualSalary: number | null;
+  maxAnnualSalary: number | null;
+  dailySalary: string | null;
+  annualSalary: string | null;
+  currency: string;
+  duration: number | null;
+  durationValue: number | null;
+  durationPeriod: string | null;
+  renewable: boolean;
+  remoteMode: string | null;
+  contracts: string[];
+  location: {
+    locality: string | null;
+    adminLevel1: string | null;
+    label: string | null;
+    shortLabel: string | null;
+  } | null;
+  company: {
+    name: string;
+    slug: string;
+  } | null;
+  job: {
+    name: string;
+    slug: string;
+  } | null;
+  skills: { name: string; slug: string }[];
+  publishedAt: string | null;
+  startsAt: string | null;
+}
 
-  const parser = new DOMParser();
-  const doc = parser.parseFromString(html, 'text/html');
-  const missions: Mission[] = [];
+export interface FreeWorkApiResponse {
+  'hydra:totalItems': number;
+  'hydra:member': FreeWorkJobPosting[];
+}
 
-  const cards = doc.querySelectorAll('[data-cy="job-card"], .job-card, article.mission, .search-result-item');
+function mapRemoteMode(mode: string | null): RemoteType | null {
+  if (!mode) return null;
+  switch (mode) {
+    case 'full': return 'full';
+    case 'partial': return 'hybrid';
+    case 'none': return 'onsite';
+    default: return null;
+  }
+}
 
-  cards.forEach((card, index) => {
-    const titleEl = card.querySelector('h2 a, h3 a, .job-title a, a[data-cy="job-title"]');
-    const title = titleEl?.textContent?.trim() ?? '';
-    const href = titleEl?.getAttribute('href') ?? '';
-    const url = href.startsWith('http') ? href : `${BASE_URL}${href}`;
+function formatDuration(value: number | null, period: string | null): string | null {
+  if (value == null || !period) return null;
+  const label = period === 'month' ? 'mois' : period === 'year' ? 'an' : period;
+  return `${value} ${label}`;
+}
 
-    if (!title) return;
+function buildJobUrl(slug: string, jobSlug: string | null): string {
+  const category = jobSlug ?? 'autre';
+  return `${BASE_URL}/fr/tech-it/${category}/job-mission/${slug}`;
+}
 
-    const clientEl = card.querySelector('.company-name, [data-cy="company-name"], .client');
-    const client = clientEl?.textContent?.trim() ?? null;
+export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[] {
+  if (!data['hydra:member'] || !Array.isArray(data['hydra:member'])) return [];
 
-    const stackEls = card.querySelectorAll('.tag, .skill-tag, [data-cy="skill-tag"], .badge');
-    const stack = Array.from(stackEls).map(el => el.textContent?.trim() ?? '').filter(Boolean);
-
-    const tjmEl = card.querySelector('.tjm, .daily-rate, [data-cy="daily-rate"]');
-    const tjmText = tjmEl?.textContent?.trim() ?? '';
-    const tjmMatch = tjmText.match(/(\d+)/);
-    const tjm = tjmMatch ? parseInt(tjmMatch[1], 10) : null;
-
-    const locationEl = card.querySelector('.location, [data-cy="location"], .city');
-    const location = locationEl?.textContent?.trim() ?? null;
-
-    const durationEl = card.querySelector('.duration, [data-cy="duration"]');
-    const duration = durationEl?.textContent?.trim() ?? null;
-
-    const descEl = card.querySelector('.description, .job-description, p');
-    const description = descEl?.textContent?.trim() ?? '';
-
-    const fullText = card.textContent?.toLowerCase() ?? '';
-    const remote = fullText.includes('full remote') || fullText.includes('télétravail complet')
-      ? 'full' as const
-      : fullText.includes('hybride') || fullText.includes('hybrid')
-      ? 'hybrid' as const
-      : fullText.includes('sur site') || fullText.includes('on-site') || fullText.includes('onsite')
-      ? 'onsite' as const
-      : null;
-
-    missions.push({
-      id: `${idPrefix}-${index}`,
-      title,
-      client,
-      description,
-      stack,
-      tjm,
-      location,
-      remote,
-      duration,
-      url,
+  return data['hydra:member']
+    .filter(p => p.contracts?.includes('contractor'))
+    .map((p): Mission => ({
+      id: `fw-${p.id}`,
+      title: p.title,
+      client: p.company?.name ?? null,
+      description: p.description ?? '',
+      stack: (p.skills ?? []).map(s => s.name),
+      tjm: p.minDailySalary ?? p.maxDailySalary ?? null,
+      location: p.location?.label ?? p.location?.shortLabel ?? null,
+      remote: mapRemoteMode(p.remoteMode),
+      duration: formatDuration(p.durationValue, p.durationPeriod),
+      url: buildJobUrl(p.slug, p.job?.slug ?? null),
       source: SOURCE,
       scrapedAt: now,
       score: null,
       semanticScore: null,
       semanticReason: null,
-    });
-  });
-
-  return missions;
+    }));
 }
