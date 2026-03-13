@@ -248,8 +248,8 @@
   }
 </script>
 
-<FeedLayout feed={feedContent} header={headerContent} onRefresh={startScan}>
-  {#snippet headerContent()}
+<FeedLayout onRefresh={startScan}>
+  {#snippet header()}
     <section class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4">
       <div class="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-accent-blue/14 blur-3xl"></div>
       <div class="pointer-events-none absolute bottom-0 left-10 h-20 w-20 rounded-full bg-accent-emerald/10 blur-2xl"></div>
@@ -403,7 +403,7 @@
     </section>
   {/snippet}
 
-  {#snippet feedContent()}
+  {#snippet feed()}
     <MissionFeed
       missions={displayMissions}
       {isLoading}
