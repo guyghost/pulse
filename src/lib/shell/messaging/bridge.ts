@@ -28,7 +28,8 @@ export type BridgeMessage =
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }
-  | { type: 'MISSIONS_SEEN'; payload: string[] };
+  | { type: 'MISSIONS_SEEN'; payload: string[] }
+  | { type: 'SCAN_COMPLETE'; payload: Mission[] };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {
