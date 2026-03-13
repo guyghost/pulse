@@ -29,6 +29,9 @@
   // --- Notifications ---
   let notifications = $state(true);
 
+  // --- Auto-scan ---
+  let autoScan = $state(true);
+
   // --- Connecteurs ---
   let connectors = $state<{
     id: string;
@@ -76,6 +79,7 @@
       const settings = await getSettings();
       scanInterval = settings.scanIntervalMinutes;
       notifications = settings.notifications;
+      autoScan = settings.autoScan;
 
       // Construire la liste des connecteurs a partir du registre
       const detections = await Promise.allSettled(
@@ -157,6 +161,16 @@
     try {
       const settings = await getSettings();
       await setSettings({ ...settings, notifications });
+    } catch {
+      // Hors contexte extension
+    }
+  }
+
+  async function handleToggleAutoScan() {
+    autoScan = !autoScan;
+    try {
+      const settings = await getSettings();
+      await setSettings({ ...settings, autoScan });
     } catch {
       // Hors contexte extension
     }
@@ -292,6 +306,25 @@
           <Button variant="secondary" onclick={handleSaveApiKey}>
             {#snippet children()}{apiKeySaved ? 'Sauve !' : 'Sauver'}{/snippet}
           </Button>
+        </div>
+      </div>
+
+      <!-- Scan automatique -->
+      <div class="section-card rounded-[1.5rem] p-4">
+        <div class="flex items-center justify-between">
+          <div>
+            <h3 class="text-sm font-semibold text-text-primary">Scan automatique</h3>
+            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Scanner les plateformes en arriere-plan automatiquement.</p>
+          </div>
+          <button
+            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {autoScan ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/[0.05]'}"
+            onclick={handleToggleAutoScan}
+            role="switch"
+            aria-checked={autoScan}
+            aria-label="Activer le scan automatique"
+          >
+            <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {autoScan ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
+          </button>
         </div>
       </div>
 
