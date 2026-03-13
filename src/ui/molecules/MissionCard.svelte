@@ -126,6 +126,11 @@
     {#if mission.stack.length > 3}
       <Badge label="+{mission.stack.length - 3}" variant="source" />
     {/if}
+    {#if mission.semanticReason}
+      <span class="inline-flex items-center gap-1 rounded-full border border-accent-blue/20 bg-accent-blue/8 px-2 py-0.5 text-[11px] text-accent-blue">
+        {mission.semanticReason}
+      </span>
+    {/if}
   </div>
 
   {#if mission.description}
