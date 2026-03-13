@@ -1,19 +1,39 @@
 import type { PlatformConnector } from '../../core/types/connector';
 import type { Mission } from '../../core/types/mission';
 
+const LOGIN_PATTERNS = ['/login', '/signin', '/sign-in', '/sign_in', '/auth', '/connexion', '/register', '/signup'];
+
 export abstract class BaseConnector implements PlatformConnector {
   abstract readonly id: string;
   abstract readonly name: string;
   abstract readonly baseUrl: string;
   abstract readonly icon: string;
 
+  /** URL to probe for session detection (override for platforms with public landing pages) */
+  protected get sessionCheckUrl(): string {
+    return this.baseUrl;
+  }
+
   async detectSession(): Promise<boolean> {
     try {
-      const cookies = await chrome.cookies.getAll({ domain: new URL(this.baseUrl).hostname });
-      return cookies.length > 0;
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(this.sessionCheckUrl, {
+        credentials: 'include',
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (response.status === 401 || response.status === 403) return false;
+
+      // Detect redirect to login page
+      const finalUrl = response.url.toLowerCase();
+      if (LOGIN_PATTERNS.some(p => finalUrl.includes(p))) return false;
+
+      return response.ok;
     } catch {
-      // Outside extension context — assume OK (side panel can still fetch)
-      return true;
+      return false;
     }
   }
 
