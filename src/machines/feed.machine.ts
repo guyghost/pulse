@@ -80,6 +80,12 @@ export const feedMachine = setup({
     searchQuery: '',
     error: null,
   },
+  on: {
+    MISSIONS_LOADED: {
+      target: '.loaded',
+      actions: 'setMissions',
+    },
+  },
   states: {
     empty: {
       on: {
@@ -88,10 +94,6 @@ export const feedMachine = setup({
     },
     loading: {
       on: {
-        MISSIONS_LOADED: {
-          target: 'loaded',
-          actions: 'setMissions',
-        },
         LOAD_ERROR: {
           target: 'error',
           actions: 'setError',

@@ -1,4 +1,4 @@
-export type MissionSource = 'free-work' | 'malt' | 'comet';
+export type MissionSource = 'free-work' | 'malt' | 'comet' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick';
 
 export type RemoteType = 'full' | 'hybrid' | 'onsite';
 

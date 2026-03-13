@@ -10,6 +10,8 @@
     icon?: string;
   } = $props();
 
+  let imgFailed = $state(false);
+
   let indicatorStatus = $derived(
     status === 'done' || status === 'authenticated' ? 'online' as const
     : status === 'error' || status === 'expired' ? 'error' as const
@@ -25,7 +27,7 @@
     : 'Erreur'
   );
 
-  let relativeTime = $derived(() => {
+  let relativeTime = $derived.by(() => {
     if (!lastSync) return 'Jamais';
     const diff = Date.now() - lastSync.getTime();
     const minutes = Math.floor(diff / 60000);
@@ -39,14 +41,18 @@
 
 <div class="flex items-center gap-3 rounded-[1.2rem] border border-white/8 bg-white/[0.04] px-3 py-3">
   <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04]">
-    <Icon name={icon} size={16} class="text-text-secondary" />
+    {#if icon.startsWith('http') && !imgFailed}
+      <img src={icon} alt={name} width="20" height="20" class="rounded-sm" onerror={() => { imgFailed = true; }} />
+    {:else}
+      <span class="text-[11px] font-bold text-text-secondary">{name.slice(0, 2).toUpperCase()}</span>
+    {/if}
   </div>
   <div class="flex-1 min-w-0">
     <p class="text-sm font-medium text-text-primary">{name}</p>
     <p class="text-[11px] text-text-secondary">{statusLabel}</p>
   </div>
   <div class="flex items-center gap-2">
-    <span class="text-[10px] text-text-muted">{relativeTime()}</span>
+    <span class="text-[10px] text-text-muted">{relativeTime}</span>
     <Indicator status={indicatorStatus} />
   </div>
 </div>
