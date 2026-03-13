@@ -107,6 +107,10 @@
   });
 
   $effect(() => {
+    isPromptApiAvailable().then(status => { aiStatus = status; }).catch(() => {});
+  });
+
+  $effect(() => {
     try {
       chrome.action.setBadgeText({ text: '' });
       resetNewMissionCount();
@@ -308,6 +312,11 @@
             <p class="mt-2 text-xl font-semibold text-text-primary">{hiddenCount}</p>
           </div>
         </div>
+        {#if aiStatus === 'after-download'}
+          <p class="mt-2 text-center text-[11px] text-text-muted">Scoring IA en telechargement...</p>
+        {:else if aiStatus === 'no'}
+          <p class="mt-2 text-center text-[11px] text-text-muted">Scoring IA indisponible</p>
+        {/if}
       </div>
     </section>
 
