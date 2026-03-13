@@ -92,6 +92,14 @@
     getProfile().then(p => { if (p?.firstName) firstName = p.firstName; }).catch(() => {});
   });
 
+  $effect(() => {
+    try {
+      chrome.action.setBadgeText({ text: '' });
+    } catch {
+      // Outside extension context
+    }
+  });
+
   function handleMissionSeen(missionId: string) {
     if (seenIds.includes(missionId)) return;
     seenIds = markAsSeen(seenIds, [missionId]);
