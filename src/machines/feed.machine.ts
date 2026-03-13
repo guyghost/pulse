@@ -15,8 +15,7 @@ type FeedEvent =
   | { type: 'SEARCH'; query: string }
   | { type: 'CLEAR_SEARCH' }
   | { type: 'FILTER'; missions: Mission[] }
-  | { type: 'CLEAR_FILTERS' }
-  | { type: 'REFRESH' };
+  | { type: 'CLEAR_FILTERS' };
 
 export const feedMachine = setup({
   types: {
@@ -85,13 +84,10 @@ export const feedMachine = setup({
       target: '.loaded',
       actions: 'setMissions',
     },
+    LOAD: '.loading',
   },
   states: {
-    empty: {
-      on: {
-        LOAD: 'loading',
-      },
-    },
+    empty: {},
     loading: {
       on: {
         LOAD_ERROR: {
@@ -110,7 +106,6 @@ export const feedMachine = setup({
           target: 'filtered',
           actions: 'applyFilter',
         },
-        REFRESH: 'loading',
       },
     },
     searching: {
@@ -126,7 +121,6 @@ export const feedMachine = setup({
           target: 'filtered',
           actions: 'applyFilter',
         },
-        REFRESH: 'loading',
       },
     },
     filtered: {
@@ -139,13 +133,8 @@ export const feedMachine = setup({
           target: 'searching',
           actions: 'setSearch',
         },
-        REFRESH: 'loading',
       },
     },
-    error: {
-      on: {
-        REFRESH: 'loading',
-      },
-    },
+    error: {},
   },
 });

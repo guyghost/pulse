@@ -118,24 +118,24 @@ describe('feed machine', () => {
     actor.stop();
   });
 
-  it('refreshes from loaded state', () => {
+  it('can reload from loaded state', () => {
     const actor = createActor(feedMachine).start();
     actor.send({ type: 'LOAD' });
     actor.send({ type: 'MISSIONS_LOADED', missions: [makeMission()] });
     expect(actor.getSnapshot().value).toBe('loaded');
 
-    actor.send({ type: 'REFRESH' });
+    actor.send({ type: 'LOAD' });
     expect(actor.getSnapshot().value).toBe('loading');
     actor.stop();
   });
 
-  it('refreshes from error state', () => {
+  it('can reload from error state', () => {
     const actor = createActor(feedMachine).start();
     actor.send({ type: 'LOAD' });
     actor.send({ type: 'LOAD_ERROR', error: 'fail' });
     expect(actor.getSnapshot().value).toBe('error');
 
-    actor.send({ type: 'REFRESH' });
+    actor.send({ type: 'LOAD' });
     expect(actor.getSnapshot().value).toBe('loading');
     actor.stop();
   });
