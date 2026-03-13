@@ -12,10 +12,13 @@
     enabled: boolean;
   }
 
-  let { connectors = [], onToggle }: {
+  let { connectors = [], onToggle, onToggleAll }: {
     connectors?: ConnectorInfo[];
     onToggle?: (id: string) => void;
+    onToggleAll?: (enabled: boolean) => void;
   } = $props();
+
+  let allEnabled = $derived(connectors.length > 0 && connectors.every(c => c.enabled));
 </script>
 
 <div class="section-card rounded-[1.5rem] p-4 space-y-3">
@@ -27,6 +30,17 @@
       </div>
       <p class="mt-1 text-xs text-text-secondary">Activez les sources que vous voulez scanner.</p>
     </div>
+    {#if connectors.length > 0}
+      <button
+        class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {allEnabled ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/[0.05]'}"
+        onclick={() => onToggleAll?.(!allEnabled)}
+        role="switch"
+        aria-checked={allEnabled}
+        aria-label="Activer ou désactiver tous les connecteurs"
+      >
+        <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {allEnabled ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
+      </button>
+    {/if}
   </div>
 
   {#each connectors as connector (connector.id)}
