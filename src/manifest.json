@@ -3,7 +3,7 @@
   "name": "MissionPulse",
   "version": "0.1.0",
   "description": "Agent freelance : feed de missions centralisé avec scoring et analyse TJM",
-  "permissions": ["sidePanel", "storage", "cookies", "alarms"],
+  "permissions": ["sidePanel", "storage", "cookies", "alarms", "notifications"],
   "host_permissions": [
     "https://www.free-work.com/*",
     "https://www.malt.fr/*",

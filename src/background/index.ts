@@ -70,4 +70,23 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // Initial setup
 setupAlarm();
 
+chrome.action.onUserSettingsChanged.addListener(async (change) => {
+  if (change.isOnToolbar) {
+    console.log('[MissionPulse] Extension pinned to toolbar');
+    const settings = await getSettings();
+    if (!settings.autoScan && settings.notifications) {
+      try {
+        await chrome.notifications.create('suggest-auto-scan', {
+          type: 'basic',
+          iconUrl: 'static/icons/icon-128.svg',
+          title: 'MissionPulse',
+          message: 'Activez le scan automatique dans les parametres pour ne rater aucune mission.',
+        });
+      } catch {
+        // Notifications permission not available
+      }
+    }
+  }
+});
+
 export {};
