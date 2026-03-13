@@ -329,6 +329,7 @@
             onclick={handleToggleNotifications}
             role="switch"
             aria-checked={notifications}
+            aria-label="Activer les notifications"
           >
             <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {notifications ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
           </button>

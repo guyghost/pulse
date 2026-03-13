@@ -11,7 +11,7 @@ export interface ScanResult {
   errors: { connectorId: string; message: string }[];
 }
 
-export async function runScan(): Promise<ScanResult> {
+export async function runScan(signal?: AbortSignal): Promise<ScanResult> {
   const settings = await getSettings();
   const enabledIds = settings.enabledConnectors;
   const errors: ScanResult['errors'] = [];
@@ -27,9 +27,12 @@ export async function runScan(): Promise<ScanResult> {
     return connector;
   }).filter((c): c is NonNullable<typeof c> => c != null);
 
+  if (signal?.aborted) return { missions: [], errors };
+
   // Fetch all connectors in parallel
   const results = await Promise.allSettled(
     connectors.map(async connector => {
+      if (signal?.aborted) return { connectorId: connector.id, missions: [] as Mission[] };
       try {
         const missions = await connector.fetchMissions();
         return { connectorId: connector.id, missions };
@@ -40,6 +43,8 @@ export async function runScan(): Promise<ScanResult> {
       }
     })
   );
+
+  if (signal?.aborted) return { missions: [], errors };
 
   const allMissions: Mission[] = [];
   for (const result of results) {
