@@ -108,7 +108,7 @@
   }
 </script>
 
-<div class="panel-shell relative flex h-screen w-[400px] flex-col overflow-hidden text-text-primary font-sans">
+<div class="panel-shell relative flex h-screen w-full flex-col overflow-hidden text-text-primary font-sans">
   <div class="panel-grid pointer-events-none absolute inset-0 opacity-45"></div>
   <div class="pointer-events-none absolute -left-16 top-10 h-40 w-40 rounded-full bg-accent-blue/12 blur-3xl"></div>
   <div class="pointer-events-none absolute right-[-2.5rem] top-48 h-36 w-36 rounded-full bg-accent-emerald/10 blur-3xl"></div>
