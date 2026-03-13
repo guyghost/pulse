@@ -1,8 +1,8 @@
 <script lang="ts">
   import { createActor } from 'xstate';
   import { feedMachine } from '../../machines/feed.machine';
-  import FeedLayout from '../templates/FeedLayout.svelte';
   import MissionFeed from '../organisms/MissionFeed.svelte';
+  import { pullToRefresh } from '../actions/pull-to-refresh';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
   import Icon from '../atoms/Icon.svelte';
@@ -248,8 +248,8 @@
   }
 </script>
 
-<FeedLayout onRefresh={startScan}>
-  {#snippet header()}
+<div class="flex h-full flex-col">
+  <div class="shrink-0 px-4 pt-4">
     <section class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4">
       <div class="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-accent-blue/14 blur-3xl"></div>
       <div class="pointer-events-none absolute bottom-0 left-10 h-20 w-20 rounded-full bg-accent-emerald/10 blur-2xl"></div>
@@ -401,9 +401,12 @@
         </div>
       {/if}
     </section>
-  {/snippet}
+  </div>
 
-  {#snippet feed()}
+  <div
+    class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
+    use:pullToRefresh={{ onRefresh: () => startScan(), threshold: 60 }}
+  >
     <MissionFeed
       missions={displayMissions}
       {isLoading}
@@ -426,5 +429,5 @@
         {showHidden ? 'Masquer les ignorees' : `Voir les ${hiddenCount} mission${hiddenCount > 1 ? 's' : ''} masquee${hiddenCount > 1 ? 's' : ''}`}
       </button>
     {/if}
-  {/snippet}
-</FeedLayout>
+  </div>
+</div>
