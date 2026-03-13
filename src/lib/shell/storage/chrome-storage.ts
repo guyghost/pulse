@@ -2,12 +2,14 @@ export interface AppSettings {
   scanIntervalMinutes: number;
   enabledConnectors: string[];
   notifications: boolean;
+  autoScan: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
   scanIntervalMinutes: 30,
   enabledConnectors: ['free-work'],
   notifications: true,
+  autoScan: true,
 };
 
 export async function getApiKey(): Promise<string | null> {
