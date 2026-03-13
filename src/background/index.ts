@@ -4,6 +4,7 @@ import type { UserProfile } from '../lib/core/types/profile';
 import { getSettings } from '../lib/shell/storage/chrome-storage';
 import { runScan } from '../lib/shell/scan/scanner';
 import { getSeenIds } from '../lib/shell/storage/seen-missions';
+import { setNewMissionCount } from '../lib/shell/storage/session-storage';
 
 console.log('[MissionPulse] Service worker started');
 
@@ -48,6 +49,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (result.missions.length === 0) return;
     const seenIds = await getSeenIds();
     const newCount = result.missions.filter(m => !seenIds.includes(m.id)).length;
+    await setNewMissionCount(newCount);
     if (newCount > 0) {
       await chrome.action.setBadgeText({ text: String(newCount) });
       await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
