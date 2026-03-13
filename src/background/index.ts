@@ -46,6 +46,14 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   console.log('[MissionPulse] Auto-scan triggered');
   try {
     const result = await runScan();
+    try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
+    if (result.missions.length > 0) {
+      try {
+        await chrome.runtime.sendMessage({ type: 'SCAN_COMPLETE', payload: result.missions });
+      } catch {
+        // Side panel not open, ignore
+      }
+    }
     if (result.missions.length === 0) return;
     const seenIds = await getSeenIds();
     const newCount = result.missions.filter(m => !seenIds.includes(m.id)).length;
