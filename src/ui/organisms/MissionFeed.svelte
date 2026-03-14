@@ -44,7 +44,7 @@
 </script>
 
 <div class="flex flex-col gap-3 overflow-y-auto">
-  {#if isLoading}
+  {#if isLoading && sortedMissions.length === 0}
     {#each Array(3) as _}
       <div class="section-card rounded-[1.5rem] p-4 space-y-3">
         <Skeleton width="58%" height="1.15rem" />
@@ -57,7 +57,7 @@
         <Skeleton width="100%" height="3rem" />
       </div>
     {/each}
-  {:else if error}
+  {:else if error && sortedMissions.length === 0}
     <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
       <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-red/12">
         <Icon name="x" size={20} class="text-accent-red" />
@@ -72,16 +72,24 @@
           <Icon name="filter-x" size={20} class="text-text-muted" />
         </div>
         <p class="text-sm font-semibold text-text-primary">Aucun resultat</p>
-        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">Essayez d’elargir vos filtres ou de modifier vos criteres de recherche.</p>
+        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">Essayez d'elargir vos filtres ou de modifier vos criteres de recherche.</p>
       {:else}
         <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
           <Icon name="briefcase" size={20} class="text-text-muted" />
         </div>
-        <p class="text-sm font-semibold text-text-primary">Aucune mission pour l’instant</p>
+        <p class="text-sm font-semibold text-text-primary">Aucune mission pour l'instant</p>
         <p class="mt-2 text-xs text-text-secondary">Lancez un scan pour alimenter le radar.</p>
       {/if}
     </div>
   {:else}
+    {#if error}
+      <div class="section-card rounded-[1.25rem] flex items-center gap-3 px-4 py-3">
+        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-red/12">
+          <Icon name="x" size={14} class="text-accent-red" />
+        </div>
+        <p class="text-xs leading-relaxed text-text-secondary">{error}</p>
+      </div>
+    {/if}
     {#each sortedMissions as mission, i (mission.id)}
       <div in:fly={{ y: 15, duration: 250, delay: Math.min(i * 50, 300), easing: cubicOut }}>
         <MissionCard
