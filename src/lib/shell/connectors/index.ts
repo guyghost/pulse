@@ -13,7 +13,7 @@ export const connectorRegistry: PlatformConnector[] = [
   new CometConnector(),
   new LeHibouConnector(),
   HiwayConnector,
-  CollectiveConnector,
+  new CollectiveConnector(),
   CherryPickConnector,
 ];
 

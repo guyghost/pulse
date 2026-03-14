@@ -65,7 +65,7 @@ export function extractCollectiveProjects(html: string): CollectiveProject[] {
 
   try {
     const data = JSON.parse(match[1]);
-    const projects = data?.props?.pageProps?.projects;
+    const projects = data?.props?.pageProps?.dehydratedState?.queries?.[0]?.state?.data?.results?.projects;
     return Array.isArray(projects) ? projects : [];
   } catch {
     return [];
