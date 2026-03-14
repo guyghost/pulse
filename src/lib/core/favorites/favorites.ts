@@ -2,12 +2,12 @@ import type { Mission } from '../types/mission';
 
 export const MAX_ENTRIES = 500;
 
-function toggle(map: Record<string, number>, id: string): Record<string, number> {
+function toggle(map: Record<string, number>, id: string, now: number): Record<string, number> {
   if (id in map) {
     const { [id]: _, ...rest } = map;
     return rest;
   }
-  const updated = { ...map, [id]: Date.now() };
+  const updated = { ...map, [id]: now };
   const keys = Object.keys(updated);
   if (keys.length > MAX_ENTRIES) {
     const sorted = keys.sort((a, b) => updated[a] - updated[b]);
@@ -19,12 +19,12 @@ function toggle(map: Record<string, number>, id: string): Record<string, number>
   return updated;
 }
 
-export function toggleFavorite(favorites: Record<string, number>, id: string): Record<string, number> {
-  return toggle(favorites, id);
+export function toggleFavorite(favorites: Record<string, number>, id: string, now: number): Record<string, number> {
+  return toggle(favorites, id, now);
 }
 
-export function toggleHidden(hidden: Record<string, number>, id: string): Record<string, number> {
-  return toggle(hidden, id);
+export function toggleHidden(hidden: Record<string, number>, id: string, now: number): Record<string, number> {
+  return toggle(hidden, id, now);
 }
 
 export function filterHidden(missions: Mission[], hidden: Record<string, number>): Mission[] {

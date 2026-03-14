@@ -5,7 +5,7 @@ import { LeHibouConnector } from './lehibou.connector';
 import { HiwayConnector } from './hiway.connector';
 import { CollectiveConnector } from './collective.connector';
 import { CherryPickConnector } from './cherrypick.connector';
-import type { PlatformConnector } from '../../core/types/connector';
+import type { PlatformConnector } from './platform-connector';
 
 export const connectorRegistry: PlatformConnector[] = [
   new FreeWorkConnector(),

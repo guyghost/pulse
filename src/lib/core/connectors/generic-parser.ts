@@ -1,4 +1,5 @@
-import type { Mission, MissionSource, RemoteType } from '../types/mission';
+import type { MissionSource, Mission } from '../types/mission';
+import { parseTJM, detectRemote, createMission } from './parser-utils';
 
 export function parseGenericHTML(html: string, source: MissionSource, baseUrl: string, now: Date, idPrefix: string): Mission[] {
   if (!html.trim()) return [];
@@ -24,10 +25,7 @@ export function parseGenericHTML(html: string, source: MissionSource, baseUrl: s
     const stack = Array.from(stackEls).map(el => el.textContent?.trim() ?? '').filter(Boolean);
 
     const tjmEl = card.querySelector('.tjm, .rate, .daily-rate, .price');
-    const tjmText = tjmEl?.textContent?.trim() ?? '';
-    const tjmNormalized = tjmText.replace(/[\s\u00A0]/g, '');
-    const tjmMatch = tjmNormalized.match(/(\d+)/);
-    const tjm = tjmMatch ? parseInt(tjmMatch[1], 10) : null;
+    const tjm = parseTJM(tjmEl?.textContent?.trim() ?? '');
 
     const locationEl = card.querySelector('.location, .city, .place');
     const location = locationEl?.textContent?.trim() ?? null;
@@ -39,15 +37,9 @@ export function parseGenericHTML(html: string, source: MissionSource, baseUrl: s
     const description = descEl?.textContent?.trim() ?? '';
 
     const fullText = card.textContent?.toLowerCase() ?? '';
-    const remote: RemoteType | null = fullText.includes('full remote') || fullText.includes('télétravail complet')
-      ? 'full'
-      : fullText.includes('hybride') || fullText.includes('hybrid')
-      ? 'hybrid'
-      : fullText.includes('sur site') || fullText.includes('on-site') || fullText.includes('onsite')
-      ? 'onsite'
-      : null;
+    const remote = detectRemote(fullText);
 
-    missions.push({
+    missions.push(createMission({
       id: `${idPrefix}-${index}`,
       title,
       client,
@@ -60,10 +52,7 @@ export function parseGenericHTML(html: string, source: MissionSource, baseUrl: s
       url,
       source,
       scrapedAt: now,
-      score: null,
-      semanticScore: null,
-      semanticReason: null,
-    });
+    }));
   });
 
   return missions;

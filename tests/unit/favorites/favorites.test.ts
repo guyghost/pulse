@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from 'vitest';
+import { describe, it, expect } from 'vitest';
 import {
   toggleFavorite,
   toggleHidden,
@@ -18,17 +18,16 @@ function makeMission(id: string): Mission {
   };
 }
 
+const NOW = 1773230400000; // 2026-03-11T12:00:00Z
+
 describe('toggleFavorite', () => {
   it('adds id with timestamp when not present', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-11T12:00:00Z'));
-    const result = toggleFavorite({}, 'a');
-    expect(result).toEqual({ a: 1773230400000 });
-    vi.useRealTimers();
+    const result = toggleFavorite({}, 'a', NOW);
+    expect(result).toEqual({ a: NOW });
   });
 
   it('removes id when already present', () => {
-    const result = toggleFavorite({ a: 123 }, 'a');
+    const result = toggleFavorite({ a: 123 }, 'a', NOW);
     expect(result).toEqual({});
   });
 
@@ -37,7 +36,7 @@ describe('toggleFavorite', () => {
     for (let i = 0; i < MAX_ENTRIES; i++) {
       entries[`id-${i}`] = i;
     }
-    const result = toggleFavorite(entries, 'new-id');
+    const result = toggleFavorite(entries, 'new-id', NOW);
     expect(Object.keys(result).length).toBe(MAX_ENTRIES);
     expect(result['new-id']).toBeDefined();
     expect(result['id-0']).toBeUndefined();
@@ -46,15 +45,12 @@ describe('toggleFavorite', () => {
 
 describe('toggleHidden', () => {
   it('adds id with timestamp when not present', () => {
-    vi.useFakeTimers();
-    vi.setSystemTime(new Date('2026-03-11T12:00:00Z'));
-    const result = toggleHidden({}, 'b');
-    expect(result).toEqual({ b: 1773230400000 });
-    vi.useRealTimers();
+    const result = toggleHidden({}, 'b', NOW);
+    expect(result).toEqual({ b: NOW });
   });
 
   it('removes id when already present', () => {
-    const result = toggleHidden({ b: 123 }, 'b');
+    const result = toggleHidden({ b: 123 }, 'b', NOW);
     expect(result).toEqual({});
   });
 });

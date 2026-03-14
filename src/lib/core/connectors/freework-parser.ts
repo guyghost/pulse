@@ -1,4 +1,5 @@
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
+import { createMission } from './parser-utils';
 
 const SOURCE: MissionSource = 'free-work';
 const BASE_URL = 'https://www.free-work.com';
@@ -73,7 +74,7 @@ function buildJobUrl(slug: string, jobSlug: string | null): string {
 export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[] {
   if (!data['hydra:member'] || !Array.isArray(data['hydra:member'])) return [];
 
-  return data['hydra:member'].map((p): Mission => ({
+  return data['hydra:member'].map((p): Mission => createMission({
       id: `fw-${p.id}`,
       title: p.title,
       client: p.company?.name ?? null,
@@ -86,8 +87,5 @@ export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[
       url: buildJobUrl(p.slug, p.job?.slug ?? null),
       source: SOURCE,
       scrapedAt: now,
-      score: null,
-      semanticScore: null,
-      semanticReason: null,
     }));
 }

@@ -1,4 +1,5 @@
-import type { Mission, MissionSource } from '../types/mission';
+import type { MissionSource, Mission } from '../types/mission';
+import { parseTJM, createMission } from './parser-utils';
 
 const SOURCE: MissionSource = 'lehibou';
 const BASE_URL = 'https://www.lehibou.com';
@@ -17,34 +18,31 @@ export function parseLeHibouHTML(html: string, now: Date, _idPrefix: string): Mi
     const title = titleEl?.textContent?.trim() ?? '';
     if (!title) return;
 
-    // Extraire le UUID depuis le href (/annonce/{uuid}?source=...)
+    // Extract UUID from href (/annonce/{uuid}?source=...)
     const href = card.getAttribute('href') ?? '';
     const uuidMatch = href.match(/\/annonce\/([^?]+)/);
     const uuid = uuidMatch ? uuidMatch[1] : '';
     const id = `lh-${uuid}`;
     const url = `${BASE_URL}/annonce/${uuid}`;
 
-    // Localisation et duree depuis les items d'informations
+    // Location and duration from info items
     const infoItems = card.querySelectorAll('.mission-card__informations__item');
     const locationEl = infoItems[0]?.querySelector('span:last-child');
     const location = locationEl?.textContent?.trim() || null;
     const durationEl = infoItems[1]?.querySelector('span:last-child');
     const duration = durationEl?.textContent?.trim() || null;
 
-    // Stack depuis les tags de competences
+    // Stack from skill tags
     const skillEls = card.querySelectorAll('.mission-card__skills--title');
     const stack = Array.from(skillEls)
       .map((el) => el.textContent?.trim() ?? '')
       .filter(Boolean);
 
-    // TJM depuis le footer
+    // TJM from footer
     const tjmEl = card.querySelector('.mission-card__footer__dailyPrice');
-    const tjmText = tjmEl?.textContent?.trim() ?? '';
-    const tjmNormalized = tjmText.replace(/[\s\u00A0]/g, '');
-    const tjmMatch = tjmNormalized.match(/(\d+)/);
-    const tjm = tjmMatch ? parseInt(tjmMatch[1], 10) : null;
+    const tjm = parseTJM(tjmEl?.textContent?.trim() ?? '');
 
-    missions.push({
+    missions.push(createMission({
       id,
       title,
       client: null,
@@ -57,10 +55,7 @@ export function parseLeHibouHTML(html: string, now: Date, _idPrefix: string): Mi
       url,
       source: SOURCE,
       scrapedAt: now,
-      score: null,
-      semanticScore: null,
-      semanticReason: null,
-    });
+    }));
   });
 
   return missions;
