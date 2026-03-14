@@ -24,9 +24,14 @@
 
   let feedSnapshot = $state(feedActor.getSnapshot());
 
+  // Subscribe synchronously so every event (including those from smartLoad)
+  // is captured BEFORE the first render. Using $effect would defer the
+  // subscription until after the first paint, creating a window where
+  // MISSIONS_LOADED and LOAD events update the actor but feedSnapshot stays stale.
+  const _feedSub = feedActor.subscribe((s) => { feedSnapshot = s; });
+
   $effect(() => {
-    const sub = feedActor.subscribe((s) => { feedSnapshot = s; });
-    return () => sub.unsubscribe();
+    return () => _feedSub.unsubscribe();
   });
 
   let missions = $derived(feedSnapshot.context.filteredMissions);
@@ -126,12 +131,12 @@
   }
 
   function handleToggleFavorite(id: string) {
-    favorites = toggleFavorite(favorites, id);
+    favorites = toggleFavorite(favorites, id, Date.now());
     saveFavorites(favorites).catch(() => {});
   }
 
   function handleHide(id: string) {
-    hidden = toggleHidden(hidden, id);
+    hidden = toggleHidden(hidden, id, Date.now());
     saveHidden(hidden).catch(() => {});
   }
 
