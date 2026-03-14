@@ -168,7 +168,7 @@ describe('extractCollectiveProjects', () => {
     const html = `
       <html><body>
         <script id="__NEXT_DATA__" type="application/json">
-          {"props":{"pageProps":{"projects":${JSON.stringify(projects)}}}}
+          {"props":{"pageProps":{"dehydratedState":{"queries":[{"state":{"data":{"results":{"projects":${JSON.stringify(projects)},"pagination":{"from":0,"total":100}}}}}]}}}}
         </script>
       </body></html>
     `;
