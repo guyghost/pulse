@@ -1,4 +1,4 @@
-import type { PlatformConnector } from '../../core/types/connector';
+import type { PlatformConnector } from './platform-connector';
 import type { Mission } from '../../core/types/mission';
 
 const LOGIN_PATTERNS = ['/login', '/signin', '/sign-in', '/sign_in', '/auth', '/connexion', '/register', '/signup'];

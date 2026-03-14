@@ -1,4 +1,5 @@
-import type { Mission, MissionSource } from '../types/mission';
+import type { MissionSource, Mission } from '../types/mission';
+import { parseTJM, detectRemote, createMission } from './parser-utils';
 
 const SOURCE: MissionSource = 'comet';
 const BASE_URL = 'https://app.comet.co';
@@ -28,10 +29,7 @@ export function parseCometHTML(html: string, now: Date, idPrefix: string): Missi
     const stack = Array.from(stackEls).map(el => el.textContent?.trim() ?? '').filter(Boolean);
 
     const tjmEl = card.querySelector('.mission-card__tjm, .daily-rate, [data-testid="tjm"]');
-    const tjmText = tjmEl?.textContent?.trim() ?? '';
-    const tjmNormalized = tjmText.replace(/[\s\u00A0]/g, '');
-    const tjmMatch = tjmNormalized.match(/(\d+)/);
-    const tjm = tjmMatch ? parseInt(tjmMatch[1], 10) : null;
+    const tjm = parseTJM(tjmEl?.textContent?.trim() ?? '');
 
     const locationEl = card.querySelector('.mission-card__location, .location, [data-testid="location"]');
     const location = locationEl?.textContent?.trim() ?? null;
@@ -42,19 +40,14 @@ export function parseCometHTML(html: string, now: Date, idPrefix: string): Missi
     const descEl = card.querySelector('.mission-card__desc, .description, p');
     const description = descEl?.textContent?.trim() ?? '';
 
+    // Comet has a dedicated remote element; fall back to full-text detection
     const remoteEl = card.querySelector('.mission-card__remote, .remote, [data-testid="remote"]');
     const remoteText = remoteEl?.textContent?.toLowerCase() ?? '';
     const fullText = card.textContent?.toLowerCase() ?? '';
+    const combinedText = remoteText + ' ' + fullText;
+    const remote = detectRemote(combinedText);
 
-    const remote = remoteText.includes('complet') || remoteText.includes('full') || fullText.includes('full remote') || fullText.includes('teletravail complet') || fullText.includes('télétravail complet')
-      ? 'full' as const
-      : fullText.includes('hybride') || fullText.includes('hybrid')
-      ? 'hybrid' as const
-      : fullText.includes('sur site') || fullText.includes('on-site') || fullText.includes('onsite')
-      ? 'onsite' as const
-      : null;
-
-    missions.push({
+    missions.push(createMission({
       id: `${idPrefix}-${index}`,
       title,
       client,
@@ -67,10 +60,7 @@ export function parseCometHTML(html: string, now: Date, idPrefix: string): Missi
       url,
       source: SOURCE,
       scrapedAt: now,
-      score: null,
-      semanticScore: null,
-      semanticReason: null,
-    });
+    }));
   });
 
   return missions;

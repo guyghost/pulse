@@ -1,4 +1,5 @@
 import type { Mission } from '../types/mission';
+import { createMission } from './parser-utils';
 
 export interface CollectiveProject {
   id: string;
@@ -40,7 +41,7 @@ function mapRemote(prefs: string[]): Mission['remote'] {
 }
 
 export function parseCollectiveProjects(projects: CollectiveProject[], now: Date): Mission[] {
-  return projects.map((p) => ({
+  return projects.map((p) => createMission({
     id: `col-${p.id}`,
     title: p.name,
     client: p.company?.name ?? null,
@@ -53,9 +54,6 @@ export function parseCollectiveProjects(projects: CollectiveProject[], now: Date
     url: `https://www.collective.work/job/${p.slug}`,
     source: 'collective' as const,
     scrapedAt: now,
-    score: null,
-    semanticScore: null,
-    semanticReason: null,
   }));
 }
 

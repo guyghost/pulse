@@ -1,4 +1,5 @@
-import type { Mission, MissionSource } from '../types/mission';
+import type { MissionSource, Mission } from '../types/mission';
+import { parseTJM, detectRemote, createMission } from './parser-utils';
 
 const SOURCE: MissionSource = 'malt';
 const BASE_URL = 'https://www.malt.fr';
@@ -27,10 +28,7 @@ export function parseMaltHTML(html: string, now: Date, idPrefix: string): Missio
     const stack = Array.from(stackEls).map(el => el.textContent?.trim() ?? '').filter(Boolean);
 
     const tjmEl = card.querySelector('.listing-card__rate, .daily-rate, [data-testid="rate"]');
-    const tjmText = tjmEl?.textContent?.trim() ?? '';
-    const tjmNormalized = tjmText.replace(/[\s\u00A0]/g, '');
-    const tjmMatch = tjmNormalized.match(/(\d+)/);
-    const tjm = tjmMatch ? parseInt(tjmMatch[1], 10) : null;
+    const tjm = parseTJM(tjmEl?.textContent?.trim() ?? '');
 
     const locationEl = card.querySelector('.listing-card__location, .location, [data-testid="location"]');
     const location = locationEl?.textContent?.trim() ?? null;
@@ -42,15 +40,9 @@ export function parseMaltHTML(html: string, now: Date, idPrefix: string): Missio
     const description = descEl?.textContent?.trim() ?? '';
 
     const fullText = card.textContent?.toLowerCase() ?? '';
-    const remote = fullText.includes('full remote') || fullText.includes('teletravail complet') || fullText.includes('télétravail complet')
-      ? 'full' as const
-      : fullText.includes('hybride') || fullText.includes('hybrid')
-      ? 'hybrid' as const
-      : fullText.includes('sur site') || fullText.includes('on-site') || fullText.includes('onsite')
-      ? 'onsite' as const
-      : null;
+    const remote = detectRemote(fullText);
 
-    missions.push({
+    missions.push(createMission({
       id: `${idPrefix}-${index}`,
       title,
       client,
@@ -63,10 +55,7 @@ export function parseMaltHTML(html: string, now: Date, idPrefix: string): Missio
       url,
       source: SOURCE,
       scrapedAt: now,
-      score: null,
-      semanticScore: null,
-      semanticReason: null,
-    });
+    }));
   });
 
   return missions;
