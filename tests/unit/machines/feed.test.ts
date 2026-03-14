@@ -65,7 +65,7 @@ describe('feed machine', () => {
     });
 
     actor.send({ type: 'SEARCH', query: 'React' });
-    expect(actor.getSnapshot().value).toBe('searching');
+    expect(actor.getSnapshot().value).toBe('loaded');
     expect(actor.getSnapshot().context.filteredMissions).toHaveLength(2);
     expect(actor.getSnapshot().context.searchQuery).toBe('React');
     actor.stop();
@@ -105,15 +105,50 @@ describe('feed machine', () => {
   it('applies and clears filters', () => {
     const actor = createActor(feedMachine).start();
     actor.send({ type: 'LOAD' });
-    const missions = [makeMission({ id: '1' }), makeMission({ id: '2' }), makeMission({ id: '3' })];
+    const missions = [
+      makeMission({ id: '1', remote: 'full' }),
+      makeMission({ id: '2', remote: 'hybrid' }),
+      makeMission({ id: '3', remote: 'onsite' }),
+    ];
     actor.send({ type: 'MISSIONS_LOADED', missions });
 
-    actor.send({ type: 'FILTER', missions: [missions[0]] });
-    expect(actor.getSnapshot().value).toBe('filtered');
+    actor.send({ type: 'SET_FILTERS', filters: { remote: 'full' } });
+    expect(actor.getSnapshot().value).toBe('loaded');
     expect(actor.getSnapshot().context.filteredMissions).toHaveLength(1);
 
     actor.send({ type: 'CLEAR_FILTERS' });
     expect(actor.getSnapshot().value).toBe('loaded');
+    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(3);
+    actor.stop();
+  });
+
+  it('combines search and filter simultaneously', () => {
+    const actor = createActor(feedMachine).start();
+    actor.send({ type: 'LOAD' });
+    actor.send({
+      type: 'MISSIONS_LOADED',
+      missions: [
+        makeMission({ id: '1', title: 'Dev React Senior', description: 'Mission React', remote: 'full' }),
+        makeMission({ id: '2', title: 'Dev React Junior', description: 'Mission React', remote: 'hybrid' }),
+        makeMission({ id: '3', title: 'Dev Java Spring', description: 'Mission Java backend', stack: ['Java', 'Spring'], remote: 'full' }),
+      ],
+    });
+
+    // Search for React (matches 2 by title)
+    actor.send({ type: 'SEARCH', query: 'React' });
+    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(2);
+
+    // Also filter by remote=full (now only 1 matches both: React + full)
+    actor.send({ type: 'SET_FILTERS', filters: { remote: 'full' } });
+    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(1);
+    expect(actor.getSnapshot().context.filteredMissions[0].id).toBe('1');
+
+    // Clear search but keep filter (now 2 remote=full missions)
+    actor.send({ type: 'CLEAR_SEARCH' });
+    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(2);
+
+    // Clear filters too (all 3)
+    actor.send({ type: 'CLEAR_FILTERS' });
     expect(actor.getSnapshot().context.filteredMissions).toHaveLength(3);
     actor.stop();
   });
@@ -138,5 +173,44 @@ describe('feed machine', () => {
     actor.send({ type: 'LOAD' });
     expect(actor.getSnapshot().value).toBe('loading');
     actor.stop();
+  });
+
+  describe('regression: undefined safety', () => {
+    it('should not crash when searching missions where one mission has undefined in stack array', () => {
+      const actor = createActor(feedMachine).start();
+      actor.send({ type: 'LOAD' });
+
+      // Mission with undefined in stack (simulating runtime pollution)
+      const missions = [
+        makeMission({ id: '1', title: 'Dev React Senior', stack: ['React', 'TypeScript'] }),
+        makeMission({ id: '2', title: 'Dev Vue', stack: ['Vue', undefined, 'TypeScript'] as any }),
+        makeMission({ id: '3', title: 'Dev Java', stack: ['Java', 'Spring'] }),
+      ];
+
+      actor.send({ type: 'MISSIONS_LOADED', missions });
+
+      // This test passes if search doesn't throw
+      expect(() => actor.send({ type: 'SEARCH', query: 'React' })).not.toThrow();
+      expect(actor.getSnapshot().value).toBe('loaded');
+      actor.stop();
+    });
+
+    it('should not crash when searching missions where one mission has nullish description', () => {
+      const actor = createActor(feedMachine).start();
+      actor.send({ type: 'LOAD' });
+
+      // Mission with null/undefined description
+      const missions = [
+        makeMission({ id: '1', title: 'Dev React', description: 'Mission React' }),
+        makeMission({ id: '2', title: 'Dev Vue', description: null as any }),
+        makeMission({ id: '3', title: 'Dev Java', description: undefined as any }),
+      ];
+
+      actor.send({ type: 'MISSIONS_LOADED', missions });
+
+      expect(() => actor.send({ type: 'SEARCH', query: 'React' })).not.toThrow();
+      expect(actor.getSnapshot().value).toBe('loaded');
+      actor.stop();
+    });
   });
 });

@@ -61,4 +61,29 @@ describe('parseSemanticResult', () => {
     const result = parseSemanticResult('{"score": 150, "reason": "overflow"}');
     expect(result?.score).toBe(100);
   });
+
+  it('handles markdown-wrapped JSON', () => {
+    const result = parseSemanticResult('```json\n{"score": 85, "reason": "Good match"}\n```');
+    expect(result).toEqual({ score: 85, reason: 'Good match' });
+  });
+
+  it('handles `}` inside the reason string', () => {
+    const result = parseSemanticResult('{"score": 70, "reason": "Stack matches {React, Node}"}');
+    expect(result).toEqual({ score: 70, reason: 'Stack matches {React, Node}' });
+  });
+
+  it('handles nested whitespace and newlines', () => {
+    const result = parseSemanticResult('{\n  "score": 60,\n  "reason": "ok"\n}');
+    expect(result).toEqual({ score: 60, reason: 'ok' });
+  });
+
+  it('handles score as string', () => {
+    const result = parseSemanticResult('{"score": "85", "reason": "match"}');
+    expect(result).toEqual({ score: 85, reason: 'match' });
+  });
+
+  it('handles extra JSON fields', () => {
+    const result = parseSemanticResult('{"score": 80, "reason": "ok", "confidence": 0.9}');
+    expect(result).toEqual({ score: 80, reason: 'ok' });
+  });
 });

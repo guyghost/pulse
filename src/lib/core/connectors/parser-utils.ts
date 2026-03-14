@@ -45,6 +45,9 @@ export type MissionFields = Omit<Mission, 'score' | 'semanticScore' | 'semanticR
 export function createMission(fields: MissionFields): Mission {
   return {
     ...fields,
+    title: fields.title ?? '',
+    description: fields.description ?? '',
+    stack: fields.stack.filter((s): s is string => typeof s === 'string' && s.length > 0),
     score: null,
     semanticScore: null,
     semanticReason: null,

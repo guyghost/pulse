@@ -27,16 +27,87 @@ Profil:
 }
 
 export function parseSemanticResult(raw: string): SemanticResult | null {
-  const match = raw.match(/\{[^}]*"score"\s*:\s*\d+[^}]*\}/);
-  if (!match) return null;
+  // 1. Strip markdown code fences (```json ... ``` or ``` ... ```)
+  let cleaned = raw.trim();
+  const fenceMatch = cleaned.match(/```(?:json)?\s*([\s\S]*?)```/);
+  if (fenceMatch) {
+    cleaned = fenceMatch[1].trim();
+  }
+
+  // 2. Find first { and use brace-counting to find matching }
+  const startIndex = cleaned.indexOf('{');
+  if (startIndex === -1) return null;
+
+  let depth = 0;
+  let inString = false;
+  let escapeNext = false;
+  let endIndex = -1;
+
+  for (let i = startIndex; i < cleaned.length; i++) {
+    const char = cleaned[i];
+
+    if (escapeNext) {
+      escapeNext = false;
+      continue;
+    }
+
+    if (char === '\\' && inString) {
+      escapeNext = true;
+      continue;
+    }
+
+    if (char === '"') {
+      inString = !inString;
+      continue;
+    }
+
+    if (!inString) {
+      if (char === '{') {
+        depth++;
+      } else if (char === '}') {
+        depth--;
+        if (depth === 0) {
+          endIndex = i;
+          break;
+        }
+      }
+    }
+  }
+
+  if (endIndex === -1) return null;
+
+  const jsonStr = cleaned.slice(startIndex, endIndex + 1);
+
+  // 3. Parse JSON
+  let parsed: unknown;
   try {
-    const parsed = JSON.parse(match[0]);
-    if (typeof parsed.score !== 'number' || typeof parsed.reason !== 'string') return null;
-    return {
-      score: Math.max(0, Math.min(100, Math.round(parsed.score))),
-      reason: parsed.reason,
-    };
+    parsed = JSON.parse(jsonStr);
   } catch {
     return null;
   }
+
+  // 4. Validate structure
+  if (typeof parsed !== 'object' || parsed === null) return null;
+  const obj = parsed as Record<string, unknown>;
+
+  // Handle score as number or string
+  let score: number;
+  if (typeof obj.score === 'number') {
+    score = obj.score;
+  } else if (typeof obj.score === 'string') {
+    const parsedScore = parseInt(obj.score, 10);
+    if (isNaN(parsedScore)) return null;
+    score = parsedScore;
+  } else {
+    return null;
+  }
+
+  // Validate reason
+  if (typeof obj.reason !== 'string') return null;
+
+  // 5. Clamp and return
+  return {
+    score: Math.max(0, Math.min(100, Math.round(score))),
+    reason: obj.reason,
+  };
 }

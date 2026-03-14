@@ -3,13 +3,19 @@ import type { BridgeMessage } from '../lib/shell/messaging/bridge';
 import type { UserProfile } from '../lib/core/types/profile';
 import { getSettings } from '../lib/shell/storage/chrome-storage';
 import { runScan } from '../lib/shell/scan/scanner';
-import { getSeenIds } from '../lib/shell/storage/seen-missions';
+import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { setNewMissionCount } from '../lib/shell/storage/session-storage';
+import { filterNotifiableMissions } from '../lib/core/scoring/notification-filter';
+import { markAsSeen } from '../lib/core/seen/mark-seen';
+import { notifyHighScoreMissions, setupNotificationClickHandler } from '../lib/shell/notifications/notify-missions';
 
 console.log('[MissionPulse] Service worker started');
 
 // Open side panel on extension icon click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
+
+// Setup notification click handler
+setupNotificationClickHandler();
 
 // Message handler — profile management only (scan is now handled in side panel)
 chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendResponse) => {
@@ -45,6 +51,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== ALARM_NAME) return;
   console.log('[MissionPulse] Auto-scan triggered');
   try {
+    const settings = await getSettings();
     const result = await runScan();
     try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
     if (result.missions.length > 0) {
@@ -55,13 +62,34 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       }
     }
     if (result.missions.length === 0) return;
+    
     const seenIds = await getSeenIds();
-    const newCount = result.missions.filter(m => !seenIds.includes(m.id)).length;
+    const seenSet = new Set(seenIds);
+    const newMissions = result.missions.filter(m => !seenSet.has(m.id));
+    const newCount = newMissions.length;
+    
     await setNewMissionCount(newCount);
     if (newCount > 0) {
       await chrome.action.setBadgeText({ text: String(newCount) });
       await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
       await chrome.action.setBadgeTextColor({ color: '#ffffff' });
+    }
+
+    // Send notifications for high-score missions if enabled
+    if (settings.notifications && newCount > 0) {
+      const notifiableMissions = filterNotifiableMissions(
+        newMissions,
+        [],
+        settings.notificationScoreThreshold,
+      );
+      
+      if (notifiableMissions.length > 0) {
+        console.log(`[MissionPulse] Notifying about ${notifiableMissions.length} high-score missions`);
+        const didNotify = await notifyHighScoreMissions(notifiableMissions);
+        if (didNotify) {
+          await saveSeenIds(markAsSeen(seenIds, notifiableMissions.map((mission) => mission.id)));
+        }
+      }
     }
   } catch (err) {
     console.error('[MissionPulse] Auto-scan error:', err);

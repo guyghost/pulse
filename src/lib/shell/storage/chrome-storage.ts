@@ -3,6 +3,8 @@ export interface AppSettings {
   enabledConnectors: string[];
   notifications: boolean;
   autoScan: boolean;
+  maxSemanticPerScan: number;
+  notificationScoreThreshold: number;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -10,26 +12,28 @@ const DEFAULT_SETTINGS: AppSettings = {
   enabledConnectors: ['free-work'],
   notifications: true,
   autoScan: true,
+  maxSemanticPerScan: 10,
+  notificationScoreThreshold: 70,
 };
 
-export async function getApiKey(): Promise<string | null> {
+export const getApiKey = async (): Promise<string | null> => {
   const result = await chrome.storage.local.get('apiKey');
   return (result.apiKey as string) ?? null;
-}
+};
 
-export async function setApiKey(key: string): Promise<void> {
+export const setApiKey = async (key: string): Promise<void> => {
   await chrome.storage.local.set({ apiKey: key });
-}
+};
 
-export async function removeApiKey(): Promise<void> {
+export const removeApiKey = async (): Promise<void> => {
   await chrome.storage.local.remove('apiKey');
-}
+};
 
-export async function getSettings(): Promise<AppSettings> {
+export const getSettings = async (): Promise<AppSettings> => {
   const result = await chrome.storage.local.get('settings');
-  return (result.settings as AppSettings) ?? { ...DEFAULT_SETTINGS };
-}
+  return { ...DEFAULT_SETTINGS, ...(result.settings as Partial<AppSettings> | undefined) };
+};
 
-export async function setSettings(settings: AppSettings): Promise<void> {
+export const setSettings = async (settings: AppSettings): Promise<void> => {
   await chrome.storage.local.set({ settings });
-}
+};

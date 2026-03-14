@@ -83,6 +83,7 @@ const scoreLocation = (
   profileLocation: string,
   weight: number,
 ): number => {
+  if (!profileLocation) return weight;
   if (!missionLocation) return weight * 0.5;
   return missionLocation.toLowerCase().includes(profileLocation.toLowerCase())
     ? weight

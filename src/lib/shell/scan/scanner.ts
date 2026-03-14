@@ -84,7 +84,11 @@ export async function runScan(signal?: AbortSignal, onProgress?: (info: ScanProg
   // Semantic scoring (async enrichment, non-blocking)
   if (profile && !signal?.aborted) {
     try {
-      const semanticResults = await scoreMissionsSemantic(scored, profile);
+      const semanticResults = await scoreMissionsSemantic(
+        scored,
+        profile,
+        settings.maxSemanticPerScan,
+      );
       for (const mission of scored) {
         const semantic = semanticResults.get(mission.id);
         if (semantic) {
