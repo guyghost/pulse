@@ -94,4 +94,55 @@ describe('scoreMission', () => {
     const score = scoreMission(mission, anyProfile);
     expect(score).toBeGreaterThanOrEqual(15);
   });
+
+  describe('regression: undefined safety', () => {
+    const baseProfile: UserProfile = {
+      firstName: 'Test',
+      stack: ['TypeScript', 'React'],
+      location: 'Paris',
+      tjmMin: 500,
+      tjmMax: 800,
+      remote: 'hybrid',
+      seniority: 'senior',
+      jobTitle: 'Développeur',
+    };
+
+    it('should not crash when mission has undefined entries in stack array', () => {
+      const mission = makeMission({
+        stack: ['TypeScript', undefined, 'React', undefined] as any,
+      });
+      const score = scoreMission(mission, baseProfile);
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    });
+
+    it('should not crash when profile has undefined entries in stack array', () => {
+      const profileWithUndefined: UserProfile = {
+        ...baseProfile,
+        stack: ['TypeScript', undefined, 'React'] as any,
+      };
+      const mission = makeMission({ stack: ['React', 'TypeScript'] });
+      const score = scoreMission(mission, profileWithUndefined);
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    });
+
+    it('should handle gracefully mission with empty string entries in stack', () => {
+      const mission = makeMission({
+        stack: ['TypeScript', '', 'React', ''],
+      });
+      const score = scoreMission(mission, baseProfile);
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    });
+
+    it('should not crash when mission has null entries in stack (runtime pollution)', () => {
+      const mission = makeMission({
+        stack: ['TypeScript', null, 'React', null] as any,
+      });
+      const score = scoreMission(mission, baseProfile);
+      expect(score).toBeGreaterThanOrEqual(0);
+      expect(score).toBeLessThanOrEqual(100);
+    });
+  });
 });

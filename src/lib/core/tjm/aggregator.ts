@@ -25,7 +25,7 @@ function stddev(values: number[]): number {
 }
 
 function normalizeTitle(title: string): string {
-  return title.toLowerCase().replace(/[^\w\s]/g, '').trim();
+  return (title ?? '').toLowerCase().replace(/[^\w\s]/g, '').trim();
 }
 
 export function aggregateFromPoints(

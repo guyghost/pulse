@@ -1,29 +1,39 @@
+/// <reference types="./chrome-ai.d.ts" />
+
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 import { buildScoringPrompt, parseSemanticResult, type SemanticResult } from '../../core/scoring/semantic-scoring';
 import { isPromptApiAvailable } from './capabilities';
+import { getCachedSemanticScores, cacheSemanticScores } from '../storage/semantic-cache';
+import type { AILanguageModelSession } from './chrome-ai';
 
 const TIMEOUT_MS = 5000;
-const MAX_PER_SCAN = 10;
+const RETRY_DELAYS_MS = [500, 1000] as const;
+const MAX_RETRIES = RETRY_DELAYS_MS.length;
 
-export async function scoreMissionsSemantic(
-  missions: Mission[],
+/**
+ * Sleep for a given number of milliseconds.
+ */
+const sleep = (ms: number): Promise<void> =>
+  new Promise((resolve) => setTimeout(resolve, ms));
+
+/**
+ * Score a single mission using the AI with retry logic.
+ */
+const scoreSingleMission = async (
+  mission: Mission,
   profile: UserProfile,
-): Promise<Map<string, SemanticResult>> {
-  const results = new Map<string, SemanticResult>();
+): Promise<SemanticResult | null> => {
+  let lastError: Error | null = null;
 
-  const availability = await isPromptApiAvailable();
-  if (availability === 'no') return results;
+  for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
+    let session: AILanguageModelSession | null = null;
 
-  const ai = (self as any).ai;
-  const batch = missions.slice(0, MAX_PER_SCAN);
-
-  for (const mission of batch) {
     try {
-      const session = await ai.languageModel.create();
+      session = await self.ai.languageModel.create();
       const prompt = buildScoringPrompt(mission, profile);
 
-      const response = await Promise.race([
+      const response = await Promise.race<string>([
         session.prompt(prompt),
         new Promise<never>((_, reject) =>
           setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS),
@@ -31,12 +41,100 @@ export async function scoreMissionsSemantic(
       ]);
 
       const parsed = parseSemanticResult(response);
-      if (parsed) results.set(mission.id, parsed);
-      session.destroy();
+      return parsed;
+    } catch (error) {
+      lastError = error instanceof Error ? error : new Error(String(error));
+
+      console.warn(
+        '[SemanticScorer]',
+        `Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for mission ${mission.id}:`,
+        lastError.message,
+      );
+
+      // Wait before retry (except on last attempt)
+      if (attempt < MAX_RETRIES) {
+        await sleep(RETRY_DELAYS_MS[attempt]);
+      }
+    } finally {
+      session?.destroy();
+    }
+  }
+
+  console.warn(
+    '[SemanticScorer]',
+    `All attempts failed for mission ${mission.id}:`,
+    lastError?.message,
+  );
+
+  return null;
+};
+
+/**
+ * Score missions using the Chrome built-in AI (Prompt API).
+ *
+ * First checks the cache for existing scores. Only uncached missions
+ * are sent to the LLM, up to maxPerScan new scores per call.
+ * Newly computed scores are cached for future use.
+ *
+ * @param missions The missions to score.
+ * @param profile The user profile for matching.
+ * @param maxPerScan Maximum number of NEW missions to process per scan (default: 10).
+ *                   Cached missions are returned without counting toward this limit.
+ * @returns A map of mission IDs to their semantic scores (cached + newly computed).
+ */
+export const scoreMissionsSemantic = async (
+  missions: Mission[],
+  profile: UserProfile,
+  maxPerScan = 10,
+): Promise<Map<string, SemanticResult>> => {
+  const results = new Map<string, SemanticResult>();
+
+  const availability = await isPromptApiAvailable();
+  if (availability === 'no') return results;
+
+  if (missions.length === 0) return results;
+
+  // Step 1: Check cache for all missions
+  const missionIds = missions.map((m) => m.id);
+  let cachedResults = new Map<string, SemanticResult>();
+  try {
+    cachedResults = await getCachedSemanticScores(missionIds, profile);
+  } catch {
+    // Cache unavailable, continue without it
+  }
+
+  // Add cached results to output
+  for (const [id, result] of cachedResults) {
+    results.set(id, result);
+  }
+
+  // Step 2: Filter out missions that already have cached scores
+  const uncachedMissions = missions.filter((m) => !cachedResults.has(m.id));
+
+  if (uncachedMissions.length === 0) {
+    return results;
+  }
+
+  // Step 3: Score only uncached missions, up to maxPerScan
+  const batch = uncachedMissions.slice(0, maxPerScan);
+  const newResults = new Map<string, SemanticResult>();
+
+  for (const mission of batch) {
+    const result = await scoreSingleMission(mission, profile);
+    if (result) {
+      newResults.set(mission.id, result);
+      results.set(mission.id, result);
+    }
+  }
+
+  // Step 4: Cache newly computed scores
+  if (newResults.size > 0) {
+    try {
+      await cacheSemanticScores(newResults, profile);
     } catch {
-      // Skip this mission, continue with next
+      // Cache write failed, scores are still returned
     }
   }
 
   return results;
-}
+};
