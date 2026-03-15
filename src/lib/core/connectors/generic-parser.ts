@@ -16,6 +16,10 @@ export function parseGenericHTML(html: string, source: MissionSource, baseUrl: s
     const href = titleEl?.getAttribute('href') ?? '';
     const url = href.startsWith('http') ? href : `${baseUrl}${href}`;
 
+    // Extract stable ID from href path, fallback to index
+    const pathMatch = href.replace(/^https?:\/\/[^/]+/, '').match(/\/([^/?#]+)$/);
+    const id = pathMatch ? `${idPrefix.split('-')[0]}-${pathMatch[1]}` : `${idPrefix}-${index}`;
+
     if (!title) return;
 
     const clientEl = card.querySelector('.client, .company, .company-name');
@@ -40,7 +44,7 @@ export function parseGenericHTML(html: string, source: MissionSource, baseUrl: s
     const remote = detectRemote(fullText);
 
     missions.push(createMission({
-      id: `${idPrefix}-${index}`,
+      id,
       title,
       client,
       description,
