@@ -2,7 +2,7 @@ import { BaseConnector } from './base.connector';
 import type { Mission, MissionSource } from '../../core/types/mission';
 import { parseGenericHTML } from '../../core/connectors/generic-parser';
 
-interface GenericConnectorConfig {
+export interface GenericConnectorConfig {
   id: string;
   name: string;
   baseUrl: string;
@@ -12,7 +12,7 @@ interface GenericConnectorConfig {
   sessionCheckPath?: string;
 }
 
-class GenericConnector extends BaseConnector {
+export class GenericConnector extends BaseConnector {
   readonly id: string;
   readonly name: string;
   readonly baseUrl: string;

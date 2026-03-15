@@ -2,9 +2,10 @@ import { FreeWorkConnector } from './freework.connector';
 import { MaltConnector } from './malt.connector';
 import { CometConnector } from './comet.connector';
 import { LeHibouConnector } from './lehibou.connector';
-import { HiwayConnector } from './hiway.connector';
+import { GenericConnector } from './generic.connector';
+import { HiwayConfig } from './hiway.connector';
 import { CollectiveConnector } from './collective.connector';
-import { CherryPickConnector } from './cherrypick.connector';
+import { CherryPickConfig } from './cherrypick.connector';
 import type { PlatformConnector } from './platform-connector';
 
 export const connectorRegistry: PlatformConnector[] = [
@@ -12,9 +13,9 @@ export const connectorRegistry: PlatformConnector[] = [
   new MaltConnector(),
   new CometConnector(),
   new LeHibouConnector(),
-  HiwayConnector,
+  new GenericConnector(HiwayConfig),
   new CollectiveConnector(),
-  CherryPickConnector,
+  new GenericConnector(CherryPickConfig),
 ];
 
 export function getConnector(id: string): PlatformConnector | undefined {
