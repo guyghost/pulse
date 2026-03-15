@@ -11,7 +11,7 @@
     "https://www.lehibou.com/*",
     "https://hiway-missions.fr/*",
     "https://collective.work/*",
-    "https://cherry-pick.io/*"
+    "https://app.cherry-pick.io/*"
   ],
   "background": {
     "service_worker": "src/background/index.ts",

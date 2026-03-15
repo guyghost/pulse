@@ -4,7 +4,7 @@ import { LeHibouConnector } from './lehibou.connector';
 import { GenericConnector } from './generic.connector';
 import { HiwayConfig } from './hiway.connector';
 import { CollectiveConnector } from './collective.connector';
-import { CherryPickConfig } from './cherrypick.connector';
+import { CherryPickConnector } from './cherrypick.connector';
 import type { PlatformConnector } from './platform-connector';
 
 export const connectorRegistry: PlatformConnector[] = [
@@ -13,7 +13,7 @@ export const connectorRegistry: PlatformConnector[] = [
   new LeHibouConnector(),
   new GenericConnector(HiwayConfig),
   new CollectiveConnector(),
-  new GenericConnector(CherryPickConfig),
+  new CherryPickConnector(),
 ];
 
 export function getConnector(id: string): PlatformConnector | undefined {
