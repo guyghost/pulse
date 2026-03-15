@@ -1,81 +1,98 @@
 import { describe, it, expect } from 'vitest';
-import { parseCometHTML } from '../../../src/lib/core/connectors/comet-parser';
+import { parseCometMissions } from '../../../src/lib/core/connectors/comet-parser';
 
 const NOW = new Date('2026-03-13T12:00:00Z');
-const ID_PREFIX = 'comet-test';
 
-const FIXTURE_HTML = `
-<html><body>
-<div class="mission-card" data-testid="mission-item">
-  <a class="mission-card__link" href="/app/mission/architect-cloud-abc">
-    <h3 class="mission-card__title">Architecte Cloud AWS</h3>
-  </a>
-  <span class="mission-card__client">BNP Paribas</span>
-  <div class="mission-card__tags">
-    <span class="tag">AWS</span>
-    <span class="tag">Terraform</span>
-    <span class="tag">Docker</span>
-  </div>
-  <span class="mission-card__tjm">800 EUR/j</span>
-  <span class="mission-card__location">Paris</span>
-  <span class="mission-card__remote">Teletravail complet</span>
-  <span class="mission-card__duration">9 mois</span>
-  <p class="mission-card__desc">Mission pour le departement cloud de BNP.</p>
-</div>
-<div class="mission-card" data-testid="mission-item">
-  <a class="mission-card__link" href="/app/mission/dev-python-xyz">
-    <h3 class="mission-card__title">Developpeur Python Data</h3>
-  </a>
-  <span class="mission-card__client">Societe Generale</span>
-  <div class="mission-card__tags">
-    <span class="tag">Python</span>
-    <span class="tag">Pandas</span>
-  </div>
-  <span class="mission-card__tjm">700 EUR/j</span>
-  <span class="mission-card__location">La Defense</span>
-  <span class="mission-card__remote">Hybride</span>
-  <span class="mission-card__duration">6 mois</span>
-  <p class="mission-card__desc">Projet data pour la banque d'investissement.</p>
-</div>
-</body></html>
-`;
+const FIXTURE_MISSIONS = [
+  {
+    id: 41715,
+    title: 'Architecte Cloud AWS',
+    status: 'seeking',
+    durationInDays: 182,
+    startDate: '2026-03-02T00:00:00.000Z',
+    prefWorkplace: 'remote',
+    experienceLevel: 'experienced',
+    createdAt: '2026-02-17T13:45:43.730Z',
+    address: { city: 'Paris' },
+    skills: [{ name: 'AWS' }, { name: 'Terraform' }, { name: 'Docker' }],
+  },
+  {
+    id: 41758,
+    title: 'Developpeur Python Data',
+    status: 'seeking',
+    durationInDays: 90,
+    startDate: '2026-04-01T00:00:00.000Z',
+    prefWorkplace: 'hybrid',
+    experienceLevel: 'senior',
+    createdAt: '2026-02-20T16:34:04.321Z',
+    address: { city: 'La Defense' },
+    skills: [{ name: 'Python' }, { name: 'Pandas' }],
+  },
+];
 
-describe('parseCometHTML', () => {
-  it('parse les cartes de mission depuis le HTML', () => {
-    const missions = parseCometHTML(FIXTURE_HTML, NOW, ID_PREFIX);
+describe('parseCometMissions', () => {
+  it('parse les missions depuis la reponse GraphQL', () => {
+    const missions = parseCometMissions(FIXTURE_MISSIONS, NOW);
     expect(missions).toHaveLength(2);
     expect(missions[0]).toMatchObject({
       source: 'comet',
       title: 'Architecte Cloud AWS',
-      client: 'BNP Paribas',
-      url: expect.stringContaining('comet.co'),
-      id: 'comet-test-0',
+      id: 'comet-41715',
       scrapedAt: NOW,
     });
   });
 
+  it('extrait un ID stable depuis l ID numerique', () => {
+    const missions = parseCometMissions(FIXTURE_MISSIONS, NOW);
+    expect(missions[0].id).toBe('comet-41715');
+    expect(missions[1].id).toBe('comet-41758');
+  });
+
   it('extrait les tags de stack', () => {
-    const missions = parseCometHTML(FIXTURE_HTML, NOW, ID_PREFIX);
+    const missions = parseCometMissions(FIXTURE_MISSIONS, NOW);
     expect(missions[0].stack).toEqual(['AWS', 'Terraform', 'Docker']);
   });
 
-  it('extrait le TJM comme nombre', () => {
-    const missions = parseCometHTML(FIXTURE_HTML, NOW, ID_PREFIX);
-    expect(missions[0].tjm).toBe(800);
-    expect(missions[1].tjm).toBe(700);
-  });
-
-  it('detecte le type remote', () => {
-    const missions = parseCometHTML(FIXTURE_HTML, NOW, ID_PREFIX);
+  it('mappe prefWorkplace vers RemoteType', () => {
+    const missions = parseCometMissions(FIXTURE_MISSIONS, NOW);
     expect(missions[0].remote).toBe('full');
     expect(missions[1].remote).toBe('hybrid');
   });
 
-  it('retourne un tableau vide pour du HTML vide', () => {
-    expect(parseCometHTML('', NOW, ID_PREFIX)).toEqual([]);
+  it('formate la duree en mois', () => {
+    const missions = parseCometMissions(FIXTURE_MISSIONS, NOW);
+    expect(missions[0].duration).toBe('6 mois');
+    expect(missions[1].duration).toBe('3 mois');
   });
 
-  it('retourne un tableau vide pour du HTML sans resultats', () => {
-    expect(parseCometHTML('<html><body><p>Aucun resultat</p></body></html>', NOW, ID_PREFIX)).toEqual([]);
+  it('extrait la localisation depuis address.city', () => {
+    const missions = parseCometMissions(FIXTURE_MISSIONS, NOW);
+    expect(missions[0].location).toBe('Paris');
+    expect(missions[1].location).toBe('La Defense');
+  });
+
+  it('tjm est null (pas disponible dans l API Comet)', () => {
+    const missions = parseCometMissions(FIXTURE_MISSIONS, NOW);
+    expect(missions[0].tjm).toBeNull();
+  });
+
+  it('retourne un tableau vide pour un tableau vide', () => {
+    expect(parseCometMissions([], NOW)).toEqual([]);
+  });
+
+  it('mappe onSite vers onsite', () => {
+    const missions = parseCometMissions([{
+      ...FIXTURE_MISSIONS[0],
+      prefWorkplace: 'onSite',
+    }], NOW);
+    expect(missions[0].remote).toBe('onsite');
+  });
+
+  it('mappe partialRemote vers hybrid', () => {
+    const missions = parseCometMissions([{
+      ...FIXTURE_MISSIONS[0],
+      prefWorkplace: 'partialRemote',
+    }], NOW);
+    expect(missions[0].remote).toBe('hybrid');
   });
 });
