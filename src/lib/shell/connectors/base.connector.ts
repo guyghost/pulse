@@ -66,6 +66,34 @@ export abstract class BaseConnector implements PlatformConnector {
     }
   }
 
+  /** Fetch JSON directly from the side panel context — no offscreen/messaging needed */
+  protected async fetchJSON(url: string, init?: RequestInit): Promise<any> {
+    const doFetch = async (): Promise<any> => {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 15000);
+      try {
+        const response = await fetch(url, {
+          credentials: 'include',
+          signal: controller.signal,
+          ...init,
+        });
+        clearTimeout(timeout);
+        if (!response.ok) throw new Error(`HTTP ${response.status} for ${url}`);
+        return response.json();
+      } catch (err) {
+        clearTimeout(timeout);
+        throw err;
+      }
+    };
+
+    try {
+      return await doFetch();
+    } catch {
+      await new Promise((r) => setTimeout(r, 1000));
+      return doFetch();
+    }
+  }
+
   abstract fetchMissions(): Promise<Mission[]>;
 
   async getLastSync(): Promise<Date | null> {
