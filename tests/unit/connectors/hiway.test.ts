@@ -113,4 +113,30 @@ describe('parseHiwayHTML', () => {
     const missions = parseHiwayHTML(html, NOW);
     expect(missions).toHaveLength(0);
   });
+
+  it('retourne tjm null quand pas de montant', () => {
+    const html = wrapHTML(`
+      <a href="/admin/freelance/mission/550e8400-e29b-41d4-a716-446655440000">
+        <h3 class="font-semibold">Mission Test</h3>
+        <span class="text-sm font-medium text-gray-600">Corp</span>
+        <span class="text-sm text-gray-500">Paris</span>
+        <div>A negocier</div>
+      </a>
+    `);
+    const missions = parseHiwayHTML(html, NOW);
+    expect(missions[0].tjm).toBeNull();
+  });
+
+  it('detecte full remote depuis le texte', () => {
+    const html = wrapHTML(`
+      <a href="/admin/freelance/mission/550e8400-e29b-41d4-a716-446655440000">
+        <h3 class="font-semibold">Mission Full Remote</h3>
+        <span class="text-sm font-medium text-gray-600">Corp</span>
+        <span class="text-sm text-gray-500">Paris</span>
+        <div>Full remote - 6 mois</div>
+      </a>
+    `);
+    const missions = parseHiwayHTML(html, NOW);
+    expect(missions[0].remote).toBe('full');
+  });
 });

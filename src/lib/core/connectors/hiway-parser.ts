@@ -1,7 +1,7 @@
-import type { MissionSource, Mission } from '../types/mission';
+import type { Mission } from '../types/mission';
 import { parseTJM, detectRemote, createMission } from './parser-utils';
 
-const SOURCE: MissionSource = 'hiway';
+const SOURCE = 'hiway' as const;
 const BASE_URL = 'https://hiway-missions.fr';
 
 export function parseHiwayHTML(html: string, now: Date): Mission[] {
@@ -46,10 +46,10 @@ export function parseHiwayHTML(html: string, now: Date): Mission[] {
     const duration = durationMatch ? durationMatch[1].trim() : null;
 
     // Remote
-    const remote = detectRemote(fullText.toLowerCase());
+    const remote = detectRemote(fullText);
 
     // Stack tags
-    const tagEls = link.querySelectorAll('.badge, .tag, span.rounded-full, span.bg-blue-100, span.bg-gray-100');
+    const tagEls = link.querySelectorAll('.badge, .tag, span.rounded-full, span.bg-blue-100');
     const stack = Array.from(tagEls)
       .map(el => el.textContent?.trim() ?? '')
       .filter(s => s.length > 0 && s.length < 30);
