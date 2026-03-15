@@ -1,24 +1,11 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 
-export interface ScanSnapshot {
-  state: string;
-  currentConnector: string | null;
-  progress: number;
-  missionsFound: number;
-}
-
 export type BridgeMessage =
-  | { type: 'SCAN_START' }
-  | { type: 'SCAN_STATUS'; payload: ScanSnapshot }
   | { type: 'MISSIONS_UPDATED'; payload: Mission[] }
-  | { type: 'SCRAPE_URL'; payload: { url: string; connectorId: string } }
-  | { type: 'SCRAPE_RESULT'; payload: { html: string } }
-  | { type: 'SCRAPE_ERROR'; payload: { error: string } }
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }
-  | { type: 'MISSIONS_SEEN'; payload: string[] }
   | { type: 'SCAN_COMPLETE'; payload: Mission[] };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
