@@ -19,6 +19,10 @@ export function parseMaltHTML(html: string, now: Date, idPrefix: string): Missio
     const href = titleEl?.getAttribute('href') ?? '';
     const url = href.startsWith('http') ? href : `${BASE_URL}${href}`;
 
+    // Extract stable ID from href slug, fallback to index
+    const slugMatch = href.match(/\/project\/([^/?]+)/);
+    const id = slugMatch ? `malt-${slugMatch[1]}` : `${idPrefix}-${index}`;
+
     if (!title) return;
 
     const clientEl = card.querySelector('.listing-card__company, .company-name, [data-testid="company"]');
@@ -43,7 +47,7 @@ export function parseMaltHTML(html: string, now: Date, idPrefix: string): Missio
     const remote = detectRemote(fullText);
 
     missions.push(createMission({
-      id: `${idPrefix}-${index}`,
+      id,
       title,
       client,
       description,
