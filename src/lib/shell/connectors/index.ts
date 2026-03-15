@@ -1,5 +1,4 @@
 import { FreeWorkConnector } from './freework.connector';
-import { MaltConnector } from './malt.connector';
 import { CometConnector } from './comet.connector';
 import { LeHibouConnector } from './lehibou.connector';
 import { GenericConnector } from './generic.connector';
@@ -10,7 +9,6 @@ import type { PlatformConnector } from './platform-connector';
 
 export const connectorRegistry: PlatformConnector[] = [
   new FreeWorkConnector(),
-  new MaltConnector(),
   new CometConnector(),
   new LeHibouConnector(),
   new GenericConnector(HiwayConfig),

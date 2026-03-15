@@ -54,7 +54,7 @@ export function generateMockMissions(count: number): Mission[] {
     remote: remotes[i % remotes.length],
     duration: durations[i % durations.length],
     url: `https://www.free-work.com/fr/tech-it/jobs/mock-${i}`,
-    source: (i % 3 === 0 ? 'malt' : 'free-work') as 'malt' | 'free-work',
+    source: 'free-work',
     scrapedAt: now,
     score: Math.floor(Math.random() * 100),
     semanticScore: null,

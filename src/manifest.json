@@ -6,7 +6,6 @@
   "permissions": ["sidePanel", "storage", "cookies", "alarms", "notifications"],
   "host_permissions": [
     "https://www.free-work.com/*",
-    "https://www.malt.fr/*",
     "https://app.comet.co/*",
     "https://www.lehibou.com/*",
     "https://hiway-missions.fr/*",
