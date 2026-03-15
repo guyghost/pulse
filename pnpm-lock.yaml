@@ -8,9 +8,6 @@ importers:
 
   .:
     dependencies:
-      '@xstate/svelte':
-        specifier: ^3.0.0
-        version: 3.0.5(svelte@5.53.10)(xstate@5.28.0)
       lucide-svelte:
         specifier: ^0.460.0
         version: 0.460.1(svelte@5.53.10)
@@ -622,15 +619,6 @@ packages:
 
   '@webcomponents/custom-elements@1.6.0':
     resolution: {integrity: sha512-CqTpxOlUCPWRNUPZDxT5v2NnHXA4oox612iUGnmTUGQFhZ1Gkj8kirtl/2wcF6MqX7+PqqicZzOCBKKfIn0dww==}
-
-  '@xstate/svelte@3.0.5':
-    resolution: {integrity: sha512-Pdtnv+9eXmv5lTdvbuYcHmLj+GLerw5vYQ/r/3esQG5RIQoOUdP3L6akHob84jNoBf07aU8wr9RkvILda5RDGg==}
-    peerDependencies:
-      svelte: ^3.24.1 || ^4
-      xstate: ^5.18.2
-    peerDependenciesMeta:
-      xstate:
-        optional: true
 
   acorn-walk@8.3.5:
     resolution: {integrity: sha512-HEHNfbars9v4pgpW6SO1KSPkfoS0xVOM/9UzkJltjlsHZmJasxg8aXkuZa7SMf8vKGIBhpUsPluQSqhJFCqebw==}
@@ -1799,12 +1787,6 @@ snapshots:
       tinyrainbow: 2.0.0
 
   '@webcomponents/custom-elements@1.6.0': {}
-
-  '@xstate/svelte@3.0.5(svelte@5.53.10)(xstate@5.28.0)':
-    dependencies:
-      svelte: 5.53.10
-    optionalDependencies:
-      xstate: 5.28.0
 
   acorn-walk@8.3.5:
     dependencies:
