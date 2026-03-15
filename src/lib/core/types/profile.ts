@@ -1,4 +1,5 @@
-import type { SeniorityLevel } from './tjm';
+export type SeniorityLevel = 'junior' | 'confirmed' | 'senior';
+
 import type { RemoteType } from './mission';
 
 /**

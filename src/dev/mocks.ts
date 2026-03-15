@@ -1,6 +1,5 @@
 import type { Mission } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
-import type { TJMAnalysis } from '$lib/core/types/tjm';
 
 export const mockProfile: UserProfile = {
   firstName: 'Alice',
@@ -64,15 +63,3 @@ export function generateMockMissions(count: number): Mission[] {
 }
 
 export const mockMissions: Mission[] = generateMockMissions(10);
-
-export const mockTJMAnalysis: TJMAnalysis = {
-  junior: { min: 350, median: 450, max: 550 },
-  confirmed: { min: 500, median: 600, max: 700 },
-  senior: { min: 650, median: 750, max: 900 },
-  trend: 'up',
-  trendDetail: 'Hausse de 5% sur les profils React/TypeScript en Île-de-France',
-  recommendation: 'Votre TJM est dans la fourchette haute. Maintenez votre positionnement.',
-  confidence: 0.82,
-  dataPoints: 47,
-  analyzedAt: new Date(),
-};

@@ -1,5 +1,4 @@
 import type { Mission } from '../../core/types/mission';
-import type { TJMDataPoint } from '../../core/types/tjm';
 import type { UserProfile } from '../../core/types/profile';
 
 const DB_NAME = 'missionpulse';
@@ -16,15 +15,8 @@ function openDB(): Promise<IDBDatabase> {
         store.createIndex('source', 'source', { unique: false });
         store.createIndex('scrapedAt', 'scrapedAt', { unique: false });
       }
-      if (!db.objectStoreNames.contains('tjmHistory')) {
-        const store = db.createObjectStore('tjmHistory', { autoIncrement: true });
-        store.createIndex('date', 'date', { unique: false });
-      }
       if (!db.objectStoreNames.contains('profile')) {
         db.createObjectStore('profile', { keyPath: 'id' });
-      }
-      if (!db.objectStoreNames.contains('tjmCache')) {
-        db.createObjectStore('tjmCache', { keyPath: 'key' });
       }
     };
 
@@ -70,19 +62,6 @@ export function getMissions(): Promise<Mission[]> {
 
 export function clearMissions(): Promise<void> {
   return withStore<void>('missions', 'readwrite', (store) => store.clear());
-}
-
-// TJM History
-export async function saveTJMDataPoint(point: TJMDataPoint): Promise<void> {
-  await withStore<IDBValidKey>('tjmHistory', 'readwrite', (store) =>
-    store.add(point),
-  );
-}
-
-export function getTJMDataPoints(): Promise<TJMDataPoint[]> {
-  return withStore<TJMDataPoint[]>('tjmHistory', 'readonly', (store) =>
-    store.getAll(),
-  );
 }
 
 // Profile
