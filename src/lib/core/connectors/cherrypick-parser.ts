@@ -10,28 +10,28 @@ interface CherryPickMission {
   slug: string;
   minimum_rate: number | null;
   maximum_rate: number | null;
-  start_date: string | null;
   duration: string | null;
   city: string | null;
-  country: string | null;
   displacement: string | null;
-  work_time: string | null;
   company: { name: string } | null;
   skills: { name: string }[];
   description: string | null;
 }
 
+// Known API values: remote, partially_remote_3, no_remote
 function mapRemote(displacement: string | null): RemoteType | null {
   if (!displacement) return null;
-  const lower = displacement.toLowerCase();
-  if (lower.includes('full') || lower === 'remote') return 'full';
-  if (lower.includes('partial') || lower.includes('hybrid')) return 'hybrid';
-  if (lower.includes('on_site') || lower.includes('onsite') || lower === 'no_remote') return 'onsite';
-  return null;
+  switch (displacement) {
+    case 'remote': return 'full';
+    case 'no_remote': return 'onsite';
+    default:
+      if (displacement.startsWith('partially_remote')) return 'hybrid';
+      return null;
+  }
 }
 
 function pickTJM(min: number | null, max: number | null): number | null {
-  if (min && max) return Math.round((min + max) / 2);
+  if (min !== null && max !== null) return Math.round((min + max) / 2);
   return max ?? min ?? null;
 }
 
