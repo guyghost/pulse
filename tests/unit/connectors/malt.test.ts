@@ -43,7 +43,7 @@ describe('parseMaltHTML', () => {
       title: 'Developpeur React Senior',
       client: 'FinTech Corp',
       url: expect.stringContaining('malt.fr'),
-      id: 'malt-test-0',
+      id: 'malt-dev-react-senior-abc123',
       scrapedAt: NOW,
     });
   });
@@ -69,6 +69,12 @@ describe('parseMaltHTML', () => {
     const missions = parseMaltHTML(FIXTURE_HTML, NOW, ID_PREFIX);
     expect(missions[0].remote).toBe('full');
     expect(missions[1].remote).toBe('onsite');
+  });
+
+  it('extrait un ID stable depuis le href', () => {
+    const missions = parseMaltHTML(FIXTURE_HTML, NOW, ID_PREFIX);
+    expect(missions[0].id).toBe('malt-dev-react-senior-abc123');
+    expect(missions[1].id).toBe('malt-dev-java-xyz789');
   });
 
   it('retourne un tableau vide pour du HTML vide', () => {
