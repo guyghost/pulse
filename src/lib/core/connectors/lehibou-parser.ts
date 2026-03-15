@@ -1,10 +1,10 @@
 import type { MissionSource, Mission } from '../types/mission';
-import { parseTJM, createMission } from './parser-utils';
+import { parseTJM, detectRemote, createMission } from './parser-utils';
 
 const SOURCE: MissionSource = 'lehibou';
 const BASE_URL = 'https://www.lehibou.com';
 
-export function parseLeHibouHTML(html: string, now: Date, _idPrefix: string): Mission[] {
+export function parseLeHibouHTML(html: string, now: Date): Mission[] {
   if (!html.trim()) return [];
 
   const parser = new DOMParser();
@@ -38,6 +38,10 @@ export function parseLeHibouHTML(html: string, now: Date, _idPrefix: string): Mi
       .map((el) => el.textContent?.trim() ?? '')
       .filter(Boolean);
 
+    // Detect remote from card text
+    const fullText = card.textContent?.toLowerCase() ?? '';
+    const remote = detectRemote(fullText);
+
     // TJM from footer
     const tjmEl = card.querySelector('.mission-card__footer__dailyPrice');
     const tjm = parseTJM(tjmEl?.textContent?.trim() ?? '');
@@ -50,7 +54,7 @@ export function parseLeHibouHTML(html: string, now: Date, _idPrefix: string): Mi
       stack,
       tjm,
       location,
-      remote: null,
+      remote,
       duration,
       url,
       source: SOURCE,
