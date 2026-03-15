@@ -10,12 +10,9 @@ const FIXTURE_MISSIONS = [
     slug: 'dev-react-senior-1234',
     minimum_rate: 500,
     maximum_rate: 700,
-    start_date: '2026-04-01',
     duration: '6 mois',
     city: 'Paris',
-    country: 'France',
     displacement: 'partially_remote_3',
-    work_time: 'full_time',
     company: { name: 'Acme Corp' },
     skills: [{ name: 'React' }, { name: 'TypeScript' }],
     description: 'Mission React pour projet e-commerce',
@@ -26,12 +23,9 @@ const FIXTURE_MISSIONS = [
     slug: 'lead-java-spring-5678',
     minimum_rate: null,
     maximum_rate: 650,
-    start_date: null,
     duration: '3 mois',
     city: 'Lyon',
-    country: 'France',
     displacement: 'remote',
-    work_time: 'full_time',
     company: { name: 'Tech SA' },
     skills: [{ name: 'Java' }, { name: 'Spring' }],
     description: null,
@@ -105,5 +99,22 @@ describe('parseCherryPickMissions', () => {
       displacement: 'no_remote',
     }], NOW);
     expect(missions[0].remote).toBe('onsite');
+  });
+
+  it('retourne null pour displacement null', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      displacement: null,
+    }], NOW);
+    expect(missions[0].remote).toBeNull();
+  });
+
+  it('retourne null pour tjm quand min et max sont null', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      minimum_rate: null,
+      maximum_rate: null,
+    }], NOW);
+    expect(missions[0].tjm).toBeNull();
   });
 });
