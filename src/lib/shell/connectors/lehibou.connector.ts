@@ -21,7 +21,7 @@ export class LeHibouConnector extends BaseConnector {
     for (let page = 1; page <= MAX_PAGES; page++) {
       const url = page === 1 ? ANNONCES_URL : `${ANNONCES_URL}?page=${page}`;
       const html = await this.fetchHTML(url);
-      const missions = parseLeHibouHTML(html, now, `lh-${now.getTime()}`);
+      const missions = parseLeHibouHTML(html, now);
       if (missions.length === 0) break;
       allMissions.push(...missions);
     }
