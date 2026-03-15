@@ -27,7 +27,6 @@
 
   const sources: { value: MissionSource; label: string }[] = [
     { value: 'free-work', label: 'Free-Work' },
-    { value: 'malt', label: 'Malt' },
     { value: 'comet', label: 'Comet' },
   ];
 
