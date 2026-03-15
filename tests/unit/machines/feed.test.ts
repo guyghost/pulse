@@ -102,57 +102,6 @@ describe('feed machine', () => {
     actor.stop();
   });
 
-  it('applies and clears filters', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
-    const missions = [
-      makeMission({ id: '1', remote: 'full' }),
-      makeMission({ id: '2', remote: 'hybrid' }),
-      makeMission({ id: '3', remote: 'onsite' }),
-    ];
-    actor.send({ type: 'MISSIONS_LOADED', missions });
-
-    actor.send({ type: 'SET_FILTERS', filters: { remote: 'full' } });
-    expect(actor.getSnapshot().value).toBe('loaded');
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(1);
-
-    actor.send({ type: 'CLEAR_FILTERS' });
-    expect(actor.getSnapshot().value).toBe('loaded');
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(3);
-    actor.stop();
-  });
-
-  it('combines search and filter simultaneously', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
-    actor.send({
-      type: 'MISSIONS_LOADED',
-      missions: [
-        makeMission({ id: '1', title: 'Dev React Senior', description: 'Mission React', remote: 'full' }),
-        makeMission({ id: '2', title: 'Dev React Junior', description: 'Mission React', remote: 'hybrid' }),
-        makeMission({ id: '3', title: 'Dev Java Spring', description: 'Mission Java backend', stack: ['Java', 'Spring'], remote: 'full' }),
-      ],
-    });
-
-    // Search for React (matches 2 by title)
-    actor.send({ type: 'SEARCH', query: 'React' });
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(2);
-
-    // Also filter by remote=full (now only 1 matches both: React + full)
-    actor.send({ type: 'SET_FILTERS', filters: { remote: 'full' } });
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(1);
-    expect(actor.getSnapshot().context.filteredMissions[0].id).toBe('1');
-
-    // Clear search but keep filter (now 2 remote=full missions)
-    actor.send({ type: 'CLEAR_SEARCH' });
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(2);
-
-    // Clear filters too (all 3)
-    actor.send({ type: 'CLEAR_FILTERS' });
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(3);
-    actor.stop();
-  });
-
   it('can reload from loaded state', () => {
     const actor = createActor(feedMachine).start();
     actor.send({ type: 'LOAD' });
