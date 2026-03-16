@@ -1,6 +1,14 @@
 import { BaseConnector } from './base.connector';
 import type { Mission } from '../../core/types/mission';
-import { parseCometMissions } from '../../core/connectors/comet-parser';
+import { parseCometMissions, type CometMission } from '../../core/connectors/comet-parser';
+import {
+  type Result,
+  type AppError,
+  ok,
+  err,
+  createConnectorError,
+  createParsingError,
+} from '$lib/core/errors';
 
 const BASE_URL = 'https://app.comet.co';
 const GRAPHQL_URL = 'https://api.comet.co/api/graphql';
@@ -28,19 +36,48 @@ export class CometConnector extends BaseConnector {
 
   protected get sessionCheckUrl() { return `${BASE_URL}/freelancer/dashboard`; }
 
-  async fetchMissions(): Promise<Mission[]> {
-    const response = await this.fetchJSON(GRAPHQL_URL, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ query: MISSIONS_QUERY }),
-    });
+  async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
+    try {
+      const result = await this.fetchJSON(GRAPHQL_URL, now, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: MISSIONS_QUERY }),
+      });
 
-    const missions = response?.data?.freelanceSuggestedMission;
-    if (!Array.isArray(missions)) return [];
+      if (!result.ok) {
+        return err(createConnectorError(
+          'Failed to fetch missions from Comet',
+          { connectorId: this.id, phase: 'fetch', context: { originalError: result.error } },
+          now
+        ));
+      }
 
-    const now = new Date();
-    const result = parseCometMissions(missions, now);
-    await this.setLastSync();
-    return result;
+      const response = result.value as { data?: { freelanceSuggestedMission?: CometMission[] } };
+      const missions = response?.data?.freelanceSuggestedMission;
+      
+      if (!Array.isArray(missions)) {
+        return err(createParsingError(
+          'Invalid response format from Comet API',
+          { source: 'comet-api', context: { response } },
+          now
+        ));
+      }
+
+      const parsedMissions = parseCometMissions(missions, new Date(now));
+      
+      const syncResult = await this.setLastSync(now);
+      if (!syncResult.ok) {
+        console.warn('Failed to set last sync:', syncResult.error);
+      }
+      
+      return ok(parsedMissions);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return err(createConnectorError(
+        `Unexpected error fetching missions from Comet: ${message}`,
+        { connectorId: this.id, phase: 'fetch', context: { originalError: message } },
+        now
+      ));
+    }
   }
 }

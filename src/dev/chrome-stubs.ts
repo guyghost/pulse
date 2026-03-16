@@ -13,6 +13,8 @@ function createChromeStubs() {
   return {
     runtime: {
       id: 'dev-mode',
+      getManifest: () => ({ version: '0.1.0-dev' }),
+      getURL: (path: string) => path,
       sendMessage: async (message: { type: string; payload?: unknown }) => {
         console.log('[Chrome Stub] sendMessage:', message.type);
 
@@ -66,6 +68,30 @@ function createChromeStubs() {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
           for (const k of keyArr) delete storage[k];
         },
+        clear: async () => {
+          for (const k of Object.keys(storage)) delete storage[k];
+        },
+      },
+      session: {
+        get: async (keys: string | string[]) => {
+          const keyArr = typeof keys === 'string' ? [keys] : keys;
+          const result: Record<string, unknown> = {};
+          for (const k of keyArr) {
+            if (k in storage) result[k] = storage[k];
+          }
+          return result;
+        },
+        set: async (items: Record<string, unknown>) => {
+          Object.assign(storage, items);
+        },
+        remove: async (keys: string | string[]) => {
+          const keyArr = typeof keys === 'string' ? [keys] : keys;
+          for (const k of keyArr) delete storage[k];
+        },
+      },
+      onChanged: {
+        addListener: () => {},
+        removeListener: () => {},
       },
     },
     cookies: {
@@ -76,9 +102,28 @@ function createChromeStubs() {
     },
     alarms: {
       create: async () => {},
+      clearAll: async () => {},
       onAlarm: {
         addListener: () => {},
       },
+    },
+    action: {
+      setBadgeText: async () => {},
+      setBadgeBackgroundColor: async () => {},
+      setBadgeTextColor: async () => {},
+      onUserSettingsChanged: {
+        addListener: () => {},
+      },
+    },
+    notifications: {
+      create: async () => {},
+      clear: async () => {},
+      onClicked: {
+        addListener: () => {},
+      },
+    },
+    tabs: {
+      query: async () => [{ id: 1 }],
     },
   };
 }

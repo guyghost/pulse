@@ -1,10 +1,10 @@
 import type { Mission } from '../types/mission';
 import type { UserProfile } from '../types/profile';
+import type { SemanticResult } from '../types/type-guards';
+import { SemanticResultSchema } from '../types/schemas';
 
-export interface SemanticResult {
-  score: number;
-  reason: string;
-}
+// Ré-export pour compatibilité avec les modules existants
+export type { SemanticResult } from '../types/type-guards';
 
 export function buildScoringPrompt(mission: Mission, profile: UserProfile): string {
   return `Evalue la pertinence de cette mission freelance pour ce profil. Reponds uniquement en JSON: {"score": 0-100, "reason": "explication en 1 phrase"}.
@@ -86,28 +86,11 @@ export function parseSemanticResult(raw: string): SemanticResult | null {
     return null;
   }
 
-  // 4. Validate structure
-  if (typeof parsed !== 'object' || parsed === null) return null;
-  const obj = parsed as Record<string, unknown>;
-
-  // Handle score as number or string
-  let score: number;
-  if (typeof obj.score === 'number') {
-    score = obj.score;
-  } else if (typeof obj.score === 'string') {
-    const parsedScore = parseInt(obj.score, 10);
-    if (isNaN(parsedScore)) return null;
-    score = parsedScore;
-  } else {
+  // 4. Validate avec Zod
+  const result = SemanticResultSchema.safeParse(parsed);
+  if (!result.success) {
     return null;
   }
 
-  // Validate reason
-  if (typeof obj.reason !== 'string') return null;
-
-  // 5. Clamp and return
-  return {
-    score: Math.max(0, Math.min(100, Math.round(score))),
-    reason: obj.reason,
-  };
+  return result.data;
 }

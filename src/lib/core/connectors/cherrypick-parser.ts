@@ -4,7 +4,7 @@ import { createMission, parseTJM } from './parser-utils';
 const SOURCE = 'cherry-pick' as const;
 const BASE_URL = 'https://app.cherry-pick.io';
 
-interface CherryPickMission {
+export interface CherryPickMission {
   id: number;
   name: string;
   slug: string;

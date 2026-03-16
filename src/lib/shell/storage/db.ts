@@ -1,5 +1,6 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
+import { parseMission, parseUserProfile } from '../../core/types/type-guards';
 
 const DB_NAME = 'missionpulse';
 const DB_VERSION = 1;
@@ -56,8 +57,29 @@ export async function saveMissions(missions: Mission[]): Promise<void> {
   });
 }
 
-export function getMissions(): Promise<Mission[]> {
-  return withStore<Mission[]>('missions', 'readonly', (store) => store.getAll());
+export async function getMissions(): Promise<Mission[]> {
+  const rawMissions = await withStore<unknown[]>('missions', 'readonly', (store) =>
+    store.getAll()
+  );
+
+  const validMissions: Mission[] = [];
+  const invalidCount = { value: 0 };
+
+  for (const raw of rawMissions) {
+    const mission = parseMission(raw);
+    if (mission) {
+      validMissions.push(mission);
+    } else {
+      invalidCount.value++;
+      console.error('[DB] Mission invalide détectée dans IndexedDB:', raw);
+    }
+  }
+
+  if (invalidCount.value > 0) {
+    console.warn(`[DB] ${invalidCount.value} missions corrompues ignorées sur ${rawMissions.length} totales`);
+  }
+
+  return validMissions;
 }
 
 export function clearMissions(): Promise<void> {
@@ -73,9 +95,27 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
 
 export async function getProfile(): Promise<UserProfile | null> {
   const result = await withStore<
-    (UserProfile & { id: string }) | undefined
+    unknown
   >('profile', 'readonly', (store) => store.get('current'));
+
   if (!result) return null;
-  const { id: _, ...profile } = result;
-  return profile as UserProfile;
+
+  // Vérifier que c'est un objet avec un id
+  if (typeof result !== 'object' || result === null) {
+    console.error('[DB] Profil corrompu: données non-objet', result);
+    return null;
+  }
+
+  // Extraire l'id et le reste des propriétés
+  const { id: _, ...profileData } = result as Record<string, unknown>;
+
+  // Valider avec Zod
+  const profile = parseUserProfile(profileData);
+
+  if (!profile) {
+    console.error('[DB] Profil invalide détecté dans IndexedDB:', profileData);
+    return null;
+  }
+
+  return profile;
 }

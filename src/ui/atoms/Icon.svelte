@@ -85,5 +85,17 @@
     <polygon points="6 3 20 12 6 21 6 3"/>
   {:else if name === 'square'}
     <rect width="14" height="14" x="5" y="5" rx="2"/>
+  {:else if name === 'keyboard'}
+    <rect width="20" height="16" x="2" y="4" rx="2"/><path d="M6 8v0"/><path d="M10 8v0"/><path d="M14 8v0"/><path d="M18 8v0"/><path d="M6 12v0"/><path d="M10 12v0"/><path d="M14 12v0"/><path d="M18 12v0"/><path d="M6 16v0"/><path d="M10 16v0"/><path d="M14 16v0"/><path d="M18 16v0"/>
+  {:else if name === 'help-circle'}
+    <circle cx="12" cy="12" r="10"/><path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3"/><path d="M12 17h.01"/>
+  {:else if name === 'wifi'}
+    <path d="M12 20h.01"/><path d="M2 8.82a15 15 0 0 1 20 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/>
+  {:else if name === 'wifi-off'}
+    <line x1="2" x2="22" y1="2" y2="22"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M20 12.859a10 10 0 0 0-2.5-1.962"/><path d="M5 12.859a10 10 0 0 1 2.5-1.962"/><path d="M17.086 8.853a15 15 0 0 0-2.1-1.334"/><path d="M2 8.82a15 15 0 0 1 4.6-2.41"/><path d="M12 20h.01"/>
+  {:else if name === 'wifi-slow'}
+    <path d="M12 20h.01"/><path d="M8.5 16.429a5 5 0 0 1 7 0"/><path d="M5 12.859a10 10 0 0 1 14 0"/>
+  {:else if name === 'database'}
+    <ellipse cx="12" cy="5" rx="9" ry="3"/><path d="M3 5V19A9 3 0 0 0 21 19V5"/><path d="M3 12A9 3 0 0 0 21 12"/>
   {/if}
 </svg>

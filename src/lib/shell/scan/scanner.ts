@@ -1,115 +1,255 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
-import { getConnector } from '../connectors/index';
+import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
 import { getProfile, saveMissions } from '../storage/db';
 import { deduplicateMissions } from '../../core/scoring/dedup';
 import { scoreMission } from '../../core/scoring/relevance';
 import { setScanState } from '../storage/session-storage';
 import { scoreMissionsSemantic } from '../ai/semantic-scorer';
+import { metricsCollector } from '../metrics/collector';
+import { calculateDedupRatio } from '../../core/metrics/types';
+import type { ScanMetrics } from '../../core/metrics/types';
+import { isOnline } from '../utils/connection-monitor';
+import { withRetry } from '../utils/retry-strategy';
+
+/**
+ * Erreur de scan avec code typé
+ */
+export class ScanError extends Error {
+	constructor(
+		message: string,
+		public readonly code: 'OFFLINE' | 'NETWORK_ERROR' | 'CANCELLED' | 'UNKNOWN'
+	) {
+		super(message);
+		this.name = 'ScanError';
+	}
+}
 
 export interface ScanResult {
-  missions: Mission[];
-  errors: { connectorId: string; message: string }[];
+	missions: Mission[];
+	errors: { connectorId: string; message: string }[];
 }
 
 export interface ScanProgressInfo {
-  current: number;
-  total: number;
-  connectorName: string;
+	current: number;
+	total: number;
+	connectorName: string;
 }
 
-export async function runScan(signal?: AbortSignal, onProgress?: (info: ScanProgressInfo) => void): Promise<ScanResult> {
-  const settings = await getSettings();
-  const enabledIds = settings.enabledConnectors;
-  const errors: ScanResult['errors'] = [];
-  try { await setScanState('scanning'); } catch {}
+export interface ScanOptions {
+	/** Délai entre les pages d'un même connecteur en ms (défaut: 500) */
+	pageDelayMs?: number;
+	/** Respecter robots.txt (optionnel, pour future implémentation) */
+	respectRobotsTxt?: boolean;
+}
 
-  if (enabledIds.length === 0) {
-    try { await setScanState('idle'); } catch {}
-    return { missions: [], errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }] };
-  }
+export async function runScan(
+	signal?: AbortSignal,
+	onProgress?: (info: ScanProgressInfo) => void,
+	options?: ScanOptions
+): Promise<ScanResult> {
+	const scanStartTime = performance.now();
+	
+	// Vérifier la connexion avant de scanner
+	if (!isOnline()) {
+		throw new ScanError(
+			'Aucune connexion internet. Le scan sera automatiquement relancé quand la connexion reviendra.',
+			'OFFLINE'
+		);
+	}
 
-  // Resolve connectors, collect unknown IDs as errors
-  const connectors = enabledIds.map(id => {
-    const connector = getConnector(id);
-    if (!connector) errors.push({ connectorId: id, message: 'Connecteur introuvable' });
-    return connector;
-  }).filter((c): c is NonNullable<typeof c> => c != null);
+	const settings = await getSettings();
+	const enabledIds = settings.enabledConnectors;
+	const errors: ScanResult['errors'] = [];
 
-  if (signal?.aborted) {
-    try { await setScanState('idle'); } catch {}
-    return { missions: [], errors };
-  }
+	try {
+		await setScanState('scanning');
+	} catch {}
 
-  // Fetch connectors sequentially to report progress
-  const connectorResults: { connectorId: string; missions: Mission[] }[] = [];
-  for (let i = 0; i < connectors.length; i++) {
-    if (signal?.aborted) {
-      try { await setScanState('idle'); } catch {}
-      return { missions: [], errors };
-    }
-    const connector = connectors[i];
-    onProgress?.({ current: i, total: connectors.length, connectorName: connector.name });
-    try {
-      const missions = await connector.fetchMissions();
-      connectorResults.push({ connectorId: connector.id, missions });
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur inconnue';
-      errors.push({ connectorId: connector.id, message });
-    }
-  }
-  onProgress?.({ current: connectors.length, total: connectors.length, connectorName: '' });
+	if (enabledIds.length === 0) {
+		try {
+			await setScanState('idle');
+		} catch {}
+		return { missions: [], errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }] };
+	}
 
-  const allMissions: Mission[] = [];
-  for (const result of connectorResults) {
-    allMissions.push(...result.missions);
-  }
+	// Validate connector IDs and report unknown ones as errors
+	const validConnectorIds: string[] = [];
+	for (const id of enabledIds) {
+		const connector = await getConnector(id);
+		if (!connector) {
+			errors.push({ connectorId: id, message: 'Connecteur introuvable' });
+		} else {
+			validConnectorIds.push(id);
+		}
+	}
 
-  // Deduplicate
-  const deduped = deduplicateMissions(allMissions);
+	if (signal?.aborted) {
+		try {
+			await setScanState('idle');
+		} catch {}
+		return { missions: [], errors };
+	}
 
-  // Score against profile
-  let profile: UserProfile | null = null;
-  try {
-    profile = await getProfile();
-  } catch {
-    // No profile available
-  }
+	// Load all connectors in parallel (they're lazy-loaded, so this loads only enabled ones)
+	const connectors = await getConnectors(validConnectorIds);
 
-  const scored = profile
-    ? deduped.map(m => ({ ...m, score: scoreMission(m, profile!) }))
-    : deduped;
+	// Check for connectors that failed to load
+	const loadedIds = new Set(connectors.map((c) => c.id));
+	for (const id of validConnectorIds) {
+		if (!loadedIds.has(id)) {
+			errors.push({ connectorId: id, message: 'Échec du chargement du connecteur' });
+		}
+	}
 
-  // Semantic scoring (async enrichment, non-blocking)
-  if (profile && !signal?.aborted) {
-    try {
-      const semanticResults = await scoreMissionsSemantic(
-        scored,
-        profile,
-        settings.maxSemanticPerScan,
-      );
-      for (const mission of scored) {
-        const semantic = semanticResults.get(mission.id);
-        if (semantic) {
-          mission.semanticScore = semantic.score;
-          mission.semanticReason = semantic.reason;
-        }
-      }
-    } catch {
-      // Gemini Nano unavailable, continue with basic scoring
-    }
-  }
+	if (signal?.aborted) {
+		try {
+			await setScanState('idle');
+		} catch {}
+		return { missions: [], errors };
+	}
 
-  // Persist
-  if (scored.length > 0) {
-    try {
-      await saveMissions(scored);
-    } catch {
-      // Storage not available
-    }
-  }
+	// Fetch connectors sequentially to report progress
+	const connectorResults: { connectorId: string; missions: Mission[] }[] = [];
+	for (let i = 0; i < connectors.length; i++) {
+		if (signal?.aborted) {
+			try {
+				await setScanState('idle');
+			} catch {}
+			return { missions: [], errors };
+		}
+		const connector = connectors[i];
+		onProgress?.({ current: i, total: connectors.length, connectorName: connector.name });
 
-  try { await setScanState('idle'); } catch {}
-  return { missions: scored, errors };
+		// Petit délai entre les connecteurs pour ne pas surcharger
+		if (i > 0) {
+			const interConnectorDelay = options?.pageDelayMs ?? 500;
+			if (import.meta.env.DEV) {
+				console.log(`[Scanner] Delay ${interConnectorDelay}ms before connector ${connector.id}`);
+			}
+			await new Promise((r) => setTimeout(r, interConnectorDelay));
+		}
+
+		const connectorStartTime = performance.now();
+		const now = Date.now();
+		
+		// Retry automatique pour les erreurs réseau avec backoff
+		const result = await withRetry(
+			() => connector.fetchMissions(now),
+			{
+				maxAttempts: 3,
+				baseDelayMs: 1000,
+				maxDelayMs: 10000,
+				retryableErrors: ['NETWORK_ERROR', 'TIMEOUT', 'OFFLINE', 'ECONNRESET', 'ETIMEDOUT', 'FETCH_ERROR'],
+			},
+			isOnline
+		);
+		
+		const connectorDuration = Math.round(performance.now() - connectorStartTime);
+		
+		// Enregistrer le timing du connecteur
+		metricsCollector.recordTiming('connector.fetch', connectorDuration, {
+			connectorId: connector.id,
+			status: result.ok ? 'success' : 'error',
+		});
+		
+		if (!result.ok) {
+			errors.push({ connectorId: connector.id, message: result.error.message });
+		} else {
+			connectorResults.push({ connectorId: connector.id, missions: result.value });
+		}
+	}
+	onProgress?.({ current: connectors.length, total: connectors.length, connectorName: '' });
+
+	const allMissions: Mission[] = [];
+	for (const result of connectorResults) {
+		allMissions.push(...result.missions);
+	}
+
+	// Deduplicate
+	const missionsBeforeDedup = allMissions.length;
+	const deduped = deduplicateMissions(allMissions);
+	const dedupRatio = calculateDedupRatio(missionsBeforeDedup, deduped.length);
+
+	// Score against profile
+	let profile: UserProfile | null = null;
+	try {
+		profile = await getProfile();
+	} catch {
+		// No profile available
+	}
+
+	const scored = profile
+		? deduped.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
+		: deduped;
+
+	// Semantic scoring (async enrichment, non-blocking)
+	if (profile && !signal?.aborted) {
+		try {
+			const semanticResults = await scoreMissionsSemantic(
+				scored,
+				profile,
+				settings.maxSemanticPerScan
+			);
+			for (const mission of scored) {
+				const semantic = semanticResults.get(mission.id);
+				if (semantic) {
+					mission.semanticScore = semantic.score;
+					mission.semanticReason = semantic.reason;
+				}
+			}
+		} catch {
+			// Gemini Nano unavailable, continue with basic scoring
+		}
+	}
+
+	// Persist
+	if (scored.length > 0) {
+		try {
+			await saveMissions(scored);
+		} catch {
+			// Storage not available
+		}
+	}
+
+	// Calculer et enregistrer les métriques du scan
+	const scanDuration = Math.round(performance.now() - scanStartTime);
+	const missionsPerConnector: Record<string, number> = {};
+	for (const result of connectorResults) {
+		missionsPerConnector[result.connectorId] = result.missions.length;
+	}
+
+	const scanMetrics: ScanMetrics = {
+		durationMs: scanDuration,
+		totalMissions: scored.length,
+		missionsPerConnector,
+		errors: errors.map((e) => ({
+			connectorId: e.connectorId,
+			errorType: e.message.includes('timeout')
+				? 'timeout'
+				: e.message.includes('auth')
+					? 'auth'
+					: e.message.includes('network')
+						? 'network'
+						: 'unknown',
+		})),
+		dedupRatio,
+	};
+	metricsCollector.recordScanMetrics(scanMetrics);
+
+	// Enregistrer le temps total de scan
+	metricsCollector.recordTiming('scan.total', scanDuration, {
+		connectorsCount: String(connectors.length),
+		errorsCount: String(errors.length),
+	});
+
+	if (import.meta.env.DEV) {
+		console.log(`[Scanner] Completed in ${scanDuration}ms, ${scored.length} missions, ${errors.length} errors`);
+	}
+
+	try {
+		await setScanState('idle');
+	} catch {}
+	return { missions: scored, errors };
 }

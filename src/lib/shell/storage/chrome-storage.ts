@@ -5,6 +5,12 @@ export interface AppSettings {
   autoScan: boolean;
   maxSemanticPerScan: number;
   notificationScoreThreshold: number;
+  /** Respecte le rate limiting pour éviter de surcharger les serveurs (défaut: true) */
+  respectRateLimits: boolean;
+  /** Délai personnalisé entre les requêtes en ms (0 = utiliser les valeurs par défaut) */
+  customDelayMs: number;
+  /** Respecte robots.txt (défaut: true) - non implémenté pour l'instant */
+  respectRobotsTxt: boolean;
 }
 
 const DEFAULT_SETTINGS: AppSettings = {
@@ -14,6 +20,9 @@ const DEFAULT_SETTINGS: AppSettings = {
   autoScan: true,
   maxSemanticPerScan: 10,
   notificationScoreThreshold: 70,
+  respectRateLimits: true,
+  customDelayMs: 0,
+  respectRobotsTxt: true,
 };
 
 export const getApiKey = async (): Promise<string | null> => {

@@ -3,10 +3,17 @@
   import ConnectorPanel from '../organisms/ConnectorPanel.svelte';
   import Button from '../atoms/Button.svelte';
   import Icon from '../atoms/Icon.svelte';
+  import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import type { ConnectorStatus } from '$lib/core/types/connector';
-  import { getSettings, setSettings, getApiKey, setApiKey } from '$lib/shell/storage/chrome-storage';
+  import type { Mission } from '$lib/core/types/mission';
+  import type { BackupData, ValidationError } from '$lib/core/backup/backup';
+  import { getSettings, setSettings, getApiKey, setApiKey, type AppSettings } from '$lib/shell/storage/chrome-storage';
   import { getProfile, saveProfile } from '$lib/shell/storage/db';
-  import { connectorRegistry } from '$lib/shell/connectors/index';
+  import { getConnectorsMeta, getConnectors, type ConnectorMeta, preloadConnector } from '$lib/shell/connectors/index';
+  import { getFavorites, getHidden, saveFavorites, saveHidden } from '$lib/shell/storage/favorites';
+  import { exportMissionsToJSON, exportMissionsToCSV, exportMissionsToMarkdown, generateFilename, type ExportFormat } from '$lib/core/export/mission-export';
+  import { downloadJSON, downloadCSV, downloadMarkdown } from '$lib/shell/export/download';
+  import { createBackup, validateBackup, serializeBackup, parseBackupJson, generateBackupFilename, type Result } from '$lib/core/backup/backup';
 
   let { onBack }: { onBack?: () => void } = $props();
 
@@ -33,17 +40,27 @@
   let autoScan = $state(true);
 
   // --- Connecteurs ---
-  let connectors = $state<{
-    id: string;
-    name: string;
-    icon: string;
+  interface ConnectorUIState extends ConnectorMeta {
     status: ConnectorStatus;
     lastSync: Date | null;
     enabled: boolean;
-  }[]>([]);
+    loading: boolean;
+  }
+
+  let connectors = $state<ConnectorUIState[]>([]);
 
   // --- Reset ---
   let showResetConfirm = $state(false);
+
+  // --- Export ---
+  let isExporting = $state(false);
+  let exportSuccess = $state(false);
+
+  // --- Backup/Restore ---
+  let showBackupModal = $state(false);
+  let pendingBackup: BackupData | null = $state(null);
+  let backupError: ValidationError | null = $state(null);
+  let fileInput: HTMLInputElement | null = $state(null);
 
   // Chargement initial (fire-and-forget, pas besoin de reactivite)
   loadProfile();
@@ -81,34 +98,109 @@
       notifications = settings.notifications;
       autoScan = settings.autoScan;
 
-      // Construire la liste des connecteurs a partir du registre
-      const detections = await Promise.allSettled(
-        connectorRegistry.map(async (c) => {
-          const hasSession = await c.detectSession();
-          const lastSync = await c.getLastSync();
-          return {
-            id: c.id,
-            name: c.name,
-            icon: c.icon,
-            status: (hasSession ? 'authenticated' : 'expired') as ConnectorStatus,
-            lastSync,
-            enabled: settings.enabledConnectors.includes(c.id),
-          };
-        }),
-      );
+      // Phase 1: Afficher les connecteurs avec metadata statique (pas de chargement)
+      const meta = getConnectorsMeta();
+      connectors = meta.map((m) => ({
+        ...m,
+        status: 'detecting',
+        lastSync: null,
+        enabled: settings.enabledConnectors.includes(m.id),
+        loading: true,
+      }));
 
-      connectors = detections
-        .filter((r): r is PromiseFulfilledResult<typeof connectors[number]> => r.status === 'fulfilled')
-        .map((r) => r.value);
+      // Phase 2: Lazy load des connecteurs actifs en priorité
+      const activeIds = settings.enabledConnectors;
+      const now = Date.now();
+      
+      if (activeIds.length > 0) {
+        // Préchargement des connecteurs actifs
+        activeIds.forEach((id) => preloadConnector(id));
+        
+        // Charger les connecteurs actifs pour la détection de session
+        const activeConnectors = await getConnectors(activeIds);
+        
+        // Mettre à jour l'état des connecteurs actifs
+        await Promise.all(
+          activeConnectors.map(async (c) => {
+            const sessionResult = await c.detectSession(now);
+            const lastSyncResult = await c.getLastSync(now);
+            
+            // Gérer les erreurs
+            if (!sessionResult.ok || !lastSyncResult.ok) {
+              connectors = connectors.map((conn) =>
+                conn.id === c.id
+                  ? { ...conn, status: 'error' as ConnectorStatus, loading: false }
+                  : conn
+              );
+              return;
+            }
+            
+            const hasSession = sessionResult.value;
+            const lastSync = lastSyncResult.value;
+            
+            connectors = connectors.map((conn) =>
+              conn.id === c.id
+                ? {
+                    ...conn,
+                    status: (hasSession ? 'authenticated' : 'expired') as ConnectorStatus,
+                    lastSync,
+                    loading: false,
+                  }
+                : conn
+            );
+          })
+        );
+      }
+
+      // Phase 3: Charger les connecteurs inactifs en arrière-plan
+      const inactiveIds = meta.map((m) => m.id).filter((id) => !activeIds.includes(id));
+      
+      // Chargement progressif des inactifs
+      for (const id of inactiveIds) {
+        const c = await getConnectors([id]).then((arr) => arr[0]);
+        if (c) {
+          const sessionResult = await c.detectSession(now);
+          const lastSyncResult = await c.getLastSync(now);
+          
+          if (!sessionResult.ok || !lastSyncResult.ok) {
+            connectors = connectors.map((conn) =>
+              conn.id === c.id
+                ? { ...conn, status: 'error' as ConnectorStatus, loading: false }
+                : conn
+            );
+          } else {
+            const hasSession = sessionResult.value;
+            const lastSync = lastSyncResult.value;
+            
+            connectors = connectors.map((conn) =>
+              conn.id === c.id
+                ? {
+                    ...conn,
+                    status: (hasSession ? 'authenticated' : 'expired') as ConnectorStatus,
+                    lastSync,
+                    loading: false,
+                  }
+                : conn
+            );
+          }
+        } else {
+          // Connecteur non trouvé, marquer comme erreur
+          connectors = connectors.map((conn) =>
+            conn.id === id
+              ? { ...conn, status: 'error' as ConnectorStatus, loading: false }
+              : conn
+          );
+        }
+      }
     } catch {
       // Hors contexte extension — fallback statique
-      connectors = connectorRegistry.map((c) => ({
-        id: c.id,
-        name: c.name,
-        icon: c.icon,
+      const meta = getConnectorsMeta();
+      connectors = meta.map((m) => ({
+        ...m,
         status: 'detecting' as ConnectorStatus,
         lastSync: null,
         enabled: false,
+        loading: false,
       }));
     }
   }
@@ -213,6 +305,147 @@
     } catch {
       // Hors contexte extension
     }
+  }
+
+  // --- Export handlers ---
+  async function handleExportFavorites(format: ExportFormat) {
+    try {
+      isExporting = true;
+      const favorites = await getFavorites();
+      const favoriteIds = Object.keys(favorites);
+
+      if (favoriteIds.length === 0) {
+        alert('Aucune mission favorite à exporter');
+        isExporting = false;
+        return;
+      }
+
+      // Récupérer les missions depuis IndexedDB
+      const { getMissions } = await import('$lib/shell/storage/db');
+      const allMissions = await getMissions();
+      const favoriteMissions = allMissions.filter(m => favoriteIds.includes(m.id));
+
+      const now = new Date();
+      const filename = generateFilename('favoris', format);
+
+      switch (format) {
+        case 'json':
+          downloadJSON(exportMissionsToJSON(favoriteMissions, { format, includeDescription: true }, now), filename);
+          break;
+        case 'csv':
+          downloadCSV(exportMissionsToCSV(favoriteMissions, { format, includeDescription: false }, now), filename);
+          break;
+        case 'markdown':
+          downloadMarkdown(exportMissionsToMarkdown(favoriteMissions, { format, includeDescription: true }, now), filename);
+          break;
+      }
+
+      exportSuccess = true;
+      setTimeout(() => { exportSuccess = false; }, 2000);
+    } catch (e) {
+      console.error('Erreur lors de l\'export:', e);
+      alert('Erreur lors de l\'export des favoris');
+    } finally {
+      isExporting = false;
+    }
+  }
+
+  // --- Backup handlers ---
+  async function handleCreateBackup() {
+    try {
+      const [profile, settings, favorites, hidden] = await Promise.all([
+        getProfile(),
+        getSettings(),
+        getFavorites(),
+        getHidden(),
+      ]);
+
+      if (!profile) {
+        alert('Veuillez configurer votre profil avant de créer un backup');
+        return;
+      }
+
+      const backup = createBackup(profile, settings, favorites, hidden, Date.now());
+      const json = serializeBackup(backup);
+      const filename = generateBackupFilename(backup.timestamp);
+
+      downloadJSON(json, filename);
+    } catch (e) {
+      console.error('Erreur lors de la création du backup:', e);
+      alert('Erreur lors de la création du backup');
+    }
+  }
+
+  async function handleFileSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    const file = input.files?.[0];
+    if (!file) return;
+
+    try {
+      const text = await file.text();
+      const parseResult = parseBackupJson(text);
+
+      if (!parseResult.ok) {
+        backupError = parseResult.error;
+        pendingBackup = null;
+        showBackupModal = true;
+        return;
+      }
+
+      const validateResult = validateBackup(parseResult.value);
+
+      if (!validateResult.ok) {
+        backupError = validateResult.error;
+        pendingBackup = null;
+      } else {
+        backupError = null;
+        pendingBackup = validateResult.value;
+      }
+
+      showBackupModal = true;
+    } catch (e) {
+      backupError = { type: 'INVALID_JSON', message: 'Impossible de lire le fichier' };
+      pendingBackup = null;
+      showBackupModal = true;
+    } finally {
+      // Reset input
+      if (fileInput) fileInput.value = '';
+    }
+  }
+
+  async function handleRestoreBackup() {
+    if (!pendingBackup) return;
+
+    try {
+      const { profile, settings, favorites, hidden } = pendingBackup;
+
+      await Promise.all([
+        saveProfile(profile),
+        setSettings(settings),
+        saveFavorites(favorites),
+        saveHidden(hidden),
+      ]);
+
+      showBackupModal = false;
+      pendingBackup = null;
+      backupError = null;
+
+      // Recharger pour refléter les changements
+      window.location.reload();
+    } catch (e) {
+      console.error('Erreur lors de la restauration:', e);
+      alert('Erreur lors de la restauration du backup');
+    }
+  }
+
+  function handleCancelRestore() {
+    showBackupModal = false;
+    pendingBackup = null;
+    backupError = null;
+  }
+
+  function triggerFileSelect() {
+    fileInput?.click();
   }
 </script>
 
@@ -379,6 +612,77 @@
         onToggleAll={toggleAllConnectors}
       />
 
+      <!-- Export -->
+      <div class="section-card rounded-[1.5rem] p-4 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-text-primary">Export</h3>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Exporter vos missions favorites dans différents formats.</p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <button
+            class="inline-flex items-center gap-2 rounded-[1rem] border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/[0.1] disabled:opacity-50"
+            onclick={() => handleExportFavorites('json')}
+            disabled={isExporting}
+          >
+            <Icon name="file-json" size={16} class="text-accent-blue" />
+            JSON
+          </button>
+          <button
+            class="inline-flex items-center gap-2 rounded-[1rem] border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/[0.1] disabled:opacity-50"
+            onclick={() => handleExportFavorites('csv')}
+            disabled={isExporting}
+          >
+            <Icon name="file-spreadsheet" size={16} class="text-accent-emerald" />
+            CSV
+          </button>
+          <button
+            class="inline-flex items-center gap-2 rounded-[1rem] border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/[0.1] disabled:opacity-50"
+            onclick={() => handleExportFavorites('markdown')}
+            disabled={isExporting}
+          >
+            <Icon name="file-text" size={16} class="text-accent-amber" />
+            Markdown
+          </button>
+        </div>
+
+        {#if exportSuccess}
+          <p class="text-xs text-accent-emerald">Export réussi !</p>
+        {/if}
+      </div>
+
+      <!-- Sauvegarde et restauration -->
+      <div class="section-card rounded-[1.5rem] p-4 space-y-4">
+        <div>
+          <h3 class="text-sm font-semibold text-text-primary">Sauvegarde</h3>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Sauvegarder ou restaurer vos données (profil, paramètres, favoris).</p>
+        </div>
+
+        <div class="flex flex-wrap gap-2">
+          <Button variant="secondary" onclick={handleCreateBackup}>
+            {#snippet children()}
+              <Icon name="download" size={16} class="mr-1" />
+              Créer une sauvegarde
+            {/snippet}
+          </Button>
+
+          <input
+            type="file"
+            accept=".pulse-backup,.json"
+            class="hidden"
+            onchange={handleFileSelect}
+            bind:this={fileInput}
+          />
+
+          <Button variant="ghost" onclick={triggerFileSelect}>
+            {#snippet children()}
+              <Icon name="upload" size={16} class="mr-1" />
+              Restaurer depuis une sauvegarde
+            {/snippet}
+          </Button>
+        </div>
+      </div>
+
       <!-- Zone de danger -->
       <div class="section-card rounded-[1.5rem] border border-red-500/20 p-4 space-y-3">
         <div>
@@ -410,3 +714,12 @@
     </div>
   {/snippet}
 </SettingsLayout>
+
+{#if showBackupModal}
+  <BackupRestoreModal
+    backup={pendingBackup}
+    error={backupError}
+    onConfirm={handleRestoreBackup}
+    onCancel={handleCancelRestore}
+  />
+{/if}

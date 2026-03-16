@@ -8,6 +8,9 @@ importers:
 
   .:
     dependencies:
+      '@xstate/svelte':
+        specifier: ^5.0.0
+        version: 5.0.0(svelte@5.53.10)(xstate@5.28.0)
       lucide-svelte:
         specifier: ^0.460.0
         version: 0.460.1(svelte@5.53.10)
@@ -17,6 +20,9 @@ importers:
       xstate:
         specifier: ^5.0.0
         version: 5.28.0
+      zod:
+        specifier: ^3.23.0
+        version: 3.25.76
     devDependencies:
       '@crxjs/vite-plugin':
         specifier: ^2.0.0-beta.28
@@ -619,6 +625,15 @@ packages:
 
   '@webcomponents/custom-elements@1.6.0':
     resolution: {integrity: sha512-CqTpxOlUCPWRNUPZDxT5v2NnHXA4oox612iUGnmTUGQFhZ1Gkj8kirtl/2wcF6MqX7+PqqicZzOCBKKfIn0dww==}
+
+  '@xstate/svelte@5.0.0':
+    resolution: {integrity: sha512-VZABqXXwKIpnEDIoz5Vb7P1C+4rIivxG8u3eNqCKW048cVg7eHBXc4lr+icwXQitSJG/fJSmfgvSGYjn9ouuRQ==}
+    peerDependencies:
+      svelte: ^3.24.1 || ^4 || ^5
+      xstate: ^5.20.0
+    peerDependenciesMeta:
+      xstate:
+        optional: true
 
   acorn-walk@8.3.5:
     resolution: {integrity: sha512-HEHNfbars9v4pgpW6SO1KSPkfoS0xVOM/9UzkJltjlsHZmJasxg8aXkuZa7SMf8vKGIBhpUsPluQSqhJFCqebw==}
@@ -1350,6 +1365,9 @@ packages:
   zimmerframe@1.1.4:
     resolution: {integrity: sha512-B58NGBEoc8Y9MWWCQGl/gq9xBCe4IiKM0a2x7GZdQKOW5Exr8S1W24J6OgM1njK8xCRGvAJIL/MxXHf6SkmQKQ==}
 
+  zod@3.25.76:
+    resolution: {integrity: sha512-gzUt/qt81nXsFGKIFcC3YnfEAx5NkunCfnDlvuBSSFS02bcXu4Lmea0AFIUwbLWxWPx3d9p8S5QoaujKcNQxcQ==}
+
 snapshots:
 
   '@acemir/cssom@0.9.31': {}
@@ -1787,6 +1805,12 @@ snapshots:
       tinyrainbow: 2.0.0
 
   '@webcomponents/custom-elements@1.6.0': {}
+
+  '@xstate/svelte@5.0.0(svelte@5.53.10)(xstate@5.28.0)':
+    dependencies:
+      svelte: 5.53.10
+    optionalDependencies:
+      xstate: 5.28.0
 
   acorn-walk@8.3.5:
     dependencies:
@@ -2498,3 +2522,5 @@ snapshots:
   xstate@5.28.0: {}
 
   zimmerframe@1.1.4: {}
+
+  zod@3.25.76: {}

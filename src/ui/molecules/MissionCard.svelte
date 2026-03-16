@@ -11,6 +11,7 @@
     isSeen = true,
     isFavorite = false,
     isHidden = false,
+    isVirtualized = false,
     onVisible: onVisibleCallback,
     onToggleFavorite,
     onHide,
@@ -20,6 +21,7 @@
     isSeen?: boolean;
     isFavorite?: boolean;
     isHidden?: boolean;
+    isVirtualized?: boolean;
     onVisible?: () => void;
     onToggleFavorite?: () => void;
     onHide?: () => void;
@@ -78,6 +80,7 @@
   use:ripple
   use:onVisibleAction={() => onVisibleCallback?.()}
   class="section-card relative cursor-pointer rounded-[1.65rem] p-4 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-white/[0.07] active:scale-[0.99] {glowClass} {isSeen ? '' : 'border-accent-blue/30 shadow-[inset_0_0_0_1px_rgba(89,198,255,0.2),0_18px_36px_rgba(1,7,12,0.26)]'} {isHidden ? 'opacity-55' : ''}"
+  style="contain: layout style paint;"
   onclick={toggleExpand}
   role="button"
   tabindex="0"
@@ -196,19 +199,37 @@
   </div>
 
   {#if expanded && mission.description}
-    <div transition:slide={{ duration: 200 }}>
-      <div class="mt-4 border-t border-white/6 pt-4">
-        <p class="text-xs leading-relaxed text-text-secondary">{mission.description}</p>
+    <!-- Les animations sont désactivées en mode virtualisé car elles conflit avec le absolute positioning -->
+    {#if isVirtualized}
+      <div>
+        <div class="mt-4 border-t border-white/6 pt-4 max-h-32 overflow-y-auto">
+          <p class="text-xs leading-relaxed text-text-secondary">{mission.description}</p>
+        </div>
+        <a
+          href={mission.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-blue hover:underline"
+          onclick={(e) => e.stopPropagation()}
+        >
+          Voir la mission <Icon name="arrow-right" size={12} />
+        </a>
       </div>
-      <a
-        href={mission.url}
-        target="_blank"
-        rel="noopener noreferrer"
-        class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-blue hover:underline"
-        onclick={(e) => e.stopPropagation()}
-      >
-        Voir la mission <Icon name="arrow-right" size={12} />
-      </a>
-    </div>
+    {:else}
+      <div transition:slide={{ duration: 200 }}>
+        <div class="mt-4 border-t border-white/6 pt-4">
+          <p class="text-xs leading-relaxed text-text-secondary">{mission.description}</p>
+        </div>
+        <a
+          href={mission.url}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-blue hover:underline"
+          onclick={(e) => e.stopPropagation()}
+        >
+          Voir la mission <Icon name="arrow-right" size={12} />
+        </a>
+      </div>
+    {/if}
   {/if}
 </div>

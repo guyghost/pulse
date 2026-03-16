@@ -1,42 +1,37 @@
 <script lang="ts">
   import FeedPage from '../ui/pages/FeedPage.svelte';
-
   import SettingsPage from '../ui/pages/SettingsPage.svelte';
   import OnboardingPage from '../ui/pages/OnboardingPage.svelte';
   import Icon from '../ui/atoms/Icon.svelte';
-  import Toast from '../ui/atoms/Toast.svelte';
+  import ConnectionIndicator from '../ui/atoms/ConnectionIndicator.svelte';
+  import ToastContainer from '../ui/organisms/ToastContainer.svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { ripple } from '../ui/actions/ripple';
   import { generateMockMissions } from '../dev/mocks';
   import type { LogEntry } from '../dev/bridge-logger';
+  import { createActor } from 'xstate';
+  import { toastMachine, type ToastType } from '../machines/toast.machine';
+  import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
+  import { subscribeToConnection, type ConnectionInfo } from '../lib/shell/utils/connection-monitor';
 
   type Page = 'feed' | 'settings' | 'onboarding';
 
   let currentPage: Page = $state('onboarding');
   let hasCompletedOnboarding = $state(false);
+  let connectionStatus = $state<ConnectionInfo['status']>('unknown');
+  let showOfflineBanner = $state(false);
 
   const PAGE_INDEX: Record<Page, number> = { onboarding: -1, feed: 0, settings: 1 };
   let previousPageIndex = $state(PAGE_INDEX['onboarding']);
   let transitionDirection = $state(1);
 
-  type ToastItem = { id: number; message: string; type: 'info' | 'error' | 'success' };
-  let toasts = $state<ToastItem[]>([]);
-  let toastId = 0;
+  // Initialize toast service
+  const toastActor = initToastService();
 
-  function addToast(message: string, type: 'info' | 'error' | 'success' = 'info') {
-    const id = ++toastId;
-    toasts = [...toasts, { id, message, type }];
-    setTimeout(() => dismissToast(id), 4000);
-  }
-
-  function dismissToast(id: number) {
-    toasts = toasts.filter(t => t.id !== id);
-  }
-
-  // Expose addToast globally for other components
-  if (typeof window !== 'undefined') {
-    (window as unknown as Record<string, unknown>).__pulseAddToast = addToast;
+  // Expose showToast globally for child components
+  export function showToastMessage(message: string, type: ToastType = 'info'): void {
+    showToast(message, type);
   }
 
   let DevPanel: typeof import('../dev/DevPanel.svelte').default | null = $state(null);
@@ -60,6 +55,10 @@
     currentPage = hasCompletedOnboarding ? 'feed' : 'onboarding';
   }
 
+  function devClearCache() {
+    window.dispatchEvent(new CustomEvent('dev:clear-cache'));
+  }
+
   function navigate(page: Page) {
     const newIndex = PAGE_INDEX[page];
     transitionDirection = newIndex > previousPageIndex ? 1 : -1;
@@ -73,6 +72,28 @@
     previousPageIndex = PAGE_INDEX['feed'];
     currentPage = 'feed';
   }
+
+  // Abonnement aux changements de connexion
+  $effect(() => {
+    const unsubscribe = subscribeToConnection((info) => {
+      const wasOffline = connectionStatus === 'offline';
+      connectionStatus = info.status;
+      
+      // Afficher le banner quand on passe offline
+      if (info.status === 'offline') {
+        showOfflineBanner = true;
+      }
+      
+      // Notification quand on revient online
+      if (wasOffline && info.status !== 'offline') {
+        showToast('Connexion restaurée', 'success');
+        // Cacher le banner après un délai
+        setTimeout(() => { showOfflineBanner = false; }, 3000);
+      }
+    });
+    
+    return unsubscribe;
+  });
 
   // Check if profile exists on mount
   $effect(() => {
@@ -116,6 +137,16 @@
     <OnboardingPage onComplete={completeOnboarding} />
   {:else}
     <div class="relative z-10 flex h-full flex-col">
+      {#if showOfflineBanner}
+        <div 
+          class="flex items-center justify-center gap-2 border-b border-white/10 bg-accent-red/10 px-4 py-2 text-xs text-accent-red"
+          transition:fade={{ duration: 200 }}
+        >
+          <Icon name="wifi-off" size={12} />
+          <span>Mode hors ligne — Données en cache uniquement</span>
+        </div>
+      {/if}
+      
       <div class="px-3 pt-3">
         <nav
           aria-label="Main navigation"
@@ -136,6 +167,10 @@
         </button>
       {/each}
         </nav>
+        
+        <div class="mt-2 flex justify-end">
+          <ConnectionIndicator />
+        </div>
       </div>
       <main class="relative flex-1 overflow-hidden">
         {#key currentPage}
@@ -155,23 +190,14 @@
     </div>
   {/if}
 
-  {#if toasts.length > 0}
-    <div class="absolute bottom-16 left-3 right-3 z-50 flex flex-col gap-2">
-      {#each toasts as toast (toast.id)}
-        <Toast
-          message={toast.message}
-          type={toast.type}
-          onDismiss={() => dismissToast(toast.id)}
-        />
-      {/each}
-    </div>
-  {/if}
+  <ToastContainer actor={toastActor} />
 
   {#if import.meta.env.DEV && DevPanel}
     <DevPanel
       onInjectMissions={devInjectMissions}
       onSetState={devSetState}
       onToggleOnboarding={devToggleOnboarding}
+      onClearCache={devClearCache}
       logs={bridgeLogs}
     />
   {/if}
