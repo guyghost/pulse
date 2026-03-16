@@ -35,21 +35,103 @@ function pickTJM(min: number | null, max: number | null): number | null {
   return max ?? min ?? null;
 }
 
+/** Metadata keys found in CherryPick description fields (regex-safe). */
+const METADATA_KEYS = [
+  'Qualification faite par',
+  'Nom du client',
+  'Nom de l\'op(?:e|é)rationnel',
+  'Type de besoin',
+  'TJM',
+  'Nombre de postes ouvert',
+  'Localisation de la mission',
+  'Processus de recrutement',
+  'Lien vers la fiche de poste',
+  'Date de d(?:e|é)marrage',
+  'Dur(?:e|é)e de la mission',
+];
+
+interface DescriptionMeta {
+  client: string | null;
+  tjm: number | null;
+  location: string | null;
+  duration: string | null;
+  cleanDescription: string;
+}
+
+/**
+ * Build a single regex that matches "Key : Value" for all known metadata keys.
+ * Value = everything up to the next known key or end of string.
+ */
+const META_REGEX = new RegExp(
+  `(${METADATA_KEYS.join('|')})\\s*:\\s*(.*?)(?=(?:${METADATA_KEYS.join('|')})\\s*:|$)`,
+  'gi',
+);
+
+/**
+ * Parse structured key-value metadata from CherryPick description text.
+ * Format: "Key1 : Value1 Key2 : Value2 ..." or newline-separated.
+ */
+export function parseDescriptionMeta(raw: string | null): DescriptionMeta {
+  const result: DescriptionMeta = { client: null, tjm: null, location: null, duration: null, cleanDescription: '' };
+  if (!raw) return result;
+
+  const kvMap = new Map<string, string>();
+  let cleaned = raw;
+
+  for (const match of raw.matchAll(META_REGEX)) {
+    const key = match[1].toLowerCase();
+    const value = match[2].trim();
+    if (value) kvMap.set(key, value);
+    cleaned = cleaned.replace(match[0], ' ');
+  }
+
+  result.client = kvMap.get('nom du client') ?? null;
+  result.location = kvMap.get('localisation de la mission') ?? null;
+
+  const tjmRaw = kvMap.get('tjm');
+  if (tjmRaw) {
+    const rangeMatch = tjmRaw.match(/(\d+)\s*[\/\-]\s*(\d+)/);
+    if (rangeMatch) {
+      result.tjm = Math.round((parseInt(rangeMatch[1]) + parseInt(rangeMatch[2])) / 2);
+    } else {
+      const single = tjmRaw.match(/(\d+)/);
+      if (single) result.tjm = parseInt(single[1]);
+    }
+  }
+
+  const durationKey = [...kvMap.keys()].find(k => k.includes('de la mission') && k.includes('dur'));
+  if (durationKey) result.duration = kvMap.get(durationKey) ?? null;
+
+  result.cleanDescription = cleaned.replace(/\s{2,}/g, ' ').trim();
+  return result;
+}
+
+/** Add "mois" suffix to bare numeric durations. */
+function normalizeDuration(d: string | null): string | null {
+  if (!d) return null;
+  const trimmed = d.trim();
+  if (/^\d+$/.test(trimmed)) return `${trimmed} mois`;
+  return trimmed;
+}
+
 export function parseCherryPickMissions(missions: CherryPickMission[], now: Date): Mission[] {
-  return missions.map((m) =>
-    createMission({
+  return missions.map((m) => {
+    const meta = parseDescriptionMeta(m.description);
+    const apiTjm = pickTJM(m.minimum_rate, m.maximum_rate);
+
+    return createMission({
       id: `cp-${m.id}`,
       title: m.name,
-      client: m.company?.name ?? null,
-      description: m.description ?? '',
+      client: m.company?.name ?? meta.client,
+      description: meta.cleanDescription,
       stack: m.skills.map((s) => s.name),
-      tjm: pickTJM(m.minimum_rate, m.maximum_rate),
-      location: m.city ?? null,
+      tjm: apiTjm ?? meta.tjm,
+      location: m.city ?? meta.location,
       remote: mapRemote(m.displacement),
-      duration: m.duration ?? null,
+      duration: normalizeDuration(m.duration ?? meta.duration),
       url: `${BASE_URL}/mission/${m.slug}`,
       source: SOURCE,
       scrapedAt: now,
-    }),
-  );
+    });
+  });
 }
