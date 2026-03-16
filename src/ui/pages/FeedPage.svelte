@@ -1,495 +1,666 @@
 <script lang="ts">
-  import { createActor } from 'xstate';
-  import { feedMachine } from '../../machines/feed.machine';
-  import MissionFeed from '../organisms/MissionFeed.svelte';
-  import { pullToRefresh } from '../actions/pull-to-refresh';
-  import ScanProgress from '../organisms/ScanProgress.svelte';
-  import SearchInput from '../molecules/SearchInput.svelte';
-  import Icon from '../atoms/Icon.svelte';
-  import FilterBar from '../organisms/FilterBar.svelte';
-  import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import { runScan } from '$lib/shell/scan/scanner';
-  import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
-  import { markAsSeen } from '$lib/core/seen/mark-seen';
-  import { getFavorites, saveFavorites, getHidden, saveHidden } from '$lib/shell/storage/favorites';
-  import { getProfile, getMissions } from '$lib/shell/storage/db';
-  import { getSettings } from '$lib/shell/storage/chrome-storage';
-  import { resetNewMissionCount } from '$lib/shell/storage/session-storage';
-  import { toggleFavorite, toggleHidden, filterHidden, filterFavoritesOnly } from '$lib/core/favorites/favorites';
-  import { getPanelSide, type PanelSide } from '$lib/shell/ui/panel-layout';
-  import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabilities';
+    import { createActor } from "xstate";
+    import { feedMachine } from "../../machines/feed.machine";
+    import MissionFeed from "../organisms/MissionFeed.svelte";
+    import { pullToRefresh } from "../actions/pull-to-refresh";
+    import ScanProgress from "../organisms/ScanProgress.svelte";
+    import SearchInput from "../molecules/SearchInput.svelte";
+    import Icon from "../atoms/Icon.svelte";
+    import FilterBar from "../organisms/FilterBar.svelte";
+    import type { MissionSource, RemoteType } from "$lib/core/types/mission";
+    import { runScan } from "$lib/shell/scan/scanner";
+    import { getSeenIds, saveSeenIds } from "$lib/shell/storage/seen-missions";
+    import { markAsSeen } from "$lib/core/seen/mark-seen";
+    import {
+        getFavorites,
+        saveFavorites,
+        getHidden,
+        saveHidden,
+    } from "$lib/shell/storage/favorites";
+    import { getProfile, getMissions } from "$lib/shell/storage/db";
+    import { getSettings } from "$lib/shell/storage/chrome-storage";
+    import { resetNewMissionCount } from "$lib/shell/storage/session-storage";
+    import {
+        toggleFavorite,
+        toggleHidden,
+        filterHidden,
+        filterFavoritesOnly,
+    } from "$lib/core/favorites/favorites";
+    import { getPanelSide, type PanelSide } from "$lib/shell/ui/panel-layout";
+    import {
+        isPromptApiAvailable,
+        type AiAvailability,
+    } from "$lib/shell/ai/capabilities";
 
-  const feedActor = createActor(feedMachine);
-  feedActor.start();
+    const feedActor = createActor(feedMachine);
+    feedActor.start();
 
-  let feedSnapshot = $state(feedActor.getSnapshot());
+    let feedSnapshot = $state(feedActor.getSnapshot());
 
-  // Subscribe synchronously so every event (including those from smartLoad)
-  // is captured BEFORE the first render. Using $effect would defer the
-  // subscription until after the first paint, creating a window where
-  // MISSIONS_LOADED and LOAD events update the actor but feedSnapshot stays stale.
-  const _feedSub = feedActor.subscribe((s) => { feedSnapshot = s; });
-
-  $effect(() => {
-    return () => _feedSub.unsubscribe();
-  });
-
-  let missions = $derived(feedSnapshot.context.filteredMissions);
-  let isLoading = $derived(feedSnapshot.matches('loading'));
-  let error = $derived(feedSnapshot.context.error);
-  let searchQuery = $derived(feedSnapshot.context.searchQuery);
-  let totalMissions = $derived(missions.length);
-
-  let displayMissions = $derived.by(() => {
-    let result = missions;
-    if (showFavoritesOnly) {
-      result = filterFavoritesOnly(result, favorites);
-    }
-    if (!showHidden) {
-      result = filterHidden(result, hidden);
-    }
-    if (selectedSource) {
-      result = result.filter(m => m.source === selectedSource);
-    }
-    if (selectedRemote) {
-      result = result.filter(m => m.remote === selectedRemote);
-    }
-    if (selectedStacks.length > 0) {
-      result = result.filter(m => selectedStacks.some(s => m.stack.includes(s)));
-    }
-    return result;
-  });
-
-  let seenIds = $state<string[]>([]);
-  let favorites = $state<Record<string, number>>({});
-  let hidden = $state<Record<string, number>>({});
-  let sortBy = $state<'score' | 'date' | 'tjm'>('score');
-  let showFavoritesOnly = $state(false);
-  let showHidden = $state(false);
-  let showFilters = $state(false);
-  let selectedStacks = $state<string[]>([]);
-  let selectedSource = $state<MissionSource | null>(null);
-  let selectedRemote = $state<RemoteType | null>(null);
-  let favoriteCount = $derived(Object.keys(favorites).length);
-  let hiddenCount = $derived(Object.keys(hidden).length);
-  let visibleCount = $derived(displayMissions.length);
-  let filterActive = $derived(selectedSource !== null || selectedRemote !== null || selectedStacks.length > 0);
-  let availableStacks = $derived.by(() => {
-    const counts = new Map<string, number>();
-    for (const m of missions) {
-      for (const s of m.stack) {
-        counts.set(s, (counts.get(s) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()]
-      .sort((a, b) => b[1] - a[1])
-      .map(([name]) => name);
-  });
-  let firstName = $state('');
-  let panelSide = $state<PanelSide>('right');
-  let aiStatus = $state<AiAvailability>('no');
-  let scanController: AbortController | null = null;
-  let scanCurrent = $state(0);
-  let scanTotal = $state(0);
-  let scanConnectorName = $state('');
-  let scanPercent = $derived(scanTotal > 0 ? Math.round((scanCurrent / scanTotal) * 100) : 0);
-
-  $effect(() => {
-    getSeenIds().then(ids => { seenIds = ids; }).catch(() => {});
-  });
-
-  $effect(() => {
-    getFavorites().then(f => { favorites = f; }).catch(() => {});
-    getHidden().then(h => { hidden = h; }).catch(() => {});
-  });
-
-  $effect(() => {
-    getProfile().then(p => { if (p?.firstName) firstName = p.firstName; }).catch(() => {});
-  });
-
-  $effect(() => {
-    getPanelSide().then(side => { panelSide = side; });
-  });
-
-  $effect(() => {
-    isPromptApiAvailable().then(status => { aiStatus = status; }).catch(() => {});
-  });
-
-  $effect(() => {
-    try {
-      chrome.action.setBadgeText({ text: '' });
-      resetNewMissionCount();
-    } catch {
-      // Outside extension context
-    }
-  });
-
-  function handleMissionSeen(missionId: string) {
-    if (seenIds.includes(missionId)) return;
-    seenIds = markAsSeen(seenIds, [missionId]);
-    saveSeenIds(seenIds).catch(() => {});
-  }
-
-  function handleToggleFavorite(id: string) {
-    favorites = toggleFavorite(favorites, id, Date.now());
-    saveFavorites(favorites).catch(() => {});
-  }
-
-  function handleHide(id: string) {
-    hidden = toggleHidden(hidden, id, Date.now());
-    saveHidden(hidden).catch(() => {});
-  }
-
-  function handleCopyLink(_id: string) {
-    // Copy handled in MissionCard, callback for future analytics
-  }
-
-  function toggleFavoritesFilter() {
-    showFavoritesOnly = !showFavoritesOnly;
-  }
-
-  function toggleHiddenFilter() {
-    showHidden = !showHidden;
-  }
-
-  function handleSearch(query: string) {
-    if (query) {
-      feedActor.send({ type: 'SEARCH', query });
-    } else {
-      feedActor.send({ type: 'CLEAR_SEARCH' });
-    }
-  }
-
-  async function startScan() {
-    if (isLoading) return;
-    scanController = new AbortController();
-    feedActor.send({ type: 'LOAD' });
-    scanCurrent = 0;
-    scanTotal = 0;
-    scanConnectorName = '';
-    try {
-      const result = await runScan(scanController.signal, (info) => {
-        scanCurrent = info.current;
-        scanTotal = info.total;
-        scanConnectorName = info.connectorName;
-      });
-      if (scanController.signal.aborted) return;
-      feedActor.send({ type: 'MISSIONS_LOADED', missions: result.missions });
-      try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
-      if (result.errors.length > 0 && result.missions.length === 0) {
-        const errorMsg = result.errors.map(e => `${e.connectorId}: ${e.message}`).join('\n');
-        feedActor.send({ type: 'LOAD_ERROR', error: errorMsg });
-      }
-    } catch (err) {
-      if (scanController.signal.aborted) return;
-      const msg = err instanceof Error ? err.message : 'Erreur de scan';
-      feedActor.send({ type: 'LOAD_ERROR', error: msg });
-    } finally {
-      scanController = null;
-    }
-  }
-
-  function stopScan() {
-    if (scanController) {
-      scanController.abort();
-      scanController = null;
-      feedActor.send({ type: 'MISSIONS_LOADED', missions: feedSnapshot.context.missions });
-    }
-  }
-
-  // Smart load: use persisted data if fresh, scan only if stale
-  async function smartLoad() {
-    try {
-      const [stored, settings] = await Promise.all([getMissions(), getSettings()]);
-      if (stored.length > 0) {
-        feedActor.send({ type: 'MISSIONS_LOADED', missions: stored });
-        const result = await chrome.storage.local.get('lastGlobalSync');
-        const lastSync = result.lastGlobalSync as number | undefined;
-        const intervalMs = settings.scanIntervalMinutes * 60 * 1000;
-        if (lastSync && Date.now() - lastSync < intervalMs) return;
-      }
-      startScan();
-    } catch {
-      startScan();
-    }
-  }
-  smartLoad();
-
-  // Listen for background scan results from service worker
-  try {
-    const handleBgScan = (message: any) => {
-      if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
-        feedActor.send({ type: 'MISSIONS_LOADED', missions: message.payload });
-      }
-    };
-    chrome.runtime.onMessage.addListener(handleBgScan);
-  } catch {
-    // Outside extension context
-  }
-
-  if (import.meta.env.DEV) {
-    $effect(() => {
-      function handleMissions(e: Event) {
-        const missions = (e as CustomEvent).detail;
-        feedActor.send({ type: 'MISSIONS_LOADED', missions });
-      }
-      function handleState(e: Event) {
-        const state = (e as CustomEvent).detail as string;
-        if (state === 'empty') {
-          feedActor.send({ type: 'MISSIONS_LOADED', missions: [] });
-        } else if (state === 'loading') {
-          feedActor.send({ type: 'LOAD' });
-        } else if (state === 'error') {
-          feedActor.send({ type: 'LOAD_ERROR', error: '[Dev] Simulated error' });
-        }
-      }
-      window.addEventListener('dev:missions', handleMissions);
-      window.addEventListener('dev:feed-state', handleState);
-      return () => {
-        window.removeEventListener('dev:missions', handleMissions);
-        window.removeEventListener('dev:feed-state', handleState);
-      };
+    // Subscribe synchronously so every event (including those from smartLoad)
+    // is captured BEFORE the first render. Using $effect would defer the
+    // subscription until after the first paint, creating a window where
+    // MISSIONS_LOADED and LOAD events update the actor but feedSnapshot stays stale.
+    const _feedSub = feedActor.subscribe((s) => {
+        feedSnapshot = s;
     });
-  }
+
+    $effect(() => {
+        return () => _feedSub.unsubscribe();
+    });
+
+    let missions = $derived(feedSnapshot.context.filteredMissions);
+    let isLoading = $derived(feedSnapshot.matches("loading"));
+    let error = $derived(feedSnapshot.context.error);
+    let searchQuery = $derived(feedSnapshot.context.searchQuery);
+    let totalMissions = $derived(missions.length);
+
+    let displayMissions = $derived.by(() => {
+        let result = missions;
+        if (showFavoritesOnly) {
+            result = filterFavoritesOnly(result, favorites);
+        }
+        if (!showHidden) {
+            result = filterHidden(result, hidden);
+        }
+        if (selectedSource) {
+            result = result.filter((m) => m.source === selectedSource);
+        }
+        if (selectedRemote) {
+            result = result.filter((m) => m.remote === selectedRemote);
+        }
+        if (selectedStacks.length > 0) {
+            result = result.filter((m) =>
+                selectedStacks.some((s) => m.stack.includes(s)),
+            );
+        }
+        return result;
+    });
+
+    let seenIds = $state<string[]>([]);
+    let favorites = $state<Record<string, number>>({});
+    let hidden = $state<Record<string, number>>({});
+    let sortBy = $state<"score" | "date" | "tjm">("score");
+    let showFavoritesOnly = $state(false);
+    let showHidden = $state(false);
+    let showFilters = $state(false);
+    let selectedStacks = $state<string[]>([]);
+    let selectedSource = $state<MissionSource | null>(null);
+    let selectedRemote = $state<RemoteType | null>(null);
+    let favoriteCount = $derived(Object.keys(favorites).length);
+    let hiddenCount = $derived(Object.keys(hidden).length);
+    let visibleCount = $derived(displayMissions.length);
+    let filterActive = $derived(
+        selectedSource !== null ||
+            selectedRemote !== null ||
+            selectedStacks.length > 0,
+    );
+    let availableStacks = $derived.by(() => {
+        const counts = new Map<string, number>();
+        for (const m of missions) {
+            for (const s of m.stack) {
+                counts.set(s, (counts.get(s) ?? 0) + 1);
+            }
+        }
+        return [...counts.entries()]
+            .sort((a, b) => b[1] - a[1])
+            .map(([name]) => name);
+    });
+    let firstName = $state("");
+    let panelSide = $state<PanelSide>("right");
+    let aiStatus = $state<AiAvailability>("no");
+    let scanController: AbortController | null = null;
+    let scanCurrent = $state(0);
+    let scanTotal = $state(0);
+    let scanConnectorName = $state("");
+    let scanPercent = $derived(
+        scanTotal > 0 ? Math.round((scanCurrent / scanTotal) * 100) : 0,
+    );
+
+    $effect(() => {
+        getSeenIds()
+            .then((ids) => {
+                seenIds = ids;
+            })
+            .catch(() => {});
+    });
+
+    $effect(() => {
+        getFavorites()
+            .then((f) => {
+                favorites = f;
+            })
+            .catch(() => {});
+        getHidden()
+            .then((h) => {
+                hidden = h;
+            })
+            .catch(() => {});
+    });
+
+    $effect(() => {
+        getProfile()
+            .then((p) => {
+                if (p?.firstName) firstName = p.firstName;
+            })
+            .catch(() => {});
+    });
+
+    $effect(() => {
+        getPanelSide().then((side) => {
+            panelSide = side;
+        });
+    });
+
+    $effect(() => {
+        isPromptApiAvailable()
+            .then((status) => {
+                aiStatus = status;
+            })
+            .catch(() => {});
+    });
+
+    $effect(() => {
+        try {
+            chrome.action.setBadgeText({ text: "" });
+            resetNewMissionCount();
+        } catch {
+            // Outside extension context
+        }
+    });
+
+    function handleMissionSeen(missionId: string) {
+        if (seenIds.includes(missionId)) return;
+        seenIds = markAsSeen(seenIds, [missionId]);
+        saveSeenIds(seenIds).catch(() => {});
+    }
+
+    function handleToggleFavorite(id: string) {
+        favorites = toggleFavorite(favorites, id, Date.now());
+        saveFavorites(favorites).catch(() => {});
+    }
+
+    function handleHide(id: string) {
+        hidden = toggleHidden(hidden, id, Date.now());
+        saveHidden(hidden).catch(() => {});
+    }
+
+    function handleCopyLink(_id: string) {
+        // Copy handled in MissionCard, callback for future analytics
+    }
+
+    function toggleFavoritesFilter() {
+        showFavoritesOnly = !showFavoritesOnly;
+    }
+
+    function toggleHiddenFilter() {
+        showHidden = !showHidden;
+    }
+
+    function handleSearch(query: string) {
+        if (query) {
+            feedActor.send({ type: "SEARCH", query });
+        } else {
+            feedActor.send({ type: "CLEAR_SEARCH" });
+        }
+    }
+
+    async function startScan() {
+        if (isLoading) return;
+        scanController = new AbortController();
+        feedActor.send({ type: "LOAD" });
+        scanCurrent = 0;
+        scanTotal = 0;
+        scanConnectorName = "";
+        try {
+            const result = await runScan(scanController.signal, (info) => {
+                scanCurrent = info.current;
+                scanTotal = info.total;
+                scanConnectorName = info.connectorName;
+            });
+            if (scanController.signal.aborted) return;
+            if (result.missions.length === 0 && result.errors.length > 0) {
+                const errorMsg = result.errors
+                    .map((e) => `${e.connectorId}: ${e.message}`)
+                    .join("\n");
+                feedActor.send({ type: "LOAD_ERROR", error: errorMsg });
+            } else {
+                feedActor.send({
+                    type: "MISSIONS_LOADED",
+                    missions: result.missions,
+                });
+                try {
+                    await chrome.storage.local.set({
+                        lastGlobalSync: Date.now(),
+                    });
+                } catch {}
+            }
+        } catch (err) {
+            if (scanController.signal.aborted) return;
+            const msg = err instanceof Error ? err.message : "Erreur de scan";
+            feedActor.send({ type: "LOAD_ERROR", error: msg });
+        } finally {
+            scanController = null;
+        }
+    }
+
+    function stopScan() {
+        if (scanController) {
+            scanController.abort();
+            scanController = null;
+            feedActor.send({
+                type: "MISSIONS_LOADED",
+                missions: feedSnapshot.context.missions,
+            });
+        }
+    }
+
+    // Smart load: use persisted data if fresh, scan only if stale
+    async function smartLoad() {
+        try {
+            const [stored, settings] = await Promise.all([
+                getMissions(),
+                getSettings(),
+            ]);
+            if (stored.length > 0) {
+                feedActor.send({ type: "MISSIONS_LOADED", missions: stored });
+                const result = await chrome.storage.local.get("lastGlobalSync");
+                const lastSync = result.lastGlobalSync as number | undefined;
+                const intervalMs = settings.scanIntervalMinutes * 60 * 1000;
+                if (lastSync && Date.now() - lastSync < intervalMs) return;
+            }
+            startScan();
+        } catch {
+            startScan();
+        }
+    }
+    smartLoad();
+
+    // Listen for background scan results from service worker
+    try {
+        const handleBgScan = (message: any) => {
+            if (
+                message?.type === "SCAN_COMPLETE" &&
+                Array.isArray(message.payload)
+            ) {
+                feedActor.send({
+                    type: "MISSIONS_LOADED",
+                    missions: message.payload,
+                });
+            }
+        };
+        chrome.runtime.onMessage.addListener(handleBgScan);
+    } catch {
+        // Outside extension context
+    }
+
+    if (import.meta.env.DEV) {
+        $effect(() => {
+            function handleMissions(e: Event) {
+                const missions = (e as CustomEvent).detail;
+                feedActor.send({ type: "MISSIONS_LOADED", missions });
+            }
+            function handleState(e: Event) {
+                const state = (e as CustomEvent).detail as string;
+                if (state === "empty") {
+                    feedActor.send({ type: "MISSIONS_LOADED", missions: [] });
+                } else if (state === "loading") {
+                    feedActor.send({ type: "LOAD" });
+                } else if (state === "error") {
+                    feedActor.send({
+                        type: "LOAD_ERROR",
+                        error: "[Dev] Simulated error",
+                    });
+                }
+            }
+            window.addEventListener("dev:missions", handleMissions);
+            window.addEventListener("dev:feed-state", handleState);
+            return () => {
+                window.removeEventListener("dev:missions", handleMissions);
+                window.removeEventListener("dev:feed-state", handleState);
+            };
+        });
+    }
 </script>
 
 <div class="flex h-full flex-col">
-  <div class="shrink-0 px-4 pt-4">
-    <section class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4">
-      <div class="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-accent-blue/14 blur-3xl"></div>
-      <div class="pointer-events-none absolute bottom-0 left-10 h-20 w-20 rounded-full bg-accent-emerald/10 blur-2xl"></div>
-      <div class="relative">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="eyebrow text-accent-blue/80">MissionPulse</p>
-            <h2 class="mt-2 text-[1.65rem] font-semibold leading-none text-white">
-              {firstName ? `Bonjour, ${firstName}` : 'Radar freelance'}
-            </h2>
-            <p class="mt-3 max-w-[20rem] text-sm leading-relaxed text-text-secondary">
-              Surveille les pistes utiles, filtre le bruit et garde les meilleures missions a portee de main.
-            </p>
-          </div>
-          <div class="flex items-center gap-2" class:flex-row-reverse={panelSide === 'left'}>
-            {#if isLoading}
-              <button
-                class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10 text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
-                onclick={stopScan}
-                title="Stopper le scan"
-              >
-                <Icon name="square" size={14} />
-              </button>
-            {/if}
-            <button
-              class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
-                {isLoading
-                  ? 'border-accent-blue/30 bg-accent-blue/10'
-                  : 'border-white/10 bg-white/[0.06] text-white hover:bg-white/[0.1]'}"
-              onclick={startScan}
-              disabled={isLoading}
-              title={isLoading ? 'Scan en cours...' : 'Lancer le scan'}
-            >
-              {#if isLoading}
-                <span class="absolute inset-0 flex items-center justify-center">
-                  <span class="radar-ping absolute h-8 w-8 rounded-full border border-accent-blue/40"></span>
-                  <span class="radar-ping animation-delay-500 absolute h-5 w-5 rounded-full border border-accent-blue/60"></span>
-                  <span class="h-2 w-2 rounded-full bg-accent-blue"></span>
-                </span>
-              {:else}
-                <Icon name="play" size={14} class="ml-0.5" />
-              {/if}
-            </button>
-          </div>
-        </div>
-
-        <ScanProgress isScanning={isLoading} progress={scanPercent} missionsFound={totalMissions} connectorName={scanConnectorName} current={scanCurrent} total={scanTotal} />
-
-        <div class="mt-4 grid grid-cols-3 gap-2">
-          <div class="rounded-[1.25rem] border border-white/8 bg-white/[0.05] px-3 py-3">
-            <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Visibles</p>
-            <p class="mt-2 text-xl font-semibold text-white">{visibleCount}</p>
-          </div>
-          <div class="rounded-[1.25rem] border border-white/8 bg-white/[0.04] px-3 py-3">
-            <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Favoris</p>
-            <p class="mt-2 text-xl font-semibold text-accent-amber">{favoriteCount}</p>
-          </div>
-          <div class="rounded-[1.25rem] border border-white/8 bg-white/[0.04] px-3 py-3">
-            <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Masquees</p>
-            <p class="mt-2 text-xl font-semibold text-text-primary">{hiddenCount}</p>
-          </div>
-        </div>
-        {#if aiStatus === 'after-download'}
-          <p class="mt-2 text-center text-[11px] text-text-muted">Scoring IA en telechargement...</p>
-        {:else if aiStatus === 'no'}
-          <p class="mt-2 text-center text-[11px] text-text-muted">Scoring IA indisponible</p>
-        {/if}
-      </div>
-    </section>
-
-    <section
-      class="section-card relative overflow-hidden mt-4 rounded-[1.6rem] p-4"
-      role="region"
-      aria-label="Missions triees"
-    >
-      <div class="pointer-events-none absolute -left-4 top-0 h-24 w-24 rounded-full bg-accent-emerald/8 blur-2xl"></div>
-
-      <div
-        class="sr-only"
-        role="status"
-        aria-live="polite"
-        aria-atomic="true"
-      >
-        {#if isLoading}Chargement des missions en cours{/if}
-      </div>
-
-      <div class="flex items-center justify-between gap-3">
-        <div class="flex items-center gap-3">
-          <h3 class="text-base font-semibold tracking-tight text-white">Missions triees</h3>
-          {#if !isLoading}
-            <span
-              class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2.5 py-1 text-[11px] font-medium text-accent-emerald/90"
-              aria-label="{visibleCount} missions visibles"
-            >
-              <span class="h-1.5 w-1.5 rounded-full bg-accent-emerald"></span>
-              {visibleCount}
-            </span>
-          {/if}
-        </div>
-        {#if isLoading}
-          <span class="flex items-center gap-2 text-xs text-text-muted" aria-hidden="true">
-            <span class="h-3 w-3 animate-spin rounded-full border-2 border-accent-blue/30 border-t-accent-blue"></span>
-            Scraping...
-          </span>
-        {/if}
-      </div>
-
-      <div class="mt-3">
-        <SearchInput value={searchQuery} onSearch={handleSearch} />
-      </div>
-
-      <div class="mt-3 flex flex-wrap items-center gap-2">
-        <div class="flex items-center gap-2">
-          <button
-            class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
-              {showFavoritesOnly
-                ? 'border-accent-amber/35 bg-accent-amber/15 text-accent-amber shadow-glow-amber'
-                : 'border-white/8 bg-white/[0.04] text-text-secondary hover:bg-white/[0.08] hover:text-white'}"
-            onclick={toggleFavoritesFilter}
-            aria-pressed={showFavoritesOnly}
-            title={showFavoritesOnly ? 'Voir toutes' : 'Voir favoris'}
-          >
-            <Icon name="star" size={13} class={showFavoritesOnly ? 'fill-accent-amber' : ''} />
-            Favoris
-            {#if favoriteCount > 0}
-              <span class="rounded-full bg-white/[0.15] px-1.5 py-0.5 text-[10px] font-medium">{favoriteCount}</span>
-            {/if}
-          </button>
-          <button
-            class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
-              {showHidden
-                ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
-                : 'border-white/8 bg-white/[0.04] text-text-secondary hover:bg-white/[0.08] hover:text-white'}"
-            onclick={toggleHiddenFilter}
-            aria-pressed={showHidden}
-            title={showHidden ? 'Masquer les ignorees' : 'Voir ignorees'}
-          >
-            <Icon name={showHidden ? 'eye' : 'eye-off'} size={13} />
-            Ignorees
-            {#if hiddenCount > 0}
-              <span class="rounded-full bg-white/[0.15] px-1.5 py-0.5 text-[10px] font-medium">{hiddenCount}</span>
-            {/if}
-          </button>
-        </div>
-
-        <div class="h-6 w-px bg-gradient-to-b from-transparent via-white/15 to-transparent"></div>
-
-        <div class="flex items-center gap-2">
-          <label class="sr-only" for="sort-select">Trier par</label>
-          <select
-            id="sort-select"
-            class="min-h-11 cursor-pointer rounded-full border border-white/8 bg-white/[0.04] px-3.5 py-2 text-xs text-text-secondary outline-none transition-colors focus:border-accent-blue/40 focus:bg-white/[0.06]"
-            bind:value={sortBy}
-          >
-            <option value="score">Pertinence</option>
-            <option value="date">Date</option>
-            <option value="tjm">TJM</option>
-          </select>
-          <button
-            class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
-              {showFilters || filterActive
-                ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
-                : 'border-white/8 bg-white/[0.04] text-text-secondary hover:bg-white/[0.08] hover:text-white'}"
-            onclick={() => showFilters = !showFilters}
-            aria-expanded={showFilters}
-            aria-controls="filter-panel"
-            title={showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
-          >
-            <Icon name="sliders-horizontal" size={13} />
-            Filtres
-            {#if filterActive}
-              <span class="h-2 w-2 rounded-full bg-accent-blue shadow-glow-blue"></span>
-            {/if}
-          </button>
-        </div>
-      </div>
-
-      {#if showFilters}
-        <div
-          id="filter-panel"
-          class="mt-4 border-t border-white/8 pt-4"
-          role="group"
-          aria-label="Options de filtrage"
+    <div class="shrink-0 px-4 pt-4">
+        <section
+            class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4"
         >
-          <FilterBar
-            {availableStacks}
-            {selectedStacks}
-            {selectedSource}
-            {selectedRemote}
-            onToggleStack={(stack) => {
-              if (selectedStacks.includes(stack)) {
-                selectedStacks = selectedStacks.filter(s => s !== stack);
-              } else {
-                selectedStacks = [...selectedStacks, stack];
-              }
-            }}
-            onSetSource={(source) => { selectedSource = source; }}
-            onSetRemote={(remote) => { selectedRemote = remote; }}
-            onClearAll={() => {
-              selectedStacks = [];
-              selectedSource = null;
-              selectedRemote = null;
-            }}
-          />
-        </div>
-      {/if}
-    </section>
-  </div>
+            <div
+                class="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-accent-blue/14 blur-3xl"
+            ></div>
+            <div
+                class="pointer-events-none absolute bottom-0 left-10 h-20 w-20 rounded-full bg-accent-emerald/10 blur-2xl"
+            ></div>
+            <div class="relative">
+                <div class="flex items-start justify-between gap-3">
+                    <div>
+                        <p class="eyebrow text-accent-blue/80">MissionPulse</p>
+                        <h2
+                            class="mt-2 text-[1.65rem] font-semibold leading-none text-white"
+                        >
+                            {firstName
+                                ? `Bonjour, ${firstName}`
+                                : "Radar freelance"}
+                        </h2>
+                        <p
+                            class="mt-3 max-w-80 text-sm leading-relaxed text-text-secondary"
+                        >
+                            Surveille les pistes utiles, filtre le bruit et
+                            garde les meilleures missions a portee de main.
+                        </p>
+                    </div>
+                    <div
+                        class="flex items-center gap-2"
+                        class:flex-row-reverse={panelSide === "left"}
+                    >
+                        {#if isLoading}
+                            <button
+                                class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10 text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
+                                onclick={stopScan}
+                                title="Stopper le scan"
+                            >
+                                <Icon name="square" size={14} />
+                            </button>
+                        {/if}
+                        <button
+                            class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
+                {isLoading
+                                ? 'border-accent-blue/30 bg-accent-blue/10'
+                                : 'border-white/10 bg-white/6 text-white hover:bg-white/10'}"
+                            onclick={startScan}
+                            disabled={isLoading}
+                            title={isLoading
+                                ? "Scan en cours..."
+                                : "Lancer le scan"}
+                        >
+                            {#if isLoading}
+                                <span
+                                    class="absolute inset-0 flex items-center justify-center"
+                                >
+                                    <span
+                                        class="radar-ping absolute h-8 w-8 rounded-full border border-accent-blue/40"
+                                    ></span>
+                                    <span
+                                        class="radar-ping animation-delay-500 absolute h-5 w-5 rounded-full border border-accent-blue/60"
+                                    ></span>
+                                    <span
+                                        class="h-2 w-2 rounded-full bg-accent-blue"
+                                    ></span>
+                                </span>
+                            {:else}
+                                <Icon name="play" size={14} class="ml-0.5" />
+                            {/if}
+                        </button>
+                    </div>
+                </div>
 
-  <div
-    class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
-    use:pullToRefresh={{ onRefresh: () => startScan(), threshold: 60 }}
-  >
-    <MissionFeed
-      missions={displayMissions}
-      {isLoading}
-      {error}
-      {seenIds}
-      {favorites}
-      {hidden}
-      {sortBy}
-      {filterActive}
-      onMissionSeen={handleMissionSeen}
-      onToggleFavorite={handleToggleFavorite}
-      onHide={handleHide}
-      onCopyLink={handleCopyLink}
-    />
-    {#if hiddenCount > 0 && !showFavoritesOnly}
-      <button
-        class="mt-3 w-full rounded-full border border-white/8 bg-white/[0.04] py-3 text-xs text-text-secondary transition-all duration-200 hover:border-white/12 hover:bg-white/[0.08] hover:text-white"
-        onclick={toggleHiddenFilter}
-        aria-pressed={showHidden}
-      >
-        {showHidden ? 'Masquer les ignorees' : `Voir les ${hiddenCount} mission${hiddenCount > 1 ? 's' : ''} masquee${hiddenCount > 1 ? 's' : ''}`}
-      </button>
-    {/if}
-  </div>
+                <ScanProgress
+                    isScanning={isLoading}
+                    progress={scanPercent}
+                    missionsFound={totalMissions}
+                    connectorName={scanConnectorName}
+                    current={scanCurrent}
+                    total={scanTotal}
+                />
+
+                <div class="mt-4 grid grid-cols-3 gap-2">
+                    <div
+                        class="rounded-[1.25rem] border border-white/8 bg-white/5 px-3 py-3"
+                    >
+                        <p
+                            class="text-[11px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Visibles
+                        </p>
+                        <p class="mt-2 text-xl font-semibold text-white">
+                            {visibleCount}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-[1.25rem] border border-white/8 bg-white/4 px-3 py-3"
+                    >
+                        <p
+                            class="text-[11px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Favoris
+                        </p>
+                        <p class="mt-2 text-xl font-semibold text-accent-amber">
+                            {favoriteCount}
+                        </p>
+                    </div>
+                    <div
+                        class="rounded-[1.25rem] border border-white/8 bg-white/4 px-3 py-3"
+                    >
+                        <p
+                            class="text-[11px] uppercase tracking-[0.18em] text-text-muted"
+                        >
+                            Masquees
+                        </p>
+                        <p class="mt-2 text-xl font-semibold text-text-primary">
+                            {hiddenCount}
+                        </p>
+                    </div>
+                </div>
+                {#if aiStatus === "after-download"}
+                    <p class="mt-2 text-center text-[11px] text-text-muted">
+                        Scoring IA en telechargement...
+                    </p>
+                {:else if aiStatus === "no"}
+                    <p class="mt-2 text-center text-[11px] text-text-muted">
+                        Scoring IA indisponible
+                    </p>
+                {/if}
+            </div>
+        </section>
+
+        <section
+            class="section-card relative overflow-hidden mt-4 rounded-[1.6rem] p-4"
+            aria-label="Missions triees"
+        >
+            <div
+                class="pointer-events-none absolute -left-4 top-0 h-24 w-24 rounded-full bg-accent-emerald/8 blur-2xl"
+            ></div>
+
+            <div
+                class="sr-only"
+                role="status"
+                aria-live="polite"
+                aria-atomic="true"
+            >
+                {#if isLoading}Chargement des missions en cours{/if}
+            </div>
+
+            <div class="flex items-center justify-between gap-3">
+                <div class="flex items-center gap-3">
+                    <h3
+                        class="text-base font-semibold tracking-tight text-white"
+                    >
+                        Missions triees
+                    </h3>
+                    {#if !isLoading}
+                        <span
+                            class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2.5 py-1 text-[11px] font-medium text-accent-emerald/90"
+                            aria-label="{visibleCount} missions visibles"
+                        >
+                            <span
+                                class="h-1.5 w-1.5 rounded-full bg-accent-emerald"
+                            ></span>
+                            {visibleCount}
+                        </span>
+                    {/if}
+                </div>
+                {#if isLoading}
+                    <span
+                        class="flex items-center gap-2 text-xs text-text-muted"
+                        aria-hidden="true"
+                    >
+                        <span
+                            class="h-3 w-3 animate-spin rounded-full border-2 border-accent-blue/30 border-t-accent-blue"
+                        ></span>
+                        Scraping...
+                    </span>
+                {/if}
+            </div>
+
+            <div class="mt-3">
+                <SearchInput value={searchQuery} onSearch={handleSearch} />
+            </div>
+
+            <div class="mt-3 flex flex-wrap items-center gap-2">
+                <div class="flex items-center gap-2">
+                    <button
+                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+              {showFavoritesOnly
+                            ? 'border-accent-amber/35 bg-accent-amber/15 text-accent-amber shadow-glow-amber'
+                            : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
+                        onclick={toggleFavoritesFilter}
+                        aria-pressed={showFavoritesOnly}
+                        title={showFavoritesOnly
+                            ? "Voir toutes"
+                            : "Voir favoris"}
+                    >
+                        <Icon
+                            name="star"
+                            size={13}
+                            class={showFavoritesOnly ? "fill-accent-amber" : ""}
+                        />
+                        Favoris
+                        {#if favoriteCount > 0}
+                            <span
+                                class="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-medium"
+                                >{favoriteCount}</span
+                            >
+                        {/if}
+                    </button>
+                    <button
+                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+              {showHidden
+                            ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
+                            : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
+                        onclick={toggleHiddenFilter}
+                        aria-pressed={showHidden}
+                        title={showHidden
+                            ? "Masquer les ignorees"
+                            : "Voir ignorees"}
+                    >
+                        <Icon name={showHidden ? "eye" : "eye-off"} size={13} />
+                        Ignorees
+                        {#if hiddenCount > 0}
+                            <span
+                                class="rounded-full bg-white/15 px-1.5 py-0.5 text-[10px] font-medium"
+                                >{hiddenCount}</span
+                            >
+                        {/if}
+                    </button>
+                </div>
+
+                <div
+                    class="h-6 w-px bg-linear-to-b from-transparent via-white/15 to-transparent"
+                ></div>
+
+                <div class="flex items-center gap-2">
+                    <label class="sr-only" for="sort-select">Trier par</label>
+                    <select
+                        id="sort-select"
+                        class="min-h-11 cursor-pointer rounded-full border border-white/8 bg-white/4 px-3.5 py-2 text-xs text-text-secondary outline-none transition-colors focus:border-accent-blue/40 focus:bg-white/6"
+                        bind:value={sortBy}
+                    >
+                        <option value="score">Pertinence</option>
+                        <option value="date">Date</option>
+                        <option value="tjm">TJM</option>
+                    </select>
+                    <button
+                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+              {showFilters || filterActive
+                            ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
+                            : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
+                        onclick={() => (showFilters = !showFilters)}
+                        aria-expanded={showFilters}
+                        aria-controls="filter-panel"
+                        title={showFilters
+                            ? "Masquer les filtres"
+                            : "Afficher les filtres"}
+                    >
+                        <Icon name="sliders-horizontal" size={13} />
+                        Filtres
+                        {#if filterActive}
+                            <span
+                                class="h-2 w-2 rounded-full bg-accent-blue shadow-glow-blue"
+                            ></span>
+                        {/if}
+                    </button>
+                </div>
+            </div>
+
+            {#if showFilters}
+                <div
+                    id="filter-panel"
+                    class="mt-4 border-t border-white/8 pt-4"
+                    role="group"
+                    aria-label="Options de filtrage"
+                >
+                    <FilterBar
+                        {availableStacks}
+                        {selectedStacks}
+                        {selectedSource}
+                        {selectedRemote}
+                        onToggleStack={(stack) => {
+                            if (selectedStacks.includes(stack)) {
+                                selectedStacks = selectedStacks.filter(
+                                    (s) => s !== stack,
+                                );
+                            } else {
+                                selectedStacks = [...selectedStacks, stack];
+                            }
+                        }}
+                        onSetSource={(source) => {
+                            selectedSource = source;
+                        }}
+                        onSetRemote={(remote) => {
+                            selectedRemote = remote;
+                        }}
+                        onClearAll={() => {
+                            selectedStacks = [];
+                            selectedSource = null;
+                            selectedRemote = null;
+                        }}
+                    />
+                </div>
+            {/if}
+        </section>
+    </div>
+
+    <div
+        class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
+        use:pullToRefresh={{ onRefresh: () => startScan(), threshold: 60 }}
+    >
+        <MissionFeed
+            missions={displayMissions}
+            {isLoading}
+            {error}
+            {seenIds}
+            {favorites}
+            {hidden}
+            {sortBy}
+            {filterActive}
+            onMissionSeen={handleMissionSeen}
+            onToggleFavorite={handleToggleFavorite}
+            onHide={handleHide}
+            onCopyLink={handleCopyLink}
+        />
+        {#if hiddenCount > 0 && !showFavoritesOnly}
+            <button
+                class="mt-3 w-full rounded-full border border-white/8 bg-white/4 py-3 text-xs text-text-secondary transition-all duration-200 hover:border-white/12 hover:bg-white/8 hover:text-white"
+                onclick={toggleHiddenFilter}
+                aria-pressed={showHidden}
+            >
+                {showHidden
+                    ? "Masquer les ignorees"
+                    : `Voir les ${hiddenCount} mission${hiddenCount > 1 ? "s" : ""} masquee${hiddenCount > 1 ? "s" : ""}`}
+            </button>
+        {/if}
+    </div>
 </div>

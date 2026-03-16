@@ -108,6 +108,9 @@ export const feedMachine = setup({
         CLEAR_SEARCH: {
           actions: 'clearSearch',
         },
+        LOAD_ERROR: {
+          actions: 'setError',
+        },
       },
     },
     error: {},
