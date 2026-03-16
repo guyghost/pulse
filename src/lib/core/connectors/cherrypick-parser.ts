@@ -1,5 +1,5 @@
 import type { Mission, RemoteType } from '../types/mission';
-import { createMission } from './parser-utils';
+import { createMission, parseTJM } from './parser-utils';
 
 const SOURCE = 'cherry-pick' as const;
 const BASE_URL = 'https://app.cherry-pick.io';
@@ -76,13 +76,11 @@ export function parseDescriptionMeta(raw: string | null): DescriptionMeta {
   if (!raw) return result;
 
   const kvMap = new Map<string, string>();
-  let cleaned = raw;
 
   for (const match of raw.matchAll(META_REGEX)) {
     const key = match[1].toLowerCase();
     const value = match[2].trim();
     if (value) kvMap.set(key, value);
-    cleaned = cleaned.replace(match[0], ' ');
   }
 
   result.client = kvMap.get('nom du client') ?? null;
@@ -92,17 +90,16 @@ export function parseDescriptionMeta(raw: string | null): DescriptionMeta {
   if (tjmRaw) {
     const rangeMatch = tjmRaw.match(/(\d+)\s*[\/\-]\s*(\d+)/);
     if (rangeMatch) {
-      result.tjm = Math.round((parseInt(rangeMatch[1]) + parseInt(rangeMatch[2])) / 2);
+      result.tjm = pickTJM(parseInt(rangeMatch[1]), parseInt(rangeMatch[2]));
     } else {
-      const single = tjmRaw.match(/(\d+)/);
-      if (single) result.tjm = parseInt(single[1]);
+      result.tjm = parseTJM(tjmRaw);
     }
   }
 
-  const durationKey = [...kvMap.keys()].find(k => k.includes('de la mission') && k.includes('dur'));
-  if (durationKey) result.duration = kvMap.get(durationKey) ?? null;
+  result.duration = kvMap.get('dur\u00e9e de la mission') ?? kvMap.get('duree de la mission') ?? null;
 
-  result.cleanDescription = cleaned.replace(/\s{2,}/g, ' ').trim();
+  // Remove all matched metadata in one pass to avoid positional corruption
+  result.cleanDescription = raw.replace(META_REGEX, ' ').replace(/\s{2,}/g, ' ').trim();
   return result;
 }
 

@@ -88,7 +88,10 @@ export const feedMachine = setup({
       target: '.loaded',
       actions: 'setMissions',
     },
-    LOAD: '.loading',
+    LOAD: {
+      target: '.loading',
+      actions: assign({ error: () => null }),
+    },
   },
   states: {
     empty: {},
