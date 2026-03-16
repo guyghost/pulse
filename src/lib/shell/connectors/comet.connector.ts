@@ -1,6 +1,7 @@
 import { BaseConnector } from './base.connector';
 import type { Mission } from '../../core/types/mission';
 import { parseCometMissions, type CometMission } from '../../core/connectors/comet-parser';
+import { delayBetweenPages } from '../utils/rate-limiter';
 import {
   type Result,
   type AppError,
@@ -12,9 +13,13 @@ import {
 
 const BASE_URL = 'https://app.comet.co';
 const GRAPHQL_URL = 'https://api.comet.co/api/graphql';
+const ITEMS_PER_PAGE = 50;
+const MAX_PAGES = 5;
 
-const MISSIONS_QUERY = `query SuggestedMissionList {
-  freelanceSuggestedMission {
+// Pagination GraphQL par offset/limit — pattern courant pour les requêtes
+// de liste Comet (l'API accepte $limit et $offset comme variables)
+const MISSIONS_QUERY = `query SuggestedMissionList($limit: Int, $offset: Int) {
+  freelanceSuggestedMission(limit: $limit, offset: $offset) {
     id
     status
     title
@@ -38,39 +43,54 @@ export class CometConnector extends BaseConnector {
 
   async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
     try {
-      const result = await this.fetchJSON(GRAPHQL_URL, now, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ query: MISSIONS_QUERY }),
-      });
+      const allMissions: Mission[] = [];
 
-      if (!result.ok) {
-        return err(createConnectorError(
-          'Failed to fetch missions from Comet',
-          { connectorId: this.id, phase: 'fetch', context: { originalError: result.error } },
-          now
-        ));
+      for (let page = 0; page < MAX_PAGES; page++) {
+        // Délai entre les pages (sauf première)
+        if (page > 0) {
+          await delayBetweenPages(this.id, page + 1);
+        }
+
+        const result = await this.fetchJSON(GRAPHQL_URL, now, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            query: MISSIONS_QUERY,
+            variables: { limit: ITEMS_PER_PAGE, offset: page * ITEMS_PER_PAGE },
+          }),
+        });
+
+        if (!result.ok) {
+          return err(createConnectorError(
+            `Failed to fetch page ${page + 1} from Comet`,
+            { connectorId: this.id, phase: 'fetch', context: { page: page + 1, originalError: result.error } },
+            now
+          ));
+        }
+
+        const response = result.value as { data?: { freelanceSuggestedMission?: CometMission[] } };
+        const missions = response?.data?.freelanceSuggestedMission;
+
+        if (!Array.isArray(missions)) {
+          return err(createParsingError(
+            'Invalid response format from Comet API',
+            { source: 'comet-api', context: { response } },
+            now
+          ));
+        }
+
+        if (missions.length === 0) break;
+
+        const parsedMissions = parseCometMissions(missions, new Date(now));
+        allMissions.push(...parsedMissions);
       }
 
-      const response = result.value as { data?: { freelanceSuggestedMission?: CometMission[] } };
-      const missions = response?.data?.freelanceSuggestedMission;
-      
-      if (!Array.isArray(missions)) {
-        return err(createParsingError(
-          'Invalid response format from Comet API',
-          { source: 'comet-api', context: { response } },
-          now
-        ));
-      }
-
-      const parsedMissions = parseCometMissions(missions, new Date(now));
-      
       const syncResult = await this.setLastSync(now);
       if (!syncResult.ok) {
         console.warn('Failed to set last sync:', syncResult.error);
       }
-      
-      return ok(parsedMissions);
+
+      return ok(allMissions);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       return err(createConnectorError(

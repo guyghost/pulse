@@ -1,5 +1,6 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
+import { UserProfileSchema } from '../../core/types/schemas';
 import { parseMission, parseUserProfile } from '../../core/types/type-guards';
 
 const DB_NAME = 'missionpulse';
@@ -88,6 +89,12 @@ export function clearMissions(): Promise<void> {
 
 // Profile
 export async function saveProfile(profile: UserProfile): Promise<void> {
+  const result = UserProfileSchema.safeParse(profile);
+  if (!result.success) {
+    const messages = result.error.issues.map((i) => i.message).join(', ');
+    throw new Error(`[DB] Profil invalide : ${messages}`);
+  }
+
   await withStore<IDBValidKey>('profile', 'readwrite', (store) =>
     store.put({ ...profile, id: 'current' }),
   );
