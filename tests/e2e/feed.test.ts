@@ -143,4 +143,37 @@ test.describe('Feed', () => {
     await expect(page.getByTitle('Voir favoris')).toBeVisible();
     await expect(page.getByTitle('Rafraichir')).toBeVisible();
   });
+
+  test('ARIA attributes for accessibility are properly set', async ({ page }) => {
+    await page.goto(SIDE_PANEL);
+    await expect(page.getByText('Missions')).toBeVisible();
+
+    // Missions triees section has proper region role and label
+    const missionsSection = page.getByRole('region', { name: 'Missions triees' });
+    await expect(missionsSection).toBeVisible();
+
+    // aria-live region for loading announcements
+    const loadingStatus = page.getByRole('status').filter({ hasText: /Chargement des missions/ });
+    await expect(loadingStatus).toHaveAttribute('aria-live', 'polite');
+    await expect(loadingStatus).toHaveAttribute('aria-atomic', 'true');
+
+    // Test aria-pressed on favorites toggle
+    const favoritesToggle = page.getByRole('button', { name: 'Voir favoris' });
+    await expect(favoritesToggle).toHaveAttribute('aria-pressed', 'false');
+
+    await favoritesToggle.click();
+    await expect(favoritesToggle).toHaveAttribute('aria-pressed', 'true');
+    await page.getByTitle('Voir toutes').click();
+    await expect(page.getByRole('button', { name: 'Voir favoris' })).toHaveAttribute('aria-pressed', 'false');
+
+    // Test aria-expanded on filter toggle
+    const filterToggle = page.getByRole('button', { name: 'Afficher les filtres' });
+    await expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
+    await expect(filterToggle).toHaveAttribute('aria-controls', 'filter-panel');
+
+    await filterToggle.click();
+    await expect(filterToggle).toHaveAttribute('aria-expanded', 'true');
+    const filterPanel = page.getByRole('group', { name: 'Options de filtrage' });
+    await expect(filterPanel).toBeVisible();
+  });
 });

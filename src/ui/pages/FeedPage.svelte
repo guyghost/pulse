@@ -325,39 +325,88 @@
       </div>
     </section>
 
-    <section class="section-card mt-4 rounded-[1.6rem] p-3">
+    <section
+      class="section-card relative overflow-hidden mt-4 rounded-[1.6rem] p-4"
+      role="region"
+      aria-label="Missions triees"
+    >
+      <div class="pointer-events-none absolute -left-4 top-0 h-24 w-24 rounded-full bg-accent-emerald/8 blur-2xl"></div>
+
+      <div
+        class="sr-only"
+        role="status"
+        aria-live="polite"
+        aria-atomic="true"
+      >
+        {#if isLoading}Chargement des missions en cours{/if}
+      </div>
+
       <div class="flex items-center justify-between gap-3">
-        <div>
-          <p class="text-sm font-semibold text-white">Missions triees</p>
-          <p class="mt-1 text-xs text-text-secondary">
-            {isLoading ? 'Scraping en cours...' : `${visibleCount} mission${visibleCount > 1 ? 's' : ''} dans le radar`}
-          </p>
+        <div class="flex items-center gap-3">
+          <h3 class="text-base font-semibold tracking-tight text-white">Missions triees</h3>
+          {#if !isLoading}
+            <span
+              class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2.5 py-1 text-[11px] font-medium text-accent-emerald/90"
+              aria-label="{visibleCount} missions visibles"
+            >
+              <span class="h-1.5 w-1.5 rounded-full bg-accent-emerald"></span>
+              {visibleCount}
+            </span>
+          {/if}
         </div>
+        {#if isLoading}
+          <span class="flex items-center gap-2 text-xs text-text-muted" aria-hidden="true">
+            <span class="h-3 w-3 animate-spin rounded-full border-2 border-accent-blue/30 border-t-accent-blue"></span>
+            Scraping...
+          </span>
+        {/if}
+      </div>
+
+      <div class="mt-3">
+        <SearchInput value={searchQuery} onSearch={handleSearch} />
+      </div>
+
+      <div class="mt-3 flex flex-wrap items-center gap-2">
         <div class="flex items-center gap-2">
           <button
-            class="inline-flex min-h-10 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition-all duration-200
+            class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
               {showFavoritesOnly
-                ? 'border-accent-amber/30 bg-accent-amber/12 text-accent-amber'
-                : 'border-white/8 bg-white/[0.03] text-text-secondary hover:bg-white/[0.07] hover:text-white'}"
+                ? 'border-accent-amber/35 bg-accent-amber/15 text-accent-amber shadow-glow-amber'
+                : 'border-white/8 bg-white/[0.04] text-text-secondary hover:bg-white/[0.08] hover:text-white'}"
             onclick={toggleFavoritesFilter}
+            aria-pressed={showFavoritesOnly}
             title={showFavoritesOnly ? 'Voir toutes' : 'Voir favoris'}
           >
-            <Icon name="star" size={14} class={showFavoritesOnly ? 'fill-accent-amber' : ''} />
+            <Icon name="star" size={13} class={showFavoritesOnly ? 'fill-accent-amber' : ''} />
             Favoris
+            {#if favoriteCount > 0}
+              <span class="rounded-full bg-white/[0.15] px-1.5 py-0.5 text-[10px] font-medium">{favoriteCount}</span>
+            {/if}
           </button>
           <button
-            class="inline-flex min-h-10 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition-all duration-200
+            class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
               {showHidden
-                ? 'border-accent-blue/30 bg-accent-blue/12 text-accent-blue'
-                : 'border-white/8 bg-white/[0.03] text-text-secondary hover:bg-white/[0.07] hover:text-white'}"
+                ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
+                : 'border-white/8 bg-white/[0.04] text-text-secondary hover:bg-white/[0.08] hover:text-white'}"
             onclick={toggleHiddenFilter}
+            aria-pressed={showHidden}
             title={showHidden ? 'Masquer les ignorees' : 'Voir ignorees'}
           >
-            <Icon name={showHidden ? 'eye' : 'eye-off'} size={14} />
+            <Icon name={showHidden ? 'eye' : 'eye-off'} size={13} />
             Ignorees
+            {#if hiddenCount > 0}
+              <span class="rounded-full bg-white/[0.15] px-1.5 py-0.5 text-[10px] font-medium">{hiddenCount}</span>
+            {/if}
           </button>
+        </div>
+
+        <div class="h-6 w-px bg-gradient-to-b from-transparent via-white/15 to-transparent"></div>
+
+        <div class="flex items-center gap-2">
+          <label class="sr-only" for="sort-select">Trier par</label>
           <select
-            class="rounded-full border border-white/8 bg-white/[0.03] px-3 py-2 text-xs text-text-secondary focus:outline-none"
+            id="sort-select"
+            class="min-h-11 cursor-pointer rounded-full border border-white/8 bg-white/[0.04] px-3.5 py-2 text-xs text-text-secondary outline-none transition-colors focus:border-accent-blue/40 focus:bg-white/[0.06]"
             bind:value={sortBy}
           >
             <option value="score">Pertinence</option>
@@ -365,24 +414,31 @@
             <option value="tjm">TJM</option>
           </select>
           <button
-            class="inline-flex min-h-10 items-center gap-2 rounded-full border px-3 py-2 text-xs font-medium transition-all duration-200
-              {showFilters
-                ? 'border-accent-blue/30 bg-accent-blue/12 text-accent-blue'
-                : 'border-white/8 bg-white/[0.03] text-text-secondary hover:bg-white/[0.07] hover:text-white'}"
+            class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+              {showFilters || filterActive
+                ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
+                : 'border-white/8 bg-white/[0.04] text-text-secondary hover:bg-white/[0.08] hover:text-white'}"
             onclick={() => showFilters = !showFilters}
+            aria-expanded={showFilters}
+            aria-controls="filter-panel"
             title={showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
           >
-            <Icon name="sliders-horizontal" size={14} />
+            <Icon name="sliders-horizontal" size={13} />
+            Filtres
+            {#if filterActive}
+              <span class="h-2 w-2 rounded-full bg-accent-blue shadow-glow-blue"></span>
+            {/if}
           </button>
         </div>
       </div>
 
-      <div class="mt-3">
-        <SearchInput value={searchQuery} onSearch={handleSearch} />
-      </div>
-
       {#if showFilters}
-        <div class="mt-3">
+        <div
+          id="filter-panel"
+          class="mt-4 border-t border-white/8 pt-4"
+          role="group"
+          aria-label="Options de filtrage"
+        >
           <FilterBar
             {availableStacks}
             {selectedStacks}
@@ -428,8 +484,9 @@
     />
     {#if hiddenCount > 0 && !showFavoritesOnly}
       <button
-        class="mt-3 w-full rounded-full border border-white/8 bg-white/[0.03] py-2 text-[11px] text-text-secondary transition-colors hover:bg-white/[0.06] hover:text-white"
+        class="mt-3 w-full rounded-full border border-white/8 bg-white/[0.04] py-3 text-xs text-text-secondary transition-all duration-200 hover:border-white/12 hover:bg-white/[0.08] hover:text-white"
         onclick={toggleHiddenFilter}
+        aria-pressed={showHidden}
       >
         {showHidden ? 'Masquer les ignorees' : `Voir les ${hiddenCount} mission${hiddenCount > 1 ? 's' : ''} masquee${hiddenCount > 1 ? 's' : ''}`}
       </button>
