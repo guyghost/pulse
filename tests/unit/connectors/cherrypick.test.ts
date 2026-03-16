@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { parseCherryPickMissions } from '../../../src/lib/core/connectors/cherrypick-parser';
+import { parseCherryPickMissions, parseDescriptionMeta } from '../../../src/lib/core/connectors/cherrypick-parser';
 
 const NOW = new Date('2026-03-15T12:00:00Z');
 
@@ -116,5 +116,91 @@ describe('parseCherryPickMissions', () => {
       maximum_rate: null,
     }], NOW);
     expect(missions[0].tjm).toBeNull();
+  });
+
+  it('extrait TJM depuis la description quand les rates API sont null', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      minimum_rate: null,
+      maximum_rate: null,
+      description: 'Qualification faite par : AO Nom du client : Agirc-Arrco TJM : 930/1030 Localisation de la mission : Paris 12eme',
+    }], NOW);
+    expect(missions[0].tjm).toBe(980);
+  });
+
+  it('prefere les rates API au TJM de la description', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      minimum_rate: 500,
+      maximum_rate: 700,
+      description: 'TJM : 930/1030',
+    }], NOW);
+    expect(missions[0].tjm).toBe(600);
+  });
+
+  it('extrait client et location depuis la description si champs API manquants', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      company: null,
+      city: null,
+      description: 'Nom du client : Agirc-Arrco Localisation de la mission : Paris 12eme',
+    }], NOW);
+    expect(missions[0].client).toBe('Agirc-Arrco');
+    expect(missions[0].location).toBe('Paris 12eme');
+  });
+
+  it('nettoie la description en retirant les metadonnees', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      description: 'Qualification faite par : AO Nom du client : Agirc-Arrco TJM : 930/1030',
+    }], NOW);
+    expect(missions[0].description).not.toContain('Qualification faite par');
+    expect(missions[0].description).not.toContain('Agirc-Arrco');
+  });
+
+  it('ajoute mois a une duree numerique', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      duration: '12',
+    }], NOW);
+    expect(missions[0].duration).toBe('12 mois');
+  });
+
+  it('garde la duree si elle contient deja une unite', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      duration: '6 mois',
+    }], NOW);
+    expect(missions[0].duration).toBe('6 mois');
+  });
+});
+
+describe('parseDescriptionMeta', () => {
+  it('parse les paires cle-valeur du format CherryPick', () => {
+    const raw = 'Qualification faite par : AO Nom du client : Agirc-Arrco Nom de l\'opérationnel : Christophe Baron Type de besoin : Freelance TJM : 930/1030 Nombre de postes ouvert : 1 Localisation de la mission : Paris 12eme';
+    const meta = parseDescriptionMeta(raw);
+    expect(meta.client).toBe('Agirc-Arrco');
+    expect(meta.tjm).toBe(980);
+    expect(meta.location).toBe('Paris 12eme');
+  });
+
+  it('parse un TJM simple (sans range)', () => {
+    const meta = parseDescriptionMeta('TJM : 650');
+    expect(meta.tjm).toBe(650);
+  });
+
+  it('retourne des nulls pour une description vide', () => {
+    const meta = parseDescriptionMeta(null);
+    expect(meta.client).toBeNull();
+    expect(meta.tjm).toBeNull();
+    expect(meta.location).toBeNull();
+    expect(meta.cleanDescription).toBe('');
+  });
+
+  it('retourne des nulls pour une description sans metadonnees', () => {
+    const meta = parseDescriptionMeta('Mission React pour projet e-commerce');
+    expect(meta.client).toBeNull();
+    expect(meta.tjm).toBeNull();
+    expect(meta.cleanDescription).toBe('Mission React pour projet e-commerce');
   });
 });
