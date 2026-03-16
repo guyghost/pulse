@@ -1,6 +1,7 @@
 import { BaseConnector } from './base.connector';
 import type { Mission } from '../../core/types/mission';
 import { parseCherryPickMissions, type CherryPickMission } from '../../core/connectors/cherrypick-parser';
+import { delayBetweenPages } from '../utils/rate-limiter';
 import {
   type Result,
   type AppError,
@@ -11,6 +12,7 @@ import {
 
 const BASE_URL = 'https://app.cherry-pick.io';
 const SEARCH_URL = `${BASE_URL}/api/mission/search`;
+const MAX_PAGES = 5;
 
 export class CherryPickConnector extends BaseConnector {
   readonly id = 'cherry-pick';
@@ -22,35 +24,45 @@ export class CherryPickConnector extends BaseConnector {
 
   async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
     try {
-      const result = await this.fetchJSON(SEARCH_URL, now, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({}),
-      });
+      const allMissions: Mission[] = [];
 
-      if (!result.ok) {
-        return err(createConnectorError(
-          'Failed to fetch missions from Cherry Pick',
-          { connectorId: this.id, phase: 'fetch', context: { originalError: result.error } },
-          now
-        ));
+      for (let page = 1; page <= MAX_PAGES; page++) {
+        // Délai entre les pages (sauf première)
+        if (page > 1) {
+          await delayBetweenPages(this.id, page);
+        }
+
+        // Paramètre de pagination : { page: N } est le pattern le plus courant
+        // pour les API REST paginées type Laravel/Symfony
+        const result = await this.fetchJSON(SEARCH_URL, now, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ page }),
+        });
+
+        if (!result.ok) {
+          return err(createConnectorError(
+            `Failed to fetch page ${page} from Cherry Pick`,
+            { connectorId: this.id, phase: 'fetch', context: { page, originalError: result.error } },
+            now
+          ));
+        }
+
+        const response = result.value as { data?: CherryPickMission[] };
+        const missions = response?.data;
+
+        if (!Array.isArray(missions) || missions.length === 0) break;
+
+        const parsedMissions = parseCherryPickMissions(missions, new Date(now));
+        allMissions.push(...parsedMissions);
       }
 
-      const response = result.value as { data?: CherryPickMission[] };
-      const missions = response?.data;
-      
-      if (!Array.isArray(missions)) {
-        return ok([]);
-      }
-
-      const parsedMissions = parseCherryPickMissions(missions, new Date(now));
-      
       const syncResult = await this.setLastSync(now);
       if (!syncResult.ok) {
         console.warn('Failed to set last sync:', syncResult.error);
       }
-      
-      return ok(parsedMissions);
+
+      return ok(allMissions);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       return err(createConnectorError(
