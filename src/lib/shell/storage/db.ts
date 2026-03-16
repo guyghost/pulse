@@ -2,6 +2,7 @@ import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 import { UserProfileSchema } from '../../core/types/schemas';
 import { parseMission, parseUserProfile } from '../../core/types/type-guards';
+import { clearSemanticCache } from './semantic-cache';
 
 const DB_NAME = 'missionpulse';
 const DB_VERSION = 1;
@@ -98,6 +99,14 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   await withStore<IDBValidKey>('profile', 'readwrite', (store) =>
     store.put({ ...profile, id: 'current' }),
   );
+
+  // Invalider le cache sémantique : les scores doivent être recalculés avec le nouveau profil
+  try {
+    await clearSemanticCache();
+  } catch {
+    // Le cache est non-critique, on ne bloque pas la sauvegarde du profil
+    console.warn('[DB] Impossible de vider le cache sémantique après sauvegarde du profil');
+  }
 }
 
 export async function getProfile(): Promise<UserProfile | null> {

@@ -19,6 +19,7 @@ import {
   isParsingError,
   isConnectorError,
 } from '$lib/core/errors';
+import { recordError } from './error-analytics';
 
 // ============================================================================
 // Configuration
@@ -61,6 +62,9 @@ export function getErrorHandlerConfig(): ErrorHandlerConfig {
 export function handleError(error: AppError): void {
   // 1. Log en console avec le niveau approprié
   logToConsole(error);
+
+  // 1b. Enregistrement dans l'analytics locale
+  recordError(error);
 
   // 2. Envoi au service de monitoring si configuré
   if (config.monitoringUrl) {

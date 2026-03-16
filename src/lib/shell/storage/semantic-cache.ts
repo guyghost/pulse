@@ -118,6 +118,20 @@ export const cacheSemanticScores = async (
  *
  * Scans all keys starting with "semantic-" and removes expired entries.
  */
+/**
+ * Clear ALL semantic cache entries.
+ * Called when the user profile changes, so scores are recomputed
+ * against the new profile on the next scan.
+ */
+export const clearSemanticCache = async (): Promise<void> => {
+  const all = await chrome.storage.local.get(null);
+  const keysToRemove = Object.keys(all).filter((key) => key.startsWith('semantic-'));
+
+  if (keysToRemove.length > 0) {
+    await chrome.storage.local.remove(keysToRemove);
+  }
+};
+
 export const clearExpiredSemanticCache = async (): Promise<void> => {
   const all = await chrome.storage.local.get(null);
   const keysToRemove: string[] = [];
