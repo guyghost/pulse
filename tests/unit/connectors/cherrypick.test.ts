@@ -173,6 +173,30 @@ describe('parseCherryPickMissions', () => {
     }], NOW);
     expect(missions[0].duration).toBe('6 mois');
   });
+
+  it('gere une duree numerique (number) depuis l API', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      duration: 6 as unknown as string,
+    }], NOW);
+    expect(missions[0].duration).toBe('6 mois');
+  });
+
+  it('gere skills en format string[] au lieu de {name}[]', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      skills: ['React', 'Node'] as unknown as { name: string }[],
+    }], NOW);
+    expect(missions[0].stack).toEqual(['React', 'Node']);
+  });
+
+  it('gere skills null', () => {
+    const missions = parseCherryPickMissions([{
+      ...FIXTURE_MISSIONS[0],
+      skills: null as unknown as { name: string }[],
+    }], NOW);
+    expect(missions[0].stack).toEqual([]);
+  });
 });
 
 describe('parseDescriptionMeta', () => {
