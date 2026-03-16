@@ -10,11 +10,11 @@ export interface CherryPickMission {
   slug: string;
   minimum_rate: number | null;
   maximum_rate: number | null;
-  duration: string | null;
+  duration: string | number | null;
   city: string | null;
   displacement: string | null;
   company: { name: string } | null;
-  skills: { name: string }[];
+  skills: ({ name: string } | string)[];
   description: string | null;
 }
 
@@ -104,11 +104,12 @@ export function parseDescriptionMeta(raw: string | null): DescriptionMeta {
 }
 
 /** Add "mois" suffix to bare numeric durations. */
-function normalizeDuration(d: string | null): string | null {
-  if (!d) return null;
-  const trimmed = d.trim();
-  if (/^\d+$/.test(trimmed)) return `${trimmed} mois`;
-  return trimmed;
+function normalizeDuration(d: string | number | null): string | null {
+  if (d == null) return null;
+  const str = String(d).trim();
+  if (!str) return null;
+  if (/^\d+$/.test(str)) return `${str} mois`;
+  return str;
 }
 
 export function parseCherryPickMissions(missions: CherryPickMission[], now: Date): Mission[] {
@@ -121,7 +122,7 @@ export function parseCherryPickMissions(missions: CherryPickMission[], now: Date
       title: m.name,
       client: m.company?.name ?? meta.client,
       description: meta.cleanDescription,
-      stack: m.skills.map((s) => s.name),
+      stack: (m.skills ?? []).map((s) => typeof s === 'string' ? s : s.name),
       tjm: apiTjm ?? meta.tjm,
       location: m.city ?? meta.location,
       remote: mapRemote(m.displacement),
