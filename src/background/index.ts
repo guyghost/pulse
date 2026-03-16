@@ -29,6 +29,9 @@ chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendRespo
   if (message.type === 'SAVE_PROFILE') {
     saveProfile(message.payload as UserProfile).then(() => {
       sendResponse({ type: 'PROFILE_RESULT', payload: message.payload as UserProfile });
+    }).catch((err) => {
+      console.error('[MissionPulse] Save profile error:', err);
+      sendResponse({ type: 'PROFILE_RESULT', payload: null });
     });
     return true;
   }
