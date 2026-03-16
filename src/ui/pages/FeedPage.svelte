@@ -740,9 +740,6 @@
             {hidden}
             {sortBy}
             {filterActive}
-            virtualizeThreshold={50}
-            itemHeight={180}
-            overscan={3}
             onMissionSeen={handleMissionSeen}
             onToggleFavorite={handleToggleFavorite}
             onHide={handleHide}

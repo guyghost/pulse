@@ -1,10 +1,8 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
-  import { calculateVirtualItems, type VirtualListState } from '$lib/core/virtualization/virtual-list';
   import MissionCard from '../molecules/MissionCard.svelte';
   import Skeleton from '../atoms/Skeleton.svelte';
   import Icon from '../atoms/Icon.svelte';
-  import { virtualScroll } from '../actions/virtual-scroll';
 
   let {
     missions = [],
@@ -15,9 +13,6 @@
     hidden = {},
     sortBy = 'score',
     filterActive = false,
-    virtualizeThreshold = 50,
-    itemHeight = 180,
-    overscan = 3,
     onMissionSeen,
     onToggleFavorite,
     onHide,
@@ -31,16 +26,12 @@
     hidden?: Record<string, number>;
     sortBy?: 'score' | 'date' | 'tjm';
     filterActive?: boolean;
-    virtualizeThreshold?: number;
-    itemHeight?: number;
-    overscan?: number;
     onMissionSeen?: (id: string) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
     onCopyLink?: (id: string) => void;
   } = $props();
 
-  // Tri des missions (même logique que MissionFeed)
   let sortedMissions = $derived(
     [...missions].sort((a, b) => {
       if (sortBy === 'date') return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
@@ -48,70 +39,9 @@
       return (b.score ?? 0) - (a.score ?? 0);
     })
   );
-
-  // État de la virtualisation
-  let scrollTop = $state(0);
-  let containerHeight = $state(0);
-  let containerRef: HTMLDivElement | null = $state(null);
-
-  // Calcul de l'état virtuel
-  let virtualState: VirtualListState<Mission> = $derived.by(() => {
-    if (sortedMissions.length <= virtualizeThreshold) {
-      // Pas de virtualisation sous le seuil
-      return {
-        virtualItems: sortedMissions.map((mission, index) => ({
-          index,
-          data: mission,
-          style: {
-            position: 'absolute' as const,
-            top: index * itemHeight,
-            height: itemHeight,
-          },
-        })),
-        totalHeight: sortedMissions.length * itemHeight,
-        startIndex: 0,
-        endIndex: sortedMissions.length - 1,
-      };
-    }
-
-    return calculateVirtualItems(
-      sortedMissions,
-      scrollTop,
-      containerHeight,
-      {
-        itemHeight,
-        overscan,
-        totalItems: sortedMissions.length,
-      }
-    );
-  });
-
-  // Détermine si on utilise la virtualisation
-  let isVirtualized = $derived(sortedMissions.length > virtualizeThreshold);
-
-  // Gestion du scroll
-  function handleScroll(newScrollTop: number, newContainerHeight: number) {
-    scrollTop = newScrollTop;
-    containerHeight = newContainerHeight;
-  }
-
-  // Style pour le container des items
-  function getContainerStyle(totalHeight: number): string {
-    return `position: relative; height: ${totalHeight}px;`;
-  }
-
-  // Style pour un item virtuel
-  function getItemStyle(top: number, height: number): string {
-    return `position: absolute; top: ${top}px; height: ${height}px; left: 0; right: 0;`;
-  }
 </script>
 
-<div 
-  class="flex flex-col gap-3 overflow-y-auto relative"
-  style="contain: layout style paint;"
-  use:virtualScroll={{ onScroll: handleScroll, throttleMs: 16 }}
-  bind:this={containerRef}
->
+<div class="flex flex-col gap-3">
   {#if isLoading && sortedMissions.length === 0}
     {#each Array(3) as _}
       <div class="section-card rounded-[1.5rem] p-4 space-y-3">
@@ -159,33 +89,24 @@
       </div>
     {/if}
     
-    <!-- Container avec hauteur totale pour le scroll -->
-    <div style={getContainerStyle(virtualState.totalHeight)}>
-      {#each virtualState.virtualItems as virtualItem (virtualItem.data.id)}
-        <div 
-          style={getItemStyle(virtualItem.style.top, virtualItem.style.height)}
-          class="px-1"
-        >
-          <MissionCard
-            mission={virtualItem.data}
-            isSeen={seenIds.includes(virtualItem.data.id)}
-            isFavorite={virtualItem.data.id in favorites}
-            isHidden={virtualItem.data.id in hidden}
-            isVirtualized={isVirtualized}
-            onVisible={() => onMissionSeen?.(virtualItem.data.id)}
-            onToggleFavorite={() => onToggleFavorite?.(virtualItem.data.id)}
-            onHide={() => onHide?.(virtualItem.data.id)}
-            onCopyLink={() => onCopyLink?.(virtualItem.data.id)}
-          />
-        </div>
+    <!-- Rendu simple (non-virtualisé) : flow normal sans absolute positioning -->
+    <div class="flex flex-col gap-3">
+      {#each sortedMissions as mission (mission.id)}
+        <MissionCard
+          {mission}
+          isSeen={seenIds.includes(mission.id)}
+          isFavorite={mission.id in favorites}
+          isHidden={mission.id in hidden}
+          onVisible={() => onMissionSeen?.(mission.id)}
+          onToggleFavorite={() => onToggleFavorite?.(mission.id)}
+          onHide={() => onHide?.(mission.id)}
+          onCopyLink={() => onCopyLink?.(mission.id)}
+        />
       {/each}
     </div>
     
     <p class="py-2 text-center text-[11px] text-text-muted shrink-0">
       {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triee{sortedMissions.length > 1 ? 's' : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
-      {#if isVirtualized}
-        <span class="text-text-muted/60">(virtualisé)</span>
-      {/if}
     </p>
   {/if}
 </div>
