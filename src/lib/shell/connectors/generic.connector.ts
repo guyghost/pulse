@@ -1,6 +1,13 @@
 import { BaseConnector } from './base.connector';
 import type { Mission, MissionSource } from '../../core/types/mission';
 import { parseGenericHTML } from '../../core/connectors/generic-parser';
+import {
+  type Result,
+  type AppError,
+  ok,
+  err,
+  createConnectorError,
+} from '$lib/core/errors';
 
 export interface GenericConnectorConfig {
   id: string;
@@ -36,12 +43,40 @@ export class GenericConnector extends BaseConnector {
 
   protected get sessionCheckUrl() { return this._sessionCheckUrl; }
 
-  async fetchMissions(): Promise<Mission[]> {
-    const html = await this.fetchHTML(this.missionsUrl);
-    const now = new Date();
-    const missions = parseGenericHTML(html, this.source, this.baseUrl, now, `${this.idPrefix}-${now.getTime()}`);
-    await this.setLastSync();
-    return missions;
+  async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
+    try {
+      const result = await this.fetchHTML(this.missionsUrl, now);
+      
+      if (!result.ok) {
+        return err(createConnectorError(
+          `Failed to fetch missions from ${this.name}`,
+          { connectorId: this.id, phase: 'fetch', context: { originalError: result.error } },
+          now
+        ));
+      }
+
+      const missions = parseGenericHTML(
+        result.value, 
+        this.source, 
+        this.baseUrl, 
+        new Date(now), 
+        `${this.idPrefix}-${now}`
+      );
+      
+      const syncResult = await this.setLastSync(now);
+      if (!syncResult.ok) {
+        console.warn('Failed to set last sync:', syncResult.error);
+      }
+      
+      return ok(missions);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : String(e);
+      return err(createConnectorError(
+        `Unexpected error fetching missions from ${this.name}: ${message}`,
+        { connectorId: this.id, phase: 'fetch', context: { originalError: message } },
+        now
+      ));
+    }
   }
 }
 

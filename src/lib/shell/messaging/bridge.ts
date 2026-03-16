@@ -1,12 +1,15 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
+import type { ToastType } from '../../../machines/toast.machine';
 
 export type BridgeMessage =
   | { type: 'MISSIONS_UPDATED'; payload: Mission[] }
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }
-  | { type: 'SCAN_COMPLETE'; payload: Mission[] };
+  | { type: 'SCAN_COMPLETE'; payload: Mission[] }
+  | { type: 'SHOW_TOAST'; payload: { message: string; toastType: ToastType; duration?: number } }
+  | { type: 'TOAST_SHOWN' };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

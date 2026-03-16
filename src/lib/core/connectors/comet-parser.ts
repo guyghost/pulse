@@ -4,7 +4,7 @@ import { createMission } from './parser-utils';
 const SOURCE = 'comet' as const;
 const BASE_URL = 'https://app.comet.co';
 
-interface CometMission {
+export interface CometMission {
   id: number;
   title: string;
   status: string;

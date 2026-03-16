@@ -1,12 +1,13 @@
 <script lang="ts">
     import { createActor } from "xstate";
     import { feedMachine } from "../../machines/feed.machine";
-    import MissionFeed from "../organisms/MissionFeed.svelte";
+    import VirtualMissionFeed from "../organisms/VirtualMissionFeed.svelte";
     import { pullToRefresh } from "../actions/pull-to-refresh";
     import ScanProgress from "../organisms/ScanProgress.svelte";
     import SearchInput from "../molecules/SearchInput.svelte";
     import Icon from "../atoms/Icon.svelte";
     import FilterBar from "../organisms/FilterBar.svelte";
+    import KeyboardShortcutsHelp from "../molecules/KeyboardShortcutsHelp.svelte";
     import type { MissionSource, RemoteType } from "$lib/core/types/mission";
     import { runScan } from "$lib/shell/scan/scanner";
     import { getSeenIds, saveSeenIds } from "$lib/shell/storage/seen-missions";
@@ -31,6 +32,13 @@
         isPromptApiAvailable,
         type AiAvailability,
     } from "$lib/shell/ai/capabilities";
+    import {
+        registerShortcut,
+        registerShortcuts,
+        FeedShortcuts,
+        type ShortcutConfig,
+    } from "$lib/shell/utils/keyboard-shortcuts";
+    import { subscribeToConnection, type ConnectionInfo } from "$lib/shell/utils/connection-monitor";
 
     const feedActor = createActor(feedMachine);
     feedActor.start();
@@ -116,6 +124,10 @@
     let scanPercent = $derived(
         scanTotal > 0 ? Math.round((scanCurrent / scanTotal) * 100) : 0,
     );
+    let showShortcutsHelp = $state(false);
+    let searchInputRef = $state<HTMLInputElement | null>(null);
+    let connectionStatus = $state<ConnectionInfo['status']>('unknown');
+    let isOffline = $derived(connectionStatus === 'offline');
 
     $effect(() => {
         getSeenIds()
@@ -167,6 +179,65 @@
         } catch {
             // Outside extension context
         }
+    });
+
+    // Abonnement à l'état de connexion
+    $effect(() => {
+        const unsubscribe = subscribeToConnection((info) => {
+            connectionStatus = info.status;
+        });
+        return unsubscribe;
+    });
+
+    // Keyboard shortcuts registration
+    $effect(() => {
+        const shortcuts: Array<{ config: ShortcutConfig; handler: () => void }> = [
+            {
+                config: FeedShortcuts.REFRESH,
+                handler: () => {
+                    if (!isLoading && !isOffline) {
+                        startScan();
+                    }
+                },
+            },
+            {
+                config: FeedShortcuts.TOGGLE_FAVORITES,
+                handler: () => {
+                    toggleFavoritesFilter();
+                },
+            },
+            {
+                config: FeedShortcuts.TOGGLE_HIDDEN,
+                handler: () => {
+                    toggleHiddenFilter();
+                },
+            },
+            {
+                config: FeedShortcuts.FOCUS_SEARCH,
+                handler: () => {
+                    searchInputRef?.focus();
+                },
+            },
+            {
+                config: FeedShortcuts.CLEAR_SEARCH,
+                handler: () => {
+                    if (searchQuery) {
+                        handleSearch('');
+                    } else if (showFilters) {
+                        showFilters = false;
+                    }
+                },
+            },
+            {
+                config: FeedShortcuts.SHOW_HELP,
+                handler: () => {
+                    showShortcutsHelp = true;
+                },
+            },
+        ];
+
+        const unsubscribe = registerShortcuts(shortcuts);
+        return unsubscribe;
     });
 
     function handleMissionSeen(missionId: string) {
@@ -369,12 +440,16 @@
                             class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
                 {isLoading
                                 ? 'border-accent-blue/30 bg-accent-blue/10'
-                                : 'border-white/10 bg-white/6 text-white hover:bg-white/10'}"
+                                : isOffline
+                                    ? 'border-white/5 bg-white/3 text-text-muted cursor-not-allowed'
+                                    : 'border-white/10 bg-white/6 text-white hover:bg-white/10'}"
                             onclick={startScan}
-                            disabled={isLoading}
+                            disabled={isLoading || isOffline}
                             title={isLoading
                                 ? "Scan en cours..."
-                                : "Lancer le scan"}
+                                : isOffline
+                                    ? "Scan indisponible hors ligne"
+                                    : "Lancer le scan (r)"}
                         >
                             {#if isLoading}
                                 <span
@@ -406,6 +481,13 @@
                     total={scanTotal}
                 />
 
+                {#if isOffline}
+                    <div class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber">
+                        <Icon name="database" size={14} />
+                        <span>Mode hors ligne — Données en cache</span>
+                    </div>
+                {/if}
+                
                 <div class="mt-4 grid grid-cols-3 gap-2">
                     <div
                         class="rounded-[1.25rem] border border-white/8 bg-white/5 px-3 py-3"
@@ -506,7 +588,11 @@
             </div>
 
             <div class="mt-3">
-                <SearchInput value={searchQuery} onSearch={handleSearch} />
+                <SearchInput 
+                    value={searchQuery} 
+                    onSearch={handleSearch}
+                    bind:inputRef={searchInputRef}
+                />
             </div>
 
             <div class="mt-3 flex flex-wrap items-center gap-2">
@@ -519,8 +605,8 @@
                         onclick={toggleFavoritesFilter}
                         aria-pressed={showFavoritesOnly}
                         title={showFavoritesOnly
-                            ? "Voir toutes"
-                            : "Voir favoris"}
+                            ? "Voir toutes (f)"
+                            : "Voir favoris (f)"}
                     >
                         <Icon
                             name="star"
@@ -543,8 +629,8 @@
                         onclick={toggleHiddenFilter}
                         aria-pressed={showHidden}
                         title={showHidden
-                            ? "Masquer les ignorees"
-                            : "Voir ignorees"}
+                            ? "Masquer les ignorees (h)"
+                            : "Voir ignorees (h)"}
                     >
                         <Icon name={showHidden ? "eye" : "eye-off"} size={13} />
                         Ignorees
@@ -592,6 +678,14 @@
                             ></span>
                         {/if}
                     </button>
+                    <button
+                        class="soft-ring inline-flex min-h-11 items-center justify-center rounded-full border border-white/8 bg-white/4 px-3 py-2 text-text-secondary transition-all duration-200 hover:bg-white/8 hover:text-white"
+                        onclick={() => showShortcutsHelp = true}
+                        title="Raccourcis clavier (?)"
+                        aria-label="Afficher l'aide des raccourcis clavier"
+                    >
+                        <Icon name="help-circle" size={14} />
+                    </button>
                 </div>
             </div>
 
@@ -637,7 +731,7 @@
         class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
         use:pullToRefresh={{ onRefresh: () => startScan(), threshold: 60 }}
     >
-        <MissionFeed
+        <VirtualMissionFeed
             missions={displayMissions}
             {isLoading}
             {error}
@@ -646,6 +740,9 @@
             {hidden}
             {sortBy}
             {filterActive}
+            virtualizeThreshold={50}
+            itemHeight={180}
+            overscan={3}
             onMissionSeen={handleMissionSeen}
             onToggleFavorite={handleToggleFavorite}
             onHide={handleHide}
@@ -664,3 +761,5 @@
         {/if}
     </div>
 </div>
+
+<KeyboardShortcutsHelp bind:isOpen={showShortcutsHelp} />

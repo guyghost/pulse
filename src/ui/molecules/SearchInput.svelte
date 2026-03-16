@@ -1,37 +1,39 @@
 <script lang="ts">
   import Icon from '../atoms/Icon.svelte';
+  import { useDebouncedSearch } from '$lib/shell/utils/debounce-svelte.svelte';
 
-  let { value = '', onSearch }: {
+  let { 
+    value = '', 
+    onSearch,
+    inputRef = $bindable<HTMLInputElement | null>(null),
+  }: { 
     value?: string;
     onSearch?: (query: string) => void;
+    inputRef?: HTMLInputElement | null;
   } = $props();
 
-  let localValue = $state('');
-  let debounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const search = useDebouncedSearch(
+    (q) => onSearch?.(q),
+    300
+  );
 
+  // Sync external value changes to internal state
   $effect(() => {
-    localValue = value;
+    if (value !== search.query) {
+      search.setValue(value);
+    }
   });
 
-  $effect(() => {
-    return () => {
-      if (debounceTimer) clearTimeout(debounceTimer);
-    };
-  });
-
-  function handleInput(e: Event) {
-    const target = e.target as HTMLInputElement;
-    localValue = target.value;
-
-    if (debounceTimer) clearTimeout(debounceTimer);
-    debounceTimer = setTimeout(() => {
-      onSearch?.(localValue);
-    }, 300);
+  export function focus() {
+    inputRef?.focus();
   }
 
-  function clear() {
-    localValue = '';
-    onSearch?.('');
+  export function clear() {
+    search.handleClear();
+  }
+
+  export function getValue() {
+    return search.query;
   }
 </script>
 
@@ -40,16 +42,18 @@
     <Icon name="search" size={14} />
   </div>
   <input
+    bind:this={inputRef}
     type="text"
     placeholder="Rechercher une mission, une stack, un client..."
     class="soft-ring w-full rounded-[1.1rem] border border-white/8 bg-white/[0.04] pl-10 pr-10 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:bg-white/[0.06] focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
-    value={localValue}
-    oninput={handleInput}
+    value={search.query}
+    oninput={search.handleInput}
   />
-  {#if localValue}
+  {#if search.query}
     <button
       class="absolute right-3 top-1/2 inline-flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-full bg-white/[0.06] text-text-muted transition-colors duration-200 hover:text-text-primary"
-      onclick={clear}
+      onclick={search.handleClear}
+      aria-label="Effacer la recherche"
     >
       <Icon name="x" size={14} />
     </button>
