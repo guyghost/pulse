@@ -5,3 +5,5 @@ dist/
 output/
 .superset/
 test-results
+coverage/
+.claude/worktrees/

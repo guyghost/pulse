@@ -13,13 +13,16 @@ import type { ScanMetrics } from '../../core/metrics/types';
 import { isOnline } from '../utils/connection-monitor';
 import { withRetry } from '../utils/retry-strategy';
 
+/** Mutex pour empêcher les scans concurrents */
+let scanInProgress = false;
+
 /**
  * Erreur de scan avec code typé
  */
 export class ScanError extends Error {
 	constructor(
 		message: string,
-		public readonly code: 'OFFLINE' | 'NETWORK_ERROR' | 'CANCELLED' | 'UNKNOWN'
+		public readonly code: 'OFFLINE' | 'NETWORK_ERROR' | 'CANCELLED' | 'MUTEX' | 'UNKNOWN'
 	) {
 		super(message);
 		this.name = 'ScanError';
@@ -49,8 +52,29 @@ export async function runScan(
 	onProgress?: (info: ScanProgressInfo) => void,
 	options?: ScanOptions
 ): Promise<ScanResult> {
+	// Mutex : empêcher les scans concurrents
+	if (scanInProgress) {
+		throw new ScanError(
+			'Un scan est déjà en cours. Veuillez patienter.',
+			'MUTEX'
+		);
+	}
+	scanInProgress = true;
+
+	try {
+		return await _runScanInternal(signal, onProgress, options);
+	} finally {
+		scanInProgress = false;
+	}
+}
+
+async function _runScanInternal(
+	signal?: AbortSignal,
+	onProgress?: (info: ScanProgressInfo) => void,
+	options?: ScanOptions
+): Promise<ScanResult> {
 	const scanStartTime = performance.now();
-	
+
 	// Vérifier la connexion avant de scanner
 	if (!isOnline()) {
 		throw new ScanError(

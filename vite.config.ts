@@ -7,6 +7,20 @@ import { resolve } from 'path';
 
 export default defineConfig({
 	plugins: [svelte(), tailwindcss(), crx({ manifest })],
+	test: {
+		coverage: {
+			provider: 'v8',
+			reporter: ['text', 'lcov'],
+			exclude: [
+				'tests/',
+				'node_modules/',
+				'dist/',
+				'src/dev/',
+				'**/*.test.ts',
+				'**/*.d.ts',
+			],
+		},
+	},
 	resolve: {
 		alias: {
 			$lib: resolve(__dirname, './src/lib'),

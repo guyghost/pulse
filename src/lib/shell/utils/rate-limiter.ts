@@ -30,8 +30,6 @@ const DEFAULT_DOMAIN_CONFIGS: Record<string, RateLimitConfig> = {
   'lehibou.com': { requestsPerSecond: 2, burstSize: 3 },
   // Cherrypick
   'cherrypick.fr': { requestsPerSecond: 2, burstSize: 3 },
-  // Malt
-  'malt.com': { requestsPerSecond: 2, burstSize: 3 },
   // Hiway
   'hiway.fr': { requestsPerSecond: 2, burstSize: 3 },
   // Freelance.com
