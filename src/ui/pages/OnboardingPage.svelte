@@ -6,7 +6,12 @@
 
   let { onComplete }: { onComplete?: () => void } = $props();
 
-  let profile: Partial<UserProfile> = {};
+  let profile: Partial<UserProfile> = {
+    location: '',
+    remote: 'any',
+    seniority: 'confirmed',
+    stack: [],
+  };
 
   function handleUpdateProfile(updates: Partial<UserProfile>) {
     profile = { ...profile, ...updates };
