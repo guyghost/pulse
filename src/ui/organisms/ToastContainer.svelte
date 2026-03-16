@@ -12,10 +12,12 @@
 
   let { actor }: Props = $props();
 
-  // Souscrire directement à l'acteur existant (les acteurs XState v5 implémentent le contrat store Svelte)
-  let snapshot = $state(actor.getSnapshot());
+  // Use a function to avoid Svelte's static analysis flagging prop capture
+  const getInitial = () => actor.getSnapshot();
+  let snapshot = $state.raw(getInitial());
 
   $effect(() => {
+    snapshot = actor.getSnapshot();
     const sub = actor.subscribe((s) => {
       snapshot = s;
     });
