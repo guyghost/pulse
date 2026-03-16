@@ -19,3 +19,13 @@ export {
 } from './error-handler';
 
 export type { ToastMessage } from './error-handler';
+
+export {
+  recordError,
+  persistErrors,
+  getErrorLog,
+  clearErrorLog,
+  getErrorSummary,
+} from './error-analytics';
+
+export type { ErrorLogEntry, ErrorSummary } from './error-analytics';
