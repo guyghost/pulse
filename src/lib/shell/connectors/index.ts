@@ -7,7 +7,8 @@ import { handleError, isRetryable } from '../errors/error-handler';
 const CONNECTOR_REGISTRY = {
 	'free-work': () => import('./freework.connector').then((m) => new m.FreeWorkConnector()),
 	'lehibou': () => import('./lehibou.connector').then((m) => new m.LeHibouConnector()),
-	'hiway': () => import('./hiway.connector').then((m) => new m.HiwayConnector()),
+	// 'hiway' — Désactivé : SPA React, le fetch retourne un DOM vide (id="root")
+	// Nécessite un offscreen document avec exécution JS pour fonctionner
 	'collective': () => import('./collective.connector').then((m) => new m.CollectiveConnector()),
 	'cherry-pick': () => import('./cherrypick.connector').then((m) => new m.CherryPickConnector()),
 } as const;
@@ -48,12 +49,6 @@ export function getConnectorsMeta(): ConnectorMeta[] {
 			name: 'LeHibou',
 			icon: 'https://www.google.com/s2/favicons?domain=lehibou.com&sz=32',
 			url: 'https://www.lehibou.com',
-		},
-		{
-			id: 'hiway',
-			name: 'Hiway',
-			icon: 'https://www.google.com/s2/favicons?domain=hiway.fr&sz=32',
-			url: 'https://app.hiway.fr',
 		},
 		{
 			id: 'collective',
