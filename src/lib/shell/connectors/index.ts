@@ -20,6 +20,7 @@ export interface ConnectorMeta {
 	id: ConnectorId;
 	name: string;
 	icon: string;
+	url: string;
 }
 
 /**
@@ -41,31 +42,37 @@ export function getConnectorsMeta(): ConnectorMeta[] {
 			id: 'free-work',
 			name: 'Free-Work',
 			icon: 'https://www.google.com/s2/favicons?domain=free-work.com&sz=32',
+			url: 'https://www.free-work.com',
 		},
 		{
 			id: 'comet',
 			name: 'Comet',
 			icon: 'https://www.google.com/s2/favicons?domain=comet.co&sz=32',
+			url: 'https://app.comet.co',
 		},
 		{
 			id: 'lehibou',
 			name: 'LeHibou',
 			icon: 'https://www.google.com/s2/favicons?domain=lehibou.com&sz=32',
+			url: 'https://www.lehibou.com',
 		},
 		{
 			id: 'hiway',
 			name: 'Hiway',
 			icon: 'https://www.google.com/s2/favicons?domain=hiway.fr&sz=32',
+			url: 'https://app.hiway.fr',
 		},
 		{
 			id: 'collective',
 			name: 'Collective',
 			icon: 'https://www.google.com/s2/favicons?domain=collective.work&sz=32',
+			url: 'https://app.collective.work',
 		},
 		{
 			id: 'cherry-pick',
 			name: 'Cherry Pick',
 			icon: 'https://www.google.com/s2/favicons?domain=cherry-pick.io&sz=32',
+			url: 'https://www.cherry-pick.io',
 		},
 	];
 }
