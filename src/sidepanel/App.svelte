@@ -173,19 +173,21 @@
         </div>
       </div>
       <main class="relative flex-1 overflow-hidden">
-        {#key currentPage}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          class:hidden={currentPage !== 'feed'}
+        >
+          <FeedPage />
+        </div>
+        {#if currentPage === 'settings'}
           <div
-            class="absolute inset-0"
-            in:fly={{ x: transitionDirection * 30, duration: 200, easing: cubicOut }}
+            class="absolute inset-0 overflow-y-auto"
+            in:fly={{ x: 30, duration: 200, easing: cubicOut }}
             out:fade={{ duration: 100 }}
           >
-            {#if currentPage === 'feed'}
-              <FeedPage />
-            {:else if currentPage === 'settings'}
-              <SettingsPage onBack={() => navigate('feed')} />
-            {/if}
+            <SettingsPage onBack={() => navigate('feed')} />
           </div>
-        {/key}
+        {/if}
       </main>
     </div>
   {/if}
