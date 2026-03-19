@@ -1,6 +1,7 @@
 <script lang="ts">
     import { createActor } from "xstate";
     import { feedMachine } from "../../machines/feed.machine";
+    import { scanOrchestratorMachine, type ConnectorDeps } from "../../machines/scan.machine";
     import VirtualMissionFeed from "../organisms/VirtualMissionFeed.svelte";
     import { pullToRefresh } from "../actions/pull-to-refresh";
     import ScanProgress from "../organisms/ScanProgress.svelte";
@@ -9,7 +10,7 @@
     import FilterBar from "../organisms/FilterBar.svelte";
     import KeyboardShortcutsHelp from "../molecules/KeyboardShortcutsHelp.svelte";
     import type { MissionSource, RemoteType } from "$lib/core/types/mission";
-    import { runScan } from "$lib/shell/scan/scanner";
+    import { getConnector, getConnectorsMeta } from "$lib/shell/connectors/index";
     import { getSeenIds, saveSeenIds } from "$lib/shell/storage/seen-missions";
     import { markAsSeen } from "$lib/core/seen/mark-seen";
     import {
@@ -18,7 +19,7 @@
         getHidden,
         saveHidden,
     } from "$lib/shell/storage/favorites";
-    import { getProfile, getMissions } from "$lib/shell/storage/db";
+    import { getProfile, getMissions, saveMissions, saveConnectorStatuses, getConnectorStatuses } from "$lib/shell/storage/db";
     import { getSettings } from "$lib/shell/storage/chrome-storage";
     import { resetNewMissionCount } from "$lib/shell/storage/session-storage";
     import {
@@ -27,6 +28,9 @@
         filterHidden,
         filterFavoritesOnly,
     } from "$lib/core/favorites/favorites";
+    import { toPersistedStatus, type ConnectorStatus, type PersistedConnectorStatus } from "$lib/core/types/connector-status";
+    import { deduplicateMissions } from "$lib/core/scoring/dedup";
+    import { scoreMission } from "$lib/core/scoring/relevance";
     import { getPanelSide, type PanelSide } from "$lib/shell/ui/panel-layout";
     import {
         isPromptApiAvailable,
@@ -38,7 +42,7 @@
         FeedShortcuts,
         type ShortcutConfig,
     } from "$lib/shell/utils/keyboard-shortcuts";
-    import { subscribeToConnection, type ConnectionInfo } from "$lib/shell/utils/connection-monitor";
+    import { subscribeToConnection, isOnline, type ConnectionInfo } from "$lib/shell/utils/connection-monitor";
 
     const feedActor = createActor(feedMachine);
     feedActor.start();
@@ -117,13 +121,23 @@
     let firstName = $state("");
     let panelSide = $state<PanelSide>("right");
     let aiStatus = $state<AiAvailability>("no");
-    let scanController: AbortController | null = null;
-    let scanCurrent = $state(0);
-    let scanTotal = $state(0);
-    let scanConnectorName = $state("");
-    let scanPercent = $derived(
-        scanTotal > 0 ? Math.round((scanCurrent / scanTotal) * 100) : 0,
-    );
+    let scanActor = $state<ReturnType<typeof createActor<typeof scanOrchestratorMachine>> | null>(null);
+    let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
+    let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
+
+    let scanProgress = $derived.by(() => {
+        if (connectorStatuses.size === 0) return { current: 0, total: 0, percent: 0, connectorName: '' };
+        const statuses = [...connectorStatuses.values()];
+        const total = statuses.length;
+        const completed = statuses.filter((s) => s.state === 'done' || s.state === 'error').length;
+        const active = statuses.find((s) => s.state === 'detecting' || s.state === 'fetching' || s.state === 'retrying');
+        return {
+            current: completed,
+            total,
+            percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+            connectorName: active?.connectorName ?? '',
+        };
+    });
     let showShortcutsHelp = $state(false);
     let searchInputRef = $state<HTMLInputElement | null>(null);
     let connectionStatus = $state<ConnectionInfo['status']>('unknown');
@@ -187,6 +201,11 @@
             connectionStatus = info.status;
         });
         return unsubscribe;
+    });
+
+    // Charger les statuts persistés au montage
+    $effect(() => {
+        getConnectorStatuses().then((s) => { persistedStatuses = s; }).catch(() => {});
     });
 
     // Keyboard shortcuts registration
@@ -278,51 +297,87 @@
 
     async function startScan() {
         if (isLoading) return;
-        scanController = new AbortController();
         feedActor.send({ type: "LOAD" });
-        scanCurrent = 0;
-        scanTotal = 0;
-        scanConnectorName = "";
-        try {
-            const result = await runScan(scanController.signal, (info) => {
-                scanCurrent = info.current;
-                scanTotal = info.total;
-                scanConnectorName = info.connectorName;
+
+        const settings = await getSettings();
+        const enabledIds = settings.enabledConnectors;
+        const meta = getConnectorsMeta();
+
+        // Build connector deps
+        const deps: ConnectorDeps[] = [];
+        for (const id of enabledIds) {
+            const connector = await getConnector(id);
+            if (!connector) continue;
+            const m = meta.find((x) => x.id === id);
+            deps.push({
+                connectorId: connector.id,
+                connectorName: m?.name ?? connector.name,
+                detectSession: (now: number) => connector.detectSession(now),
+                fetchMissions: (now: number) => connector.fetchMissions(now),
             });
-            if (scanController.signal.aborted) return;
-            if (result.missions.length === 0 && result.errors.length > 0) {
-                const errorMsg = result.errors
-                    .map((e) => `${e.connectorId}: ${e.message}`)
-                    .join("\n");
-                feedActor.send({ type: "LOAD_ERROR", error: errorMsg });
-            } else {
-                feedActor.send({
-                    type: "MISSIONS_LOADED",
-                    missions: result.missions,
-                });
-                try {
-                    await chrome.storage.local.set({
-                        lastGlobalSync: Date.now(),
-                    });
-                } catch {}
-            }
-        } catch (err) {
-            if (scanController.signal.aborted) return;
-            const msg = err instanceof Error ? err.message : "Erreur de scan";
-            feedActor.send({ type: "LOAD_ERROR", error: msg });
-        } finally {
-            scanController = null;
         }
+
+        const actor = createActor(scanOrchestratorMachine, {
+            input: { connectorDeps: deps, isOnline },
+        });
+
+        const sub = actor.subscribe((s) => {
+            connectorStatuses = new Map(s.context.connectorStatuses);
+
+            if (s.value === 'done') {
+                handleScanDone(s.context);
+                sub.unsubscribe();
+                scanActor = null;
+            }
+
+            if (s.value === 'cancelled') {
+                feedActor.send({ type: "MISSIONS_LOADED", missions: feedSnapshot.context.missions });
+                sub.unsubscribe();
+                scanActor = null;
+            }
+        });
+
+        scanActor = actor;
+        actor.start();
+        actor.send({ type: 'START_SCAN' });
+    }
+
+    async function handleScanDone(ctx: { missions: import('$lib/core/types/mission').Mission[]; connectorStatuses: Map<string, ConnectorStatus>; globalError: string | null }) {
+        if (ctx.globalError) {
+            feedActor.send({ type: "LOAD_ERROR", error: ctx.globalError });
+            return;
+        }
+
+        const hasOnlyErrors = ctx.missions.length === 0 && [...ctx.connectorStatuses.values()].some((s) => s.error);
+        if (hasOnlyErrors) {
+            const errorMsg = [...ctx.connectorStatuses.values()]
+                .filter((s) => s.error)
+                .map((s) => `${s.connectorName}: ${s.error!.message}`)
+                .join("\n");
+            feedActor.send({ type: "LOAD_ERROR", error: errorMsg });
+        } else {
+            const deduped = deduplicateMissions(ctx.missions);
+            let profile = null;
+            try { profile = await getProfile(); } catch {}
+            const scored = profile
+                ? deduped.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
+                : deduped;
+            feedActor.send({ type: "MISSIONS_LOADED", missions: scored });
+            try { await saveMissions(scored); } catch {}
+            try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
+        }
+
+        // Persist connector statuses
+        const persisted = [...ctx.connectorStatuses.values()].map((s) => toPersistedStatus(s, Date.now()));
+        try {
+            await saveConnectorStatuses(persisted);
+            persistedStatuses = persisted;
+        } catch {}
     }
 
     function stopScan() {
-        if (scanController) {
-            scanController.abort();
-            scanController = null;
-            feedActor.send({
-                type: "MISSIONS_LOADED",
-                missions: feedSnapshot.context.missions,
-            });
+        if (scanActor) {
+            scanActor.send({ type: 'CANCEL' });
         }
     }
 
@@ -474,11 +529,11 @@
 
                 <ScanProgress
                     isScanning={isLoading}
-                    progress={scanPercent}
+                    progress={scanProgress.percent}
                     missionsFound={totalMissions}
-                    connectorName={scanConnectorName}
-                    current={scanCurrent}
-                    total={scanTotal}
+                    connectorName={scanProgress.connectorName}
+                    current={scanProgress.current}
+                    total={scanProgress.total}
                 />
 
                 {#if isOffline}
