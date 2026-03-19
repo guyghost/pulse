@@ -1,5 +1,6 @@
 import type { Mission } from '../types/mission';
 import { createMission } from './parser-utils';
+import { validateNextData } from './validate-parser-output';
 
 export interface CollectiveProject {
   id: string;
@@ -58,13 +59,34 @@ export function parseCollectiveProjects(projects: CollectiveProject[], now: Date
 }
 
 export function extractCollectiveProjects(html: string): CollectiveProject[] {
-  const match = html.match(/<script\s+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-  if (!match) return [];
+  // Use shared validator for __NEXT_DATA__ extraction
+  const nextData = validateNextData(html);
+  if (!nextData) {
+    return [];
+  }
 
   try {
-    const data = JSON.parse(match[1]);
-    const projects = data?.props?.pageProps?.dehydratedState?.queries?.[0]?.state?.data?.results?.projects;
-    return Array.isArray(projects) ? projects : [];
+    // Navigate the nested structure with null-safety
+    const props = nextData.props as Record<string, unknown> | undefined;
+    const pageProps = props?.pageProps as Record<string, unknown> | undefined;
+    const dehydratedState = pageProps?.dehydratedState as Record<string, unknown> | undefined;
+    const queries = dehydratedState?.queries as unknown[] | undefined;
+    const firstQuery = queries?.[0] as Record<string, unknown> | undefined;
+    const state = firstQuery?.state as Record<string, unknown> | undefined;
+    const data = state?.data as Record<string, unknown> | undefined;
+    const results = data?.results as Record<string, unknown> | undefined;
+    const projects = results?.projects;
+
+    if (!Array.isArray(projects)) {
+      return [];
+    }
+
+    // Validate each project has required fields
+    return projects.filter((p): p is CollectiveProject => {
+      if (typeof p !== 'object' || p === null) return false;
+      const proj = p as Record<string, unknown>;
+      return typeof proj.id === 'string' && typeof proj.name === 'string';
+    });
   } catch {
     return [];
   }

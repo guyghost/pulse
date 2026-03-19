@@ -1,142 +1,234 @@
 import { describe, it, expect } from 'vitest';
-import { parseHiwayHTML } from '../../../src/lib/core/connectors/hiway-parser';
+import { parseHiwayJSON, parseHiwayMissionRow, type HiwayMissionRow } from '../../../src/lib/core/connectors/hiway-json-parser';
+import { getConnectorIds, getConnectorsMeta, getConnector } from '../../../src/lib/shell/connectors/index';
 
 const NOW = new Date('2026-03-15T12:00:00Z');
+const BASE_URL = 'https://hiway-missions.fr';
 
-function makeCard(overrides: {
-  uuid?: string;
-  title?: string;
-  company?: string;
-  tjm?: string;
-  location?: string;
-  duration?: string;
-  tags?: string[];
-} = {}): string {
-  const uuid = overrides.uuid ?? '550e8400-e29b-41d4-a716-446655440000';
-  const title = overrides.title ?? 'Dev React Senior';
-  const company = overrides.company ?? 'Acme Corp';
-  const tjm = overrides.tjm ?? 'TJM 600€';
-  const location = overrides.location ?? 'Paris';
-  const duration = overrides.duration ?? '6 mois';
-  const tags = overrides.tags ?? ['React', 'TypeScript'];
-
-  return `
-    <a href="/admin/freelance/mission/${uuid}">
-      <h3 class="font-semibold">${title}</h3>
-      <span class="text-sm font-medium text-gray-600">${company}</span>
-      <span class="text-sm text-gray-500">${location}</span>
-      <div>${tjm} - ${duration}</div>
-      ${tags.map(t => `<span class="rounded-full bg-blue-100">${t}</span>`).join('')}
-    </a>
-  `;
+function makeRow(overrides: Partial<HiwayMissionRow> = {}): HiwayMissionRow {
+	return {
+		id: '550e8400-e29b-41d4-a716-446655440000',
+		title: 'Dev React Senior',
+		client: 'Acme Corp',
+		company: null,
+		description: 'Mission de développement React',
+		stack: ['React', 'TypeScript'],
+		skills: null,
+		tjm: 600,
+		daily_rate: null,
+		location: 'Paris',
+		city: null,
+		remote: 'full',
+		work_mode: null,
+		duration: '6 mois',
+		duration_months: null,
+		url: null,
+		slug: null,
+		created_at: '2026-03-15T10:00:00Z',
+		updated_at: null,
+		...overrides,
+	};
 }
 
-function wrapHTML(cards: string): string {
-  return `<html><body><div>${cards}</div></body></html>`;
-}
+describe('parseHiwayMissionRow', () => {
+	it('parses a complete mission row', () => {
+		const row = makeRow();
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		
+		expect(mission).not.toBeNull();
+		expect(mission).toMatchObject({
+			id: 'hw-550e8400-e29b-41d4-a716-446655440000',
+			title: 'Dev React Senior',
+			client: 'Acme Corp',
+			description: 'Mission de développement React',
+			stack: ['React', 'TypeScript'],
+			tjm: 600,
+			location: 'Paris',
+			remote: 'full',
+			duration: '6 mois',
+			source: 'hiway',
+			scrapedAt: NOW,
+		});
+	});
 
-describe('parseHiwayHTML', () => {
-  it('parse une carte mission basique', () => {
-    const html = wrapHTML(makeCard());
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions).toHaveLength(1);
-    expect(missions[0]).toMatchObject({
-      source: 'hiway',
-      title: 'Dev React Senior',
-      scrapedAt: NOW,
-    });
-  });
+	it('extracts ID stable from row.id', () => {
+		const row = makeRow({ id: 'abc12345-e29b-41d4-a716-446655440000' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.id).toBe('hw-abc12345-e29b-41d4-a716-446655440000');
+	});
 
-  it('extrait un ID stable depuis le UUID du href', () => {
-    const html = wrapHTML(makeCard({ uuid: 'abc12345-e29b-41d4-a716-446655440000' }));
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].id).toBe('hw-abc12345-e29b-41d4-a716-446655440000');
-  });
+	it('uses company field as fallback for client', () => {
+		const row = makeRow({ client: null, company: 'Tech SA' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.client).toBe('Tech SA');
+	});
 
-  it('extrait le titre depuis h3.font-semibold', () => {
-    const html = wrapHTML(makeCard({ title: 'Lead Java Spring' }));
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].title).toBe('Lead Java Spring');
-  });
+	it('uses skills field as fallback for stack', () => {
+		const row = makeRow({ stack: null, skills: ['Vue', 'Node.js'] });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.stack).toEqual(['Vue', 'Node.js']);
+	});
 
-  it('extrait le client depuis span.font-medium', () => {
-    const html = wrapHTML(makeCard({ company: 'Tech SA' }));
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].client).toBe('Tech SA');
-  });
+	it('uses daily_rate field as fallback for tjm', () => {
+		const row = makeRow({ tjm: null, daily_rate: 580 });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.tjm).toBe(580);
+	});
 
-  it('extrait le TJM depuis le texte', () => {
-    const html = wrapHTML(makeCard({ tjm: 'TJM 580€' }));
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].tjm).toBe(580);
-  });
+	it('uses city field as fallback for location', () => {
+		const row = makeRow({ location: null, city: 'Lyon' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.location).toBe('Lyon');
+	});
 
-  it('extrait les tags de stack', () => {
-    const html = wrapHTML(makeCard({ tags: ['Vue', 'Node.js', 'PostgreSQL'] }));
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].stack).toEqual(['Vue', 'Node.js', 'PostgreSQL']);
-  });
+	it('uses work_mode string to detect remote', () => {
+		const row = makeRow({ remote: null, work_mode: 'Full remote possible' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.remote).toBe('full');
+	});
 
-  it('extrait la duree depuis le texte', () => {
-    const html = wrapHTML(makeCard({ duration: '3 mois' }));
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].duration).toBe('3 mois');
-  });
+	it('converts duration_months to duration string', () => {
+		const row = makeRow({ duration: null, duration_months: 3 });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.duration).toBe('3 mois');
+	});
 
-  it('construit l URL complete', () => {
-    const html = wrapHTML(makeCard({ uuid: '550e8400-e29b-41d4-a716-446655440000' }));
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].url).toBe('https://hiway-missions.fr/admin/freelance/mission/550e8400-e29b-41d4-a716-446655440000');
-  });
+	it('builds URL from slug when url is null', () => {
+		const row = makeRow({ url: null, slug: 'mission-react-123' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.url).toBe('https://hiway-missions.fr/admin/freelance/mission/mission-react-123');
+	});
 
-  it('parse plusieurs cartes', () => {
-    const html = wrapHTML(
-      makeCard({ uuid: '550e8400-e29b-41d4-a716-446655440000', title: 'Mission A' }) +
-      makeCard({ uuid: '660e8400-e29b-41d4-a716-446655440001', title: 'Mission B' })
-    );
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions).toHaveLength(2);
-  });
+	it('builds URL from id when both url and slug are null', () => {
+		const row = makeRow({ url: null, slug: null });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.url).toBe('https://hiway-missions.fr/admin/freelance/mission/550e8400-e29b-41d4-a716-446655440000');
+	});
 
-  it('retourne un tableau vide pour du HTML vide', () => {
-    expect(parseHiwayHTML('', NOW)).toEqual([]);
-  });
+	it('uses provided url when present', () => {
+		const row = makeRow({ url: 'https://custom.url/mission/123' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.url).toBe('https://custom.url/mission/123');
+	});
 
-  it('ignore les liens sans UUID valide', () => {
-    const html = wrapHTML('<a href="/admin/freelance/mission/not-a-uuid"><h3 class="font-semibold">Test</h3></a>');
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions).toHaveLength(0);
-  });
+	it('returns null for row without id', () => {
+		const row = makeRow({ id: '' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission).toBeNull();
+	});
 
-  it('ignore les cartes sans titre', () => {
-    const html = wrapHTML('<a href="/admin/freelance/mission/550e8400-e29b-41d4-a716-446655440000"><div>No title here</div></a>');
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions).toHaveLength(0);
-  });
+	it('returns null for row without title', () => {
+		const row = makeRow({ title: null });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission).toBeNull();
+	});
 
-  it('retourne tjm null quand pas de montant', () => {
-    const html = wrapHTML(`
-      <a href="/admin/freelance/mission/550e8400-e29b-41d4-a716-446655440000">
-        <h3 class="font-semibold">Mission Test</h3>
-        <span class="text-sm font-medium text-gray-600">Corp</span>
-        <span class="text-sm text-gray-500">Paris</span>
-        <div>A negocier</div>
-      </a>
-    `);
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].tjm).toBeNull();
-  });
+	it('returns null for row with empty title', () => {
+		const row = makeRow({ title: '   ' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission).toBeNull();
+	});
 
-  it('detecte full remote depuis le texte', () => {
-    const html = wrapHTML(`
-      <a href="/admin/freelance/mission/550e8400-e29b-41d4-a716-446655440000">
-        <h3 class="font-semibold">Mission Full Remote</h3>
-        <span class="text-sm font-medium text-gray-600">Corp</span>
-        <span class="text-sm text-gray-500">Paris</span>
-        <div>Full remote - 6 mois</div>
-      </a>
-    `);
-    const missions = parseHiwayHTML(html, NOW);
-    expect(missions[0].remote).toBe('full');
-  });
+	it('strips HTML from description', () => {
+		const row = makeRow({ description: '<p>Hello <b>World</b></p>' });
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		expect(mission?.description).toBe('Hello World');
+	});
+
+	it('handles null fields gracefully', () => {
+		const row = makeRow({
+			client: null,
+			company: null,
+			description: null,
+			stack: null,
+			tjm: null,
+			location: null,
+			remote: null,
+			duration: null,
+		});
+		const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+		
+		expect(mission).not.toBeNull();
+		expect(mission?.client).toBeNull();
+		expect(mission?.description).toBe('');
+		expect(mission?.stack).toEqual([]);
+		expect(mission?.tjm).toBeNull();
+		expect(mission?.location).toBeNull();
+		expect(mission?.remote).toBeNull();
+		expect(mission?.duration).toBeNull();
+	});
+});
+
+describe('parseHiwayJSON', () => {
+	it('parses an array of rows', () => {
+		const rows = [
+			makeRow({ id: 'id-1', title: 'Mission A' }),
+			makeRow({ id: 'id-2', title: 'Mission B' }),
+		];
+		const missions = parseHiwayJSON(rows, NOW, BASE_URL);
+		
+		expect(missions).toHaveLength(2);
+		expect(missions[0].title).toBe('Mission A');
+		expect(missions[1].title).toBe('Mission B');
+	});
+
+	it('filters out invalid rows', () => {
+		const rows = [
+			makeRow({ id: 'id-1', title: 'Mission A' }),
+			{ id: '' }, // No title
+			null, // Null row
+			'string', // Not an object
+			makeRow({ id: 'id-2', title: 'Mission B' }),
+		];
+		const missions = parseHiwayJSON(rows as unknown[], NOW, BASE_URL);
+		
+		expect(missions).toHaveLength(2);
+	});
+
+	it('returns empty array for non-array input', () => {
+		expect(parseHiwayJSON(null as unknown, NOW, BASE_URL)).toEqual([]);
+		expect(parseHiwayJSON({} as unknown, NOW, BASE_URL)).toEqual([]);
+		expect(parseHiwayJSON('string' as unknown, NOW, BASE_URL)).toEqual([]);
+	});
+
+	it('returns empty array for empty input', () => {
+		expect(parseHiwayJSON([], NOW, BASE_URL)).toEqual([]);
+	});
+});
+
+// ============================================================================
+// Enabled State Tests
+// Hiway connector is enabled with confirmed Supabase credentials.
+// ============================================================================
+
+describe('Hiway connector enabled state', () => {
+	it('is in the active connector registry', () => {
+		const activeIds = getConnectorIds();
+		expect(activeIds).toContain('hiway');
+		expect(activeIds).toEqual(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick']);
+	});
+
+	it('is in the connectors metadata for UI display', () => {
+		const meta = getConnectorsMeta();
+		const hiwayMeta = meta.find((m) => (m.id as string) === 'hiway');
+		expect(hiwayMeta).toBeDefined();
+		expect(hiwayMeta).toMatchObject({
+			id: 'hiway',
+			name: 'Hiway',
+			url: 'https://hiway-missions.fr',
+		});
+	});
+
+	it('JSON parser is available for Supabase row parsing', () => {
+		expect(typeof parseHiwayJSON).toBe('function');
+		expect(typeof parseHiwayMissionRow).toBe('function');
+	});
+
+	it('connector can be instantiated via registry', async () => {
+		const connector = await getConnector('hiway');
+		expect(connector).not.toBeNull();
+		expect(connector?.id).toBe('hiway');
+		expect(connector?.name).toBe('Hiway');
+		expect(connector?.baseUrl).toBe('https://hiway-missions.fr');
+	});
 });

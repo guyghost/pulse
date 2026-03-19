@@ -2,6 +2,9 @@
  * Stratégie de retry avec backoff exponentiel pour les requêtes réseau
  */
 
+import type { Result, AppError } from '../../core/errors';
+import { isRetryable } from '../errors/error-handler';
+
 export interface RetryConfig {
 	maxAttempts: number;
 	baseDelayMs: number;
@@ -156,4 +159,67 @@ export async function fetchWithRetry(
 		retryConfig,
 		() => navigator.onLine
 	);
+}
+
+/**
+ * Result-aware retry helper for functions returning Result<T, AppError>
+ *
+ * Unlike `withRetry`, this helper:
+ * - Works with the Result pattern (ok/error) instead of exceptions
+ * - Uses AppError's retryable flag instead of string matching
+ * - Returns the final Result directly (no exception thrown)
+ *
+ * @param fn Function returning Promise<Result<T, AppError>>
+ * @param config Retry configuration
+ * @returns The final Result (either Ok<T> or Err<AppError>)
+ */
+export async function withResultRetry<T>(
+	fn: () => Promise<Result<T, AppError>>,
+	config: Partial<RetryConfig> = {}
+): Promise<Result<T, AppError>> {
+	const fullConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
+
+	for (let attempt = 1; attempt <= fullConfig.maxAttempts; attempt++) {
+		const result = await fn();
+
+		// Success - return immediately
+		if (result.ok) {
+			return result;
+		}
+
+		// Check if error is retryable using AppError's built-in flag
+		if (!isRetryable(result.error)) {
+			return result;
+		}
+
+		const isLastAttempt = attempt === fullConfig.maxAttempts;
+		if (isLastAttempt) {
+			// Return the last error - no more retries
+			if (import.meta.env.DEV) {
+				console.log(`[Retry] Result retry exhausted after ${attempt} attempts`);
+			}
+			return result;
+		}
+
+		// Calculate and wait for delay before retry
+		const delay = calculateDelay(attempt, fullConfig);
+
+		if (import.meta.env.DEV) {
+			console.log(`[Retry] Result attempt ${attempt} failed (retryable), retry in ${Math.round(delay)}ms...`);
+		}
+
+		await sleep(delay);
+	}
+
+	// Should never reach here
+	return {
+		ok: false,
+		error: {
+			type: 'network',
+			message: 'Retry failed unexpectedly',
+			retryable: false,
+			recoverable: false,
+			timestamp: Date.now(),
+		},
+	};
 }

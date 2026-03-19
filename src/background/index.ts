@@ -9,8 +9,14 @@ import { setNewMissionCount } from '../lib/shell/storage/session-storage';
 import { filterNotifiableMissions } from '../lib/core/scoring/notification-filter';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import { notifyHighScoreMissions, setupNotificationClickHandler } from '../lib/shell/notifications/notify-missions';
+import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 
 console.log('[MissionPulse] Service worker started');
+
+// Trigger expired semantic cache cleanup on startup
+clearExpiredSemanticCache().catch((err) => {
+  console.warn('[MissionPulse] Failed to cleanup expired semantic cache:', err);
+});
 
 // Open side panel on extension icon click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -117,7 +123,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (settings.notifications && newCount > 0) {
       const notifiableMissions = filterNotifiableMissions(
         newMissions,
-        [],
+        seenIds,
         settings.notificationScoreThreshold,
       );
       

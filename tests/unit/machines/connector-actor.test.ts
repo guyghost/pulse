@@ -214,4 +214,77 @@ describe('connector actor machine', () => {
 
     actor.stop();
   });
+
+  // ---------------------------------------------------------------------------
+  // Non-retryable error path - critical for reliability hardening
+  // ---------------------------------------------------------------------------
+
+  it('does NOT retry on non-retryable fetch error (403 Forbidden)', async () => {
+    const nonRetryableError = createNetworkError('Forbidden', {
+      retryable: false,
+      status: 403,
+    }, Date.now());
+
+    const detectSession = vi.fn<(now: number) => Promise<Result<boolean, AppError>>>()
+      .mockResolvedValue(okResult(true));
+    const fetchMissions = vi.fn<(now: number) => Promise<Result<Mission[], AppError>>>()
+      .mockResolvedValue(errResult(nonRetryableError));
+
+    const input = makeInput({ detectSession, fetchMissions, maxRetries: 3 });
+    const actor = createActor(connectorActorMachine, { input });
+
+    actor.start();
+    actor.send({ type: 'START' });
+
+    await vi.waitFor(
+      () => { expect(actor.getSnapshot().status).toBe('done'); },
+      { timeout: 5000 },
+    );
+
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.error).not.toBeNull();
+    expect(ctx.error!.type).toBe('network');
+    if (ctx.error!.type === 'network') {
+      expect(ctx.error!.retryable).toBe(false);
+      expect(ctx.error!.status).toBe(403);
+    }
+    expect(ctx.missions).toHaveLength(0);
+    // Critical: only called once, no retries for non-retryable error
+    expect(fetchMissions).toHaveBeenCalledTimes(1);
+    expect(ctx.retryCount).toBe(0);
+
+    actor.stop();
+  });
+
+  it('does NOT retry on parsing error (non-retryable by nature)', async () => {
+    const parsingError = createConnectorError('Parse failed: malformed JSON', {
+      connectorId: 'test-connector',
+      phase: 'parse',
+      recoverable: false,
+    }, Date.now());
+
+    const detectSession = vi.fn<(now: number) => Promise<Result<boolean, AppError>>>()
+      .mockResolvedValue(okResult(true));
+    const fetchMissions = vi.fn<(now: number) => Promise<Result<Mission[], AppError>>>()
+      .mockResolvedValue(errResult(parsingError));
+
+    const input = makeInput({ detectSession, fetchMissions, maxRetries: 3 });
+    const actor = createActor(connectorActorMachine, { input });
+
+    actor.start();
+    actor.send({ type: 'START' });
+
+    await vi.waitFor(
+      () => { expect(actor.getSnapshot().status).toBe('done'); },
+      { timeout: 5000 },
+    );
+
+    const ctx = actor.getSnapshot().context;
+    expect(ctx.error).not.toBeNull();
+    // Only called once, no retries
+    expect(fetchMissions).toHaveBeenCalledTimes(1);
+    expect(ctx.retryCount).toBe(0);
+
+    actor.stop();
+  });
 });

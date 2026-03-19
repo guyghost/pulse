@@ -161,3 +161,49 @@ export async function getConnectorStatuses(): Promise<PersistedConnectorStatus[]
 export async function clearConnectorStatuses(): Promise<void> {
   return withStore<void>('connector_status', 'readwrite', (store) => store.clear());
 }
+
+/**
+ * Purge missions older than the specified number of days (based on scrapedAt)
+ * @param maxAgeDays Maximum age in days (default: 90)
+ * @returns Number of missions purged
+ */
+export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
+  const db = await openDB();
+  const tx = db.transaction('missions', 'readwrite');
+  const store = tx.objectStore('missions');
+  const index = store.index('scrapedAt');
+
+  const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+  const range = IDBKeyRange.upperBound(cutoff);
+
+  return new Promise((resolve, reject) => {
+    const request = index.openCursor(range);
+    let purged = 0;
+
+    request.onsuccess = () => {
+      const cursor = request.result;
+      if (cursor) {
+        cursor.delete();
+        purged++;
+        cursor.continue();
+      } else {
+        // All done
+        resolve(purged);
+      }
+    };
+
+    request.onerror = () => {
+      reject(request.error);
+    };
+
+    tx.oncomplete = () => {
+      if (purged > 0) {
+        console.log(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
+      }
+    };
+
+    tx.onerror = () => {
+      reject(tx.error);
+    };
+  });
+}
