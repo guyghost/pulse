@@ -5,6 +5,7 @@
     import VirtualMissionFeed from "../organisms/VirtualMissionFeed.svelte";
     import { pullToRefresh } from "../actions/pull-to-refresh";
     import ScanProgress from "../organisms/ScanProgress.svelte";
+    import ConnectorStatusList from "../molecules/ConnectorStatusList.svelte";
     import SearchInput from "../molecules/SearchInput.svelte";
     import Icon from "../atoms/Icon.svelte";
     import FilterBar from "../organisms/FilterBar.svelte";
@@ -534,6 +535,12 @@
                     connectorName={scanProgress.connectorName}
                     current={scanProgress.current}
                     total={scanProgress.total}
+                />
+
+                <ConnectorStatusList
+                    statuses={connectorStatuses}
+                    {persistedStatuses}
+                    isScanning={isLoading}
                 />
 
                 {#if isOffline}
