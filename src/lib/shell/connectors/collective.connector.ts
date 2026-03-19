@@ -24,6 +24,18 @@ export class CollectiveConnector extends BaseConnector {
     return JOB_URL;
   }
 
+  /**
+   * Collective est derriere Cloudflare — la detection de session peut echouer
+   * meme si l'utilisateur est connecte. On tente toujours le fetch.
+   */
+  async detectSession(now: number): Promise<Result<boolean, AppError>> {
+    const result = await super.detectSession(now);
+    if (!result.ok || result.value === false) {
+      return ok(true);
+    }
+    return result;
+  }
+
   async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
     try {
       const allMissions: Mission[] = [];

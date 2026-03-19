@@ -349,7 +349,12 @@
             return;
         }
 
-        const deduped = deduplicateMissions(ctx.missions);
+        // Fusionner nouvelles missions + cache pour resilience (scan partiel)
+        let cached: import('$lib/core/types/mission').Mission[] = [];
+        try { cached = await getMissions(); } catch {}
+        const merged = [...ctx.missions, ...cached];
+        const deduped = deduplicateMissions(merged);
+
         let profile = null;
         try { profile = await getProfile(); } catch {}
         const scored = profile
@@ -361,19 +366,11 @@
             try { await saveMissions(scored); } catch {}
             try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
         } else {
-            // Scan n'a rien ramene — recharger depuis IndexedDB (source fiable)
-            // Les erreurs par connecteur sont deja visibles dans ConnectorStatusList
-            let cached: import('$lib/core/types/mission').Mission[] = [];
-            try { cached = await getMissions(); } catch {}
-            if (cached.length > 0) {
-                feedActor.send({ type: "MISSIONS_LOADED", missions: cached });
-            } else {
-                const errorMsg = [...ctx.connectorStatuses.values()]
-                    .filter((s) => s.error)
-                    .map((s) => `${s.connectorName}: ${s.error!.message}`)
-                    .join("\n");
-                feedActor.send({ type: "LOAD_ERROR", error: errorMsg || "Aucune mission trouvee" });
-            }
+            const errorMsg = [...ctx.connectorStatuses.values()]
+                .filter((s) => s.error)
+                .map((s) => `${s.connectorName}: ${s.error!.message}`)
+                .join("\n");
+            feedActor.send({ type: "LOAD_ERROR", error: errorMsg || "Aucune mission trouvee" });
         }
 
         // Persist connector statuses

@@ -22,6 +22,19 @@ export class LeHibouConnector extends BaseConnector {
 
   protected get sessionCheckUrl() { return ANNONCES_URL; }
 
+  /**
+   * LeHibou est derriere Cloudflare — la detection de session peut echouer
+   * meme si l'utilisateur est connecte. On tente toujours le fetch.
+   */
+  async detectSession(now: number): Promise<Result<boolean, AppError>> {
+    const result = await super.detectSession(now);
+    // Si la detection echoue (Cloudflare), on tente quand meme
+    if (!result.ok || result.value === false) {
+      return ok(true);
+    }
+    return result;
+  }
+
   async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
     try {
       const allMissions: Mission[] = [];
