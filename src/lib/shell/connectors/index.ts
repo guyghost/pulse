@@ -6,7 +6,6 @@ import { handleError, isRetryable } from '../errors/error-handler';
 // Each connector is loaded on-demand as a separate chunk
 const CONNECTOR_REGISTRY = {
 	'free-work': () => import('./freework.connector').then((m) => new m.FreeWorkConnector()),
-	'comet': () => import('./comet.connector').then((m) => new m.CometConnector()),
 	'lehibou': () => import('./lehibou.connector').then((m) => new m.LeHibouConnector()),
 	'hiway': () => import('./hiway.connector').then((m) => new m.HiwayConnector()),
 	'collective': () => import('./collective.connector').then((m) => new m.CollectiveConnector()),
@@ -43,12 +42,6 @@ export function getConnectorsMeta(): ConnectorMeta[] {
 			name: 'Free-Work',
 			icon: 'https://www.google.com/s2/favicons?domain=free-work.com&sz=32',
 			url: 'https://www.free-work.com',
-		},
-		{
-			id: 'comet',
-			name: 'Comet',
-			icon: 'https://www.google.com/s2/favicons?domain=comet.co&sz=32',
-			url: 'https://app.comet.co',
 		},
 		{
 			id: 'lehibou',

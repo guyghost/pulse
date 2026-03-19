@@ -361,11 +361,12 @@
             try { await saveMissions(scored); } catch {}
             try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
         } else {
-            // Scan n'a rien ramene — preserver les missions en cache si disponibles
+            // Scan n'a rien ramene — recharger depuis IndexedDB (source fiable)
             // Les erreurs par connecteur sont deja visibles dans ConnectorStatusList
-            const existing = feedSnapshot.context.missions;
-            if (existing.length > 0) {
-                feedActor.send({ type: "MISSIONS_LOADED", missions: existing });
+            let cached: import('$lib/core/types/mission').Mission[] = [];
+            try { cached = await getMissions(); } catch {}
+            if (cached.length > 0) {
+                feedActor.send({ type: "MISSIONS_LOADED", missions: cached });
             } else {
                 const errorMsg = [...ctx.connectorStatuses.values()]
                     .filter((s) => s.error)
