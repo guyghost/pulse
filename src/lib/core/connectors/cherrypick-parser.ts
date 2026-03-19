@@ -131,7 +131,7 @@ export function parseCherryPickMissions(missions: CherryPickMission[], now: Date
       location: m.city ?? meta.location,
       remote: mapRemote(m.displacement),
       duration: normalizeDuration(m.duration ?? meta.duration),
-      url: `https://www.cherry-pick.io/missions/${m.id}/${m.slug}`,
+      url: `${BASE_URL}/missions/${m.id}`,
       source: SOURCE,
       scrapedAt: now,
     });

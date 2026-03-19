@@ -78,7 +78,7 @@ describe('parseCherryPickMissions', () => {
 
   it('construit l URL depuis le slug', () => {
     const missions = parseCherryPickMissions(FIXTURE_MISSIONS, NOW);
-    expect(missions[0].url).toBe('https://www.cherry-pick.io/missions/1234/dev-react-senior-1234');
+    expect(missions[0].url).toBe('https://app.cherry-pick.io/missions/1234');
   });
 
   it('retourne un tableau vide pour un tableau vide', () => {
