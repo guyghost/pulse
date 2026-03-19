@@ -1,25 +1,29 @@
 import type { Mission } from '../../core/types/mission';
+import type { PersistedConnectorStatus } from '../../core/types/connector-status';
 import type { UserProfile } from '../../core/types/profile';
 import { UserProfileSchema } from '../../core/types/schemas';
 import { parseMission, parseUserProfile } from '../../core/types/type-guards';
 import { clearSemanticCache } from './semantic-cache';
 
 const DB_NAME = 'missionpulse';
-const DB_VERSION = 1;
+const DB_VERSION = 2;
 
 function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
-    request.onupgradeneeded = () => {
+    request.onupgradeneeded = (event) => {
       const db = request.result;
-      if (!db.objectStoreNames.contains('missions')) {
+      const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
+
+      if (oldVersion < 1) {
         const store = db.createObjectStore('missions', { keyPath: 'id' });
         store.createIndex('source', 'source', { unique: false });
         store.createIndex('scrapedAt', 'scrapedAt', { unique: false });
-      }
-      if (!db.objectStoreNames.contains('profile')) {
         db.createObjectStore('profile', { keyPath: 'id' });
+      }
+      if (oldVersion < 2) {
+        db.createObjectStore('connector_status', { keyPath: 'connectorId' });
       }
     };
 
@@ -134,4 +138,26 @@ export async function getProfile(): Promise<UserProfile | null> {
   }
 
   return profile;
+}
+
+// Connector Statuses
+export async function saveConnectorStatuses(statuses: PersistedConnectorStatus[]): Promise<void> {
+  const db = await openDB();
+  const tx = db.transaction('connector_status', 'readwrite');
+  const store = tx.objectStore('connector_status');
+  for (const status of statuses) {
+    store.put(status);
+  }
+  return new Promise((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+  });
+}
+
+export async function getConnectorStatuses(): Promise<PersistedConnectorStatus[]> {
+  return withStore<PersistedConnectorStatus[]>('connector_status', 'readonly', (store) => store.getAll());
+}
+
+export async function clearConnectorStatuses(): Promise<void> {
+  return withStore<void>('connector_status', 'readwrite', (store) => store.clear());
 }
