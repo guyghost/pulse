@@ -349,23 +349,30 @@
             return;
         }
 
-        const hasOnlyErrors = ctx.missions.length === 0 && [...ctx.connectorStatuses.values()].some((s) => s.error);
-        if (hasOnlyErrors) {
-            const errorMsg = [...ctx.connectorStatuses.values()]
-                .filter((s) => s.error)
-                .map((s) => `${s.connectorName}: ${s.error!.message}`)
-                .join("\n");
-            feedActor.send({ type: "LOAD_ERROR", error: errorMsg });
-        } else {
-            const deduped = deduplicateMissions(ctx.missions);
-            let profile = null;
-            try { profile = await getProfile(); } catch {}
-            const scored = profile
-                ? deduped.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
-                : deduped;
+        const deduped = deduplicateMissions(ctx.missions);
+        let profile = null;
+        try { profile = await getProfile(); } catch {}
+        const scored = profile
+            ? deduped.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
+            : deduped;
+
+        if (scored.length > 0) {
             feedActor.send({ type: "MISSIONS_LOADED", missions: scored });
             try { await saveMissions(scored); } catch {}
             try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
+        } else {
+            // Scan n'a rien ramene — preserver les missions en cache si disponibles
+            // Les erreurs par connecteur sont deja visibles dans ConnectorStatusList
+            const existing = feedSnapshot.context.missions;
+            if (existing.length > 0) {
+                feedActor.send({ type: "MISSIONS_LOADED", missions: existing });
+            } else {
+                const errorMsg = [...ctx.connectorStatuses.values()]
+                    .filter((s) => s.error)
+                    .map((s) => `${s.connectorName}: ${s.error!.message}`)
+                    .join("\n");
+                feedActor.send({ type: "LOAD_ERROR", error: errorMsg || "Aucune mission trouvee" });
+            }
         }
 
         // Persist connector statuses

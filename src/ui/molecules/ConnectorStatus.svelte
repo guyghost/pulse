@@ -90,10 +90,10 @@
       <span class="text-[9px] text-text-muted">{relativeTime}</span>
     {/if}
     <span class="flex items-center gap-1 text-[10px] {stateConfig.color}">
-      <span class:animate-spin={stateConfig.spin}>
+      <span class="shrink-0" class:animate-spin={stateConfig.spin}>
         <Icon name={stateConfig.icon} size={12} />
       </span>
-      <span class="max-w-24 truncate">{stateConfig.label}</span>
+      <span class="max-w-40 truncate">{stateConfig.label}</span>
     </span>
   </div>
 </div>
