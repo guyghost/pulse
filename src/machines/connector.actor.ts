@@ -229,6 +229,21 @@ export const connectorActorMachine = setup({
       type: 'final',
     },
   },
+  output: ({ context }) => ({
+    missions: context.missions,
+    error: context.error,
+    retryCount: context.retryCount,
+    completedAt: context.completedAt,
+    connectorId: context.connectorId,
+  }),
 });
+
+export type ConnectorActorOutput = {
+  missions: Mission[];
+  error: AppError | null;
+  retryCount: number;
+  completedAt: number | null;
+  connectorId: string;
+};
 
 export type ConnectorActorMachine = typeof connectorActorMachine;
