@@ -44,7 +44,7 @@
 </script>
 
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-  <div class="w-full max-w-md rounded-[1.5rem] border border-white/10 bg-navy-800 p-6 shadow-2xl">
+  <div class="w-full max-w-md rounded-3xl border border-white/10 bg-navy-800 p-6 shadow-2xl">
     <!-- Header -->
     <div class="mb-5 flex items-center gap-3">
       {#if error}
@@ -76,7 +76,7 @@
 
     <!-- Content -->
     {#if error}
-      <div class="mb-5 rounded-[1rem] border border-red-500/20 bg-red-500/10 p-4">
+      <div class="mb-5 rounded-2xl border border-red-500/20 bg-red-500/10 p-4">
         <p class="text-sm text-red-300">{getErrorMessage(error)}</p>
       </div>
 
@@ -95,7 +95,7 @@
         version: backup.version,
       }}
 
-      <div class="mb-5 space-y-3 rounded-[1rem] border border-white/10 bg-navy-900/50 p-4">
+      <div class="mb-5 space-y-3 rounded-2xl border border-white/10 bg-navy-900/50 p-4">
         <div class="flex items-center justify-between">
           <span class="text-sm text-text-secondary">Profil</span>
           <span class="text-sm font-medium text-text-primary">
@@ -127,7 +127,7 @@
         </div>
       </div>
 
-      <div class="mb-5 rounded-[1rem] border border-amber-500/20 bg-amber-500/10 p-4">
+      <div class="mb-5 rounded-2xl border border-amber-500/20 bg-amber-500/10 p-4">
         <p class="text-sm text-amber-300">
           <Icon name="alert-triangle" size={14} class="inline mr-1" />
           Attention : vos données actuelles seront remplacées. Cette action est irréversible.
