@@ -1,6 +1,6 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
-import type { ToastType } from '../../../machines/toast.machine';
+import type { ToastType } from '../../state/toast.svelte';
 
 export type BridgeMessage =
   | { type: 'MISSIONS_UPDATED'; payload: Mission[] }

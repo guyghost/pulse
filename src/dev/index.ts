@@ -13,14 +13,5 @@ export async function bootstrapDevMode(): Promise<void> {
   const { installBridgeLogger } = await import('./bridge-logger');
   installBridgeLogger();
 
-  // Install XState inspector
-  try {
-    const { createBrowserInspector } = await import('@statelyai/inspect');
-    createBrowserInspector({ autoStart: true });
-    console.log('[Dev] XState inspector active');
-  } catch {
-    console.log('[Dev] XState inspector not available (install @statelyai/inspect)');
-  }
-
   console.log('[Dev] Dev mode active', { isExtensionContext: !!globalThis.chrome?.runtime?.id });
 }
