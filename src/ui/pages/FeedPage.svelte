@@ -1,7 +1,6 @@
 <script lang="ts">
-    import { createActor } from "xstate";
-    import { feedMachine } from "../../machines/feed.machine";
-    import { scanOrchestratorMachine, type ConnectorDeps } from "../../machines/scan.machine";
+    import { createFeedStore } from "$lib/state/feed.svelte";
+    import { ScanOrchestrator, type ConnectorDeps } from "$lib/state/scan-orchestrator.svelte";
     import VirtualMissionFeed from "../organisms/VirtualMissionFeed.svelte";
     import { pullToRefresh } from "../actions/pull-to-refresh";
     import ScanProgress from "../organisms/ScanProgress.svelte";
@@ -46,27 +45,12 @@
     } from "$lib/shell/utils/keyboard-shortcuts";
     import { subscribeToConnection, isOnline, type ConnectionInfo } from "$lib/shell/utils/connection-monitor";
 
-    const feedActor = createActor(feedMachine);
-    feedActor.start();
+    const feed = createFeedStore();
 
-    let feedSnapshot = $state(feedActor.getSnapshot());
-
-    // Subscribe synchronously so every event (including those from smartLoad)
-    // is captured BEFORE the first render. Using $effect would defer the
-    // subscription until after the first paint, creating a window where
-    // MISSIONS_LOADED and LOAD events update the actor but feedSnapshot stays stale.
-    const _feedSub = feedActor.subscribe((s) => {
-        feedSnapshot = s;
-    });
-
-    $effect(() => {
-        return () => _feedSub.unsubscribe();
-    });
-
-    let missions = $derived(feedSnapshot.context.filteredMissions);
-    let isLoading = $derived(feedSnapshot.matches("loading"));
-    let error = $derived(feedSnapshot.context.error);
-    let searchQuery = $derived(feedSnapshot.context.searchQuery);
+    let missions = $derived(feed.filteredMissions);
+    let isLoading = $derived(feed.state === 'loading');
+    let error = $derived(feed.error);
+    let searchQuery = $derived(feed.searchQuery);
     let totalMissions = $derived(missions.length);
 
     let displayMissions = $derived.by(() => {
@@ -130,7 +114,7 @@
     let firstName = $state("");
     let panelSide = $state<PanelSide>("right");
     let aiStatus = $state<AiAvailability>("no");
-    let scanActor = $state<ReturnType<typeof createActor<typeof scanOrchestratorMachine>> | null>(null);
+    let orchestrator = $state<ScanOrchestrator | null>(null);
     let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
     let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
     let sourceStatuses = $state<SourceStatus[]>([]);
@@ -302,16 +286,16 @@
 
     function handleSearch(query: string) {
         if (query) {
-            feedActor.send({ type: "SEARCH", query });
+            feed.search(query);
         } else {
-            feedActor.send({ type: "CLEAR_SEARCH" });
+            feed.clearSearch();
         }
     }
 
     async function startScan() {
         if (isLoading) return;
         scanCompleted = false;
-        feedActor.send({ type: "LOAD" });
+        feed.load();
 
         const settings = await getSettings();
         const enabledIds = settings.enabledConnectors;
@@ -331,29 +315,24 @@
             });
         }
 
-        const actor = createActor(scanOrchestratorMachine, {
-            input: { connectorDeps: deps, isOnline },
-        });
+        const scan = new ScanOrchestrator({ connectorDeps: deps, isOnline });
+        orchestrator = scan;
 
-        const sub = actor.subscribe((s) => {
-            connectorStatuses = new Map(s.context.connectorStatuses);
+        await scan.startScan();
 
-            if (s.value === 'done') {
-                handleScanDone(s.context);
-                sub.unsubscribe();
-                scanActor = null;
-            }
+        connectorStatuses = new Map(scan.connectorStatuses);
 
-            if (s.value === 'cancelled') {
-                feedActor.send({ type: "MISSIONS_LOADED", missions: feedSnapshot.context.missions });
-                sub.unsubscribe();
-                scanActor = null;
-            }
-        });
-
-        scanActor = actor;
-        actor.start();
-        actor.send({ type: 'START_SCAN' });
+        if (scan.state === 'done') {
+            await handleScanDone({
+                missions: scan.missions,
+                connectorStatuses: scan.connectorStatuses,
+                globalError: scan.globalError,
+            });
+            orchestrator = null;
+        } else if (scan.state === 'cancelled') {
+            feed.setMissions(feed.missions);
+            orchestrator = null;
+        }
     }
 
     async function handleScanDone(ctx: { missions: import('$lib/core/types/mission').Mission[]; connectorStatuses: Map<string, ConnectorStatus>; globalError: string | null }) {
@@ -368,7 +347,7 @@
         const hasMissions = ctx.missions.length > 0 || [...ctx.connectorStatuses.values()].some(s => s.missionsCount > 0);
         scanCompleted = hasMissions;
         if (ctx.globalError) {
-            feedActor.send({ type: "LOAD_ERROR", error: ctx.globalError });
+            feed.setError(ctx.globalError);
             return;
         }
 
@@ -385,7 +364,7 @@
             : deduped;
 
         if (scored.length > 0) {
-            feedActor.send({ type: "MISSIONS_LOADED", missions: scored });
+            feed.setMissions(scored);
             try { await saveMissions(scored); } catch {}
             try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
         } else {
@@ -400,7 +379,7 @@
             if (noSessionParts.length > 0 && !errorMsg) {
                 errorMsg = `Aucune session active sur : ${noSessionParts.join(", ")}. Connectez-vous aux plateformes puis relancez le scan.`;
             }
-            feedActor.send({ type: "LOAD_ERROR", error: errorMsg || "Aucune mission trouvee" });
+            feed.setError(errorMsg || "Aucune mission trouvee");
         }
 
         // Persist connector statuses
@@ -412,9 +391,7 @@
     }
 
     function stopScan() {
-        if (scanActor) {
-            scanActor.send({ type: 'CANCEL' });
-        }
+        orchestrator?.cancel();
     }
 
     async function checkSourceSessions() {
@@ -505,7 +482,7 @@
                 getSettings(),
             ]);
             if (stored.length > 0) {
-                feedActor.send({ type: "MISSIONS_LOADED", missions: stored });
+                feed.setMissions(stored);
                 const result = await chrome.storage.local.get("lastGlobalSync");
                 const lastSync = result.lastGlobalSync as number | undefined;
                 const intervalMs = settings.scanIntervalMinutes * 60 * 1000;
@@ -525,10 +502,7 @@
                 message?.type === "SCAN_COMPLETE" &&
                 Array.isArray(message.payload)
             ) {
-                feedActor.send({
-                    type: "MISSIONS_LOADED",
-                    missions: message.payload,
-                });
+                feed.setMissions(message.payload);
             }
         };
         chrome.runtime.onMessage.addListener(handleBgScan);
@@ -540,19 +514,16 @@
         $effect(() => {
             function handleMissions(e: Event) {
                 const missions = (e as CustomEvent).detail;
-                feedActor.send({ type: "MISSIONS_LOADED", missions });
+                feed.setMissions(missions);
             }
             function handleState(e: Event) {
-                const state = (e as CustomEvent).detail as string;
-                if (state === "empty") {
-                    feedActor.send({ type: "MISSIONS_LOADED", missions: [] });
-                } else if (state === "loading") {
-                    feedActor.send({ type: "LOAD" });
-                } else if (state === "error") {
-                    feedActor.send({
-                        type: "LOAD_ERROR",
-                        error: "[Dev] Simulated error",
-                    });
+                const devState = (e as CustomEvent).detail as string;
+                if (devState === "empty") {
+                    feed.setMissions([]);
+                } else if (devState === "loading") {
+                    feed.load();
+                } else if (devState === "error") {
+                    feed.setError("[Dev] Simulated error");
                 }
             }
             window.addEventListener("dev:missions", handleMissions);

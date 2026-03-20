@@ -1,5 +1,4 @@
-import { createActor } from 'xstate';
-import { feedMachine } from '../../../src/machines/feed.machine';
+import { createFeedStore } from '../../../src/lib/state/feed.svelte';
 import type { Mission } from '../../../src/lib/core/types/mission';
 
 function makeMission(overrides: Partial<Mission> = {}): Mission {
@@ -23,111 +22,97 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
   };
 }
 
-describe('feed machine', () => {
+describe('feed store', () => {
   it('starts in empty state', () => {
-    const actor = createActor(feedMachine).start();
-    expect(actor.getSnapshot().value).toBe('empty');
-    actor.stop();
+    const store = createFeedStore();
+    expect(store.state).toBe('empty');
   });
 
   it('transitions empty → loading → loaded', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
-    expect(actor.getSnapshot().value).toBe('loading');
+    const store = createFeedStore();
+    store.load();
+    expect(store.state).toBe('loading');
 
     const missions = [makeMission(), makeMission({ id: 'test-2', title: 'Dev Vue' })];
-    actor.send({ type: 'MISSIONS_LOADED', missions });
-    expect(actor.getSnapshot().value).toBe('loaded');
-    expect(actor.getSnapshot().context.missions).toHaveLength(2);
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(2);
-    actor.stop();
+    store.setMissions(missions);
+    expect(store.state).toBe('loaded');
+    expect(store.missions).toHaveLength(2);
+    expect(store.filteredMissions).toHaveLength(2);
   });
 
-  it('transitions loading → error on LOAD_ERROR', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
-    actor.send({ type: 'LOAD_ERROR', error: 'Network error' });
-    expect(actor.getSnapshot().value).toBe('error');
-    expect(actor.getSnapshot().context.error).toBe('Network error');
-    actor.stop();
+  it('transitions loading → error on setError', () => {
+    const store = createFeedStore();
+    store.load();
+    store.setError('Network error');
+    expect(store.state).toBe('error');
+    expect(store.error).toBe('Network error');
   });
 
   it('searches missions by title', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
-    actor.send({
-      type: 'MISSIONS_LOADED',
-      missions: [
-        makeMission({ id: '1', title: 'Dev React Senior' }),
-        makeMission({ id: '2', title: 'Dev Java Spring', description: 'Mission Java pour projet backend', stack: ['Java', 'Spring'] }),
-        makeMission({ id: '3', title: 'Lead React Native' }),
-      ],
-    });
+    const store = createFeedStore();
+    store.load();
+    store.setMissions([
+      makeMission({ id: '1', title: 'Dev React Senior' }),
+      makeMission({ id: '2', title: 'Dev Java Spring', description: 'Mission Java pour projet backend', stack: ['Java', 'Spring'] }),
+      makeMission({ id: '3', title: 'Lead React Native' }),
+    ]);
 
-    actor.send({ type: 'SEARCH', query: 'React' });
-    expect(actor.getSnapshot().value).toBe('loaded');
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(2);
-    expect(actor.getSnapshot().context.searchQuery).toBe('React');
-    actor.stop();
+    store.search('React');
+    expect(store.state).toBe('loaded');
+    expect(store.filteredMissions).toHaveLength(2);
+    expect(store.searchQuery).toBe('React');
   });
 
   it('searches missions by stack', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
-    actor.send({
-      type: 'MISSIONS_LOADED',
-      missions: [
-        makeMission({ id: '1', stack: ['React', 'TypeScript'] }),
-        makeMission({ id: '2', stack: ['Java', 'Spring'] }),
-      ],
-    });
+    const store = createFeedStore();
+    store.load();
+    store.setMissions([
+      makeMission({ id: '1', stack: ['React', 'TypeScript'] }),
+      makeMission({ id: '2', stack: ['Java', 'Spring'] }),
+    ]);
 
-    actor.send({ type: 'SEARCH', query: 'java' });
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(1);
-    actor.stop();
+    store.search('java');
+    expect(store.filteredMissions).toHaveLength(1);
   });
 
   it('clears search and restores all missions', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
+    const store = createFeedStore();
+    store.load();
     const missions = [makeMission({ id: '1' }), makeMission({ id: '2' })];
-    actor.send({ type: 'MISSIONS_LOADED', missions });
-    actor.send({ type: 'SEARCH', query: 'nonexistent' });
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(0);
+    store.setMissions(missions);
+    store.search('nonexistent');
+    expect(store.filteredMissions).toHaveLength(0);
 
-    actor.send({ type: 'CLEAR_SEARCH' });
-    expect(actor.getSnapshot().value).toBe('loaded');
-    expect(actor.getSnapshot().context.filteredMissions).toHaveLength(2);
-    expect(actor.getSnapshot().context.searchQuery).toBe('');
-    actor.stop();
+    store.clearSearch();
+    expect(store.state).toBe('loaded');
+    expect(store.filteredMissions).toHaveLength(2);
+    expect(store.searchQuery).toBe('');
   });
 
   it('can reload from loaded state', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
-    actor.send({ type: 'MISSIONS_LOADED', missions: [makeMission()] });
-    expect(actor.getSnapshot().value).toBe('loaded');
+    const store = createFeedStore();
+    store.load();
+    store.setMissions([makeMission()]);
+    expect(store.state).toBe('loaded');
 
-    actor.send({ type: 'LOAD' });
-    expect(actor.getSnapshot().value).toBe('loading');
-    actor.stop();
+    store.load();
+    expect(store.state).toBe('loading');
   });
 
   it('can reload from error state', () => {
-    const actor = createActor(feedMachine).start();
-    actor.send({ type: 'LOAD' });
-    actor.send({ type: 'LOAD_ERROR', error: 'fail' });
-    expect(actor.getSnapshot().value).toBe('error');
+    const store = createFeedStore();
+    store.load();
+    store.setError('fail');
+    expect(store.state).toBe('error');
 
-    actor.send({ type: 'LOAD' });
-    expect(actor.getSnapshot().value).toBe('loading');
-    actor.stop();
+    store.load();
+    expect(store.state).toBe('loading');
   });
 
   describe('regression: undefined safety', () => {
     it('should not crash when searching missions where one mission has undefined in stack array', () => {
-      const actor = createActor(feedMachine).start();
-      actor.send({ type: 'LOAD' });
+      const store = createFeedStore();
+      store.load();
 
       // Mission with undefined in stack (simulating runtime pollution)
       const missions = [
@@ -136,17 +121,16 @@ describe('feed machine', () => {
         makeMission({ id: '3', title: 'Dev Java', stack: ['Java', 'Spring'] }),
       ];
 
-      actor.send({ type: 'MISSIONS_LOADED', missions });
+      store.setMissions(missions);
 
       // This test passes if search doesn't throw
-      expect(() => actor.send({ type: 'SEARCH', query: 'React' })).not.toThrow();
-      expect(actor.getSnapshot().value).toBe('loaded');
-      actor.stop();
+      expect(() => store.search('React')).not.toThrow();
+      expect(store.state).toBe('loaded');
     });
 
     it('should not crash when searching missions where one mission has nullish description', () => {
-      const actor = createActor(feedMachine).start();
-      actor.send({ type: 'LOAD' });
+      const store = createFeedStore();
+      store.load();
 
       // Mission with null/undefined description
       const missions = [
@@ -155,11 +139,10 @@ describe('feed machine', () => {
         makeMission({ id: '3', title: 'Dev Java', description: undefined as any }),
       ];
 
-      actor.send({ type: 'MISSIONS_LOADED', missions });
+      store.setMissions(missions);
 
-      expect(() => actor.send({ type: 'SEARCH', query: 'React' })).not.toThrow();
-      expect(actor.getSnapshot().value).toBe('loaded');
-      actor.stop();
+      expect(() => store.search('React')).not.toThrow();
+      expect(store.state).toBe('loaded');
     });
   });
 });
