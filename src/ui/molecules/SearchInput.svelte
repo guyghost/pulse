@@ -45,7 +45,7 @@
     bind:this={inputRef}
     type="text"
     placeholder="Rechercher une mission, une stack, un client..."
-    class="soft-ring w-full rounded-[1.1rem] border border-white/8 bg-white/[0.04] pl-10 pr-10 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:bg-white/[0.06] focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
+    class="soft-ring w-full rounded-[1rem] border border-white/8 bg-white/[0.04] pl-10 pr-10 py-2.5 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:bg-white/[0.06] focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
     value={search.query}
     oninput={search.handleInput}
   />

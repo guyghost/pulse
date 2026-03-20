@@ -697,7 +697,7 @@
         </section>
 
         <section
-            class="section-card relative overflow-hidden mt-4 rounded-[1.6rem] p-4"
+            class="section-card relative overflow-hidden mt-4 rounded-[1.4rem] p-3"
             aria-label="Missions triees"
         >
             <div
@@ -716,13 +716,13 @@
             <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
                     <h3
-                        class="text-base font-semibold tracking-tight text-white"
+                        class="text-sm font-semibold tracking-tight text-white"
                     >
                         Missions triees
                     </h3>
                     {#if !isLoading}
                         <span
-                            class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2.5 py-1 text-[11px] font-medium text-accent-emerald/90"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2 py-0.5 text-[10px] font-medium text-accent-emerald/90"
                             aria-label="{visibleCount} missions visibles"
                         >
                             <span
@@ -745,7 +745,7 @@
                 {/if}
             </div>
 
-            <div class="mt-3">
+            <div class="mt-2">
                 <SearchInput 
                     value={searchQuery} 
                     onSearch={handleSearch}
@@ -753,10 +753,10 @@
                 />
             </div>
 
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-                <div class="flex items-center gap-2">
+            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <div class="flex items-center gap-1.5">
                     <button
-                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+                        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-all duration-200
               {showFavoritesOnly
                             ? 'border-accent-amber/35 bg-accent-amber/15 text-accent-amber shadow-glow-amber'
                             : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
@@ -780,7 +780,7 @@
                         {/if}
                     </button>
                     <button
-                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+                        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-all duration-200
               {showHidden
                             ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
                             : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
@@ -802,14 +802,14 @@
                 </div>
 
                 <div
-                    class="h-6 w-px bg-linear-to-b from-transparent via-white/15 to-transparent"
+                    class="h-5 w-px bg-linear-to-b from-transparent via-white/15 to-transparent"
                 ></div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5">
                     <label class="sr-only" for="sort-select">Trier par</label>
                     <select
                         id="sort-select"
-                        class="min-h-11 cursor-pointer rounded-full border border-white/8 bg-white/4 px-3.5 py-2 text-xs text-text-secondary outline-none transition-colors focus:border-accent-blue/40 focus:bg-white/6"
+                        class="min-h-9 cursor-pointer rounded-full border border-white/8 bg-white/4 px-3 py-1.5 text-[11px] text-text-secondary outline-none transition-colors focus:border-accent-blue/40 focus:bg-white/6"
                         bind:value={sortBy}
                     >
                         <option value="score">Pertinence</option>
@@ -817,7 +817,7 @@
                         <option value="tjm">TJM</option>
                     </select>
                     <button
-                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+                        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-all duration-200
               {showFilters || filterActive
                             ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
                             : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
@@ -837,7 +837,7 @@
                         {/if}
                     </button>
                     <button
-                        class="soft-ring inline-flex min-h-11 items-center justify-center rounded-full border border-white/8 bg-white/4 px-3 py-2 text-text-secondary transition-all duration-200 hover:bg-white/8 hover:text-white"
+                        class="soft-ring inline-flex min-h-9 items-center justify-center rounded-full border border-white/8 bg-white/4 px-2.5 py-1.5 text-text-secondary transition-all duration-200 hover:bg-white/8 hover:text-white"
                         onclick={() => showShortcutsHelp = true}
                         title="Raccourcis clavier (?)"
                         aria-label="Afficher l'aide des raccourcis clavier"
@@ -850,7 +850,7 @@
             {#if showFilters}
                 <div
                     id="filter-panel"
-                    class="mt-4 border-t border-white/8 pt-4"
+                    class="mt-3 border-t border-white/8 pt-3"
                     role="group"
                     aria-label="Options de filtrage"
                 >
