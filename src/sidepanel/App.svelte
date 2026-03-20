@@ -10,8 +10,7 @@
   import { ripple } from '../ui/actions/ripple';
   import { generateMockMissions } from '../dev/mocks';
   import type { LogEntry } from '../dev/bridge-logger';
-  import { createActor } from 'xstate';
-  import { toastMachine, type ToastType } from '../machines/toast.machine';
+  import type { ToastType } from '$lib/state/toast.svelte.ts';
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
   import { subscribeToConnection, type ConnectionInfo } from '../lib/shell/utils/connection-monitor';
   import { sendMessage } from '../lib/shell/messaging/bridge';
@@ -193,7 +192,7 @@
     </div>
   {/if}
 
-  <ToastContainer actor={toastActor} />
+  <ToastContainer store={toastActor} />
 
   {#if import.meta.env.DEV && DevPanel}
     <DevPanel

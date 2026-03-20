@@ -1,148 +1,124 @@
-import { createActor } from 'xstate';
-import { toastMachine, toastEvents } from '../../../src/machines/toast.machine';
+import { ToastStore } from '../../../src/lib/state/toast.svelte.ts';
 
-describe('toast machine', () => {
-  it('starts in idle state with empty toasts', () => {
-    const actor = createActor(toastMachine).start();
-    expect(actor.getSnapshot().value).toBe('idle');
-    expect(actor.getSnapshot().context.toasts).toHaveLength(0);
-    expect(actor.getSnapshot().context.nextId).toBe(1);
-    actor.stop();
+describe('ToastStore', () => {
+  it('démarre avec des toasts vides et nextId à 1', () => {
+    const store = new ToastStore();
+    expect(store.toasts).toHaveLength(0);
+    expect(store.nextId).toBe(1);
+    store.destroy();
   });
 
-  it('adds a toast with correct context (id, message, type, duration)', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'Test toast', toastType: 'info' });
+  it('ajoute un toast avec le bon contexte (id, message, type, durée)', () => {
+    const store = new ToastStore();
+    store.add('Test toast', 'info');
 
-    const { toasts } = actor.getSnapshot().context;
-    expect(toasts).toHaveLength(1);
-    expect(toasts[0].id).toBe(1);
-    expect(toasts[0].message).toBe('Test toast');
-    expect(toasts[0].toastType).toBe('info');
-    expect(toasts[0].duration).toBe(4000);
-    expect(typeof toasts[0].createdAt).toBe('number');
-    actor.stop();
+    expect(store.toasts).toHaveLength(1);
+    expect(store.toasts[0].id).toBe(1);
+    expect(store.toasts[0].message).toBe('Test toast');
+    expect(store.toasts[0].toastType).toBe('info');
+    expect(store.toasts[0].duration).toBe(4000);
+    expect(typeof store.toasts[0].createdAt).toBe('number');
+    store.destroy();
   });
 
-  it('uses default duration of 4000ms', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'Default duration', toastType: 'info' });
+  it('utilise la durée par défaut de 4000ms', () => {
+    const store = new ToastStore();
+    store.add('Default duration', 'info');
 
-    expect(actor.getSnapshot().context.toasts[0].duration).toBe(4000);
-    actor.stop();
+    expect(store.toasts[0].duration).toBe(4000);
+    store.destroy();
   });
 
-  it('respects custom duration', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'Custom', toastType: 'info', duration: 8000 });
+  it('respecte la durée personnalisée', () => {
+    const store = new ToastStore();
+    store.add('Custom', 'info', 8000);
 
-    expect(actor.getSnapshot().context.toasts[0].duration).toBe(8000);
-    actor.stop();
+    expect(store.toasts[0].duration).toBe(8000);
+    store.destroy();
   });
 
-  it('increments nextId correctly', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'First', toastType: 'info' });
-    actor.send({ type: 'ADD', message: 'Second', toastType: 'error' });
-    actor.send({ type: 'ADD', message: 'Third', toastType: 'success' });
+  it('incrémente nextId correctement', () => {
+    const store = new ToastStore();
+    store.add('First', 'info');
+    store.add('Second', 'error');
+    store.add('Third', 'success');
 
-    const { toasts, nextId } = actor.getSnapshot().context;
-    expect(toasts[0].id).toBe(1);
-    expect(toasts[1].id).toBe(2);
-    expect(toasts[2].id).toBe(3);
-    expect(nextId).toBe(4);
-    actor.stop();
+    expect(store.toasts[0].id).toBe(1);
+    expect(store.toasts[1].id).toBe(2);
+    expect(store.toasts[2].id).toBe(3);
+    expect(store.nextId).toBe(4);
+    store.destroy();
   });
 
-  it('enforces max 5 toasts with FIFO eviction', () => {
-    const actor = createActor(toastMachine).start();
+  it('applique la limite max de 5 toasts avec éviction FIFO', () => {
+    const store = new ToastStore();
 
     for (let i = 1; i <= 6; i++) {
-      actor.send({ type: 'ADD', message: `Toast ${i}`, toastType: 'info' });
+      store.add(`Toast ${i}`, 'info');
     }
 
-    const { toasts } = actor.getSnapshot().context;
-    expect(toasts).toHaveLength(5);
-    // Oldest (Toast 1) should have been evicted
-    expect(toasts[0].message).toBe('Toast 2');
-    expect(toasts[4].message).toBe('Toast 6');
-    actor.stop();
+    expect(store.toasts).toHaveLength(5);
+    // Le plus ancien (Toast 1) doit avoir été évincé
+    expect(store.toasts[0].message).toBe('Toast 2');
+    expect(store.toasts[4].message).toBe('Toast 6');
+    store.destroy();
   });
 
-  it('dismisses a specific toast by ID', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'First', toastType: 'info' });
-    actor.send({ type: 'ADD', message: 'Second', toastType: 'error' });
+  it('supprime un toast spécifique par ID', () => {
+    const store = new ToastStore();
+    store.add('First', 'info');
+    store.add('Second', 'error');
 
-    actor.send({ type: 'DISMISS', id: 1 });
+    store.dismiss(1);
 
-    const { toasts } = actor.getSnapshot().context;
-    expect(toasts).toHaveLength(1);
-    expect(toasts[0].id).toBe(2);
-    expect(toasts[0].message).toBe('Second');
-    actor.stop();
+    expect(store.toasts).toHaveLength(1);
+    expect(store.toasts[0].id).toBe(2);
+    expect(store.toasts[0].message).toBe('Second');
+    store.destroy();
   });
 
-  it('dismisses all toasts', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'First', toastType: 'info' });
-    actor.send({ type: 'ADD', message: 'Second', toastType: 'error' });
-    actor.send({ type: 'ADD', message: 'Third', toastType: 'success' });
+  it('supprime tous les toasts', () => {
+    const store = new ToastStore();
+    store.add('First', 'info');
+    store.add('Second', 'error');
+    store.add('Third', 'success');
 
-    actor.send({ type: 'DISMISS_ALL' });
+    store.dismissAll();
 
-    expect(actor.getSnapshot().context.toasts).toHaveLength(0);
-    actor.stop();
+    expect(store.toasts).toHaveLength(0);
+    store.destroy();
   });
 
-  it('auto-dismisses a toast by ID', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'First', toastType: 'info' });
-    actor.send({ type: 'ADD', message: 'Second', toastType: 'error' });
+  it('auto-supprime un toast par ID', () => {
+    const store = new ToastStore();
+    store.add('First', 'info');
+    store.add('Second', 'error');
 
-    actor.send({ type: 'AUTO_DISMISS', id: 1 });
+    store.autoDismiss(1);
 
-    const { toasts } = actor.getSnapshot().context;
-    expect(toasts).toHaveLength(1);
-    expect(toasts[0].id).toBe(2);
-    actor.stop();
+    expect(store.toasts).toHaveLength(1);
+    expect(store.toasts[0].id).toBe(2);
+    store.destroy();
   });
 
-  it('adds toast with type info', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'Info toast', toastType: 'info' });
-    expect(actor.getSnapshot().context.toasts[0].toastType).toBe('info');
-    actor.stop();
+  it('ajoute un toast de type info', () => {
+    const store = new ToastStore();
+    store.add('Info toast', 'info');
+    expect(store.toasts[0].toastType).toBe('info');
+    store.destroy();
   });
 
-  it('adds toast with type error', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'Error toast', toastType: 'error' });
-    expect(actor.getSnapshot().context.toasts[0].toastType).toBe('error');
-    actor.stop();
+  it('ajoute un toast de type error', () => {
+    const store = new ToastStore();
+    store.add('Error toast', 'error');
+    expect(store.toasts[0].toastType).toBe('error');
+    store.destroy();
   });
 
-  it('adds toast with type success', () => {
-    const actor = createActor(toastMachine).start();
-    actor.send({ type: 'ADD', message: 'Success toast', toastType: 'success' });
-    expect(actor.getSnapshot().context.toasts[0].toastType).toBe('success');
-    actor.stop();
-  });
-
-  describe('toastEvents helpers', () => {
-    it('creates an ADD event with defaults', () => {
-      const event = toastEvents.add('Hello');
-      expect(event).toEqual({ type: 'ADD', message: 'Hello', toastType: 'info', duration: undefined });
-    });
-
-    it('creates a DISMISS event', () => {
-      const event = toastEvents.dismiss(42);
-      expect(event).toEqual({ type: 'DISMISS', id: 42 });
-    });
-
-    it('creates a DISMISS_ALL event', () => {
-      const event = toastEvents.dismissAll();
-      expect(event).toEqual({ type: 'DISMISS_ALL' });
-    });
+  it('ajoute un toast de type success', () => {
+    const store = new ToastStore();
+    store.add('Success toast', 'success');
+    expect(store.toasts[0].toastType).toBe('success');
+    store.destroy();
   });
 });
