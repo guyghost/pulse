@@ -356,7 +356,10 @@
             counts.set(id, status.missionsCount);
         }
         scanResultCounts = counts;
-        scanCompleted = true;
+
+        // Only compact if we actually found missions
+        const hasMissions = ctx.missions.length > 0 || [...ctx.connectorStatuses.values()].some(s => s.missionsCount > 0);
+        scanCompleted = hasMissions;
         if (ctx.globalError) {
             feedActor.send({ type: "LOAD_ERROR", error: ctx.globalError });
             return;
@@ -379,10 +382,17 @@
             try { await saveMissions(scored); } catch {}
             try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
         } else {
-            const errorMsg = [...ctx.connectorStatuses.values()]
+            const errorParts = [...ctx.connectorStatuses.values()]
                 .filter((s) => s.error)
-                .map((s) => `${s.connectorName}: ${s.error!.message}`)
-                .join("\n");
+                .map((s) => `${s.connectorName}: ${s.error!.message}`);
+            const noSessionParts = [...ctx.connectorStatuses.values()]
+                .filter((s) => !s.error && s.missionsCount === 0)
+                .map((s) => s.connectorName);
+
+            let errorMsg = errorParts.join("\n");
+            if (noSessionParts.length > 0 && !errorMsg) {
+                errorMsg = `Aucune session active sur : ${noSessionParts.join(", ")}. Connectez-vous aux plateformes puis relancez le scan.`;
+            }
             feedActor.send({ type: "LOAD_ERROR", error: errorMsg || "Aucune mission trouvee" });
         }
 
