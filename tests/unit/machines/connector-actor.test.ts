@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createActor } from 'xstate';
-import { connectorActorMachine } from '../../../src/machines/connector.actor';
-import type { ConnectorActorInput } from '../../../src/machines/connector.actor';
+import { ConnectorRunner } from '../../../src/lib/state/connector-runner.svelte';
+import type { ConnectorActorInput } from '../../../src/lib/state/connector-runner.svelte';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { AppError } from '../../../src/lib/core/errors/app-error';
 import { createConnectorError, createNetworkError } from '../../../src/lib/core/errors/app-error';
@@ -64,27 +63,16 @@ describe('connector actor machine', () => {
       .mockResolvedValue(okResult(missions));
 
     const input = makeInput({ detectSession, fetchMissions });
-    const actor = createActor(connectorActorMachine, { input });
+    const runner = new ConnectorRunner(input);
 
-    actor.start();
-    expect(actor.getSnapshot().value).toBe('idle');
+    await runner.run();
 
-    actor.send({ type: 'START' });
-
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().status).toBe('done'); },
-      { timeout: 5000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.missions).toHaveLength(2);
-    expect(ctx.missions[0].id).toBe('1');
-    expect(ctx.missions[1].id).toBe('2');
-    expect(ctx.error).toBeNull();
+    expect(runner.missions).toHaveLength(2);
+    expect(runner.missions[0].id).toBe('1');
+    expect(runner.missions[1].id).toBe('2');
+    expect(runner.error).toBeNull();
     expect(detectSession).toHaveBeenCalledOnce();
     expect(fetchMissions).toHaveBeenCalledOnce();
-
-    actor.stop();
   });
 
   it('goes to done with error when detection returns ok: false', async () => {
@@ -100,23 +88,14 @@ describe('connector actor machine', () => {
       .mockResolvedValue(okResult([]));
 
     const input = makeInput({ detectSession, fetchMissions });
-    const actor = createActor(connectorActorMachine, { input });
+    const runner = new ConnectorRunner(input);
 
-    actor.start();
-    actor.send({ type: 'START' });
+    await runner.run();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().status).toBe('done'); },
-      { timeout: 5000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.error).not.toBeNull();
-    expect(ctx.error!.type).toBe('connector');
-    expect(ctx.missions).toHaveLength(0);
+    expect(runner.error).not.toBeNull();
+    expect(runner.error!.type).toBe('connector');
+    expect(runner.missions).toHaveLength(0);
     expect(fetchMissions).not.toHaveBeenCalled();
-
-    actor.stop();
   });
 
   it('goes to done with error when session not detected (ok: true, value: false)', async () => {
@@ -126,27 +105,18 @@ describe('connector actor machine', () => {
       .mockResolvedValue(okResult([]));
 
     const input = makeInput({ detectSession, fetchMissions });
-    const actor = createActor(connectorActorMachine, { input });
+    const runner = new ConnectorRunner(input);
 
-    actor.start();
-    actor.send({ type: 'START' });
+    await runner.run();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().status).toBe('done'); },
-      { timeout: 5000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.error).not.toBeNull();
-    expect(ctx.error!.type).toBe('connector');
-    if (ctx.error!.type === 'connector') {
-      expect(ctx.error!.phase).toBe('detect');
-      expect(ctx.error!.recoverable).toBe(true);
+    expect(runner.error).not.toBeNull();
+    expect(runner.error!.type).toBe('connector');
+    if (runner.error!.type === 'connector') {
+      expect(runner.error!.phase).toBe('detect');
+      expect(runner.error!.recoverable).toBe(true);
     }
-    expect(ctx.missions).toHaveLength(0);
+    expect(runner.missions).toHaveLength(0);
     expect(fetchMissions).not.toHaveBeenCalled();
-
-    actor.stop();
   });
 
   it('retries on retryable fetch error then succeeds', async () => {
@@ -163,23 +133,14 @@ describe('connector actor machine', () => {
       .mockResolvedValueOnce(okResult(missions));
 
     const input = makeInput({ detectSession, fetchMissions, maxRetries: 3 });
-    const actor = createActor(connectorActorMachine, { input });
+    const runner = new ConnectorRunner(input);
 
-    actor.start();
-    actor.send({ type: 'START' });
+    await runner.run();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().status).toBe('done'); },
-      { timeout: 15000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.missions).toHaveLength(1);
-    expect(ctx.error).toBeNull();
-    expect(ctx.retryCount).toBe(1);
+    expect(runner.missions).toHaveLength(1);
+    expect(runner.error).toBeNull();
+    expect(runner.retryCount).toBe(1);
     expect(fetchMissions).toHaveBeenCalledTimes(2);
-
-    actor.stop();
   });
 
   it('goes to done with error after max retries exhausted', async () => {
@@ -195,24 +156,15 @@ describe('connector actor machine', () => {
       .mockResolvedValue(errResult(retryableError));
 
     const input = makeInput({ detectSession, fetchMissions, maxRetries });
-    const actor = createActor(connectorActorMachine, { input });
+    const runner = new ConnectorRunner(input);
 
-    actor.start();
-    actor.send({ type: 'START' });
+    await runner.run();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().status).toBe('done'); },
-      { timeout: 15000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.error).not.toBeNull();
-    expect(ctx.error!.type).toBe('network');
-    expect(ctx.missions).toHaveLength(0);
+    expect(runner.error).not.toBeNull();
+    expect(runner.error!.type).toBe('network');
+    expect(runner.missions).toHaveLength(0);
     // Initial call + maxRetries retries = maxRetries + 1
     expect(fetchMissions).toHaveBeenCalledTimes(maxRetries + 1);
-
-    actor.stop();
   });
 
   // ---------------------------------------------------------------------------
@@ -231,29 +183,20 @@ describe('connector actor machine', () => {
       .mockResolvedValue(errResult(nonRetryableError));
 
     const input = makeInput({ detectSession, fetchMissions, maxRetries: 3 });
-    const actor = createActor(connectorActorMachine, { input });
+    const runner = new ConnectorRunner(input);
 
-    actor.start();
-    actor.send({ type: 'START' });
+    await runner.run();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().status).toBe('done'); },
-      { timeout: 5000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.error).not.toBeNull();
-    expect(ctx.error!.type).toBe('network');
-    if (ctx.error!.type === 'network') {
-      expect(ctx.error!.retryable).toBe(false);
-      expect(ctx.error!.status).toBe(403);
+    expect(runner.error).not.toBeNull();
+    expect(runner.error!.type).toBe('network');
+    if (runner.error!.type === 'network') {
+      expect(runner.error!.retryable).toBe(false);
+      expect(runner.error!.status).toBe(403);
     }
-    expect(ctx.missions).toHaveLength(0);
+    expect(runner.missions).toHaveLength(0);
     // Critical: only called once, no retries for non-retryable error
     expect(fetchMissions).toHaveBeenCalledTimes(1);
-    expect(ctx.retryCount).toBe(0);
-
-    actor.stop();
+    expect(runner.retryCount).toBe(0);
   });
 
   it('does NOT retry on parsing error (non-retryable by nature)', async () => {
@@ -269,22 +212,13 @@ describe('connector actor machine', () => {
       .mockResolvedValue(errResult(parsingError));
 
     const input = makeInput({ detectSession, fetchMissions, maxRetries: 3 });
-    const actor = createActor(connectorActorMachine, { input });
+    const runner = new ConnectorRunner(input);
 
-    actor.start();
-    actor.send({ type: 'START' });
+    await runner.run();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().status).toBe('done'); },
-      { timeout: 5000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.error).not.toBeNull();
+    expect(runner.error).not.toBeNull();
     // Only called once, no retries
     expect(fetchMissions).toHaveBeenCalledTimes(1);
-    expect(ctx.retryCount).toBe(0);
-
-    actor.stop();
+    expect(runner.retryCount).toBe(0);
   });
 });

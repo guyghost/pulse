@@ -1,7 +1,6 @@
 import { describe, it, expect, vi } from 'vitest';
-import { createActor } from 'xstate';
-import { scanOrchestratorMachine } from '../../../src/machines/scan.machine';
-import type { ConnectorDeps, ScanOrchestratorInput } from '../../../src/machines/scan.machine';
+import { ScanOrchestrator } from '../../../src/lib/state/scan-orchestrator.svelte';
+import type { ConnectorDeps, ScanOrchestratorInput } from '../../../src/lib/state/scan-orchestrator.svelte';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { AppError } from '../../../src/lib/core/errors/app-error';
 import { createConnectorError } from '../../../src/lib/core/errors/app-error';
@@ -73,24 +72,17 @@ describe('scan orchestrator machine', () => {
     const deps = [makeConnectorDeps('fw', 'Free-Work', missions)];
     const input = makeInput(deps);
 
-    const actor = createActor(scanOrchestratorMachine, { input });
-    actor.start();
+    const orchestrator = new ScanOrchestrator(input);
 
-    expect(actor.getSnapshot().value).toBe('idle');
+    expect(orchestrator.state).toBe('idle');
 
-    actor.send({ type: 'START_SCAN' });
+    await orchestrator.startScan();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().value).toBe('done'); },
-      { timeout: 15000 },
-    );
+    expect(orchestrator.state).toBe('done');
 
     // Vérifier que le scan a bien traversé les états
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.missions).toHaveLength(1);
-    expect(ctx.missions[0].id).toBe('1');
-
-    actor.stop();
+    expect(orchestrator.missions).toHaveLength(1);
+    expect(orchestrator.missions[0].id).toBe('1');
   });
 
   it('completes scan with two connectors sequentially — both done, missions collected', async () => {
@@ -103,33 +95,25 @@ describe('scan orchestrator machine', () => {
     ];
     const input = makeInput(deps);
 
-    const actor = createActor(scanOrchestratorMachine, { input });
-    actor.start();
-    actor.send({ type: 'START_SCAN' });
+    const orchestrator = new ScanOrchestrator(input);
+    await orchestrator.startScan();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().value).toBe('done'); },
-      { timeout: 15000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
+    expect(orchestrator.state).toBe('done');
 
     // Missions agrégées des deux connecteurs
-    expect(ctx.missions).toHaveLength(3);
-    expect(ctx.missions.map((m) => m.id)).toEqual(['1', '2', '3']);
+    expect(orchestrator.missions).toHaveLength(3);
+    expect(orchestrator.missions.map((m) => m.id)).toEqual(['1', '2', '3']);
 
     // Statuts des deux connecteurs
-    const fwStatus = ctx.connectorStatuses.get('fw');
+    const fwStatus = orchestrator.connectorStatuses.get('fw');
     expect(fwStatus).toBeDefined();
     expect(fwStatus!.state).toBe('done');
     expect(fwStatus!.missionsCount).toBe(2);
 
-    const cometStatus = ctx.connectorStatuses.get('comet');
+    const cometStatus = orchestrator.connectorStatuses.get('comet');
     expect(cometStatus).toBeDefined();
     expect(cometStatus!.state).toBe('done');
     expect(cometStatus!.missionsCount).toBe(1);
-
-    actor.stop();
   });
 
   it('one connector fails, other succeeds — scan completes with error recorded', async () => {
@@ -149,34 +133,26 @@ describe('scan orchestrator machine', () => {
     ];
     const input = makeInput(deps);
 
-    const actor = createActor(scanOrchestratorMachine, { input });
-    actor.start();
-    actor.send({ type: 'START_SCAN' });
+    const orchestrator = new ScanOrchestrator(input);
+    await orchestrator.startScan();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().value).toBe('done'); },
-      { timeout: 15000 },
-    );
-
-    const ctx = actor.getSnapshot().context;
+    expect(orchestrator.state).toBe('done');
 
     // Le premier connecteur a réussi
-    expect(ctx.missions).toHaveLength(1);
-    expect(ctx.missions[0].id).toBe('1');
+    expect(orchestrator.missions).toHaveLength(1);
+    expect(orchestrator.missions[0].id).toBe('1');
 
-    const fwStatus = ctx.connectorStatuses.get('fw');
+    const fwStatus = orchestrator.connectorStatuses.get('fw');
     expect(fwStatus!.state).toBe('done');
     expect(fwStatus!.error).toBeNull();
 
     // Le second a échoué
-    const cometStatus = ctx.connectorStatuses.get('comet');
+    const cometStatus = orchestrator.connectorStatuses.get('comet');
     expect(cometStatus!.state).toBe('error');
     expect(cometStatus!.error).not.toBeNull();
 
     // Pas d'erreur globale (seulement un connecteur a échoué)
-    expect(ctx.globalError).toBeNull();
-
-    actor.stop();
+    expect(orchestrator.globalError).toBeNull();
   });
 
   it('CANCEL during scanning goes to cancelled state', async () => {
@@ -191,21 +167,22 @@ describe('scan orchestrator machine', () => {
     ];
     const input = makeInput(deps);
 
-    const actor = createActor(scanOrchestratorMachine, { input });
-    actor.start();
-    actor.send({ type: 'START_SCAN' });
+    const orchestrator = new ScanOrchestrator(input);
 
-    // Attendre que le scan soit en cours
+    // Démarrer le scan en arrière-plan
+    const scanPromise = orchestrator.startScan();
+
+    // Attendre que le scan soit en cours (state = 'scanning')
     await vi.waitFor(
-      () => { expect(actor.getSnapshot().value).toBe('scanning'); },
+      () => { expect(orchestrator.state).toBe('scanning'); },
       { timeout: 5000 },
     );
 
-    actor.send({ type: 'CANCEL' });
+    orchestrator.cancel();
 
-    expect(actor.getSnapshot().value).toBe('cancelled');
+    await scanPromise;
 
-    actor.stop();
+    expect(orchestrator.state).toBe('cancelled');
   });
 
   it('RESET from done goes to idle with context cleared', async () => {
@@ -213,45 +190,34 @@ describe('scan orchestrator machine', () => {
     const deps = [makeConnectorDeps('fw', 'Free-Work', missions)];
     const input = makeInput(deps);
 
-    const actor = createActor(scanOrchestratorMachine, { input });
-    actor.start();
-    actor.send({ type: 'START_SCAN' });
+    const orchestrator = new ScanOrchestrator(input);
+    await orchestrator.startScan();
 
-    await vi.waitFor(
-      () => { expect(actor.getSnapshot().value).toBe('done'); },
-      { timeout: 15000 },
-    );
+    expect(orchestrator.state).toBe('done');
 
     // Vérifier qu'on a des données
-    expect(actor.getSnapshot().context.missions).toHaveLength(1);
+    expect(orchestrator.missions).toHaveLength(1);
 
     // Reset
-    actor.send({ type: 'RESET' });
+    orchestrator.reset();
 
-    expect(actor.getSnapshot().value).toBe('idle');
-
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.missions).toHaveLength(0);
-    expect(ctx.connectorStatuses.size).toBe(0);
-    expect(ctx.currentConnectorIndex).toBe(0);
-    expect(ctx.globalError).toBeNull();
-
-    actor.stop();
+    expect(orchestrator.state).toBe('idle');
+    expect(orchestrator.missions).toHaveLength(0);
+    expect(orchestrator.connectorStatuses.size).toBe(0);
+    expect(orchestrator.currentConnectorIndex).toBe(0);
+    expect(orchestrator.globalError).toBeNull();
   });
 
-  it('goes to done with globalError when offline', () => {
+  it('goes to done with globalError when offline', async () => {
     const deps = [makeConnectorDeps('fw', 'Free-Work', [makeMission('1', 'free-work')])];
     const input = makeInput(deps, false);
 
-    const actor = createActor(scanOrchestratorMachine, { input });
-    actor.start();
+    const orchestrator = new ScanOrchestrator(input);
 
-    actor.send({ type: 'START_SCAN' });
+    await orchestrator.startScan();
 
-    expect(actor.getSnapshot().value).toBe('done');
-    expect(actor.getSnapshot().context.globalError).toBe('Pas de connexion internet');
-    expect(actor.getSnapshot().context.missions).toHaveLength(0);
-
-    actor.stop();
+    expect(orchestrator.state).toBe('done');
+    expect(orchestrator.globalError).toBe('Pas de connexion internet');
+    expect(orchestrator.missions).toHaveLength(0);
   });
 });
