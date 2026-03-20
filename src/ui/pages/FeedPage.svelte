@@ -538,7 +538,7 @@
     }
 </script>
 
-<div class="flex h-full flex-col">
+<div class="relative flex h-full flex-col">
     <div class="shrink-0 px-4 pt-4">
         <section
             class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4"
