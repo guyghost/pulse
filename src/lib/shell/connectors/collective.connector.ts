@@ -1,7 +1,6 @@
 import { BaseConnector } from './base.connector';
 import type { Mission } from '../../core/types/mission';
 import { extractCollectiveProjects, parseCollectiveProjects } from '../../core/connectors/collective-parser';
-import { delayBetweenPages } from '../utils/rate-limiter';
 import {
   type Result,
   type AppError,
@@ -10,66 +9,85 @@ import {
   createConnectorError,
 } from '$lib/core/errors';
 
-const BASE_URL = 'https://www.collective.work';
-const JOB_URL = `${BASE_URL}/jobs/fr`;
-const MAX_PAGES = 5;
+const APP_URL = 'https://app.collective.work';
+const USER_ID_PATTERN = /\/collective\/([^/]+)/;
 
 export class CollectiveConnector extends BaseConnector {
   readonly id = 'collective';
   readonly name = 'Collective';
-  readonly baseUrl = BASE_URL;
+  readonly baseUrl = APP_URL;
   readonly icon = 'https://www.google.com/s2/favicons?domain=collective.work&sz=32';
 
+  private userId: string | null = null;
+
   protected get sessionCheckUrl(): string {
-    return JOB_URL;
+    return APP_URL;
   }
 
   /**
-   * Collective est derriere Cloudflare — la detection de session peut echouer
-   * meme si l'utilisateur est connecte. On tente toujours le fetch.
+   * Détecte la session en suivant la redirection vers /collective/<userId>/
+   * Si l'utilisateur est connecté, l'app redirige vers son dashboard.
    */
   async detectSession(now: number): Promise<Result<boolean, AppError>> {
-    const result = await super.detectSession(now);
-    if (!result.ok || result.value === false) {
-      return ok(true);
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+      const response = await fetch(APP_URL, {
+        credentials: 'include',
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      const finalUrl = response.url;
+      const match = finalUrl.match(USER_ID_PATTERN);
+      if (match) {
+        this.userId = match[1];
+        return ok(true);
+      }
+
+      // Pas de redirection vers le dashboard → pas connecté
+      return ok(false);
+    } catch (e) {
+      const message = e instanceof Error ? e.message : 'Network request failed';
+      return err(createConnectorError(
+        `Failed to detect Collective session: ${message}`,
+        { connectorId: this.id, phase: 'detect', recoverable: true },
+        now
+      ));
     }
-    return result;
   }
 
   async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
+    if (!this.userId) {
+      return err(createConnectorError(
+        'User ID not discovered during session detection',
+        { connectorId: this.id, phase: 'fetch', recoverable: false },
+        now
+      ));
+    }
+
     try {
-      const allMissions: Mission[] = [];
+      const jobsUrl = `${APP_URL}/collective/${this.userId}/jobs`;
+      const result = await this.fetchHTML(jobsUrl, now);
 
-      for (let page = 1; page <= MAX_PAGES; page++) {
-        // Délai entre les pages (sauf première)
-        if (page > 1) {
-          await delayBetweenPages(this.id, page);
-        }
-
-        const url = page === 1 ? JOB_URL : `${JOB_URL}?page=${page}`; // /jobs/fr?page=N
-        const result = await this.fetchHTML(url, now);
-        
-        if (!result.ok) {
-          return err(createConnectorError(
-            `Failed to fetch page ${page} from Collective`,
-            { connectorId: this.id, phase: 'fetch', context: { page, originalError: result.error } },
-            now
-          ));
-        }
-
-        const projects = extractCollectiveProjects(result.value);
-        if (projects.length === 0) break;
-        
-        const missions = parseCollectiveProjects(projects, new Date(now));
-        allMissions.push(...missions);
+      if (!result.ok) {
+        return err(createConnectorError(
+          'Failed to fetch jobs from Collective',
+          { connectorId: this.id, phase: 'fetch', context: { originalError: result.error } },
+          now
+        ));
       }
+
+      const projects = extractCollectiveProjects(result.value);
+      const missions = parseCollectiveProjects(projects, new Date(now));
 
       const syncResult = await this.setLastSync(now);
       if (!syncResult.ok) {
         console.warn('Failed to set last sync:', syncResult.error);
       }
-      
-      return ok(allMissions);
+
+      return ok(missions);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       return err(createConnectorError(

@@ -32,6 +32,10 @@
     onCopyLink?: (id: string) => void;
   } = $props();
 
+  // Unwrap Svelte 5 $state proxy — proxied arrays aren't iterable in template context
+  let seenArr = $derived(Array.isArray(seenIds) ? Array.from(seenIds) : []);
+  let seenSet = $derived(new Set(seenArr));
+
   // Use $derived.by for explicit reactivity with defensive checks
   let sortedMissions = $derived.by(() => {
     // Defensive: handle undefined/null cases
@@ -106,7 +110,7 @@
       {#each sortedMissions as mission (mission.id)}
         <MissionCard
           {mission}
-          isSeen={(seenIds ?? []).includes(mission.id)}
+          isSeen={seenSet.has(mission.id)}
           isFavorite={mission.id in (favorites ?? {})}
           isHidden={mission.id in (hidden ?? {})}
           onVisible={() => onMissionSeen?.(mission.id)}

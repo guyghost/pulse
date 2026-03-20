@@ -19,13 +19,21 @@
     isChecking = false,
     compact = false,
     scanResultCounts = new Map<string, number>(),
+    activeSourceFilter = null,
+    enabledConnectors = null,
     onRefresh,
+    onFilterBySource,
+    onToggleConnector,
   }: {
     sources: SourceStatus[];
     isChecking?: boolean;
     compact?: boolean;
     scanResultCounts?: Map<string, number>;
+    activeSourceFilter?: string | null;
+    enabledConnectors?: Set<string> | null;
     onRefresh?: () => void;
+    onFilterBySource?: (connectorId: string | null) => void;
+    onToggleConnector?: (connectorId: string) => void;
   } = $props();
 
   let imgFailed = $state<Record<string, boolean>>({});
@@ -49,6 +57,15 @@
 
   let isCompact = $derived(compact && !expanded);
 
+  // Sources triées par nombre de missions décroissant (actives d'abord, puis inactives)
+  let sortedSources = $derived(
+    [...sources].sort((a, b) => {
+      const countA = scanResultCounts.get(a.connectorId) ?? 0;
+      const countB = scanResultCounts.get(b.connectorId) ?? 0;
+      return countB - countA;
+    })
+  );
+
   function handleReconnect(url: string) {
     try {
       chrome.tabs.create({ url });
@@ -71,21 +88,21 @@
     class:py-2={isCompact}
   >
     {#if isCompact}
-      <!-- Compact mode: favicon row only -->
+      <!-- Compact mode: favicon row sorted by mission count desc -->
       <button
         class="flex w-full items-center gap-2"
         onclick={toggleExpand}
         title="Afficher le détail des sources"
       >
         <div class="flex items-center gap-1.5">
-          {#each sources as source (source.connectorId)}
+          {#each sortedSources as source (source.connectorId)}
             {@const missionCount = scanResultCounts.get(source.connectorId) ?? 0}
             {@const hasData = missionCount > 0}
             <div
               class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all duration-300
                 {hasData
-                  ? 'border-white/10 bg-white/[0.06]'
-                  : 'border-white/5 bg-white/[0.02] opacity-40 grayscale'}"
+                  ? 'border-accent-emerald/25 bg-white/[0.06] shadow-[0_0_6px_rgba(88,217,169,0.1)]'
+                  : 'border-white/5 bg-white/[0.02] opacity-30 grayscale'}"
               title="{source.name}{hasData ? ` — ${missionCount} missions` : ' — aucune mission'}"
             >
               {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
@@ -151,7 +168,24 @@
 
       <div class="mt-2 space-y-0.5">
         {#each sources as source (source.connectorId)}
-          <div class="flex items-center gap-2.5 py-1.5">
+          {@const missionCount = scanResultCounts.get(source.connectorId) ?? 0}
+          {@const isFiltered = activeSourceFilter === source.connectorId}
+          {@const isEnabled = enabledConnectors ? enabledConnectors.has(source.connectorId) : true}
+          <div class="flex items-center gap-2.5 py-1.5" class:opacity-40={!isEnabled}>
+            <!-- Toggle switch -->
+            {#if onToggleConnector}
+              <button
+                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200
+                  {isEnabled ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/[0.05]'}"
+                onclick={() => onToggleConnector(source.connectorId)}
+                role="switch"
+                aria-checked={isEnabled}
+                aria-label="Activer {source.name}"
+              >
+                <span class="inline-block h-3.5 w-3.5 rounded-full transition-transform duration-200
+                  {isEnabled ? 'translate-x-4 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
+              </button>
+            {/if}
             <!-- Favicon -->
             <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]">
               {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
@@ -174,6 +208,20 @@
             <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">
               {source.name}
             </span>
+
+            <!-- Mission count badge (clickable filter) -->
+            {#if missionCount > 0}
+              <button
+                class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-all duration-200
+                  {isFiltered
+                    ? 'border border-accent-blue/40 bg-accent-blue/20 text-accent-blue shadow-glow-blue'
+                    : 'border border-white/10 bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white'}"
+                onclick={() => onFilterBySource?.(isFiltered ? null : source.connectorId)}
+                title={isFiltered ? 'Retirer le filtre' : `Filtrer par ${source.name}`}
+              >
+                {missionCount}
+              </button>
+            {/if}
 
             <!-- Status -->
             <div class="flex items-center gap-1.5">

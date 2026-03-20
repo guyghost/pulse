@@ -13,7 +13,7 @@
   import type { ToastType } from '$lib/state/toast.svelte.ts';
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
   import { subscribeToConnection, type ConnectionInfo } from '../lib/shell/utils/connection-monitor';
-  import { sendMessage } from '../lib/shell/messaging/bridge';
+  import { getProfile } from '../lib/shell/storage/db';
 
   type Page = 'feed' | 'settings' | 'onboarding';
 
@@ -95,20 +95,15 @@
     return unsubscribe;
   });
 
-  // Check if profile exists on mount
-  $effect(() => {
-    (async () => {
-      try {
-        const response = await sendMessage({ type: 'GET_PROFILE' });
-        if (response && 'payload' in response && response.payload) {
-          hasCompletedOnboarding = true;
-          previousPageIndex = PAGE_INDEX['feed'];
-          currentPage = 'feed';
-        }
-      } catch {
-        // Outside extension context — show onboarding
-      }
-    })();
+  // Check if profile exists on mount (direct IndexedDB access, no bridge needed)
+  getProfile().then((profile) => {
+    if (profile) {
+      hasCompletedOnboarding = true;
+      previousPageIndex = PAGE_INDEX['feed'];
+      currentPage = 'feed';
+    }
+  }).catch(() => {
+    // Outside extension context — show onboarding
   });
 
   const navItems: { page: Page; label: string; icon: string }[] = [

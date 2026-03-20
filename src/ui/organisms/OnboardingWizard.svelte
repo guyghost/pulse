@@ -49,6 +49,8 @@
             stack,
             tjmMin: tjm,
             tjmMax: tjm + 150,
+            remote: 'any',
+            seniority: 'senior',
         });
         onComplete?.();
     }

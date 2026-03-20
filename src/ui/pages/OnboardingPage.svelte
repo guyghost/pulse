@@ -2,7 +2,7 @@
   import OnboardingLayout from '../templates/OnboardingLayout.svelte';
   import OnboardingWizard from '../organisms/OnboardingWizard.svelte';
   import type { UserProfile } from '$lib/core/types/profile';
-  import { sendMessage } from '$lib/shell/messaging/bridge';
+  import { saveProfile } from '$lib/shell/storage/db';
   import { createOnboardingStore } from '$lib/state/onboarding.svelte';
 
   let { onComplete }: { onComplete?: () => void } = $props();
@@ -20,13 +20,11 @@
   async function handleComplete() {
     onboarding.save();
 
-    const profile = onboarding.profile;
+    // Unwrap $state proxy to plain object for IndexedDB storage
+    const profile = JSON.parse(JSON.stringify(onboarding.profile)) as UserProfile;
 
     try {
-      await sendMessage({
-        type: 'SAVE_PROFILE',
-        payload: profile as UserProfile,
-      });
+      await saveProfile(profile);
       onboarding.saveSuccess();
       onComplete?.();
     } catch (err) {

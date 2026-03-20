@@ -34,10 +34,12 @@ chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendRespo
   }
 
   if (message.type === 'SAVE_PROFILE') {
+    // Profile is now saved directly from the side panel via IndexedDB.
+    // Keep handler for backwards compatibility with queued messages.
     saveProfile(message.payload as UserProfile).then(() => {
       sendResponse({ type: 'PROFILE_RESULT', payload: message.payload as UserProfile });
     }).catch((err) => {
-      console.error('[MissionPulse] Save profile error:', err);
+      console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
       sendResponse({ type: 'PROFILE_RESULT', payload: null });
     });
     return true;

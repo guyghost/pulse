@@ -1,4 +1,4 @@
-import { ToastStore, type ToastType } from '$lib/state/toast.svelte.ts';
+import { ToastStore, type ToastType } from '$lib/state/toast.svelte';
 import { sendMessage } from '../messaging/bridge';
 
 // Singleton global pour la gestion des toasts

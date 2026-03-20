@@ -1,17 +1,11 @@
 <script lang="ts">
   import SettingsLayout from '../templates/SettingsLayout.svelte';
-  import ConnectorPanel from '../organisms/ConnectorPanel.svelte';
   import Button from '../atoms/Button.svelte';
   import Icon from '../atoms/Icon.svelte';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
-  import type { Mission } from '$lib/core/types/mission';
-
-  /** Statuts UI d'un connecteur (settings) */
-  type ConnectorStatus = 'detecting' | 'authenticated' | 'expired' | 'fetching' | 'done' | 'error';
   import type { BackupData, ValidationError } from '$lib/core/backup/backup';
-  import { getSettings, setSettings, getApiKey, setApiKey, type AppSettings } from '$lib/shell/storage/chrome-storage';
+  import { getSettings, setSettings, getApiKey, setApiKey } from '$lib/shell/storage/chrome-storage';
   import { getProfile, saveProfile } from '$lib/shell/storage/db';
-  import { getConnectorsMeta, getConnectors, type ConnectorMeta, preloadConnector } from '$lib/shell/connectors/index';
   import { getFavorites, getHidden, saveFavorites, saveHidden } from '$lib/shell/storage/favorites';
   import { exportMissionsToJSON, exportMissionsToCSV, exportMissionsToMarkdown, generateFilename, type ExportFormat } from '$lib/core/export/mission-export';
   import { downloadJSON, downloadCSV, downloadMarkdown } from '$lib/shell/export/download';
@@ -27,6 +21,7 @@
   let tjmMax = $state(0);
   let editingProfile = $state(false);
   let profileSaved = $state(false);
+  let profileError = $state<string | null>(null);
 
   // --- API Key ---
   let apiKey = $state('');
@@ -40,16 +35,6 @@
 
   // --- Auto-scan ---
   let autoScan = $state(true);
-
-  // --- Connecteurs ---
-  interface ConnectorUIState extends ConnectorMeta {
-    status: ConnectorStatus;
-    lastSync: Date | null;
-    enabled: boolean;
-    loading: boolean;
-  }
-
-  let connectors = $state<ConnectorUIState[]>([]);
 
   // --- Reset ---
   let showResetConfirm = $state(false);
@@ -99,115 +84,13 @@
       scanInterval = settings.scanIntervalMinutes;
       notifications = settings.notifications;
       autoScan = settings.autoScan;
-
-      // Phase 1: Afficher les connecteurs avec metadata statique (pas de chargement)
-      const meta = getConnectorsMeta();
-      connectors = meta.map((m) => ({
-        ...m,
-        status: 'detecting',
-        lastSync: null,
-        enabled: settings.enabledConnectors.includes(m.id),
-        loading: true,
-      }));
-
-      // Phase 2: Lazy load des connecteurs actifs en priorité
-      const activeIds = settings.enabledConnectors;
-      const now = Date.now();
-      
-      if (activeIds.length > 0) {
-        // Préchargement des connecteurs actifs
-        activeIds.forEach((id) => preloadConnector(id));
-        
-        // Charger les connecteurs actifs pour la détection de session
-        const activeConnectors = await getConnectors(activeIds);
-        
-        // Mettre à jour l'état des connecteurs actifs
-        await Promise.all(
-          activeConnectors.map(async (c) => {
-            const sessionResult = await c.detectSession(now);
-            const lastSyncResult = await c.getLastSync(now);
-            
-            // Gérer les erreurs
-            if (!sessionResult.ok || !lastSyncResult.ok) {
-              connectors = connectors.map((conn) =>
-                conn.id === c.id
-                  ? { ...conn, status: 'error' as ConnectorStatus, loading: false }
-                  : conn
-              );
-              return;
-            }
-            
-            const hasSession = sessionResult.value;
-            const lastSync = lastSyncResult.value;
-            
-            connectors = connectors.map((conn) =>
-              conn.id === c.id
-                ? {
-                    ...conn,
-                    status: (hasSession ? 'authenticated' : 'expired') as ConnectorStatus,
-                    lastSync,
-                    loading: false,
-                  }
-                : conn
-            );
-          })
-        );
-      }
-
-      // Phase 3: Charger les connecteurs inactifs en arrière-plan
-      const inactiveIds = meta.map((m) => m.id).filter((id) => !activeIds.includes(id));
-      
-      // Chargement progressif des inactifs
-      for (const id of inactiveIds) {
-        const c = await getConnectors([id]).then((arr) => arr[0]);
-        if (c) {
-          const sessionResult = await c.detectSession(now);
-          const lastSyncResult = await c.getLastSync(now);
-          
-          if (!sessionResult.ok || !lastSyncResult.ok) {
-            connectors = connectors.map((conn) =>
-              conn.id === c.id
-                ? { ...conn, status: 'error' as ConnectorStatus, loading: false }
-                : conn
-            );
-          } else {
-            const hasSession = sessionResult.value;
-            const lastSync = lastSyncResult.value;
-            
-            connectors = connectors.map((conn) =>
-              conn.id === c.id
-                ? {
-                    ...conn,
-                    status: (hasSession ? 'authenticated' : 'expired') as ConnectorStatus,
-                    lastSync,
-                    loading: false,
-                  }
-                : conn
-            );
-          }
-        } else {
-          // Connecteur non trouvé, marquer comme erreur
-          connectors = connectors.map((conn) =>
-            conn.id === id
-              ? { ...conn, status: 'error' as ConnectorStatus, loading: false }
-              : conn
-          );
-        }
-      }
     } catch {
-      // Hors contexte extension — fallback statique
-      const meta = getConnectorsMeta();
-      connectors = meta.map((m) => ({
-        ...m,
-        status: 'detecting' as ConnectorStatus,
-        lastSync: null,
-        enabled: false,
-        loading: false,
-      }));
+      // Hors contexte extension
     }
   }
 
   async function handleSaveProfile() {
+    profileError = null;
     try {
       const current = await getProfile();
       await saveProfile({
@@ -216,15 +99,15 @@
         location: profileLocation,
         tjmMin,
         tjmMax,
-        stack: current?.stack ?? [],
+        stack: Array.from(current?.stack ?? []),
         remote: current?.remote ?? 'any',
         seniority: current?.seniority ?? 'senior',
       });
       editingProfile = false;
       profileSaved = true;
       setTimeout(() => { profileSaved = false; }, 2000);
-    } catch {
-      // Hors contexte extension
+    } catch (err) {
+      profileError = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
     }
   }
 
@@ -265,30 +148,6 @@
     try {
       const settings = await getSettings();
       await setSettings({ ...settings, autoScan });
-    } catch {
-      // Hors contexte extension
-    }
-  }
-
-  async function toggleConnector(id: string) {
-    connectors = connectors.map(c =>
-      c.id === id ? { ...c, enabled: !c.enabled } : c
-    );
-    try {
-      const settings = await getSettings();
-      const enabledConnectors = connectors.filter(c => c.enabled).map(c => c.id);
-      await setSettings({ ...settings, enabledConnectors });
-    } catch {
-      // Hors contexte extension
-    }
-  }
-
-  async function toggleAllConnectors(enabled: boolean) {
-    connectors = connectors.map(c => ({ ...c, enabled }));
-    try {
-      const settings = await getSettings();
-      const enabledConnectors = enabled ? connectors.map(c => c.id) : [];
-      await setSettings({ ...settings, enabledConnectors });
     } catch {
       // Hors contexte extension
     }
@@ -510,6 +369,9 @@
             <Button variant="secondary" onclick={handleSaveProfile}>
               {#snippet children()}{profileSaved ? 'Sauvegarde !' : 'Enregistrer le profil'}{/snippet}
             </Button>
+            {#if profileError}
+              <p class="text-xs text-red-400">{profileError}</p>
+            {/if}
           </div>
         {:else}
           <div class="space-y-1 text-sm">
@@ -606,13 +468,6 @@
           </button>
         </div>
       </div>
-
-      <!-- Connecteurs -->
-      <ConnectorPanel
-        {connectors}
-        onToggle={toggleConnector}
-        onToggleAll={toggleAllConnectors}
-      />
 
       <!-- Export -->
       <div class="section-card rounded-[1.5rem] p-4 space-y-4">

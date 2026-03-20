@@ -59,7 +59,7 @@ export function getConnectorsMeta(): ConnectorMeta[] {
 			id: 'collective',
 			name: 'Collective',
 			icon: 'https://www.google.com/s2/favicons?domain=collective.work&sz=32',
-			url: 'https://app.collective.work',
+			url: 'https://app.collective.work/',
 		},
 		{
 			id: 'cherry-pick',
