@@ -128,6 +128,8 @@
     let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
     let sourceStatuses = $state<SourceStatus[]>([]);
     let isCheckingSources = $state(false);
+    let scanCompleted = $state(false);
+    let scanResultCounts = $state<Map<string, number>>(new Map());
 
     let scanProgress = $derived.by(() => {
         if (connectorStatuses.size === 0) return { current: 0, total: 0, percent: 0, connectorName: '' };
@@ -301,6 +303,7 @@
 
     async function startScan() {
         if (isLoading) return;
+        scanCompleted = false;
         feedActor.send({ type: "LOAD" });
 
         const settings = await getSettings();
@@ -347,6 +350,13 @@
     }
 
     async function handleScanDone(ctx: { missions: import('$lib/core/types/mission').Mission[]; connectorStatuses: Map<string, ConnectorStatus>; globalError: string | null }) {
+        // Extract mission counts per source for compact display
+        const counts = new Map<string, number>();
+        for (const [id, status] of ctx.connectorStatuses) {
+            counts.set(id, status.missionsCount);
+        }
+        scanResultCounts = counts;
+        scanCompleted = true;
         if (ctx.globalError) {
             feedActor.send({ type: "LOAD_ERROR", error: ctx.globalError });
             return;
@@ -635,6 +645,8 @@
                     <SourceHealthPanel
                         sources={sourceStatuses}
                         isChecking={isCheckingSources}
+                        compact={scanCompleted}
+                        {scanResultCounts}
                         onRefresh={checkSourceSessions}
                     />
                 {/if}

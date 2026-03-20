@@ -14,13 +14,22 @@
     error?: AppError;
   }
 
-  let { sources, isChecking = false, onRefresh }: {
+  let {
+    sources,
+    isChecking = false,
+    compact = false,
+    scanResultCounts = new Map<string, number>(),
+    onRefresh,
+  }: {
     sources: SourceStatus[];
     isChecking?: boolean;
+    compact?: boolean;
+    scanResultCounts?: Map<string, number>;
     onRefresh?: () => void;
   } = $props();
 
   let imgFailed = $state<Record<string, boolean>>({});
+  let expanded = $state(false);
 
   function getRelativeTime(timestamp: number): string {
     const diff = Date.now() - timestamp;
@@ -38,6 +47,8 @@
 
   let totalSources = $derived(sources.length);
 
+  let isCompact = $derived(compact && !expanded);
+
   function handleReconnect(url: string) {
     try {
       chrome.tabs.create({ url });
@@ -45,100 +56,161 @@
       window.open(url, '_blank');
     }
   }
+
+  function toggleExpand() {
+    if (compact) expanded = !expanded;
+  }
 </script>
 
 {#if sources.length > 0}
-  <div class="mt-3 rounded-[1.25rem] border border-white/8 bg-white/[0.03] px-4 py-3">
-    <div class="flex items-center justify-between">
-      <div class="flex items-center gap-2">
-        <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Sources</p>
-        {#if !isChecking}
-          <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium
-            {connectedCount === totalSources
-              ? 'border border-accent-emerald/20 bg-accent-emerald/10 text-accent-emerald'
-              : connectedCount > 0
-                ? 'border border-accent-amber/20 bg-accent-amber/10 text-accent-amber'
-                : 'border border-white/10 bg-white/5 text-text-muted'}"
-          >
-            {connectedCount}/{totalSources} connectées
-          </span>
-        {/if}
-      </div>
-      {#if onRefresh}
-        <button
-          class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-all duration-200 hover:bg-white/6 hover:text-text-primary disabled:opacity-40"
-          onclick={onRefresh}
-          disabled={isChecking}
-          title="Vérifier les connexions"
-        >
-          <span class:animate-spin={isChecking}>
-            <Icon name="refresh-cw" size={12} />
-          </span>
-        </button>
-      {/if}
-    </div>
-
-    <div class="mt-2 space-y-0.5">
-      {#each sources as source (source.connectorId)}
-        <div class="flex items-center gap-2.5 py-1.5">
-          <!-- Favicon -->
-          <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]">
-            {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
-              <img
-                src={source.icon}
-                alt={source.name}
-                width="14"
-                height="14"
-                class="rounded-sm"
-                onerror={() => { imgFailed[source.connectorId] = true; }}
-              />
-            {:else}
-              <span class="text-[9px] font-bold text-text-secondary">
-                {source.name.slice(0, 2).toUpperCase()}
-              </span>
-            {/if}
-          </div>
-
-          <!-- Name -->
-          <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">
-            {source.name}
-          </span>
-
-          <!-- Status -->
-          <div class="flex items-center gap-1.5">
-            {#if source.sessionStatus === 'checking'}
-              <span class="flex items-center gap-1 text-[10px] text-text-muted">
-                <span class="animate-spin">
-                  <Icon name="loader" size={12} />
+  <div
+    class="mt-3 overflow-hidden rounded-[1.25rem] border border-white/8 bg-white/[0.03] transition-all duration-300 ease-in-out"
+    class:px-4={!isCompact}
+    class:py-3={!isCompact}
+    class:px-3={isCompact}
+    class:py-2={isCompact}
+  >
+    {#if isCompact}
+      <!-- Compact mode: favicon row only -->
+      <button
+        class="flex w-full items-center gap-2"
+        onclick={toggleExpand}
+        title="Afficher le détail des sources"
+      >
+        <div class="flex items-center gap-1.5">
+          {#each sources as source (source.connectorId)}
+            {@const missionCount = scanResultCounts.get(source.connectorId) ?? 0}
+            {@const hasData = missionCount > 0}
+            <div
+              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all duration-300
+                {hasData
+                  ? 'border-white/10 bg-white/[0.06]'
+                  : 'border-white/5 bg-white/[0.02] opacity-40 grayscale'}"
+              title="{source.name}{hasData ? ` — ${missionCount} missions` : ' — aucune mission'}"
+            >
+              {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
+                <img
+                  src={source.icon}
+                  alt={source.name}
+                  width="16"
+                  height="16"
+                  class="rounded-sm"
+                  onerror={() => { imgFailed[source.connectorId] = true; }}
+                />
+              {:else}
+                <span class="text-[8px] font-bold text-text-secondary">
+                  {source.name.slice(0, 2).toUpperCase()}
                 </span>
-                <span>Vérification...</span>
-              </span>
-            {:else if source.sessionStatus === 'connected'}
-              {#if source.lastSyncAt}
-                <span class="text-[9px] text-text-muted">{getRelativeTime(source.lastSyncAt)}</span>
               {/if}
-              <span class="flex items-center gap-1 text-[10px] text-accent-emerald">
-                <span class="inline-block h-1.5 w-1.5 rounded-full bg-accent-emerald"></span>
-                <span>Connecté</span>
-              </span>
-            {:else if source.sessionStatus === 'not-connected'}
-              <button
-                class="rounded-md border border-accent-blue/20 bg-accent-blue/8 px-2 py-0.5 text-[10px] font-medium text-accent-blue transition-colors hover:bg-accent-blue/15"
-                onclick={() => handleReconnect(source.url)}
-              >
-                Se connecter
-              </button>
-            {:else if source.sessionStatus === 'error'}
-              <span class="flex items-center gap-1 text-[10px] text-red-400">
-                <Icon name="x-circle" size={12} />
-                <span class="max-w-32 truncate">
-                  {source.error?.message ?? 'Erreur'}
-                </span>
-              </span>
-            {/if}
-          </div>
+            </div>
+          {/each}
         </div>
-      {/each}
-    </div>
+        <Icon name="chevron-down" size={12} class="text-text-muted ml-auto" />
+      </button>
+    {:else}
+      <!-- Expanded mode: full status list -->
+      <div class="flex items-center justify-between">
+        <div class="flex items-center gap-2">
+          <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Sources</p>
+          {#if !isChecking}
+            <span class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium
+              {connectedCount === totalSources
+                ? 'border border-accent-emerald/20 bg-accent-emerald/10 text-accent-emerald'
+                : connectedCount > 0
+                  ? 'border border-accent-amber/20 bg-accent-amber/10 text-accent-amber'
+                  : 'border border-white/10 bg-white/5 text-text-muted'}"
+            >
+              {connectedCount}/{totalSources} connectées
+            </span>
+          {/if}
+        </div>
+        <div class="flex items-center gap-1">
+          {#if compact}
+            <button
+              class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-all duration-200 hover:bg-white/6 hover:text-text-primary"
+              onclick={toggleExpand}
+              title="Réduire"
+            >
+              <Icon name="chevron-down" size={12} class="rotate-180" />
+            </button>
+          {/if}
+          {#if onRefresh}
+            <button
+              class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-all duration-200 hover:bg-white/6 hover:text-text-primary disabled:opacity-40"
+              onclick={onRefresh}
+              disabled={isChecking}
+              title="Vérifier les connexions"
+            >
+              <span class:animate-spin={isChecking}>
+                <Icon name="refresh-cw" size={12} />
+              </span>
+            </button>
+          {/if}
+        </div>
+      </div>
+
+      <div class="mt-2 space-y-0.5">
+        {#each sources as source (source.connectorId)}
+          <div class="flex items-center gap-2.5 py-1.5">
+            <!-- Favicon -->
+            <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]">
+              {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
+                <img
+                  src={source.icon}
+                  alt={source.name}
+                  width="14"
+                  height="14"
+                  class="rounded-sm"
+                  onerror={() => { imgFailed[source.connectorId] = true; }}
+                />
+              {:else}
+                <span class="text-[9px] font-bold text-text-secondary">
+                  {source.name.slice(0, 2).toUpperCase()}
+                </span>
+              {/if}
+            </div>
+
+            <!-- Name -->
+            <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">
+              {source.name}
+            </span>
+
+            <!-- Status -->
+            <div class="flex items-center gap-1.5">
+              {#if source.sessionStatus === 'checking'}
+                <span class="flex items-center gap-1 text-[10px] text-text-muted">
+                  <span class="animate-spin">
+                    <Icon name="loader" size={12} />
+                  </span>
+                  <span>Vérification...</span>
+                </span>
+              {:else if source.sessionStatus === 'connected'}
+                {#if source.lastSyncAt}
+                  <span class="text-[9px] text-text-muted">{getRelativeTime(source.lastSyncAt)}</span>
+                {/if}
+                <span class="flex items-center gap-1 text-[10px] text-accent-emerald">
+                  <span class="inline-block h-1.5 w-1.5 rounded-full bg-accent-emerald"></span>
+                  <span>Connecté</span>
+                </span>
+              {:else if source.sessionStatus === 'not-connected'}
+                <button
+                  class="rounded-md border border-accent-blue/20 bg-accent-blue/8 px-2 py-0.5 text-[10px] font-medium text-accent-blue transition-colors hover:bg-accent-blue/15"
+                  onclick={() => handleReconnect(source.url)}
+                >
+                  Se connecter
+                </button>
+              {:else if source.sessionStatus === 'error'}
+                <span class="flex items-center gap-1 text-[10px] text-red-400">
+                  <Icon name="x-circle" size={12} />
+                  <span class="max-w-32 truncate">
+                    {source.error?.message ?? 'Erreur'}
+                  </span>
+                </span>
+              {/if}
+            </div>
+          </div>
+        {/each}
+      </div>
+    {/if}
   </div>
 {/if}
