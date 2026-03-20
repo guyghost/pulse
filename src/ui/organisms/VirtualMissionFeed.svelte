@@ -5,13 +5,13 @@
   import Icon from '../atoms/Icon.svelte';
 
   let {
-    missions = [] as Mission[],
+    missions = [],
     isLoading = false,
-    error = null as string | null,
-    seenIds = [] as string[],
-    favorites = {} as Record<string, number>,
-    hidden = {} as Record<string, number>,
-    sortBy = 'score' as 'score' | 'date' | 'tjm',
+    error = null,
+    seenIds = [],
+    favorites = {},
+    hidden = {},
+    sortBy = 'score',
     filterActive = false,
     onMissionSeen,
     onToggleFavorite,
@@ -32,13 +32,25 @@
     onCopyLink?: (id: string) => void;
   } = $props();
 
-  let sortedMissions = $derived(
-    [...missions].sort((a, b) => {
+  // Use $derived.by for explicit reactivity with defensive checks
+  let sortedMissions = $derived.by(() => {
+    // Defensive: handle undefined/null cases
+    if (!missions || !Array.isArray(missions) || missions.length === 0) {
+      return [];
+    }
+    // Create a new array to ensure reactivity tracking
+    return [...missions].sort((a, b) => {
       if (sortBy === 'date') return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
       if (sortBy === 'tjm') return (b.tjm ?? 0) - (a.tjm ?? 0);
       return (b.score ?? 0) - (a.score ?? 0);
-    })
-  );
+    });
+  });
+
+  if (import.meta.env.DEV) {
+    $effect(() => {
+      console.log('[VirtualMissionFeed] missions prop:', missions?.length ?? 0, 'sortedMissions:', sortedMissions.length);
+    });
+  }
 </script>
 
 <div class="flex flex-col gap-3">

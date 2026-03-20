@@ -13,7 +13,8 @@
 
   let imgFailed = $state(false);
 
-  let state = $derived(status?.state ?? persisted?.lastState ?? 'pending');
+  // Renamed from 'state' to 'connectorState' to avoid conflict with $state rune
+  let connectorState = $derived(status?.state ?? persisted?.lastState ?? 'pending');
 
   let missionsCount = $derived(status?.missionsCount ?? persisted?.missionsCount ?? 0);
 
@@ -43,7 +44,7 @@
   });
 
   let stateConfig = $derived.by(() => {
-    switch (state) {
+    switch (connectorState) {
       case 'pending':
         return { icon: 'loader', color: 'text-text-muted', label: 'En attente', spin: false };
       case 'detecting':
@@ -81,12 +82,12 @@
   </div>
   <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">{name}</span>
   <div class="flex items-center gap-1.5">
-    {#if state === 'error' && isSessionError && url}
+    {#if connectorState === 'error' && isSessionError && url}
       <button class="text-[10px] text-accent-blue hover:underline" onclick={handleReconnect}>
         Reconnecter
       </button>
     {/if}
-    {#if relativeTime && state === 'error'}
+    {#if relativeTime && connectorState === 'error'}
       <span class="text-[9px] text-text-muted">{relativeTime}</span>
     {/if}
     <span class="flex items-center gap-1 text-[10px] {stateConfig.color}">

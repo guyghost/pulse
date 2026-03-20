@@ -52,15 +52,15 @@
   }
 </script>
 
-<OnboardingLayout content={wizardContent}>
-  {#snippet wizardContent()}
-    <OnboardingWizard
-      onComplete={handleComplete}
-      onUpdateProfile={handleUpdateProfile}
-      onRetry={handleRetry}
-      {isSaving}
-      {hasError}
-      errorMessage={errorMessage}
-    />
-  {/snippet}
-</OnboardingLayout>
+{#snippet wizardContent()}
+  <OnboardingWizard
+    onComplete={handleComplete}
+    onUpdateProfile={handleUpdateProfile}
+    onRetry={handleRetry}
+    {isSaving}
+    {hasError}
+    errorMessage={errorMessage}
+  />
+{/snippet}
+
+<OnboardingLayout content={wizardContent} />

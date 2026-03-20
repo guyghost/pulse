@@ -70,7 +70,8 @@
     let totalMissions = $derived(missions.length);
 
     let displayMissions = $derived.by(() => {
-        let result = missions;
+        // Defensive: ensure missions is always an array
+        let result = missions ?? [];
         if (showFavoritesOnly) {
             result = filterFavoritesOnly(result, favorites);
         }
@@ -90,6 +91,12 @@
         }
         return result;
     });
+
+    if (import.meta.env.DEV) {
+        $effect(() => {
+            console.log('[FeedPage] missions from feed:', missions?.length ?? 0, 'displayMissions:', displayMissions.length, 'visibleCount:', visibleCount);
+        });
+    }
 
     let seenIds = $state<string[]>([]);
     let favorites = $state<Record<string, number>>({});

@@ -22,16 +22,27 @@ async function withNoProfile(page: import('@playwright/test').Page) {
 }
 
 test.describe('Onboarding', () => {
-  test('single-screen onboarding completes and shows greeting', async ({ page }) => {
+  test('single-screen onboarding completes and navigates to feed', async ({ page }) => {
     await withNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByText('Configurez en 30 secondes')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Le cockpit freelance' })).toBeVisible();
+    await expect(page.locator('#ob-firstname')).toBeVisible();
     await page.locator('#ob-firstname').fill('Guy');
     await page.locator('#ob-jobtitle').fill('Dev React Senior');
+    await page.locator('#ob-location').fill('Paris');
     await page.getByRole('button', { name: /C.est parti/ }).click();
 
-    await expect(page.getByText('Bonjour, Guy')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Radar freelance' })).toBeVisible();
+    await expect(page.locator('#ob-firstname')).not.toBeVisible();
+  });
+
+  test('shows desired location field', async ({ page }) => {
+    await withNoProfile(page);
+    await page.goto(SIDE_PANEL);
+
+    await expect(page.locator('#ob-location')).toBeVisible();
+    await expect(page.getByLabel('Localisation souhaitee')).toBeVisible();
   });
 
   test('submit button disabled without firstName', async ({ page }) => {

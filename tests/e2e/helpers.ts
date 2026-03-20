@@ -84,6 +84,9 @@ export async function fillOnboardingForm(page: Page, profile: Partial<UserProfil
   if (profile.jobTitle) {
     await page.locator('#ob-jobtitle').fill(profile.jobTitle);
   }
+  if (profile.location) {
+    await page.locator('#ob-location').fill(profile.location);
+  }
 }
 
 /**
@@ -93,6 +96,7 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
   const defaultProfile = {
     firstName: 'Test',
     jobTitle: 'Développeur Fullstack',
+    location: 'Paris',
     ...profile,
   };
 
