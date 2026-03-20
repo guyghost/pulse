@@ -1,27 +1,16 @@
 <script lang="ts">
-  import { createActor } from 'xstate';
-  import { connectionMachine } from '../../machines/connection.machine';
+  import { createConnectionStore } from '$lib/state/connection.svelte';
   import Icon from './Icon.svelte';
 
-  // Singleton actor pour la machine de connexion
-  const actor = createActor(connectionMachine);
-  actor.start();
-
-  let snapshot = $state(actor.getSnapshot());
+  const connection = createConnectionStore();
 
   $effect(() => {
-    const sub = actor.subscribe((s) => {
-      snapshot = s;
-    });
-    return () => {
-      sub.unsubscribe();
-      actor.stop();
-    };
+    return () => connection.destroy();
   });
 
-  let status = $derived(snapshot.context.status);
-  let rtt = $derived(snapshot.context.rtt);
-  let effectiveType = $derived(snapshot.context.effectiveType);
+  let status = $derived(connection.status);
+  let rtt = $derived(connection.rtt);
+  let effectiveType = $derived(connection.effectiveType);
   
   // S'affiche uniquement quand offline ou slow
   let isVisible = $derived(status === 'offline' || status === 'slow');

@@ -1,16 +1,22 @@
 import { vi, describe, it, expect, beforeEach, afterEach } from 'vitest';
-import { createActor } from 'xstate';
+import type { ConnectionInfo } from '../../../src/lib/shell/utils/connection-monitor';
 
-// Mock the connection monitor module before importing the machine
+// Capturer le callback pour simuler des événements de connexion
+let connectionCallback: ((info: ConnectionInfo) => void) | null = null;
+
 vi.mock('../../../src/lib/shell/utils/connection-monitor', () => ({
-  subscribeToConnection: vi.fn(() => vi.fn()),
+  subscribeToConnection: vi.fn((cb: (info: ConnectionInfo) => void) => {
+    connectionCallback = cb;
+    return vi.fn();
+  }),
 }));
 
-import { connectionMachine } from '../../../src/machines/connection.machine';
+import { createConnectionStore } from '../../../src/lib/state/connection.svelte';
 
-describe('connection machine', () => {
+describe('connection store', () => {
   beforeEach(() => {
     vi.useFakeTimers();
+    connectionCallback = null;
   });
 
   afterEach(() => {
@@ -18,155 +24,133 @@ describe('connection machine', () => {
   });
 
   it('starts in unknown state', () => {
-    const actor = createActor(connectionMachine).start();
-    expect(actor.getSnapshot().value).toBe('unknown');
-    expect(actor.getSnapshot().context.status).toBe('unknown');
-    expect(actor.getSnapshot().context.lastOnlineTime).toBeNull();
-    expect(actor.getSnapshot().context.lastOfflineTime).toBeNull();
-    actor.stop();
+    const store = createConnectionStore();
+    // subscribeToConnection appelle immédiatement le callback — mais dans les tests,
+    // le mock ne l'appelle pas automatiquement, donc le statut reste 'unknown'
+    expect(store.status).toBe('unknown');
+    expect(store.lastOnlineTime).toBeNull();
+    expect(store.lastOfflineTime).toBeNull();
+    store.destroy();
   });
 
-  it('transitions unknown → online on CONNECTION_RESTORED', () => {
-    const actor = createActor(connectionMachine).start();
-    actor.send({
-      type: 'CONNECTION_RESTORED',
-      info: { status: 'online', downlink: 10, rtt: 50, effectiveType: '4g' },
-    });
+  it('transitions unknown → online on online info', () => {
+    const store = createConnectionStore();
+    connectionCallback!({ status: 'online', downlink: 10, rtt: 50, effectiveType: '4g' });
 
-    const snapshot = actor.getSnapshot();
-    expect(snapshot.value).toBe('online');
-    expect(snapshot.context.status).toBe('online');
-    expect(snapshot.context.lastOnlineTime).toBeTypeOf('number');
-    expect(snapshot.context.downlink).toBe(10);
-    expect(snapshot.context.rtt).toBe(50);
-    expect(snapshot.context.effectiveType).toBe('4g');
-    actor.stop();
+    expect(store.status).toBe('online');
+    expect(store.lastOnlineTime).toBeTypeOf('number');
+    expect(store.downlink).toBe(10);
+    expect(store.rtt).toBe(50);
+    expect(store.effectiveType).toBe('4g');
+    store.destroy();
   });
 
-  it('transitions unknown → offline on CONNECTION_LOST', () => {
-    const actor = createActor(connectionMachine).start();
-    actor.send({ type: 'CONNECTION_LOST' });
+  it('transitions unknown → offline on offline info', () => {
+    const store = createConnectionStore();
+    connectionCallback!({ status: 'offline' });
 
-    const snapshot = actor.getSnapshot();
-    expect(snapshot.value).toBe('offline');
-    expect(snapshot.context.status).toBe('offline');
-    expect(snapshot.context.lastOfflineTime).toBeTypeOf('number');
-    actor.stop();
+    expect(store.status).toBe('offline');
+    expect(store.lastOfflineTime).toBeTypeOf('number');
+    store.destroy();
   });
 
-  it('transitions unknown → slow on SPEED_DETECTED', () => {
-    const actor = createActor(connectionMachine).start();
-    actor.send({
-      type: 'SPEED_DETECTED',
-      info: { status: 'slow', downlink: 0.5, rtt: 800, effectiveType: '2g' },
-    });
+  it('transitions unknown → slow on slow info', () => {
+    const store = createConnectionStore();
+    connectionCallback!({ status: 'slow', downlink: 0.5, rtt: 800, effectiveType: '2g' });
 
-    const snapshot = actor.getSnapshot();
-    expect(snapshot.value).toBe('slow');
-    expect(snapshot.context.status).toBe('slow');
-    expect(snapshot.context.downlink).toBe(0.5);
-    expect(snapshot.context.rtt).toBe(800);
-    expect(snapshot.context.effectiveType).toBe('2g');
-    actor.stop();
+    expect(store.status).toBe('slow');
+    expect(store.downlink).toBe(0.5);
+    expect(store.rtt).toBe(800);
+    expect(store.effectiveType).toBe('2g');
+    store.destroy();
   });
 
-  it('transitions online → offline on CONNECTION_LOST', () => {
-    const actor = createActor(connectionMachine).start();
-    actor.send({
-      type: 'CONNECTION_RESTORED',
-      info: { status: 'online' },
-    });
-    expect(actor.getSnapshot().value).toBe('online');
+  it('transitions online → offline on offline info', () => {
+    const store = createConnectionStore();
+    connectionCallback!({ status: 'online' });
+    expect(store.status).toBe('online');
 
-    actor.send({ type: 'CONNECTION_LOST' });
-    expect(actor.getSnapshot().value).toBe('offline');
-    expect(actor.getSnapshot().context.status).toBe('offline');
-    actor.stop();
+    connectionCallback!({ status: 'offline' });
+    expect(store.status).toBe('offline');
+    expect(store.lastOfflineTime).toBeTypeOf('number');
+    store.destroy();
   });
 
-  it('transitions offline → reconnecting on CONNECTION_RESTORED', () => {
-    const actor = createActor(connectionMachine).start();
-    actor.send({ type: 'CONNECTION_LOST' });
-    expect(actor.getSnapshot().value).toBe('offline');
+  it('transitions offline → reconnecting on online info', () => {
+    const store = createConnectionStore();
+    connectionCallback!({ status: 'offline' });
+    expect(store.status).toBe('offline');
 
-    actor.send({
-      type: 'CONNECTION_RESTORED',
-      info: { status: 'online', downlink: 10, rtt: 50, effectiveType: '4g' },
-    });
-    expect(actor.getSnapshot().value).toBe('reconnecting');
-    actor.stop();
+    connectionCallback!({ status: 'online', downlink: 10, rtt: 50, effectiveType: '4g' });
+    expect(store.status).toBe('reconnecting');
+    store.destroy();
   });
 
   it('transitions reconnecting → online after 500ms delay', () => {
-    const actor = createActor(connectionMachine).start();
-    // Go to offline first
-    actor.send({ type: 'CONNECTION_LOST' });
-    expect(actor.getSnapshot().value).toBe('offline');
+    const store = createConnectionStore();
+    // Passer par offline d'abord
+    connectionCallback!({ status: 'offline' });
+    expect(store.status).toBe('offline');
 
-    // Go to reconnecting
-    actor.send({
-      type: 'CONNECTION_RESTORED',
-      info: { status: 'online' },
-    });
-    expect(actor.getSnapshot().value).toBe('reconnecting');
+    // Passer en reconnecting
+    connectionCallback!({ status: 'online' });
+    expect(store.status).toBe('reconnecting');
 
-    // Advance timers by 500ms
+    // Avancer les timers de 500ms
     vi.advanceTimersByTime(500);
-    expect(actor.getSnapshot().value).toBe('online');
-    actor.stop();
+    expect(store.status).toBe('online');
+    store.destroy();
   });
 
-  it('transitions reconnecting → offline on CONNECTION_LOST during reconnecting', () => {
-    const actor = createActor(connectionMachine).start();
-    // Go to offline then reconnecting
-    actor.send({ type: 'CONNECTION_LOST' });
-    actor.send({
-      type: 'CONNECTION_RESTORED',
-      info: { status: 'online' },
-    });
-    expect(actor.getSnapshot().value).toBe('reconnecting');
+  it('transitions reconnecting → offline on offline info during reconnecting', () => {
+    const store = createConnectionStore();
+    // Passer par offline puis reconnecting
+    connectionCallback!({ status: 'offline' });
+    connectionCallback!({ status: 'online' });
+    expect(store.status).toBe('reconnecting');
 
-    // Lose connection during reconnecting
-    actor.send({ type: 'CONNECTION_LOST' });
-    expect(actor.getSnapshot().value).toBe('offline');
-    actor.stop();
+    // Perdre la connexion pendant reconnecting
+    connectionCallback!({ status: 'offline' });
+    expect(store.status).toBe('offline');
+
+    // Vérifier que le timer est annulé (pas de transition vers online)
+    vi.advanceTimersByTime(500);
+    expect(store.status).toBe('offline');
+    store.destroy();
   });
 
-  it('updates context with connection info on CONNECTION_RESTORED', () => {
-    const actor = createActor(connectionMachine).start();
-    const info = { status: 'online' as const, downlink: 25, rtt: 30, effectiveType: '4g' as const };
-    actor.send({ type: 'CONNECTION_RESTORED', info });
+  it('updates context with connection info on online', () => {
+    const store = createConnectionStore();
+    const info: ConnectionInfo = { status: 'online', downlink: 25, rtt: 30, effectiveType: '4g' };
+    connectionCallback!(info);
 
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.status).toBe('online');
-    expect(ctx.lastOnlineTime).toBeTypeOf('number');
-    expect(ctx.downlink).toBe(25);
-    expect(ctx.rtt).toBe(30);
-    expect(ctx.effectiveType).toBe('4g');
-    actor.stop();
+    expect(store.status).toBe('online');
+    expect(store.lastOnlineTime).toBeTypeOf('number');
+    expect(store.downlink).toBe(25);
+    expect(store.rtt).toBe(30);
+    expect(store.effectiveType).toBe('4g');
+    store.destroy();
   });
 
-  it('updates context with connection info on SPEED_DETECTED', () => {
-    const actor = createActor(connectionMachine).start();
-    const info = { status: 'slow' as const, downlink: 0.3, rtt: 1000, effectiveType: 'slow-2g' as const };
-    actor.send({ type: 'SPEED_DETECTED', info });
+  it('updates context with connection info on slow', () => {
+    const store = createConnectionStore();
+    const info: ConnectionInfo = { status: 'slow', downlink: 0.3, rtt: 1000, effectiveType: 'slow-2g' };
+    connectionCallback!(info);
 
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.status).toBe('slow');
-    expect(ctx.downlink).toBe(0.3);
-    expect(ctx.rtt).toBe(1000);
-    expect(ctx.effectiveType).toBe('slow-2g');
-    actor.stop();
+    expect(store.status).toBe('slow');
+    expect(store.downlink).toBe(0.3);
+    expect(store.rtt).toBe(1000);
+    expect(store.effectiveType).toBe('slow-2g');
+    store.destroy();
   });
 
-  it('updates lastOfflineTime on CONNECTION_LOST', () => {
+  it('updates lastOfflineTime on offline info', () => {
     const now = Date.now();
-    const actor = createActor(connectionMachine).start();
-    actor.send({ type: 'CONNECTION_LOST' });
+    const store = createConnectionStore();
+    connectionCallback!({ status: 'offline' });
 
-    const ctx = actor.getSnapshot().context;
-    expect(ctx.lastOfflineTime).toBeTypeOf('number');
-    expect(ctx.lastOfflineTime!).toBeGreaterThanOrEqual(now);
-    actor.stop();
+    expect(store.lastOfflineTime).toBeTypeOf('number');
+    expect(store.lastOfflineTime!).toBeGreaterThanOrEqual(now);
+    store.destroy();
   });
 });
