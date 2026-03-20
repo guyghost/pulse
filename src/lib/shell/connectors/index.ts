@@ -6,7 +6,6 @@ import { handleError, isRetryable } from '../errors/error-handler';
 // Each connector is loaded on-demand as a separate chunk
 const CONNECTOR_REGISTRY = {
 	'free-work': () => import('./freework.connector').then((m) => new m.FreeWorkConnector()),
-	'comet': () => import('./comet.connector').then((m) => new m.CometConnector()),
 	'lehibou': () => import('./lehibou.connector').then((m) => new m.LeHibouConnector()),
 	'hiway': () => import('./hiway.connector').then((m) => new m.HiwayConnector()),
 	'collective': () => import('./collective.connector').then((m) => new m.CollectiveConnector()),
@@ -20,6 +19,7 @@ export interface ConnectorMeta {
 	id: ConnectorId;
 	name: string;
 	icon: string;
+	url: string;
 }
 
 /**
@@ -41,31 +41,31 @@ export function getConnectorsMeta(): ConnectorMeta[] {
 			id: 'free-work',
 			name: 'Free-Work',
 			icon: 'https://www.google.com/s2/favicons?domain=free-work.com&sz=32',
-		},
-		{
-			id: 'comet',
-			name: 'Comet',
-			icon: 'https://www.google.com/s2/favicons?domain=comet.co&sz=32',
+			url: 'https://www.free-work.com',
 		},
 		{
 			id: 'lehibou',
 			name: 'LeHibou',
 			icon: 'https://www.google.com/s2/favicons?domain=lehibou.com&sz=32',
+			url: 'https://www.lehibou.com',
 		},
 		{
 			id: 'hiway',
 			name: 'Hiway',
-			icon: 'https://www.google.com/s2/favicons?domain=hiway.fr&sz=32',
+			icon: 'https://www.google.com/s2/favicons?domain=hiway-missions.fr&sz=32',
+			url: 'https://hiway-missions.fr',
 		},
 		{
 			id: 'collective',
 			name: 'Collective',
 			icon: 'https://www.google.com/s2/favicons?domain=collective.work&sz=32',
+			url: 'https://app.collective.work',
 		},
 		{
 			id: 'cherry-pick',
 			name: 'Cherry Pick',
 			icon: 'https://www.google.com/s2/favicons?domain=cherry-pick.io&sz=32',
+			url: 'https://www.cherry-pick.io',
 		},
 	];
 }
@@ -207,7 +207,3 @@ export async function detectAllConnectorSessions(
 export function isDetectionRetryable(error: AppError): boolean {
 	return isRetryable(error);
 }
-
-// Deprecated: kept for backward compatibility during migration
-// TODO: Remove after all consumers migrate to async getConnector
-export const connectorRegistry: PlatformConnector[] = [];

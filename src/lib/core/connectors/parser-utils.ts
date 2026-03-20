@@ -37,6 +37,27 @@ export function detectRemote(text: string): RemoteType | null {
 }
 
 /**
+ * Strip HTML tags and normalize whitespace from raw text.
+ */
+export function stripHtml(html: string): string {
+  return html
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<\/p>/gi, '\n')
+    .replace(/<[^>]*>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/&#x([0-9a-f]+);/gi, (_, hex) => String.fromCodePoint(parseInt(hex, 16)))
+    .replace(/&#(\d+);/g, (_, dec) => String.fromCodePoint(parseInt(dec, 10)))
+    .replace(/\n{3,}/g, '\n\n')
+    .replace(/[ \t]+/g, ' ')
+    .trim();
+}
+
+/**
  * Build a Mission with scoring fields defaulted to null.
  * Avoids repeating `score: null, semanticScore: null, semanticReason: null` in every parser.
  */
@@ -45,8 +66,8 @@ export type MissionFields = Omit<Mission, 'score' | 'semanticScore' | 'semanticR
 export function createMission(fields: MissionFields): Mission {
   return {
     ...fields,
-    title: fields.title ?? '',
-    description: fields.description ?? '',
+    title: stripHtml(fields.title ?? ''),
+    description: stripHtml(fields.description ?? ''),
     stack: fields.stack.filter((s): s is string => typeof s === 'string' && s.length > 0),
     score: null,
     semanticScore: null,

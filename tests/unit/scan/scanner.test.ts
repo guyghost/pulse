@@ -16,6 +16,7 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
 vi.mock('../../../src/lib/shell/storage/db', () => ({
 	getProfile: vi.fn(),
 	saveMissions: vi.fn(),
+	purgeOldMissions: vi.fn().mockResolvedValue(0),
 }));
 
 vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
@@ -45,9 +46,10 @@ vi.mock('../../../src/lib/shell/metrics/collector', () => ({
 	},
 }));
 
-// Mock withRetry to just call the function directly (no actual retries in tests)
+// Mock withRetry and withResultRetry to just call the function directly (no actual retries in tests)
 vi.mock('../../../src/lib/shell/utils/retry-strategy', () => ({
 	withRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
+	withResultRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
 // ── Imports (after mocks) ────────────────────────────────────────────────

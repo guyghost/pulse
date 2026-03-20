@@ -191,4 +191,113 @@ describe('extractCollectiveProjects', () => {
     const html = '<html><body><script id="__NEXT_DATA__">{"props":{"pageProps":{}}}</script></body></html>';
     expect(extractCollectiveProjects(html)).toEqual([]);
   });
+
+  // ---------------------------------------------------------------------------
+  // Malformed project data hardening tests
+  // ---------------------------------------------------------------------------
+
+  it('extractCollectiveProjects validates and filters invalid entries', () => {
+    // extractCollectiveProjects validates each entry:
+    // - must be an object (typeof p !== 'object' || p === null)
+    // - must have string id and name
+    const projects = [
+      null,
+      { id: 'valid-1', slug: 'valid', name: 'Valid' },
+      'not-an-object',
+      123,
+      { id: null, name: 'Invalid' },
+      { id: 'valid-2', slug: 'valid', name: 'Another Valid' },
+    ];
+    const html = `
+      <html><body>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"dehydratedState":{"queries":[{"state":{"data":{"results":{"projects":${JSON.stringify(projects)}}}}}]}}}}
+        </script>
+      </body></html>
+    `;
+    const result = extractCollectiveProjects(html);
+    // Only valid objects with string id and name pass validation
+    expect(result).toHaveLength(2);
+    expect(result[0]).toMatchObject({ id: 'valid-1' });
+    expect(result[1]).toMatchObject({ id: 'valid-2' });
+  });
+
+  it('parseCollectiveProjects handles filtered entries correctly', () => {
+    // After extractCollectiveProjects filters, parseCollectiveProjects processes valid entries
+    const validProjects: CollectiveProject[] = [
+      makeProject({ id: 'valid-1' }),
+      makeProject({ id: 'valid-2', name: 'Another' }),
+    ];
+    
+    const missions = parseCollectiveProjects(validProjects, NOW);
+    
+    expect(missions).toHaveLength(2);
+    expect(missions[0].id).toBe('col-valid-1');
+    expect(missions[1].id).toBe('col-valid-2');
+  });
+
+  it('handles project with null optional fields', () => {
+    const projectWithNulls: CollectiveProject = {
+      id: 'test',
+      slug: 'test-slug',
+      name: 'Test',
+      sumUp: null,
+      description: null,
+      budgetBrief: null,
+      workPreferences: [],
+      isPermanentContract: false,
+      idealStartDate: null,
+      projectTypes: [],
+      publishedAt: '2026-03-14T10:00:00.000Z',
+      company: null,
+      location: null,
+    };
+
+    const missions = parseCollectiveProjects([projectWithNulls], NOW);
+    
+    expect(missions).toHaveLength(1);
+    expect(missions[0].client).toBeNull();
+    expect(missions[0].location).toBeNull();
+    expect(missions[0].tjm).toBeNull();
+    expect(missions[0].description).toBe('');
+    expect(missions[0].remote).toBeNull();
+    expect(missions[0].stack).toEqual([]);
+  });
+
+  it('handles project with empty strings', () => {
+    const projectWithEmpty: CollectiveProject = {
+      ...makeProject(),
+      name: '',
+      slug: '',
+      sumUp: '',
+    };
+
+    const missions = parseCollectiveProjects([projectWithEmpty], NOW);
+    
+    expect(missions).toHaveLength(1);
+    expect(missions[0].title).toBe('');
+    expect(missions[0].description).toBe('');
+  });
+
+  it('handles deeply nested missing path in __NEXT_DATA__', () => {
+    const html = `
+      <html><body>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"dehydratedState":{"queries":[]}}}}
+        </script>
+      </body></html>
+    `;
+    expect(extractCollectiveProjects(html)).toEqual([]);
+  });
+
+  it('handles __NEXT_DATA__ with queries but no state', () => {
+    const html = `
+      <html><body>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"dehydratedState":{"queries":[{"other":"data"}]}}}}
+        </script>
+      </body></html>
+    `;
+    expect(extractCollectiveProjects(html)).toEqual([]);
+  });
 });

@@ -30,9 +30,13 @@ function mapRemote(displacement: string | null): RemoteType | null {
   }
 }
 
-function pickTJM(min: number | null, max: number | null): number | null {
-  if (min !== null && max !== null) return Math.round((min + max) / 2);
-  return max ?? min ?? null;
+function pickTJM(min: number | string | null, max: number | string | null): number | null {
+  const nMin = min !== null ? Number(min) : null;
+  const nMax = max !== null ? Number(max) : null;
+  if (nMin !== null && !isNaN(nMin) && nMax !== null && !isNaN(nMax)) return Math.round((nMin + nMax) / 2);
+  if (nMax !== null && !isNaN(nMax)) return nMax;
+  if (nMin !== null && !isNaN(nMin)) return nMin;
+  return null;
 }
 
 /** Metadata keys found in CherryPick description fields (regex-safe). */
@@ -127,7 +131,7 @@ export function parseCherryPickMissions(missions: CherryPickMission[], now: Date
       location: m.city ?? meta.location,
       remote: mapRemote(m.displacement),
       duration: normalizeDuration(m.duration ?? meta.duration),
-      url: `${BASE_URL}/mission/${m.slug}`,
+      url: `${BASE_URL}/missions/${m.id}`,
       source: SOURCE,
       scrapedAt: now,
     });

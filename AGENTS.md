@@ -2,7 +2,7 @@
 
 ## Projet
 
-MissionPulse est une extension Chrome (Manifest V3) qui agit comme un agent au service du freelance tech. Elle scrappe les plateformes de missions via les sessions navigateur existantes et présente les résultats dans un feed centralisé avec scoring de pertinence et analyse TJM par LLM.
+MissionPulse est une extension Chrome (Manifest V3) qui agit comme un agent au service du freelance tech. Elle scrappe les plateformes de missions via les sessions navigateur existantes et présente les résultats dans un feed centralisé avec scoring de pertinence et analyse sémantique via Gemini Nano (Chrome built-in AI).
 
 ## Stack
 
@@ -29,30 +29,37 @@ src/lib/
 │   ├── types/                         # Types, interfaces, value objects
 │   │   ├── mission.ts                 # Mission, MissionSource, RemoteType
 │   │   ├── connector.ts               # PlatformConnector, ConnectorError, ConnectorStatus
-│   │   ├── tjm.ts                     # TJMAnalysis, TJMDataPoint, TJMRange, TJMTrend
 │   │   └── profile.ts                 # UserProfile
 │   ├── scoring/                       # Scoring et déduplication
 │   │   ├── relevance.ts               # scoreMission(mission, profile) → 0-100
+│   │   ├── semantic-scoring.ts        # Types pour le scoring sémantique
 │   │   └── dedup.ts                   # deduplicateMissions(missions) → Mission[]
-│   ├── tjm/                           # Agrégation TJM pure
-│   │   └── aggregator.ts              # aggregateFromPoints(points, title, location, now)
+│   ├── seen/                          # Gestion des missions vues
+│   │   └── mark-seen.ts               # markAsSeen(seenIds, newIds) → string[]
 │   └── connectors/                    # Parsing HTML pur
+│       ├── parser-utils.ts            # createMission(), parseTJM(), stripHtml()
+│       ├── validate-parser-output.ts  # Validation runtime des outputs parser
 │       └── freework-parser.ts         # parseFreeWorkHTML(html, now, idPrefix)
 │
 └── shell/                             # I/O, async, side effects, orchestration
     ├── storage/                       # Persistance
-    │   ├── db.ts                      # IndexedDB (missions, TJM history, profile)
+    │   ├── db.ts                      # IndexedDB (missions, profile, connector statuses)
     │   ├── chrome-storage.ts          # chrome.storage.local (settings, API key)
-    │   └── tjm-cache.ts              # Cache TJM 24h (IndexedDB)
+    │   ├── semantic-cache.ts          # Cache scores sémantiques (chrome.storage)
+    │   └── seen-missions.ts           # IDs des missions déjà vues
+    ├── ai/                            # Intégration IA
+    │   └── semantic-scorer.ts         # Scoring sémantique via Gemini Nano
     ├── messaging/                     # Communication inter-contextes
     │   └── bridge.ts                  # chrome.runtime.sendMessage typé
     ├── connectors/                    # Connecteurs avec I/O
     │   ├── base.connector.ts          # Classe abstraite (chrome.cookies, chrome.storage)
-    │   ├── freework.connector.ts      # Utilise le parser pur + bridge
-    │   ├── malt.connector.ts          # Stub
-    │   └── index.ts                   # Registry
-    └── usecases/                      # Orchestration métier
-        └── analyze-tjm.ts             # Cache → agrégation (Core) → LLM → cache
+    │   ├── freework.connector.ts      # Utilise le parser pur + fetch
+    │   └── index.ts                   # Registry async des connecteurs
+    ├── scan/                          # Orchestration scan
+    │   ├── scanner.ts                 # runScan() - orchestration principale
+    │   └── parser-health.ts           # Détection d'anomalies parser
+    └── notifications/                 # Notifications Chrome
+        └── notify-missions.ts         # Notifications pour missions à haut score
 ```
 
 **Règle fondamentale : Shell appelle Core. Core n'appelle JAMAIS Shell. Core ignore que Shell existe.**
@@ -77,10 +84,10 @@ src/lib/
 ```typescript
 // CORRECT : Shell importe Core
 import { scoreMission } from '$lib/core/scoring/relevance';
-import { aggregateFromPoints } from '$lib/core/tjm/aggregator';
+import { deduplicateMissions } from '$lib/core/scoring/dedup';
 
 // INTERDIT : Core importe Shell
-import { getTJMDataPoints } from '$lib/shell/storage/db'; // ← JAMAIS dans core/
+import { getMissions } from '$lib/shell/storage/db'; // ← JAMAIS dans core/
 ```
 
 ### Contextes d'exécution Chrome
@@ -105,8 +112,8 @@ type MessageType =
   | { type: 'MISSIONS_UPDATED'; payload: Mission[] }
   | { type: 'SCRAPE_URL'; payload: { url: string; connectorId: string } }
   | { type: 'SCRAPE_RESULT'; payload: { missions: Mission[] } }
-  | { type: 'TJM_REQUEST'; payload: TJMQuery }
-  | { type: 'TJM_RESULT'; payload: TJMAnalysis }
+  | { type: 'GET_PROFILE' }
+  | { type: 'SAVE_PROFILE'; payload: UserProfile }
 ```
 
 Règle : le side panel n'appelle JAMAIS directement IndexedDB ou chrome.cookies. Tout passe par le service worker.
@@ -224,7 +231,6 @@ export const myMachine = setup({
 | `connector` | `src/background/machines/` | Service Worker | Lifecycle d'un connecteur (detect → fetch → done) |
 | `feed` | `src/machines/` | Side Panel | État de l'affichage du feed |
 | `onboarding` | `src/machines/` | Side Panel | Wizard de configuration initiale |
-| `tjm` | `src/machines/` | Side Panel + SW | Cycle d'analyse TJM (agrégation → LLM → résultat) |
 | `filters` | `src/machines/` | Side Panel | État des filtres actifs |
 
 ## TailwindCSS 4 — Config CSS-first
@@ -259,10 +265,10 @@ Interdit : `tailwind.config.js`, `tailwind.config.ts`, ou toute config JS/TS.
 ```
 src/ui/
 ├── atoms/          # Éléments indivisibles : Button, Badge, Icon, Chip, Skeleton
-├── molecules/      # Combinaisons d'atomes : MissionCard, TJMGauge, FilterBar
-├── organisms/      # Sections autonomes : MissionFeed, TJMDashboard, ConnectorPanel
+├── molecules/      # Combinaisons d'atomes : MissionCard, FilterBar
+├── organisms/      # Sections autonomes : MissionFeed, ConnectorPanel
 ├── templates/      # Layouts de page : FeedLayout, SettingsLayout
-└── pages/          # Pages complètes : FeedPage, TJMPage, SettingsPage
+└── pages/          # Pages complètes : FeedPage, SettingsPage
 ```
 
 ### Conventions de nommage
@@ -278,10 +284,10 @@ src/ui/
 | Niveau | Connaît XState ? | Appelle des services ? | Exemples |
 |--------|-----------------|----------------------|----------|
 | Atoms | Non | Non | Button, Badge, Icon |
-| Molecules | Non | Non | MissionCard, TJMGauge |
-| Organisms | Oui (via `useActor`) | Via événements XState | MissionFeed, TJMDashboard |
+| Molecules | Non | Non | MissionCard, FilterBar |
+| Organisms | Oui (via `useActor`) | Via événements XState | MissionFeed, ConnectorPanel |
 | Templates | Non (layout pur) | Non | FeedLayout |
-| Pages | Oui (crée les actors) | Oui (init machines) | FeedPage, TJMPage |
+| Pages | Oui (crée les actors) | Oui (init machines) | FeedPage, SettingsPage |
 
 ## Connecteurs — Pattern d'implémentation
 
@@ -312,37 +318,16 @@ Le scraping se fait via l'offscreen document. Le connecteur envoie un message au
 
 Quand un connecteur casse (DOM changé), il doit throw une `ConnectorError` typée. La machine `connector` passe en état `error` et notifie l'utilisateur. Les autres connecteurs continuent.
 
-## TJM Intelligence — Pipeline
+## Sémantique — Scoring via Gemini Nano
 
-Orchestré par le use case `src/lib/shell/usecases/analyze-tjm.ts` :
+Le scoring sémantique utilise Gemini Nano (Chrome built-in AI) pour analyser la pertinence des missions :
 
-```
-1. Check cache (shell/storage/tjm-cache.ts)
-   - Clé : hash(poste + zone + séniorité)
-   - TTL : 24h
-   - Si cache valide → retourner directement
-       ↓
-2. Lire les données (shell/storage/db.ts)
-   - getTJMDataPoints() depuis IndexedDB
-       ↓
-3. Agrégation PURE (core/tjm/aggregator.ts)
-   - aggregateFromPoints(points, title, location, now)
-   - Grouper par poste + zone
-   - Calculer min, median, max, écart-type
-   - Sur les 30 derniers jours (relatif au `now` injecté)
-       ↓
-4. Appel LLM (dans le use case)
-   - API Anthropic Claude Sonnet
-   - Prompt structuré avec données agrégées
-   - Réponse JSON stricte
-   - Parse + validation du JSON
-       ↓
-5. Stockage résultat en cache (shell/storage/tjm-cache.ts)
-       ↓
-6. Affichage dans TJMDashboard / TJMGauge
-```
+- **Cache** : Les scores sémantiques sont mis en cache dans `chrome.storage.local` via `semantic-cache.ts`
+- **TTL** : 7 jours (les scores sont moins volatiles que les données TJM)
+- **Invalidation** : Le cache est vidé quand le profil utilisateur change
+- **Limitation** : Seules les N premières missions d'un scan sont analysées (`maxSemanticPerScan` dans les settings)
 
-La clé API Anthropic est stockée dans `chrome.storage.local` (chiffré par Chrome). L'utilisateur la fournit dans les settings. Pas de proxy backend.
+Le scoring sémantique est optionnel et non-bloquant : si Gemini Nano n'est pas disponible, le scoring de base (`relevance.ts`) est utilisé.
 
 ## Conventions TypeScript
 
@@ -355,10 +340,10 @@ La clé API Anthropic est stockée dans `chrome.storage.local` (chiffré par Chr
 
 ## Conventions de test
 
-- Unit tests avec Vitest pour le Core : scoring, déduplication, agrégation TJM, parsing connecteurs — **sans mocks**
+- Unit tests avec Vitest pour le Core : scoring, déduplication, parsing connecteurs — **sans mocks**
 - Les fonctions Core sont testables avec des données pures (injection de `now: Date`, etc.)
 - Fichiers de test dans `tests/unit/` (miroir de `src/lib/core/`)
-- Fixtures dans `tests/fixtures/` (HTML scrapé, réponses LLM mock, jeux de missions)
+- Fixtures dans `tests/fixtures/` (HTML scrapé, jeux de missions)
 - Tests d'intégration Shell avec mocks de `chrome.*` APIs (`vitest-chrome` ou mocks manuels)
 - E2E avec Playwright pour les flows critiques : onboarding, scan + feed, settings
 
@@ -422,11 +407,11 @@ Tout le code dans `src/dev/` est derrière `import.meta.env.DEV` et n'est jamais
 2. **Utiliser des stores Svelte** — Tout état partagé passe par XState
 3. **Accéder à chrome.* depuis le side panel** — Passer par le messaging bridge
 4. **Stocker des credentials** — On utilise les sessions navigateur existantes
-5. **Créer un backend** — L'architecture est local-first, seul l'appel LLM sort
+5. **Créer un backend** — L'architecture est local-first
 6. **Utiliser tailwind.config.js** — TailwindCSS 4 = CSS-first avec @theme
 7. **Mettre de la logique métier dans les composants UI** — Déléguer à `lib/core/` ou aux machines
 8. **Ignorer les erreurs de connecteur** — Chaque erreur doit être typée et remonter proprement
-9. **Appeler le LLM sans passer par le cache** — Coût et latence inutiles
+9. **Appeler Gemini Nano sans passer par le cache** — Coût et latence inutiles
 10. **Commit du code avec `any`** — TypeScript strict, pas de compromis
 11. **Importer du Shell depuis le Core** — `core/` ne doit JAMAIS importer depuis `shell/`
 12. **Utiliser `Date.now()` ou `new Date()` dans le Core** — Injecter via paramètre depuis le Shell

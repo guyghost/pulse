@@ -14,6 +14,7 @@
   import { toastMachine, type ToastType } from '../machines/toast.machine';
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
   import { subscribeToConnection, type ConnectionInfo } from '../lib/shell/utils/connection-monitor';
+  import { sendMessage } from '../lib/shell/messaging/bridge';
 
   type Page = 'feed' | 'settings' | 'onboarding';
 
@@ -99,8 +100,8 @@
   $effect(() => {
     (async () => {
       try {
-        const response = await chrome.runtime.sendMessage({ type: 'GET_PROFILE' });
-        if (response?.payload) {
+        const response = await sendMessage({ type: 'GET_PROFILE' });
+        if (response && 'payload' in response && response.payload) {
           hasCompletedOnboarding = true;
           previousPageIndex = PAGE_INDEX['feed'];
           currentPage = 'feed';
@@ -173,19 +174,21 @@
         </div>
       </div>
       <main class="relative flex-1 overflow-hidden">
-        {#key currentPage}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          class:hidden={currentPage !== 'feed'}
+        >
+          <FeedPage />
+        </div>
+        {#if currentPage === 'settings'}
           <div
-            class="absolute inset-0"
-            in:fly={{ x: transitionDirection * 30, duration: 200, easing: cubicOut }}
+            class="absolute inset-0 overflow-y-auto"
+            in:fly={{ x: 30, duration: 200, easing: cubicOut }}
             out:fade={{ duration: 100 }}
           >
-            {#if currentPage === 'feed'}
-              <FeedPage />
-            {:else if currentPage === 'settings'}
-              <SettingsPage onBack={() => navigate('feed')} />
-            {/if}
+            <SettingsPage onBack={() => navigate('feed')} />
           </div>
-        {/key}
+        {/if}
       </main>
     </div>
   {/if}

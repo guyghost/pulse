@@ -1,15 +1,18 @@
 <script lang="ts">
     import { createActor } from "xstate";
     import { feedMachine } from "../../machines/feed.machine";
+    import { scanOrchestratorMachine, type ConnectorDeps } from "../../machines/scan.machine";
     import VirtualMissionFeed from "../organisms/VirtualMissionFeed.svelte";
     import { pullToRefresh } from "../actions/pull-to-refresh";
     import ScanProgress from "../organisms/ScanProgress.svelte";
+    import ConnectorStatusList from "../molecules/ConnectorStatusList.svelte";
     import SearchInput from "../molecules/SearchInput.svelte";
     import Icon from "../atoms/Icon.svelte";
     import FilterBar from "../organisms/FilterBar.svelte";
     import KeyboardShortcutsHelp from "../molecules/KeyboardShortcutsHelp.svelte";
     import type { MissionSource, RemoteType } from "$lib/core/types/mission";
-    import { runScan } from "$lib/shell/scan/scanner";
+    import { getConnector, getConnectorsMeta, getConnectors, detectAllConnectorSessions } from "$lib/shell/connectors/index";
+    import SourceHealthPanel, { type SourceStatus, type SourceSessionStatus } from "../organisms/SourceHealthPanel.svelte";
     import { getSeenIds, saveSeenIds } from "$lib/shell/storage/seen-missions";
     import { markAsSeen } from "$lib/core/seen/mark-seen";
     import {
@@ -18,7 +21,7 @@
         getHidden,
         saveHidden,
     } from "$lib/shell/storage/favorites";
-    import { getProfile, getMissions } from "$lib/shell/storage/db";
+    import { getProfile, getMissions, saveMissions, saveConnectorStatuses, getConnectorStatuses } from "$lib/shell/storage/db";
     import { getSettings } from "$lib/shell/storage/chrome-storage";
     import { resetNewMissionCount } from "$lib/shell/storage/session-storage";
     import {
@@ -27,6 +30,9 @@
         filterHidden,
         filterFavoritesOnly,
     } from "$lib/core/favorites/favorites";
+    import { toPersistedStatus, type ConnectorStatus, type PersistedConnectorStatus } from "$lib/core/types/connector-status";
+    import { deduplicateMissions } from "$lib/core/scoring/dedup";
+    import { scoreMission } from "$lib/core/scoring/relevance";
     import { getPanelSide, type PanelSide } from "$lib/shell/ui/panel-layout";
     import {
         isPromptApiAvailable,
@@ -38,7 +44,7 @@
         FeedShortcuts,
         type ShortcutConfig,
     } from "$lib/shell/utils/keyboard-shortcuts";
-    import { subscribeToConnection, type ConnectionInfo } from "$lib/shell/utils/connection-monitor";
+    import { subscribeToConnection, isOnline, type ConnectionInfo } from "$lib/shell/utils/connection-monitor";
 
     const feedActor = createActor(feedMachine);
     feedActor.start();
@@ -64,7 +70,8 @@
     let totalMissions = $derived(missions.length);
 
     let displayMissions = $derived.by(() => {
-        let result = missions;
+        // Defensive: ensure missions is always an array
+        let result = missions ?? [];
         if (showFavoritesOnly) {
             result = filterFavoritesOnly(result, favorites);
         }
@@ -84,6 +91,12 @@
         }
         return result;
     });
+
+    if (import.meta.env.DEV) {
+        $effect(() => {
+            console.log('[FeedPage] missions from feed:', missions?.length ?? 0, 'displayMissions:', displayMissions.length, 'visibleCount:', visibleCount);
+        });
+    }
 
     let seenIds = $state<string[]>([]);
     let favorites = $state<Record<string, number>>({});
@@ -117,13 +130,27 @@
     let firstName = $state("");
     let panelSide = $state<PanelSide>("right");
     let aiStatus = $state<AiAvailability>("no");
-    let scanController: AbortController | null = null;
-    let scanCurrent = $state(0);
-    let scanTotal = $state(0);
-    let scanConnectorName = $state("");
-    let scanPercent = $derived(
-        scanTotal > 0 ? Math.round((scanCurrent / scanTotal) * 100) : 0,
-    );
+    let scanActor = $state<ReturnType<typeof createActor<typeof scanOrchestratorMachine>> | null>(null);
+    let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
+    let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
+    let sourceStatuses = $state<SourceStatus[]>([]);
+    let isCheckingSources = $state(false);
+    let scanCompleted = $state(false);
+    let scanResultCounts = $state<Map<string, number>>(new Map());
+
+    let scanProgress = $derived.by(() => {
+        if (connectorStatuses.size === 0) return { current: 0, total: 0, percent: 0, connectorName: '' };
+        const statuses = [...connectorStatuses.values()];
+        const total = statuses.length;
+        const completed = statuses.filter((s) => s.state === 'done' || s.state === 'error').length;
+        const active = statuses.find((s) => s.state === 'detecting' || s.state === 'fetching' || s.state === 'retrying');
+        return {
+            current: completed,
+            total,
+            percent: total > 0 ? Math.round((completed / total) * 100) : 0,
+            connectorName: active?.connectorName ?? '',
+        };
+    });
     let showShortcutsHelp = $state(false);
     let searchInputRef = $state<HTMLInputElement | null>(null);
     let connectionStatus = $state<ConnectionInfo['status']>('unknown');
@@ -187,6 +214,11 @@
             connectionStatus = info.status;
         });
         return unsubscribe;
+    });
+
+    // Charger les statuts persistés au montage
+    $effect(() => {
+        getConnectorStatuses().then((s) => { persistedStatuses = s; }).catch(() => {});
     });
 
     // Keyboard shortcuts registration
@@ -278,53 +310,192 @@
 
     async function startScan() {
         if (isLoading) return;
-        scanController = new AbortController();
+        scanCompleted = false;
         feedActor.send({ type: "LOAD" });
-        scanCurrent = 0;
-        scanTotal = 0;
-        scanConnectorName = "";
-        try {
-            const result = await runScan(scanController.signal, (info) => {
-                scanCurrent = info.current;
-                scanTotal = info.total;
-                scanConnectorName = info.connectorName;
+
+        const settings = await getSettings();
+        const enabledIds = settings.enabledConnectors;
+        const meta = getConnectorsMeta();
+
+        // Build connector deps
+        const deps: ConnectorDeps[] = [];
+        for (const id of enabledIds) {
+            const connector = await getConnector(id);
+            if (!connector) continue;
+            const m = meta.find((x) => x.id === id);
+            deps.push({
+                connectorId: connector.id,
+                connectorName: m?.name ?? connector.name,
+                detectSession: (now: number) => connector.detectSession(now),
+                fetchMissions: (now: number) => connector.fetchMissions(now),
             });
-            if (scanController.signal.aborted) return;
-            if (result.missions.length === 0 && result.errors.length > 0) {
-                const errorMsg = result.errors
-                    .map((e) => `${e.connectorId}: ${e.message}`)
-                    .join("\n");
-                feedActor.send({ type: "LOAD_ERROR", error: errorMsg });
-            } else {
-                feedActor.send({
-                    type: "MISSIONS_LOADED",
-                    missions: result.missions,
-                });
-                try {
-                    await chrome.storage.local.set({
-                        lastGlobalSync: Date.now(),
-                    });
-                } catch {}
-            }
-        } catch (err) {
-            if (scanController.signal.aborted) return;
-            const msg = err instanceof Error ? err.message : "Erreur de scan";
-            feedActor.send({ type: "LOAD_ERROR", error: msg });
-        } finally {
-            scanController = null;
         }
+
+        const actor = createActor(scanOrchestratorMachine, {
+            input: { connectorDeps: deps, isOnline },
+        });
+
+        const sub = actor.subscribe((s) => {
+            connectorStatuses = new Map(s.context.connectorStatuses);
+
+            if (s.value === 'done') {
+                handleScanDone(s.context);
+                sub.unsubscribe();
+                scanActor = null;
+            }
+
+            if (s.value === 'cancelled') {
+                feedActor.send({ type: "MISSIONS_LOADED", missions: feedSnapshot.context.missions });
+                sub.unsubscribe();
+                scanActor = null;
+            }
+        });
+
+        scanActor = actor;
+        actor.start();
+        actor.send({ type: 'START_SCAN' });
+    }
+
+    async function handleScanDone(ctx: { missions: import('$lib/core/types/mission').Mission[]; connectorStatuses: Map<string, ConnectorStatus>; globalError: string | null }) {
+        // Extract mission counts per source for compact display
+        const counts = new Map<string, number>();
+        for (const [id, status] of ctx.connectorStatuses) {
+            counts.set(id, status.missionsCount);
+        }
+        scanResultCounts = counts;
+
+        // Only compact if we actually found missions
+        const hasMissions = ctx.missions.length > 0 || [...ctx.connectorStatuses.values()].some(s => s.missionsCount > 0);
+        scanCompleted = hasMissions;
+        if (ctx.globalError) {
+            feedActor.send({ type: "LOAD_ERROR", error: ctx.globalError });
+            return;
+        }
+
+        // Fusionner nouvelles missions + cache pour resilience (scan partiel)
+        let cached: import('$lib/core/types/mission').Mission[] = [];
+        try { cached = await getMissions(); } catch {}
+        const merged = [...ctx.missions, ...cached];
+        const deduped = deduplicateMissions(merged);
+
+        let profile = null;
+        try { profile = await getProfile(); } catch {}
+        const scored = profile
+            ? deduped.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
+            : deduped;
+
+        if (scored.length > 0) {
+            feedActor.send({ type: "MISSIONS_LOADED", missions: scored });
+            try { await saveMissions(scored); } catch {}
+            try { await chrome.storage.local.set({ lastGlobalSync: Date.now() }); } catch {}
+        } else {
+            const errorParts = [...ctx.connectorStatuses.values()]
+                .filter((s) => s.error)
+                .map((s) => `${s.connectorName}: ${s.error!.message}`);
+            const noSessionParts = [...ctx.connectorStatuses.values()]
+                .filter((s) => !s.error && s.missionsCount === 0)
+                .map((s) => s.connectorName);
+
+            let errorMsg = errorParts.join("\n");
+            if (noSessionParts.length > 0 && !errorMsg) {
+                errorMsg = `Aucune session active sur : ${noSessionParts.join(", ")}. Connectez-vous aux plateformes puis relancez le scan.`;
+            }
+            feedActor.send({ type: "LOAD_ERROR", error: errorMsg || "Aucune mission trouvee" });
+        }
+
+        // Persist connector statuses
+        const persisted = [...ctx.connectorStatuses.values()].map((s) => toPersistedStatus(s, Date.now()));
+        try {
+            await saveConnectorStatuses(persisted);
+            persistedStatuses = persisted;
+        } catch {}
     }
 
     function stopScan() {
-        if (scanController) {
-            scanController.abort();
-            scanController = null;
-            feedActor.send({
-                type: "MISSIONS_LOADED",
-                missions: feedSnapshot.context.missions,
-            });
+        if (scanActor) {
+            scanActor.send({ type: 'CANCEL' });
         }
     }
+
+    async function checkSourceSessions() {
+        if (isCheckingSources) return;
+        isCheckingSources = true;
+
+        try {
+            const settings = await getSettings();
+            const enabledIds = settings.enabledConnectors;
+            const meta = getConnectorsMeta();
+            const now = Date.now();
+
+            // Build initial source statuses with "checking" state
+            sourceStatuses = enabledIds.map((id) => {
+                const m = meta.find((x) => x.id === id);
+                return {
+                    connectorId: id,
+                    name: m?.name ?? id,
+                    icon: m?.icon ?? '',
+                    url: m?.url ?? '',
+                    sessionStatus: 'checking' as SourceSessionStatus,
+                    lastSyncAt: null,
+                };
+            });
+
+            // Load connectors and detect sessions in parallel
+            const connectors = await getConnectors(enabledIds);
+            const results = await detectAllConnectorSessions(connectors, now);
+
+            // Load last sync times in parallel
+            const lastSyncResults = await Promise.all(
+                connectors.map(async (c) => {
+                    const result = await c.getLastSync(now);
+                    return {
+                        id: c.id,
+                        lastSyncAt: result.ok ? result.value : null,
+                    };
+                })
+            );
+
+            // Merge results into source statuses
+            const lastSyncMap = new Map(lastSyncResults.map((r) => [r.id, r.lastSyncAt]));
+            const resultMap = new Map(results.map((r) => [r.connectorId, r]));
+
+            sourceStatuses = sourceStatuses.map((s) => {
+                const result = resultMap.get(s.connectorId);
+                const lastSync = lastSyncMap.get(s.connectorId);
+
+                let sessionStatus: SourceSessionStatus = 'checking';
+                if (result) {
+                    if (result.error) {
+                        sessionStatus = 'error';
+                    } else if (result.hasSession) {
+                        sessionStatus = 'connected';
+                    } else {
+                        sessionStatus = 'not-connected';
+                    }
+                }
+
+                return {
+                    ...s,
+                    sessionStatus,
+                    lastSyncAt: lastSync?.getTime() ?? null,
+                    error: result?.error,
+                };
+            });
+        } catch {
+            // Outside extension context or connector load failed
+            sourceStatuses = sourceStatuses.map((s) => ({
+                ...s,
+                sessionStatus: 'error' as SourceSessionStatus,
+            }));
+        } finally {
+            isCheckingSources = false;
+        }
+    }
+
+    // Check source sessions on mount (only when not auto-scanning)
+    $effect(() => {
+        checkSourceSessions();
+    });
 
     // Smart load: use persisted data if fresh, scan only if stale
     async function smartLoad() {
@@ -394,7 +565,7 @@
     }
 </script>
 
-<div class="flex h-full flex-col">
+<div class="relative flex h-full flex-col">
     <div class="shrink-0 px-4 pt-4">
         <section
             class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4"
@@ -474,12 +645,28 @@
 
                 <ScanProgress
                     isScanning={isLoading}
-                    progress={scanPercent}
+                    progress={scanProgress.percent}
                     missionsFound={totalMissions}
-                    connectorName={scanConnectorName}
-                    current={scanCurrent}
-                    total={scanTotal}
+                    connectorName={scanProgress.connectorName}
+                    current={scanProgress.current}
+                    total={scanProgress.total}
                 />
+
+                <ConnectorStatusList
+                    statuses={connectorStatuses}
+                    {persistedStatuses}
+                    isScanning={isLoading}
+                />
+
+                {#if !isLoading}
+                    <SourceHealthPanel
+                        sources={sourceStatuses}
+                        isChecking={isCheckingSources}
+                        compact={scanCompleted}
+                        {scanResultCounts}
+                        onRefresh={checkSourceSessions}
+                    />
+                {/if}
 
                 {#if isOffline}
                     <div class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber">
@@ -539,7 +726,7 @@
         </section>
 
         <section
-            class="section-card relative overflow-hidden mt-4 rounded-[1.6rem] p-4"
+            class="section-card relative overflow-hidden mt-4 rounded-[1.4rem] p-3"
             aria-label="Missions triees"
         >
             <div
@@ -558,13 +745,13 @@
             <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-3">
                     <h3
-                        class="text-base font-semibold tracking-tight text-white"
+                        class="text-sm font-semibold tracking-tight text-white"
                     >
                         Missions triees
                     </h3>
                     {#if !isLoading}
                         <span
-                            class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2.5 py-1 text-[11px] font-medium text-accent-emerald/90"
+                            class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2 py-0.5 text-[10px] font-medium text-accent-emerald/90"
                             aria-label="{visibleCount} missions visibles"
                         >
                             <span
@@ -587,7 +774,7 @@
                 {/if}
             </div>
 
-            <div class="mt-3">
+            <div class="mt-2">
                 <SearchInput 
                     value={searchQuery} 
                     onSearch={handleSearch}
@@ -595,10 +782,10 @@
                 />
             </div>
 
-            <div class="mt-3 flex flex-wrap items-center gap-2">
-                <div class="flex items-center gap-2">
+            <div class="mt-2 flex flex-wrap items-center gap-1.5">
+                <div class="flex items-center gap-1.5">
                     <button
-                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+                        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-all duration-200
               {showFavoritesOnly
                             ? 'border-accent-amber/35 bg-accent-amber/15 text-accent-amber shadow-glow-amber'
                             : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
@@ -622,7 +809,7 @@
                         {/if}
                     </button>
                     <button
-                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+                        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-all duration-200
               {showHidden
                             ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
                             : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
@@ -644,14 +831,14 @@
                 </div>
 
                 <div
-                    class="h-6 w-px bg-linear-to-b from-transparent via-white/15 to-transparent"
+                    class="h-5 w-px bg-linear-to-b from-transparent via-white/15 to-transparent"
                 ></div>
 
-                <div class="flex items-center gap-2">
+                <div class="flex items-center gap-1.5">
                     <label class="sr-only" for="sort-select">Trier par</label>
                     <select
                         id="sort-select"
-                        class="min-h-11 cursor-pointer rounded-full border border-white/8 bg-white/4 px-3.5 py-2 text-xs text-text-secondary outline-none transition-colors focus:border-accent-blue/40 focus:bg-white/6"
+                        class="min-h-9 cursor-pointer rounded-full border border-white/8 bg-white/4 px-3 py-1.5 text-[11px] text-text-secondary outline-none transition-colors focus:border-accent-blue/40 focus:bg-white/6"
                         bind:value={sortBy}
                     >
                         <option value="score">Pertinence</option>
@@ -659,7 +846,7 @@
                         <option value="tjm">TJM</option>
                     </select>
                     <button
-                        class="inline-flex min-h-11 items-center gap-2 rounded-full border px-3.5 py-2 text-xs font-medium transition-all duration-200
+                        class="inline-flex min-h-9 items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11px] font-medium transition-all duration-200
               {showFilters || filterActive
                             ? 'border-accent-blue/35 bg-accent-blue/15 text-accent-blue shadow-glow-blue'
                             : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
@@ -679,7 +866,7 @@
                         {/if}
                     </button>
                     <button
-                        class="soft-ring inline-flex min-h-11 items-center justify-center rounded-full border border-white/8 bg-white/4 px-3 py-2 text-text-secondary transition-all duration-200 hover:bg-white/8 hover:text-white"
+                        class="soft-ring inline-flex min-h-9 items-center justify-center rounded-full border border-white/8 bg-white/4 px-2.5 py-1.5 text-text-secondary transition-all duration-200 hover:bg-white/8 hover:text-white"
                         onclick={() => showShortcutsHelp = true}
                         title="Raccourcis clavier (?)"
                         aria-label="Afficher l'aide des raccourcis clavier"
@@ -692,7 +879,7 @@
             {#if showFilters}
                 <div
                     id="filter-panel"
-                    class="mt-4 border-t border-white/8 pt-4"
+                    class="mt-3 border-t border-white/8 pt-3"
                     role="group"
                     aria-label="Options de filtrage"
                 >

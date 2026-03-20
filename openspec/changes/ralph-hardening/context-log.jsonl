@@ -20,3 +20,9 @@
 {"ts": "2026-03-14T18:58:09Z", "seq": 20, "agent": "@tests", "type": "artifact", "action": "modified", "file": "tests/unit/scoring/dedup.test.ts"}
 {"ts": "2026-03-14T18:58:10Z", "seq": 21, "agent": "@tests", "type": "artifact", "action": "modified", "file": "tests/unit/machines/feed.test.ts"}
 {"ts": "2026-03-14T18:59:00Z", "seq": 22, "agent": "@orchestrator", "type": "state", "from": "FIXING", "to": "DONE", "reason": "Bug fixed: 222 tests pass (25 new regression tests), 0 TS errors, defense-in-depth applied across 7 files"}
+{"ts": "2026-03-19T10:00:00Z", "seq": 23, "agent": "@codegen", "type": "decision", "content": "Enable Hiway connector with confirmed Supabase credentials (URL: jhgjtlkfewuiiofxfrvh.supabase.co, table: freelance_posted_missions)", "reason": "Supabase credentials confirmed by user — anon key is public-safe (RLS enforced on backend). Added host permission for Supabase API calls."}
+{"ts": "2026-03-19T10:00:01Z", "seq": 24, "agent": "@codegen", "type": "artifact", "action": "modified", "file": "src/lib/shell/connectors/hiway.connector.ts"}
+{"ts": "2026-03-19T10:00:02Z", "seq": 25, "agent": "@codegen", "type": "artifact", "action": "modified", "file": "src/lib/shell/connectors/index.ts"}
+{"ts": "2026-03-19T10:00:03Z", "seq": 26, "agent": "@codegen", "type": "artifact", "action": "modified", "file": "src/manifest.json"}
+{"ts": "2026-03-19T10:00:04Z", "seq": 27, "agent": "@codegen", "type": "artifact", "action": "modified", "file": "tests/unit/connectors/hiway.test.ts"}
+{"ts": "2026-03-19T10:00:05Z", "seq": 28, "agent": "@codegen", "type": "checkpoint", "run": 1}

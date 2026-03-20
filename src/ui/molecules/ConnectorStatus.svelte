@@ -1,58 +1,100 @@
 <script lang="ts">
-  import type { ConnectorStatus } from '$lib/core/types/connector';
-  import Indicator from '../atoms/Indicator.svelte';
+  import type { ConnectorStatus as ConnectorStatusType } from '$lib/core/types/connector-status';
+  import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
   import Icon from '../atoms/Icon.svelte';
 
-  let { name, status, lastSync, icon = 'briefcase' }: {
+  let { name, icon = '', url = '', status = null, persisted = null }: {
     name: string;
-    status: ConnectorStatus;
-    lastSync: Date | null;
     icon?: string;
+    url?: string;
+    status?: ConnectorStatusType | null;
+    persisted?: PersistedConnectorStatus | null;
   } = $props();
 
   let imgFailed = $state(false);
 
-  let indicatorStatus = $derived(
-    status === 'done' || status === 'authenticated' ? 'online' as const
-    : status === 'error' || status === 'expired' ? 'error' as const
-    : 'offline' as const
-  );
+  // Renamed from 'state' to 'connectorState' to avoid conflict with $state rune
+  let connectorState = $derived(status?.state ?? persisted?.lastState ?? 'pending');
 
-  let statusLabel = $derived(
-    status === 'detecting' ? 'D\u00e9tection...'
-    : status === 'authenticated' ? 'Connect\u00e9'
-    : status === 'expired' ? 'Session expir\u00e9e'
-    : status === 'fetching' ? 'R\u00e9cup\u00e9ration...'
-    : status === 'done' ? 'Synchronis\u00e9'
-    : 'Erreur'
+  let missionsCount = $derived(status?.missionsCount ?? persisted?.missionsCount ?? 0);
+
+  let retryCount = $derived(status?.retryCount ?? 0);
+
+  let errorMessage = $derived.by(() => {
+    if (status?.error?.message) return status.error.message;
+    if (persisted?.error && typeof persisted.error === 'object' && 'message' in persisted.error) {
+      return String(persisted.error.message);
+    }
+    return undefined;
+  });
+
+  let isSessionError = $derived(
+    errorMessage ? /session|expir/i.test(errorMessage) : false
   );
 
   let relativeTime = $derived.by(() => {
-    if (!lastSync) return 'Jamais';
-    const diff = Date.now() - lastSync.getTime();
+    if (!persisted?.lastSyncAt) return undefined;
+    const diff = Date.now() - persisted.lastSyncAt;
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "\u00c0 l'instant";
-    if (minutes < 60) return `Il y a ${minutes}min`;
+    if (minutes < 1) return "il y a 0min";
+    if (minutes < 60) return `il y a ${minutes}min`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `Il y a ${hours}h`;
-    return `Il y a ${Math.floor(hours / 24)}j`;
+    if (hours < 24) return `il y a ${hours}h`;
+    return `il y a ${Math.floor(hours / 24)}j`;
   });
+
+  let stateConfig = $derived.by(() => {
+    switch (connectorState) {
+      case 'pending':
+        return { icon: 'loader', color: 'text-text-muted', label: 'En attente', spin: false };
+      case 'detecting':
+        return { icon: 'loader', color: 'text-accent-blue', label: 'Detection...', spin: true };
+      case 'fetching':
+        return { icon: 'loader', color: 'text-accent-blue', label: 'Scraping...', spin: true };
+      case 'retrying':
+        return { icon: 'loader', color: 'text-accent-amber', label: `Retry ${retryCount}/3...`, spin: true };
+      case 'done':
+        return { icon: 'check', color: 'text-accent-emerald', label: `${missionsCount} missions`, spin: false };
+      case 'error':
+        return { icon: 'x-circle', color: 'text-red-400', label: errorMessage ?? 'Erreur', spin: false };
+      default:
+        return { icon: 'loader', color: 'text-text-muted', label: 'En attente', spin: false };
+    }
+  });
+
+  function handleReconnect() {
+    if (!url) return;
+    try {
+      chrome.tabs.create({ url });
+    } catch {
+      window.open(url, '_blank');
+    }
+  }
 </script>
 
-<div class="flex items-center gap-3 rounded-[1.2rem] border border-white/8 bg-white/[0.04] px-3 py-3">
-  <div class="flex h-10 w-10 items-center justify-center rounded-2xl border border-white/8 bg-white/[0.04]">
+<div class="flex items-center gap-2.5 py-1.5">
+  <div class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]">
     {#if icon.startsWith('http') && !imgFailed}
-      <img src={icon} alt={name} width="20" height="20" class="rounded-sm" onerror={() => { imgFailed = true; }} />
+      <img src={icon} alt={name} width="14" height="14" class="rounded-sm" onerror={() => { imgFailed = true; }} />
     {:else}
-      <span class="text-[11px] font-bold text-text-secondary">{name.slice(0, 2).toUpperCase()}</span>
+      <span class="text-[9px] font-bold text-text-secondary">{name.slice(0, 2).toUpperCase()}</span>
     {/if}
   </div>
-  <div class="flex-1 min-w-0">
-    <p class="text-sm font-medium text-text-primary">{name}</p>
-    <p class="text-[11px] text-text-secondary">{statusLabel}</p>
-  </div>
-  <div class="flex items-center gap-2">
-    <span class="text-[10px] text-text-muted">{relativeTime}</span>
-    <Indicator status={indicatorStatus} />
+  <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">{name}</span>
+  <div class="flex items-center gap-1.5">
+    {#if connectorState === 'error' && isSessionError && url}
+      <button class="text-[10px] text-accent-blue hover:underline" onclick={handleReconnect}>
+        Reconnecter
+      </button>
+    {/if}
+    {#if relativeTime && connectorState === 'error'}
+      <span class="text-[9px] text-text-muted">{relativeTime}</span>
+    {/if}
+    <span class="flex items-center gap-1 text-[10px] {stateConfig.color}">
+      <span class="shrink-0" class:animate-spin={stateConfig.spin}>
+        <Icon name={stateConfig.icon} size={12} />
+      </span>
+      <span class="max-w-40 truncate">{stateConfig.label}</span>
+    </span>
   </div>
 </div>

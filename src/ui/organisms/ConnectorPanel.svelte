@@ -1,7 +1,9 @@
 <script lang="ts">
-  import type { ConnectorStatus as ConnectorStatusType } from '$lib/core/types/connector';
   import ConnectorStatus from '../molecules/ConnectorStatus.svelte';
   import Icon from '../atoms/Icon.svelte';
+
+  /** Statuts UI d'un connecteur (panel) */
+  type ConnectorStatusType = 'detecting' | 'authenticated' | 'expired' | 'fetching' | 'done' | 'error';
 
   interface ConnectorInfo {
     id: string;

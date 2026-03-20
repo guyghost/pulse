@@ -4,8 +4,10 @@
   import Button from '../atoms/Button.svelte';
   import Icon from '../atoms/Icon.svelte';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
-  import type { ConnectorStatus } from '$lib/core/types/connector';
   import type { Mission } from '$lib/core/types/mission';
+
+  /** Statuts UI d'un connecteur (settings) */
+  type ConnectorStatus = 'detecting' | 'authenticated' | 'expired' | 'fetching' | 'done' | 'error';
   import type { BackupData, ValidationError } from '$lib/core/backup/backup';
   import { getSettings, setSettings, getApiKey, setApiKey, type AppSettings } from '$lib/shell/storage/chrome-storage';
   import { getProfile, saveProfile } from '$lib/shell/storage/db';

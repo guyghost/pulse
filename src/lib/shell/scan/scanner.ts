@@ -2,7 +2,7 @@ import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
-import { getProfile, saveMissions } from '../storage/db';
+import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
 import { deduplicateMissions } from '../../core/scoring/dedup';
 import { scoreMission } from '../../core/scoring/relevance';
 import { setScanState } from '../storage/session-storage';
@@ -11,7 +11,8 @@ import { metricsCollector } from '../metrics/collector';
 import { calculateDedupRatio } from '../../core/metrics/types';
 import type { ScanMetrics } from '../../core/metrics/types';
 import { isOnline } from '../utils/connection-monitor';
-import { withRetry } from '../utils/retry-strategy';
+import { withResultRetry } from '../utils/retry-strategy';
+import { trackParserHealth } from './parser-health';
 
 /** Mutex pour empêcher les scans concurrents */
 let scanInProgress = false;
@@ -158,16 +159,14 @@ async function _runScanInternal(
 		const connectorStartTime = performance.now();
 		const now = Date.now();
 		
-		// Retry automatique pour les erreurs réseau avec backoff
-		const result = await withRetry(
+		// Retry automatique pour les erreurs réseau avec backoff (Result-aware)
+		const result = await withResultRetry(
 			() => connector.fetchMissions(now),
 			{
 				maxAttempts: 3,
 				baseDelayMs: 1000,
 				maxDelayMs: 10000,
-				retryableErrors: ['NETWORK_ERROR', 'TIMEOUT', 'OFFLINE', 'ECONNRESET', 'ETIMEDOUT', 'FETCH_ERROR'],
-			},
-			isOnline
+			}
 		);
 		
 		const connectorDuration = Math.round(performance.now() - connectorStartTime);
@@ -180,7 +179,11 @@ async function _runScanInternal(
 		
 		if (!result.ok) {
 			errors.push({ connectorId: connector.id, message: result.error.message });
+			// Track health for failed connector (0 missions)
+			trackParserHealth(connector.id, 0, now).catch(() => {});
 		} else {
+			// Track parser health for successful result
+			trackParserHealth(connector.id, result.value.length, now).catch(() => {});
 			connectorResults.push({ connectorId: connector.id, missions: result.value });
 		}
 	}
@@ -235,6 +238,16 @@ async function _runScanInternal(
 		} catch {
 			// Storage not available
 		}
+	}
+
+	// Purge old missions (older than 90 days) - non-blocking, silent failure
+	try {
+		const purged = await purgeOldMissions(90);
+		if (purged > 0 && import.meta.env.DEV) {
+			console.log(`[Scanner] Purged ${purged} old missions`);
+		}
+	} catch {
+		// Purge failure is non-critical
 	}
 
 	// Calculer et enregistrer les métriques du scan

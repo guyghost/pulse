@@ -1,6 +1,7 @@
-import { getProfile, saveProfile } from '../lib/shell/storage/db';
+import { getProfile, saveProfile, saveConnectorStatuses } from '../lib/shell/storage/db';
 import type { BridgeMessage } from '../lib/shell/messaging/bridge';
 import type { UserProfile } from '../lib/core/types/profile';
+import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import { getSettings } from '../lib/shell/storage/chrome-storage';
 import { runScan } from '../lib/shell/scan/scanner';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
@@ -8,8 +9,14 @@ import { setNewMissionCount } from '../lib/shell/storage/session-storage';
 import { filterNotifiableMissions } from '../lib/core/scoring/notification-filter';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import { notifyHighScoreMissions, setupNotificationClickHandler } from '../lib/shell/notifications/notify-missions';
+import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 
 console.log('[MissionPulse] Service worker started');
+
+// Trigger expired semantic cache cleanup on startup
+clearExpiredSemanticCache().catch((err) => {
+  console.warn('[MissionPulse] Failed to cleanup expired semantic cache:', err);
+});
 
 // Open side panel on extension icon click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -64,8 +71,42 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
         // Side panel not open, ignore
       }
     }
+    // Persist connector statuses (simplified — no XState in service worker)
+    const now = Date.now();
+    const statusMap = new Map<string, { missions: number; error: string | null }>();
+
+    // Count missions per source
+    for (const mission of result.missions) {
+      const entry = statusMap.get(mission.source) ?? { missions: 0, error: null };
+      entry.missions++;
+      statusMap.set(mission.source, entry);
+    }
+
+    // Record errors
+    for (const err of result.errors) {
+      const entry = statusMap.get(err.connectorId) ?? { missions: 0, error: null };
+      entry.error = err.message;
+      statusMap.set(err.connectorId, entry);
+    }
+
+    const persistedStatuses: PersistedConnectorStatus[] = [...statusMap.entries()].map(([id, data]) => ({
+      connectorId: id,
+      connectorName: id,
+      lastState: data.error && data.missions === 0 ? 'error' : 'done',
+      missionsCount: data.missions,
+      error: data.error ? { type: 'connector', message: data.error } : null,
+      lastSyncAt: now,
+      lastSuccessAt: data.missions > 0 ? now : null,
+    }));
+
+    try {
+      await saveConnectorStatuses(persistedStatuses);
+    } catch {
+      // Storage non-critical
+    }
+
     if (result.missions.length === 0) return;
-    
+
     const seenIds = await getSeenIds();
     const seenSet = new Set(seenIds);
     const newMissions = result.missions.filter(m => !seenSet.has(m.id));
@@ -82,7 +123,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (settings.notifications && newCount > 0) {
       const notifiableMissions = filterNotifiableMissions(
         newMissions,
-        [],
+        seenIds,
         settings.notificationScoreThreshold,
       );
       
