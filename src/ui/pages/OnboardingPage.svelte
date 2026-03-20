@@ -3,47 +3,36 @@
   import OnboardingWizard from '../organisms/OnboardingWizard.svelte';
   import type { UserProfile } from '$lib/core/types/profile';
   import { sendMessage } from '$lib/shell/messaging/bridge';
-  import { createActor } from 'xstate';
-  import {
-    onboardingMachine,
-    onboardingEvents,
-  } from '$lib/../machines/onboarding.machine';
+  import { createOnboardingStore } from '$lib/state/onboarding.svelte';
 
   let { onComplete }: { onComplete?: () => void } = $props();
 
-  const actor = createActor(onboardingMachine);
-  actor.start();
+  const onboarding = createOnboardingStore();
 
-  let snapshot = $state(actor.getSnapshot());
-
-  actor.subscribe((s) => {
-    snapshot = s;
-  });
-
-  let isSaving = $derived(snapshot.matches('saving'));
-  let hasError = $derived(snapshot.matches('error'));
-  let errorMessage = $derived(snapshot.context.error);
+  let isSaving = $derived(onboarding.state === 'saving');
+  let hasError = $derived(onboarding.state === 'error');
+  let errorMessage = $derived(onboarding.error);
 
   function handleUpdateProfile(updates: Partial<UserProfile>) {
-    actor.send(onboardingEvents.updateProfile(updates));
+    onboarding.updateProfile(updates);
   }
 
   async function handleComplete() {
-    actor.send(onboardingEvents.save());
+    onboarding.save();
 
-    const profile = actor.getSnapshot().context.profile;
+    const profile = onboarding.profile;
 
     try {
       await sendMessage({
         type: 'SAVE_PROFILE',
         payload: profile as UserProfile,
       });
-      actor.send(onboardingEvents.saveSuccess());
+      onboarding.saveSuccess();
       onComplete?.();
     } catch (err) {
       const message =
         err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
-      actor.send(onboardingEvents.saveError(message));
+      onboarding.saveError(message);
     }
   }
 
