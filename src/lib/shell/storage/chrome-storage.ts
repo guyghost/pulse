@@ -16,7 +16,7 @@ export type AppSettings = z.infer<typeof SettingsSchema>;
 
 const DEFAULT_SETTINGS: AppSettings = {
   scanIntervalMinutes: 30,
-  enabledConnectors: ['free-work'],
+  enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'],
   notifications: true,
   autoScan: true,
   maxSemanticPerScan: 10,

@@ -11,7 +11,8 @@
     import FilterBar from "../organisms/FilterBar.svelte";
     import KeyboardShortcutsHelp from "../molecules/KeyboardShortcutsHelp.svelte";
     import type { MissionSource, RemoteType } from "$lib/core/types/mission";
-    import { getConnector, getConnectorsMeta } from "$lib/shell/connectors/index";
+    import { getConnector, getConnectorsMeta, getConnectors, detectAllConnectorSessions } from "$lib/shell/connectors/index";
+    import SourceHealthPanel, { type SourceStatus, type SourceSessionStatus } from "../organisms/SourceHealthPanel.svelte";
     import { getSeenIds, saveSeenIds } from "$lib/shell/storage/seen-missions";
     import { markAsSeen } from "$lib/core/seen/mark-seen";
     import {
@@ -125,6 +126,8 @@
     let scanActor = $state<ReturnType<typeof createActor<typeof scanOrchestratorMachine>> | null>(null);
     let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
     let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
+    let sourceStatuses = $state<SourceStatus[]>([]);
+    let isCheckingSources = $state(false);
 
     let scanProgress = $derived.by(() => {
         if (connectorStatuses.size === 0) return { current: 0, total: 0, percent: 0, connectorName: '' };
@@ -387,6 +390,86 @@
         }
     }
 
+    async function checkSourceSessions() {
+        if (isCheckingSources) return;
+        isCheckingSources = true;
+
+        try {
+            const settings = await getSettings();
+            const enabledIds = settings.enabledConnectors;
+            const meta = getConnectorsMeta();
+            const now = Date.now();
+
+            // Build initial source statuses with "checking" state
+            sourceStatuses = enabledIds.map((id) => {
+                const m = meta.find((x) => x.id === id);
+                return {
+                    connectorId: id,
+                    name: m?.name ?? id,
+                    icon: m?.icon ?? '',
+                    url: m?.url ?? '',
+                    sessionStatus: 'checking' as SourceSessionStatus,
+                    lastSyncAt: null,
+                };
+            });
+
+            // Load connectors and detect sessions in parallel
+            const connectors = await getConnectors(enabledIds);
+            const results = await detectAllConnectorSessions(connectors, now);
+
+            // Load last sync times in parallel
+            const lastSyncResults = await Promise.all(
+                connectors.map(async (c) => {
+                    const result = await c.getLastSync(now);
+                    return {
+                        id: c.id,
+                        lastSyncAt: result.ok ? result.value : null,
+                    };
+                })
+            );
+
+            // Merge results into source statuses
+            const lastSyncMap = new Map(lastSyncResults.map((r) => [r.id, r.lastSyncAt]));
+            const resultMap = new Map(results.map((r) => [r.connectorId, r]));
+
+            sourceStatuses = sourceStatuses.map((s) => {
+                const result = resultMap.get(s.connectorId);
+                const lastSync = lastSyncMap.get(s.connectorId);
+
+                let sessionStatus: SourceSessionStatus = 'checking';
+                if (result) {
+                    if (result.error) {
+                        sessionStatus = 'error';
+                    } else if (result.hasSession) {
+                        sessionStatus = 'connected';
+                    } else {
+                        sessionStatus = 'not-connected';
+                    }
+                }
+
+                return {
+                    ...s,
+                    sessionStatus,
+                    lastSyncAt: lastSync?.getTime() ?? null,
+                    error: result?.error,
+                };
+            });
+        } catch {
+            // Outside extension context or connector load failed
+            sourceStatuses = sourceStatuses.map((s) => ({
+                ...s,
+                sessionStatus: 'error' as SourceSessionStatus,
+            }));
+        } finally {
+            isCheckingSources = false;
+        }
+    }
+
+    // Check source sessions on mount (only when not auto-scanning)
+    $effect(() => {
+        checkSourceSessions();
+    });
+
     // Smart load: use persisted data if fresh, scan only if stale
     async function smartLoad() {
         try {
@@ -547,6 +630,14 @@
                     {persistedStatuses}
                     isScanning={isLoading}
                 />
+
+                {#if !isLoading}
+                    <SourceHealthPanel
+                        sources={sourceStatuses}
+                        isChecking={isCheckingSources}
+                        onRefresh={checkSourceSessions}
+                    />
+                {/if}
 
                 {#if isOffline}
                     <div class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber">

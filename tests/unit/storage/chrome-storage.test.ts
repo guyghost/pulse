@@ -40,7 +40,7 @@ describe('getSettings', () => {
     const settings = await getSettings();
     expect(settings).toEqual({
       scanIntervalMinutes: 30,
-      enabledConnectors: ['free-work'],
+      enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'],
       notifications: true,
       autoScan: true,
       maxSemanticPerScan: 10,
@@ -188,6 +188,6 @@ describe('getSettings', () => {
 
     const settings = await getSettings();
 
-    expect(settings.enabledConnectors).toEqual(['free-work']); // default
+    expect(settings.enabledConnectors).toEqual(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick']); // default
   });
 });
