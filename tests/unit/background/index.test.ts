@@ -59,6 +59,9 @@ vi.stubGlobal('chrome', {
       addListener: vi.fn(),
     },
   },
+  declarativeNetRequest: {
+    updateDynamicRules: vi.fn(async () => undefined),
+  },
   action: {
     setBadgeText: vi.fn(async () => undefined),
     setBadgeBackgroundColor: vi.fn(async () => undefined),

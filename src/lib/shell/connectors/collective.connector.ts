@@ -1,6 +1,5 @@
 import { BaseConnector } from './base.connector';
 import type { Mission } from '../../core/types/mission';
-import { extractCollectiveProjects, parseCollectiveProjects } from '../../core/connectors/collective-parser';
 import {
   type Result,
   type AppError,
@@ -8,9 +7,65 @@ import {
   err,
   createConnectorError,
 } from '$lib/core/errors';
+import { createMission, stripHtml } from '$lib/core/connectors/parser-utils';
+import { mapSkill, extractTjm, mapCollectiveRemote } from '$lib/core/connectors/collective-parser';
+import { injectCookieRule, removeCookieRule } from './cookie-rules';
 
+const API_URL = 'https://api.collective.work/graphql';
 const APP_URL = 'https://app.collective.work';
-const USER_ID_PATTERN = /\/collective\/([^/]+)/;
+const COOKIE_DOMAIN = '.collective.work';
+const COOKIE_RULE_ID = 11;
+const URL_FILTER = 'api.collective.work';
+
+const GET_ME_QUERY = `
+  query Collective_GetMe {
+    me: Collective_GetMe {
+      members {
+        collective { slug }
+      }
+    }
+  }
+`;
+
+const SEARCH_QUERY = `
+  query Collective_SearchJobs($data: Collective_SearchJobsInputType!) {
+    results: Collective_SearchJobs(data: $data) {
+      projects {
+        id
+        slug
+        name
+        description
+        sumUp
+        budgetBrief
+        duration
+        idealStartDate
+        workPreferences
+        isPermanentContract
+        projectTypes
+        publishedAt
+        company { name logoUrl }
+        location { fullNameFrench }
+      }
+      pagination { from total }
+    }
+  }
+`;
+
+interface CollectiveProject {
+  id: string;
+  slug: string;
+  name: string;
+  description: string | null;
+  sumUp: string | null;
+  budgetBrief: string | null;
+  duration: number | null;
+  workPreferences: string[];
+  isPermanentContract: boolean;
+  projectTypes: string[];
+  publishedAt: string | null;
+  company: { name: string; logoUrl: string | null } | null;
+  location: { fullNameFrench: string } | null;
+}
 
 export class CollectiveConnector extends BaseConnector {
   readonly id = 'collective';
@@ -18,77 +73,123 @@ export class CollectiveConnector extends BaseConnector {
   readonly baseUrl = APP_URL;
   readonly icon = 'https://www.google.com/s2/favicons?domain=collective.work&sz=32';
 
-  private userId: string | null = null;
+  private userSlug: string | null = null;
 
-  protected get sessionCheckUrl(): string {
-    return APP_URL;
-  }
+  protected get sessionCheckUrl() { return APP_URL; }
 
-  /**
-   * Détecte la session en suivant la redirection vers /collective/<userId>/
-   * Si l'utilisateur est connecté, l'app redirige vers son dashboard.
-   */
-  async detectSession(now: number): Promise<Result<boolean, AppError>> {
+  async detectSession(_now: number): Promise<Result<boolean, AppError>> {
     try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-      const response = await fetch(APP_URL, {
-        credentials: 'include',
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
+      const cookies = await chrome.cookies.getAll({ domain: COOKIE_DOMAIN });
+      const hasSession = cookies.length > 0 && cookies.some(c =>
+        c.name.includes('session') || c.name.includes('token') ||
+        c.name.includes('auth') || c.name.includes('connect') ||
+        c.name === '__Secure-next-auth.session-token'
+      );
+      if (!hasSession) return ok(false);
 
-      const finalUrl = response.url;
-      const match = finalUrl.match(USER_ID_PATTERN);
-      if (match) {
-        this.userId = match[1];
-        return ok(true);
+      // Inject cookie rule once — reused by fetchMissions
+      await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
+
+      // Discover user slug for mission URLs
+      try {
+        const resp = await fetch(API_URL, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ query: GET_ME_QUERY }),
+        });
+        if (resp.ok) {
+          const data = await resp.json() as { data?: { me?: { members?: { collective?: { slug?: string } }[] } } };
+          this.userSlug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
+        }
+      } catch {
+        // Non-blocking — URLs will use fallback
       }
 
-      // Pas de redirection vers le dashboard → pas connecté
+      return ok(true);
+    } catch {
       return ok(false);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Network request failed';
-      return err(createConnectorError(
-        `Failed to detect Collective session: ${message}`,
-        { connectorId: this.id, phase: 'detect', recoverable: true },
-        now
-      ));
     }
   }
 
   async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
-    if (!this.userId) {
-      return err(createConnectorError(
-        'User ID not discovered during session detection',
-        { connectorId: this.id, phase: 'fetch', recoverable: false },
-        now
-      ));
-    }
-
     try {
-      const jobsUrl = `${APP_URL}/collective/${this.userId}/jobs`;
-      const result = await this.fetchHTML(jobsUrl, now);
+      // Rule already injected by detectSession, re-inject only if needed
+      await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
 
-      if (!result.ok) {
+      const response = await fetch(API_URL, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          query: SEARCH_QUERY,
+          variables: {
+            data: {
+              query: '',
+              dailyRates: { from: 0, to: null },
+              locations: [],
+              skills: [],
+              workPreferences: [],
+              exclusive: false,
+              hasDailyRate: false,
+              companies: [],
+              fromTopRecruiter: false,
+              idealStartDate: [],
+              contractType: 'All',
+              offerLanguages: [],
+              from: 0,
+              sort: 'Relevance',
+              explain: false,
+            },
+          },
+        }),
+      });
+
+      if (!response.ok) {
+        await removeCookieRule(COOKIE_RULE_ID);
         return err(createConnectorError(
-          'Failed to fetch jobs from Collective',
-          { connectorId: this.id, phase: 'fetch', context: { originalError: result.error } },
+          `Collective API error: ${response.status}`,
+          { connectorId: this.id, phase: 'fetch', context: { status: response.status } },
           now
         ));
       }
 
-      const projects = extractCollectiveProjects(result.value);
-      const missions = parseCollectiveProjects(projects, new Date(now));
+      const result = await response.json() as {
+        data?: {
+          results?: {
+            projects?: CollectiveProject[];
+            pagination?: { total: number };
+          };
+        };
+      };
+
+      const projects = result.data?.results?.projects ?? [];
+      const missions = projects.map(p => createMission({
+        id: `col-${p.id}`,
+        title: p.name,
+        client: p.company?.name ?? null,
+        description: stripHtml(p.sumUp ?? p.description ?? ''),
+        stack: p.projectTypes.map(mapSkill),
+        tjm: extractTjm(p.budgetBrief),
+        location: p.location?.fullNameFrench ?? null,
+        remote: mapCollectiveRemote(p.workPreferences),
+        duration: p.duration ? `${p.duration} mois` : null,
+        url: this.userSlug
+          ? `${APP_URL}/collective/${this.userSlug}/jobs?jobId=${p.id}`
+          : `${APP_URL}/job/${p.slug}`,
+        source: 'collective' as const,
+        scrapedAt: new Date(now),
+      }));
 
       const syncResult = await this.setLastSync(now);
       if (!syncResult.ok) {
         console.warn('Failed to set last sync:', syncResult.error);
       }
 
+      await removeCookieRule(COOKIE_RULE_ID);
       return ok(missions);
     } catch (e) {
+      await removeCookieRule(COOKIE_RULE_ID);
       const message = e instanceof Error ? e.message : String(e);
       return err(createConnectorError(
         `Unexpected error fetching missions from Collective: ${message}`,

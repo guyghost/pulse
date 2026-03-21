@@ -372,7 +372,7 @@
     }
 
     async function handleScanDone(ctx: { missions: import('$lib/core/types/mission').Mission[]; connectorStatuses: Map<string, ConnectorStatus>; globalError: string | null }) {
-        if (import.meta.env.DEV) console.log('[handleScanDone] scan missions:', ctx.missions.length, 'statuses:', [...ctx.connectorStatuses.entries()].map(([id, s]) => `${id}:${s.state}(${s.missionsCount})`).join(', '), 'globalError:', ctx.globalError);
+        if (import.meta.env.DEV) console.log('[handleScanDone] scan missions:', ctx.missions.length, 'statuses:', [...ctx.connectorStatuses.entries()].map(([id, s]) => `${id}:${s.state}(${s.missionsCount})`).join(', '));
 
         // Extract mission counts per source for compact display
         const counts = new Map<string, number>();

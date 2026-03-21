@@ -24,17 +24,17 @@ const SKILL_MAP: Record<string, string> = {
   A_B_TESTING: 'A/B Testing',
 };
 
-function mapSkill(raw: string): string {
+export function mapSkill(raw: string): string {
   return SKILL_MAP[raw] ?? raw.replace(/_/g, ' ');
 }
 
-function extractTjm(budgetBrief: string | null): number | null {
+export function extractTjm(budgetBrief: string | null): number | null {
   if (!budgetBrief) return null;
   const match = budgetBrief.match(/\d+/);
   return match ? parseInt(match[0], 10) : null;
 }
 
-function mapRemote(prefs: string[]): Mission['remote'] {
+export function mapCollectiveRemote(prefs: string[]): Mission['remote'] {
   if (prefs.includes('REMOTE')) return 'full';
   if (prefs.includes('HYBRID')) return 'hybrid';
   if (prefs.includes('ON_SITE')) return 'onsite';
@@ -50,7 +50,7 @@ export function parseCollectiveProjects(projects: CollectiveProject[], now: Date
     stack: p.projectTypes.map(mapSkill),
     tjm: extractTjm(p.budgetBrief),
     location: p.location?.fullNameFrench ?? null,
-    remote: mapRemote(p.workPreferences),
+    remote: mapCollectiveRemote(p.workPreferences),
     duration: null,
     url: `https://www.collective.work/job/${p.slug}`,
     source: 'collective' as const,

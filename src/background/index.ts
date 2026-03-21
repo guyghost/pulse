@@ -21,6 +21,45 @@ clearExpiredSemanticCache().catch((err) => {
 // Open side panel on extension icon click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
+// Rewrite Origin header for APIs that block chrome-extension:// origin
+chrome.declarativeNetRequest.updateDynamicRules({
+  removeRuleIds: [1, 2],
+  addRules: [
+    {
+      id: 1,
+      priority: 1,
+      action: {
+        type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+        requestHeaders: [
+          { header: 'Origin', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'https://www.lehibou.com' },
+          { header: 'Referer', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'https://www.lehibou.com/' },
+        ],
+      },
+      condition: {
+        urlFilter: 'api.lehibou.com',
+        resourceTypes: ['xmlhttprequest' as chrome.declarativeNetRequest.ResourceType],
+      },
+    },
+    {
+      id: 2,
+      priority: 1,
+      action: {
+        type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+        requestHeaders: [
+          { header: 'Origin', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'https://app.collective.work' },
+          { header: 'Referer', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'https://app.collective.work/' },
+        ],
+      },
+      condition: {
+        urlFilter: 'api.collective.work',
+        resourceTypes: ['xmlhttprequest' as chrome.declarativeNetRequest.ResourceType],
+      },
+    },
+  ],
+}).catch((err) => {
+  console.warn('[MissionPulse] Failed to set header rewrite rules:', err);
+});
+
 // Setup notification click handler
 setupNotificationClickHandler();
 
