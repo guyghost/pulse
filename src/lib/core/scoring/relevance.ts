@@ -80,6 +80,7 @@ const scoreStack = (
  * Score location matching using fuzzy matching.
  * - Exact match: full weight
  * - Synonym match (regional equivalents): 80% of weight
+ * - Nearby match (same metropolitan area): 70% of weight
  * - Partial match (token-based): 60% of weight
  * - Unknown location: partial score (half of weight)
  * - No match: 0
@@ -99,6 +100,8 @@ const scoreLocation = (
       return weight;
     case 'synonym':
       return weight * 0.8;
+    case 'nearby':
+      return weight * 0.7;
     case 'partial':
       return weight * 0.6;
     case 'none':

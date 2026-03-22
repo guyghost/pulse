@@ -12,10 +12,11 @@
  * Result of a location match comparison.
  * - 'exact': Perfect match after normalization or substring match
  * - 'synonym': Regional synonym match (e.g., Paris ↔ 75 ↔ Île-de-France)
+ * - 'nearby': Same metropolitan area (e.g., Nanterre → Paris, Villeurbanne → Lyon)
  * - 'partial': Token-based partial match
  * - 'none': No match found
  */
-export type LocationMatchResult = 'exact' | 'synonym' | 'partial' | 'none';
+export type LocationMatchResult = 'exact' | 'synonym' | 'nearby' | 'partial' | 'none';
 
 /**
  * Mapping of canonical location names to their regional synonyms.
@@ -63,6 +64,139 @@ const REGION_SYNONYMS: Record<string, string[]> = {
 };
 
 /**
+ * Metropolitan area definitions.
+ * Each metro area contains cities that are considered 'nearby' to the main city.
+ * Cities are normalized (lowercase, no accents, hyphens → spaces).
+ */
+interface MetroAreaData {
+  /** Cities belonging to this metro area (normalized) */
+  cities: string[];
+  /** Department codes that belong to this metro area */
+  departments: string[];
+}
+
+const METRO_AREAS: Record<string, MetroAreaData> = {
+  // Paris (petite couronne: 92, 93, 94)
+  paris: {
+    departments: ['92', '93', '94'],
+    cities: [
+      'nanterre',
+      'boulogne billancourt',
+      'la defense',
+      'neuilly sur seine',
+      'saint denis',
+      'montreuil',
+      'creteil',
+      'vincennes',
+      'levallois perret',
+      'issy les moulineaux',
+      'courbevoie',
+      'puteaux',
+      'clichy',
+      'colombes',
+      'villejuif',
+      'ivry sur seine',
+      'bobigny',
+      'pantin',
+      'aubervilliers',
+      'noisy le grand',
+      'rueil malmaison',
+      'antony',
+      'clamart',
+      'sevran',
+      'aulnay sous bois',
+      'saint ouen',
+      'gennevilliers',
+      'asnieres sur seine',
+      'suresnes',
+      'meudon',
+      'malakoff',
+      'chatillon',
+      'bagneux',
+      'fontenay sous bois',
+      'nogent sur marne',
+      'saint mande',
+      'charenton le pont',
+      'maisons alfort',
+      'vitry sur seine',
+    ],
+  },
+
+  // Lyon
+  lyon: {
+    departments: [],
+    cities: [
+      'villeurbanne',
+      'venissieux',
+      'vaulx en velin',
+      'bron',
+      'saint priest',
+      'caluire et cuire',
+      'ecully',
+      'oullins',
+      'tassin la demi lune',
+      'rillieux la pape',
+      'meyzieu',
+      'decines charpieu',
+    ],
+  },
+
+  // Marseille
+  marseille: {
+    departments: [],
+    cities: [
+      'aix en provence',
+      'aubagne',
+      'martigues',
+      'vitrolles',
+      'salon de provence',
+      'la ciotat',
+      'istres',
+      'gardanne',
+      'miramas',
+    ],
+  },
+
+  // Bordeaux
+  bordeaux: {
+    departments: [],
+    cities: [
+      'merignac',
+      'pessac',
+      'talence',
+      'begles',
+      'cenon',
+      'gradignan',
+      'villenave d ornon',
+      'le bouscat',
+      'bruges',
+      'blanquefort',
+      'floirac',
+      'lormont',
+      'carbon blanc',
+    ],
+  },
+
+  // Toulouse
+  toulouse: {
+    departments: [],
+    cities: [
+      'blagnac',
+      'colomiers',
+      'tournefeuille',
+      'balma',
+      'ramonville saint agne',
+      'muret',
+      'cugnaux',
+      'l union',
+      'castanet tolosan',
+      'saint orens de gameville',
+      'fenouillet',
+    ],
+  },
+};
+
+/**
  * Build a lookup cache where each synonym maps to its canonical form.
  */
 const buildSynonymCache = (): Map<string, string> => {
@@ -80,6 +214,149 @@ const buildSynonymCache = (): Map<string, string> => {
  * Built once from REGION_SYNONYMS.
  */
 const SYNONYM_CACHE: Map<string, string> = buildSynonymCache();
+
+/**
+ * Build a lookup cache for fast city → metro area resolution.
+ * Each city in a metro area maps to its canonical metro name.
+ * Also maps the metro name itself to itself (e.g., "paris" → "paris").
+ */
+const buildMetroAreaCache = (): Map<string, string> => {
+  const cache = new Map<string, string>();
+  for (const [metroName, data] of Object.entries(METRO_AREAS)) {
+    // The metro name itself maps to itself
+    cache.set(metroName, metroName);
+    // Each city maps to the metro name
+    for (const city of data.cities) {
+      cache.set(city, metroName);
+    }
+  }
+  return cache;
+};
+
+/**
+ * Cache for fast city → metro area resolution.
+ * Built once from METRO_AREAS.
+ */
+const METRO_AREA_CACHE: Map<string, string> = buildMetroAreaCache();
+
+/**
+ * Build a lookup cache for department → metro area resolution.
+ */
+const buildMetroDepartmentCache = (): Map<string, string> => {
+  const cache = new Map<string, string>();
+  for (const [metroName, data] of Object.entries(METRO_AREAS)) {
+    for (const dept of data.departments) {
+      cache.set(dept, metroName);
+    }
+  }
+  return cache;
+};
+
+/**
+ * Cache for fast department → metro area resolution.
+ * Built once from METRO_AREAS.
+ */
+const METRO_DEPARTMENT_CACHE: Map<string, string> = buildMetroDepartmentCache();
+
+/**
+ * Extract 2-digit department codes from a location string.
+ * Looks for standalone 2-digit numbers or codes in parentheses.
+ *
+ * @param location - Location string to extract from
+ * @returns Array of 2-digit department codes found
+ */
+const extractDepartmentCodes = (location: string): string[] => {
+  const codes: string[] = [];
+  // Match standalone 2-digit codes
+  const standaloneMatch = location.match(/\b(\d{2})\b/g);
+  if (standaloneMatch) {
+    codes.push(...standaloneMatch);
+  }
+  // Match codes in parentheses like (92) or (75)
+  const parenMatch = location.match(/\((\d{2})\)/g);
+  if (parenMatch) {
+    codes.push(...parenMatch.map((m) => m.slice(1, 3)));
+  }
+  return [...new Set(codes)]; // Deduplicate
+};
+
+/**
+ * Generate all n-gram phrases from a list of tokens.
+ * Used for matching multi-word city names and synonyms.
+ *
+ * @param tokens - Array of individual tokens
+ * @param maxN - Maximum phrase length (default: 4)
+ * @returns Array of phrases (consecutive token combinations)
+ */
+const generatePhrases = (tokens: string[], maxN = 4): string[] => {
+  const phrases: string[] = [];
+  const limit = Math.min(maxN, tokens.length);
+
+  for (let n = 2; n <= limit; n++) {
+    for (let i = 0; i <= tokens.length - n; i++) {
+      phrases.push(tokens.slice(i, i + n).join(' '));
+    }
+  }
+
+  return phrases;
+};
+
+/**
+ * Find the metropolitan area a location belongs to.
+ * Checks city names, tokens, multi-word phrases, and department codes.
+ *
+ * @param location - Lightly normalized location string
+ * @returns The canonical metro name if found, null otherwise
+ */
+const findMetroArea = (location: string): string | null => {
+  if (!location) return null;
+
+  // 1. Check if the full string matches a city in any metro area
+  const directMatch = METRO_AREA_CACHE.get(location);
+  if (directMatch) return directMatch;
+
+  // 2. Check if any token matches a city name (for compound locations like "Nanterre La Défense")
+  const tokens = tokenizeLocation(location);
+  for (const token of tokens) {
+    const tokenMatch = METRO_AREA_CACHE.get(token);
+    if (tokenMatch) return tokenMatch;
+  }
+
+  // 3. Check multi-word phrases (for cities like "boulogne billancourt")
+  const phrases = generatePhrases(tokens);
+  for (const phrase of phrases) {
+    const phraseMatch = METRO_AREA_CACHE.get(phrase);
+    if (phraseMatch) return phraseMatch;
+  }
+
+  // 4. Check if any department code matches a metro department
+  const deptCodes = extractDepartmentCodes(location);
+  for (const code of deptCodes) {
+    const deptMatch = METRO_DEPARTMENT_CACHE.get(code);
+    if (deptMatch) return deptMatch;
+  }
+
+  return null;
+};
+
+/**
+ * Check if two locations are in the same metropolitan area.
+ *
+ * @param loc1 - First location string (lightly normalized)
+ * @param loc2 - Second location string (lightly normalized)
+ * @returns true if both locations resolve to the same metro area
+ */
+const areInSameMetroArea = (loc1: string, loc2: string): boolean => {
+  const metro1 = findMetroArea(loc1);
+  const metro2 = findMetroArea(loc2);
+
+  // Both must resolve to the same metro area
+  if (metro1 && metro2 && metro1 === metro2) {
+    return true;
+  }
+
+  return false;
+};
 
 /**
  * Remove French accents from a string.
@@ -243,12 +520,14 @@ const hasTokenMatch = (tokens1: string[], tokens2: string[]): boolean => {
 
 /**
  * Check if any token pair from two locations are regional synonyms.
+ * Also checks multi-word phrases for synonyms like "ile de france".
  *
  * @param tokens1 - First set of tokens
  * @param tokens2 - Second set of tokens
- * @returns true if any token pair are synonyms
+ * @returns true if any token pair or phrase pair are synonyms
  */
 const hasSynonymTokenMatch = (tokens1: string[], tokens2: string[]): boolean => {
+  // Check individual tokens
   for (const token1 of tokens1) {
     for (const token2 of tokens2) {
       if (areRegionalSynonyms(token1, token2)) {
@@ -256,6 +535,36 @@ const hasSynonymTokenMatch = (tokens1: string[], tokens2: string[]): boolean => 
       }
     }
   }
+
+  // Check multi-word phrases (for synonyms like "ile de france")
+  const phrases1 = generatePhrases(tokens1);
+  const phrases2 = generatePhrases(tokens2);
+
+  for (const phrase1 of phrases1) {
+    for (const phrase2 of phrases2) {
+      if (areRegionalSynonyms(phrase1, phrase2)) {
+        return true;
+      }
+    }
+  }
+
+  // Also check phrases against individual tokens (e.g., "ile de france" vs "paris")
+  for (const phrase1 of phrases1) {
+    for (const token2 of tokens2) {
+      if (areRegionalSynonyms(phrase1, token2)) {
+        return true;
+      }
+    }
+  }
+
+  for (const token1 of tokens1) {
+    for (const phrase2 of phrases2) {
+      if (areRegionalSynonyms(token1, phrase2)) {
+        return true;
+      }
+    }
+  }
+
   return false;
 };
 
@@ -267,8 +576,10 @@ const hasSynonymTokenMatch = (tokens1: string[], tokens2: string[]): boolean => 
  * 2. Substring match (one contains the other)
  * 3. Regional synonym match on lightly normalized strings (preserves department codes)
  * 4. Token-based synonym match
- * 5. Token-based exact match (partial)
- * 6. No match
+ * 5. Metropolitan area proximity match (nearby) on lightly normalized strings
+ * 6. Metropolitan area proximity match on fully normalized strings/tokens
+ * 7. Token-based exact match (partial)
+ * 8. No match
  *
  * @param missionLoc - Mission location string (may be null)
  * @param profileLoc - Profile location string (may be null)
@@ -318,6 +629,12 @@ export const matchLocation = (
     }
   }
 
+  // 4b. Check metropolitan area proximity (nearby)
+  // This handles: Nanterre → Paris, Villeurbanne → Lyon, etc.
+  if (areInSameMetroArea(lightMission, lightProfile)) {
+    return 'nearby';
+  }
+
   // 5. Full normalization for remaining exact/partial matching
   const normMission = normalizeLocation(missionLoc);
   const normProfile = normalizeLocation(profileLoc);
@@ -327,10 +644,25 @@ export const matchLocation = (
     return 'none';
   }
 
-  // 6. Token-based matching with full normalization (for partial matches)
+  // 5b. Fallback nearby check with fully normalized values
+  if (areInSameMetroArea(normMission, normProfile)) {
+    return 'nearby';
+  }
+
+  // 6. Fallback nearby check with tokenized normalized values
   const missionTokens = tokenizeLocation(normMission);
   const profileTokens = tokenizeLocation(normProfile);
 
+  // Check if any token pair are in the same metro area
+  for (const token1 of missionTokens) {
+    for (const token2 of profileTokens) {
+      if (areInSameMetroArea(token1, token2)) {
+        return 'nearby';
+      }
+    }
+  }
+
+  // 7. Token-based matching with full normalization (for partial matches)
   // Handle case where tokenization produces empty arrays
   if (missionTokens.length === 0 || profileTokens.length === 0) {
     return 'none';

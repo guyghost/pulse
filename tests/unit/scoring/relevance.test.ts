@@ -160,4 +160,66 @@ describe('scoreMission', () => {
       expect(score).toBeLessThanOrEqual(100);
     });
   });
+
+  describe('location nearby scoring', () => {
+    const parisProfile: UserProfile = {
+      firstName: 'Test',
+      stack: ['TypeScript', 'React'],
+      location: 'Paris',
+      tjmMin: 500,
+      tjmMax: 800,
+      remote: 'any',
+      seniority: 'senior',
+      jobTitle: 'Développeur',
+    };
+
+    it('scores nearby location match at 70% of weight', () => {
+      // A mission in Nanterre should score 70% location weight for a Paris profile
+      // Default location weight is 20, so nearby = 20 * 0.7 = 14
+      const mission = makeMission({
+        stack: ['TypeScript', 'React'],
+        location: 'Nanterre',
+        tjm: 600,
+        remote: 'hybrid',
+      });
+
+      // Compare with exact location match
+      const exactMission = makeMission({
+        stack: ['TypeScript', 'React'],
+        location: 'Paris',
+        tjm: 600,
+        remote: 'hybrid',
+      });
+
+      const nearbyScore = scoreMission(mission, parisProfile);
+      const exactScore = scoreMission(exactMission, parisProfile);
+
+      // Both should have high scores, but nearby should be slightly lower
+      expect(nearbyScore).toBeGreaterThan(0);
+      expect(nearbyScore).toBeLessThan(exactScore);
+      // The difference should be the location weight difference (20 - 14 = 6 points)
+      expect(exactScore - nearbyScore).toBe(6);
+    });
+
+    it('scores nearby (Courbevoie) higher than no match (Lyon) for Paris profile', () => {
+      const nearbyMission = makeMission({
+        stack: ['TypeScript', 'React'],
+        location: 'Courbevoie', // Paris suburb
+        tjm: 600,
+        remote: 'hybrid',
+      });
+
+      const noMatchMission = makeMission({
+        stack: ['TypeScript', 'React'],
+        location: 'Lyon', // different city
+        tjm: 600,
+        remote: 'hybrid',
+      });
+
+      const nearbyScore = scoreMission(nearbyMission, parisProfile);
+      const noMatchScore = scoreMission(noMatchMission, parisProfile);
+
+      expect(nearbyScore).toBeGreaterThan(noMatchScore);
+    });
+  });
 });
