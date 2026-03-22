@@ -115,7 +115,7 @@
         location: profileLocation,
         tjmMin,
         tjmMax,
-        stack: profileStack,
+        stack: [...profileStack], // Convert proxy to plain array for IndexedDB
         remote: current?.remote ?? 'any',
         seniority: current?.seniority ?? 'senior',
       });
