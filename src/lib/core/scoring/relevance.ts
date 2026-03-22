@@ -1,6 +1,7 @@
 import type { Mission } from '../types/mission';
 import type { UserProfile, ScoringWeights } from '../types/profile';
 import { DEFAULT_SCORING_WEIGHTS } from '../types/profile';
+import { matchLocation } from './location-matching';
 
 /**
  * Score a mission's relevance to a user profile.
@@ -73,9 +74,11 @@ const scoreStack = (
 };
 
 /**
- * Score location matching.
- * - Exact match (city/region contained in location): full weight
- * - Unknown location: partial score (half of weight for location)
+ * Score location matching using fuzzy matching.
+ * - Exact match: full weight
+ * - Synonym match (regional equivalents): 80% of weight
+ * - Partial match (token-based): 60% of weight
+ * - Unknown location: partial score (half of weight)
  * - No match: 0
  */
 const scoreLocation = (
@@ -85,9 +88,19 @@ const scoreLocation = (
 ): number => {
   if (!profileLocation) return weight;
   if (!missionLocation) return weight * 0.5;
-  return missionLocation.toLowerCase().includes(profileLocation.toLowerCase())
-    ? weight
-    : 0;
+
+  const match = matchLocation(missionLocation, profileLocation);
+
+  switch (match) {
+    case 'exact':
+      return weight;
+    case 'synonym':
+      return weight * 0.8;
+    case 'partial':
+      return weight * 0.6;
+    case 'none':
+      return 0;
+  }
 };
 
 /**
