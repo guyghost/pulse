@@ -385,9 +385,10 @@
 
             <!-- Stack Editor -->
             <div class="space-y-2">
-              <label class="text-xs uppercase tracking-[0.18em] text-text-muted">Stack technique</label>
+              <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted">Stack technique</label>
               <div class="flex gap-2">
                 <input
+                  id="stack-input"
                   type="text"
                   placeholder="ex: React, Node.js..."
                   class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
