@@ -1,6 +1,7 @@
 <script lang="ts">
   import SettingsLayout from '../templates/SettingsLayout.svelte';
   import Button from '../atoms/Button.svelte';
+  import Chip from '../atoms/Chip.svelte';
   import Icon from '../atoms/Icon.svelte';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import type { BackupData, ValidationError } from '$lib/core/backup/backup';
@@ -19,6 +20,8 @@
   let profileLocation = $state('');
   let tjmMin = $state(0);
   let tjmMax = $state(0);
+  let profileStack = $state<string[]>([]);
+  let stackInput = $state('');
   let editingProfile = $state(false);
   let profileSaved = $state(false);
   let profileError = $state<string | null>(null);
@@ -63,6 +66,7 @@
         profileLocation = profile.location ?? '';
         tjmMin = profile.tjmMin ?? 0;
         tjmMax = profile.tjmMax ?? 0;
+        profileStack = profile.stack ?? [];
       }
     } catch {
       // Hors contexte extension
@@ -89,6 +93,18 @@
     }
   }
 
+  function addStack() {
+    const trimmed = stackInput.trim();
+    if (trimmed && !profileStack.includes(trimmed)) {
+      profileStack = [...profileStack, trimmed];
+      stackInput = '';
+    }
+  }
+
+  function removeStack(item: string) {
+    profileStack = profileStack.filter((s) => s !== item);
+  }
+
   async function handleSaveProfile() {
     profileError = null;
     try {
@@ -99,7 +115,7 @@
         location: profileLocation,
         tjmMin,
         tjmMax,
-        stack: Array.from(current?.stack ?? []),
+        stack: profileStack,
         remote: current?.remote ?? 'any',
         seniority: current?.seniority ?? 'senior',
       });
@@ -366,6 +382,39 @@
                 bind:value={tjmMax}
               />
             </div>
+
+            <!-- Stack Editor -->
+            <div class="space-y-2">
+              <label class="text-xs uppercase tracking-[0.18em] text-text-muted">Stack technique</label>
+              <div class="flex gap-2">
+                <input
+                  type="text"
+                  placeholder="ex: React, Node.js..."
+                  class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+                  bind:value={stackInput}
+                  onkeydown={(e) => { if (e.key === 'Enter') addStack(); }}
+                />
+                <button
+                  class="inline-flex min-h-12 items-center justify-center rounded-[1.1rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
+                  onclick={addStack}
+                  title="Ajouter"
+                >
+                  <Icon name="plus" size={14} />
+                </button>
+              </div>
+              {#if profileStack.length > 0}
+                <div class="flex flex-wrap gap-2 pt-1">
+                  {#each profileStack as tech}
+                    <Chip
+                      label={tech}
+                      selected={true}
+                      onclick={() => removeStack(tech)}
+                    />
+                  {/each}
+                </div>
+              {/if}
+            </div>
+
             <Button variant="secondary" onclick={handleSaveProfile}>
               {#snippet children()}{profileSaved ? 'Sauvegarde !' : 'Enregistrer le profil'}{/snippet}
             </Button>
@@ -374,11 +423,22 @@
             {/if}
           </div>
         {:else}
-          <div class="space-y-1 text-sm">
+          <div class="space-y-2 text-sm">
             <p class="text-text-primary">{firstName || 'Non renseigne'} {jobTitle ? `— ${jobTitle}` : ''}</p>
             <p class="text-text-secondary">{profileLocation || 'Localisation non renseignee'}</p>
             {#if tjmMin > 0 || tjmMax > 0}
               <p class="text-text-secondary">TJM : {tjmMin} - {tjmMax} EUR/jour</p>
+            {/if}
+            {#if profileStack.length > 0}
+              <div class="flex flex-wrap gap-1.5 pt-1">
+                {#each profileStack as tech}
+                  <span class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue">
+                    {tech}
+                  </span>
+                {/each}
+              </div>
+            {:else}
+              <p class="text-text-muted text-xs">Aucune technologie renseignee</p>
             {/if}
           </div>
         {/if}
