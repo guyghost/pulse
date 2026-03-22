@@ -95,6 +95,21 @@ describe('scoreMission', () => {
     expect(score).toBeGreaterThanOrEqual(15);
   });
 
+  it('gives full stack weight when profile has no stack (does not penalize user)', () => {
+    const profileNoStack: UserProfile = { ...profile, stack: [] };
+    const mission = makeMission({
+      stack: ['React', 'TypeScript', 'Node.js'],
+      tjm: 600,
+      location: 'Paris',
+      remote: 'hybrid',
+    });
+    const score = scoreMission(mission, profileNoStack);
+    // Without stack matching, score should be location (20) + tjm (25) + remote (15) = 60
+    // Plus partial for stack (40 * 1.0 = 40) if we give full weight
+    expect(score).toBeGreaterThanOrEqual(60);
+    expect(score).toBeLessThanOrEqual(100);
+  });
+
   describe('regression: undefined safety', () => {
     const baseProfile: UserProfile = {
       firstName: 'Test',

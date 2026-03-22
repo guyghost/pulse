@@ -59,12 +59,15 @@ const normalizeWeights = (weights: ScoringWeights): ScoringWeights => {
 /**
  * Score stack matching based on how many mission technologies match the profile.
  * Returns a proportional score based on match ratio multiplied by the weight.
+ * If the profile has no stack defined, returns full weight (doesn't penalize the user).
  */
 const scoreStack = (
   missionStack: string[],
   profileStack: string[],
   weight: number,
 ): number => {
+  // If profile has no stack, don't penalize - return full weight
+  if (profileStack.length === 0) return weight;
   if (missionStack.length === 0) return 0;
   const normalizedProfile = profileStack.filter(Boolean).map((s) => s.toLowerCase());
   const matches = missionStack.filter((s) =>
