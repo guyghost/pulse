@@ -73,6 +73,13 @@
     currentPage = 'feed';
   }
 
+  function resetToOnboarding() {
+    hasCompletedOnboarding = false;
+    transitionDirection = -1;
+    previousPageIndex = PAGE_INDEX['onboarding'];
+    currentPage = 'onboarding';
+  }
+
   // Abonnement aux changements de connexion
   $effect(() => {
     const unsubscribe = subscribeToConnection((info) => {
@@ -180,7 +187,7 @@
             in:fly={{ x: 30, duration: 200, easing: cubicOut }}
             out:fade={{ duration: 100 }}
           >
-            <SettingsPage onBack={() => navigate('feed')} />
+            <SettingsPage onBack={() => navigate('feed')} onNavigateToOnboarding={resetToOnboarding} />
           </div>
         {/if}
       </main>

@@ -12,7 +12,7 @@
   import { downloadJSON, downloadCSV, downloadMarkdown } from '$lib/shell/export/download';
   import { createBackup, validateBackup, serializeBackup, parseBackupJson, generateBackupFilename, type Result } from '$lib/core/backup/backup';
 
-  let { onBack }: { onBack?: () => void } = $props();
+  let { onBack, onNavigateToOnboarding }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
 
   // --- Profil ---
   let firstName = $state('');
@@ -177,8 +177,8 @@
         if (db.name) indexedDB.deleteDatabase(db.name);
       }
       showResetConfirm = false;
-      // Recharger la page
-      window.location.reload();
+      // Navigate to onboarding instead of reloading
+      onNavigateToOnboarding?.();
     } catch {
       // Hors contexte extension
     }
