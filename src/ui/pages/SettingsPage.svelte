@@ -384,28 +384,6 @@
         {/if}
       </div>
 
-      <!-- Cle API -->
-      <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
-        <div class="flex items-center gap-2">
-          <Icon name="edit-2" size={12} class="text-accent-blue/60" />
-          <div>
-            <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
-            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Necessaire pour enrichir l'analyse TJM locale avec le modele.</p>
-          </div>
-        </div>
-        <div class="flex gap-2">
-          <input
-            type="password"
-            placeholder="sk-ant-..."
-            class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-mono text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-            bind:value={apiKey}
-          />
-          <Button variant="secondary" onclick={handleSaveApiKey}>
-            {#snippet children()}{apiKeySaved ? 'Sauve !' : 'Sauver'}{/snippet}
-          </Button>
-        </div>
-      </div>
-
       <!-- Scan automatique -->
       <div class="section-card rounded-[1.5rem] p-4">
         <div class="flex items-center justify-between">
@@ -536,6 +514,28 @@
               <Icon name="upload" size={16} class="mr-1" />
               Restaurer depuis une sauvegarde
             {/snippet}
+          </Button>
+        </div>
+      </div>
+
+      <!-- Cle API -->
+      <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
+        <div class="flex items-center gap-2">
+          <Icon name="edit-2" size={12} class="text-accent-blue/60" />
+          <div>
+            <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
+            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Necessaire pour enrichir l'analyse TJM locale avec le modele.</p>
+          </div>
+        </div>
+        <div class="flex gap-2">
+          <input
+            type="password"
+            placeholder="sk-ant-..."
+            class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-mono text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+            bind:value={apiKey}
+          />
+          <Button variant="secondary" onclick={handleSaveApiKey}>
+            {#snippet children()}{apiKeySaved ? 'Sauve !' : 'Sauver'}{/snippet}
           </Button>
         </div>
       </div>

@@ -1,44 +1,91 @@
 @import "tailwindcss";
 
 @theme {
-  --color-navy-900: #07131d;
-  --color-navy-800: #0e2231;
-  --color-navy-700: #163548;
-  --color-navy-600: #2c556f;
-  --color-surface: #102434;
-  --color-surface-hover: #173247;
-  --color-surface-active: #1f425a;
-  --color-text-primary: #f5f7fb;
-  --color-text-secondary: #b3c4d5;
-  --color-text-muted: #72889c;
-  --color-accent-blue: #59c6ff;
-  --color-accent-blue-hover: #7ed5ff;
-  --color-accent-emerald: #58d9a9;
-  --color-accent-amber: #ffca72;
-  --color-accent-red: #ff8787;
-  --color-border: #28465b;
+  /* ================================================
+   * MissionPulse Glass Radar Design System
+   * ================================================ */
 
-  --font-sans: 'Space Grotesk', system-ui, sans-serif;
+  /* Primary Cyan/Teal Palette - from PULSE identity */
+  --color-primary: #0E7490;
+  --color-primary-light: #22D3EE;
+  --color-primary-dark: #164E63;
+  --color-primary-glow: rgba(14, 116, 144, 0.5);
+
+  /* Surface Colors - Dark backgrounds */
+  --color-surface-dark: #0F172A;
+  --color-surface-card: #1E293B;
+  --color-surface-elevated: #334155;
+
+  /* Glass Effect Tokens */
+  --color-glass-bg: rgba(255, 255, 255, 0.05);
+  --color-glass-border: rgba(255, 255, 255, 0.1);
+  --color-glass-hover: rgba(255, 255, 255, 0.08);
+
+  /* Text Colors */
+  --color-text-primary: #F8FAFC;
+  --color-text-secondary: #94A3B8;
+  --color-text-muted: #64748B;
+
+  /* Accent Colors */
+  --color-accent-cyan: #22D3EE;
+  --color-accent-blue: #3B82F6;
+  --color-accent-emerald: #10B981;
+  --color-accent-amber: #F59E0B;
+  --color-accent-red: #EF4444;
+
+  /* Legacy Navy Palette (for backward compatibility) */
+  --color-navy-900: #0F172A;
+  --color-navy-800: #1E293B;
+  --color-navy-700: #334155;
+  --color-navy-600: #475569;
+  --color-surface: #1E293B;
+  --color-surface-hover: #334155;
+  --color-surface-active: #475569;
+  --color-border: rgba(255, 255, 255, 0.1);
+
+  /* Fonts */
+  --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
 
+  /* Border Radius */
   --radius-sm: 0.25rem;
-  --radius-md: 0.375rem;
-  --radius-lg: 0.5rem;
-  --radius-xl: 0.75rem;
+  --radius-md: 0.5rem;
+  --radius-lg: 0.75rem;
+  --radius-xl: 1rem;
+  --radius-2xl: 1.5rem;
   --radius-full: 9999px;
 
-  --shadow-card: 0 1px 3px 0 rgb(0 0 0 / 0.3), 0 1px 2px -1px rgb(0 0 0 / 0.3);
-  --shadow-card-hover: 0 4px 6px -1px rgb(0 0 0 / 0.3), 0 2px 4px -2px rgb(0 0 0 / 0.3);
+  /* Shadows */
+  --shadow-card: 0 4px 6px -1px rgba(0, 0, 0, 0.3), 0 2px 4px -2px rgba(0, 0, 0, 0.3);
+  --shadow-card-hover: 0 10px 15px -3px rgba(0, 0, 0, 0.3), 0 4px 6px -4px rgba(0, 0, 0, 0.3);
+  --shadow-glow-primary: 0 0 20px rgba(14, 116, 144, 0.5), 0 0 40px rgba(14, 116, 144, 0.3);
+  --shadow-glow-cyan: 0 0 15px rgba(34, 211, 238, 0.4), 0 0 30px rgba(34, 211, 238, 0.2);
+  --shadow-glow-blue: 0 0 12px rgba(59, 130, 246, 0.12);
   --shadow-glow-emerald: 0 0 12px rgba(16, 185, 129, 0.15);
   --shadow-glow-amber: 0 0 12px rgba(245, 158, 11, 0.12);
-  --shadow-glow-blue: 0 0 12px rgba(59, 130, 246, 0.12);
 
+  /* Spacing */
   --spacing-xs: 0.25rem;
   --spacing-sm: 0.5rem;
   --spacing-md: 0.75rem;
   --spacing-lg: 1rem;
   --spacing-xl: 1.5rem;
+  --spacing-2xl: 2rem;
+
+  /* Blur values for glass effects */
+  --blur-sm: 8px;
+  --blur-md: 12px;
+  --blur-lg: 16px;
+  --blur-xl: 24px;
+
+  /* Animation timing */
+  --ease-out-expo: cubic-bezier(0.16, 1, 0.3, 1);
+  --ease-out-back: cubic-bezier(0.34, 1.56, 0.64, 1);
 }
+
+/* ================================================
+ * Base Styles
+ * ================================================ */
 
 :root {
   color-scheme: dark;
@@ -53,22 +100,10 @@ body {
 
 body {
   background:
-    radial-gradient(circle at top left, rgb(89 198 255 / 0.22), transparent 30%),
-    radial-gradient(circle at 85% 18%, rgb(88 217 169 / 0.16), transparent 22%),
-    linear-gradient(160deg, #041018 0%, #091724 38%, #07131d 100%);
-}
-
-body::before {
-  content: "";
-  position: fixed;
-  inset: 0;
-  pointer-events: none;
-  opacity: 0.26;
-  background-image:
-    linear-gradient(rgb(255 255 255 / 0.025) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.025) 1px, transparent 1px);
-  background-size: 28px 28px;
-  mask-image: radial-gradient(circle at center, black 30%, transparent 95%);
+    radial-gradient(circle at top left, rgba(14, 116, 144, 0.15), transparent 40%),
+    radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.1), transparent 30%),
+    linear-gradient(160deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+  font-family: var(--font-sans);
 }
 
 #app {
@@ -78,64 +113,71 @@ body::before {
 }
 
 ::selection {
-  background: rgb(89 198 255 / 0.28);
-  color: #f5f7fb;
+  background: rgba(14, 116, 144, 0.4);
+  color: var(--color-text-primary);
 }
 
-.panel-shell {
+/* ================================================
+ * Glass Components
+ * ================================================ */
+
+/* Glass Card - Base glassmorphism container */
+.glass-card {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-xl);
+}
+
+/* Glass Card Elevated - More prominent glass effect */
+.glass-card-elevated {
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.065), rgb(255 255 255 / 0.02)),
-    linear-gradient(160deg, rgb(7 19 29 / 0.95), rgb(10 28 40 / 0.94));
-  border: 1px solid rgb(255 255 255 / 0.08);
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(30, 41, 59, 0.9);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: var(--radius-xl);
   box-shadow:
-    0 24px 60px rgb(1 7 12 / 0.48),
-    inset 0 1px 0 rgb(255 255 255 / 0.08);
-  backdrop-filter: blur(24px);
+    inset 0 1px 0 rgba(255, 255, 255, 0.1),
+    0 20px 40px rgba(0, 0, 0, 0.3);
 }
 
-.panel-grid {
-  background-image:
-    linear-gradient(rgb(255 255 255 / 0.018) 1px, transparent 1px),
-    linear-gradient(90deg, rgb(255 255 255 / 0.018) 1px, transparent 1px);
-  background-size: 22px 22px;
-}
-
-.section-card {
-  border: 1px solid rgb(255 255 255 / 0.08);
+/* Glass Card with Primary Glow */
+.glass-card-glow {
   background:
-    linear-gradient(180deg, rgb(255 255 255 / 0.055), rgb(255 255 255 / 0.02)),
-    rgb(12 29 41 / 0.9);
+    radial-gradient(circle at top right, rgba(14, 116, 144, 0.15), transparent 40%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.02)),
+    rgba(30, 41, 59, 0.95);
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(14, 116, 144, 0.2);
+  border-radius: var(--radius-xl);
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.05),
-    0 18px 35px rgb(1 7 12 / 0.22);
-  backdrop-filter: blur(20px);
+    0 0 30px rgba(14, 116, 144, 0.15),
+    inset 0 1px 0 rgba(255, 255, 255, 0.1);
 }
 
-.section-card-strong {
-  border: 1px solid rgb(89 198 255 / 0.18);
-  background:
-    radial-gradient(circle at top right, rgb(89 198 255 / 0.12), transparent 35%),
-    linear-gradient(180deg, rgb(255 255 255 / 0.08), rgb(255 255 255 / 0.03)),
-    rgb(10 26 37 / 0.96);
+/* ================================================
+ * Radar Effects
+ * ================================================ */
+
+/* Radar Glow - Primary glow effect for interactive elements */
+.radar-glow {
   box-shadow:
-    inset 0 1px 0 rgb(255 255 255 / 0.07),
-    0 24px 40px rgb(1 7 12 / 0.28);
-  backdrop-filter: blur(24px);
+    0 0 20px rgba(14, 116, 144, 0.5),
+    0 0 40px rgba(14, 116, 144, 0.3);
 }
 
-.eyebrow {
-  font-size: 0.68rem;
-  font-weight: 600;
-  letter-spacing: 0.28em;
-  text-transform: uppercase;
-}
-
-.soft-ring {
+/* Radar Glow Cyan - Lighter cyan glow */
+.radar-glow-cyan {
   box-shadow:
-    0 0 0 1px rgb(255 255 255 / 0.06),
-    0 12px 28px rgb(1 7 12 / 0.18);
+    0 0 15px rgba(34, 211, 238, 0.5),
+    0 0 30px rgba(34, 211, 238, 0.3);
 }
 
+/* Radar Ping Animation */
 @keyframes radar-ping {
   0% {
     transform: scale(0.5);
@@ -151,6 +193,202 @@ body::before {
   animation: radar-ping 1.5s cubic-bezier(0, 0, 0.2, 1) infinite;
 }
 
+/* Radar Scan Animation - Rotating scan line */
+@keyframes radar-scan {
+  0% {
+    transform: rotate(0deg);
+  }
+  100% {
+    transform: rotate(360deg);
+  }
+}
+
+.radar-scan {
+  animation: radar-scan 3s linear infinite;
+}
+
+/* Radar Pulse Animation - Pulsing center */
+@keyframes radar-pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.6;
+    transform: scale(0.95);
+  }
+}
+
+.radar-pulse {
+  animation: radar-pulse 2s ease-in-out infinite;
+}
+
+/* Radar Sweep Animation - Sweeping light effect */
+@keyframes radar-sweep {
+  0% {
+    opacity: 0;
+    transform: rotate(0deg);
+  }
+  50% {
+    opacity: 0.3;
+  }
+  100% {
+    opacity: 0;
+    transform: rotate(360deg);
+  }
+}
+
+.radar-sweep {
+  animation: radar-sweep 4s linear infinite;
+}
+
+/* ================================================
+ * Button Styles
+ * ================================================ */
+
+/* Glow Button - Primary action with cyan glow */
+.glow-button {
+  background: linear-gradient(135deg, var(--color-primary), var(--color-primary-dark));
+  color: var(--color-text-primary);
+  border: 1px solid rgba(34, 211, 238, 0.3);
+  border-radius: var(--radius-lg);
+  box-shadow:
+    0 0 20px rgba(14, 116, 144, 0.4),
+    0 4px 15px rgba(0, 0, 0, 0.3);
+  transition: all 0.2s ease-out;
+}
+
+.glow-button:hover {
+  background: linear-gradient(135deg, var(--color-primary-light), var(--color-primary));
+  box-shadow:
+    0 0 30px rgba(34, 211, 238, 0.5),
+    0 6px 20px rgba(0, 0, 0, 0.4);
+  transform: translateY(-1px);
+}
+
+.glow-button:active {
+  transform: translateY(0);
+  box-shadow:
+    0 0 15px rgba(14, 116, 144, 0.4),
+    0 2px 10px rgba(0, 0, 0, 0.3);
+}
+
+/* Glass Button - Secondary ghost style */
+.glass-button {
+  background: rgba(255, 255, 255, 0.05);
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: var(--radius-lg);
+  color: var(--color-text-primary);
+  transition: all 0.2s ease-out;
+}
+
+.glass-button:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+/* ================================================
+ * Panel & Layout Utilities
+ * ================================================ */
+
+/* Panel Shell - Main container glass effect */
+.panel-shell {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.06), rgba(255, 255, 255, 0.02)),
+    linear-gradient(160deg, rgba(15, 23, 42, 0.95), rgba(30, 41, 59, 0.94));
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  box-shadow:
+    0 24px 60px rgba(0, 0, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.08);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* Panel Grid - Subtle grid overlay */
+.panel-grid {
+  background-image:
+    linear-gradient(rgba(255, 255, 255, 0.02), transparent 1px),
+    linear-gradient(90deg, rgba(255, 255, 255, 0.02), transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* Section Card - Content sections */
+.section-card {
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.05), rgba(255, 255, 255, 0.02)),
+    rgba(30, 41, 59, 0.9);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.05),
+    0 18px 35px rgba(0, 0, 0, 0.25);
+  backdrop-filter: blur(20px);
+  -webkit-backdrop-filter: blur(20px);
+}
+
+/* Section Card Strong - More prominent sections */
+.section-card-strong {
+  border: 1px solid rgba(14, 116, 144, 0.2);
+  background:
+    radial-gradient(circle at top right, rgba(14, 116, 144, 0.12), transparent 35%),
+    linear-gradient(180deg, rgba(255, 255, 255, 0.08), rgba(255, 255, 255, 0.03)),
+    rgba(15, 23, 42, 0.96);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.07),
+    0 24px 40px rgba(0, 0, 0, 0.3);
+  backdrop-filter: blur(24px);
+  -webkit-backdrop-filter: blur(24px);
+}
+
+/* ================================================
+ * Typography Utilities
+ * ================================================ */
+
+/* Eyebrow - Small uppercase labels */
+.eyebrow {
+  font-size: 0.68rem;
+  font-weight: 600;
+  letter-spacing: 0.28em;
+  text-transform: uppercase;
+}
+
+/* Gradient Text - Cyan gradient for headings */
+.gradient-text {
+  background: linear-gradient(135deg, var(--color-accent-cyan), var(--color-primary));
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+}
+
+/* ================================================
+ * Animation Delays
+ * ================================================ */
+
+.animation-delay-200 {
+  animation-delay: 0.2s;
+}
+
 .animation-delay-500 {
   animation-delay: 0.5s;
+}
+
+.animation-delay-700 {
+  animation-delay: 0.7s;
+}
+
+/* ================================================
+ * Soft Ring - Subtle border highlight
+ * ================================================ */
+
+.soft-ring {
+  box-shadow:
+    0 0 0 1px rgba(255, 255, 255, 0.06),
+    0 12px 28px rgba(0, 0, 0, 0.2);
+}
+
+.soft-ring-primary {
+  box-shadow:
+    0 0 0 1px rgba(14, 116, 144, 0.3),
+    0 12px 28px rgba(0, 0, 0, 0.2);
 }
