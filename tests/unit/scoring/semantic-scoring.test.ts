@@ -12,6 +12,7 @@ const profile: UserProfile = {
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Developpeur Fullstack',
+  searchKeywords: [],
 };
 
 const mission: Mission = {

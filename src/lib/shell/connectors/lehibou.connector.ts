@@ -1,5 +1,6 @@
 import { BaseConnector } from './base.connector';
 import type { Mission } from '../../core/types/mission';
+import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import {
   type Result,
   type AppError,
@@ -69,18 +70,28 @@ export class LeHibouConnector extends BaseConnector {
     }
   }
 
-  async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
+  async fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>> {
     try {
       await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
       const allMissions: Mission[] = [];
 
       for (let page = 1; page <= MAX_PAGES; page++) {
         const url = `${MISSIONS_URL}?limit=${ITEMS_PER_PAGE}&page=${page}`;
+
+        // Build search body with context
+        const body: Record<string, unknown> = {};
+        if (context?.query) {
+          body.query = context.query;
+        }
+        if (context?.skills?.length) {
+          body.skills = context.skills;
+        }
+
         const response = await fetch(url, {
           method: 'POST',
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
-          body: '{}',
+          body: JSON.stringify(body),
         });
 
         if (!response.ok) {

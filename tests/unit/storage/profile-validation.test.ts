@@ -15,6 +15,7 @@ function validProfile(): UserProfile {
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Développeur React Senior',
+    searchKeywords: [],
   };
 }
 

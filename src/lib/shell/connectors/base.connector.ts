@@ -1,5 +1,6 @@
 import type { PlatformConnector } from './platform-connector';
 import type { Mission } from '../../core/types/mission';
+import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import {
   type Result,
   type AppError,
@@ -195,7 +196,7 @@ export abstract class BaseConnector implements PlatformConnector {
     return result;
   }
 
-  abstract fetchMissions(now: number): Promise<Result<Mission[], AppError>>;
+  abstract fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>>;
 
   /**
    * Récupère la date de dernière synchronisation

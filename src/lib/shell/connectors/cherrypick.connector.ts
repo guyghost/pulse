@@ -1,7 +1,8 @@
-import { BaseConnector } from './base.connector';
+import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import type { Mission } from '../../core/types/mission';
 import { parseCherryPickMissions, type CherryPickMission } from '../../core/connectors/cherrypick-parser';
 import { delayBetweenPages } from '../utils/rate-limiter';
+import { BaseConnector } from './base.connector';
 import {
   type Result,
   type AppError,
@@ -22,7 +23,7 @@ export class CherryPickConnector extends BaseConnector {
 
   protected get sessionCheckUrl() { return `${BASE_URL}/dashboard`; }
 
-  async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
+  async fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>> {
     try {
       const allMissions: Mission[] = [];
 
@@ -32,12 +33,21 @@ export class CherryPickConnector extends BaseConnector {
           await delayBetweenPages(this.id, page);
         }
 
+        // Build request body with search context
+        const body: Record<string, unknown> = { page };
+        if (context?.query) {
+          body.search = context.query;
+        }
+        if (context?.skills?.length) {
+          body.skills = context.skills;
+        }
+
         // Paramètre de pagination : { page: N } est le pattern le plus courant
         // pour les API REST paginées type Laravel/Symfony
         const result = await this.fetchJSON(SEARCH_URL, now, {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ page }),
+          body: JSON.stringify(body),
         });
 
         if (!result.ok) {

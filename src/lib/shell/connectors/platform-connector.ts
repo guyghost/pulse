@@ -1,5 +1,6 @@
 import type { Mission } from '../../core/types/mission';
 import type { Result, AppError } from '$lib/core/errors';
+import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 
 export interface PlatformConnector {
   readonly id: string;
@@ -12,13 +13,14 @@ export interface PlatformConnector {
    * @param now - Timestamp injecté (pas de Date.now() dans Core)
    */
   detectSession(now: number): Promise<Result<boolean, AppError>>;
-  
+
   /**
    * Récupère les missions depuis la plateforme
    * @param now - Timestamp injecté (pas de Date.now() dans Core)
+   * @param context - Optional search context for server-side filtering
    */
-  fetchMissions(now: number): Promise<Result<Mission[], AppError>>;
-  
+  fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>>;
+
   /**
    * Récupère la date de dernière synchronisation
    * @param now - Timestamp injecté (pas de Date.now() dans Core)

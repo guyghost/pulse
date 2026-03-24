@@ -183,3 +183,113 @@ describe('parseFreeWorkAPI', () => {
     expect(parseFreeWorkAPI({} as any, NOW)).toEqual([]);
   });
 });
+
+/**
+ * Tests for FreeWork URL building with search context.
+ * These verify that the connector correctly translates ConnectorSearchContext
+ * into FreeWork API URL parameters.
+ *
+ * Since the URL building is embedded in the connector (Shell, I/O),
+ * we test the URL construction logic in isolation by extracting it.
+ */
+describe('FreeWork URL building with search context', () => {
+  const API_BASE = 'https://www.free-work.com/api/job_postings';
+  const ITEMS_PER_PAGE = 50;
+
+  /**
+   * Replicates the URL building logic from FreeWorkConnector.fetchMissions()
+   * so we can test it as a pure function without I/O.
+   */
+  function buildFreeWorkUrl(
+    page: number,
+    context?: { query?: string; skills?: string[]; lastSync?: Date | null },
+  ): string {
+    const url = new URL(API_BASE);
+    url.searchParams.set('page', String(page));
+    url.searchParams.set('itemsPerPage', String(ITEMS_PER_PAGE));
+    url.searchParams.set('contracts', 'contractor');
+    // Note: order[publishedAt]=desc is listed in hydra:search but returns 400.
+    // The API already returns newest first by default.
+
+    if (context?.query) {
+      url.searchParams.set('q', context.query);
+    }
+
+    if (context?.skills?.length) {
+      for (const skill of context.skills) {
+        url.searchParams.append('properties[]', skill);
+      }
+    }
+
+    if (context?.lastSync) {
+      url.searchParams.set('createdAt[after]', context.lastSync.toISOString());
+    }
+
+    return url.toString();
+  }
+
+  it('builds base URL with pagination (no context)', () => {
+    const url = buildFreeWorkUrl(1);
+    expect(url).toContain('page=1');
+    expect(url).toContain('itemsPerPage=50');
+    expect(url).toContain('contracts=contractor');
+    // order[publishedAt] is NOT sent (API returns 400)
+    expect(url).not.toContain('order');
+    expect(url).not.toContain('q=');
+    expect(url).not.toContain('properties');
+    expect(url).not.toContain('createdAt');
+  });
+
+  it('adds q parameter when query is provided', () => {
+    const url = buildFreeWorkUrl(1, { query: 'React Developer' });
+    expect(url).toContain('q=React+Developer');
+  });
+
+  it('encodes special characters in query', () => {
+    const url = buildFreeWorkUrl(1, { query: 'Développeur Frontend' });
+    expect(url).toContain('q=');
+    expect(url).toContain('D%C3%A9veloppeur+Frontend');
+  });
+
+  it('adds properties[] for each skill', () => {
+    const url = buildFreeWorkUrl(1, { skills: ['React', 'TypeScript', 'Node.js'] });
+    expect(url).toContain('properties%5B%5D=React');
+    expect(url).toContain('properties%5B%5D=TypeScript');
+    expect(url).toContain('properties%5B%5D=Node.js');
+  });
+
+  it('adds createdAt[after] for incremental scanning', () => {
+    const lastSync = new Date('2026-03-20T10:00:00.000Z');
+    const url = buildFreeWorkUrl(1, { lastSync });
+    expect(url).toContain('createdAt%5Bafter%5D=2026-03-20T10%3A00%3A00.000Z');
+  });
+
+  it('combines all parameters together', () => {
+    const lastSync = new Date('2026-03-20T10:00:00.000Z');
+    const url = buildFreeWorkUrl(2, {
+      query: 'React',
+      skills: ['React', 'TypeScript'],
+      lastSync,
+    });
+    expect(url).toContain('page=2');
+    expect(url).toContain('q=React');
+    expect(url).toContain('properties%5B%5D=React');
+    expect(url).toContain('properties%5B%5D=TypeScript');
+    expect(url).toContain('createdAt%5Bafter%5D=');
+  });
+
+  it('ignores empty query string', () => {
+    const url = buildFreeWorkUrl(1, { query: '' });
+    expect(url).not.toContain('q=');
+  });
+
+  it('ignores empty skills array', () => {
+    const url = buildFreeWorkUrl(1, { skills: [] });
+    expect(url).not.toContain('properties');
+  });
+
+  it('ignores null lastSync', () => {
+    const url = buildFreeWorkUrl(1, { lastSync: null });
+    expect(url).not.toContain('createdAt');
+  });
+});

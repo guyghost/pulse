@@ -29,6 +29,7 @@ const baseProfile: UserProfile = {
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Developpeur Fullstack',
+  searchKeywords: [],
 };
 
 describe('semantic cache', () => {

@@ -10,6 +10,7 @@ export const mockProfile: UserProfile = {
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Développeur Fullstack',
+  searchKeywords: [],
 };
 
 const stacks = [

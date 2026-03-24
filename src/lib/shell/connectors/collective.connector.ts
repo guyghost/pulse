@@ -1,5 +1,6 @@
 import { BaseConnector } from './base.connector';
 import type { Mission } from '../../core/types/mission';
+import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import {
   type Result,
   type AppError,
@@ -112,7 +113,7 @@ export class CollectiveConnector extends BaseConnector {
     }
   }
 
-  async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
+  async fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>> {
     try {
       // Rule already injected by detectSession, re-inject only if needed
       await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
@@ -125,11 +126,13 @@ export class CollectiveConnector extends BaseConnector {
           query: SEARCH_QUERY,
           variables: {
             data: {
-              query: '',
+              query: context?.query ?? '',
               dailyRates: { from: 0, to: null },
-              locations: [],
-              skills: [],
-              workPreferences: [],
+              locations: context?.location ? [context.location] : [],
+              skills: context?.skills ?? [],
+              workPreferences: context?.remote && context.remote !== 'any'
+                ? [context.remote === 'full' ? 'fullRemote' : context.remote === 'hybrid' ? 'hybrid' : 'onsite']
+                : [],
               exclusive: false,
               hasDailyRate: false,
               companies: [],
@@ -138,7 +141,7 @@ export class CollectiveConnector extends BaseConnector {
               contractType: 'All',
               offerLanguages: [],
               from: 0,
-              sort: 'Relevance',
+              sort: 'PublishedAt',
               explain: false,
             },
           },

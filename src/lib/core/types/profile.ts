@@ -36,4 +36,6 @@ export interface UserProfile {
   jobTitle: string;
   /** Optional custom scoring weights. Defaults to DEFAULT_SCORING_WEIGHTS if not provided. */
   scoringWeights?: ScoringWeights;
+  /** User-defined search keywords sent to connector APIs for server-side filtering */
+  searchKeywords: string[];
 }

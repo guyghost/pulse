@@ -95,6 +95,8 @@ export const UserProfileSchema = z.object({
   seniority: SeniorityLevelSchema,
   jobTitle: z.string(),
   scoringWeights: ScoringWeightsSchema.optional(),
+  /** User-defined search keywords sent to connector APIs for server-side filtering */
+  searchKeywords: z.array(z.string()).default([]),
 }).refine(
   (p) => p.tjmMax >= p.tjmMin,
   { message: 'Le TJM maximum doit être supérieur ou égal au TJM minimum', path: ['tjmMax'] },

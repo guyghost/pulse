@@ -1,5 +1,7 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
+import type { ConnectorSearchContext } from '../../core/connectors/search-context';
+import { buildSearchContext } from '../../core/connectors/search-context';
 import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
 import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
@@ -92,33 +94,29 @@ async function _runScanInternal(
 		await setScanState('scanning');
 	} catch {}
 
-	if (enabledIds.length === 0) {
-		try {
-			await setScanState('idle');
-		} catch {}
-		return { missions: [], errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }] };
-	}
+	 if (enabledIds.length === 0) {
+        try { await setScanState('idle'); } catch {}
+        return { missions: [], errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }] };
+    }
 
-	// Validate connector IDs and report unknown ones as errors
-	const validConnectorIds: string[] = [];
-	for (const id of enabledIds) {
-		const connector = await getConnector(id);
-		if (!connector) {
-			errors.push({ connectorId: id, message: 'Connecteur introuvable' });
-		} else {
-			validConnectorIds.push(id);
-		}
-	}
+    // Validate connector IDs and report unknown ones as errors
+    const validConnectorIds: string[] = [];
+    for (const id of enabledIds) {
+        const connector = await getConnector(id);
+        if (!connector) {
+            errors.push({ connectorId: id, message: 'Connecteur introuvable' });
+        } else {
+            validConnectorIds.push(id);
+        }
+    }
 
-	if (signal?.aborted) {
-		try {
-			await setScanState('idle');
-		} catch {}
-		return { missions: [], errors };
-	}
+    if (signal?.aborted) {
+        try { await setScanState('idle'); } catch {}
+        return { missions: [], errors };
+    }
 
-	// Load all connectors in parallel (they're lazy-loaded, so this loads only enabled ones)
-	const connectors = await getConnectors(validConnectorIds);
+    // Load all connectors in parallel (they're lazy-loaded, so this loads only enabled ones)
+    const connectors = await getConnectors(validConnectorIds);
 
 	// Check for connectors that failed to load
 	const loadedIds = new Set(connectors.map((c) => c.id));
@@ -134,6 +132,17 @@ async function _runScanInternal(
 		} catch {}
 		return { missions: [], errors };
 	}
+
+	// Load profile early for connector search filtering + scoring
+	let profile: UserProfile | null = null;
+	try {
+		profile = await getProfile();
+	} catch {
+		// No profile available — connectors will fetch without filters
+	}
+
+	// Build base search context from profile (without lastSync — that's per-connector)
+	const baseSearchContext = profile ? buildSearchContext(profile, null) : null;
 
 	// Fetch connectors sequentially to report progress
 	const connectorResults: { connectorId: string; missions: Mission[] }[] = [];
@@ -158,10 +167,23 @@ async function _runScanInternal(
 
 		const connectorStartTime = performance.now();
 		const now = Date.now();
+
+		// Build per-connector search context with lastSync
+		let connectorContext: ConnectorSearchContext | undefined;
+		if (baseSearchContext) {
+			try {
+				const lastSyncResult = await connector.getLastSync(now);
+				const lastSync = lastSyncResult.ok ? lastSyncResult.value : null;
+				connectorContext = { ...baseSearchContext, lastSync };
+			} catch {
+				// If getLastSync fails, use context without lastSync
+				connectorContext = baseSearchContext;
+			}
+		}
 		
 		// Retry automatique pour les erreurs réseau avec backoff (Result-aware)
 		const result = await withResultRetry(
-			() => connector.fetchMissions(now),
+			() => connector.fetchMissions(now, connectorContext),
 			{
 				maxAttempts: 3,
 				baseDelayMs: 1000,
@@ -199,14 +221,7 @@ async function _runScanInternal(
 	const deduped = deduplicateMissions(allMissions);
 	const dedupRatio = calculateDedupRatio(missionsBeforeDedup, deduped.length);
 
-	// Score against profile
-	let profile: UserProfile | null = null;
-	try {
-		profile = await getProfile();
-	} catch {
-		// No profile available
-	}
-
+	// Score against profile (already loaded above for connector filtering)
 	const scored = profile
 		? deduped.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
 		: deduped;
