@@ -85,7 +85,7 @@
 
 {#if sources.length > 0}
     <div
-        class="mt-3 overflow-hidden rounded-[1.25rem] border border-white/8 bg-white/[0.03] transition-all duration-300 ease-in-out"
+        class="mt-3 overflow-hidden rounded-[1.25rem] border border-white/8 bg-white/3 transition-all duration-300 ease-in-out"
         class:px-4={!isCompact}
         class:py-3={!isCompact}
         class:px-3={isCompact}
@@ -106,8 +106,8 @@
                         <div
                             class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all duration-300
                 {hasData
-                                ? 'border-accent-emerald/25 bg-white/[0.06] shadow-[0_0_6px_rgba(88,217,169,0.1)]'
-                                : 'border-white/5 bg-white/[0.02] opacity-30 grayscale'}"
+                                ? 'border-accent-emerald/25 bg-white/6 shadow-[0_0_6px_rgba(88,217,169,0.1)]'
+                                : 'border-white/5 bg-white/2 opacity-30 grayscale'}"
                             title="{source.name}{hasData
                                 ? ` — ${missionCount} missions`
                                 : ' — aucune mission'}"
@@ -209,7 +209,7 @@
                                 class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200
                   {isEnabled
                                     ? 'border-accent-emerald/30 bg-accent-emerald/20'
-                                    : 'border-white/10 bg-white/[0.05]'}"
+                                    : 'border-white/10 bg-white/5'}"
                                 onclick={() =>
                                     onToggleConnector(source.connectorId)}
                                 role="switch"
@@ -226,7 +226,7 @@
                         {/if}
                         <!-- Favicon -->
                         <div
-                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]"
+                            class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/4"
                         >
                             {#if source.icon.startsWith("http") && !imgFailed[source.connectorId]}
                                 <img
