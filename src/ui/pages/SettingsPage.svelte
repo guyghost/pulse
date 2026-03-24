@@ -326,312 +326,307 @@
   }
 </script>
 
-<SettingsLayout {onBack} content={settingsContent}>
-  {#snippet settingsContent()}
-    <div class="space-y-6">
-      <!-- Profil -->
-      <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-2">
-            <Icon name="edit-2" size={12} class="text-accent-blue/60" />
-            <div>
-              <h3 class="text-sm font-semibold text-text-primary">Profil</h3>
-              <p class="mt-1 text-xs leading-relaxed text-text-secondary">Vos informations de freelance.</p>
-            </div>
-          </div>
-          <button
-            class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-secondary transition-colors hover:bg-white/[0.08] hover:text-text-primary"
-            onclick={() => { editingProfile = !editingProfile; }}
-            title={editingProfile ? 'Annuler' : 'Modifier'}
-          >
-            <Icon name={editingProfile ? 'x' : 'edit-2'} size={14} />
-          </button>
-        </div>
-
-        {#if editingProfile}
-          <div class="space-y-2">
-            <input
-              type="text"
-              placeholder="Prenom"
-              class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-              bind:value={firstName}
-            />
-            <input
-              type="text"
-              placeholder="Poste (ex: Developpeur React Senior)"
-              class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-              bind:value={jobTitle}
-            />
-            <input
-              type="text"
-              placeholder="Localisation"
-              class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-              bind:value={profileLocation}
-            />
-            <div class="flex gap-2">
-              <input
-                type="number"
-                placeholder="TJM min"
-                class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-                bind:value={tjmMin}
-              />
-              <input
-                type="number"
-                placeholder="TJM max"
-                class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-                bind:value={tjmMax}
-              />
-            </div>
-
-            <!-- Stack Editor -->
-            <div class="space-y-2">
-              <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted">Stack technique</label>
-              <div class="flex gap-2">
-                <input
-                  id="stack-input"
-                  type="text"
-                  placeholder="ex: React, Node.js..."
-                  class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-                  bind:value={stackInput}
-                  onkeydown={(e) => { if (e.key === 'Enter') addStack(); }}
-                />
-                <button
-                  class="inline-flex min-h-12 items-center justify-center rounded-[1.1rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
-                  onclick={addStack}
-                  title="Ajouter"
-                >
-                  <Icon name="plus" size={14} />
-                </button>
-              </div>
-              {#if profileStack.length > 0}
-                <div class="flex flex-wrap gap-2 pt-1">
-                  {#each profileStack as tech}
-                    <Chip
-                      label={tech}
-                      selected={true}
-                      onclick={() => removeStack(tech)}
-                    />
-                  {/each}
-                </div>
-              {/if}
-            </div>
-
-            <Button variant="secondary" onclick={handleSaveProfile}>
-              {#snippet children()}{profileSaved ? 'Sauvegarde !' : 'Enregistrer le profil'}{/snippet}
-            </Button>
-            {#if profileError}
-              <p class="text-xs text-red-400">{profileError}</p>
-            {/if}
-          </div>
-        {:else}
-          <div class="space-y-2 text-sm">
-            <p class="text-text-primary">{firstName || 'Non renseigne'} {jobTitle ? `— ${jobTitle}` : ''}</p>
-            <p class="text-text-secondary">{profileLocation || 'Localisation non renseignee'}</p>
-            {#if tjmMin > 0 || tjmMax > 0}
-              <p class="text-text-secondary">TJM : {tjmMin} - {tjmMax} EUR/jour</p>
-            {/if}
-            {#if profileStack.length > 0}
-              <div class="flex flex-wrap gap-1.5 pt-1">
-                {#each profileStack as tech}
-                  <span class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue">
-                    {tech}
-                  </span>
-                {/each}
-              </div>
-            {:else}
-              <p class="text-text-muted text-xs">Aucune technologie renseignee</p>
-            {/if}
-          </div>
-        {/if}
-      </div>
-
-      <!-- Scan automatique -->
-      <div class="section-card rounded-[1.5rem] p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-semibold text-text-primary">Scan automatique</h3>
-            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Scanner les plateformes en arriere-plan automatiquement.</p>
-          </div>
-          <button
-            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {autoScan ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/[0.05]'}"
-            onclick={handleToggleAutoScan}
-            role="switch"
-            aria-checked={autoScan}
-            aria-label="Activer le scan automatique"
-          >
-            <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {autoScan ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Intervalle de scan -->
-      <div class="section-card rounded-[1.5rem] p-4 space-y-3 transition-opacity duration-200" class:opacity-40={!autoScan} class:pointer-events-none={!autoScan}>
-        <div>
-          <h3 class="text-sm font-semibold text-text-primary">Frequence de scan</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Scanner les plateformes toutes les {scanInterval} minutes.</p>
-        </div>
-        <div class="flex items-center gap-3">
-          <span class="text-xs text-text-muted">5 min</span>
-          <input
-            type="range"
-            min="5"
-            max="120"
-            step="5"
-            value={scanInterval}
-            onchange={handleScanIntervalChange}
-            class="flex-1 accent-accent-blue"
-          />
-          <span class="text-xs text-text-muted">120 min</span>
-        </div>
-        <p class="text-center text-sm font-semibold text-accent-blue">{scanInterval} min</p>
-        {#if !autoScan}
-          <p class="text-center text-[11px] text-text-muted">Activez le scan automatique pour configurer la frequence.</p>
-        {/if}
-      </div>
-
-      <!-- Notifications -->
-      <div class="section-card rounded-[1.5rem] p-4">
-        <div class="flex items-center justify-between">
-          <div>
-            <h3 class="text-sm font-semibold text-text-primary">Notifications</h3>
-            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Recevoir une alerte quand de nouvelles missions arrivent.</p>
-          </div>
-          <button
-            class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {notifications ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/[0.05]'}"
-            onclick={handleToggleNotifications}
-            role="switch"
-            aria-checked={notifications}
-            aria-label="Activer les notifications"
-          >
-            <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {notifications ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
-          </button>
-        </div>
-      </div>
-
-      <!-- Export -->
-      <div class="section-card rounded-[1.5rem] p-4 space-y-4">
-        <div>
-          <h3 class="text-sm font-semibold text-text-primary">Export</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Exporter vos missions favorites dans différents formats.</p>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <button
-            class="inline-flex items-center gap-2 rounded-[1rem] border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/[0.1] disabled:opacity-50"
-            onclick={() => handleExportFavorites('json')}
-            disabled={isExporting}
-          >
-            <Icon name="file-json" size={16} class="text-accent-blue" />
-            JSON
-          </button>
-          <button
-            class="inline-flex items-center gap-2 rounded-[1rem] border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/[0.1] disabled:opacity-50"
-            onclick={() => handleExportFavorites('csv')}
-            disabled={isExporting}
-          >
-            <Icon name="file-spreadsheet" size={16} class="text-accent-emerald" />
-            CSV
-          </button>
-          <button
-            class="inline-flex items-center gap-2 rounded-[1rem] border border-white/10 bg-white/[0.05] px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/[0.1] disabled:opacity-50"
-            onclick={() => handleExportFavorites('markdown')}
-            disabled={isExporting}
-          >
-            <Icon name="file-text" size={16} class="text-accent-amber" />
-            Markdown
-          </button>
-        </div>
-
-        {#if exportSuccess}
-          <p class="text-xs text-accent-emerald">Export réussi !</p>
-        {/if}
-      </div>
-
-      <!-- Sauvegarde et restauration -->
-      <div class="section-card rounded-[1.5rem] p-4 space-y-4">
-        <div>
-          <h3 class="text-sm font-semibold text-text-primary">Sauvegarde</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Sauvegarder ou restaurer vos données (profil, paramètres, favoris).</p>
-        </div>
-
-        <div class="flex flex-wrap gap-2">
-          <Button variant="secondary" onclick={handleCreateBackup}>
-            {#snippet children()}
-              <Icon name="download" size={16} class="mr-1" />
-              Créer une sauvegarde
-            {/snippet}
-          </Button>
-
-          <input
-            type="file"
-            accept=".pulse-backup,.json"
-            class="hidden"
-            onchange={handleFileSelect}
-            bind:this={fileInput}
-          />
-
-          <Button variant="ghost" onclick={triggerFileSelect}>
-            {#snippet children()}
-              <Icon name="upload" size={16} class="mr-1" />
-              Restaurer depuis une sauvegarde
-            {/snippet}
-          </Button>
-        </div>
-      </div>
-
-      <!-- Cle API -->
-      <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
+{#snippet settingsContent()}
+  <div class="space-y-6">
+    <!-- Profil -->
+    <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
+      <div class="flex items-center justify-between">
         <div class="flex items-center gap-2">
           <Icon name="edit-2" size={12} class="text-accent-blue/60" />
           <div>
-            <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
-            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Necessaire pour enrichir l'analyse TJM locale avec le modele.</p>
+            <h3 class="text-sm font-semibold text-text-primary">Profil</h3>
+            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Vos informations de freelance.</p>
           </div>
         </div>
-        <div class="flex gap-2">
-          <input
-            type="password"
-            placeholder="sk-ant-..."
-            class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/[0.05] px-4 py-3 text-sm font-mono text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-            bind:value={apiKey}
-          />
-          <Button variant="secondary" onclick={handleSaveApiKey}>
-            {#snippet children()}{apiKeySaved ? 'Sauve !' : 'Sauver'}{/snippet}
-          </Button>
-        </div>
+        <button
+          class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/4 text-text-secondary transition-colors hover:bg-white/8 hover:text-text-primary"
+          onclick={() => { editingProfile = !editingProfile; }}
+          title={editingProfile ? 'Annuler' : 'Modifier'}
+        >
+          <Icon name={editingProfile ? 'x' : 'edit-2'} size={14} />
+        </button>
       </div>
 
-      <!-- Zone de danger -->
-      <div class="section-card rounded-[1.5rem] border border-red-500/20 p-4 space-y-3">
-        <div>
-          <h3 class="text-sm font-semibold text-red-400">Zone dangereuse</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Supprimer toutes les donnees locales (profil, missions, cache).</p>
-        </div>
-        {#if showResetConfirm}
+      {#if editingProfile}
+        <div class="space-y-2">
+          <input
+            type="text"
+            placeholder="Prenom"
+            class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+            bind:value={firstName}
+          />
+          <input
+            type="text"
+            placeholder="Poste (ex: Developpeur React Senior)"
+            class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+            bind:value={jobTitle}
+          />
+          <input
+            type="text"
+            placeholder="Localisation"
+            class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+            bind:value={profileLocation}
+          />
           <div class="flex gap-2">
-            <Button variant="ghost" onclick={() => { showResetConfirm = false; }}>
-              {#snippet children()}Annuler{/snippet}
-            </Button>
-            <button
-              class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[1rem] border border-red-500/30 bg-red-500/20 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/30"
-              onclick={handleResetAll}
-            >
-              Confirmer la suppression
-            </button>
+            <input
+              type="number"
+              placeholder="TJM min"
+              class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+              bind:value={tjmMin}
+            />
+            <input
+              type="number"
+              placeholder="TJM max"
+              class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+              bind:value={tjmMax}
+            />
           </div>
-        {:else}
-          <button
-            class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-[1rem] border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/20"
-            onclick={() => { showResetConfirm = true; }}
-          >
-            <Icon name="trash-2" size={14} />
-            Reinitialiser tout
-          </button>
-        {/if}
+
+          <!-- Stack Editor -->
+          <div class="space-y-2">
+            <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted">Stack technique</label>
+            <div class="flex gap-2">
+              <input
+                id="stack-input"
+                type="text"
+                placeholder="ex: React, Node.js..."
+                class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+                bind:value={stackInput}
+                onkeydown={(e) => { if (e.key === 'Enter') addStack(); }}
+              />
+              <button
+                class="inline-flex min-h-12 items-center justify-center rounded-[1.1rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
+                onclick={addStack}
+                title="Ajouter"
+              >
+                <Icon name="plus" size={14} />
+              </button>
+            </div>
+            {#if profileStack.length > 0}
+              <div class="flex flex-wrap gap-2 pt-1">
+                {#each profileStack as tech}
+                  <Chip
+                    label={tech}
+                    selected={true}
+                    onclick={() => removeStack(tech)}
+                  />
+                {/each}
+              </div>
+            {/if}
+          </div>
+
+          <Button variant="secondary" onclick={handleSaveProfile}>
+            {#snippet children()}{profileSaved ? 'Sauvegarde !' : 'Enregistrer le profil'}{/snippet}
+          </Button>
+          {#if profileError}
+            <p class="text-xs text-red-400">{profileError}</p>
+          {/if}
+        </div>
+      {:else}
+        <div class="space-y-2 text-sm">
+          <p class="text-text-primary">{firstName || 'Non renseigne'} {jobTitle ? `— ${jobTitle}` : ''}</p>
+          <p class="text-text-secondary">{profileLocation || 'Localisation non renseignee'}</p>
+          {#if tjmMin > 0 || tjmMax > 0}
+            <p class="text-text-secondary">TJM : {tjmMin} - {tjmMax} EUR/jour</p>
+          {/if}
+          {#if profileStack.length > 0}
+            <div class="flex flex-wrap gap-1.5 pt-1">
+              {#each profileStack as tech}
+                <span class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue">
+                  {tech}
+                </span>
+              {/each}
+            </div>
+          {:else}
+            <p class="text-text-muted text-xs">Aucune technologie renseignee</p>
+          {/if}
+        </div>
+      {/if}
+    </div>
+
+    <!-- Scan automatique -->
+    <div class="section-card rounded-[1.5rem] p-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-text-primary">Scan automatique</h3>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Scanner les plateformes en arriere-plan automatiquement.</p>
+        </div>
+        <button
+          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {autoScan ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/5'}"
+          onclick={handleToggleAutoScan}
+          role="switch"
+          aria-checked={autoScan}
+          aria-label="Activer le scan automatique"
+        >
+          <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {autoScan ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
+        </button>
       </div>
     </div>
-  {/snippet}
-</SettingsLayout>
+
+    <!-- Intervalle de scan -->
+    <div class="section-card rounded-[1.5rem] p-4 space-y-3 transition-opacity duration-200" class:opacity-40={!autoScan} class:pointer-events-none={!autoScan}>
+      <div>
+        <h3 class="text-sm font-semibold text-text-primary">Frequence de scan</h3>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">Scanner les plateformes toutes les {scanInterval} minutes.</p>
+      </div>
+      <div class="flex items-center gap-3">
+        <span class="text-xs text-text-muted">5 min</span>
+        <input
+          type="range"
+          min="5"
+          max="120"
+          step="5"
+          value={scanInterval}
+          onchange={handleScanIntervalChange}
+          class="flex-1 accent-accent-blue"
+        />
+        <span class="text-xs text-text-muted">120 min</span>
+      </div>
+      <p class="text-center text-sm font-semibold text-accent-blue">{scanInterval} min</p>
+      {#if !autoScan}
+        <p class="text-center text-[11px] text-text-muted">Activez le scan automatique pour configurer la frequence.</p>
+      {/if}
+    </div>
+
+    <!-- Notifications -->
+    <div class="section-card rounded-[1.5rem] p-4">
+      <div class="flex items-center justify-between">
+        <div>
+          <h3 class="text-sm font-semibold text-text-primary">Notifications</h3>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Recevoir une alerte quand de nouvelles missions arrivent.</p>
+        </div>
+        <button
+          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {notifications ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/5'}"
+          onclick={handleToggleNotifications}
+          role="switch"
+          aria-checked={notifications}
+          aria-label="Activer les notifications"
+        >
+          <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {notifications ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
+        </button>
+      </div>
+    </div>
+
+    <!-- Export -->
+    <div class="section-card rounded-[1.5rem] p-4 space-y-4">
+      <div>
+        <h3 class="text-sm font-semibold text-text-primary">Export</h3>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">Exporter vos missions favorites dans différents formats.</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <button
+          class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
+          onclick={() => handleExportFavorites('json')}
+          disabled={isExporting}
+        >
+          <Icon name="file-json" size={16} class="text-accent-blue" />
+          JSON
+        </button>
+        <button
+          class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
+          onclick={() => handleExportFavorites('csv')}
+          disabled={isExporting}
+        >
+          <Icon name="file-spreadsheet" size={16} class="text-accent-emerald" />
+          CSV
+        </button>
+        <button
+          class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
+          onclick={() => handleExportFavorites('markdown')}
+          disabled={isExporting}
+        >
+          <Icon name="file-text" size={16} class="text-accent-amber" />
+          Markdown
+        </button>
+      </div>
+      {#if exportSuccess}
+        <p class="text-xs text-accent-emerald">Export réussi !</p>
+      {/if}
+    </div>
+
+    <!-- Sauvegarde et restauration -->
+    <div class="section-card rounded-[1.5rem] p-4 space-y-4">
+      <div>
+        <h3 class="text-sm font-semibold text-text-primary">Sauvegarde</h3>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">Sauvegarder ou restaurer vos données (profil, paramètres, favoris).</p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <Button variant="secondary" onclick={handleCreateBackup}>
+          {#snippet children()}
+            <Icon name="download" size={16} class="mr-1" />
+            Créer une sauvegarde
+          {/snippet}
+        </Button>
+        <input
+          type="file"
+          accept=".pulse-backup,.json"
+          class="hidden"
+          onchange={handleFileSelect}
+          bind:this={fileInput}
+        />
+        <Button variant="ghost" onclick={triggerFileSelect}>
+          {#snippet children()}
+            <Icon name="upload" size={16} class="mr-1" />
+            Restaurer depuis une sauvegarde
+          {/snippet}
+        </Button>
+      </div>
+    </div>
+
+    <!-- Cle API -->
+    <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
+      <div class="flex items-center gap-2">
+        <Icon name="edit-2" size={12} class="text-accent-blue/60" />
+        <div>
+          <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Necessaire pour enrichir l\'analyse TJM locale avec le modele.</p>
+        </div>
+      </div>
+      <div class="flex gap-2">
+        <input
+          type="password"
+          placeholder="sk-ant-..."
+          class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+          bind:value={apiKey}
+        />
+        <Button variant="secondary" onclick={handleSaveApiKey}>
+          {#snippet children()}{apiKeySaved ? 'Sauve !' : 'Sauver'}{/snippet}
+        </Button>
+      </div>
+    </div>
+
+    <!-- Zone de danger -->
+    <div class="section-card rounded-[1.5rem] border border-red-500/20 p-4 space-y-3">
+      <div>
+        <h3 class="text-sm font-semibold text-red-400">Zone dangereuse</h3>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">Supprimer toutes les donnees locales (profil, missions, cache).</p>
+      </div>
+      {#if showResetConfirm}
+        <div class="flex gap-2">
+          <Button variant="ghost" onclick={() => { showResetConfirm = false; }}>
+            {#snippet children()}Annuler{/snippet}
+          </Button>
+          <button
+            class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/20 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/30"
+            onclick={handleResetAll}
+          >
+            Confirmer la suppression
+          </button>
+        </div>
+      {:else}
+        <button
+          class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/20"
+          onclick={() => { showResetConfirm = true; }}
+        >
+          <Icon name="trash-2" size={14} />
+          Reinitialiser tout
+        </button>
+      {/if}
+    </div>
+  </div>
+{/snippet}
+
+<SettingsLayout {onBack} content={settingsContent} />
 
 {#if showBackupModal}
   <BackupRestoreModal
