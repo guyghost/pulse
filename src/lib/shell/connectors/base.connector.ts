@@ -9,6 +9,17 @@ import {
   createNetworkError,
   createStorageError,
 } from '$lib/core/errors';
+import { detectBrowser, type BrowserInfo } from '../../core/browser/browser-compat';
+
+// Lazy-initialized browser info singleton for diagnostic logging
+let _browserInfo: BrowserInfo | null = null;
+
+const getBrowserInfo = (): BrowserInfo => {
+  if (!_browserInfo) {
+    _browserInfo = detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '');
+  }
+  return _browserInfo;
+};
 
 const LOGIN_PATTERNS = ['/login', '/signin', '/sign-in', '/sign_in', '/auth', '/connexion', '/register', '/signup'];
 
@@ -60,10 +71,11 @@ export abstract class BaseConnector implements PlatformConnector {
         {
           url: this.sessionCheckUrl,
           retryable: !isAbort,
-          context: { 
-            connectorId: this.id, 
+          context: {
+            connectorId: this.id,
             aborted: isAbort,
             originalError: message,
+            browser: getBrowserInfo().name,
           },
         },
         now
@@ -90,7 +102,7 @@ export abstract class BaseConnector implements PlatformConnector {
               status: response.status,
               url,
               retryable: response.status >= 500 || response.status === 429,
-              context: { connectorId: this.id },
+              context: { connectorId: this.id, browser: getBrowserInfo().name },
             },
             now
           ));
@@ -111,6 +123,7 @@ export abstract class BaseConnector implements PlatformConnector {
             context: { 
               connectorId: this.id, 
               aborted: isAbort,
+              browser: getBrowserInfo().name,
             },
           },
           now
@@ -153,7 +166,7 @@ export abstract class BaseConnector implements PlatformConnector {
               status: response.status,
               url,
               retryable: response.status >= 500 || response.status === 429,
-              context: { connectorId: this.id },
+              context: { connectorId: this.id, browser: getBrowserInfo().name },
             },
             now
           ));
@@ -174,6 +187,7 @@ export abstract class BaseConnector implements PlatformConnector {
             context: { 
               connectorId: this.id, 
               aborted: isAbort,
+              browser: getBrowserInfo().name,
             },
           },
           now

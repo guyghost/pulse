@@ -63,6 +63,7 @@ export class FreeWorkConnector extends BaseConnector {
 
         const result = await this.fetchJSON(url.toString(), now, {
           headers: { 'Accept': 'application/ld+json' },
+          credentials: 'omit',  // Public API — no cookies needed
         });
 
         if (!result.ok) {

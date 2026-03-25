@@ -10,7 +10,15 @@ import {
 } from '$lib/core/errors';
 import { createMission, stripHtml } from '$lib/core/connectors/parser-utils';
 import { mapSkill, extractTjm, mapCollectiveRemote } from '$lib/core/connectors/collective-parser';
-import { injectCookieRule, removeCookieRule } from './cookie-rules';
+import {
+  injectCookieRule,
+  removeCookieRule,
+  verifyCookieRule,
+  getCookieCount,
+  getCookieNames,
+  type CookieRuleResult,
+} from './cookie-rules';
+import { detectBrowser } from '../../core/browser/browser-compat';
 
 const API_URL = 'https://api.collective.work/graphql';
 const APP_URL = 'https://app.collective.work';
@@ -81,12 +89,40 @@ export class CollectiveConnector extends BaseConnector {
   async detectSession(_now: number): Promise<Result<boolean, AppError>> {
     try {
       const cookies = await chrome.cookies.getAll({ domain: COOKIE_DOMAIN });
+      console.debug('[collective] detectSession: found', cookies.length, 'cookies');
       const hasSession = cookies.length > 0 && cookies.some(c =>
         c.name.includes('session') || c.name.includes('token') ||
         c.name.includes('auth') || c.name.includes('connect') ||
         c.name === '__Secure-next-auth.session-token'
       );
-      if (!hasSession) return ok(false);
+
+      if (!hasSession) {
+        // FALLBACK: Try cookie injection + API query for browsers with partitioned cookies
+        console.debug('[collective] detectSession: no session cookies found, trying fallback detection via cookie injection');
+        const injectResult = await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
+        if (injectResult.success) {
+          try {
+            const resp = await fetch(API_URL, {
+              method: 'POST',
+              credentials: 'include',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ query: GET_ME_QUERY }),
+            });
+            if (resp.ok) {
+              const data = await resp.json() as { data?: { me?: { members?: { collective?: { slug?: string } }[] } } };
+              if (data.data?.me?.members && data.data.me.members.length > 0) {
+                console.debug('[collective] detectSession: fallback detection succeeded, user slug:', data.data.me.members[0]?.collective?.slug);
+                this.userSlug = data.data.me.members[0]?.collective?.slug ?? null;
+                return ok(true);
+              }
+            }
+          } catch (fallbackError) {
+            console.warn('[collective] detectSession: fallback detection failed:', fallbackError);
+          }
+        }
+        console.debug('[collective] detectSession: fallback detection failed - no cookies or API error');
+        return ok(false);
+      }
 
       // Inject cookie rule once — reused by fetchMissions
       await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
@@ -115,8 +151,12 @@ export class CollectiveConnector extends BaseConnector {
 
   async fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>> {
     try {
-      // Rule already injected by detectSession, re-inject only if needed
-      await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
+      // Verify cookie rule is active, re-inject if needed
+      const ruleActive = await verifyCookieRule(COOKIE_RULE_ID);
+      if (!ruleActive) {
+        console.debug('[collective] fetchMissions: cookie rule not active, re-injecting');
+        await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
+      }
 
       const response = await fetch(API_URL, {
         method: 'POST',
@@ -152,7 +192,7 @@ export class CollectiveConnector extends BaseConnector {
         await removeCookieRule(COOKIE_RULE_ID);
         return err(createConnectorError(
           `Collective API error: ${response.status}`,
-          { connectorId: this.id, phase: 'fetch', context: { status: response.status } },
+          { connectorId: this.id, phase: 'fetch', context: { status: response.status, browser: detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '').name } },
           now
         ));
       }

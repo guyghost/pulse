@@ -1,0 +1,50 @@
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+
+⎯⎯⎯⎯⎯⎯ Failed Suites 1 ⎯⎯⎯⎯⎯⎯⎯
+
+ FAIL  tests/unit/connectors/cookie-rules.test.ts [ tests/unit/connectors/cookie-rules.test.ts ]
+ FAIL  tests/unit/connectors/cookie-rules.test.ts [ tests/unit/connectors/cookie-rules.test.ts ]
+Error: Transform failed with 1 error:
+/Users/guy/Developer/dev/pulse/tests/unit/connectors/cookie-rules.test.ts:27:4: ERROR: Unexpected "}"
+Error: Transform failed with 1 error:
+/Users/guy/Developer/dev/pulse/tests/unit/connectors/cookie-rules.test.ts:27:4: ERROR: Unexpected "}"
+  Plugin: vite:esbuild
+  File: /Users/guy/Developer/dev/pulse/tests/unit/connectors/cookie-rules.test.ts:27:4
+  
+  Unexpected "}"
+  25 |      // Mock chrome.declarativeNetRequest
+  26 |      const mockUpdateDynamicRules = vi.fn().mockRejectedValue(new Error('API unavailable'));
+  27 |      });
+     |      ^
+  28 |      throw error;
+  29 |    });
+  
+  Plugin: vite:esbuild
+  File: /Users/guy/Developer/dev/pulse/tests/unit/connectors/cookie-rules.test.ts:27:4
+  
+  Unexpected "}"
+  25 |      // Mock chrome.declarativeNetRequest
+  26 |      const mockUpdateDynamicRules = vi.fn().mockRejectedValue(new Error('API unavailable'));
+  27 |      });
+     |      ^
+  28 |      throw error;
+  29 |    });
+  
+ ❯ failureErrorWithLog node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15
+ ❯ failureErrorWithLog node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:1467:15
+ ❯ node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:736:50
+ ❯ node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:736:50
+ ❯ responseCallbacks.<computed> node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9
+ ❯ handleIncomingPacket node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12
+ ❯ responseCallbacks.<computed> node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:603:9
+ ❯ handleIncomingPacket node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:658:12
+ ❯ Socket.readFromStdout node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7
+ ❯ Socket.readFromStdout node_modules/.pnpm/esbuild@0.25.12/node_modules/esbuild/lib/main.js:581:7
+
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+
+⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯⎯[1/1]⎯
+

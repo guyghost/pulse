@@ -23,7 +23,7 @@ chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
 
 // Rewrite Origin header for APIs that block chrome-extension:// origin
 chrome.declarativeNetRequest.updateDynamicRules({
-  removeRuleIds: [1, 2],
+  removeRuleIds: [1, 2, 3],
   addRules: [
     {
       id: 1,
@@ -52,6 +52,21 @@ chrome.declarativeNetRequest.updateDynamicRules({
       },
       condition: {
         urlFilter: 'api.collective.work',
+        resourceTypes: ['xmlhttprequest' as chrome.declarativeNetRequest.ResourceType],
+      },
+    },
+    {
+      id: 3,
+      priority: 1,
+      action: {
+        type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+        requestHeaders: [
+          { header: 'Origin', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'https://www.free-work.com' },
+          { header: 'Referer', operation: 'set' as chrome.declarativeNetRequest.HeaderOperation, value: 'https://www.free-work.com/' },
+        ],
+      },
+      condition: {
+        urlFilter: 'free-work.com/api',
         resourceTypes: ['xmlhttprequest' as chrome.declarativeNetRequest.ResourceType],
       },
     },
