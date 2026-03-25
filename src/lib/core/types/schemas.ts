@@ -10,7 +10,6 @@ import { z } from 'zod';
 
 export const MissionSourceSchema = z.enum([
   'free-work',
-  'comet',
   'lehibou',
   'hiway',
   'collective',

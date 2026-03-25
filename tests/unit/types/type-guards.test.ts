@@ -182,7 +182,7 @@ describe('isSemanticResult', () => {
 
 describe('isMissionSource', () => {
 	it('returns true for valid sources', () => {
-		const validSources: MissionSource[] = ['free-work', 'comet', 'lehibou', 'hiway', 'collective', 'cherry-pick'];
+		const validSources: MissionSource[] = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'];
 		for (const source of validSources) {
 			expect(isMissionSource(source)).toBe(true);
 		}

@@ -186,12 +186,12 @@ describe('scanner — runScan', () => {
 	it('returns missions from working connectors when some fail', async () => {
 		const missions = [makeMission({ source: 'free-work' })];
 		const goodConnector = makeConnector('free-work', 'Free-Work', missions);
-		const badConnector = makeFailingConnector('comet', 'Comet', 'Auth required');
+		const badConnector = makeFailingConnector('lehibou', 'LeHibou', 'Auth required');
 
-		(getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'comet']));
+		(getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
 		(getConnector as Mock).mockImplementation(async (id: string) => {
 			if (id === 'free-work') return goodConnector;
-			if (id === 'comet') return badConnector;
+			if (id === 'lehibou') return badConnector;
 			return null;
 		});
 		(getConnectors as Mock).mockResolvedValue([goodConnector, badConnector]);
@@ -201,18 +201,18 @@ describe('scanner — runScan', () => {
 		expect(result.missions).toHaveLength(1);
 		expect(result.missions[0].source).toBe('free-work');
 		expect(result.errors).toHaveLength(1);
-		expect(result.errors[0].connectorId).toBe('comet');
+		expect(result.errors[0].connectorId).toBe('lehibou');
 	});
 
 	// 4. All connectors fail
 	it('returns no missions and errors when all connectors fail', async () => {
 		const bad1 = makeFailingConnector('free-work', 'Free-Work', 'Timeout');
-		const bad2 = makeFailingConnector('comet', 'Comet', 'Network error');
+		const bad2 = makeFailingConnector('lehibou', 'LeHibou', 'Network error');
 
-		(getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'comet']));
+		(getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
 		(getConnector as Mock).mockImplementation(async (id: string) => {
 			if (id === 'free-work') return bad1;
-			if (id === 'comet') return bad2;
+			if (id === 'lehibou') return bad2;
 			return null;
 		});
 		(getConnectors as Mock).mockResolvedValue([bad1, bad2]);
@@ -269,14 +269,14 @@ describe('scanner — runScan', () => {
 	// 7. Progress callback
 	it('calls onProgress with correct current/total/connectorName', async () => {
 		const m1 = [makeMission({ source: 'free-work' })];
-		const m2 = [makeMission({ source: 'comet' })];
+		const m2 = [makeMission({ source: 'lehibou' })];
 		const c1 = makeConnector('free-work', 'Free-Work', m1);
-		const c2 = makeConnector('comet', 'Comet', m2);
+		const c2 = makeConnector('lehibou', 'LeHibou', m2);
 
-		(getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'comet']));
+		(getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
 		(getConnector as Mock).mockImplementation(async (id: string) => {
 			if (id === 'free-work') return c1;
-			if (id === 'comet') return c2;
+			if (id === 'lehibou') return c2;
 			return null;
 		});
 		(getConnectors as Mock).mockResolvedValue([c1, c2]);
@@ -292,7 +292,7 @@ describe('scanner — runScan', () => {
 		// First connector: current=0, total=2
 		expect(progressCalls[0]).toEqual({ current: 0, total: 2, connectorName: 'Free-Work' });
 		// Second connector: current=1, total=2
-		expect(progressCalls[1]).toEqual({ current: 1, total: 2, connectorName: 'Comet' });
+		expect(progressCalls[1]).toEqual({ current: 1, total: 2, connectorName: 'LeHibou' });
 		// Final: current=2, total=2
 		expect(progressCalls[2]).toEqual({ current: 2, total: 2, connectorName: '' });
 	});
@@ -303,15 +303,15 @@ describe('scanner — runScan', () => {
 		const uniqueMission = makeMission({ id: 'unique-1', title: 'Dev Vue.js' });
 
 		const c1 = makeConnector('free-work', 'Free-Work', [sharedMission]);
-		const c2 = makeConnector('comet', 'Comet', [
-			{ ...sharedMission, id: 'dup-2', source: 'comet' as const },
+		const c2 = makeConnector('lehibou', 'LeHibou', [
+			{ ...sharedMission, id: 'dup-2', source: 'lehibou' as const },
 			uniqueMission,
 		]);
 
-		(getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'comet']));
+		(getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
 		(getConnector as Mock).mockImplementation(async (id: string) => {
 			if (id === 'free-work') return c1;
-			if (id === 'comet') return c2;
+			if (id === 'lehibou') return c2;
 			return null;
 		});
 		(getConnectors as Mock).mockResolvedValue([c1, c2]);

@@ -87,11 +87,11 @@ describe('scan orchestrator machine', () => {
 
   it('completes scan with two connectors sequentially — both done, missions collected', async () => {
     const missions1 = [makeMission('1', 'free-work'), makeMission('2', 'free-work')];
-    const missions2 = [makeMission('3', 'comet')];
+    const missions2 = [makeMission('3', 'lehibou')];
 
     const deps = [
       makeConnectorDeps('fw', 'Free-Work', missions1),
-      makeConnectorDeps('comet', 'Comet', missions2),
+      makeConnectorDeps('lehibou', 'LeHibou', missions2),
     ];
     const input = makeInput(deps);
 
@@ -110,15 +110,15 @@ describe('scan orchestrator machine', () => {
     expect(fwStatus!.state).toBe('done');
     expect(fwStatus!.missionsCount).toBe(2);
 
-    const cometStatus = orchestrator.connectorStatuses.get('comet');
-    expect(cometStatus).toBeDefined();
-    expect(cometStatus!.state).toBe('done');
-    expect(cometStatus!.missionsCount).toBe(1);
+    const lehibouStatus = orchestrator.connectorStatuses.get('lehibou');
+    expect(lehibouStatus).toBeDefined();
+    expect(lehibouStatus!.state).toBe('done');
+    expect(lehibouStatus!.missionsCount).toBe(1);
   });
 
   it('one connector fails, other succeeds — scan completes with error recorded', async () => {
     const detectError = createConnectorError('Session expirée', {
-      connectorId: 'comet',
+      connectorId: 'lehibou',
       phase: 'detect',
       recoverable: false,
     }, Date.now());
@@ -126,7 +126,7 @@ describe('scan orchestrator machine', () => {
     const missions1 = [makeMission('1', 'free-work')];
     const deps = [
       makeConnectorDeps('fw', 'Free-Work', missions1),
-      makeConnectorDeps('comet', 'Comet', [], {
+      makeConnectorDeps('lehibou', 'LeHibou', [], {
         detectSession: vi.fn<(now: number) => Promise<Result<boolean, AppError>>>()
           .mockResolvedValue(errResult(detectError)),
       }),
@@ -147,9 +147,9 @@ describe('scan orchestrator machine', () => {
     expect(fwStatus!.error).toBeNull();
 
     // Le second a échoué
-    const cometStatus = orchestrator.connectorStatuses.get('comet');
-    expect(cometStatus!.state).toBe('error');
-    expect(cometStatus!.error).not.toBeNull();
+    const lehibouStatus = orchestrator.connectorStatuses.get('lehibou');
+    expect(lehibouStatus!.state).toBe('error');
+    expect(lehibouStatus!.error).not.toBeNull();
 
     // Pas d'erreur globale (seulement un connecteur a échoué)
     expect(orchestrator.globalError).toBeNull();

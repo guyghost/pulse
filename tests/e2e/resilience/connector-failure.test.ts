@@ -178,7 +178,7 @@ test.describe('Connector Resilience', () => {
                 const connectorId = msg.payload?.connectorId || 'free-work';
 
                 // Simuler que certains connecteurs échouent
-                if (connectorId === 'comet' || connectorId === 'lehibou') {
+                if (connectorId === 'free-work' || connectorId === 'lehibou') {
                   return {
                     type: 'SCAN_ERROR',
                     payload: {

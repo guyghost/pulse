@@ -6,8 +6,8 @@
   "permissions": ["sidePanel", "storage", "cookies", "alarms", "notifications", "declarativeNetRequest"],
   "host_permissions": [
     "https://www.free-work.com/*",
-    "https://app.comet.co/*",
-    "https://api.comet.co/*",
+    
+    
     "https://*.lehibou.com/*",
     "https://hiway-missions.fr/*",
     "https://jhgjtlkfewuiiofxfrvh.supabase.co/*",

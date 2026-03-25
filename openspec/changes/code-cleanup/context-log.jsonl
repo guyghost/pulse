@@ -1,0 +1,17 @@
+{"ts": "2026-03-25T10:00:00.000Z", "seq": 1, "agent": "@orchestrator", "type": "init", "feature": "code-cleanup", "objective": "Supprimer le code mort : Comet, XState 5, et fichiers non utilisés", "constraints": {"platform": "chrome-extension", "offline": true, "designSystem": "svelte-5"}}
+{"ts": "2026-03-25T10:00:05.000Z", "seq": 2, "agent": "@orchestrator", "type": "decision", "content": "XState 5 n'est pas installe et n'est pas utilise", "reason": "Verification via grep xstate dans package.json"}
+{"ts": "2026-03-25T10:00:10.000Z", "seq": 3, "agent": "@orchestrator", "type": "decision", "content": "Comet supprime de MissionSource", "reason": "Le connecteur n'existe plus dans le registre"}
+{"ts": "2026-03-25T10:00:15.000Z", "seq": 4, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "src/lib/core/types/mission.ts", "description": "MissionSource sans Comet"}
+{"ts": "2026-03-25T10:00:20.000Z", "seq": 5, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "src/lib/core/types/schemas.ts", "description": "MissionSourceSchema sans Comet"}
+{"ts": "2026-03-25T10:00:25.000Z", "seq": 6, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "src/lib/core/connectors/validate-parser-output.ts", "description": "validSources sans Comet"}
+{"ts": "2026-03-25T10:00:30.000Z", "seq": 7, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "src/lib/shell/utils/rate-limiter.ts", "description": "Retire config comet.co"}
+{"ts": "2026-03-25T10:00:35.000Z", "seq": 8, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "src/manifest.json", "description": "Retire host_permissions Comet"}
+{"ts": "2026-03-25T10:00:40.000Z", "seq": 9, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "tests/unit/types/type-guards.test.ts", "description": "Mise a jour tests MissionSource"}
+{"ts": "2026-03-25T10:00:45.000Z", "seq": 10, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "tests/unit/scan/scanner.test.ts", "description": "6 tests mis a jour: comet -> lehibou"}
+{"ts": "2026-03-25T10:00:50.000Z", "seq": 11, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "tests/unit/machines/scan-orchestrator.test.ts", "description": "2 tests mis a jour: comet -> lehibou"}
+{"ts": "2026-03-25T10:00:55.000Z", "seq": 12, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "tests/e2e/resilience/connector-failure.test.ts", "description": "connectorId comet -> free-work"}
+{"ts": "2026-03-25T10:01:00.000Z", "seq": 13, "agent": "@orchestrator", "type": "artifact", "action": "modified", "file": "tests/fixtures/large-dataset.ts", "description": "SOURCES sans Comet"}
+{"ts": "2026-03-25T10:01:05.000Z", "seq": 14, "agent": "@orchestrator", "type": "artifact", "action": "deleted", "file": "src/lib/core/virtualization/virtual-list.ts", "description": "Code mort - non utilise"}
+{"ts": "2026-03-25T10:01:10.000Z", "seq": 15, "agent": "@orchestrator", "type": "artifact", "action": "deleted", "file": "src/lib/shell/storage/db-cache.ts", "description": "Code mort - non utilise"}
+{"ts": "2026-03-25T10:01:15.000Z", "seq": 16, "agent": "@orchestrator", "type": "artifact", "action": "deleted", "file": "src/lib/shell/storage/db-with-cache.ts", "description": "Code mort - non utilise"}
+{"ts": "2026-03-25T10:01:20.000Z", "seq": 17, "agent": "@orchestrator", "type": "checkpoint", "run": 1}

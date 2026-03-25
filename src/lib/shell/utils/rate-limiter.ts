@@ -24,8 +24,6 @@ const DEFAULT_DOMAIN_CONFIGS: Record<string, RateLimitConfig> = {
   default: { requestsPerSecond: 2, burstSize: 3 },
   // Free-work - API publique, plus tolérant
   'free-work.com': { requestsPerSecond: 3, burstSize: 5 },
-  // Comet - plus strict
-  'comet.co': { requestsPerSecond: 1, burstSize: 2 },
   // Lehibou
   'lehibou.com': { requestsPerSecond: 2, burstSize: 3 },
   // Cherrypick

@@ -36,7 +36,7 @@ export const validateMission = (raw: unknown): { valid: boolean; mission?: Missi
   }
 
   // Required: source (valid MissionSource)
-  const validSources = ['free-work', 'comet', 'lehibou', 'hiway', 'collective', 'cherry-pick'];
+  const validSources = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'];
   if (typeof m.source !== 'string' || !validSources.includes(m.source)) {
     return { valid: false, reason: `Invalid source: ${m.source}` };
   }
