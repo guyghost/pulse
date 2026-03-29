@@ -1,3 +1,15 @@
+/**
+ * Chrome Storage — Settings & API Key persistence
+ *
+ * SECURITY: Data stored in chrome.storage.local is NOT encrypted.
+ * - Settings (scan interval, connectors, etc.) — low sensitivity
+ * - API key — MEDIUM sensitivity, stored in plaintext
+ * - User profile — low sensitivity
+ *
+ * Mitigation: Chrome extensions' storage is isolated per-extension
+ * and not accessible to web pages. Physical access to the profile
+ * directory would expose the data.
+ */
 import { z } from 'zod';
 
 const SettingsSchema = z.object({
