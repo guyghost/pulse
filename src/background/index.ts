@@ -1,9 +1,18 @@
 import { getProfile, saveProfile, saveConnectorStatuses } from '../lib/shell/storage/db';
-import type { BridgeMessage } from '../lib/shell/messaging/bridge';
+import type {
+  BridgeMessage,
+  ScanProgressPayload,
+  ConnectorProgress,
+} from '../lib/shell/messaging/bridge';
 import type { UserProfile } from '../lib/core/types/profile';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import { getSettings } from '../lib/shell/storage/chrome-storage';
-import { runScan } from '../lib/shell/scan/scanner';
+import {
+  runScan,
+  cancelCurrentScan,
+  isScanRunning,
+  type ConnectorScanState,
+} from '../lib/shell/scan/scanner';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { setNewMissionCount } from '../lib/shell/storage/session-storage';
 import { filterNotifiableMissions } from '../lib/core/scoring/notification-filter';
@@ -109,7 +118,152 @@ chrome.declarativeNetRequest
 // Setup notification click handler
 setupNotificationClickHandler();
 
-// Message handler — profile management only (scan is now handled in side panel)
+// ── Scan orchestration helpers ──
+
+/**
+ * Convertit les ConnectorScanState du scanner en ConnectorProgress pour le bridge.
+ */
+function toConnectorProgress(states: ConnectorScanState[]): ConnectorProgress[] {
+  return states.map((s) => ({
+    connectorId: s.connectorId,
+    connectorName: s.connectorName,
+    state: s.state,
+    missionsCount: s.missionsCount,
+    error: s.error,
+    retryCount: s.retryCount,
+  }));
+}
+
+/**
+ * Envoie un message SCAN_PROGRESS au side panel (si ouvert).
+ * Les erreurs de messaging sont ignorées (panel peut être fermé).
+ */
+function sendScanProgress(payload: ScanProgressPayload): void {
+  chrome.runtime.sendMessage({ type: 'SCAN_PROGRESS', payload }).catch(() => {
+    // Side panel not open, ignore
+  });
+}
+
+/**
+ * Gère un SCAN_START initié par le side panel.
+ * Lance runScan() avec un callback de progression qui envoie SCAN_PROGRESS au panel.
+ * Retourne les missions scannées.
+ */
+async function handleScanStartFromPanel(): Promise<import('../lib/core/types/mission').Mission[]> {
+  // Si un scan est déjà en cours, retourner vide (mutex du scanner)
+  if (isScanRunning()) {
+    if (import.meta.env.DEV) {
+      console.log('[MissionPulse] SCAN_START ignored — scan already in progress');
+    }
+    return [];
+  }
+
+  const result = await runScan(
+    undefined, // signal (panel can use SCAN_CANCEL instead)
+    undefined, // onProgress (legacy)
+    {
+      pageDelayMs: 500,
+      onDetailedProgress: (info) => {
+        sendScanProgress({
+          phase: info.phase,
+          current: info.current,
+          total: info.total,
+          connectorProgress: toConnectorProgress(info.connectorStates),
+        });
+      },
+    }
+  );
+
+  // Persist connector statuses + update badge (same as alarm handler)
+  await persistScanResults(result.missions, result.errors);
+
+  return result.missions;
+}
+
+/**
+ * Persiste les résultats de scan: statuts connecteurs, badge, notifications.
+ * Partagé entre l'alarm handler et le SCAN_START handler.
+ */
+async function persistScanResults(
+  missions: import('../lib/core/types/mission').Mission[],
+  errors: { connectorId: string; message: string }[]
+): Promise<void> {
+  const now = Date.now();
+
+  // Persist last sync timestamp
+  try {
+    await chrome.storage.local.set({ lastGlobalSync: now });
+  } catch {
+    /* Non-critical: sync timestamp */
+  }
+
+  // Persist connector statuses
+  const statusMap = new Map<string, { missions: number; error: string | null }>();
+  for (const mission of missions) {
+    const entry = statusMap.get(mission.source) ?? { missions: 0, error: null };
+    entry.missions++;
+    statusMap.set(mission.source, entry);
+  }
+  for (const err of errors) {
+    const entry = statusMap.get(err.connectorId) ?? { missions: 0, error: null };
+    entry.error = err.message;
+    statusMap.set(err.connectorId, entry);
+  }
+  const persistedStatuses: PersistedConnectorStatus[] = [...statusMap.entries()].map(
+    ([id, data]) => ({
+      connectorId: id,
+      connectorName: id,
+      lastState: data.error && data.missions === 0 ? 'error' : 'done',
+      missionsCount: data.missions,
+      error: data.error ? { type: 'connector', message: data.error } : null,
+      lastSyncAt: now,
+      lastSuccessAt: data.missions > 0 ? now : null,
+    })
+  );
+  try {
+    await saveConnectorStatuses(persistedStatuses);
+  } catch {
+    /* Non-critical: status persistence */
+  }
+
+  if (missions.length === 0) return;
+
+  // Update badge with new mission count
+  const seenIds = await getSeenIds();
+  const seenSet = new Set(seenIds);
+  const newMissions = missions.filter((m) => !seenSet.has(m.id));
+  const newCount = newMissions.length;
+
+  await setNewMissionCount(newCount);
+  if (newCount > 0) {
+    await chrome.action.setBadgeText({ text: String(newCount) });
+    await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
+    await chrome.action.setBadgeTextColor({ color: '#ffffff' });
+  }
+
+  // Send notifications for high-score missions if enabled
+  const settings = await getSettings();
+  if (settings.notifications && newCount > 0) {
+    const notifiableMissions = filterNotifiableMissions(
+      newMissions,
+      seenIds,
+      settings.notificationScoreThreshold
+    );
+    if (notifiableMissions.length > 0) {
+      const didNotify = await notifyHighScoreMissions(notifiableMissions);
+      if (didNotify) {
+        await saveSeenIds(
+          markAsSeen(
+            seenIds,
+            notifiableMissions.map((m) => m.id)
+          )
+        );
+      }
+    }
+  }
+}
+
+// Message handler — profile management + scan orchestration
 chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendResponse) => {
   if (message.type === 'GET_PROFILE') {
     getProfile().then((profile) => {
@@ -130,6 +284,26 @@ chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendRespo
         sendResponse({ type: 'PROFILE_RESULT', payload: null });
       });
     return true;
+  }
+
+  // ── Scan orchestration (panel → service worker) ──
+
+  if (message.type === 'SCAN_START') {
+    handleScanStartFromPanel()
+      .then((missions) => {
+        sendResponse({ type: 'SCAN_COMPLETE', payload: missions });
+      })
+      .catch((err) => {
+        console.error('[MissionPulse] SCAN_START error:', err);
+        sendResponse({ type: 'SCAN_COMPLETE', payload: [] });
+      });
+    return true; // async response
+  }
+
+  if (message.type === 'SCAN_CANCEL') {
+    cancelCurrentScan();
+    sendResponse({ type: 'SCAN_CANCEL' });
+    return false;
   }
 });
 
@@ -154,93 +328,28 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     console.log('[MissionPulse] Auto-scan triggered');
   }
   try {
-    const settings = await getSettings();
-    const result = await runScan();
-    try {
-      await chrome.storage.local.set({ lastGlobalSync: Date.now() });
-    } catch {
-      /* Non-critical: sync timestamp */
-    }
+    const result = await runScan(undefined, undefined, {
+      pageDelayMs: 500,
+      onDetailedProgress: (info) => {
+        // Envoyer la progression au panel (si ouvert)
+        sendScanProgress({
+          phase: info.phase,
+          current: info.current,
+          total: info.total,
+          connectorProgress: toConnectorProgress(info.connectorStates),
+        });
+      },
+    });
+
+    // Persist results + badge + notifications (shared logic)
+    await persistScanResults(result.missions, result.errors);
+
+    // Notify side panel with final missions (for immediate UI update)
     if (result.missions.length > 0) {
       try {
         await chrome.runtime.sendMessage({ type: 'SCAN_COMPLETE', payload: result.missions });
       } catch {
         // Side panel not open, ignore
-      }
-    }
-    // Persist connector statuses (simplified — no XState in service worker)
-    const now = Date.now();
-    const statusMap = new Map<string, { missions: number; error: string | null }>();
-
-    // Count missions per source
-    for (const mission of result.missions) {
-      const entry = statusMap.get(mission.source) ?? { missions: 0, error: null };
-      entry.missions++;
-      statusMap.set(mission.source, entry);
-    }
-
-    // Record errors
-    for (const err of result.errors) {
-      const entry = statusMap.get(err.connectorId) ?? { missions: 0, error: null };
-      entry.error = err.message;
-      statusMap.set(err.connectorId, entry);
-    }
-
-    const persistedStatuses: PersistedConnectorStatus[] = [...statusMap.entries()].map(
-      ([id, data]) => ({
-        connectorId: id,
-        connectorName: id,
-        lastState: data.error && data.missions === 0 ? 'error' : 'done',
-        missionsCount: data.missions,
-        error: data.error ? { type: 'connector', message: data.error } : null,
-        lastSyncAt: now,
-        lastSuccessAt: data.missions > 0 ? now : null,
-      })
-    );
-
-    try {
-      await saveConnectorStatuses(persistedStatuses);
-    } catch {
-      // Storage non-critical
-    }
-
-    if (result.missions.length === 0) return;
-
-    const seenIds = await getSeenIds();
-    const seenSet = new Set(seenIds);
-    const newMissions = result.missions.filter((m) => !seenSet.has(m.id));
-    const newCount = newMissions.length;
-
-    await setNewMissionCount(newCount);
-    if (newCount > 0) {
-      await chrome.action.setBadgeText({ text: String(newCount) });
-      await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
-      await chrome.action.setBadgeTextColor({ color: '#ffffff' });
-    }
-
-    // Send notifications for high-score missions if enabled
-    if (settings.notifications && newCount > 0) {
-      const notifiableMissions = filterNotifiableMissions(
-        newMissions,
-        seenIds,
-        settings.notificationScoreThreshold
-      );
-
-      if (notifiableMissions.length > 0) {
-        if (import.meta.env.DEV) {
-          console.log(
-            `[MissionPulse] Notifying about ${notifiableMissions.length} high-score missions`
-          );
-        }
-        const didNotify = await notifyHighScoreMissions(notifiableMissions);
-        if (didNotify) {
-          await saveSeenIds(
-            markAsSeen(
-              seenIds,
-              notifiableMissions.map((mission) => mission.id)
-            )
-          );
-        }
       }
     }
   } catch (err) {

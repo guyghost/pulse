@@ -1,6 +1,7 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
+import type { AppError } from '../../core/errors/app-error';
 import { buildSearchContext } from '../../core/connectors/search-context';
 import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
@@ -18,6 +19,26 @@ import { trackParserHealth } from './parser-health';
 
 /** Mutex pour empêcher les scans concurrents */
 let scanInProgress = false;
+
+/** AbortController global pour permettre la cancellation depuis le service worker */
+let currentAbortController: AbortController | null = null;
+
+/**
+ * Annule le scan en cours (si existant).
+ * Utilisé par le handler SCAN_CANCEL dans le service worker.
+ */
+export function cancelCurrentScan(): void {
+  if (currentAbortController) {
+    currentAbortController.abort();
+  }
+}
+
+/**
+ * Retourne true si un scan est actuellement en cours.
+ */
+export function isScanRunning(): boolean {
+  return scanInProgress;
+}
 
 /**
  * Erreur de scan avec code typé
@@ -43,11 +64,36 @@ export interface ScanProgressInfo {
   connectorName: string;
 }
 
+/**
+ * Progression détaillée d'un connecteur individuel pendant le scan.
+ * Utilisé pour les messages bridge SCAN_PROGRESS.
+ */
+export interface ConnectorScanState {
+  connectorId: string;
+  connectorName: string;
+  state: 'pending' | 'detecting' | 'fetching' | 'retrying' | 'done' | 'error';
+  missionsCount: number;
+  error: AppError | null;
+  retryCount: number;
+}
+
+/**
+ * Callback de progression détaillé avec état par connecteur.
+ */
+export type DetailedProgressCallback = (info: {
+  phase: 'connecting' | 'scanning' | 'post-processing' | 'done';
+  current: number;
+  total: number;
+  connectorStates: ConnectorScanState[];
+}) => void;
+
 export interface ScanOptions {
   /** Délai entre les pages d'un même connecteur en ms (défaut: 500) */
   pageDelayMs?: number;
   /** Respecter robots.txt (optionnel, pour future implémentation) */
   respectRobotsTxt?: boolean;
+  /** Callback de progression détaillé (pour bridge SCAN_PROGRESS) */
+  onDetailedProgress?: DetailedProgressCallback;
 }
 
 export async function runScan(
@@ -60,11 +106,18 @@ export async function runScan(
     throw new ScanError('Un scan est déjà en cours. Veuillez patienter.', 'MUTEX');
   }
   scanInProgress = true;
+  currentAbortController = new AbortController();
+
+  // Combiner le signal externe avec le AbortController global
+  const combinedSignal = signal
+    ? AbortSignal.any([signal, currentAbortController.signal])
+    : currentAbortController.signal;
 
   try {
-    return await _runScanInternal(signal, onProgress, options);
+    return await _runScanInternal(combinedSignal, onProgress, options);
   } finally {
     scanInProgress = false;
+    currentAbortController = null;
   }
 }
 
@@ -74,6 +127,16 @@ async function _runScanInternal(
   options?: ScanOptions
 ): Promise<ScanResult> {
   const scanStartTime = performance.now();
+  const detailedProgress = options?.onDetailedProgress;
+  const connectorStates: ConnectorScanState[] = [];
+
+  function emitDetailed(
+    phase: 'connecting' | 'scanning' | 'post-processing' | 'done',
+    current = 0,
+    total = 0
+  ) {
+    detailedProgress?.({ phase, current, total, connectorStates: [...connectorStates] });
+  }
 
   // Vérifier la connexion avant de scanner
   if (!isOnline()) {
@@ -133,6 +196,19 @@ async function _runScanInternal(
     }
   }
 
+  // Initialiser les états par connecteur pour le progress détaillé
+  for (const connector of connectors) {
+    connectorStates.push({
+      connectorId: connector.id,
+      connectorName: connector.name,
+      state: 'pending',
+      missionsCount: 0,
+      error: null,
+      retryCount: 0,
+    });
+  }
+  emitDetailed('connecting', 0, connectors.length);
+
   if (signal?.aborted) {
     try {
       await setScanState('idle');
@@ -165,7 +241,14 @@ async function _runScanInternal(
       return { missions: [], errors };
     }
     const connector = connectors[i];
+    const stateIdx = connectorStates.findIndex((s) => s.connectorId === connector.id);
     onProgress?.({ current: i, total: connectors.length, connectorName: connector.name });
+
+    // État: detecting
+    if (stateIdx >= 0) {
+      connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'detecting' };
+    }
+    emitDetailed('scanning', i, connectors.length);
 
     // Petit délai entre les connecteurs pour ne pas surcharger
     if (i > 0) {
@@ -192,6 +275,12 @@ async function _runScanInternal(
       }
     }
 
+    // État: fetching
+    if (stateIdx >= 0) {
+      connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'fetching' };
+    }
+    emitDetailed('scanning', i, connectors.length);
+
     // Retry automatique pour les erreurs réseau avec backoff (Result-aware)
     const result = await withResultRetry(() => connector.fetchMissions(now, connectorContext), {
       maxAttempts: 3,
@@ -211,11 +300,28 @@ async function _runScanInternal(
       errors.push({ connectorId: connector.id, message: result.error.message });
       // Track health for failed connector (0 missions)
       trackParserHealth(connector.id, 0, now).catch(() => {});
+      // État: error
+      if (stateIdx >= 0) {
+        connectorStates[stateIdx] = {
+          ...connectorStates[stateIdx],
+          state: 'error',
+          error: result.error,
+        };
+      }
     } else {
       // Track parser health for successful result
       trackParserHealth(connector.id, result.value.length, now).catch(() => {});
       connectorResults.push({ connectorId: connector.id, missions: result.value });
+      // État: done
+      if (stateIdx >= 0) {
+        connectorStates[stateIdx] = {
+          ...connectorStates[stateIdx],
+          state: 'done',
+          missionsCount: result.value.length,
+        };
+      }
     }
+    emitDetailed('scanning', i + 1, connectors.length);
   }
   onProgress?.({ current: connectors.length, total: connectors.length, connectorName: '' });
 
@@ -224,10 +330,14 @@ async function _runScanInternal(
     allMissions.push(...result.missions);
   }
 
+  // Post-processing: emit progress
+  emitDetailed('post-processing', 0, 3);
+
   // Deduplicate
   const missionsBeforeDedup = allMissions.length;
   const deduped = deduplicateMissions(allMissions);
   const dedupRatio = calculateDedupRatio(missionsBeforeDedup, deduped.length);
+  emitDetailed('post-processing', 1, 3);
 
   // Score against profile (already loaded above for connector filtering)
   const scored = profile
@@ -253,6 +363,7 @@ async function _runScanInternal(
       // Gemini Nano unavailable, continue with basic scoring
     }
   }
+  emitDetailed('post-processing', 2, 3);
 
   // Persist
   if (scored.length > 0) {
@@ -315,5 +426,6 @@ async function _runScanInternal(
   } catch {
     /* Non-critical: scan state is UI-only */
   }
+  emitDetailed('done', connectors.length, connectors.length);
   return { missions: scored, errors };
 }

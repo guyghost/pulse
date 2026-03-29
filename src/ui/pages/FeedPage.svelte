@@ -1,6 +1,7 @@
 <script lang="ts">
   import { createFeedStore } from '$lib/state/feed.svelte';
-  import { ScanOrchestrator, type ConnectorDeps } from '$lib/state/scan-orchestrator.svelte';
+  import { sendMessage } from '$lib/shell/messaging/bridge';
+  import type { ScanProgressPayload, ConnectorProgress } from '$lib/shell/messaging/bridge';
   import VirtualMissionFeed from '../organisms/VirtualMissionFeed.svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
   import ScanProgress from '../organisms/ScanProgress.svelte';
@@ -10,12 +11,7 @@
   import FilterBar from '../organisms/FilterBar.svelte';
   import KeyboardShortcutsHelp from '../molecules/KeyboardShortcutsHelp.svelte';
   import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import {
-    getConnector,
-    getConnectorsMeta,
-    getConnectors,
-    detectAllConnectorSessions,
-  } from '$lib/shell/connectors/index';
+  import { getConnectorsMeta, detectAllConnectorSessions } from '$lib/shell/connectors/index';
   import SourceHealthPanel, {
     type SourceStatus,
     type SourceSessionStatus,
@@ -23,13 +19,7 @@
   import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
   import { markAsSeen } from '$lib/core/seen/mark-seen';
   import { getFavorites, saveFavorites, getHidden, saveHidden } from '$lib/shell/storage/favorites';
-  import {
-    getProfile,
-    getMissions,
-    saveMissions,
-    saveConnectorStatuses,
-    getConnectorStatuses,
-  } from '$lib/shell/storage/db';
+  import { getProfile, getMissions, getConnectorStatuses } from '$lib/shell/storage/db';
   import { getSettings, setSettings } from '$lib/shell/storage/chrome-storage';
   import { resetNewMissionCount } from '$lib/shell/storage/session-storage';
   import {
@@ -39,12 +29,10 @@
     filterFavoritesOnly,
   } from '$lib/core/favorites/favorites';
   import {
-    toPersistedStatus,
     type ConnectorStatus,
     type PersistedConnectorStatus,
   } from '$lib/core/types/connector-status';
-  import { deduplicateMissions } from '$lib/core/scoring/dedup';
-  import { scoreMission } from '$lib/core/scoring/relevance';
+  import type { AppError } from '$lib/core/errors/app-error';
   import { getPanelSide, type PanelSide } from '$lib/shell/ui/panel-layout';
   import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabilities';
   import {
@@ -135,7 +123,7 @@
   let firstName = $state('');
   let panelSide = $state<PanelSide>('right');
   let aiStatus = $state<AiAvailability>('no');
-  let orchestrator = $state<ScanOrchestrator | null>(null);
+  let isScanning = $state(false);
   let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
   let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
   let sourceStatuses = $state<SourceStatus[]>([]);
@@ -246,7 +234,7 @@
       {
         config: FeedShortcuts.REFRESH,
         handler: () => {
-          if (!isLoading && !isOffline) {
+          if (!isScanning && !isLoading && !isOffline) {
             startScan();
           }
         },
@@ -345,169 +333,83 @@
   }
 
   async function startScan() {
-    if (isLoading) return;
+    if (isScanning) return;
     scanCompleted = false;
+    isScanning = true;
+    connectorStatuses = new Map();
     feed.load();
 
     try {
-      const settings = await getSettings();
-      const enabledIds = settings.enabledConnectors;
-      const meta = getConnectorsMeta();
-
-      // Build connector deps
-      const deps: ConnectorDeps[] = [];
-      for (const id of enabledIds) {
-        const connector = await getConnector(id);
-        if (!connector) continue;
-        const m = meta.find((x) => x.id === id);
-        deps.push({
-          connectorId: connector.id,
-          connectorName: m?.name ?? connector.name,
-          detectSession: (now: number) => connector.detectSession(now),
-          fetchMissions: (now: number) => connector.fetchMissions(now),
-        });
-      }
-
-      const scan = new ScanOrchestrator({ connectorDeps: deps, isOnline });
-      orchestrator = scan;
-
-      // Suivre la progression en temps réel pendant le scan
-      const progressInterval = setInterval(() => {
-        if (scan.state === 'scanning') {
-          connectorStatuses = new Map(scan.connectorStatuses);
-        }
-      }, 200);
-
-      await scan.startScan();
-
-      clearInterval(progressInterval);
-      connectorStatuses = new Map(scan.connectorStatuses);
-
-      if (scan.state === 'done') {
-        await handleScanDone({
-          missions: scan.missions,
-          connectorStatuses: scan.connectorStatuses,
-          globalError: scan.globalError,
-        });
-        orchestrator = null;
-      } else if (scan.state === 'cancelled') {
-        feed.setMissions(feed.missions);
-        orchestrator = null;
+      // Envoyer SCAN_START au service worker — il gère toute l'orchestration
+      const response = await sendMessage({ type: 'SCAN_START' });
+      // Le SW renvoie SCAN_COMPLETE avec les missions traitées
+      if (response.type === 'SCAN_COMPLETE' && Array.isArray(response.payload)) {
+        await handleScanComplete(response.payload);
       }
     } catch (err) {
       if (import.meta.env.DEV) {
         console.error('[FeedPage] startScan error:', err);
       }
       feed.setError(err instanceof Error ? err.message : 'Erreur inattendue lors du scan');
-      orchestrator = null;
+    } finally {
+      isScanning = false;
+      connectorStatuses = new Map();
     }
   }
 
-  async function handleScanDone(ctx: {
-    missions: import('$lib/core/types/mission').Mission[];
-    connectorStatuses: Map<string, ConnectorStatus>;
-    globalError: string | null;
-  }) {
-    if (import.meta.env.DEV)
-      console.log(
-        '[handleScanDone] scan missions:',
-        ctx.missions.length,
-        'statuses:',
-        [...ctx.connectorStatuses.entries()]
-          .map(([id, s]) => `${id}:${s.state}(${s.missionsCount})`)
-          .join(', ')
-      );
-
-    // Extract mission counts per source for compact display
-    const counts = new Map<string, number>();
-    for (const [id, status] of ctx.connectorStatuses) {
-      counts.set(id, status.missionsCount);
-    }
-    scanResultCounts = counts;
-
-    // Only compact if we actually found missions
-    const hasMissions =
-      ctx.missions.length > 0 ||
-      [...ctx.connectorStatuses.values()].some((s) => s.missionsCount > 0);
-    scanCompleted = hasMissions;
-    if (ctx.globalError) {
-      feed.setError(ctx.globalError);
-      return;
+  /**
+   * Reçoit les missions finalisées du service worker (déjà scored, deduped, semantic).
+   * Plus de post-processing local — le SW fait tout.
+   */
+  async function handleScanComplete(missions: import('$lib/core/types/mission').Mission[]) {
+    if (import.meta.env.DEV) {
+      console.log('[handleScanComplete] received', missions.length, 'missions from SW');
     }
 
-    // Fusionner nouvelles missions + cache pour resilience (scan partiel)
+    // Merge avec cache pour résilience
     let cached: import('$lib/core/types/mission').Mission[] = [];
     try {
       cached = await getMissions();
     } catch {
-      /* Non-critical: cache unavailable, continue with scan results */
+      /* Non-critical */
     }
-    const merged = [...ctx.missions, ...cached];
-    const deduped = deduplicateMissions(merged);
 
-    let profile = null;
-    try {
-      profile = await getProfile();
-    } catch {
-      /* Non-critical: profile unavailable, skip scoring */
+    // Dedup simple (SW a déjà dedup, mais merge avec cache peut créer des doublons)
+    const merged = [...missions, ...cached];
+    const unique = new Map<string, import('$lib/core/types/mission').Mission>();
+    for (const m of merged) {
+      if (!unique.has(m.id)) unique.set(m.id, m);
     }
-    const scored = profile
-      ? deduped.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
-      : deduped;
+    const finalMissions = [...unique.values()];
 
-    if (import.meta.env.DEV)
-      console.log(
-        '[handleScanDone] cached:',
-        cached.length,
-        'merged:',
-        merged.length,
-        'deduped:',
-        deduped.length,
-        'scored:',
-        scored.length
-      );
+    if (finalMissions.length > 0) {
+      feed.setMissions(finalMissions);
+      scanCompleted = true;
 
-    if (scored.length > 0) {
-      feed.setMissions(scored);
-      try {
-        await saveMissions(scored);
-      } catch {
-        /* Non-critical: persistence failure, missions still in memory */
+      // Compter par source pour l'affichage
+      const counts = new Map<string, number>();
+      for (const m of missions) {
+        counts.set(m.source, (counts.get(m.source) ?? 0) + 1);
       }
-      try {
-        await chrome.storage.local.set({ lastGlobalSync: Date.now() });
-      } catch {
-        /* Non-critical: last sync timestamp */
-      }
+      scanResultCounts = counts;
     } else {
-      const errorParts = [...ctx.connectorStatuses.values()]
-        .filter((s) => s.error)
-        .map((s) => `${s.connectorName}: ${s.error!.message}`);
-      const noSessionParts = [...ctx.connectorStatuses.values()]
-        .filter((s) => !s.error && s.missionsCount === 0)
-        .map((s) => s.connectorName);
-
-      let errorMsg = errorParts.join('\n');
-      if (noSessionParts.length > 0 && !errorMsg) {
-        errorMsg = `Aucune session active sur : ${noSessionParts.join(', ')}. Connectez-vous aux plateformes puis relancez le scan.`;
-      }
-      feed.setError(errorMsg || 'Aucune mission trouvee');
+      feed.setError('Aucune mission trouvee');
     }
 
-    // Persist connector statuses
-    const persisted = [...ctx.connectorStatuses.values()].map((s) =>
-      toPersistedStatus(s, Date.now())
-    );
+    // Recharger les statuts persistés pour le panneau SourceHealthPanel
     try {
-      await saveConnectorStatuses(persisted);
-      persistedStatuses = persisted;
+      persistedStatuses = await getConnectorStatuses();
     } catch {
-      /* Non-critical: status persistence */
+      /* Non-critical */
     }
   }
 
   function stopScan() {
-    orchestrator?.cancel();
+    sendMessage({ type: 'SCAN_CANCEL' }).catch(() => {
+      // Service worker might not be available
+    });
+    isScanning = false;
+    connectorStatuses = new Map();
   }
 
   async function checkSourceSessions() {
@@ -607,14 +509,34 @@
   }
   smartLoad();
 
-  // Listen for background scan results from service worker
+  // Listen for messages from service worker: SCAN_PROGRESS + SCAN_COMPLETE
   try {
-    const handleBgScan = (message: any) => {
-      if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
-        feed.setMissions(message.payload);
+    chrome.runtime.onMessage.addListener((message: any) => {
+      // Progression détaillée pendant le scan
+      if (message?.type === 'SCAN_PROGRESS' && message.payload) {
+        const payload = message.payload as ScanProgressPayload;
+        // Mettre à jour les états de connecteurs pour l'UI
+        const updated = new Map<string, ConnectorStatus>();
+        for (const cp of payload.connectorProgress) {
+          updated.set(cp.connectorId, {
+            connectorId: cp.connectorId,
+            connectorName: cp.connectorName,
+            state: cp.state,
+            missionsCount: cp.missionsCount,
+            error: cp.error as AppError | null,
+            retryCount: cp.retryCount,
+            startedAt: null,
+            completedAt: null,
+          });
+        }
+        connectorStatuses = updated;
       }
-    };
-    chrome.runtime.onMessage.addListener(handleBgScan);
+
+      // Résultat final du scan (auto-scan du background)
+      if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
+        handleScanComplete(message.payload).catch(() => {});
+      }
+    });
   } catch {
     // Outside extension context
   }
@@ -692,7 +614,7 @@
               <button
                 class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition-all duration-200 hover:bg-white/10"
                 onclick={startScan}
-                disabled={isLoading || isOffline}
+                disabled={isScanning || isLoading || isOffline}
                 title="Lancer le scan (r)"
               >
                 <Icon name="play" size={12} class="ml-0.5" />
@@ -726,7 +648,7 @@
               </p>
             </div>
             <div class="flex items-center gap-2" class:flex-row-reverse={panelSide === 'left'}>
-              {#if isLoading}
+              {#if isScanning || isLoading}
                 <button
                   class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10 text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
                   onclick={stopScan}
@@ -737,20 +659,20 @@
               {/if}
               <button
                 class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
-                    {isLoading
+                    {isScanning || isLoading
                   ? 'border-accent-blue/30 bg-accent-blue/10'
                   : isOffline
                     ? 'border-white/5 bg-white/3 text-text-muted cursor-not-allowed'
                     : 'border-white/10 bg-white/6 text-white hover:bg-white/10'}"
                 onclick={startScan}
-                disabled={isLoading || isOffline}
-                title={isLoading
+                disabled={isScanning || isLoading || isOffline}
+                title={isScanning || isLoading
                   ? 'Scan en cours...'
                   : isOffline
                     ? 'Scan indisponible hors ligne'
                     : 'Lancer le scan (r)'}
               >
-                {#if isLoading}
+                {#if isScanning || isLoading}
                   <span class="absolute inset-0 flex items-center justify-center">
                     <span
                       class="radar-ping absolute h-8 w-8 rounded-full border border-accent-blue/40"
@@ -768,7 +690,7 @@
           </div>
 
           <ScanProgress
-            isScanning={isLoading}
+            isScanning={isScanning || isLoading}
             progress={scanProgress.percent}
             missionsFound={totalMissions}
             connectorName={scanProgress.connectorName}
@@ -779,10 +701,10 @@
           <ConnectorStatusList
             statuses={connectorStatuses}
             {persistedStatuses}
-            isScanning={isLoading}
+            isScanning={isScanning || isLoading}
           />
 
-          {#if !isLoading}
+          {#if !(isScanning || isLoading)}
             <SourceHealthPanel
               sources={sourceStatuses}
               isChecking={isCheckingSources}
@@ -847,13 +769,13 @@
       ></div>
 
       <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {#if isLoading}Chargement des missions en cours{/if}
+        {#if isScanning || isLoading}Chargement des missions en cours{/if}
       </div>
 
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <h3 class="text-sm font-semibold tracking-tight text-white">Missions triees</h3>
-          {#if !isLoading}
+          {#if !(isScanning || isLoading)}
             <span
               class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2 py-0.5 text-[10px] font-medium text-accent-emerald/90"
               aria-label="{visibleCount} missions visibles"
@@ -863,7 +785,7 @@
             </span>
           {/if}
         </div>
-        {#if isLoading}
+        {#if isScanning || isLoading}
           <span class="flex items-center gap-2 text-xs text-text-muted" aria-hidden="true">
             <span
               class="h-3 w-3 animate-spin rounded-full border-2 border-accent-blue/30 border-t-accent-blue"
@@ -995,7 +917,7 @@
   >
     <VirtualMissionFeed
       missions={displayMissions}
-      {isLoading}
+      isLoading={isScanning || isLoading}
       {error}
       {seenIds}
       {favorites}
