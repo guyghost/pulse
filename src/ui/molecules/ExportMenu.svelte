@@ -24,11 +24,16 @@
   function handleFormatSelect(format: ExportFormat) {
     // Import dynamique du Core pour garder le composant léger
     import('$lib/core/export/mission-export').then((module) => {
-      const content = module.exportMissions(missions, {
-        format,
-        includeDescription,
-        dateFormat,
-      });
+      const now = new Date();
+      const content = module.exportMissions(
+        missions,
+        {
+          format,
+          includeDescription,
+          dateFormat,
+        },
+        now
+      );
       onExport(format, content);
       isOpen = false;
     });
@@ -80,7 +85,9 @@
             type="checkbox"
             class="accent-accent-blue"
             checked={includeDescription}
-            onchange={() => { includeDescription = !includeDescription; }}
+            onchange={() => {
+              includeDescription = !includeDescription;
+            }}
           />
           <span>Inclure les descriptions</span>
         </label>
@@ -90,7 +97,9 @@
           <select
             class="w-full rounded-[0.75rem] border border-white/10 bg-navy-900 px-3 py-2 text-sm text-text-primary focus:border-accent-blue/30 focus:outline-none"
             value={dateFormat}
-            onchange={(e) => { dateFormat = e.currentTarget.value as typeof dateFormat; }}
+            onchange={(e) => {
+              dateFormat = e.currentTarget.value as typeof dateFormat;
+            }}
           >
             <option value="locale">Locale (FR)</option>
             <option value="iso">ISO 8601</option>

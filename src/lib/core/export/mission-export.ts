@@ -17,11 +17,7 @@ export interface ExportOptions {
  * Formate une date selon le format spécifié
  * Pure function - injection de la date de référence pour testabilité
  */
-function formatDate(
-  date: Date,
-  format: 'iso' | 'locale' | 'relative',
-  now: Date
-): string {
+function formatDate(date: Date, format: 'iso' | 'locale' | 'relative', now: Date): string {
   switch (format) {
     case 'iso':
       return date.toISOString();
@@ -51,8 +47,8 @@ function formatDate(
  */
 export function exportMissionsToJSON(
   missions: Mission[],
-  options?: ExportOptions,
-  now: Date = new Date()
+  options: ExportOptions | undefined,
+  now: Date
 ): string {
   const includeDescription = options?.includeDescription ?? true;
   const dateFormat = options?.dateFormat ?? 'iso';
@@ -98,8 +94,8 @@ function escapeCSV(value: string | null | undefined): string {
  */
 export function exportMissionsToCSV(
   missions: Mission[],
-  options?: ExportOptions,
-  now: Date = new Date()
+  options: ExportOptions | undefined,
+  now: Date
 ): string {
   const includeDescription = options?.includeDescription ?? false;
   const dateFormat = options?.dateFormat ?? 'locale';
@@ -149,8 +145,8 @@ export function exportMissionsToCSV(
  */
 export function exportMissionsToMarkdown(
   missions: Mission[],
-  options?: ExportOptions,
-  now: Date = new Date()
+  options: ExportOptions | undefined,
+  now: Date
 ): string {
   const includeDescription = options?.includeDescription ?? true;
   const dateFormat = options?.dateFormat ?? 'locale';
@@ -212,10 +208,10 @@ export function exportMissionsToMarkdown(
 
 /**
  * Génère un nom de fichier pour l'export
- * Pure function
+ * Pure function - injection de la date pour testabilité
  */
-export function generateFilename(prefix: string, format: ExportFormat): string {
-  const timestamp = new Date().toISOString().split('T')[0]; // YYYY-MM-DD
+export function generateFilename(prefix: string, format: ExportFormat, now: Date): string {
+  const timestamp = now.toISOString().split('T')[0]; // YYYY-MM-DD
   const extensions: Record<ExportFormat, string> = {
     json: 'json',
     csv: 'csv',
@@ -229,11 +225,7 @@ export function generateFilename(prefix: string, format: ExportFormat): string {
  * Fonction utilitaire qui délègue aux fonctions spécifiques
  * Pure function
  */
-export function exportMissions(
-  missions: Mission[],
-  options: ExportOptions,
-  now: Date = new Date()
-): string {
+export function exportMissions(missions: Mission[], options: ExportOptions, now: Date): string {
   switch (options.format) {
     case 'json':
       return exportMissionsToJSON(missions, options, now);

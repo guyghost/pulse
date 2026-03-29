@@ -1,15 +1,12 @@
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import type { Mission } from '../../core/types/mission';
-import { parseCherryPickMissions, type CherryPickMission } from '../../core/connectors/cherrypick-parser';
+import {
+  parseCherryPickMissions,
+  type CherryPickMission,
+} from '../../core/connectors/cherrypick-parser';
 import { delayBetweenPages } from '../utils/rate-limiter';
 import { BaseConnector } from './base.connector';
-import {
-  type Result,
-  type AppError,
-  ok,
-  err,
-  createConnectorError,
-} from '$lib/core/errors';
+import { type Result, type AppError, ok, err, createConnectorError } from '$lib/core/errors';
 
 const BASE_URL = 'https://app.cherry-pick.io';
 const SEARCH_URL = `${BASE_URL}/api/mission/search`;
@@ -21,9 +18,14 @@ export class CherryPickConnector extends BaseConnector {
   readonly baseUrl = BASE_URL;
   readonly icon = 'https://www.google.com/s2/favicons?domain=cherry-pick.io&sz=32';
 
-  protected get sessionCheckUrl() { return `${BASE_URL}/dashboard`; }
+  protected get sessionCheckUrl() {
+    return `${BASE_URL}/dashboard`;
+  }
 
-  async fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>> {
+  async fetchMissions(
+    now: number,
+    context?: ConnectorSearchContext
+  ): Promise<Result<Mission[], AppError>> {
     try {
       const allMissions: Mission[] = [];
 
@@ -51,11 +53,17 @@ export class CherryPickConnector extends BaseConnector {
         });
 
         if (!result.ok) {
-          return err(createConnectorError(
-            `Failed to fetch page ${page} from Cherry Pick`,
-            { connectorId: this.id, phase: 'fetch', context: { page, originalError: result.error } },
-            now
-          ));
+          return err(
+            createConnectorError(
+              `Failed to fetch page ${page} from Cherry Pick`,
+              {
+                connectorId: this.id,
+                phase: 'fetch',
+                context: { page, originalError: result.error },
+              },
+              now
+            )
+          );
         }
 
         const response = result.value as { data?: CherryPickMission[] };
@@ -67,19 +75,19 @@ export class CherryPickConnector extends BaseConnector {
         allMissions.push(...parsedMissions);
       }
 
-      const syncResult = await this.setLastSync(now);
-      if (!syncResult.ok) {
-        console.warn('Failed to set last sync:', syncResult.error);
-      }
+      // Last sync tracking (non-critical)
+      this.setLastSync(now).catch(() => {});
 
       return ok(allMissions);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      return err(createConnectorError(
-        `Unexpected error fetching missions from Cherry Pick: ${message}`,
-        { connectorId: this.id, phase: 'fetch', context: { originalError: message } },
-        now
-      ));
+      return err(
+        createConnectorError(
+          `Unexpected error fetching missions from Cherry Pick: ${message}`,
+          { connectorId: this.id, phase: 'fetch', context: { originalError: message } },
+          now
+        )
+      );
     }
   }
 }

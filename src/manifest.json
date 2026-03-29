@@ -3,11 +3,17 @@
   "name": "MissionPulse",
   "version": "0.1.0",
   "description": "Agent freelance : feed de missions centralisé avec scoring et analyse TJM",
-  "permissions": ["sidePanel", "storage", "cookies", "alarms", "notifications", "declarativeNetRequest"],
+  "minimum_chrome_version": "114",
+  "permissions": [
+    "sidePanel",
+    "storage",
+    "cookies",
+    "alarms",
+    "notifications",
+    "declarativeNetRequest"
+  ],
   "host_permissions": [
     "https://www.free-work.com/*",
-    
-    
     "https://*.lehibou.com/*",
     "https://hiway-missions.fr/*",
     "https://jhgjtlkfewuiiofxfrvh.supabase.co/*",
@@ -25,8 +31,8 @@
     "default_title": "MissionPulse"
   },
   "icons": {
-    "16": "static/icons/icon-16.svg",
-    "48": "static/icons/icon-48.svg",
-    "128": "static/icons/icon-128.svg"
+    "16": "static/icons/icon-16.png",
+    "48": "static/icons/icon-48.png",
+    "128": "static/icons/icon-128.png"
   }
 }

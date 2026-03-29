@@ -12,7 +12,10 @@
   import type { LogEntry } from '../dev/bridge-logger';
   import type { ToastType } from '$lib/state/toast.svelte.ts';
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
-  import { subscribeToConnection, type ConnectionInfo } from '../lib/shell/utils/connection-monitor';
+  import {
+    subscribeToConnection,
+    type ConnectionInfo,
+  } from '../lib/shell/utils/connection-monitor';
   import { getProfile } from '../lib/shell/storage/db';
 
   type Page = 'feed' | 'settings' | 'onboarding';
@@ -38,7 +41,9 @@
   let bridgeLogs: LogEntry[] = $state([]);
 
   if (import.meta.env.DEV) {
-    import('../dev/DevPanel.svelte').then(m => { DevPanel = m.default; });
+    import('../dev/DevPanel.svelte').then((m) => {
+      DevPanel = m.default;
+    });
   }
 
   function devInjectMissions(count: number) {
@@ -85,33 +90,37 @@
     const unsubscribe = subscribeToConnection((info) => {
       const wasOffline = connectionStatus === 'offline';
       connectionStatus = info.status;
-      
+
       // Afficher le banner quand on passe offline
       if (info.status === 'offline') {
         showOfflineBanner = true;
       }
-      
+
       // Notification quand on revient online
       if (wasOffline && info.status !== 'offline') {
         showToast('Connexion restaurée', 'success');
         // Cacher le banner après un délai
-        setTimeout(() => { showOfflineBanner = false; }, 3000);
+        setTimeout(() => {
+          showOfflineBanner = false;
+        }, 3000);
       }
     });
-    
+
     return unsubscribe;
   });
 
   // Check if profile exists on mount (direct IndexedDB access, no bridge needed)
-  getProfile().then((profile) => {
-    if (profile) {
-      hasCompletedOnboarding = true;
-      previousPageIndex = PAGE_INDEX['feed'];
-      currentPage = 'feed';
-    }
-  }).catch(() => {
-    // Outside extension context — show onboarding
-  });
+  getProfile()
+    .then((profile) => {
+      if (profile) {
+        hasCompletedOnboarding = true;
+        previousPageIndex = PAGE_INDEX['feed'];
+        currentPage = 'feed';
+      }
+    })
+    .catch(() => {
+      // Outside extension context — show onboarding
+    });
 
   const navItems: { page: Page; label: string; icon: string }[] = [
     { page: 'feed', label: 'Feed', icon: 'briefcase' },
@@ -130,17 +139,43 @@
   }
 </script>
 
-<div class="panel-shell relative flex h-screen w-full flex-col overflow-hidden text-text-primary font-sans">
+<div
+  class="panel-shell relative flex h-screen w-full flex-col overflow-hidden text-text-primary font-sans"
+>
   <div class="panel-grid pointer-events-none absolute inset-0 opacity-45"></div>
-  <div class="pointer-events-none absolute -left-16 top-10 h-40 w-40 rounded-full bg-accent-blue/12 blur-3xl"></div>
-  <div class="pointer-events-none absolute right-[-2.5rem] top-48 h-36 w-36 rounded-full bg-accent-emerald/10 blur-3xl"></div>
-  <div class="pointer-events-none absolute bottom-0 left-14 h-32 w-32 rounded-full bg-accent-amber/10 blur-3xl"></div>
+  <div
+    class="pointer-events-none absolute -left-16 top-10 h-40 w-40 rounded-full bg-accent-blue/12 blur-3xl"
+  ></div>
+  <div
+    class="pointer-events-none absolute right-[-2.5rem] top-48 h-36 w-36 rounded-full bg-accent-emerald/10 blur-3xl"
+  ></div>
+  <div
+    class="pointer-events-none absolute bottom-0 left-14 h-32 w-32 rounded-full bg-accent-amber/10 blur-3xl"
+  ></div>
   {#if currentPage === 'onboarding' && !hasCompletedOnboarding}
-    <OnboardingPage onComplete={completeOnboarding} />
+    <svelte:boundary
+      onerror={(e) => {
+        if (import.meta.env.DEV) console.error('[OnboardingPage crash]', e);
+      }}
+    >
+      <OnboardingPage onComplete={completeOnboarding} />
+      {#snippet failed(error, reset)}
+        <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+          <div class="text-4xl">🚀</div>
+          <p class="text-sm text-text-secondary">L'onboarding a rencontré une erreur.</p>
+          <button
+            onclick={reset}
+            class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+          >
+            Réessayer
+          </button>
+        </div>
+      {/snippet}
+    </svelte:boundary>
   {:else}
     <div class="relative z-10 flex h-full flex-col">
       {#if showOfflineBanner}
-        <div 
+        <div
           class="flex items-center justify-center gap-2 border-b border-white/10 bg-accent-red/10 px-4 py-2 text-xs text-accent-red"
           transition:fade={{ duration: 200 }}
         >
@@ -148,38 +183,53 @@
           <span>Mode hors ligne — Données en cache uniquement</span>
         </div>
       {/if}
-      
+
       <div class="px-3 pt-3">
         <nav
           aria-label="Main navigation"
           class="section-card flex items-center gap-1 rounded-[1.5rem] p-1.5"
         >
-      {#each navItems as item}
-        <button
-          use:ripple
-          class="flex flex-1 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-250 active:scale-[0.985]
+          {#each navItems as item}
+            <button
+              use:ripple
+              class="flex flex-1 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-250 active:scale-[0.985]
             {currentPage === item.page
-              ? 'bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_18px_rgba(1,7,12,0.22)]'
-              : 'text-text-secondary hover:bg-white/[0.04] hover:text-white'}"
-          aria-current={currentPage === item.page ? 'page' : undefined}
-          onclick={() => navigate(item.page)}
-        >
-          <Icon name={item.icon} size={16} />
-          <span>{item.label}</span>
-        </button>
-      {/each}
+                ? 'bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_18px_rgba(1,7,12,0.22)]'
+                : 'text-text-secondary hover:bg-white/[0.04] hover:text-white'}"
+              aria-current={currentPage === item.page ? 'page' : undefined}
+              onclick={() => navigate(item.page)}
+            >
+              <Icon name={item.icon} size={16} />
+              <span>{item.label}</span>
+            </button>
+          {/each}
         </nav>
-        
+
         <div class="mt-2 flex justify-end">
           <ConnectionIndicator />
         </div>
       </div>
       <main class="relative flex-1 overflow-hidden">
-        <div
-          class="absolute inset-0 overflow-y-auto"
-          class:hidden={currentPage !== 'feed'}
-        >
-          <FeedPage />
+        <div class="absolute inset-0 overflow-y-auto" class:hidden={currentPage !== 'feed'}>
+          <svelte:boundary
+            onerror={(e) => {
+              if (import.meta.env.DEV) console.error('[FeedPage crash]', e);
+            }}
+          >
+            <FeedPage />
+            {#snippet failed(error, reset)}
+              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <div class="text-4xl">⚠️</div>
+                <p class="text-sm text-text-secondary">Le feed a rencontré une erreur.</p>
+                <button
+                  onclick={reset}
+                  class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                >
+                  Réessayer
+                </button>
+              </div>
+            {/snippet}
+          </svelte:boundary>
         </div>
         {#if currentPage === 'settings'}
           <div
@@ -187,7 +237,30 @@
             in:fly={{ x: 30, duration: 200, easing: cubicOut }}
             out:fade={{ duration: 100 }}
           >
-            <SettingsPage onBack={() => navigate('feed')} onNavigateToOnboarding={resetToOnboarding} />
+            <svelte:boundary
+              onerror={(e) => {
+                if (import.meta.env.DEV) console.error('[SettingsPage crash]', e);
+              }}
+            >
+              <SettingsPage
+                onBack={() => navigate('feed')}
+                onNavigateToOnboarding={resetToOnboarding}
+              />
+              {#snippet failed(error, reset)}
+                <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+                  <div class="text-4xl">⚙️</div>
+                  <p class="text-sm text-text-secondary">
+                    Les paramètres ont rencontré une erreur.
+                  </p>
+                  <button
+                    onclick={reset}
+                    class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                  >
+                    Réessayer
+                  </button>
+                </div>
+              {/snippet}
+            </svelte:boundary>
           </div>
         {/if}
       </main>

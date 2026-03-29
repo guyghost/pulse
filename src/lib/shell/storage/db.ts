@@ -36,7 +36,7 @@ function openDB(): Promise<IDBDatabase> {
 function withStore<T>(
   storeName: string,
   mode: IDBTransactionMode,
-  fn: (store: IDBObjectStore) => IDBRequest,
+  fn: (store: IDBObjectStore) => IDBRequest
 ): Promise<T> {
   return openDB().then((db) => {
     return new Promise<T>((resolve, reject) => {
@@ -64,9 +64,7 @@ export async function saveMissions(missions: Mission[]): Promise<void> {
 }
 
 export async function getMissions(): Promise<Mission[]> {
-  const rawMissions = await withStore<unknown[]>('missions', 'readonly', (store) =>
-    store.getAll()
-  );
+  const rawMissions = await withStore<unknown[]>('missions', 'readonly', (store) => store.getAll());
 
   const validMissions: Mission[] = [];
   const invalidCount = { value: 0 };
@@ -82,7 +80,9 @@ export async function getMissions(): Promise<Mission[]> {
   }
 
   if (invalidCount.value > 0) {
-    console.warn(`[DB] ${invalidCount.value} missions corrompues ignorées sur ${rawMissions.length} totales`);
+    console.warn(
+      `[DB] ${invalidCount.value} missions corrompues ignorées sur ${rawMissions.length} totales`
+    );
   }
 
   return validMissions;
@@ -101,7 +101,7 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   }
 
   await withStore<IDBValidKey>('profile', 'readwrite', (store) =>
-    store.put({ ...profile, id: 'current' }),
+    store.put({ ...profile, id: 'current' })
   );
 
   // Invalider le cache sémantique : les scores doivent être recalculés avec le nouveau profil
@@ -114,9 +114,7 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
 }
 
 export async function getProfile(): Promise<UserProfile | null> {
-  const result = await withStore<
-    unknown
-  >('profile', 'readonly', (store) => store.get('current'));
+  const result = await withStore<unknown>('profile', 'readonly', (store) => store.get('current'));
 
   if (!result) return null;
 
@@ -155,7 +153,9 @@ export async function saveConnectorStatuses(statuses: PersistedConnectorStatus[]
 }
 
 export async function getConnectorStatuses(): Promise<PersistedConnectorStatus[]> {
-  return withStore<PersistedConnectorStatus[]>('connector_status', 'readonly', (store) => store.getAll());
+  return withStore<PersistedConnectorStatus[]>('connector_status', 'readonly', (store) =>
+    store.getAll()
+  );
 }
 
 export async function clearConnectorStatuses(): Promise<void> {
@@ -197,7 +197,7 @@ export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
     };
 
     tx.oncomplete = () => {
-      if (purged > 0) {
+      if (purged > 0 && import.meta.env.DEV) {
         console.log(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
       }
     };

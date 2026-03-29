@@ -26,7 +26,7 @@ export interface CookieRuleResult {
 export const injectCookieRule = async (
   cookieDomain: string,
   urlFilter: string,
-  ruleId: number,
+  ruleId: number
 ): Promise<CookieRuleResult> => {
   const cookies = await chrome.cookies.getAll({ domain: cookieDomain });
   const cookieCount = cookies.length;
@@ -40,8 +40,10 @@ export const injectCookieRule = async (
   }
 
   // Log found cookies for diagnostics
-  const cookieNames = cookies.map((c) => c.name).join(', ');
-  console.log(`[cookie-rules] Found ${cookieCount} cookies for ${cookieDomain}: ${cookieNames}`);
+  if (import.meta.env.DEV) {
+    const cookieNames = cookies.map((c) => c.name).join(', ');
+    console.log(`[cookie-rules] Found ${cookieCount} cookies for ${cookieDomain}: ${cookieNames}`);
+  }
 
   await chrome.declarativeNetRequest.updateDynamicRules({
     removeRuleIds: [ruleId],

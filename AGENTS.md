@@ -6,16 +6,16 @@ MissionPulse est une extension Chrome (Manifest V3) qui agit comme un agent au s
 
 ## Stack
 
-| Couche | Technologie | Version |
-|--------|-------------|---------|
-| UI | Svelte 5 (runes) | ^5.x |
-| Styling | TailwindCSS 4 (CSS-first config) | ^4.x |
-| State | XState 5 (actors, setup API) | ^5.x |
-| Language | TypeScript (strict) | ^5.x |
-| Build | Vite + @crxjs/vite-plugin | latest |
-| Tests | Vitest + Playwright | latest |
-| Runtime | Chrome Extension Manifest V3 | MV3 |
-| Package manager | pnpm | latest |
+| Couche          | Technologie                                | Version |
+| --------------- | ------------------------------------------ | ------- |
+| UI              | Svelte 5 (runes)                           | ^5.x    |
+| Styling         | TailwindCSS 4 (CSS-first config)           | ^4.x    |
+| State           | Svelte 5 runes ($state, $derived, $effect) | ^5.x    |
+| Language        | TypeScript (strict)                        | ^5.x    |
+| Build           | Vite + @crxjs/vite-plugin                  | latest  |
+| Tests           | Vitest + Playwright                        | latest  |
+| Runtime         | Chrome Extension Manifest V3               | MV3     |
+| Package manager | pnpm                                       | latest  |
 
 ## Architecture
 
@@ -94,11 +94,11 @@ import { getMissions } from '$lib/shell/storage/db'; // ← JAMAIS dans core/
 
 L'extension a **trois contextes isolés** qui communiquent via `chrome.runtime.sendMessage` :
 
-1. **Service Worker** (`src/background/`) — Cerveau de l'extension. Héberge les machines XState globales (scan, connectors). Pas d'accès DOM. Orchestre les cycles de scan via `chrome.alarms`.
+1. **Service Worker** (`src/background/`) — Cerveau de l'extension. Orchestre les cycles de scan via `chrome.alarms`. Pas d'accès DOM.
 
 2. **Offscreen Document** (`src/offscreen/`) — Utilisé pour le scraping. A accès au DOM. Le service worker crée un offscreen document temporaire, lui envoie une URL à scrapper, récupère le résultat, puis le détruit. Un seul offscreen document actif à la fois (contrainte Chrome).
 
-3. **Side Panel** (`src/sidepanel/`) — Interface utilisateur Svelte. Communique avec le service worker pour lire l'état des machines et déclencher des actions.
+3. **Side Panel** (`src/sidepanel/`) — Interface utilisateur Svelte. L'état est géré via des runes Svelte 5 dans `src/lib/state/`. Communique avec le service worker via le messaging bridge.
 
 ### Messaging entre contextes
 
@@ -113,7 +113,7 @@ type MessageType =
   | { type: 'SCRAPE_URL'; payload: { url: string; connectorId: string } }
   | { type: 'SCRAPE_RESULT'; payload: { missions: Mission[] } }
   | { type: 'GET_PROFILE' }
-  | { type: 'SAVE_PROFILE'; payload: UserProfile }
+  | { type: 'SAVE_PROFILE'; payload: UserProfile };
 ```
 
 Règle : le side panel n'appelle JAMAIS directement IndexedDB ou chrome.cookies. Tout passe par le service worker.
@@ -122,7 +122,7 @@ Règle : le side panel n'appelle JAMAIS directement IndexedDB ou chrome.cookies.
 
 ```
 [Side Panel]  →  message  →  [Service Worker]  →  message  →  [Offscreen Doc]
-    UI Svelte        ↕              XState machines        ↕           DOM scraping
+    UI Svelte        ↕              Orchestration          ↕           DOM scraping
     $state/props     ↕              IndexedDB              ↕           Parse HTML
                   snapshot                                result
 ```
@@ -148,7 +148,9 @@ Règle : le side panel n'appelle JAMAIS directement IndexedDB ou chrome.cookies.
   });
 
   // Events : attributs natifs
-  function handleClick() { isOpen = !isOpen; }
+  function handleClick() {
+    isOpen = !isOpen;
+  }
 </script>
 
 <button onclick={handleClick}>{display}</button>
@@ -158,100 +160,91 @@ Règle : le side panel n'appelle JAMAIS directement IndexedDB ou chrome.cookies.
 
 - `export let` → utiliser `$props()`
 - `$:` reactive declarations → utiliser `$derived` ou `$effect`
-- `writable()`, `readable()`, `derived()` stores → utiliser `$state` ou XState
+- `writable()`, `readable()`, `derived()` stores → utiliser `$state` runes
 - `on:click`, `on:input` → utiliser `onclick`, `oninput`
 - `createEventDispatcher()` → utiliser callback props
 - `$$props`, `$$restProps` → utiliser `...rest` avec `$props()`
 - Slots nommés legacy → utiliser `{#snippet}` et `{@render}`
 
-### Binding XState ↔ Svelte
+### State Management avec Svelte 5 Runes
 
-Utiliser `@xstate/svelte` pour connecter les machines aux composants :
-
-```svelte
-<script lang="ts">
-  import { useActor } from '@xstate/svelte';
-  import { feedMachine } from '$lib/machines/feed.machine';
-
-  const { snapshot, send } = useActor(feedMachine);
-
-  let missions = $derived($snapshot.context.missions);
-  let isLoading = $derived($snapshot.matches('loading'));
-</script>
-```
-
-## XState 5 — Règles strictes
-
-### Pattern obligatoire
-
-Toujours utiliser `setup()` avant `createMachine()` :
+L'état partagé est géré via des modules `.svelte.ts` dans `src/lib/state/`. Chaque module exporte une factory function ou une classe utilisant les runes `$state`, `$derived` et `$effect` :
 
 ```typescript
-import { setup, assign, fromPromise } from 'xstate';
+// src/lib/state/feed.svelte.ts — Pattern factory
+export function createFeedStore() {
+  let state = $state<FeedState>('empty');
+  let missions = $state<Mission[]>([]);
+  let searchQuery = $state('');
 
-export const myMachine = setup({
-  types: {
-    context: {} as MyContext,
-    events: {} as MyEvents,
-  },
-  actors: {
-    fetchData: fromPromise(async ({ input }: { input: FetchInput }) => {
-      // ...
-    }),
-  },
-  actions: {
-    setData: assign({
-      data: ({ event }) => event.output,
-    }),
-  },
-  guards: {
-    hasData: ({ context }) => context.data.length > 0,
-  },
-}).createMachine({
-  id: 'my-machine',
-  initial: 'idle',
-  context: { /* ... */ },
-  states: { /* ... */ },
-});
+  let filteredMissions = $derived(recomputeFilteredMissions(missions, searchQuery));
+
+  return {
+    get state() {
+      return state;
+    },
+    get missions() {
+      return missions;
+    },
+    get filteredMissions() {
+      return filteredMissions;
+    },
+    setMissions(m: Mission[]) {
+      missions = m;
+      state = 'loaded';
+    },
+    setSearch(q: string) {
+      searchQuery = q;
+    },
+  };
+}
 ```
 
-### Interdit
+```typescript
+// src/lib/state/scan-orchestrator.svelte.ts — Pattern classe
+export class ScanOrchestrator {
+  state = $state<ScanOrchestratorState>('idle');
+  progress = $state(0);
+  // ...
+  async start() {
+    /* orchestration logic */
+  }
+  cancel() {
+    /* ... */
+  }
+}
+```
 
-- `createMachine()` sans `setup()` — toujours wraper dans `setup()`
-- `interpret()` — utiliser `createActor()`
-- `services` en config objet — utiliser `actors` dans `setup()`
-- String references sans déclaration dans `setup()` — tout doit être typé
-- `send()` avec string — toujours `{ type: 'EVENT_NAME' }`
+### Modules d'état du projet
 
-### Machines du projet
-
-| Machine | Localisation | Contexte d'exécution | Rôle |
-|---------|-------------|---------------------|------|
-| `scan` | `src/background/machines/` | Service Worker | Orchestration du cycle de scan complet |
-| `connector` | `src/background/machines/` | Service Worker | Lifecycle d'un connecteur (detect → fetch → done) |
-| `feed` | `src/machines/` | Side Panel | État de l'affichage du feed |
-| `onboarding` | `src/machines/` | Side Panel | Wizard de configuration initiale |
-| `filters` | `src/machines/` | Side Panel | État des filtres actifs |
+| Module              | Localisation                                | Rôle                                              |
+| ------------------- | ------------------------------------------- | ------------------------------------------------- |
+| `feed`              | `src/lib/state/feed.svelte.ts`              | État du feed : missions, recherche, filtrage      |
+| `scan-orchestrator` | `src/lib/state/scan-orchestrator.svelte.ts` | Orchestration du cycle de scan complet            |
+| `connector-runner`  | `src/lib/state/connector-runner.svelte.ts`  | Lifecycle d'un connecteur (detect → fetch → done) |
+| `onboarding`        | `src/lib/state/onboarding.svelte.ts`        | Wizard de configuration initiale                  |
+| `connection`        | `src/lib/state/connection.svelte.ts`        | Détection de l'état réseau                        |
+| `toast`             | `src/lib/state/toast.svelte.ts`             | Notifications toast UI                            |
 
 ## TailwindCSS 4 — Config CSS-first
 
 La configuration est dans `src/ui/design-tokens.css`, pas dans un fichier JS :
 
 ```css
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
-  --color-navy-900: #0F172A;
-  --color-navy-800: #1E293B;
+  --color-navy-900: #0f172a;
+  --color-navy-800: #1e293b;
   --color-navy-700: #334155;
-  --color-surface: #1E293B;
+  --color-surface: #1e293b;
   --color-surface-hover: #273548;
-  --color-text-primary: #F8FAFC;
-  --color-text-secondary: #94A3B8;
-  --color-accent-blue: #3B82F6;
-  --color-accent-emerald: #10B981;
-  --color-accent-amber: #F59E0B;
-  --color-accent-red: #EF4444;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-accent-blue: #3b82f6;
+  --color-accent-emerald: #10b981;
+  --color-accent-amber: #f59e0b;
+  --color-accent-red: #ef4444;
 
   --font-sans: 'Inter', system-ui, sans-serif;
   --font-mono: 'JetBrains Mono', monospace;
@@ -275,19 +268,19 @@ src/ui/
 
 - Un fichier = un composant : `MissionCard.svelte`
 - Props typées dans `$props()` avec interface inline ou importée
-- Pas de logique métier dans les composants — déléguer aux machines XState ou aux modules `lib/core/`
-- Les atomes ne connaissent pas XState. Les organisms et pages y accèdent.
-- Les molecules reçoivent des données via props, jamais via import direct de machine
+- Pas de logique métier dans les composants — déléguer aux modules `lib/core/` ou aux modules d'état `lib/state/`
+- Les atomes ne connaissent pas les modules d'état. Les organisms et pages y accèdent.
+- Les molecules reçoivent des données via props, jamais via import direct de modules d'état
 
 ### Hiérarchie de responsabilité
 
-| Niveau | Connaît XState ? | Appelle des services ? | Exemples |
-|--------|-----------------|----------------------|----------|
-| Atoms | Non | Non | Button, Badge, Icon |
-| Molecules | Non | Non | MissionCard, FilterBar |
-| Organisms | Oui (via `useActor`) | Via événements XState | MissionFeed, ConnectorPanel |
-| Templates | Non (layout pur) | Non | FeedLayout |
-| Pages | Oui (crée les actors) | Oui (init machines) | FeedPage, SettingsPage |
+| Niveau    | Accède à l'état ?           | Appelle des services ? | Exemples                    |
+| --------- | --------------------------- | ---------------------- | --------------------------- |
+| Atoms     | Non                         | Non                    | Button, Badge, Icon         |
+| Molecules | Non                         | Non                    | MissionCard, FilterBar      |
+| Organisms | Oui (via state modules)     | Via state modules      | MissionFeed, ConnectorPanel |
+| Templates | Non (layout pur)            | Non                    | FeedLayout                  |
+| Pages     | Oui (crée les state stores) | Oui (init state)       | FeedPage, SettingsPage      |
 
 ## Connecteurs — Pattern d'implémentation
 
@@ -308,6 +301,7 @@ export interface PlatformConnector {
 ```
 
 Convention pour ajouter un connecteur :
+
 1. Créer le parser pur dans `src/lib/core/connectors/{platform}-parser.ts` — fonction `parse{Platform}HTML(html, now, idPrefix)`
 2. Créer le connecteur I/O dans `src/lib/shell/connectors/{platform}.connector.ts` — utilise le parser pur + bridge
 3. Enregistrer dans `src/lib/shell/connectors/index.ts`
@@ -316,7 +310,7 @@ Convention pour ajouter un connecteur :
 
 Le scraping se fait via l'offscreen document. Le connecteur envoie un message au service worker avec l'URL cible, qui crée l'offscreen document, charge la page, et exécute le parsing DOM.
 
-Quand un connecteur casse (DOM changé), il doit throw une `ConnectorError` typée. La machine `connector` passe en état `error` et notifie l'utilisateur. Les autres connecteurs continuent.
+Quand un connecteur casse (DOM changé), il doit throw une `ConnectorError` typée. Le `ConnectorRunner` passe en état `error` et notifie l'utilisateur. Les autres connecteurs continuent.
 
 ## Sémantique — Scoring via Gemini Nano
 
@@ -336,7 +330,7 @@ Le scoring sémantique est optionnel et non-bloquant : si Gemini Nano n'est pas 
 - Types dans `src/lib/core/types/` — un fichier par domaine
 - Zod pour la validation des réponses LLM (parse + safeParse)
 - Les types Chrome sont fournis par `@types/chrome`
-- Chaque machine XState a ses types explicites dans `setup({ types: { ... } })`
+- Chaque module d'état dans `src/lib/state/` a ses types explicites
 
 ## Conventions de test
 
@@ -361,23 +355,22 @@ En mode dev, les APIs Chrome sont automatiquement stubées avec des données moc
 ### Dev Panel
 
 `Ctrl+Shift+D` ouvre un panel de contrôle avec :
+
 - **Feed State** : basculer entre empty / loading / loaded / error
 - **Missions** : injecter N missions mock
 - **Onboarding** : toggle l'état onboarding complété
 - **Bridge Logs** : messages bridge en temps réel
 
-### XState Inspector
-
-En mode dev, `@statelyai/inspect` est activé automatiquement. Ouvrir https://stately.ai/inspect pour visualiser les machines XState en temps réel.
-
 ### Bridge Logging
 
 Les messages bridge sont loggés automatiquement en mode dev :
+
 ```
 [Bridge] → SCAN_START                    12:34:56.789
 [Bridge] ← SCAN_STATUS {progress: 0.5}  12:34:57.123
 [Bridge] ← MISSIONS_UPDATED [8 items]   12:34:58.456
 ```
+
 Logs visibles dans la console ET dans le Dev Panel.
 
 ### Structure dev
@@ -404,12 +397,12 @@ Tout le code dans `src/dev/` est derrière `import.meta.env.DEV` et n'est jamais
 ## Ce qu'il ne faut JAMAIS faire
 
 1. **Mélanger Svelte 4 et 5** — Ce projet est 100% Svelte 5 runes
-2. **Utiliser des stores Svelte** — Tout état partagé passe par XState
-3. **Accéder à chrome.* depuis le side panel** — Passer par le messaging bridge
+2. **Utiliser des stores Svelte** — Tout état partagé passe par des runes Svelte 5 dans `src/lib/state/`
+3. **Accéder à chrome.\* depuis le side panel** — Passer par le messaging bridge
 4. **Stocker des credentials** — On utilise les sessions navigateur existantes
 5. **Créer un backend** — L'architecture est local-first
 6. **Utiliser tailwind.config.js** — TailwindCSS 4 = CSS-first avec @theme
-7. **Mettre de la logique métier dans les composants UI** — Déléguer à `lib/core/` ou aux machines
+7. **Mettre de la logique métier dans les composants UI** — Déléguer à `lib/core/` ou aux modules d'état
 8. **Ignorer les erreurs de connecteur** — Chaque erreur doit être typée et remonter proprement
 9. **Appeler Gemini Nano sans passer par le cache** — Coût et latence inutiles
 10. **Commit du code avec `any`** — TypeScript strict, pas de compromis

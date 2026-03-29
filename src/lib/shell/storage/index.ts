@@ -1,42 +1,13 @@
 /**
  * Point d'entrée unique pour le stockage shell.
- * Ré-exporte toutes les fonctions avec cache (db-with-cache) et les autres modules.
+ * Ré-exporte toutes les fonctions de stockage.
  */
 
-// === Cache-enabled DB (usage recommandé) ===
-export {
-  // Fonctions avec cache
-  getMissionsCached,
-  getProfileCached,
-  saveMissionsWithCacheInvalidation,
-  saveProfileWithCacheInvalidation,
-  clearMissionsWithCacheInvalidation,
-  // Cache utilities
-  getCached,
-  setCached,
-  invalidateCache,
-  getCacheStats,
-  resetCacheStats,
-  clearCache,
-  // Fonctions brutes (si besoin d'accès direct)
-  saveMissions,
-  clearMissions,
-  saveProfile,
-} from './db-with-cache';
-
 // === Favorites & Hidden (chrome.storage.local) ===
-export {
-  getFavorites,
-  saveFavorites,
-  getHidden,
-  saveHidden,
-} from './favorites';
+export { getFavorites, saveFavorites, getHidden, saveHidden } from './favorites';
 
 // === Seen Missions (chrome.storage.local) ===
-export {
-  getSeenIds,
-  saveSeenIds,
-} from './seen-missions';
+export { getSeenIds, saveSeenIds } from './seen-missions';
 
 // === Chrome Storage (Settings, API Key) ===
 export {
@@ -65,9 +36,3 @@ export {
   clearExpiredSemanticCache,
   isSemanticCacheValid,
 } from './semantic-cache';
-
-// === Types du cache mémoire ===
-export type {
-  CacheEntry,
-  CacheStats,
-} from './db-cache';

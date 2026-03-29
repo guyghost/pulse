@@ -1,13 +1,7 @@
 import { BaseConnector } from './base.connector';
 import type { Mission } from '../../core/types/mission';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
-import {
-  type Result,
-  type AppError,
-  ok,
-  err,
-  createConnectorError,
-} from '$lib/core/errors';
+import { type Result, type AppError, ok, err, createConnectorError } from '$lib/core/errors';
 import { createMission, stripHtml } from '$lib/core/connectors/parser-utils';
 import { mapSkill, extractTjm, mapCollectiveRemote } from '$lib/core/connectors/collective-parser';
 import {
@@ -84,21 +78,30 @@ export class CollectiveConnector extends BaseConnector {
 
   private userSlug: string | null = null;
 
-  protected get sessionCheckUrl() { return APP_URL; }
+  protected get sessionCheckUrl() {
+    return APP_URL;
+  }
 
   async detectSession(_now: number): Promise<Result<boolean, AppError>> {
     try {
       const cookies = await chrome.cookies.getAll({ domain: COOKIE_DOMAIN });
       console.debug('[collective] detectSession: found', cookies.length, 'cookies');
-      const hasSession = cookies.length > 0 && cookies.some(c =>
-        c.name.includes('session') || c.name.includes('token') ||
-        c.name.includes('auth') || c.name.includes('connect') ||
-        c.name === '__Secure-next-auth.session-token'
-      );
+      const hasSession =
+        cookies.length > 0 &&
+        cookies.some(
+          (c) =>
+            c.name.includes('session') ||
+            c.name.includes('token') ||
+            c.name.includes('auth') ||
+            c.name.includes('connect') ||
+            c.name === '__Secure-next-auth.session-token'
+        );
 
       if (!hasSession) {
         // FALLBACK: Try cookie injection + API query for browsers with partitioned cookies
-        console.debug('[collective] detectSession: no session cookies found, trying fallback detection via cookie injection');
+        console.debug(
+          '[collective] detectSession: no session cookies found, trying fallback detection via cookie injection'
+        );
         const injectResult = await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
         if (injectResult.success) {
           try {
@@ -109,18 +112,27 @@ export class CollectiveConnector extends BaseConnector {
               body: JSON.stringify({ query: GET_ME_QUERY }),
             });
             if (resp.ok) {
-              const data = await resp.json() as { data?: { me?: { members?: { collective?: { slug?: string } }[] } } };
+              const data = (await resp.json()) as {
+                data?: { me?: { members?: { collective?: { slug?: string } }[] } };
+              };
               if (data.data?.me?.members && data.data.me.members.length > 0) {
-                console.debug('[collective] detectSession: fallback detection succeeded, user slug:', data.data.me.members[0]?.collective?.slug);
+                console.debug(
+                  '[collective] detectSession: fallback detection succeeded, user slug:',
+                  data.data.me.members[0]?.collective?.slug
+                );
                 this.userSlug = data.data.me.members[0]?.collective?.slug ?? null;
                 return ok(true);
               }
             }
           } catch (fallbackError) {
-            console.warn('[collective] detectSession: fallback detection failed:', fallbackError);
+            if (import.meta.env.DEV) {
+              console.warn('[collective] detectSession: fallback detection failed:', fallbackError);
+            }
           }
         }
-        console.debug('[collective] detectSession: fallback detection failed - no cookies or API error');
+        console.debug(
+          '[collective] detectSession: fallback detection failed - no cookies or API error'
+        );
         return ok(false);
       }
 
@@ -136,7 +148,9 @@ export class CollectiveConnector extends BaseConnector {
           body: JSON.stringify({ query: GET_ME_QUERY }),
         });
         if (resp.ok) {
-          const data = await resp.json() as { data?: { me?: { members?: { collective?: { slug?: string } }[] } } };
+          const data = (await resp.json()) as {
+            data?: { me?: { members?: { collective?: { slug?: string } }[] } };
+          };
           this.userSlug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
         }
       } catch {
@@ -149,7 +163,10 @@ export class CollectiveConnector extends BaseConnector {
     }
   }
 
-  async fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>> {
+  async fetchMissions(
+    now: number,
+    context?: ConnectorSearchContext
+  ): Promise<Result<Mission[], AppError>> {
     try {
       // Verify cookie rule is active, re-inject if needed
       const ruleActive = await verifyCookieRule(COOKIE_RULE_ID);
@@ -170,9 +187,16 @@ export class CollectiveConnector extends BaseConnector {
               dailyRates: { from: 0, to: null },
               locations: context?.location ? [context.location] : [],
               skills: context?.skills ?? [],
-              workPreferences: context?.remote && context.remote !== 'any'
-                ? [context.remote === 'full' ? 'fullRemote' : context.remote === 'hybrid' ? 'hybrid' : 'onsite']
-                : [],
+              workPreferences:
+                context?.remote && context.remote !== 'any'
+                  ? [
+                      context.remote === 'full'
+                        ? 'fullRemote'
+                        : context.remote === 'hybrid'
+                          ? 'hybrid'
+                          : 'onsite',
+                    ]
+                  : [],
               exclusive: false,
               hasDailyRate: false,
               companies: [],
@@ -190,14 +214,24 @@ export class CollectiveConnector extends BaseConnector {
 
       if (!response.ok) {
         await removeCookieRule(COOKIE_RULE_ID);
-        return err(createConnectorError(
-          `Collective API error: ${response.status}`,
-          { connectorId: this.id, phase: 'fetch', context: { status: response.status, browser: detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '').name } },
-          now
-        ));
+        return err(
+          createConnectorError(
+            `Collective API error: ${response.status}`,
+            {
+              connectorId: this.id,
+              phase: 'fetch',
+              context: {
+                status: response.status,
+                browser: detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '')
+                  .name,
+              },
+            },
+            now
+          )
+        );
       }
 
-      const result = await response.json() as {
+      const result = (await response.json()) as {
         data?: {
           results?: {
             projects?: CollectiveProject[];
@@ -207,38 +241,40 @@ export class CollectiveConnector extends BaseConnector {
       };
 
       const projects = result.data?.results?.projects ?? [];
-      const missions = projects.map(p => createMission({
-        id: `col-${p.id}`,
-        title: p.name,
-        client: p.company?.name ?? null,
-        description: stripHtml(p.sumUp ?? p.description ?? ''),
-        stack: p.projectTypes.map(mapSkill),
-        tjm: extractTjm(p.budgetBrief),
-        location: p.location?.fullNameFrench ?? null,
-        remote: mapCollectiveRemote(p.workPreferences),
-        duration: p.duration ? `${p.duration} mois` : null,
-        url: this.userSlug
-          ? `${APP_URL}/collective/${this.userSlug}/jobs?jobId=${p.id}`
-          : `${APP_URL}/job/${p.slug}`,
-        source: 'collective' as const,
-        scrapedAt: new Date(now),
-      }));
+      const missions = projects.map((p) =>
+        createMission({
+          id: `col-${p.id}`,
+          title: p.name,
+          client: p.company?.name ?? null,
+          description: stripHtml(p.sumUp ?? p.description ?? ''),
+          stack: p.projectTypes.map(mapSkill),
+          tjm: extractTjm(p.budgetBrief),
+          location: p.location?.fullNameFrench ?? null,
+          remote: mapCollectiveRemote(p.workPreferences),
+          duration: p.duration ? `${p.duration} mois` : null,
+          url: this.userSlug
+            ? `${APP_URL}/collective/${this.userSlug}/jobs?jobId=${p.id}`
+            : `${APP_URL}/job/${p.slug}`,
+          source: 'collective' as const,
+          scrapedAt: new Date(now),
+        })
+      );
 
-      const syncResult = await this.setLastSync(now);
-      if (!syncResult.ok) {
-        console.warn('Failed to set last sync:', syncResult.error);
-      }
+      // Last sync tracking (non-critical)
+      this.setLastSync(now).catch(() => {});
 
       await removeCookieRule(COOKIE_RULE_ID);
       return ok(missions);
     } catch (e) {
       await removeCookieRule(COOKIE_RULE_ID);
       const message = e instanceof Error ? e.message : String(e);
-      return err(createConnectorError(
-        `Unexpected error fetching missions from Collective: ${message}`,
-        { connectorId: this.id, phase: 'fetch', context: { originalError: message } },
-        now
-      ));
+      return err(
+        createConnectorError(
+          `Unexpected error fetching missions from Collective: ${message}`,
+          { connectorId: this.id, phase: 'fetch', context: { originalError: message } },
+          now
+        )
+      );
     }
   }
 }

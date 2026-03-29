@@ -5,14 +5,35 @@
   import Icon from '../atoms/Icon.svelte';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import type { BackupData, ValidationError } from '$lib/core/backup/backup';
-  import { getSettings, setSettings, getApiKey, setApiKey } from '$lib/shell/storage/chrome-storage';
+  import {
+    getSettings,
+    setSettings,
+    getApiKey,
+    setApiKey,
+  } from '$lib/shell/storage/chrome-storage';
   import { getProfile, saveProfile } from '$lib/shell/storage/db';
   import { getFavorites, getHidden, saveFavorites, saveHidden } from '$lib/shell/storage/favorites';
-  import { exportMissionsToJSON, exportMissionsToCSV, exportMissionsToMarkdown, generateFilename, type ExportFormat } from '$lib/core/export/mission-export';
+  import {
+    exportMissionsToJSON,
+    exportMissionsToCSV,
+    exportMissionsToMarkdown,
+    generateFilename,
+    type ExportFormat,
+  } from '$lib/core/export/mission-export';
   import { downloadJSON, downloadCSV, downloadMarkdown } from '$lib/shell/export/download';
-  import { createBackup, validateBackup, serializeBackup, parseBackupJson, generateBackupFilename, type Result } from '$lib/core/backup/backup';
+  import {
+    createBackup,
+    validateBackup,
+    serializeBackup,
+    parseBackupJson,
+    generateBackupFilename,
+    type Result,
+  } from '$lib/core/backup/backup';
 
-  let { onBack, onNavigateToOnboarding }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
+  let {
+    onBack,
+    onNavigateToOnboarding,
+  }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
 
   // --- Profil ---
   let firstName = $state('');
@@ -121,7 +142,9 @@
       });
       editingProfile = false;
       profileSaved = true;
-      setTimeout(() => { profileSaved = false; }, 2000);
+      setTimeout(() => {
+        profileSaved = false;
+      }, 2000);
     } catch (err) {
       profileError = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
     }
@@ -132,7 +155,9 @@
     try {
       await setApiKey(apiKey);
       apiKeySaved = true;
-      setTimeout(() => { apiKeySaved = false; }, 2000);
+      setTimeout(() => {
+        apiKeySaved = false;
+      }, 2000);
     } catch {
       // Hors contexte extension
     }
@@ -200,28 +225,39 @@
       // Récupérer les missions depuis IndexedDB
       const { getMissions } = await import('$lib/shell/storage/db');
       const allMissions = await getMissions();
-      const favoriteMissions = allMissions.filter(m => favoriteIds.includes(m.id));
+      const favoriteMissions = allMissions.filter((m) => favoriteIds.includes(m.id));
 
       const now = new Date();
-      const filename = generateFilename('favoris', format);
+      const filename = generateFilename('favoris', format, now);
 
       switch (format) {
         case 'json':
-          downloadJSON(exportMissionsToJSON(favoriteMissions, { format, includeDescription: true }, now), filename);
+          downloadJSON(
+            exportMissionsToJSON(favoriteMissions, { format, includeDescription: true }, now),
+            filename
+          );
           break;
         case 'csv':
-          downloadCSV(exportMissionsToCSV(favoriteMissions, { format, includeDescription: false }, now), filename);
+          downloadCSV(
+            exportMissionsToCSV(favoriteMissions, { format, includeDescription: false }, now),
+            filename
+          );
           break;
         case 'markdown':
-          downloadMarkdown(exportMissionsToMarkdown(favoriteMissions, { format, includeDescription: true }, now), filename);
+          downloadMarkdown(
+            exportMissionsToMarkdown(favoriteMissions, { format, includeDescription: true }, now),
+            filename
+          );
           break;
       }
 
       exportSuccess = true;
-      setTimeout(() => { exportSuccess = false; }, 2000);
+      setTimeout(() => {
+        exportSuccess = false;
+      }, 2000);
     } catch (e) {
-      console.error('Erreur lors de l\'export:', e);
-      alert('Erreur lors de l\'export des favoris');
+      console.error("Erreur lors de l'export:", e);
+      alert("Erreur lors de l'export des favoris");
     } finally {
       isExporting = false;
     }
@@ -335,12 +371,16 @@
           <Icon name="edit-2" size={12} class="text-accent-blue/60" />
           <div>
             <h3 class="text-sm font-semibold text-text-primary">Profil</h3>
-            <p class="mt-1 text-xs leading-relaxed text-text-secondary">Vos informations de freelance.</p>
+            <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+              Vos informations de freelance.
+            </p>
           </div>
         </div>
         <button
           class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/4 text-text-secondary transition-colors hover:bg-white/8 hover:text-text-primary"
-          onclick={() => { editingProfile = !editingProfile; }}
+          onclick={() => {
+            editingProfile = !editingProfile;
+          }}
           title={editingProfile ? 'Annuler' : 'Modifier'}
         >
           <Icon name={editingProfile ? 'x' : 'edit-2'} size={14} />
@@ -384,7 +424,9 @@
 
           <!-- Stack Editor -->
           <div class="space-y-2">
-            <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted">Stack technique</label>
+            <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted"
+              >Stack technique</label
+            >
             <div class="flex gap-2">
               <input
                 id="stack-input"
@@ -392,7 +434,9 @@
                 placeholder="ex: React, Node.js..."
                 class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
                 bind:value={stackInput}
-                onkeydown={(e) => { if (e.key === 'Enter') addStack(); }}
+                onkeydown={(e) => {
+                  if (e.key === 'Enter') addStack();
+                }}
               />
               <button
                 class="inline-flex min-h-12 items-center justify-center rounded-[1.1rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
@@ -405,11 +449,7 @@
             {#if profileStack.length > 0}
               <div class="flex flex-wrap gap-2 pt-1">
                 {#each profileStack as tech}
-                  <Chip
-                    label={tech}
-                    selected={true}
-                    onclick={() => removeStack(tech)}
-                  />
+                  <Chip label={tech} selected={true} onclick={() => removeStack(tech)} />
                 {/each}
               </div>
             {/if}
@@ -424,7 +464,10 @@
         </div>
       {:else}
         <div class="space-y-2 text-sm">
-          <p class="text-text-primary">{firstName || 'Non renseigne'} {jobTitle ? `— ${jobTitle}` : ''}</p>
+          <p class="text-text-primary">
+            {firstName || 'Non renseigne'}
+            {jobTitle ? `— ${jobTitle}` : ''}
+          </p>
           <p class="text-text-secondary">{profileLocation || 'Localisation non renseignee'}</p>
           {#if tjmMin > 0 || tjmMax > 0}
             <p class="text-text-secondary">TJM : {tjmMin} - {tjmMax} EUR/jour</p>
@@ -432,7 +475,9 @@
           {#if profileStack.length > 0}
             <div class="flex flex-wrap gap-1.5 pt-1">
               {#each profileStack as tech}
-                <span class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue">
+                <span
+                  class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue"
+                >
                   {tech}
                 </span>
               {/each}
@@ -449,25 +494,39 @@
       <div class="flex items-center justify-between">
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Scan automatique</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Scanner les plateformes en arriere-plan automatiquement.</p>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+            Scanner les plateformes en arriere-plan automatiquement.
+          </p>
         </div>
         <button
-          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {autoScan ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/5'}"
+          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {autoScan
+            ? 'border-accent-emerald/30 bg-accent-emerald/20'
+            : 'border-white/10 bg-white/5'}"
           onclick={handleToggleAutoScan}
           role="switch"
           aria-checked={autoScan}
           aria-label="Activer le scan automatique"
         >
-          <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {autoScan ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
+          <span
+            class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {autoScan
+              ? 'translate-x-6 bg-accent-emerald'
+              : 'translate-x-0.5 bg-text-muted'}"
+          ></span>
         </button>
       </div>
     </div>
 
     <!-- Intervalle de scan -->
-    <div class="section-card rounded-[1.5rem] p-4 space-y-3 transition-opacity duration-200" class:opacity-40={!autoScan} class:pointer-events-none={!autoScan}>
+    <div
+      class="section-card rounded-[1.5rem] p-4 space-y-3 transition-opacity duration-200"
+      class:opacity-40={!autoScan}
+      class:pointer-events-none={!autoScan}
+    >
       <div>
         <h3 class="text-sm font-semibold text-text-primary">Frequence de scan</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">Scanner les plateformes toutes les {scanInterval} minutes.</p>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+          Scanner les plateformes toutes les {scanInterval} minutes.
+        </p>
       </div>
       <div class="flex items-center gap-3">
         <span class="text-xs text-text-muted">5 min</span>
@@ -484,7 +543,9 @@
       </div>
       <p class="text-center text-sm font-semibold text-accent-blue">{scanInterval} min</p>
       {#if !autoScan}
-        <p class="text-center text-[11px] text-text-muted">Activez le scan automatique pour configurer la frequence.</p>
+        <p class="text-center text-[11px] text-text-muted">
+          Activez le scan automatique pour configurer la frequence.
+        </p>
       {/if}
     </div>
 
@@ -493,16 +554,24 @@
       <div class="flex items-center justify-between">
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Notifications</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Recevoir une alerte quand de nouvelles missions arrivent.</p>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+            Recevoir une alerte quand de nouvelles missions arrivent.
+          </p>
         </div>
         <button
-          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {notifications ? 'border-accent-emerald/30 bg-accent-emerald/20' : 'border-white/10 bg-white/5'}"
+          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {notifications
+            ? 'border-accent-emerald/30 bg-accent-emerald/20'
+            : 'border-white/10 bg-white/5'}"
           onclick={handleToggleNotifications}
           role="switch"
           aria-checked={notifications}
           aria-label="Activer les notifications"
         >
-          <span class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {notifications ? 'translate-x-6 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"></span>
+          <span
+            class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {notifications
+              ? 'translate-x-6 bg-accent-emerald'
+              : 'translate-x-0.5 bg-text-muted'}"
+          ></span>
         </button>
       </div>
     </div>
@@ -511,7 +580,9 @@
     <div class="section-card rounded-[1.5rem] p-4 space-y-4">
       <div>
         <h3 class="text-sm font-semibold text-text-primary">Export</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">Exporter vos missions favorites dans différents formats.</p>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+          Exporter vos missions favorites dans différents formats.
+        </p>
       </div>
       <div class="flex flex-wrap gap-2">
         <button
@@ -548,7 +619,9 @@
     <div class="section-card rounded-[1.5rem] p-4 space-y-4">
       <div>
         <h3 class="text-sm font-semibold text-text-primary">Sauvegarde</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">Sauvegarder ou restaurer vos données (profil, paramètres, favoris).</p>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+          Sauvegarder ou restaurer vos données (profil, paramètres, favoris).
+        </p>
       </div>
       <div class="flex flex-wrap gap-2">
         <Button variant="secondary" onclick={handleCreateBackup}>
@@ -579,7 +652,9 @@
         <Icon name="edit-2" size={12} class="text-accent-blue/60" />
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">Necessaire pour enrichir l\'analyse TJM locale avec le modele.</p>
+          <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+            Necessaire pour enrichir l\'analyse TJM locale avec le modele.
+          </p>
         </div>
       </div>
       <div class="flex gap-2">
@@ -599,11 +674,18 @@
     <div class="section-card rounded-[1.5rem] border border-red-500/20 p-4 space-y-3">
       <div>
         <h3 class="text-sm font-semibold text-red-400">Zone dangereuse</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">Supprimer toutes les donnees locales (profil, missions, cache).</p>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+          Supprimer toutes les donnees locales (profil, missions, cache).
+        </p>
       </div>
       {#if showResetConfirm}
         <div class="flex gap-2">
-          <Button variant="ghost" onclick={() => { showResetConfirm = false; }}>
+          <Button
+            variant="ghost"
+            onclick={() => {
+              showResetConfirm = false;
+            }}
+          >
             {#snippet children()}Annuler{/snippet}
           </Button>
           <button
@@ -616,7 +698,9 @@
       {:else}
         <button
           class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/20"
-          onclick={() => { showResetConfirm = true; }}
+          onclick={() => {
+            showResetConfirm = true;
+          }}
         >
           <Icon name="trash-2" size={14} />
           Reinitialiser tout

@@ -3,13 +3,7 @@ import type { Mission } from '../../core/types/mission';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import { parseFreeWorkAPI, type FreeWorkApiResponse } from '../../core/connectors/freework-parser';
 import { delayBetweenPages } from '../utils/rate-limiter';
-import {
-  type Result,
-  type AppError,
-  ok,
-  err,
-  createConnectorError,
-} from '$lib/core/errors';
+import { type Result, type AppError, ok, err, createConnectorError } from '$lib/core/errors';
 
 const BASE_URL = 'https://www.free-work.com';
 const API_BASE = `${BASE_URL}/api/job_postings`;
@@ -27,7 +21,10 @@ export class FreeWorkConnector extends BaseConnector {
     return ok(true);
   }
 
-  async fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>> {
+  async fetchMissions(
+    now: number,
+    context?: ConnectorSearchContext
+  ): Promise<Result<Mission[], AppError>> {
     try {
       const allMissions: Mission[] = [];
 
@@ -62,16 +59,22 @@ export class FreeWorkConnector extends BaseConnector {
         }
 
         const result = await this.fetchJSON(url.toString(), now, {
-          headers: { 'Accept': 'application/ld+json' },
-          credentials: 'omit',  // Public API — no cookies needed
+          headers: { Accept: 'application/ld+json' },
+          credentials: 'omit', // Public API — no cookies needed
         });
 
         if (!result.ok) {
-          return err(createConnectorError(
-            `Failed to fetch page ${page} from Free-Work`,
-            { connectorId: this.id, phase: 'fetch', context: { page, originalError: result.error } },
-            now
-          ));
+          return err(
+            createConnectorError(
+              `Failed to fetch page ${page} from Free-Work`,
+              {
+                connectorId: this.id,
+                phase: 'fetch',
+                context: { page, originalError: result.error },
+              },
+              now
+            )
+          );
         }
 
         const data = result.value as FreeWorkApiResponse;
@@ -81,19 +84,19 @@ export class FreeWorkConnector extends BaseConnector {
         allMissions.push(...missions);
       }
 
-      const syncResult = await this.setLastSync(now);
-      if (!syncResult.ok) {
-        console.warn('Failed to set last sync:', syncResult.error);
-      }
+      // Last sync tracking (non-critical)
+      this.setLastSync(now).catch(() => {});
 
       return ok(allMissions);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
-      return err(createConnectorError(
-        `Unexpected error fetching missions from Free-Work: ${message}`,
-        { connectorId: this.id, phase: 'fetch', context: { originalError: message } },
-        now
-      ));
+      return err(
+        createConnectorError(
+          `Unexpected error fetching missions from Free-Work: ${message}`,
+          { connectorId: this.id, phase: 'fetch', context: { originalError: message } },
+          now
+        )
+      );
     }
   }
 }
