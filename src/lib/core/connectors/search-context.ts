@@ -25,7 +25,10 @@ export interface ConnectorSearchContext {
  *
  * Strategy:
  * - query: derived from searchKeywords (if any), fallback to jobTitle
- * - skills: from profile.stack
+ * - skills: EMPTY — skills are NOT sent as server-side filters because:
+ *   1. APIs use AND logic (each additional skill further narrows results)
+ *   2. Skill names don't match across platforms (e.g. "React.js" vs "React" vs "ReactJS")
+ *   3. Local scoring (scoreMission) handles skill matching much better with fuzzy logic
  * - location: from profile.location
  * - remote: from profile.remote
  * - lastSync: passed as parameter (from Shell)
@@ -44,7 +47,7 @@ export const buildSearchContext = (
 
   return {
     query: query.trim(),
-    skills: profile.stack,
+    skills: [], // Skills handled by local scoring, not server-side filtering
     location: profile.location || null,
     remote: profile.remote || null,
     lastSync,

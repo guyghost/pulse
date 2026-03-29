@@ -5,7 +5,7 @@ import type { AppError } from '../../core/errors/app-error';
 import { buildSearchContext } from '../../core/connectors/search-context';
 import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
-import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
+import { getProfile, saveMissions, purgeOldMissions, getMissions } from '../storage/db';
 import { deduplicateMissions } from '../../core/scoring/dedup';
 import { scoreMission } from '../../core/scoring/relevance';
 import { setScanState } from '../storage/session-storage';
@@ -227,6 +227,16 @@ async function _runScanInternal(
   // Build base search context from profile (without lastSync — that's per-connector)
   const baseSearchContext = profile ? buildSearchContext(profile, null) : null;
 
+  // Check if we have cached missions — if not, do a full scan (skip lastSync filter)
+  // This ensures the first scan (or after cache clear) fetches ALL available missions
+  let hasCachedMissions = false;
+  try {
+    const cached = await getMissions();
+    hasCachedMissions = cached.length > 0;
+  } catch {
+    // If we can't read cache, assume empty → full scan
+  }
+
   // Fetch connectors sequentially to report progress
   const connectorResults: { connectorId: string; missions: Mission[] }[] = [];
   for (let i = 0; i < connectors.length; i++) {
@@ -260,15 +270,20 @@ async function _runScanInternal(
     const connectorStartTime = performance.now();
     const now = Date.now();
 
-    // Build per-connector search context with lastSync
+    // Build per-connector search context with lastSync (only if we have cached missions)
     let connectorContext: ConnectorSearchContext | undefined;
     if (baseSearchContext) {
-      try {
-        const lastSyncResult = await connector.getLastSync(now);
-        const lastSync = lastSyncResult.ok ? lastSyncResult.value : null;
-        connectorContext = { ...baseSearchContext, lastSync };
-      } catch {
-        // If getLastSync fails, use context without lastSync
+      if (hasCachedMissions) {
+        try {
+          const lastSyncResult = await connector.getLastSync(now);
+          const lastSync = lastSyncResult.ok ? lastSyncResult.value : null;
+          connectorContext = { ...baseSearchContext, lastSync };
+        } catch {
+          // If getLastSync fails, use context without lastSync
+          connectorContext = baseSearchContext;
+        }
+      } else {
+        // No cached missions → full scan, no lastSync filter
         connectorContext = baseSearchContext;
       }
     }

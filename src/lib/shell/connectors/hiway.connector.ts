@@ -30,6 +30,11 @@ export class HiwayConnector extends BaseConnector {
     return `${BASE_URL}/admin/freelance/missions`;
   }
 
+  /** Hiway uses a public Supabase API with an anon key — no user session needed */
+  async detectSession(_now: number): Promise<Result<boolean, AppError>> {
+    return ok(this.isConfigured());
+  }
+
   /**
    * Checks if the Supabase configuration is valid (not using placeholders).
    */

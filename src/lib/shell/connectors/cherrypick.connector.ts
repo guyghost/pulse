@@ -10,6 +10,7 @@ import { type Result, type AppError, ok, err, createConnectorError } from '$lib/
 
 const BASE_URL = 'https://app.cherry-pick.io';
 const SEARCH_URL = `${BASE_URL}/api/mission/search`;
+const COOKIE_DOMAIN = '.cherry-pick.io';
 const MAX_PAGES = 5;
 
 export class CherryPickConnector extends BaseConnector {
@@ -20,6 +21,30 @@ export class CherryPickConnector extends BaseConnector {
 
   protected get sessionCheckUrl() {
     return `${BASE_URL}/dashboard`;
+  }
+
+  /**
+   * Detects session via cookies on .cherry-pick.io.
+   * Cherry Pick requires authentication — the API returns empty results without a valid session.
+   * We check for common auth/session cookies rather than fetching the SPA (which always returns 200).
+   */
+  async detectSession(_now: number): Promise<Result<boolean, AppError>> {
+    try {
+      const cookies = await chrome.cookies.getAll({ domain: COOKIE_DOMAIN });
+      // Look for session/auth cookies typical of Next.js apps
+      const hasSession = cookies.some(
+        (c) =>
+          c.name === '__Secure-next-auth.session-token' ||
+          c.name === 'next-auth.session-token' ||
+          c.name === '__Secure-next-auth.callback-url' ||
+          c.name === 'next-auth.callback-url' ||
+          c.name.includes('session') ||
+          c.name.includes('token')
+      );
+      return ok(hasSession);
+    } catch {
+      return ok(false);
+    }
   }
 
   async fetchMissions(

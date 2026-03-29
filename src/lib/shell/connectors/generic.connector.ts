@@ -39,6 +39,44 @@ export class GenericConnector extends BaseConnector {
     return this._sessionCheckUrl;
   }
 
+  /**
+   * Fallback session detection via HTTP fetch.
+   * WARNING: This is unreliable for SPAs that return 200 regardless of auth state.
+   * Specific connectors should override with cookie-based detection.
+   */
+  async detectSession(now: number, signal?: AbortSignal): Promise<Result<boolean, AppError>> {
+    try {
+      const controller = new AbortController();
+      const timeout = setTimeout(() => controller.abort(), 8000);
+
+      if (signal) {
+        signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+
+      const response = await fetch(this.sessionCheckUrl, {
+        credentials: 'include',
+        redirect: 'follow',
+        signal: controller.signal,
+      });
+      clearTimeout(timeout);
+
+      if (response.status === 401 || response.status === 403) {
+        return ok(false);
+      }
+
+      // Detect redirect to login page
+      const finalUrl = response.url.toLowerCase();
+      const loginPatterns = ['/login', '/signin', '/sign-in', '/auth', '/connexion'];
+      if (loginPatterns.some((p) => finalUrl.includes(p))) {
+        return ok(false);
+      }
+
+      return ok(response.ok);
+    } catch {
+      return ok(false);
+    }
+  }
+
   async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
     try {
       const result = await this.fetchHTML(this.missionsUrl, now);

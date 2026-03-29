@@ -21,17 +21,6 @@ const getBrowserInfo = (): BrowserInfo => {
   return _browserInfo;
 };
 
-const LOGIN_PATTERNS = [
-  '/login',
-  '/signin',
-  '/sign-in',
-  '/sign_in',
-  '/auth',
-  '/connexion',
-  '/register',
-  '/signup',
-];
-
 export abstract class BaseConnector implements PlatformConnector {
   abstract readonly id: string;
   abstract readonly name: string;
@@ -44,59 +33,16 @@ export abstract class BaseConnector implements PlatformConnector {
   }
 
   /**
-   * Détecte si l'utilisateur a une session active sur la plateforme
-   * Retourne un Result<boolean, AppError> au lieu de Promise<boolean>
+   * Détecte si l'utilisateur a une session active sur la plateforme.
+   * Each connector MUST implement this — the base fetch-based approach is unreliable
+   * because SPAs return HTTP 200 regardless of authentication state.
+   *
+   * Recommended patterns:
+   * - Public API (no auth): return ok(true)
+   * - Cookie-based auth: chrome.cookies.getAll() + check for specific cookie names
+   * - API probe: call a /me or /profile endpoint and check for 401/403
    */
-  async detectSession(now: number, signal?: AbortSignal): Promise<Result<boolean, AppError>> {
-    try {
-      const controller = new AbortController();
-      const timeout = setTimeout(() => controller.abort(), 8000);
-
-      // Combine external signal with internal timeout
-      if (signal) {
-        signal.addEventListener('abort', () => controller.abort(), { once: true });
-      }
-
-      const response = await fetch(this.sessionCheckUrl, {
-        credentials: 'include',
-        redirect: 'follow',
-        signal: controller.signal,
-      });
-      clearTimeout(timeout);
-
-      if (response.status === 401 || response.status === 403) {
-        return ok(false);
-      }
-
-      // Detect redirect to login page
-      const finalUrl = response.url.toLowerCase();
-      if (LOGIN_PATTERNS.some((p) => finalUrl.includes(p))) {
-        return ok(false);
-      }
-
-      return ok(response.ok);
-    } catch (e) {
-      const message = e instanceof Error ? e.message : 'Network request failed';
-      const isAbort = e instanceof Error && e.name === 'AbortError';
-
-      return err(
-        createNetworkError(
-          `Failed to detect session for ${this.id}: ${message}`,
-          {
-            url: this.sessionCheckUrl,
-            retryable: !isAbort,
-            context: {
-              connectorId: this.id,
-              aborted: isAbort,
-              originalError: message,
-              browser: getBrowserInfo().name,
-            },
-          },
-          now
-        )
-      );
-    }
-  }
+  abstract detectSession(now: number, signal?: AbortSignal): Promise<Result<boolean, AppError>>;
 
   /** Fetch HTML directly from the side panel context — no offscreen/messaging needed */
   protected async fetchHTML(

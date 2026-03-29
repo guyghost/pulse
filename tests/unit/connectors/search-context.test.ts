@@ -36,7 +36,7 @@ describe('buildSearchContext', () => {
       const context = buildSearchContext(profile, lastSync);
 
       expect(context.query).toBe('React Developer');
-      expect(context.skills).toEqual(['React', 'TypeScript']);
+      expect(context.skills).toEqual([]);
     });
 
     it('handles single searchKeyword', () => {
@@ -114,19 +114,21 @@ describe('buildSearchContext', () => {
   });
 
   /**
-   * Test 4: Skills mapping — skills should come from profile.stack
+   * Test 4: Skills mapping — skills are always empty (not sent as server-side filters)
+   * Skills are handled by local scoring (scoreMission), not server-side filtering,
+   * because APIs use AND logic and skill names vary across platforms.
    */
   describe('skills mapping', () => {
-    it('maps skills from profile.stack', () => {
+    it('returns empty skills array (skills not sent to APIs)', () => {
       const profile = makeProfile({
         stack: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'],
       });
       const context = buildSearchContext(profile, null);
 
-      expect(context.skills).toEqual(['React', 'TypeScript', 'Node.js', 'PostgreSQL']);
+      expect(context.skills).toEqual([]);
     });
 
-    it('returns empty skills array when stack is empty', () => {
+    it('returns empty skills array even when stack is empty', () => {
       const profile = makeProfile({
         stack: [],
       });
@@ -135,13 +137,13 @@ describe('buildSearchContext', () => {
       expect(context.skills).toEqual([]);
     });
 
-    it('preserves skill order from stack', () => {
+    it('returns empty skills regardless of stack contents', () => {
       const profile = makeProfile({
         stack: ['Vue.js', 'Nuxt', 'TypeScript', 'GraphQL'],
       });
       const context = buildSearchContext(profile, null);
 
-      expect(context.skills).toEqual(['Vue.js', 'Nuxt', 'TypeScript', 'GraphQL']);
+      expect(context.skills).toEqual([]);
     });
   });
 
@@ -267,7 +269,7 @@ describe('buildSearchContext', () => {
       const context = buildSearchContext(profile, lastSync);
 
       expect(context.query).toBe('React TypeScript Senior');
-      expect(context.skills).toEqual(['React', 'TypeScript', 'Node.js', 'PostgreSQL']);
+      expect(context.skills).toEqual([]);
       expect(context.location).toBe('Paris');
       expect(context.remote).toBe('full');
       expect(context.lastSync).toEqual(lastSync);
