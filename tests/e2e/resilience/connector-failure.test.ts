@@ -31,7 +31,10 @@ test.describe('Connector Resilience', () => {
 
     // Vérifier que les missions sont affichées (les autres connecteurs ont continué)
     const missionCount = await page.locator('[role="button"]').count();
-    expect(missionCount).toBeGreaterThan(0);
+    expect(missionCount).toBe(5);
+
+    // Vérifier que le compteur affiche 5 missions
+    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 2000 });
   });
 
   test('shows typed error message for connector failure', async ({ page }) => {
@@ -47,9 +50,11 @@ test.describe('Connector Resilience', () => {
           _chrome = val;
           if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
             const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown,
+              msg: unknown
             ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: { type: string }) => {
+            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
+              type: string;
+            }) => {
               if (msg?.type === 'SCAN_START') {
                 // Simuler une erreur de connecteur typée
                 setTimeout(() => {
@@ -61,7 +66,7 @@ test.describe('Connector Resilience', () => {
                         message: 'Le connecteur free-work a échoué',
                         code: 'PARSER_ERROR',
                       },
-                    }),
+                    })
                   );
                 }, 500);
 
@@ -105,9 +110,11 @@ test.describe('Connector Resilience', () => {
           _chrome = val;
           if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
             const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown,
+              msg: unknown
             ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: { type: string }) => {
+            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
+              type: string;
+            }) => {
               if (msg?.type === 'SCAN_START') {
                 // Simuler une erreur de parsing (DOM changé)
                 setTimeout(() => {
@@ -120,7 +127,7 @@ test.describe('Connector Resilience', () => {
                         code: 'DOM_CHANGED',
                         hint: 'Le site free-work a été mis à jour',
                       },
-                    }),
+                    })
                   );
                 }, 800);
 
@@ -168,7 +175,7 @@ test.describe('Connector Resilience', () => {
           _chrome = val;
           if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
             const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown,
+              msg: unknown
             ) => Promise<unknown>;
             (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
               type: string;
@@ -195,7 +202,7 @@ test.describe('Connector Resilience', () => {
                   window.dispatchEvent(
                     new CustomEvent('dev:missions', {
                       detail: missions,
-                    }),
+                    })
                   );
                 }, 300);
 
@@ -240,9 +247,11 @@ test.describe('Connector Resilience', () => {
           _chrome = val;
           if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
             const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown,
+              msg: unknown
             ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: { type: string }) => {
+            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
+              type: string;
+            }) => {
               if (msg?.type === 'SCAN_START') {
                 // Simuler un timeout (pas de réponse)
                 return new Promise((resolve) => {
@@ -292,9 +301,11 @@ test.describe('Connector Resilience', () => {
           _chrome = val;
           if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
             const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown,
+              msg: unknown
             ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: { type: string }) => {
+            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
+              type: string;
+            }) => {
               if (msg?.type === 'SCAN_START') {
                 if ((window as unknown as Record<string, boolean>).__shouldFail) {
                   // Premier appel échoue
@@ -330,7 +341,7 @@ test.describe('Connector Resilience', () => {
                           semanticReason: null,
                         },
                       ],
-                    }),
+                    })
                   );
                 }, 300);
 

@@ -57,6 +57,11 @@ test.describe('Accessibility', () => {
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
 
+    // Vérifier que les cartes sont présentes
+    const cards = page.locator('[role="button"]');
+    const cardCount = await cards.count();
+    expect(cardCount).toBe(5);
+
     // Naviguer vers la première carte avec Tab
     // Le nombre de tabs dépend de l'ordre des éléments dans le DOM
     for (let i = 0; i < 5; i++) {
@@ -69,11 +74,14 @@ test.describe('Accessibility', () => {
       (el) =>
         el.getAttribute('role') === 'button' ||
         el.tagName === 'BUTTON' ||
-        el.closest('[role="button"]') !== null,
+        el.closest('[role="button"]') !== null
     );
     expect(isCardOrButton).toBe(true);
 
-    // Enter pour activer l'élément focusé
+    // Vérifier que l'élément focusé est visible
+    await expect(focusedElement).toBeVisible();
+
+    // Enter pour activer l'élément focusé (ouvre le lien externe)
     await page.keyboard.press('Enter');
   });
 
@@ -101,7 +109,7 @@ test.describe('Accessibility', () => {
     const buttons = [favoriteBtn, hideBtn, copyBtn, openBtn];
     for (const btn of buttons) {
       const hasAccessibleName = await btn.evaluate(
-        (el) => el.getAttribute('aria-label') !== null || el.getAttribute('title') !== null,
+        (el) => el.getAttribute('aria-label') !== null || el.getAttribute('title') !== null
       );
       expect(hasAccessibleName).toBe(true);
     }
@@ -123,7 +131,7 @@ test.describe('Accessibility', () => {
     await page.getByTitle('Voir toutes').click();
     await expect(page.getByRole('button', { name: 'Voir favoris' })).toHaveAttribute(
       'aria-pressed',
-      'false',
+      'false'
     );
   });
 
@@ -203,9 +211,7 @@ test.describe('Accessibility', () => {
       const labelId = el.getAttribute('aria-labelledby');
       const associatedLabel = labelId ? document.getElementById(labelId)?.textContent : null;
       const parentLabel = el.closest('label')?.textContent;
-      const forLabel = el.id
-        ? document.querySelector(`label[for="${el.id}"]`)?.textContent
-        : null;
+      const forLabel = el.id ? document.querySelector(`label[for="${el.id}"]`)?.textContent : null;
       return ariaLabel || associatedLabel || parentLabel || forLabel;
     });
 
@@ -216,9 +222,7 @@ test.describe('Accessibility', () => {
       const labelId = el.getAttribute('aria-labelledby');
       const associatedLabel = labelId ? document.getElementById(labelId)?.textContent : null;
       const parentLabel = el.closest('label')?.textContent;
-      const forLabel = el.id
-        ? document.querySelector(`label[for="${el.id}"]`)?.textContent
-        : null;
+      const forLabel = el.id ? document.querySelector(`label[for="${el.id}"]`)?.textContent : null;
       return ariaLabel || associatedLabel || parentLabel || forLabel;
     });
 
@@ -292,11 +296,24 @@ test.describe('Accessibility', () => {
     await page.goto(SIDE_PANEL);
     await expect(page.getByText('Missions')).toBeVisible();
 
+    // Injecter des missions pour avoir du contenu à tester
+    await page.keyboard.press('Control+Shift+D');
+    await expect(page.getByText('DEV PANEL')).toBeVisible();
+    await page.getByRole('button', { name: 'inject' }).click();
+    await page.keyboard.press('Control+Shift+D');
+
+    // Attendre les missions
+    await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
+
     // Vérifier les couleurs de texte principales
     const textElements = await page.locator('p, span, h1, h2, h3, button, a').all();
 
-    for (const el of textElements.slice(0, 10)) {
-      // Limiter à 10 éléments pour les perfs
+    let checkedCount = 0;
+    for (const el of textElements.slice(0, 15)) {
+      // Limiter à 15 éléments pour les perfs
+      const isVisible = await el.isVisible().catch(() => false);
+      if (!isVisible) continue;
+
       const styles = await el.evaluate((element) => {
         const computed = window.getComputedStyle(element);
         return {
@@ -309,7 +326,11 @@ test.describe('Accessibility', () => {
       // Vérifier que le texte n'est pas transparent
       expect(styles.color).not.toBe('rgba(0, 0, 0, 0)');
       expect(styles.color).not.toBe('transparent');
+      checkedCount++;
     }
+
+    // Au moins quelques éléments doivent avoir été vérifiés
+    expect(checkedCount).toBeGreaterThan(0);
   });
 
   test('disabled buttons are properly marked', async ({ page }) => {
@@ -342,7 +363,7 @@ test.describe('Accessibility', () => {
     let focusableCount = 0;
     for (const el of interactiveElements.slice(0, 5)) {
       const isFocusable = await el.evaluate(
-        (e) => !e.hasAttribute('disabled') && !e.hasAttribute('aria-hidden'),
+        (e) => !e.hasAttribute('disabled') && !e.hasAttribute('aria-hidden')
       );
       if (isFocusable) focusableCount++;
     }

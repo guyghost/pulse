@@ -1,7 +1,9 @@
 <script lang="ts">
   import { createFeedStore } from '$lib/state/feed.svelte';
-  import { sendMessage } from '$lib/shell/messaging/bridge';
-  import type { ScanProgressPayload, ConnectorProgress } from '$lib/shell/messaging/bridge';
+  import {
+    createFeedController,
+    type SourceStatus,
+  } from '$lib/shell/facades/feed-controller.svelte';
   import VirtualMissionFeed from '../organisms/VirtualMissionFeed.svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
   import ScanProgress from '../organisms/ScanProgress.svelte';
@@ -11,63 +13,93 @@
   import FilterBar from '../organisms/FilterBar.svelte';
   import KeyboardShortcutsHelp from '../molecules/KeyboardShortcutsHelp.svelte';
   import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import SourceHealthPanel, {
-    type SourceStatus,
-    type SourceSessionStatus,
-  } from '../organisms/SourceHealthPanel.svelte';
   import {
-    getConnectorsMeta,
-    detectAllConnectorSessions,
     getSeenIds,
     saveSeenIds,
-    markAsSeen,
     getFavorites,
     saveFavorites,
     getHidden,
     saveHidden,
+    markAsSeen,
     toggleFavorite,
     toggleHidden,
     filterHidden,
     filterFavoritesOnly,
     getProfile,
-    getMissions,
-    getConnectorStatuses,
     resetNewMissionCount,
   } from '$lib/shell/facades/feed-data.facade';
-  import { getSettings, setSettings } from '$lib/shell/facades/settings.facade';
-  import {
-    type ConnectorStatus,
-    type PersistedConnectorStatus,
-  } from '$lib/core/types/connector-status';
-  import type { AppError } from '$lib/core/errors/app-error';
   import { getPanelSide, type PanelSide } from '$lib/shell/ui/panel-layout';
   import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabilities';
   import {
-    registerShortcut,
     registerShortcuts,
     FeedShortcuts,
     type ShortcutConfig,
   } from '$lib/shell/utils/keyboard-shortcuts';
-  import {
-    subscribeToConnection,
-    isOnline,
-    type ConnectionInfo,
-  } from '$lib/shell/utils/connection-monitor';
+  import { subscribeToConnection, type ConnectionInfo } from '$lib/shell/utils/connection-monitor';
 
+  // ============================================================
+  // Feed store and controller
+  // ============================================================
   const feed = createFeedStore();
+  const controller = createFeedController(feed);
 
+  // ============================================================
+  // Derived state from feed store
+  // ============================================================
   let missions = $derived(feed.filteredMissions);
   let isLoading = $derived(feed.state === 'loading');
   let error = $derived(feed.error);
   let searchQuery = $derived(feed.searchQuery);
   let totalMissions = $derived(missions.length);
 
+  // ============================================================
+  // UI-only state
+  // ============================================================
+  let seenIds = $state<string[]>([]);
+  let favorites = $state<Record<string, number>>({});
+  let hidden = $state<Record<string, number>>({});
+  let sortBy = $state<'score' | 'date' | 'tjm'>('score');
+  let showFavoritesOnly = $state(false);
+  let showHidden = $state(false);
+  let showFilters = $state(false);
+  let selectedStacks = $state<string[]>([]);
+  let selectedSource = $state<MissionSource | null>(null);
+  let selectedRemote = $state<RemoteType | null>(null);
+  let firstName = $state('');
+  let panelSide = $state<PanelSide>('right');
+  let aiStatus = $state<AiAvailability>('no');
+  let showShortcutsHelp = $state(false);
+  let searchInputRef = $state<HTMLInputElement | null>(null);
+  let connectionStatus = $state<ConnectionInfo['status']>('unknown');
+
+  // ============================================================
+  // Derived UI state
+  // ============================================================
+  let favoriteCount = $derived(Object.keys(favorites).length);
+  let hiddenCount = $derived(Object.keys(hidden).length);
+  let isOffline = $derived(connectionStatus === 'offline');
+  let heroCompact = $derived(totalMissions > 0 && !isLoading);
+
+  let filterActive = $derived(
+    selectedSource !== null || selectedRemote !== null || selectedStacks.length > 0
+  );
+
+  let availableStacks = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const m of missions) {
+      for (const s of m.stack) {
+        counts.set(s, (counts.get(s) ?? 0) + 1);
+      }
+    }
+    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+  });
+
+  // displayMissions combines controller state with UI filters
   let displayMissions = $derived.by(() => {
-    // Defensive: ensure missions is always an array
     let result = missions ?? [];
     // Hide missions from disabled connectors
-    if (enabledConnectorIds.size > 0) {
-      result = result.filter((m) => enabledConnectorIds.has(m.source));
+    if (controller.enabledConnectorIds.size > 0) {
+      result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
     }
     if (showFavoritesOnly) {
       result = filterFavoritesOnly(result, favorites);
@@ -87,6 +119,9 @@
     return result;
   });
 
+  let visibleCount = $derived(displayMissions.length);
+
+  // Dev logging
   if (import.meta.env.DEV) {
     $effect(() => {
       console.log(
@@ -102,65 +137,9 @@
     });
   }
 
-  let seenIds = $state<string[]>([]);
-  let favorites = $state<Record<string, number>>({});
-  let hidden = $state<Record<string, number>>({});
-  let sortBy = $state<'score' | 'date' | 'tjm'>('score');
-  let showFavoritesOnly = $state(false);
-  let showHidden = $state(false);
-  let showFilters = $state(false);
-  let selectedStacks = $state<string[]>([]);
-  let selectedSource = $state<MissionSource | null>(null);
-  let selectedRemote = $state<RemoteType | null>(null);
-  let favoriteCount = $derived(Object.keys(favorites).length);
-  let hiddenCount = $derived(Object.keys(hidden).length);
-  let visibleCount = $derived(displayMissions.length);
-  let filterActive = $derived(
-    selectedSource !== null || selectedRemote !== null || selectedStacks.length > 0
-  );
-  let availableStacks = $derived.by(() => {
-    const counts = new Map<string, number>();
-    for (const m of missions) {
-      for (const s of m.stack) {
-        counts.set(s, (counts.get(s) ?? 0) + 1);
-      }
-    }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
-  });
-  let firstName = $state('');
-  let panelSide = $state<PanelSide>('right');
-  let aiStatus = $state<AiAvailability>('no');
-  let isScanning = $state(false);
-  let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
-  let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
-  let sourceStatuses = $state<SourceStatus[]>([]);
-  let isCheckingSources = $state(false);
-  let scanCompleted = $state(false);
-  let scanResultCounts = $state<Map<string, number>>(new Map());
-  let enabledConnectorIds = $state<Set<string>>(new Set());
-
-  let scanProgress = $derived.by(() => {
-    if (connectorStatuses.size === 0)
-      return { current: 0, total: 0, percent: 0, connectorName: '' };
-    const statuses = [...connectorStatuses.values()];
-    const total = statuses.length;
-    const completed = statuses.filter((s) => s.state === 'done' || s.state === 'error').length;
-    const active = statuses.find(
-      (s) => s.state === 'detecting' || s.state === 'fetching' || s.state === 'retrying'
-    );
-    return {
-      current: completed,
-      total,
-      percent: total > 0 ? Math.round((completed / total) * 100) : 0,
-      connectorName: active?.connectorName ?? '',
-    };
-  });
-  let showShortcutsHelp = $state(false);
-  let searchInputRef = $state<HTMLInputElement | null>(null);
-  let connectionStatus = $state<ConnectionInfo['status']>('unknown');
-  let isOffline = $derived(connectionStatus === 'offline');
-  let heroCompact = $derived(totalMissions > 0 && !isLoading);
-
+  // ============================================================
+  // Effects: Load UI-only data on mount
+  // ============================================================
   $effect(() => {
     getSeenIds()
       .then((ids) => {
@@ -213,7 +192,7 @@
     }
   });
 
-  // Abonnement à l'état de connexion
+  // Connection status subscription
   $effect(() => {
     const unsubscribe = subscribeToConnection((info) => {
       connectionStatus = info.status;
@@ -221,28 +200,16 @@
     return unsubscribe;
   });
 
-  // Charger les statuts persistés et les connecteurs activés au montage
-  $effect(() => {
-    getConnectorStatuses()
-      .then((s) => {
-        persistedStatuses = s;
-      })
-      .catch(() => {});
-    getSettings()
-      .then((s) => {
-        enabledConnectorIds = new Set(s.enabledConnectors);
-      })
-      .catch(() => {});
-  });
-
-  // Keyboard shortcuts registration
+  // ============================================================
+  // Keyboard shortcuts
+  // ============================================================
   $effect(() => {
     const shortcuts: Array<{ config: ShortcutConfig; handler: () => void }> = [
       {
         config: FeedShortcuts.REFRESH,
         handler: () => {
-          if (!isScanning && !isLoading && !isOffline) {
-            startScan();
+          if (!controller.isScanning && !isLoading && !isOffline) {
+            controller.startScan();
           }
         },
       },
@@ -286,268 +253,7 @@
     return unsubscribe;
   });
 
-  function handleMissionSeen(missionId: string) {
-    const ids = Array.from(seenIds);
-    if (ids.includes(missionId)) return;
-    seenIds = markAsSeen(ids, [missionId]);
-    saveSeenIds(Array.from(seenIds)).catch(() => {});
-  }
-
-  function handleToggleFavorite(id: string) {
-    favorites = toggleFavorite(favorites, id, Date.now());
-    saveFavorites(favorites).catch(() => {});
-  }
-
-  function handleHide(id: string) {
-    hidden = toggleHidden(hidden, id, Date.now());
-    saveHidden(hidden).catch(() => {});
-  }
-
-  function handleCopyLink(_id: string) {
-    // Copy handled in MissionCard, callback for future analytics
-  }
-
-  async function handleToggleConnector(id: string) {
-    const updated = new Set(enabledConnectorIds);
-    if (updated.has(id)) {
-      updated.delete(id);
-    } else {
-      updated.add(id);
-    }
-    enabledConnectorIds = updated;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, enabledConnectors: [...updated] });
-    } catch {
-      /* Non-critical: settings persistence */
-    }
-  }
-
-  function toggleFavoritesFilter() {
-    showFavoritesOnly = !showFavoritesOnly;
-  }
-
-  function toggleHiddenFilter() {
-    showHidden = !showHidden;
-  }
-
-  function handleSearch(query: string) {
-    if (query) {
-      feed.search(query);
-    } else {
-      feed.clearSearch();
-    }
-  }
-
-  async function startScan() {
-    if (isScanning) return;
-    scanCompleted = false;
-    isScanning = true;
-    connectorStatuses = new Map();
-    feed.load();
-
-    try {
-      // Envoyer SCAN_START au service worker — il gère toute l'orchestration
-      const response = await sendMessage({ type: 'SCAN_START' });
-      // Le SW renvoie SCAN_COMPLETE avec les missions traitées
-      if (response.type === 'SCAN_COMPLETE' && Array.isArray(response.payload)) {
-        await handleScanComplete(response.payload);
-      }
-    } catch (err) {
-      if (import.meta.env.DEV) {
-        console.error('[FeedPage] startScan error:', err);
-      }
-      feed.setError(err instanceof Error ? err.message : 'Erreur inattendue lors du scan');
-    } finally {
-      isScanning = false;
-      connectorStatuses = new Map();
-    }
-  }
-
-  /**
-   * Reçoit les missions finalisées du service worker (déjà scored, deduped, semantic).
-   * Plus de post-processing local — le SW fait tout.
-   */
-  async function handleScanComplete(missions: import('$lib/core/types/mission').Mission[]) {
-    if (import.meta.env.DEV) {
-      console.log('[handleScanComplete] received', missions.length, 'missions from SW');
-    }
-
-    // Merge avec cache pour résilience
-    let cached: import('$lib/core/types/mission').Mission[] = [];
-    try {
-      cached = await getMissions();
-    } catch {
-      /* Non-critical */
-    }
-
-    // Dedup simple (SW a déjà dedup, mais merge avec cache peut créer des doublons)
-    const merged = [...missions, ...cached];
-    const unique = new Map<string, import('$lib/core/types/mission').Mission>();
-    for (const m of merged) {
-      if (!unique.has(m.id)) unique.set(m.id, m);
-    }
-    const finalMissions = [...unique.values()];
-
-    if (finalMissions.length > 0) {
-      feed.setMissions(finalMissions);
-      scanCompleted = true;
-
-      // Compter par source pour l'affichage
-      const counts = new Map<string, number>();
-      for (const m of missions) {
-        counts.set(m.source, (counts.get(m.source) ?? 0) + 1);
-      }
-      scanResultCounts = counts;
-    } else {
-      feed.setError('Aucune mission trouvee');
-    }
-
-    // Recharger les statuts persistés pour le panneau SourceHealthPanel
-    try {
-      persistedStatuses = await getConnectorStatuses();
-    } catch {
-      /* Non-critical */
-    }
-  }
-
-  function stopScan() {
-    sendMessage({ type: 'SCAN_CANCEL' }).catch(() => {
-      // Service worker might not be available
-    });
-    isScanning = false;
-    connectorStatuses = new Map();
-  }
-
-  async function checkSourceSessions() {
-    if (isCheckingSources) return;
-    isCheckingSources = true;
-
-    try {
-      const settings = await getSettings();
-      const enabledIds = settings.enabledConnectors;
-      const meta = getConnectorsMeta();
-      const now = Date.now();
-
-      // Build initial source statuses with "checking" state
-      sourceStatuses = enabledIds.map((id) => {
-        const m = meta.find((x) => x.id === id);
-        return {
-          connectorId: id,
-          name: m?.name ?? id,
-          icon: m?.icon ?? '',
-          url: m?.url ?? '',
-          sessionStatus: 'checking' as SourceSessionStatus,
-          lastSyncAt: null,
-        };
-      });
-
-      // Load connectors and detect sessions in parallel
-      const connectors = await getConnectors(enabledIds);
-      const results = await detectAllConnectorSessions(connectors, now);
-
-      // Load last sync times in parallel
-      const lastSyncResults = await Promise.all(
-        connectors.map(async (c) => {
-          const result = await c.getLastSync(now);
-          return {
-            id: c.id,
-            lastSyncAt: result.ok ? result.value : null,
-          };
-        })
-      );
-
-      // Merge results into source statuses
-      const lastSyncMap = new Map(lastSyncResults.map((r) => [r.id, r.lastSyncAt]));
-      const resultMap = new Map(results.map((r) => [r.connectorId, r]));
-
-      sourceStatuses = sourceStatuses.map((s) => {
-        const result = resultMap.get(s.connectorId);
-        const lastSync = lastSyncMap.get(s.connectorId);
-
-        let sessionStatus: SourceSessionStatus = 'checking';
-        if (result) {
-          if (result.error) {
-            sessionStatus = 'error';
-          } else if (result.hasSession) {
-            sessionStatus = 'connected';
-          } else {
-            sessionStatus = 'not-connected';
-          }
-        }
-
-        return {
-          ...s,
-          sessionStatus,
-          lastSyncAt: lastSync?.getTime() ?? null,
-          error: result?.error,
-        };
-      });
-    } catch {
-      // Outside extension context or connector load failed
-      sourceStatuses = sourceStatuses.map((s) => ({
-        ...s,
-        sessionStatus: 'error' as SourceSessionStatus,
-      }));
-    } finally {
-      isCheckingSources = false;
-    }
-  }
-
-  // Check source sessions on mount (called once, not in $effect to avoid
-  // re-triggering when isCheckingSources changes)
-  checkSourceSessions();
-
-  // Smart load: use persisted data if fresh, scan only if stale
-  async function smartLoad() {
-    try {
-      const [stored, settings] = await Promise.all([getMissions(), getSettings()]);
-      if (stored.length > 0) {
-        feed.setMissions(stored);
-        const result = await chrome.storage.local.get('lastGlobalSync');
-        const lastSync = result.lastGlobalSync as number | undefined;
-        const intervalMs = settings.scanIntervalMinutes * 60 * 1000;
-        if (lastSync && Date.now() - lastSync < intervalMs) return;
-      }
-      startScan();
-    } catch {
-      startScan();
-    }
-  }
-  smartLoad();
-
-  // Listen for messages from service worker: SCAN_PROGRESS + SCAN_COMPLETE
-  try {
-    chrome.runtime.onMessage.addListener((message: any) => {
-      // Progression détaillée pendant le scan
-      if (message?.type === 'SCAN_PROGRESS' && message.payload) {
-        const payload = message.payload as ScanProgressPayload;
-        // Mettre à jour les états de connecteurs pour l'UI
-        const updated = new Map<string, ConnectorStatus>();
-        for (const cp of payload.connectorProgress) {
-          updated.set(cp.connectorId, {
-            connectorId: cp.connectorId,
-            connectorName: cp.connectorName,
-            state: cp.state,
-            missionsCount: cp.missionsCount,
-            error: cp.error as AppError | null,
-            retryCount: cp.retryCount,
-            startedAt: null,
-            completedAt: null,
-          });
-        }
-        connectorStatuses = updated;
-      }
-
-      // Résultat final du scan (auto-scan du background)
-      if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
-        handleScanComplete(message.payload).catch(() => {});
-      }
-    });
-  } catch {
-    // Outside extension context
-  }
-
+  // Dev event handlers
   if (import.meta.env.DEV) {
     $effect(() => {
       function handleMissions(e: Event) {
@@ -571,6 +277,60 @@
         window.removeEventListener('dev:feed-state', handleState);
       };
     });
+  }
+
+  // Cleanup controller on unmount
+  $effect(() => {
+    return () => controller.dispose();
+  });
+
+  // ============================================================
+  // Event handlers (UI-specific)
+  // ============================================================
+  function handleMissionSeen(missionId: string) {
+    const ids = Array.from(seenIds);
+    if (ids.includes(missionId)) return;
+    seenIds = markAsSeen(ids, [missionId]);
+    saveSeenIds(Array.from(seenIds)).catch(() => {});
+  }
+
+  function handleToggleFavorite(id: string) {
+    favorites = toggleFavorite(favorites, id, Date.now());
+    saveFavorites(favorites).catch(() => {});
+  }
+
+  function handleHide(id: string) {
+    hidden = toggleHidden(hidden, id, Date.now());
+    saveHidden(hidden).catch(() => {});
+  }
+
+  function handleCopyLink(_id: string) {
+    // Copy handled in MissionCard, callback for future analytics
+  }
+
+  function toggleFavoritesFilter() {
+    showFavoritesOnly = !showFavoritesOnly;
+  }
+
+  function toggleHiddenFilter() {
+    showHidden = !showHidden;
+  }
+
+  function handleSearch(query: string) {
+    if (query) {
+      feed.search(query);
+    } else {
+      feed.clearSearch();
+    }
+  }
+
+  // Shorthand for template
+  function startScan() {
+    return controller.startScan();
+  }
+
+  function stopScan() {
+    controller.stopScan();
   }
 </script>
 
@@ -621,7 +381,7 @@
               <button
                 class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition-all duration-200 hover:bg-white/10"
                 onclick={startScan}
-                disabled={isScanning || isLoading || isOffline}
+                disabled={controller.isScanning || isLoading || isOffline}
                 title="Lancer le scan (r)"
               >
                 <Icon name="play" size={12} class="ml-0.5" />
@@ -629,17 +389,17 @@
             </div>
           </div>
           <SourceHealthPanel
-            sources={sourceStatuses}
-            isChecking={isCheckingSources}
+            sources={controller.sourceStatuses as SourceStatus[]}
+            isChecking={controller.isCheckingSources}
             compact={true}
-            {scanResultCounts}
+            scanResultCounts={controller.scanResultCounts}
             activeSourceFilter={selectedSource}
-            enabledConnectors={enabledConnectorIds}
-            onRefresh={checkSourceSessions}
+            enabledConnectors={controller.enabledConnectorIds}
+            onRefresh={() => controller.checkSourceSessions()}
             onFilterBySource={(id) => {
-              selectedSource = id as import('$lib/core/types/mission').MissionSource | null;
+              selectedSource = id as MissionSource | null;
             }}
-            onToggleConnector={handleToggleConnector}
+            onToggleConnector={(id) => controller.handleToggleConnector(id)}
           />
         {:else}
           <!-- Full: hero with description, progress, stats -->
@@ -655,7 +415,7 @@
               </p>
             </div>
             <div class="flex items-center gap-2" class:flex-row-reverse={panelSide === 'left'}>
-              {#if isScanning || isLoading}
+              {#if controller.isScanning || isLoading}
                 <button
                   class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10 text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
                   onclick={stopScan}
@@ -666,20 +426,20 @@
               {/if}
               <button
                 class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
-                    {isScanning || isLoading
+                    {controller.isScanning || isLoading
                   ? 'border-accent-blue/30 bg-accent-blue/10'
                   : isOffline
                     ? 'border-white/5 bg-white/3 text-text-muted cursor-not-allowed'
                     : 'border-white/10 bg-white/6 text-white hover:bg-white/10'}"
                 onclick={startScan}
-                disabled={isScanning || isLoading || isOffline}
-                title={isScanning || isLoading
+                disabled={controller.isScanning || isLoading || isOffline}
+                title={controller.isScanning || isLoading
                   ? 'Scan en cours...'
                   : isOffline
                     ? 'Scan indisponible hors ligne'
                     : 'Lancer le scan (r)'}
               >
-                {#if isScanning || isLoading}
+                {#if controller.isScanning || isLoading}
                   <span class="absolute inset-0 flex items-center justify-center">
                     <span
                       class="radar-ping absolute h-8 w-8 rounded-full border border-accent-blue/40"
@@ -697,33 +457,33 @@
           </div>
 
           <ScanProgress
-            isScanning={isScanning || isLoading}
-            progress={scanProgress.percent}
+            isScanning={controller.isScanning || isLoading}
+            progress={controller.scanProgress.percent}
             missionsFound={totalMissions}
-            connectorName={scanProgress.connectorName}
-            current={scanProgress.current}
-            total={scanProgress.total}
+            connectorName={controller.scanProgress.connectorName}
+            current={controller.scanProgress.current}
+            total={controller.scanProgress.total}
           />
 
           <ConnectorStatusList
-            statuses={connectorStatuses}
-            {persistedStatuses}
-            isScanning={isScanning || isLoading}
+            statuses={controller.connectorStatuses}
+            persistedStatuses={controller.persistedStatuses}
+            isScanning={controller.isScanning || isLoading}
           />
 
-          {#if !(isScanning || isLoading)}
+          {#if !(controller.isScanning || isLoading)}
             <SourceHealthPanel
-              sources={sourceStatuses}
-              isChecking={isCheckingSources}
-              compact={scanCompleted}
-              {scanResultCounts}
+              sources={controller.sourceStatuses as SourceStatus[]}
+              isChecking={controller.isCheckingSources}
+              compact={controller.scanCompleted}
+              scanResultCounts={controller.scanResultCounts}
               activeSourceFilter={selectedSource}
-              enabledConnectors={enabledConnectorIds}
-              onRefresh={checkSourceSessions}
+              enabledConnectors={controller.enabledConnectorIds}
+              onRefresh={() => controller.checkSourceSessions()}
               onFilterBySource={(id) => {
-                selectedSource = id as import('$lib/core/types/mission').MissionSource | null;
+                selectedSource = id as MissionSource | null;
               }}
-              onToggleConnector={handleToggleConnector}
+              onToggleConnector={(id) => controller.handleToggleConnector(id)}
             />
           {/if}
 
@@ -776,13 +536,13 @@
       ></div>
 
       <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-        {#if isScanning || isLoading}Chargement des missions en cours{/if}
+        {#if controller.isScanning || isLoading}Chargement des missions en cours{/if}
       </div>
 
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
           <h3 class="text-sm font-semibold tracking-tight text-white">Missions triees</h3>
-          {#if !(isScanning || isLoading)}
+          {#if !(controller.isScanning || isLoading)}
             <span
               class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2 py-0.5 text-[10px] font-medium text-accent-emerald/90"
               aria-label="{visibleCount} missions visibles"
@@ -792,7 +552,7 @@
             </span>
           {/if}
         </div>
-        {#if isScanning || isLoading}
+        {#if controller.isScanning || isLoading}
           <span class="flex items-center gap-2 text-xs text-text-muted" aria-hidden="true">
             <span
               class="h-3 w-3 animate-spin rounded-full border-2 border-accent-blue/30 border-t-accent-blue"
@@ -920,11 +680,11 @@
 
   <div
     class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
-    use:pullToRefresh={{ onRefresh: () => startScan(), threshold: 60 }}
+    use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
   >
     <VirtualMissionFeed
       missions={displayMissions}
-      isLoading={isScanning || isLoading}
+      isLoading={controller.isScanning || isLoading}
       {error}
       {seenIds}
       {favorites}

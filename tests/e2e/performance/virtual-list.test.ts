@@ -80,7 +80,9 @@ test.describe('Performance - Virtual List', () => {
     await expect(page.getByText('300 missions')).toBeVisible({ timeout: 5000 });
 
     // Scroller rapidement vers le bas
-    const container = page.locator('[role="region"], .missions-container, [data-testid="mission-feed"]').first();
+    const container = page
+      .locator('[role="region"], .missions-container, [data-testid="mission-feed"]')
+      .first();
 
     // Effectuer plusieurs scrolls rapides
     for (let i = 0; i < 5; i++) {
@@ -125,7 +127,9 @@ test.describe('Performance - Virtual List', () => {
     await expect(page.getByText('400 missions')).toBeVisible({ timeout: 5000 });
 
     // Scroller beaucoup pour forcer le recyclage des éléments
-    const container = page.locator('[role="region"], .missions-container, [data-testid="mission-feed"]').first();
+    const container = page
+      .locator('[role="region"], .missions-container, [data-testid="mission-feed"]')
+      .first();
 
     for (let i = 0; i < 10; i++) {
       await container.evaluate((el) => {
@@ -177,7 +181,9 @@ test.describe('Performance - Virtual List', () => {
 
     // Utiliser l'API Performance pour mesurer le scroll
     const scrollPerformance = await page.evaluate(async () => {
-      const container = document.querySelector('[role="region"], .missions-container, [data-testid="mission-feed"]') as HTMLElement;
+      const container = document.querySelector(
+        '[role="region"], .missions-container, [data-testid="mission-feed"]'
+      ) as HTMLElement;
       if (!container) return null;
 
       const marks: number[] = [];
@@ -220,19 +226,27 @@ test.describe('Performance - Virtual List', () => {
 
     // Mesurer le temps de recherche
     const searchStart = Date.now();
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    const searchInput = page.getByPlaceholder('Rechercher...');
+    await searchInput.fill('React');
 
     // Attendre que les résultats se mettent à jour
     await page.waitForTimeout(300);
 
     const searchTime = Date.now() - searchStart;
 
-    // La recherche doit être rapide (< 500ms)
+    // La recherche doit être rapide (< 1000ms)
     expect(searchTime).toBeLessThan(1000);
 
-    // Vérifier qu'on a des résultats
+    // Vérifier que l'input contient bien le terme de recherche
+    await expect(searchInput).toHaveValue('React');
+
+    // Vérifier qu'on a des résultats filtrés
     const resultsText = await page.locator('text=/\\d+ mission/').textContent();
     expect(resultsText).toMatch(/\d+ mission/);
+    const resultsCount = parseInt(resultsText?.match(/\d+/)?.[0] || '0', 10);
+
+    // Le nombre de résultats devrait être <= 300 (filtré)
+    expect(resultsCount).toBeLessThanOrEqual(300);
   });
 
   test('filter toggle performance with large dataset', async ({ page }) => {
@@ -250,16 +264,32 @@ test.describe('Performance - Virtual List', () => {
 
     await expect(page.getByText('200 missions')).toBeVisible({ timeout: 5000 });
 
+    // D'abord, favoriser quelques missions pour que le filtre ait du sens
+    const cards = page.locator('[role="button"]');
+    // Favoriser les 3 premières missions
+    for (let i = 0; i < 3; i++) {
+      const card = cards.nth(i);
+      const starBtn = card.getByTitle('Ajouter aux favoris');
+      if (await starBtn.isVisible().catch(() => false)) {
+        await starBtn.click().catch(() => {});
+      }
+    }
+
     // Mesurer le temps de bascule du filtre favoris
     const toggleStart = Date.now();
     await page.getByTitle('Voir favoris').click();
 
-    await page.waitForTimeout(200);
+    // Attendre que les favoris s'affichent
+    await expect(page.getByText(/mission/)).toBeVisible({ timeout: 2000 });
 
     const toggleTime = Date.now() - toggleStart;
 
-    // Le filtre doit répondre rapidement (< 200ms)
+    // Le filtre doit répondre rapidement (< 500ms)
     expect(toggleTime).toBeLessThan(500);
+
+    // Vérifier qu'on a des favoris affichés
+    const filteredText = await page.locator('text=/\\d+ mission/').textContent();
+    expect(filteredText).toMatch(/\d+ mission/);
   });
 
   test('maintains scroll position when filtering', async ({ page }) => {
@@ -278,14 +308,19 @@ test.describe('Performance - Virtual List', () => {
     await expect(page.getByText('200 missions')).toBeVisible({ timeout: 5000 });
 
     // Scroller vers le milieu
-    const container = page.locator('[role="region"], .missions-container, [data-testid="mission-feed"]').first();
+    const container = page
+      .locator('[role="region"], .missions-container, [data-testid="mission-feed"]')
+      .first();
     await container.evaluate((el) => {
       el.scrollTop = el.scrollHeight / 3;
     });
 
     const scrollPositionBefore = await container.evaluate((el) => el.scrollTop);
 
-    // Changer le filtre
+    // Vérifier qu'on a bien scrollé (pas à 0)
+    expect(scrollPositionBefore).toBeGreaterThan(0);
+
+    // Changer le filtre (va afficher 0 favoris)
     await page.getByTitle('Voir favoris').click();
     await page.waitForTimeout(200);
 
@@ -293,11 +328,14 @@ test.describe('Performance - Virtual List', () => {
     await page.getByTitle('Voir toutes').click();
     await page.waitForTimeout(200);
 
-    // Vérifier que la position de scroll est raisonnable
+    // Vérifier que la position de scroll est revenue à une valeur valide
     // (peut ne pas être exacte à cause de la virtual list)
     const scrollPositionAfter = await container.evaluate((el) => el.scrollTop);
 
-    // La position devrait être proche de l'originale ou remise à 0
-    expect(typeof scrollPositionAfter).toBe('number');
+    // La position devrait être un nombre valide
+    expect(scrollPositionAfter).toBeGreaterThanOrEqual(0);
+
+    // Les missions doivent toujours être affichées
+    await expect(page.getByText('200 missions')).toBeVisible({ timeout: 2000 });
   });
 });

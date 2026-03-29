@@ -6,9 +6,17 @@
  */
 export {
   getMissions,
+  getMissionCount,
+  getMissionsPaginated,
+  getMissionsBySource,
+  getRecentMissions,
+  upsertMissions,
   getProfile,
   getConnectorStatuses,
   saveConnectorStatuses,
+  type PaginatedMissions,
+  type PaginatedQueryOptions,
+  type MissionSortBy,
 } from '../storage/db';
 export { getSeenIds, saveSeenIds } from '../storage/seen-missions';
 export { getFavorites, saveFavorites, getHidden, saveHidden } from '../storage/favorites';

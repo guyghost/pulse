@@ -41,8 +41,10 @@ test.describe('Full User Journey', () => {
     await waitForMissions(page, 1, 10000);
 
     // 5. Voir des missions apparaître
-    const initialCount = await page.locator('text=/\\d+ mission/').textContent();
-    expect(initialCount).toMatch(/\d+ mission/);
+    const initialText = await page.locator('text=/\\d+ mission/').textContent();
+    expect(initialText).toMatch(/\d+ mission/);
+    const initialCount = parseInt(initialText?.match(/\d+/)?.[0] || '0', 10);
+    expect(initialCount).toBeGreaterThanOrEqual(1);
 
     // Injecter des missions supplémentaires pour les tests suivants
     await injectMissions(page, 5);
@@ -127,7 +129,10 @@ test.describe('Full User Journey', () => {
 
     // Naviguer vers Settings
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Settings' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
 
     // Revenir au Feed
     await page.getByRole('button', { name: 'Feed' }).click();
@@ -145,13 +150,21 @@ test.describe('Full User Journey', () => {
     await injectMissions(page, 10);
     await waitForMissions(page, 10, 5000);
 
+    // Mémoriser le nombre de missions
+    const initialCount = 10;
+
     // Rechercher
     await page.getByPlaceholder('Rechercher...').fill('React');
     await page.waitForTimeout(500);
 
-    // Vérifier qu'on a des résultats
+    // Vérifier qu'on a des résultats filtrés
     const missionText = await page.locator('text=/\\d+ mission/').textContent();
     expect(missionText).toMatch(/\d+ mission/);
+    const filteredCount = parseInt(missionText?.match(/\d+/)?.[0] || '0', 10);
+    expect(filteredCount).toBeLessThanOrEqual(initialCount);
+
+    // Vérifier que la recherche a bien filtré
+    await expect(page.getByPlaceholder('Rechercher...')).toHaveValue('React');
 
     // Favoriser la première mission des résultats de recherche
     const firstResult = await getFirstMissionCard(page);
@@ -160,6 +173,9 @@ test.describe('Full User Journey', () => {
     // Effacer la recherche
     await page.getByPlaceholder('Rechercher...').clear();
     await page.waitForTimeout(300);
+
+    // Vérifier qu'on retrouve toutes les missions
+    await expect(page.getByText(`${initialCount} missions`)).toBeVisible({ timeout: 2000 });
 
     // Vérifier que le favori est toujours là
     await toggleFavoritesFilter(page, true);
