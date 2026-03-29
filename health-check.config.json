@@ -1,0 +1,15 @@
+{
+  "connectors": {
+    "free-work": { "enabled": true, "timeout": 30000 },
+    "lehibou": { "enabled": true, "timeout": 60000 },
+    "hiway": { "enabled": true, "timeout": 60000 },
+    "collective": { "enabled": true, "timeout": 60000 },
+    "cherry-pick": { "enabled": true, "timeout": 60000 }
+  },
+  "screenshots": {
+    "enabled": true,
+    "directory": "tests/health/screenshots"
+  },
+  "failFast": false,
+  "parallel": true
+}

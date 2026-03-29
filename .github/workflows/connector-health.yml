@@ -1,0 +1,150 @@
+name: Connector Health Checks
+
+on:
+  schedule:
+    # Run daily at 8:00 AM UTC
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+    # Allow manual trigger
+    inputs:
+      connectors:
+        description: 'Comma-separated list of connectors to test (empty = all)'
+        required: false
+        default: ''
+      skip_issue:
+        description: 'Skip issue creation (only log results)'
+        required: false
+        default: 'false'
+        type: boolean
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '10.32.1'
+
+jobs:
+  health-check:
+    name: Run Connector Health Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Playwright browsers
+        run: pnpm exec playwright install chromium
+
+      - name: Run connector health checks
+        id: health-check
+        run: |
+          CONNECTOR_FILTER="${{ github.event.inputs.connectors || '' }}"
+          CONNECTOR_ARGS=""
+
+          if [ -n "$CONNECTOR_FILTER" ]; then
+            IFS=',' read -ra CONNECTORS <<< "$CONNECTOR_FILTER"
+            for connector in "${CONNECTORS[@]}"; do
+              trimmed="$(printf '%s' "$connector" | xargs)"
+              if [ -n "$trimmed" ]; then
+                CONNECTOR_ARGS="$CONNECTOR_ARGS --connector=$trimmed"
+              fi
+            done
+          fi
+
+          pnpm health-check:json $CONNECTOR_ARGS --output=health-report.json
+        continue-on-error: true
+
+      - name: Parse health check results
+        id: parse
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFileSync, appendFileSync } from 'node:fs';
+
+          const report = JSON.parse(readFileSync('health-report.json', 'utf8'));
+          const failedResults = report.results.filter((result) => result.status !== 'ok' && result.status !== 'skipped');
+          const status = failedResults.length > 0 ? 'failed' : 'passed';
+          const failedConnectors = failedResults.map((result) => result.connectorName).join(', ') || 'none';
+
+          appendFileSync(process.env.GITHUB_OUTPUT, `status=${status}\n`);
+          appendFileSync(process.env.GITHUB_OUTPUT, `failed_connectors=${failedConnectors}\n`);
+
+          const summaryLines = status === 'failed'
+            ? [
+                '## Connector Health Check Failed',
+                '',
+                `**Failed connectors:** \`${failedConnectors}\``,
+                '',
+                '### Report',
+                '```json',
+                JSON.stringify(report, null, 2),
+                '```',
+              ]
+            : [
+                '## ✅ All Connectors Healthy',
+                '',
+                'All connector health checks passed successfully.',
+              ];
+
+          appendFileSync(process.env.GITHUB_STEP_SUMMARY, `${summaryLines.join('\n')}\n`);
+          EOF
+
+      - name: Upload health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connector-health-report
+          path: health-report.json
+          retention-days: 14
+
+      - name: Get current date
+        id: date
+        run: echo "date=$(date +'%Y-%m-%d')" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Issue for Failed Connector
+        if: |
+          steps.parse.outputs.status == 'failed' &&
+          github.event.inputs.skip_issue != 'true'
+        uses: JasonEtco/create-an-issue@v2
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          DATE: ${{ steps.date.outputs.date }}
+          FAILED_CONNECTORS: ${{ steps.parse.outputs.failed_connectors }}
+          RUN_URL: ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}
+        with:
+          filename: .github/ISSUE_TEMPLATE/connector-failure.md
+          update_existing: true
+          search_existing: open
+
+      - name: Fail workflow if health checks failed
+        if: steps.parse.outputs.status == 'failed'
+        run: |
+          echo "::error::Connector health checks failed. See issue for details."
+          exit 1
+
+  notify-success:
+    name: Notify on Success
+    runs-on: ubuntu-latest
+    needs: health-check
+    if: success() && github.event_name == 'schedule'
+
+    steps:
+      - name: Log success
+        run: |
+          echo "✅ All connector health checks passed on $(date +'%Y-%m-%d %H:%M UTC')"

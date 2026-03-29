@@ -1,0 +1,165 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+env:
+  NODE_VERSION: '20'
+  PNPM_VERSION: '10.32.1'
+
+jobs:
+  build-and-release:
+    name: Build & Release Extension
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Extract version from tag
+        id: version
+        run: |
+          # Remove 'v' prefix from tag (e.g., v1.0.0 -> 1.0.0)
+          VERSION="${GITHUB_REF#refs/tags/v}"
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "Building version: $VERSION"
+
+      - name: Verify manifest.json
+        run: pnpm tsx scripts/verify-manifest.ts
+
+      - name: Bump version in files
+        run: pnpm tsx scripts/bump-version.ts ${{ steps.version.outputs.version }}
+
+      - name: Build extension
+        run: pnpm build
+
+      - name: Create extension ZIP
+        run: |
+          cd dist
+          zip -r ../missionpulse-${{ steps.version.outputs.version }}.zip .
+          cd ..
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          # Get previous tag
+          PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+
+          if [ -n "$PREV_TAG" ]; then
+            echo "Generating changelog from $PREV_TAG to ${{ github.ref_name }}"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD 2>/dev/null || echo "- Release ${{ steps.version.outputs.version }}")
+          else
+            echo "First release, generating initial changelog"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" -10 || echo "- Initial release")
+          fi
+
+          # Write changelog using EOF syntax for multiline output
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          name: MissionPulse v${{ steps.version.outputs.version }}
+          body: |
+            ## MissionPulse v${{ steps.version.outputs.version }}
+
+            ### Changes
+            ${{ steps.changelog.outputs.changelog }}
+
+            ### Installation
+            Download `missionpulse-${{ steps.version.outputs.version }}.zip` and load it as an unpacked extension in Chrome.
+
+            ---
+
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ github.ref_name }}...HEAD
+          files: |
+            missionpulse-${{ steps.version.outputs.version }}.zip
+          draft: false
+          prerelease: ${{ contains(steps.version.outputs.version, '-') }}
+          generate_release_notes: false
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: missionpulse-${{ steps.version.outputs.version }}
+          path: dist/
+          retention-days: 30
+
+  publish-to-chrome-store:
+    name: Publish to Chrome Web Store
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    needs: build-and-release
+    if: ${{ !contains(github.ref_name, '-') }} # Only publish stable releases (no pre-release tags)
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v4
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Download extension artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: missionpulse-${{ needs.build-and-release.outputs.version }}
+          path: dist/
+
+      - name: Create ZIP for Chrome Store
+        run: |
+          cd dist
+          zip -r ../extension.zip .
+
+      - name: Publish to Chrome Web Store
+        if: ${{ env.CHROME_EXTENSION_ID != '' }}
+        uses: mnao305/chrome-extension-upload@v5.0.0
+        with:
+          file-path: extension.zip
+          extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
+          client-id: ${{ secrets.CHROME_CLIENT_ID }}
+          client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
+          refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+
+      - name: Publish notification
+        if: ${{ env.CHROME_EXTENSION_ID == '' }}
+        run: |
+          echo "::warning::Chrome Web Store credentials not configured. Skipping CWS publish."
+          echo "To enable Chrome Web Store publishing, configure the following secrets:"
+          echo "  - CHROME_EXTENSION_ID"
+          echo "  - CHROME_CLIENT_ID"
+          echo "  - CHROME_CLIENT_SECRET"
+          echo "  - CHROME_REFRESH_TOKEN"
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
