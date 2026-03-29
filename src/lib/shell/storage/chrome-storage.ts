@@ -9,7 +9,6 @@ const SettingsSchema = z.object({
   notificationScoreThreshold: z.number().int().min(0).max(100),
   respectRateLimits: z.boolean(),
   customDelayMs: z.number().int().min(0).max(60000),
-  respectRobotsTxt: z.boolean(),
 });
 
 export type AppSettings = z.infer<typeof SettingsSchema>;
@@ -23,7 +22,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   notificationScoreThreshold: 70,
   respectRateLimits: true,
   customDelayMs: 0,
-  respectRobotsTxt: true,
 };
 
 export const getApiKey = async (): Promise<string | null> => {
@@ -51,7 +49,10 @@ export const getSettings = async (): Promise<AppSettings> => {
   const parseResult = SettingsSchema.safeParse(raw);
 
   if (!parseResult.success) {
-    console.warn('[Settings] Invalid stored settings, falling back to defaults:', parseResult.error.issues);
+    console.warn(
+      '[Settings] Invalid stored settings, falling back to defaults:',
+      parseResult.error.issues
+    );
     return DEFAULT_SETTINGS;
   }
 

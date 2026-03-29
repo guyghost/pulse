@@ -2,7 +2,11 @@
 
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
-import { buildScoringPrompt, parseSemanticResult, type SemanticResult } from '../../core/scoring/semantic-scoring';
+import {
+  buildScoringPrompt,
+  parseSemanticResult,
+  type SemanticResult,
+} from '../../core/scoring/semantic-scoring';
 import { isPromptApiAvailable } from './capabilities';
 import { getCachedSemanticScores, cacheSemanticScores } from '../storage/semantic-cache';
 import type { AILanguageModelSession } from './chrome-ai';
@@ -14,29 +18,27 @@ const MAX_RETRIES = RETRY_DELAYS_MS.length;
 /**
  * Sleep for a given number of milliseconds.
  */
-const sleep = (ms: number): Promise<void> =>
-  new Promise((resolve) => setTimeout(resolve, ms));
+const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
 
 /**
- * Score a single mission using the AI with retry logic.
+ * Score a single mission using an existing AI session with retry logic.
+ * Reuses the provided session instead of creating a new one per mission.
  */
 const scoreSingleMission = async (
   mission: Mission,
   profile: UserProfile,
+  session: AILanguageModelSession
 ): Promise<SemanticResult | null> => {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
-    let session: AILanguageModelSession | null = null;
-
     try {
-      session = await self.ai.languageModel.create();
       const prompt = buildScoringPrompt(mission, profile);
 
       const response = await Promise.race<string>([
         session.prompt(prompt),
         new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS),
+          setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS)
         ),
       ]);
 
@@ -48,22 +50,20 @@ const scoreSingleMission = async (
       console.warn(
         '[SemanticScorer]',
         `Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for mission ${mission.id}:`,
-        lastError.message,
+        lastError.message
       );
 
       // Wait before retry (except on last attempt)
       if (attempt < MAX_RETRIES) {
         await sleep(RETRY_DELAYS_MS[attempt]);
       }
-    } finally {
-      session?.destroy();
     }
   }
 
   console.warn(
     '[SemanticScorer]',
     `All attempts failed for mission ${mission.id}:`,
-    lastError?.message,
+    lastError?.message
   );
 
   return null;
@@ -72,6 +72,7 @@ const scoreSingleMission = async (
 /**
  * Score missions using the Chrome built-in AI (Prompt API).
  *
+ * Uses a SINGLE session for the entire batch (create once, destroy once).
  * First checks the cache for existing scores. Only uncached missions
  * are sent to the LLM, up to maxPerScan new scores per call.
  * Newly computed scores are cached for future use.
@@ -85,7 +86,7 @@ const scoreSingleMission = async (
 export const scoreMissionsSemantic = async (
   missions: Mission[],
   profile: UserProfile,
-  maxPerScan = 10,
+  maxPerScan = 10
 ): Promise<Map<string, SemanticResult>> => {
   const results = new Map<string, SemanticResult>();
 
@@ -116,15 +117,23 @@ export const scoreMissionsSemantic = async (
   }
 
   // Step 3: Score only uncached missions, up to maxPerScan
+  // Use a SINGLE session for the entire batch (performance fix)
   const batch = uncachedMissions.slice(0, maxPerScan);
   const newResults = new Map<string, SemanticResult>();
+  let session: AILanguageModelSession | null = null;
 
-  for (const mission of batch) {
-    const result = await scoreSingleMission(mission, profile);
-    if (result) {
-      newResults.set(mission.id, result);
-      results.set(mission.id, result);
+  try {
+    session = await self.ai.languageModel.create();
+
+    for (const mission of batch) {
+      const result = await scoreSingleMission(mission, profile, session);
+      if (result) {
+        newResults.set(mission.id, result);
+        results.set(mission.id, result);
+      }
     }
+  } finally {
+    session?.destroy();
   }
 
   // Step 4: Cache newly computed scores

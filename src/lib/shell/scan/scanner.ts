@@ -90,8 +90,6 @@ export type DetailedProgressCallback = (info: {
 export interface ScanOptions {
   /** Délai entre les pages d'un même connecteur en ms (défaut: 500) */
   pageDelayMs?: number;
-  /** Respecter robots.txt (optionnel, pour future implémentation) */
-  respectRobotsTxt?: boolean;
   /** Callback de progression détaillé (pour bridge SCAN_PROGRESS) */
   onDetailedProgress?: DetailedProgressCallback;
 }

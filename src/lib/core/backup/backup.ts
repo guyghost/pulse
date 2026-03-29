@@ -41,7 +41,6 @@ export const BackupDataSchema = z.object({
     notificationScoreThreshold: z.number(),
     respectRateLimits: z.boolean(),
     customDelayMs: z.number(),
-    respectRobotsTxt: z.boolean(),
   }),
   favorites: z.record(z.number()),
   hidden: z.record(z.number()),
@@ -58,9 +57,7 @@ export type ValidationError =
   | { type: 'SCHEMA_ERROR'; message: string; issues: z.ZodIssue[] }
   | { type: 'VERSION_UNSUPPORTED'; message: string; version: number };
 
-export type Result<T, E> =
-  | { ok: true; value: T }
-  | { ok: false; error: E };
+export type Result<T, E> = { ok: true; value: T } | { ok: false; error: E };
 
 // ============================================
 // Constantes

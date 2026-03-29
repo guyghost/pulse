@@ -47,7 +47,6 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
-      respectRobotsTxt: true,
     });
   });
 
@@ -65,7 +64,6 @@ describe('getSettings', () => {
       notificationScoreThreshold: 85,
       respectRateLimits: false,
       customDelayMs: 2000,
-      respectRobotsTxt: false,
     };
 
     const settings = await getSettings();
@@ -78,7 +76,6 @@ describe('getSettings', () => {
     expect(settings.notificationScoreThreshold).toBe(85);
     expect(settings.respectRateLimits).toBe(false);
     expect(settings.customDelayMs).toBe(2000);
-    expect(settings.respectRobotsTxt).toBe(false);
   });
 
   it('falls back to defaults when stored settings are partial (missing fields)', async () => {
@@ -96,27 +93,26 @@ describe('getSettings', () => {
     expect(settings.autoScan).toBe(true);
   });
 
-	it('strips unknown fields and keeps valid settings', async () => {
-		// Zod by default uses passthrough mode - strips unknown fields rather than rejecting
-		mockStorage.settings = {
-			unknownField: 'should be ignored',
-			scanIntervalMinutes: 15,
-			enabledConnectors: ['free-work'],
-			notifications: true,
-			autoScan: true,
-			maxSemanticPerScan: 10,
-			notificationScoreThreshold: 70,
-			respectRateLimits: true,
-			customDelayMs: 0,
-			respectRobotsTxt: true,
-		};
+  it('strips unknown fields and keeps valid settings', async () => {
+    // Zod by default uses passthrough mode - strips unknown fields rather than rejecting
+    mockStorage.settings = {
+      unknownField: 'should be ignored',
+      scanIntervalMinutes: 15,
+      enabledConnectors: ['free-work'],
+      notifications: true,
+      autoScan: true,
+      maxSemanticPerScan: 10,
+      notificationScoreThreshold: 70,
+      respectRateLimits: true,
+      customDelayMs: 0,
+    };
 
-		const settings = await getSettings();
+    const settings = await getSettings();
 
-		// Unknown field is stripped, valid settings are kept
-		expect(settings.scanIntervalMinutes).toBe(15);
-		expect((settings as unknown as Record<string, unknown>).unknownField).toBeUndefined();
-	});
+    // Unknown field is stripped, valid settings are kept
+    expect(settings.scanIntervalMinutes).toBe(15);
+    expect((settings as unknown as Record<string, unknown>).unknownField).toBeUndefined();
+  });
 
   it('falls back to defaults when stored settings have invalid types', async () => {
     mockStorage.settings = {
@@ -128,7 +124,6 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
-      respectRobotsTxt: true,
     };
 
     const settings = await getSettings();
@@ -147,7 +142,6 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
-      respectRobotsTxt: true,
     };
 
     const settings = await getSettings();
@@ -165,7 +159,6 @@ describe('getSettings', () => {
       notificationScoreThreshold: 150, // Above max of 100
       respectRateLimits: true,
       customDelayMs: 0,
-      respectRobotsTxt: true,
     };
 
     const settings = await getSettings();
@@ -183,11 +176,16 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
-      respectRobotsTxt: true,
     };
 
     const settings = await getSettings();
 
-    expect(settings.enabledConnectors).toEqual(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick']); // default
+    expect(settings.enabledConnectors).toEqual([
+      'free-work',
+      'lehibou',
+      'hiway',
+      'collective',
+      'cherry-pick',
+    ]); // default
   });
 });
