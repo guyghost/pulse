@@ -2,7 +2,7 @@
   import OnboardingLayout from '../templates/OnboardingLayout.svelte';
   import OnboardingWizard from '../organisms/OnboardingWizard.svelte';
   import type { UserProfile } from '$lib/core/types/profile';
-  import { saveProfile } from '$lib/shell/storage/db';
+  import { saveProfile } from '$lib/shell/facades/settings.facade';
   import { createOnboardingStore } from '$lib/state/onboarding.svelte';
 
   let { onComplete }: { onComplete?: () => void } = $props();
@@ -28,8 +28,7 @@
       onboarding.saveSuccess();
       onComplete?.();
     } catch (err) {
-      const message =
-        err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
+      const message = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
       onboarding.saveError(message);
     }
   }
@@ -46,7 +45,7 @@
     onRetry={handleRetry}
     {isSaving}
     {hasError}
-    errorMessage={errorMessage}
+    {errorMessage}
   />
 {/snippet}
 

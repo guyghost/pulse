@@ -10,9 +10,15 @@
     setSettings,
     getApiKey,
     setApiKey,
-  } from '$lib/shell/storage/chrome-storage';
-  import { getProfile, saveProfile } from '$lib/shell/storage/db';
-  import { getFavorites, getHidden, saveFavorites, saveHidden } from '$lib/shell/storage/favorites';
+    getProfile,
+    saveProfile,
+  } from '$lib/shell/facades/settings.facade';
+  import {
+    getFavorites,
+    getHidden,
+    saveFavorites,
+    saveHidden,
+  } from '$lib/shell/facades/feed-data.facade';
   import {
     exportMissionsToJSON,
     exportMissionsToCSV,

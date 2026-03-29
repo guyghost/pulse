@@ -2,7 +2,7 @@
   import Chip from '../atoms/Chip.svelte';
   import Icon from '../atoms/Icon.svelte';
   import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import { getConnectorsMeta } from '$lib/shell/connectors/index';
+  import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
 
   let {
     availableStacks = [],
@@ -24,7 +24,9 @@
     onClearAll?: () => void;
   } = $props();
 
-  let hasFilters = $derived(selectedStacks.length > 0 || selectedSource !== null || selectedRemote !== null);
+  let hasFilters = $derived(
+    selectedStacks.length > 0 || selectedSource !== null || selectedRemote !== null
+  );
 
   const sources: { value: MissionSource; label: string }[] = getConnectorsMeta().map((m) => ({
     value: m.id as MissionSource,

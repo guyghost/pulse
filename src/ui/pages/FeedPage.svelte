@@ -11,23 +11,30 @@
   import FilterBar from '../organisms/FilterBar.svelte';
   import KeyboardShortcutsHelp from '../molecules/KeyboardShortcutsHelp.svelte';
   import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import { getConnectorsMeta, detectAllConnectorSessions } from '$lib/shell/connectors/index';
   import SourceHealthPanel, {
     type SourceStatus,
     type SourceSessionStatus,
   } from '../organisms/SourceHealthPanel.svelte';
-  import { getSeenIds, saveSeenIds } from '$lib/shell/storage/seen-missions';
-  import { markAsSeen } from '$lib/core/seen/mark-seen';
-  import { getFavorites, saveFavorites, getHidden, saveHidden } from '$lib/shell/storage/favorites';
-  import { getProfile, getMissions, getConnectorStatuses } from '$lib/shell/storage/db';
-  import { getSettings, setSettings } from '$lib/shell/storage/chrome-storage';
-  import { resetNewMissionCount } from '$lib/shell/storage/session-storage';
   import {
+    getConnectorsMeta,
+    detectAllConnectorSessions,
+    getSeenIds,
+    saveSeenIds,
+    markAsSeen,
+    getFavorites,
+    saveFavorites,
+    getHidden,
+    saveHidden,
     toggleFavorite,
     toggleHidden,
     filterHidden,
     filterFavoritesOnly,
-  } from '$lib/core/favorites/favorites';
+    getProfile,
+    getMissions,
+    getConnectorStatuses,
+    resetNewMissionCount,
+  } from '$lib/shell/facades/feed-data.facade';
+  import { getSettings, setSettings } from '$lib/shell/facades/settings.facade';
   import {
     type ConnectorStatus,
     type PersistedConnectorStatus,

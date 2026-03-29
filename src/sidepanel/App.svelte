@@ -16,7 +16,7 @@
     subscribeToConnection,
     type ConnectionInfo,
   } from '../lib/shell/utils/connection-monitor';
-  import { getProfile } from '../lib/shell/storage/db';
+  import { getProfile } from '../lib/shell/facades/settings.facade';
 
   type Page = 'feed' | 'settings' | 'onboarding';
 

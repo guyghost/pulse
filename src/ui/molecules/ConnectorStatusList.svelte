@@ -1,10 +1,14 @@
 <script lang="ts">
   import type { ConnectorStatus } from '$lib/core/types/connector-status';
   import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
-  import { getConnectorsMeta } from '$lib/shell/connectors';
+  import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
   import ConnectorStatusItem from './ConnectorStatus.svelte';
 
-  let { statuses, persistedStatuses = [], isScanning = false }: {
+  let {
+    statuses,
+    persistedStatuses = [],
+    isScanning = false,
+  }: {
     statuses?: Map<string, ConnectorStatus>;
     persistedStatuses?: PersistedConnectorStatus[];
     isScanning?: boolean;
@@ -16,17 +20,11 @@
     return metas.find((m) => m.id === id);
   }
 
-  let scanEntries = $derived(
-    statuses ? [...statuses.entries()] : []
-  );
+  let scanEntries = $derived(statuses ? [...statuses.entries()] : []);
 
-  let errorEntries = $derived(
-    persistedStatuses.filter((p) => p.lastState === 'error')
-  );
+  let errorEntries = $derived(persistedStatuses.filter((p) => p.lastState === 'error'));
 
-  let shouldShow = $derived(
-    isScanning ? scanEntries.length > 0 : errorEntries.length > 0
-  );
+  let shouldShow = $derived(isScanning ? scanEntries.length > 0 : errorEntries.length > 0);
 </script>
 
 {#if shouldShow}
@@ -34,12 +32,22 @@
     {#if isScanning}
       {#each scanEntries as [id, status] (id)}
         {@const m = getMeta(id)}
-        <ConnectorStatusItem name={m?.name ?? id} icon={m?.icon ?? ''} url={m?.url ?? ''} {status} />
+        <ConnectorStatusItem
+          name={m?.name ?? id}
+          icon={m?.icon ?? ''}
+          url={m?.url ?? ''}
+          {status}
+        />
       {/each}
     {:else}
       {#each errorEntries as persisted (persisted.connectorId)}
         {@const m = getMeta(persisted.connectorId)}
-        <ConnectorStatusItem name={m?.name ?? persisted.connectorName} icon={m?.icon ?? ''} url={m?.url ?? ''} {persisted} />
+        <ConnectorStatusItem
+          name={m?.name ?? persisted.connectorName}
+          icon={m?.icon ?? ''}
+          url={m?.url ?? ''}
+          {persisted}
+        />
       {/each}
     {/if}
   </div>
