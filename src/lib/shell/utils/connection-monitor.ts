@@ -1,7 +1,12 @@
 /**
  * Surveillance de l'état de la connexion réseau
  * Utilise navigator.onLine et l'API Network Information si disponible
+ *
+ * Compatible Service Worker (pas de window/document).
  */
+
+/** Détecte si on est dans un contexte Service Worker (pas de window) */
+const isServiceWorker = typeof window === 'undefined';
 
 export type ConnectionStatus = 'online' | 'offline' | 'slow' | 'unknown';
 
@@ -33,14 +38,18 @@ let currentInfo: ConnectionInfo = getConnectionInfo();
  * Combine navigator.onLine et Network Information API
  */
 function getConnectionInfo(): ConnectionInfo {
-  const isOnline = navigator.onLine;
+  // Service worker: navigator.onLine est disponible mais pas window/document
+  const online = typeof navigator !== 'undefined' ? navigator.onLine : true;
 
-  if (!isOnline) {
+  if (!online) {
     return { status: 'offline' };
   }
 
   // Network Information API (experimental mais bien supportée)
-  const connection = (navigator as NavigatorWithConnection).connection;
+  const connection =
+    typeof navigator !== 'undefined'
+      ? (navigator as NavigatorWithConnection).connection
+      : undefined;
 
   if (connection) {
     const effectiveType = connection.effectiveType as ConnectionInfo['effectiveType'];
@@ -72,11 +81,15 @@ function notifyListeners(): void {
 
 /**
  * Initialise les écouteurs d'événements (appelé une seule fois)
+ * No-op dans le Service Worker (pas de window).
  */
 let isInitialized = false;
 function initListeners(): void {
   if (isInitialized) return;
   isInitialized = true;
+
+  // Service Worker n'a pas accès à window — skip les event listeners
+  if (isServiceWorker) return;
 
   window.addEventListener('online', notifyListeners);
   window.addEventListener('offline', notifyListeners);
@@ -115,9 +128,10 @@ export function getCurrentConnection(): ConnectionInfo {
 
 /**
  * Vérifie si le navigateur est en ligne
+ * Fonctionne dans le Service Worker (utilise navigator, pas window)
  */
 export function isOnline(): boolean {
-  return navigator.onLine;
+  return typeof navigator !== 'undefined' ? navigator.onLine : true;
 }
 
 /**
