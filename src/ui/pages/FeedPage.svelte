@@ -11,6 +11,7 @@
   import SearchInput from '../molecules/SearchInput.svelte';
   import Icon from '../atoms/Icon.svelte';
   import FilterBar from '../organisms/FilterBar.svelte';
+  import SourceHealthPanel from '../organisms/SourceHealthPanel.svelte';
   import KeyboardShortcutsHelp from '../molecules/KeyboardShortcutsHelp.svelte';
   import type { MissionSource, RemoteType } from '$lib/core/types/mission';
   import {
