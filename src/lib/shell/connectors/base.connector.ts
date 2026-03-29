@@ -21,7 +21,16 @@ const getBrowserInfo = (): BrowserInfo => {
   return _browserInfo;
 };
 
-const LOGIN_PATTERNS = ['/login', '/signin', '/sign-in', '/sign_in', '/auth', '/connexion', '/register', '/signup'];
+const LOGIN_PATTERNS = [
+  '/login',
+  '/signin',
+  '/sign-in',
+  '/sign_in',
+  '/auth',
+  '/connexion',
+  '/register',
+  '/signup',
+];
 
 export abstract class BaseConnector implements PlatformConnector {
   abstract readonly id: string;
@@ -38,12 +47,16 @@ export abstract class BaseConnector implements PlatformConnector {
    * Détecte si l'utilisateur a une session active sur la plateforme
    * Retourne un Result<boolean, AppError> au lieu de Promise<boolean>
    */
-  async detectSession(now: number): Promise<Result<boolean, AppError>> {
+  async detectSession(now: number, signal?: AbortSignal): Promise<Result<boolean, AppError>> {
     try {
-      // TODO: When `tabs` permission is available, skip detection if platform tab is frozen
-      // (Chrome 132+ tabs.Tab.frozen property) to avoid unnecessary fetch requests.
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 8000);
+
+      // Combine external signal with internal timeout
+      if (signal) {
+        signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
+
       const response = await fetch(this.sessionCheckUrl, {
         credentials: 'include',
         redirect: 'follow',
@@ -57,7 +70,7 @@ export abstract class BaseConnector implements PlatformConnector {
 
       // Detect redirect to login page
       const finalUrl = response.url.toLowerCase();
-      if (LOGIN_PATTERNS.some(p => finalUrl.includes(p))) {
+      if (LOGIN_PATTERNS.some((p) => finalUrl.includes(p))) {
         return ok(false);
       }
 
@@ -65,74 +78,89 @@ export abstract class BaseConnector implements PlatformConnector {
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Network request failed';
       const isAbort = e instanceof Error && e.name === 'AbortError';
-      
-      return err(createNetworkError(
-        `Failed to detect session for ${this.id}: ${message}`,
-        {
-          url: this.sessionCheckUrl,
-          retryable: !isAbort,
-          context: {
-            connectorId: this.id,
-            aborted: isAbort,
-            originalError: message,
-            browser: getBrowserInfo().name,
+
+      return err(
+        createNetworkError(
+          `Failed to detect session for ${this.id}: ${message}`,
+          {
+            url: this.sessionCheckUrl,
+            retryable: !isAbort,
+            context: {
+              connectorId: this.id,
+              aborted: isAbort,
+              originalError: message,
+              browser: getBrowserInfo().name,
+            },
           },
-        },
-        now
-      ));
+          now
+        )
+      );
     }
   }
 
   /** Fetch HTML directly from the side panel context — no offscreen/messaging needed */
-  protected async fetchHTML(url: string, now: number): Promise<Result<string, AppError>> {
+  protected async fetchHTML(
+    url: string,
+    now: number,
+    signal?: AbortSignal
+  ): Promise<Result<string, AppError>> {
     const doFetch = async (): Promise<Result<string, AppError>> => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
+
+      // Combine external signal with internal timeout
+      if (signal) {
+        signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
       try {
         const response = await fetch(url, {
           credentials: 'include',
           signal: controller.signal,
         });
         clearTimeout(timeout);
-        
+
         if (!response.ok) {
-          return err(createNetworkError(
-            `HTTP ${response.status} for ${url}`,
-            {
-              status: response.status,
-              url,
-              retryable: response.status >= 500 || response.status === 429,
-              context: { connectorId: this.id, browser: getBrowserInfo().name },
-            },
-            now
-          ));
+          return err(
+            createNetworkError(
+              `HTTP ${response.status} for ${url}`,
+              {
+                status: response.status,
+                url,
+                retryable: response.status >= 500 || response.status === 429,
+                context: { connectorId: this.id, browser: getBrowserInfo().name },
+              },
+              now
+            )
+          );
         }
-        
+
         const text = await response.text();
         return ok(text);
       } catch (e) {
         clearTimeout(timeout);
         const message = e instanceof Error ? e.message : 'Fetch failed';
         const isAbort = e instanceof Error && e.name === 'AbortError';
-        
-        return err(createNetworkError(
-          `Failed to fetch HTML from ${url}: ${message}`,
-          {
-            url,
-            retryable: !isAbort,
-            context: { 
-              connectorId: this.id, 
-              aborted: isAbort,
-              browser: getBrowserInfo().name,
+
+        return err(
+          createNetworkError(
+            `Failed to fetch HTML from ${url}: ${message}`,
+            {
+              url,
+              retryable: !isAbort,
+              context: {
+                connectorId: this.id,
+                aborted: isAbort,
+                browser: getBrowserInfo().name,
+              },
             },
-          },
-          now
-        ));
+            now
+          )
+        );
       }
     };
 
     const result = await doFetch();
-    
+
     if (result.ok) {
       return result;
     }
@@ -147,10 +175,20 @@ export abstract class BaseConnector implements PlatformConnector {
   }
 
   /** Fetch JSON directly from the side panel context — no offscreen/messaging needed */
-  protected async fetchJSON(url: string, now: number, init?: RequestInit): Promise<Result<unknown, AppError>> {
+  protected async fetchJSON(
+    url: string,
+    now: number,
+    init?: RequestInit,
+    signal?: AbortSignal
+  ): Promise<Result<unknown, AppError>> {
     const doFetch = async (): Promise<Result<unknown, AppError>> => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
+
+      // Combine external signal with internal timeout
+      if (signal) {
+        signal.addEventListener('abort', () => controller.abort(), { once: true });
+      }
       try {
         const response = await fetch(url, {
           credentials: 'include',
@@ -158,45 +196,49 @@ export abstract class BaseConnector implements PlatformConnector {
           ...init,
         });
         clearTimeout(timeout);
-        
+
         if (!response.ok) {
-          return err(createNetworkError(
-            `HTTP ${response.status} for ${url}`,
-            {
-              status: response.status,
-              url,
-              retryable: response.status >= 500 || response.status === 429,
-              context: { connectorId: this.id, browser: getBrowserInfo().name },
-            },
-            now
-          ));
+          return err(
+            createNetworkError(
+              `HTTP ${response.status} for ${url}`,
+              {
+                status: response.status,
+                url,
+                retryable: response.status >= 500 || response.status === 429,
+                context: { connectorId: this.id, browser: getBrowserInfo().name },
+              },
+              now
+            )
+          );
         }
-        
-        const json = await response.json() as unknown;
+
+        const json = (await response.json()) as unknown;
         return ok(json);
       } catch (e) {
         clearTimeout(timeout);
         const message = e instanceof Error ? e.message : 'Fetch failed';
         const isAbort = e instanceof Error && e.name === 'AbortError';
-        
-        return err(createNetworkError(
-          `Failed to fetch JSON from ${url}: ${message}`,
-          {
-            url,
-            retryable: !isAbort,
-            context: { 
-              connectorId: this.id, 
-              aborted: isAbort,
-              browser: getBrowserInfo().name,
+
+        return err(
+          createNetworkError(
+            `Failed to fetch JSON from ${url}: ${message}`,
+            {
+              url,
+              retryable: !isAbort,
+              context: {
+                connectorId: this.id,
+                aborted: isAbort,
+                browser: getBrowserInfo().name,
+              },
             },
-          },
-          now
-        ));
+            now
+          )
+        );
       }
     };
 
     const result = await doFetch();
-    
+
     if (result.ok) {
       return result;
     }
@@ -210,7 +252,10 @@ export abstract class BaseConnector implements PlatformConnector {
     return result;
   }
 
-  abstract fetchMissions(now: number, context?: ConnectorSearchContext): Promise<Result<Mission[], AppError>>;
+  abstract fetchMissions(
+    now: number,
+    context?: ConnectorSearchContext
+  ): Promise<Result<Mission[], AppError>>;
 
   /**
    * Récupère la date de dernière synchronisation
@@ -223,15 +268,17 @@ export abstract class BaseConnector implements PlatformConnector {
       return ok(timestamp ? new Date(timestamp) : null);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Storage read failed';
-      return err(createStorageError(
-        `Failed to get last sync for ${this.id}: ${message}`,
-        {
-          operation: 'read',
-          key: `lastSync_${this.id}`,
-          context: { connectorId: this.id },
-        },
-        now
-      ));
+      return err(
+        createStorageError(
+          `Failed to get last sync for ${this.id}: ${message}`,
+          {
+            operation: 'read',
+            key: `lastSync_${this.id}`,
+            context: { connectorId: this.id },
+          },
+          now
+        )
+      );
     }
   }
 
@@ -245,15 +292,17 @@ export abstract class BaseConnector implements PlatformConnector {
       return ok(undefined);
     } catch (e) {
       const message = e instanceof Error ? e.message : 'Storage write failed';
-      return err(createStorageError(
-        `Failed to set last sync for ${this.id}: ${message}`,
-        {
-          operation: 'write',
-          key: `lastSync_${this.id}`,
-          context: { connectorId: this.id },
-        },
-        now
-      ));
+      return err(
+        createStorageError(
+          `Failed to set last sync for ${this.id}: ${message}`,
+          {
+            operation: 'write',
+            key: `lastSync_${this.id}`,
+            context: { connectorId: this.id },
+          },
+          now
+        )
+      );
     }
   }
 }

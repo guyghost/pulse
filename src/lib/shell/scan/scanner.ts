@@ -280,11 +280,14 @@ async function _runScanInternal(
     emitDetailed('scanning', i, connectors.length);
 
     // Retry automatique pour les erreurs réseau avec backoff (Result-aware)
-    const result = await withResultRetry(() => connector.fetchMissions(now, connectorContext), {
-      maxAttempts: 3,
-      baseDelayMs: 1000,
-      maxDelayMs: 10000,
-    });
+    const result = await withResultRetry(
+      () => connector.fetchMissions(now, connectorContext, signal),
+      {
+        maxAttempts: 3,
+        baseDelayMs: 1000,
+        maxDelayMs: 10000,
+      }
+    );
 
     const connectorDuration = Math.round(performance.now() - connectorStartTime);
 
