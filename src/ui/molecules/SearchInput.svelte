@@ -18,13 +18,15 @@
   // (e.g. parent calls clearSearch). We track the previous prop value to avoid
   // resetting user input — without this, the $effect would fire on every
   // keystroke because localValue diverges from the prop during debounce.
-  let prevValue = value;
+  let prevValue = $state('');
   $effect(() => {
-    if (value !== prevValue) {
-      prevValue = value;
-      if (value !== search.query) {
-        search.setValue(value);
-      }
+    // Read `value` reactively — this makes the effect re-run when the prop changes.
+    // Compare against prevValue using untrack to avoid circular dependency.
+    const currentProp = value;
+    const prev = $state.snapshot(prevValue);
+    if (currentProp !== prev) {
+      prevValue = currentProp;
+      search.setValue(currentProp);
     }
   });
 
