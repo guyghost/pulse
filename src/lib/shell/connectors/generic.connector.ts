@@ -99,8 +99,10 @@ export class GenericConnector extends BaseConnector {
         `${this.idPrefix}-${now}`
       );
 
-      // Last sync tracking (non-critical)
-      this.setLastSync(now).catch(() => {});
+      // Only update lastSync when we actually got results
+      if (missions.length > 0) {
+        this.setLastSync(now).catch(() => {});
+      }
 
       return ok(missions);
     } catch (e) {

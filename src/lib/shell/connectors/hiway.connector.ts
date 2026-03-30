@@ -105,8 +105,12 @@ export class HiwayConnector extends BaseConnector {
       const rows = Array.isArray(result.value) ? result.value : [];
       const missions = parseHiwayJSON(rows, new Date(now), BASE_URL);
 
-      // Last sync tracking (non-critical)
-      this.setLastSync(now).catch(() => {});
+      // Only update lastSync when we actually got results — calling setLastSync on
+      // 0 results would poison subsequent incremental scans (created_at gt. filter
+      // would always exclude everything).
+      if (missions.length > 0) {
+        this.setLastSync(now).catch(() => {});
+      }
 
       return ok(missions);
     } catch (e) {

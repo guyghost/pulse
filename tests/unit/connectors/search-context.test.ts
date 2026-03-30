@@ -59,27 +59,29 @@ describe('buildSearchContext', () => {
   });
 
   /**
-   * Test 2: Without searchKeywords (empty array), with jobTitle — query should be jobTitle
+   * Test 2: Without searchKeywords (empty array), with jobTitle — query should be EMPTY
+   * jobTitle is NOT used as fallback because it's too restrictive for API keyword search.
+   * Relevance is handled by local scoring (scoreMission), not server-side filtering.
    */
-  describe('query fallback to jobTitle', () => {
-    it('uses jobTitle when searchKeywords is empty', () => {
+  describe('query does NOT fallback to jobTitle', () => {
+    it('returns empty query when searchKeywords is empty (even if jobTitle exists)', () => {
       const profile = makeProfile({
         searchKeywords: [],
         jobTitle: 'Développeur Frontend',
       });
       const context = buildSearchContext(profile, null);
 
-      expect(context.query).toBe('Développeur Frontend');
+      expect(context.query).toBe('');
     });
 
-    it('uses jobTitle with special characters', () => {
+    it('returns empty query for special character jobTitle (no fallback)', () => {
       const profile = makeProfile({
         searchKeywords: [],
         jobTitle: 'Développeur C#/.NET',
       });
       const context = buildSearchContext(profile, null);
 
-      expect(context.query).toBe('Développeur C#/.NET');
+      expect(context.query).toBe('');
     });
   });
 

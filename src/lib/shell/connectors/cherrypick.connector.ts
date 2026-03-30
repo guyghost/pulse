@@ -100,8 +100,10 @@ export class CherryPickConnector extends BaseConnector {
         allMissions.push(...parsedMissions);
       }
 
-      // Last sync tracking (non-critical)
-      this.setLastSync(now).catch(() => {});
+      // Only update lastSync when we actually got results
+      if (allMissions.length > 0) {
+        this.setLastSync(now).catch(() => {});
+      }
 
       return ok(allMissions);
     } catch (e) {

@@ -24,7 +24,10 @@ export interface ConnectorSearchContext {
  * PURE FUNCTION — no I/O, no async, no side effects.
  *
  * Strategy:
- * - query: derived from searchKeywords (if any), fallback to jobTitle
+ * - query: derived from searchKeywords ONLY (if explicitly set by user).
+ *   jobTitle is NOT used as fallback because it's too restrictive for API keyword
+ *   search (e.g., "Développeur Fullstack" returns 0 results on most platforms).
+ *   Local scoring (scoreMission) handles relevance matching much better.
  * - skills: EMPTY — skills are NOT sent as server-side filters because:
  *   1. APIs use AND logic (each additional skill further narrows results)
  *   2. Skill names don't match across platforms (e.g. "React.js" vs "React" vs "ReactJS")
@@ -37,16 +40,14 @@ export const buildSearchContext = (
   profile: UserProfile,
   lastSync: Date | null
 ): ConnectorSearchContext => {
-  // Build query: prefer searchKeywords, fallback to jobTitle
-  let query = '';
-  if (profile.searchKeywords.length > 0) {
-    query = profile.searchKeywords.join(' ');
-  } else if (profile.jobTitle) {
-    query = profile.jobTitle;
-  }
+  // Build query: ONLY from explicit searchKeywords.
+  // Do NOT fallback to jobTitle — it's too restrictive for server-side keyword search
+  // (e.g., "Développeur Fullstack Senior" matches almost nothing on Free-Work/Hiway/Collective).
+  // Relevance is handled locally by scoreMission() with fuzzy matching.
+  const query = profile.searchKeywords.length > 0 ? profile.searchKeywords.join(' ').trim() : '';
 
   return {
-    query: query.trim(),
+    query,
     skills: [], // Skills handled by local scoring, not server-side filtering
     location: profile.location || null,
     remote: profile.remote || null,

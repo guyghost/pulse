@@ -132,8 +132,10 @@ export class LeHibouConnector extends BaseConnector {
         if (allMissions.length >= data.total) break;
       }
 
-      // Last sync tracking (non-critical)
-      this.setLastSync(now).catch(() => {});
+      // Only update lastSync when we actually got results
+      if (allMissions.length > 0) {
+        this.setLastSync(now).catch(() => {});
+      }
 
       await removeCookieRule(COOKIE_RULE_ID);
       return ok(allMissions);

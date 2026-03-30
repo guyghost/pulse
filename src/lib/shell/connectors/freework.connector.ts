@@ -84,8 +84,13 @@ export class FreeWorkConnector extends BaseConnector {
         allMissions.push(...missions);
       }
 
-      // Last sync tracking (non-critical)
-      this.setLastSync(now).catch(() => {});
+      // Only update lastSync when we actually got results — calling setLastSync on
+      // 0 results would poison subsequent incremental scans (createdAt[after] filter
+      // would always exclude everything because the "last sync" timestamp advances
+      // despite having found nothing).
+      if (allMissions.length > 0) {
+        this.setLastSync(now).catch(() => {});
+      }
 
       return ok(allMissions);
     } catch (e) {
