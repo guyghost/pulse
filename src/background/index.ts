@@ -11,6 +11,7 @@ import {
   runScan,
   cancelCurrentScan,
   isScanRunning,
+  ScanError,
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
@@ -295,7 +296,9 @@ chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendRespo
       })
       .catch((err) => {
         console.error('[MissionPulse] SCAN_START error:', err);
-        sendResponse({ type: 'SCAN_COMPLETE', payload: [] });
+        const code = err instanceof ScanError ? err.code : 'UNKNOWN';
+        const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue lors du scan';
+        sendResponse({ type: 'SCAN_ERROR', payload: { message: errorMessage, code } });
       });
     return true; // async response
   }
@@ -354,6 +357,17 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     }
   } catch (err) {
     console.error('[MissionPulse] Auto-scan error:', err);
+    const code = err instanceof ScanError ? err.code : 'UNKNOWN';
+    const errorMessage =
+      err instanceof Error ? err.message : 'Erreur inconnue lors du scan automatique';
+    try {
+      await chrome.runtime.sendMessage({
+        type: 'SCAN_ERROR',
+        payload: { message: errorMessage, code },
+      });
+    } catch {
+      // Side panel not open, ignore
+    }
   }
 });
 

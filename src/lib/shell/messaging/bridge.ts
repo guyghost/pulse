@@ -35,6 +35,7 @@ export type BridgeMessage =
   | { type: 'SCAN_START' }
   | { type: 'SCAN_PROGRESS'; payload: ScanProgressPayload }
   | { type: 'SCAN_COMPLETE'; payload: Mission[] }
+  | { type: 'SCAN_ERROR'; payload: { message: string; code: string } }
   | { type: 'SCAN_CANCEL' }
   // Toast
   | { type: 'SHOW_TOAST'; payload: { message: string; toastType: ToastType; duration?: number } }

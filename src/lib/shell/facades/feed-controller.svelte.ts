@@ -20,6 +20,25 @@ import {
 import { getSettings, setSettings } from './settings.facade';
 import { getConnectors } from '../connectors/index';
 
+/**
+ * Converts scan error codes into user-friendly French messages.
+ * Falls back to the raw error message if code is unknown.
+ */
+const humanizeScanError = (message: string, code: string): string => {
+  switch (code) {
+    case 'OFFLINE':
+      return 'Aucune connexion internet. Verifiez votre reseau et reessayez.';
+    case 'MUTEX':
+      return 'Un scan est deja en cours. Veuillez patienter.';
+    case 'CANCELLED':
+      return 'Scan annule.';
+    case 'NETWORK_ERROR':
+      return 'Erreur reseau lors du scan. Reessayez dans quelques instants.';
+    default:
+      return message || 'Erreur inattendue lors du scan.';
+  }
+};
+
 // Re-export SourceStatus types for consumers
 export type SourceSessionStatus = 'checking' | 'connected' | 'not-connected' | 'error';
 
@@ -132,6 +151,9 @@ export function createFeedController(feedStore: {
       // Le SW renvoie SCAN_COMPLETE avec les missions traitées
       if (response.type === 'SCAN_COMPLETE' && Array.isArray(response.payload)) {
         await handleScanComplete(response.payload);
+      } else if (response.type === 'SCAN_ERROR' && response.payload) {
+        const { message, code } = response.payload as { message: string; code: string };
+        feedStore.setError(humanizeScanError(message, code));
       }
     } catch (err) {
       if (import.meta.env.DEV) {
@@ -355,6 +377,12 @@ export function createFeedController(feedStore: {
         // Résultat final du scan (auto-scan du background)
         if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
           handleScanComplete(message.payload).catch(() => {});
+        }
+
+        // Erreur du scan (auto-scan du background)
+        if (message?.type === 'SCAN_ERROR' && message.payload) {
+          const { message: errorMsg, code } = message.payload as { message: string; code: string };
+          feedStore.setError(humanizeScanError(errorMsg, code));
         }
       };
 
