@@ -12,6 +12,8 @@ export interface Mission {
   location: string | null;
   remote: RemoteType | null;
   duration: string | null;
+  /** Mission start date (ISO 8601 date string, e.g. "2026-04-01") */
+  startDate: string | null;
   url: string;
   source: MissionSource;
   scrapedAt: Date;

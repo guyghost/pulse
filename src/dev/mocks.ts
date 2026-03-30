@@ -37,7 +37,16 @@ const titles = [
   'DevOps / SRE Senior',
 ];
 
-const clients = ['Société Générale', 'BNP Paribas', 'AXA', 'Thales', 'Capgemini', 'Startup FinTech', 'Scale-up SaaS', null];
+const clients = [
+  'Société Générale',
+  'BNP Paribas',
+  'AXA',
+  'Thales',
+  'Capgemini',
+  'Startup FinTech',
+  'Scale-up SaaS',
+  null,
+];
 const locations = ['Paris', 'Lyon', 'Nantes', 'Bordeaux', 'Remote', 'Toulouse'];
 const remotes = ['full', 'hybrid', 'onsite', null] as const;
 const durations = ['3 mois', '6 mois', '12 mois', '18 mois', null];
@@ -54,8 +63,9 @@ export function generateMockMissions(count: number): Mission[] {
     location: locations[i % locations.length],
     remote: remotes[i % remotes.length],
     duration: durations[i % durations.length],
+    startDate: null,
     url: `https://www.free-work.com/fr/tech-it/jobs/mock-${i}`,
-    source: 'free-work',
+    source: 'free-work' as const,
     scrapedAt: now,
     score: Math.floor(Math.random() * 100),
     semanticScore: null,

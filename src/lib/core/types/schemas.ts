@@ -24,18 +24,20 @@ export const SeniorityLevelSchema = z.enum(['junior', 'confirmed', 'senior']);
 // Types complexes
 // ============================================
 
-export const ScoringWeightsSchema = z.object({
-  stack: z.number().min(0).max(100),
-  location: z.number().min(0).max(100),
-  tjm: z.number().min(0).max(100),
-  remote: z.number().min(0).max(100),
-}).refine(
-  (w) => {
-    const sum = w.stack + w.location + w.tjm + w.remote;
-    return sum >= 90 && sum <= 110;
-  },
-  { message: 'La somme des poids doit être proche de 100 (entre 90 et 110)' },
-);
+export const ScoringWeightsSchema = z
+  .object({
+    stack: z.number().min(0).max(100),
+    location: z.number().min(0).max(100),
+    tjm: z.number().min(0).max(100),
+    remote: z.number().min(0).max(100),
+  })
+  .refine(
+    (w) => {
+      const sum = w.stack + w.location + w.tjm + w.remote;
+      return sum >= 90 && sum <= 110;
+    },
+    { message: 'La somme des poids doit être proche de 100 (entre 90 et 110)' }
+  );
 
 // ============================================
 // Mission
@@ -51,6 +53,7 @@ export const MissionSchema = z.object({
   location: z.string().nullable(),
   remote: RemoteTypeSchema.nullable(),
   duration: z.string().nullable(),
+  startDate: z.string().nullable(),
   url: z.string(),
   source: MissionSourceSchema,
   scrapedAt: z.date(),
@@ -70,11 +73,12 @@ export const MissionSerializedSchema = z.object({
   location: z.string().nullable(),
   remote: RemoteTypeSchema.nullable(),
   duration: z.string().nullable(),
+  startDate: z.string().nullable(),
   url: z.string(),
   source: MissionSourceSchema,
-  scrapedAt: z.union([z.date(), z.string()]).transform((val) =>
-    typeof val === 'string' ? new Date(val) : val
-  ),
+  scrapedAt: z
+    .union([z.date(), z.string()])
+    .transform((val) => (typeof val === 'string' ? new Date(val) : val)),
   score: z.number().nullable(),
   semanticScore: z.number().nullable(),
   semanticReason: z.string().nullable(),
@@ -84,38 +88,53 @@ export const MissionSerializedSchema = z.object({
 // Profile
 // ============================================
 
-export const UserProfileSchema = z.object({
-  firstName: z.string().min(1, 'Le prénom est requis').max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
-  stack: z.array(z.string().min(1, 'Chaque compétence doit être non vide')).max(20, 'Maximum 20 compétences'),
-  tjmMin: z.number().min(0, 'Le TJM minimum doit être positif').max(5000, 'Le TJM minimum ne doit pas dépasser 5000'),
-  tjmMax: z.number().min(0, 'Le TJM maximum doit être positif').max(5000, 'Le TJM maximum ne doit pas dépasser 5000'),
-  location: z.string(),
-  remote: z.union([RemoteTypeSchema, z.literal('any')]),
-  seniority: SeniorityLevelSchema,
-  jobTitle: z.string(),
-  scoringWeights: ScoringWeightsSchema.optional(),
-  /** User-defined search keywords sent to connector APIs for server-side filtering */
-  searchKeywords: z.array(z.string()).default([]),
-}).refine(
-  (p) => p.tjmMax >= p.tjmMin,
-  { message: 'Le TJM maximum doit être supérieur ou égal au TJM minimum', path: ['tjmMax'] },
-);
+export const UserProfileSchema = z
+  .object({
+    firstName: z
+      .string()
+      .min(1, 'Le prénom est requis')
+      .max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
+    stack: z
+      .array(z.string().min(1, 'Chaque compétence doit être non vide'))
+      .max(20, 'Maximum 20 compétences'),
+    tjmMin: z
+      .number()
+      .min(0, 'Le TJM minimum doit être positif')
+      .max(5000, 'Le TJM minimum ne doit pas dépasser 5000'),
+    tjmMax: z
+      .number()
+      .min(0, 'Le TJM maximum doit être positif')
+      .max(5000, 'Le TJM maximum ne doit pas dépasser 5000'),
+    location: z.string(),
+    remote: z.union([RemoteTypeSchema, z.literal('any')]),
+    seniority: SeniorityLevelSchema,
+    jobTitle: z.string(),
+    scoringWeights: ScoringWeightsSchema.optional(),
+    /** User-defined search keywords sent to connector APIs for server-side filtering */
+    searchKeywords: z.array(z.string()).default([]),
+  })
+  .refine((p) => p.tjmMax >= p.tjmMin, {
+    message: 'Le TJM maximum doit être supérieur ou égal au TJM minimum',
+    path: ['tjmMax'],
+  });
 
 // ============================================
 // Semantic Scoring (réponses LLM)
 // ============================================
 
 export const SemanticResultSchema = z.object({
-  score: z.union([
-    z.number(),
-    z.string().transform((val) => {
-      const parsed = parseInt(val, 10);
-      if (isNaN(parsed)) {
-        throw new Error('Invalid score string');
-      }
-      return parsed;
-    }),
-  ]).transform((val) => Math.max(0, Math.min(100, Math.round(val)))),
+  score: z
+    .union([
+      z.number(),
+      z.string().transform((val) => {
+        const parsed = parseInt(val, 10);
+        if (isNaN(parsed)) {
+          throw new Error('Invalid score string');
+        }
+        return parsed;
+      }),
+    ])
+    .transform((val) => Math.max(0, Math.min(100, Math.round(val)))),
   reason: z.string(),
 });
 

@@ -77,6 +77,7 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
     location: 'Paris',
     remote: 'hybrid',
     duration: '6 mois',
+    startDate: null,
     url: `https://example.com/mission-${missionCounter}`,
     source: 'free-work',
     scrapedAt: new Date('2026-03-01'),

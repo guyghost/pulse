@@ -26,11 +26,7 @@ export function detectRemote(text: string): RemoteType | null {
   if (lower.includes('hybride') || lower.includes('hybrid')) {
     return 'hybrid';
   }
-  if (
-    lower.includes('sur site') ||
-    lower.includes('on-site') ||
-    lower.includes('onsite')
-  ) {
+  if (lower.includes('sur site') || lower.includes('on-site') || lower.includes('onsite')) {
     return 'onsite';
   }
   return null;
@@ -60,8 +56,14 @@ export function stripHtml(html: string): string {
 /**
  * Build a Mission with scoring fields defaulted to null.
  * Avoids repeating `score: null, semanticScore: null, semanticReason: null` in every parser.
+ * `startDate` is optional — defaults to null if not provided by the parser.
  */
-export type MissionFields = Omit<Mission, 'score' | 'semanticScore' | 'semanticReason'>;
+export type MissionFields = Omit<
+  Mission,
+  'score' | 'semanticScore' | 'semanticReason' | 'startDate'
+> & {
+  startDate?: string | null;
+};
 
 export function createMission(fields: MissionFields): Mission {
   return {
@@ -69,6 +71,7 @@ export function createMission(fields: MissionFields): Mission {
     title: stripHtml(fields.title ?? ''),
     description: stripHtml(fields.description ?? ''),
     stack: fields.stack.filter((s): s is string => typeof s === 'string' && s.length > 0),
+    startDate: fields.startDate ?? null,
     score: null,
     semanticScore: null,
     semanticReason: null,
