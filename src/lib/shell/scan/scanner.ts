@@ -224,12 +224,13 @@ async function _runScanInternal(
     // No profile available — connectors will fetch without filters
   }
 
-  // Build base search context from profile (without lastSync — that's per-connector)
+  // Build base search context from profile (lastSync is always null — see comment below)
   const baseSearchContext = profile ? buildSearchContext(profile, null) : null;
 
-  // Note: lastSync is handled per-connector below. Since fix 7a ensures setLastSync()
-  // is only called when a connector actually returns missions, each connector's lastSync
-  // value is reliable — it will be null if the connector never returned results.
+  // Note: No connector uses server-side lastSync filtering anymore. This avoids the
+  // split-brain bug where lastSync (chrome.storage.local) becomes stale when IndexedDB
+  // is cleared separately, causing connectors to return 0 results permanently.
+  // All connectors now always fetch latest N missions and rely on local dedup.
 
   // Fetch connectors sequentially to report progress
   const connectorResults: { connectorId: string; missions: Mission[] }[] = [];
@@ -264,20 +265,12 @@ async function _runScanInternal(
     const connectorStartTime = performance.now();
     const now = Date.now();
 
-    // Build per-connector search context with lastSync.
-    // Each connector's lastSync is reliable: fix 7a ensures it's only set when
-    // the connector actually returned missions, so null = never returned results = full scan.
-    let connectorContext: ConnectorSearchContext | undefined;
-    if (baseSearchContext) {
-      try {
-        const lastSyncResult = await connector.getLastSync(now);
-        const lastSync = lastSyncResult.ok ? lastSyncResult.value : null;
-        connectorContext = { ...baseSearchContext, lastSync };
-      } catch {
-        // If getLastSync fails, use context without lastSync (full scan)
-        connectorContext = baseSearchContext;
-      }
-    }
+    // No per-connector lastSync filtering — all connectors always fetch latest N missions
+    // and rely on local deduplication. This avoids the split-brain bug where lastSync
+    // (in chrome.storage.local) becomes stale when IndexedDB is cleared separately.
+    const connectorContext: ConnectorSearchContext | undefined = baseSearchContext
+      ? { ...baseSearchContext, lastSync: null }
+      : undefined;
 
     // État: fetching
     if (stateIdx >= 0) {

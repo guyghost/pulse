@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { parseFreeWorkAPI, type FreeWorkApiResponse } from '../../../src/lib/core/connectors/freework-parser';
+import {
+  parseFreeWorkAPI,
+  type FreeWorkApiResponse,
+} from '../../../src/lib/core/connectors/freework-parser';
 
 const NOW = new Date('2026-03-11T12:00:00Z');
 
@@ -171,7 +174,9 @@ describe('parseFreeWorkAPI', () => {
 
   it('builds correct URL with job slug', () => {
     const missions = parseFreeWorkAPI(FIXTURE_API, NOW);
-    expect(missions[0].url).toBe('https://www.free-work.com/fr/tech-it/developpeur/job-mission/dev-react-senior');
+    expect(missions[0].url).toBe(
+      'https://www.free-work.com/fr/tech-it/developpeur/job-mission/dev-react-senior'
+    );
   });
 
   it('returns empty array for empty response', () => {
@@ -191,6 +196,11 @@ describe('parseFreeWorkAPI', () => {
  *
  * Since the URL building is embedded in the connector (Shell, I/O),
  * we test the URL construction logic in isolation by extracting it.
+ *
+ * Note: lastSync/createdAt[after] filtering was intentionally removed to fix
+ * the split-brain bug where lastSync (chrome.storage.local) becomes stale
+ * when IndexedDB is cleared, causing 0 results permanently. All connectors
+ * now always fetch latest pages and rely on local dedup.
  */
 describe('FreeWork URL building with search context', () => {
   const API_BASE = 'https://www.free-work.com/api/job_postings';
@@ -200,10 +210,7 @@ describe('FreeWork URL building with search context', () => {
    * Replicates the URL building logic from FreeWorkConnector.fetchMissions()
    * so we can test it as a pure function without I/O.
    */
-  function buildFreeWorkUrl(
-    page: number,
-    context?: { query?: string; skills?: string[]; lastSync?: Date | null },
-  ): string {
+  function buildFreeWorkUrl(page: number, context?: { query?: string; skills?: string[] }): string {
     const url = new URL(API_BASE);
     url.searchParams.set('page', String(page));
     url.searchParams.set('itemsPerPage', String(ITEMS_PER_PAGE));
@@ -219,10 +226,6 @@ describe('FreeWork URL building with search context', () => {
       for (const skill of context.skills) {
         url.searchParams.append('properties[]', skill);
       }
-    }
-
-    if (context?.lastSync) {
-      url.searchParams.set('createdAt[after]', context.lastSync.toISOString());
     }
 
     return url.toString();
@@ -258,24 +261,21 @@ describe('FreeWork URL building with search context', () => {
     expect(url).toContain('properties%5B%5D=Node.js');
   });
 
-  it('adds createdAt[after] for incremental scanning', () => {
-    const lastSync = new Date('2026-03-20T10:00:00.000Z');
-    const url = buildFreeWorkUrl(1, { lastSync });
-    expect(url).toContain('createdAt%5Bafter%5D=2026-03-20T10%3A00%3A00.000Z');
+  it('never includes createdAt[after] — lastSync filtering removed (split-brain fix)', () => {
+    const url = buildFreeWorkUrl(1);
+    expect(url).not.toContain('createdAt');
   });
 
-  it('combines all parameters together', () => {
-    const lastSync = new Date('2026-03-20T10:00:00.000Z');
+  it('combines query and skills together', () => {
     const url = buildFreeWorkUrl(2, {
       query: 'React',
       skills: ['React', 'TypeScript'],
-      lastSync,
     });
     expect(url).toContain('page=2');
     expect(url).toContain('q=React');
     expect(url).toContain('properties%5B%5D=React');
     expect(url).toContain('properties%5B%5D=TypeScript');
-    expect(url).toContain('createdAt%5Bafter%5D=');
+    expect(url).not.toContain('createdAt');
   });
 
   it('ignores empty query string', () => {
@@ -286,10 +286,5 @@ describe('FreeWork URL building with search context', () => {
   it('ignores empty skills array', () => {
     const url = buildFreeWorkUrl(1, { skills: [] });
     expect(url).not.toContain('properties');
-  });
-
-  it('ignores null lastSync', () => {
-    const url = buildFreeWorkUrl(1, { lastSync: null });
-    expect(url).not.toContain('createdAt');
   });
 });

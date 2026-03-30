@@ -100,11 +100,6 @@ export class CherryPickConnector extends BaseConnector {
         allMissions.push(...parsedMissions);
       }
 
-      // Only update lastSync when we actually got results
-      if (allMissions.length > 0) {
-        this.setLastSync(now).catch(() => {});
-      }
-
       return ok(allMissions);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

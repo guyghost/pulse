@@ -99,11 +99,6 @@ export class GenericConnector extends BaseConnector {
         `${this.idPrefix}-${now}`
       );
 
-      // Only update lastSync when we actually got results
-      if (missions.length > 0) {
-        this.setLastSync(now).catch(() => {});
-      }
-
       return ok(missions);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);

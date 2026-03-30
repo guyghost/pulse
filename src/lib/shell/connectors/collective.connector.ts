@@ -260,12 +260,6 @@ export class CollectiveConnector extends BaseConnector {
         })
       );
 
-      // Only update lastSync when we actually got results — calling setLastSync on
-      // 0 results would poison subsequent incremental scans.
-      if (missions.length > 0) {
-        this.setLastSync(now).catch(() => {});
-      }
-
       await removeCookieRule(COOKIE_RULE_ID);
       return ok(missions);
     } catch (e) {

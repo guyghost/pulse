@@ -75,9 +75,12 @@ export class HiwayConnector extends BaseConnector {
         endpoint.searchParams.set('title', `ilike.*${context.query}*`);
       }
 
-      if (context?.lastSync) {
-        endpoint.searchParams.set('created_at', `gt.${context.lastSync.toISOString()}`);
-      }
+      // Note: We intentionally do NOT filter by created_at > lastSync.
+      // Incremental scanning via server-side date filters causes a split-brain bug:
+      // lastSync is stored in chrome.storage.local while missions are in IndexedDB.
+      // If IndexedDB is cleared (or missions are purged), lastSync becomes stale and
+      // the filter excludes all existing missions, resulting in 0 results forever.
+      // Instead, we always fetch the latest 100 missions and rely on local dedup.
 
       const result = await this.fetchJSON(endpoint.toString(), now, {
         headers: {
@@ -104,13 +107,6 @@ export class HiwayConnector extends BaseConnector {
       // Parse JSON response into missions
       const rows = Array.isArray(result.value) ? result.value : [];
       const missions = parseHiwayJSON(rows, new Date(now), BASE_URL);
-
-      // Only update lastSync when we actually got results — calling setLastSync on
-      // 0 results would poison subsequent incremental scans (created_at gt. filter
-      // would always exclude everything).
-      if (missions.length > 0) {
-        this.setLastSync(now).catch(() => {});
-      }
 
       return ok(missions);
     } catch (e) {

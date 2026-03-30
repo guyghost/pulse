@@ -53,10 +53,12 @@ export class FreeWorkConnector extends BaseConnector {
           }
         }
 
-        // Incremental: only fetch missions published after last sync
-        if (context?.lastSync) {
-          url.searchParams.set('createdAt[after]', context.lastSync.toISOString());
-        }
+        // Note: We intentionally do NOT filter by createdAt[after] > lastSync.
+        // Incremental scanning via server-side date filters causes a split-brain bug:
+        // lastSync is stored in chrome.storage.local while missions are in IndexedDB.
+        // If IndexedDB is cleared (or missions are purged), lastSync becomes stale and
+        // the filter excludes all existing missions, resulting in 0 results forever.
+        // Instead, we always fetch the latest pages and rely on local dedup.
 
         const result = await this.fetchJSON(url.toString(), now, {
           headers: { Accept: 'application/ld+json' },
@@ -82,14 +84,6 @@ export class FreeWorkConnector extends BaseConnector {
 
         if (missions.length === 0) break;
         allMissions.push(...missions);
-      }
-
-      // Only update lastSync when we actually got results — calling setLastSync on
-      // 0 results would poison subsequent incremental scans (createdAt[after] filter
-      // would always exclude everything because the "last sync" timestamp advances
-      // despite having found nothing).
-      if (allMissions.length > 0) {
-        this.setLastSync(now).catch(() => {});
       }
 
       return ok(allMissions);
