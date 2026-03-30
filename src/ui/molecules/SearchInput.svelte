@@ -2,25 +2,29 @@
   import Icon from '../atoms/Icon.svelte';
   import { useDebouncedSearch } from '$lib/shell/utils/debounce-svelte.svelte';
 
-  let { 
-    value = '', 
+  let {
+    value = '',
     onSearch,
     inputRef = $bindable<HTMLInputElement | null>(null),
-  }: { 
+  }: {
     value?: string;
     onSearch?: (query: string) => void;
     inputRef?: HTMLInputElement | null;
   } = $props();
 
-  const search = useDebouncedSearch(
-    (q) => onSearch?.(q),
-    300
-  );
+  const search = useDebouncedSearch((q) => onSearch?.(q), 300);
 
-  // Sync external value changes to internal state
+  // Sync external value to internal state ONLY when the prop actually changes
+  // (e.g. parent calls clearSearch). We track the previous prop value to avoid
+  // resetting user input — without this, the $effect would fire on every
+  // keystroke because localValue diverges from the prop during debounce.
+  let prevValue = value;
   $effect(() => {
-    if (value !== search.query) {
-      search.setValue(value);
+    if (value !== prevValue) {
+      prevValue = value;
+      if (value !== search.query) {
+        search.setValue(value);
+      }
     }
   });
 
