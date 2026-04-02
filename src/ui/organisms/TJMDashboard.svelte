@@ -4,17 +4,34 @@
   import Skeleton from '../atoms/Skeleton.svelte';
   import Icon from '../atoms/Icon.svelte';
 
-  let { analysis = null, isLoading = false, error = null }: {
+  let { analysis = null, isLoading = false, error = null, userTjmMin = 0, userTjmMax = 0 }: {
     analysis?: TJMAnalysis | null;
     isLoading?: boolean;
     error?: string | null;
+    userTjmMin?: number;
+    userTjmMax?: number;
   } = $props();
 
   const levels = [
     { key: 'junior' as const, label: 'Junior' },
-    { key: 'confirmed' as const, label: 'Confirm\u00e9' },
+    { key: 'confirmed' as const, label: 'Confirmé' },
     { key: 'senior' as const, label: 'Senior' },
   ];
+
+  function medianPercent(range: { min: number; max: number; median: number }): number {
+    if (range.max === range.min) return 50;
+    return Math.round(((range.median - range.min) / (range.max - range.min)) * 100);
+  }
+
+  function userTjmPercent(range: { min: number; max: number }): number | null {
+    const mid = (userTjmMin + userTjmMax) / 2;
+    if (mid <= 0 || range.max === range.min) return null;
+    const pct = ((mid - range.min) / (range.max - range.min)) * 100;
+    if (pct < 0 || pct > 100) return null;
+    return Math.round(pct);
+  }
+
+  let hasUserTjm = $derived(userTjmMin > 0 || userTjmMax > 0);
 </script>
 
 <div class="space-y-4">
@@ -51,6 +68,8 @@
     <div class="space-y-3">
       {#each levels as level}
         {@const range = analysis[level.key]}
+        {@const mPct = medianPercent(range)}
+        {@const uPct = hasUserTjm ? userTjmPercent(range) : null}
         <div class="section-card rounded-[1.5rem] p-4">
           <div class="flex items-center justify-between gap-3">
             <div>
@@ -58,17 +77,38 @@
               <p class="mt-2 text-2xl font-semibold text-white">{range.median}<span class="ml-1 text-sm font-mono text-accent-blue">€/j</span></p>
             </div>
             <div class="rounded-full border border-accent-blue/18 bg-accent-blue/12 px-3 py-1.5 text-[11px] font-mono text-accent-blue">
-              {range.min}-{range.max}
+              {range.min}–{range.max}
             </div>
           </div>
 
           <div class="mt-4 flex items-center gap-2 text-[10px] font-mono text-text-muted">
             <span>{range.min}€</span>
-            <div class="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-              <div class="h-full rounded-full bg-gradient-to-r from-accent-blue/45 via-accent-emerald/55 to-accent-blue/45" style:width="100%"></div>
+            <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+              <!-- Filled bar up to median -->
+              <div
+                class="h-full rounded-full bg-gradient-to-r from-accent-blue/50 to-accent-emerald/60"
+                style:width="{mPct}%"
+              ></div>
+              <!-- Median marker -->
+              <div
+                class="absolute top-[-2px] h-[12px] w-[2px] rounded-full bg-white"
+                style:left="{mPct}%"
+                title="Médian : {range.median}€"
+              ></div>
+              <!-- User TJM marker -->
+              {#if uPct !== null}
+                <div
+                  class="absolute top-[-3px] h-[14px] w-[3px] rounded-full bg-accent-amber shadow-glow-amber"
+                  style:left="{uPct}%"
+                  title="Votre TJM cible"
+                ></div>
+              {/if}
             </div>
             <span>{range.max}€</span>
           </div>
+          {#if uPct !== null}
+            <p class="mt-1 text-right text-[9px] text-accent-amber/70">▲ votre cible</p>
+          {/if}
         </div>
       {/each}
     </div>
@@ -89,7 +129,7 @@
     <div class="section-card rounded-[1.5rem] flex flex-col items-center py-8 text-center">
       <Icon name="trending-up" size={24} class="text-text-muted mb-2" />
       <p class="text-sm text-text-primary">TJM Intelligence</p>
-      <p class="text-xs text-text-secondary mt-1">Lancez une analyse pour voir les tendances TJM</p>
+      <p class="text-xs text-text-secondary mt-1">Lancez un scan pour alimenter les tendances TJM.</p>
     </div>
   {/if}
 </div>

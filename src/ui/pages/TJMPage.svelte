@@ -4,10 +4,13 @@
   import type { TJMAnalysis } from '$lib/core/types/tjm';
   import { getTJMAnalysis } from '$lib/shell/facades/tjm.facade';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
+  import { getProfile } from '$lib/shell/facades/settings.facade';
 
   let analysis = $state<TJMAnalysis | null>(null);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
+  let userTjmMin = $state(0);
+  let userTjmMax = $state(0);
   const connection = getConnectionStore();
 
   async function loadAnalysis() {
@@ -27,6 +30,9 @@
 
   $effect(() => {
     loadAnalysis();
+    getProfile().then((p) => {
+      if (p) { userTjmMin = p.tjmMin; userTjmMax = p.tjmMax; }
+    }).catch(() => {});
   });
 
   // Auto-refresh when a scan completes (background or manual)
@@ -98,7 +104,7 @@
   </section>
 
   <section class="mt-4">
-    <TJMDashboard {analysis} {isLoading} {error} />
+    <TJMDashboard {analysis} {isLoading} {error} {userTjmMin} {userTjmMax} />
   </section>
 
   {#if analysis && analysis.topStacks.length > 0 && !isLoading}
