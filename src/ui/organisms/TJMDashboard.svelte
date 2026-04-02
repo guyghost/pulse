@@ -12,22 +12,54 @@
     userTjmMax?: number;
   } = $props();
 
-  const levels = [
-    { key: 'junior' as const, label: 'Junior' },
-    { key: 'confirmed' as const, label: 'Confirmé' },
-    { key: 'senior' as const, label: 'Senior' },
+  const levels: Array<{
+    key: 'junior' | 'confirmed' | 'senior';
+    label: string;
+    icon: string;
+    gradient: string;
+    accentText: string;
+    accentBg: string;
+    accentBorder: string;
+  }> = [
+    {
+      key: 'junior',
+      label: 'Junior',
+      icon: 'zap',
+      gradient: 'from-accent-blue/40 to-accent-blue/15',
+      accentText: 'text-accent-blue',
+      accentBg: 'bg-accent-blue/12',
+      accentBorder: 'border-accent-blue/20',
+    },
+    {
+      key: 'confirmed',
+      label: 'Confirmé',
+      icon: 'shield',
+      gradient: 'from-accent-emerald/40 to-accent-emerald/15',
+      accentText: 'text-accent-emerald',
+      accentBg: 'bg-accent-emerald/12',
+      accentBorder: 'border-accent-emerald/20',
+    },
+    {
+      key: 'senior',
+      label: 'Senior',
+      icon: 'crown',
+      gradient: 'from-accent-amber/40 to-accent-amber/15',
+      accentText: 'text-accent-amber',
+      accentBg: 'bg-accent-amber/12',
+      accentBorder: 'border-accent-amber/20',
+    },
   ];
 
   function medianPercent(range: { min: number; max: number; median: number }): number {
     if (range.max === range.min) return 50;
-    return Math.round(((range.median - range.min) / (range.max - range.min)) * 100);
+    return Math.max(5, Math.min(95, Math.round(((range.median - range.min) / (range.max - range.min)) * 100)));
   }
 
   function userTjmPercent(range: { min: number; max: number }): number | null {
     const mid = (userTjmMin + userTjmMax) / 2;
     if (mid <= 0 || range.max === range.min) return null;
     const pct = ((mid - range.min) / (range.max - range.min)) * 100;
-    if (pct < 0 || pct > 100) return null;
+    if (pct < 2 || pct > 98) return null;
     return Math.round(pct);
   }
 
@@ -38,98 +70,153 @@
   {#if isLoading}
     <div class="section-card rounded-[1.5rem] space-y-3 p-4">
       <Skeleton width="50%" height="1.25rem" />
-      <Skeleton width="100%" height="3rem" />
-      <Skeleton width="100%" height="3rem" />
-      <Skeleton width="100%" height="3rem" />
+      <Skeleton width="100%" height="5rem" />
+      <Skeleton width="100%" height="5rem" />
+      <Skeleton width="100%" height="5rem" />
     </div>
   {:else if error}
-    <div class="section-card rounded-[1.5rem] flex flex-col items-center py-8 text-center">
-      <Icon name="x" size={24} class="text-accent-red mb-2" />
-      <p class="text-sm text-text-primary">{error}</p>
+    <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
+      <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-red/12">
+        <Icon name="x" size={20} class="text-accent-red" />
+      </div>
+      <p class="text-sm font-semibold text-text-primary">Erreur de chargement</p>
+      <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">{error}</p>
     </div>
   {:else if analysis}
+    <!-- Trend overview card -->
     <div class="section-card-strong rounded-[1.75rem] p-4">
       <div class="flex items-center justify-between">
-        <h3 class="text-sm font-semibold text-text-primary">Analyse TJM</h3>
+        <div class="flex items-center gap-3">
+          <div class="flex h-9 w-9 items-center justify-center rounded-xl bg-accent-blue/12">
+            <Icon name="bar-chart-3" size={16} class="text-accent-blue" />
+          </div>
+          <div>
+            <p class="text-sm font-semibold text-text-primary">Vue d'ensemble</p>
+            <p class="text-[11px] text-text-muted">{analysis.dataPoints} points · {analysis.topStacks.length} stacks</p>
+          </div>
+        </div>
         <TrendBadge trend={analysis.trend} />
       </div>
-      <div class="mt-4 grid grid-cols-2 gap-2 text-[11px]">
-        <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
-          <p class="uppercase tracking-[0.18em] text-text-muted">Confiance</p>
-          <p class="mt-2 text-lg font-semibold text-white">{Math.round(analysis.confidence * 100)}%</p>
-        </div>
-        <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
-          <p class="uppercase tracking-[0.18em] text-text-muted">Points</p>
-          <p class="mt-2 text-lg font-semibold text-white">{analysis.dataPoints}</p>
-        </div>
-      </div>
+
+      {#if analysis.trendDetail}
+        <p class="mt-3 text-xs leading-relaxed text-text-secondary">{analysis.trendDetail}</p>
+      {/if}
     </div>
 
+    <!-- Level cards -->
     <div class="space-y-3">
       {#each levels as level}
         {@const range = analysis[level.key]}
         {@const mPct = medianPercent(range)}
         {@const uPct = hasUserTjm ? userTjmPercent(range) : null}
-        <div class="section-card rounded-[1.5rem] p-4">
-          <div class="flex items-center justify-between gap-3">
-            <div>
-              <p class="text-xs font-medium text-text-secondary">{level.label}</p>
-              <p class="mt-2 text-2xl font-semibold text-white">{range.median}<span class="ml-1 text-sm font-mono text-accent-blue">€/j</span></p>
+        <div class="section-card rounded-[1.5rem] overflow-hidden">
+          <!-- Color accent top strip -->
+          <div class="h-[3px] bg-gradient-to-r {level.gradient}"></div>
+          <div class="p-4">
+            <div class="flex items-center justify-between">
+              <div class="flex items-center gap-2.5">
+                <div class="flex h-8 w-8 items-center justify-center rounded-lg {level.accentBg}">
+                  <Icon name={level.icon} size={14} class={level.accentText} />
+                </div>
+                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-text-secondary">{level.label}</p>
+              </div>
+              <div class="text-right">
+                <p class="text-2xl font-bold tabular-nums text-white">{range.median}<span class="ml-0.5 text-xs font-normal {level.accentText}">€</span></p>
+                <p class="text-[10px] font-mono text-text-muted">/jour</p>
+              </div>
             </div>
-            <div class="rounded-full border border-accent-blue/18 bg-accent-blue/12 px-3 py-1.5 text-[11px] font-mono text-accent-blue">
-              {range.min}–{range.max}
-            </div>
-          </div>
 
-          <div class="mt-4 flex items-center gap-2 text-[10px] font-mono text-text-muted">
-            <span>{range.min}€</span>
-            <div class="relative h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
-              <!-- Filled bar up to median -->
-              <div
-                class="h-full rounded-full bg-gradient-to-r from-accent-blue/50 to-accent-emerald/60"
-                style:width="{mPct}%"
-              ></div>
-              <!-- Median marker -->
-              <div
-                class="absolute top-[-2px] h-[12px] w-[2px] rounded-full bg-white"
-                style:left="{mPct}%"
-                title="Médian : {range.median}€"
-              ></div>
-              <!-- User TJM marker -->
+            <!-- Range bar -->
+            <div class="mt-4">
+              <div class="flex items-center gap-2">
+                <span class="w-10 text-right text-[10px] font-mono text-text-muted">{range.min}€</span>
+                <div class="relative h-2.5 flex-1 rounded-full bg-white/[0.06]">
+                  <div
+                    class="h-full rounded-full bg-gradient-to-r {level.gradient} transition-all duration-500"
+                    style:width="{mPct}%"
+                  ></div>
+                  <!-- Median tick -->
+                  <div
+                    class="absolute -top-0.5 h-3.5 w-0.5 rounded-full bg-white/80"
+                    style:left="{mPct}%"
+                  ></div>
+                  <!-- User TJM marker -->
+                  {#if uPct !== null}
+                    <div
+                      class="absolute -top-1 h-4.5 w-1 rounded-full bg-accent-amber shadow-glow-amber"
+                      style:left="{uPct}%"
+                      title="Votre TJM cible : {Math.round((userTjmMin + userTjmMax) / 2)}€"
+                    ></div>
+                  {/if}
+                </div>
+                <span class="w-10 text-[10px] font-mono text-text-muted">{range.max}€</span>
+              </div>
               {#if uPct !== null}
-                <div
-                  class="absolute top-[-3px] h-[14px] w-[3px] rounded-full bg-accent-amber shadow-glow-amber"
-                  style:left="{uPct}%"
-                  title="Votre TJM cible"
-                ></div>
+                <div class="mt-1.5 flex items-center justify-end gap-1">
+                  <span class="h-2 w-2 rounded-full bg-accent-amber"></span>
+                  <span class="text-[9px] text-accent-amber/80">votre cible</span>
+                </div>
               {/if}
             </div>
-            <span>{range.max}€</span>
           </div>
-          {#if uPct !== null}
-            <p class="mt-1 text-right text-[9px] text-accent-amber/70">▲ votre cible</p>
-          {/if}
         </div>
       {/each}
     </div>
 
-    {#if analysis.trendDetail}
+    <!-- Top stacks -->
+    {#if analysis.topStacks.length > 0}
       <div class="section-card rounded-[1.5rem] p-4">
-        <p class="text-xs leading-relaxed text-text-secondary">{analysis.trendDetail}</p>
+        <p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-text-muted mb-3">Stacks suivies</p>
+        <div class="space-y-2">
+          {#each analysis.topStacks as stack}
+            {@const barWidth = Math.max(15, Math.round((stack.average / (analysis.topStacks[0]?.average || 1)) * 100))}
+            <div class="flex items-center gap-3">
+              <span class="w-20 truncate text-xs font-medium text-text-primary">{stack.stack}</span>
+              <div class="relative h-1.5 flex-1 rounded-full bg-white/[0.06]">
+                <div
+                  class="h-full rounded-full transition-all duration-500
+                    {stack.trend === 'up' ? 'bg-accent-emerald/50' : stack.trend === 'down' ? 'bg-accent-red/40' : 'bg-white/20'}"
+                  style:width="{barWidth}%"
+                ></div>
+              </div>
+              <span class="w-14 text-right text-[11px] font-mono tabular-nums {stack.trend === 'up' ? 'text-accent-emerald' : stack.trend === 'down' ? 'text-accent-red' : 'text-text-secondary'}">
+                {stack.average}€
+              </span>
+              <Icon
+                name={stack.trend === 'up' ? 'trending-up' : stack.trend === 'down' ? 'trending-down' : 'minus'}
+                size={10}
+                class={stack.trend === 'up' ? 'text-accent-emerald' : stack.trend === 'down' ? 'text-accent-red' : 'text-text-muted'}
+              />
+            </div>
+          {/each}
+        </div>
       </div>
     {/if}
 
+    <!-- Recommendation -->
     {#if analysis.recommendation}
       <div class="section-card-strong rounded-[1.5rem] p-4">
-        <p class="text-[11px] uppercase tracking-[0.2em] text-accent-blue">Recommandation</p>
-        <p class="mt-2 text-sm leading-relaxed text-text-secondary">{analysis.recommendation}</p>
+        <div class="flex items-start gap-3">
+          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-blue/12">
+            <Icon name="lightbulb" size={14} class="text-accent-blue" />
+          </div>
+          <div>
+            <p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-accent-blue">Recommandation</p>
+            <p class="mt-1.5 text-xs leading-relaxed text-text-secondary">{analysis.recommendation}</p>
+          </div>
+        </div>
       </div>
     {/if}
   {:else}
-    <div class="section-card rounded-[1.5rem] flex flex-col items-center py-8 text-center">
-      <Icon name="trending-up" size={24} class="text-text-muted mb-2" />
-      <p class="text-sm text-text-primary">TJM Intelligence</p>
-      <p class="text-xs text-text-secondary mt-1">Lancez un scan pour alimenter les tendances TJM.</p>
+    <!-- Empty state -->
+    <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-16 text-center">
+      <div class="mb-4 flex h-14 w-14 items-center justify-center rounded-2xl bg-white/[0.05]">
+        <Icon name="bar-chart-3" size={24} class="text-text-muted" />
+      </div>
+      <p class="text-sm font-semibold text-text-primary">Aucune donnée TJM</p>
+      <p class="mt-2 max-w-[220px] text-xs leading-relaxed text-text-secondary">
+        Lancez un scan depuis l'onglet Feed pour alimenter les tendances.
+      </p>
     </div>
   {/if}
 </div>

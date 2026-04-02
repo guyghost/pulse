@@ -40,7 +40,7 @@
     }).catch(() => { loadAnalysis(); });
   });
 
-  // Auto-refresh when a scan completes (background or manual)
+  // Auto-refresh when a scan completes
   $effect(() => {
     try {
       const listener = (message: { type?: string }) => {
@@ -57,82 +57,49 @@
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
+  <!-- Compact hero -->
   <section class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4">
     <div class="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-accent-blue/14 blur-3xl"></div>
-    <div class="relative">
-      <div class="flex items-start justify-between gap-3">
+    <div class="relative flex items-center justify-between gap-3">
+      <div class="flex items-center gap-3">
+        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent-blue/20 bg-accent-blue/10">
+          <Icon name="chart-column" size={18} class="text-accent-blue" />
+        </div>
         <div>
-          <p class="eyebrow text-accent-blue/80">TJM</p>
-          <h2 class="mt-2 text-[1.65rem] font-semibold leading-none text-white">Radar marché</h2>
-          <p class="mt-3 max-w-80 text-sm leading-relaxed text-text-secondary">
-            Suivez les fourchettes observées sur vos stacks et repérez rapidement les signaux de marché.
+          <h2 class="text-lg font-semibold text-white">Radar marché</h2>
+          <p class="text-[11px] text-text-muted">
+            {#if analysis && !isLoading}
+              Mis à jour le {analysis.lastUpdated ?? '—'}
+            {:else if isLoading}
+              Chargement…
+            {:else}
+              Aucune donnée
+            {/if}
           </p>
         </div>
-        <div class="flex items-center gap-2">
-          <button
-            class="soft-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition-all duration-200 hover:bg-white/10 disabled:opacity-40"
-            onclick={() => loadAnalysis()}
-            disabled={isLoading}
-            title="Rafraîchir l'analyse"
-          >
-            <span class:animate-spin={isLoading}>
-              <Icon name="refresh-cw" size={16} />
-            </span>
-          </button>
-        </div>
       </div>
-
-      {#if isOffline}
-        <div class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber">
-          <Icon name="database" size={14} />
-          <span>Mode hors ligne — Affichage des dernières données en cache</span>
-        </div>
-      {/if}
-
-      {#if analysis && !isLoading}
-        <div class="mt-4 grid grid-cols-3 gap-2">
-          <div class="rounded-[1.25rem] border border-white/8 bg-white/5 px-3 py-3">
-            <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Stacks</p>
-            <p class="mt-2 text-xl font-semibold text-white">{analysis.topStacks.length}</p>
-          </div>
-          <div class="rounded-[1.25rem] border border-white/8 bg-white/4 px-3 py-3">
-            <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Points</p>
-            <p class="mt-2 text-xl font-semibold text-white">{analysis.dataPoints}</p>
-          </div>
-          <div class="rounded-[1.25rem] border border-white/8 bg-white/4 px-3 py-3">
-            <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Maj</p>
-            <p class="mt-2 text-sm font-semibold text-white">{analysis.lastUpdated ?? 'N/A'}</p>
-          </div>
-        </div>
-      {/if}
+      <button
+        class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition-all duration-200 hover:bg-white/10 disabled:opacity-40"
+        onclick={() => loadAnalysis()}
+        disabled={isLoading}
+        title="Rafraîchir l'analyse"
+      >
+        <span class:animate-spin={isLoading}>
+          <Icon name="refresh-cw" size={14} />
+        </span>
+      </button>
     </div>
+
+    {#if isOffline}
+      <div class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber">
+        <Icon name="database" size={14} />
+        <span>Mode hors ligne — Données en cache</span>
+      </div>
+    {/if}
   </section>
 
+  <!-- Dashboard -->
   <section class="mt-4">
     <TJMDashboard {analysis} {isLoading} {error} {userTjmMin} {userTjmMax} />
   </section>
-
-  {#if analysis && analysis.topStacks.length > 0 && !isLoading}
-    <section class="section-card mt-4 rounded-[1.5rem] p-4">
-      <div class="flex items-center justify-between gap-3">
-        <div>
-          <h3 class="text-sm font-semibold text-text-primary">Stacks suivies</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-            Basée sur les stacks les plus représentés dans l'historique TJM.
-          </p>
-        </div>
-      </div>
-
-      <div class="mt-3 flex flex-wrap gap-2">
-        {#each analysis.topStacks as stack}
-          <span class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1.5 text-xs text-text-primary">
-            <span class="font-medium">{stack.stack}</span>
-            <span class:text-accent-emerald={stack.trend === 'up'} class:text-accent-red={stack.trend === 'down'} class:text-text-muted={stack.trend === 'stable'}>
-              {stack.average} €/j
-            </span>
-          </span>
-        {/each}
-      </div>
-    </section>
-  {/if}
 </div>
