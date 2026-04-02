@@ -40,6 +40,17 @@ export async function injectMissions(page: Page, count: number) {
   await closeDevPanel(page);
 }
 
+/**
+ * Vide le feed puis injecte exactement `count` missions.
+ * Utilise le DevPanel pour garantir un état propre sans missions résiduelles.
+ */
+export async function clearAndInjectMissions(page: Page, count: number) {
+  await setFeedState(page, 'empty');
+  await page.waitForTimeout(200);
+  await injectMissions(page, count);
+  await waitForMissions(page, count, 5000);
+}
+
 // ============================================================================
 // Onboarding Helpers
 // ============================================================================
@@ -275,9 +286,9 @@ export async function toggleFavoritesFilter(page: Page, showOnlyFavorites: boole
  * Affiche les missions masquées
  */
 export async function showHiddenMissions(page: Page) {
-  const showHiddenLink = page.getByText(/Voir les \d+ masquee/);
-  await expect(showHiddenLink).toBeVisible();
-  await showHiddenLink.click();
+  const showHiddenBtn = page.getByRole('button', { name: /Voir les \d+ mission/ });
+  await expect(showHiddenBtn).toBeVisible({ timeout: 5000 });
+  await showHiddenBtn.click();
 }
 
 // ============================================================================
@@ -365,7 +376,7 @@ export async function getDisplayedMissionCount(page: Page): Promise<number> {
  * Assert que le compteur de missions visibles affiche exactement `count`.
  * Utilise aria-label pour éviter les collisions de texte.
  */
-export async function expectMissionCount(page: Page, count: number, timeout = 3000) {
+export async function expectMissionCount(page: Page, count: number, timeout = 5000) {
   await expect(
     page.locator(`[aria-label="${count} missions visibles"]`)
   ).toBeVisible({ timeout });
