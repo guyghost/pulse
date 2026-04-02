@@ -93,7 +93,7 @@
           <span class="inline-flex items-center gap-2 rounded-full border border-white/8 bg-white/5 px-3 py-1.5 text-xs text-text-primary">
             <span class="font-medium">{stack.stack}</span>
             <span class:text-accent-emerald={stack.trend === 'up'} class:text-accent-red={stack.trend === 'down'} class:text-text-muted={stack.trend === 'stable'}>
-              {stack.average} EUR/j
+              {stack.average} €/j
             </span>
           </span>
         {/each}

@@ -171,7 +171,7 @@
           </p>
           <p class="text-text-secondary">{settings.profileLocation || 'Localisation non renseignée'}</p>
           {#if settings.tjmMin > 0 || settings.tjmMax > 0}
-            <p class="text-text-secondary">TJM : {settings.tjmMin} - {settings.tjmMax} EUR/jour</p>
+            <p class="text-text-secondary">TJM : {settings.tjmMin} – {settings.tjmMax} €/jour</p>
           {/if}
           {#if settings.profileStack.length > 0}
             <div class="flex flex-wrap gap-1.5 pt-1">

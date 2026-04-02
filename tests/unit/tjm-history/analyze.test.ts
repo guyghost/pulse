@@ -55,7 +55,7 @@ describe('analyzeTJMHistory', () => {
     expect(analysis).not.toBeNull();
     expect(analysis!.trend).toBe('down');
     expect(analysis!.trendDetail).toContain('ralentit');
-    expect(analysis!.recommendation).toContain('coeur de marche');
+    expect(analysis!.recommendation).toContain('cœur de marché');
   });
 
   it('falls back to duplicated slices when there are too few stacks', () => {

@@ -302,24 +302,24 @@ const buildTrendDetail = (trend: TJMTrend, topStacks: TJMStackInsight[]): string
     .join(', ');
 
   if (trend === 'up') {
-    return `Le marche est orienté a la hausse sur ${stackList}.`;
+    return `Le marché est orienté à la hausse sur ${stackList}.`;
   }
   if (trend === 'down') {
-    return `Le marche ralentit sur ${stackList}. Ajustez votre ciblage TJM avec prudence.`;
+    return `Le marché ralentit sur ${stackList}. Ajustez votre ciblage TJM avec prudence.`;
   }
-  return `Le marche reste globalement stable sur ${stackList}.`;
+  return `Le marché reste globalement stable sur ${stackList}.`;
 };
 
 const buildRecommendation = (trend: TJMTrend, confirmed: TJMRange): string | null => {
   if (confirmed.median <= 0) return null;
 
   if (trend === 'up') {
-    return `Visez en priorite la zone ${confirmed.min}-${confirmed.max} EUR/j pour vos positionnements confirmes.`;
+    return `Visez en priorité la zone ${confirmed.min}–${confirmed.max} €/j pour vos positionnements confirmés.`;
   }
   if (trend === 'down') {
-    return `Le coeur de marche semble se situer autour de ${confirmed.median} EUR/j. Misez sur des missions a forte valeur percue.`;
+    return `Le cœur de marché semble se situer autour de ${confirmed.median} €/j. Misez sur des missions à forte valeur perçue.`;
   }
-  return `Le centre de marche reste proche de ${confirmed.median} EUR/j. Utilisez cette base pour calibrer vos candidatures.`;
+  return `Le centre de marché reste proche de ${confirmed.median} €/j. Utilisez cette base pour calibrer vos candidatures.`;
 };
 
 /**

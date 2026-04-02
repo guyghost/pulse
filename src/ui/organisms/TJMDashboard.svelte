@@ -55,7 +55,7 @@
           <div class="flex items-center justify-between gap-3">
             <div>
               <p class="text-xs font-medium text-text-secondary">{level.label}</p>
-              <p class="mt-2 text-2xl font-semibold text-white">{range.median}<span class="ml-1 text-sm font-mono text-accent-blue">EUR/j</span></p>
+              <p class="mt-2 text-2xl font-semibold text-white">{range.median}<span class="ml-1 text-sm font-mono text-accent-blue">€/j</span></p>
             </div>
             <div class="rounded-full border border-accent-blue/18 bg-accent-blue/12 px-3 py-1.5 text-[11px] font-mono text-accent-blue">
               {range.min}-{range.max}
@@ -63,11 +63,11 @@
           </div>
 
           <div class="mt-4 flex items-center gap-2 text-[10px] font-mono text-text-muted">
-            <span>{range.min}EUR</span>
+            <span>{range.min}€</span>
             <div class="h-2 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
               <div class="h-full rounded-full bg-gradient-to-r from-accent-blue/45 via-accent-emerald/55 to-accent-blue/45" style:width="100%"></div>
             </div>
-            <span>{range.max}EUR</span>
+            <span>{range.max}€</span>
           </div>
         </div>
       {/each}
