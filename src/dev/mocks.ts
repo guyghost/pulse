@@ -1,5 +1,6 @@
 import type { Mission } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
+import type { TJMHistory } from '$lib/core/types/tjm';
 
 export const mockProfile: UserProfile = {
   firstName: 'Alice',
@@ -74,3 +75,27 @@ export function generateMockMissions(count: number): Mission[] {
 }
 
 export const mockMissions: Mission[] = generateMockMissions(10);
+
+export function generateMockTJMHistory(): TJMHistory {
+  const stacks = ['react', 'typescript', 'node.js', 'python', 'vue.js', 'java'];
+  const dates = ['2026-03-15', '2026-03-22', '2026-03-29', '2026-04-01'];
+  const records = [];
+
+  for (const stack of stacks) {
+    const base = 400 + Math.floor(Math.random() * 300);
+    for (let i = 0; i < dates.length; i++) {
+      const drift = Math.floor((i - 1) * 15 * (Math.random() - 0.3));
+      const avg = base + drift;
+      records.push({
+        stack,
+        date: dates[i],
+        min: avg - 80 - Math.floor(Math.random() * 40),
+        max: avg + 80 + Math.floor(Math.random() * 40),
+        average: avg,
+        sampleCount: 3 + Math.floor(Math.random() * 8),
+      });
+    }
+  }
+
+  return { records };
+}

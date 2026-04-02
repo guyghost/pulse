@@ -1,4 +1,4 @@
-import { mockProfile, mockMissions } from './mocks';
+import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
 
 const storage: Record<string, unknown> = {
   settings: {
@@ -7,6 +7,7 @@ const storage: Record<string, unknown> = {
     notifications: true,
     autoScan: true,
   },
+  tjm_history: generateMockTJMHistory(),
 };
 
 function createChromeStubs() {
