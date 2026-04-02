@@ -136,7 +136,10 @@ describe('background auto-scan notifications', () => {
       ],
       errors: [],
     });
-    notifyHighScoreMissions.mockResolvedValue(true);
+    notifyHighScoreMissions.mockResolvedValue({
+      shown: true,
+      notifiedMissionIds: ['mission-1'],
+    });
   });
 
   it('persists notified mission ids so they are not alerted again on the next scan', async () => {
@@ -146,6 +149,7 @@ describe('background auto-scan notifications', () => {
 
     expect(notifyHighScoreMissions).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'mission-1' }),
+      expect.objectContaining({ id: 'mission-2' }),
     ]);
     expect(saveSeenIds).toHaveBeenCalledWith(['already-seen', 'mission-1']);
   });

@@ -16,7 +16,6 @@ import {
 } from '../lib/shell/scan/scanner';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { setNewMissionCount } from '../lib/shell/storage/session-storage';
-import { filterNotifiableMissions } from '../lib/core/scoring/notification-filter';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
   notifyHighScoreMissions,
@@ -243,23 +242,10 @@ async function persistScanResults(
   }
 
   // Send notifications for high-score missions if enabled
-  const settings = await getSettings();
-  if (settings.notifications && newCount > 0) {
-    const notifiableMissions = filterNotifiableMissions(
-      newMissions,
-      seenIds,
-      settings.notificationScoreThreshold
-    );
-    if (notifiableMissions.length > 0) {
-      const didNotify = await notifyHighScoreMissions(notifiableMissions);
-      if (didNotify) {
-        await saveSeenIds(
-          markAsSeen(
-            seenIds,
-            notifiableMissions.map((m) => m.id)
-          )
-        );
-      }
+  if (newCount > 0) {
+    const notification = await notifyHighScoreMissions(newMissions);
+    if (notification.shown && notification.notifiedMissionIds.length > 0) {
+      await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
     }
   }
 }

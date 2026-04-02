@@ -1,32 +1,119 @@
 import type { Mission } from '../../core/types/mission';
+import type { AppSettings } from '../storage/chrome-storage';
+import { filterNotifiableMissions } from '../../core/scoring/notification-filter';
+import { canNotify } from '../../core/scoring/notification-rate-limit';
+import { getSettings } from '../storage/chrome-storage';
+import { getSeenIds } from '../storage/seen-missions';
+
+// ---------------------------------------------------------------------------
+// Rate limit state (in-memory, reset on service worker restart)
+// ---------------------------------------------------------------------------
+
+let lastNotificationTime: number | null = null;
+
+const LAST_NOTIFICATION_KEY = 'last_notification_time';
+
+/**
+ * Persist the last notification timestamp to chrome.storage.session.
+ * Uses session storage so it resets when the browser session ends.
+ */
+const persistLastNotificationTime = async (time: number): Promise<void> => {
+  lastNotificationTime = time;
+  try {
+    await chrome.storage.session.set({ [LAST_NOTIFICATION_KEY]: time });
+  } catch {
+    // Non-critical: session storage may not be available
+  }
+};
+
+/**
+ * Load the last notification timestamp from session storage.
+ */
+const loadLastNotificationTime = async (): Promise<number | null> => {
+  if (lastNotificationTime !== null) return lastNotificationTime;
+  try {
+    const result = await chrome.storage.session.get(LAST_NOTIFICATION_KEY);
+    lastNotificationTime = (result[LAST_NOTIFICATION_KEY] as number) ?? null;
+    return lastNotificationTime;
+  } catch {
+    return null;
+  }
+};
+
+// ---------------------------------------------------------------------------
+// Notification creation
+// ---------------------------------------------------------------------------
+
+export interface NotificationResult {
+  shown: boolean;
+  notifiedMissionIds: string[];
+}
 
 /**
  * Creates Chrome notifications for high-score missions.
- * 
- * - 1-3 missions: Single notification with titles listed
- * - 4+ missions: Grouped notification with count
- * 
- * Clicking the notification opens the side panel.
+ *
+ * Features:
+ * - Respects user notification settings (enabled + score threshold)
+ * - Rate limited: max 1 notification per 5 minutes
+ * - Groups multiple missions: 1-3 titles listed, 4+ grouped with count
+ * - Clicking the notification opens the side panel
+ *
+ * @param missions - All missions from the scan
+ * @returns Whether a notification was shown, and which mission IDs were included
  */
-export const notifyHighScoreMissions = async (missions: Mission[]): Promise<boolean> => {
-  if (missions.length === 0) return false;
+export const notifyHighScoreMissions = async (missions: Mission[]): Promise<NotificationResult> => {
+  if (missions.length === 0) return { shown: false, notifiedMissionIds: [] };
 
-  const missionCount = missions.length;
+  // Check if notifications are enabled
+  let settings: AppSettings;
+  try {
+    settings = await getSettings();
+  } catch {
+    return { shown: false, notifiedMissionIds: [] };
+  }
+
+  if (!settings.notifications) return { shown: false, notifiedMissionIds: [] };
+
+  // Check rate limit
+  const lastTime = await loadLastNotificationTime();
+  const now = Date.now();
+
+  if (!canNotify(lastTime, now)) return { shown: false, notifiedMissionIds: [] };
+
+  // Filter missions above threshold that haven't been seen
+  let seenIds: string[] = [];
+  try {
+    seenIds = await getSeenIds();
+  } catch {
+    // If we can't load seen IDs, proceed without filtering
+  }
+
+  const notifiableMissions = filterNotifiableMissions(
+    missions,
+    seenIds,
+    settings.notificationScoreThreshold
+  );
+
+  if (notifiableMissions.length === 0) return { shown: false, notifiedMissionIds: [] };
 
   // Build notification content based on count
+  const missionCount = notifiableMissions.length;
   let title: string;
   let message: string;
 
   if (missionCount === 1) {
-    const mission = missions[0];
+    const mission = notifiableMissions[0];
     title = '🎯 Nouvelle mission pertinente';
     message = `${mission.title}${mission.client ? ` — ${mission.client}` : ''}`;
   } else if (missionCount <= 3) {
     title = `🎯 ${missionCount} nouvelles missions pertinentes`;
-    message = missions.map((m) => `• ${m.title}`).join('\n');
+    message = notifiableMissions.map((m) => `• ${m.title}`).join('\n');
   } else {
     title = `🎯 ${missionCount} nouvelles missions pertinentes`;
-    const topMissions = missions.slice(0, 3).map((m) => `• ${m.title}`).join('\n');
+    const topMissions = notifiableMissions
+      .slice(0, 3)
+      .map((m) => `• ${m.title}`)
+      .join('\n');
     message = `${topMissions}\n• ...et ${missionCount - 3} autres`;
   }
 
@@ -39,10 +126,16 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<bool
       priority: 2,
       isClickable: true,
     });
-    return true;
+
+    // Update rate limit timestamp
+    await persistLastNotificationTime(now);
+    return {
+      shown: true,
+      notifiedMissionIds: notifiableMissions.map((mission) => mission.id),
+    };
   } catch (err) {
     console.error('[MissionPulse] Failed to create notification:', err);
-    return false;
+    return { shown: false, notifiedMissionIds: [] };
   }
 };
 

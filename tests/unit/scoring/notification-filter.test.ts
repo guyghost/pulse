@@ -155,6 +155,18 @@ describe('filterNotifiableMissions', () => {
     expect(result.every(m => m.score !== null)).toBe(true);
   });
 
+  it('prefers semantic score over basic score for filtering and sorting', () => {
+    const missions = [
+      makeMission({ id: '1', title: 'Basic only', score: 80, semanticScore: null }),
+      makeMission({ id: '2', title: 'Semantic winner', score: 40, semanticScore: 95 }),
+      makeMission({ id: '3', title: 'Filtered out', score: 49, semanticScore: null }),
+    ];
+
+    const result = filterNotifiableMissions(missions, [], 50);
+    expect(result).toHaveLength(2);
+    expect(result.map((m) => m.title)).toEqual(['Semantic winner', 'Basic only']);
+  });
+
   it('maintains order when scores are equal', () => {
     const missions = [
       makeMission({ id: '1', score: 75, title: 'First' }),
