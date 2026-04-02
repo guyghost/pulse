@@ -354,10 +354,21 @@ export async function waitForLoadingComplete(page: Page, timeout = 5000) {
  * Récupère le nombre de missions affiché dans le header
  */
 export async function getDisplayedMissionCount(page: Page): Promise<number> {
-  const headerText = await page.locator('text=/\\d+ mission/').textContent();
-  if (!headerText) return 0;
-  const match = headerText.match(/(\d+)/);
+  const badge = page.locator('[aria-label$="missions visibles"]');
+  const label = await badge.getAttribute('aria-label').catch(() => null);
+  if (!label) return 0;
+  const match = label.match(/(\d+)/);
   return match ? parseInt(match[1], 10) : 0;
+}
+
+/**
+ * Assert que le compteur de missions visibles affiche exactement `count`.
+ * Utilise aria-label pour éviter les collisions de texte.
+ */
+export async function expectMissionCount(page: Page, count: number, timeout = 3000) {
+  await expect(
+    page.locator(`[aria-label="${count} missions visibles"]`)
+  ).toBeVisible({ timeout });
 }
 
 /**
