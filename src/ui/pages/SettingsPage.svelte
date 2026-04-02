@@ -5,14 +5,8 @@
   import Icon from '../atoms/Icon.svelte';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import type { BackupData, ValidationError } from '$lib/core/backup/backup';
-  import {
-    getSettings,
-    setSettings,
-    getApiKey,
-    setApiKey,
-    getProfile,
-    saveProfile,
-  } from '$lib/shell/facades/settings.facade';
+  import { getSettings, setSettings, getProfile, saveProfile } from '$lib/shell/facades/settings.facade';
+  import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabilities';
   import {
     getFavorites,
     getHidden,
@@ -53,9 +47,9 @@
   let profileSaved = $state(false);
   let profileError = $state<string | null>(null);
 
-  // --- API Key ---
-  let apiKey = $state('');
-  let apiKeySaved = $state(false);
+  // --- AI locale ---
+  let aiAvailability = $state<AiAvailability>('no');
+  let maxSemanticPerScan = $state(10);
 
   // --- Scan ---
   let scanInterval = $state(30);
@@ -81,7 +75,7 @@
 
   // Chargement initial (fire-and-forget, pas besoin de reactivite)
   loadProfile();
-  loadApiKey();
+  loadAiAvailability();
   loadSettings();
 
   async function loadProfile() {
@@ -100,12 +94,11 @@
     }
   }
 
-  async function loadApiKey() {
+  async function loadAiAvailability() {
     try {
-      const key = await getApiKey();
-      if (key) apiKey = key;
+      aiAvailability = await isPromptApiAvailable();
     } catch {
-      // Hors contexte extension
+      aiAvailability = 'no';
     }
   }
 
@@ -115,6 +108,7 @@
       scanInterval = settings.scanIntervalMinutes;
       notifications = settings.notifications;
       autoScan = settings.autoScan;
+      maxSemanticPerScan = settings.maxSemanticPerScan;
     } catch {
       // Hors contexte extension
     }
@@ -153,19 +147,6 @@
       }, 2000);
     } catch (err) {
       profileError = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
-    }
-  }
-
-  async function handleSaveApiKey() {
-    if (!apiKey.trim()) return;
-    try {
-      await setApiKey(apiKey);
-      apiKeySaved = true;
-      setTimeout(() => {
-        apiKeySaved = false;
-      }, 2000);
-    } catch {
-      // Hors contexte extension
     }
   }
 
@@ -652,28 +633,36 @@
       </div>
     </div>
 
-    <!-- Cle API -->
+    <!-- IA locale -->
     <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
       <div class="flex items-center gap-2">
-        <Icon name="edit-2" size={12} class="text-accent-blue/60" />
+        <Icon name="info" size={12} class="text-accent-blue/60" />
         <div>
-          <h3 class="text-sm font-semibold text-text-primary">Cle API Anthropic</h3>
+          <h3 class="text-sm font-semibold text-text-primary">IA locale</h3>
           <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-            Necessaire pour enrichir l\'analyse TJM locale avec le modele.
+            Le scoring semantique utilise Gemini Nano via la Prompt API de Chrome, sans cle API externe.
           </p>
         </div>
       </div>
-      <div class="flex gap-2">
-        <input
-          type="password"
-          placeholder="sk-ant-..."
-          class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm font-mono text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-          bind:value={apiKey}
-        />
-        <Button variant="secondary" onclick={handleSaveApiKey}>
-          {#snippet children()}{apiKeySaved ? 'Sauve !' : 'Sauver'}{/snippet}
-        </Button>
+      <div class="grid grid-cols-2 gap-2 text-[11px]">
+        <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
+          <p class="uppercase tracking-[0.18em] text-text-muted">Statut</p>
+          <p class="mt-2 text-sm font-semibold text-white">
+            {aiAvailability === 'available'
+              ? 'Disponible'
+              : aiAvailability === 'after-download'
+                ? 'Telechargement requis'
+                : 'Indisponible'}
+          </p>
+        </div>
+        <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
+          <p class="uppercase tracking-[0.18em] text-text-muted">Missions / scan</p>
+          <p class="mt-2 text-sm font-semibold text-white">{maxSemanticPerScan}</p>
+        </div>
       </div>
+      <p class="text-xs leading-relaxed text-text-secondary">
+        Les scores sont mis en cache localement pour limiter la latence et eviter les recalculs inutiles.
+      </p>
     </div>
 
     <!-- Zone de danger -->

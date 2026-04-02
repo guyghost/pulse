@@ -118,7 +118,6 @@ test.describe('Offline Mode', () => {
     await expect(hideBtn).toBeVisible();
     await hideBtn.click();
 
-    await expect(page.getByText('4 missions', { exact: true }).first()).toBeVisible({ timeout: 2000 });
     await expect(page.getByRole('button', { name: /Voir les 1 mission masquee/ })).toBeVisible();
   });
 

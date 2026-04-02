@@ -77,7 +77,9 @@ async function seedTJMHistory(page: Page) {
 test.describe('TJM page', () => {
   test('shows TJM tab in main navigation', async ({ page }) => {
     await ensureFeedIsVisible(page);
-    await expect(page.getByRole('button', { name: 'TJM' })).toBeVisible();
+    await expect(
+      page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })
+    ).toBeVisible();
   });
 
   test('shows an empty state when no TJM history exists', async ({ page }) => {
