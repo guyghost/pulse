@@ -5,8 +5,6 @@
     import type { SourceStatus } from "$lib/shell/facades/feed-controller.svelte";
 
     let {
-
-    let {
         sources,
         isChecking = false,
         compact = false,

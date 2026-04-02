@@ -200,7 +200,6 @@ export function createFeedPageState(
       searchDebounceTimer = null;
     }, SEARCH_DEBOUNCE_MS);
   }
-  }
 
   function toggleFavoritesFilter(): void {
     showFavoritesOnly = !showFavoritesOnly;
