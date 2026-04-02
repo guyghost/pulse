@@ -4,348 +4,52 @@
   import Chip from '../atoms/Chip.svelte';
   import Icon from '../atoms/Icon.svelte';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
-  import type { BackupData, ValidationError } from '$lib/core/backup/backup';
-  import { getSettings, setSettings, getProfile, saveProfile } from '$lib/shell/facades/settings.facade';
-  import { isPromptApiAvailable, type AiAvailability } from '$lib/shell/ai/capabilities';
-  import {
-    getFavorites,
-    getHidden,
-    saveFavorites,
-    saveHidden,
-  } from '$lib/shell/facades/feed-data.facade';
-  import {
-    exportMissionsToJSON,
-    exportMissionsToCSV,
-    exportMissionsToMarkdown,
-    generateFilename,
-    type ExportFormat,
-  } from '$lib/core/export/mission-export';
-  import { downloadJSON, downloadCSV, downloadMarkdown } from '$lib/shell/export/download';
-  import {
-    createBackup,
-    validateBackup,
-    serializeBackup,
-    parseBackupJson,
-    generateBackupFilename,
-    type Result,
-  } from '$lib/core/backup/backup';
+  import { SettingsPageController } from '$lib/state/settings-page.svelte';
+  import type { ExportFormat } from '$lib/core/export/mission-export';
 
   let {
     onBack,
     onNavigateToOnboarding,
   }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
 
-  // --- Profil ---
-  let firstName = $state('');
-  let jobTitle = $state('');
-  let profileLocation = $state('');
-  let tjmMin = $state(0);
-  let tjmMax = $state(0);
-  let profileStack = $state<string[]>([]);
-  let stackInput = $state('');
-  let editingProfile = $state(false);
-  let profileSaved = $state(false);
-  let profileError = $state<string | null>(null);
+  const settings = new SettingsPageController({
+    onNavigateToOnboarding,
+    onRestoreCompleted: () => {
+      window.location.reload();
+    },
+  });
 
-  // --- AI locale ---
-  let aiAvailability = $state<AiAvailability>('no');
-  let maxSemanticPerScan = $state(10);
+  settings.load();
 
-  // --- Scan ---
-  let scanInterval = $state(30);
-
-  // --- Notifications ---
-  let notifications = $state(true);
-
-  // --- Auto-scan ---
-  let autoScan = $state(true);
-
-  // --- Reset ---
-  let showResetConfirm = $state(false);
-
-  // --- Export ---
-  let isExporting = $state(false);
-  let exportSuccess = $state(false);
-
-  // --- Backup/Restore ---
-  let showBackupModal = $state(false);
-  let pendingBackup: BackupData | null = $state(null);
-  let backupError: ValidationError | null = $state(null);
-  let fileInput: HTMLInputElement | null = $state(null);
-
-  // Chargement initial (fire-and-forget, pas besoin de reactivite)
-  loadProfile();
-  loadAiAvailability();
-  loadSettings();
-
-  async function loadProfile() {
-    try {
-      const profile = await getProfile();
-      if (profile) {
-        firstName = profile.firstName ?? '';
-        jobTitle = profile.jobTitle ?? '';
-        profileLocation = profile.location ?? '';
-        tjmMin = profile.tjmMin ?? 0;
-        tjmMax = profile.tjmMax ?? 0;
-        profileStack = profile.stack ?? [];
-      }
-    } catch {
-      // Hors contexte extension
-    }
-  }
-
-  async function loadAiAvailability() {
-    try {
-      aiAvailability = await isPromptApiAvailable();
-    } catch {
-      aiAvailability = 'no';
-    }
-  }
-
-  async function loadSettings() {
-    try {
-      const settings = await getSettings();
-      scanInterval = settings.scanIntervalMinutes;
-      notifications = settings.notifications;
-      autoScan = settings.autoScan;
-      maxSemanticPerScan = settings.maxSemanticPerScan;
-    } catch {
-      // Hors contexte extension
-    }
-  }
-
-  function addStack() {
-    const trimmed = stackInput.trim();
-    if (trimmed && !profileStack.includes(trimmed)) {
-      profileStack = [...profileStack, trimmed];
-      stackInput = '';
-    }
-  }
-
-  function removeStack(item: string) {
-    profileStack = profileStack.filter((s) => s !== item);
-  }
-
-  async function handleSaveProfile() {
-    profileError = null;
-    try {
-      const current = await getProfile();
-      await saveProfile({
-        firstName,
-        jobTitle,
-        location: profileLocation,
-        tjmMin,
-        tjmMax,
-        stack: [...profileStack], // Convert proxy to plain array for IndexedDB
-        remote: current?.remote ?? 'any',
-        seniority: current?.seniority ?? 'senior',
-      });
-      editingProfile = false;
-      profileSaved = true;
-      setTimeout(() => {
-        profileSaved = false;
-      }, 2000);
-    } catch (err) {
-      profileError = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
-    }
-  }
-
-  async function handleScanIntervalChange(event: Event) {
-    const value = parseInt((event.target as HTMLInputElement).value, 10);
-    scanInterval = value;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, scanIntervalMinutes: value });
-    } catch {
-      // Hors contexte extension
-    }
-  }
-
-  async function handleToggleNotifications() {
-    notifications = !notifications;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, notifications });
-    } catch {
-      // Hors contexte extension
-    }
-  }
-
-  async function handleToggleAutoScan() {
-    autoScan = !autoScan;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, autoScan });
-    } catch {
-      // Hors contexte extension
-    }
-  }
-
-  async function handleResetAll() {
-    try {
-      await chrome.storage.local.clear();
-      const databases = await indexedDB.databases();
-      for (const db of databases) {
-        if (db.name) indexedDB.deleteDatabase(db.name);
-      }
-      showResetConfirm = false;
-      // Navigate to onboarding instead of reloading
-      onNavigateToOnboarding?.();
-    } catch {
-      // Hors contexte extension
-    }
-  }
-
-  // --- Export handlers ---
   async function handleExportFavorites(format: ExportFormat) {
-    try {
-      isExporting = true;
-      const favorites = await getFavorites();
-      const favoriteIds = Object.keys(favorites);
-
-      if (favoriteIds.length === 0) {
-        alert('Aucune mission favorite à exporter');
-        isExporting = false;
-        return;
-      }
-
-      // Récupérer les missions depuis IndexedDB
-      const { getMissions } = await import('$lib/shell/storage/db');
-      const allMissions = await getMissions();
-      const favoriteMissions = allMissions.filter((m) => favoriteIds.includes(m.id));
-
-      const now = new Date();
-      const filename = generateFilename('favoris', format, now);
-
-      switch (format) {
-        case 'json':
-          downloadJSON(
-            exportMissionsToJSON(favoriteMissions, { format, includeDescription: true }, now),
-            filename
-          );
-          break;
-        case 'csv':
-          downloadCSV(
-            exportMissionsToCSV(favoriteMissions, { format, includeDescription: false }, now),
-            filename
-          );
-          break;
-        case 'markdown':
-          downloadMarkdown(
-            exportMissionsToMarkdown(favoriteMissions, { format, includeDescription: true }, now),
-            filename
-          );
-          break;
-      }
-
-      exportSuccess = true;
-      setTimeout(() => {
-        exportSuccess = false;
-      }, 2000);
-    } catch (e) {
-      console.error("Erreur lors de l'export:", e);
-      alert("Erreur lors de l'export des favoris");
-    } finally {
-      isExporting = false;
+    const result = await settings.exportFavorites(format);
+    if (!result.ok) {
+      alert(result.error);
     }
   }
 
-  // --- Backup handlers ---
   async function handleCreateBackup() {
-    try {
-      const [profile, settings, favorites, hidden] = await Promise.all([
-        getProfile(),
-        getSettings(),
-        getFavorites(),
-        getHidden(),
-      ]);
-
-      if (!profile) {
-        alert('Veuillez configurer votre profil avant de créer un backup');
-        return;
-      }
-
-      const backup = createBackup(profile, settings, favorites, hidden, Date.now());
-      const json = serializeBackup(backup);
-      const filename = generateBackupFilename(backup.timestamp);
-
-      downloadJSON(json, filename);
-    } catch (e) {
-      console.error('Erreur lors de la création du backup:', e);
-      alert('Erreur lors de la création du backup');
-    }
-  }
-
-  async function handleFileSelect(event: Event) {
-    const input = event.target as HTMLInputElement;
-    const file = input.files?.[0];
-    if (!file) return;
-
-    try {
-      const text = await file.text();
-      const parseResult = parseBackupJson(text);
-
-      if (!parseResult.ok) {
-        backupError = parseResult.error;
-        pendingBackup = null;
-        showBackupModal = true;
-        return;
-      }
-
-      const validateResult = validateBackup(parseResult.value);
-
-      if (!validateResult.ok) {
-        backupError = validateResult.error;
-        pendingBackup = null;
-      } else {
-        backupError = null;
-        pendingBackup = validateResult.value;
-      }
-
-      showBackupModal = true;
-    } catch (e) {
-      backupError = { type: 'INVALID_JSON', message: 'Impossible de lire le fichier' };
-      pendingBackup = null;
-      showBackupModal = true;
-    } finally {
-      // Reset input
-      if (fileInput) fileInput.value = '';
+    const result = await settings.createBackupFile();
+    if (!result.ok) {
+      alert(result.error);
     }
   }
 
   async function handleRestoreBackup() {
-    if (!pendingBackup) return;
-
-    try {
-      const { profile, settings, favorites, hidden } = pendingBackup;
-
-      await Promise.all([
-        saveProfile(profile),
-        setSettings(settings),
-        saveFavorites(favorites),
-        saveHidden(hidden),
-      ]);
-
-      showBackupModal = false;
-      pendingBackup = null;
-      backupError = null;
-
-      // Recharger pour refléter les changements
-      window.location.reload();
-    } catch (e) {
-      console.error('Erreur lors de la restauration:', e);
-      alert('Erreur lors de la restauration du backup');
+    const result = await settings.restoreBackup();
+    if (!result.ok) {
+      alert(result.error);
     }
   }
 
-  function handleCancelRestore() {
-    showBackupModal = false;
-    pendingBackup = null;
-    backupError = null;
+  async function handleScanIntervalChange(event: Event) {
+    const value = Number.parseInt((event.target as HTMLInputElement).value, 10);
+    await settings.updateScanInterval(value);
   }
 
-  function triggerFileSelect() {
-    fileInput?.click();
+  async function handleFileSelect(event: Event) {
+    const input = event.target as HTMLInputElement;
+    await settings.handleFileSelect(input.files?.[0]);
   }
 </script>
 
@@ -366,46 +70,46 @@
         <button
           class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/4 text-text-secondary transition-colors hover:bg-white/8 hover:text-text-primary"
           onclick={() => {
-            editingProfile = !editingProfile;
+            settings.toggleProfileEditing();
           }}
-          title={editingProfile ? 'Annuler' : 'Modifier'}
+          title={settings.editingProfile ? 'Annuler' : 'Modifier'}
         >
-          <Icon name={editingProfile ? 'x' : 'edit-2'} size={14} />
+          <Icon name={settings.editingProfile ? 'x' : 'edit-2'} size={14} />
         </button>
       </div>
 
-      {#if editingProfile}
+      {#if settings.editingProfile}
         <div class="space-y-2">
           <input
             type="text"
             placeholder="Prenom"
             class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-            bind:value={firstName}
+            bind:value={settings.firstName}
           />
           <input
             type="text"
             placeholder="Poste (ex: Developpeur React Senior)"
             class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-            bind:value={jobTitle}
+            bind:value={settings.jobTitle}
           />
           <input
             type="text"
             placeholder="Localisation"
             class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-            bind:value={profileLocation}
+            bind:value={settings.profileLocation}
           />
           <div class="flex gap-2">
             <input
               type="number"
               placeholder="TJM min"
               class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-              bind:value={tjmMin}
+              bind:value={settings.tjmMin}
             />
             <input
               type="number"
               placeholder="TJM max"
               class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-              bind:value={tjmMax}
+              bind:value={settings.tjmMax}
             />
           </div>
 
@@ -420,48 +124,48 @@
                 type="text"
                 placeholder="ex: React, Node.js..."
                 class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
-                bind:value={stackInput}
+                bind:value={settings.stackInput}
                 onkeydown={(e) => {
-                  if (e.key === 'Enter') addStack();
+                  if (e.key === 'Enter') settings.addStack();
                 }}
               />
               <button
                 class="inline-flex min-h-12 items-center justify-center rounded-[1.1rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
-                onclick={addStack}
+                onclick={() => settings.addStack()}
                 title="Ajouter"
               >
                 <Icon name="plus" size={14} />
               </button>
             </div>
-            {#if profileStack.length > 0}
+            {#if settings.profileStack.length > 0}
               <div class="flex flex-wrap gap-2 pt-1">
-                {#each profileStack as tech}
-                  <Chip label={tech} selected={true} onclick={() => removeStack(tech)} />
+                {#each settings.profileStack as tech}
+                  <Chip label={tech} selected={true} onclick={() => settings.removeStack(tech)} />
                 {/each}
               </div>
             {/if}
           </div>
 
-          <Button variant="secondary" onclick={handleSaveProfile}>
-            {#snippet children()}{profileSaved ? 'Sauvegarde !' : 'Enregistrer le profil'}{/snippet}
+          <Button variant="secondary" onclick={() => settings.saveProfile()}>
+            {#snippet children()}{settings.profileSaved ? 'Sauvegarde !' : 'Enregistrer le profil'}{/snippet}
           </Button>
-          {#if profileError}
-            <p class="text-xs text-red-400">{profileError}</p>
+          {#if settings.profileError}
+            <p class="text-xs text-red-400">{settings.profileError}</p>
           {/if}
         </div>
       {:else}
         <div class="space-y-2 text-sm">
           <p class="text-text-primary">
-            {firstName || 'Non renseigne'}
-            {jobTitle ? `— ${jobTitle}` : ''}
+            {settings.firstName || 'Non renseigne'}
+            {settings.jobTitle ? `— ${settings.jobTitle}` : ''}
           </p>
-          <p class="text-text-secondary">{profileLocation || 'Localisation non renseignee'}</p>
-          {#if tjmMin > 0 || tjmMax > 0}
-            <p class="text-text-secondary">TJM : {tjmMin} - {tjmMax} EUR/jour</p>
+          <p class="text-text-secondary">{settings.profileLocation || 'Localisation non renseignee'}</p>
+          {#if settings.tjmMin > 0 || settings.tjmMax > 0}
+            <p class="text-text-secondary">TJM : {settings.tjmMin} - {settings.tjmMax} EUR/jour</p>
           {/if}
-          {#if profileStack.length > 0}
+          {#if settings.profileStack.length > 0}
             <div class="flex flex-wrap gap-1.5 pt-1">
-              {#each profileStack as tech}
+              {#each settings.profileStack as tech}
                 <span
                   class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue"
                 >
@@ -486,16 +190,16 @@
           </p>
         </div>
         <button
-          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {autoScan
+          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {settings.autoScan
             ? 'border-accent-emerald/30 bg-accent-emerald/20'
             : 'border-white/10 bg-white/5'}"
-          onclick={handleToggleAutoScan}
+          onclick={() => settings.toggleAutoScan()}
           role="switch"
-          aria-checked={autoScan}
+          aria-checked={settings.autoScan}
           aria-label="Activer le scan automatique"
         >
           <span
-            class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {autoScan
+            class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {settings.autoScan
               ? 'translate-x-6 bg-accent-emerald'
               : 'translate-x-0.5 bg-text-muted'}"
           ></span>
@@ -506,13 +210,13 @@
     <!-- Intervalle de scan -->
     <div
       class="section-card rounded-[1.5rem] p-4 space-y-3 transition-opacity duration-200"
-      class:opacity-40={!autoScan}
-      class:pointer-events-none={!autoScan}
+      class:opacity-40={!settings.autoScan}
+      class:pointer-events-none={!settings.autoScan}
     >
       <div>
         <h3 class="text-sm font-semibold text-text-primary">Frequence de scan</h3>
         <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-          Scanner les plateformes toutes les {scanInterval} minutes.
+          Scanner les plateformes toutes les {settings.scanInterval} minutes.
         </p>
       </div>
       <div class="flex items-center gap-3">
@@ -522,14 +226,14 @@
           min="5"
           max="120"
           step="5"
-          value={scanInterval}
+          value={settings.scanInterval}
           onchange={handleScanIntervalChange}
           class="flex-1 accent-accent-blue"
         />
         <span class="text-xs text-text-muted">120 min</span>
       </div>
-      <p class="text-center text-sm font-semibold text-accent-blue">{scanInterval} min</p>
-      {#if !autoScan}
+      <p class="text-center text-sm font-semibold text-accent-blue">{settings.scanInterval} min</p>
+      {#if !settings.autoScan}
         <p class="text-center text-[11px] text-text-muted">
           Activez le scan automatique pour configurer la frequence.
         </p>
@@ -546,16 +250,16 @@
           </p>
         </div>
         <button
-          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {notifications
+          class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {settings.notifications
             ? 'border-accent-emerald/30 bg-accent-emerald/20'
             : 'border-white/10 bg-white/5'}"
-          onclick={handleToggleNotifications}
+          onclick={() => settings.toggleNotifications()}
           role="switch"
-          aria-checked={notifications}
+          aria-checked={settings.notifications}
           aria-label="Activer les notifications"
         >
           <span
-            class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {notifications
+            class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {settings.notifications
               ? 'translate-x-6 bg-accent-emerald'
               : 'translate-x-0.5 bg-text-muted'}"
           ></span>
@@ -575,7 +279,7 @@
         <button
           class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
           onclick={() => handleExportFavorites('json')}
-          disabled={isExporting}
+          disabled={settings.isExporting}
         >
           <Icon name="file-json" size={16} class="text-accent-blue" />
           JSON
@@ -583,7 +287,7 @@
         <button
           class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
           onclick={() => handleExportFavorites('csv')}
-          disabled={isExporting}
+          disabled={settings.isExporting}
         >
           <Icon name="file-spreadsheet" size={16} class="text-accent-emerald" />
           CSV
@@ -591,13 +295,13 @@
         <button
           class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
           onclick={() => handleExportFavorites('markdown')}
-          disabled={isExporting}
+          disabled={settings.isExporting}
         >
           <Icon name="file-text" size={16} class="text-accent-amber" />
           Markdown
         </button>
       </div>
-      {#if exportSuccess}
+      {#if settings.exportSuccess}
         <p class="text-xs text-accent-emerald">Export réussi !</p>
       {/if}
     </div>
@@ -622,9 +326,9 @@
           accept=".pulse-backup,.json"
           class="hidden"
           onchange={handleFileSelect}
-          bind:this={fileInput}
+          bind:this={settings.fileInput}
         />
-        <Button variant="ghost" onclick={triggerFileSelect}>
+        <Button variant="ghost" onclick={() => settings.triggerFileSelect()}>
           {#snippet children()}
             <Icon name="upload" size={16} class="mr-1" />
             Restaurer depuis une sauvegarde
@@ -648,16 +352,16 @@
         <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
           <p class="uppercase tracking-[0.18em] text-text-muted">Statut</p>
           <p class="mt-2 text-sm font-semibold text-white">
-            {aiAvailability === 'available'
+            {settings.aiAvailability === 'available'
               ? 'Disponible'
-              : aiAvailability === 'after-download'
+              : settings.aiAvailability === 'after-download'
                 ? 'Telechargement requis'
                 : 'Indisponible'}
           </p>
         </div>
         <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
           <p class="uppercase tracking-[0.18em] text-text-muted">Missions / scan</p>
-          <p class="mt-2 text-sm font-semibold text-white">{maxSemanticPerScan}</p>
+          <p class="mt-2 text-sm font-semibold text-white">{settings.maxSemanticPerScan}</p>
         </div>
       </div>
       <p class="text-xs leading-relaxed text-text-secondary">
@@ -673,19 +377,19 @@
           Supprimer toutes les donnees locales (profil, missions, cache).
         </p>
       </div>
-      {#if showResetConfirm}
+      {#if settings.showResetConfirm}
         <div class="flex gap-2">
           <Button
             variant="ghost"
             onclick={() => {
-              showResetConfirm = false;
+              settings.showResetConfirm = false;
             }}
           >
             {#snippet children()}Annuler{/snippet}
           </Button>
           <button
             class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/20 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/30"
-            onclick={handleResetAll}
+            onclick={() => settings.resetAll()}
           >
             Confirmer la suppression
           </button>
@@ -694,7 +398,7 @@
         <button
           class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/20"
           onclick={() => {
-            showResetConfirm = true;
+            settings.showResetConfirm = true;
           }}
         >
           <Icon name="trash-2" size={14} />
@@ -707,11 +411,11 @@
 
 <SettingsLayout {onBack} content={settingsContent} />
 
-{#if showBackupModal}
+{#if settings.showBackupModal}
   <BackupRestoreModal
-    backup={pendingBackup}
-    error={backupError}
+    backup={settings.pendingBackup}
+    error={settings.backupError}
     onConfirm={handleRestoreBackup}
-    onCancel={handleCancelRestore}
+    onCancel={() => settings.cancelRestore()}
   />
 {/if}
