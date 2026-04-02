@@ -28,6 +28,21 @@
   $effect(() => {
     loadAnalysis();
   });
+
+  // Auto-refresh when a scan completes (background or manual)
+  $effect(() => {
+    try {
+      const listener = (message: { type?: string }) => {
+        if (message?.type === 'SCAN_COMPLETE') {
+          loadAnalysis();
+        }
+      };
+      chrome.runtime.onMessage.addListener(listener);
+      return () => chrome.runtime.onMessage.removeListener(listener);
+    } catch {
+      // Outside extension context
+    }
+  });
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
@@ -42,8 +57,17 @@
             Suivez les fourchettes observées sur vos stacks et repérez rapidement les signaux de marché.
           </p>
         </div>
-        <div class="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white">
-          <Icon name="chart-column" size={16} />
+        <div class="flex items-center gap-2">
+          <button
+            class="soft-ring inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition-all duration-200 hover:bg-white/10 disabled:opacity-40"
+            onclick={() => loadAnalysis()}
+            disabled={isLoading}
+            title="Rafraîchir l'analyse"
+          >
+            <span class:animate-spin={isLoading}>
+              <Icon name="refresh-cw" size={16} />
+            </span>
+          </button>
         </div>
       </div>
 
