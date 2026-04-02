@@ -21,7 +21,7 @@ Four storage layers, each with a distinct purpose:
 - **Validation on read**: `getMissions()` runs every record through `parseMission()` (Zod + type guards), silently discarding corrupted entries with a warning log. Protects against schema drift across extension updates.
 
 ### 3. chrome.storage.local (`chrome-storage.ts`, `favorites.ts`, `seen-missions.ts`)
-- Settings, API keys, enabled connectors, favorites, hidden missions, seen IDs.
+- Settings, enabled connectors, favorites, hidden missions, seen IDs, semantic cache.
 - Survives extension updates. Syncs across Chrome profiles if sync storage is used.
 - Small key-value data only (Chrome enforces quota).
 

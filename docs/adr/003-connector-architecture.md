@@ -4,12 +4,12 @@
 Accepted
 
 ## Context
-MissionPulse aggregates freelance missions from 6+ platforms (Free-Work, Comet, LeHibou, Hiway, Collective, CherryPick), each with different data formats (HTML scraping, JSON-LD API, SPAs). We need a uniform interface that handles authentication detection, rate limiting, and error recovery while keeping each connector's code isolated for bundle size.
+MissionPulse aggregates freelance missions from 5 platforms (Free-Work, LeHibou, Hiway, Collective, CherryPick), each with different data formats (JSON APIs, HTML). We need a uniform interface that handles authentication detection, rate limiting, and error recovery while keeping each connector's code isolated.
 
 ## Decision
 
-### Lazy Loading via Dynamic Imports
-`src/lib/shell/connectors/index.ts` defines a `CONNECTOR_REGISTRY` mapping IDs to factory functions using dynamic `import()`. Connectors are loaded on-demand as separate Vite chunks. Static metadata (`ConnectorMeta`) is available without loading connector code, enabling fast UI rendering of the connector list.
+### Static Imports (service-worker safe)
+`src/lib/shell/connectors/index.ts` defines a `CONNECTOR_REGISTRY` mapping IDs to factory functions using **static imports** wrapped in `Promise.resolve()`. Dynamic `import()` was removed because Vite's `__vitePreload` polyfill uses `document` APIs which crash in Chrome extension service workers. Static metadata (`ConnectorMeta`) is available without loading connector code, enabling fast UI rendering of the connector list.
 
 ### Base Class with Result<T,E>
 `BaseConnector` provides shared infrastructure:

@@ -1,3 +1,6 @@
+> **⚠️ Historical document** — Ce plan a été rédigé pendant une phase antérieure du projet. Certains choix techniques mentionnés (XState, offscreen document, API Anthropic, Malt, Comet) ne reflètent plus l'architecture actuelle. Voir `README.md` et `AGENTS.md` pour l'état courant.
+
+
 # Refactoring Connecteurs + XState
 
 Date: 2026-03-15

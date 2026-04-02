@@ -380,7 +380,7 @@ Contributions are welcome. Please follow these guidelines:
 Follow [Conventional Commits](https://www.conventionalcommits.org/):
 
 ```
-feat(connector): add Malt platform scraper
+feat(connector): add LeHibou platform scraper
 fix(scoring): handle null TJM in relevance calculation
 refactor(shell): extract retry logic into utility
 test(scoring): add edge cases for deduplication

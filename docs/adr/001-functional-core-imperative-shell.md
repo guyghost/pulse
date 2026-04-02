@@ -4,7 +4,7 @@
 Accepted
 
 ## Context
-MissionPulse is a Chrome extension running across 3 isolated contexts (Service Worker, Offscreen Document, Side Panel). Sharing state and debugging across these contexts is hard. We needed an architecture that maximizes testability and keeps business logic predictable despite the inherently side-effect-heavy Chrome extension environment.
+MissionPulse is a Chrome extension running across 2 main contexts (Service Worker, Side Panel). Sharing state and debugging across these contexts is hard. We needed an architecture that maximizes testability and keeps business logic predictable despite the inherently side-effect-heavy Chrome extension environment.
 
 ## Decision
 Adopt the Functional Core, Imperative Shell (FC&IS) pattern:

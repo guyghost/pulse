@@ -1,7 +1,9 @@
 # ADR-002: XState 5 for State Management
 
 ## Status
-Accepted
+~~Accepted~~ **Superseded** (2026-04-02)
+
+> **Note :** Cette ADR est historique. XState a été retiré du projet au profit des runes Svelte 5 (`$state`, `$derived`, `$effect`) dans `src/lib/state/*.svelte.ts`. Les machines d'état mentionnées ci-dessous n'existent plus dans le code.
 
 ## Context
 Svelte 5 provides runes (`$state`, `$derived`) for reactive state, but MissionPulse has complex state transitions (scan lifecycle, connection monitoring, toast queues) spread across multiple Chrome contexts. Simple reactive stores lead to implicit state transitions and hard-to-reproduce bugs -- e.g., what happens when a scan fails while offline and a reconnection triggers mid-retry?

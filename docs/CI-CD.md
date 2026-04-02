@@ -214,7 +214,7 @@ pnpm lint:fix
 - No `any` types
 - Functional Core isolation (no shell imports from core)
 - Svelte 5 runes enforcement
-- No Svelte stores (use XState or $state)
+- No Svelte stores (use $state runes)
 
 ### Prettier
 

@@ -386,7 +386,7 @@ Tout le code dans `src/dev/` est derrière `import.meta.env.DEV` et n'est jamais
 ## Conventions Git
 
 - Conventional commits : `feat:`, `fix:`, `refactor:`, `test:`, `docs:`, `chore:`
-- Scope par domaine : `feat(connector): add Malt scraper`, `fix(tjm): cache invalidation`
+- Scope par domaine : `feat(connector): add LeHibou scraper`, `fix(tjm): cache invalidation`
 - Branche principale : `main`
 - Feature branches : `feat/nom-feature`
 - PR obligatoire pour merge dans `main`
