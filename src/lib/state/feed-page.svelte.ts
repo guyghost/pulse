@@ -63,6 +63,18 @@ export function createFeedPageState(
   // Mutable $state fields — accessible directly for bind:
   // ============================================================
   let sortBy = $state<SortBy>('score');
+
+  // Restore persisted sortBy
+  try {
+    chrome.storage.local.get('feedSortBy').then((result) => {
+      const stored = result.feedSortBy as string;
+      if (stored === 'score' || stored === 'date' || stored === 'tjm') {
+        sortBy = stored;
+      }
+    });
+  } catch {
+    // Outside extension context
+  }
   let showFavoritesOnly = $state(false);
   let showHidden = $state(false);
   let showFilters = $state(false);
@@ -408,7 +420,10 @@ export function createFeedPageState(
   return {
     // Mutable state — bindable by Svelte
     get sortBy() { return sortBy; },
-    set sortBy(v: SortBy) { sortBy = v; },
+    set sortBy(v: SortBy) {
+      sortBy = v;
+      try { chrome.storage.local.set({ feedSortBy: v }); } catch { /* outside ext */ }
+    },
 
     get showFavoritesOnly() { return showFavoritesOnly; },
     get showHidden() { return showHidden; },
