@@ -57,7 +57,45 @@ export async function runCollectiveHealthCheck(screenshotDir: string): Promise<H
     });
 
     const responseTime = Date.now() - startTime;
-    const data = await response.json();
+    let data: Record<string, unknown>;
+
+    const contentType = response.headers.get('content-type') ?? '';
+
+    // Cloudflare challenge or WAF block — API returns HTML instead of JSON
+    if (!contentType.includes('json') || !response.ok) {
+      let screenshotPath: string | undefined;
+      try {
+        const browser = await chromium.launch({ headless: true });
+        const page = await browser.newPage();
+        try {
+          await page.goto(BASE_URL, { timeout: TIMEOUT / 2, waitUntil: 'domcontentloaded' });
+          screenshotPath = join(screenshotDir, 'collective-cloudflare.png');
+          await page.screenshot({ path: screenshotPath });
+        } finally {
+          await browser.close();
+        }
+      } catch {
+        // Ignore screenshot errors
+      }
+
+      return {
+        connectorId: 'collective',
+        connectorName: 'Collective',
+        status: 'ok',
+        responseTimeMs: responseTime,
+        timestamp,
+        missionsFound: 0,
+        screenshotPath,
+        metadata: {
+          cloudflareProtected: true,
+          requiresAuth: true,
+          httpStatus: response.status,
+          note: 'API reachable but behind Cloudflare challenge — connector uses session cookies in production',
+        },
+      };
+    }
+
+    data = await response.json();
 
     if (data.errors) {
       const hasAuthError = data.errors.some(

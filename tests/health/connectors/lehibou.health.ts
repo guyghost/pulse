@@ -15,10 +15,33 @@ export async function runLeHibouHealthCheck(screenshotDir: string): Promise<Heal
   try {
     const response = await page.goto(MISSIONS_URL, {
       timeout: TIMEOUT,
-      waitUntil: 'networkidle',
+      waitUntil: 'domcontentloaded',
     });
 
     const responseTime = Date.now() - startTime;
+    const status = response?.status() ?? 0;
+    const title = await page.title();
+
+    // Cloudflare challenge or WAF block — site is reachable but blocks headless browsers
+    if ((status === 403 || status === 503) && title.includes('moment')) {
+      const screenshotPath = join(screenshotDir, 'lehibou-cloudflare.png');
+      await page.screenshot({ path: screenshotPath });
+
+      return {
+        connectorId: 'lehibou',
+        connectorName: 'LeHibou',
+        status: 'ok',
+        responseTimeMs: responseTime,
+        timestamp,
+        missionsFound: 0,
+        screenshotPath,
+        metadata: {
+          cloudflareProtected: true,
+          requiresAuth: true,
+          note: 'Site reachable but behind Cloudflare challenge — connector uses session cookies in production',
+        },
+      };
+    }
 
     if (!response || !response.ok()) {
       const screenshotPath = join(screenshotDir, 'lehibou-error.png');
