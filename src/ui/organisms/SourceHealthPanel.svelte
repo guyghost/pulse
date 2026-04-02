@@ -2,21 +2,9 @@
     import Icon from "../atoms/Icon.svelte";
     import type { AppError } from "$lib/core/errors";
 
-    export type SourceSessionStatus =
-        | "checking"
-        | "connected"
-        | "not-connected"
-        | "error";
+    import type { SourceStatus } from "$lib/shell/facades/feed-controller.svelte";
 
-    export interface SourceStatus {
-        connectorId: string;
-        name: string;
-        icon: string;
-        url: string;
-        sessionStatus: SourceSessionStatus;
-        lastSyncAt: number | null;
-        error?: AppError;
-    }
+    let {
 
     let {
         sources,

@@ -21,7 +21,8 @@ import {
   saveFavorites,
   saveHidden,
 } from '$lib/shell/facades/feed-data.facade';
-import { getProfile, getSettings, saveProfile, setSettings } from '$lib/shell/facades/settings.facade';
+import { getSettings, setSettings } from '$lib/shell/facades/settings.facade';
+import { getProfile, saveProfile } from '$lib/shell/storage/db';
 import { getMissions } from '$lib/shell/storage/db';
 import type { UserProfile } from '$lib/core/types/profile';
 
