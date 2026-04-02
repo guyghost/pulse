@@ -5,3 +5,4 @@
  */
 
 export { getSettings, setSettings } from '../storage/chrome-storage';
+export { getProfile, saveProfile } from '../storage/db';

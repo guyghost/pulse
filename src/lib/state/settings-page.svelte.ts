@@ -21,9 +21,8 @@ import {
   saveFavorites,
   saveHidden,
 } from '$lib/shell/facades/feed-data.facade';
-import { getSettings, setSettings } from '$lib/shell/facades/settings.facade';
-import { getProfile, saveProfile } from '$lib/shell/storage/db';
-import { getMissions } from '$lib/shell/storage/db';
+import { getSettings, setSettings, getProfile, saveProfile } from '$lib/shell/facades/settings.facade';
+import { getMissions } from '$lib/shell/facades/feed-data.facade';
 import type { UserProfile } from '$lib/core/types/profile';
 
 interface SettingsPageControllerOptions {
