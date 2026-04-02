@@ -8,6 +8,9 @@ const saveSeenIds = vi.fn();
 const setNewMissionCount = vi.fn();
 const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
+const setBadgeText = vi.fn(async () => undefined);
+const setBadgeBackgroundColor = vi.fn(async () => undefined);
+const setBadgeTextColor = vi.fn(async () => undefined);
 
 let alarmListener: ((alarm: { name: string }) => Promise<void>) | undefined;
 
@@ -63,9 +66,9 @@ vi.stubGlobal('chrome', {
     updateDynamicRules: vi.fn(async () => undefined),
   },
   action: {
-    setBadgeText: vi.fn(async () => undefined),
-    setBadgeBackgroundColor: vi.fn(async () => undefined),
-    setBadgeTextColor: vi.fn(async () => undefined),
+    setBadgeText,
+    setBadgeBackgroundColor,
+    setBadgeTextColor,
     onUserSettingsChanged: {
       addListener: vi.fn(),
     },
@@ -152,5 +155,35 @@ describe('background auto-scan notifications', () => {
       expect.objectContaining({ id: 'mission-2' }),
     ]);
     expect(saveSeenIds).toHaveBeenCalledWith(['already-seen', 'mission-1']);
+    expect(setNewMissionCount).toHaveBeenCalledWith(2);
+    expect(setBadgeText).toHaveBeenCalledWith({ text: '2' });
+  });
+
+  it('clears badge and new mission count when all fetched missions are already seen', async () => {
+    runScan.mockResolvedValueOnce({
+      missions: [makeMission({ id: 'already-seen', score: 92 })],
+      errors: [],
+    });
+    notifyHighScoreMissions.mockResolvedValueOnce({ shown: false, notifiedMissionIds: [] });
+
+    await alarmListener?.({ name: 'auto-scan' });
+
+    expect(setNewMissionCount).toHaveBeenCalledWith(0);
+    expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
+    expect(notifyHighScoreMissions).not.toHaveBeenCalled();
+    expect(saveSeenIds).not.toHaveBeenCalled();
+  });
+
+  it('clears badge and new mission count when scan returns no missions', async () => {
+    runScan.mockResolvedValueOnce({
+      missions: [],
+      errors: [],
+    });
+
+    await alarmListener?.({ name: 'auto-scan' });
+
+    expect(setNewMissionCount).toHaveBeenCalledWith(0);
+    expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
+    expect(notifyHighScoreMissions).not.toHaveBeenCalled();
   });
 });

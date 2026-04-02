@@ -184,6 +184,11 @@ async function handleScanStartFromPanel(): Promise<import('../lib/core/types/mis
  * Persiste les résultats de scan: statuts connecteurs, badge, notifications.
  * Partagé entre l'alarm handler et le SCAN_START handler.
  */
+async function clearNewMissionBadge(): Promise<void> {
+  await setNewMissionCount(0);
+  await chrome.action.setBadgeText({ text: '' });
+}
+
 async function persistScanResults(
   missions: import('../lib/core/types/mission').Mission[],
   errors: { connectorId: string; message: string }[]
@@ -226,7 +231,10 @@ async function persistScanResults(
     /* Non-critical: status persistence */
   }
 
-  if (missions.length === 0) return;
+  if (missions.length === 0) {
+    await clearNewMissionBadge();
+    return;
+  }
 
   // Update badge with new mission count
   const seenIds = await getSeenIds();
@@ -234,11 +242,13 @@ async function persistScanResults(
   const newMissions = missions.filter((m) => !seenSet.has(m.id));
   const newCount = newMissions.length;
 
-  await setNewMissionCount(newCount);
   if (newCount > 0) {
+    await setNewMissionCount(newCount);
     await chrome.action.setBadgeText({ text: String(newCount) });
     await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
     await chrome.action.setBadgeTextColor({ color: '#ffffff' });
+  } else {
+    await clearNewMissionBadge();
   }
 
   // Send notifications for high-score missions if enabled
