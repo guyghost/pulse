@@ -43,6 +43,8 @@
     <polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/>
   {:else if name === 'trending-down'}
     <polyline points="22 17 13.5 8.5 8.5 13.5 2 7"/><polyline points="16 17 22 17 22 11"/>
+  {:else if name === 'chart-column'}
+    <path d="M3 3v18h18"/><rect x="7" y="10" width="3" height="7" rx="1"/><rect x="12" y="6" width="3" height="11" rx="1"/><rect x="17" y="13" width="3" height="4" rx="1"/>
   {:else if name === 'minus'}
     <path d="M5 12h14"/>
   {:else if name === 'plus'}

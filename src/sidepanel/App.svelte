@@ -1,5 +1,6 @@
 <script lang="ts">
   import FeedPage from '../ui/pages/FeedPage.svelte';
+  import TJMPage from '../ui/pages/TJMPage.svelte';
   import SettingsPage from '../ui/pages/SettingsPage.svelte';
   import OnboardingPage from '../ui/pages/OnboardingPage.svelte';
   import Icon from '../ui/atoms/Icon.svelte';
@@ -18,14 +19,14 @@
   } from '../lib/shell/utils/connection-monitor';
   import { getProfile } from '../lib/shell/facades/settings.facade';
 
-  type Page = 'feed' | 'settings' | 'onboarding';
+  type Page = 'feed' | 'tjm' | 'settings' | 'onboarding';
 
   let currentPage: Page = $state('onboarding');
   let hasCompletedOnboarding = $state(false);
   let connectionStatus = $state<ConnectionInfo['status']>('unknown');
   let showOfflineBanner = $state(false);
 
-  const PAGE_INDEX: Record<Page, number> = { onboarding: -1, feed: 0, settings: 1 };
+  const PAGE_INDEX: Record<Page, number> = { onboarding: -1, feed: 0, tjm: 1, settings: 2 };
   let previousPageIndex = $state(PAGE_INDEX['onboarding']);
   let transitionDirection = $state(1);
 
@@ -124,6 +125,7 @@
 
   const navItems: { page: Page; label: string; icon: string }[] = [
     { page: 'feed', label: 'Feed', icon: 'briefcase' },
+    { page: 'tjm', label: 'TJM', icon: 'chart-column' },
     { page: 'settings', label: 'Settings', icon: 'settings' },
   ];
 
@@ -231,6 +233,33 @@
             {/snippet}
           </svelte:boundary>
         </div>
+        {#if currentPage === 'tjm'}
+          <div
+            class="absolute inset-0 overflow-y-auto"
+            in:fly={{ x: 30, duration: 200, easing: cubicOut }}
+            out:fade={{ duration: 100 }}
+          >
+            <svelte:boundary
+              onerror={(e) => {
+                if (import.meta.env.DEV) console.error('[TJMPage crash]', e);
+              }}
+            >
+              <TJMPage />
+              {#snippet failed(error, reset)}
+                <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+                  <div class="text-4xl">📈</div>
+                  <p class="text-sm text-text-secondary">La vue TJM a rencontré une erreur.</p>
+                  <button
+                    onclick={reset}
+                    class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                  >
+                    Réessayer
+                  </button>
+                </div>
+              {/snippet}
+            </svelte:boundary>
+          </div>
+        {/if}
         {#if currentPage === 'settings'}
           <div
             class="absolute inset-0 overflow-y-auto"
