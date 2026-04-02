@@ -223,7 +223,7 @@ function showToast(error: AppError): void {
   });
 
   // Fallback: si pas de listener, log dans la console
-  if (toastListeners.size === 0) {
+  if (toastListeners.size === 0 && import.meta.env.DEV) {
     console.warn(`[TOAST] ${toast.title}: ${toast.message}`);
   }
 }

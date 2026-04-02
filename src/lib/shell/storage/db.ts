@@ -357,7 +357,7 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
     await clearSemanticCache();
   } catch {
     // Le cache est non-critique, on ne bloque pas la sauvegarde du profil
-    console.warn('[DB] Impossible de vider le cache sémantique après sauvegarde du profil');
+    if (import.meta.env.DEV) console.warn('[DB] Impossible de vider le cache sémantique après sauvegarde du profil');
   }
 }
 

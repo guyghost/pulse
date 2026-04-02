@@ -47,11 +47,13 @@ const scoreSingleMission = async (
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
 
-      console.warn(
-        '[SemanticScorer]',
-        `Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for mission ${mission.id}:`,
-        lastError.message
-      );
+      if (import.meta.env.DEV) {
+        console.warn(
+          '[SemanticScorer]',
+          `Attempt ${attempt + 1}/${MAX_RETRIES + 1} failed for mission ${mission.id}:`,
+          lastError.message
+        );
+      }
 
       // Wait before retry (except on last attempt)
       if (attempt < MAX_RETRIES) {
@@ -60,11 +62,13 @@ const scoreSingleMission = async (
     }
   }
 
-  console.warn(
-    '[SemanticScorer]',
-    `All attempts failed for mission ${mission.id}:`,
-    lastError?.message
-  );
+  if (import.meta.env.DEV) {
+    console.warn(
+      '[SemanticScorer]',
+      `All attempts failed for mission ${mission.id}:`,
+      lastError?.message
+    );
+  }
 
   return null;
 };

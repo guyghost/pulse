@@ -44,7 +44,7 @@ export async function showToast(
       payload: { message, toastType, duration },
     });
   } catch {
-    console.warn('[ToastService] Failed to show toast:', message);
+    if (import.meta.env.DEV) console.warn('[ToastService] Failed to show toast:', message);
   }
 }
 

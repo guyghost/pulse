@@ -87,11 +87,11 @@ export const trackParserHealth = async (
 
   if (isSuspicious) {
     status.warning = `Parser anomaly: ${connectorId} returned 0 missions after previously returning ${previousCount}`;
-    console.warn(`[ParserHealth] ${status.warning}`);
+    if (import.meta.env.DEV) console.warn(`[ParserHealth] ${status.warning}`);
   }
 
   // Also warn on too many consecutive zeros (might indicate a broken parser)
-  if (consecutiveZeros >= 5) {
+  if (consecutiveZeros >= 5 && import.meta.env.DEV) {
     console.warn(
       `[ParserHealth] ${connectorId} has returned 0 missions for ${consecutiveZeros} consecutive scans`
     );

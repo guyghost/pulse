@@ -47,10 +47,12 @@ export const getSettings = async (): Promise<AppSettings> => {
   const parseResult = SettingsSchema.safeParse(raw);
 
   if (!parseResult.success) {
-    console.warn(
-      '[Settings] Invalid stored settings, falling back to defaults:',
-      parseResult.error.issues
-    );
+    if (import.meta.env.DEV) {
+      console.warn(
+        '[Settings] Invalid stored settings, falling back to defaults:',
+        parseResult.error.issues
+      );
+    }
     return DEFAULT_SETTINGS;
   }
 
