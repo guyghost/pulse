@@ -95,7 +95,7 @@
         <label
             for="ob-jobtitle"
             class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
-            >Poste recherche</label
+            >Poste recherché</label
         >
         <input
             id="ob-jobtitle"
@@ -147,7 +147,7 @@
         <label
             for="ob-location"
             class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
-            >Localisation souhaitee</label
+            >Localisation souhaitée</label
         >
         <input
             id="ob-location"
@@ -171,7 +171,7 @@
                         Base de calibration
                     </p>
                     <p class="mt-1 text-[11px] text-text-muted">
-                        Nous generons ensuite une fourchette cible.
+                        Nous générons ensuite une fourchette cible.
                     </p>
                 </div>
                 <div class="flex items-center gap-2">

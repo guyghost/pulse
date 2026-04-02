@@ -177,7 +177,7 @@
     {/if}
     {#if mission.duration}
       <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Duree</p>
+        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Durée</p>
         <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
       </div>
     {/if}

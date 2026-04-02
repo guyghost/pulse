@@ -44,9 +44,9 @@
       <div class="flex items-start justify-between gap-3">
         <div>
           <p class="eyebrow text-accent-blue/80">TJM</p>
-          <h2 class="mt-2 text-[1.65rem] font-semibold leading-none text-white">Radar marche</h2>
+          <h2 class="mt-2 text-[1.65rem] font-semibold leading-none text-white">Radar marché</h2>
           <p class="mt-3 max-w-80 text-sm leading-relaxed text-text-secondary">
-            Suivez les fourchettes observees sur vos stacks et reperez rapidement les signaux de marche.
+            Suivez les fourchettes observées sur vos stacks et repérez rapidement les signaux de marché.
           </p>
         </div>
         <div class="flex h-10 w-10 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white">
@@ -57,7 +57,7 @@
       {#if isOffline}
         <div class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber">
           <Icon name="database" size={14} />
-          <span>Mode hors ligne — Affichage des dernieres donnees en cache</span>
+          <span>Mode hors ligne — Affichage des dernières données en cache</span>
         </div>
       {/if}
 
@@ -90,7 +90,7 @@
         <div>
           <h3 class="text-sm font-semibold text-text-primary">Stacks suivies</h3>
           <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-            Basee sur les stacks les plus representes dans l'historique TJM.
+            Basée sur les stacks les plus représentés dans l'historique TJM.
           </p>
         </div>
       </div>

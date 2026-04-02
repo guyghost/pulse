@@ -85,8 +85,8 @@
         <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
           <Icon name="filter-x" size={20} class="text-text-muted" />
         </div>
-        <p class="text-sm font-semibold text-text-primary">Aucun resultat</p>
-        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">Essayez d'elargir vos filtres ou de modifier vos criteres de recherche.</p>
+        <p class="text-sm font-semibold text-text-primary">Aucun résultat</p>
+        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">Essayez d'élargir vos filtres ou de modifier vos critères de recherche.</p>
       {:else}
         <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
           <Icon name="briefcase" size={20} class="text-text-muted" />
@@ -122,7 +122,7 @@
     </div>
     
     <p class="py-2 text-center text-[11px] text-text-muted shrink-0">
-      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triee{sortedMissions.length > 1 ? 's' : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
+      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length > 1 ? 's' : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
     </p>
   {/if}
 </div>

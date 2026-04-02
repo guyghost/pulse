@@ -166,10 +166,10 @@
       {:else}
         <div class="space-y-2 text-sm">
           <p class="text-text-primary">
-            {settings.firstName || 'Non renseigne'}
+            {settings.firstName || 'Non renseigné'}
             {settings.jobTitle ? `— ${settings.jobTitle}` : ''}
           </p>
-          <p class="text-text-secondary">{settings.profileLocation || 'Localisation non renseignee'}</p>
+          <p class="text-text-secondary">{settings.profileLocation || 'Localisation non renseignée'}</p>
           {#if settings.tjmMin > 0 || settings.tjmMax > 0}
             <p class="text-text-secondary">TJM : {settings.tjmMin} - {settings.tjmMax} EUR/jour</p>
           {/if}
@@ -184,7 +184,7 @@
               {/each}
             </div>
           {:else}
-            <p class="text-text-muted text-xs">Aucune technologie renseignee</p>
+            <p class="text-text-muted text-xs">Aucune technologie renseignée</p>
           {/if}
         </div>
       {/if}
@@ -224,7 +224,7 @@
       class:pointer-events-none={!settings.autoScan}
     >
       <div>
-        <h3 class="text-sm font-semibold text-text-primary">Frequence de scan</h3>
+        <h3 class="text-sm font-semibold text-text-primary">Fréquence de scan</h3>
         <p class="mt-1 text-xs leading-relaxed text-text-secondary">
           Scanner les plateformes toutes les {settings.scanInterval} minutes.
         </p>
@@ -245,7 +245,7 @@
       <p class="text-center text-sm font-semibold text-accent-blue">{settings.scanInterval} min</p>
       {#if !settings.autoScan}
         <p class="text-center text-[11px] text-text-muted">
-          Activez le scan automatique pour configurer la frequence.
+          Activez le scan automatique pour configurer la fréquence.
         </p>
       {/if}
     </div>
@@ -365,7 +365,7 @@
             {settings.aiAvailability === 'available'
               ? 'Disponible'
               : settings.aiAvailability === 'after-download'
-                ? 'Telechargement requis'
+                ? 'Téléchargement requis'
                 : 'Indisponible'}
           </p>
         </div>
@@ -384,7 +384,7 @@
       <div>
         <h3 class="text-sm font-semibold text-red-400">Zone dangereuse</h3>
         <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-          Supprimer toutes les donnees locales (profil, missions, cache).
+          Supprimer toutes les données locales (profil, missions, cache).
         </p>
       </div>
       {#if settings.showResetConfirm}
