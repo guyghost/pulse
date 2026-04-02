@@ -8,7 +8,7 @@
  */
 import type { Mission, MissionSource } from '$lib/core/types/mission';
 import type { ConnectorStatus, PersistedConnectorStatus } from '$lib/core/types/connector-status';
-import type { ScanProgressPayload } from '../messaging/bridge';
+import type { ScanProgressPayload, BridgeMessage } from '../messaging/bridge';
 import type { AppError } from '$lib/core/errors/app-error';
 import { sendMessage } from '../messaging/bridge';
 import {
@@ -353,7 +353,7 @@ export function createFeedController(feedStore: {
 
   function setupBridgeListener(): void {
     try {
-      const listener = (message: any) => {
+      const listener = (message: BridgeMessage) => {
         // Progression détaillée pendant le scan
         if (message?.type === 'SCAN_PROGRESS' && message.payload) {
           const payload = message.payload as ScanProgressPayload;
