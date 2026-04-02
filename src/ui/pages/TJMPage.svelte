@@ -11,6 +11,7 @@
   let error = $state<string | null>(null);
   let userTjmMin = $state(0);
   let userTjmMax = $state(0);
+  let profileStacks = $state<string[]>([]);
   const connection = getConnectionStore();
 
   async function loadAnalysis() {
@@ -18,7 +19,7 @@
     error = null;
 
     try {
-      analysis = await getTJMAnalysis();
+      analysis = await getTJMAnalysis(profileStacks.length > 0 ? profileStacks : undefined);
     } catch (err) {
       error = err instanceof Error ? err.message : 'Impossible de charger les tendances TJM';
     } finally {
@@ -29,10 +30,14 @@
   const isOffline = $derived(connection.status === 'offline');
 
   $effect(() => {
-    loadAnalysis();
     getProfile().then((p) => {
-      if (p) { userTjmMin = p.tjmMin; userTjmMax = p.tjmMax; }
-    }).catch(() => {});
+      if (p) {
+        userTjmMin = p.tjmMin;
+        userTjmMax = p.tjmMax;
+        profileStacks = p.stack;
+      }
+      loadAnalysis();
+    }).catch(() => { loadAnalysis(); });
   });
 
   // Auto-refresh when a scan completes (background or manual)
