@@ -171,12 +171,24 @@ export function createFeedPageState(
     // Copy handled in MissionCard, callback for future analytics
   }
 
+  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
+  const SEARCH_DEBOUNCE_MS = 300;
+
   function handleSearch(query: string): void {
-    if (query) {
-      feedStore.search(query);
-    } else {
+    // Clear immediately when emptying
+    if (!query) {
+      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = null;
       feedStore.clearSearch();
+      return;
     }
+    // Debounce non-empty queries
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    searchDebounceTimer = setTimeout(() => {
+      feedStore.search(query);
+      searchDebounceTimer = null;
+    }, SEARCH_DEBOUNCE_MS);
+  }
   }
 
   function toggleFavoritesFilter(): void {
@@ -382,6 +394,7 @@ export function createFeedPageState(
   }
 
   function dispose(): void {
+    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
     for (const fn of cleanupFns) {
       fn();
     }
