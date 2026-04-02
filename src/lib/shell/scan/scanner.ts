@@ -13,6 +13,7 @@ import { scoreMissionsSemantic } from '../ai/semantic-scorer';
 import { metricsCollector } from '../metrics/collector';
 import { calculateDedupRatio } from '../../core/metrics/types';
 import type { ScanMetrics } from '../../core/metrics/types';
+import { recordTJMFromMissions } from '../storage/tjm-history';
 import { isOnline } from '../utils/connection-monitor';
 import { withResultRetry } from '../utils/retry-strategy';
 import { trackParserHealth } from './parser-health';
@@ -371,6 +372,14 @@ async function _runScanInternal(
       await saveMissions(scored);
     } catch {
       // Storage not available
+    }
+
+    // Record TJM data from this scan into history
+    try {
+      const today = new Date().toISOString().slice(0, 10);
+      await recordTJMFromMissions(scored, today);
+    } catch {
+      // TJM recording is non-critical
     }
   }
 
