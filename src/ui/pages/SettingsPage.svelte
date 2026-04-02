@@ -6,6 +6,7 @@
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
   import type { ExportFormat } from '$lib/core/export/mission-export';
+  import { showToast } from '$lib/shell/notifications/toast-service';
 
   let {
     onBack,
@@ -14,9 +15,6 @@
 
   const settings = new SettingsPageController({
     onNavigateToOnboarding,
-    onRestoreCompleted: () => {
-      window.location.reload();
-    },
   });
 
   settings.load();
@@ -24,22 +22,32 @@
   async function handleExportFavorites(format: ExportFormat) {
     const result = await settings.exportFavorites(format);
     if (!result.ok) {
-      alert(result.error);
+      await showToast(result.error, 'error');
+      return;
     }
+
+    await showToast('Export des favoris lancé', 'success');
   }
 
   async function handleCreateBackup() {
     const result = await settings.createBackupFile();
     if (!result.ok) {
-      alert(result.error);
+      await showToast(result.error, 'error');
+      return;
     }
+
+    await showToast('Sauvegarde créée', 'success');
   }
 
   async function handleRestoreBackup() {
     const result = await settings.restoreBackup();
     if (!result.ok) {
-      alert(result.error);
+      await showToast(result.error, 'error');
+      return;
     }
+
+    await settings.load();
+    await showToast('Sauvegarde restaurée', 'success');
   }
 
   async function handleScanIntervalChange(event: Event) {

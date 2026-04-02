@@ -27,7 +27,6 @@ import type { UserProfile } from '$lib/core/types/profile';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
-  onRestoreCompleted?: () => void;
 }
 
 const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({
@@ -329,7 +328,6 @@ export class SettingsPageController {
       this.showBackupModal = false;
       this.pendingBackup = null;
       this.backupError = null;
-      this.options.onRestoreCompleted?.();
 
       return { ok: true, value: undefined };
     } catch {
