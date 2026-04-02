@@ -56,7 +56,7 @@
     }
 
     let canSubmit = $derived(
-        firstName.trim().length > 0 && jobTitle.trim().length > 0,
+        firstName.trim().length > 0 && jobTitle.trim().length > 0 && stack.length > 0,
     );
 
     function handleSubmit() {
@@ -201,6 +201,10 @@
                 Réessayer
             </button>
         </div>
+    {/if}
+
+    {#if firstName.trim().length > 0 && jobTitle.trim().length > 0 && stack.length === 0}
+      <p class="text-xs text-accent-amber">Ajoutez au moins une technologie pour activer le scoring.</p>
     {/if}
 
     <button
