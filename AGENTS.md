@@ -92,13 +92,11 @@ import { getMissions } from '$lib/shell/storage/db'; // ← JAMAIS dans core/
 
 ### Contextes d'exécution Chrome
 
-L'extension a **trois contextes isolés** qui communiquent via `chrome.runtime.sendMessage` :
+L'implémentation actuelle s'appuie principalement sur **deux contextes** :
 
-1. **Service Worker** (`src/background/`) — Cerveau de l'extension. Orchestre les cycles de scan via `chrome.alarms`. Pas d'accès DOM.
+1. **Service Worker** (`src/background/`) — Cerveau de l'extension. Orchestre les cycles de scan via `chrome.alarms`, pilote les connecteurs et persiste les états de scan.
 
-2. **Offscreen Document** (`src/offscreen/`) — Utilisé pour le scraping. A accès au DOM. Le service worker crée un offscreen document temporaire, lui envoie une URL à scrapper, récupère le résultat, puis le détruit. Un seul offscreen document actif à la fois (contrainte Chrome).
-
-3. **Side Panel** (`src/sidepanel/`) — Interface utilisateur Svelte. L'état est géré via des runes Svelte 5 dans `src/lib/state/`. Communique avec le service worker via le messaging bridge.
+2. **Side Panel** (`src/sidepanel/`) — Interface utilisateur Svelte. L'état est géré via des runes Svelte 5 dans `src/lib/state/`. Il peut lire la persistance locale pour le bootstrap UI et utilise les facades / le bridge pour les interactions runtime.
 
 ### Messaging entre contextes
 
@@ -121,10 +119,10 @@ Règle : le side panel n'appelle JAMAIS directement IndexedDB ou chrome.cookies.
 ### Flux de données
 
 ```
-[Side Panel]  →  message  →  [Service Worker]  →  message  →  [Offscreen Doc]
-    UI Svelte        ↕              Orchestration          ↕           DOM scraping
-    $state/props     ↕              IndexedDB              ↕           Parse HTML
-                  snapshot                                result
+[Side Panel]  →  message / facade  →  [Service Worker / Shell]
+    UI Svelte           ↕                    Orchestration
+    $state/props        ↕                    IndexedDB / chrome.storage
+                     snapshot / result
 ```
 
 ## Svelte 5 — Règles strictes
@@ -220,11 +218,10 @@ export class ScanOrchestrator {
 | Module              | Localisation                                | Rôle                                              |
 | ------------------- | ------------------------------------------- | ------------------------------------------------- |
 | `feed`              | `src/lib/state/feed.svelte.ts`              | État du feed : missions, recherche, filtrage      |
-| `scan-orchestrator` | `src/lib/state/scan-orchestrator.svelte.ts` | Orchestration du cycle de scan complet            |
-| `connector-runner`  | `src/lib/state/connector-runner.svelte.ts`  | Lifecycle d'un connecteur (detect → fetch → done) |
 | `onboarding`        | `src/lib/state/onboarding.svelte.ts`        | Wizard de configuration initiale                  |
 | `connection`        | `src/lib/state/connection.svelte.ts`        | Détection de l'état réseau                        |
 | `toast`             | `src/lib/state/toast.svelte.ts`             | Notifications toast UI                            |
+| `settings-page`     | `src/lib/state/settings-page.svelte.ts`     | Orchestration de la page Settings                 |
 
 ## TailwindCSS 4 — Config CSS-first
 
@@ -308,7 +305,7 @@ Convention pour ajouter un connecteur :
 4. Ajouter le `host_permissions` dans `manifest.json`
 5. Ajouter un test du parser dans `tests/unit/connectors/` (testable sans mocks)
 
-Le scraping se fait via l'offscreen document. Le connecteur envoie un message au service worker avec l'URL cible, qui crée l'offscreen document, charge la page, et exécute le parsing DOM.
+Le scraping est aujourd'hui piloté directement par les connecteurs shell et l'orchestration du scanner côté service worker. Le parser reste pur dans `core/`, et toute récupération réseau/session reste dans `shell/`.
 
 Quand un connecteur casse (DOM changé), il doit throw une `ConnectorError` typée. Le `ConnectorRunner` passe en état `error` et notifie l'utilisateur. Les autres connecteurs continuent.
 
