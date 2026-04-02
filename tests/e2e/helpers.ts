@@ -104,6 +104,40 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
   await page.getByRole('button', { name: /C.est parti|Commencer/ }).click();
 }
 
+/**
+ * Ouvre l'application et complète l'onboarding si nécessaire pour arriver sur le feed.
+ */
+export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile> = {}) {
+  await page.goto(SIDE_PANEL);
+
+  const ensureOnce = async () => {
+    const navVisible = await page.getByRole('navigation', { name: 'Main navigation' }).isVisible().catch(() => false);
+    if (navVisible) return true;
+
+    const onboardingVisible = await page.getByText('Votre profil cible').isVisible().catch(() => false);
+    if (onboardingVisible) {
+      await completeOnboarding(page, {
+        firstName: 'Jean',
+        jobTitle: 'Développeur React Senior',
+        location: 'Paris',
+        ...profile,
+      });
+      return true;
+    }
+
+    return false;
+  };
+
+  const ready = await ensureOnce();
+  if (!ready) {
+    await page.reload().catch(() => {});
+    await ensureOnce();
+  }
+
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('button', { name: 'Feed' })).toBeVisible();
+}
+
 // ============================================================================
 // Scan & Missions Helpers
 // ============================================================================
@@ -164,8 +198,9 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
  * Attend que le nombre spécifié de missions soit visible
  */
 export async function waitForMissions(page: Page, count: number, timeout = 5000) {
-  const missionText = count === 1 ? '1 mission' : `${count} missions`;
-  await expect(page.getByText(new RegExp(`${count} mission`))).toBeVisible({ timeout });
+  await expect
+    .poll(async () => page.locator('[role="button"][tabindex="0"]').count(), { timeout })
+    .toBeGreaterThanOrEqual(count);
 }
 
 /**

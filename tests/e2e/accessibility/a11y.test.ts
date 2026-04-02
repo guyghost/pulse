@@ -3,6 +3,7 @@ import {
   SIDE_PANEL,
   mockNoProfile,
   completeOnboarding,
+  ensureFeedVisible,
   injectMissions,
   waitForMissions,
   openDevPanel,
@@ -15,7 +16,7 @@ test.describe('Accessibility', () => {
     await page.goto(SIDE_PANEL);
 
     // 1. Navigation sur l'onboarding
-    await expect(page.getByText('Configurez en 30 secondes')).toBeVisible();
+    await expect(page.getByText('Votre profil cible')).toBeVisible();
 
     // Tab jusqu'au champ prénom
     await page.keyboard.press('Tab');
@@ -29,7 +30,11 @@ test.describe('Accessibility', () => {
 
     await page.keyboard.type('Développeur');
 
-    // Tab jusqu'au bouton submit
+    // Aller jusqu'au bouton submit
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
+    await page.keyboard.press('Tab');
     await page.keyboard.press('Tab');
     await expect(page.getByRole('button', { name: /C.est parti|Commencer/ })).toBeFocused();
 
@@ -37,7 +42,7 @@ test.describe('Accessibility', () => {
     await page.keyboard.press('Enter');
 
     // 2. Navigation sur le feed
-    await expect(page.getByText('Bonjour, Jean')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
 
     // Tab à travers les éléments du header
     await page.keyboard.press('Tab'); // Filtre favoris
@@ -50,8 +55,7 @@ test.describe('Accessibility', () => {
   });
 
   test('keyboard navigation on mission cards', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter des missions
     await injectMissions(page, 5);
@@ -86,8 +90,7 @@ test.describe('Accessibility', () => {
   });
 
   test('ARIA labels on action buttons', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     await injectMissions(page, 3);
     await waitForMissions(page, 3, 5000);
@@ -116,37 +119,27 @@ test.describe('Accessibility', () => {
   });
 
   test('aria-pressed on toggle buttons', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
-    // Vérifier l'état initial des boutons toggle
-    const favoritesToggle = page.getByRole('button', { name: 'Voir favoris' });
+    const favoritesToggle = page.getByTitle('Voir favoris');
     await expect(favoritesToggle).toHaveAttribute('aria-pressed', 'false');
 
-    // Cliquer pour activer
     await favoritesToggle.click();
-    await expect(favoritesToggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTitle('Voir toutes')).toHaveAttribute('aria-pressed', 'true');
 
-    // Revenir à tous
     await page.getByTitle('Voir toutes').click();
-    await expect(page.getByRole('button', { name: 'Voir favoris' })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
+    await expect(page.getByTitle('Voir favoris')).toHaveAttribute('aria-pressed', 'false');
   });
 
   test('aria-expanded on collapsible sections', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
-    // Vérifier le bouton de filtre
-    const filterToggle = page.getByRole('button', { name: 'Afficher les filtres' });
+    const filterToggle = page.getByTitle('Afficher les filtres');
     await expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
     await expect(filterToggle).toHaveAttribute('aria-controls');
 
-    // Ouvrir les filtres
     await filterToggle.click();
-    await expect(filterToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTitle('Masquer les filtres')).toHaveAttribute('aria-expanded', 'true');
 
     // Le panneau doit être visible
     const filterPanel = page.getByRole('group', { name: 'Options de filtrage' });
@@ -154,8 +147,7 @@ test.describe('Accessibility', () => {
   });
 
   test('aria-current on navigation tabs', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Vérifier l'état actif sur Feed
     const feedTab = page.getByRole('button', { name: 'Feed' });
@@ -175,8 +167,7 @@ test.describe('Accessibility', () => {
   });
 
   test('heading hierarchy is correct', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Vérifier la hiérarchie des headings
     const headings = await page.locator('h1, h2, h3').all();
@@ -199,7 +190,7 @@ test.describe('Accessibility', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByText('Configurez en 30 secondes')).toBeVisible();
+    await expect(page.getByText('Votre profil cible')).toBeVisible();
 
     // Vérifier que les champs ont des labels
     const firstnameInput = page.locator('#ob-firstname');
@@ -230,8 +221,7 @@ test.describe('Accessibility', () => {
   });
 
   test('focus trap in dev panel', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Ouvrir le dev panel
     await openDevPanel(page);
@@ -260,8 +250,7 @@ test.describe('Accessibility', () => {
   });
 
   test('skip link or main landmark exists', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Vérifier la présence de landmarks
     const main = page.locator('main');
@@ -275,8 +264,7 @@ test.describe('Accessibility', () => {
   });
 
   test('live region for dynamic updates', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Chercher une région live pour les annonces
     const liveRegion = page.locator('[aria-live]');
@@ -293,8 +281,7 @@ test.describe('Accessibility', () => {
   });
 
   test('sufficient color contrast on text', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter des missions pour avoir du contenu à tester
     await page.keyboard.press('Control+Shift+D');
@@ -303,7 +290,7 @@ test.describe('Accessibility', () => {
     await page.keyboard.press('Control+Shift+D');
 
     // Attendre les missions
-    await expect(page.getByText(/\d+ missions?/)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('10 missions', { exact: true }).first()).toBeVisible({ timeout: 3000 });
 
     // Vérifier les couleurs de texte principales
     const textElements = await page.locator('p, span, h1, h2, h3, button, a').all();
@@ -337,7 +324,7 @@ test.describe('Accessibility', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByText('Configurez en 30 secondes')).toBeVisible();
+    await expect(page.getByText('Votre profil cible')).toBeVisible();
 
     // Le bouton doit être désactivé tant que les champs sont vides
     const submitBtn = page.getByRole('button', { name: /C.est parti|Commencer/ });
@@ -350,8 +337,7 @@ test.describe('Accessibility', () => {
   });
 
   test('keyboard accessible dropdowns or selects', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Naviguer vers Settings
     await page.getByRole('button', { name: 'Settings' }).click();
