@@ -1,16 +1,15 @@
 /**
- * Chrome Storage — Settings & API Key persistence
+ * Chrome Storage — settings persistence.
  *
  * SECURITY: Data stored in chrome.storage.local is NOT encrypted.
- * - Settings (scan interval, connectors, etc.) — low sensitivity
- * - API key — MEDIUM sensitivity, stored in plaintext
- * - User profile — low sensitivity
+ * - Settings (scan interval, connectors, thresholds, etc.) — low sensitivity
  *
  * Mitigation: Chrome extensions' storage is isolated per-extension
  * and not accessible to web pages. Physical access to the profile
  * directory would expose the data.
  */
 import { z } from 'zod';
+import type { AppSettings } from '../../core/types/app-settings';
 
 const SettingsSchema = z.object({
   scanIntervalMinutes: z.number().int().min(1).max(1440),
@@ -23,7 +22,7 @@ const SettingsSchema = z.object({
   customDelayMs: z.number().int().min(0).max(60000),
 });
 
-export type AppSettings = z.infer<typeof SettingsSchema>;
+export type { AppSettings } from '../../core/types/app-settings';
 
 const DEFAULT_SETTINGS: AppSettings = {
   scanIntervalMinutes: 30,
@@ -34,19 +33,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   notificationScoreThreshold: 70,
   respectRateLimits: true,
   customDelayMs: 0,
-};
-
-export const getApiKey = async (): Promise<string | null> => {
-  const result = await chrome.storage.local.get('apiKey');
-  return (result.apiKey as string) ?? null;
-};
-
-export const setApiKey = async (key: string): Promise<void> => {
-  await chrome.storage.local.set({ apiKey: key });
-};
-
-export const removeApiKey = async (): Promise<void> => {
-  await chrome.storage.local.remove('apiKey');
 };
 
 export const getSettings = async (): Promise<AppSettings> => {

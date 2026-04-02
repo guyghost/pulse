@@ -1,13 +1,7 @@
 /**
- * Settings Facade — Single entry point for settings, profile, and API key operations.
+ * Settings Facade — Single entry point for settings and profile operations.
  *
  * UI pages import this instead of individual storage modules.
  */
-export {
-  getSettings,
-  setSettings,
-  getApiKey,
-  setApiKey,
-  removeApiKey,
-} from '../storage/chrome-storage';
+export { getSettings, setSettings } from '../storage/chrome-storage';
 export { getProfile, saveProfile } from '../storage/db';

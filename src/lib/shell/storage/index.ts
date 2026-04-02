@@ -9,15 +9,8 @@ export { getFavorites, saveFavorites, getHidden, saveHidden } from './favorites'
 // === Seen Missions (chrome.storage.local) ===
 export { getSeenIds, saveSeenIds } from './seen-missions';
 
-// === Chrome Storage (Settings, API Key) ===
-export {
-  getApiKey,
-  setApiKey,
-  removeApiKey,
-  getSettings,
-  setSettings,
-  type AppSettings,
-} from './chrome-storage';
+// === Chrome Storage (Settings) ===
+export { getSettings, setSettings, type AppSettings } from './chrome-storage';
 
 // === Session Storage (état temporaire) ===
 export {

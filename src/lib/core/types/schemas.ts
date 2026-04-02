@@ -143,8 +143,6 @@ export const SemanticResultSchema = z.object({
 // ============================================
 
 export const AppSettingsSchema = z.object({
-  /** Clé API Anthropic pour l'analyse LLM */
-  apiKey: z.string().optional(),
   /** Version du schéma de données */
   schemaVersion: z.number().default(1),
   /** Date de dernière synchronisation */
@@ -157,7 +155,6 @@ export const AppSettingsSchema = z.object({
 
 // Schéma pour les settings sérialisés (dates en string)
 export const AppSettingsSerializedSchema = z.object({
-  apiKey: z.string().optional(),
   schemaVersion: z.number().default(1),
   lastSyncAt: z
     .union([z.date(), z.string()])
