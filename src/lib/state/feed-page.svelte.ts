@@ -11,7 +11,6 @@ import type { FeedState } from './feed.svelte';
 import type { FeedController, SourceStatus } from '$lib/shell/facades/feed-controller.svelte';
 import type { AiAvailability } from '$lib/shell/ai/capabilities';
 import type { PanelSide } from '$lib/shell/ui/panel-layout';
-import type { ConnectionInfo } from '$lib/shell/utils/connection-monitor';
 import {
   getSeenIds,
   saveSeenIds,
@@ -34,7 +33,7 @@ import {
   FeedShortcuts,
   type ShortcutConfig,
 } from '$lib/shell/utils/keyboard-shortcuts';
-import { subscribeToConnection } from '$lib/shell/utils/connection-monitor';
+import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 
 export type SortBy = 'score' | 'date' | 'tjm';
 
@@ -85,7 +84,7 @@ export function createFeedPageState(
   let panelSide = $state<PanelSide>('right');
   let aiStatus = $state<AiAvailability>('no');
   let showShortcutsHelp = $state(false);
-  let connectionStatus = $state<ConnectionInfo['status']>('unknown');
+  const connection = getConnectionStore();
   let searchInputRef = $state<HTMLInputElement | null>(null);
 
   // Internal state (not directly bound)
@@ -112,7 +111,7 @@ export function createFeedPageState(
 
   let favoriteCount = $derived(Object.keys(favorites).length);
   let hiddenCount = $derived(Object.keys(hidden).length);
-  let isOffline = $derived(connectionStatus === 'offline');
+  let isOffline = $derived(connection.status === 'offline');
   let heroCompact = $derived(totalMissions > 0 && !isLoading);
 
   let filterActive = $derived(
@@ -294,15 +293,6 @@ export function createFeedPageState(
       } catch {
         // Outside extension context
       }
-    });
-
-    // Connection status
-    $effect(() => {
-      const unsubscribe = subscribeToConnection((info) => {
-        connectionStatus = info.status;
-      });
-      cleanupFns.push(unsubscribe);
-      return unsubscribe;
     });
 
     // Keyboard shortcuts

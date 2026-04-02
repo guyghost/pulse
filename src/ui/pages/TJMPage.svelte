@@ -3,12 +3,12 @@
   import Icon from '../atoms/Icon.svelte';
   import type { TJMAnalysis } from '$lib/core/types/tjm';
   import { getTJMAnalysis } from '$lib/shell/facades/tjm.facade';
-  import { subscribeToConnection, type ConnectionInfo } from '$lib/shell/utils/connection-monitor';
+  import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 
   let analysis = $state<TJMAnalysis | null>(null);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
-  let connectionStatus = $state<ConnectionInfo['status']>('unknown');
+  const connection = getConnectionStore();
 
   async function loadAnalysis() {
     isLoading = true;
@@ -23,17 +23,10 @@
     }
   }
 
-  const isOffline = $derived(connectionStatus === 'offline');
+  const isOffline = $derived(connection.status === 'offline');
 
   $effect(() => {
     loadAnalysis();
-  });
-
-  $effect(() => {
-    const unsubscribe = subscribeToConnection((info) => {
-      connectionStatus = info.status;
-    });
-    return unsubscribe;
   });
 </script>
 

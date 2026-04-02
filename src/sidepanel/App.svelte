@@ -13,17 +13,14 @@
   import type { LogEntry } from '../dev/bridge-logger';
   import type { ToastType } from '$lib/state/toast.svelte.ts';
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
-  import {
-    subscribeToConnection,
-    type ConnectionInfo,
-  } from '../lib/shell/utils/connection-monitor';
+  import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { getProfile } from '../lib/shell/facades/settings.facade';
 
   type Page = 'feed' | 'tjm' | 'settings' | 'onboarding';
 
   let currentPage: Page = $state('onboarding');
   let hasCompletedOnboarding = $state(false);
-  let connectionStatus = $state<ConnectionInfo['status']>('unknown');
+  const connection = getConnectionStore();
   let showOfflineBanner = $state(false);
 
   const PAGE_INDEX: Record<Page, number> = { onboarding: -1, feed: 0, tjm: 1, settings: 2 };
@@ -86,28 +83,23 @@
     currentPage = 'onboarding';
   }
 
-  // Abonnement aux changements de connexion
+  // Réagir aux changements de connexion via le singleton store
+  let prevConnectionStatus = $state(connection.status);
   $effect(() => {
-    const unsubscribe = subscribeToConnection((info) => {
-      const wasOffline = connectionStatus === 'offline';
-      connectionStatus = info.status;
+    const current = connection.status;
+    const wasOffline = prevConnectionStatus === 'offline';
+    prevConnectionStatus = current;
 
-      // Afficher le banner quand on passe offline
-      if (info.status === 'offline') {
-        showOfflineBanner = true;
-      }
+    if (current === 'offline') {
+      showOfflineBanner = true;
+    }
 
-      // Notification quand on revient online
-      if (wasOffline && info.status !== 'offline') {
-        showToast('Connexion restaurée', 'success');
-        // Cacher le banner après un délai
-        setTimeout(() => {
-          showOfflineBanner = false;
-        }, 3000);
-      }
-    });
-
-    return unsubscribe;
+    if (wasOffline && current !== 'offline') {
+      showToast('Connexion restaur\u00e9e', 'success');
+      setTimeout(() => {
+        showOfflineBanner = false;
+      }, 3000);
+    }
   });
 
   // Check if profile exists on mount (direct IndexedDB access, no bridge needed)
