@@ -4,6 +4,8 @@
   import Skeleton from '../atoms/Skeleton.svelte';
   import Icon from '../atoms/Icon.svelte';
 
+  const BATCH_SIZE = 20;
+
   let {
     missions = [],
     isLoading = false,
@@ -36,13 +38,11 @@
   let seenArr = $derived(Array.isArray(seenIds) ? Array.from(seenIds) : []);
   let seenSet = $derived(new Set(seenArr));
 
-  // Use $derived.by for explicit reactivity with defensive checks
+  // Sort missions
   let sortedMissions = $derived.by(() => {
-    // Defensive: handle undefined/null cases
     if (!missions || !Array.isArray(missions) || missions.length === 0) {
       return [];
     }
-    // Create a new array to ensure reactivity tracking
     return [...missions].sort((a, b) => {
       if (sortBy === 'date') return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
       if (sortBy === 'tjm') return (b.tjm ?? 0) - (a.tjm ?? 0);
@@ -50,9 +50,46 @@
     });
   });
 
+  // Lazy loading: show only visibleCount missions, expand on scroll or click
+  let visibleCount = $state(BATCH_SIZE);
+
+  // Reset visible count when missions change (new scan, new filter)
+  $effect(() => {
+    // Track missions array reference to detect changes
+    const _len = sortedMissions.length;
+    visibleCount = BATCH_SIZE;
+  });
+
+  let visibleMissions = $derived(sortedMissions.slice(0, visibleCount));
+  let hasMore = $derived(visibleCount < sortedMissions.length);
+  let remainingCount = $derived(sortedMissions.length - visibleCount);
+
+  function loadMore() {
+    visibleCount = Math.min(visibleCount + BATCH_SIZE, sortedMissions.length);
+  }
+
+  // IntersectionObserver sentinel for auto-loading
+  let sentinelEl: HTMLDivElement | undefined = $state(undefined);
+
+  $effect(() => {
+    if (!sentinelEl || !hasMore) return;
+
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0]?.isIntersecting) {
+          loadMore();
+        }
+      },
+      { rootMargin: '200px' }
+    );
+
+    observer.observe(sentinelEl);
+    return () => observer.disconnect();
+  });
+
   if (import.meta.env.DEV) {
     $effect(() => {
-      console.log('[VirtualMissionFeed] missions prop:', missions?.length ?? 0, 'sortedMissions:', sortedMissions.length);
+      console.log('[VirtualMissionFeed] missions:', missions?.length ?? 0, 'visible:', visibleMissions.length, 'total:', sortedMissions.length);
     });
   }
 </script>
@@ -105,9 +142,9 @@
       </div>
     {/if}
     
-    <!-- Rendu simple (non-virtualisé) : flow normal sans absolute positioning -->
+    <!-- Lazy-loaded list: renders only visibleCount missions, loads more on scroll -->
     <div class="flex flex-col gap-3">
-      {#each sortedMissions as mission (mission.id)}
+      {#each visibleMissions as mission (mission.id)}
         <MissionCard
           {mission}
           isSeen={seenSet.has(mission.id)}
@@ -120,9 +157,21 @@
         />
       {/each}
     </div>
+
+    <!-- Sentinel for IntersectionObserver auto-loading -->
+    {#if hasMore}
+      <div bind:this={sentinelEl} class="flex items-center justify-center py-4">
+        <button
+          class="rounded-full border border-white/8 bg-white/4 px-4 py-2 text-xs text-text-secondary transition-all hover:bg-white/8 hover:text-white"
+          onclick={loadMore}
+        >
+          Voir {Math.min(BATCH_SIZE, remainingCount)} missions de plus ({remainingCount} restantes)
+        </button>
+      </div>
+    {/if}
     
     <p class="py-2 text-center text-[11px] text-text-muted shrink-0">
-      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length > 1 ? 's' : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
+      {visibleMissions.length}/{sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length > 1 ? 's' : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
     </p>
   {/if}
 </div>
