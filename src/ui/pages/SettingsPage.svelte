@@ -14,7 +14,9 @@
   }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
 
   const settings = new SettingsPageController({
-    onNavigateToOnboarding,
+    onNavigateToOnboarding: () => {
+      onNavigateToOnboarding?.();
+    },
   });
 
   settings.load();
