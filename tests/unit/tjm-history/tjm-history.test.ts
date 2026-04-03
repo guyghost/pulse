@@ -11,6 +11,7 @@ import {
   getTrend,
   getStatsForMission,
   getDominantTrendForMission,
+  analyzeTJMHistory,
 } from '$lib/core/tjm-history/index';
 
 // ---------------------------------------------------------------------------
@@ -31,6 +32,7 @@ const makeMission = (overrides: Partial<Mission> = {}): Mission => ({
   url: 'https://example.com',
   source: 'free-work',
   scrapedAt: new Date('2024-01-01'),
+  seniority: null,
   score: null,
   semanticScore: null,
   semanticReason: null,
@@ -44,6 +46,7 @@ const makeRecord = (overrides: Partial<TJMRecord> = {}): TJMRecord => ({
   max: 600,
   average: 500,
   sampleCount: 5,
+  seniority: null,
   ...overrides,
 });
 
@@ -80,6 +83,7 @@ describe('extractRecords', () => {
       max: 500,
       average: 500,
       sampleCount: 1,
+      seniority: null,
     });
   });
 
@@ -151,6 +155,63 @@ describe('extractRecords', () => {
     expect(result).toHaveLength(1);
     expect(result[0].stack).toBe('react');
   });
+
+  // -- Seniority grouping --------------------------------------------------
+
+  it('groups by stack AND seniority', () => {
+    const missions = [
+      makeMission({ tjm: 500, stack: ['React'], seniority: 'junior' }),
+      makeMission({ tjm: 600, stack: ['React'], seniority: 'senior' }),
+    ];
+
+    const result = extractRecords(missions, '2026-04-01');
+    expect(result).toHaveLength(2);
+
+    const juniorRecord = result.find((r) => r.seniority === 'junior')!;
+    const seniorRecord = result.find((r) => r.seniority === 'senior')!;
+
+    expect(juniorRecord.stack).toBe('react');
+    expect(juniorRecord.average).toBe(500);
+    expect(juniorRecord.sampleCount).toBe(1);
+    expect(juniorRecord.seniority).toBe('junior');
+
+    expect(seniorRecord.stack).toBe('react');
+    expect(seniorRecord.average).toBe(600);
+    expect(seniorRecord.sampleCount).toBe(1);
+    expect(seniorRecord.seniority).toBe('senior');
+  });
+
+  it('carries seniority into extracted record', () => {
+    const missions = [makeMission({ tjm: 450, stack: ['Vue'], seniority: 'confirmed' })];
+
+    const result = extractRecords(missions, '2026-04-01');
+    expect(result).toHaveLength(1);
+    expect(result[0]).toEqual({
+      stack: 'vue',
+      date: '2026-04-01',
+      min: 450,
+      max: 450,
+      average: 450,
+      sampleCount: 1,
+      seniority: 'confirmed',
+    });
+  });
+
+  it('treats null seniority missions separately from non-null', () => {
+    const missions = [
+      makeMission({ tjm: 500, stack: ['React'], seniority: null }),
+      makeMission({ tjm: 600, stack: ['React'], seniority: 'junior' }),
+      makeMission({ tjm: 700, stack: ['React'], seniority: 'senior' }),
+    ];
+
+    const result = extractRecords(missions, '2026-04-01');
+    expect(result).toHaveLength(3);
+
+    const seniorities = result.map((r) => r.seniority);
+    expect(seniorities).toContain(null);
+    expect(seniorities).toContain('junior');
+    expect(seniorities).toContain('senior');
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -209,6 +270,38 @@ describe('addRecords', () => {
     const result = addRecords(original, newRecords);
     expect(original.records).toHaveLength(1);
     expect(result.records).toHaveLength(2);
+  });
+
+  // -- Seniority in upsert key ---------------------------------------------
+
+  it('keeps records with different seniority separate even for same stack+date', () => {
+    const history = makeHistory([
+      makeRecord({ stack: 'react', date: '2026-04-01', seniority: null }),
+    ]);
+
+    const newRecords = [makeRecord({ stack: 'react', date: '2026-04-01', seniority: 'junior' })];
+
+    const result = addRecords(history, newRecords);
+    expect(result.records).toHaveLength(2);
+
+    const seniorities = result.records.map((r) => r.seniority);
+    expect(seniorities).toContain(null);
+    expect(seniorities).toContain('junior');
+  });
+
+  it('upserts correctly with seniority in key', () => {
+    const history = makeHistory([
+      makeRecord({ stack: 'react', date: '2026-04-01', seniority: 'junior', average: 500 }),
+    ]);
+
+    const newRecords = [
+      makeRecord({ stack: 'react', date: '2026-04-01', seniority: 'junior', average: 550 }),
+    ];
+
+    const result = addRecords(history, newRecords);
+    expect(result.records).toHaveLength(1);
+    expect(result.records[0].average).toBe(550);
+    expect(result.records[0].seniority).toBe('junior');
   });
 });
 
@@ -425,5 +518,217 @@ describe('getDominantTrendForMission', () => {
 
     const mission = makeMission({ stack: ['React', 'Vue'] });
     expect(getDominantTrendForMission(history, mission)).toBe('down');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// analyzeTJMHistory
+// ---------------------------------------------------------------------------
+
+describe('analyzeTJMHistory', () => {
+  it('returns null for empty history', () => {
+    expect(analyzeTJMHistory(emptyHistory())).toBeNull();
+  });
+
+  it('falls back to statistical split when no records have seniority', () => {
+    // 9 records across 9 different stacks, all with seniority: null
+    // Averages spread across 300–700 so statistical thirds are clearly separated
+    const averages = [300, 350, 400, 450, 500, 550, 600, 650, 700];
+    const records = averages.map((avg, i) =>
+      makeRecord({
+        stack: `stack-${i}`,
+        date: '2026-04-01',
+        average: avg,
+        min: avg,
+        max: avg,
+        seniority: null,
+      })
+    );
+
+    const analysis = analyzeTJMHistory(makeHistory(records));
+    expect(analysis).not.toBeNull();
+
+    // Statistical thirds of [300..700]: junior=[300,350,400], confirmed=[450,500,550], senior=[600,650,700]
+    expect(analysis!.junior).toEqual({ min: 300, max: 400, median: 350 });
+    expect(analysis!.confirmed).toEqual({ min: 450, max: 550, median: 500 });
+    expect(analysis!.senior).toEqual({ min: 600, max: 700, median: 650 });
+  });
+
+  it('uses real seniority grouping when records have seniority data', () => {
+    const records = [
+      // Junior records — low TJM range
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 300,
+        min: 300,
+        max: 300,
+        seniority: 'junior',
+      }),
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-02',
+        average: 350,
+        min: 350,
+        max: 350,
+        seniority: 'junior',
+      }),
+      makeRecord({
+        stack: 'vue',
+        date: '2026-04-01',
+        average: 400,
+        min: 400,
+        max: 400,
+        seniority: 'junior',
+      }),
+      // Confirmed records — mid TJM range
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 450,
+        min: 450,
+        max: 450,
+        seniority: 'confirmed',
+      }),
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-02',
+        average: 500,
+        min: 500,
+        max: 500,
+        seniority: 'confirmed',
+      }),
+      makeRecord({
+        stack: 'vue',
+        date: '2026-04-01',
+        average: 550,
+        min: 550,
+        max: 550,
+        seniority: 'confirmed',
+      }),
+      // Senior records — high TJM range
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 600,
+        min: 600,
+        max: 600,
+        seniority: 'senior',
+      }),
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-02',
+        average: 650,
+        min: 650,
+        max: 650,
+        seniority: 'senior',
+      }),
+      makeRecord({
+        stack: 'vue',
+        date: '2026-04-01',
+        average: 700,
+        min: 700,
+        max: 700,
+        seniority: 'senior',
+      }),
+    ];
+
+    const analysis = analyzeTJMHistory(makeHistory(records));
+    expect(analysis).not.toBeNull();
+
+    // Junior averages: [300, 350, 400] → median 350
+    expect(analysis!.junior.median).toBeGreaterThanOrEqual(300);
+    expect(analysis!.junior.median).toBeLessThanOrEqual(400);
+
+    // Confirmed averages: [450, 500, 550] → median 500
+    expect(analysis!.confirmed.median).toBeGreaterThanOrEqual(450);
+    expect(analysis!.confirmed.median).toBeLessThanOrEqual(550);
+
+    // Senior averages: [600, 650, 700] → median 650
+    expect(analysis!.senior.median).toBeGreaterThanOrEqual(600);
+    expect(analysis!.senior.median).toBeLessThanOrEqual(700);
+  });
+
+  it('handles mixed seniority and null records gracefully', () => {
+    const records = [
+      // Records with real seniority
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 300,
+        min: 300,
+        max: 300,
+        seniority: 'junior',
+      }),
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-02',
+        average: 350,
+        min: 350,
+        max: 350,
+        seniority: 'junior',
+      }),
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 450,
+        min: 450,
+        max: 450,
+        seniority: 'confirmed',
+      }),
+      makeRecord({
+        stack: 'vue',
+        date: '2026-04-01',
+        average: 500,
+        min: 500,
+        max: 500,
+        seniority: 'confirmed',
+      }),
+      makeRecord({
+        stack: 'vue',
+        date: '2026-04-01',
+        average: 600,
+        min: 600,
+        max: 600,
+        seniority: 'senior',
+      }),
+      // Records without seniority (legacy data from other connectors)
+      makeRecord({
+        stack: 'angular',
+        date: '2026-04-01',
+        average: 800,
+        min: 800,
+        max: 800,
+        seniority: null,
+      }),
+      makeRecord({
+        stack: 'angular',
+        date: '2026-04-02',
+        average: 850,
+        min: 850,
+        max: 850,
+        seniority: null,
+      }),
+    ];
+
+    const analysis = analyzeTJMHistory(makeHistory(records));
+    expect(analysis).not.toBeNull();
+
+    // Because at least one record has seniority, real grouping is used.
+    // Null-seniority records are excluded from the seniority ranges.
+    // Junior averages: [300, 350] → {min: 300, max: 350, median: 325}
+    expect(analysis!.junior.min).toBe(300);
+    expect(analysis!.junior.max).toBe(350);
+    expect(analysis!.junior.median).toBe(325);
+
+    // Confirmed averages: [450, 500] → {min: 450, max: 500, median: 475}
+    expect(analysis!.confirmed.min).toBe(450);
+    expect(analysis!.confirmed.max).toBe(500);
+    expect(analysis!.confirmed.median).toBe(475);
+
+    // Senior averages: [600] → {min: 600, max: 600, median: 600}
+    expect(analysis!.senior.min).toBe(600);
+    expect(analysis!.senior.max).toBe(600);
+    expect(analysis!.senior.median).toBe(600);
   });
 });

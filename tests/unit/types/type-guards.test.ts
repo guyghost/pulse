@@ -31,6 +31,7 @@ const makeValidMission = (overrides: Partial<Mission> = {}): Mission => ({
   url: 'https://example.com/mission/1',
   source: 'free-work',
   scrapedAt: new Date('2026-01-01T00:00:00.000Z'),
+  seniority: 'senior',
   score: 75,
   semanticScore: 80,
   semanticReason: 'Good match',
@@ -46,6 +47,7 @@ const makeValidProfile = (overrides: Partial<UserProfile> = {}): UserProfile => 
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Developer',
+  searchKeywords: [],
   ...overrides,
 });
 
@@ -102,6 +104,7 @@ describe('isMission', () => {
       location: null,
       remote: null,
       duration: null,
+      seniority: null,
       score: null,
       semanticScore: null,
       semanticReason: null,

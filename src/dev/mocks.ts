@@ -1,6 +1,6 @@
 import type { Mission } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
-import type { TJMHistory } from '$lib/core/types/tjm';
+import type { TJMHistory, TJMRecord } from '$lib/core/types/tjm';
 
 export const mockProfile: UserProfile = {
   firstName: 'Alice',
@@ -52,6 +52,13 @@ const locations = ['Paris', 'Lyon', 'Nantes', 'Bordeaux', 'Remote', 'Toulouse'];
 const remotes = ['full', 'hybrid', 'onsite', null] as const;
 const durations = ['3 mois', '6 mois', '12 mois', '18 mois', null];
 
+const seniorities: Array<'junior' | 'confirmed' | 'senior' | null> = [
+  'junior',
+  'confirmed',
+  'senior',
+  null,
+];
+
 export function generateMockMissions(count: number): Mission[] {
   const now = new Date();
   return Array.from({ length: count }, (_, i) => ({
@@ -68,6 +75,7 @@ export function generateMockMissions(count: number): Mission[] {
     url: `https://www.free-work.com/fr/tech-it/jobs/mock-${i}`,
     source: 'free-work' as const,
     scrapedAt: now,
+    seniority: seniorities[i % seniorities.length],
     score: Math.floor(Math.random() * 100),
     semanticScore: null,
     semanticReason: null,
@@ -79,7 +87,13 @@ export const mockMissions: Mission[] = generateMockMissions(10);
 export function generateMockTJMHistory(): TJMHistory {
   const stacks = ['react', 'typescript', 'node.js', 'python', 'vue.js', 'java'];
   const dates = ['2026-03-15', '2026-03-22', '2026-03-29', '2026-04-01'];
-  const records = [];
+  const seniorityLevels: Array<'junior' | 'confirmed' | 'senior' | null> = [
+    'junior',
+    'confirmed',
+    'senior',
+    null,
+  ];
+  const records: TJMRecord[] = [];
 
   for (const stack of stacks) {
     const base = 400 + Math.floor(Math.random() * 300);
@@ -93,6 +107,7 @@ export function generateMockTJMHistory(): TJMHistory {
         max: avg + 80 + Math.floor(Math.random() * 40),
         average: avg,
         sampleCount: 3 + Math.floor(Math.random() * 8),
+        seniority: seniorityLevels[Math.floor(Math.random() * seniorityLevels.length)],
       });
     }
   }

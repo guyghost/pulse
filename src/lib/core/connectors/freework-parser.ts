@@ -1,4 +1,5 @@
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
+import type { SeniorityLevel } from '../types/profile';
 import { createMission } from './parser-utils';
 
 const SOURCE: MissionSource = 'free-work';
@@ -43,6 +44,7 @@ export interface FreeWorkJobPosting {
   skills: { name: string; slug: string }[];
   publishedAt: string | null;
   startsAt: string | null;
+  experienceLevel: string | null;
 }
 
 export interface FreeWorkApiResponse {
@@ -53,10 +55,14 @@ export interface FreeWorkApiResponse {
 function mapRemoteMode(mode: string | null): RemoteType | null {
   if (!mode) return null;
   switch (mode) {
-    case 'full': return 'full';
-    case 'partial': return 'hybrid';
-    case 'none': return 'onsite';
-    default: return null;
+    case 'full':
+      return 'full';
+    case 'partial':
+      return 'hybrid';
+    case 'none':
+      return 'onsite';
+    default:
+      return null;
   }
 }
 
@@ -79,23 +85,45 @@ function isFreelanceContract(contracts: string[]): boolean {
   return contracts.some((c) => FREELANCE_CONTRACTS.has(c.toLowerCase()));
 }
 
+/**
+ * Map FreeWork experience level to internal SeniorityLevel.
+ * Pure function — deterministic mapping.
+ */
+export const mapExperienceLevel = (level: string | null): SeniorityLevel | null => {
+  if (!level) return null;
+  switch (level) {
+    case 'junior':
+      return 'junior';
+    case 'intermediate':
+      return 'confirmed';
+    case 'senior':
+      return 'senior';
+    default:
+      return null;
+  }
+};
+
 export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[] {
   if (!data['hydra:member'] || !Array.isArray(data['hydra:member'])) return [];
 
   return data['hydra:member']
     .filter((p) => isFreelanceContract(p.contracts ?? []))
-    .map((p): Mission => createMission({
-      id: `fw-${p.id}`,
-      title: p.title,
-      client: p.company?.name ?? null,
-      description: p.description ?? '',
-      stack: (p.skills ?? []).map(s => s.name),
-      tjm: p.minDailySalary ?? p.maxDailySalary ?? null,
-      location: p.location?.label ?? p.location?.shortLabel ?? null,
-      remote: mapRemoteMode(p.remoteMode),
-      duration: formatDuration(p.durationValue, p.durationPeriod),
-      url: buildJobUrl(p.slug, p.job?.slug ?? null),
-      source: SOURCE,
-      scrapedAt: now,
-    }));
+    .map(
+      (p): Mission =>
+        createMission({
+          id: `fw-${p.id}`,
+          title: p.title,
+          client: p.company?.name ?? null,
+          description: p.description ?? '',
+          stack: (p.skills ?? []).map((s) => s.name),
+          tjm: p.minDailySalary ?? p.maxDailySalary ?? null,
+          location: p.location?.label ?? p.location?.shortLabel ?? null,
+          remote: mapRemoteMode(p.remoteMode),
+          duration: formatDuration(p.durationValue, p.durationPeriod),
+          url: buildJobUrl(p.slug, p.job?.slug ?? null),
+          source: SOURCE,
+          scrapedAt: now,
+          seniority: mapExperienceLevel(p.experienceLevel),
+        })
+    );
 }

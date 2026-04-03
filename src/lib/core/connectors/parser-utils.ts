@@ -1,4 +1,5 @@
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
+import type { SeniorityLevel } from '../types/profile';
 
 /**
  * Extract a TJM (daily rate) number from raw text.
@@ -60,9 +61,10 @@ export function stripHtml(html: string): string {
  */
 export type MissionFields = Omit<
   Mission,
-  'score' | 'semanticScore' | 'semanticReason' | 'startDate'
+  'score' | 'semanticScore' | 'semanticReason' | 'startDate' | 'seniority'
 > & {
   startDate?: string | null;
+  seniority?: SeniorityLevel | null;
 };
 
 export function createMission(fields: MissionFields): Mission {
@@ -72,6 +74,7 @@ export function createMission(fields: MissionFields): Mission {
     description: stripHtml(fields.description ?? ''),
     stack: fields.stack.filter((s): s is string => typeof s === 'string' && s.length > 0),
     startDate: fields.startDate ?? null,
+    seniority: fields.seniority ?? null,
     score: null,
     semanticScore: null,
     semanticReason: null,

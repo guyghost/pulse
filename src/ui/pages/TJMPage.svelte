@@ -2,6 +2,7 @@
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
   import Icon from '../atoms/Icon.svelte';
   import type { TJMAnalysis } from '$lib/core/types/tjm';
+  import type { SeniorityLevel } from '$lib/core/types/profile';
   import { getTJMAnalysis } from '$lib/shell/facades/tjm.facade';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { getProfile } from '$lib/shell/facades/settings.facade';
@@ -12,6 +13,7 @@
   let userTjmMin = $state(0);
   let userTjmMax = $state(0);
   let profileStacks = $state<string[]>([]);
+  let userSeniority = $state<SeniorityLevel | null>(null);
   const connection = getConnectionStore();
 
   async function loadAnalysis() {
@@ -27,17 +29,26 @@
     }
   }
 
-  const isOffline = $derived(connection.status === 'offline');
-
-  $effect(() => {
-    getProfile().then((p) => {
+  async function loadProfileAndAnalysis() {
+    try {
+      const p = await getProfile();
       if (p) {
         userTjmMin = p.tjmMin;
         userTjmMax = p.tjmMax;
         profileStacks = p.stack;
+        userSeniority = p.seniority;
       }
-      loadAnalysis();
-    }).catch(() => { loadAnalysis(); });
+    } catch {
+      // Profile load failed, continue with defaults
+    }
+    await loadAnalysis();
+  }
+
+  const isOffline = $derived(connection.status === 'offline');
+
+  // Initial load
+  $effect(() => {
+    loadProfileAndAnalysis();
   });
 
   // Auto-refresh when a scan completes
@@ -54,15 +65,26 @@
       // Outside extension context
     }
   });
+
+  // Refresh when profile is updated from Settings
+  $effect(() => {
+    const handler = () => loadProfileAndAnalysis();
+    window.addEventListener('profile-updated', handler);
+    return () => window.removeEventListener('profile-updated', handler);
+  });
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
   <!-- Compact hero -->
   <section class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4">
-    <div class="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-accent-blue/14 blur-3xl"></div>
+    <div
+      class="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-accent-blue/14 blur-3xl"
+    ></div>
     <div class="relative flex items-center justify-between gap-3">
       <div class="flex items-center gap-3">
-        <div class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent-blue/20 bg-accent-blue/10">
+        <div
+          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent-blue/20 bg-accent-blue/10"
+        >
           <Icon name="chart-column" size={18} class="text-accent-blue" />
         </div>
         <div>
@@ -91,7 +113,9 @@
     </div>
 
     {#if isOffline}
-      <div class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber">
+      <div
+        class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber"
+      >
         <Icon name="database" size={14} />
         <span>Mode hors ligne — Données en cache</span>
       </div>
@@ -100,6 +124,6 @@
 
   <!-- Dashboard -->
   <section class="mt-4">
-    <TJMDashboard {analysis} {isLoading} {error} {userTjmMin} {userTjmMax} />
+    <TJMDashboard {analysis} {isLoading} {error} {userSeniority} />
   </section>
 </div>

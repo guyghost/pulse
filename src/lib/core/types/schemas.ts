@@ -57,6 +57,7 @@ export const MissionSchema = z.object({
   url: z.string(),
   source: MissionSourceSchema,
   scrapedAt: z.date(),
+  seniority: SeniorityLevelSchema.nullable(),
   score: z.number().nullable(),
   semanticScore: z.number().nullable(),
   semanticReason: z.string().nullable(),
@@ -79,6 +80,7 @@ export const MissionSerializedSchema = z.object({
   scrapedAt: z
     .union([z.date(), z.string()])
     .transform((val) => (typeof val === 'string' ? new Date(val) : val)),
+  seniority: SeniorityLevelSchema.nullable(),
   score: z.number().nullable(),
   semanticScore: z.number().nullable(),
   semanticReason: z.string().nullable(),

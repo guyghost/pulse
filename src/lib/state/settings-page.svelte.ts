@@ -151,6 +151,7 @@ export class SettingsPageController {
 
       this.editingProfile = false;
       this.profileSaved = true;
+      window.dispatchEvent(new CustomEvent('profile-updated'));
       setTimeout(() => {
         this.profileSaved = false;
       }, 2000);
@@ -328,6 +329,7 @@ export class SettingsPageController {
       this.showBackupModal = false;
       this.pendingBackup = null;
       this.backupError = null;
+      window.dispatchEvent(new CustomEvent('profile-updated'));
 
       return { ok: true, value: undefined };
     } catch {

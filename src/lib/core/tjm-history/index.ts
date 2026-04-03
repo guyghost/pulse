@@ -5,6 +5,7 @@
  * Non-deterministic values (dates, IDs) are injected via parameters.
  */
 import type { Mission } from '../types/mission';
+import type { SeniorityLevel } from '../types/profile';
 import type {
   TJMAnalysis,
   TJMHistory,
@@ -32,15 +33,21 @@ const TREND_THRESHOLD_PERCENT = 5;
 /**
  * Extract TJM records from a batch of missions for a given date.
  *
- * Groups missions by stack, computes min/max/average TJM per stack.
+ * Groups missions by stack + seniority, computes min/max/average TJM per group.
  * Missions without TJM or without stack are excluded.
  *
  * @param missions - Missions to extract TJM data from
  * @param date - ISO 8601 date string for the record (e.g. "2026-04-01")
- * @returns Array of TJMRecords, one per unique stack with TJM data
+ * @returns Array of TJMRecords, one per unique stack+seniority group with TJM data
  */
 export const extractRecords = (missions: Mission[], date: string): TJMRecord[] => {
-  const stackGroups = new Map<string, number[]>();
+  interface StackGroup {
+    tjms: number[];
+    seniority: SeniorityLevel | null;
+    stack: string;
+  }
+
+  const groups = new Map<string, StackGroup>();
 
   for (const mission of missions) {
     if (mission.tjm === null || mission.tjm <= 0) continue;
@@ -51,18 +58,26 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
       const normalizedStack = tech.toLowerCase().trim();
       if (!normalizedStack) continue;
 
-      const existing = stackGroups.get(normalizedStack);
+      const seniorityKey = mission.seniority ?? 'unknown';
+      const groupKey = `${normalizedStack}:${seniorityKey}`;
+
+      const existing = groups.get(groupKey);
       if (existing) {
-        existing.push(mission.tjm);
+        existing.tjms.push(mission.tjm);
       } else {
-        stackGroups.set(normalizedStack, [mission.tjm]);
+        groups.set(groupKey, {
+          tjms: [mission.tjm],
+          seniority: mission.seniority,
+          stack: normalizedStack,
+        });
       }
     }
   }
 
   const records: TJMRecord[] = [];
 
-  for (const [stack, tjms] of stackGroups) {
+  for (const group of groups.values()) {
+    const { tjms, seniority, stack } = group;
     const min = Math.min(...tjms);
     const max = Math.max(...tjms);
     const sum = tjms.reduce((acc, t) => acc + t, 0);
@@ -75,6 +90,7 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
       max,
       average,
       sampleCount: tjms.length,
+      seniority,
     });
   }
 
@@ -87,7 +103,7 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
 
 /**
  * Add new records to an existing history, replacing any records for the same
- * stack+date combination (upsert by stack+date).
+ * stack+date+seniority combination (upsert by stack+date+seniority).
  *
  * @param history - Existing history
  * @param newRecords - Records to merge in
@@ -97,11 +113,11 @@ export const addRecords = (history: TJMHistory, newRecords: TJMRecord[]): TJMHis
   const existingByKey = new Map<string, TJMRecord>();
 
   for (const record of history.records) {
-    existingByKey.set(`${record.stack}:${record.date}`, record);
+    existingByKey.set(`${record.stack}:${record.date}:${record.seniority ?? 'unknown'}`, record);
   }
 
   for (const record of newRecords) {
-    existingByKey.set(`${record.stack}:${record.date}`, record);
+    existingByKey.set(`${record.stack}:${record.date}:${record.seniority ?? 'unknown'}`, record);
   }
 
   const merged = Array.from(existingByKey.values());
@@ -290,7 +306,11 @@ const sliceIntoThirds = (values: number[]): [number[], number[], number[]] => {
   const confirmed = sorted.slice(size, size * 2);
   const senior = sorted.slice(size * 2);
 
-  return [junior.length > 0 ? junior : sorted, confirmed.length > 0 ? confirmed : sorted, senior.length > 0 ? senior : sorted];
+  return [
+    junior.length > 0 ? junior : sorted,
+    confirmed.length > 0 ? confirmed : sorted,
+    senior.length > 0 ? senior : sorted,
+  ];
 };
 
 const buildTrendDetail = (trend: TJMTrend, topStacks: TJMStackInsight[]): string | null => {
@@ -323,7 +343,54 @@ const buildRecommendation = (trend: TJMTrend, confirmed: TJMRange): string | nul
 };
 
 /**
+ * Collect average TJM values from records matching a specific seniority level.
+ */
+const collectAveragesForSeniority = (records: TJMRecord[], level: SeniorityLevel): number[] =>
+  records
+    .filter((r) => r.seniority === level)
+    .map((r) => r.average)
+    .filter((v) => v > 0);
+
+/**
+ * Collect average TJM values from records with null seniority (unknown bucket).
+ */
+const collectAveragesUnknown = (records: TJMRecord[]): number[] =>
+  records
+    .filter((r) => r.seniority === null)
+    .map((r) => r.average)
+    .filter((v) => v > 0);
+
+/**
+ * Collect all average TJM values regardless of seniority.
+ */
+const collectAllAverages = (records: TJMRecord[]): number[] =>
+  records.map((r) => r.average).filter((v) => v > 0);
+
+/**
+ * Build a TJMRange for a seniority level, with fallback strategy:
+ * 1. Use averages from records matching the level
+ * 2. If empty, fall back to unknown bucket
+ * 3. If still empty, fall back to all averages
+ */
+const buildRangeForLevel = (records: TJMRecord[], level: SeniorityLevel): TJMRange => {
+  const levelValues = collectAveragesForSeniority(records, level);
+  if (levelValues.length > 0) return buildRange(levelValues);
+
+  const unknownValues = collectAveragesUnknown(records);
+  if (unknownValues.length > 0) return buildRange(unknownValues);
+
+  const allValues = collectAllAverages(records);
+  return buildRange(allValues);
+};
+
+/**
  * Transform a raw TJM history into a dashboard-ready analysis.
+ *
+ * When records have real seniority data, builds ranges from actual
+ * seniority-grouped averages. When no records have seniority (all null),
+ * falls back to the statistical sliceIntoThirds approach for backward
+ * compatibility.
+ *
  * Pure function: no I/O, no async, deterministic from inputs only.
  */
 export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
@@ -338,10 +405,25 @@ export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
   const latestAverages = stats.map((stat) => stat.currentAverage).filter((value) => value > 0);
   if (latestAverages.length === 0) return null;
 
-  const [juniorValues, confirmedValues, seniorValues] = sliceIntoThirds(latestAverages);
-  const junior = buildRange(juniorValues);
-  const confirmed = buildRange(confirmedValues);
-  const senior = buildRange(seniorValues);
+  // Check if any records have real seniority data
+  const hasRealSeniority = history.records.some((r) => r.seniority !== null);
+
+  let junior: TJMRange;
+  let confirmed: TJMRange;
+  let senior: TJMRange;
+
+  if (hasRealSeniority) {
+    // Use actual seniority-grouped data
+    junior = buildRangeForLevel(history.records, 'junior');
+    confirmed = buildRangeForLevel(history.records, 'confirmed');
+    senior = buildRangeForLevel(history.records, 'senior');
+  } else {
+    // Fallback: statistical thirds (backward compatibility)
+    const [juniorValues, confirmedValues, seniorValues] = sliceIntoThirds(latestAverages);
+    junior = buildRange(juniorValues);
+    confirmed = buildRange(confirmedValues);
+    senior = buildRange(seniorValues);
+  }
 
   const topStacks: TJMStackInsight[] = stats.slice(0, 5).map((stat) => ({
     stack: stat.stack,
@@ -373,11 +455,12 @@ export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
       (stableCount === stats.length ? 0.1 : 0.18)
   );
 
-  const lastUpdated = stats
-    .map((stat) => stat.lastUpdated)
-    .filter((date): date is string => date !== null)
-    .sort()
-    .at(-1) ?? null;
+  const lastUpdated =
+    stats
+      .map((stat) => stat.lastUpdated)
+      .filter((date): date is string => date !== null)
+      .sort()
+      .at(-1) ?? null;
 
   return {
     trend,

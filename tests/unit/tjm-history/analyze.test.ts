@@ -9,6 +9,7 @@ const makeRecord = (overrides: Partial<TJMRecord> = {}): TJMRecord => ({
   max: 650,
   average: 550,
   sampleCount: 3,
+  seniority: null,
   ...overrides,
 });
 

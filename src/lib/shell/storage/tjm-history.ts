@@ -34,7 +34,13 @@ export const loadTJMHistory = async (): Promise<TJMHistory> => {
       typeof r.sampleCount === 'number'
   );
 
-  return { records: validRecords };
+  // Migration: old records without seniority field
+  const migratedRecords = validRecords.map((r: TJMRecord & { seniority?: unknown }) => ({
+    ...r,
+    seniority: r.seniority ?? null,
+  }));
+
+  return { records: migratedRecords };
 };
 
 /**
@@ -59,7 +65,9 @@ export const recordTJMFromMissions = async (
   const history = await loadTJMHistory();
   const newRecords = extractRecords(missions, date);
 
-  if (newRecords.length === 0) {return history;}
+  if (newRecords.length === 0) {
+    return history;
+  }
 
   const updated = addRecords(history, newRecords);
   await saveTJMHistory(updated);

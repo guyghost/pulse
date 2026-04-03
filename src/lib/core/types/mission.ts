@@ -1,3 +1,5 @@
+import type { SeniorityLevel } from './profile';
+
 export type MissionSource = 'free-work' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick';
 
 export type RemoteType = 'full' | 'hybrid' | 'onsite';
@@ -17,6 +19,8 @@ export interface Mission {
   url: string;
   source: MissionSource;
   scrapedAt: Date;
+  /** Experience level extracted from the source platform, if available */
+  seniority: SeniorityLevel | null;
   score: number | null;
   semanticScore: number | null;
   semanticReason: string | null;

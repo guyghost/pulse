@@ -30,6 +30,16 @@
 
   let expanded = $state(false);
 
+  const seniorityLabels: Record<string, string> = {
+    junior: 'Junior (0-2 ans)',
+    confirmed: 'Confirmé (3-7 ans)',
+    senior: 'Senior (7+ ans)',
+  };
+
+  let seniorityLabel = $derived(
+    mission.seniority ? seniorityLabels[mission.seniority] ?? mission.seniority : null
+  );
+
   let scoreColor = $derived(
     (mission.score ?? 0) >= 80
       ? 'text-accent-emerald bg-accent-emerald/15'
@@ -185,6 +195,12 @@
       <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
         <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Début</p>
         <p class="mt-1 truncate text-text-primary">{mission.startDate}</p>
+      </div>
+    {/if}
+    {#if seniorityLabel}
+      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
+        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Séniorité</p>
+        <p class="mt-1 truncate text-text-primary">{seniorityLabel}</p>
       </div>
     {/if}
     <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">

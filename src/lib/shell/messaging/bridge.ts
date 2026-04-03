@@ -39,7 +39,9 @@ export type BridgeMessage =
   | { type: 'SCAN_CANCEL' }
   // Toast
   | { type: 'SHOW_TOAST'; payload: { message: string; toastType: ToastType; duration?: number } }
-  | { type: 'TOAST_SHOWN' };
+  | { type: 'TOAST_SHOWN' }
+  // Profile
+  | { type: 'PROFILE_UPDATED' };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

@@ -2,6 +2,7 @@
  * TJM (Tarif Journalier Moyen) types for history tracking and trend analysis.
  * Pure types — no I/O, no async, no side effects.
  */
+import type { SeniorityLevel } from './profile';
 
 /** Direction of TJM trend for a given technology stack */
 export type TJMTrend = 'up' | 'stable' | 'down';
@@ -20,6 +21,8 @@ export interface TJMRecord {
   average: number;
   /** Number of missions contributing to this data point */
   sampleCount: number;
+  /** Experience level extracted from missions, null when unavailable */
+  seniority: SeniorityLevel | null;
 }
 
 /** Aggregated statistics for a technology stack over time */
