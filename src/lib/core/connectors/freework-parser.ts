@@ -71,10 +71,20 @@ function buildJobUrl(slug: string, jobSlug: string | null): string {
   return `${BASE_URL}/fr/tech-it/${category}/job-mission/${slug}`;
 }
 
+/** Contract types that indicate a freelance/contractor mission */
+const FREELANCE_CONTRACTS = new Set(['contractor', 'freelance', 'portage']);
+
+function isFreelanceContract(contracts: string[]): boolean {
+  if (contracts.length === 0) return true; // No info → keep
+  return contracts.some((c) => FREELANCE_CONTRACTS.has(c.toLowerCase()));
+}
+
 export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[] {
   if (!data['hydra:member'] || !Array.isArray(data['hydra:member'])) return [];
 
-  return data['hydra:member'].map((p): Mission => createMission({
+  return data['hydra:member']
+    .filter((p) => isFreelanceContract(p.contracts ?? []))
+    .map((p): Mission => createMission({
       id: `fw-${p.id}`,
       title: p.title,
       client: p.company?.name ?? null,

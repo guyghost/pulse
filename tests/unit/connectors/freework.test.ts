@@ -131,9 +131,10 @@ const FIXTURE_API: FreeWorkApiResponse = {
 };
 
 describe('parseFreeWorkAPI', () => {
-  it('parses all missions from API response', () => {
+  it('parses freelance missions and filters permanent contracts', () => {
     const missions = parseFreeWorkAPI(FIXTURE_API, NOW);
-    expect(missions).toHaveLength(3);
+    // 3 items in fixture, 1 is permanent → 2 freelance
+    expect(missions).toHaveLength(2);
     expect(missions[0]).toMatchObject({
       source: 'free-work',
       title: 'Développeur React Senior',
@@ -141,6 +142,8 @@ describe('parseFreeWorkAPI', () => {
       id: 'fw-12345',
       scrapedAt: NOW,
     });
+    // Verify the permanent contract was filtered out
+    expect(missions.find(m => m.id === 'fw-99999')).toBeUndefined();
   });
 
   it('extracts stack from skills', () => {

@@ -7,6 +7,7 @@ import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
 import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
 import { deduplicateMissions } from '../../core/scoring/dedup';
+import { filterSalariedMissions } from '../../core/scoring/contract-filter';
 import { scoreMission } from '../../core/scoring/relevance';
 import { setScanState } from '../storage/session-storage';
 import { scoreMissionsSemantic } from '../ai/semantic-scorer';
@@ -338,12 +339,15 @@ async function _runScanInternal(
   const missionsBeforeDedup = allMissions.length;
   const deduped = deduplicateMissions(allMissions);
   const dedupRatio = calculateDedupRatio(missionsBeforeDedup, deduped.length);
+
+  // Filter out salaried positions (CDD/CDI) — safety net after connector filters
+  const freelanceOnly = filterSalariedMissions(deduped);
   emitDetailed('post-processing', 1, 3);
 
   // Score against profile (already loaded above for connector filtering)
   const scored = profile
-    ? deduped.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
-    : deduped;
+    ? freelanceOnly.map((m) => ({ ...m, score: scoreMission(m, profile!) }))
+    : freelanceOnly;
 
   // Semantic scoring (async enrichment, non-blocking)
   if (profile && !signal?.aborted) {

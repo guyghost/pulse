@@ -42,7 +42,9 @@ export function mapCollectiveRemote(prefs: string[]): Mission['remote'] {
 }
 
 export function parseCollectiveProjects(projects: CollectiveProject[], now: Date): Mission[] {
-  return projects.map((p) => createMission({
+  return projects
+    .filter((p) => !p.isPermanentContract)
+    .map((p) => createMission({
     id: `col-${p.id}`,
     title: p.name,
     client: p.company?.name ?? null,
