@@ -1,0 +1,10 @@
+{
+  "name": "@pulse/landing",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "npx serve . -p 3001",
+    "build": "echo 'Static site — no build needed'",
+    "lint": "echo 'No lint configured for static landing'"
+  }
+}

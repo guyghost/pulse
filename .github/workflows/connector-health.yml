@@ -50,7 +50,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Install Playwright browsers
-        run: pnpm exec playwright install chromium
+        run: pnpm --filter @pulse/extension exec playwright install chromium
 
       - name: Run connector health checks
         id: health-check
@@ -68,7 +68,7 @@ jobs:
             done
           fi
 
-          pnpm health-check:json $CONNECTOR_ARGS --output=health-report.json
+          pnpm --filter @pulse/extension health-check:json $CONNECTOR_ARGS --output=health-report.json
         continue-on-error: true
 
       - name: Parse health check results

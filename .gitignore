@@ -4,7 +4,8 @@ dist/
 *.local
 output/
 .superset/
-test-results
+test-results/
 coverage/
 .claude/worktrees/
 .worktrees/
+.turbo/
