@@ -1,6 +1,17 @@
 # MissionPulse CI/CD Pipeline
 
-This document describes the complete CI/CD pipeline for the MissionPulse Chrome extension.
+This document describes the CI/CD pipeline for the MissionPulse monorepo.
+
+## Monorepo Structure
+
+```
+pulse/
+├── apps/extension/   # Chrome extension (tests, build, health checks)
+├── apps/landing/     # Static landing page (no CI needed)
+└── packages/tsconfig # Shared TypeScript config
+```
+
+All CI jobs run in the `apps/extension/` workspace via Turborepo.
 
 ## Overview
 

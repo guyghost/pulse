@@ -2,7 +2,20 @@
 
 ## Projet
 
-MissionPulse est une extension Chrome (Manifest V3) qui agit comme un agent au service du freelance tech. Elle scrappe les plateformes de missions via les sessions navigateur existantes et présente les résultats dans un feed centralisé avec scoring de pertinence et analyse sémantique via Gemini Nano (Chrome built-in AI).
+MissionPulse est une extension Chrome (Manifest V3) dans un monorepo Turborepo. Elle scrappe les plateformes de missions via les sessions navigateur existantes et présente les résultats dans un feed centralisé avec scoring de pertinence et analyse sémantique via Gemini Nano (Chrome built-in AI).
+
+## Monorepo
+
+```
+pulse/
+├── apps/extension/   # Extension Chrome (Svelte 5 + Vite + MV3)
+├── apps/landing/     # Landing page statique (missionpulse.app)
+├── packages/tsconfig # Shared TypeScript config
+├── turbo.json        # Turborepo pipeline
+└── pnpm-workspace.yaml
+```
+
+Tous les chemins ci-dessous sont relatifs à `apps/extension/`.
 
 ## Stack
 
@@ -218,6 +231,8 @@ export class ScanOrchestrator {
 | Module              | Localisation                                | Rôle                                              |
 | ------------------- | ------------------------------------------- | ------------------------------------------------- |
 | `feed`              | `src/lib/state/feed.svelte.ts`              | État du feed : missions, recherche, filtrage      |
+| `feed-page`         | `src/lib/state/feed-page.svelte.ts`         | État complet FeedPage (seen, favoris, filtres, comparaison) |
+| `app-navigation`    | `src/lib/state/app-navigation.svelte.ts`    | Routing, transitions, onboarding              |
 | `onboarding`        | `src/lib/state/onboarding.svelte.ts`        | Wizard de configuration initiale                  |
 | `connection`        | `src/lib/state/connection.svelte.ts`        | Détection de l'état réseau                        |
 | `toast`             | `src/lib/state/toast.svelte.ts`             | Notifications toast UI                            |
