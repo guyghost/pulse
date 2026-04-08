@@ -28,11 +28,26 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
     url: 'https://example.com',
     source: 'free-work',
     scrapedAt: new Date(),
+    scoreBreakdown: null,
     score: null,
     semanticScore: null,
     semanticReason: null,
     ...overrides,
   };
+}
+
+/**
+ * Helper: call scoreMission and return the total numeric score.
+ */
+function score(mission: Mission, prof: UserProfile, now?: Date): number {
+  return scoreMission(mission, prof, now).total;
+}
+
+/**
+ * Helper: call scoreMission and return the full result with breakdown.
+ */
+function scoreWithBreakdown(mission: Mission, prof: UserProfile, now?: Date) {
+  return scoreMission(mission, prof, now);
 }
 
 describe('scoreMission', () => {
@@ -43,8 +58,7 @@ describe('scoreMission', () => {
       location: 'Paris',
       remote: 'hybrid',
     });
-    const score = scoreMission(mission, profile);
-    expect(score).toBe(100);
+    expect(score(mission, profile)).toBe(100);
   });
 
   it('scores low for no match', () => {
@@ -54,22 +68,20 @@ describe('scoreMission', () => {
       location: 'Marseille',
       remote: 'onsite',
     });
-    const score = scoreMission(mission, profile);
-    expect(score).toBeLessThan(25);
+    expect(score(mission, profile)).toBeLessThan(25);
   });
 
   it('returns score between 0 and 100', () => {
     const mission = makeMission();
-    const score = scoreMission(mission, profile);
-    expect(score).toBeGreaterThanOrEqual(0);
-    expect(score).toBeLessThanOrEqual(100);
+    expect(score(mission, profile)).toBeGreaterThanOrEqual(0);
+    expect(score(mission, profile)).toBeLessThanOrEqual(100);
   });
 
   it('gives partial stack score', () => {
     const mission = makeMission({ stack: ['React', 'Vue', 'Angular'] });
-    const score = scoreMission(mission, profile);
+    const s = score(mission, profile);
     // 1 match out of 3 = 40/3 ~ 13 for stack, plus null-field defaults (10+12+7=29)
-    const stackOnly = score - 29; // subtract null defaults for location, tjm, remote
+    const stackOnly = s - 29; // subtract null defaults for location, tjm, remote
     expect(stackOnly).toBeGreaterThanOrEqual(13);
     expect(stackOnly).toBeLessThanOrEqual(14);
   });
@@ -77,22 +89,18 @@ describe('scoreMission', () => {
   it('gives 12 for null TJM', () => {
     const missionWithTjm = makeMission({ tjm: 600 });
     const missionWithoutTjm = makeMission({ tjm: null });
-    const scoreWith = scoreMission(missionWithTjm, profile);
-    const scoreWithout = scoreMission(missionWithoutTjm, profile);
-    expect(scoreWith).toBeGreaterThan(scoreWithout);
+    expect(score(missionWithTjm, profile)).toBeGreaterThan(score(missionWithoutTjm, profile));
   });
 
   it('handles case-insensitive stack matching', () => {
     const mission = makeMission({ stack: ['react', 'typescript'] });
-    const score = scoreMission(mission, profile);
-    expect(score).toBeGreaterThanOrEqual(30);
+    expect(score(mission, profile)).toBeGreaterThanOrEqual(30);
   });
 
   it('handles "any" remote preference', () => {
     const anyProfile: UserProfile = { ...profile, remote: 'any' };
     const mission = makeMission({ remote: 'onsite' });
-    const score = scoreMission(mission, anyProfile);
-    expect(score).toBeGreaterThanOrEqual(15);
+    expect(score(mission, anyProfile)).toBeGreaterThanOrEqual(15);
   });
 
   it('gives full stack weight when profile has no stack (does not penalize user)', () => {
@@ -103,11 +111,62 @@ describe('scoreMission', () => {
       location: 'Paris',
       remote: 'hybrid',
     });
-    const score = scoreMission(mission, profileNoStack);
-    // Without stack matching, score should be location (20) + tjm (25) + remote (15) = 60
-    // Plus partial for stack (40 * 1.0 = 40) if we give full weight
-    expect(score).toBeGreaterThanOrEqual(60);
-    expect(score).toBeLessThanOrEqual(100);
+    const s = score(mission, profileNoStack);
+    expect(s).toBeGreaterThanOrEqual(60);
+    expect(s).toBeLessThanOrEqual(100);
+  });
+
+  describe('structured breakdown', () => {
+    it('returns breakdown with criteria', () => {
+      const mission = makeMission({
+        stack: ['React', 'TypeScript'],
+        tjm: 600,
+        location: 'Paris',
+        remote: 'hybrid',
+      });
+      const result = scoreWithBreakdown(mission, profile);
+
+      expect(result.total).toBeGreaterThanOrEqual(0);
+      expect(result.total).toBeLessThanOrEqual(100);
+      expect(result.breakdown).toBeDefined();
+      expect(result.breakdown.stack).toBeGreaterThanOrEqual(0);
+      expect(result.breakdown.location).toBeGreaterThanOrEqual(0);
+      expect(result.breakdown.tjm).toBeGreaterThanOrEqual(0);
+      expect(result.breakdown.remote).toBeGreaterThanOrEqual(0);
+      expect(result.breakdown.seniorityBonus).toBeGreaterThanOrEqual(0);
+      expect(result.breakdown.seniorityBonus).toBeLessThanOrEqual(5);
+    });
+
+    it('provides seniority bonus for exact match', () => {
+      const mission = makeMission({
+        seniority: 'senior',
+      });
+      const result = scoreWithBreakdown(mission, profile);
+      expect(result.breakdown.seniorityBonus).toBe(5);
+    });
+
+    it('provides partial seniority bonus for adjacent level', () => {
+      const mission = makeMission({
+        seniority: 'confirmed',
+      });
+      const result = scoreWithBreakdown(mission, profile);
+      expect(result.breakdown.seniorityBonus).toBe(2);
+    });
+
+    it('provides start date bonus for missions starting within 7 days', () => {
+      const now = new Date('2026-04-08');
+      const mission = makeMission({
+        startDate: '2026-04-12',
+      });
+      const result = scoreWithBreakdown(mission, profile, now);
+      expect(result.breakdown.startDateBonus).toBe(5);
+    });
+
+    it('provides no start date bonus when no date provided', () => {
+      const mission = makeMission({ startDate: null });
+      const result = scoreWithBreakdown(mission, profile);
+      expect(result.breakdown.startDateBonus).toBe(0);
+    });
   });
 
   describe('regression: undefined safety', () => {
@@ -126,9 +185,9 @@ describe('scoreMission', () => {
       const mission = makeMission({
         stack: ['TypeScript', undefined, 'React', undefined] as any,
       });
-      const score = scoreMission(mission, baseProfile);
-      expect(score).toBeGreaterThanOrEqual(0);
-      expect(score).toBeLessThanOrEqual(100);
+      const s = score(mission, baseProfile);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThanOrEqual(100);
     });
 
     it('should not crash when profile has undefined entries in stack array', () => {
@@ -137,27 +196,27 @@ describe('scoreMission', () => {
         stack: ['TypeScript', undefined, 'React'] as any,
       };
       const mission = makeMission({ stack: ['React', 'TypeScript'] });
-      const score = scoreMission(mission, profileWithUndefined);
-      expect(score).toBeGreaterThanOrEqual(0);
-      expect(score).toBeLessThanOrEqual(100);
+      const s = score(mission, profileWithUndefined);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThanOrEqual(100);
     });
 
     it('should handle gracefully mission with empty string entries in stack', () => {
       const mission = makeMission({
         stack: ['TypeScript', '', 'React', ''],
       });
-      const score = scoreMission(mission, baseProfile);
-      expect(score).toBeGreaterThanOrEqual(0);
-      expect(score).toBeLessThanOrEqual(100);
+      const s = score(mission, baseProfile);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThanOrEqual(100);
     });
 
     it('should not crash when mission has null entries in stack (runtime pollution)', () => {
       const mission = makeMission({
         stack: ['TypeScript', null, 'React', null] as any,
       });
-      const score = scoreMission(mission, baseProfile);
-      expect(score).toBeGreaterThanOrEqual(0);
-      expect(score).toBeLessThanOrEqual(100);
+      const s = score(mission, baseProfile);
+      expect(s).toBeGreaterThanOrEqual(0);
+      expect(s).toBeLessThanOrEqual(100);
     });
   });
 
@@ -174,8 +233,6 @@ describe('scoreMission', () => {
     };
 
     it('scores nearby location match at 70% of weight', () => {
-      // A mission in Nanterre should score 70% location weight for a Paris profile
-      // Default location weight is 20, so nearby = 20 * 0.7 = 14
       const mission = makeMission({
         stack: ['TypeScript', 'React'],
         location: 'Nanterre',
@@ -183,7 +240,6 @@ describe('scoreMission', () => {
         remote: 'hybrid',
       });
 
-      // Compare with exact location match
       const exactMission = makeMission({
         stack: ['TypeScript', 'React'],
         location: 'Paris',
@@ -191,33 +247,31 @@ describe('scoreMission', () => {
         remote: 'hybrid',
       });
 
-      const nearbyScore = scoreMission(mission, parisProfile);
-      const exactScore = scoreMission(exactMission, parisProfile);
+      const nearbyScore = score(mission, parisProfile);
+      const exactScore = score(exactMission, parisProfile);
 
-      // Both should have high scores, but nearby should be slightly lower
       expect(nearbyScore).toBeGreaterThan(0);
       expect(nearbyScore).toBeLessThan(exactScore);
-      // The difference should be the location weight difference (20 - 14 = 6 points)
       expect(exactScore - nearbyScore).toBe(6);
     });
 
     it('scores nearby (Courbevoie) higher than no match (Lyon) for Paris profile', () => {
       const nearbyMission = makeMission({
         stack: ['TypeScript', 'React'],
-        location: 'Courbevoie', // Paris suburb
+        location: 'Courbevoie',
         tjm: 600,
         remote: 'hybrid',
       });
 
       const noMatchMission = makeMission({
         stack: ['TypeScript', 'React'],
-        location: 'Lyon', // different city
+        location: 'Lyon',
         tjm: 600,
         remote: 'hybrid',
       });
 
-      const nearbyScore = scoreMission(nearbyMission, parisProfile);
-      const noMatchScore = scoreMission(noMatchMission, parisProfile);
+      const nearbyScore = score(nearbyMission, parisProfile);
+      const noMatchScore = score(noMatchMission, parisProfile);
 
       expect(nearbyScore).toBeGreaterThan(noMatchScore);
     });

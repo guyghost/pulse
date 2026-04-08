@@ -28,7 +28,7 @@ vi.mock('../../../src/lib/core/scoring/dedup', () => ({
 }));
 
 vi.mock('../../../src/lib/core/scoring/relevance', () => ({
-  scoreMission: vi.fn(() => 50),
+  scoreMission: vi.fn(() => ({ total: 50, breakdown: { stack: 20, location: 10, tjm: 12, remote: 8, seniorityBonus: 0, startDateBonus: 0 } })),
 }));
 
 vi.mock('../../../src/lib/shell/utils/connection-monitor', () => ({

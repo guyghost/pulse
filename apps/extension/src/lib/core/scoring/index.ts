@@ -1,6 +1,6 @@
-export { scoreMission } from './relevance';
+export { scoreMission, type DeterministicScoreResult } from './relevance';
 export { deduplicateMissions } from './dedup';
-export { computeFinalScore } from './final-score';
+export { computeFinalScore, computeFinalBreakdown, buildScoreBreakdown } from './final-score';
 export { sortMissions, type MissionSortBy } from './sort-missions';
 export { filterSalariedMissions } from './contract-filter';
 export { filterNotifiableMissions } from './notification-filter';

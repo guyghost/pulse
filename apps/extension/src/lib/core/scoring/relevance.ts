@@ -1,8 +1,17 @@
 import type { Mission } from '../types/mission';
 import type { UserProfile, ScoringWeights } from '../types/profile';
 import { DEFAULT_SCORING_WEIGHTS } from '../types/profile';
+import type { DeterministicBreakdown } from '../types/score';
 import { matchLocation } from './location-matching';
 import { scoreSeniorityBonus, scoreStartDateBonus } from './bonus-scoring';
+
+/**
+ * Deterministic scoring result — breakdown + total.
+ */
+export interface DeterministicScoreResult {
+  breakdown: DeterministicBreakdown;
+  total: number; // 0-100, clamped
+}
 
 /**
  * Score a mission's relevance to a user profile.
@@ -20,9 +29,13 @@ import { scoreSeniorityBonus, scoreStartDateBonus } from './bonus-scoring';
  * @param mission - The mission to score
  * @param profile - The user profile to match against
  * @param now - Current date for start date bonus (optional, defaults to no bonus)
- * @returns A score from 0-100 representing relevance
+ * @returns Structured result with per-criterion breakdown and total score (0-100)
  */
-export const scoreMission = (mission: Mission, profile: UserProfile, now?: Date): number => {
+export const scoreMission = (
+  mission: Mission,
+  profile: UserProfile,
+  now?: Date
+): DeterministicScoreResult => {
   const weights = profile.scoringWeights ?? DEFAULT_SCORING_WEIGHTS;
   const normalizedWeights = normalizeWeights(weights);
 
@@ -41,7 +54,19 @@ export const scoreMission = (mission: Mission, profile: UserProfile, now?: Date)
   const seniorityBonus = scoreSeniorityBonus(mission.seniority, profile.seniority);
   const startDateBonus = now ? scoreStartDateBonus(mission.startDate, now) : 0;
 
-  return Math.min(100, Math.round(baseScore + seniorityBonus + startDateBonus));
+  const total = Math.min(100, Math.round(baseScore + seniorityBonus + startDateBonus));
+
+  return {
+    breakdown: {
+      stack: Math.round(stackScore),
+      location: Math.round(locationScore),
+      tjm: Math.round(tjmScore),
+      remote: Math.round(remoteScore),
+      seniorityBonus,
+      startDateBonus,
+    },
+    total,
+  };
 };
 
 /**

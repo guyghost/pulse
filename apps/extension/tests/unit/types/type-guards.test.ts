@@ -32,6 +32,14 @@ const makeValidMission = (overrides: Partial<Mission> = {}): Mission => ({
   source: 'free-work',
   scrapedAt: new Date('2026-01-01T00:00:00.000Z'),
   seniority: 'senior',
+  scoreBreakdown: {
+    criteria: { stack: 30, location: 20, tjm: 25, remote: 15, seniorityBonus: 5, startDateBonus: 0 },
+    deterministic: 95,
+    semantic: 80,
+    semanticReason: 'Good match',
+    total: 89,
+    grade: 'B',
+  },
   score: 75,
   semanticScore: 80,
   semanticReason: 'Good match',
@@ -108,6 +116,7 @@ describe('isMission', () => {
       score: null,
       semanticScore: null,
       semanticReason: null,
+      scoreBreakdown: null,
     });
     expect(isMission(mission)).toBe(true);
   });

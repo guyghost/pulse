@@ -9,6 +9,7 @@ import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
 import { deduplicateMissions } from '../../core/scoring/dedup';
 import { filterSalariedMissions } from '../../core/scoring/contract-filter';
 import { scoreMission } from '../../core/scoring/relevance';
+import { computeFinalBreakdown, buildScoreBreakdown } from '../../core/scoring/final-score';
 import { setScanState } from '../storage/session-storage';
 import { scoreMissionsSemantic } from '../ai/semantic-scorer';
 import { metricsCollector } from '../metrics/collector';
@@ -364,8 +365,16 @@ async function _runScanInternal(
   emitDetailed('post-processing', 1, 3);
 
   // Score against profile (already loaded above for connector filtering)
+  // Now returns structured breakdown
   const scored = profile
-    ? freelanceOnly.map((m) => ({ ...m, score: scoreMission(m, profile, new Date()) }))
+    ? freelanceOnly.map((m) => {
+        const result = scoreMission(m, profile, new Date());
+        return {
+          ...m,
+          scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),
+          score: result.total,
+        };
+      })
     : freelanceOnly;
 
   // Semantic scoring (async enrichment, non-blocking)
@@ -378,9 +387,18 @@ async function _runScanInternal(
       );
       for (const mission of scored) {
         const semantic = semanticResults.get(mission.id);
-        if (semantic) {
+        if (semantic && mission.scoreBreakdown) {
+          // Rebuild breakdown with semantic fusion
+          mission.scoreBreakdown = computeFinalBreakdown(
+            mission.scoreBreakdown.deterministic,
+            mission.scoreBreakdown.criteria,
+            semantic.score,
+            semantic.reason
+          );
           mission.semanticScore = semantic.score;
           mission.semanticReason = semantic.reason;
+          // Keep legacy score in sync
+          mission.score = mission.scoreBreakdown.total;
         }
       }
     } catch {

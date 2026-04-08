@@ -76,6 +76,7 @@ export function generateMockMissions(count: number): Mission[] {
     source: 'free-work' as const,
     scrapedAt: now,
     seniority: seniorities[i % seniorities.length],
+    scoreBreakdown: null,
     score: Math.floor(Math.random() * 100),
     semanticScore: null,
     semanticReason: null,

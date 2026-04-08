@@ -3,6 +3,13 @@ import type { Mission } from '../types/mission';
 export type MissionSortBy = 'date' | 'score' | 'tjm';
 
 /**
+ * Get the best available numeric score for sorting.
+ * Uses scoreBreakdown.total if available, falls back to legacy score.
+ */
+const getMissionScore = (m: Mission): number =>
+  m.scoreBreakdown?.total ?? m.semanticScore ?? m.score ?? 0;
+
+/**
  * Sort missions based on the specified criteria.
  * Pure function — no I/O, no side effects.
  *
@@ -16,9 +23,7 @@ export const sortMissions = (missions: Mission[], sortBy: MissionSortBy): Missio
   switch (sortBy) {
     case 'score':
       return sorted.sort((a, b) => {
-        const scoreA = a.semanticScore ?? a.score ?? 0;
-        const scoreB = b.semanticScore ?? b.score ?? 0;
-        return scoreB - scoreA;
+        return getMissionScore(b) - getMissionScore(a);
       });
 
     case 'tjm':

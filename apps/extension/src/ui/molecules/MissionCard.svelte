@@ -1,6 +1,8 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
   import type { Mission } from '$lib/core/types/mission';
+  import type { ApplicationStatus } from '$lib/core/types/tracking';
+  import { STATUS_LABELS, STATUS_VARIANTS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import Badge from '../atoms/Badge.svelte';
   import Icon from '../atoms/Icon.svelte';
   import { ripple } from '../actions/ripple';
@@ -16,6 +18,8 @@
     onToggleFavorite,
     onHide,
     onCopyLink,
+    trackingStatus = null as ApplicationStatus | null,
+    onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
   }: {
     mission: Mission;
     isSeen?: boolean;
@@ -26,6 +30,8 @@
     onToggleFavorite?: () => void;
     onHide?: () => void;
     onCopyLink?: () => void;
+    trackingStatus?: ApplicationStatus | null;
+    onStatusTransition?: ((status: ApplicationStatus) => void) | null;
   } = $props();
 
   let expanded = $state(false);
@@ -40,18 +46,24 @@
     mission.seniority ? (seniorityLabels[mission.seniority] ?? mission.seniority) : null
   );
 
+  const availableTransitions = $derived(
+    trackingStatus ? (VALID_TRANSITIONS[trackingStatus] ?? []) : []
+  );
+
+  const scoreValue = $derived(mission.scoreBreakdown?.total ?? mission.score ?? 0);
+
   const scoreColor = $derived(
-    (mission.score ?? 0) >= 80
+    scoreValue >= 80
       ? 'text-accent-emerald bg-accent-emerald/15'
-      : (mission.score ?? 0) >= 50
+      : scoreValue >= 50
         ? 'text-accent-amber bg-accent-amber/15'
         : 'text-text-muted bg-white/5'
   );
 
   const glowClass = $derived(
-    (mission.score ?? 0) >= 80
+    scoreValue >= 80
       ? 'shadow-glow-emerald'
-      : (mission.score ?? 0) >= 50
+      : scoreValue >= 50
         ? 'shadow-glow-blue'
         : ''
   );
@@ -114,6 +126,9 @@
     <div class="min-w-0 flex-1">
       <div class="mb-3 flex flex-wrap items-center gap-2">
         <Badge label={mission.source} variant="source" />
+        {#if trackingStatus}
+          <Badge label={STATUS_LABELS[trackingStatus]} variant={STATUS_VARIANTS[trackingStatus]} />
+        {/if}
         {#if !isSeen}
           <span
             class="inline-flex items-center rounded-full border border-accent-blue/18 bg-accent-blue/12 px-2 py-1 text-[11px] font-medium text-accent-blue"
@@ -135,7 +150,11 @@
       {/if}
     </div>
     <div class="flex items-center gap-2">
-      {#if mission.score !== null}
+      {#if mission.scoreBreakdown}
+        <span class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor}"
+          >{mission.scoreBreakdown.grade}{#if mission.scoreBreakdown.semantic !== null}+{/if}</span
+        >
+      {:else if mission.score !== null}
         <span class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor}"
           >{mission.score}</span
         >
@@ -157,11 +176,11 @@
     {#if mission.stack.length > 3}
       <Badge label="+{mission.stack.length - 3}" variant="source" />
     {/if}
-    {#if mission.semanticReason}
+    {#if (mission.scoreBreakdown?.semanticReason ?? mission.semanticReason)}
       <span
         class="inline-flex items-center gap-1 rounded-full border border-accent-blue/20 bg-accent-blue/8 px-2 py-0.5 text-[11px] text-accent-blue"
       >
-        {mission.semanticReason}
+        {mission.scoreBreakdown?.semanticReason ?? mission.semanticReason}
       </span>
     {/if}
   </div>
@@ -245,6 +264,24 @@
       <Icon name="external-link" size={14} />
     </button>
   </div>
+
+  {#if trackingStatus && availableTransitions.length > 0 && onStatusTransition}
+    <div class="mt-3 flex flex-wrap gap-1.5">
+      {#each availableTransitions as nextStatus}
+        {@const label = STATUS_LABELS[nextStatus]}
+        {@const variant = STATUS_VARIANTS[nextStatus]}
+        <button
+          class="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[11px] text-text-secondary transition-all duration-200 hover:bg-white/[0.07] hover:text-text-primary"
+          onclick={(e) => {
+            e.stopPropagation();
+            onStatusTransition?.(nextStatus);
+          }}
+        >
+          {label}
+        </button>
+      {/each}
+    </div>
+  {/if}
 
   {#if expanded && mission.description}
     <!-- Les animations sont désactivées en mode virtualisé car elles conflit avec le absolute positioning -->

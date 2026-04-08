@@ -61,7 +61,7 @@ export function stripHtml(html: string): string {
  */
 export type MissionFields = Omit<
   Mission,
-  'score' | 'semanticScore' | 'semanticReason' | 'startDate' | 'seniority'
+  'scoreBreakdown' | 'score' | 'semanticScore' | 'semanticReason' | 'startDate' | 'seniority'
 > & {
   startDate?: string | null;
   seniority?: SeniorityLevel | null;
@@ -75,6 +75,7 @@ export function createMission(fields: MissionFields): Mission {
     stack: fields.stack.filter((s): s is string => typeof s === 'string' && s.length > 0),
     startDate: fields.startDate ?? null,
     seniority: fields.seniority ?? null,
+    scoreBreakdown: null,
     score: null,
     semanticScore: null,
     semanticReason: null,

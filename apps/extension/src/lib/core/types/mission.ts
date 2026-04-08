@@ -1,4 +1,5 @@
 import type { SeniorityLevel } from './profile';
+import type { ScoreBreakdown } from './score';
 
 export type MissionSource = 'free-work' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick';
 
@@ -21,7 +22,22 @@ export interface Mission {
   scrapedAt: Date;
   /** Experience level extracted from the source platform, if available */
   seniority: SeniorityLevel | null;
+  /** Structured score breakdown (deterministic + semantic + grade) */
+  scoreBreakdown: ScoreBreakdown | null;
+  /**
+   * Legacy numeric score for backward compatibility.
+   * Derived from scoreBreakdown.total.
+   * @deprecated Use scoreBreakdown.total instead.
+   */
   score: number | null;
+  /**
+   * Legacy semantic score for backward compatibility.
+   * @deprecated Use scoreBreakdown.semantic instead.
+   */
   semanticScore: number | null;
+  /**
+   * Legacy semantic reason for backward compatibility.
+   * @deprecated Use scoreBreakdown.semanticReason instead.
+   */
   semanticReason: string | null;
 }

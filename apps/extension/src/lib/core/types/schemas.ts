@@ -20,6 +20,8 @@ export const RemoteTypeSchema = z.enum(['full', 'hybrid', 'onsite']);
 
 export const SeniorityLevelSchema = z.enum(['junior', 'confirmed', 'senior']);
 
+export const GradeSchema = z.enum(['A', 'B', 'C', 'D', 'F']);
+
 // ============================================
 // Types complexes
 // ============================================
@@ -40,6 +42,28 @@ export const ScoringWeightsSchema = z
   );
 
 // ============================================
+// Score Breakdown
+// ============================================
+
+export const DeterministicBreakdownSchema = z.object({
+  stack: z.number().min(0).max(100),
+  location: z.number().min(0).max(100),
+  tjm: z.number().min(0).max(100),
+  remote: z.number().min(0).max(100),
+  seniorityBonus: z.number().min(0).max(5),
+  startDateBonus: z.number().min(0).max(5),
+});
+
+export const ScoreBreakdownSchema = z.object({
+  criteria: DeterministicBreakdownSchema,
+  deterministic: z.number().min(0).max(100),
+  semantic: z.number().min(0).max(100).nullable(),
+  semanticReason: z.string().nullable(),
+  total: z.number().min(0).max(100),
+  grade: GradeSchema,
+});
+
+// ============================================
 // Mission
 // ============================================
 
@@ -58,6 +82,7 @@ export const MissionSchema = z.object({
   source: MissionSourceSchema,
   scrapedAt: z.date(),
   seniority: SeniorityLevelSchema.nullable(),
+  scoreBreakdown: ScoreBreakdownSchema.nullable(),
   score: z.number().nullable(),
   semanticScore: z.number().nullable(),
   semanticReason: z.string().nullable(),
@@ -81,6 +106,7 @@ export const MissionSerializedSchema = z.object({
     .union([z.date(), z.string()])
     .transform((val) => (typeof val === 'string' ? new Date(val) : val)),
   seniority: SeniorityLevelSchema.nullable(),
+  scoreBreakdown: ScoreBreakdownSchema.nullable(),
   score: z.number().nullable(),
   semanticScore: z.number().nullable(),
   semanticReason: z.string().nullable(),
