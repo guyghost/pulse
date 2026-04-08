@@ -115,12 +115,10 @@ export class CollectiveConnector extends BaseConnector {
               const data = (await resp.json()) as {
                 data?: { me?: { members?: { collective?: { slug?: string } }[] } };
               };
-              if (data.data?.me?.members && data.data.me.members.length > 0) {
-                console.debug(
-                  '[collective] detectSession: fallback detection succeeded, user slug:',
-                  data.data.me.members[0]?.collective?.slug
-                );
-                this.userSlug = data.data.me.members[0]?.collective?.slug ?? null;
+              const slug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
+              if (slug) {
+                console.debug('[collective] detectSession: fallback succeeded, slug:', slug);
+                this.userSlug = slug;
                 return ok(true);
               }
             }
@@ -152,6 +150,7 @@ export class CollectiveConnector extends BaseConnector {
             data?: { me?: { members?: { collective?: { slug?: string } }[] } };
           };
           this.userSlug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
+          if (import.meta.env.DEV) console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
         }
       } catch {
         // Non-blocking — URLs will use fallback
@@ -171,59 +170,109 @@ export class CollectiveConnector extends BaseConnector {
       // Verify cookie rule is active, re-inject if needed
       const ruleActive = await verifyCookieRule(COOKIE_RULE_ID);
       if (!ruleActive) {
-        console.debug('[collective] fetchMissions: cookie rule not active, re-injecting');
+        console.log('[collective] fetchMissions: cookie rule not active, re-injecting');
         await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
       }
+
+      // Log cookie state for diagnostics
+      const cookieCount = await getCookieCount(COOKIE_DOMAIN);
+      const cookieNames = await getCookieNames(COOKIE_DOMAIN);
+      if (import.meta.env.DEV) console.log(`[collective] fetchMissions: ${cookieCount} cookies for ${COOKIE_DOMAIN}: [${cookieNames.join(', ')}]`);
+
+      // Discover user slug for mission URLs (if not already known)
+      if (!this.userSlug) {
+        try {
+          const meResp = await fetch(API_URL, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: GET_ME_QUERY }),
+          });
+          if (meResp.ok) {
+            const meData = (await meResp.json()) as {
+              data?: { me?: { members?: { collective?: { slug?: string } }[] } };
+            };
+            this.userSlug = meData.data?.me?.members?.[0]?.collective?.slug ?? null;
+            if (import.meta.env.DEV) console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+          } else {
+            if (import.meta.env.DEV) console.warn(`[collective] GET_ME failed: HTTP ${meResp.status}`);
+          }
+        } catch {
+          // Non-blocking — URLs will use fallback
+        }
+      }
+
+      if (cookieCount === 0) {
+        return err(
+          createConnectorError(
+            'Collective: aucun cookie trouv\u00e9. Connectez-vous sur app.collective.work puis relancez le scan.',
+            { connectorId: this.id, phase: 'detect', context: { cookieCount: 0 } },
+            now
+          )
+        );
+      }
+
+      const body = JSON.stringify({
+        query: SEARCH_QUERY,
+        variables: {
+          data: {
+            query: context?.query ?? '',
+            dailyRates: { from: 0, to: null },
+            locations: context?.location ? [context.location] : [],
+            skills: context?.skills ?? [],
+            workPreferences:
+              context?.remote && context.remote !== 'any'
+                ? [
+                    context.remote === 'full'
+                      ? 'fullRemote'
+                      : context.remote === 'hybrid'
+                        ? 'hybrid'
+                        : 'onsite',
+                  ]
+                : [],
+            exclusive: false,
+            hasDailyRate: false,
+            companies: [],
+            fromTopRecruiter: false,
+            idealStartDate: [],
+            contractType: 'All',
+            offerLanguages: [],
+            from: 0,
+            // Note: 'sort' field was removed from Collective API (caused BAD_USER_INPUT since ~April 2026)
+            // The API now returns results sorted by publishedAt by default.
+            explain: false,
+          },
+        },
+      });
 
       const response = await fetch(API_URL, {
         method: 'POST',
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          query: SEARCH_QUERY,
-          variables: {
-            data: {
-              query: context?.query ?? '',
-              dailyRates: { from: 0, to: null },
-              locations: context?.location ? [context.location] : [],
-              skills: context?.skills ?? [],
-              workPreferences:
-                context?.remote && context.remote !== 'any'
-                  ? [
-                      context.remote === 'full'
-                        ? 'fullRemote'
-                        : context.remote === 'hybrid'
-                          ? 'hybrid'
-                          : 'onsite',
-                    ]
-                  : [],
-              exclusive: false,
-              hasDailyRate: false,
-              companies: [],
-              fromTopRecruiter: false,
-              idealStartDate: [],
-              contractType: 'All',
-              offerLanguages: [],
-              from: 0,
-              sort: 'PublishedAt',
-              explain: false,
-            },
-          },
-        }),
+        body,
       });
 
-      if (!response.ok) {
+      const contentType = response.headers.get('content-type') ?? '';
+      if (import.meta.env.DEV) console.log(`[collective] fetchMissions: HTTP ${response.status}, content-type: ${contentType}`);
+
+      // Cloudflare challenge returns HTML with 403
+      if (!response.ok || !contentType.includes('json')) {
+        const preview = await response.text().then(t => t.slice(0, 300)).catch(() => '(unreadable)');
+        if (import.meta.env.DEV) console.error(`[collective] fetchMissions: blocked — status=${response.status}, preview: ${preview}`);
         await removeCookieRule(COOKIE_RULE_ID);
         return err(
           createConnectorError(
-            `Collective API error: ${response.status}`,
+            response.status === 403
+              ? 'Collective: bloqu\u00e9 par Cloudflare. Visitez app.collective.work dans un onglet puis relancez le scan.'
+              : `Collective API error: ${response.status}`,
             {
               connectorId: this.id,
               phase: 'fetch',
               context: {
                 status: response.status,
-                browser: detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '')
-                  .name,
+                contentType,
+                cloudflare: response.status === 403,
+                browser: detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '').name,
               },
             },
             now
@@ -238,9 +287,28 @@ export class CollectiveConnector extends BaseConnector {
             pagination?: { total: number };
           };
         };
+        errors?: { message: string; extensions?: Record<string, unknown>; path?: string[]; locations?: unknown[] }[];
       };
 
+      // GraphQL errors (auth, schema, etc.)
+      if (result.errors && result.errors.length > 0) {
+        const fullErrors = JSON.stringify(result.errors).slice(0, 1000);
+        if (import.meta.env.DEV) console.error(`[collective] fetchMissions: GraphQL errors (full):`, fullErrors);
+
+        await removeCookieRule(COOKIE_RULE_ID);
+        return err(
+          createConnectorError(
+            `Collective GraphQL error: ${fullErrors}`,
+            { connectorId: this.id, phase: 'fetch', context: { errors: result.errors } },
+            now
+          )
+        );
+      }
+
       const projects = result.data?.results?.projects ?? [];
+      const total = result.data?.results?.pagination?.total ?? 0;
+      if (import.meta.env.DEV) console.log(`[collective] fetchMissions: ${projects.length} projects returned (total: ${total})`);
+
       const missions = projects.map((p) =>
         createMission({
           id: `col-${p.id}`,
@@ -265,6 +333,7 @@ export class CollectiveConnector extends BaseConnector {
     } catch (e) {
       await removeCookieRule(COOKIE_RULE_ID);
       const message = e instanceof Error ? e.message : String(e);
+      console.error('[collective] fetchMissions: unexpected error:', message);
       return err(
         createConnectorError(
           `Unexpected error fetching missions from Collective: ${message}`,
