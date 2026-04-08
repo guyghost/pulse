@@ -65,7 +65,7 @@
     }
 </script>
 
-<div class="space-y-5">
+<div class="space-y-5 pb-2">
     <div class="space-y-2">
         <div>
             <p class="text-sm font-semibold text-white">Votre profil cible</p>
