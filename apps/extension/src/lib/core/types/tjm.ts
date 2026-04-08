@@ -7,6 +7,23 @@ import type { SeniorityLevel } from './profile';
 /** Direction of TJM trend for a given technology stack */
 export type TJMTrend = 'up' | 'stable' | 'down';
 
+/** Normalized French region identifier */
+export type TJMRegion =
+  | 'ile-de-france'
+  | 'lyon'
+  | 'marseille'
+  | 'toulouse'
+  | 'bordeaux'
+  | 'nantes'
+  | 'lille'
+  | 'strasbourg'
+  | 'rennes'
+  | 'grenoble'
+  | 'montpellier'
+  | 'nice'
+  | 'remote'
+  | 'other';
+
 /** A single TJM data point extracted from missions at a specific date */
 export interface TJMRecord {
   /** Normalized technology stack name (lowercase) */
@@ -23,6 +40,8 @@ export interface TJMRecord {
   sampleCount: number;
   /** Experience level extracted from missions, null when unavailable */
   seniority: SeniorityLevel | null;
+  /** Normalized region, null for records created before region tracking */
+  region: TJMRegion | null;
 }
 
 /** Aggregated statistics for a technology stack over time */
@@ -60,6 +79,17 @@ export interface TJMStackInsight {
   lastUpdated: string | null;
 }
 
+/** TJM insight for a specific region. */
+export interface TJMRegionInsight {
+  region: TJMRegion;
+  label: string;
+  average: number;
+  min: number;
+  max: number;
+  sampleCount: number;
+  trend: TJMTrend;
+}
+
 /** UI-ready analysis for the TJM dashboard. */
 export interface TJMAnalysis {
   trend: TJMTrend;
@@ -72,6 +102,8 @@ export interface TJMAnalysis {
   recommendation: string | null;
   lastUpdated: string | null;
   topStacks: TJMStackInsight[];
+  /** Per-region TJM insights, sorted by average descending */
+  regionInsights: TJMRegionInsight[];
 }
 
 /** History of TJM records, indexed by stack */

@@ -11,10 +11,13 @@ import type {
   TJMHistory,
   TJMRange,
   TJMRecord,
+  TJMRegion,
+  TJMRegionInsight,
   TJMStackInsight,
   TJMStats,
   TJMTrend,
 } from '../types/tjm';
+import { normalizeRegion, REGION_LABELS } from './normalize-region';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -45,6 +48,7 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
     tjms: number[];
     seniority: SeniorityLevel | null;
     stack: string;
+    region: TJMRegion;
   }
 
   const groups = new Map<string, StackGroup>();
@@ -57,6 +61,8 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
       continue;
     }
 
+    const region = normalizeRegion(mission.location, mission.remote);
+
     for (const tech of mission.stack) {
       if (!tech) {
         continue;
@@ -67,7 +73,7 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
       }
 
       const seniorityKey = mission.seniority ?? 'unknown';
-      const groupKey = `${normalizedStack}:${seniorityKey}`;
+      const groupKey = `${normalizedStack}:${seniorityKey}:${region}`;
 
       const existing = groups.get(groupKey);
       if (existing) {
@@ -77,6 +83,7 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
           tjms: [mission.tjm],
           seniority: mission.seniority,
           stack: normalizedStack,
+          region,
         });
       }
     }
@@ -85,7 +92,7 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
   const records: TJMRecord[] = [];
 
   for (const group of groups.values()) {
-    const { tjms, seniority, stack } = group;
+    const { tjms, seniority, stack, region } = group;
     const min = Math.min(...tjms);
     const max = Math.max(...tjms);
     const sum = tjms.reduce((acc, t) => acc + t, 0);
@@ -99,6 +106,7 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
       average,
       sampleCount: tjms.length,
       seniority,
+      region,
     });
   }
 
@@ -121,11 +129,17 @@ export const addRecords = (history: TJMHistory, newRecords: TJMRecord[]): TJMHis
   const existingByKey = new Map<string, TJMRecord>();
 
   for (const record of history.records) {
-    existingByKey.set(`${record.stack}:${record.date}:${record.seniority ?? 'unknown'}`, record);
+    existingByKey.set(
+      `${record.stack}:${record.date}:${record.seniority ?? 'unknown'}:${record.region ?? 'other'}`,
+      record
+    );
   }
 
   for (const record of newRecords) {
-    existingByKey.set(`${record.stack}:${record.date}:${record.seniority ?? 'unknown'}`, record);
+    existingByKey.set(
+      `${record.stack}:${record.date}:${record.seniority ?? 'unknown'}:${record.region ?? 'other'}`,
+      record
+    );
   }
 
   const merged = Array.from(existingByKey.values());
@@ -401,24 +415,153 @@ const collectAllAverages = (records: TJMRecord[]): number[] =>
   records.map((r) => r.average).filter((v) => v > 0);
 
 /**
- * Build a TJMRange for a seniority level, with fallback strategy:
- * 1. Use averages from records matching the level
- * 2. If empty, fall back to unknown bucket
- * 3. If still empty, fall back to all averages
+ * Build seniority ranges by combining real seniority data with unknown records.
+ *
+ * Strategy:
+ * 1. Collect averages for each level from records that have real seniority tags
+ * 2. Distribute unknown records (seniority === null) into the appropriate third
+ *    using sliceIntoThirds, then merge them with the real data
+ * 3. If no real seniority data exists for a level, use only the unknown-third values
+ * 4. Enforce ordering: junior.median ≤ confirmed.median ≤ senior.median
  */
-const buildRangeForLevel = (records: TJMRecord[], level: SeniorityLevel): TJMRange => {
-  const levelValues = collectAveragesForSeniority(records, level);
-  if (levelValues.length > 0) {
-    return buildRange(levelValues);
-  }
+const buildSeniorityRanges = (
+  records: TJMRecord[]
+): { junior: TJMRange; confirmed: TJMRange; senior: TJMRange } => {
+  const juniorReal = collectAveragesForSeniority(records, 'junior');
+  const confirmedReal = collectAveragesForSeniority(records, 'confirmed');
+  const seniorReal = collectAveragesForSeniority(records, 'senior');
 
   const unknownValues = collectAveragesUnknown(records);
-  if (unknownValues.length > 0) {
-    return buildRange(unknownValues);
+
+  // Distribute unknown values into thirds so they supplement (not replace) real data
+  const [unknownJunior, unknownConfirmed, unknownSenior] = sliceIntoThirds(unknownValues);
+
+  // Merge real + unknown-third for each level
+  const juniorAll = [...juniorReal, ...(juniorReal.length === 0 ? unknownJunior : [])];
+  const confirmedAll = [
+    ...confirmedReal,
+    ...(confirmedReal.length === 0 ? unknownConfirmed : []),
+  ];
+  const seniorAll = [...seniorReal, ...(seniorReal.length === 0 ? unknownSenior : [])];
+
+  // Last resort: if still empty, use all averages
+  const allValues = collectAllAverages(records);
+  const juniorFinal = juniorAll.length > 0 ? juniorAll : allValues;
+  const confirmedFinal = confirmedAll.length > 0 ? confirmedAll : allValues;
+  const seniorFinal = seniorAll.length > 0 ? seniorAll : allValues;
+
+  let junior = buildRange(juniorFinal);
+  let confirmed = buildRange(confirmedFinal);
+  let senior = buildRange(seniorFinal);
+
+  // Enforce ordering: junior.median ≤ confirmed.median ≤ senior.median
+  if (confirmed.median < junior.median) {
+    const swap = confirmed;
+    confirmed = junior;
+    junior = swap;
+  }
+  if (senior.median < confirmed.median) {
+    const swap = senior;
+    senior = confirmed;
+    confirmed = swap;
+  }
+  // Re-check junior ≤ confirmed after the senior swap might have pushed confirmed down
+  if (confirmed.median < junior.median) {
+    const swap = confirmed;
+    confirmed = junior;
+    junior = swap;
   }
 
-  const allValues = collectAllAverages(records);
-  return buildRange(allValues);
+  return { junior, confirmed, senior };
+};
+
+// ---------------------------------------------------------------------------
+// Region insights (pure)
+// ---------------------------------------------------------------------------
+
+/**
+ * Build per-region TJM insights from history records.
+ * Groups all records by region, computes weighted average, min, max, trend.
+ * Returns insights sorted by average descending, excluding 'other' if few samples.
+ */
+const buildRegionInsights = (history: TJMHistory): TJMRegionInsight[] => {
+  interface RegionGroup {
+    region: TJMRegion;
+    entries: Array<{ average: number; sampleCount: number; date: string }>;
+  }
+
+  const groups = new Map<TJMRegion, RegionGroup>();
+
+  for (const record of history.records) {
+    const region = record.region ?? 'other';
+    if (record.average <= 0) continue;
+
+    const existing = groups.get(region);
+    if (existing) {
+      existing.entries.push({
+        average: record.average,
+        sampleCount: record.sampleCount,
+        date: record.date,
+      });
+    } else {
+      groups.set(region, {
+        region,
+        entries: [
+          { average: record.average, sampleCount: record.sampleCount, date: record.date },
+        ],
+      });
+    }
+  }
+
+  const insights: TJMRegionInsight[] = [];
+
+  for (const group of groups.values()) {
+    const { region, entries } = group;
+    const totalSamples = entries.reduce((sum, e) => sum + e.sampleCount, 0);
+    if (totalSamples === 0) continue;
+
+    // Weighted average by sample count
+    const weightedSum = entries.reduce((sum, e) => sum + e.average * e.sampleCount, 0);
+    const average = Math.round(weightedSum / totalSamples);
+
+    const averages = entries.map((e) => e.average);
+    const min = Math.min(...averages);
+    const max = Math.max(...averages);
+
+    // Trend: compare latest date entries vs previous date entries
+    const sortedDates = [...new Set(entries.map((e) => e.date))].sort();
+    let trend: TJMTrend = 'stable';
+    if (sortedDates.length >= 2) {
+      const latestDate = sortedDates[sortedDates.length - 1];
+      const previousDate = sortedDates[sortedDates.length - 2];
+      const latestEntries = entries.filter((e) => e.date === latestDate);
+      const previousEntries = entries.filter((e) => e.date === previousDate);
+
+      const latestAvg =
+        latestEntries.reduce((s, e) => s + e.average * e.sampleCount, 0) /
+        latestEntries.reduce((s, e) => s + e.sampleCount, 0);
+      const previousAvg =
+        previousEntries.reduce((s, e) => s + e.average * e.sampleCount, 0) /
+        previousEntries.reduce((s, e) => s + e.sampleCount, 0);
+
+      trend = determineTrend(latestAvg, previousAvg);
+    }
+
+    insights.push({
+      region,
+      label: REGION_LABELS[region],
+      average,
+      min,
+      max,
+      sampleCount: totalSamples,
+      trend,
+    });
+  }
+
+  // Sort by average descending, filter out 'other' if only 1 sample
+  return insights
+    .filter((i) => i.region !== 'other' || i.sampleCount >= 2)
+    .sort((a, b) => b.average - a.average);
 };
 
 /**
@@ -457,10 +600,8 @@ export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
   let senior: TJMRange;
 
   if (hasRealSeniority) {
-    // Use actual seniority-grouped data
-    junior = buildRangeForLevel(history.records, 'junior');
-    confirmed = buildRangeForLevel(history.records, 'confirmed');
-    senior = buildRangeForLevel(history.records, 'senior');
+    // Combine real seniority data with unknown records distributed into thirds
+    ({ junior, confirmed, senior } = buildSeniorityRanges(history.records));
   } else {
     // Fallback: statistical thirds (backward compatibility)
     const [juniorValues, confirmedValues, seniorValues] = sliceIntoThirds(latestAverages);
@@ -521,5 +662,6 @@ export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
     recommendation: buildRecommendation(trend, confirmed),
     lastUpdated,
     topStacks,
+    regionInsights: buildRegionInsights(history),
   };
 };

@@ -114,16 +114,18 @@
                 <div class="flex h-8 w-8 items-center justify-center rounded-lg {level.accentBg}">
                   <Icon name={level.icon} size={14} class={level.accentText} />
                 </div>
-                <p class="text-xs font-semibold uppercase tracking-[0.12em] text-text-secondary">
-                  {level.label}
-                </p>
+                <div>
+                  <p class="text-xs font-semibold uppercase tracking-[0.12em] text-text-secondary">
+                    {level.label}
+                  </p>
+                  <p class="mt-0.5 text-[10px] font-mono text-text-muted">{range.min}–{range.max}€</p>
+                </div>
               </div>
-              <div class="flex items-baseline gap-3">
-                <span class="text-[10px] font-mono text-text-muted">{range.min}–{range.max}€</span>
+              <div class="text-right">
                 <p class="text-2xl font-bold tabular-nums text-white">
-                  {range.median}<span class="ml-0.5 text-xs font-normal {level.accentText}">€</span>
-                  <span class="text-[10px] font-mono text-text-muted">/jour</span>
+                  {range.median}<span class="ml-0.5 text-sm font-normal {level.accentText}">€</span>
                 </p>
+                <p class="text-[10px] font-mono text-text-muted">/jour</p>
               </div>
             </div>
           </div>
@@ -131,53 +133,51 @@
       {/each}
     </div>
 
-    <!-- Top stacks -->
-    {#if analysis.topStacks.length > 0}
+    <!-- Region insights -->
+    {#if analysis.regionInsights && analysis.regionInsights.length > 0}
       <div class="section-card rounded-[1.5rem] p-4">
         <p class="text-[11px] font-semibold uppercase tracking-[0.15em] text-text-muted mb-3">
-          Stacks suivies
+          TJM par région
         </p>
-        <div class="space-y-2">
-          {#each analysis.topStacks as stack}
+        <div class="space-y-2.5">
+          {#each analysis.regionInsights.slice(0, 8) as region}
             {@const barWidth = Math.max(
               15,
-              Math.round((stack.average / (analysis.topStacks[0]?.average || 1)) * 100)
+              Math.round(
+                (region.average / (analysis.regionInsights[0]?.average || 1)) * 100
+              )
             )}
-            <div class="flex items-center gap-3">
-              <span class="w-20 truncate text-xs font-medium text-text-primary">{stack.stack}</span>
-              <div class="relative h-1.5 flex-1 rounded-full bg-white/[0.06]">
+            <div class="space-y-1">
+              <div class="flex items-center justify-between">
+                <span class="truncate text-xs font-medium text-text-primary">
+                  {region.label}
+                </span>
+                <div class="flex shrink-0 items-center gap-2 pl-3">
+                  <span class="text-[10px] font-mono text-text-muted">
+                    {region.min}–{region.max}€
+                  </span>
+                  <span
+                    class="text-[11px] font-mono tabular-nums {region.trend === 'up'
+                      ? 'text-accent-emerald'
+                      : region.trend === 'down'
+                        ? 'text-accent-red'
+                        : 'text-text-secondary'}"
+                  >
+                    {region.average}€
+                  </span>
+                </div>
+              </div>
+              <div class="relative h-1.5 rounded-full bg-white/[0.06]">
                 <div
                   class="h-full rounded-full transition-all duration-500
-                    {stack.trend === 'up'
+                    {region.trend === 'up'
                     ? 'bg-accent-emerald/50'
-                    : stack.trend === 'down'
+                    : region.trend === 'down'
                       ? 'bg-accent-red/40'
-                      : 'bg-white/20'}"
+                      : 'bg-accent-blue/30'}"
                   style:width="{barWidth}%"
                 ></div>
               </div>
-              <span
-                class="w-14 text-right text-[11px] font-mono tabular-nums {stack.trend === 'up'
-                  ? 'text-accent-emerald'
-                  : stack.trend === 'down'
-                    ? 'text-accent-red'
-                    : 'text-text-secondary'}"
-              >
-                {stack.average}€
-              </span>
-              <Icon
-                name={stack.trend === 'up'
-                  ? 'trending-up'
-                  : stack.trend === 'down'
-                    ? 'trending-down'
-                    : 'minus'}
-                size={10}
-                class={stack.trend === 'up'
-                  ? 'text-accent-emerald'
-                  : stack.trend === 'down'
-                    ? 'text-accent-red'
-                    : 'text-text-muted'}
-              />
             </div>
           {/each}
         </div>

@@ -34,10 +34,11 @@ export const loadTJMHistory = async (): Promise<TJMHistory> => {
       typeof r.sampleCount === 'number'
   );
 
-  // Migration: old records without seniority field
-  const migratedRecords = validRecords.map((r: TJMRecord & { seniority?: unknown }) => ({
+  // Migration: old records without seniority or region fields
+  const migratedRecords = validRecords.map((r: TJMRecord & { seniority?: unknown; region?: unknown }) => ({
     ...r,
     seniority: r.seniority ?? null,
+    region: r.region ?? null,
   }));
 
   return { records: migratedRecords };

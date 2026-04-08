@@ -108,6 +108,7 @@ export function generateMockTJMHistory(): TJMHistory {
         average: avg,
         sampleCount: 3 + Math.floor(Math.random() * 8),
         seniority: seniorityLevels[Math.floor(Math.random() * seniorityLevels.length)],
+        region: (['ile-de-france', 'lyon', 'remote', 'bordeaux', 'nantes', 'other'] as const)[Math.floor(Math.random() * 6)],
       });
     }
   }

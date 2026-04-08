@@ -10,6 +10,7 @@ const makeRecord = (overrides: Partial<TJMRecord> = {}): TJMRecord => ({
   average: 550,
   sampleCount: 3,
   seniority: null,
+  region: null,
   ...overrides,
 });
 
@@ -39,6 +40,7 @@ describe('analyzeTJMHistory', () => {
     expect(analysis!.topStacks).toHaveLength(3);
     expect(analysis!.confirmed.median).toBeGreaterThan(0);
     expect(analysis!.senior.max).toBeGreaterThanOrEqual(analysis!.confirmed.max);
+    expect(analysis!.regionInsights).toBeDefined();
   });
 
   it('marks the market as down when most tracked stacks are decreasing', () => {
@@ -71,5 +73,53 @@ describe('analyzeTJMHistory', () => {
     expect(analysis!.junior.min).toBeGreaterThan(0);
     expect(analysis!.confirmed.min).toBeGreaterThan(0);
     expect(analysis!.senior.min).toBeGreaterThan(0);
+  });
+
+  it('computes region insights from records with region data', () => {
+    const history = makeHistory([
+      makeRecord({ stack: 'react', average: 600, sampleCount: 5, region: 'ile-de-france' }),
+      makeRecord({ stack: 'vue', average: 580, sampleCount: 3, region: 'ile-de-france' }),
+      makeRecord({ stack: 'react', average: 480, sampleCount: 4, region: 'lyon' }),
+      makeRecord({ stack: 'vue', average: 460, sampleCount: 2, region: 'lyon' }),
+      makeRecord({ stack: 'react', average: 550, sampleCount: 3, region: 'remote' }),
+    ]);
+
+    const analysis = analyzeTJMHistory(history);
+    expect(analysis).not.toBeNull();
+
+    const { regionInsights } = analysis!;
+    expect(regionInsights.length).toBeGreaterThanOrEqual(3);
+
+    // Sorted by average desc → IDF should be first
+    const idf = regionInsights.find((r) => r.region === 'ile-de-france');
+    const lyon = regionInsights.find((r) => r.region === 'lyon');
+    const remote = regionInsights.find((r) => r.region === 'remote');
+
+    expect(idf).toBeDefined();
+    expect(lyon).toBeDefined();
+    expect(remote).toBeDefined();
+
+    // IDF weighted average: (600*5 + 580*3) / 8 = 4740/8 = 593
+    expect(idf!.average).toBe(593);
+    expect(idf!.label).toBe('Île-de-France');
+
+    // Lyon weighted average: (480*4 + 460*2) / 6 = 2840/6 = 473
+    expect(lyon!.average).toBe(473);
+
+    // IDF average > Lyon average
+    expect(idf!.average).toBeGreaterThan(lyon!.average);
+  });
+
+  it('excludes other region with only 1 sample', () => {
+    const history = makeHistory([
+      makeRecord({ stack: 'react', average: 500, sampleCount: 1, region: 'other' }),
+      makeRecord({ stack: 'react', average: 600, sampleCount: 5, region: 'ile-de-france' }),
+    ]);
+
+    const analysis = analyzeTJMHistory(history);
+    expect(analysis).not.toBeNull();
+
+    const otherInsight = analysis!.regionInsights.find((r) => r.region === 'other');
+    expect(otherInsight).toBeUndefined();
   });
 });

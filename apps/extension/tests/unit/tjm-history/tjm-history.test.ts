@@ -84,6 +84,7 @@ describe('extractRecords', () => {
       average: 500,
       sampleCount: 1,
       seniority: null,
+      region: 'other',
     });
   });
 
@@ -194,6 +195,7 @@ describe('extractRecords', () => {
       average: 450,
       sampleCount: 1,
       seniority: 'confirmed',
+      region: 'other',
     });
   });
 
@@ -730,5 +732,144 @@ describe('analyzeTJMHistory', () => {
     expect(analysis!.senior.min).toBe(600);
     expect(analysis!.senior.max).toBe(600);
     expect(analysis!.senior.median).toBe(600);
+  });
+
+  it('does not produce senior < junior when senior seniority is missing', () => {
+    // BUG REPRO: Only junior/confirmed have real seniority tags.
+    // Unknown records (from other connectors) have mixed low TJMs.
+    // Old code fell back to the unknown bucket for senior → senior.median < junior.median.
+    const records = [
+      // FreeWork junior missions (tagged)
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 400,
+        min: 350,
+        max: 450,
+        seniority: 'junior',
+      }),
+      makeRecord({
+        stack: 'vue',
+        date: '2026-04-01',
+        average: 420,
+        min: 380,
+        max: 460,
+        seniority: 'junior',
+      }),
+      // FreeWork confirmed missions (tagged)
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 520,
+        min: 480,
+        max: 560,
+        seniority: 'confirmed',
+      }),
+      makeRecord({
+        stack: 'vue',
+        date: '2026-04-01',
+        average: 540,
+        min: 500,
+        max: 580,
+        seniority: 'confirmed',
+      }),
+      // NO senior-tagged records
+      // Other connectors (LeHibou, etc.) — no seniority, mixed TJMs
+      makeRecord({
+        stack: 'node',
+        date: '2026-04-01',
+        average: 300,
+        min: 280,
+        max: 320,
+        seniority: null,
+      }),
+      makeRecord({
+        stack: 'python',
+        date: '2026-04-01',
+        average: 350,
+        min: 320,
+        max: 380,
+        seniority: null,
+      }),
+      makeRecord({
+        stack: 'java',
+        date: '2026-04-01',
+        average: 500,
+        min: 450,
+        max: 550,
+        seniority: null,
+      }),
+      makeRecord({
+        stack: 'go',
+        date: '2026-04-01',
+        average: 550,
+        min: 510,
+        max: 590,
+        seniority: null,
+      }),
+      makeRecord({
+        stack: 'rust',
+        date: '2026-04-01',
+        average: 600,
+        min: 560,
+        max: 640,
+        seniority: null,
+      }),
+      makeRecord({
+        stack: 'scala',
+        date: '2026-04-01',
+        average: 650,
+        min: 610,
+        max: 690,
+        seniority: null,
+      }),
+    ];
+
+    const analysis = analyzeTJMHistory(makeHistory(records));
+    expect(analysis).not.toBeNull();
+
+    // Core invariant: junior ≤ confirmed ≤ senior
+    expect(analysis!.junior.median).toBeLessThanOrEqual(analysis!.confirmed.median);
+    expect(analysis!.confirmed.median).toBeLessThanOrEqual(analysis!.senior.median);
+
+    // Senior should use the top third of unknown records, not the whole unknown bucket
+    expect(analysis!.senior.median).toBeGreaterThanOrEqual(analysis!.junior.median);
+  });
+
+  it('always enforces junior ≤ confirmed ≤ senior ordering', () => {
+    // Edge case: seniority data exists but with unusual TJM values
+    const records = [
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 700,
+        min: 700,
+        max: 700,
+        seniority: 'junior',
+      }),
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 400,
+        min: 400,
+        max: 400,
+        seniority: 'confirmed',
+      }),
+      makeRecord({
+        stack: 'react',
+        date: '2026-04-01',
+        average: 300,
+        min: 300,
+        max: 300,
+        seniority: 'senior',
+      }),
+    ];
+
+    const analysis = analyzeTJMHistory(makeHistory(records));
+    expect(analysis).not.toBeNull();
+
+    // Even with inverted raw data, ordering must be enforced
+    expect(analysis!.junior.median).toBeLessThanOrEqual(analysis!.confirmed.median);
+    expect(analysis!.confirmed.median).toBeLessThanOrEqual(analysis!.senior.median);
   });
 });
