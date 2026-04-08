@@ -1,4 +1,7 @@
 import type { Mission } from '../../core/types/mission';
+import type { MissionTracking } from '../../core/types/tracking';
+import type { ApplicationStatus } from '../../core/types/tracking';
+import type { GeneratedAsset, GenerationType } from '../../core/types/generation';
 import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorState } from '../../core/types/connector-status';
 import type { AppError } from '../../core/errors/app-error';
@@ -37,6 +40,16 @@ export type BridgeMessage =
   | { type: 'SCAN_COMPLETE'; payload: Mission[] }
   | { type: 'SCAN_ERROR'; payload: { message: string; code: string } }
   | { type: 'SCAN_CANCEL' }
+  // Tracking
+  | { type: 'UPDATE_TRACKING'; payload: { missionId: string; status: ApplicationStatus; note?: string } }
+  | { type: 'TRACKING_UPDATED'; payload: MissionTracking }
+  | { type: 'GET_TRACKINGS'; payload?: { status?: ApplicationStatus } }
+  | { type: 'TRACKINGS_RESULT'; payload: MissionTracking[] }
+  // Generation
+  | { type: 'GENERATE_ASSET'; payload: { missionId: string; generationType: GenerationType } }
+  | { type: 'GENERATION_RESULT'; payload: GeneratedAsset | null }
+  | { type: 'GET_GENERATED_ASSETS'; payload: { missionId: string } }
+  | { type: 'GENERATED_ASSETS_RESULT'; payload: GeneratedAsset[] }
   // Toast
   | { type: 'SHOW_TOAST'; payload: { message: string; toastType: ToastType; duration?: number } }
   | { type: 'TOAST_SHOWN' }
