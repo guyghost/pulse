@@ -9,3 +9,8 @@ coverage/
 .claude/worktrees/
 .worktrees/
 .turbo/
+.ralph/
+.idea/
+.vscode/
+.worktrees/
+.conductor/

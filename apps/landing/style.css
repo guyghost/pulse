@@ -161,7 +161,13 @@ p {
 }
 
 .section {
-  padding: var(--space-4xl) 0;
+  padding: var(--space-2xl) 0;
+}
+
+@media (min-width: 768px) {
+  .section {
+    padding: var(--space-4xl) 0;
+  }
 }
 
 .section-header {
@@ -529,6 +535,19 @@ p {
   margin-bottom: var(--space-xl);
 }
 
+/* On very small screens, make CTA buttons full-width and stacked */
+@media (max-width: 480px) {
+  .hero__actions {
+    flex-direction: column;
+    align-items: stretch;
+  }
+  
+  .hero__actions .btn {
+    width: 100%;
+    justify-content: center;
+  }
+}
+
 .hero__meta {
   display: flex;
   flex-wrap: wrap;
@@ -713,7 +732,7 @@ p {
 
 /* ===== Stats Section ===== */
 .stats {
-  padding: var(--space-3xl) 0;
+  padding: var(--space-xl) 0;
   border-top: 1px solid var(--glass-border);
   border-bottom: 1px solid var(--glass-border);
   background: linear-gradient(180deg, rgba(14, 116, 144, 0.05) 0%, transparent 100%);
@@ -751,7 +770,7 @@ p {
 
 /* ===== Features Section ===== */
 .features {
-  padding: var(--space-4xl) 0;
+  /* padding inherited from .section */
 }
 
 .features__grid {
@@ -818,35 +837,41 @@ p {
 
 /* ===== How It Works Section ===== */
 .how-it-works {
-  padding: var(--space-4xl) 0;
+  /* padding inherited from .section */
   background: linear-gradient(180deg, transparent 0%, rgba(14, 116, 144, 0.03) 50%, transparent 100%);
 }
 
 .steps {
   display: flex;
   flex-direction: column;
-  gap: var(--space-xl);
-  max-width: 800px;
+  gap: 0;
+  max-width: 640px;
   margin: 0 auto;
   position: relative;
 }
 
+/* Vertical timeline line connecting the step numbers */
 .steps::before {
   content: '';
   position: absolute;
-  left: 24px;
+  left: 23px;
   top: 48px;
   bottom: 48px;
   width: 2px;
   background: linear-gradient(180deg, var(--color-accent-cyan) 0%, var(--color-accent-blue) 100%);
-  opacity: 0.3;
+  opacity: 0.2;
 }
 
 .step {
   display: flex;
-  gap: var(--space-xl);
+  gap: var(--space-lg);
   align-items: flex-start;
   position: relative;
+  padding-bottom: var(--space-xl);
+}
+
+.step:last-child {
+  padding-bottom: 0;
 }
 
 .step__number {
@@ -868,14 +893,14 @@ p {
 
 .step__content {
   flex: 1;
-  padding-top: var(--space-sm);
+  padding-top: 0.625rem; /* vertically center-align with the 48px number circle */
 }
 
 .step__title {
   font-size: 1.125rem;
   font-weight: 700;
   color: var(--color-text-primary);
-  margin-bottom: var(--space-sm);
+  margin-bottom: var(--space-xs);
 }
 
 .step__desc {
@@ -884,44 +909,29 @@ p {
   line-height: 1.7;
 }
 
+/* Desktop: two-column grid, no absolute positioning */
 @media (min-width: 768px) {
+  .steps {
+    max-width: 900px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: var(--space-lg) var(--space-2xl);
+  }
+
+  /* Remove the vertical line on desktop grid */
   .steps::before {
-    left: 50%;
-    transform: translateX(-50%);
+    display: none;
   }
-  
+
   .step {
-    flex-direction: row;
-    text-align: left;
-  }
-  
-  .step:nth-child(even) {
-    flex-direction: row-reverse;
-  }
-  
-  .step:nth-child(even) .step__content {
-    text-align: right;
-  }
-  
-  .step__number {
-    position: absolute;
-    left: 50%;
-    transform: translateX(-50%);
-  }
-  
-  .step__content {
-    width: calc(50% - 48px);
-    padding-top: var(--space-md);
-  }
-  
-  .step:nth-child(odd) .step__content {
-    margin-left: auto;
+    padding-bottom: 0;
+    gap: var(--space-md);
   }
 }
 
 /* ===== Platforms Section ===== */
 .platforms {
-  padding: var(--space-4xl) 0;
+  /* padding inherited from .section */
 }
 
 .platforms__grid {
@@ -952,6 +962,15 @@ p {
   font-size: 1.5rem;
   font-weight: 800;
   color: var(--color-accent-cyan);
+}
+
+.platform-card__logo-img {
+  width: 48px;
+  height: 48px;
+  object-fit: contain;
+  border-radius: var(--radius-lg);
+  background: #fff;
+  padding: 4px;
 }
 
 .platform-card__name {
@@ -1016,7 +1035,7 @@ p {
 
 /* ===== Tech Stack Section ===== */
 .tech-stack {
-  padding: var(--space-4xl) 0;
+  /* padding inherited from .section */
   border-top: 1px solid var(--glass-border);
   background: linear-gradient(180deg, rgba(14, 116, 144, 0.03) 0%, transparent 100%);
 }
@@ -1100,17 +1119,23 @@ p {
 
 /* ===== CTA Section ===== */
 .cta {
-  padding: var(--space-4xl) 0;
+  /* padding inherited from .section */
   text-align: center;
 }
 
 .cta__card {
-  padding: var(--space-3xl);
+  padding: var(--space-xl) var(--space-lg);
   background: linear-gradient(135deg, rgba(14, 116, 144, 0.15) 0%, rgba(59, 130, 246, 0.1) 100%);
   border: 1px solid rgba(34, 211, 238, 0.2);
   border-radius: var(--radius-2xl);
   position: relative;
   overflow: hidden;
+}
+
+@media (min-width: 768px) {
+  .cta__card {
+    padding: var(--space-3xl);
+  }
 }
 
 .cta__card::before {
@@ -1306,3 +1331,26 @@ p {
 .mb-md { margin-bottom: var(--space-md); }
 .mb-lg { margin-bottom: var(--space-lg); }
 .mb-xl { margin-bottom: var(--space-xl); }
+
+/* ===== 5-column platform grid ===== */
+@media (min-width: 768px) {
+  .platforms__grid--5 {
+    grid-template-columns: repeat(3, 1fr);
+  }
+}
+
+@media (min-width: 1024px) {
+  .platforms__grid--5 {
+    grid-template-columns: repeat(5, 1fr);
+  }
+  
+  .platforms__grid--5 .platform-card {
+    padding: var(--space-lg);
+  }
+}
+
+/* ===== For Who section (reuses features grid) ===== */
+.for-who {
+  /* padding inherited from .section */
+  background: linear-gradient(180deg, transparent 0%, rgba(14, 116, 144, 0.03) 50%, transparent 100%);
+}
