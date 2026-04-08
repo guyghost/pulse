@@ -36,6 +36,9 @@
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
   
+  <!-- Configuration (Chrome Store URL) -->
+  <script src="config.js"></script>
+  
   <!-- Stylesheet -->
   <link rel="stylesheet" href="style.css">
 </head>
@@ -455,7 +458,7 @@
           <p class="cta__desc">
             Installation gratuite en 30 secondes. Aucun compte à créer. Vos données restent chez vous.
           </p>
-          <a href="https://chromewebstore.google.com/detail/missionpulse" class="btn btn--primary btn--lg" target="_blank" rel="noopener noreferrer">
+          <a href="#" class="btn btn--primary btn--lg" data-store-link target="_blank" rel="noopener noreferrer">
             <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
               <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/>
               <polyline points="7 10 12 15 17 10"/>
@@ -546,6 +549,14 @@
             window.scrollTo({ top: target.getBoundingClientRect().top + window.pageYOffset - 68, behavior: 'smooth' });
           }
         });
+      });
+    })();
+
+    // Inject Chrome Store URL from config
+    (function() {
+      var url = (window.__PULSE_CONFIG__ && window.__PULSE_CONFIG__.CHROME_STORE_URL) || '#install';
+      document.querySelectorAll('[data-store-link]').forEach(function(el) {
+        el.setAttribute('href', url);
       });
     })();
   </script>
