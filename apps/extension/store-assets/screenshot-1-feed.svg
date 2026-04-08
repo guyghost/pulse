@@ -1,0 +1,181 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="800" viewBox="0 0 1280 800">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="0.3" y2="1">
+      <stop offset="0%" stop-color="#0F172A"/>
+      <stop offset="100%" stop-color="#1E293B"/>
+    </linearGradient>
+    <linearGradient id="pulse" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#22D3EE"/>
+      <stop offset="100%" stop-color="#3B82F6"/>
+    </linearGradient>
+    <linearGradient id="card" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0%" stop-color="rgba(255,255,255,0.08)"/>
+      <stop offset="100%" stop-color="rgba(255,255,255,0.03)"/>
+    </linearGradient>
+  </defs>
+
+  <!-- Background -->
+  <rect width="1280" height="800" fill="url(#bg)"/>
+  <!-- Glow effects -->
+  <circle cx="200" cy="200" r="200" fill="#3B82F6" opacity="0.06"/>
+  <circle cx="900" cy="600" r="250" fill="#10B981" opacity="0.04"/>
+
+  <!-- Left side: Side panel mockup -->
+  <g transform="translate(60, 40)">
+    <!-- Panel frame -->
+    <rect width="380" height="720" rx="20" fill="#1E293B" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+
+    <!-- Nav bar -->
+    <rect x="16" y="16" width="348" height="48" rx="24" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    <text x="80" y="46" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#F8FAFC" font-weight="600" letter-spacing="0.5">Feed</text>
+    <text x="170" y="46" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#64748B" font-weight="500" letter-spacing="0.5">TJM</text>
+    <text x="250" y="46" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#64748B" font-weight="500" letter-spacing="0.5">Settings</text>
+
+    <!-- Hero compact -->
+    <rect x="16" y="78" width="348" height="64" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <text x="32" y="100" font-family="Inter,system-ui,sans-serif" font-size="9" fill="#3B82F6" font-weight="700" letter-spacing="1.5" text-transform="uppercase">MISSIONPULSE</text>
+    <text x="32" y="126" font-family="Inter,system-ui,sans-serif" font-size="22" fill="#F8FAFC" font-weight="700">247</text>
+    <text x="80" y="126" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#64748B">missions</text>
+    <text x="150" y="126" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#F59E0B">★ 12</text>
+    <!-- Scan button -->
+    <circle cx="332" cy="110" r="16" fill="rgba(255,255,255,0.06)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+    <polygon points="328,104 328,116 338,110" fill="#F8FAFC"/>
+
+    <!-- Mission card 1 - high score -->
+    <rect x="16" y="156" width="348" height="120" rx="16" fill="url(#card)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+    <text x="32" y="180" font-family="Inter,system-ui,sans-serif" font-size="13" fill="#F8FAFC" font-weight="600">Dev React Senior — Fintech</text>
+    <text x="32" y="198" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8">BNP Paribas · Paris · Hybride</text>
+    <!-- Score badge -->
+    <rect x="300" y="164" width="48" height="24" rx="12" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.3)" stroke-width="1"/>
+    <text x="314" y="181" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#10B981" font-weight="700">92</text>
+    <!-- TJM -->
+    <text x="32" y="220" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#22D3EE" font-weight="600">650 €/j</text>
+    <text x="100" y="220" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#64748B">· 6 mois · Renouvelable</text>
+    <!-- Stack chips -->
+    <rect x="32" y="234" width="50" height="22" rx="11" fill="rgba(59,130,246,0.1)"/>
+    <text x="42" y="249" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#3B82F6">React</text>
+    <rect x="90" y="234" width="72" height="22" rx="11" fill="rgba(59,130,246,0.1)"/>
+    <text x="100" y="249" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#3B82F6">TypeScript</text>
+    <rect x="170" y="234" width="48" height="22" rx="11" fill="rgba(59,130,246,0.1)"/>
+    <text x="180" y="249" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#3B82F6">Node</text>
+    <!-- Source -->
+    <text x="32" y="266" font-family="Inter,system-ui,sans-serif" font-size="9" fill="#64748B">Free-Work · il y a 2h</text>
+
+    <!-- Mission card 2 -->
+    <rect x="16" y="290" width="348" height="120" rx="16" fill="url(#card)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <text x="32" y="314" font-family="Inter,system-ui,sans-serif" font-size="13" fill="#F8FAFC" font-weight="600">Lead Dev Vue.js — E-commerce</text>
+    <text x="32" y="332" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8">Decathlon · Lille · Full remote</text>
+    <rect x="300" y="298" width="48" height="24" rx="12" fill="rgba(16,185,129,0.15)" stroke="rgba(16,185,129,0.3)" stroke-width="1"/>
+    <text x="314" y="315" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#10B981" font-weight="700">87</text>
+    <text x="32" y="354" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#22D3EE" font-weight="600">700 €/j</text>
+    <text x="100" y="354" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#64748B">· 12 mois</text>
+    <rect x="32" y="368" width="42" height="22" rx="11" fill="rgba(59,130,246,0.1)"/>
+    <text x="42" y="383" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#3B82F6">Vue</text>
+    <rect x="82" y="368" width="48" height="22" rx="11" fill="rgba(59,130,246,0.1)"/>
+    <text x="92" y="383" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#3B82F6">Nuxt</text>
+    <text x="32" y="400" font-family="Inter,system-ui,sans-serif" font-size="9" fill="#64748B">LeHibou · il y a 5h</text>
+
+    <!-- Mission card 3 -->
+    <rect x="16" y="424" width="348" height="120" rx="16" fill="url(#card)" stroke="rgba(255,255,255,0.06)" stroke-width="1"/>
+    <text x="32" y="448" font-family="Inter,system-ui,sans-serif" font-size="13" fill="#F8FAFC" font-weight="600">Architecte Cloud AWS</text>
+    <text x="32" y="466" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8">Société Générale · La Défense</text>
+    <rect x="300" y="432" width="48" height="24" rx="12" fill="rgba(245,158,11,0.15)" stroke="rgba(245,158,11,0.3)" stroke-width="1"/>
+    <text x="314" y="449" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#F59E0B" font-weight="700">74</text>
+    <text x="32" y="488" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#22D3EE" font-weight="600">750 €/j</text>
+    <text x="100" y="488" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#64748B">· 9 mois</text>
+    <rect x="32" y="502" width="42" height="22" rx="11" fill="rgba(59,130,246,0.1)"/>
+    <text x="42" y="517" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#3B82F6">AWS</text>
+    <rect x="82" y="502" width="68" height="22" rx="11" fill="rgba(59,130,246,0.1)"/>
+    <text x="92" y="517" font-family="Inter,system-ui,sans-serif" font-size="10" fill="#3B82F6">Terraform</text>
+    <text x="32" y="534" font-family="Inter,system-ui,sans-serif" font-size="9" fill="#64748B">Collective · il y a 1j</text>
+
+    <!-- Mission card 4 (partial) -->
+    <rect x="16" y="558" width="348" height="80" rx="16" fill="url(#card)" stroke="rgba(255,255,255,0.06)" stroke-width="1" opacity="0.6"/>
+    <text x="32" y="582" font-family="Inter,system-ui,sans-serif" font-size="13" fill="#F8FAFC" font-weight="600" opacity="0.7">Data Engineer Python/Spark</text>
+    <text x="32" y="600" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8" opacity="0.7">AXA · Nantes · Hybride</text>
+    <text x="32" y="622" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#22D3EE" font-weight="600" opacity="0.7">580 €/j</text>
+  </g>
+
+  <!-- Right side: Feature highlights -->
+  <g transform="translate(520, 80)">
+    <!-- Title -->
+    <text x="0" y="0" font-family="Inter,system-ui,sans-serif" font-size="42" fill="#F8FAFC" font-weight="800" letter-spacing="-1">Votre radar freelance</text>
+    <text x="0" y="50" font-family="Inter,system-ui,sans-serif" font-size="20" fill="#94A3B8" font-weight="400">5 plateformes · Scoring IA · 100% local</text>
+
+    <!-- Feature blocks -->
+    <g transform="translate(0, 100)">
+      <!-- Feature 1 -->
+      <rect width="320" height="90" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <circle cx="40" cy="45" r="20" fill="rgba(34,211,238,0.1)" stroke="rgba(34,211,238,0.2)" stroke-width="1"/>
+      <text x="30" y="51" font-family="Inter,system-ui,sans-serif" font-size="16" fill="#22D3EE">⟳</text>
+      <text x="72" y="34" font-family="Inter,system-ui,sans-serif" font-size="15" fill="#F8FAFC" font-weight="700">Scan automatique</text>
+      <text x="72" y="54" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#94A3B8">5 plateformes scannées en parallèle</text>
+      <text x="72" y="72" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#94A3B8">en arrière-plan.</text>
+
+      <!-- Feature 2 -->
+      <g transform="translate(340, 0)">
+        <rect width="320" height="90" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <circle cx="40" cy="45" r="20" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.2)" stroke-width="1"/>
+        <text x="30" y="51" font-family="Inter,system-ui,sans-serif" font-size="16" fill="#10B981">★</text>
+        <text x="72" y="34" font-family="Inter,system-ui,sans-serif" font-size="15" fill="#F8FAFC" font-weight="700">Scoring IA</text>
+        <text x="72" y="54" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#94A3B8">Gemini Nano analyse la pertinence</text>
+        <text x="72" y="72" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#94A3B8">de chaque mission pour vous.</text>
+      </g>
+    </g>
+
+    <g transform="translate(0, 210)">
+      <!-- Feature 3 -->
+      <rect width="320" height="90" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+      <circle cx="40" cy="45" r="20" fill="rgba(245,158,11,0.1)" stroke="rgba(245,158,11,0.2)" stroke-width="1"/>
+      <text x="30" y="51" font-family="Inter,system-ui,sans-serif" font-size="16" fill="#F59E0B">€</text>
+      <text x="72" y="34" font-family="Inter,system-ui,sans-serif" font-size="15" fill="#F8FAFC" font-weight="700">Dashboard TJM</text>
+      <text x="72" y="54" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#94A3B8">Historique et tendances TJM</text>
+      <text x="72" y="72" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#94A3B8">par stack et par source.</text>
+
+      <!-- Feature 4 -->
+      <g transform="translate(340, 0)">
+        <rect width="320" height="90" rx="16" fill="rgba(255,255,255,0.04)" stroke="rgba(255,255,255,0.08)" stroke-width="1"/>
+        <circle cx="40" cy="45" r="20" fill="rgba(59,130,246,0.1)" stroke="rgba(59,130,246,0.2)" stroke-width="1"/>
+        <text x="30" y="51" font-family="Inter,system-ui,sans-serif" font-size="16" fill="#3B82F6">🔒</text>
+        <text x="72" y="34" font-family="Inter,system-ui,sans-serif" font-size="15" fill="#F8FAFC" font-weight="700">100% local</text>
+        <text x="72" y="54" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#94A3B8">Aucun serveur. Zéro tracking.</text>
+        <text x="72" y="72" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#94A3B8">Vos données restent chez vous.</text>
+      </g>
+    </g>
+
+    <!-- Platform logos row -->
+    <g transform="translate(0, 340)">
+      <text x="0" y="0" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#64748B" letter-spacing="1.5" font-weight="600">PLATEFORMES CONNECTÉES</text>
+      <g transform="translate(0, 20)">
+        <rect width="110" height="36" rx="18" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        <text x="20" y="23" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8">Free-Work</text>
+
+        <rect x="120" width="96" height="36" rx="18" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        <text x="140" y="23" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8">LeHibou</text>
+
+        <rect x="226" width="76" height="36" rx="18" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        <text x="246" y="23" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8">Hiway</text>
+
+        <rect x="312" width="106" height="36" rx="18" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        <text x="332" y="23" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8">Collective</text>
+
+        <rect x="428" width="116" height="36" rx="18" fill="rgba(255,255,255,0.05)" stroke="rgba(255,255,255,0.1)" stroke-width="1"/>
+        <text x="448" y="23" font-family="Inter,system-ui,sans-serif" font-size="11" fill="#94A3B8">Cherry Pick</text>
+      </g>
+    </g>
+
+    <!-- Badge -->
+    <g transform="translate(0, 430)">
+      <rect width="200" height="40" rx="20" fill="rgba(16,185,129,0.1)" stroke="rgba(16,185,129,0.2)" stroke-width="1"/>
+      <circle cx="20" cy="20" r="4" fill="#10B981"/>
+      <text x="34" y="25" font-family="Inter,system-ui,sans-serif" font-size="12" fill="#10B981" font-weight="500">Extension Chrome · Gratuit</text>
+    </g>
+  </g>
+
+  <!-- Bottom: MissionPulse logo -->
+  <g transform="translate(60, 750)">
+    <text x="0" y="0" font-family="Inter,system-ui,sans-serif" font-size="13" fill="#64748B">
+      Mission<tspan fill="#22D3EE">Pulse</tspan> — Open source · 700+ tests
+    </text>
+  </g>
+</svg>
