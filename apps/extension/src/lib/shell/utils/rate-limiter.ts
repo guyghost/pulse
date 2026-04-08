@@ -1,6 +1,6 @@
 /**
  * Rate Limiter - Token Bucket implementation
- * 
+ *
  * Gère le rate limiting par domaine pour éviter de surcharger les serveurs.
  * Utilise un algorithme token bucket pour permettre des bursts contrôlés.
  */
@@ -55,15 +55,19 @@ function extractDomain(url: string): string {
  */
 function findConfig(domain: string, configs: Record<string, RateLimitConfig>): RateLimitConfig {
   // Recherche exacte d'abord
-  if (configs[domain]) return configs[domain];
-  
+  if (configs[domain]) {
+    return configs[domain];
+  }
+
   // Recherche par suffixe (ex: api.free-work.com -> free-work.com)
   const parts = domain.split('.');
   for (let i = 0; i < parts.length - 1; i++) {
     const suffix = parts.slice(i).join('.');
-    if (configs[suffix]) return configs[suffix];
+    if (configs[suffix]) {
+      return configs[suffix];
+    }
   }
-  
+
   // Fallback
   return configs.default || DEFAULT_DOMAIN_CONFIGS.default;
 }
@@ -96,17 +100,19 @@ export class RateLimiter {
    * Attend si nécessaire selon la politique de rate limiting.
    */
   async acquire(urlOrDomain: string): Promise<void> {
-    if (!this.enabled) return;
+    if (!this.enabled) {
+      return;
+    }
 
     const domain = extractDomain(urlOrDomain);
     const config = findConfig(domain, this.configs);
-    
+
     // Calcul du délai minimum entre requêtes
     const minDelayMs = 1000 / config.requestsPerSecond;
-    
+
     const now = Date.now();
     let state = this.domains.get(domain);
-    
+
     if (!state) {
       state = {
         tokens: config.burstSize ?? config.requestsPerSecond,
@@ -126,23 +132,25 @@ export class RateLimiter {
     // Si on a des tokens disponibles, on consomme et on continue
     if (state.tokens >= 1) {
       state.tokens -= 1;
-      
+
       if (import.meta.env.DEV) {
-        console.log(`[RateLimiter] Token acquired for ${domain} (${state.tokens.toFixed(1)} remaining)`);
+        console.log(
+          `[RateLimiter] Token acquired for ${domain} (${state.tokens.toFixed(1)} remaining)`
+        );
       }
       return;
     }
 
     // Sinon, on calcule le temps d'attente
     const waitTimeMs = minDelayMs - (elapsedMs % minDelayMs);
-    
+
     if (import.meta.env.DEV) {
       console.log(`[RateLimiter] Rate limit hit for ${domain}, waiting ${waitTimeMs.toFixed(0)}ms`);
     }
 
     // Attendre le prochain token
-    await new Promise(resolve => setTimeout(resolve, waitTimeMs));
-    
+    await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
+
     // Après l'attente, réessayer récursivement (pour gérer la queue)
     return this.acquire(urlOrDomain);
   }
@@ -166,7 +174,7 @@ export class RateLimiter {
       const config = findConfig(domain, this.configs);
       return config.burstSize ?? config.requestsPerSecond;
     }
-    
+
     const config = findConfig(domain, this.configs);
     const now = Date.now();
     const elapsedMs = now - state.lastUpdate;
@@ -188,9 +196,9 @@ export class RateLimiter {
   }
 }
 
-/** 
+/**
  * Instance globale du rate limiter
- * 
+ *
  * Usage: await globalRateLimiter.acquire('https://example.com/api');
  */
 export const globalRateLimiter = new RateLimiter(DEFAULT_DOMAIN_CONFIGS);
@@ -205,11 +213,15 @@ export const DEFAULT_PAGE_DELAY_MS = 500;
  * Crée un délai entre les pages avec logging en mode dev
  */
 export async function delayBetweenPages(connectorId: string, pageNumber: number): Promise<void> {
-  if (pageNumber <= 1) return; // Pas de délai pour la première page
-  
+  if (pageNumber <= 1) {
+    return;
+  } // Pas de délai pour la première page
+
   if (import.meta.env.DEV) {
-    console.log(`[Scanner] Delay ${DEFAULT_PAGE_DELAY_MS}ms before page ${pageNumber} for ${connectorId}`);
+    console.log(
+      `[Scanner] Delay ${DEFAULT_PAGE_DELAY_MS}ms before page ${pageNumber} for ${connectorId}`
+    );
   }
-  
-  await new Promise(resolve => setTimeout(resolve, DEFAULT_PAGE_DELAY_MS));
+
+  await new Promise((resolve) => setTimeout(resolve, DEFAULT_PAGE_DELAY_MS));
 }

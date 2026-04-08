@@ -1,12 +1,11 @@
-<script context="module" lang="ts">
+<script module lang="ts">
   let nextRadarIconId = 0;
 </script>
 
 <script lang="ts">
-
   type RadarState = 'idle' | 'scanning' | 'active';
 
-  let {
+  const {
     size = 48,
     state = 'idle',
     class: className = '',
@@ -16,12 +15,16 @@
     class?: string;
   } = $props();
 
-  let isAnimating = $derived(state === 'scanning' || state === 'active');
-  let primaryColor = $derived(
+  const isAnimating = $derived(state === 'scanning' || state === 'active');
+  const primaryColor = $derived(
     state === 'active' ? '#22D3EE' : state === 'scanning' ? '#0E7490' : '#164E63'
   );
-  let glowColor = $derived(
-    state === 'active' ? 'rgba(34, 211, 238, 0.6)' : state === 'scanning' ? 'rgba(14, 116, 144, 0.4)' : 'rgba(22, 78, 99, 0.2)'
+  const glowColor = $derived(
+    state === 'active'
+      ? 'rgba(34, 211, 238, 0.6)'
+      : state === 'scanning'
+        ? 'rgba(14, 116, 144, 0.4)'
+        : 'rgba(22, 78, 99, 0.2)'
   );
 
   const gradientIdBase = `radar-icon-${nextRadarIconId++}`;
@@ -78,13 +81,7 @@
       fill="none"
     />
 
-    <circle
-      cx="24"
-      cy="24"
-      r="3"
-      fill={primaryColor}
-      class={isAnimating ? 'radar-pulse' : ''}
-    />
+    <circle cx="24" cy="24" r="3" fill={primaryColor} class={isAnimating ? 'radar-pulse' : ''} />
 
     {#if isAnimating}
       <g class="radar-scan" style="transform-origin: 24px 24px;">
@@ -117,7 +114,14 @@
     {/if}
 
     <defs>
-      <linearGradient id={scanGradientId} x1="24" y1="24" x2="24" y2="4" gradientUnits="userSpaceOnUse">
+      <linearGradient
+        id={scanGradientId}
+        x1="24"
+        y1="24"
+        x2="24"
+        y2="4"
+        gradientUnits="userSpaceOnUse"
+      >
         <stop offset="0%" stop-color={primaryColor} stop-opacity="0" />
         <stop offset="50%" stop-color={primaryColor} stop-opacity="0.8" />
         <stop offset="100%" stop-color="#22D3EE" stop-opacity="1" />

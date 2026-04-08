@@ -1,5 +1,5 @@
 <script lang="ts">
-  let {
+  const {
     progress = 0,
     isScanning = false,
     missionsFound = 0,
@@ -27,7 +27,8 @@
     {#if connectorName}
       Scraping {connectorName}... ({current}/{total})
     {:else if missionsFound > 0}
-      {missionsFound} mission{missionsFound > 1 ? 's' : ''} reperee{missionsFound > 1 ? 's' : ''} pendant le scan
+      {missionsFound} mission{missionsFound > 1 ? 's' : ''} reperee{missionsFound > 1 ? 's' : ''} pendant
+      le scan
     {:else}
       Demarrage du scan...
     {/if}

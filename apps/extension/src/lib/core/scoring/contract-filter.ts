@@ -24,10 +24,7 @@ const SALARIED_KEYWORDS = [
  * Regex pattern matching salaried contract keywords as whole words.
  * Uses word boundaries to avoid matching "CDI" inside "CREDIT" etc.
  */
-const SALARIED_REGEX = new RegExp(
-  `\\b(${SALARIED_KEYWORDS.join('|')})\\b`,
-  'i',
-);
+const SALARIED_REGEX = new RegExp(`\\b(${SALARIED_KEYWORDS.join('|')})\\b`, 'i');
 
 /**
  * Check if a mission looks like a freelance mission (not a salaried CDD/CDI).

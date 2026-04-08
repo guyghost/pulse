@@ -19,18 +19,29 @@ function toggle(map: Record<string, number>, id: string, now: number): Record<st
   return updated;
 }
 
-export function toggleFavorite(favorites: Record<string, number>, id: string, now: number): Record<string, number> {
+export function toggleFavorite(
+  favorites: Record<string, number>,
+  id: string,
+  now: number
+): Record<string, number> {
   return toggle(favorites, id, now);
 }
 
-export function toggleHidden(hidden: Record<string, number>, id: string, now: number): Record<string, number> {
+export function toggleHidden(
+  hidden: Record<string, number>,
+  id: string,
+  now: number
+): Record<string, number> {
   return toggle(hidden, id, now);
 }
 
 export function filterHidden(missions: Mission[], hidden: Record<string, number>): Mission[] {
-  return missions.filter(m => !(m.id in hidden));
+  return missions.filter((m) => !(m.id in hidden));
 }
 
-export function filterFavoritesOnly(missions: Mission[], favorites: Record<string, number>): Mission[] {
-  return missions.filter(m => m.id in favorites);
+export function filterFavoritesOnly(
+  missions: Mission[],
+  favorites: Record<string, number>
+): Mission[] {
+  return missions.filter((m) => m.id in favorites);
 }

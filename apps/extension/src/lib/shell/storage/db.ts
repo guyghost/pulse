@@ -35,7 +35,7 @@ function openDB(): Promise<IDBDatabase> {
 
     request.onupgradeneeded = (event) => {
       const db = request.result;
-      const oldVersion = (event as IDBVersionChangeEvent).oldVersion;
+      const oldVersion = event.oldVersion;
 
       if (oldVersion < 1) {
         const store = db.createObjectStore('missions', { keyPath: 'id' });
@@ -77,7 +77,9 @@ function withStore<T>(
  * Missions with the same ID are deduplicated before writing.
  */
 export async function saveMissions(missions: Mission[]): Promise<void> {
-  if (missions.length === 0) return;
+  if (missions.length === 0) {
+    return;
+  }
 
   const db = await openDB();
   const tx = db.transaction('missions', 'readwrite');
@@ -279,7 +281,9 @@ export async function getMissionsPaginated(
  * Only writes missions that are new or have changed.
  */
 export async function upsertMissions(newMissions: Mission[]): Promise<number> {
-  if (newMissions.length === 0) return 0;
+  if (newMissions.length === 0) {
+    return 0;
+  }
 
   const db = await openDB();
   const tx = db.transaction('missions', 'readwrite');
@@ -334,14 +338,18 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
     await clearSemanticCache();
   } catch {
     // Le cache est non-critique, on ne bloque pas la sauvegarde du profil
-    if (import.meta.env.DEV) console.warn('[DB] Impossible de vider le cache sémantique après sauvegarde du profil');
+    if (import.meta.env.DEV) {
+      console.warn('[DB] Impossible de vider le cache sémantique après sauvegarde du profil');
+    }
   }
 }
 
 export async function getProfile(): Promise<UserProfile | null> {
   const result = await withStore<unknown>('profile', 'readonly', (store) => store.get('current'));
 
-  if (!result) return null;
+  if (!result) {
+    return null;
+  }
 
   // Vérifier que c'est un objet avec un id
   if (typeof result !== 'object' || result === null) {

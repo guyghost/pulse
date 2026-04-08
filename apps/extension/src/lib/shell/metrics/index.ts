@@ -4,11 +4,22 @@
  */
 
 // Types (depuis Core)
-export type { Metric, MetricUnit, ScanMetrics, CacheMetrics, TimingMetric } from '../../core/metrics/types';
+export type {
+  Metric,
+  MetricUnit,
+  ScanMetrics,
+  CacheMetrics,
+  TimingMetric,
+} from '../../core/metrics/types';
 export { calculateHitRate, calculateDedupRatio } from '../../core/metrics/types';
 
 // Collector
 export { metricsCollector, measureAsync, measureSync } from './collector';
 
 // Performance monitoring
-export { initPerformanceMonitoring, getWebVitals, markPerformance, measurePerformance } from './performance-monitor';
+export {
+  initPerformanceMonitoring,
+  getWebVitals,
+  markPerformance,
+  measurePerformance,
+} from './performance-monitor';

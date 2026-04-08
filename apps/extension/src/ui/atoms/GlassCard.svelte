@@ -3,7 +3,7 @@
 
   type GlassVariant = 'default' | 'elevated' | 'glow';
 
-  let {
+  const {
     variant = 'default',
     padding = 'md',
     class: className = '',
@@ -19,17 +19,11 @@
     children: Snippet;
   } = $props();
 
-  let paddingClasses = $derived(
-    padding === 'none'
-      ? ''
-      : padding === 'sm'
-        ? 'p-3'
-        : padding === 'lg'
-          ? 'p-6'
-          : 'p-4'
+  const paddingClasses = $derived(
+    padding === 'none' ? '' : padding === 'sm' ? 'p-3' : padding === 'lg' ? 'p-6' : 'p-4'
   );
 
-  let variantClasses = $derived(
+  const variantClasses = $derived(
     variant === 'elevated'
       ? 'glass-card-elevated'
       : variant === 'glow'
@@ -37,8 +31,10 @@
         : 'glass-card'
   );
 
-  let interactiveClasses = $derived(
-    onclick ? 'cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]' : ''
+  const interactiveClasses = $derived(
+    onclick
+      ? 'cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]'
+      : ''
   );
 
   const handleKeydown = (event: KeyboardEvent) => {
@@ -53,7 +49,7 @@
 
 <div
   class="{variantClasses} {paddingClasses} {interactiveClasses} {className}"
-  onclick={onclick}
+  {onclick}
   role={onclick ? 'button' : undefined}
   tabindex={onclick ? 0 : undefined}
   aria-label={onclick ? ariaLabel : undefined}

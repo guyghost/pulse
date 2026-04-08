@@ -1,33 +1,44 @@
 <script lang="ts">
   import type { TJMRange } from '$lib/core/types/tjm';
 
-  let { missionTjm, range }: {
+  const {
+    missionTjm,
+    range,
+  }: {
     missionTjm: number;
     range: TJMRange;
   } = $props();
 
   // Calculate position of the mission TJM on the gauge (0-100%)
-  let gaugeMin = $derived(Math.max(0, range.min - 100));
-  let gaugeMax = $derived(range.max + 100);
-  let gaugeRange = $derived(gaugeMax - gaugeMin);
+  const gaugeMin = $derived(Math.max(0, range.min - 100));
+  const gaugeMax = $derived(range.max + 100);
+  const gaugeRange = $derived(gaugeMax - gaugeMin);
 
-  let position = $derived(
+  const position = $derived(
     Math.max(0, Math.min(100, ((missionTjm - gaugeMin) / gaugeRange) * 100))
   );
 
-  let rangeStart = $derived(((range.min - gaugeMin) / gaugeRange) * 100);
-  let rangeEnd = $derived(((range.max - gaugeMin) / gaugeRange) * 100);
+  const rangeStart = $derived(((range.min - gaugeMin) / gaugeRange) * 100);
+  const rangeEnd = $derived(((range.max - gaugeMin) / gaugeRange) * 100);
 
-  let status = $derived(
+  const status = $derived(
     missionTjm < range.min ? 'below' : missionTjm > range.max ? 'above' : 'within'
   );
 
-  let statusColor = $derived(
-    status === 'within' ? 'bg-accent-emerald' : status === 'below' ? 'bg-accent-amber' : 'bg-accent-blue'
+  const statusColor = $derived(
+    status === 'within'
+      ? 'bg-accent-emerald'
+      : status === 'below'
+        ? 'bg-accent-amber'
+        : 'bg-accent-blue'
   );
 
-  let statusText = $derived(
-    status === 'within' ? 'Dans le march\u00e9' : status === 'below' ? 'Sous le march\u00e9' : 'Au-dessus du march\u00e9'
+  const statusText = $derived(
+    status === 'within'
+      ? 'Dans le march\u00e9'
+      : status === 'below'
+        ? 'Sous le march\u00e9'
+        : 'Au-dessus du march\u00e9'
   );
 </script>
 

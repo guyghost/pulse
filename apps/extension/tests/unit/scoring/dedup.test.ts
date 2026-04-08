@@ -48,8 +48,20 @@ describe('deduplicateMissions', () => {
 
   it('keeps exact duplicate with more info (higher TJM)', () => {
     const missions = [
-      makeMission({ id: '1', title: 'Dev React Senior', stack: ['React', 'TypeScript'], tjm: 500, description: 'Short' }),
-      makeMission({ id: '2', title: 'Dev React Senior', stack: ['React', 'TypeScript'], tjm: 600, description: 'Long description with more details' }),
+      makeMission({
+        id: '1',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        tjm: 500,
+        description: 'Short',
+      }),
+      makeMission({
+        id: '2',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        tjm: 600,
+        description: 'Long description with more details',
+      }),
     ];
     const result = deduplicateMissions(missions);
     expect(result).toHaveLength(1);
@@ -90,8 +102,20 @@ describe('deduplicateMissions', () => {
 
   it('prefers mission with TJM when deduplicating', () => {
     const missions = [
-      makeMission({ id: '1', title: 'Dev React', stack: ['React'], tjm: null, description: 'Description A' }),
-      makeMission({ id: '2', title: 'Dev React', stack: ['React'], tjm: 500, description: 'Description B' }),
+      makeMission({
+        id: '1',
+        title: 'Dev React',
+        stack: ['React'],
+        tjm: null,
+        description: 'Description A',
+      }),
+      makeMission({
+        id: '2',
+        title: 'Dev React',
+        stack: ['React'],
+        tjm: 500,
+        description: 'Description B',
+      }),
     ];
     const result = deduplicateMissions(missions);
     expect(result).toHaveLength(1);
@@ -101,8 +125,20 @@ describe('deduplicateMissions', () => {
 
   it('prefers mission with longer description when TJM is same', () => {
     const missions = [
-      makeMission({ id: '1', title: 'Dev React', stack: ['React'], tjm: 500, description: 'Short' }),
-      makeMission({ id: '2', title: 'Dev React', stack: ['React'], tjm: 500, description: 'Longer description with more details' }),
+      makeMission({
+        id: '1',
+        title: 'Dev React',
+        stack: ['React'],
+        tjm: 500,
+        description: 'Short',
+      }),
+      makeMission({
+        id: '2',
+        title: 'Dev React',
+        stack: ['React'],
+        tjm: 500,
+        description: 'Longer description with more details',
+      }),
     ];
     const result = deduplicateMissions(missions);
     expect(result).toHaveLength(1);
@@ -134,17 +170,29 @@ describe('deduplicateMissions', () => {
 
   it('handles complex duplicate scenarios', () => {
     const missions = [
-      makeMission({ id: '1', title: 'Dev React Senior', stack: ['React', 'TypeScript'], tjm: 500, description: 'Short desc' }),
+      makeMission({
+        id: '1',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        tjm: 500,
+        description: 'Short desc',
+      }),
       makeMission({ id: '2', title: 'Dev Angular', stack: ['Angular', 'TypeScript'], tjm: 450 }),
-      makeMission({ id: '3', title: 'Dev React Senior H/F', stack: ['React', 'TypeScript'], tjm: 600, description: 'Complete description with details' }),
+      makeMission({
+        id: '3',
+        title: 'Dev React Senior H/F',
+        stack: ['React', 'TypeScript'],
+        tjm: 600,
+        description: 'Complete description with details',
+      }),
       makeMission({ id: '4', title: 'Dev React Junior', stack: ['React'] }),
     ];
     const result = deduplicateMissions(missions);
     expect(result).toHaveLength(3);
-    expect(result.find(m => m.id === '1')).toBeUndefined(); // Replaced by id=3
-    expect(result.find(m => m.id === '3')).toBeDefined(); // Kept (has more info)
-    expect(result.find(m => m.id === '2')).toBeDefined(); // Different mission
-    expect(result.find(m => m.id === '4')).toBeDefined(); // Different mission
+    expect(result.find((m) => m.id === '1')).toBeUndefined(); // Replaced by id=3
+    expect(result.find((m) => m.id === '3')).toBeDefined(); // Kept (has more info)
+    expect(result.find((m) => m.id === '2')).toBeDefined(); // Different mission
+    expect(result.find((m) => m.id === '4')).toBeDefined(); // Different mission
   });
 
   describe('regression: undefined safety', () => {

@@ -35,7 +35,9 @@ import type { AppError } from '../../../src/lib/core/errors/app-error';
 // Helpers
 // ============================================================================
 
-function makeConnectorError(overrides: Partial<{ message: string; connectorId: string; timestamp: number }> = {}): AppError {
+function makeConnectorError(
+  overrides: Partial<{ message: string; connectorId: string; timestamp: number }> = {}
+): AppError {
   return {
     type: 'connector',
     message: overrides.message ?? 'Erreur connecteur',
@@ -46,7 +48,9 @@ function makeConnectorError(overrides: Partial<{ message: string; connectorId: s
   } as AppError;
 }
 
-function makeNetworkError(overrides: Partial<{ message: string; timestamp: number }> = {}): AppError {
+function makeNetworkError(
+  overrides: Partial<{ message: string; timestamp: number }> = {}
+): AppError {
   return {
     type: 'network',
     message: overrides.message ?? 'Erreur reseau',
@@ -64,7 +68,9 @@ function makeNetworkError(overrides: Partial<{ message: string; timestamp: numbe
 describe('error-analytics', () => {
   beforeEach(() => {
     _resetBuffer();
-    for (const key of Object.keys(mockStorage)) delete mockStorage[key];
+    for (const key of Object.keys(mockStorage)) {
+      delete mockStorage[key];
+    }
     vi.clearAllMocks();
   });
 
@@ -148,7 +154,7 @@ describe('error-analytics', () => {
       expect(log[0].message).toBe('test-persist');
     });
 
-    it('retourne un tableau vide si rien n\'est persiste', async () => {
+    it("retourne un tableau vide si rien n'est persiste", async () => {
       const log = await getErrorLog();
       expect(log).toEqual([]);
     });

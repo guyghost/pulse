@@ -1,10 +1,9 @@
-<script context="module" lang="ts">
+<script module lang="ts">
   let nextLogoHorizontalId = 0;
 </script>
 
 <script lang="ts">
-
-  let {
+  const {
     size = 'md',
     showText = true,
     class: className = '',
@@ -14,10 +13,12 @@
     class?: string;
   } = $props();
 
-  let dimensions = $derived(
-    size === 'sm' ? { icon: 24, fontSize: 'text-base', gap: 'gap-2' }
-      : size === 'lg' ? { icon: 40, fontSize: 'text-2xl', gap: 'gap-3' }
-      : { icon: 32, fontSize: 'text-xl', gap: 'gap-2.5' }
+  const dimensions = $derived(
+    size === 'sm'
+      ? { icon: 24, fontSize: 'text-base', gap: 'gap-2' }
+      : size === 'lg'
+        ? { icon: 40, fontSize: 'text-2xl', gap: 'gap-3' }
+        : { icon: 32, fontSize: 'text-xl', gap: 'gap-2.5' }
   );
 
   const gradientIdBase = `logo-horizontal-${nextLogoHorizontalId++}`;
@@ -25,11 +26,11 @@
   const scanLineId = `${gradientIdBase}-scan-line`;
 </script>
 
-<div
-  class="flex items-center {dimensions.gap} {className}"
-  data-testid="logo-horizontal"
->
-  <div class="relative flex-shrink-0" style="width: {dimensions.icon}px; height: {dimensions.icon}px;">
+<div class="flex items-center {dimensions.gap} {className}" data-testid="logo-horizontal">
+  <div
+    class="relative flex-shrink-0"
+    style="width: {dimensions.icon}px; height: {dimensions.icon}px;"
+  >
     <svg
       width={dimensions.icon}
       height={dimensions.icon}
@@ -38,9 +39,33 @@
       xmlns="http://www.w3.org/2000/svg"
       aria-hidden="true"
     >
-      <circle cx="16" cy="16" r="14" stroke="#0E7490" stroke-opacity="0.3" stroke-width="1" fill="none" />
-      <circle cx="16" cy="16" r="10" stroke="#0E7490" stroke-opacity="0.4" stroke-width="1" fill="none" />
-      <circle cx="16" cy="16" r="6" stroke="#0E7490" stroke-opacity="0.5" stroke-width="1.5" fill="none" />
+      <circle
+        cx="16"
+        cy="16"
+        r="14"
+        stroke="#0E7490"
+        stroke-opacity="0.3"
+        stroke-width="1"
+        fill="none"
+      />
+      <circle
+        cx="16"
+        cy="16"
+        r="10"
+        stroke="#0E7490"
+        stroke-opacity="0.4"
+        stroke-width="1"
+        fill="none"
+      />
+      <circle
+        cx="16"
+        cy="16"
+        r="6"
+        stroke="#0E7490"
+        stroke-opacity="0.5"
+        stroke-width="1.5"
+        fill="none"
+      />
 
       <circle cx="16" cy="16" r="2.5" fill="url(#{centerGlowId})" />
 
@@ -61,7 +86,14 @@
           <stop offset="0%" stop-color="#22D3EE" />
           <stop offset="100%" stop-color="#0E7490" />
         </radialGradient>
-        <linearGradient id={scanLineId} x1="16" y1="16" x2="16" y2="3" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id={scanLineId}
+          x1="16"
+          y1="16"
+          x2="16"
+          y2="3"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop offset="0%" stop-color="#0E7490" stop-opacity="0.3" />
           <stop offset="100%" stop-color="#22D3EE" />
         </linearGradient>
@@ -71,12 +103,8 @@
 
   {#if showText}
     <div class="flex items-baseline">
-      <span class="text-text-secondary text-sm tracking-wide">
-        Mission
-      </span>
-      <span class="{dimensions.fontSize} font-bold tracking-wide gradient-text">
-        Pulse
-      </span>
+      <span class="text-text-secondary text-sm tracking-wide"> Mission </span>
+      <span class="{dimensions.fontSize} font-bold tracking-wide gradient-text"> Pulse </span>
     </div>
   {/if}
 </div>

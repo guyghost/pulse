@@ -1,11 +1,20 @@
 import { test, expect } from '@playwright/test';
-import { showHiddenMissions, ensureFeedVisible, waitForMissions, expectMissionCount } from './helpers';
+import {
+  showHiddenMissions,
+  ensureFeedVisible,
+  waitForMissions,
+  expectMissionCount,
+} from './helpers';
 
 test.describe('Hidden Missions Flow', () => {
   test.beforeEach(async ({ page }) => {
     // Clear hidden state from previous tests
     await page.addInitScript(() => {
-      try { localStorage.removeItem('hiddenMissions'); } catch {}
+      try {
+        localStorage.removeItem('hiddenMissions');
+      } catch {
+        /* ignore */
+      }
     });
   });
 
@@ -20,7 +29,9 @@ test.describe('Hidden Missions Flow', () => {
     await card.getByTitle('Masquer').click();
 
     await expectMissionCount(page, initialCount - 1);
-    await expect(page.getByRole('button', { name: /Voir les 1 mission/ })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /Voir les 1 mission/ })).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('revealing hidden missions restores count', async ({ page }) => {
@@ -67,6 +78,8 @@ test.describe('Hidden Missions Flow', () => {
     // Back to all
     await page.getByTitle('Voir toutes').click();
     await expectMissionCount(page, initialCount - 1);
-    await expect(page.getByRole('button', { name: /Voir les 1 mission/ })).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('button', { name: /Voir les 1 mission/ })).toBeVisible({
+      timeout: 5000,
+    });
   });
 });

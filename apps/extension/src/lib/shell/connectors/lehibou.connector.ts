@@ -27,24 +27,41 @@ interface LeHibouMission {
 }
 
 function mapRemote(remote: unknown): Mission['remote'] {
-  if (remote === true) return 'full';
-  if (remote === false) return 'onsite';
+  if (remote === true) {
+    return 'full';
+  }
+  if (remote === false) {
+    return 'onsite';
+  }
   if (typeof remote === 'string') {
     const r = remote.toLowerCase();
-    if (r.includes('full') || r.includes('remote')) return 'full';
-    if (r.includes('hybrid') || r.includes('partiel')) return 'hybrid';
-    if (r.includes('onsite') || r.includes('présentiel')) return 'onsite';
+    if (r.includes('full') || r.includes('remote')) {
+      return 'full';
+    }
+    if (r.includes('hybrid') || r.includes('partiel')) {
+      return 'hybrid';
+    }
+    if (r.includes('onsite') || r.includes('présentiel')) {
+      return 'onsite';
+    }
   }
   return null;
 }
 
 function formatDuration(duration: number | null, unit: string | null): string | null {
-  if (!duration) return null;
+  if (!duration) {
+    return null;
+  }
   const u = unit?.toLowerCase() ?? 'mois';
-  if (u.includes('day') || u.includes('jour')) return `${duration} jour${duration > 1 ? 's' : ''}`;
-  if (u.includes('week') || u.includes('semaine'))
+  if (u.includes('day') || u.includes('jour')) {
+    return `${duration} jour${duration > 1 ? 's' : ''}`;
+  }
+  if (u.includes('week') || u.includes('semaine')) {
     return `${duration} semaine${duration > 1 ? 's' : ''}`;
-  if (u.includes('year') || u.includes('an')) return `${duration} an${duration > 1 ? 's' : ''}`;
+  }
+  if (u.includes('year') || u.includes('an')) {
+    return `${duration} an${duration > 1 ? 's' : ''}`;
+  }
   return `${duration} mois`;
 }
 
@@ -106,7 +123,9 @@ export class LeHibouConnector extends BaseConnector {
         }
 
         const data = (await response.json()) as { total: number; missions: LeHibouMission[] };
-        if (!data.missions || data.missions.length === 0) break;
+        if (!data.missions || data.missions.length === 0) {
+          break;
+        }
 
         for (const m of data.missions) {
           allMissions.push(
@@ -129,7 +148,9 @@ export class LeHibouConnector extends BaseConnector {
           );
         }
 
-        if (allMissions.length >= data.total) break;
+        if (allMissions.length >= data.total) {
+          break;
+        }
       }
 
       await removeCookieRule(COOKIE_RULE_ID);

@@ -15,7 +15,9 @@ async function withNoProfile(page: import('@playwright/test').Page) {
         if (val?.runtime?.sendMessage) {
           const origSend = val.runtime.sendMessage;
           val.runtime.sendMessage = async (msg: any) => {
-            if (msg?.type === 'GET_PROFILE') return { type: 'PROFILE_RESULT', payload: null };
+            if (msg?.type === 'GET_PROFILE') {
+              return { type: 'PROFILE_RESULT', payload: null };
+            }
             return origSend.call(val.runtime, msg);
           };
         }

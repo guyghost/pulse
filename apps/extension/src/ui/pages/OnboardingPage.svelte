@@ -5,13 +5,13 @@
   import { saveProfile } from '$lib/shell/facades/settings.facade';
   import { createOnboardingStore } from '$lib/state/onboarding.svelte';
 
-  let { onComplete }: { onComplete?: () => void } = $props();
+  const { onComplete }: { onComplete?: () => void } = $props();
 
   const onboarding = createOnboardingStore();
 
-  let isSaving = $derived(onboarding.state === 'saving');
-  let hasError = $derived(onboarding.state === 'error');
-  let errorMessage = $derived(onboarding.error);
+  const isSaving = $derived(onboarding.state === 'saving');
+  const hasError = $derived(onboarding.state === 'error');
+  const errorMessage = $derived(onboarding.error);
 
   function handleUpdateProfile(updates: Partial<UserProfile>) {
     onboarding.updateProfile(updates);

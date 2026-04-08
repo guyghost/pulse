@@ -20,12 +20,18 @@ export interface CherryPickMission {
 
 // Known API values: remote, partially_remote_3, no_remote
 function mapRemote(displacement: string | null): RemoteType | null {
-  if (!displacement) return null;
+  if (!displacement) {
+    return null;
+  }
   switch (displacement) {
-    case 'remote': return 'full';
-    case 'no_remote': return 'onsite';
+    case 'remote':
+      return 'full';
+    case 'no_remote':
+      return 'onsite';
     default:
-      if (displacement.startsWith('partially_remote')) return 'hybrid';
+      if (displacement.startsWith('partially_remote')) {
+        return 'hybrid';
+      }
       return null;
   }
 }
@@ -33,9 +39,15 @@ function mapRemote(displacement: string | null): RemoteType | null {
 function pickTJM(min: number | string | null, max: number | string | null): number | null {
   const nMin = min !== null ? Number(min) : null;
   const nMax = max !== null ? Number(max) : null;
-  if (nMin !== null && !isNaN(nMin) && nMax !== null && !isNaN(nMax)) return Math.round((nMin + nMax) / 2);
-  if (nMax !== null && !isNaN(nMax)) return nMax;
-  if (nMin !== null && !isNaN(nMin)) return nMin;
+  if (nMin !== null && !isNaN(nMin) && nMax !== null && !isNaN(nMax)) {
+    return Math.round((nMin + nMax) / 2);
+  }
+  if (nMax !== null && !isNaN(nMax)) {
+    return nMax;
+  }
+  if (nMin !== null && !isNaN(nMin)) {
+    return nMin;
+  }
   return null;
 }
 
@@ -43,7 +55,7 @@ function pickTJM(min: number | string | null, max: number | string | null): numb
 const METADATA_KEYS = [
   'Qualification faite par',
   'Nom du client',
-  'Nom de l\'op(?:e|é)rationnel',
+  "Nom de l'op(?:e|é)rationnel",
   'Type de besoin',
   'TJM',
   'Nombre de postes ouvert',
@@ -68,7 +80,7 @@ interface DescriptionMeta {
  */
 const META_REGEX = new RegExp(
   `(${METADATA_KEYS.join('|')})\\s*:\\s*(.*?)(?=(?:${METADATA_KEYS.join('|')})\\s*:|$)`,
-  'gi',
+  'gi'
 );
 
 /**
@@ -76,15 +88,25 @@ const META_REGEX = new RegExp(
  * Format: "Key1 : Value1 Key2 : Value2 ..." or newline-separated.
  */
 export function parseDescriptionMeta(raw: string | null): DescriptionMeta {
-  const result: DescriptionMeta = { client: null, tjm: null, location: null, duration: null, cleanDescription: '' };
-  if (!raw) return result;
+  const result: DescriptionMeta = {
+    client: null,
+    tjm: null,
+    location: null,
+    duration: null,
+    cleanDescription: '',
+  };
+  if (!raw) {
+    return result;
+  }
 
   const kvMap = new Map<string, string>();
 
   for (const match of raw.matchAll(META_REGEX)) {
     const key = match[1].toLowerCase();
     const value = match[2].trim();
-    if (value) kvMap.set(key, value);
+    if (value) {
+      kvMap.set(key, value);
+    }
   }
 
   result.client = kvMap.get('nom du client') ?? null;
@@ -92,7 +114,7 @@ export function parseDescriptionMeta(raw: string | null): DescriptionMeta {
 
   const tjmRaw = kvMap.get('tjm');
   if (tjmRaw) {
-    const rangeMatch = tjmRaw.match(/(\d+)\s*[\/\-]\s*(\d+)/);
+    const rangeMatch = tjmRaw.match(/(\d+)\s*[/-]\s*(\d+)/);
     if (rangeMatch) {
       result.tjm = pickTJM(parseInt(rangeMatch[1]), parseInt(rangeMatch[2]));
     } else {
@@ -100,19 +122,29 @@ export function parseDescriptionMeta(raw: string | null): DescriptionMeta {
     }
   }
 
-  result.duration = kvMap.get('dur\u00e9e de la mission') ?? kvMap.get('duree de la mission') ?? null;
+  result.duration =
+    kvMap.get('dur\u00e9e de la mission') ?? kvMap.get('duree de la mission') ?? null;
 
   // Remove all matched metadata in one pass to avoid positional corruption
-  result.cleanDescription = raw.replace(META_REGEX, ' ').replace(/\s{2,}/g, ' ').trim();
+  result.cleanDescription = raw
+    .replace(META_REGEX, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim();
   return result;
 }
 
 /** Add "mois" suffix to bare numeric durations. */
 function normalizeDuration(d: string | number | null): string | null {
-  if (d == null) return null;
+  if (d === null || d === undefined) {
+    return null;
+  }
   const str = String(d).trim();
-  if (!str) return null;
-  if (/^\d+$/.test(str)) return `${str} mois`;
+  if (!str) {
+    return null;
+  }
+  if (/^\d+$/.test(str)) {
+    return `${str} mois`;
+  }
   return str;
 }
 
@@ -126,7 +158,7 @@ export function parseCherryPickMissions(missions: CherryPickMission[], now: Date
       title: m.name,
       client: m.company?.name ?? meta.client,
       description: meta.cleanDescription,
-      stack: (m.skills ?? []).map((s) => typeof s === 'string' ? s : s.name),
+      stack: (m.skills ?? []).map((s) => (typeof s === 'string' ? s : s.name)),
       tjm: apiTjm ?? meta.tjm,
       location: m.city ?? meta.location,
       remote: mapRemote(m.displacement),

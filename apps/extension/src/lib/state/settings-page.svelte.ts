@@ -21,7 +21,12 @@ import {
   saveFavorites,
   saveHidden,
 } from '$lib/shell/facades/feed-data.facade';
-import { getSettings, setSettings, getProfile, saveProfile } from '$lib/shell/facades/settings.facade';
+import {
+  getSettings,
+  setSettings,
+  getProfile,
+  saveProfile,
+} from '$lib/shell/facades/settings.facade';
 import { getMissions } from '$lib/shell/facades/feed-data.facade';
 import type { UserProfile } from '$lib/core/types/profile';
 
@@ -80,7 +85,9 @@ export class SettingsPageController {
   async loadProfile(): Promise<void> {
     try {
       const profile = await getProfile();
-      if (!profile) return;
+      if (!profile) {
+        return;
+      }
 
       this.firstName = profile.firstName ?? '';
       this.jobTitle = profile.jobTitle ?? '';
@@ -119,7 +126,9 @@ export class SettingsPageController {
 
   addStack(): void {
     const trimmed = this.stackInput.trim();
-    if (!trimmed || this.profileStack.includes(trimmed)) return;
+    if (!trimmed || this.profileStack.includes(trimmed)) {
+      return;
+    }
 
     this.profileStack = [...this.profileStack, trimmed];
     this.stackInput = '';
@@ -197,7 +206,9 @@ export class SettingsPageController {
       await chrome.storage.local.clear();
       const databases = await indexedDB.databases();
       for (const db of databases) {
-        if (db.name) indexedDB.deleteDatabase(db.name);
+        if (db.name) {
+          indexedDB.deleteDatabase(db.name);
+        }
       }
       this.showResetConfirm = false;
       this.options.onNavigateToOnboarding?.();
@@ -280,7 +291,9 @@ export class SettingsPageController {
   }
 
   async handleFileSelect(file: File | null | undefined): Promise<void> {
-    if (!file) return;
+    if (!file) {
+      return;
+    }
 
     try {
       const text = await file.text();
@@ -309,7 +322,9 @@ export class SettingsPageController {
       this.pendingBackup = null;
       this.showBackupModal = true;
     } finally {
-      if (this.fileInput) this.fileInput.value = '';
+      if (this.fileInput) {
+        this.fileInput.value = '';
+      }
     }
   }
 

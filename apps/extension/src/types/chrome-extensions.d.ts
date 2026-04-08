@@ -21,7 +21,5 @@ declare namespace chrome.action {
    *
    * @since Chrome 130
    */
-  const onUserSettingsChanged: chrome.events.Event<
-    (change: UserSettingsChange) => void
-  >;
+  const onUserSettingsChanged: chrome.events.Event<(change: UserSettingsChange) => void>;
 }

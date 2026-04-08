@@ -18,7 +18,7 @@
 export const computeFinalScore = (
   deterministicScore: number | null,
   semanticScore: number | null,
-  semanticWeight = 0.4,
+  semanticWeight = 0.4
 ): number | null => {
   // If neither score exists, return null
   if (deterministicScore === null && semanticScore === null) {
@@ -39,8 +39,7 @@ export const computeFinalScore = (
 
   // Both exist: weighted average
   const deterministicWeight = 1 - semanticWeight;
-  const rawScore =
-    deterministicScore * deterministicWeight + semanticScore * semanticWeight;
+  const rawScore = deterministicScore * deterministicWeight + semanticScore * semanticWeight;
 
   return Math.round(clampScore(rawScore));
 };

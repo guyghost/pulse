@@ -141,9 +141,7 @@ test.describe('Performance - Virtual List', () => {
     // Forcer le garbage collector si disponible
     try {
       await page.evaluate(() => {
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         if ((window as unknown as Record<string, () => void>).gc) {
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           (window as unknown as Record<string, () => void>).gc();
         }
       });
@@ -184,7 +182,9 @@ test.describe('Performance - Virtual List', () => {
       const container = document.querySelector(
         '[role="region"], .missions-container, [data-testid="mission-feed"]'
       ) as HTMLElement;
-      if (!container) return null;
+      if (!container) {
+        return null;
+      }
 
       const marks: number[] = [];
       const startTime = performance.now();

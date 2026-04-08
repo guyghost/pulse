@@ -8,9 +8,7 @@ export async function getSeenIds(): Promise<string[]> {
 
 export async function saveSeenIds(ids: string[]): Promise<void> {
   // Limit storage to MAX_SEEN_IDS, keeping most recent (last added)
-  const toStore = ids.length > MAX_SEEN_IDS 
-    ? ids.slice(-MAX_SEEN_IDS) 
-    : ids;
-  
+  const toStore = ids.length > MAX_SEEN_IDS ? ids.slice(-MAX_SEEN_IDS) : ids;
+
   await chrome.storage.local.set({ [STORAGE_KEY]: toStore });
 }

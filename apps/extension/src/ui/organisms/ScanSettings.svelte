@@ -1,7 +1,7 @@
 <script lang="ts">
   import Icon from '../atoms/Icon.svelte';
 
-  let {
+  const {
     autoScan,
     scanInterval,
     notifications,

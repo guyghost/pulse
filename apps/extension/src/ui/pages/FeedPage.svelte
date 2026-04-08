@@ -265,7 +265,11 @@
       </div>
 
       <div class="mt-2">
-        <SearchInput value={page.searchQuery} onSearch={page.handleSearch} bind:inputRef={page.searchInputRef} />
+        <SearchInput
+          value={page.searchQuery}
+          onSearch={page.handleSearch}
+          bind:inputRef={page.searchInputRef}
+        />
       </div>
 
       <div class="mt-2 flex items-center gap-1.5">
@@ -336,7 +340,7 @@
         </button>
         <button
           class="soft-ring inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full border border-white/8 bg-white/4 text-text-secondary transition-all duration-200 hover:bg-white/8 hover:text-white"
-          onclick={() => page.showShortcutsHelp = true}
+          onclick={() => (page.showShortcutsHelp = true)}
           title="Raccourcis clavier (?)"
           aria-label="Afficher l'aide des raccourcis clavier"
         >
@@ -404,9 +408,13 @@
 
 {#if page.comparisonMissionIds.length > 0}
   <!-- Floating comparison bar -->
-  <div class="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-accent-blue/30 bg-navy-800/95 backdrop-blur-sm px-4 py-2.5 shadow-xl">
+  <div
+    class="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-accent-blue/30 bg-navy-800/95 backdrop-blur-sm px-4 py-2.5 shadow-xl"
+  >
     <span class="text-xs text-text-secondary">
-      {page.comparisonMissionIds.length}/3 sélectionnée{page.comparisonMissionIds.length > 1 ? 's' : ''}
+      {page.comparisonMissionIds.length}/3 sélectionnée{page.comparisonMissionIds.length > 1
+        ? 's'
+        : ''}
     </span>
     {#if page.comparisonMissions.length >= 2}
       <button
@@ -427,9 +435,6 @@
 
 {#if page.comparisonMissions.length >= 2}
   {#key page.comparisonMissionIds.join(',')}
-    <MissionComparison
-      missions={page.comparisonMissions}
-      onClose={page.clearComparison}
-    />
+    <MissionComparison missions={page.comparisonMissions} onClose={page.clearComparison} />
   {/key}
 {/if}

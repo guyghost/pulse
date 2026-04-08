@@ -30,7 +30,7 @@ export const scoreMission = (mission: Mission, profile: UserProfile, now?: Date)
   const locationScore = scoreLocation(
     mission.location,
     profile.location,
-    normalizedWeights.location,
+    normalizedWeights.location
   );
   const tjmScore = scoreTJM(mission.tjm, profile.tjmMin, profile.tjmMax, normalizedWeights.tjm);
   const remoteScore = scoreRemote(mission.remote, profile.remote, normalizedWeights.remote);
@@ -73,18 +73,16 @@ const normalizeWeights = (weights: ScoringWeights): ScoringWeights => {
  * Returns a proportional score based on match ratio multiplied by the weight.
  * If the profile has no stack defined, returns full weight (doesn't penalize the user).
  */
-const scoreStack = (
-  missionStack: string[],
-  profileStack: string[],
-  weight: number,
-): number => {
+const scoreStack = (missionStack: string[], profileStack: string[], weight: number): number => {
   // If profile has no stack, don't penalize - return full weight
-  if (profileStack.length === 0) return weight;
-  if (missionStack.length === 0) return 0;
+  if (profileStack.length === 0) {
+    return weight;
+  }
+  if (missionStack.length === 0) {
+    return 0;
+  }
   const normalizedProfile = profileStack.filter(Boolean).map((s) => s.toLowerCase());
-  const matches = missionStack.filter((s) =>
-    s && normalizedProfile.includes(s.toLowerCase()),
-  );
+  const matches = missionStack.filter((s) => s && normalizedProfile.includes(s.toLowerCase()));
   return (matches.length / missionStack.length) * weight;
 };
 
@@ -100,10 +98,14 @@ const scoreStack = (
 const scoreLocation = (
   missionLocation: string | null,
   profileLocation: string,
-  weight: number,
+  weight: number
 ): number => {
-  if (!profileLocation) return weight;
-  if (!missionLocation) return weight * 0.5;
+  if (!profileLocation) {
+    return weight;
+  }
+  if (!missionLocation) {
+    return weight * 0.5;
+  }
 
   const match = matchLocation(missionLocation, profileLocation);
 
@@ -127,14 +129,13 @@ const scoreLocation = (
  * - Unknown TJM: partial score (roughly half)
  * - Outside range: scaled by distance from range
  */
-const scoreTJM = (
-  missionTjm: number | null,
-  min: number,
-  max: number,
-  weight: number,
-): number => {
-  if (missionTjm === null) return weight * 0.48; // ~12/25 = 0.48
-  if (missionTjm >= min && missionTjm <= max) return weight;
+const scoreTJM = (missionTjm: number | null, min: number, max: number, weight: number): number => {
+  if (missionTjm === null) {
+    return weight * 0.48;
+  } // ~12/25 = 0.48
+  if (missionTjm >= min && missionTjm <= max) {
+    return weight;
+  }
   const distance = missionTjm < min ? min - missionTjm : missionTjm - max;
   const rangeSize = max - min || 1;
   const ratio = Math.max(0, 1 - distance / rangeSize);
@@ -151,9 +152,13 @@ const scoreTJM = (
 const scoreRemote = (
   missionRemote: string | null,
   profileRemote: string,
-  weight: number,
+  weight: number
 ): number => {
-  if (profileRemote === 'any') return weight;
-  if (missionRemote === null) return weight * 0.467; // ~7/15 = 0.467
+  if (profileRemote === 'any') {
+    return weight;
+  }
+  if (missionRemote === null) {
+    return weight * 0.467;
+  } // ~7/15 = 0.467
   return missionRemote === profileRemote ? weight : 0;
 };

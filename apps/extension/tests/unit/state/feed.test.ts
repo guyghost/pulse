@@ -53,7 +53,12 @@ describe('feed store', () => {
     store.load();
     store.setMissions([
       makeMission({ id: '1', title: 'Dev React Senior' }),
-      makeMission({ id: '2', title: 'Dev Java Spring', description: 'Mission Java pour projet backend', stack: ['Java', 'Spring'] }),
+      makeMission({
+        id: '2',
+        title: 'Dev Java Spring',
+        description: 'Mission Java pour projet backend',
+        stack: ['Java', 'Spring'],
+      }),
       makeMission({ id: '3', title: 'Lead React Native' }),
     ]);
 

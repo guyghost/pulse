@@ -1,14 +1,12 @@
 <script lang="ts">
-  let { status }: {
+  const {
+    status,
+  }: {
     status: 'online' | 'offline' | 'error';
   } = $props();
 
-  let colorClass = $derived(
-    status === 'online'
-      ? 'bg-accent-emerald'
-      : status === 'error'
-      ? 'bg-accent-red'
-      : 'bg-navy-600'
+  const colorClass = $derived(
+    status === 'online' ? 'bg-accent-emerald' : status === 'error' ? 'bg-accent-red' : 'bg-navy-600'
   );
 </script>
 

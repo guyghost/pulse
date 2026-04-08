@@ -285,7 +285,7 @@ test.describe('Connector Resilience', () => {
   });
 
   test('error recovery allows retry', async ({ page }) => {
-    let shouldFail = true;
+    const shouldFail = true;
 
     await page.addInitScript((initialFail: boolean) => {
       let _chrome: unknown = undefined;

@@ -4,7 +4,7 @@
   type GlowVariant = 'primary' | 'secondary' | 'glass';
   type ButtonSize = 'sm' | 'md' | 'lg';
 
-  let {
+  const {
     variant = 'primary',
     size = 'md',
     disabled = false,
@@ -22,7 +22,7 @@
     class?: string;
   } = $props();
 
-  let sizeClasses = $derived(
+  const sizeClasses = $derived(
     size === 'sm'
       ? 'h-11 px-3 text-sm gap-1.5'
       : size === 'lg'
@@ -30,7 +30,7 @@
         : 'h-11 px-4 text-sm gap-2'
   );
 
-  let variantClasses = $derived(
+  const variantClasses = $derived(
     variant === 'primary'
       ? 'glow-button font-semibold'
       : variant === 'secondary'
@@ -38,14 +38,14 @@
         : 'glass-button font-medium'
   );
 
-  let isDisabled = $derived(disabled || loading);
+  const isDisabled = $derived(disabled || loading);
 </script>
 
 <button
   type="button"
   class="inline-flex items-center justify-center rounded-xl font-medium transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] {sizeClasses} {variantClasses} {className}"
   disabled={isDisabled}
-  onclick={onclick}
+  {onclick}
   aria-busy={loading}
   data-testid="glow-button"
   data-variant={variant}
@@ -58,14 +58,7 @@
       viewBox="0 0 24 24"
       aria-hidden="true"
     >
-      <circle
-        class="opacity-25"
-        cx="12"
-        cy="12"
-        r="10"
-        stroke="currentColor"
-        stroke-width="4"
-      />
+      <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4" />
       <path
         class="opacity-75"
         fill="currentColor"

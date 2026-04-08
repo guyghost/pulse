@@ -35,7 +35,9 @@ export const injectCookieRule = async (
   // Warn if no cookies found — possible cookie partitioning issue
   if (cookieCount === 0) {
     const warning = `No cookies found for ${cookieDomain} — possible cookie partitioning issue`;
-    if (import.meta.env.DEV) console.warn(`[cookie-rules] ${warning}`);
+    if (import.meta.env.DEV) {
+      console.warn(`[cookie-rules] ${warning}`);
+    }
     return { success: false, cookieCount, warning };
   }
 

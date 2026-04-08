@@ -6,7 +6,7 @@
 
   const BATCH_SIZE = 20;
 
-  let {
+  const {
     missions = [],
     isLoading = false,
     error = null,
@@ -35,17 +35,21 @@
   } = $props();
 
   // Unwrap Svelte 5 $state proxy — proxied arrays aren't iterable in template context
-  let seenArr = $derived(Array.isArray(seenIds) ? Array.from(seenIds) : []);
-  let seenSet = $derived(new Set(seenArr));
+  const seenArr = $derived(Array.isArray(seenIds) ? Array.from(seenIds) : []);
+  const seenSet = $derived(new Set(seenArr));
 
   // Sort missions
-  let sortedMissions = $derived.by(() => {
+  const sortedMissions = $derived.by(() => {
     if (!missions || !Array.isArray(missions) || missions.length === 0) {
       return [];
     }
     return [...missions].sort((a, b) => {
-      if (sortBy === 'date') return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
-      if (sortBy === 'tjm') return (b.tjm ?? 0) - (a.tjm ?? 0);
+      if (sortBy === 'date') {
+        return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
+      }
+      if (sortBy === 'tjm') {
+        return (b.tjm ?? 0) - (a.tjm ?? 0);
+      }
       return (b.score ?? 0) - (a.score ?? 0);
     });
   });
@@ -60,9 +64,9 @@
     visibleCount = BATCH_SIZE;
   });
 
-  let visibleMissions = $derived(sortedMissions.slice(0, visibleCount));
-  let hasMore = $derived(visibleCount < sortedMissions.length);
-  let remainingCount = $derived(sortedMissions.length - visibleCount);
+  const visibleMissions = $derived(sortedMissions.slice(0, visibleCount));
+  const hasMore = $derived(visibleCount < sortedMissions.length);
+  const remainingCount = $derived(sortedMissions.length - visibleCount);
 
   function loadMore() {
     visibleCount = Math.min(visibleCount + BATCH_SIZE, sortedMissions.length);
@@ -72,7 +76,9 @@
   let sentinelEl: HTMLDivElement | undefined = $state(undefined);
 
   $effect(() => {
-    if (!sentinelEl || !hasMore) return;
+    if (!sentinelEl || !hasMore) {
+      return;
+    }
 
     const observer = new IntersectionObserver(
       (entries) => {
@@ -89,7 +95,14 @@
 
   if (import.meta.env.DEV) {
     $effect(() => {
-      console.log('[VirtualMissionFeed] missions:', missions?.length ?? 0, 'visible:', visibleMissions.length, 'total:', sortedMissions.length);
+      console.log(
+        '[VirtualMissionFeed] missions:',
+        missions?.length ?? 0,
+        'visible:',
+        visibleMissions.length,
+        'total:',
+        sortedMissions.length
+      );
     });
   }
 </script>
@@ -109,7 +122,9 @@
       </div>
     {/each}
   {:else if error && sortedMissions.length === 0}
-    <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
+    <div
+      class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center"
+    >
       <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-red/12">
         <Icon name="x" size={20} class="text-accent-red" />
       </div>
@@ -117,13 +132,17 @@
       <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">{error}</p>
     </div>
   {:else if sortedMissions.length === 0}
-    <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
+    <div
+      class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center"
+    >
       {#if filterActive}
         <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
           <Icon name="filter-x" size={20} class="text-text-muted" />
         </div>
         <p class="text-sm font-semibold text-text-primary">Aucun résultat</p>
-        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">Essayez d'élargir vos filtres ou de modifier vos critères de recherche.</p>
+        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">
+          Essayez d'élargir vos filtres ou de modifier vos critères de recherche.
+        </p>
       {:else}
         <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
           <Icon name="briefcase" size={20} class="text-text-muted" />
@@ -141,7 +160,7 @@
         <p class="text-xs leading-relaxed text-text-secondary">{error}</p>
       </div>
     {/if}
-    
+
     <!-- Lazy-loaded list: renders only visibleCount missions, loads more on scroll -->
     <div class="flex flex-col gap-3">
       {#each visibleMissions as mission (mission.id)}
@@ -169,9 +188,12 @@
         </button>
       </div>
     {/if}
-    
+
     <p class="py-2 text-center text-[11px] text-text-muted shrink-0">
-      {visibleMissions.length}/{sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length > 1 ? 's' : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
+      {visibleMissions.length}/{sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length >
+      1
+        ? 's'
+        : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
     </p>
   {/if}
 </div>

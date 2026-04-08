@@ -1,6 +1,6 @@
 /**
  * Système d'erreurs typé pour MissionPulse
- * 
+ *
  * Règles:
  * - Core = pure, pas d'I/O (pas de console.log, pas de Date.now())
  * - Les erreurs sont sérialisables (pour postMessage)
@@ -11,12 +11,7 @@
 // Types de base
 // ============================================================================
 
-export type ErrorType = 
-  | 'network'
-  | 'storage'
-  | 'parsing'
-  | 'connector'
-  | 'validation';
+export type ErrorType = 'network' | 'storage' | 'parsing' | 'connector' | 'validation';
 
 export interface BaseAppError {
   readonly type: ErrorType;
@@ -63,7 +58,7 @@ export interface ValidationError extends BaseAppError {
 }
 
 /** Union discriminating de toutes les erreurs applicatives */
-export type AppError = 
+export type AppError =
   | NetworkError
   | StorageError
   | ParsingError

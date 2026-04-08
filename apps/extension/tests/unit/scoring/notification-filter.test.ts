@@ -61,9 +61,7 @@ describe('filterNotifiableMissions', () => {
   });
 
   it('returns single mission above threshold and not seen', () => {
-    const missions = [
-      makeMission({ id: '1', score: 75 }),
-    ];
+    const missions = [makeMission({ id: '1', score: 75 })];
 
     const result = filterNotifiableMissions(missions, [], 50);
     expect(result).toHaveLength(1);
@@ -73,16 +71,16 @@ describe('filterNotifiableMissions', () => {
 
   it('filters to return only unseen missions above threshold', () => {
     const missions = [
-      makeMission({ id: '1', score: 30 }),   // below threshold
-      makeMission({ id: '2', score: 60 }),   // above, unseen
-      makeMission({ id: '3', score: 80 }),   // above, but seen
-      makeMission({ id: '4', score: 70 }),   // above, unseen
+      makeMission({ id: '1', score: 30 }), // below threshold
+      makeMission({ id: '2', score: 60 }), // above, unseen
+      makeMission({ id: '3', score: 80 }), // above, but seen
+      makeMission({ id: '4', score: 70 }), // above, unseen
       makeMission({ id: '5', score: null }), // null score
     ];
 
     const result = filterNotifiableMissions(missions, ['3'], 50);
     expect(result).toHaveLength(2);
-    expect(result.map(m => m.id)).toEqual(['4', '2']); // sorted by score desc
+    expect(result.map((m) => m.id)).toEqual(['4', '2']); // sorted by score desc
   });
 
   it('returns missions sorted by score descending', () => {
@@ -94,7 +92,7 @@ describe('filterNotifiableMissions', () => {
     ];
 
     const result = filterNotifiableMissions(missions, [], 50);
-    expect(result.map(m => m.score)).toEqual([90, 80, 70, 60]);
+    expect(result.map((m) => m.score)).toEqual([90, 80, 70, 60]);
   });
 
   it('includes missions with score exactly equal to threshold when threshold is 0', () => {
@@ -106,7 +104,7 @@ describe('filterNotifiableMissions', () => {
 
     const result = filterNotifiableMissions(missions, [], 0);
     expect(result).toHaveLength(3);
-    expect(result.map(m => m.score)).toEqual([50, 25, 0]);
+    expect(result.map((m) => m.score)).toEqual([50, 25, 0]);
   });
 
   it('excludes missions with score just below threshold when threshold is 100', () => {
@@ -119,24 +117,18 @@ describe('filterNotifiableMissions', () => {
 
     const result = filterNotifiableMissions(missions, [], 100);
     expect(result).toHaveLength(2);
-    expect(result.every(m => m.score === 100)).toBe(true);
+    expect(result.every((m) => m.score === 100)).toBe(true);
   });
 
   it('handles duplicate seen IDs correctly', () => {
-    const missions = [
-      makeMission({ id: '1', score: 60 }),
-      makeMission({ id: '2', score: 70 }),
-    ];
+    const missions = [makeMission({ id: '1', score: 60 }), makeMission({ id: '2', score: 70 })];
 
     const result = filterNotifiableMissions(missions, ['1', '1', '1', '2'], 50);
     expect(result).toHaveLength(0);
   });
 
   it('handles empty seenIds array', () => {
-    const missions = [
-      makeMission({ id: '1', score: 60 }),
-      makeMission({ id: '2', score: 70 }),
-    ];
+    const missions = [makeMission({ id: '1', score: 60 }), makeMission({ id: '2', score: 70 })];
 
     const result = filterNotifiableMissions(missions, [], 50);
     expect(result).toHaveLength(2);
@@ -152,7 +144,7 @@ describe('filterNotifiableMissions', () => {
 
     const result = filterNotifiableMissions(missions, [], 50);
     expect(result).toHaveLength(2);
-    expect(result.every(m => m.score !== null)).toBe(true);
+    expect(result.every((m) => m.score !== null)).toBe(true);
   });
 
   it('prefers semantic score over basic score for filtering and sorting', () => {
@@ -176,6 +168,6 @@ describe('filterNotifiableMissions', () => {
 
     const result = filterNotifiableMissions(missions, [], 50);
     expect(result).toHaveLength(3);
-    expect(result.map(m => m.title)).toEqual(['First', 'Second', 'Third']);
+    expect(result.map((m) => m.title)).toEqual(['First', 'Second', 'Third']);
   });
 });

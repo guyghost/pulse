@@ -36,7 +36,9 @@ export function parseSemanticResult(raw: string): SemanticResult | null {
 
   // 2. Find first { and use brace-counting to find matching }
   const startIndex = cleaned.indexOf('{');
-  if (startIndex === -1) return null;
+  if (startIndex === -1) {
+    return null;
+  }
 
   let depth = 0;
   let inString = false;
@@ -74,7 +76,9 @@ export function parseSemanticResult(raw: string): SemanticResult | null {
     }
   }
 
-  if (endIndex === -1) return null;
+  if (endIndex === -1) {
+    return null;
+  }
 
   const jsonStr = cleaned.slice(startIndex, endIndex + 1);
 

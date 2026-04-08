@@ -1,15 +1,21 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  let { content }: {
+  const {
+    content,
+  }: {
     content: Snippet;
   } = $props();
 </script>
 
 <div class="relative flex h-full flex-col px-4 py-6 overflow-y-auto">
-  <div class="pointer-events-none absolute left-1/2 top-12 h-28 w-28 -translate-x-1/2 rounded-full bg-accent-blue/14 blur-3xl"></div>
+  <div
+    class="pointer-events-none absolute left-1/2 top-12 h-28 w-28 -translate-x-1/2 rounded-full bg-accent-blue/14 blur-3xl"
+  ></div>
   <div class="section-card-strong relative w-full overflow-visible rounded-[2rem] p-5 my-auto">
-    <div class="pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full bg-accent-emerald/12 blur-3xl"></div>
+    <div
+      class="pointer-events-none absolute -right-10 top-0 h-24 w-24 rounded-full bg-accent-emerald/12 blur-3xl"
+    ></div>
     <div class="relative">
       <div class="mb-6">
         <p class="eyebrow text-accent-blue/80">MissionPulse</p>

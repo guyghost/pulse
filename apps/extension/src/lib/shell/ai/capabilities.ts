@@ -13,12 +13,18 @@ export type AiAvailability = 'available' | 'after-download' | 'no';
 export const isPromptApiAvailable = async (): Promise<AiAvailability> => {
   try {
     const ai = self.ai;
-    if (!ai?.languageModel?.capabilities) return 'no';
+    if (!ai?.languageModel?.capabilities) {
+      return 'no';
+    }
 
     const caps = await ai.languageModel.capabilities();
 
-    if (caps.available === 'readily') return 'available';
-    if (caps.available === 'after-download') return 'after-download';
+    if (caps.available === 'readily') {
+      return 'available';
+    }
+    if (caps.available === 'after-download') {
+      return 'after-download';
+    }
     return 'no';
   } catch {
     return 'no';

@@ -6,7 +6,7 @@
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
 
-  let {
+  const {
     missions = [],
     isLoading = false,
     error = null,
@@ -35,22 +35,31 @@
   } = $props();
 
   // Use $derived.by for explicit reactivity with defensive checks
-  let sortedMissions = $derived.by(() => {
+  const sortedMissions = $derived.by(() => {
     // Defensive: handle undefined/null cases
     if (!missions || !Array.isArray(missions) || missions.length === 0) {
       return [];
     }
     // Create a new array to ensure reactivity tracking
     return [...missions].sort((a, b) => {
-      if (sortBy === 'date') return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
-      if (sortBy === 'tjm') return (b.tjm ?? 0) - (a.tjm ?? 0);
+      if (sortBy === 'date') {
+        return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
+      }
+      if (sortBy === 'tjm') {
+        return (b.tjm ?? 0) - (a.tjm ?? 0);
+      }
       return (b.score ?? 0) - (a.score ?? 0);
     });
   });
 
   if (import.meta.env.DEV) {
     $effect(() => {
-      console.log('[MissionFeed] missions prop:', missions?.length ?? 0, 'sortedMissions:', sortedMissions.length);
+      console.log(
+        '[MissionFeed] missions prop:',
+        missions?.length ?? 0,
+        'sortedMissions:',
+        sortedMissions.length
+      );
     });
   }
 </script>
@@ -70,7 +79,9 @@
       </div>
     {/each}
   {:else if error && sortedMissions.length === 0}
-    <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
+    <div
+      class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center"
+    >
       <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-red/12">
         <Icon name="x" size={20} class="text-accent-red" />
       </div>
@@ -78,13 +89,17 @@
       <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">{error}</p>
     </div>
   {:else if sortedMissions.length === 0}
-    <div class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center">
+    <div
+      class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center"
+    >
       {#if filterActive}
         <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
           <Icon name="filter-x" size={20} class="text-text-muted" />
         </div>
         <p class="text-sm font-semibold text-text-primary">Aucun résultat</p>
-        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">Essayez d'élargir vos filtres ou de modifier vos critères de recherche.</p>
+        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">
+          Essayez d'élargir vos filtres ou de modifier vos critères de recherche.
+        </p>
       {:else}
         <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
           <Icon name="briefcase" size={20} class="text-text-muted" />
@@ -117,7 +132,10 @@
       </div>
     {/each}
     <p class="py-2 text-center text-[11px] text-text-muted">
-      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length > 1 ? 's' : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
+      {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length >
+      1
+        ? 's'
+        : ''} par {sortBy === 'score' ? 'pertinence' : sortBy === 'date' ? 'date' : 'TJM'}
     </p>
   {/if}
 </div>

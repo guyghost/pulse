@@ -3,7 +3,6 @@ import { parseLeHibouHTML } from '../../../src/lib/core/connectors/lehibou-parse
 
 const NOW = new Date('2026-03-13T12:00:00Z');
 
-
 const FIXTURE_HTML = `
 <html><body>
 <a class="mission-card" href="/annonce/aaa-bbb-ccc?source=search-engine">

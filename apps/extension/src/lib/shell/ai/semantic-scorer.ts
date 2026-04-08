@@ -95,9 +95,13 @@ export const scoreMissionsSemantic = async (
   const results = new Map<string, SemanticResult>();
 
   const availability = await isPromptApiAvailable();
-  if (availability === 'no') return results;
+  if (availability === 'no') {
+    return results;
+  }
 
-  if (missions.length === 0) return results;
+  if (missions.length === 0) {
+    return results;
+  }
 
   // Step 1: Check cache for all missions
   const missionIds = missions.map((m) => m.id);

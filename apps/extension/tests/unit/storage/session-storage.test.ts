@@ -7,7 +7,11 @@ vi.stubGlobal('chrome', {
     session: {
       get: vi.fn(async (keys: string[]) => {
         const result: Record<string, unknown> = {};
-        for (const k of keys) if (k in sessionStore) result[k] = sessionStore[k];
+        for (const k of keys) {
+          if (k in sessionStore) {
+            result[k] = sessionStore[k];
+          }
+        }
         return result;
       }),
       set: vi.fn(async (items: Record<string, unknown>) => {
@@ -27,7 +31,9 @@ import {
 
 describe('session-storage', () => {
   beforeEach(() => {
-    for (const key of Object.keys(sessionStore)) delete sessionStore[key];
+    for (const key of Object.keys(sessionStore)) {
+      delete sessionStore[key];
+    }
   });
 
   it('returns idle scan state by default', async () => {

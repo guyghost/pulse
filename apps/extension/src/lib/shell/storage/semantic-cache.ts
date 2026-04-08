@@ -61,11 +61,13 @@ export const isSemanticCacheValid = (cachedAt: number): boolean =>
  */
 export const getCachedSemanticScores = async (
   missionIds: string[],
-  profile: UserProfile,
+  profile: UserProfile
 ): Promise<Map<string, SemanticResult>> => {
   const results = new Map<string, SemanticResult>();
 
-  if (missionIds.length === 0) return results;
+  if (missionIds.length === 0) {
+    return results;
+  }
 
   const keys = missionIds.map((missionId) => buildCacheKey(missionId, profile));
   const stored = await chrome.storage.local.get(keys);
@@ -74,8 +76,12 @@ export const getCachedSemanticScores = async (
     const key = buildCacheKey(missionId, profile);
     const entry = stored[key] as SemanticCacheEntry | undefined;
 
-    if (!entry) continue;
-    if (!isSemanticCacheValid(entry.cachedAt)) continue;
+    if (!entry) {
+      continue;
+    }
+    if (!isSemanticCacheValid(entry.cachedAt)) {
+      continue;
+    }
 
     results.set(missionId, {
       score: entry.score,
@@ -93,9 +99,11 @@ export const getCachedSemanticScores = async (
  */
 export const cacheSemanticScores = async (
   results: Map<string, SemanticResult>,
-  profile: UserProfile,
+  profile: UserProfile
 ): Promise<void> => {
-  if (results.size === 0) return;
+  if (results.size === 0) {
+    return;
+  }
 
   const toStore: Record<string, SemanticCacheEntry> = {};
   const now = Date.now();
@@ -137,7 +145,9 @@ export const clearExpiredSemanticCache = async (): Promise<void> => {
   const keysToRemove: string[] = [];
 
   for (const [key, value] of Object.entries(all)) {
-    if (!key.startsWith('semantic-')) continue;
+    if (!key.startsWith('semantic-')) {
+      continue;
+    }
 
     const entry = value as SemanticCacheEntry;
     if (!isSemanticCacheValid(entry.cachedAt)) {

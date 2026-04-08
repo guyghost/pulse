@@ -8,7 +8,7 @@ export function onVisible(node: HTMLElement, callback: () => void) {
         }
       }
     },
-    { threshold: 0.5 },
+    { threshold: 0.5 }
   );
 
   observer.observe(node);

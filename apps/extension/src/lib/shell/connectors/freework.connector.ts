@@ -91,10 +91,7 @@ export class FreeWorkConnector extends BaseConnector {
 
         if (!result.ok) {
           if (import.meta.env.DEV) {
-            console.error(
-              `[FreeWork] Page ${page} fetch failed:`,
-              result.error.message
-            );
+            console.error(`[FreeWork] Page ${page} fetch failed:`, result.error.message);
           }
           return err(
             createConnectorError(
@@ -141,7 +138,9 @@ export class FreeWorkConnector extends BaseConnector {
           );
         }
 
-        if (missions.length === 0) break;
+        if (missions.length === 0) {
+          break;
+        }
         allMissions.push(...missions);
       }
 

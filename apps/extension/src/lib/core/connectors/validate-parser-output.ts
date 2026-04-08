@@ -18,7 +18,9 @@ export interface ParserValidationResult {
 /**
  * Validate that a mission object has all required fields with correct types.
  */
-export const validateMission = (raw: unknown): { valid: boolean; mission?: Mission; reason?: string } => {
+export const validateMission = (
+  raw: unknown
+): { valid: boolean; mission?: Mission; reason?: string } => {
   if (typeof raw !== 'object' || raw === null) {
     return { valid: false, reason: 'Mission is not an object' };
   }
@@ -93,9 +95,7 @@ export const validateMission = (raw: unknown): { valid: boolean; mission?: Missi
  * @param missions Raw parsed missions
  * @returns Validation result with valid missions and rejection details
  */
-export const validateParserOutput = (
-  missions: unknown[]
-): ParserValidationResult => {
+export const validateParserOutput = (missions: unknown[]): ParserValidationResult => {
   const valid: Mission[] = [];
   const rejected: Array<{ mission: unknown; reason: string }> = [];
 
@@ -122,7 +122,9 @@ export const validateParserOutput = (
  */
 export const validateNextData = (html: string): Record<string, unknown> | null => {
   const match = html.match(/<script\s+id="__NEXT_DATA__"[^>]*>([\s\S]*?)<\/script>/);
-  if (!match) return null;
+  if (!match) {
+    return null;
+  }
 
   try {
     const parsed = JSON.parse(match[1]);

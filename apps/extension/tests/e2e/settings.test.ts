@@ -160,7 +160,10 @@ test.describe('Settings Flow', () => {
     await expect(page.getByRole('heading', { name: 'Profil' })).toBeVisible();
 
     await page.getByRole('button', { name: 'Feed' }).click();
-    await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
 
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Profil' })).toBeVisible({ timeout: 2000 });

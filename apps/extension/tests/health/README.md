@@ -26,6 +26,7 @@ pnpm health-check --output=health-report.md
 ```
 
 ## Architecture
+
 ```
 tests/health/
 ├── connectors/              # Individual health check tests
@@ -46,40 +47,44 @@ tests/health/
 ## Connector Types
 
 ### API-Based Connectors
+
 These connectors use public or authenticated APIs:
 
-| Connector | Type | Auth Required |
-|-----------|------|---------------|
-| Free-Work | REST API | No (public) |
-| Hiway | Supabase | No (anon key) |
-| Cherry Pick | REST API | No (public) |
-| Collective | GraphQL | Yes |
+| Connector   | Type     | Auth Required |
+| ----------- | -------- | ------------- |
+| Free-Work   | REST API | No (public)   |
+| Hiway       | Supabase | No (anon key) |
+| Cherry Pick | REST API | No (public)   |
+| Collective  | GraphQL  | Yes           |
 
 ### Scraping Connectors
+
 These connectors require browser automation
 
-| Connector | Type | Auth Required |
-|-----------|------|---------------|
-| LeHibou | HTML Scraping | Yes |
+| Connector | Type          | Auth Required |
+| --------- | ------------- | ------------- |
+| LeHibou   | HTML Scraping | Yes           |
 
 ## Health Check Results
+
 Each health check returns:
 
 ```typescript
 interface HealthCheckResult {
-  connectorId: string;       // e.g., 'free-work'
-  connectorName: string;     // e.g., 'Free-Work'
+  connectorId: string; // e.g., 'free-work'
+  connectorName: string; // e.g., 'Free-Work'
   status: 'ok' | 'failed' | 'timeout' | 'skipped';
-  responseTimeMs: number;    // Response time in milliseconds
-  timestamp: string;         // ISO timestamp
-  error?: string;            // Error message if failed
-  errorDetails?: object;     // Detailed error info
-  screenshotPath?: string;   // Path to screenshot (for scraping)
-  missionsFound?: number;    // Number of missions extracted
+  responseTimeMs: number; // Response time in milliseconds
+  timestamp: string; // ISO timestamp
+  error?: string; // Error message if failed
+  errorDetails?: object; // Detailed error info
+  screenshotPath?: string; // Path to screenshot (for scraping)
+  missionsFound?: number; // Number of missions extracted
 }
 ```
 
 ## Configuration
+
 Create `health-check.config.json` in the project root (optional):
 
 ```json
@@ -101,10 +106,11 @@ Create `health-check.config.json` in the project root (optional):
 ```
 
 ### Environment Variables
-| Variable | Description | Default |
-|----------|-------------|---------|
-| `HEALTH_CHECK_TIMEOUT` | Default timeout in ms | 30000 |
-| `CI` | Detect CI environment | auto |
+
+| Variable               | Description           | Default |
+| ---------------------- | --------------------- | ------- |
+| `HEALTH_CHECK_TIMEOUT` | Default timeout in ms | 30000   |
+| `CI`                   | Detect CI environment | auto    |
 
 ## CI Integration
 
@@ -124,23 +130,23 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      
+
       - uses: pnpm/action-setup@v2
         with:
           version: 10
-          
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
-          
+
       - run: pnpm install
-      
+
       - name: Run health checks
         run: pnpm health-check --json --output=health-report.json
         env:
           HEALTH_CHECK_TIMEOUT: 60000
-          
+
       - name: Create Issue on Failure
         if: failure()
         uses: actions/github-script@v7
@@ -149,7 +155,7 @@ jobs:
             const fs = require('fs');
             const report = JSON.parse(fs.readFileSync('health-report.json', 'utf8'));
             const failures = report.results.filter(r => r.status !== 'ok');
-            
+
             if (failures.length > 0) {
               await github.rest.issues.create({
                 owner: context.repo.owner,
@@ -202,6 +208,7 @@ When running `pnpm health-check`, you you will see output like:
 ```
 
 ## Writing New Health Checks
+
 See `tests/health/connectors/freework.health.test.ts` for an example of how to write health checks.
 
 ### Template for API Connector
@@ -220,16 +227,16 @@ test.describe('MyConnector Health Check', () => {
   test('API responds with valid JSON', async ({ request }) => {
     const response = await request.get(API_URL, { timeout: TIMEOUT });
     expect(response.ok()).toBe(true);
-    
+
     const data = await response.json();
     expect(Array.isArray(data)).toBe(true);
   });
 
   test('Parser extracts missions', async ({ request }) => {
     const response = await request.get(API_URL, { timeout: TIMEOUT });
-    const data = await response.json() as MyApiResponse;
+    const data = (await response.json()) as MyApiResponse;
     const missions = parseMyApi(data, new Date());
-    
+
     expect(missions.length).toBeGreaterThan(0);
     expect(missions[0]).toHaveProperty('id');
     expect(missions[0]).toHaveProperty('title');
@@ -258,7 +265,7 @@ export async function runMyConnectorHealthCheck(): Promise<HealthCheckResult> {
       };
     }
 
-    const data = await response.json() as MyApiResponse;
+    const data = (await response.json()) as MyApiResponse;
     const missions = parseMyApi(data, new Date());
 
     return {
@@ -292,4 +299,5 @@ export async function runMyConnectorHealthCheck(): Promise<HealthCheckResult> {
 4. **Parser Errors**: Site structure may have changed
 
 ### Screenshots
+
 When a scraping connector fails, a screenshot is saved to `tests/health/screenshots/` for debugging.

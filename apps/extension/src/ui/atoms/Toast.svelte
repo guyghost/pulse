@@ -2,7 +2,7 @@
   import Icon from './Icon.svelte';
   import { fly } from 'svelte/transition';
 
-  let {
+  const {
     message,
     type = 'info',
     onDismiss,
@@ -31,10 +31,7 @@
 >
   <Icon name={iconMap[type]} size={16} />
   <p class="flex-1 text-xs font-medium">{message}</p>
-  <button
-    class="opacity-60 transition-opacity hover:opacity-100"
-    onclick={() => onDismiss?.()}
-  >
+  <button class="opacity-60 transition-opacity hover:opacity-100" onclick={() => onDismiss?.()}>
     <Icon name="x" size={14} />
   </button>
 </div>

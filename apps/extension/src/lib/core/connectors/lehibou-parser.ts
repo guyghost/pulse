@@ -11,7 +11,9 @@ const BASE_URL = 'https://www.lehibou.com';
 function queryFallback(root: Element, selectors: string[]): Element | null {
   for (const sel of selectors) {
     const el = root.querySelector(sel);
-    if (el) return el;
+    if (el) {
+      return el;
+    }
   }
   return null;
 }
@@ -29,7 +31,9 @@ function extractInfoItems(card: Element): { location: string | null; duration: s
     const durationEl = items[1]?.querySelector('span:last-child');
     const location = locationEl?.textContent?.trim() || null;
     const duration = durationEl?.textContent?.trim() || null;
-    if (location || duration) return { location, duration };
+    if (location || duration) {
+      return { location, duration };
+    }
   }
 
   // Stratégie 2 : fallback sur les classes BEM (ancienne structure)
@@ -76,7 +80,9 @@ function extractStack(card: Element): string[] {
 }
 
 export function parseLeHibouHTML(html: string, now: Date): Mission[] {
-  if (!html.trim()) return [];
+  if (!html.trim()) {
+    return [];
+  }
 
   const parser = new DOMParser();
   const doc = parser.parseFromString(html, 'text/html');
@@ -88,20 +94,24 @@ export function parseLeHibouHTML(html: string, now: Date): Mission[] {
   cards.forEach((card) => {
     // Titre : heading sémantique avec fallback chain
     const titleEl = queryFallback(card, [
-      'h1',                             // Heading principal (structure actuelle)
-      'h2',                             // Fallback si restructuré
-      'h3',                             // Fallback heading tertiaire
-      '[role="heading"]',               // ARIA heading
-      'header *:first-child',           // Premier enfant du header
+      'h1', // Heading principal (structure actuelle)
+      'h2', // Fallback si restructuré
+      'h3', // Fallback heading tertiaire
+      '[role="heading"]', // ARIA heading
+      'header *:first-child', // Premier enfant du header
     ]);
     const title = titleEl?.textContent?.trim() ?? '';
-    if (!title) return;
+    if (!title) {
+      return;
+    }
 
     // Extract UUID from href (/annonce/{uuid}?source=...)
     const href = card.getAttribute('href') ?? '';
     const uuidMatch = href.match(/\/annonce\/([^?]+)/);
     const uuid = uuidMatch ? uuidMatch[1] : '';
-    if (!uuid) return;
+    if (!uuid) {
+      return;
+    }
     const id = `lh-${uuid}`;
     const url = `${BASE_URL}/annonce/${uuid}`;
 
@@ -117,26 +127,28 @@ export function parseLeHibouHTML(html: string, now: Date): Mission[] {
 
     // TJM : extraction depuis le texte brut (insensible au markup)
     const tjmEl = queryFallback(card, [
-      'footer div',                       // Premier div du footer (structure actuelle)
-      '[class*="dailyPrice"]',            // Fallback classe BEM
-      '[class*="price"]',                 // Fallback classe générique
+      'footer div', // Premier div du footer (structure actuelle)
+      '[class*="dailyPrice"]', // Fallback classe BEM
+      '[class*="price"]', // Fallback classe générique
     ]);
     const tjm = parseTJM(tjmEl?.textContent?.trim() ?? '');
 
-    missions.push(createMission({
-      id,
-      title,
-      client: null,
-      description: '',
-      stack,
-      tjm,
-      location,
-      remote,
-      duration,
-      url,
-      source: SOURCE,
-      scrapedAt: now,
-    }));
+    missions.push(
+      createMission({
+        id,
+        title,
+        client: null,
+        description: '',
+        stack,
+        tjm,
+        location,
+        remote,
+        duration,
+        url,
+        source: SOURCE,
+        scrapedAt: now,
+      })
+    );
   });
 
   return missions;

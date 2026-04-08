@@ -9,7 +9,7 @@
     label?: string;
   }
 
-  let { missions, onExport, label = 'Exporter' }: Props = $props();
+  const { missions, onExport, label = 'Exporter' }: Props = $props();
 
   let isOpen = $state(false);
   let includeDescription = $state(true);

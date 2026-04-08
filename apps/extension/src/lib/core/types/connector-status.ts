@@ -38,10 +38,7 @@ export interface PersistedConnectorStatus {
 // ============================================================================
 
 /** Crée un statut initial pour un connecteur (état 'pending', tout à zéro) */
-export function createInitialStatus(
-  connectorId: string,
-  connectorName: string,
-): ConnectorStatus {
+export function createInitialStatus(connectorId: string, connectorName: string): ConnectorStatus {
   return {
     connectorId,
     connectorName,
@@ -55,10 +52,7 @@ export function createInitialStatus(
 }
 
 /** Convertit un ConnectorStatus terminal en PersistedConnectorStatus sérialisable */
-export function toPersistedStatus(
-  status: ConnectorStatus,
-  now: number,
-): PersistedConnectorStatus {
+export function toPersistedStatus(status: ConnectorStatus, now: number): PersistedConnectorStatus {
   const lastState: 'done' | 'error' = status.state === 'error' ? 'error' : 'done';
 
   return {
@@ -66,9 +60,7 @@ export function toPersistedStatus(
     connectorName: status.connectorName,
     lastState,
     missionsCount: status.missionsCount,
-    error: status.error
-      ? ({ ...status.error } as unknown as Record<string, unknown>)
-      : null,
+    error: status.error ? ({ ...status.error } as unknown as Record<string, unknown>) : null,
     lastSyncAt: now,
     lastSuccessAt: lastState === 'done' ? now : null,
   };

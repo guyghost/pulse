@@ -14,11 +14,17 @@ function formatTime(): string {
 }
 
 function summarizePayload(payload: unknown): string {
-  if (payload === undefined || payload === null) return '';
-  if (Array.isArray(payload)) return `[${payload.length} items]`;
+  if (payload === undefined || payload === null) {
+    return '';
+  }
+  if (Array.isArray(payload)) {
+    return `[${payload.length} items]`;
+  }
   if (typeof payload === 'object') {
-    const keys = Object.keys(payload as object);
-    if (keys.length <= 3) return JSON.stringify(payload);
+    const keys = Object.keys(payload);
+    if (keys.length <= 3) {
+      return JSON.stringify(payload);
+    }
     return `{${keys.slice(0, 3).join(', ')}...}`;
   }
   return String(payload);
@@ -32,7 +38,9 @@ export function logBridgeMessage(direction: '→' | '←', type: string, payload
     time: formatTime(),
   };
   logs.push(entry);
-  if (logs.length > maxLogs) logs.shift();
+  if (logs.length > maxLogs) {
+    logs.shift();
+  }
 
   console.log(`[Bridge] ${direction} ${type} ${entry.summary}  ${entry.time}`);
 

@@ -150,7 +150,9 @@ export class CollectiveConnector extends BaseConnector {
             data?: { me?: { members?: { collective?: { slug?: string } }[] } };
           };
           this.userSlug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
-          if (import.meta.env.DEV) console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+          if (import.meta.env.DEV) {
+            console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+          }
         }
       } catch {
         // Non-blocking — URLs will use fallback
@@ -177,7 +179,11 @@ export class CollectiveConnector extends BaseConnector {
       // Log cookie state for diagnostics
       const cookieCount = await getCookieCount(COOKIE_DOMAIN);
       const cookieNames = await getCookieNames(COOKIE_DOMAIN);
-      if (import.meta.env.DEV) console.log(`[collective] fetchMissions: ${cookieCount} cookies for ${COOKIE_DOMAIN}: [${cookieNames.join(', ')}]`);
+      if (import.meta.env.DEV) {
+        console.log(
+          `[collective] fetchMissions: ${cookieCount} cookies for ${COOKIE_DOMAIN}: [${cookieNames.join(', ')}]`
+        );
+      }
 
       // Discover user slug for mission URLs (if not already known)
       if (!this.userSlug) {
@@ -193,9 +199,13 @@ export class CollectiveConnector extends BaseConnector {
               data?: { me?: { members?: { collective?: { slug?: string } }[] } };
             };
             this.userSlug = meData.data?.me?.members?.[0]?.collective?.slug ?? null;
-            if (import.meta.env.DEV) console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+            if (import.meta.env.DEV) {
+              console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+            }
           } else {
-            if (import.meta.env.DEV) console.warn(`[collective] GET_ME failed: HTTP ${meResp.status}`);
+            if (import.meta.env.DEV) {
+              console.warn(`[collective] GET_ME failed: HTTP ${meResp.status}`);
+            }
           }
         } catch {
           // Non-blocking — URLs will use fallback
@@ -253,12 +263,23 @@ export class CollectiveConnector extends BaseConnector {
       });
 
       const contentType = response.headers.get('content-type') ?? '';
-      if (import.meta.env.DEV) console.log(`[collective] fetchMissions: HTTP ${response.status}, content-type: ${contentType}`);
+      if (import.meta.env.DEV) {
+        console.log(
+          `[collective] fetchMissions: HTTP ${response.status}, content-type: ${contentType}`
+        );
+      }
 
       // Cloudflare challenge returns HTML with 403
       if (!response.ok || !contentType.includes('json')) {
-        const preview = await response.text().then(t => t.slice(0, 300)).catch(() => '(unreadable)');
-        if (import.meta.env.DEV) console.error(`[collective] fetchMissions: blocked — status=${response.status}, preview: ${preview}`);
+        const preview = await response
+          .text()
+          .then((t) => t.slice(0, 300))
+          .catch(() => '(unreadable)');
+        if (import.meta.env.DEV) {
+          console.error(
+            `[collective] fetchMissions: blocked — status=${response.status}, preview: ${preview}`
+          );
+        }
         await removeCookieRule(COOKIE_RULE_ID);
         return err(
           createConnectorError(
@@ -272,7 +293,8 @@ export class CollectiveConnector extends BaseConnector {
                 status: response.status,
                 contentType,
                 cloudflare: response.status === 403,
-                browser: detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '').name,
+                browser: detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '')
+                  .name,
               },
             },
             now
@@ -287,13 +309,20 @@ export class CollectiveConnector extends BaseConnector {
             pagination?: { total: number };
           };
         };
-        errors?: { message: string; extensions?: Record<string, unknown>; path?: string[]; locations?: unknown[] }[];
+        errors?: {
+          message: string;
+          extensions?: Record<string, unknown>;
+          path?: string[];
+          locations?: unknown[];
+        }[];
       };
 
       // GraphQL errors (auth, schema, etc.)
       if (result.errors && result.errors.length > 0) {
         const fullErrors = JSON.stringify(result.errors).slice(0, 1000);
-        if (import.meta.env.DEV) console.error(`[collective] fetchMissions: GraphQL errors (full):`, fullErrors);
+        if (import.meta.env.DEV) {
+          console.error(`[collective] fetchMissions: GraphQL errors (full):`, fullErrors);
+        }
 
         await removeCookieRule(COOKIE_RULE_ID);
         return err(
@@ -307,7 +336,11 @@ export class CollectiveConnector extends BaseConnector {
 
       const projects = result.data?.results?.projects ?? [];
       const total = result.data?.results?.pagination?.total ?? 0;
-      if (import.meta.env.DEV) console.log(`[collective] fetchMissions: ${projects.length} projects returned (total: ${total})`);
+      if (import.meta.env.DEV) {
+        console.log(
+          `[collective] fetchMissions: ${projects.length} projects returned (total: ${total})`
+        );
+      }
 
       const missions = projects.map((p) =>
         createMission({

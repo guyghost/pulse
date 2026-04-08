@@ -40,11 +40,17 @@ export interface HiwayMissionRow {
  * Returns null if the value cannot be parsed or is unreasonable (< 50 or > 9999).
  */
 export function parseBudgetToTJM(budget: string | null | undefined): number | null {
-  if (!budget) return null;
+  if (!budget) {
+    return null;
+  }
   const trimmed = budget.trim().replace(/[^\d]/g, '');
-  if (!trimmed) return null;
+  if (!trimmed) {
+    return null;
+  }
   const n = parseInt(trimmed, 10);
-  if (isNaN(n) || n < 50 || n > 9999) return null;
+  if (isNaN(n) || n < 50 || n > 9999) {
+    return null;
+  }
   return n;
 }
 
@@ -53,7 +59,9 @@ export function parseBudgetToTJM(budget: string | null | undefined): number | nu
  * e.g. "scrum, agile, safe" → ["scrum", "agile", "safe"]
  */
 export function parseSkillsString(skills: string | null | undefined): string[] {
-  if (!skills || typeof skills !== 'string') return [];
+  if (!skills || typeof skills !== 'string') {
+    return [];
+  }
   return skills
     .split(',')
     .map((s) => s.trim())
@@ -69,13 +77,21 @@ export function parseSkillsString(skills: string | null | undefined): string[] {
  *   Already has "mois" → keep as-is
  */
 export function normalizeDuration(duration: string | null | undefined): string | null {
-  if (!duration || typeof duration !== 'string') return null;
+  if (!duration || typeof duration !== 'string') {
+    return null;
+  }
   const trimmed = duration.trim();
-  if (!trimmed) return null;
+  if (!trimmed) {
+    return null;
+  }
   // Already has a unit → keep as-is
-  if (/mois|month|an|year|jour|day|semaine|week/i.test(trimmed)) return trimmed;
+  if (/mois|month|an|year|jour|day|semaine|week/i.test(trimmed)) {
+    return trimmed;
+  }
   // Looks like a number or range (e.g. "12+", "6-12", "3")
-  if (/^[\d][\d+\-]*$/.test(trimmed)) return `${trimmed} mois`;
+  if (/^[\d][\d+-]*$/.test(trimmed)) {
+    return `${trimmed} mois`;
+  }
   return trimmed;
 }
 
@@ -84,7 +100,9 @@ export function normalizeDuration(duration: string | null | undefined): string |
  * Examples: "Télétravail 2j/semaine", "Télétravail", "Présentiel", "Hybride"
  */
 function detectRemoteFromHiway(remoteInfo: string | null | undefined): Mission['remote'] {
-  if (!remoteInfo) return null;
+  if (!remoteInfo) {
+    return null;
+  }
   const lower = remoteInfo.toLowerCase();
   // Full remote: no mention of days on-site
   if (

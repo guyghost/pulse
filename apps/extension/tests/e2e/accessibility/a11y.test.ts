@@ -290,7 +290,9 @@ test.describe('Accessibility', () => {
     await page.keyboard.press('Control+Shift+D');
 
     // Attendre les missions
-    await expect(page.getByText('10 missions', { exact: true }).first()).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('10 missions', { exact: true }).first()).toBeVisible({
+      timeout: 3000,
+    });
 
     // Vérifier les couleurs de texte principales
     const textElements = await page.locator('p, span, h1, h2, h3, button, a').all();
@@ -299,7 +301,9 @@ test.describe('Accessibility', () => {
     for (const el of textElements.slice(0, 15)) {
       // Limiter à 15 éléments pour les perfs
       const isVisible = await el.isVisible().catch(() => false);
-      if (!isVisible) continue;
+      if (!isVisible) {
+        continue;
+      }
 
       const styles = await el.evaluate((element) => {
         const computed = window.getComputedStyle(element);
@@ -351,7 +355,9 @@ test.describe('Accessibility', () => {
       const isFocusable = await el.evaluate(
         (e) => !e.hasAttribute('disabled') && !e.hasAttribute('aria-hidden')
       );
-      if (isFocusable) focusableCount++;
+      if (isFocusable) {
+        focusableCount++;
+      }
     }
 
     expect(focusableCount).toBeGreaterThan(0);

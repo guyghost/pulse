@@ -65,7 +65,13 @@ const CHROMIUM_PATTERN = /\bChrom(?:e|ium)\/\d+/;
 export const detectBrowser = (userAgent: string): BrowserInfo => {
   // Guard against null/undefined (defensive, since callers may pass navigator.userAgent which is always string)
   if (!userAgent) {
-    return { name: 'unknown', version: 0, isChromium: false, credentialsReliable: false, cookiePartitioningRisk: true };
+    return {
+      name: 'unknown',
+      version: 0,
+      isChromium: false,
+      credentialsReliable: false,
+      cookiePartitioningRisk: true,
+    };
   }
   const ua = userAgent;
 
@@ -130,8 +136,7 @@ export const needsExplicitCookieInjection = (browser: BrowserInfo): boolean =>
  * @param browser - BrowserInfo from detectBrowser()
  * @returns true if Origin rewriting should be used (all Chromium browsers)
  */
-export const needsOriginRewrite = (browser: BrowserInfo): boolean =>
-  browser.isChromium;
+export const needsOriginRewrite = (browser: BrowserInfo): boolean => browser.isChromium;
 
 /**
  * Parses a version string into a major version number

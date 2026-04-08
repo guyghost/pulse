@@ -2,7 +2,12 @@
   import type { Snippet } from 'svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
 
-  let { header, feed, sidebar, onRefresh }: {
+  const {
+    header,
+    feed,
+    sidebar,
+    onRefresh,
+  }: {
     header?: Snippet;
     feed: Snippet;
     sidebar?: Snippet;

@@ -14,10 +14,14 @@ import type { SeniorityLevel } from '../types/profile';
  */
 export const scoreSeniorityBonus = (
   missionSeniority: SeniorityLevel | null,
-  profileSeniority: SeniorityLevel,
+  profileSeniority: SeniorityLevel
 ): number => {
-  if (missionSeniority === null) return 2;
-  if (missionSeniority === profileSeniority) return 5;
+  if (missionSeniority === null) {
+    return 2;
+  }
+  if (missionSeniority === profileSeniority) {
+    return 5;
+  }
 
   const levels: SeniorityLevel[] = ['junior', 'confirmed', 'senior'];
   const missionIdx = levels.indexOf(missionSeniority);
@@ -41,23 +45,34 @@ export const scoreSeniorityBonus = (
  * @param missionStartDate - ISO 8601 date string (e.g. "2026-04-15") or null
  * @param now - Current date for comparison (injected for purity)
  */
-export const scoreStartDateBonus = (
-  missionStartDate: string | null,
-  now: Date,
-): number => {
-  if (!missionStartDate) return 0;
+export const scoreStartDateBonus = (missionStartDate: string | null, now: Date): number => {
+  if (!missionStartDate) {
+    return 0;
+  }
 
   const startDate = new Date(missionStartDate);
-  if (isNaN(startDate.getTime())) return 0;
+  if (isNaN(startDate.getTime())) {
+    return 0;
+  }
 
   const diffMs = startDate.getTime() - now.getTime();
-  if (diffMs < 0) return 0; // Past date
+  if (diffMs < 0) {
+    return 0;
+  } // Past date
 
   const diffDays = diffMs / (1000 * 60 * 60 * 24);
 
-  if (diffDays <= 7) return 5;
-  if (diffDays <= 14) return 4;
-  if (diffDays <= 30) return 3;
-  if (diffDays <= 60) return 1;
+  if (diffDays <= 7) {
+    return 5;
+  }
+  if (diffDays <= 14) {
+    return 4;
+  }
+  if (diffDays <= 30) {
+    return 3;
+  }
+  if (diffDays <= 60) {
+    return 1;
+  }
   return 0;
 };

@@ -84,7 +84,9 @@ export function getConnectorsMeta(): ConnectorMeta[] {
  */
 export async function getConnector(id: string): Promise<PlatformConnector | null> {
   const factory = CONNECTOR_REGISTRY[id as ConnectorId];
-  if (!factory) return null;
+  if (!factory) {
+    return null;
+  }
 
   try {
     return await factory();

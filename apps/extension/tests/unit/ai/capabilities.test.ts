@@ -8,9 +8,7 @@ describe('isPromptApiAvailable', () => {
 
   it('returns "no" when self.ai is undefined', async () => {
     vi.stubGlobal('self', {});
-    const { isPromptApiAvailable } = await import(
-      '../../../src/lib/shell/ai/capabilities'
-    );
+    const { isPromptApiAvailable } = await import('../../../src/lib/shell/ai/capabilities');
     expect(await isPromptApiAvailable()).toBe('no');
   });
 
@@ -22,9 +20,7 @@ describe('isPromptApiAvailable', () => {
         },
       },
     });
-    const { isPromptApiAvailable } = await import(
-      '../../../src/lib/shell/ai/capabilities'
-    );
+    const { isPromptApiAvailable } = await import('../../../src/lib/shell/ai/capabilities');
     expect(await isPromptApiAvailable()).toBe('available');
   });
 
@@ -36,9 +32,7 @@ describe('isPromptApiAvailable', () => {
         },
       },
     });
-    const { isPromptApiAvailable } = await import(
-      '../../../src/lib/shell/ai/capabilities'
-    );
+    const { isPromptApiAvailable } = await import('../../../src/lib/shell/ai/capabilities');
     expect(await isPromptApiAvailable()).toBe('after-download');
   });
 
@@ -46,13 +40,13 @@ describe('isPromptApiAvailable', () => {
     vi.stubGlobal('self', {
       ai: {
         languageModel: {
-          capabilities: vi.fn(async () => { throw new Error('fail'); }),
+          capabilities: vi.fn(async () => {
+            throw new Error('fail');
+          }),
         },
       },
     });
-    const { isPromptApiAvailable } = await import(
-      '../../../src/lib/shell/ai/capabilities'
-    );
+    const { isPromptApiAvailable } = await import('../../../src/lib/shell/ai/capabilities');
     expect(await isPromptApiAvailable()).toBe('no');
   });
 });

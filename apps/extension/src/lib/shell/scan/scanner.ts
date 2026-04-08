@@ -243,10 +243,12 @@ async function _runScanInternal(
    * Fetch a single connector with progress tracking and retry.
    */
   async function fetchOneConnector(
-    connector: typeof connectors[number],
-    index: number,
+    connector: (typeof connectors)[number],
+    index: number
   ): Promise<void> {
-    if (signal?.aborted) return;
+    if (signal?.aborted) {
+      return;
+    }
 
     const stateIdx = connectorStates.findIndex((s) => s.connectorId === connector.id);
     onProgress?.({ current: index, total: connectors.length, connectorName: connector.name });
@@ -317,7 +319,9 @@ async function _runScanInternal(
   let nextIndex = 0;
 
   while (nextIndex < connectors.length) {
-    if (signal?.aborted) break;
+    if (signal?.aborted) {
+      break;
+    }
 
     // Fill up to CONCURRENCY slots
     while (pending.length < CONCURRENCY && nextIndex < connectors.length) {
@@ -325,7 +329,9 @@ async function _runScanInternal(
       const promise = fetchOneConnector(connectors[idx], idx).then(() => {
         // Remove from pending when done
         const pIdx = pending.indexOf(promise);
-        if (pIdx >= 0) pending.splice(pIdx, 1);
+        if (pIdx >= 0) {
+          pending.splice(pIdx, 1);
+        }
       });
       pending.push(promise);
     }
@@ -359,7 +365,7 @@ async function _runScanInternal(
 
   // Score against profile (already loaded above for connector filtering)
   const scored = profile
-    ? freelanceOnly.map((m) => ({ ...m, score: scoreMission(m, profile!, new Date()) }))
+    ? freelanceOnly.map((m) => ({ ...m, score: scoreMission(m, profile, new Date()) }))
     : freelanceOnly;
 
   // Semantic scoring (async enrichment, non-blocking)

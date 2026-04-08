@@ -30,7 +30,9 @@ const persistLastNotificationTime = async (time: number): Promise<void> => {
  * Load the last notification timestamp from session storage.
  */
 const loadLastNotificationTime = async (): Promise<number | null> => {
-  if (lastNotificationTime !== null) return lastNotificationTime;
+  if (lastNotificationTime !== null) {
+    return lastNotificationTime;
+  }
   try {
     const result = await chrome.storage.session.get(LAST_NOTIFICATION_KEY);
     lastNotificationTime = (result[LAST_NOTIFICATION_KEY] as number) ?? null;
@@ -62,7 +64,9 @@ export interface NotificationResult {
  * @returns Whether a notification was shown, and which mission IDs were included
  */
 export const notifyHighScoreMissions = async (missions: Mission[]): Promise<NotificationResult> => {
-  if (missions.length === 0) return { shown: false, notifiedMissionIds: [] };
+  if (missions.length === 0) {
+    return { shown: false, notifiedMissionIds: [] };
+  }
 
   // Check if notifications are enabled
   let settings: AppSettings;
@@ -72,13 +76,17 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
     return { shown: false, notifiedMissionIds: [] };
   }
 
-  if (!settings.notifications) return { shown: false, notifiedMissionIds: [] };
+  if (!settings.notifications) {
+    return { shown: false, notifiedMissionIds: [] };
+  }
 
   // Check rate limit
   const lastTime = await loadLastNotificationTime();
   const now = Date.now();
 
-  if (!canNotify(lastTime, now)) return { shown: false, notifiedMissionIds: [] };
+  if (!canNotify(lastTime, now)) {
+    return { shown: false, notifiedMissionIds: [] };
+  }
 
   // Filter missions above threshold that haven't been seen
   let seenIds: string[] = [];
@@ -94,7 +102,9 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
     settings.notificationScoreThreshold
   );
 
-  if (notifiableMissions.length === 0) return { shown: false, notifiedMissionIds: [] };
+  if (notifiableMissions.length === 0) {
+    return { shown: false, notifiedMissionIds: [] };
+  }
 
   // Build notification content based on count
   const missionCount = notifiableMissions.length;

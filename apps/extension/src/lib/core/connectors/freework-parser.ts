@@ -53,7 +53,9 @@ export interface FreeWorkApiResponse {
 }
 
 function mapRemoteMode(mode: string | null): RemoteType | null {
-  if (!mode) return null;
+  if (!mode) {
+    return null;
+  }
   switch (mode) {
     case 'full':
       return 'full';
@@ -67,7 +69,9 @@ function mapRemoteMode(mode: string | null): RemoteType | null {
 }
 
 function formatDuration(value: number | null, period: string | null): string | null {
-  if (value == null || !period) return null;
+  if (value === null || value === undefined || !period) {
+    return null;
+  }
   const label = period === 'month' ? 'mois' : period === 'year' ? 'an' : period;
   return `${value} ${label}`;
 }
@@ -81,7 +85,9 @@ function buildJobUrl(slug: string, jobSlug: string | null): string {
 const FREELANCE_CONTRACTS = new Set(['contractor', 'freelance', 'portage']);
 
 function isFreelanceContract(contracts: string[]): boolean {
-  if (contracts.length === 0) return true; // No info → keep
+  if (contracts.length === 0) {
+    return true;
+  } // No info → keep
   return contracts.some((c) => FREELANCE_CONTRACTS.has(c.toLowerCase()));
 }
 
@@ -90,7 +96,9 @@ function isFreelanceContract(contracts: string[]): boolean {
  * Pure function — deterministic mapping.
  */
 export const mapExperienceLevel = (level: string | null): SeniorityLevel | null => {
-  if (!level) return null;
+  if (!level) {
+    return null;
+  }
   switch (level) {
     case 'junior':
       return 'junior';
@@ -104,7 +112,9 @@ export const mapExperienceLevel = (level: string | null): SeniorityLevel | null 
 };
 
 export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[] {
-  if (!data['hydra:member'] || !Array.isArray(data['hydra:member'])) return [];
+  if (!data['hydra:member'] || !Array.isArray(data['hydra:member'])) {
+    return [];
+  }
 
   return data['hydra:member']
     .filter((p) => isFreelanceContract(p.contracts ?? []))

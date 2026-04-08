@@ -5,7 +5,7 @@
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
 
-  let {
+  const {
     availableStacks = [],
     selectedStacks = [],
     selectedSource = null,
@@ -29,8 +29,11 @@
     onClearAll?: () => void;
   } = $props();
 
-  let hasFilters = $derived(
-    selectedStacks.length > 0 || selectedSource !== null || selectedRemote !== null || selectedSeniority !== null
+  const hasFilters = $derived(
+    selectedStacks.length > 0 ||
+      selectedSource !== null ||
+      selectedRemote !== null ||
+      selectedSeniority !== null
   );
 
   const sources: { value: MissionSource; label: string }[] = getConnectorsMeta().map((m) => ({

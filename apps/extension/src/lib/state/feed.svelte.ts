@@ -3,14 +3,16 @@ import type { Mission } from '$lib/core/types/mission';
 export type FeedState = 'empty' | 'loading' | 'loaded' | 'error';
 
 const recomputeFilteredMissions = (missions: Mission[], searchQuery: string): Mission[] => {
-  if (!searchQuery.trim()) return missions;
+  if (!searchQuery.trim()) {
+    return missions;
+  }
 
   const query = searchQuery.toLowerCase().trim();
   return missions.filter(
     (m) =>
       (m.title ?? '').toLowerCase().includes(query) ||
       m.stack.some((s) => s && s.toLowerCase().includes(query)) ||
-      (m.description ?? '').toLowerCase().includes(query),
+      (m.description ?? '').toLowerCase().includes(query)
   );
 };
 
@@ -20,14 +22,24 @@ export function createFeedStore() {
   let searchQuery = $state('');
   let error = $state<string | null>(null);
 
-  let filteredMissions = $derived(recomputeFilteredMissions(missions, searchQuery));
+  const filteredMissions = $derived(recomputeFilteredMissions(missions, searchQuery));
 
   return {
-    get state() { return state; },
-    get missions() { return missions; },
-    get filteredMissions() { return filteredMissions; },
-    get searchQuery() { return searchQuery; },
-    get error() { return error; },
+    get state() {
+      return state;
+    },
+    get missions() {
+      return missions;
+    },
+    get filteredMissions() {
+      return filteredMissions;
+    },
+    get searchQuery() {
+      return searchQuery;
+    },
+    get error() {
+      return error;
+    },
 
     load() {
       state = 'loading';

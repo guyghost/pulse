@@ -10,11 +10,21 @@ import type { Mission } from '../../../src/lib/core/types/mission';
 
 function makeMission(id: string): Mission {
   return {
-    id, title: `Mission ${id}`, client: null, description: '',
-    stack: [], tjm: null, location: null, remote: null,
-    duration: null, url: `https://example.com/${id}`,
-    source: 'free-work', scrapedAt: new Date(), score: null,
-    semanticScore: null, semanticReason: null,
+    id,
+    title: `Mission ${id}`,
+    client: null,
+    description: '',
+    stack: [],
+    tjm: null,
+    location: null,
+    remote: null,
+    duration: null,
+    url: `https://example.com/${id}`,
+    source: 'free-work',
+    scrapedAt: new Date(),
+    score: null,
+    semanticScore: null,
+    semanticReason: null,
   };
 }
 
@@ -60,7 +70,7 @@ describe('filterHidden', () => {
     const missions = [makeMission('a'), makeMission('b'), makeMission('c')];
     const hidden = { b: 123 };
     const result = filterHidden(missions, hidden);
-    expect(result.map(m => m.id)).toEqual(['a', 'c']);
+    expect(result.map((m) => m.id)).toEqual(['a', 'c']);
   });
 
   it('returns all missions when hidden is empty', () => {
@@ -74,7 +84,7 @@ describe('filterFavoritesOnly', () => {
     const missions = [makeMission('a'), makeMission('b'), makeMission('c')];
     const favorites = { a: 123, c: 456 };
     const result = filterFavoritesOnly(missions, favorites);
-    expect(result.map(m => m.id)).toEqual(['a', 'c']);
+    expect(result.map((m) => m.id)).toEqual(['a', 'c']);
   });
 
   it('returns empty when no favorites match', () => {

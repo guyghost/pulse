@@ -96,7 +96,8 @@ describe('notifyHighScoreMissions', () => {
       customDelayMs: 0,
     });
 
-    const { notifyHighScoreMissions } = await import('../../../src/lib/shell/notifications/notify-missions');
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([makeMission()]);
 
     expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
@@ -104,10 +105,16 @@ describe('notifyHighScoreMissions', () => {
   });
 
   it('uses semantic score for threshold filtering and creates a notification', async () => {
-    const { notifyHighScoreMissions } = await import('../../../src/lib/shell/notifications/notify-missions');
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([
       makeMission({ id: 'low-basic', score: 40, semanticScore: 91, title: 'Mission IA' }),
-      makeMission({ id: 'below-threshold', score: 65, semanticScore: null, title: 'Mission faible' }),
+      makeMission({
+        id: 'below-threshold',
+        score: 65,
+        semanticScore: null,
+        title: 'Mission faible',
+      }),
     ]);
 
     expect(result).toEqual({ shown: true, notifiedMissionIds: ['low-basic'] });
@@ -124,7 +131,8 @@ describe('notifyHighScoreMissions', () => {
   it('filters out seen missions before notifying', async () => {
     getSeenIds.mockResolvedValueOnce(['already-seen']);
 
-    const { notifyHighScoreMissions } = await import('../../../src/lib/shell/notifications/notify-missions');
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([
       makeMission({ id: 'already-seen', title: 'Déjà vue', score: 95 }),
       makeMission({ id: 'new-one', title: 'Nouvelle mission', score: 92 }),
@@ -138,7 +146,8 @@ describe('notifyHighScoreMissions', () => {
   });
 
   it('groups more than 3 missions in a single notification', async () => {
-    const { notifyHighScoreMissions } = await import('../../../src/lib/shell/notifications/notify-missions');
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([
       makeMission({ id: '1', title: 'Mission 1', score: 95 }),
       makeMission({ id: '2', title: 'Mission 2', score: 94 }),
@@ -159,7 +168,8 @@ describe('notifyHighScoreMissions', () => {
   it('returns false when cooldown is still active from session storage', async () => {
     sessionGet.mockResolvedValueOnce({ last_notification_time: 1_700_000_000_000 - 60_000 });
 
-    const { notifyHighScoreMissions } = await import('../../../src/lib/shell/notifications/notify-missions');
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
     const result = await notifyHighScoreMissions([makeMission({ title: 'Mission rate-limited' })]);
 
     expect(result).toEqual({ shown: false, notifiedMissionIds: [] });

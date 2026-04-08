@@ -50,13 +50,21 @@ export const extractRecords = (missions: Mission[], date: string): TJMRecord[] =
   const groups = new Map<string, StackGroup>();
 
   for (const mission of missions) {
-    if (mission.tjm === null || mission.tjm <= 0) continue;
-    if (mission.stack.length === 0) continue;
+    if (mission.tjm === null || mission.tjm <= 0) {
+      continue;
+    }
+    if (mission.stack.length === 0) {
+      continue;
+    }
 
     for (const tech of mission.stack) {
-      if (!tech) continue;
+      if (!tech) {
+        continue;
+      }
       const normalizedStack = tech.toLowerCase().trim();
-      if (!normalizedStack) continue;
+      if (!normalizedStack) {
+        continue;
+      }
 
       const seniorityKey = mission.seniority ?? 'unknown';
       const groupKey = `${normalizedStack}:${seniorityKey}`;
@@ -140,12 +148,18 @@ export const emptyHistory = (): TJMHistory => ({ records: [] });
  * Returns 'stable' if the change is below the threshold percentage.
  */
 export const determineTrend = (current: number, previous: number | null): TJMTrend => {
-  if (previous === null || previous === 0) return 'stable';
+  if (previous === null || previous === 0) {
+    return 'stable';
+  }
 
   const changePercent = ((current - previous) / previous) * 100;
 
-  if (changePercent > TREND_THRESHOLD_PERCENT) return 'up';
-  if (changePercent < -TREND_THRESHOLD_PERCENT) return 'down';
+  if (changePercent > TREND_THRESHOLD_PERCENT) {
+    return 'up';
+  }
+  if (changePercent < -TREND_THRESHOLD_PERCENT) {
+    return 'down';
+  }
   return 'stable';
 };
 
@@ -163,7 +177,9 @@ export const getStatsForStack = (history: TJMHistory, stack: string): TJMStats |
     .filter((r) => r.stack === normalizedStack)
     .sort((a, b) => a.date.localeCompare(b.date));
 
-  if (stackRecords.length === 0) return null;
+  if (stackRecords.length === 0) {
+    return null;
+  }
 
   const latestRecord = stackRecords[stackRecords.length - 1];
   const previousRecord =
@@ -232,7 +248,9 @@ export const getStatsForMission = (
   const result = new Map<string, TJMStats>();
 
   for (const tech of mission.stack) {
-    if (!tech) continue;
+    if (!tech) {
+      continue;
+    }
     const stats = getStatsForStack(history, tech);
     if (stats) {
       result.set(tech.toLowerCase().trim(), stats);
@@ -253,20 +271,30 @@ export const getStatsForMission = (
 export const getDominantTrendForMission = (history: TJMHistory, mission: Mission): TJMTrend => {
   const stats = getStatsForMission(history, mission);
 
-  if (stats.size === 0) return 'stable';
+  if (stats.size === 0) {
+    return 'stable';
+  }
 
   let upCount = 0;
   let downCount = 0;
   let stableCount = 0;
 
   for (const stat of stats.values()) {
-    if (stat.trend === 'up') upCount++;
-    else if (stat.trend === 'down') downCount++;
-    else stableCount++;
+    if (stat.trend === 'up') {
+      upCount++;
+    } else if (stat.trend === 'down') {
+      downCount++;
+    } else {
+      stableCount++;
+    }
   }
 
-  if (upCount >= downCount && upCount >= stableCount) return 'up';
-  if (downCount >= upCount && downCount >= stableCount) return 'down';
+  if (upCount >= downCount && upCount >= stableCount) {
+    return 'up';
+  }
+  if (downCount >= upCount && downCount >= stableCount) {
+    return 'down';
+  }
   return 'stable';
 };
 
@@ -277,7 +305,9 @@ export const getDominantTrendForMission = (history: TJMHistory, mission: Mission
 const clampConfidence = (value: number): number => Math.max(0, Math.min(1, value));
 
 const medianOf = (values: number[]): number => {
-  if (values.length === 0) return 0;
+  if (values.length === 0) {
+    return 0;
+  }
   const sorted = [...values].sort((a, b) => a - b);
   const middle = Math.floor(sorted.length / 2);
   if (sorted.length % 2 === 0) {
@@ -314,7 +344,9 @@ const sliceIntoThirds = (values: number[]): [number[], number[], number[]] => {
 };
 
 const buildTrendDetail = (trend: TJMTrend, topStacks: TJMStackInsight[]): string | null => {
-  if (topStacks.length === 0) return null;
+  if (topStacks.length === 0) {
+    return null;
+  }
 
   const stackList = topStacks
     .slice(0, 3)
@@ -331,7 +363,9 @@ const buildTrendDetail = (trend: TJMTrend, topStacks: TJMStackInsight[]): string
 };
 
 const buildRecommendation = (trend: TJMTrend, confirmed: TJMRange): string | null => {
-  if (confirmed.median <= 0) return null;
+  if (confirmed.median <= 0) {
+    return null;
+  }
 
   if (trend === 'up') {
     return `Visez en priorité la zone ${confirmed.min}–${confirmed.max} €/j pour vos positionnements confirmés.`;
@@ -374,10 +408,14 @@ const collectAllAverages = (records: TJMRecord[]): number[] =>
  */
 const buildRangeForLevel = (records: TJMRecord[], level: SeniorityLevel): TJMRange => {
   const levelValues = collectAveragesForSeniority(records, level);
-  if (levelValues.length > 0) return buildRange(levelValues);
+  if (levelValues.length > 0) {
+    return buildRange(levelValues);
+  }
 
   const unknownValues = collectAveragesUnknown(records);
-  if (unknownValues.length > 0) return buildRange(unknownValues);
+  if (unknownValues.length > 0) {
+    return buildRange(unknownValues);
+  }
 
   const allValues = collectAllAverages(records);
   return buildRange(allValues);
@@ -394,16 +432,22 @@ const buildRangeForLevel = (records: TJMRecord[], level: SeniorityLevel): TJMRan
  * Pure function: no I/O, no async, deterministic from inputs only.
  */
 export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
-  if (history.records.length === 0) return null;
+  if (history.records.length === 0) {
+    return null;
+  }
 
   const stats = [...getAllStats(history).values()]
     .sort((a, b) => b.dataPointCount - a.dataPointCount || b.currentAverage - a.currentAverage)
     .slice(0, 9);
 
-  if (stats.length === 0) return null;
+  if (stats.length === 0) {
+    return null;
+  }
 
   const latestAverages = stats.map((stat) => stat.currentAverage).filter((value) => value > 0);
-  if (latestAverages.length === 0) return null;
+  if (latestAverages.length === 0) {
+    return null;
+  }
 
   // Check if any records have real seniority data
   const hasRealSeniority = history.records.some((r) => r.seniority !== null);
@@ -437,9 +481,13 @@ export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
   let downCount = 0;
   let stableCount = 0;
   for (const stat of stats) {
-    if (stat.trend === 'up') upCount++;
-    else if (stat.trend === 'down') downCount++;
-    else stableCount++;
+    if (stat.trend === 'up') {
+      upCount++;
+    } else if (stat.trend === 'down') {
+      downCount++;
+    } else {
+      stableCount++;
+    }
   }
 
   const trend: TJMTrend =

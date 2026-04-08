@@ -5,7 +5,7 @@
   import Skeleton from '../atoms/Skeleton.svelte';
   import Icon from '../atoms/Icon.svelte';
 
-  let {
+  const {
     analysis = null,
     isLoading = false,
     error = null,
@@ -54,8 +54,6 @@
       accentBorder: 'border-accent-amber/20',
     },
   ];
-
-
 </script>
 
 <div class="space-y-4">

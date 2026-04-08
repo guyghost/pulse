@@ -18,7 +18,12 @@ type MockCookie = { name: string; value: string; domain: string };
 let mockCookies: MockCookie[] = [];
 
 // Mock rules storage
-let mockDynamicRules: Array<{ id: number; priority?: number; action?: unknown; condition?: unknown }> = [];
+let mockDynamicRules: Array<{
+  id: number;
+  priority?: number;
+  action?: unknown;
+  condition?: unknown;
+}> = [];
 
 // Mock chrome.cookies.getAll
 const mockCookiesGetAll = vi.fn(async (query: { domain: string }) => {
@@ -26,21 +31,23 @@ const mockCookiesGetAll = vi.fn(async (query: { domain: string }) => {
 });
 
 // Mock chrome.declarativeNetRequest.updateDynamicRules
-const mockUpdateDynamicRules = vi.fn(async (options: { removeRuleIds?: number[]; addRules?: unknown[] }) => {
-  // Remove rules
-  if (options.removeRuleIds) {
-    mockDynamicRules = mockDynamicRules.filter((r) => !options.removeRuleIds?.includes(r.id));
-  }
-  // Add rules
-  if (options.addRules) {
-    for (const rule of options.addRules) {
-      const typedRule = rule as { id: number };
-      // Remove existing rule with same ID first
-      mockDynamicRules = mockDynamicRules.filter((r) => r.id !== typedRule.id);
-      mockDynamicRules.push(typedRule as typeof mockDynamicRules[number]);
+const mockUpdateDynamicRules = vi.fn(
+  async (options: { removeRuleIds?: number[]; addRules?: unknown[] }) => {
+    // Remove rules
+    if (options.removeRuleIds) {
+      mockDynamicRules = mockDynamicRules.filter((r) => !options.removeRuleIds?.includes(r.id));
+    }
+    // Add rules
+    if (options.addRules) {
+      for (const rule of options.addRules) {
+        const typedRule = rule as { id: number };
+        // Remove existing rule with same ID first
+        mockDynamicRules = mockDynamicRules.filter((r) => r.id !== typedRule.id);
+        mockDynamicRules.push(typedRule as (typeof mockDynamicRules)[number]);
+      }
     }
   }
-});
+);
 
 // Mock chrome.declarativeNetRequest.getDynamicRules
 const mockGetDynamicRules = vi.fn(async () => {
@@ -134,7 +141,9 @@ describe('injectCookieRule', () => {
 
     expect(addedRule.id).toBe(100);
     expect(addedRule.action.requestHeaders[0]?.header).toBe('Cookie');
-    expect(addedRule.action.requestHeaders[0]?.value).toBe('session_id=session-value; auth_token=auth-value');
+    expect(addedRule.action.requestHeaders[0]?.value).toBe(
+      'session_id=session-value; auth_token=auth-value'
+    );
     expect(addedRule.condition.urlFilter).toBe('*://api.example.com/*');
   });
 
@@ -351,9 +360,7 @@ describe('edge cases', () => {
   });
 
   it('injectCookieRule handles cookies with special characters in values', async () => {
-    mockCookies = [
-      { name: 'session', value: 'abc=123&xyz=456', domain: '.example.com' },
-    ];
+    mockCookies = [{ name: 'session', value: 'abc=123&xyz=456', domain: '.example.com' }];
 
     const result = await injectCookieRule('.example.com', '*://api.example.com/*', 100);
 
@@ -377,11 +384,7 @@ describe('edge cases', () => {
   });
 
   it('verifyCookieRule matches exact rule ID', async () => {
-    mockDynamicRules = [
-      { id: 99 },
-      { id: 100 },
-      { id: 101 },
-    ];
+    mockDynamicRules = [{ id: 99 }, { id: 100 }, { id: 101 }];
 
     const result = await verifyCookieRule(100);
 

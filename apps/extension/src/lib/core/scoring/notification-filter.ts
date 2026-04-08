@@ -31,11 +31,15 @@ export const filterNotifiableMissions = (
   return missions
     .filter((mission) => {
       // Must not have been seen
-      if (seenSet.has(mission.id)) return false;
+      if (seenSet.has(mission.id)) {
+        return false;
+      }
 
       // Must have a score (basic or semantic)
       const score = bestScore(mission);
-      if (score === null) return false;
+      if (score === null) {
+        return false;
+      }
 
       // Score must meet threshold
       return score >= scoreThreshold;

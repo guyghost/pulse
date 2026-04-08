@@ -71,7 +71,7 @@ export async function mockNoProfile(page: Page) {
         _chrome = val;
         if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
           const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-            msg: unknown,
+            msg: unknown
           ) => Promise<unknown>;
           (val as Record<string, unknown>).runtime.sendMessage = async (msg: { type: string }) => {
             if (msg?.type === 'GET_PROFILE') {
@@ -122,10 +122,18 @@ export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile
   await page.goto(SIDE_PANEL);
 
   const ensureOnce = async () => {
-    const navVisible = await page.getByRole('navigation', { name: 'Main navigation' }).isVisible().catch(() => false);
-    if (navVisible) return true;
+    const navVisible = await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .isVisible()
+      .catch(() => false);
+    if (navVisible) {
+      return true;
+    }
 
-    const onboardingVisible = await page.getByText('Votre profil cible').isVisible().catch(() => false);
+    const onboardingVisible = await page
+      .getByText('Votre profil cible')
+      .isVisible()
+      .catch(() => false);
     if (onboardingVisible) {
       await completeOnboarding(page, {
         firstName: 'Jean',
@@ -145,7 +153,9 @@ export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile
     await ensureOnce();
   }
 
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 10000 });
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+    timeout: 10000,
+  });
   await expect(page.getByRole('button', { name: 'Feed' })).toBeVisible();
 }
 
@@ -172,7 +182,7 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
         _chrome = val;
         if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
           const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-            msg: unknown,
+            msg: unknown
           ) => Promise<unknown>;
           (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
             type: string;
@@ -184,7 +194,7 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
                 window.dispatchEvent(
                   new CustomEvent('dev:missions', {
                     detail: mockMissions,
-                  }),
+                  })
                 );
               }, 300);
               return {
@@ -305,41 +315,48 @@ export async function toggleOffline(page: Page, offline: boolean) {
 /**
  * Simule une erreur réseau pour un connecteur spécifique
  */
-export async function mockConnectorFailure(page: Page, connectorId: string, errorCode: number = 500) {
-  await page.addInitScript(({ connector, code }: { connector: string; code: number }) => {
-    let _chrome: unknown = undefined;
-    Object.defineProperty(window, 'chrome', {
-      configurable: true,
-      enumerable: true,
-      get() {
-        return _chrome;
-      },
-      set(val) {
-        _chrome = val;
-        if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-          const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-            msg: unknown,
-          ) => Promise<unknown>;
-          (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-            type: string;
-            payload?: { connectorId?: string };
-          }) => {
-            if (msg?.type === 'SCAN_START' && msg?.payload?.connectorId === connector) {
-              return {
-                type: 'SCAN_ERROR',
-                payload: {
-                  connectorId: connector,
-                  error: `HTTP ${code}`,
-                  code,
-                },
-              };
-            }
-            return origSend.call((val as Record<string, unknown>).runtime, msg);
-          };
-        }
-      },
-    });
-  }, { connector: connectorId, code: errorCode });
+export async function mockConnectorFailure(
+  page: Page,
+  connectorId: string,
+  errorCode: number = 500
+) {
+  await page.addInitScript(
+    ({ connector, code }: { connector: string; code: number }) => {
+      let _chrome: unknown = undefined;
+      Object.defineProperty(window, 'chrome', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return _chrome;
+        },
+        set(val) {
+          _chrome = val;
+          if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
+            const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
+              msg: unknown
+            ) => Promise<unknown>;
+            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
+              type: string;
+              payload?: { connectorId?: string };
+            }) => {
+              if (msg?.type === 'SCAN_START' && msg?.payload?.connectorId === connector) {
+                return {
+                  type: 'SCAN_ERROR',
+                  payload: {
+                    connectorId: connector,
+                    error: `HTTP ${code}`,
+                    code,
+                  },
+                };
+              }
+              return origSend.call((val as Record<string, unknown>).runtime, msg);
+            };
+          }
+        },
+      });
+    },
+    { connector: connectorId, code: errorCode }
+  );
 }
 
 // ============================================================================
@@ -367,7 +384,9 @@ export async function waitForLoadingComplete(page: Page, timeout = 5000) {
 export async function getDisplayedMissionCount(page: Page): Promise<number> {
   const badge = page.locator('[aria-label$="missions visibles"]');
   const label = await badge.getAttribute('aria-label').catch(() => null);
-  if (!label) return 0;
+  if (!label) {
+    return 0;
+  }
   const match = label.match(/(\d+)/);
   return match ? parseInt(match[1], 10) : 0;
 }
@@ -377,9 +396,7 @@ export async function getDisplayedMissionCount(page: Page): Promise<number> {
  * Utilise aria-label pour éviter les collisions de texte.
  */
 export async function expectMissionCount(page: Page, count: number, timeout = 5000) {
-  await expect(
-    page.locator(`[aria-label="${count} missions visibles"]`)
-  ).toBeVisible({ timeout });
+  await expect(page.locator(`[aria-label="${count} missions visibles"]`)).toBeVisible({ timeout });
 }
 
 /**
@@ -404,7 +421,6 @@ export async function captureMemoryMetrics(page: Page): Promise<{
   jsHeapSizeLimit: number;
 }> {
   const metrics = await page.evaluate(() => {
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     const memory = (performance as unknown as Record<string, unknown>).memory as
       | {
           usedJSHeapSize: number;

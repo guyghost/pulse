@@ -34,7 +34,10 @@ test.describe('Offline Mode', () => {
     await page.waitForTimeout(700);
 
     const firstCard = page.locator('[role="button"]').first();
-    const missionTitle = await firstCard.locator('h3, .mission-title').textContent().catch(() => null);
+    const missionTitle = await firstCard
+      .locator('h3, .mission-title')
+      .textContent()
+      .catch(() => null);
 
     await toggleOffline(page, true);
     await page.waitForTimeout(500);
@@ -82,7 +85,10 @@ test.describe('Offline Mode', () => {
     await triggerScan(page);
     await page.waitForTimeout(1000);
 
-    await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute(
+      'aria-current',
+      'page'
+    );
   });
 
   test('favorite actions work while offline', async ({ page }) => {
@@ -143,7 +149,9 @@ test.describe('Offline Mode', () => {
 
     await page.getByPlaceholder('Rechercher...').clear();
     await page.waitForTimeout(300);
-    await expect(page.getByText(`${initialCount} missions`, { exact: true }).first()).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText(`${initialCount} missions`, { exact: true }).first()).toBeVisible({
+      timeout: 2000,
+    });
   });
 
   test('navigation between tabs works offline', async ({ page }) => {
@@ -155,15 +163,36 @@ test.describe('Offline Mode', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' }).click();
-    await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
+    await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'TJM' })
+      .click();
+    await expect(
+      page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })
+    ).toHaveAttribute('aria-current', 'page');
 
-    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Settings' })).toHaveAttribute('aria-current', 'page');
+    await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'Settings' })
+      .click();
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('button', { name: 'Settings' })
+    ).toHaveAttribute('aria-current', 'page');
 
-    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Feed' }).click();
-    await expect(page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'Feed' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({ timeout: 3000 });
+    await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'Feed' })
+      .click();
+    await expect(
+      page
+        .getByRole('navigation', { name: 'Main navigation' })
+        .getByRole('button', { name: 'Feed' })
+    ).toHaveAttribute('aria-current', 'page');
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('page reload while offline shows cached data', async ({ page }) => {
@@ -181,8 +210,14 @@ test.describe('Offline Mode', () => {
     await page.reload().catch(() => {});
     await page.waitForTimeout(500);
 
-    const hasOfflineBanner = await page.getByText('Mode hors ligne — Données en cache uniquement').isVisible().catch(() => false);
-    const hasNavigation = await page.getByRole('navigation', { name: 'Main navigation' }).isVisible().catch(() => false);
+    const hasOfflineBanner = await page
+      .getByText('Mode hors ligne — Données en cache uniquement')
+      .isVisible()
+      .catch(() => false);
+    const hasNavigation = await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .isVisible()
+      .catch(() => false);
     expect(hasOfflineBanner || hasNavigation || true).toBe(true);
   });
 });

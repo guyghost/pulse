@@ -10,7 +10,7 @@
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast } from '$lib/shell/notifications/toast-service';
 
-  let {
+  const {
     onBack,
     onNavigateToOnboarding,
   }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
@@ -169,7 +169,8 @@
         <div>
           <h3 class="text-sm font-semibold text-text-primary">IA locale</h3>
           <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-            Le scoring semantique utilise Gemini Nano via la Prompt API de Chrome, sans cle API externe.
+            Le scoring semantique utilise Gemini Nano via la Prompt API de Chrome, sans cle API
+            externe.
           </p>
         </div>
       </div>
@@ -190,15 +191,20 @@
         </div>
       </div>
       <p class="text-xs leading-relaxed text-text-secondary">
-        Les scores sont mis en cache localement pour limiter la latence et eviter les recalculs inutiles.
+        Les scores sont mis en cache localement pour limiter la latence et eviter les recalculs
+        inutiles.
       </p>
     </div>
 
     <!-- Zone de danger -->
     <DangerZone
       showResetConfirm={settings.showResetConfirm}
-      onShowConfirm={() => { settings.showResetConfirm = true; }}
-      onCancelConfirm={() => { settings.showResetConfirm = false; }}
+      onShowConfirm={() => {
+        settings.showResetConfirm = true;
+      }}
+      onCancelConfirm={() => {
+        settings.showResetConfirm = false;
+      }}
       onConfirmReset={() => settings.resetAll()}
     />
   </div>

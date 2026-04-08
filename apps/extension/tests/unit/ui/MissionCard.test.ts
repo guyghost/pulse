@@ -63,7 +63,7 @@ describe('MissionCard', () => {
     expect(target.textContent).toMatch(/650.*\/j/);
   });
 
-  it('n\'affiche pas le TJM quand il est null', async () => {
+  it("n'affiche pas le TJM quand il est null", async () => {
     const target = mountCard({ mission: makeMission({ tjm: null }) });
     await tick();
     expect(target.textContent).not.toMatch(/€\/j/);
@@ -86,25 +86,31 @@ describe('MissionCard', () => {
     const target = mountCard({ onToggleFavorite });
     await tick();
 
-    const favoriteBtn = target.querySelector('button[title="Ajouter aux favoris"]') as HTMLButtonElement;
+    const favoriteBtn = target.querySelector(
+      'button[title="Ajouter aux favoris"]'
+    ) as HTMLButtonElement;
     expect(favoriteBtn).not.toBeNull();
     favoriteBtn.click();
     expect(onToggleFavorite).toHaveBeenCalledOnce();
   });
 
-  it('affiche l\'etat favori (titre change)', async () => {
+  it("affiche l'etat favori (titre change)", async () => {
     const target = mountCard({ isFavorite: true });
     await tick();
 
-    const starredBtn = target.querySelector('button[title="Retirer des favoris"]') as HTMLButtonElement;
+    const starredBtn = target.querySelector(
+      'button[title="Retirer des favoris"]'
+    ) as HTMLButtonElement;
     expect(starredBtn).not.toBeNull();
   });
 
-  it('affiche l\'etat non-favori par defaut', async () => {
+  it("affiche l'etat non-favori par defaut", async () => {
     const target = mountCard({ isFavorite: false });
     await tick();
 
-    const unstarredBtn = target.querySelector('button[title="Ajouter aux favoris"]') as HTMLButtonElement;
+    const unstarredBtn = target.querySelector(
+      'button[title="Ajouter aux favoris"]'
+    ) as HTMLButtonElement;
     expect(unstarredBtn).not.toBeNull();
     // Pas de bouton "Retirer"
     expect(target.querySelector('button[title="Retirer des favoris"]')).toBeNull();

@@ -2,7 +2,7 @@
   import Icon from '../atoms/Icon.svelte';
   import Button from '../atoms/Button.svelte';
 
-  let {
+  const {
     showResetConfirm,
     onShowConfirm,
     onCancelConfirm,

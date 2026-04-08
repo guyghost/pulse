@@ -1,14 +1,19 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest';
-import { getFavorites, saveFavorites, getHidden, saveHidden } from '../../../src/lib/shell/storage/favorites';
+import {
+  getFavorites,
+  saveFavorites,
+  getHidden,
+  saveHidden,
+} from '../../../src/lib/shell/storage/favorites';
 
 const mockStorage: Record<string, unknown> = {};
 
 vi.stubGlobal('chrome', {
   storage: {
     local: {
-      get: vi.fn((keys: string[]) => Promise.resolve(
-        Object.fromEntries(keys.map(k => [k, mockStorage[k]]))
-      )),
+      get: vi.fn((keys: string[]) =>
+        Promise.resolve(Object.fromEntries(keys.map((k) => [k, mockStorage[k]])))
+      ),
       set: vi.fn((obj: Record<string, unknown>) => {
         Object.assign(mockStorage, obj);
         return Promise.resolve();
@@ -19,7 +24,7 @@ vi.stubGlobal('chrome', {
 
 describe('favorites storage', () => {
   beforeEach(() => {
-    Object.keys(mockStorage).forEach(k => delete mockStorage[k]);
+    Object.keys(mockStorage).forEach((k) => delete mockStorage[k]);
   });
 
   it('returns empty object when no favorites stored', async () => {

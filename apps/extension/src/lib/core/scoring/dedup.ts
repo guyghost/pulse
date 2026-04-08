@@ -9,14 +9,16 @@ const tokenize = (text: string): Set<string> =>
       .toLowerCase()
       .replace(/[^\w\s]/g, '')
       .split(/\s+/)
-      .filter((t) => t.length > 2),
+      .filter((t) => t.length > 2)
   );
 
 /**
  * Computes Jaccard similarity between two token sets
  */
 const jaccardSimilarity = (a: Set<string>, b: Set<string>): number => {
-  if (a.size === 0 && b.size === 0) return 1;
+  if (a.size === 0 && b.size === 0) {
+    return 1;
+  }
   const intersection = new Set([...a].filter((x) => b.has(x)));
   const union = new Set([...a, ...b]);
   return intersection.size / union.size;
@@ -26,7 +28,11 @@ const jaccardSimilarity = (a: Set<string>, b: Set<string>): number => {
  * Normalizes free text for tokenization/comparison.
  */
 const normalizeText = (text: string | null): string =>
-  (text ?? '').toLowerCase().replace(/[^\w\s]/g, '').replace(/\s+/g, ' ').trim();
+  (text ?? '')
+    .toLowerCase()
+    .replace(/[^\w\s]/g, '')
+    .replace(/\s+/g, ' ')
+    .trim();
 
 /**
  * Builds the text signature used for duplicate detection.
@@ -34,11 +40,7 @@ const normalizeText = (text: string | null): string =>
  * from collapsing unrelated missions.
  */
 const buildMissionSignature = (mission: Mission): string =>
-  [
-    mission.title,
-    mission.client,
-    mission.stack.join(' '),
-  ]
+  [mission.title, mission.client, mission.stack.join(' ')]
     .map((part) => normalizeText(part))
     .filter(Boolean)
     .join(' ');
@@ -62,10 +64,7 @@ const computeMissionScore = (mission: Mission): number =>
  * @param threshold - Jaccard similarity threshold (default 0.8)
  * @returns Deduplicated array, keeping higher-quality duplicates
  */
-export const deduplicateMissions = (
-  missions: Mission[],
-  threshold = 0.8,
-): Mission[] => {
+export const deduplicateMissions = (missions: Mission[], threshold = 0.8): Mission[] => {
   const result: Mission[] = [];
   const tokenCache = new Map<string, Set<string>>();
 
@@ -78,7 +77,7 @@ export const deduplicateMissions = (
   const updateInvertedIndex = (
     idx: number,
     oldTokens: Set<string>,
-    newTokens: Set<string>,
+    newTokens: Set<string>
   ): void => {
     for (const token of oldTokens) {
       invertedIndex.get(token)?.delete(idx);

@@ -60,7 +60,15 @@ const REGION_SYNONYMS: Record<string, string[]> = {
   'bas rhin': ['bas rhin', '67', 'strasbourg'],
 
   // Remote work synonyms
-  remote: ['remote', 'teletravail', 'full remote', 'distanciel', 'home office', 'a distance', '100 remote'],
+  remote: [
+    'remote',
+    'teletravail',
+    'full remote',
+    'distanciel',
+    'home office',
+    'a distance',
+    '100 remote',
+  ],
 };
 
 /**
@@ -309,31 +317,41 @@ const generatePhrases = (tokens: string[], maxN = 4): string[] => {
  * @returns The canonical metro name if found, null otherwise
  */
 const findMetroArea = (location: string): string | null => {
-  if (!location) return null;
+  if (!location) {
+    return null;
+  }
 
   // 1. Check if the full string matches a city in any metro area
   const directMatch = METRO_AREA_CACHE.get(location);
-  if (directMatch) return directMatch;
+  if (directMatch) {
+    return directMatch;
+  }
 
   // 2. Check if any token matches a city name (for compound locations like "Nanterre La Défense")
   const tokens = tokenizeLocation(location);
   for (const token of tokens) {
     const tokenMatch = METRO_AREA_CACHE.get(token);
-    if (tokenMatch) return tokenMatch;
+    if (tokenMatch) {
+      return tokenMatch;
+    }
   }
 
   // 3. Check multi-word phrases (for cities like "boulogne billancourt")
   const phrases = generatePhrases(tokens);
   for (const phrase of phrases) {
     const phraseMatch = METRO_AREA_CACHE.get(phrase);
-    if (phraseMatch) return phraseMatch;
+    if (phraseMatch) {
+      return phraseMatch;
+    }
   }
 
   // 4. Check if any department code matches a metro department
   const deptCodes = extractDepartmentCodes(location);
   for (const code of deptCodes) {
     const deptMatch = METRO_DEPARTMENT_CACHE.get(code);
-    if (deptMatch) return deptMatch;
+    if (deptMatch) {
+      return deptMatch;
+    }
   }
 
   return null;
@@ -364,13 +382,23 @@ const areInSameMetroArea = (loc1: string, loc2: string): boolean => {
  */
 const removeAccents = (str: string): string => {
   const accentMap: Record<string, string> = {
-    à: 'a', â: 'a', ä: 'a',
-    é: 'e', è: 'e', ê: 'e', ë: 'e',
-    î: 'i', ï: 'i',
-    ô: 'o', ö: 'o',
-    ù: 'u', û: 'u', ü: 'u',
+    à: 'a',
+    â: 'a',
+    ä: 'a',
+    é: 'e',
+    è: 'e',
+    ê: 'e',
+    ë: 'e',
+    î: 'i',
+    ï: 'i',
+    ô: 'o',
+    ö: 'o',
+    ù: 'u',
+    û: 'u',
+    ü: 'u',
     ç: 'c',
-    œ: 'oe', æ: 'ae',
+    œ: 'oe',
+    æ: 'ae',
   };
 
   let result = str.toLowerCase();
@@ -464,7 +492,9 @@ export const normalizeLocation = (location: string): string => {
  * @returns true if both locations are synonyms of each other
  */
 const areRegionalSynonyms = (loc1: string, loc2: string): boolean => {
-  if (!loc1 || !loc2) return false;
+  if (!loc1 || !loc2) {
+    return false;
+  }
 
   const canonical1 = SYNONYM_CACHE.get(loc1);
   const canonical2 = SYNONYM_CACHE.get(loc2);
@@ -587,7 +617,7 @@ const hasSynonymTokenMatch = (tokens1: string[], tokens2: string[]): boolean => 
  */
 export const matchLocation = (
   missionLoc: string | null,
-  profileLoc: string | null,
+  profileLoc: string | null
 ): LocationMatchResult => {
   // Handle null/undefined cases
   if (!missionLoc || !profileLoc) {

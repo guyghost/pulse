@@ -272,9 +272,9 @@ chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendRespo
   if (message.type === 'SAVE_PROFILE') {
     // Profile is now saved directly from the side panel via IndexedDB.
     // Keep handler for backwards compatibility with queued messages.
-    saveProfile(message.payload as UserProfile)
+    saveProfile(message.payload)
       .then(() => {
-        sendResponse({ type: 'PROFILE_RESULT', payload: message.payload as UserProfile });
+        sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
       })
       .catch((err) => {
         console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
@@ -322,7 +322,9 @@ async function setupAlarm() {
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
-  if (alarm.name !== ALARM_NAME) return;
+  if (alarm.name !== ALARM_NAME) {
+    return;
+  }
   if (import.meta.env.DEV) {
     console.log('[MissionPulse] Auto-scan triggered');
   }

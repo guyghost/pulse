@@ -10,7 +10,7 @@
     onCancel: () => void;
   }
 
-  let { backup, error, onConfirm, onCancel }: Props = $props();
+  const { backup, error, onConfirm, onCancel }: Props = $props();
 
   let isRestoring = $state(false);
 
@@ -32,7 +32,7 @@
   function getErrorMessage(err: ValidationError): string {
     switch (err.type) {
       case 'INVALID_JSON':
-        return 'Le fichier n\'est pas un JSON valide.';
+        return "Le fichier n'est pas un JSON valide.";
       case 'SCHEMA_ERROR':
         return `Le format du backup est invalide. ${err.issues.length} erreur(s) trouvée(s).`;
       case 'VERSION_UNSUPPORTED':
@@ -108,7 +108,9 @@
 
         <div class="flex items-center justify-between">
           <span class="text-sm text-text-secondary">Favoris</span>
-          <span class="text-sm font-medium text-accent-emerald">{stats.favoritesCount} mission(s)</span>
+          <span class="text-sm font-medium text-accent-emerald"
+            >{stats.favoritesCount} mission(s)</span
+          >
         </div>
 
         <div class="flex items-center justify-between">
@@ -152,7 +154,9 @@
       </div>
     {:else}
       <div class="mb-5 flex items-center justify-center py-8">
-        <div class="h-8 w-8 animate-spin rounded-full border-2 border-accent-blue/30 border-t-accent-blue"></div>
+        <div
+          class="h-8 w-8 animate-spin rounded-full border-2 border-accent-blue/30 border-t-accent-blue"
+        ></div>
       </div>
 
       <div class="flex justify-end">

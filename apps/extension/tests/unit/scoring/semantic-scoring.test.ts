@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { buildScoringPrompt, parseSemanticResult } from '../../../src/lib/core/scoring/semantic-scoring';
+import {
+  buildScoringPrompt,
+  parseSemanticResult,
+} from '../../../src/lib/core/scoring/semantic-scoring';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 
@@ -50,7 +53,9 @@ describe('parseSemanticResult', () => {
   });
 
   it('extracts JSON from surrounding text', () => {
-    const result = parseSemanticResult('Here is the result: {"score": 70, "reason": "Bon match"} done.');
+    const result = parseSemanticResult(
+      'Here is the result: {"score": 70, "reason": "Bon match"} done.'
+    );
     expect(result).toEqual({ score: 70, reason: 'Bon match' });
   });
 

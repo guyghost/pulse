@@ -100,7 +100,17 @@ const CLIENTS = [
   null,
 ];
 
-const LOCATIONS = ['Paris', 'Lyon', 'Nantes', 'Bordeaux', 'Toulouse', 'Marseille', 'Lille', 'Strasbourg', 'Remote'];
+const LOCATIONS = [
+  'Paris',
+  'Lyon',
+  'Nantes',
+  'Bordeaux',
+  'Toulouse',
+  'Marseille',
+  'Lille',
+  'Strasbourg',
+  'Remote',
+];
 
 const REMOTES: (RemoteType | null)[] = ['full', 'hybrid', 'onsite', null];
 
@@ -108,18 +118,18 @@ const DURATIONS = ['3 mois', '6 mois', '9 mois', '12 mois', '18 mois', '24 mois'
 
 const DESCRIPTIONS = [
   'Mission pour un projet de transformation digitale. Stack moderne, équipe agile, CI/CD.',
-  'Développement d\'une plateforme SaaS B2B en forte croissance. Architecture microservices.',
-  'Refonte complète de l\'application frontend. Migration vers React 18 et TypeScript.',
-  'Projet greenfield : construction d\'une nouvelle API from scratch.',
+  "Développement d'une plateforme SaaS B2B en forte croissance. Architecture microservices.",
+  "Refonte complète de l'application frontend. Migration vers React 18 et TypeScript.",
+  "Projet greenfield : construction d'une nouvelle API from scratch.",
   'Accompagnement technique sur un projet legacy. Modernisation progressive.',
-  'Mise en place d\'une architecture data lake. ETL et analytics en temps réel.',
+  "Mise en place d'une architecture data lake. ETL et analytics en temps réel.",
   'Développement mobile natif iOS/Android. Publication sur les stores.',
   'Projet cloud migration : lift-and-shift vers AWS puis refactorisation.',
   'Mission DevOps : mise en place de pipelines CI/CD et infrastructure as code.',
-  'Audit et refactoring d\'une application critique. Optimisation des performances.',
-  'Construction d\'une plateforme e-commerce headless. Next.js et CMS headless.',
+  "Audit et refactoring d'une application critique. Optimisation des performances.",
+  "Construction d'une plateforme e-commerce headless. Next.js et CMS headless.",
   'Projet IA/ML : intégration de modèles de NLP dans un produit existant.',
-  'Développement d\'une application web3 et smart contracts Solidity.',
+  "Développement d'une application web3 et smart contracts Solidity.",
   'Intégration Salesforce et développement de composants Lightning.',
 ];
 

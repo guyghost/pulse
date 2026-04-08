@@ -9,7 +9,7 @@
     store: ToastStore;
   }
 
-  let { store }: Props = $props();
+  const { store }: Props = $props();
 
   function handleDismiss(id: number) {
     store.dismiss(id);

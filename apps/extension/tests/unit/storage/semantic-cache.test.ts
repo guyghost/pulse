@@ -11,7 +11,8 @@ vi.stubGlobal('chrome', {
   storage: {
     local: {
       get: vi.fn(async (keys: string[]) =>
-        Object.fromEntries(keys.map((key) => [key, mockStorage[key]]))),
+        Object.fromEntries(keys.map((key) => [key, mockStorage[key]]))
+      ),
       set: vi.fn(async (items: Record<string, unknown>) => {
         Object.assign(mockStorage, items);
       }),
@@ -42,9 +43,7 @@ describe('semantic cache', () => {
 
     await cacheSemanticScores(results, baseProfile);
 
-    await expect(
-      getCachedSemanticScores(['mission-1'], baseProfile),
-    ).resolves.toEqual(results);
+    await expect(getCachedSemanticScores(['mission-1'], baseProfile)).resolves.toEqual(results);
   });
 
   it('misses cache entries when the profile changes', async () => {
@@ -53,10 +52,11 @@ describe('semantic cache', () => {
     await cacheSemanticScores(results, baseProfile);
 
     await expect(
-      getCachedSemanticScores(
-        ['mission-1'],
-        { ...baseProfile, stack: ['Go', 'Rust'], jobTitle: 'Developpeur backend' },
-      ),
+      getCachedSemanticScores(['mission-1'], {
+        ...baseProfile,
+        stack: ['Go', 'Rust'],
+        jobTitle: 'Developpeur backend',
+      })
     ).resolves.toEqual(new Map());
   });
 });

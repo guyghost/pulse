@@ -2,7 +2,10 @@
   import type { Snippet } from 'svelte';
   import Icon from '../atoms/Icon.svelte';
 
-  let { content, onBack }: {
+  const {
+    content,
+    onBack,
+  }: {
     content: Snippet;
     onBack?: () => void;
   } = $props();

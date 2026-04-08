@@ -58,7 +58,7 @@ export function createFeedPageState(
     search(query: string): void;
     clearSearch(): void;
   },
-  controller: FeedController,
+  controller: FeedController
 ) {
   // ============================================================
   // Mutable $state fields — accessible directly for bind:
@@ -95,27 +95,30 @@ export function createFeedPageState(
   // ============================================================
   // Derived — from feed store
   // ============================================================
-  let missions = $derived(feedStore.filteredMissions);
-  let isLoading = $derived(feedStore.state === 'loading');
-  let error = $derived(feedStore.error);
-  let searchQuery = $derived(feedStore.searchQuery);
-  let totalMissions = $derived(missions.length);
+  const missions = $derived(feedStore.filteredMissions);
+  const isLoading = $derived(feedStore.state === 'loading');
+  const error = $derived(feedStore.error);
+  const searchQuery = $derived(feedStore.searchQuery);
+  const totalMissions = $derived(missions.length);
 
   // ============================================================
   // Derived — UI computations
   // ============================================================
-  let seenSet = $derived(new Set(Array.isArray(seenIds) ? Array.from(seenIds) : []));
+  const seenSet = $derived(new Set(Array.isArray(seenIds) ? Array.from(seenIds) : []));
 
-  let favoriteCount = $derived(Object.keys(favorites).length);
-  let hiddenCount = $derived(Object.keys(hidden).length);
-  let isOffline = $derived(connection.status === 'offline');
-  let heroCompact = $derived(totalMissions > 0 && !isLoading);
+  const favoriteCount = $derived(Object.keys(favorites).length);
+  const hiddenCount = $derived(Object.keys(hidden).length);
+  const isOffline = $derived(connection.status === 'offline');
+  const heroCompact = $derived(totalMissions > 0 && !isLoading);
 
-  let filterActive = $derived(
-    selectedSource !== null || selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null,
+  const filterActive = $derived(
+    selectedSource !== null ||
+      selectedRemote !== null ||
+      selectedStacks.length > 0 ||
+      selectedSeniority !== null
   );
 
-  let availableStacks = $derived.by(() => {
+  const availableStacks = $derived.by(() => {
     const counts = new Map<string, number>();
     for (const m of missions) {
       for (const s of m.stack) {
@@ -126,7 +129,7 @@ export function createFeedPageState(
   });
 
   // Combined single-pass filter pipeline
-  let displayMissions = $derived.by(() => {
+  const displayMissions = $derived.by(() => {
     let result = missions ?? [];
     if (controller.enabledConnectorIds.size > 0) {
       result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
@@ -139,13 +142,26 @@ export function createFeedPageState(
     }
 
     // Single-pass: source + remote + stacks + seniority
-    if (selectedSource !== null || selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
+    if (
+      selectedSource !== null ||
+      selectedRemote !== null ||
+      selectedStacks.length > 0 ||
+      selectedSeniority !== null
+    ) {
       const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
       result = result.filter((m) => {
-        if (selectedSource !== null && m.source !== selectedSource) return false;
-        if (selectedRemote !== null && m.remote !== selectedRemote) return false;
-        if (selectedSeniority !== null && m.seniority !== selectedSeniority) return false;
-        if (stacksSet && !m.stack.some((s) => stacksSet.has(s))) return false;
+        if (selectedSource !== null && m.source !== selectedSource) {
+          return false;
+        }
+        if (selectedRemote !== null && m.remote !== selectedRemote) {
+          return false;
+        }
+        if (selectedSeniority !== null && m.seniority !== selectedSeniority) {
+          return false;
+        }
+        if (stacksSet && !m.stack.some((s) => stacksSet.has(s))) {
+          return false;
+        }
         return true;
       });
     }
@@ -153,13 +169,15 @@ export function createFeedPageState(
     return result;
   });
 
-  let comparisonMissions = $derived.by(() => {
-    if (comparisonMissionIds.length < 2) return [];
+  const comparisonMissions = $derived.by(() => {
+    if (comparisonMissionIds.length < 2) {
+      return [];
+    }
     const idSet = new Set(comparisonMissionIds);
     return (missions ?? []).filter((m) => idSet.has(m.id));
   });
 
-  let visibleCount = $derived(displayMissions.length);
+  const visibleCount = $derived(displayMissions.length);
 
   // ============================================================
   // Event handlers
@@ -167,7 +185,9 @@ export function createFeedPageState(
 
   function handleMissionSeen(missionId: string): void {
     const ids = Array.from(seenIds);
-    if (ids.includes(missionId)) return;
+    if (ids.includes(missionId)) {
+      return;
+    }
     seenIds = markAsSeen(ids, [missionId]);
     saveSeenIds(Array.from(seenIds)).catch(() => {});
   }
@@ -192,13 +212,17 @@ export function createFeedPageState(
   function handleSearch(query: string): void {
     // Clear immediately when emptying
     if (!query) {
-      if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+      if (searchDebounceTimer) {
+        clearTimeout(searchDebounceTimer);
+      }
       searchDebounceTimer = null;
       feedStore.clearSearch();
       return;
     }
     // Debounce non-empty queries
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
     searchDebounceTimer = setTimeout(() => {
       feedStore.search(query);
       searchDebounceTimer = null;
@@ -284,7 +308,9 @@ export function createFeedPageState(
     $effect(() => {
       getProfile()
         .then((p) => {
-          if (p?.firstName) firstName = p.firstName;
+          if (p?.firstName) {
+            firstName = p.firstName;
+          }
         })
         .catch(() => {});
     });
@@ -409,14 +435,16 @@ export function createFeedPageState(
           'displayMissions:',
           displayMissions.length,
           'visibleCount:',
-          visibleCount,
+          visibleCount
         );
       });
     }
   }
 
   function dispose(): void {
-    if (searchDebounceTimer) clearTimeout(searchDebounceTimer);
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+    }
     for (const fn of cleanupFns) {
       fn();
     }
@@ -429,57 +457,127 @@ export function createFeedPageState(
 
   return {
     // Mutable state — bindable by Svelte
-    get sortBy() { return sortBy; },
+    get sortBy() {
+      return sortBy;
+    },
     set sortBy(v: SortBy) {
       sortBy = v;
       setFeedSortBy(v);
     },
 
-    get showFavoritesOnly() { return showFavoritesOnly; },
-    get showHidden() { return showHidden; },
-    get showFilters() { return showFilters; },
-    get selectedStacks() { return selectedStacks; },
-    get selectedSource() { return selectedSource; },
-    get selectedRemote() { return selectedRemote; },
-    get selectedSeniority() { return selectedSeniority; },
-    get firstName() { return firstName; },
-    get panelSide() { return panelSide; },
-    get aiStatus() { return aiStatus; },
+    get showFavoritesOnly() {
+      return showFavoritesOnly;
+    },
+    get showHidden() {
+      return showHidden;
+    },
+    get showFilters() {
+      return showFilters;
+    },
+    get selectedStacks() {
+      return selectedStacks;
+    },
+    get selectedSource() {
+      return selectedSource;
+    },
+    get selectedRemote() {
+      return selectedRemote;
+    },
+    get selectedSeniority() {
+      return selectedSeniority;
+    },
+    get firstName() {
+      return firstName;
+    },
+    get panelSide() {
+      return panelSide;
+    },
+    get aiStatus() {
+      return aiStatus;
+    },
 
-    get showShortcutsHelp() { return showShortcutsHelp; },
-    set showShortcutsHelp(v: boolean) { showShortcutsHelp = v; },
+    get showShortcutsHelp() {
+      return showShortcutsHelp;
+    },
+    set showShortcutsHelp(v: boolean) {
+      showShortcutsHelp = v;
+    },
 
-    get searchInputRef() { return searchInputRef; },
-    set searchInputRef(v: HTMLInputElement | null) { searchInputRef = v; },
+    get searchInputRef() {
+      return searchInputRef;
+    },
+    set searchInputRef(v: HTMLInputElement | null) {
+      searchInputRef = v;
+    },
 
     // Internal state (read-only from template, mutated via handlers)
-    get seenIds() { return seenIds; },
-    get favorites() { return favorites; },
-    get hidden() { return hidden; },
+    get seenIds() {
+      return seenIds;
+    },
+    get favorites() {
+      return favorites;
+    },
+    get hidden() {
+      return hidden;
+    },
 
     // Derived — from feed store
-    get missions() { return missions; },
-    get isLoading() { return isLoading; },
-    get error() { return error; },
-    get searchQuery() { return searchQuery; },
-    get totalMissions() { return totalMissions; },
+    get missions() {
+      return missions;
+    },
+    get isLoading() {
+      return isLoading;
+    },
+    get error() {
+      return error;
+    },
+    get searchQuery() {
+      return searchQuery;
+    },
+    get totalMissions() {
+      return totalMissions;
+    },
 
     // Derived — UI
-    get seenSet() { return seenSet; },
-    get favoriteCount() { return favoriteCount; },
-    get hiddenCount() { return hiddenCount; },
-    get isOffline() { return isOffline; },
-    get heroCompact() { return heroCompact; },
-    get filterActive() { return filterActive; },
-    get availableStacks() { return availableStacks; },
-    get displayMissions() { return displayMissions; },
-    get visibleCount() { return visibleCount; },
+    get seenSet() {
+      return seenSet;
+    },
+    get favoriteCount() {
+      return favoriteCount;
+    },
+    get hiddenCount() {
+      return hiddenCount;
+    },
+    get isOffline() {
+      return isOffline;
+    },
+    get heroCompact() {
+      return heroCompact;
+    },
+    get filterActive() {
+      return filterActive;
+    },
+    get availableStacks() {
+      return availableStacks;
+    },
+    get displayMissions() {
+      return displayMissions;
+    },
+    get visibleCount() {
+      return visibleCount;
+    },
 
-    get comparisonMissionIds() { return comparisonMissionIds; },
-    get comparisonMissions() { return comparisonMissions; },
+    get comparisonMissionIds() {
+      return comparisonMissionIds;
+    },
+    get comparisonMissions() {
+      return comparisonMissions;
+    },
 
     // Setters for non-bind cases
-    setShowFilters(v: boolean) { showFilters = v; },
+    setShowFilters(v: boolean) {
+      showFilters = v;
+    },
 
     // Actions
     handleMissionSeen,

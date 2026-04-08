@@ -134,7 +134,12 @@ describe('connection store', () => {
 
   it('updates context with connection info on slow', () => {
     const store = createConnectionStore();
-    const info: ConnectionInfo = { status: 'slow', downlink: 0.3, rtt: 1000, effectiveType: 'slow-2g' };
+    const info: ConnectionInfo = {
+      status: 'slow',
+      downlink: 0.3,
+      rtt: 1000,
+      effectiveType: 'slow-2g',
+    };
     connectionCallback!(info);
 
     expect(store.status).toBe('slow');

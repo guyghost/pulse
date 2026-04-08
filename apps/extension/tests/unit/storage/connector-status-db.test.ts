@@ -28,7 +28,14 @@ describe('connector_status IndexedDB store', () => {
   it('saves and retrieves connector statuses', async () => {
     const statuses: PersistedConnectorStatus[] = [
       makeStatus({ connectorId: 'free-work', connectorName: 'Free-Work', missionsCount: 10 }),
-      makeStatus({ connectorId: 'malt', connectorName: 'Malt', missionsCount: 5, lastState: 'error', error: { code: 'AUTH_REQUIRED' }, lastSuccessAt: null }),
+      makeStatus({
+        connectorId: 'malt',
+        connectorName: 'Malt',
+        missionsCount: 5,
+        lastState: 'error',
+        error: { code: 'AUTH_REQUIRED' },
+        lastSuccessAt: null,
+      }),
     ];
 
     await saveConnectorStatuses(statuses);

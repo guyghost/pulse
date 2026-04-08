@@ -27,13 +27,17 @@ export function pullToRefresh(node: HTMLElement, options: PullToRefreshOptions) 
   }
 
   function handlePointerDown(e: PointerEvent) {
-    if (node.scrollTop > 0) return;
+    if (node.scrollTop > 0) {
+      return;
+    }
     startY = e.clientY;
     pulling = true;
   }
 
   function handlePointerMove(e: PointerEvent) {
-    if (!pulling) return;
+    if (!pulling) {
+      return;
+    }
     const delta = Math.max(0, e.clientY - startY);
     if (delta > 5 && !indicator) {
       createIndicator();
@@ -57,7 +61,9 @@ export function pullToRefresh(node: HTMLElement, options: PullToRefreshOptions) 
   }
 
   function handlePointerUp(e: PointerEvent) {
-    if (!pulling) return;
+    if (!pulling) {
+      return;
+    }
     const delta = e.clientY - startY;
     if (delta >= threshold) {
       options.onRefresh();

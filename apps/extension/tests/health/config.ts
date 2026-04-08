@@ -1,6 +1,6 @@
 /**
  * Health Check Configuration
- * 
+ *
  * Loads and validates health check configuration from environment
  * and optional config file.
  */
@@ -32,12 +32,12 @@ const DEFAULT_CONFIG: HealthCheckConfig = {
  */
 export function loadConfig(): HealthCheckConfig {
   const configPath = join(process.cwd(), 'health-check.config.json');
-  
+
   if (existsSync(configPath)) {
     try {
       const raw = readFileSync(configPath, 'utf-8');
       const fileConfig = JSON.parse(raw) as Partial<HealthCheckConfig>;
-      
+
       // Merge with defaults
       return {
         ...DEFAULT_CONFIG,
@@ -55,7 +55,7 @@ export function loadConfig(): HealthCheckConfig {
       console.warn('Failed to load health-check.config.json, using defaults:', error);
     }
   }
-  
+
   return DEFAULT_CONFIG;
 }
 
@@ -70,7 +70,7 @@ export function getTimeout(config: HealthCheckConfig, connectorId: string): numb
       return parsed;
     }
   }
-  
+
   return config.connectors[connectorId]?.timeout ?? 30000;
 }
 
@@ -91,7 +91,10 @@ export function getSkipReason(config: HealthCheckConfig, connectorId: string): s
 /**
  * Get connector configuration.
  */
-export function getConnectorConfig(config: HealthCheckConfig, connectorId: string): ConnectorConfig {
+export function getConnectorConfig(
+  config: HealthCheckConfig,
+  connectorId: string
+): ConnectorConfig {
   return config.connectors[connectorId] ?? { enabled: true, timeout: 30000 };
 }
 

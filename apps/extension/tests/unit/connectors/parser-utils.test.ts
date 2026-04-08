@@ -1,5 +1,9 @@
 import { describe, it, expect } from 'vitest';
-import { createMission, parseTJM, detectRemote } from '../../../src/lib/core/connectors/parser-utils';
+import {
+  createMission,
+  parseTJM,
+  detectRemote,
+} from '../../../src/lib/core/connectors/parser-utils';
 import type { Mission, MissionSource } from '../../../src/lib/core/types/mission';
 
 describe('parser-utils', () => {

@@ -1,6 +1,6 @@
 /**
  * Action Svelte pour gérer le virtual scroll.
- * 
+ *
  * Throttle le scroll à 60fps (16ms) et gère le resize du container.
  */
 
@@ -56,7 +56,7 @@ function throttle<T extends (...args: unknown[]) => void>(
 
 /**
  * Action Svelte pour le virtual scroll.
- * 
+ *
  * Usage:
  * ```svelte
  * <div use:virtualScroll={{ onScroll: (scrollTop, height) => {...} }}>
@@ -84,7 +84,7 @@ export function virtualScroll(
 
   // Handler de resize avec ResizeObserver
   let resizeObserver: ResizeObserver | null = null;
-  
+
   const handleResize = throttle(() => {
     const newHeight = node.clientHeight;
     if (newHeight !== currentContainerHeight) {
@@ -95,7 +95,7 @@ export function virtualScroll(
 
   // Setup
   node.addEventListener('scroll', handleScroll, { passive: true });
-  
+
   if (typeof ResizeObserver !== 'undefined') {
     resizeObserver = new ResizeObserver(handleResize);
     resizeObserver.observe(node);

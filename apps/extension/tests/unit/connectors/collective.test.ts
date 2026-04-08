@@ -64,7 +64,10 @@ describe('parseCollectiveProjects', () => {
 
   // --- TJM extraction ---
   it('extracts TJM from "400-450€ (Journalier)"', () => {
-    const missions = parseCollectiveProjects([makeProject({ budgetBrief: '400-450€ (Journalier)' })], NOW);
+    const missions = parseCollectiveProjects(
+      [makeProject({ budgetBrief: '400-450€ (Journalier)' })],
+      NOW
+    );
     expect(missions[0].tjm).toBe(400);
   });
 
@@ -79,7 +82,10 @@ describe('parseCollectiveProjects', () => {
   });
 
   it('extracts TJM from "TJM HT max 636 €"', () => {
-    const missions = parseCollectiveProjects([makeProject({ budgetBrief: 'TJM HT max 636 €' })], NOW);
+    const missions = parseCollectiveProjects(
+      [makeProject({ budgetBrief: 'TJM HT max 636 €' })],
+      NOW
+    );
     expect(missions[0].tjm).toBe(636);
   });
 
@@ -110,12 +116,18 @@ describe('parseCollectiveProjects', () => {
   });
 
   it('prioritizes REMOTE over HYBRID', () => {
-    const missions = parseCollectiveProjects([makeProject({ workPreferences: ['HYBRID', 'REMOTE'] })], NOW);
+    const missions = parseCollectiveProjects(
+      [makeProject({ workPreferences: ['HYBRID', 'REMOTE'] })],
+      NOW
+    );
     expect(missions[0].remote).toBe('full');
   });
 
   it('prioritizes HYBRID over ON_SITE', () => {
-    const missions = parseCollectiveProjects([makeProject({ workPreferences: ['ON_SITE', 'HYBRID'] })], NOW);
+    const missions = parseCollectiveProjects(
+      [makeProject({ workPreferences: ['ON_SITE', 'HYBRID'] })],
+      NOW
+    );
     expect(missions[0].remote).toBe('hybrid');
   });
 
@@ -188,7 +200,8 @@ describe('extractCollectiveProjects', () => {
   });
 
   it('returns empty array when projects key is missing', () => {
-    const html = '<html><body><script id="__NEXT_DATA__">{"props":{"pageProps":{}}}</script></body></html>';
+    const html =
+      '<html><body><script id="__NEXT_DATA__">{"props":{"pageProps":{}}}</script></body></html>';
     expect(extractCollectiveProjects(html)).toEqual([]);
   });
 
@@ -228,9 +241,9 @@ describe('extractCollectiveProjects', () => {
       makeProject({ id: 'valid-1' }),
       makeProject({ id: 'valid-2', name: 'Another' }),
     ];
-    
+
     const missions = parseCollectiveProjects(validProjects, NOW);
-    
+
     expect(missions).toHaveLength(2);
     expect(missions[0].id).toBe('col-valid-1');
     expect(missions[1].id).toBe('col-valid-2');
@@ -254,7 +267,7 @@ describe('extractCollectiveProjects', () => {
     };
 
     const missions = parseCollectiveProjects([projectWithNulls], NOW);
-    
+
     expect(missions).toHaveLength(1);
     expect(missions[0].client).toBeNull();
     expect(missions[0].location).toBeNull();
@@ -273,7 +286,7 @@ describe('extractCollectiveProjects', () => {
     };
 
     const missions = parseCollectiveProjects([projectWithEmpty], NOW);
-    
+
     expect(missions).toHaveLength(1);
     expect(missions[0].title).toBe('');
     expect(missions[0].description).toBe('');

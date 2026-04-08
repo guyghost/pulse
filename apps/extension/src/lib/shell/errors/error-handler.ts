@@ -1,11 +1,11 @@
 /**
  * Gestionnaire d'erreurs - Shell
- * 
+ *
  * Ce module contient la logique I/O pour la gestion d'erreurs:
  * - Logging console
  * - Envoi à un service de monitoring (si configuré)
  * - Affichage de toasts
- * 
+ *
  * Règle: Core = pure, Shell = I/O autorisé
  */
 
@@ -163,15 +163,18 @@ function getLogLevel(error: AppError): 'debug' | 'info' | 'warn' | 'error' {
 // ============================================================================
 
 async function sendToMonitoring(error: AppError): Promise<void> {
-  if (!config.monitoringUrl) return;
+  if (!config.monitoringUrl) {
+    return;
+  }
 
   try {
     const payload = {
       ...serializeError(error),
       userAgent: typeof navigator !== 'undefined' ? navigator.userAgent : undefined,
-      extensionVersion: typeof chrome !== 'undefined' && chrome.runtime?.getManifest 
-        ? chrome.runtime.getManifest().version 
-        : 'unknown',
+      extensionVersion:
+        typeof chrome !== 'undefined' && chrome.runtime?.getManifest
+          ? chrome.runtime.getManifest().version
+          : 'unknown',
     };
 
     // Envoi en fire-and-forget (pas d'attente)
@@ -212,9 +215,9 @@ export function subscribeToToasts(callback: (toast: ToastMessage) => void): () =
 
 function showToast(error: AppError): void {
   const toast = createToastMessage(error);
-  
+
   // Notifie tous les listeners
-  toastListeners.forEach(listener => {
+  toastListeners.forEach((listener) => {
     try {
       listener(toast);
     } catch {
@@ -230,28 +233,28 @@ function showToast(error: AppError): void {
 
 function createToastMessage(error: AppError): ToastMessage {
   const id = `${error.type}-${error.timestamp}-${Math.random().toString(36).slice(2, 9)}`;
-  
+
   switch (error.type) {
     case 'network':
       return {
         id,
         type: error.retryable ? 'warning' : 'error',
         title: 'Erreur réseau',
-        message: error.retryable 
+        message: error.retryable
           ? 'Problème de connexion temporaire. Réessai en cours...'
           : 'Impossible de se connecter au serveur. Vérifiez votre connexion.',
         duration: error.retryable ? 3000 : 5000,
       };
-    
+
     case 'storage':
       return {
         id,
         type: 'error',
         title: 'Erreur de stockage',
-        message: 'Impossible d\'accéder aux données locales. Essayez de redémarrer l\'extension.',
+        message: "Impossible d'accéder aux données locales. Essayez de redémarrer l'extension.",
         duration: 5000,
       };
-    
+
     case 'parsing':
       return {
         id,
@@ -260,7 +263,7 @@ function createToastMessage(error: AppError): ToastMessage {
         message: `Impossible d'analyser les données depuis ${error.source}. Le site a peut-être changé.`,
         duration: 5000,
       };
-    
+
     case 'connector':
       return {
         id,
@@ -269,18 +272,18 @@ function createToastMessage(error: AppError): ToastMessage {
         message: getConnectorErrorMessage(error),
         duration: error.recoverable ? 3000 : 5000,
       };
-    
+
     case 'validation':
       return {
         id,
         type: 'warning',
         title: 'Données invalides',
-        message: error.field 
+        message: error.field
           ? `Le champ "${error.field}" est invalide.`
           : 'Certaines données sont invalides.',
         duration: 3000,
       };
-    
+
     default:
       return {
         id,

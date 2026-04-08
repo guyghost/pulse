@@ -52,7 +52,7 @@ function getConnectionInfo(): ConnectionInfo {
       : undefined;
 
   if (connection) {
-    const effectiveType = connection.effectiveType as ConnectionInfo['effectiveType'];
+    const effectiveType = connection.effectiveType;
     const downlink = typeof connection.downlink === 'number' ? connection.downlink : undefined;
     const rtt = typeof connection.rtt === 'number' ? connection.rtt : undefined;
 
@@ -85,17 +85,25 @@ function notifyListeners(): void {
  */
 let isInitialized = false;
 function initListeners(): void {
-  if (isInitialized) return;
+  if (isInitialized) {
+    return;
+  }
   isInitialized = true;
 
   // Service Worker n'a pas accès à window — skip les event listeners
-  if (isServiceWorker) return;
+  if (isServiceWorker) {
+    return;
+  }
 
   window.addEventListener('online', notifyListeners);
   window.addEventListener('offline', notifyListeners);
 
   // Écouter les changements de Network Information API
-  const connection = (navigator as any).connection;
+  const connection = (
+    navigator as unknown as {
+      connection?: EventTarget & { effectiveType?: string };
+    }
+  ).connection;
   if (connection) {
     connection.addEventListener('change', notifyListeners);
   }

@@ -6,7 +6,7 @@ export default defineConfig({
   plugins: [svelte({ hot: false })],
   resolve: {
     alias: {
-      '$lib': resolve(__dirname, './src/lib'),
+      $lib: resolve(__dirname, './src/lib'),
     },
     conditions: ['browser', 'import', 'module', 'default'],
   },

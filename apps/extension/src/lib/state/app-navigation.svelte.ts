@@ -62,9 +62,15 @@ export function createAppNavigation() {
     });
 
   return {
-    get currentPage() { return currentPage; },
-    get hasCompletedOnboarding() { return hasCompletedOnboarding; },
-    get transitionDirection() { return transitionDirection; },
+    get currentPage() {
+      return currentPage;
+    },
+    get hasCompletedOnboarding() {
+      return hasCompletedOnboarding;
+    },
+    get transitionDirection() {
+      return transitionDirection;
+    },
 
     navigate,
     completeOnboarding,

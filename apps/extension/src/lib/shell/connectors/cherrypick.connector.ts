@@ -94,7 +94,9 @@ export class CherryPickConnector extends BaseConnector {
         const response = result.value as { data?: CherryPickMission[] };
         const missions = response?.data;
 
-        if (!Array.isArray(missions) || missions.length === 0) break;
+        if (!Array.isArray(missions) || missions.length === 0) {
+          break;
+        }
 
         const parsedMissions = parseCherryPickMissions(missions, new Date(now));
         allMissions.push(...parsedMissions);

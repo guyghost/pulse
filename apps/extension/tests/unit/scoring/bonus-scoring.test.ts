@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { scoreSeniorityBonus, scoreStartDateBonus } from '../../../src/lib/core/scoring/bonus-scoring';
+import {
+  scoreSeniorityBonus,
+  scoreStartDateBonus,
+} from '../../../src/lib/core/scoring/bonus-scoring';
 
 describe('scoreSeniorityBonus', () => {
   it('returns 5 for exact match', () => {

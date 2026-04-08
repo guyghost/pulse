@@ -16,7 +16,7 @@ export interface OnboardingStore {
 
 const mergeProfile = (
   current: Partial<UserProfile>,
-  update: Partial<UserProfile>,
+  update: Partial<UserProfile>
 ): Partial<UserProfile> => ({
   ...current,
   ...update,

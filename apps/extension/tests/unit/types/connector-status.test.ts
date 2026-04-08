@@ -63,7 +63,7 @@ describe('ConnectorStatus types', () => {
       const error = createConnectorError(
         'Timeout réseau',
         { connectorId: 'malt', phase: 'fetch', recoverable: true },
-        now - 1000,
+        now - 1000
       );
 
       const status: ConnectorStatus = {

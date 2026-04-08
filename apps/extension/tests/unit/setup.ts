@@ -6,7 +6,7 @@ class IntersectionObserverMock implements IntersectionObserver {
 
   constructor(
     private callback: IntersectionObserverCallback,
-    _options?: IntersectionObserverInit,
+    _options?: IntersectionObserverInit
   ) {}
 
   observe(_target: Element): void {}
@@ -17,11 +17,15 @@ class IntersectionObserverMock implements IntersectionObserver {
   }
 }
 
-globalThis.IntersectionObserver = IntersectionObserverMock as unknown as typeof IntersectionObserver;
+globalThis.IntersectionObserver =
+  IntersectionObserverMock as unknown as typeof IntersectionObserver;
 
 // Polyfill Element.animate pour jsdom (Web Animations API non disponible)
 if (typeof Element !== 'undefined' && !Element.prototype.animate) {
-  Element.prototype.animate = function (_keyframes: Keyframe[] | PropertyIndexedKeyframes | null, _options?: number | KeyframeAnimationOptions): Animation {
+  Element.prototype.animate = function (
+    _keyframes: Keyframe[] | PropertyIndexedKeyframes | null,
+    _options?: number | KeyframeAnimationOptions
+  ): Animation {
     return {
       cancel: () => {},
       finish: () => {},
@@ -34,8 +38,12 @@ if (typeof Element !== 'undefined' && !Element.prototype.animate) {
       addEventListener: () => {},
       removeEventListener: () => {},
       dispatchEvent: () => false,
-      get finished() { return Promise.resolve(this as unknown as Animation); },
-      get ready() { return Promise.resolve(this as unknown as Animation); },
+      get finished() {
+        return Promise.resolve(this as unknown as Animation);
+      },
+      get ready() {
+        return Promise.resolve(this as unknown as Animation);
+      },
       onfinish: null,
       oncancel: null,
       onremove: null,

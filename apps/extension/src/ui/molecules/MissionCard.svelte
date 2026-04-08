@@ -6,7 +6,7 @@
   import { ripple } from '../actions/ripple';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
 
-  let {
+  const {
     mission,
     isSeen = true,
     isFavorite = false,
@@ -36,11 +36,11 @@
     senior: 'Senior (7+ ans)',
   };
 
-  let seniorityLabel = $derived(
-    mission.seniority ? seniorityLabels[mission.seniority] ?? mission.seniority : null
+  const seniorityLabel = $derived(
+    mission.seniority ? (seniorityLabels[mission.seniority] ?? mission.seniority) : null
   );
 
-  let scoreColor = $derived(
+  const scoreColor = $derived(
     (mission.score ?? 0) >= 80
       ? 'text-accent-emerald bg-accent-emerald/15'
       : (mission.score ?? 0) >= 50
@@ -48,7 +48,7 @@
         : 'text-text-muted bg-white/5'
   );
 
-  let glowClass = $derived(
+  const glowClass = $derived(
     (mission.score ?? 0) >= 80
       ? 'shadow-glow-emerald'
       : (mission.score ?? 0) >= 50

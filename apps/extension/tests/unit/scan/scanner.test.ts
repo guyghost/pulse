@@ -186,8 +186,12 @@ describe('scanner — runScan', () => {
 
     (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
     (getConnector as Mock).mockImplementation(async (id: string) => {
-      if (id === 'free-work') return goodConnector;
-      if (id === 'lehibou') return badConnector;
+      if (id === 'free-work') {
+        return goodConnector;
+      }
+      if (id === 'lehibou') {
+        return badConnector;
+      }
       return null;
     });
     (getConnectors as Mock).mockResolvedValue([goodConnector, badConnector]);
@@ -207,8 +211,12 @@ describe('scanner — runScan', () => {
 
     (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
     (getConnector as Mock).mockImplementation(async (id: string) => {
-      if (id === 'free-work') return bad1;
-      if (id === 'lehibou') return bad2;
+      if (id === 'free-work') {
+        return bad1;
+      }
+      if (id === 'lehibou') {
+        return bad2;
+      }
       return null;
     });
     (getConnectors as Mock).mockResolvedValue([bad1, bad2]);
@@ -271,8 +279,12 @@ describe('scanner — runScan', () => {
 
     (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
     (getConnector as Mock).mockImplementation(async (id: string) => {
-      if (id === 'free-work') return c1;
-      if (id === 'lehibou') return c2;
+      if (id === 'free-work') {
+        return c1;
+      }
+      if (id === 'lehibou') {
+        return c2;
+      }
       return null;
     });
     (getConnectors as Mock).mockResolvedValue([c1, c2]);
@@ -306,8 +318,12 @@ describe('scanner — runScan', () => {
 
     (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
     (getConnector as Mock).mockImplementation(async (id: string) => {
-      if (id === 'free-work') return c1;
-      if (id === 'lehibou') return c2;
+      if (id === 'free-work') {
+        return c1;
+      }
+      if (id === 'lehibou') {
+        return c2;
+      }
       return null;
     });
     (getConnectors as Mock).mockResolvedValue([c1, c2]);
@@ -355,7 +371,9 @@ describe('scanner — runScan', () => {
 
     (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'unknown-connector']));
     (getConnector as Mock).mockImplementation(async (id: string) => {
-      if (id === 'free-work') return connector;
+      if (id === 'free-work') {
+        return connector;
+      }
       return null;
     });
     (getConnectors as Mock).mockResolvedValue([connector]);

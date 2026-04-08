@@ -30,7 +30,7 @@ function createChromeStubs() {
               window.dispatchEvent(
                 new CustomEvent('dev:missions', {
                   detail: mockMissions.map((m) => ({ ...m, scrapedAt: new Date() })),
-                }),
+                })
               );
             }, 800);
             return {
@@ -58,7 +58,9 @@ function createChromeStubs() {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
           const result: Record<string, unknown> = {};
           for (const k of keyArr) {
-            if (k in storage) result[k] = storage[k];
+            if (k in storage) {
+              result[k] = storage[k];
+            }
           }
           return result;
         },
@@ -67,10 +69,14 @@ function createChromeStubs() {
         },
         remove: async (keys: string | string[]) => {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
-          for (const k of keyArr) delete storage[k];
+          for (const k of keyArr) {
+            delete storage[k];
+          }
         },
         clear: async () => {
-          for (const k of Object.keys(storage)) delete storage[k];
+          for (const k of Object.keys(storage)) {
+            delete storage[k];
+          }
         },
       },
       session: {
@@ -78,7 +84,9 @@ function createChromeStubs() {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
           const result: Record<string, unknown> = {};
           for (const k of keyArr) {
-            if (k in storage) result[k] = storage[k];
+            if (k in storage) {
+              result[k] = storage[k];
+            }
           }
           return result;
         },
@@ -87,7 +95,9 @@ function createChromeStubs() {
         },
         remove: async (keys: string | string[]) => {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
-          for (const k of keyArr) delete storage[k];
+          for (const k of keyArr) {
+            delete storage[k];
+          }
         },
       },
       onChanged: {

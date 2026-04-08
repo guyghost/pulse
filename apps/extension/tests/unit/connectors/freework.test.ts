@@ -143,7 +143,7 @@ describe('parseFreeWorkAPI', () => {
       scrapedAt: NOW,
     });
     // Verify the permanent contract was filtered out
-    expect(missions.find(m => m.id === 'fw-99999')).toBeUndefined();
+    expect(missions.find((m) => m.id === 'fw-99999')).toBeUndefined();
   });
 
   it('extracts stack from skills', () => {

@@ -9,7 +9,9 @@ vi.stubGlobal('chrome', {
         if (Array.isArray(key)) {
           const result: Record<string, unknown> = {};
           for (const k of key) {
-            if (mockStorage[k] !== undefined) result[k] = mockStorage[k];
+            if (mockStorage[k] !== undefined) {
+              result[k] = mockStorage[k];
+            }
           }
           return result;
         }
@@ -27,7 +29,9 @@ import { getSettings } from '../../../src/lib/shell/storage/chrome-storage';
 
 describe('getSettings', () => {
   beforeEach(() => {
-    for (const key of Object.keys(mockStorage)) delete mockStorage[key];
+    for (const key of Object.keys(mockStorage)) {
+      delete mockStorage[key];
+    }
   });
 
   it('returns defaults with autoScan true', async () => {

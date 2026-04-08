@@ -8,17 +8,17 @@
     return () => connection.destroy();
   });
 
-  let status = $derived(connection.status);
-  let rtt = $derived(connection.rtt);
-  let effectiveType = $derived(connection.effectiveType);
-  
+  const status = $derived(connection.status);
+  const rtt = $derived(connection.rtt);
+  const effectiveType = $derived(connection.effectiveType);
+
   // S'affiche uniquement quand offline ou slow
-  let isVisible = $derived(status === 'offline' || status === 'slow');
-  
+  const isVisible = $derived(status === 'offline' || status === 'slow');
+
   let showDetails = $state(false);
-  
+
   // Couleurs selon le statut
-  let statusConfig = $derived.by(() => {
+  const statusConfig = $derived.by(() => {
     switch (status) {
       case 'online':
         return {
@@ -58,28 +58,30 @@
         };
     }
   });
-  
+
   function toggleDetails() {
     if (status !== 'online') {
       showDetails = !showDetails;
     }
   }
-  
+
   function closeDetails() {
     showDetails = false;
   }
-  
+
   // Fermer les détails quand on clique ailleurs
   $effect(() => {
-    if (!showDetails) return;
-    
+    if (!showDetails) {
+      return;
+    }
+
     function handleClickOutside(event: MouseEvent) {
       const target = event.target as HTMLElement;
       if (!target.closest('.connection-indicator')) {
         closeDetails();
       }
     }
-    
+
     document.addEventListener('click', handleClickOutside);
     return () => document.removeEventListener('click', handleClickOutside);
   });
@@ -96,14 +98,16 @@
     >
       <span class="relative flex h-2 w-2">
         {#if status === 'offline'}
-          <span class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 {statusConfig.color}"></span>
+          <span
+            class="absolute inline-flex h-full w-full animate-ping rounded-full opacity-75 {statusConfig.color}"
+          ></span>
         {/if}
         <span class="relative inline-flex h-2 w-2 rounded-full {statusConfig.color}"></span>
       </span>
       <Icon name={statusConfig.icon} size={12} />
       <span class="text-[10px] font-medium uppercase tracking-wider">{statusConfig.label}</span>
     </button>
-    
+
     {#if showDetails}
       <div
         class="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-white/10 bg-surface p-3 shadow-xl"
@@ -114,7 +118,7 @@
           <span class="h-2 w-2 rounded-full {statusConfig.color}"></span>
           <span class="text-xs font-medium text-white">{statusConfig.label}</span>
         </div>
-        
+
         <div class="space-y-1.5 text-xs">
           {#if rtt !== undefined}
             <div class="flex justify-between">
@@ -122,14 +126,14 @@
               <span class="text-text-primary">{rtt} ms</span>
             </div>
           {/if}
-          
+
           {#if effectiveType}
             <div class="flex justify-between">
               <span class="text-text-secondary">Type:</span>
               <span class="text-text-primary uppercase">{effectiveType}</span>
             </div>
           {/if}
-          
+
           {#if status === 'offline'}
             <p class="mt-2 text-text-secondary leading-relaxed">
               Mode hors ligne activé. Les données en cache sont disponibles.

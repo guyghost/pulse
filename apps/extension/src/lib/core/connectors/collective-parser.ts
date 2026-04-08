@@ -29,35 +29,45 @@ export function mapSkill(raw: string): string {
 }
 
 export function extractTjm(budgetBrief: string | null): number | null {
-  if (!budgetBrief) return null;
+  if (!budgetBrief) {
+    return null;
+  }
   const match = budgetBrief.match(/\d+/);
   return match ? parseInt(match[0], 10) : null;
 }
 
 export function mapCollectiveRemote(prefs: string[]): Mission['remote'] {
-  if (prefs.includes('REMOTE')) return 'full';
-  if (prefs.includes('HYBRID')) return 'hybrid';
-  if (prefs.includes('ON_SITE')) return 'onsite';
+  if (prefs.includes('REMOTE')) {
+    return 'full';
+  }
+  if (prefs.includes('HYBRID')) {
+    return 'hybrid';
+  }
+  if (prefs.includes('ON_SITE')) {
+    return 'onsite';
+  }
   return null;
 }
 
 export function parseCollectiveProjects(projects: CollectiveProject[], now: Date): Mission[] {
   return projects
     .filter((p) => !p.isPermanentContract)
-    .map((p) => createMission({
-    id: `col-${p.id}`,
-    title: p.name,
-    client: p.company?.name ?? null,
-    description: p.sumUp ?? '',
-    stack: p.projectTypes.map(mapSkill),
-    tjm: extractTjm(p.budgetBrief),
-    location: p.location?.fullNameFrench ?? null,
-    remote: mapCollectiveRemote(p.workPreferences),
-    duration: null,
-    url: `https://www.collective.work/job/${p.slug}`,
-    source: 'collective' as const,
-    scrapedAt: now,
-  }));
+    .map((p) =>
+      createMission({
+        id: `col-${p.id}`,
+        title: p.name,
+        client: p.company?.name ?? null,
+        description: p.sumUp ?? '',
+        stack: p.projectTypes.map(mapSkill),
+        tjm: extractTjm(p.budgetBrief),
+        location: p.location?.fullNameFrench ?? null,
+        remote: mapCollectiveRemote(p.workPreferences),
+        duration: null,
+        url: `https://www.collective.work/job/${p.slug}`,
+        source: 'collective' as const,
+        scrapedAt: now,
+      })
+    );
 }
 
 export function extractCollectiveProjects(html: string): CollectiveProject[] {
@@ -85,7 +95,9 @@ export function extractCollectiveProjects(html: string): CollectiveProject[] {
 
     // Validate each project has required fields
     return projects.filter((p): p is CollectiveProject => {
-      if (typeof p !== 'object' || p === null) return false;
+      if (typeof p !== 'object' || p === null) {
+        return false;
+      }
       const proj = p as Record<string, unknown>;
       return typeof proj.id === 'string' && typeof proj.name === 'string';
     });

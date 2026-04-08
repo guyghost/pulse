@@ -41,18 +41,14 @@ describe('isFreelanceMission', () => {
 
   it('returns false when description mentions CDI', () => {
     expect(
-      isFreelanceMission(
-        makeMission({ description: 'Poste en CDI avec avantages salariés' })
-      )
+      isFreelanceMission(makeMission({ description: 'Poste en CDI avec avantages salariés' }))
     ).toBe(false);
   });
 
   it('returns false for "contrat salarié"', () => {
-    expect(
-      isFreelanceMission(
-        makeMission({ description: 'Contrat salarié temps plein' })
-      )
-    ).toBe(false);
+    expect(isFreelanceMission(makeMission({ description: 'Contrat salarié temps plein' }))).toBe(
+      false
+    );
   });
 
   it('returns true when CDI appears inside another word (e.g. CREDIT)', () => {
@@ -83,10 +79,7 @@ describe('filterSalariedMissions', () => {
   });
 
   it('returns all missions when none are salaried', () => {
-    const missions = [
-      makeMission({ id: '1' }),
-      makeMission({ id: '2' }),
-    ];
+    const missions = [makeMission({ id: '1' }), makeMission({ id: '2' })];
     expect(filterSalariedMissions(missions)).toHaveLength(2);
   });
 

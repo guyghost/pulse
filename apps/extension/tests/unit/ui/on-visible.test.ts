@@ -10,14 +10,20 @@ class MockObserver {
     this.callback = cb;
     MockObserver.instances.push(this);
   }
-  observe(el: Element) { this.elements.push(el); }
-  unobserve(el: Element) { this.elements = this.elements.filter(e => e !== el); }
-  disconnect() { this.elements = []; }
+  observe(el: Element) {
+    this.elements.push(el);
+  }
+  unobserve(el: Element) {
+    this.elements = this.elements.filter((e) => e !== el);
+  }
+  disconnect() {
+    this.elements = [];
+  }
 
   trigger(isIntersecting: boolean) {
     this.callback(
       [{ isIntersecting, target: this.elements[0] } as IntersectionObserverEntry],
-      this as unknown as IntersectionObserver,
+      this as unknown as IntersectionObserver
     );
   }
 }

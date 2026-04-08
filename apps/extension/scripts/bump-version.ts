@@ -32,10 +32,7 @@ const isValidSemver = (version: string): boolean => {
 /**
  * Updates version in package.json content.
  */
-const updatePackageJsonVersion = (
-  content: string,
-  version: string
-): string => {
+const updatePackageJsonVersion = (content: string, version: string): string => {
   const parsed = JSON.parse(content);
   parsed.version = version;
   return JSON.stringify(parsed, null, 2) + '\n';
@@ -44,10 +41,7 @@ const updatePackageJsonVersion = (
 /**
  * Updates version in manifest.json content.
  */
-const updateManifestVersion = (
-  content: string,
-  version: string
-): string => {
+const updateManifestVersion = (content: string, version: string): string => {
   const parsed = JSON.parse(content);
   parsed.version = version;
   return JSON.stringify(parsed, null, 2) + '\n';
@@ -89,17 +83,9 @@ const main = (): void => {
   console.log(`  manifest.json: ${currentManifestVersion} → ${version}`);
 
   // Write updated content
-  writeFileSync(
-    packageJsonPath,
-    updatePackageJsonVersion(packageJsonContent, version),
-    'utf-8'
-  );
+  writeFileSync(packageJsonPath, updatePackageJsonVersion(packageJsonContent, version), 'utf-8');
 
-  writeFileSync(
-    manifestJsonPath,
-    updateManifestVersion(manifestJsonContent, version),
-    'utf-8'
-  );
+  writeFileSync(manifestJsonPath, updateManifestVersion(manifestJsonContent, version), 'utf-8');
 
   console.log(`\n✅ Version bumped to ${version}`);
 };

@@ -92,7 +92,9 @@
       </div>
 
       <div class="space-y-2">
-        <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted">Stack technique</label>
+        <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted"
+          >Stack technique</label
+        >
         <div class="flex gap-2">
           <input
             id="stack-input"
@@ -100,7 +102,11 @@
             placeholder="ex: React, Node.js..."
             class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
             bind:value={stackInput}
-            onkeydown={(e) => { if (e.key === 'Enter') onAddStack(); }}
+            onkeydown={(e) => {
+              if (e.key === 'Enter') {
+                onAddStack();
+              }
+            }}
           />
           <button
             class="inline-flex min-h-12 items-center justify-center rounded-[1.1rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
@@ -139,7 +145,10 @@
       {#if profileStack.length > 0}
         <div class="flex flex-wrap gap-1.5 pt-1">
           {#each profileStack as tech}
-            <span class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue">{tech}</span>
+            <span
+              class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue"
+              >{tech}</span
+            >
           {/each}
         </div>
       {:else}

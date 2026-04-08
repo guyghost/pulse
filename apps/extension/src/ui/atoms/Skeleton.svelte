@@ -1,5 +1,9 @@
 <script lang="ts">
-  let { width = '100%', height = '1rem', rounded = 'md' }: {
+  const {
+    width = '100%',
+    height = '1rem',
+    rounded = 'md',
+  }: {
     width?: string;
     height?: string;
     rounded?: 'sm' | 'md' | 'lg' | 'full';
@@ -13,8 +17,4 @@
   };
 </script>
 
-<div
-  class="animate-pulse bg-navy-700 {roundedClass[rounded]}"
-  style:width={width}
-  style:height={height}
-></div>
+<div class="animate-pulse bg-navy-700 {roundedClass[rounded]}" style:width style:height></div>

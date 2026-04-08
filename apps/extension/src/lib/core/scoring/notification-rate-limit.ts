@@ -16,6 +16,8 @@ export const NOTIFICATION_COOLDOWN_MS = 5 * 60 * 1000;
  * @returns true if a new notification is allowed
  */
 export const canNotify = (lastNotificationTime: number | null, now: number): boolean => {
-  if (lastNotificationTime === null) return true;
+  if (lastNotificationTime === null) {
+    return true;
+  }
   return now - lastNotificationTime >= NOTIFICATION_COOLDOWN_MS;
 };

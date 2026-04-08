@@ -4,7 +4,12 @@ import { SIDE_PANEL, injectMissions, toggleOffline } from './helpers';
 async function ensureFeedIsVisible(page: Page) {
   await page.goto(SIDE_PANEL);
 
-  if (await page.getByText('Votre profil cible').isVisible().catch(() => false)) {
+  if (
+    await page
+      .getByText('Votre profil cible')
+      .isVisible()
+      .catch(() => false)
+  ) {
     await page.locator('#ob-firstname').fill('Jean');
     await page.locator('#ob-jobtitle').fill('Développeur React Senior');
     await page.locator('#ob-location').fill('Paris');
@@ -99,7 +104,10 @@ test.describe('TJM page', () => {
     await ensureFeedIsVisible(page);
     await seedTJMHistory(page);
 
-    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' }).click();
+    await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'TJM' })
+      .click();
 
     await expect(page.getByText('Radar marche')).toBeVisible();
     await expect(page.getByText('Analyse TJM')).toBeVisible();
@@ -118,9 +126,14 @@ test.describe('TJM page', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    await page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' }).click();
+    await page
+      .getByRole('navigation', { name: 'Main navigation' })
+      .getByRole('button', { name: 'TJM' })
+      .click();
 
-    await expect(page.getByText('Mode hors ligne — Affichage des dernieres donnees en cache')).toBeVisible();
+    await expect(
+      page.getByText('Mode hors ligne — Affichage des dernieres donnees en cache')
+    ).toBeVisible();
     await expect(page.getByText('Analyse TJM')).toBeVisible();
     await expect(page.getByText('react', { exact: true })).toBeVisible();
 

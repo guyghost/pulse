@@ -115,9 +115,7 @@ const main = (): void => {
   const args = process.argv.slice(2);
   const projectRoot = resolve(__dirname, '..');
 
-  const manifestPath = args[0]
-    ? resolve(args[0])
-    : resolve(projectRoot, 'src/manifest.json');
+  const manifestPath = args[0] ? resolve(args[0]) : resolve(projectRoot, 'src/manifest.json');
   const packageJsonPath = resolve(projectRoot, 'package.json');
 
   console.log(`Verifying manifest: ${manifestPath}\n`);
@@ -177,12 +175,8 @@ const main = (): void => {
   console.log(`   Version:         ${data.version}`);
   console.log(`   Manifest Version: ${data.manifest_version}`);
   console.log(`   Permissions:     ${data.permissions?.join(', ') || 'none'}`);
-  console.log(
-    `   Host Permissions: ${data.host_permissions?.length || 0} patterns`
-  );
-  console.log(
-    `   Service Worker:  ${data.background?.service_worker || 'none'}`
-  );
+  console.log(`   Host Permissions: ${data.host_permissions?.length || 0} patterns`);
+  console.log(`   Service Worker:  ${data.background?.service_worker || 'none'}`);
 
   console.log('\n✅ Manifest is valid for Chrome Extension MV3\n');
 };

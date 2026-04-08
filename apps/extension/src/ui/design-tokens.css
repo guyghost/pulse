@@ -1,4 +1,4 @@
-@import "tailwindcss";
+@import 'tailwindcss';
 
 @theme {
   /* ================================================
@@ -6,14 +6,14 @@
    * ================================================ */
 
   /* Primary Cyan/Teal Palette - from PULSE identity */
-  --color-primary: #0E7490;
-  --color-primary-light: #22D3EE;
-  --color-primary-dark: #164E63;
+  --color-primary: #0e7490;
+  --color-primary-light: #22d3ee;
+  --color-primary-dark: #164e63;
   --color-primary-glow: rgba(14, 116, 144, 0.5);
 
   /* Surface Colors - Dark backgrounds */
-  --color-surface-dark: #0F172A;
-  --color-surface-card: #1E293B;
+  --color-surface-dark: #0f172a;
+  --color-surface-card: #1e293b;
   --color-surface-elevated: #334155;
 
   /* Glass Effect Tokens */
@@ -22,23 +22,23 @@
   --color-glass-hover: rgba(255, 255, 255, 0.08);
 
   /* Text Colors */
-  --color-text-primary: #F8FAFC;
-  --color-text-secondary: #94A3B8;
-  --color-text-muted: #64748B;
+  --color-text-primary: #f8fafc;
+  --color-text-secondary: #94a3b8;
+  --color-text-muted: #64748b;
 
   /* Accent Colors */
-  --color-accent-cyan: #22D3EE;
-  --color-accent-blue: #3B82F6;
-  --color-accent-emerald: #10B981;
-  --color-accent-amber: #F59E0B;
-  --color-accent-red: #EF4444;
+  --color-accent-cyan: #22d3ee;
+  --color-accent-blue: #3b82f6;
+  --color-accent-emerald: #10b981;
+  --color-accent-amber: #f59e0b;
+  --color-accent-red: #ef4444;
 
   /* Legacy Navy Palette (for backward compatibility) */
-  --color-navy-900: #0F172A;
-  --color-navy-800: #1E293B;
+  --color-navy-900: #0f172a;
+  --color-navy-800: #1e293b;
   --color-navy-700: #334155;
   --color-navy-600: #475569;
-  --color-surface: #1E293B;
+  --color-surface: #1e293b;
   --color-surface-hover: #334155;
   --color-surface-active: #475569;
   --color-border: rgba(255, 255, 255, 0.1);
@@ -102,7 +102,7 @@ body {
   background:
     radial-gradient(circle at top left, rgba(14, 116, 144, 0.15), transparent 40%),
     radial-gradient(circle at 80% 20%, rgba(34, 211, 238, 0.1), transparent 30%),
-    linear-gradient(160deg, #0F172A 0%, #1E293B 50%, #0F172A 100%);
+    linear-gradient(160deg, #0f172a 0%, #1e293b 50%, #0f172a 100%);
   font-family: var(--font-sans);
 }
 
@@ -163,7 +163,6 @@ body {
  * Radar Effects
  * ================================================ */
 
-
 /* Radar Ping Animation */
 @keyframes radar-ping {
   0% {
@@ -196,7 +195,8 @@ body {
 
 /* Radar Pulse Animation - Pulsing center */
 @keyframes radar-pulse {
-  0%, 100% {
+  0%,
+  100% {
     opacity: 1;
     transform: scale(1);
   }
@@ -209,8 +209,6 @@ body {
 .radar-pulse {
   animation: radar-pulse 2s ease-in-out infinite;
 }
-
-
 
 /* ================================================
  * Button Styles

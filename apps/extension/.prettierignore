@@ -1,0 +1,8 @@
+dist/
+node_modules/
+coverage/
+test-results/
+.svelte-kit/
+pnpm-lock.yaml
+*.png
+*.svg

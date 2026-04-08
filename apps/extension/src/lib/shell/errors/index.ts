@@ -1,6 +1,6 @@
 /**
  * Exports du module de gestion d'erreurs Shell
- * 
+ *
  * Ce module contient la logique I/O pour la gestion d'erreurs:
  * - Logging console
  * - Envoi à un service de monitoring

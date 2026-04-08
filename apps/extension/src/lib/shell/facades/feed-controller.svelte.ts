@@ -120,7 +120,7 @@ export function createFeedController(feedStore: {
   // ============================================================
   // Derived state
   // ============================================================
-  let scanProgress = $derived.by((): ScanProgress => {
+  const scanProgress = $derived.by((): ScanProgress => {
     if (connectorStatuses.size === 0) {
       return { current: 0, total: 0, percent: 0, connectorName: '' };
     }
@@ -143,7 +143,9 @@ export function createFeedController(feedStore: {
   // ============================================================
 
   async function startScan(): Promise<void> {
-    if (isScanning) return;
+    if (isScanning) {
+      return;
+    }
     scanCompleted = false;
     isScanning = true;
     connectorStatuses = new Map();
@@ -250,7 +252,9 @@ export function createFeedController(feedStore: {
         const result = await chrome.storage.local.get('lastGlobalSync');
         const lastSync = result.lastGlobalSync as number | undefined;
         const intervalMs = settings.scanIntervalMinutes * 60 * 1000;
-        if (lastSync && Date.now() - lastSync < intervalMs) return;
+        if (lastSync && Date.now() - lastSync < intervalMs) {
+          return;
+        }
       }
       startScan();
     } catch {
@@ -263,7 +267,9 @@ export function createFeedController(feedStore: {
   // ============================================================
 
   async function checkSourceSessions(): Promise<void> {
-    if (isCheckingSources) return;
+    if (isCheckingSources) {
+      return;
+    }
     isCheckingSources = true;
 
     try {
@@ -366,7 +372,7 @@ export function createFeedController(feedStore: {
       const listener = (message: BridgeMessage) => {
         // Progression détaillée pendant le scan
         if (message?.type === 'SCAN_PROGRESS' && message.payload) {
-          const payload = message.payload as ScanProgressPayload;
+          const payload = message.payload;
           // Mettre à jour les états de connecteurs pour l'UI
           const updated = new Map<string, ConnectorStatus>();
           for (const cp of payload.connectorProgress) {
@@ -375,7 +381,7 @@ export function createFeedController(feedStore: {
               connectorName: cp.connectorName,
               state: cp.state,
               missionsCount: cp.missionsCount,
-              error: cp.error as AppError | null,
+              error: cp.error,
               retryCount: cp.retryCount,
               startedAt: null,
               completedAt: null,

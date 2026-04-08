@@ -30,7 +30,7 @@ export function getToastActor(): ToastStore | null {
 export async function showToast(
   message: string,
   toastType: ToastType = 'info',
-  duration?: number,
+  duration?: number
 ): Promise<void> {
   if (toastStore) {
     toastStore.add(message, toastType, duration);
@@ -44,7 +44,9 @@ export async function showToast(
       payload: { message, toastType, duration },
     });
   } catch {
-    if (import.meta.env.DEV) console.warn('[ToastService] Failed to show toast:', message);
+    if (import.meta.env.DEV) {
+      console.warn('[ToastService] Failed to show toast:', message);
+    }
   }
 }
 

@@ -13,7 +13,11 @@ function mountToast(store: ToastStore) {
 /**
  * Ajoute un toast au store et attend la mise à jour du DOM.
  */
-function addAndFlush(store: ToastStore, message: string, type: 'info' | 'error' | 'success' = 'info') {
+function addAndFlush(
+  store: ToastStore,
+  message: string,
+  type: 'info' | 'error' | 'success' = 'info'
+) {
   store.add(message, type);
   flushSync();
 }
@@ -23,7 +27,7 @@ describe('ToastContainer', () => {
     document.body.innerHTML = '';
   });
 
-  it('n\'affiche rien quand il n\'y a pas de toasts', () => {
+  it("n'affiche rien quand il n'y a pas de toasts", () => {
     const store = new ToastStore();
     const target = mountToast(store);
 

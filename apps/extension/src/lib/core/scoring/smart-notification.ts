@@ -41,34 +41,36 @@ const bestScore = (mission: Mission): number | null => mission.semanticScore ?? 
 export const filterSmartNotifications = (
   missions: Mission[],
   seenIds: string[],
-  criteria: SmartNotificationCriteria,
+  criteria: SmartNotificationCriteria
 ): Mission[] => {
   const seenSet = new Set(seenIds);
-  const requiredStacksLower = criteria.requiredStacks
-    .filter(Boolean)
-    .map((s) => s.toLowerCase());
+  const requiredStacksLower = criteria.requiredStacks.filter(Boolean).map((s) => s.toLowerCase());
 
   return missions
     .filter((mission) => {
-      if (seenSet.has(mission.id)) return false;
+      if (seenSet.has(mission.id)) {
+        return false;
+      }
 
       const score = bestScore(mission);
-      if (score === null || score < criteria.scoreThreshold) return false;
+      if (score === null || score < criteria.scoreThreshold) {
+        return false;
+      }
 
       // Stack filter: mission must contain at least one required stack
       if (requiredStacksLower.length > 0) {
-        const missionStacksLower = mission.stack
-          .filter(Boolean)
-          .map((s) => s.toLowerCase());
-        const hasMatch = requiredStacksLower.some((req) =>
-          missionStacksLower.includes(req),
-        );
-        if (!hasMatch) return false;
+        const missionStacksLower = mission.stack.filter(Boolean).map((s) => s.toLowerCase());
+        const hasMatch = requiredStacksLower.some((req) => missionStacksLower.includes(req));
+        if (!hasMatch) {
+          return false;
+        }
       }
 
       // TJM filter
       if (criteria.minTJM > 0) {
-        if (mission.tjm === null || mission.tjm < criteria.minTJM) return false;
+        if (mission.tjm === null || mission.tjm < criteria.minTJM) {
+          return false;
+        }
       }
 
       return true;

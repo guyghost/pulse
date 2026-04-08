@@ -1,14 +1,14 @@
 /**
  * Pattern Result<T, E> inspiré de Rust
- * 
+ *
  * Permet une gestion d'erreurs explicite sans exceptions
- * 
+ *
  * Usage:
  *   function mayFail(): Result<string, AppError> {
  *     if (success) return ok("value");
  *     return err(createNetworkError(...));
  *   }
- * 
+ *
  *   const result = mayFail();
  *   if (result.ok) {
  *     console.log(result.value);
@@ -55,10 +55,7 @@ export function isErr<T, E>(result: Result<T, E>): result is Err<E> {
 }
 
 /** Transforme la valeur en cas de succès */
-export function map<T, U, E>(
-  result: Result<T, E>,
-  fn: (value: T) => U
-): Result<U, E> {
+export function map<T, U, E>(result: Result<T, E>, fn: (value: T) => U): Result<U, E> {
   if (result.ok) {
     return ok(fn(result.value));
   }
@@ -77,10 +74,7 @@ export function flatMap<T, U, E>(
 }
 
 /** Transforme l'erreur en cas d'échec */
-export function mapErr<T, E, F>(
-  result: Result<T, E>,
-  fn: (error: E) => F
-): Result<T, F> {
+export function mapErr<T, E, F>(result: Result<T, E>, fn: (error: E) => F): Result<T, F> {
   if (result.ok) {
     return result;
   }

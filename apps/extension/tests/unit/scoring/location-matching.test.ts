@@ -8,7 +8,7 @@ describe('normalizeLocation', () => {
     });
 
     it('removes French accents from lowercase', () => {
-      expect(normalizeLocation('côte d\'azur')).toBe('cote dazur');
+      expect(normalizeLocation("côte d'azur")).toBe('cote dazur');
     });
 
     it('handles ç correctly', () => {
@@ -248,7 +248,7 @@ describe('matchLocation', () => {
 
       it('is symmetric: Aix-en-Provence ↔ Marseille', () => {
         expect(matchLocation('Aix-en-Provence', 'Marseille')).toBe(
-          matchLocation('Marseille', 'Aix-en-Provence'),
+          matchLocation('Marseille', 'Aix-en-Provence')
         );
       });
     });
@@ -417,9 +417,7 @@ describe('matchLocation', () => {
     });
 
     it('is symmetric: Remote ↔ Télétravail', () => {
-      expect(matchLocation('Remote', 'Télétravail')).toBe(
-        matchLocation('Télétravail', 'Remote'),
-      );
+      expect(matchLocation('Remote', 'Télétravail')).toBe(matchLocation('Télétravail', 'Remote'));
     });
 
     it('is symmetric: Lyon ↔ Rhône', () => {

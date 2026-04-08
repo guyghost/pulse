@@ -61,7 +61,7 @@ export const trackParserHealth = async (
   const existing = records.get(connectorId);
 
   const previousCount = existing?.lastMissionCount ?? 0;
-  let consecutiveZeros = missionCount === 0 ? (existing?.consecutiveZeros ?? 0) + 1 : 0;
+  const consecutiveZeros = missionCount === 0 ? (existing?.consecutiveZeros ?? 0) + 1 : 0;
 
   // Detect suspicious pattern: went from >0 to 0
   const isSuspicious = previousCount > 0 && missionCount === 0;
@@ -70,7 +70,7 @@ export const trackParserHealth = async (
   const record: ConnectorHealthRecord = {
     connectorId,
     lastMissionCount: missionCount,
-    lastSuccessAt: missionCount > 0 ? now : existing?.lastSuccessAt ?? null,
+    lastSuccessAt: missionCount > 0 ? now : (existing?.lastSuccessAt ?? null),
     consecutiveZeros,
   };
   records.set(connectorId, record);
@@ -87,7 +87,9 @@ export const trackParserHealth = async (
 
   if (isSuspicious) {
     status.warning = `Parser anomaly: ${connectorId} returned 0 missions after previously returning ${previousCount}`;
-    if (import.meta.env.DEV) console.warn(`[ParserHealth] ${status.warning}`);
+    if (import.meta.env.DEV) {
+      console.warn(`[ParserHealth] ${status.warning}`);
+    }
   }
 
   // Also warn on too many consecutive zeros (might indicate a broken parser)

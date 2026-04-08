@@ -33,8 +33,12 @@ function getStatusIcon(status: HealthCheckResult['status']): string {
  * Format duration for display
  */
 function formatDuration(ms: number): string {
-  if (ms < 1000) return `${ms}ms`;
-  if (ms < 60000) return `${(ms / 1000).toFixed(1)}s`;
+  if (ms < 1000) {
+    return `${ms}ms`;
+  }
+  if (ms < 60000) {
+    return `${(ms / 1000).toFixed(1)}s`;
+  }
   return `${(ms / 60000).toFixed(1)}m`;
 }
 
@@ -121,12 +125,22 @@ export function generateJsonReport(report: HealthCheckReport): string {
  * Get badge color based on pass rate
  */
 function getBadgeColor(passed: number, total: number): BadgeColor {
-  if (total === 0) return 'lightgrey';
+  if (total === 0) {
+    return 'lightgrey';
+  }
   const rate = passed / total;
-  if (rate === 1) return 'brightgreen';
-  if (rate >= 0.8) return 'green';
-  if (rate >= 0.6) return 'yellowgreen';
-  if (rate >= 0.4) return 'yellow';
+  if (rate === 1) {
+    return 'brightgreen';
+  }
+  if (rate >= 0.8) {
+    return 'green';
+  }
+  if (rate >= 0.6) {
+    return 'yellowgreen';
+  }
+  if (rate >= 0.4) {
+    return 'yellow';
+  }
   return 'red';
 }
 

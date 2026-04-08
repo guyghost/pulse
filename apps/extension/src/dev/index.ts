@@ -1,7 +1,9 @@
 export const isDev = import.meta.env.DEV;
 
 export async function bootstrapDevMode(): Promise<void> {
-  if (!isDev) return;
+  if (!isDev) {
+    return;
+  }
 
   // Install Chrome stubs if not in extension context
   if (!globalThis.chrome?.runtime?.id) {

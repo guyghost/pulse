@@ -6,11 +6,7 @@
 /**
  * Télécharge un fichier avec le contenu, nom et type MIME spécifiés
  */
-export function downloadFile(
-  content: string,
-  filename: string,
-  mimeType: string
-): void {
+export function downloadFile(content: string, filename: string, mimeType: string): void {
   // Créer un Blob avec le contenu
   const blob = new Blob([content], { type: mimeType });
 
@@ -35,8 +31,7 @@ export function downloadFile(
  * Télécharge des données JSON
  */
 export function downloadJSON(data: unknown, filename: string): void {
-  const content =
-    typeof data === 'string' ? data : JSON.stringify(data, null, 2);
+  const content = typeof data === 'string' ? data : JSON.stringify(data, null, 2);
   downloadFile(content, filename, 'application/json');
 }
 

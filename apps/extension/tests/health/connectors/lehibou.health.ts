@@ -43,7 +43,7 @@ export async function runLeHibouHealthCheck(screenshotDir: string): Promise<Heal
       };
     }
 
-    if (!response || !response.ok()) {
+    if (!response?.ok()) {
       const screenshotPath = join(screenshotDir, 'lehibou-error.png');
       await page.screenshot({ path: screenshotPath });
 

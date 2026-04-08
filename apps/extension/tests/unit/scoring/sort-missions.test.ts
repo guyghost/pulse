@@ -52,19 +52,13 @@ describe('sortMissions', () => {
   });
 
   it('handles null scores (treated as 0)', () => {
-    const withNulls = [
-      makeMission({ id: 'x', score: null }),
-      makeMission({ id: 'y', score: 50 }),
-    ];
+    const withNulls = [makeMission({ id: 'x', score: null }), makeMission({ id: 'y', score: 50 })];
     const sorted = sortMissions(withNulls, 'score');
     expect(sorted.map((m) => m.id)).toEqual(['y', 'x']);
   });
 
   it('handles null tjm (treated as 0)', () => {
-    const withNulls = [
-      makeMission({ id: 'x', tjm: null }),
-      makeMission({ id: 'y', tjm: 600 }),
-    ];
+    const withNulls = [makeMission({ id: 'x', tjm: null }), makeMission({ id: 'y', tjm: 600 })];
     const sorted = sortMissions(withNulls, 'tjm');
     expect(sorted.map((m) => m.id)).toEqual(['y', 'x']);
   });

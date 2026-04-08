@@ -4,7 +4,7 @@
   import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
   import ConnectorStatusItem from './ConnectorStatus.svelte';
 
-  let {
+  const {
     statuses,
     persistedStatuses = [],
     isScanning = false,
@@ -20,11 +20,11 @@
     return metas.find((m) => m.id === id);
   }
 
-  let scanEntries = $derived(statuses ? [...statuses.entries()] : []);
+  const scanEntries = $derived(statuses ? [...statuses.entries()] : []);
 
-  let errorEntries = $derived(persistedStatuses.filter((p) => p.lastState === 'error'));
+  const errorEntries = $derived(persistedStatuses.filter((p) => p.lastState === 'error'));
 
-  let shouldShow = $derived(isScanning ? scanEntries.length > 0 : errorEntries.length > 0);
+  const shouldShow = $derived(isScanning ? scanEntries.length > 0 : errorEntries.length > 0);
 </script>
 
 {#if shouldShow}

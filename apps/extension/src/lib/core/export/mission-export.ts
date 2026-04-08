@@ -32,10 +32,18 @@ function formatDate(date: Date, format: 'iso' | 'locale' | 'relative', now: Date
     case 'relative': {
       const diffMs = now.getTime() - date.getTime();
       const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
-      if (diffDays === 0) return "Aujourd'hui";
-      if (diffDays === 1) return 'Hier';
-      if (diffDays < 7) return `Il y a ${diffDays} jours`;
-      if (diffDays < 30) return `Il y a ${Math.floor(diffDays / 7)} semaines`;
+      if (diffDays === 0) {
+        return "Aujourd'hui";
+      }
+      if (diffDays === 1) {
+        return 'Hier';
+      }
+      if (diffDays < 7) {
+        return `Il y a ${diffDays} jours`;
+      }
+      if (diffDays < 30) {
+        return `Il y a ${Math.floor(diffDays / 7)} semaines`;
+      }
       return `Il y a ${Math.floor(diffDays / 30)} mois`;
     }
     default:
@@ -81,7 +89,9 @@ export function exportMissionsToJSON(
  * Pure function
  */
 function escapeCSV(value: string | null | undefined): string {
-  if (value === null || value === undefined) return '';
+  if (value === null || value === undefined) {
+    return '';
+  }
   const str = String(value);
   // Si contient des caractères spéciaux, entourer de guillemets et échapper
   if (str.includes(',') || str.includes('"') || str.includes('\n')) {
@@ -153,7 +163,9 @@ export function exportMissionsToMarkdown(
   const includeDescription = options?.includeDescription ?? true;
   const dateFormat = options?.dateFormat ?? 'locale';
 
-  const lines: string[] = [`# ${options?.filterLabel ? options.filterLabel : 'Missions favorites'}\n`];
+  const lines: string[] = [
+    `# ${options?.filterLabel ? options.filterLabel : 'Missions favorites'}\n`,
+  ];
 
   for (const mission of missions) {
     lines.push(`## ${mission.title}\n`);

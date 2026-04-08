@@ -52,13 +52,13 @@ describe('markAsSeen', () => {
     const halfLimit = Math.floor(MAX_SEEN_IDS / 2);
     const existing = Array.from({ length: halfLimit }, (_, i) => `old-${i}`);
     const newIds = Array.from({ length: halfLimit + 10 }, (_, i) => `new-${i}`);
-    
+
     const result = markAsSeen(existing, newIds);
-    
+
     expect(result.length).toBe(MAX_SEEN_IDS);
     // Should drop oldest from existing to make room
-    const oldIdsKept = result.filter(id => id.startsWith('old-'));
-    const newIdsKept = result.filter(id => id.startsWith('new-'));
+    const oldIdsKept = result.filter((id) => id.startsWith('old-'));
+    const newIdsKept = result.filter((id) => id.startsWith('new-'));
     expect(oldIdsKept.length + newIdsKept.length).toBe(MAX_SEEN_IDS);
   });
 
@@ -66,9 +66,9 @@ describe('markAsSeen', () => {
     const existing = Array.from({ length: MAX_SEEN_IDS }, (_, i) => `id-${i}`);
     // All new ids are duplicates
     const newIds = Array.from({ length: 100 }, (_, i) => `id-${i}`);
-    
+
     const result = markAsSeen(existing, newIds);
-    
+
     expect(result.length).toBe(MAX_SEEN_IDS);
     // No items dropped since all were duplicates
     expect(result[0]).toBe('id-0');
@@ -83,7 +83,7 @@ describe('markAsSeen', () => {
     const existing = Array.from({ length: MAX_SEEN_IDS + 100 }, (_, i) => `id-${i}`);
     // Simulate a case where existing already exceeds limit (shouldn't happen in practice but test resilience)
     const result = markAsSeen(existing, ['new-1']);
-    
+
     expect(result.length).toBe(MAX_SEEN_IDS);
     // Newest items should be at the end
     expect(result[result.length - 1]).toBe('new-1');
@@ -95,7 +95,7 @@ describe('markAsSeen', () => {
     for (let i = 0; i < MAX_SEEN_IDS + 50; i++) {
       current = markAsSeen(current, [`id-${i}`]);
     }
-    
+
     expect(current.length).toBe(MAX_SEEN_IDS);
     // Should have the newest MAX_SEEN_IDS
     expect(current).toContain(`id-${MAX_SEEN_IDS + 49}`);

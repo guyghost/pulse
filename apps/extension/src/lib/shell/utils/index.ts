@@ -1,6 +1,6 @@
 /**
  * Shell utilities exports
- * 
+ *
  * Ce module expose les utilitaires côté Shell (I/O, side effects).
  */
 
@@ -12,11 +12,7 @@ export {
   type RateLimitConfig,
 } from './rate-limiter';
 
-export {
-  useDebounce,
-  useDebouncedState,
-  useDebouncedSearch,
-} from './debounce-svelte.svelte';
+export { useDebounce, useDebouncedState, useDebouncedSearch } from './debounce-svelte.svelte';
 
 export {
   registerShortcut,

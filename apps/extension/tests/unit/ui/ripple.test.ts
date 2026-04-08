@@ -4,7 +4,17 @@ import { ripple } from '../../../src/ui/actions/ripple';
 function makeEl(): HTMLElement {
   const el = document.createElement('button');
   el.style.position = 'relative';
-  el.getBoundingClientRect = () => ({ left: 10, top: 10, width: 100, height: 40, right: 110, bottom: 50, x: 10, y: 10, toJSON() {} });
+  el.getBoundingClientRect = () => ({
+    left: 10,
+    top: 10,
+    width: 100,
+    height: 40,
+    right: 110,
+    bottom: 50,
+    x: 10,
+    y: 10,
+    toJSON() {},
+  });
   document.body.appendChild(el);
   return el;
 }

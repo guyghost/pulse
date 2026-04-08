@@ -1,10 +1,9 @@
-<script context="module" lang="ts">
+<script module lang="ts">
   let nextLogoVerticalId = 0;
 </script>
 
 <script lang="ts">
-
-  let {
+  const {
     size = 'md',
     class: className = '',
   }: {
@@ -12,10 +11,12 @@
     class?: string;
   } = $props();
 
-  let dimensions = $derived(
-    size === 'sm' ? { icon: 48, fontSize: 'text-lg', gap: 'gap-2' }
-      : size === 'lg' ? { icon: 80, fontSize: 'text-3xl', gap: 'gap-3' }
-      : { icon: 64, fontSize: 'text-2xl', gap: 'gap-2.5' }
+  const dimensions = $derived(
+    size === 'sm'
+      ? { icon: 48, fontSize: 'text-lg', gap: 'gap-2' }
+      : size === 'lg'
+        ? { icon: 80, fontSize: 'text-3xl', gap: 'gap-3' }
+        : { icon: 64, fontSize: 'text-2xl', gap: 'gap-2.5' }
   );
 
   const gradientIdBase = `logo-vertical-${nextLogoVerticalId++}`;
@@ -23,10 +24,7 @@
   const scanLineGradientId = `${gradientIdBase}-scan-line`;
 </script>
 
-<div
-  class="flex flex-col items-center {dimensions.gap} {className}"
-  data-testid="logo-vertical"
->
+<div class="flex flex-col items-center {dimensions.gap} {className}" data-testid="logo-vertical">
   <div class="relative" style="width: {dimensions.icon}px; height: {dimensions.icon}px;">
     <div
       class="absolute inset-0 rounded-full opacity-40"
@@ -71,12 +69,7 @@
         fill="none"
       />
 
-      <circle
-        cx="32"
-        cy="32"
-        r="6"
-        fill="url(#{centerGlowId})"
-      />
+      <circle cx="32" cy="32" r="6" fill="url(#{centerGlowId})" />
 
       <line
         x1="32"
@@ -97,7 +90,14 @@
           <stop offset="0%" stop-color="#22D3EE" />
           <stop offset="100%" stop-color="#0E7490" />
         </radialGradient>
-        <linearGradient id={scanLineGradientId} x1="32" y1="32" x2="32" y2="6" gradientUnits="userSpaceOnUse">
+        <linearGradient
+          id={scanLineGradientId}
+          x1="32"
+          y1="32"
+          x2="32"
+          y2="6"
+          gradientUnits="userSpaceOnUse"
+        >
           <stop offset="0%" stop-color="#0E7490" stop-opacity="0.3" />
           <stop offset="50%" stop-color="#0E7490" stop-opacity="0.8" />
           <stop offset="100%" stop-color="#22D3EE" />
@@ -110,8 +110,6 @@
     <span class="text-text-secondary text-xs tracking-[0.35em] uppercase font-medium">
       Mission
     </span>
-    <span class="{dimensions.fontSize} font-bold tracking-wide gradient-text">
-      PULSE
-    </span>
+    <span class="{dimensions.fontSize} font-bold tracking-wide gradient-text"> PULSE </span>
   </div>
 </div>
