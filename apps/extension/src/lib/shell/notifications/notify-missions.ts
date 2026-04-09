@@ -130,7 +130,7 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
   try {
     await chrome.notifications.create('high-score-missions', {
       type: 'basic',
-      iconUrl: 'static/icons/icon-128.svg',
+      iconUrl: 'static/icons/icon-128.png',
       title,
       message,
       priority: 2,

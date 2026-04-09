@@ -4,6 +4,7 @@ import type { ApplicationStatus } from '../../core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '../../core/types/generation';
 import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorState } from '../../core/types/connector-status';
+import type { AuthStatus, AuthUser } from '../../core/types/auth';
 import type { AppError } from '../../core/errors/app-error';
 import type { ToastType } from '../../state/toast.svelte';
 
@@ -54,7 +55,13 @@ export type BridgeMessage =
   | { type: 'SHOW_TOAST'; payload: { message: string; toastType: ToastType; duration?: number } }
   | { type: 'TOAST_SHOWN' }
   // Profile
-  | { type: 'PROFILE_UPDATED' };
+  | { type: 'PROFILE_UPDATED' }
+  // Auth
+  | { type: 'AUTH_LOGIN'; payload: { email: string; password: string } }
+  | { type: 'AUTH_SIGNUP'; payload: { email: string; password: string } }
+  | { type: 'AUTH_LOGOUT' }
+  | { type: 'AUTH_STATUS' }
+  | { type: 'AUTH_RESULT'; payload: { status: AuthStatus; user: AuthUser | null; error?: string } };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

@@ -1,4 +1,4 @@
-import { getProfile, saveProfile, saveConnectorStatuses } from '../lib/shell/storage/db';
+import { getProfile, saveProfile, saveConnectorStatuses, getMissionById } from '../lib/shell/storage/db';
 import type {
   BridgeMessage,
   ScanProgressPayload,
@@ -6,6 +6,7 @@ import type {
 } from '../lib/shell/messaging/bridge';
 import type { UserProfile } from '../lib/core/types/profile';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
+import type { AuthUser } from '../lib/core/types/auth';
 import { getSettings } from '../lib/shell/storage/chrome-storage';
 import {
   runScan,
@@ -22,6 +23,23 @@ import {
   setupNotificationClickHandler,
 } from '../lib/shell/notifications/notify-missions';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
+import {
+  getTracking,
+  saveTracking,
+  getAllTrackings,
+  getTrackingsByStatus,
+} from '../lib/shell/storage/tracking';
+import { createTracking, transitionStatus, addGeneratedAsset } from '../lib/core/tracking/transitions';
+import { generateAsset } from '../lib/shell/ai/mission-generator';
+import {
+  saveGeneratedAsset,
+  getGeneratedAssetsForMission,
+} from '../lib/shell/storage/generated-assets';
+import { getSupabaseClient } from '../lib/shell/auth/supabase-client';
+import { saveAuthUser, loadAuthUser, clearAuthUser } from '../lib/shell/auth/auth-storage';
+import { isPremiumActive } from '../lib/core/types/auth';
+import type { GeneratedAsset } from '../lib/core/types/generation';
+import { generatePremium } from '../lib/shell/auth/premium-api';
 
 if (import.meta.env.DEV) {
   console.log('[MissionPulse] Service worker started');
@@ -302,6 +320,337 @@ chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendRespo
   if (message.type === 'SCAN_CANCEL') {
     cancelCurrentScan();
     sendResponse({ type: 'SCAN_CANCEL' });
+    return false;
+  }
+
+  // ── Tracking handlers ──
+
+  if (message.type === 'UPDATE_TRACKING') {
+    const { missionId, status, note } = message.payload;
+    const now = Date.now();
+
+    (async () => {
+      try {
+        let tracking = await getTracking(missionId);
+        if (!tracking) {
+          tracking = createTracking(missionId, now);
+        }
+
+        const updated = transitionStatus(tracking, status, now, note ?? null);
+        if (!updated) {
+          sendResponse({
+            type: 'TRACKING_UPDATED',
+            payload: tracking,
+          });
+          return;
+        }
+
+        await saveTracking(updated);
+        sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+      } catch (err) {
+        console.error('[MissionPulse] UPDATE_TRACKING error:', err);
+        sendResponse({
+          type: 'TRACKING_UPDATED',
+          payload: {
+            missionId,
+            currentStatus: status,
+            history: [],
+            generatedAssetIds: [],
+            userRating: null,
+            notes: '',
+          },
+        });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === 'GET_TRACKINGS') {
+    const { status } = message.payload ?? {};
+    const query = status
+      ? getTrackingsByStatus(status)
+      : getAllTrackings();
+
+    query
+      .then((trackings) => {
+        sendResponse({ type: 'TRACKINGS_RESULT', payload: trackings });
+      })
+      .catch((err) => {
+        console.error('[MissionPulse] GET_TRACKINGS error:', err);
+        sendResponse({ type: 'TRACKINGS_RESULT', payload: [] });
+      });
+    return true;
+  }
+
+  // ── Generation handlers ──
+
+  if (message.type === 'GENERATE_ASSET') {
+    const { missionId, generationType } = message.payload;
+
+    (async () => {
+      try {
+        const mission = await getMissionById(missionId);
+        if (!mission) {
+          sendResponse({ type: 'GENERATION_RESULT', payload: null });
+          return;
+        }
+
+        const profile = await getProfile();
+        if (!profile) {
+          sendResponse({ type: 'GENERATION_RESULT', payload: null });
+          return;
+        }
+
+        let asset: GeneratedAsset | null = null;
+
+        // Try premium backend first if user is premium
+        const authUser = await loadAuthUser();
+        if (authUser && isPremiumActive(authUser, Date.now())) {
+          try {
+            asset = await generatePremium(missionId, generationType, mission, profile);
+          } catch (err) {
+            if (import.meta.env.DEV) {
+              console.warn('[MissionPulse] Premium generation failed, falling back to Gemini Nano:', err);
+            }
+          }
+        }
+
+        // Fall back to Gemini Nano (free, local)
+        if (!asset) {
+          asset = await generateAsset(missionId, generationType, mission, profile);
+        }
+
+        if (!asset) {
+          sendResponse({ type: 'GENERATION_RESULT', payload: null });
+          return;
+        }
+
+        // Persist the generated asset
+        await saveGeneratedAsset(asset);
+
+        // Update tracking to reference the new asset
+        let tracking = await getTracking(missionId);
+        if (!tracking) {
+          tracking = createTracking(missionId, Date.now());
+        }
+        const updatedTracking = addGeneratedAsset(tracking, asset.id);
+        await saveTracking(updatedTracking);
+
+        sendResponse({ type: 'GENERATION_RESULT', payload: asset });
+      } catch (err) {
+        console.error('[MissionPulse] GENERATE_ASSET error:', err);
+        sendResponse({ type: 'GENERATION_RESULT', payload: null });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === 'GET_GENERATED_ASSETS') {
+    const { missionId } = message.payload;
+
+    getGeneratedAssetsForMission(missionId)
+      .then((assets) => {
+        sendResponse({ type: 'GENERATED_ASSETS_RESULT', payload: assets });
+      })
+      .catch((err) => {
+        console.error('[MissionPulse] GET_GENERATED_ASSETS error:', err);
+        sendResponse({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+      });
+    return true;
+  }
+
+  // ── Auth handlers ──
+
+  if (message.type === 'AUTH_LOGIN') {
+    const { email, password } = message.payload;
+    const supabase = getSupabaseClient();
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+        if (error || !data.user) {
+          sendResponse({
+            type: 'AUTH_RESULT',
+            payload: { status: 'unauthenticated', user: null, error: error?.message ?? 'Login failed' },
+          });
+          return;
+        }
+
+        // Query profiles table for premium status
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('subscription_status, subscription_period_end')
+          .eq('id', data.user.id)
+          .single();
+
+        const now = Date.now();
+        let premiumStatus: AuthUser['premiumStatus'] = 'free';
+        let premiumExpiresAt: number | null = null;
+
+        if (profile?.subscription_status === 'premium') {
+          const expiresAt = profile.subscription_period_end
+            ? new Date(profile.subscription_period_end).getTime()
+            : null;
+          if (expiresAt && expiresAt > now) {
+            premiumStatus = 'premium';
+            premiumExpiresAt = expiresAt;
+          } else if (expiresAt && expiresAt <= now) {
+            premiumStatus = 'expired';
+            premiumExpiresAt = expiresAt;
+          } else {
+            // No expiry set but marked premium — treat as active
+            premiumStatus = 'premium';
+          }
+        }
+
+        const authUser: AuthUser = {
+          id: data.user.id,
+          email: data.user.email ?? email,
+          premiumStatus,
+          premiumExpiresAt,
+        };
+
+        await saveAuthUser(authUser);
+        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'authenticated', user: authUser } });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Login failed';
+        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null, error: msg } });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === 'AUTH_SIGNUP') {
+    const { email, password } = message.payload;
+    const supabase = getSupabaseClient();
+
+    (async () => {
+      try {
+        const { data, error } = await supabase.auth.signUp({ email, password });
+        if (error || !data.user) {
+          sendResponse({
+            type: 'AUTH_RESULT',
+            payload: { status: 'unauthenticated', user: null, error: error?.message ?? 'Signup failed' },
+          });
+          return;
+        }
+
+        // New users start as free — the trigger creates the profile row
+        const authUser: AuthUser = {
+          id: data.user.id,
+          email: data.user.email ?? email,
+          premiumStatus: 'free',
+          premiumExpiresAt: null,
+        };
+
+        await saveAuthUser(authUser);
+        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'authenticated', user: authUser } });
+      } catch (err) {
+        const msg = err instanceof Error ? err.message : 'Signup failed';
+        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null, error: msg } });
+      }
+    })();
+    return true;
+  }
+
+  if (message.type === 'AUTH_LOGOUT') {
+    const supabase = getSupabaseClient();
+
+    (async () => {
+      try {
+        await supabase.auth.signOut();
+      } catch {
+        // Session may already be gone — ignore
+      }
+      await clearAuthUser();
+      sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null } });
+    })();
+    return true;
+  }
+
+  if (message.type === 'AUTH_STATUS') {
+    const supabase = getSupabaseClient();
+
+    (async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+
+        if (!session?.user) {
+          // No active session — try cached user
+          const cached = await loadAuthUser();
+          if (cached) {
+            sendResponse({ type: 'AUTH_RESULT', payload: { status: 'authenticated', user: cached } });
+          } else {
+            sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null } });
+          }
+          return;
+        }
+
+        // Active session — refresh premium status from profiles table
+        const { data: profile } = await supabase
+          .from('profiles')
+          .select('subscription_status, subscription_period_end')
+          .eq('id', session.user.id)
+          .single();
+
+        const now = Date.now();
+        let premiumStatus: AuthUser['premiumStatus'] = 'free';
+        let premiumExpiresAt: number | null = null;
+
+        if (profile?.subscription_status === 'premium') {
+          const expiresAt = profile.subscription_period_end
+            ? new Date(profile.subscription_period_end).getTime()
+            : null;
+          if (expiresAt && expiresAt > now) {
+            premiumStatus = 'premium';
+            premiumExpiresAt = expiresAt;
+          } else if (expiresAt && expiresAt <= now) {
+            premiumStatus = 'expired';
+            premiumExpiresAt = expiresAt;
+          } else {
+            premiumStatus = 'premium';
+          }
+        }
+
+        const authUser: AuthUser = {
+          id: session.user.id,
+          email: session.user.email ?? '',
+          premiumStatus,
+          premiumExpiresAt,
+        };
+
+        await saveAuthUser(authUser);
+        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'authenticated', user: authUser } });
+      } catch {
+        // On any error, fall back to cache
+        const cached = await loadAuthUser();
+        sendResponse({
+          type: 'AUTH_RESULT',
+          payload: cached
+            ? { status: 'authenticated', user: cached }
+            : { status: 'unknown', user: null },
+        });
+      }
+    })();
+    return true;
+  }
+
+  // ── Toast handler (forward to side panel) ──
+
+  if (message.type === 'SHOW_TOAST') {
+    chrome.runtime.sendMessage(message).catch(() => {
+      // Side panel not open, ignore
+    });
+    sendResponse({ type: 'TOAST_SHOWN' });
+    return false;
+  }
+
+  // ── Profile broadcast ──
+
+  if (message.type === 'PROFILE_UPDATED') {
+    chrome.runtime.sendMessage(message).catch(() => {
+      // No listeners, ignore
+    });
     return false;
   }
 });

@@ -3,10 +3,12 @@
   import Button from '../atoms/Button.svelte';
   import Icon from '../atoms/Icon.svelte';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
+  import AccountSection from '../organisms/AccountSection.svelte';
   import ProfileSection from '../organisms/ProfileSection.svelte';
   import ScanSettings from '../organisms/ScanSettings.svelte';
   import DangerZone from '../organisms/DangerZone.svelte';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
+  import { createAuthStore } from '$lib/state/auth.svelte';
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast } from '$lib/shell/notifications/toast-service';
 
@@ -21,7 +23,10 @@
     },
   });
 
+  const auth = createAuthStore();
+
   settings.load();
+  auth.checkStatus();
 
   async function handleExportFavorites(format: ExportFormat) {
     const result = await settings.exportFavorites(format);
@@ -64,6 +69,35 @@
 
 {#snippet settingsContent()}
   <div class="space-y-6">
+    <!-- Compte -->
+    <AccountSection
+      isAuthenticated={auth.isAuthenticated}
+      email={auth.user?.email ?? null}
+      premiumStatus={auth.premiumStatus}
+      premiumExpiresAt={auth.user?.premiumExpiresAt ?? null}
+      isLoading={auth.storeState === 'loading'}
+      error={auth.error}
+      onLogin={async (email, password) => {
+        const result = await auth.login(email, password);
+        if (!result.success && result.error) {
+          await showToast(result.error, 'error');
+        }
+      }}
+      onSignup={async (email, password) => {
+        const result = await auth.signup(email, password);
+        if (result.success) {
+          await showToast('Compte créé avec succès', 'success');
+        }
+      }}
+      onLogout={async () => {
+        await auth.logout();
+        await showToast('Déconnecté', 'success');
+      }}
+      onOpenDashboard={() => {
+        window.open('https://missionpulse.app/dashboard', '_blank');
+      }}
+    />
+
     <!-- Profil -->
     <ProfileSection
       bind:firstName={settings.firstName}

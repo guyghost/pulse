@@ -18,7 +18,8 @@
     "https://hiway-missions.fr/*",
     "https://jhgjtlkfewuiiofxfrvh.supabase.co/*",
     "https://*.collective.work/*",
-    "https://app.cherry-pick.io/*"
+    "https://app.cherry-pick.io/*",
+    "https://missionpulse.app/*"
   ],
   "background": {
     "service_worker": "src/background/index.ts",

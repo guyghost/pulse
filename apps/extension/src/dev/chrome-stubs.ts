@@ -42,6 +42,65 @@ function createChromeStubs() {
                 missionsFound: 0,
               },
             };
+          case 'GET_TRACKINGS':
+            return { type: 'TRACKINGS_RESULT', payload: [] };
+          case 'UPDATE_TRACKING': {
+            const p = message.payload as Record<string, unknown> | undefined;
+            return {
+              type: 'TRACKING_UPDATED',
+              payload: {
+                missionId: p?.missionId,
+                currentStatus: p?.status,
+                history: [],
+                generatedAssetIds: [],
+                userRating: null,
+                notes: '',
+              },
+            };
+          }
+          case 'GENERATE_ASSET':
+            // In dev mode, no AI backend available (neither Gemini Nano nor premium GLM)
+            console.log('[Chrome Stub] GENERATE_ASSET (no AI in dev mode):', message.payload);
+            return { type: 'GENERATION_RESULT', payload: null };
+          case 'GET_GENERATED_ASSETS':
+            return { type: 'GENERATED_ASSETS_RESULT', payload: [] };
+          case 'SHOW_TOAST':
+            console.log('[Chrome Stub] Toast:', message.payload);
+            return { type: 'TOAST_SHOWN' };
+          case 'PROFILE_UPDATED':
+            console.log('[Chrome Stub] Profile updated notification');
+            return null;
+          case 'AUTH_LOGIN':
+            console.log('[Chrome Stub] Auth login stub:', (message.payload as Record<string, unknown>)?.email);
+            return {
+              type: 'AUTH_RESULT',
+              payload: {
+                status: 'unauthenticated',
+                user: null,
+                error: 'Auth not available in dev mode',
+              },
+            };
+          case 'AUTH_SIGNUP':
+            console.log('[Chrome Stub] Auth signup stub:', (message.payload as Record<string, unknown>)?.email);
+            return {
+              type: 'AUTH_RESULT',
+              payload: {
+                status: 'unauthenticated',
+                user: null,
+                error: 'Auth not available in dev mode',
+              },
+            };
+          case 'AUTH_LOGOUT':
+            console.log('[Chrome Stub] Auth logout stub');
+            return {
+              type: 'AUTH_RESULT',
+              payload: { status: 'unauthenticated', user: null },
+            };
+          case 'AUTH_STATUS':
+            return {
+              type: 'AUTH_RESULT',
+              payload: { status: 'unauthenticated', user: null },
+            };
           default:
             console.log('[Chrome Stub] Unhandled message type:', message.type);
             return null;

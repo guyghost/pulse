@@ -27,9 +27,9 @@ export interface PaginatedQueryOptions {
 }
 
 const DB_NAME = 'missionpulse';
-const DB_VERSION = 2;
+const DB_VERSION = 3;
 
-function openDB(): Promise<IDBDatabase> {
+export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -46,6 +46,10 @@ function openDB(): Promise<IDBDatabase> {
       if (oldVersion < 2) {
         db.createObjectStore('connector_status', { keyPath: 'connectorId' });
       }
+      if (oldVersion < 3) {
+        const genStore = db.createObjectStore('generated_assets', { keyPath: 'id' });
+        genStore.createIndex('missionId', 'missionId', { unique: false });
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -54,7 +58,7 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 // Generic helper for store operations
-function withStore<T>(
+export function withStore<T>(
   storeName: string,
   mode: IDBTransactionMode,
   fn: (store: IDBObjectStore) => IDBRequest
@@ -315,6 +319,16 @@ export async function upsertMissions(newMissions: Mission[]): Promise<number> {
 
     tx.onerror = () => reject(tx.error);
   });
+}
+
+/**
+ * Get a single mission by ID.
+ * Returns null if not found or if the stored data is invalid.
+ */
+export async function getMissionById(id: string): Promise<Mission | null> {
+  const raw = await withStore<unknown>('missions', 'readonly', (store) => store.get(id));
+  if (!raw) return null;
+  return parseMission(raw) ?? null;
 }
 
 export function clearMissions(): Promise<void> {

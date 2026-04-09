@@ -9,3 +9,5 @@ export type {
 export type { AppSettings } from './app-settings';
 export type { PersistedConnectorStatus } from './connector-status';
 export type { TJMRecord, TJMStats, TJMRange, TJMTrend, TJMStackInsight } from './tjm';
+export type { AuthStatus, PremiumStatus, AuthUser, AuthState } from './auth';
+export { isPremiumActive } from './auth';
