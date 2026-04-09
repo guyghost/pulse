@@ -8,7 +8,6 @@ import { type Result, type AppError, ok, err, createConnectorError } from '$lib/
 const BASE_URL = 'https://www.free-work.com';
 const API_BASE = `${BASE_URL}/api/job_postings`;
 const ITEMS_PER_PAGE = 50;
-const MAX_PAGES = 5;
 
 /**
  * Validates that the API response has the expected Hydra/JSON-LD shape.
@@ -57,7 +56,7 @@ export class FreeWorkConnector extends BaseConnector {
     try {
       const allMissions: Mission[] = [];
 
-      for (let page = 1; page <= MAX_PAGES; page++) {
+      for (let page = 1; ; page++) {
         if (page > 1) {
           await delayBetweenPages(this.id, page);
         }
@@ -66,6 +65,13 @@ export class FreeWorkConnector extends BaseConnector {
         url.searchParams.set('page', String(page));
         url.searchParams.set('itemsPerPage', String(ITEMS_PER_PAGE));
         url.searchParams.set('contracts', 'contractor');
+
+        // TJM filter: use minDailySalary to exclude missions below the user's range
+        // The FreeWork API interprets minDailySalary as a range-overlap filter,
+        // returning missions whose TJM range overlaps with the requested value.
+        if (context?.tjmMin && context.tjmMin > 0) {
+          url.searchParams.set('minDailySalary', String(context.tjmMin));
+        }
 
         if (context?.query) {
           url.searchParams.set('q', context.query);

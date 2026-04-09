@@ -15,6 +15,10 @@ export interface ConnectorSearchContext {
   location: string | null;
   /** Remote preference */
   remote: RemoteType | 'any' | null;
+  /** Minimum desired daily rate (TJM) */
+  tjmMin: number | null;
+  /** Maximum desired daily rate (TJM) */
+  tjmMax: number | null;
   /** Last sync timestamp for incremental scanning (only fetch missions newer than this) */
   lastSync: Date | null;
 }
@@ -51,6 +55,8 @@ export const buildSearchContext = (
     skills: [], // Skills handled by local scoring, not server-side filtering
     location: profile.location || null,
     remote: profile.remote || null,
+    tjmMin: profile.tjmMin > 0 ? profile.tjmMin : null,
+    tjmMax: profile.tjmMax > 0 ? profile.tjmMax : null,
     lastSync,
   };
 };

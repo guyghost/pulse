@@ -80,6 +80,7 @@ export function generateMockMissions(count: number): Mission[] {
     score: Math.floor(Math.random() * 100),
     semanticScore: null,
     semanticReason: null,
+    publishedAt: new Date(now.getTime() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000).toISOString(),
   }));
 }
 

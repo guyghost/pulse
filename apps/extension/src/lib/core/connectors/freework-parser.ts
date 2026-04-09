@@ -134,6 +134,7 @@ export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[
           source: SOURCE,
           scrapedAt: now,
           seniority: mapExperienceLevel(p.experienceLevel),
+          publishedAt: p.publishedAt ?? null,
         })
     );
 }

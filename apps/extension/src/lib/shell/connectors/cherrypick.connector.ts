@@ -11,7 +11,7 @@ import { type Result, type AppError, ok, err, createConnectorError } from '$lib/
 const BASE_URL = 'https://app.cherry-pick.io';
 const SEARCH_URL = `${BASE_URL}/api/mission/search`;
 const COOKIE_DOMAIN = '.cherry-pick.io';
-const MAX_PAGES = 5;
+
 
 export class CherryPickConnector extends BaseConnector {
   readonly id = 'cherry-pick';
@@ -54,19 +54,30 @@ export class CherryPickConnector extends BaseConnector {
     try {
       const allMissions: Mission[] = [];
 
-      for (let page = 1; page <= MAX_PAGES; page++) {
+      for (let page = 1; ; page++) {
         // Délai entre les pages (sauf première)
         if (page > 1) {
           await delayBetweenPages(this.id, page);
         }
 
         // Build request body with search context
-        const body: Record<string, unknown> = { page };
+        const body: Record<string, unknown> = {
+          page,
+          // Only fetch freelance/contractor missions (short-term), exclude CDI
+          mission_type: 'short',
+          // Only fetch published missions — exclude unpublished/closed/archived
+          status: 'published',
+        };
         if (context?.query) {
           body.search = context.query;
         }
         if (context?.skills?.length) {
           body.skills = context.skills;
+        }
+
+        // TJM filter: exclude missions below the user's minimum rate
+        if (context?.tjmMin && context.tjmMin > 0) {
+          body.minimum_rate = context.tjmMin;
         }
 
         // Paramètre de pagination : { page: N } est le pattern le plus courant

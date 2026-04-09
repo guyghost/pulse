@@ -11,7 +11,6 @@ const COOKIE_DOMAIN = '.lehibou.com';
 const COOKIE_RULE_ID = 10;
 const URL_FILTER = 'api.lehibou.com';
 const ITEMS_PER_PAGE = 50;
-const MAX_PAGES = 5;
 
 interface LeHibouMission {
   id: string;
@@ -92,7 +91,7 @@ export class LeHibouConnector extends BaseConnector {
       await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
       const allMissions: Mission[] = [];
 
-      for (let page = 1; page <= MAX_PAGES; page++) {
+      for (let page = 1; ; page++) {
         const url = `${MISSIONS_URL}?limit=${ITEMS_PER_PAGE}&page=${page}`;
 
         // Build search body with context
@@ -102,6 +101,11 @@ export class LeHibouConnector extends BaseConnector {
         }
         if (context?.skills?.length) {
           body.skills = context.skills;
+        }
+
+        // TJM filter: exclude missions below the user's minimum rate
+        if (context?.tjmMin && context.tjmMin > 0) {
+          body.tjmMin = context.tjmMin;
         }
 
         const response = await fetch(url, {
@@ -144,6 +148,7 @@ export class LeHibouConnector extends BaseConnector {
               url: `https://www.lehibou.com/annonce/${m.id}`,
               source: 'lehibou' as const,
               scrapedAt: new Date(now),
+              publishedAt: m.createdAt ?? null,
             })
           );
         }

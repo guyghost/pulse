@@ -110,10 +110,8 @@ export const MissionSerializedSchema = z.object({
   score: z.number().nullable(),
   semanticScore: z.number().nullable(),
   semanticReason: z.string().nullable(),
+  publishedAt: z.string().nullable(),
 });
-
-// ============================================
-// Profile
 // ============================================
 
 export const UserProfileSchema = z

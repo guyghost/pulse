@@ -8,6 +8,7 @@ import { getSettings } from '../storage/chrome-storage';
 import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
 import { deduplicateMissions } from '../../core/scoring/dedup';
 import { filterSalariedMissions } from '../../core/scoring/contract-filter';
+import { filterStaleMissions } from '../../core/scoring/mission-freshness';
 import { scoreMission } from '../../core/scoring/relevance';
 import { computeFinalBreakdown, buildScoreBreakdown } from '../../core/scoring/final-score';
 import { setScanState } from '../storage/session-storage';
@@ -362,12 +363,15 @@ async function _runScanInternal(
 
   // Filter out salaried positions (CDD/CDI) — safety net after connector filters
   const freelanceOnly = filterSalariedMissions(deduped);
+
+  // Filter out stale missions (too old — likely filled or cancelled)
+  const freshOnly = filterStaleMissions(freelanceOnly, new Date());
   emitDetailed('post-processing', 1, 3);
 
   // Score against profile (already loaded above for connector filtering)
   // Now returns structured breakdown
   const scored = profile
-    ? freelanceOnly.map((m) => {
+    ? freshOnly.map((m) => {
         const result = scoreMission(m, profile, new Date());
         return {
           ...m,
@@ -375,7 +379,7 @@ async function _runScanInternal(
           score: result.total,
         };
       })
-    : freelanceOnly;
+    : freshOnly;
 
   // Semantic scoring (async enrichment, non-blocking)
   if (profile && !signal?.aborted) {

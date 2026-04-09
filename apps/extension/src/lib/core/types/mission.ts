@@ -17,6 +17,8 @@ export interface Mission {
   duration: string | null;
   /** Mission start date (ISO 8601 date string, e.g. "2026-04-01") */
   startDate: string | null;
+  /** Date the mission was published on the source platform (ISO 8601) */
+  publishedAt: string | null;
   url: string;
   source: MissionSource;
   scrapedAt: Date;

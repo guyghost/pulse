@@ -63,11 +63,9 @@ export class HiwayConnector extends BaseConnector {
 
     try {
       // Build Supabase REST API URL with query params
-      // Select all columns, order by created_at descending, limit to 100
       const endpoint = new URL(`/rest/v1/${SUPABASE_TABLE}`, SUPABASE_URL);
       endpoint.searchParams.set('select', '*');
       endpoint.searchParams.set('order', 'created_at.desc');
-      endpoint.searchParams.set('limit', '100');
 
       // Add search context filters
       if (context?.query) {
@@ -108,7 +106,13 @@ export class HiwayConnector extends BaseConnector {
       const rows = Array.isArray(result.value) ? result.value : [];
       const missions = parseHiwayJSON(rows, new Date(now), BASE_URL);
 
-      return ok(missions);
+      // Client-side TJM filter: Supabase budget column is text (e.g. "TJM 550€", "Selon profil"),
+      // so server-side filtering is unreliable. Filter here after numeric parsing.
+      const filtered = context?.tjmMin && context.tjmMin > 0
+        ? missions.filter((m) => m.tjm === null || m.tjm >= context.tjmMin!)
+        : missions;
+
+      return ok(filtered);
     } catch (e) {
       const message = e instanceof Error ? e.message : String(e);
       return err(

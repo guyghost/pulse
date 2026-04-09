@@ -43,6 +43,7 @@ const makeValidMission = (overrides: Partial<Mission> = {}): Mission => ({
   score: 75,
   semanticScore: 80,
   semanticReason: 'Good match',
+  publishedAt: '2026-01-01T00:00:00.000Z',
   ...overrides,
 });
 
