@@ -8,6 +8,8 @@ import { type Result, type AppError, ok, err, createConnectorError } from '$lib/
 const BASE_URL = 'https://www.free-work.com';
 const API_BASE = `${BASE_URL}/api/job_postings`;
 const ITEMS_PER_PAGE = 50;
+/** Max age in days — stop paginating when missions are older than this */
+const MAX_AGE_DAYS = 30;
 
 /**
  * Validates that the API response has the expected Hydra/JSON-LD shape.
@@ -73,15 +75,9 @@ export class FreeWorkConnector extends BaseConnector {
           url.searchParams.set('minDailySalary', String(context.tjmMin));
         }
 
-        if (context?.query) {
-          url.searchParams.set('q', context.query);
-        }
-
-        if (context?.skills.length) {
-          for (const skill of context.skills) {
-            url.searchParams.append('properties[]', skill);
-          }
-        }
+        // Note: FreeWork API ignores q, properties[], and createdAt filters server-side.
+        // Only `contracts` and `minDailySalary` actually work.
+        // Results are ordered by publishedAt DESC, so we stop early when missions get too old.
 
         const result = await this.fetchJSON(url.toString(), now, {
           headers: {
@@ -147,6 +143,30 @@ export class FreeWorkConnector extends BaseConnector {
         if (missions.length === 0) {
           break;
         }
+
+        // Early termination: FreeWork results are ordered by publishedAt DESC.
+        // If the last mission on this page is older than MAX_AGE_DAYS, stop paginating.
+        const lastMission = missions[missions.length - 1];
+        if (lastMission.publishedAt) {
+          const publishedDate = new Date(lastMission.publishedAt);
+          const ageMs = now - publishedDate.getTime();
+          const maxAgeMs = MAX_AGE_DAYS * 24 * 60 * 60 * 1000;
+          if (ageMs > maxAgeMs) {
+            // Keep only fresh missions from this page (some may still be within range)
+            const freshOnPage = missions.filter((m) => {
+              if (!m.publishedAt) return true;
+              return (now - new Date(m.publishedAt).getTime()) <= maxAgeMs;
+            });
+            allMissions.push(...freshOnPage);
+            if (import.meta.env.DEV) {
+              console.log(
+                `[FreeWork] Stopping at page ${page}: last mission older than ${MAX_AGE_DAYS} days. Kept ${freshOnPage.length}/${missions.length} from this page.`
+              );
+            }
+            break;
+          }
+        }
+
         allMissions.push(...missions);
       }
 
