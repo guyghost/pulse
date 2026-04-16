@@ -172,7 +172,7 @@
     </div>
   {:else}
     <!-- Not logged in state -->
-    <div class="space-y-3" role="form" onkeydown={handleKeydown}>
+    <form class="space-y-3" onsubmit={(e) => { e.preventDefault(); handleLogin(); }}>
       <div class="space-y-2">
         <!-- Email input -->
         <div class="relative">
@@ -233,6 +233,6 @@
           {/snippet}
         </Button>
       </div>
-    </div>
+    </form>
   {/if}
 </div>

@@ -7,6 +7,7 @@
 
 import type { AuthStatus, AuthUser, PremiumStatus } from '$lib/core/types/auth';
 import { isPremiumActive } from '$lib/core/types/auth';
+import { sendMessage } from '$lib/shell/messaging/bridge';
 
 export type AuthStoreState = 'idle' | 'loading' | 'ready' | 'error';
 
@@ -30,7 +31,6 @@ export function createAuthStore() {
     error = null;
 
     try {
-      const { sendMessage } = await import('$lib/shell/messaging/bridge');
       const response = await sendMessage({ type: 'AUTH_STATUS' });
 
       if (response.type === 'AUTH_RESULT') {
@@ -57,7 +57,6 @@ export function createAuthStore() {
     error = null;
 
     try {
-      const { sendMessage } = await import('$lib/shell/messaging/bridge');
       const response = await sendMessage({
         type: 'AUTH_LOGIN',
         payload: { email, password },
@@ -92,7 +91,6 @@ export function createAuthStore() {
     error = null;
 
     try {
-      const { sendMessage } = await import('$lib/shell/messaging/bridge');
       const response = await sendMessage({
         type: 'AUTH_SIGNUP',
         payload: { email, password },
@@ -124,7 +122,6 @@ export function createAuthStore() {
    */
   async function logout(): Promise<void> {
     try {
-      const { sendMessage } = await import('$lib/shell/messaging/bridge');
       await sendMessage({ type: 'AUTH_LOGOUT' });
     } catch {
       // Ignore errors on logout
