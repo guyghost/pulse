@@ -16,6 +16,7 @@
     onRefresh,
     onFilterBySource,
     onToggleConnector,
+    healthSnapshots,
   }: {
     sources: SourceStatus[];
     isChecking?: boolean;

@@ -454,8 +454,13 @@ export function createFeedController(feedStore: {
     smartLoad();
   }
 
-  // Run initialization
-  init();
+  // Run initialization — surface errors instead of swallowing them.
+  // Unhandled rejections here are invisible to svelte:boundary and lead to
+  // silent feed failures (isScanning never resets, missions never load).
+  init().catch((err) => {
+    console.error('[FeedController] init failed:', err);
+    feedStore.setError(err instanceof Error ? err.message : 'Initialisation du feed échouée');
+  });
 
   // ============================================================
   // Cleanup
