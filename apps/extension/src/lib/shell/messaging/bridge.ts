@@ -4,6 +4,7 @@ import type { ApplicationStatus } from '../../core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '../../core/types/generation';
 import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorState } from '../../core/types/connector-status';
+import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { AuthStatus, AuthUser } from '../../core/types/auth';
 import type { AppError } from '../../core/errors/app-error';
 import type { ToastType } from '../../state/toast.svelte';
@@ -28,6 +29,15 @@ export interface ScanProgressPayload {
   current: number;
   total: number;
   connectorProgress: ConnectorProgress[];
+}
+
+/**
+ * Payload du message CONNECTOR_HEALTH_UPDATED
+ */
+export interface ConnectorHealthPayload {
+  snapshot: ConnectorHealthSnapshot;
+  /** true si le circuit vient de changer d'état dans ce cycle */
+  stateChanged: boolean;
 }
 
 export type BridgeMessage =
@@ -61,7 +71,10 @@ export type BridgeMessage =
   | { type: 'AUTH_SIGNUP'; payload: { email: string; password: string } }
   | { type: 'AUTH_LOGOUT' }
   | { type: 'AUTH_STATUS' }
-  | { type: 'AUTH_RESULT'; payload: { status: AuthStatus; user: AuthUser | null; error?: string } };
+  | { type: 'AUTH_RESULT'; payload: { status: AuthStatus; user: AuthUser | null; error?: string } }
+  // Connector health (service worker → side panel)
+  | { type: 'CONNECTOR_HEALTH_UPDATED'; payload: ConnectorHealthPayload }
+  | { type: 'CONNECTOR_SKIPPED'; payload: { connectorId: string; connectorName: string; reason: 'circuit-open' } };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

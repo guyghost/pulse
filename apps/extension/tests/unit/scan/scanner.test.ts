@@ -52,6 +52,51 @@ vi.mock('../../../src/lib/shell/utils/retry-strategy', () => ({
   withResultRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
+// Mock CircuitBreakerRunner — simule un circuit fermé qui passe directement au connecteur
+vi.mock('../../../src/lib/shell/health/circuit-breaker-runner', () => ({
+  runWithCircuitBreaker: vi.fn(async (
+    connector: { fetchMissions: (n: number, c: unknown, s: unknown) => Promise<unknown> },
+    now: number,
+    context: unknown,
+    signal: unknown,
+  ) => {
+    const result = await connector.fetchMissions(now, context, signal);
+    return {
+      status: 'executed',
+      result,
+      snapshot: {
+        connectorId: connector.id ?? 'test',
+        circuitState: 'closed',
+        consecutiveFailures: 0,
+        totalFailures: 0,
+        totalSuccesses: 1,
+        lastSuccessAt: now,
+        lastFailureAt: null,
+        lastStateChangeAt: now,
+        recentLatenciesMs: [100],
+      },
+    };
+  }),
+}));
+
+// Mock ProbeScheduler — no-op dans les tests
+vi.mock('../../../src/lib/shell/health/probe-scheduler', () => ({
+  syncProbeAlarm: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock chrome.runtime.sendMessage (bridge health notifications, best-effort)
+if (typeof chrome === 'undefined') {
+  vi.stubGlobal('chrome', {
+    runtime: { sendMessage: vi.fn().mockResolvedValue(undefined) },
+    storage: {
+      local: {
+        get: vi.fn().mockResolvedValue({}),
+        set: vi.fn().mockResolvedValue(undefined),
+      },
+    },
+  });
+}
+
 // ── Imports (after mocks) ────────────────────────────────────────────────
 
 import { runScan, ScanError } from '../../../src/lib/shell/scan/scanner';

@@ -18,8 +18,9 @@ import { calculateDedupRatio } from '../../core/metrics/types';
 import type { ScanMetrics } from '../../core/metrics/types';
 import { recordTJMFromMissions } from '../storage/tjm-history';
 import { isOnline } from '../utils/connection-monitor';
-import { withResultRetry } from '../utils/retry-strategy';
 import { trackParserHealth } from './parser-health';
+import { runWithCircuitBreaker } from '../health/circuit-breaker-runner';
+import { syncProbeAlarm } from '../health/probe-scheduler';
 
 /** Mutex pour empêcher les scans concurrents */
 let scanInProgress = false;
@@ -261,7 +262,6 @@ async function _runScanInternal(
     }
     emitDetailed('scanning', index, connectors.length);
 
-    const connectorStartTime = performance.now();
     const now = Date.now();
 
     const connectorContext: ConnectorSearchContext | undefined = baseSearchContext
@@ -274,17 +274,52 @@ async function _runScanInternal(
     }
     emitDetailed('scanning', index, connectors.length);
 
-    // Retry automatique pour les erreurs réseau avec backoff (Result-aware)
-    const result = await withResultRetry(
-      () => connector.fetchMissions(now, connectorContext, signal),
-      {
-        maxAttempts: 3,
-        baseDelayMs: 1000,
-        maxDelayMs: 10000,
-      }
-    );
+    // --- Circuit Breaker ---
+    // runWithCircuitBreaker gère : open → skip, half-open → probe, closed → execute
+    const circuitRun = await runWithCircuitBreaker(connector, now, connectorContext, signal);
 
-    const connectorDuration = Math.round(performance.now() - connectorStartTime);
+    // Sync alarme de sonde (schedule si open, cancel si closed/half-open)
+    syncProbeAlarm(circuitRun.snapshot).catch(() => {});
+
+    // Émissions bridge health (best-effort — panel peut être fermé)
+    chrome.runtime.sendMessage({
+      type: 'CONNECTOR_HEALTH_UPDATED',
+      payload: {
+        snapshot: circuitRun.snapshot,
+        stateChanged: circuitRun.snapshot.circuitState !== 'closed' ||
+          circuitRun.snapshot.consecutiveFailures === 0,
+      },
+    }).catch(() => {});
+
+    if (circuitRun.status === 'skipped') {
+      // Circuit ouvert — skip ce connecteur pour ce cycle
+      errors.push({
+        connectorId: connector.id,
+        message: `Circuit ouvert — connecteur ${connector.name} temporairement désactivé`,
+      });
+      chrome.runtime.sendMessage({
+        type: 'CONNECTOR_SKIPPED',
+        payload: { connectorId: connector.id, connectorName: connector.name, reason: 'circuit-open' },
+      }).catch(() => {});
+      // Toast — circuit ouvert
+      chrome.runtime.sendMessage({
+        type: 'SHOW_TOAST',
+        payload: {
+          message: `⚠️ ${connector.name} suspendu — trop d'erreurs répétées`,
+          toastType: 'warning',
+          duration: 5000,
+        },
+      }).catch(() => {});
+      if (stateIdx >= 0) {
+        connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'error', error: null };
+      }
+      emitDetailed('scanning', index + 1, connectors.length);
+      return;
+    }
+
+    // circuitRun.status === 'executed'
+    const result = circuitRun.result;
+    const connectorDuration = circuitRun.snapshot.recentLatenciesMs.at(-1) ?? 0;
 
     // Enregistrer le timing du connecteur
     metricsCollector.recordTiming('connector.fetch', connectorDuration, {
@@ -305,6 +340,19 @@ async function _runScanInternal(
     } else {
       trackParserHealth(connector.id, result.value.length, now).catch(() => {});
       connectorResults.push({ connectorId: connector.id, missions: result.value });
+      // Toast de récupération si le circuit revient à closed depuis open/half-open
+      if (circuitRun.snapshot.circuitState === 'closed' &&
+          circuitRun.snapshot.consecutiveFailures === 0 &&
+          circuitRun.snapshot.totalFailures > 0) {
+        chrome.runtime.sendMessage({
+          type: 'SHOW_TOAST',
+          payload: {
+            message: `✅ ${connector.name} récupéré et opérationnel`,
+            toastType: 'success',
+            duration: 4000,
+          },
+        }).catch(() => {});
+      }
       if (stateIdx >= 0) {
         connectorStates[stateIdx] = {
           ...connectorStates[stateIdx],

@@ -1,6 +1,8 @@
 <script lang="ts">
   import Icon from '../atoms/Icon.svelte';
+  import CircuitBadge from '../atoms/CircuitBadge.svelte';
   import type { AppError } from '$lib/core/errors';
+  import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
 
   import type { SourceStatus } from '$lib/shell/facades/feed-controller.svelte';
 
@@ -24,6 +26,7 @@
     onRefresh?: () => void;
     onFilterBySource?: (connectorId: string | null) => void;
     onToggleConnector?: (connectorId: string) => void;
+    healthSnapshots?: Map<string, ConnectorHealthSnapshot>;
   } = $props();
 
   const imgFailed = $state<Record<string, boolean>>({});
@@ -232,6 +235,13 @@
 
             <!-- Status -->
             <div class="flex items-center gap-1.5">
+              <!-- Circuit breaker badge (uniquement si circuit non fermé) -->
+              {#if healthSnapshots}
+                {@const snap = healthSnapshots.get(source.connectorId)}
+                {#if snap && snap.circuitState !== 'closed'}
+                  <CircuitBadge state={snap.circuitState} size="sm" showLabel />
+                {/if}
+              {/if}
               {#if source.sessionStatus === 'checking'}
                 <span class="flex items-center gap-1 text-[10px] text-text-muted">
                   <span class="animate-spin">

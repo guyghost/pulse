@@ -7,6 +7,7 @@
  * Uses Svelte 5 runes for reactive state.
  */
 import type { Mission, MissionSource } from '$lib/core/types/mission';
+import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
 import type { ConnectorStatus, PersistedConnectorStatus } from '$lib/core/types/connector-status';
 import type { ScanProgressPayload, BridgeMessage } from '../messaging/bridge';
 import type { AppError } from '$lib/core/errors/app-error';
@@ -69,6 +70,8 @@ export interface FeedController {
   get lastScanAt(): number | null;
   get lastScanMissionCount(): number;
   get scanProgress(): ScanProgress;
+  /** Santé des connecteurs (circuit breaker snapshots) */
+  get healthSnapshots(): Map<string, ConnectorHealthSnapshot>;
 
   // Source session state
   get sourceStatuses(): SourceStatus[];
@@ -113,6 +116,7 @@ export function createFeedController(feedStore: {
   let sourceStatuses = $state<SourceStatus[]>([]);
   let isCheckingSources = $state(false);
   let enabledConnectorIds = $state<Set<string>>(new Set());
+  let healthSnapshots = $state<Map<string, ConnectorHealthSnapshot>>(new Map());
 
   // Bridge message listener cleanup
   let bridgeListenerCleanup: (() => void) | null = null;
@@ -390,6 +394,11 @@ export function createFeedController(feedStore: {
           connectorStatuses = updated;
         }
 
+        if (message?.type === 'CONNECTOR_HEALTH_UPDATED' && message.payload?.snapshot) {
+          const snap = message.payload.snapshot as ConnectorHealthSnapshot;
+          healthSnapshots = new Map(healthSnapshots).set(snap.connectorId, snap);
+        }
+
         // Résultat final du scan (auto-scan du background)
         if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
           handleScanComplete(message.payload).catch(() => {});
@@ -501,6 +510,9 @@ export function createFeedController(feedStore: {
     // Connector management getters
     get enabledConnectorIds() {
       return enabledConnectorIds;
+    },
+    get healthSnapshots() {
+      return healthSnapshots;
     },
 
     // Methods
