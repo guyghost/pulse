@@ -40,6 +40,8 @@ import { saveAuthUser, loadAuthUser, clearAuthUser } from '../lib/shell/auth/aut
 import { isPremiumActive } from '../lib/core/types/auth';
 import type { GeneratedAsset } from '../lib/core/types/generation';
 import { generatePremium } from '../lib/shell/auth/premium-api';
+import { validateMessage } from '../lib/shell/messaging/schemas';
+import { classifyError } from '../lib/shell/messaging/error-boundary';
 
 if (import.meta.env.DEV) {
   console.log('[MissionPulse] Service worker started');
@@ -279,7 +281,28 @@ async function persistScanResults(
 }
 
 // Message handler — profile management + scan orchestration
-chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendResponse) => {
+chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse) => {
+  // ── Input validation ──────────────────────────────────────────────────────
+  const validation = validateMessage(rawMessage);
+  if (!validation.valid) {
+    if (import.meta.env.DEV) {
+      console.warn(
+        `[Bridge] Validation failed for "${validation.messageType ?? 'unknown'}":`,
+        validation.errors,
+        { sender: _sender.id ?? _sender.tab?.id }
+      );
+    }
+    sendResponse({ success: false, error: { code: 'VALIDATION_ERROR', message: validation.errors.join('; ') } });
+    return false;
+  }
+
+  // Cast validé — le message a passé les schémas Zod
+  const message = rawMessage as BridgeMessage;
+
+  // ── Error boundary global ─────────────────────────────────────────────────
+  // Chaque branche a son propre try/catch mais cette enveloppe protège contre
+  // toute exception imprévue qui sinon crasherait le service worker.
+  try {
   if (message.type === 'GET_PROFILE') {
     getProfile().then((profile) => {
       sendResponse({ type: 'PROFILE_RESULT', payload: profile });
@@ -651,6 +674,26 @@ chrome.runtime.onMessage.addListener((message: BridgeMessage, _sender, sendRespo
     chrome.runtime.sendMessage(message).catch(() => {
       // No listeners, ignore
     });
+    return false;
+  }
+  } catch (err: unknown) {
+    // Error boundary — protège le service worker contre les crashes inattendus
+    const category = classifyError(err);
+    const errMessage = err instanceof Error ? err.message : String(err);
+
+    if (import.meta.env.DEV) {
+      console.error('[Bridge] Unhandled error in message handler:', {
+        category,
+        message: errMessage,
+        messageType: (rawMessage as Record<string, unknown>)?.type,
+      });
+    }
+
+    try {
+      sendResponse({ success: false, error: { code: category, message: errMessage } });
+    } catch {
+      // sendResponse peut échouer si le canal est déjà fermé
+    }
     return false;
   }
 });
