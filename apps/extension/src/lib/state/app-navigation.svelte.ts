@@ -5,6 +5,7 @@
  * Pure Svelte 5 runes, no chrome.* access.
  */
 import { getProfile } from '$lib/shell/facades/settings.facade';
+import { getFirstScanDone } from '$lib/shell/storage/first-scan';
 
 export type Page = 'feed' | 'tjm' | 'settings' | 'onboarding';
 
@@ -48,10 +49,19 @@ export function createAppNavigation() {
     currentPage = 'onboarding';
   }
 
-  // Check if profile exists on startup
+  // Check if profile exists OR a first scan was done (zero-config flow)
   getProfile()
-    .then((profile) => {
+    .then(async (profile) => {
       if (profile) {
+        hasCompletedOnboarding = true;
+        previousPageIndex = PAGE_INDEX['feed'];
+        currentPage = 'feed';
+        return;
+      }
+      // No profile — check if zero-config first scan ran
+      const firstScanDone = await getFirstScanDone();
+      if (firstScanDone) {
+        // Skip wizard — land directly on feed with refinement banner
         hasCompletedOnboarding = true;
         previousPageIndex = PAGE_INDEX['feed'];
         currentPage = 'feed';

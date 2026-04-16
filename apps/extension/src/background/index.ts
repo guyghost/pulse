@@ -7,7 +7,7 @@ import type {
 import type { UserProfile } from '../lib/core/types/profile';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { AuthUser } from '../lib/core/types/auth';
-import { getSettings } from '../lib/shell/storage/chrome-storage';
+import { getSettings, setSettings } from '../lib/shell/storage/chrome-storage';
 import {
   runScan,
   cancelCurrentScan,
@@ -15,6 +15,7 @@ import {
   ScanError,
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
+import { getConnectors } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { setNewMissionCount } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
@@ -24,6 +25,8 @@ import {
 } from '../lib/shell/notifications/notify-missions';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 import { clearAllHealthSnapshots } from '../lib/shell/storage/connector-health';
+import { setFirstScanDone, getFirstScanDone } from '../lib/shell/storage/first-scan';
+import { createDefaultProfile } from '../lib/core/profile/defaults';
 import {
   getTracking,
   saveTracking,
@@ -776,6 +779,79 @@ chrome.storage.onChanged.addListener((changes, area) => {
 
 // Initial setup
 setupAlarm();
+
+// ── First-install silent scan ──────────────────────────────────────────────────
+// On fresh install: detect active platform sessions in parallel.
+// If any found, run a silent scan with a default profile so the user
+// lands directly on a populated feed — no wizard required.
+chrome.runtime.onInstalled.addListener(async (details) => {
+  if (details.reason !== 'install') return;
+
+  if (import.meta.env.DEV) {
+    console.log('[MissionPulse] Fresh install — starting zero-config first scan');
+  }
+
+  try {
+    // Already done? (shouldn't happen on fresh install, but guard anyway)
+    const alreadyDone = await getFirstScanDone();
+    if (alreadyDone) return;
+
+    // Detect active sessions across all connectors in parallel
+    const settings = await getSettings();
+    const allConnectors = await getConnectors(settings.enabledConnectors);
+    const now = Date.now();
+    const sessionResults = await Promise.allSettled(
+      allConnectors.map((c) => c.detectSession(now))
+    );
+
+    const activeConnectorIds: string[] = allConnectors
+      .filter((_c, i) => {
+        const r = sessionResults[i];
+        return r.status === 'fulfilled' && r.value.ok && r.value.value === true;
+      })
+      .map((c) => c.id);
+
+    if (activeConnectorIds.length === 0) {
+      // No sessions — user will go through normal onboarding
+      if (import.meta.env.DEV) {
+        console.log('[MissionPulse] No active sessions found on install, skipping first scan');
+      }
+      return;
+    }
+
+    if (import.meta.env.DEV) {
+      console.log(`[MissionPulse] Found ${activeConnectorIds.length} active session(s):`, activeConnectorIds);
+    }
+
+    // Temporarily restrict scan to only connectors with active sessions
+    const previousEnabled = settings.enabledConnectors;
+    await setSettings({ ...settings, enabledConnectors: activeConnectorIds });
+
+    // Run silent scan (no user profile — scorer uses createDefaultProfile fallback)
+    const result = await runScan(undefined, undefined, { pageDelayMs: 300 });
+
+    // Restore previous connector list
+    await setSettings({ ...settings, enabledConnectors: previousEnabled.length > 0 ? previousEnabled : activeConnectorIds });
+
+    if (result.missions.length > 0) {
+      await setFirstScanDone();
+
+      // Notify side panel if it’s open
+      try {
+        await chrome.runtime.sendMessage({ type: 'SCAN_COMPLETE', payload: result.missions });
+      } catch {
+        // Panel not open yet — missions are in IndexedDB, will load on next open
+      }
+
+      if (import.meta.env.DEV) {
+        console.log(`[MissionPulse] First scan complete: ${result.missions.length} missions`);
+      }
+    }
+  } catch (err) {
+    // First scan failure is non-critical — user sees normal onboarding
+    console.warn('[MissionPulse] First scan on install failed:', err);
+  }
+});
 
 chrome.action.onUserSettingsChanged.addListener(async (change) => {
   if (change.isOnToolbar) {

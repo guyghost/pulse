@@ -166,7 +166,7 @@
               if (import.meta.env.DEV) console.error('[FeedPage crash]', e);
             }}
           >
-            <FeedPage />
+            <FeedPage onNavigateToOnboarding={nav.resetToOnboarding} />
             {#snippet failed(error, reset)}
               <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
                 <div class="text-4xl">⚠️</div>

@@ -41,6 +41,9 @@ vi.stubGlobal('chrome', {
     onMessage: {
       addListener: vi.fn(),
     },
+    onInstalled: {
+      addListener: vi.fn(),
+    },
     sendMessage: vi.fn(async () => undefined),
   },
   alarms: {

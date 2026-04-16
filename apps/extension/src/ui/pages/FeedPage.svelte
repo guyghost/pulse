@@ -17,6 +17,11 @@
   import KeyboardShortcutsHelp from '../molecules/KeyboardShortcutsHelp.svelte';
   import type { MissionSource } from '$lib/core/types/mission';
   import MissionComparison from '../organisms/MissionComparison.svelte';
+  import ProfileRefinementBanner from '../molecules/ProfileRefinementBanner.svelte';
+  import { getFirstScanDone, getProfileBannerDismissed } from '$lib/shell/storage/first-scan';
+  import { getProfile } from '$lib/shell/facades/settings.facade';
+
+  const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
 
   // ============================================================
   // Initialization
@@ -25,6 +30,17 @@
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
   page.setup();
+
+  // Refinement banner: shown only on zero-config first scan (no profile yet)
+  let showRefinementBanner = $state(false);
+  (async () => {
+    const [firstScanDone, bannerDismissed, profile] = await Promise.all([
+      getFirstScanDone(),
+      getProfileBannerDismissed(),
+      getProfile(),
+    ]);
+    showRefinementBanner = firstScanDone && !bannerDismissed && !profile;
+  })().catch(() => {});
 </script>
 
 <div class="relative flex h-full flex-col">
@@ -240,6 +256,15 @@
       <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
         {#if controller.isScanning || page.isLoading}Chargement des missions en cours{/if}
       </div>
+
+      {#if showRefinementBanner && !controller.isScanning}
+        <ProfileRefinementBanner
+          onSetupProfile={() => {
+            showRefinementBanner = false;
+            onNavigateToOnboarding?.();
+          }}
+        />
+      {/if}
 
       <div class="flex items-center justify-between gap-3">
         <div class="flex items-center gap-3">
