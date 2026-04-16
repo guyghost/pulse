@@ -23,6 +23,7 @@ import {
   setupNotificationClickHandler,
 } from '../lib/shell/notifications/notify-missions';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
+import { clearAllHealthSnapshots } from '../lib/shell/storage/connector-health';
 import {
   getTracking,
   saveTracking,
@@ -51,6 +52,11 @@ if (import.meta.env.DEV) {
 clearExpiredSemanticCache().catch((err) => {
   console.warn('[MissionPulse] Failed to cleanup expired semantic cache:', err);
 });
+
+// Reset circuit breaker health snapshots on every SW startup.
+// Circuits that opened during a previous session due to transient errors
+// are cleared so connectors can be tried fresh on next scan.
+clearAllHealthSnapshots().catch(() => {});
 
 // Open side panel on extension icon click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
