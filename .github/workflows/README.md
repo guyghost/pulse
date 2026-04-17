@@ -46,8 +46,8 @@ gh workflow run connector-health.yml -f connectors=freework,lehibou
 ### ci.yml
 
 **Triggers:**
-- Push to `main` branch
-- Pull requests
+- Push to `develop` and `main`
+- Pull requests targeting `develop` and `main`
 - Manual dispatch
 
 **Jobs:**
@@ -56,7 +56,7 @@ gh workflow run connector-health.yml -f connectors=freework,lehibou
 3. `format` - Prettier check
 4. `typecheck` - TypeScript
 5. `test` - Vitest with coverage
-6. `build` - Vite build
+6. `build` - Vite build, built manifest verification, ZIP artifact
 7. `test-e2e` - Playwright (PRs only)
 
 **Concurrency:** Previous runs on same branch are cancelled.
@@ -66,10 +66,10 @@ gh workflow run connector-health.yml -f connectors=freework,lehibou
 ### release.yml
 
 **Triggers:**
-- Tags matching `v*` (e.g., `v1.0.0`, `v2.1.0-beta.1`)
+- Tags matching `v*.*.*` (e.g., `v1.0.0`, `v2.1.0-beta.1`)
 
 **Jobs:**
-1. `build-and-release` - Build, ZIP, GitHub Release
+1. `build-and-release` - Typecheck, test, build, verify built manifest, ZIP, GitHub Release
 2. `publish-to-chrome-store` - CWS publish (stable only)
 
 **Pre-releases:** Tags with `-` (e.g., `v1.0.0-beta.1`) skip CWS publish.

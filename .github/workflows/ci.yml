@@ -2,8 +2,9 @@ name: CI
 
 on:
   push:
-    branches: [main]
+    branches: [develop, main]
   pull_request:
+    branches: [develop, main]
   workflow_dispatch:
 
 permissions:
@@ -28,6 +29,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -56,6 +60,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -82,6 +89,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -110,6 +120,9 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Enable Corepack
+        run: corepack enable
+
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
         with:
@@ -136,6 +149,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -169,11 +185,14 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 15
     needs: test
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/main'
+    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
 
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -189,17 +208,29 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Verify manifest.json
-        run: pnpm --filter @pulse/extension verify-manifest
-
       - name: Build all packages
         run: pnpm turbo build
 
-      - name: Upload build artifact
+      - name: Verify built manifest.json
+        run: pnpm --filter @pulse/extension verify-manifest apps/extension/dist/manifest.json
+
+      - name: Create extension ZIP
+        run: |
+          cd apps/extension/dist
+          zip -r ../missionpulse-ci.zip .
+
+      - name: Upload build directory artifact
         uses: actions/upload-artifact@v4
         with:
-          name: chrome-extension
+          name: chrome-extension-dist
           path: apps/extension/dist/
+          retention-days: 7
+
+      - name: Upload extension ZIP artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: chrome-extension-zip
+          path: apps/extension/missionpulse-ci.zip
           retention-days: 7
 
   test-e2e:
@@ -212,6 +243,9 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -233,7 +267,7 @@ jobs:
       - name: Download build artifact
         uses: actions/download-artifact@v4
         with:
-          name: chrome-extension
+          name: chrome-extension-dist
           path: apps/extension/dist/
 
       - name: Run E2E tests
