@@ -63,7 +63,7 @@ jobs:
         run: pnpm turbo build
 
       - name: Verify built manifest.json
-        run: pnpm --filter @pulse/extension verify-manifest apps/extension/dist/manifest.json
+        run: pnpm --filter @pulse/extension verify-manifest dist/manifest.json
 
       - name: Create extension ZIP
         run: |
