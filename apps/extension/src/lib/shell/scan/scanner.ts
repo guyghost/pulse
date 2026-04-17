@@ -11,6 +11,7 @@ import { filterSalariedMissions } from '../../core/scoring/contract-filter';
 import { filterStaleMissions } from '../../core/scoring/mission-freshness';
 import { scoreMission } from '../../core/scoring/relevance';
 import { computeFinalBreakdown, buildScoreBreakdown } from '../../core/scoring/final-score';
+import { createDefaultProfile, isDefaultProfile } from '../../core/profile/defaults';
 import { setScanState } from '../storage/session-storage';
 import { scoreMissionsSemantic } from '../ai/semantic-scorer';
 import { metricsCollector } from '../metrics/collector';
@@ -97,6 +98,8 @@ export interface ScanOptions {
   pageDelayMs?: number;
   /** Callback de progression détaillé (pour bridge SCAN_PROGRESS) */
   onDetailedProgress?: DetailedProgressCallback;
+  /** Override explicite du profil utilisé pour le scan */
+  profileOverride?: UserProfile;
 }
 
 export async function runScan(
@@ -222,15 +225,20 @@ async function _runScanInternal(
   }
 
   // Load profile early for connector search filtering + scoring
-  let profile: UserProfile | null = null;
-  try {
-    profile = await getProfile();
-  } catch {
-    // No profile available — connectors will fetch without filters
+  let profile = options?.profileOverride ?? null;
+  if (!profile) {
+    try {
+      profile = await getProfile();
+    } catch {
+      // No saved profile available
+    }
   }
+  profile ??= createDefaultProfile();
+  const usingDefaultProfile = isDefaultProfile(profile);
 
   // Build base search context from profile (lastSync is always null — see comment below)
-  const baseSearchContext = profile ? buildSearchContext(profile, null) : null;
+  // Keep connector fetching broad for the default profile.
+  const baseSearchContext = usingDefaultProfile ? null : buildSearchContext(profile, null);
 
   // Note: No connector uses server-side lastSync filtering anymore. This avoids the
   // split-brain bug where lastSync (chrome.storage.local) becomes stale when IndexedDB
@@ -282,14 +290,17 @@ async function _runScanInternal(
     syncProbeAlarm(circuitRun.snapshot).catch(() => {});
 
     // Émissions bridge health (best-effort — panel peut être fermé)
-    chrome.runtime.sendMessage({
-      type: 'CONNECTOR_HEALTH_UPDATED',
-      payload: {
-        snapshot: circuitRun.snapshot,
-        stateChanged: circuitRun.snapshot.circuitState !== 'closed' ||
-          circuitRun.snapshot.consecutiveFailures === 0,
-      },
-    }).catch(() => {});
+    chrome.runtime
+      .sendMessage({
+        type: 'CONNECTOR_HEALTH_UPDATED',
+        payload: {
+          snapshot: circuitRun.snapshot,
+          stateChanged:
+            circuitRun.snapshot.circuitState !== 'closed' ||
+            circuitRun.snapshot.consecutiveFailures === 0,
+        },
+      })
+      .catch(() => {});
 
     if (circuitRun.status === 'skipped') {
       // Circuit ouvert — skip ce connecteur pour ce cycle
@@ -297,19 +308,27 @@ async function _runScanInternal(
         connectorId: connector.id,
         message: `Circuit ouvert — connecteur ${connector.name} temporairement désactivé`,
       });
-      chrome.runtime.sendMessage({
-        type: 'CONNECTOR_SKIPPED',
-        payload: { connectorId: connector.id, connectorName: connector.name, reason: 'circuit-open' },
-      }).catch(() => {});
+      chrome.runtime
+        .sendMessage({
+          type: 'CONNECTOR_SKIPPED',
+          payload: {
+            connectorId: connector.id,
+            connectorName: connector.name,
+            reason: 'circuit-open',
+          },
+        })
+        .catch(() => {});
       // Toast — circuit ouvert
-      chrome.runtime.sendMessage({
-        type: 'SHOW_TOAST',
-        payload: {
-          message: `⚠️ ${connector.name} suspendu — trop d'erreurs répétées`,
-          toastType: 'warning',
-          duration: 5000,
-        },
-      }).catch(() => {});
+      chrome.runtime
+        .sendMessage({
+          type: 'SHOW_TOAST',
+          payload: {
+            message: `⚠️ ${connector.name} suspendu — trop d'erreurs répétées`,
+            toastType: 'warning',
+            duration: 5000,
+          },
+        })
+        .catch(() => {});
       if (stateIdx >= 0) {
         connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'error', error: null };
       }
@@ -341,17 +360,21 @@ async function _runScanInternal(
       trackParserHealth(connector.id, result.value.length, now).catch(() => {});
       connectorResults.push({ connectorId: connector.id, missions: result.value });
       // Toast de récupération si le circuit revient à closed depuis open/half-open
-      if (circuitRun.snapshot.circuitState === 'closed' &&
-          circuitRun.snapshot.consecutiveFailures === 0 &&
-          circuitRun.snapshot.totalFailures > 0) {
-        chrome.runtime.sendMessage({
-          type: 'SHOW_TOAST',
-          payload: {
-            message: `✅ ${connector.name} récupéré et opérationnel`,
-            toastType: 'success',
-            duration: 4000,
-          },
-        }).catch(() => {});
+      if (
+        circuitRun.snapshot.circuitState === 'closed' &&
+        circuitRun.snapshot.consecutiveFailures === 0 &&
+        circuitRun.snapshot.totalFailures > 0
+      ) {
+        chrome.runtime
+          .sendMessage({
+            type: 'SHOW_TOAST',
+            payload: {
+              message: `✅ ${connector.name} récupéré et opérationnel`,
+              toastType: 'success',
+              duration: 4000,
+            },
+          })
+          .catch(() => {});
       }
       if (stateIdx >= 0) {
         connectorStates[stateIdx] = {
@@ -418,19 +441,17 @@ async function _runScanInternal(
 
   // Score against profile (already loaded above for connector filtering)
   // Now returns structured breakdown
-  const scored = profile
-    ? freshOnly.map((m) => {
-        const result = scoreMission(m, profile, new Date());
-        return {
-          ...m,
-          scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),
-          score: result.total,
-        };
-      })
-    : freshOnly;
+  const scored = freshOnly.map((m) => {
+    const result = scoreMission(m, profile, new Date());
+    return {
+      ...m,
+      scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),
+      score: result.total,
+    };
+  });
 
   // Semantic scoring (async enrichment, non-blocking)
-  if (profile && !signal?.aborted) {
+  if (!usingDefaultProfile && !signal?.aborted) {
     try {
       const semanticResults = await scoreMissionsSemantic(
         scored,

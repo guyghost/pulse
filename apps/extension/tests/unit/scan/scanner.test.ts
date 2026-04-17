@@ -28,7 +28,17 @@ vi.mock('../../../src/lib/core/scoring/dedup', () => ({
 }));
 
 vi.mock('../../../src/lib/core/scoring/relevance', () => ({
-  scoreMission: vi.fn(() => ({ total: 50, breakdown: { stack: 20, location: 10, tjm: 12, remote: 8, seniorityBonus: 0, startDateBonus: 0 } })),
+  scoreMission: vi.fn(() => ({
+    total: 50,
+    breakdown: {
+      stack: 20,
+      location: 10,
+      tjm: 12,
+      remote: 8,
+      seniorityBonus: 0,
+      startDateBonus: 0,
+    },
+  })),
 }));
 
 vi.mock('../../../src/lib/shell/utils/connection-monitor', () => ({
@@ -54,29 +64,31 @@ vi.mock('../../../src/lib/shell/utils/retry-strategy', () => ({
 
 // Mock CircuitBreakerRunner — simule un circuit fermé qui passe directement au connecteur
 vi.mock('../../../src/lib/shell/health/circuit-breaker-runner', () => ({
-  runWithCircuitBreaker: vi.fn(async (
-    connector: { fetchMissions: (n: number, c: unknown, s: unknown) => Promise<unknown> },
-    now: number,
-    context: unknown,
-    signal: unknown,
-  ) => {
-    const result = await connector.fetchMissions(now, context, signal);
-    return {
-      status: 'executed',
-      result,
-      snapshot: {
-        connectorId: connector.id ?? 'test',
-        circuitState: 'closed',
-        consecutiveFailures: 0,
-        totalFailures: 0,
-        totalSuccesses: 1,
-        lastSuccessAt: now,
-        lastFailureAt: null,
-        lastStateChangeAt: now,
-        recentLatenciesMs: [100],
-      },
-    };
-  }),
+  runWithCircuitBreaker: vi.fn(
+    async (
+      connector: { fetchMissions: (n: number, c: unknown, s: unknown) => Promise<unknown> },
+      now: number,
+      context: unknown,
+      signal: unknown
+    ) => {
+      const result = await connector.fetchMissions(now, context, signal);
+      return {
+        status: 'executed',
+        result,
+        snapshot: {
+          connectorId: connector.id ?? 'test',
+          circuitState: 'closed',
+          consecutiveFailures: 0,
+          totalFailures: 0,
+          totalSuccesses: 1,
+          lastSuccessAt: now,
+          lastFailureAt: null,
+          lastStateChangeAt: now,
+          recentLatenciesMs: [100],
+        },
+      };
+    }
+  ),
 }));
 
 // Mock ProbeScheduler — no-op dans les tests
@@ -210,6 +222,22 @@ describe('scanner — runScan', () => {
     expect(result.errors).toHaveLength(0);
     expect(result.missions[0].id).toBe('mission-1');
     expect(result.missions[1].id).toBe('mission-2');
+  });
+
+  it('scores missions with the default profile when no saved profile exists', async () => {
+    const missions = [makeMission()];
+    const connector = makeConnector('free-work', 'Free-Work', missions);
+
+    (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work']));
+    (getConnector as Mock).mockResolvedValue(connector);
+    (getConnectors as Mock).mockResolvedValue([connector]);
+    (getProfile as Mock).mockResolvedValue(null);
+
+    const result = await runScan();
+
+    expect(result.missions).toHaveLength(1);
+    expect(result.missions[0].score).toBe(50);
+    expect(result.missions[0].scoreBreakdown).not.toBeNull();
   });
 
   // 2. Empty connectors

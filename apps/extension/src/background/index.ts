@@ -827,8 +827,12 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     const previousEnabled = settings.enabledConnectors;
     await setSettings({ ...settings, enabledConnectors: activeConnectorIds });
 
-    // Run silent scan (no user profile — scorer uses createDefaultProfile fallback)
-    const result = await runScan(undefined, undefined, { pageDelayMs: 300 });
+    // Run silent scan with an explicit default profile so missions are scored
+    // even before the user completes onboarding.
+    const result = await runScan(undefined, undefined, {
+      pageDelayMs: 300,
+      profileOverride: createDefaultProfile(),
+    });
 
     // Restore previous connector list
     await setSettings({ ...settings, enabledConnectors: previousEnabled.length > 0 ? previousEnabled : activeConnectorIds });

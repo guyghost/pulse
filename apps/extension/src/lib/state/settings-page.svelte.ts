@@ -30,6 +30,7 @@ import {
 import { getMissions } from '$lib/shell/facades/feed-data.facade';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/storage/first-scan';
+import { rescoreStoredMissions } from '$lib/shell/scan/rescore';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
@@ -144,23 +145,25 @@ export class SettingsPageController {
 
     try {
       const current = await getProfile();
-      await saveProfile(
-        withProfileDefaults({
-          firstName: this.firstName,
-          jobTitle: this.jobTitle,
-          location: this.profileLocation,
-          tjmMin: this.tjmMin,
-          tjmMax: this.tjmMax,
-          stack: [...this.profileStack],
-          remote: current?.remote ?? 'any',
-          seniority: current?.seniority ?? 'senior',
-          scoringWeights: current?.scoringWeights,
-          searchKeywords: current?.searchKeywords ?? [],
-        })
-      );
+      const nextProfile = withProfileDefaults({
+        firstName: this.firstName,
+        jobTitle: this.jobTitle,
+        location: this.profileLocation,
+        tjmMin: this.tjmMin,
+        tjmMax: this.tjmMax,
+        stack: [...this.profileStack],
+        remote: current?.remote ?? 'any',
+        seniority: current?.seniority ?? 'senior',
+        scoringWeights: current?.scoringWeights,
+        searchKeywords: current?.searchKeywords ?? [],
+      });
+
+      await saveProfile(nextProfile);
+      const rescored = await rescoreStoredMissions(nextProfile);
 
       this.editingProfile = false;
       this.profileSaved = true;
+      window.dispatchEvent(new CustomEvent('missions-rescored', { detail: rescored }));
       window.dispatchEvent(new CustomEvent('profile-updated'));
       setTimeout(() => {
         this.profileSaved = false;

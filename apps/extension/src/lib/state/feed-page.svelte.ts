@@ -19,6 +19,7 @@ import {
   saveFavorites,
   getHidden,
   saveHidden,
+  getMissions,
   getProfile,
   resetNewMissionCount,
   markAsSeen,
@@ -308,9 +309,7 @@ export function createFeedPageState(
     $effect(() => {
       getProfile()
         .then((p) => {
-          if (p?.firstName) {
-            firstName = p.firstName;
-          }
+          firstName = p?.firstName ?? '';
         })
         .catch(() => {});
     });
@@ -391,6 +390,39 @@ export function createFeedPageState(
       const unsubscribe = registerShortcuts(shortcuts);
       cleanupFns.push(unsubscribe);
       return unsubscribe;
+    });
+
+    $effect(() => {
+      async function handleProfileUpdated() {
+        try {
+          const profile = await getProfile();
+          firstName = profile?.firstName ?? '';
+        } catch {
+          // Ignore refresh failures
+        }
+      }
+
+      async function handleMissionsRescored(e: Event) {
+        const missions = (e as CustomEvent).detail;
+        if (Array.isArray(missions)) {
+          feedStore.setMissions(missions as Mission[]);
+          return;
+        }
+
+        try {
+          const stored = await getMissions();
+          feedStore.setMissions(stored);
+        } catch {
+          // Ignore refresh failures
+        }
+      }
+
+      window.addEventListener('profile-updated', handleProfileUpdated);
+      window.addEventListener('missions-rescored', handleMissionsRescored);
+      return () => {
+        window.removeEventListener('profile-updated', handleProfileUpdated);
+        window.removeEventListener('missions-rescored', handleMissionsRescored);
+      };
     });
 
     // Dev event handlers

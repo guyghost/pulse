@@ -102,8 +102,16 @@
       showTour = true;
     }
 
+    function handleProfileUpdated() {
+      showRefinementBanner = false;
+    }
+
     window.addEventListener('feed-tour:open', handleOpenTour);
-    return () => window.removeEventListener('feed-tour:open', handleOpenTour);
+    window.addEventListener('profile-updated', handleProfileUpdated);
+    return () => {
+      window.removeEventListener('feed-tour:open', handleOpenTour);
+      window.removeEventListener('profile-updated', handleProfileUpdated);
+    };
   });
 
   async function closeTour() {
