@@ -28,8 +28,14 @@ export interface AuthState {
  * Pure function — `now` is injected, no Date.now() in Core.
  */
 export const isPremiumActive = (user: AuthUser | null, now: number): boolean => {
-  if (!user) return false;
-  if (user.premiumStatus !== 'premium') return false;
-  if (user.premiumExpiresAt && user.premiumExpiresAt < now) return false;
+  if (!user) {
+    return false;
+  }
+  if (user.premiumStatus !== 'premium') {
+    return false;
+  }
+  if (user.premiumExpiresAt && user.premiumExpiresAt < now) {
+    return false;
+  }
   return true;
 };

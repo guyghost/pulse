@@ -33,7 +33,14 @@ const makeValidMission = (overrides: Partial<Mission> = {}): Mission => ({
   scrapedAt: new Date('2026-01-01T00:00:00.000Z'),
   seniority: 'senior',
   scoreBreakdown: {
-    criteria: { stack: 30, location: 20, tjm: 25, remote: 15, seniorityBonus: 5, startDateBonus: 0 },
+    criteria: {
+      stack: 30,
+      location: 20,
+      tjm: 25,
+      remote: 15,
+      seniorityBonus: 5,
+      startDateBonus: 0,
+    },
     deterministic: 95,
     semantic: 80,
     semanticReason: 'Good match',

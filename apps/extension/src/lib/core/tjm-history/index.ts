@@ -438,10 +438,7 @@ const buildSeniorityRanges = (
 
   // Merge real + unknown-third for each level
   const juniorAll = [...juniorReal, ...(juniorReal.length === 0 ? unknownJunior : [])];
-  const confirmedAll = [
-    ...confirmedReal,
-    ...(confirmedReal.length === 0 ? unknownConfirmed : []),
-  ];
+  const confirmedAll = [...confirmedReal, ...(confirmedReal.length === 0 ? unknownConfirmed : [])];
   const seniorAll = [...seniorReal, ...(seniorReal.length === 0 ? unknownSenior : [])];
 
   // Last resort: if still empty, use all averages
@@ -494,7 +491,9 @@ const buildRegionInsights = (history: TJMHistory): TJMRegionInsight[] => {
 
   for (const record of history.records) {
     const region = record.region ?? 'other';
-    if (record.average <= 0) continue;
+    if (record.average <= 0) {
+      continue;
+    }
 
     const existing = groups.get(region);
     if (existing) {
@@ -506,9 +505,7 @@ const buildRegionInsights = (history: TJMHistory): TJMRegionInsight[] => {
     } else {
       groups.set(region, {
         region,
-        entries: [
-          { average: record.average, sampleCount: record.sampleCount, date: record.date },
-        ],
+        entries: [{ average: record.average, sampleCount: record.sampleCount, date: record.date }],
       });
     }
   }
@@ -518,7 +515,9 @@ const buildRegionInsights = (history: TJMHistory): TJMRegionInsight[] => {
   for (const group of groups.values()) {
     const { region, entries } = group;
     const totalSamples = entries.reduce((sum, e) => sum + e.sampleCount, 0);
-    if (totalSamples === 0) continue;
+    if (totalSamples === 0) {
+      continue;
+    }
 
     // Weighted average by sample count
     const weightedSum = entries.reduce((sum, e) => sum + e.average * e.sampleCount, 0);

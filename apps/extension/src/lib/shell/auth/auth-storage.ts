@@ -16,9 +16,13 @@ export const saveAuthUser = async (user: AuthUser): Promise<void> => {
 export const loadAuthUser = async (): Promise<AuthUser | null> => {
   const result = await chrome.storage.local.get(AUTH_USER_KEY);
   const raw = result[AUTH_USER_KEY];
-  if (!raw || typeof raw !== 'object') return null;
+  if (!raw || typeof raw !== 'object') {
+    return null;
+  }
   const obj = raw as Record<string, unknown>;
-  if (typeof obj.id !== 'string' || typeof obj.email !== 'string') return null;
+  if (typeof obj.id !== 'string' || typeof obj.email !== 'string') {
+    return null;
+  }
   return raw as AuthUser;
 };
 

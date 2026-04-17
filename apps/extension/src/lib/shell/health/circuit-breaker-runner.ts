@@ -18,10 +18,7 @@ import {
   shouldAttemptProbe,
   transitionToHalfOpen,
 } from '../../core/health/circuit-breaker';
-import {
-  getHealthSnapshot,
-  saveHealthSnapshot,
-} from '../storage/connector-health';
+import { getHealthSnapshot, saveHealthSnapshot } from '../storage/connector-health';
 import type { PlatformConnector } from '../connectors/platform-connector';
 import { err } from '../../core/errors/result';
 import { withResultRetry } from '../utils/retry-strategy';
@@ -80,10 +77,11 @@ export async function runWithCircuitBreaker(
   // Exécuter l'appel avec retry pour les erreurs transientes,
   // puis mesurer la latence totale pour le circuit breaker
   const startTime = performance.now();
-  const result = await withResultRetry(
-    () => connector.fetchMissions(now, context, signal),
-    { maxAttempts: 3, baseDelayMs: 1000, maxDelayMs: 10_000 }
-  );
+  const result = await withResultRetry(() => connector.fetchMissions(now, context, signal), {
+    maxAttempts: 3,
+    baseDelayMs: 1000,
+    maxDelayMs: 10_000,
+  });
   const latencyMs = Math.round(performance.now() - startTime);
 
   // Calculer le prochain état de santé (pure function)

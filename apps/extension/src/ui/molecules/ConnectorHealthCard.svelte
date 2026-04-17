@@ -20,19 +20,31 @@
   const isOpen = $derived(snapshot.circuitState === 'open');
 
   function formatLatency(ms: number | null): string {
-    if (ms === null) return '—';
-    if (ms < 1000) return `${Math.round(ms)}ms`;
+    if (ms === null) {
+      return '—';
+    }
+    if (ms < 1000) {
+      return `${Math.round(ms)}ms`;
+    }
     return `${(ms / 1000).toFixed(1)}s`;
   }
 
   function formatRelativeTime(ts: number | null): string {
-    if (ts === null) return 'jamais';
+    if (ts === null) {
+      return 'jamais';
+    }
     const diff = now - ts;
     const minutes = Math.floor(diff / 60_000);
-    if (minutes < 1) return "à l'instant";
-    if (minutes < 60) return `il y a ${minutes}min`;
+    if (minutes < 1) {
+      return "à l'instant";
+    }
+    if (minutes < 60) {
+      return `il y a ${minutes}min`;
+    }
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `il y a ${hours}h`;
+    if (hours < 24) {
+      return `il y a ${hours}h`;
+    }
     return `il y a ${Math.floor(hours / 24)}j`;
   }
 
@@ -44,10 +56,10 @@
 <div
   class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[11px]
     {isOpen
-      ? 'border-red-400/20 bg-red-400/[0.06]'
-      : isHealthy
-        ? 'border-white/6 bg-white/[0.03]'
-        : 'border-accent-amber/20 bg-accent-amber/[0.06]'}"
+    ? 'border-red-400/20 bg-red-400/[0.06]'
+    : isHealthy
+      ? 'border-white/6 bg-white/[0.03]'
+      : 'border-accent-amber/20 bg-accent-amber/[0.06]'}"
 >
   <!-- Left: circuit badge + name -->
   <div class="flex min-w-0 items-center gap-2">
@@ -58,10 +70,9 @@
   <!-- Right: metrics -->
   <div class="flex shrink-0 items-center gap-3 text-text-muted">
     {#if snapshot.consecutiveFailures > 0}
-      <span
-        class="font-mono text-red-400"
-        title="Échecs consécutifs"
-      >{snapshot.consecutiveFailures} err</span>
+      <span class="font-mono text-red-400" title="Échecs consécutifs"
+        >{snapshot.consecutiveFailures} err</span
+      >
     {/if}
 
     {#if metrics.totalCalls > 0}

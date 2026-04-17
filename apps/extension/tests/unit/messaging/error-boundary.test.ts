@@ -23,7 +23,9 @@ describe('classifyError', () => {
   });
 
   it('retourne PAYLOAD_TOO_LARGE pour un payload trop grand', () => {
-    expect(classifyError(new Error('payload too large for this request'))).toBe('PAYLOAD_TOO_LARGE');
+    expect(classifyError(new Error('payload too large for this request'))).toBe(
+      'PAYLOAD_TOO_LARGE'
+    );
   });
 
   it('retourne UNKNOWN pour une erreur générique', () => {
@@ -51,9 +53,7 @@ describe('withErrorBoundary — validation', () => {
     wrapped(null, noopSender, sendResponse);
 
     expect(handler).not.toHaveBeenCalled();
-    expect(sendResponse).toHaveBeenCalledWith(
-      expect.objectContaining({ success: false })
-    );
+    expect(sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
   });
 
   it('rejette un message sans type string', () => {
@@ -98,7 +98,7 @@ describe('withErrorBoundary — validation', () => {
 // ============================================================================
 
 describe('withErrorBoundary — error boundary sync', () => {
-  it('attrape une erreur sync et envoie une réponse d\'erreur', () => {
+  it("attrape une erreur sync et envoie une réponse d'erreur", () => {
     const handler = vi.fn(() => {
       throw new Error('something went wrong');
     });
@@ -108,7 +108,10 @@ describe('withErrorBoundary — error boundary sync', () => {
     // Ne devrait pas lever d'exception
     expect(() => wrapped({ type: 'SCAN_START' }, noopSender, sendResponse)).not.toThrow();
     expect(sendResponse).toHaveBeenCalledWith(
-      expect.objectContaining({ success: false, error: expect.objectContaining({ code: 'UNKNOWN' }) })
+      expect.objectContaining({
+        success: false,
+        error: expect.objectContaining({ code: 'UNKNOWN' }),
+      })
     );
   });
 
@@ -158,8 +161,6 @@ describe('withErrorBoundary — error boundary async', () => {
     // Laisser les microtâches se terminer
     await new Promise((r) => setTimeout(r, 10));
 
-    expect(sendResponse).toHaveBeenCalledWith(
-      expect.objectContaining({ success: false })
-    );
+    expect(sendResponse).toHaveBeenCalledWith(expect.objectContaining({ success: false }));
   });
 });

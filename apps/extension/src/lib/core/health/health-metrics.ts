@@ -25,8 +25,7 @@ export function computeHealthMetrics(
     p95LatencyMs: percentile(latencies, 95),
     failureRate: totalCalls === 0 ? 0 : snapshot.totalFailures / totalCalls,
     totalCalls,
-    msSinceLastSuccess:
-      snapshot.lastSuccessAt !== null ? now - snapshot.lastSuccessAt : null,
+    msSinceLastSuccess: snapshot.lastSuccessAt !== null ? now - snapshot.lastSuccessAt : null,
   };
 }
 
@@ -39,14 +38,18 @@ export function computeHealthMetrics(
  * Retourne null si le tableau est vide.
  */
 export function percentile(values: readonly number[], p: number): number | null {
-  if (values.length === 0) return null;
+  if (values.length === 0) {
+    return null;
+  }
 
   const sorted = [...values].sort((a, b) => a - b);
   const index = (p / 100) * (sorted.length - 1);
   const lower = Math.floor(index);
   const upper = Math.ceil(index);
 
-  if (lower === upper) return sorted[lower];
+  if (lower === upper) {
+    return sorted[lower];
+  }
 
   // Interpolation linéaire
   const fraction = index - lower;

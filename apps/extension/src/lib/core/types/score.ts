@@ -59,10 +59,18 @@ export interface ScoreBreakdown {
  * Pure function — no I/O, no side effects.
  */
 export function scoreToGrade(score: number): Grade {
-  if (score >= 80) return 'A';
-  if (score >= 60) return 'B';
-  if (score >= 40) return 'C';
-  if (score >= 20) return 'D';
+  if (score >= 80) {
+    return 'A';
+  }
+  if (score >= 60) {
+    return 'B';
+  }
+  if (score >= 40) {
+    return 'C';
+  }
+  if (score >= 20) {
+    return 'D';
+  }
   return 'F';
 }
 

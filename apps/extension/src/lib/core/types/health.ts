@@ -73,8 +73,8 @@ export interface HealthThresholds {
 }
 
 export const DEFAULT_HEALTH_THRESHOLDS: HealthThresholds = {
-  failureThreshold: 5,              // 5 échecs persistants (chacun après 3 retries) pour ouvrir
-  probeIntervalMs: 5 * 60 * 1000,  // Sonde toutes les 5min (au lieu de 30min)
+  failureThreshold: 5, // 5 échecs persistants (chacun après 3 retries) pour ouvrir
+  probeIntervalMs: 5 * 60 * 1000, // Sonde toutes les 5min (au lieu de 30min)
   latencyWindowSize: 100,
 };
 

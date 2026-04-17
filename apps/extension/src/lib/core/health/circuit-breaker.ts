@@ -33,7 +33,11 @@ export function computeNextHealth(
   thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS
 ): ConnectorHealthSnapshot {
   // Mise à jour fenêtre glissante des latences
-  const latencies = appendLatency(current.recentLatenciesMs, result.latencyMs, thresholds.latencyWindowSize);
+  const latencies = appendLatency(
+    current.recentLatenciesMs,
+    result.latencyMs,
+    thresholds.latencyWindowSize
+  );
 
   if (result.success) {
     return handleSuccess(current, latencies, now);
@@ -55,7 +59,9 @@ export function shouldAttemptProbe(
   now: number,
   thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS
 ): boolean {
-  if (snapshot.circuitState !== 'open') return false;
+  if (snapshot.circuitState !== 'open') {
+    return false;
+  }
   return now - snapshot.lastStateChangeAt >= thresholds.probeIntervalMs;
 }
 
@@ -83,8 +89,7 @@ function handleSuccess(
   latencies: readonly number[],
   now: number
 ): ConnectorHealthSnapshot {
-  const wasOpenOrHalfOpen =
-    current.circuitState === 'open' || current.circuitState === 'half-open';
+  const wasOpenOrHalfOpen = current.circuitState === 'open' || current.circuitState === 'half-open';
 
   return {
     ...current,
@@ -121,8 +126,7 @@ function handleFailure(
   }
 
   // closed + atteint le seuil → open
-  const shouldOpen =
-    current.circuitState === 'closed' && consecutiveFailures >= failureThreshold;
+  const shouldOpen = current.circuitState === 'closed' && consecutiveFailures >= failureThreshold;
 
   return {
     ...current,

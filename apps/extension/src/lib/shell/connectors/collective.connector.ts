@@ -227,7 +227,10 @@ export class CollectiveConnector extends BaseConnector {
         variables: {
           data: {
             query: context?.query ?? '',
-            dailyRates: { from: context?.tjmMin && context.tjmMin > 0 ? context.tjmMin : 0, to: null },
+            dailyRates: {
+              from: context?.tjmMin && context.tjmMin > 0 ? context.tjmMin : 0,
+              to: null,
+            },
             locations: context?.location ? [context.location] : [],
             skills: context?.skills ?? [],
             workPreferences:

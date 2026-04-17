@@ -40,11 +40,13 @@ function maxBytes(maxB: number) {
 
 // ── Missions ─────────────────────────────────────────────────────────────────
 
-const MissionSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  source: z.string(),
-}).passthrough(); // Les autres champs de Mission sont acceptés
+const MissionSchema = z
+  .object({
+    id: z.string(),
+    title: z.string(),
+    source: z.string(),
+  })
+  .passthrough(); // Les autres champs de Mission sont acceptés
 
 const MissionsPayloadSchema = z.array(MissionSchema).max(500, {
   message: 'MISSIONS_UPDATED payload exceeds 500 items limit',
@@ -149,7 +151,10 @@ export const MessageSchemas = {
   SCAN_CANCEL: z.object({ type: z.literal('SCAN_CANCEL') }),
 
   // Missions
-  MISSIONS_UPDATED: z.object({ type: z.literal('MISSIONS_UPDATED'), payload: MissionsPayloadSchema }),
+  MISSIONS_UPDATED: z.object({
+    type: z.literal('MISSIONS_UPDATED'),
+    payload: MissionsPayloadSchema,
+  }),
 
   // Tracking
   UPDATE_TRACKING: z.object({
@@ -180,7 +185,10 @@ export const MessageSchemas = {
     type: z.literal('GET_GENERATED_ASSETS'),
     payload: z.object({ missionId: z.string().max(256) }),
   }),
-  GENERATED_ASSETS_RESULT: z.object({ type: z.literal('GENERATED_ASSETS_RESULT'), payload: z.unknown() }),
+  GENERATED_ASSETS_RESULT: z.object({
+    type: z.literal('GENERATED_ASSETS_RESULT'),
+    payload: z.unknown(),
+  }),
 
   // Toast
   SHOW_TOAST: z.object({
@@ -233,16 +241,23 @@ export type MessageType = keyof typeof MessageSchemas;
  * Valide un message entrant contre son schéma.
  * Retourne le message typé si valide, ou une erreur structurée.
  */
-export function validateMessage(raw: unknown): {
-  valid: true;
-  message: { type: string; payload?: unknown };
-} | {
-  valid: false;
-  messageType: string | undefined;
-  errors: string[];
-} {
+export function validateMessage(raw: unknown):
+  | {
+      valid: true;
+      message: { type: string; payload?: unknown };
+    }
+  | {
+      valid: false;
+      messageType: string | undefined;
+      errors: string[];
+    } {
   // 1. Le message doit être un objet avec un champ `type`
-  if (!raw || typeof raw !== 'object' || !('type' in raw) || typeof (raw as Record<string, unknown>).type !== 'string') {
+  if (
+    !raw ||
+    typeof raw !== 'object' ||
+    !('type' in raw) ||
+    typeof (raw as Record<string, unknown>).type !== 'string'
+  ) {
     return {
       valid: false,
       messageType: undefined,

@@ -9,7 +9,9 @@ describe('validateMessage — structure de base', () => {
   it('rejette null', () => {
     const r = validateMessage(null);
     expect(r.valid).toBe(false);
-    if (!r.valid) expect(r.messageType).toBeUndefined();
+    if (!r.valid) {
+      expect(r.messageType).toBeUndefined();
+    }
   });
 
   it('rejette une string', () => {
@@ -56,7 +58,10 @@ describe('validateMessage — messages sans payload', () => {
 
 describe('validateMessage — SAVE_PROFILE', () => {
   it('accepte un payload valide', () => {
-    const r = validateMessage({ type: 'SAVE_PROFILE', payload: { skills: ['React'], tjmMin: 500 } });
+    const r = validateMessage({
+      type: 'SAVE_PROFILE',
+      payload: { skills: ['React'], tjmMin: 500 },
+    });
     expect(r.valid).toBe(true);
   });
 
@@ -64,7 +69,9 @@ describe('validateMessage — SAVE_PROFILE', () => {
     const huge = { type: 'SAVE_PROFILE', payload: { bio: 'x'.repeat(11_000) } };
     const r = validateMessage(huge);
     expect(r.valid).toBe(false);
-    if (!r.valid) expect(r.errors.some((e) => e.includes('10KB'))).toBe(true);
+    if (!r.valid) {
+      expect(r.errors.some((e) => e.includes('10KB'))).toBe(true);
+    }
   });
 });
 
@@ -75,7 +82,7 @@ describe('validateMessage — SAVE_PROFILE', () => {
 describe('validateMessage — MISSIONS_UPDATED', () => {
   const validMission = { id: 'm1', title: 'Dev React', source: 'freework' };
 
-  it('accepte jusqu\'à 500 missions', () => {
+  it("accepte jusqu'à 500 missions", () => {
     const missions = Array.from({ length: 500 }, (_, i) => ({ ...validMission, id: `m${i}` }));
     const r = validateMessage({ type: 'MISSIONS_UPDATED', payload: missions });
     expect(r.valid).toBe(true);
@@ -85,10 +92,12 @@ describe('validateMessage — MISSIONS_UPDATED', () => {
     const missions = Array.from({ length: 501 }, (_, i) => ({ ...validMission, id: `m${i}` }));
     const r = validateMessage({ type: 'MISSIONS_UPDATED', payload: missions });
     expect(r.valid).toBe(false);
-    if (!r.valid) expect(r.errors.some((e) => e.includes('500'))).toBe(true);
+    if (!r.valid) {
+      expect(r.errors.some((e) => e.includes('500'))).toBe(true);
+    }
   });
 
-  it('rejette un payload qui n\'est pas un array', () => {
+  it("rejette un payload qui n'est pas un array", () => {
     const r = validateMessage({ type: 'MISSIONS_UPDATED', payload: 'not-an-array' });
     expect(r.valid).toBe(false);
   });

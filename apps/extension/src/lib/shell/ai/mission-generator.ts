@@ -11,7 +11,10 @@ import type { GeneratedAsset, GenerationType } from '../../core/types/generation
 import { buildPitchPrompt } from '../../core/generation/build-pitch-prompt';
 import { buildCoverMessagePrompt } from '../../core/generation/build-cover-message';
 import { buildCvSummaryPrompt } from '../../core/generation/build-cv-summary';
-import { cleanGenerationOutput, isValidGeneration } from '../../core/generation/parse-generation-result';
+import {
+  cleanGenerationOutput,
+  isValidGeneration,
+} from '../../core/generation/parse-generation-result';
 import { isPromptApiAvailable } from './capabilities';
 import type { AILanguageModelSession } from './chrome-ai';
 
@@ -24,11 +27,7 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 /**
  * Build the appropriate prompt based on generation type.
  */
-const buildPrompt = (
-  type: GenerationType,
-  mission: Mission,
-  profile: UserProfile
-): string => {
+const buildPrompt = (type: GenerationType, mission: Mission, profile: UserProfile): string => {
   switch (type) {
     case 'pitch':
       return buildPitchPrompt(mission, profile, mission.scoreBreakdown);

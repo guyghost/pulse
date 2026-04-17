@@ -33,10 +33,10 @@
   let showPassword = $state(false);
 
   // Form validation
-  let canSubmit = $derived(formEmail.length > 0 && formPassword.length >= 6);
+  const canSubmit = $derived(formEmail.length > 0 && formPassword.length >= 6);
 
   // Premium expiry formatting
-  let formattedExpiry = $derived(
+  const formattedExpiry = $derived(
     premiumExpiresAt
       ? new Intl.DateTimeFormat('fr-FR', {
           day: 'numeric',
@@ -47,7 +47,7 @@
   );
 
   // Premium badge config
-  let badgeConfig = $derived.by(() => {
+  const badgeConfig = $derived.by(() => {
     switch (premiumStatus) {
       case 'premium':
         return {
@@ -69,12 +69,16 @@
   });
 
   function handleLogin() {
-    if (!canSubmit || isLoading) return;
+    if (!canSubmit || isLoading) {
+      return;
+    }
     onLogin(formEmail, formPassword);
   }
 
   function handleSignup() {
-    if (!canSubmit || isLoading) return;
+    if (!canSubmit || isLoading) {
+      return;
+    }
     onSignup(formEmail, formPassword);
   }
 
@@ -172,7 +176,13 @@
     </div>
   {:else}
     <!-- Not logged in state -->
-    <form class="space-y-3" onsubmit={(e) => { e.preventDefault(); handleLogin(); }}>
+    <form
+      class="space-y-3"
+      onsubmit={(e) => {
+        e.preventDefault();
+        handleLogin();
+      }}
+    >
       <div class="space-y-2">
         <!-- Email input -->
         <div class="relative">

@@ -55,7 +55,7 @@ describe('computeHealthMetrics', () => {
     expect(metrics.msSinceLastSuccess).toBeNull();
   });
 
-  it('calcule le taux d\'échec correctement', () => {
+  it("calcule le taux d'échec correctement", () => {
     const snap = makeSnapshot({ totalSuccesses: 7, totalFailures: 3 });
     const metrics = computeHealthMetrics(snap, T0 + 1000);
     expect(metrics.failureRate).toBeCloseTo(0.3);
@@ -79,13 +79,13 @@ describe('computeHealthMetrics', () => {
     expect(metrics.p95LatencyMs!).toBeGreaterThan(metrics.p50LatencyMs!);
   });
 
-  it('taux d\'échec = 1 si aucun succès', () => {
+  it("taux d'échec = 1 si aucun succès", () => {
     const snap = makeSnapshot({ totalFailures: 5, totalSuccesses: 0 });
     const metrics = computeHealthMetrics(snap, T0 + 1000);
     expect(metrics.failureRate).toBe(1);
   });
 
-  it('taux d\'échec = 0 si aucun échec', () => {
+  it("taux d'échec = 0 si aucun échec", () => {
     const snap = makeSnapshot({ totalSuccesses: 10, totalFailures: 0 });
     const metrics = computeHealthMetrics(snap, T0 + 1000);
     expect(metrics.failureRate).toBe(0);

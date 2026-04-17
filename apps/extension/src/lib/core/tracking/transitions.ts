@@ -11,10 +11,7 @@ import { VALID_TRANSITIONS } from '../types/tracking';
 /**
  * Check if a transition from one status to another is valid.
  */
-export const isValidTransition = (
-  from: ApplicationStatus,
-  to: ApplicationStatus
-): boolean => {
+export const isValidTransition = (from: ApplicationStatus, to: ApplicationStatus): boolean => {
   const allowed = VALID_TRANSITIONS[from];
   return allowed ? allowed.includes(to) : false;
 };
@@ -22,10 +19,7 @@ export const isValidTransition = (
 /**
  * Create a fresh tracking record for a newly discovered mission.
  */
-export const createTracking = (
-  missionId: string,
-  timestamp: number
-): MissionTracking => ({
+export const createTracking = (missionId: string, timestamp: number): MissionTracking => ({
   missionId,
   currentStatus: 'new',
   history: [{ from: null, to: 'new', timestamp, note: null }],
@@ -87,20 +81,14 @@ export const setTrackingRating = (
 /**
  * Update notes on a tracking record.
  */
-export const setTrackingNotes = (
-  tracking: MissionTracking,
-  notes: string
-): MissionTracking => {
+export const setTrackingNotes = (tracking: MissionTracking, notes: string): MissionTracking => {
   return { ...tracking, notes };
 };
 
 /**
  * Add a generated asset ID to a tracking record.
  */
-export const addGeneratedAsset = (
-  tracking: MissionTracking,
-  assetId: string
-): MissionTracking => {
+export const addGeneratedAsset = (tracking: MissionTracking, assetId: string): MissionTracking => {
   if (tracking.generatedAssetIds.includes(assetId)) {
     return tracking;
   }
@@ -121,9 +109,7 @@ export const getLastTransitionTime = (tracking: MissionTracking): number | null 
 /**
  * Count how many missions have each status.
  */
-export const countByStatus = (
-  trackings: MissionTracking[]
-): Record<ApplicationStatus, number> => {
+export const countByStatus = (trackings: MissionTracking[]): Record<ApplicationStatus, number> => {
   const counts: Record<string, number> = {
     new: 0,
     interested: 0,

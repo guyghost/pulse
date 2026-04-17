@@ -154,8 +154,10 @@ export class FreeWorkConnector extends BaseConnector {
           if (ageMs > maxAgeMs) {
             // Keep only fresh missions from this page (some may still be within range)
             const freshOnPage = missions.filter((m) => {
-              if (!m.publishedAt) return true;
-              return (now - new Date(m.publishedAt).getTime()) <= maxAgeMs;
+              if (!m.publishedAt) {
+                return true;
+              }
+              return now - new Date(m.publishedAt).getTime() <= maxAgeMs;
             });
             allMissions.push(...freshOnPage);
             if (import.meta.env.DEV) {

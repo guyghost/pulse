@@ -18,9 +18,9 @@ export function createAuthStore() {
   let error = $state<string | null>(null);
 
   // Derived values
-  let isAuthenticated = $derived(authStatus === 'authenticated');
-  let isPremium = $derived(isPremiumActive(user, Date.now()));
-  let premiumStatus = $derived<PremiumStatus>(user?.premiumStatus ?? 'free');
+  const isAuthenticated = $derived(authStatus === 'authenticated');
+  const isPremium = $derived(isPremiumActive(user, Date.now()));
+  const premiumStatus = $derived<PremiumStatus>(user?.premiumStatus ?? 'free');
 
   /**
    * Check current auth status via bridge.
@@ -34,7 +34,11 @@ export function createAuthStore() {
       const response = await sendMessage({ type: 'AUTH_STATUS' });
 
       if (response.type === 'AUTH_RESULT') {
-        const payload = response.payload as { status: AuthStatus; user: AuthUser | null; error?: string };
+        const payload = response.payload as {
+          status: AuthStatus;
+          user: AuthUser | null;
+          error?: string;
+        };
         authStatus = payload.status;
         user = payload.user;
         if (payload.error) {
@@ -52,7 +56,10 @@ export function createAuthStore() {
   /**
    * Log in with email/password.
    */
-  async function login(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+  async function login(
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string }> {
     storeState = 'loading';
     error = null;
 
@@ -63,7 +70,11 @@ export function createAuthStore() {
       });
 
       if (response.type === 'AUTH_RESULT') {
-        const payload = response.payload as { status: AuthStatus; user: AuthUser | null; error?: string };
+        const payload = response.payload as {
+          status: AuthStatus;
+          user: AuthUser | null;
+          error?: string;
+        };
         authStatus = payload.status;
         user = payload.user;
         storeState = 'ready';
@@ -86,7 +97,10 @@ export function createAuthStore() {
   /**
    * Sign up with email/password.
    */
-  async function signup(email: string, password: string): Promise<{ success: boolean; error?: string }> {
+  async function signup(
+    email: string,
+    password: string
+  ): Promise<{ success: boolean; error?: string }> {
     storeState = 'loading';
     error = null;
 
@@ -97,7 +111,11 @@ export function createAuthStore() {
       });
 
       if (response.type === 'AUTH_RESULT') {
-        const payload = response.payload as { status: AuthStatus; user: AuthUser | null; error?: string };
+        const payload = response.payload as {
+          status: AuthStatus;
+          user: AuthUser | null;
+          error?: string;
+        };
         authStatus = payload.status;
         user = payload.user;
         storeState = 'ready';
@@ -133,13 +151,27 @@ export function createAuthStore() {
   }
 
   return {
-    get storeState() { return storeState; },
-    get authStatus() { return authStatus; },
-    get user() { return user; },
-    get error() { return error; },
-    get isAuthenticated() { return isAuthenticated; },
-    get isPremium() { return isPremium; },
-    get premiumStatus() { return premiumStatus; },
+    get storeState() {
+      return storeState;
+    },
+    get authStatus() {
+      return authStatus;
+    },
+    get user() {
+      return user;
+    },
+    get error() {
+      return error;
+    },
+    get isAuthenticated() {
+      return isAuthenticated;
+    },
+    get isPremium() {
+      return isPremium;
+    },
+    get premiumStatus() {
+      return premiumStatus;
+    },
     checkStatus,
     login,
     signup,

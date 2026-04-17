@@ -185,11 +185,11 @@
       y2="12"
     />
   {:else if name === 'crown'}
-    <path
-      d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14"
-    />
+    <path d="m2 4 3 12h14l3-12-6 7-4-7-4 7-6-7zm3 16h14" />
   {:else if name === 'mail'}
-    <rect width="20" height="16" x="2" y="4" rx="2" /><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7" />
+    <rect width="20" height="16" x="2" y="4" rx="2" /><path
+      d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"
+    />
   {:else if name === 'lock'}
     <rect width="18" height="11" x="3" y="11" rx="2" ry="2" /><path d="M7 11V7a5 5 0 0 1 10 0v4" />
   {/if}

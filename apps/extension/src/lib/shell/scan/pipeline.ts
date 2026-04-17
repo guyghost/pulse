@@ -63,7 +63,9 @@ export function createExtractStage(
       const results: Mission[] = [];
 
       for (const connector of connectors) {
-        if (ctx.signal?.aborted) break;
+        if (ctx.signal?.aborted) {
+          break;
+        }
 
         const result = await connector.fetchMissions(
           ctx.now.getTime(),
@@ -107,7 +109,9 @@ export const dedupStage: PipelineStage = {
 export const scoreStage: PipelineStage = {
   name: 'score',
   execute: async (missions: Mission[], ctx: PipelineContext) => {
-    if (!ctx.profile) return missions;
+    if (!ctx.profile) {
+      return missions;
+    }
 
     return missions.map((m) => {
       const result: DeterministicScoreResult = scoreMission(m, ctx.profile!, ctx.now);
@@ -126,7 +130,9 @@ export const scoreStage: PipelineStage = {
 export const enrichStage: PipelineStage = {
   name: 'enrich',
   execute: async (missions: Mission[], ctx: PipelineContext) => {
-    if (!ctx.profile || ctx.signal?.aborted) return missions;
+    if (!ctx.profile || ctx.signal?.aborted) {
+      return missions;
+    }
 
     try {
       const semanticResults = await scoreMissionsSemantic(
@@ -228,7 +234,9 @@ export async function runPipeline(
   const stageResults: PipelineResult['stageResults'] = [];
 
   for (let i = 0; i < stages.length; i++) {
-    if (ctx.signal?.aborted) break;
+    if (ctx.signal?.aborted) {
+      break;
+    }
 
     const stage = stages[i];
     const inputCount = current.length;

@@ -67,7 +67,7 @@ describe('getHealthSnapshot', () => {
     expect(snap.consecutiveFailures).toBe(0);
   });
 
-  it('retourne le snapshot stocké s\'il existe', async () => {
+  it("retourne le snapshot stocké s'il existe", async () => {
     const stored = makeSnapshot('freework', { circuitState: 'open', consecutiveFailures: 3 });
     await saveHealthSnapshot(stored);
 
@@ -106,7 +106,7 @@ describe('saveHealthSnapshot', () => {
     expect(loaded.totalSuccesses).toBe(10);
   });
 
-  it('ne touche pas aux autres connecteurs lors d\'une sauvegarde', async () => {
+  it("ne touche pas aux autres connecteurs lors d'une sauvegarde", async () => {
     const snapA = makeSnapshot('freework', { consecutiveFailures: 1 });
     const snapB = makeSnapshot('lehibou', { consecutiveFailures: 2 });
 
@@ -162,7 +162,7 @@ describe('resetHealthSnapshot', () => {
     vi.clearAllMocks();
   });
 
-  it('supprime le snapshot d\'un connecteur', async () => {
+  it("supprime le snapshot d'un connecteur", async () => {
     await saveHealthSnapshot(makeSnapshot('freework', { circuitState: 'open' }));
     await resetHealthSnapshot('freework');
 

@@ -54,9 +54,7 @@ export async function scheduleProbe(
     chrome.alarms.create(name, { delayInMinutes });
 
     if (import.meta.env.DEV) {
-      console.log(
-        `[ProbeScheduler] Probe scheduled for ${connectorId} in ${delayInMinutes}min`
-      );
+      console.log(`[ProbeScheduler] Probe scheduled for ${connectorId} in ${delayInMinutes}min`);
     }
   } catch {
     // Non-critical — le circuit breaker fonctionne sans l'alarme

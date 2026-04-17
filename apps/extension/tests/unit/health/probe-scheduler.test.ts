@@ -47,7 +47,10 @@ import {
   isProbeAlarm,
   connectorIdFromAlarm,
 } from '../../../src/lib/shell/health/probe-scheduler';
-import { createInitialHealthSnapshot, DEFAULT_HEALTH_THRESHOLDS } from '../../../src/lib/core/types/health';
+import {
+  createInitialHealthSnapshot,
+  DEFAULT_HEALTH_THRESHOLDS,
+} from '../../../src/lib/core/types/health';
 import type { ConnectorHealthSnapshot } from '../../../src/lib/core/types/health';
 
 // ============================================================================
@@ -77,7 +80,7 @@ describe('alarm name helpers', () => {
     expect(isProbeAlarm('auto-scan')).toBe(false);
   });
 
-  it('connectorIdFromAlarm extrait l\'ID du connecteur', () => {
+  it("connectorIdFromAlarm extrait l'ID du connecteur", () => {
     expect(connectorIdFromAlarm('probe:freework')).toBe('freework');
     expect(connectorIdFromAlarm('probe:lehibou')).toBe('lehibou');
   });
@@ -104,13 +107,13 @@ describe('scheduleProbe', () => {
     );
   });
 
-  it('utilise le nom de connecteur dans le nom de l\'alarme', async () => {
+  it("utilise le nom de connecteur dans le nom de l'alarme", async () => {
     await scheduleProbe('lehibou', DEFAULT_HEALTH_THRESHOLDS);
 
     expect(mockAlarms.create).toHaveBeenCalledWith('probe:lehibou', expect.any(Object));
   });
 
-  it('supprime l\'ancienne alarme avant d\'en créer une nouvelle (idempotence)', async () => {
+  it("supprime l'ancienne alarme avant d'en créer une nouvelle (idempotence)", async () => {
     await scheduleProbe('freework');
     await scheduleProbe('freework');
 
@@ -129,7 +132,7 @@ describe('cancelProbe', () => {
     vi.clearAllMocks();
   });
 
-  it('supprime l\'alarme du connecteur', async () => {
+  it("supprime l'alarme du connecteur", async () => {
     await scheduleProbe('freework');
     vi.clearAllMocks();
 
@@ -138,7 +141,7 @@ describe('cancelProbe', () => {
     expect(mockAlarms.clear).toHaveBeenCalledWith('probe:freework');
   });
 
-  it('ne lève pas d\'erreur si l\'alarme n\'existe pas', async () => {
+  it("ne lève pas d'erreur si l'alarme n'existe pas", async () => {
     await expect(cancelProbe('unknown-connector')).resolves.toBeUndefined();
   });
 });

@@ -327,7 +327,9 @@ export async function upsertMissions(newMissions: Mission[]): Promise<number> {
  */
 export async function getMissionById(id: string): Promise<Mission | null> {
   const raw = await withStore<unknown>('missions', 'readonly', (store) => store.get(id));
-  if (!raw) return null;
+  if (!raw) {
+    return null;
+  }
   return parseMission(raw) ?? null;
 }
 

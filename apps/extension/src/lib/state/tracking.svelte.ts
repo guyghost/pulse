@@ -89,12 +89,10 @@ export function createTrackingStore() {
       // Outside extension context — try direct storage
       try {
         const { getTracking, saveTracking } = await import('$lib/shell/storage/tracking');
-        const { transitionStatus: transition } = await import(
-          '$lib/core/tracking/transitions'
-        );
+        const { transitionStatus: transition } = await import('$lib/core/tracking/transitions');
         const { createTracking } = await import('$lib/core/tracking/transitions');
 
-        let tracking = (await getTracking(missionId)) ?? createTracking(missionId, Date.now());
+        const tracking = (await getTracking(missionId)) ?? createTracking(missionId, Date.now());
         const updated = transition(tracking, newStatus, Date.now(), note ?? null);
         if (updated) {
           await saveTracking(updated);
@@ -120,7 +118,9 @@ export function createTrackingStore() {
    */
   function getStatusLabel(missionId: string): string | null {
     const tracking = trackings.get(missionId);
-    if (!tracking) return null;
+    if (!tracking) {
+      return null;
+    }
     return STATUS_LABELS[tracking.currentStatus];
   }
 

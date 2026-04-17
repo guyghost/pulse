@@ -118,7 +118,9 @@
                   <p class="text-xs font-semibold uppercase tracking-[0.12em] text-text-secondary">
                     {level.label}
                   </p>
-                  <p class="mt-0.5 text-[10px] font-mono text-text-muted">{range.min}–{range.max}€</p>
+                  <p class="mt-0.5 text-[10px] font-mono text-text-muted">
+                    {range.min}–{range.max}€
+                  </p>
                 </div>
               </div>
               <div class="text-right">
@@ -143,9 +145,7 @@
           {#each analysis.regionInsights.slice(0, 8) as region}
             {@const barWidth = Math.max(
               15,
-              Math.round(
-                (region.average / (analysis.regionInsights[0]?.average || 1)) * 100
-              )
+              Math.round((region.average / (analysis.regionInsights[0]?.average || 1)) * 100)
             )}
             <div class="space-y-1">
               <div class="flex items-center justify-between">

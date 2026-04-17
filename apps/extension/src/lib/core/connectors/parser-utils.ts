@@ -61,7 +61,13 @@ export function stripHtml(html: string): string {
  */
 export type MissionFields = Omit<
   Mission,
-  'scoreBreakdown' | 'score' | 'semanticScore' | 'semanticReason' | 'startDate' | 'seniority' | 'publishedAt'
+  | 'scoreBreakdown'
+  | 'score'
+  | 'semanticScore'
+  | 'semanticReason'
+  | 'startDate'
+  | 'seniority'
+  | 'publishedAt'
 > & {
   startDate?: string | null;
   seniority?: SeniorityLevel | null;

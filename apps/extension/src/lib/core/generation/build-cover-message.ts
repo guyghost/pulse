@@ -14,10 +14,7 @@ import type { UserProfile } from '../types/profile';
  * @param profile - User profile
  * @returns Prompt string for the LLM
  */
-export const buildCoverMessagePrompt = (
-  mission: Mission,
-  profile: UserProfile
-): string => {
+export const buildCoverMessagePrompt = (mission: Mission, profile: UserProfile): string => {
   return `Écris un message court (5-6 phrases max) pour contacter un recruteur à propos de cette mission freelance.
 Style: direct, senior, confiant. Pas de formules creuses.
 Tu expliques pourquoi tu es le bon profil et tu proposes un échange.

@@ -33,7 +33,7 @@
           dotClass: 'bg-red-400 shadow-[0_0_6px_theme(colors.red-400/60%)]',
           labelClass: 'text-red-400',
           label: 'Suspendu',
-          title: 'Connecteur suspendu — trop d\'erreurs',
+          title: "Connecteur suspendu — trop d'erreurs",
         };
     }
   });
@@ -41,15 +41,8 @@
   const dotSize = $derived(size === 'md' ? 'size-2.5' : 'size-2');
 </script>
 
-<span
-  class="inline-flex items-center gap-1.5"
-  title={config.title}
-  aria-label={config.title}
->
-  <span
-    class="shrink-0 rounded-full {dotSize} {config.dotClass}"
-    aria-hidden="true"
-  ></span>
+<span class="inline-flex items-center gap-1.5" title={config.title} aria-label={config.title}>
+  <span class="shrink-0 rounded-full {dotSize} {config.dotClass}" aria-hidden="true"></span>
   {#if showLabel}
     <span class="text-[10px] font-medium {config.labelClass}">{config.label}</span>
   {/if}

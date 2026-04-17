@@ -148,7 +148,7 @@ describe('parse-generation-result', () => {
     });
 
     it('preserves normal content', () => {
-      const input = 'Je suis un développeur Go senior avec 8 ans d\'expérience.';
+      const input = "Je suis un développeur Go senior avec 8 ans d'expérience.";
       expect(cleanGenerationOutput(input)).toBe(input);
     });
 
@@ -169,7 +169,9 @@ describe('parse-generation-result', () => {
     });
 
     it('accepts reasonable content', () => {
-      expect(isValidGeneration('Je suis un développeur senior avec 8 ans d\'expérience en Go.')).toBe(true);
+      expect(
+        isValidGeneration("Je suis un développeur senior avec 8 ans d'expérience en Go.")
+      ).toBe(true);
     });
 
     it('rejects overly long content', () => {

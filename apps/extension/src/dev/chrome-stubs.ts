@@ -71,7 +71,10 @@ function createChromeStubs() {
             console.log('[Chrome Stub] Profile updated notification');
             return null;
           case 'AUTH_LOGIN':
-            console.log('[Chrome Stub] Auth login stub:', (message.payload as Record<string, unknown>)?.email);
+            console.log(
+              '[Chrome Stub] Auth login stub:',
+              (message.payload as Record<string, unknown>)?.email
+            );
             return {
               type: 'AUTH_RESULT',
               payload: {
@@ -81,7 +84,10 @@ function createChromeStubs() {
               },
             };
           case 'AUTH_SIGNUP':
-            console.log('[Chrome Stub] Auth signup stub:', (message.payload as Record<string, unknown>)?.email);
+            console.log(
+              '[Chrome Stub] Auth signup stub:',
+              (message.payload as Record<string, unknown>)?.email
+            );
             return {
               type: 'AUTH_RESULT',
               payload: {

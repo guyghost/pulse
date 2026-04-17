@@ -54,7 +54,9 @@ async function loadAll(): Promise<StoredSnapshots> {
   try {
     const result = await chrome.storage.local.get(STORAGE_KEY);
     const raw = result[STORAGE_KEY];
-    if (!raw || typeof raw !== 'object') return {};
+    if (!raw || typeof raw !== 'object') {
+      return {};
+    }
 
     const snapshots: StoredSnapshots = {};
     for (const [id, value] of Object.entries(raw)) {

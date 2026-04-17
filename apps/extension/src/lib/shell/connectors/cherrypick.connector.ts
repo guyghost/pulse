@@ -12,7 +12,6 @@ const BASE_URL = 'https://app.cherry-pick.io';
 const SEARCH_URL = `${BASE_URL}/api/mission/search`;
 const COOKIE_DOMAIN = '.cherry-pick.io';
 
-
 export class CherryPickConnector extends BaseConnector {
   readonly id = 'cherry-pick';
   readonly name = 'Cherry Pick';

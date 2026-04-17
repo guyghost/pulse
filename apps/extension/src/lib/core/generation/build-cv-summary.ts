@@ -14,18 +14,11 @@ import type { UserProfile } from '../types/profile';
  * @param profile - User profile
  * @returns Prompt string for the LLM
  */
-export const buildCvSummaryPrompt = (
-  mission: Mission,
-  profile: UserProfile
-): string => {
+export const buildCvSummaryPrompt = (mission: Mission, profile: UserProfile): string => {
   // Find overlapping stack items
   const profileStackLower = profile.stack.map((s) => s.toLowerCase());
-  const matchingStack = mission.stack.filter((s) =>
-    profileStackLower.includes(s.toLowerCase())
-  );
-  const missingStack = mission.stack.filter(
-    (s) => !profileStackLower.includes(s.toLowerCase())
-  );
+  const matchingStack = mission.stack.filter((s) => profileStackLower.includes(s.toLowerCase()));
+  const missingStack = mission.stack.filter((s) => !profileStackLower.includes(s.toLowerCase()));
 
   return `Génère un résumé de profil (4-5 phrases) adapté à cette mission freelance.
 Mets en avant les compétences qui matchent la mission.

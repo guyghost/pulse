@@ -1,4 +1,9 @@
-import { getProfile, saveProfile, saveConnectorStatuses, getMissionById } from '../lib/shell/storage/db';
+import {
+  getProfile,
+  saveProfile,
+  saveConnectorStatuses,
+  getMissionById,
+} from '../lib/shell/storage/db';
 import type {
   BridgeMessage,
   ScanProgressPayload,
@@ -33,7 +38,11 @@ import {
   getAllTrackings,
   getTrackingsByStatus,
 } from '../lib/shell/storage/tracking';
-import { createTracking, transitionStatus, addGeneratedAsset } from '../lib/core/tracking/transitions';
+import {
+  createTracking,
+  transitionStatus,
+  addGeneratedAsset,
+} from '../lib/core/tracking/transitions';
 import { generateAsset } from '../lib/shell/ai/mission-generator';
 import {
   saveGeneratedAsset,
@@ -301,7 +310,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         { sender: _sender.id ?? _sender.tab?.id }
       );
     }
-    sendResponse({ success: false, error: { code: 'VALIDATION_ERROR', message: validation.errors.join('; ') } });
+    sendResponse({
+      success: false,
+      error: { code: 'VALIDATION_ERROR', message: validation.errors.join('; ') },
+    });
     return false;
   }
 
@@ -312,379 +324,411 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
   // Chaque branche a son propre try/catch mais cette enveloppe protège contre
   // toute exception imprévue qui sinon crasherait le service worker.
   try {
-  if (message.type === 'GET_PROFILE') {
-    getProfile().then((profile) => {
-      sendResponse({ type: 'PROFILE_RESULT', payload: profile });
-    });
-    return true;
-  }
-
-  if (message.type === 'SAVE_PROFILE') {
-    // Profile is now saved directly from the side panel via IndexedDB.
-    // Keep handler for backwards compatibility with queued messages.
-    saveProfile(message.payload)
-      .then(() => {
-        sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
-      })
-      .catch((err) => {
-        console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
-        sendResponse({ type: 'PROFILE_RESULT', payload: null });
+    if (message.type === 'GET_PROFILE') {
+      getProfile().then((profile) => {
+        sendResponse({ type: 'PROFILE_RESULT', payload: profile });
       });
-    return true;
-  }
+      return true;
+    }
 
-  // ── Scan orchestration (panel → service worker) ──
+    if (message.type === 'SAVE_PROFILE') {
+      // Profile is now saved directly from the side panel via IndexedDB.
+      // Keep handler for backwards compatibility with queued messages.
+      saveProfile(message.payload)
+        .then(() => {
+          sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
+          sendResponse({ type: 'PROFILE_RESULT', payload: null });
+        });
+      return true;
+    }
 
-  if (message.type === 'SCAN_START') {
-    handleScanStartFromPanel()
-      .then((missions) => {
-        sendResponse({ type: 'SCAN_COMPLETE', payload: missions });
-      })
-      .catch((err) => {
-        console.error('[MissionPulse] SCAN_START error:', err);
-        const code = err instanceof ScanError ? err.code : 'UNKNOWN';
-        const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue lors du scan';
-        sendResponse({ type: 'SCAN_ERROR', payload: { message: errorMessage, code } });
-      });
-    return true; // async response
-  }
+    // ── Scan orchestration (panel → service worker) ──
 
-  if (message.type === 'SCAN_CANCEL') {
-    cancelCurrentScan();
-    sendResponse({ type: 'SCAN_CANCEL' });
-    return false;
-  }
+    if (message.type === 'SCAN_START') {
+      handleScanStartFromPanel()
+        .then((missions) => {
+          sendResponse({ type: 'SCAN_COMPLETE', payload: missions });
+        })
+        .catch((err) => {
+          console.error('[MissionPulse] SCAN_START error:', err);
+          const code = err instanceof ScanError ? err.code : 'UNKNOWN';
+          const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue lors du scan';
+          sendResponse({ type: 'SCAN_ERROR', payload: { message: errorMessage, code } });
+        });
+      return true; // async response
+    }
 
-  // ── Tracking handlers ──
+    if (message.type === 'SCAN_CANCEL') {
+      cancelCurrentScan();
+      sendResponse({ type: 'SCAN_CANCEL' });
+      return false;
+    }
 
-  if (message.type === 'UPDATE_TRACKING') {
-    const { missionId, status, note } = message.payload;
-    const now = Date.now();
+    // ── Tracking handlers ──
 
-    (async () => {
-      try {
-        let tracking = await getTracking(missionId);
-        if (!tracking) {
-          tracking = createTracking(missionId, now);
-        }
+    if (message.type === 'UPDATE_TRACKING') {
+      const { missionId, status, note } = message.payload;
+      const now = Date.now();
 
-        const updated = transitionStatus(tracking, status, now, note ?? null);
-        if (!updated) {
+      (async () => {
+        try {
+          let tracking = await getTracking(missionId);
+          if (!tracking) {
+            tracking = createTracking(missionId, now);
+          }
+
+          const updated = transitionStatus(tracking, status, now, note ?? null);
+          if (!updated) {
+            sendResponse({
+              type: 'TRACKING_UPDATED',
+              payload: tracking,
+            });
+            return;
+          }
+
+          await saveTracking(updated);
+          sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+        } catch (err) {
+          console.error('[MissionPulse] UPDATE_TRACKING error:', err);
           sendResponse({
             type: 'TRACKING_UPDATED',
-            payload: tracking,
+            payload: {
+              missionId,
+              currentStatus: status,
+              history: [],
+              generatedAssetIds: [],
+              userRating: null,
+              notes: '',
+            },
           });
-          return;
         }
+      })();
+      return true;
+    }
 
-        await saveTracking(updated);
-        sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
-      } catch (err) {
-        console.error('[MissionPulse] UPDATE_TRACKING error:', err);
-        sendResponse({
-          type: 'TRACKING_UPDATED',
-          payload: {
-            missionId,
-            currentStatus: status,
-            history: [],
-            generatedAssetIds: [],
-            userRating: null,
-            notes: '',
-          },
+    if (message.type === 'GET_TRACKINGS') {
+      const { status } = message.payload ?? {};
+      const query = status ? getTrackingsByStatus(status) : getAllTrackings();
+
+      query
+        .then((trackings) => {
+          sendResponse({ type: 'TRACKINGS_RESULT', payload: trackings });
+        })
+        .catch((err) => {
+          console.error('[MissionPulse] GET_TRACKINGS error:', err);
+          sendResponse({ type: 'TRACKINGS_RESULT', payload: [] });
         });
-      }
-    })();
-    return true;
-  }
+      return true;
+    }
 
-  if (message.type === 'GET_TRACKINGS') {
-    const { status } = message.payload ?? {};
-    const query = status
-      ? getTrackingsByStatus(status)
-      : getAllTrackings();
+    // ── Generation handlers ──
 
-    query
-      .then((trackings) => {
-        sendResponse({ type: 'TRACKINGS_RESULT', payload: trackings });
-      })
-      .catch((err) => {
-        console.error('[MissionPulse] GET_TRACKINGS error:', err);
-        sendResponse({ type: 'TRACKINGS_RESULT', payload: [] });
-      });
-    return true;
-  }
+    if (message.type === 'GENERATE_ASSET') {
+      const { missionId, generationType } = message.payload;
 
-  // ── Generation handlers ──
+      (async () => {
+        try {
+          const mission = await getMissionById(missionId);
+          if (!mission) {
+            sendResponse({ type: 'GENERATION_RESULT', payload: null });
+            return;
+          }
 
-  if (message.type === 'GENERATE_ASSET') {
-    const { missionId, generationType } = message.payload;
+          const profile = await getProfile();
+          if (!profile) {
+            sendResponse({ type: 'GENERATION_RESULT', payload: null });
+            return;
+          }
 
-    (async () => {
-      try {
-        const mission = await getMissionById(missionId);
-        if (!mission) {
-          sendResponse({ type: 'GENERATION_RESULT', payload: null });
-          return;
-        }
+          let asset: GeneratedAsset | null = null;
 
-        const profile = await getProfile();
-        if (!profile) {
-          sendResponse({ type: 'GENERATION_RESULT', payload: null });
-          return;
-        }
-
-        let asset: GeneratedAsset | null = null;
-
-        // Try premium backend first if user is premium
-        const authUser = await loadAuthUser();
-        if (authUser && isPremiumActive(authUser, Date.now())) {
-          try {
-            asset = await generatePremium(missionId, generationType, mission, profile);
-          } catch (err) {
-            if (import.meta.env.DEV) {
-              console.warn('[MissionPulse] Premium generation failed, falling back to Gemini Nano:', err);
+          // Try premium backend first if user is premium
+          const authUser = await loadAuthUser();
+          if (authUser && isPremiumActive(authUser, Date.now())) {
+            try {
+              asset = await generatePremium(missionId, generationType, mission, profile);
+            } catch (err) {
+              if (import.meta.env.DEV) {
+                console.warn(
+                  '[MissionPulse] Premium generation failed, falling back to Gemini Nano:',
+                  err
+                );
+              }
             }
           }
-        }
 
-        // Fall back to Gemini Nano (free, local)
-        if (!asset) {
-          asset = await generateAsset(missionId, generationType, mission, profile);
-        }
+          // Fall back to Gemini Nano (free, local)
+          if (!asset) {
+            asset = await generateAsset(missionId, generationType, mission, profile);
+          }
 
-        if (!asset) {
+          if (!asset) {
+            sendResponse({ type: 'GENERATION_RESULT', payload: null });
+            return;
+          }
+
+          // Persist the generated asset
+          await saveGeneratedAsset(asset);
+
+          // Update tracking to reference the new asset
+          let tracking = await getTracking(missionId);
+          if (!tracking) {
+            tracking = createTracking(missionId, Date.now());
+          }
+          const updatedTracking = addGeneratedAsset(tracking, asset.id);
+          await saveTracking(updatedTracking);
+
+          sendResponse({ type: 'GENERATION_RESULT', payload: asset });
+        } catch (err) {
+          console.error('[MissionPulse] GENERATE_ASSET error:', err);
           sendResponse({ type: 'GENERATION_RESULT', payload: null });
-          return;
         }
+      })();
+      return true;
+    }
 
-        // Persist the generated asset
-        await saveGeneratedAsset(asset);
+    if (message.type === 'GET_GENERATED_ASSETS') {
+      const { missionId } = message.payload;
 
-        // Update tracking to reference the new asset
-        let tracking = await getTracking(missionId);
-        if (!tracking) {
-          tracking = createTracking(missionId, Date.now());
-        }
-        const updatedTracking = addGeneratedAsset(tracking, asset.id);
-        await saveTracking(updatedTracking);
-
-        sendResponse({ type: 'GENERATION_RESULT', payload: asset });
-      } catch (err) {
-        console.error('[MissionPulse] GENERATE_ASSET error:', err);
-        sendResponse({ type: 'GENERATION_RESULT', payload: null });
-      }
-    })();
-    return true;
-  }
-
-  if (message.type === 'GET_GENERATED_ASSETS') {
-    const { missionId } = message.payload;
-
-    getGeneratedAssetsForMission(missionId)
-      .then((assets) => {
-        sendResponse({ type: 'GENERATED_ASSETS_RESULT', payload: assets });
-      })
-      .catch((err) => {
-        console.error('[MissionPulse] GET_GENERATED_ASSETS error:', err);
-        sendResponse({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
-      });
-    return true;
-  }
-
-  // ── Auth handlers ──
-
-  if (message.type === 'AUTH_LOGIN') {
-    const { email, password } = message.payload;
-    const supabase = getSupabaseClient();
-
-    (async () => {
-      try {
-        const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-        if (error || !data.user) {
-          sendResponse({
-            type: 'AUTH_RESULT',
-            payload: { status: 'unauthenticated', user: null, error: error?.message ?? 'Login failed' },
-          });
-          return;
-        }
-
-        // Query profiles table for premium status
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('subscription_status, subscription_period_end')
-          .eq('id', data.user.id)
-          .single();
-
-        const now = Date.now();
-        let premiumStatus: AuthUser['premiumStatus'] = 'free';
-        let premiumExpiresAt: number | null = null;
-
-        if (profile?.subscription_status === 'premium') {
-          const expiresAt = profile.subscription_period_end
-            ? new Date(profile.subscription_period_end).getTime()
-            : null;
-          if (expiresAt && expiresAt > now) {
-            premiumStatus = 'premium';
-            premiumExpiresAt = expiresAt;
-          } else if (expiresAt && expiresAt <= now) {
-            premiumStatus = 'expired';
-            premiumExpiresAt = expiresAt;
-          } else {
-            // No expiry set but marked premium — treat as active
-            premiumStatus = 'premium';
-          }
-        }
-
-        const authUser: AuthUser = {
-          id: data.user.id,
-          email: data.user.email ?? email,
-          premiumStatus,
-          premiumExpiresAt,
-        };
-
-        await saveAuthUser(authUser);
-        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'authenticated', user: authUser } });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Login failed';
-        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null, error: msg } });
-      }
-    })();
-    return true;
-  }
-
-  if (message.type === 'AUTH_SIGNUP') {
-    const { email, password } = message.payload;
-    const supabase = getSupabaseClient();
-
-    (async () => {
-      try {
-        const { data, error } = await supabase.auth.signUp({ email, password });
-        if (error || !data.user) {
-          sendResponse({
-            type: 'AUTH_RESULT',
-            payload: { status: 'unauthenticated', user: null, error: error?.message ?? 'Signup failed' },
-          });
-          return;
-        }
-
-        // New users start as free — the trigger creates the profile row
-        const authUser: AuthUser = {
-          id: data.user.id,
-          email: data.user.email ?? email,
-          premiumStatus: 'free',
-          premiumExpiresAt: null,
-        };
-
-        await saveAuthUser(authUser);
-        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'authenticated', user: authUser } });
-      } catch (err) {
-        const msg = err instanceof Error ? err.message : 'Signup failed';
-        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null, error: msg } });
-      }
-    })();
-    return true;
-  }
-
-  if (message.type === 'AUTH_LOGOUT') {
-    const supabase = getSupabaseClient();
-
-    (async () => {
-      try {
-        await supabase.auth.signOut();
-      } catch {
-        // Session may already be gone — ignore
-      }
-      await clearAuthUser();
-      sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null } });
-    })();
-    return true;
-  }
-
-  if (message.type === 'AUTH_STATUS') {
-    const supabase = getSupabaseClient();
-
-    (async () => {
-      try {
-        const { data: { session } } = await supabase.auth.getSession();
-
-        if (!session?.user) {
-          // No active session — try cached user
-          const cached = await loadAuthUser();
-          if (cached) {
-            sendResponse({ type: 'AUTH_RESULT', payload: { status: 'authenticated', user: cached } });
-          } else {
-            sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null } });
-          }
-          return;
-        }
-
-        // Active session — refresh premium status from profiles table
-        const { data: profile } = await supabase
-          .from('profiles')
-          .select('subscription_status, subscription_period_end')
-          .eq('id', session.user.id)
-          .single();
-
-        const now = Date.now();
-        let premiumStatus: AuthUser['premiumStatus'] = 'free';
-        let premiumExpiresAt: number | null = null;
-
-        if (profile?.subscription_status === 'premium') {
-          const expiresAt = profile.subscription_period_end
-            ? new Date(profile.subscription_period_end).getTime()
-            : null;
-          if (expiresAt && expiresAt > now) {
-            premiumStatus = 'premium';
-            premiumExpiresAt = expiresAt;
-          } else if (expiresAt && expiresAt <= now) {
-            premiumStatus = 'expired';
-            premiumExpiresAt = expiresAt;
-          } else {
-            premiumStatus = 'premium';
-          }
-        }
-
-        const authUser: AuthUser = {
-          id: session.user.id,
-          email: session.user.email ?? '',
-          premiumStatus,
-          premiumExpiresAt,
-        };
-
-        await saveAuthUser(authUser);
-        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'authenticated', user: authUser } });
-      } catch {
-        // On any error, fall back to cache
-        const cached = await loadAuthUser();
-        sendResponse({
-          type: 'AUTH_RESULT',
-          payload: cached
-            ? { status: 'authenticated', user: cached }
-            : { status: 'unknown', user: null },
+      getGeneratedAssetsForMission(missionId)
+        .then((assets) => {
+          sendResponse({ type: 'GENERATED_ASSETS_RESULT', payload: assets });
+        })
+        .catch((err) => {
+          console.error('[MissionPulse] GET_GENERATED_ASSETS error:', err);
+          sendResponse({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
         });
-      }
-    })();
-    return true;
-  }
+      return true;
+    }
 
-  // ── Toast handler (forward to side panel) ──
+    // ── Auth handlers ──
 
-  if (message.type === 'SHOW_TOAST') {
-    chrome.runtime.sendMessage(message).catch(() => {
-      // Side panel not open, ignore
-    });
-    sendResponse({ type: 'TOAST_SHOWN' });
-    return false;
-  }
+    if (message.type === 'AUTH_LOGIN') {
+      const { email, password } = message.payload;
+      const supabase = getSupabaseClient();
 
-  // ── Profile broadcast ──
+      (async () => {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+          if (error || !data.user) {
+            sendResponse({
+              type: 'AUTH_RESULT',
+              payload: {
+                status: 'unauthenticated',
+                user: null,
+                error: error?.message ?? 'Login failed',
+              },
+            });
+            return;
+          }
 
-  if (message.type === 'PROFILE_UPDATED') {
-    chrome.runtime.sendMessage(message).catch(() => {
-      // No listeners, ignore
-    });
-    return false;
-  }
+          // Query profiles table for premium status
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('subscription_status, subscription_period_end')
+            .eq('id', data.user.id)
+            .single();
+
+          const now = Date.now();
+          let premiumStatus: AuthUser['premiumStatus'] = 'free';
+          let premiumExpiresAt: number | null = null;
+
+          if (profile?.subscription_status === 'premium') {
+            const expiresAt = profile.subscription_period_end
+              ? new Date(profile.subscription_period_end).getTime()
+              : null;
+            if (expiresAt && expiresAt > now) {
+              premiumStatus = 'premium';
+              premiumExpiresAt = expiresAt;
+            } else if (expiresAt && expiresAt <= now) {
+              premiumStatus = 'expired';
+              premiumExpiresAt = expiresAt;
+            } else {
+              // No expiry set but marked premium — treat as active
+              premiumStatus = 'premium';
+            }
+          }
+
+          const authUser: AuthUser = {
+            id: data.user.id,
+            email: data.user.email ?? email,
+            premiumStatus,
+            premiumExpiresAt,
+          };
+
+          await saveAuthUser(authUser);
+          sendResponse({
+            type: 'AUTH_RESULT',
+            payload: { status: 'authenticated', user: authUser },
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Login failed';
+          sendResponse({
+            type: 'AUTH_RESULT',
+            payload: { status: 'unauthenticated', user: null, error: msg },
+          });
+        }
+      })();
+      return true;
+    }
+
+    if (message.type === 'AUTH_SIGNUP') {
+      const { email, password } = message.payload;
+      const supabase = getSupabaseClient();
+
+      (async () => {
+        try {
+          const { data, error } = await supabase.auth.signUp({ email, password });
+          if (error || !data.user) {
+            sendResponse({
+              type: 'AUTH_RESULT',
+              payload: {
+                status: 'unauthenticated',
+                user: null,
+                error: error?.message ?? 'Signup failed',
+              },
+            });
+            return;
+          }
+
+          // New users start as free — the trigger creates the profile row
+          const authUser: AuthUser = {
+            id: data.user.id,
+            email: data.user.email ?? email,
+            premiumStatus: 'free',
+            premiumExpiresAt: null,
+          };
+
+          await saveAuthUser(authUser);
+          sendResponse({
+            type: 'AUTH_RESULT',
+            payload: { status: 'authenticated', user: authUser },
+          });
+        } catch (err) {
+          const msg = err instanceof Error ? err.message : 'Signup failed';
+          sendResponse({
+            type: 'AUTH_RESULT',
+            payload: { status: 'unauthenticated', user: null, error: msg },
+          });
+        }
+      })();
+      return true;
+    }
+
+    if (message.type === 'AUTH_LOGOUT') {
+      const supabase = getSupabaseClient();
+
+      (async () => {
+        try {
+          await supabase.auth.signOut();
+        } catch {
+          // Session may already be gone — ignore
+        }
+        await clearAuthUser();
+        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null } });
+      })();
+      return true;
+    }
+
+    if (message.type === 'AUTH_STATUS') {
+      const supabase = getSupabaseClient();
+
+      (async () => {
+        try {
+          const {
+            data: { session },
+          } = await supabase.auth.getSession();
+
+          if (!session?.user) {
+            // No active session — try cached user
+            const cached = await loadAuthUser();
+            if (cached) {
+              sendResponse({
+                type: 'AUTH_RESULT',
+                payload: { status: 'authenticated', user: cached },
+              });
+            } else {
+              sendResponse({
+                type: 'AUTH_RESULT',
+                payload: { status: 'unauthenticated', user: null },
+              });
+            }
+            return;
+          }
+
+          // Active session — refresh premium status from profiles table
+          const { data: profile } = await supabase
+            .from('profiles')
+            .select('subscription_status, subscription_period_end')
+            .eq('id', session.user.id)
+            .single();
+
+          const now = Date.now();
+          let premiumStatus: AuthUser['premiumStatus'] = 'free';
+          let premiumExpiresAt: number | null = null;
+
+          if (profile?.subscription_status === 'premium') {
+            const expiresAt = profile.subscription_period_end
+              ? new Date(profile.subscription_period_end).getTime()
+              : null;
+            if (expiresAt && expiresAt > now) {
+              premiumStatus = 'premium';
+              premiumExpiresAt = expiresAt;
+            } else if (expiresAt && expiresAt <= now) {
+              premiumStatus = 'expired';
+              premiumExpiresAt = expiresAt;
+            } else {
+              premiumStatus = 'premium';
+            }
+          }
+
+          const authUser: AuthUser = {
+            id: session.user.id,
+            email: session.user.email ?? '',
+            premiumStatus,
+            premiumExpiresAt,
+          };
+
+          await saveAuthUser(authUser);
+          sendResponse({
+            type: 'AUTH_RESULT',
+            payload: { status: 'authenticated', user: authUser },
+          });
+        } catch {
+          // On any error, fall back to cache
+          const cached = await loadAuthUser();
+          sendResponse({
+            type: 'AUTH_RESULT',
+            payload: cached
+              ? { status: 'authenticated', user: cached }
+              : { status: 'unknown', user: null },
+          });
+        }
+      })();
+      return true;
+    }
+
+    // ── Toast handler (forward to side panel) ──
+
+    if (message.type === 'SHOW_TOAST') {
+      chrome.runtime.sendMessage(message).catch(() => {
+        // Side panel not open, ignore
+      });
+      sendResponse({ type: 'TOAST_SHOWN' });
+      return false;
+    }
+
+    // ── Profile broadcast ──
+
+    if (message.type === 'PROFILE_UPDATED') {
+      chrome.runtime.sendMessage(message).catch(() => {
+        // No listeners, ignore
+      });
+      return false;
+    }
   } catch (err: unknown) {
     // Error boundary — protège le service worker contre les crashes inattendus
     const category = classifyError(err);
@@ -785,7 +829,9 @@ setupAlarm();
 // If any found, run a silent scan with a default profile so the user
 // lands directly on a populated feed — no wizard required.
 chrome.runtime.onInstalled.addListener(async (details) => {
-  if (details.reason !== 'install') return;
+  if (details.reason !== 'install') {
+    return;
+  }
 
   if (import.meta.env.DEV) {
     console.log('[MissionPulse] Fresh install — starting zero-config first scan');
@@ -794,15 +840,15 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   try {
     // Already done? (shouldn't happen on fresh install, but guard anyway)
     const alreadyDone = await getFirstScanDone();
-    if (alreadyDone) return;
+    if (alreadyDone) {
+      return;
+    }
 
     // Detect active sessions across all connectors in parallel
     const settings = await getSettings();
     const allConnectors = await getConnectors(settings.enabledConnectors);
     const now = Date.now();
-    const sessionResults = await Promise.allSettled(
-      allConnectors.map((c) => c.detectSession(now))
-    );
+    const sessionResults = await Promise.allSettled(allConnectors.map((c) => c.detectSession(now)));
 
     const activeConnectorIds: string[] = allConnectors
       .filter((_c, i) => {
@@ -820,7 +866,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     }
 
     if (import.meta.env.DEV) {
-      console.log(`[MissionPulse] Found ${activeConnectorIds.length} active session(s):`, activeConnectorIds);
+      console.log(
+        `[MissionPulse] Found ${activeConnectorIds.length} active session(s):`,
+        activeConnectorIds
+      );
     }
 
     // Temporarily restrict scan to only connectors with active sessions
@@ -835,7 +884,10 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     });
 
     // Restore previous connector list
-    await setSettings({ ...settings, enabledConnectors: previousEnabled.length > 0 ? previousEnabled : activeConnectorIds });
+    await setSettings({
+      ...settings,
+      enabledConnectors: previousEnabled.length > 0 ? previousEnabled : activeConnectorIds,
+    });
 
     if (result.missions.length > 0) {
       await setFirstScanDone();

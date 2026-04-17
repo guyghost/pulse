@@ -42,7 +42,9 @@ export type BoundaryResponse<T = unknown> = BoundarySuccessResponse<T> | Boundar
 // ============================================================================
 
 export function classifyError(err: unknown): ErrorCategory {
-  if (!(err instanceof Error)) return 'UNKNOWN';
+  if (!(err instanceof Error)) {
+    return 'UNKNOWN';
+  }
 
   const msg = err.message.toLowerCase();
   const name = err.name.toLowerCase();
@@ -122,11 +124,7 @@ export function withErrorBoundary(
 
     // ── 2. Execute handler with error boundary ─────────────────────────────
     try {
-      const result = handler(
-        validation.message as Record<string, unknown>,
-        sender,
-        sendResponse
-      );
+      const result = handler(validation.message as Record<string, unknown>, sender, sendResponse);
 
       // Handler is async (returns true to keep the channel open)
       if (result === true || result instanceof Promise) {

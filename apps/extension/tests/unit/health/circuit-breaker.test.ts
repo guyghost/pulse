@@ -4,7 +4,10 @@ import {
   shouldAttemptProbe,
   transitionToHalfOpen,
 } from '../../../src/lib/core/health/circuit-breaker';
-import { createInitialHealthSnapshot, DEFAULT_HEALTH_THRESHOLDS } from '../../../src/lib/core/types/health';
+import {
+  createInitialHealthSnapshot,
+  DEFAULT_HEALTH_THRESHOLDS,
+} from '../../../src/lib/core/types/health';
 import type { ConnectorHealthSnapshot, HealthThresholds } from '../../../src/lib/core/types/health';
 
 const T0 = 1_000_000; // timestamp de référence

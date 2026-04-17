@@ -62,7 +62,9 @@ export async function saveTracking(tracking: MissionTracking): Promise<void> {
  * Save multiple tracking records in a single transaction.
  */
 export async function saveTrackings(trackings: MissionTracking[]): Promise<void> {
-  if (trackings.length === 0) return;
+  if (trackings.length === 0) {
+    return;
+  }
 
   const db = await openDBWithTracking();
   const tx = db.transaction(TRACKING_STORE, 'readwrite');
@@ -114,9 +116,7 @@ export async function getAllTrackings(): Promise<MissionTracking[]> {
 /**
  * Get tracking records filtered by status.
  */
-export async function getTrackingsByStatus(
-  status: ApplicationStatus
-): Promise<MissionTracking[]> {
+export async function getTrackingsByStatus(status: ApplicationStatus): Promise<MissionTracking[]> {
   const db = await openDBWithTracking();
   const tx = db.transaction(TRACKING_STORE, 'readonly');
   const store = tx.objectStore(TRACKING_STORE);

@@ -12,9 +12,7 @@ import type { UserProfile } from '../../core/types/profile';
 import { getSupabaseClient } from './supabase-client';
 
 /** The landing backend URL */
-const API_BASE_URL = import.meta.env.DEV
-  ? 'http://localhost:5174'
-  : 'https://missionpulse.app';
+const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:5174' : 'https://missionpulse.app';
 
 /**
  * Generate content using the premium GLM backend.
@@ -23,7 +21,7 @@ export const generatePremium = async (
   missionId: string,
   type: GenerationType,
   mission: Mission,
-  profile: UserProfile,
+  profile: UserProfile
 ): Promise<GeneratedAsset | null> => {
   const supabase = getSupabaseClient();
   const {

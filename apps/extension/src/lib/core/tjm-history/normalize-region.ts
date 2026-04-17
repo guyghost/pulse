@@ -75,7 +75,7 @@ const REGION_KEYWORDS: Array<[string[], TJMRegion]> = [
   // Nantes
   [['nantes', 'saint-herblain', 'saint herblain', 'rezé', 'reze'], 'nantes'],
   // Lille
-  [['lille', 'villeneuve-d\'ascq', 'villeneuve d\'ascq', 'roubaix', 'tourcoing', 'marcq'], 'lille'],
+  [['lille', "villeneuve-d'ascq", "villeneuve d'ascq", 'roubaix', 'tourcoing', 'marcq'], 'lille'],
   // Strasbourg
   [['strasbourg', 'illkirch', 'schiltigheim'], 'strasbourg'],
   // Rennes
@@ -87,7 +87,17 @@ const REGION_KEYWORDS: Array<[string[], TJMRegion]> = [
   // Nice / Côte d'Azur
   [['nice', 'sophia antipolis', 'sophia-antipolis', 'antibes', 'cannes'], 'nice'],
   // Remote
-  [['full remote', 'remote', 'télétravail complet', 'teletravail complet', '100% remote', '100% télétravail'], 'remote'],
+  [
+    [
+      'full remote',
+      'remote',
+      'télétravail complet',
+      'teletravail complet',
+      '100% remote',
+      '100% télétravail',
+    ],
+    'remote',
+  ],
 ];
 
 /**

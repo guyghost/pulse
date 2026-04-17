@@ -52,7 +52,10 @@ export type BridgeMessage =
   | { type: 'SCAN_ERROR'; payload: { message: string; code: string } }
   | { type: 'SCAN_CANCEL' }
   // Tracking
-  | { type: 'UPDATE_TRACKING'; payload: { missionId: string; status: ApplicationStatus; note?: string } }
+  | {
+      type: 'UPDATE_TRACKING';
+      payload: { missionId: string; status: ApplicationStatus; note?: string };
+    }
   | { type: 'TRACKING_UPDATED'; payload: MissionTracking }
   | { type: 'GET_TRACKINGS'; payload?: { status?: ApplicationStatus } }
   | { type: 'TRACKINGS_RESULT'; payload: MissionTracking[] }
@@ -74,7 +77,10 @@ export type BridgeMessage =
   | { type: 'AUTH_RESULT'; payload: { status: AuthStatus; user: AuthUser | null; error?: string } }
   // Connector health (service worker → side panel)
   | { type: 'CONNECTOR_HEALTH_UPDATED'; payload: ConnectorHealthPayload }
-  | { type: 'CONNECTOR_SKIPPED'; payload: { connectorId: string; connectorName: string; reason: 'circuit-open' } };
+  | {
+      type: 'CONNECTOR_SKIPPED';
+      payload: { connectorId: string; connectorName: string; reason: 'circuit-open' };
+    };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {
