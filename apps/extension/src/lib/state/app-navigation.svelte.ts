@@ -5,7 +5,12 @@
  * Pure Svelte 5 runes, no chrome.* access.
  */
 import { getProfile } from '$lib/shell/facades/settings.facade';
-import { getFirstScanDone } from '$lib/shell/storage/first-scan';
+import {
+  clearOnboardingCompleted,
+  getFirstScanDone,
+  getOnboardingCompleted,
+  setOnboardingCompleted,
+} from '$lib/shell/storage/first-scan';
 
 export type Page = 'feed' | 'tjm' | 'settings' | 'onboarding';
 
@@ -23,9 +28,9 @@ export const NAV_ITEMS: { page: Page; label: string; icon: string }[] = [
 ];
 
 export function createAppNavigation() {
-  let currentPage = $state<Page>('onboarding');
+  let currentPage = $state<Page>('feed');
   let hasCompletedOnboarding = $state(false);
-  let previousPageIndex = $state(PAGE_INDEX['onboarding']);
+  let previousPageIndex = $state(PAGE_INDEX['feed']);
   let transitionDirection = $state(1);
 
   function navigate(page: Page) {
@@ -40,6 +45,7 @@ export function createAppNavigation() {
     transitionDirection = 1;
     previousPageIndex = PAGE_INDEX['feed'];
     currentPage = 'feed';
+    void setOnboardingCompleted();
   }
 
   function resetToOnboarding() {
@@ -47,9 +53,11 @@ export function createAppNavigation() {
     transitionDirection = -1;
     previousPageIndex = PAGE_INDEX['onboarding'];
     currentPage = 'onboarding';
+    void clearOnboardingCompleted();
   }
 
-  // Check if profile exists OR a first scan was done (zero-config flow)
+  // Fresh installs can land directly on the feed after the zero-config scan,
+  // while still keeping onboarding available as a non-blocking flow.
   getProfile()
     .then(async (profile) => {
       if (profile) {
@@ -58,17 +66,18 @@ export function createAppNavigation() {
         currentPage = 'feed';
         return;
       }
-      // No profile — check if zero-config first scan ran
-      const firstScanDone = await getFirstScanDone();
-      if (firstScanDone) {
-        // Skip wizard — land directly on feed with refinement banner
-        hasCompletedOnboarding = true;
-        previousPageIndex = PAGE_INDEX['feed'];
-        currentPage = 'feed';
-      }
+
+      const [firstScanDone, onboardingCompleted] = await Promise.all([
+        getFirstScanDone(),
+        getOnboardingCompleted(),
+      ]);
+
+      hasCompletedOnboarding = onboardingCompleted;
+      previousPageIndex = PAGE_INDEX['feed'];
+      currentPage = firstScanDone ? 'feed' : onboardingCompleted ? 'feed' : 'onboarding';
     })
     .catch(() => {
-      // Outside extension context — show onboarding
+      // Outside extension context — keep default feed/onboarding behaviour
     });
 
   return {

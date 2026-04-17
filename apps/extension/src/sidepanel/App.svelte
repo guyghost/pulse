@@ -102,75 +102,81 @@
   <div
     class="pointer-events-none absolute bottom-0 left-14 h-32 w-32 rounded-full bg-accent-amber/10 blur-3xl"
   ></div>
-  {#if nav.currentPage === 'onboarding' && !nav.hasCompletedOnboarding}
-    <svelte:boundary
-      onerror={(e) => {
-        if (import.meta.env.DEV) console.error('[OnboardingPage crash]', e);
-      }}
-    >
-      <OnboardingPage onComplete={nav.completeOnboarding} />
-      {#snippet failed(error, reset)}
-        <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-          <div class="text-4xl">🚀</div>
-          <p class="text-sm text-text-secondary">L'onboarding a rencontré une erreur.</p>
-          <button
-            onclick={reset}
-            class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
-          >
-            Réessayer
-          </button>
-        </div>
-      {/snippet}
-    </svelte:boundary>
-  {:else}
-    <div class="relative z-10 flex h-full flex-col">
-      {#if showOfflineBanner}
-        <div
-          class="flex items-center justify-center gap-2 border-b border-white/10 bg-accent-red/10 px-4 py-2 text-xs text-accent-red"
-          transition:fade={{ duration: 200 }}
-        >
-          <Icon name="wifi-off" size={12} />
-          <span>Mode hors ligne — Données en cache uniquement</span>
-        </div>
-      {/if}
-
-      <div class="px-3 pt-3">
-        <nav
-          aria-label="Main navigation"
-          class="section-card flex items-center gap-1 rounded-[1.5rem] p-1.5"
-        >
-          {#each NAV_ITEMS as item}
-            <button
-              use:ripple
-              class="flex flex-1 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-250 active:scale-[0.985]
-            {nav.currentPage === item.page
-                ? 'bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_18px_rgba(1,7,12,0.22)]'
-                : 'text-text-secondary hover:bg-white/[0.04] hover:text-white'}"
-              aria-current={nav.currentPage === item.page ? 'page' : undefined}
-              onclick={() => nav.navigate(item.page)}
-            >
-              <Icon name={item.icon} size={16} />
-              <span>{item.label}</span>
-            </button>
-          {/each}
-        </nav>
-
-        <div class="mt-2 flex justify-end">
-          <ConnectionIndicator />
-        </div>
+  <div class="relative z-10 flex h-full flex-col">
+    {#if showOfflineBanner}
+      <div
+        class="flex items-center justify-center gap-2 border-b border-white/10 bg-accent-red/10 px-4 py-2 text-xs text-accent-red"
+        transition:fade={{ duration: 200 }}
+      >
+        <Icon name="wifi-off" size={12} />
+        <span>Mode hors ligne — Données en cache uniquement</span>
       </div>
-      <main class="relative flex-1 overflow-hidden">
-        <div class="absolute inset-0 overflow-y-auto" class:hidden={nav.currentPage !== 'feed'}>
+    {/if}
+
+    <div class="px-3 pt-3">
+      <nav
+        aria-label="Main navigation"
+        class="section-card flex items-center gap-1 rounded-[1.5rem] p-1.5"
+      >
+        {#each NAV_ITEMS as item}
+          <button
+            use:ripple
+            class="flex flex-1 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-250 active:scale-[0.985]
+          {nav.currentPage === item.page
+              ? 'bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_18px_rgba(1,7,12,0.22)]'
+              : 'text-text-secondary hover:bg-white/[0.04] hover:text-white'}"
+            aria-current={nav.currentPage === item.page ? 'page' : undefined}
+            onclick={() => nav.navigate(item.page)}
+          >
+            <Icon name={item.icon} size={16} />
+            <span>{item.label}</span>
+          </button>
+        {/each}
+      </nav>
+
+      <div class="mt-2 flex justify-end">
+        <ConnectionIndicator />
+      </div>
+    </div>
+    <main class="relative flex-1 overflow-hidden">
+      <div class="absolute inset-0 overflow-y-auto" class:hidden={nav.currentPage !== 'feed'}>
+        <svelte:boundary
+          onerror={(e) => {
+            if (import.meta.env.DEV) console.error('[FeedPage crash]', e);
+          }}
+        >
+          <FeedPage onNavigateToOnboarding={nav.resetToOnboarding} />
+          {#snippet failed(error, reset)}
+            <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+              <div class="text-4xl">⚠️</div>
+              <p class="text-sm text-text-secondary">Le feed a rencontré une erreur.</p>
+              <button
+                onclick={reset}
+                class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+              >
+                Réessayer
+              </button>
+            </div>
+          {/snippet}
+        </svelte:boundary>
+      </div>
+
+      {#if nav.currentPage === 'onboarding'}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 100 }}
+        >
           <svelte:boundary
             onerror={(e) => {
-              if (import.meta.env.DEV) console.error('[FeedPage crash]', e);
+              if (import.meta.env.DEV) console.error('[OnboardingPage crash]', e);
             }}
           >
-            <FeedPage onNavigateToOnboarding={nav.resetToOnboarding} />
+            <OnboardingPage onComplete={nav.completeOnboarding} onSkip={nav.completeOnboarding} />
             {#snippet failed(error, reset)}
               <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                <div class="text-4xl">⚠️</div>
-                <p class="text-sm text-text-secondary">Le feed a rencontré une erreur.</p>
+                <div class="text-4xl">🚀</div>
+                <p class="text-sm text-text-secondary">L'onboarding a rencontré une erreur.</p>
                 <button
                   onclick={reset}
                   class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
@@ -181,68 +187,66 @@
             {/snippet}
           </svelte:boundary>
         </div>
-        {#if nav.currentPage === 'tjm'}
-          <div
-            class="absolute inset-0 overflow-y-auto"
-            in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-            out:fade={{ duration: 100 }}
+      {/if}
+      {#if nav.currentPage === 'tjm'}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 100 }}
+        >
+          <svelte:boundary
+            onerror={(e) => {
+              if (import.meta.env.DEV) console.error('[TJMPage crash]', e);
+            }}
           >
-            <svelte:boundary
-              onerror={(e) => {
-                if (import.meta.env.DEV) console.error('[TJMPage crash]', e);
-              }}
-            >
-              <TJMPage />
-              {#snippet failed(error, reset)}
-                <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                  <div class="text-4xl">📈</div>
-                  <p class="text-sm text-text-secondary">La vue TJM a rencontré une erreur.</p>
-                  <button
-                    onclick={reset}
-                    class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
-                  >
-                    Réessayer
-                  </button>
-                </div>
-              {/snippet}
-            </svelte:boundary>
-          </div>
-        {/if}
-        {#if nav.currentPage === 'settings'}
-          <div
-            class="absolute inset-0 overflow-y-auto"
-            in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-            out:fade={{ duration: 100 }}
+            <TJMPage />
+            {#snippet failed(error, reset)}
+              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <div class="text-4xl">📈</div>
+                <p class="text-sm text-text-secondary">La vue TJM a rencontré une erreur.</p>
+                <button
+                  onclick={reset}
+                  class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                >
+                  Réessayer
+                </button>
+              </div>
+            {/snippet}
+          </svelte:boundary>
+        </div>
+      {/if}
+      {#if nav.currentPage === 'settings'}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 100 }}
+        >
+          <svelte:boundary
+            onerror={(e) => {
+              if (import.meta.env.DEV) console.error('[SettingsPage crash]', e);
+            }}
           >
-            <svelte:boundary
-              onerror={(e) => {
-                if (import.meta.env.DEV) console.error('[SettingsPage crash]', e);
-              }}
-            >
-              <SettingsPage
-                onBack={() => nav.navigate('feed')}
-                onNavigateToOnboarding={nav.resetToOnboarding}
-              />
-              {#snippet failed(error, reset)}
-                <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                  <div class="text-4xl">⚙️</div>
-                  <p class="text-sm text-text-secondary">
-                    Les paramètres ont rencontré une erreur.
-                  </p>
-                  <button
-                    onclick={reset}
-                    class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
-                  >
-                    Réessayer
-                  </button>
-                </div>
-              {/snippet}
-            </svelte:boundary>
-          </div>
-        {/if}
-      </main>
-    </div>
-  {/if}
+            <SettingsPage
+              onBack={() => nav.navigate('feed')}
+              onNavigateToOnboarding={nav.resetToOnboarding}
+            />
+            {#snippet failed(error, reset)}
+              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <div class="text-4xl">⚙️</div>
+                <p class="text-sm text-text-secondary">Les paramètres ont rencontré une erreur.</p>
+                <button
+                  onclick={reset}
+                  class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                >
+                  Réessayer
+                </button>
+              </div>
+            {/snippet}
+          </svelte:boundary>
+        </div>
+      {/if}
+    </main>
+  </div>
 
   <ToastContainer store={toastActor} />
 

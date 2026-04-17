@@ -230,6 +230,29 @@
       </p>
     </div>
 
+    <div class="section-card rounded-[1.5rem] p-4 space-y-4">
+      <div>
+        <h3 class="text-sm font-semibold text-text-primary">Onboarding</h3>
+        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+          Rejouer l'accompagnement initial ou relancer le tour du feed à tout moment.
+        </p>
+      </div>
+      <div class="flex flex-wrap gap-2">
+        <Button variant="secondary" onclick={() => settings.restartOnboarding()}>
+          {#snippet children()}
+            <Icon name="star" size={16} class="mr-1" />
+            Rejouer l'onboarding
+          {/snippet}
+        </Button>
+        <Button variant="ghost" onclick={() => settings.replayFeedTour()}>
+          {#snippet children()}
+            <Icon name="play" size={16} class="mr-1" />
+            Revoir le tour du feed
+          {/snippet}
+        </Button>
+      </div>
+    </div>
+
     <!-- Zone de danger -->
     <DangerZone
       showResetConfirm={settings.showResetConfirm}

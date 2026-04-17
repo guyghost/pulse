@@ -29,6 +29,7 @@ import {
 } from '$lib/shell/facades/settings.facade';
 import { getMissions } from '$lib/shell/facades/feed-data.facade';
 import type { UserProfile } from '$lib/core/types/profile';
+import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/storage/first-scan';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
@@ -197,6 +198,16 @@ export class SettingsPageController {
     } catch {
       // Hors contexte extension
     }
+  }
+
+  async replayFeedTour(): Promise<void> {
+    await clearFeedTourSeen();
+    window.dispatchEvent(new CustomEvent('feed-tour:open'));
+  }
+
+  async restartOnboarding(): Promise<void> {
+    await clearOnboardingCompleted();
+    this.options.onNavigateToOnboarding?.();
   }
 
   async resetAll(): Promise<void> {

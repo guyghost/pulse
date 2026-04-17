@@ -23,12 +23,14 @@
     role="status"
   >
     <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-blue/15">
-      <Icon name="sparkles" size={16} class="text-accent-blue" />
+      <Icon name="star" size={16} class="text-accent-blue" />
     </div>
 
     <div class="min-w-0 flex-1">
       <p class="text-[12px] font-semibold text-text-primary">Affinez vos résultats</p>
-      <p class="text-[11px] text-text-secondary">Complétez votre profil pour un scoring personnalisé</p>
+      <p class="text-[11px] text-text-secondary">
+        Complétez votre profil pour un scoring personnalisé
+      </p>
     </div>
 
     <div class="flex shrink-0 items-center gap-1">

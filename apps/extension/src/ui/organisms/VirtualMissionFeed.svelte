@@ -15,6 +15,7 @@
     hidden = {},
     sortBy = 'score',
     filterActive = false,
+    tourStep = null,
     onMissionSeen,
     onToggleFavorite,
     onHide,
@@ -28,6 +29,7 @@
     hidden?: Record<string, number>;
     sortBy?: 'score' | 'date' | 'tjm';
     filterActive?: boolean;
+    tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onMissionSeen?: (id: string) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
@@ -169,6 +171,7 @@
           isSeen={seenSet.has(mission.id)}
           isFavorite={mission.id in (favorites ?? {})}
           isHidden={mission.id in (hidden ?? {})}
+          tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
           onVisible={() => onMissionSeen?.(mission.id)}
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}

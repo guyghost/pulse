@@ -18,7 +18,13 @@
   import type { MissionSource } from '$lib/core/types/mission';
   import MissionComparison from '../organisms/MissionComparison.svelte';
   import ProfileRefinementBanner from '../molecules/ProfileRefinementBanner.svelte';
-  import { getFirstScanDone, getProfileBannerDismissed } from '$lib/shell/storage/first-scan';
+  import FeedTourOverlay, { type FeedTourStep } from '../molecules/FeedTourOverlay.svelte';
+  import {
+    getFeedTourSeen,
+    getFirstScanDone,
+    getProfileBannerDismissed,
+    setFeedTourSeen,
+  } from '$lib/shell/storage/first-scan';
   import { getProfile } from '$lib/shell/facades/settings.facade';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
@@ -33,14 +39,86 @@
 
   // Refinement banner: shown only on zero-config first scan (no profile yet)
   let showRefinementBanner = $state(false);
+  let shouldAutoOpenTour = $state(false);
+  let showTour = $state(false);
+  let tourStepIndex = $state(0);
+
+  const tourSteps: FeedTourStep[] = [
+    {
+      id: 'score',
+      title: 'La pertinence en premier',
+      description:
+        'Chaque mission affiche un score pour vous aider à repérer rapidement les opportunités les plus prometteuses.',
+    },
+    {
+      id: 'filters',
+      title: 'Affinez avec les filtres',
+      description:
+        'Utilisez la recherche, le tri et les filtres pour réduire le bruit en quelques clics.',
+    },
+    {
+      id: 'expand',
+      title: 'Ouvrez une carte pour plus de détails',
+      description:
+        'Touchez une mission pour développer la fiche, lire la description et accéder aux actions rapides.',
+    },
+    {
+      id: 'seen',
+      title: 'Repérez les nouveautés',
+      description:
+        'Les nouvelles missions sont distinguées visuellement pour éviter de re-traiter ce que vous avez déjà vu.',
+    },
+  ];
+
+  const activeTourStep = $derived(showTour ? tourSteps[tourStepIndex] : null);
+
   (async () => {
-    const [firstScanDone, bannerDismissed, profile] = await Promise.all([
+    const [firstScanDone, bannerDismissed, profile, feedTourSeen] = await Promise.all([
       getFirstScanDone(),
       getProfileBannerDismissed(),
       getProfile(),
+      getFeedTourSeen(),
     ]);
     showRefinementBanner = firstScanDone && !bannerDismissed && !profile;
+    shouldAutoOpenTour = firstScanDone && !feedTourSeen;
   })().catch(() => {});
+
+  $effect(() => {
+    if (
+      shouldAutoOpenTour &&
+      !showTour &&
+      !controller.isScanning &&
+      page.displayMissions.length > 0
+    ) {
+      shouldAutoOpenTour = false;
+      tourStepIndex = 0;
+      showTour = true;
+    }
+  });
+
+  $effect(() => {
+    function handleOpenTour() {
+      tourStepIndex = 0;
+      showTour = true;
+    }
+
+    window.addEventListener('feed-tour:open', handleOpenTour);
+    return () => window.removeEventListener('feed-tour:open', handleOpenTour);
+  });
+
+  async function closeTour() {
+    showTour = false;
+    await setFeedTourSeen();
+  }
+
+  async function advanceTour() {
+    if (tourStepIndex >= tourSteps.length - 1) {
+      await closeTour();
+      return;
+    }
+
+    tourStepIndex += 1;
+  }
 </script>
 
 <div class="relative flex h-full flex-col">
@@ -271,7 +349,10 @@
           <h3 class="text-sm font-semibold tracking-tight text-white">Missions triées</h3>
           {#if !(controller.isScanning || page.isLoading)}
             <span
-              class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2 py-0.5 text-[10px] font-medium text-accent-emerald/90"
+              class="inline-flex items-center gap-1.5 rounded-full border border-accent-emerald/15 bg-accent-emerald/8 px-2 py-0.5 text-[10px] font-medium text-accent-emerald/90 {activeTourStep?.id ===
+              'score'
+                ? 'ring-2 ring-accent-blue/50 ring-offset-2 ring-offset-navy-900'
+                : ''}"
               aria-label="{page.visibleCount} missions visibles"
             >
               <span class="h-1.5 w-1.5 rounded-full bg-accent-emerald"></span>
@@ -297,7 +378,12 @@
         />
       </div>
 
-      <div class="mt-2 flex items-center gap-1.5">
+      <div
+        class="mt-2 flex items-center gap-1.5 rounded-[1.1rem] transition-all duration-200 {activeTourStep?.id ===
+        'filters'
+          ? 'ring-2 ring-accent-blue/45 ring-offset-2 ring-offset-navy-900 px-1 py-1'
+          : ''}"
+      >
         <button
           class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-2 @[20rem]:px-3 transition-all duration-200
                         {page.showFavoritesOnly
@@ -401,20 +487,28 @@
     class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
     use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
   >
-    <VirtualMissionFeed
-      missions={page.displayMissions}
-      isLoading={controller.isScanning || page.isLoading}
-      error={page.error}
-      seenIds={page.seenIds}
-      favorites={page.favorites}
-      hidden={page.hidden}
-      sortBy={page.sortBy}
-      filterActive={page.filterActive}
-      onMissionSeen={page.handleMissionSeen}
-      onToggleFavorite={page.handleToggleFavorite}
-      onHide={page.handleHide}
-      onCopyLink={page.handleCopyLink}
-    />
+    <div
+      class="rounded-[1.5rem] transition-all duration-200 {activeTourStep?.id === 'expand' ||
+      activeTourStep?.id === 'seen'
+        ? 'ring-2 ring-accent-blue/45 ring-offset-2 ring-offset-navy-900'
+        : ''}"
+    >
+      <VirtualMissionFeed
+        missions={page.displayMissions}
+        isLoading={controller.isScanning || page.isLoading}
+        error={page.error}
+        seenIds={page.seenIds}
+        favorites={page.favorites}
+        hidden={page.hidden}
+        sortBy={page.sortBy}
+        filterActive={page.filterActive}
+        onMissionSeen={page.handleMissionSeen}
+        onToggleFavorite={page.handleToggleFavorite}
+        onHide={page.handleHide}
+        onCopyLink={page.handleCopyLink}
+        tourStep={activeTourStep?.id ?? null}
+      />
+    </div>
     {#if page.hiddenCount > 0 && !page.showFavoritesOnly}
       <button
         class="mt-3 w-full rounded-full border border-white/8 bg-white/4 py-3 text-xs text-text-secondary transition-all duration-200 hover:border-white/12 hover:bg-white/8 hover:text-white"
@@ -430,6 +524,16 @@
 </div>
 
 <KeyboardShortcutsHelp bind:isOpen={page.showShortcutsHelp} />
+
+{#if activeTourStep}
+  <FeedTourOverlay
+    step={activeTourStep}
+    stepIndex={tourStepIndex}
+    totalSteps={tourSteps.length}
+    onNext={advanceTour}
+    onSkip={closeTour}
+  />
+{/if}
 
 {#if page.comparisonMissionIds.length > 0}
   <!-- Floating comparison bar -->

@@ -5,7 +5,7 @@
   import { saveProfile } from '$lib/shell/facades/settings.facade';
   import { createOnboardingStore } from '$lib/state/onboarding.svelte';
 
-  const { onComplete }: { onComplete?: () => void } = $props();
+  const { onComplete, onSkip }: { onComplete?: () => void; onSkip?: () => void } = $props();
 
   const onboarding = createOnboardingStore();
 
@@ -41,6 +41,7 @@
 {#snippet wizardContent()}
   <OnboardingWizard
     onComplete={handleComplete}
+    {onSkip}
     onUpdateProfile={handleUpdateProfile}
     onRetry={handleRetry}
     {isSaving}

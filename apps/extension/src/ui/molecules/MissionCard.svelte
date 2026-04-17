@@ -14,6 +14,7 @@
     isFavorite = false,
     isHidden = false,
     isVirtualized = false,
+    tourHighlight = null,
     onVisible: onVisibleCallback,
     onToggleFavorite,
     onHide,
@@ -26,6 +27,7 @@
     isFavorite?: boolean;
     isHidden?: boolean;
     isVirtualized?: boolean;
+    tourHighlight?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onVisible?: () => void;
     onToggleFavorite?: () => void;
     onHide?: () => void;
@@ -61,11 +63,7 @@
   );
 
   const glowClass = $derived(
-    scoreValue >= 80
-      ? 'shadow-glow-emerald'
-      : scoreValue >= 50
-        ? 'shadow-glow-blue'
-        : ''
+    scoreValue >= 80 ? 'shadow-glow-emerald' : scoreValue >= 50 ? 'shadow-glow-blue' : ''
   );
 
   function toggleExpand() {
@@ -107,6 +105,8 @@
     ? ''
     : 'border-accent-blue/30 shadow-[inset_0_0_0_1px_rgba(89,198,255,0.2),0_18px_36px_rgba(1,7,12,0.26)]'} {isHidden
     ? 'opacity-55'
+    : ''} {tourHighlight === 'seen'
+    ? 'ring-2 ring-accent-blue/45 ring-offset-2 ring-offset-navy-900'
     : ''}"
   style="contain: layout style paint;"
   onclick={toggleExpand}
@@ -151,15 +151,27 @@
     </div>
     <div class="flex items-center gap-2">
       {#if mission.scoreBreakdown}
-        <span class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor}"
+        <span
+          class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor} {tourHighlight ===
+          'score'
+            ? 'ring-2 ring-accent-blue/50 ring-offset-2 ring-offset-navy-900'
+            : ''}"
           >{mission.scoreBreakdown.grade}{#if mission.scoreBreakdown.semantic !== null}+{/if}</span
         >
       {:else if mission.score !== null}
-        <span class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor}"
-          >{mission.score}</span
+        <span
+          class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor} {tourHighlight ===
+          'score'
+            ? 'ring-2 ring-accent-blue/50 ring-offset-2 ring-offset-navy-900'
+            : ''}">{mission.score}</span
         >
       {/if}
-      <div class="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.04]">
+      <div
+        class="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.04] {tourHighlight ===
+        'expand'
+          ? 'ring-2 ring-accent-blue/50 ring-offset-2 ring-offset-navy-900'
+          : ''}"
+      >
         <Icon
           name="chevron-down"
           size={14}
@@ -176,7 +188,7 @@
     {#if mission.stack.length > 3}
       <Badge label="+{mission.stack.length - 3}" variant="source" />
     {/if}
-    {#if (mission.scoreBreakdown?.semanticReason ?? mission.semanticReason)}
+    {#if mission.scoreBreakdown?.semanticReason ?? mission.semanticReason}
       <span
         class="inline-flex items-center gap-1 rounded-full border border-accent-blue/20 bg-accent-blue/8 px-2 py-0.5 text-[11px] text-accent-blue"
       >
