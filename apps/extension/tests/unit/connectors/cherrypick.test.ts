@@ -3,6 +3,7 @@ import {
   parseCherryPickMissions,
   parseDescriptionMeta,
 } from '../../../src/lib/core/connectors/cherrypick-parser';
+import { CherryPickConnector } from '../../../src/lib/shell/connectors/cherrypick.connector';
 
 const NOW = new Date('2026-03-15T12:00:00Z');
 
@@ -265,6 +266,17 @@ describe('parseCherryPickMissions', () => {
       NOW
     );
     expect(missions[0].stack).toEqual([]);
+  });
+});
+
+describe('CherryPickConnector.detectSession', () => {
+  it('returns true even when no browser session is available because the API is public', async () => {
+    const connector = new CherryPickConnector();
+
+    await expect(connector.detectSession(Date.now())).resolves.toEqual({
+      ok: true,
+      value: true,
+    });
   });
 });
 
