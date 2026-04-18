@@ -3,6 +3,8 @@
   import CircuitBadge from '../atoms/CircuitBadge.svelte';
   import type { AppError } from '$lib/core/errors';
   import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
+  import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
+  import ConnectorHealthCard from '../molecules/ConnectorHealthCard.svelte';
 
   import type { SourceStatus } from '$lib/shell/facades/feed-controller.svelte';
 
@@ -16,6 +18,7 @@
     onRefresh,
     onFilterBySource,
     onToggleConnector,
+    onRecheckConnector,
     healthSnapshots,
   }: {
     sources: SourceStatus[];
@@ -27,6 +30,7 @@
     onRefresh?: () => void;
     onFilterBySource?: (connectorId: string | null) => void;
     onToggleConnector?: (connectorId: string) => void;
+    onRecheckConnector?: (connectorId: string, enable?: boolean) => void;
     healthSnapshots?: Map<string, ConnectorHealthSnapshot>;
   } = $props();
 
@@ -71,6 +75,22 @@
       window.open(url, '_blank');
     }
   }
+
+  const unhealthySnapshots = $derived.by(() => {
+    if (!healthSnapshots) {
+      return [] as Array<{ connectorId: string; name: string; snapshot: ConnectorHealthSnapshot }>;
+    }
+
+    return sources
+      .map((source) => {
+        const snapshot = healthSnapshots.get(source.connectorId);
+        return snapshot ? { connectorId: source.connectorId, name: source.name, snapshot } : null;
+      })
+      .filter(
+        (item): item is { connectorId: string; name: string; snapshot: ConnectorHealthSnapshot } =>
+          item !== null && deriveHealthStatus(item.snapshot) !== 'healthy'
+      );
+  });
 
   function toggleExpand() {
     if (compact) {
@@ -275,10 +295,31 @@
                   </span>
                 </span>
               {/if}
+
+              {#if healthSnapshots}
+                {@const snap = healthSnapshots.get(source.connectorId)}
+                {#if snap && deriveHealthStatus(snap) === 'broken' && onRecheckConnector}
+                  <button
+                    class="rounded-md border border-red-400/20 bg-red-400/10 px-2 py-0.5 text-[10px] font-medium text-red-300 transition-colors hover:bg-red-400/20"
+                    onclick={() => onRecheckConnector(source.connectorId, !isEnabled)}
+                  >
+                    {isEnabled ? 'Re-check' : 'Activer & scan'}
+                  </button>
+                {/if}
+              {/if}
             </div>
           </div>
         {/each}
       </div>
+
+      {#if unhealthySnapshots.length > 0}
+        <div class="mt-3 space-y-2 border-t border-white/8 pt-3">
+          <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Santé détaillée</p>
+          {#each unhealthySnapshots as item (item.connectorId)}
+            <ConnectorHealthCard snapshot={item.snapshot} connectorName={item.name} />
+          {/each}
+        </div>
+      {/if}
     {/if}
   </div>
 {/if}

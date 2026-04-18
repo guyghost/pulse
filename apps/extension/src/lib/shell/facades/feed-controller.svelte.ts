@@ -6,10 +6,10 @@
  *
  * Uses Svelte 5 runes for reactive state.
  */
-import type { Mission, MissionSource } from '$lib/core/types/mission';
+import type { Mission } from '$lib/core/types/mission';
 import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
 import type { ConnectorStatus, PersistedConnectorStatus } from '$lib/core/types/connector-status';
-import type { ScanProgressPayload, BridgeMessage } from '../messaging/bridge';
+import type { BridgeMessage } from '../messaging/bridge';
 import type { AppError } from '$lib/core/errors/app-error';
 import { sendMessage } from '../messaging/bridge';
 import {
@@ -87,6 +87,8 @@ export interface FeedController {
   smartLoad(): Promise<void>;
   checkSourceSessions(): Promise<void>;
   handleToggleConnector(id: string): Promise<void>;
+  refreshHealthSnapshots(): Promise<void>;
+  recheckConnector(id: string, enable?: boolean): Promise<void>;
 
   // Cleanup
   dispose(): void;
@@ -277,26 +279,22 @@ export function createFeedController(feedStore: {
     isCheckingSources = true;
 
     try {
-      const settings = await getSettings();
-      const enabledIds = settings.enabledConnectors;
       const meta = getConnectorsMeta();
+      const allIds = meta.map((item) => item.id);
       const now = Date.now();
 
       // Build initial source statuses with "checking" state
-      sourceStatuses = enabledIds.map((id) => {
-        const m = meta.find((x) => x.id === id);
-        return {
-          connectorId: id,
-          name: m?.name ?? id,
-          icon: m?.icon ?? '',
-          url: m?.url ?? '',
-          sessionStatus: 'checking' as SourceSessionStatus,
-          lastSyncAt: null,
-        };
-      });
+      sourceStatuses = meta.map((item) => ({
+        connectorId: item.id,
+        name: item.name,
+        icon: item.icon,
+        url: item.url,
+        sessionStatus: 'checking' as SourceSessionStatus,
+        lastSyncAt: null,
+      }));
 
       // Load connectors and detect sessions in parallel
-      const connectors = await getConnectors(enabledIds);
+      const connectors = await getConnectors(allIds);
       const results = await detectAllConnectorSessions(connectors, now);
 
       // Load last sync times in parallel
@@ -364,6 +362,40 @@ export function createFeedController(feedStore: {
       await setSettings({ ...settings, enabledConnectors: [...updated] });
     } catch {
       /* Non-critical: settings persistence */
+    }
+  }
+
+  async function refreshHealthSnapshots(): Promise<void> {
+    try {
+      const response = await sendMessage({ type: 'GET_CONNECTOR_HEALTH' });
+      if (response.type === 'CONNECTOR_HEALTH_RESULT' && Array.isArray(response.payload)) {
+        healthSnapshots = new Map(
+          response.payload.map((snapshot) => [snapshot.connectorId, snapshot])
+        );
+      }
+    } catch {
+      // Outside extension context
+    }
+  }
+
+  async function recheckConnector(id: string, enable = false): Promise<void> {
+    try {
+      const response = await sendMessage({
+        type: 'RECHECK_CONNECTOR_HEALTH',
+        payload: { connectorId: id, enable },
+      });
+      if (response.type === 'CONNECTOR_HEALTH_RESULT' && Array.isArray(response.payload)) {
+        healthSnapshots = new Map(
+          response.payload.map((snapshot) => [snapshot.connectorId, snapshot])
+        );
+      }
+      if (enable) {
+        enabledConnectorIds = new Set(enabledConnectorIds).add(id);
+      }
+    } catch (err) {
+      feedStore.setError(
+        err instanceof Error ? err.message : 'Impossible de re-verifier le connecteur'
+      );
     }
   }
 
@@ -447,6 +479,8 @@ export function createFeedController(feedStore: {
     // Setup bridge listener
     setupBridgeListener();
 
+    await refreshHealthSnapshots();
+
     // Check source sessions on mount
     checkSourceSessions();
 
@@ -527,6 +561,8 @@ export function createFeedController(feedStore: {
     smartLoad,
     checkSourceSessions,
     handleToggleConnector,
+    refreshHealthSnapshots,
+    recheckConnector,
 
     // Cleanup
     dispose,

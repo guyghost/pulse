@@ -9,7 +9,6 @@ import type {
   ScanProgressPayload,
   ConnectorProgress,
 } from '../lib/shell/messaging/bridge';
-import type { UserProfile } from '../lib/core/types/profile';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { AuthUser } from '../lib/core/types/auth';
 import { getSettings, setSettings } from '../lib/shell/storage/chrome-storage';
@@ -20,7 +19,7 @@ import {
   ScanError,
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
-import { getConnectors } from '../lib/shell/connectors/index';
+import { getConnectorIds, getConnectors } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { setNewMissionCount } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
@@ -29,7 +28,7 @@ import {
   setupNotificationClickHandler,
 } from '../lib/shell/notifications/notify-missions';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
-import { clearAllHealthSnapshots } from '../lib/shell/storage/connector-health';
+import { getAllHealthSnapshots, resetHealthSnapshot } from '../lib/shell/storage/connector-health';
 import { setFirstScanDone, getFirstScanDone } from '../lib/shell/storage/first-scan';
 import { createDefaultProfile } from '../lib/core/profile/defaults';
 import {
@@ -65,10 +64,8 @@ clearExpiredSemanticCache().catch((err) => {
   console.warn('[MissionPulse] Failed to cleanup expired semantic cache:', err);
 });
 
-// Reset circuit breaker health snapshots on every SW startup.
-// Circuits that opened during a previous session due to transient errors
-// are cleared so connectors can be tried fresh on next scan.
-clearAllHealthSnapshots().catch(() => {});
+// Health snapshots are persisted across service worker wake-ups so the side panel
+// can show the latest known connector state even when the worker hibernates.
 
 // Open side panel on extension icon click
 chrome.sidePanel.setPanelBehavior({ openPanelOnActionClick: true });
@@ -227,6 +224,41 @@ async function clearNewMissionBadge(): Promise<void> {
   await chrome.action.setBadgeText({ text: '' });
 }
 
+async function loadConnectorHealthSnapshots() {
+  const now = Date.now();
+  const connectorIds = getConnectorIds();
+  const snapshots = await getAllHealthSnapshots(connectorIds, now);
+  return [...snapshots.values()];
+}
+
+async function recheckConnectorHealth(
+  connectorId: string,
+  enable = false
+): Promise<import('../lib/core/types/mission').Mission[]> {
+  const settings = await getSettings();
+  const persistedEnabled = enable
+    ? Array.from(new Set([...settings.enabledConnectors, connectorId]))
+    : settings.enabledConnectors;
+
+  await resetHealthSnapshot(connectorId);
+  await setSettings({ ...settings, enabledConnectors: [connectorId] });
+
+  try {
+    const result = await runScan(undefined, undefined, { pageDelayMs: 300 });
+    await persistScanResults(result.missions, result.errors);
+
+    try {
+      await chrome.runtime.sendMessage({ type: 'SCAN_COMPLETE', payload: result.missions });
+    } catch {
+      // Side panel not open, ignore
+    }
+
+    return result.missions;
+  } finally {
+    await setSettings({ ...settings, enabledConnectors: persistedEnabled });
+  }
+}
+
 async function persistScanResults(
   missions: import('../lib/core/types/mission').Mission[],
   errors: { connectorId: string; message: string }[]
@@ -365,6 +397,33 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       cancelCurrentScan();
       sendResponse({ type: 'SCAN_CANCEL' });
       return false;
+    }
+
+    if (message.type === 'GET_CONNECTOR_HEALTH') {
+      loadConnectorHealthSnapshots()
+        .then((snapshots) => {
+          sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: snapshots });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_CONNECTOR_HEALTH error:', err);
+          sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+        });
+      return true;
+    }
+
+    if (message.type === 'RECHECK_CONNECTOR_HEALTH') {
+      const { connectorId, enable = false } = message.payload;
+      recheckConnectorHealth(connectorId, enable)
+        .then(async () => {
+          const snapshots = await loadConnectorHealthSnapshots();
+          sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: snapshots });
+        })
+        .catch(async (err) => {
+          console.warn('[MissionPulse] RECHECK_CONNECTOR_HEALTH error:', err);
+          const snapshots = await loadConnectorHealthSnapshots();
+          sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: snapshots });
+        });
+      return true;
     }
 
     // ── Tracking handlers ──

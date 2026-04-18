@@ -18,6 +18,7 @@
   import type { MissionSource } from '$lib/core/types/mission';
   import MissionComparison from '../organisms/MissionComparison.svelte';
   import ProfileRefinementBanner from '../molecules/ProfileRefinementBanner.svelte';
+  import ConnectorAlertBar from '../molecules/ConnectorAlertBar.svelte';
   import FeedTourOverlay, { type FeedTourStep } from '../molecules/FeedTourOverlay.svelte';
   import {
     getFeedTourSeen,
@@ -26,6 +27,7 @@
     setFeedTourSeen,
   } from '$lib/shell/storage/first-scan';
   import { getProfile } from '$lib/shell/facades/settings.facade';
+  import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
 
@@ -71,6 +73,21 @@
   ];
 
   const activeTourStep = $derived(showTour ? tourSteps[tourStepIndex] : null);
+  const brokenConnectors = $derived.by(() => {
+    const snapshots = controller.healthSnapshots;
+    const enabled = controller.enabledConnectorIds;
+    const names = new Map(
+      controller.sourceStatuses.map((source) => [source.connectorId, source.name])
+    );
+
+    return [...snapshots.values()]
+      .filter((snapshot) => deriveHealthStatus(snapshot) === 'broken')
+      .map((snapshot) => ({
+        connectorId: snapshot.connectorId,
+        connectorName: names.get(snapshot.connectorId) ?? snapshot.connectorId,
+        isEnabled: enabled.has(snapshot.connectorId),
+      }));
+  });
 
   (async () => {
     const [firstScanDone, bannerDismissed, profile, feedTourSeen] = await Promise.all([
@@ -190,11 +207,13 @@
             scanResultCounts={controller.scanResultCounts}
             activeSourceFilter={page.selectedSource}
             enabledConnectors={controller.enabledConnectorIds}
+            healthSnapshots={controller.healthSnapshots}
             onRefresh={() => controller.checkSourceSessions()}
             onFilterBySource={(id) => {
               page.setSelectedSource(id as MissionSource | null);
             }}
             onToggleConnector={(id) => controller.handleToggleConnector(id)}
+            onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
           />
         {:else}
           <!-- Full: hero with description, progress, stats -->
@@ -274,11 +293,13 @@
               scanResultCounts={controller.scanResultCounts}
               activeSourceFilter={page.selectedSource}
               enabledConnectors={controller.enabledConnectorIds}
+              healthSnapshots={controller.healthSnapshots}
               onRefresh={() => controller.checkSourceSessions()}
               onFilterBySource={(id) => {
                 page.setSelectedSource(id as MissionSource | null);
               }}
               onToggleConnector={(id) => controller.handleToggleConnector(id)}
+              onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
             />
           {/if}
 
@@ -330,6 +351,14 @@
         {/if}
       </div>
     </section>
+
+    {#if brokenConnectors.length > 0}
+      <ConnectorAlertBar
+        {brokenConnectors}
+        onRecheck={(connectorId) => controller.recheckConnector(connectorId)}
+        onEnableAndScan={(connectorId) => controller.recheckConnector(connectorId, true)}
+      />
+    {/if}
 
     <section
       class="section-card relative overflow-hidden mt-4 rounded-[1.4rem] p-3 @container"

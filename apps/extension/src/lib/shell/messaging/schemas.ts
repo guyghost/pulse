@@ -218,6 +218,18 @@ export const MessageSchemas = {
   AUTH_RESULT: z.object({ type: z.literal('AUTH_RESULT'), payload: z.unknown() }),
 
   // Connector health
+  GET_CONNECTOR_HEALTH: z.object({ type: z.literal('GET_CONNECTOR_HEALTH') }),
+  CONNECTOR_HEALTH_RESULT: z.object({
+    type: z.literal('CONNECTOR_HEALTH_RESULT'),
+    payload: z.array(ConnectorHealthSnapshotSchema),
+  }),
+  RECHECK_CONNECTOR_HEALTH: z.object({
+    type: z.literal('RECHECK_CONNECTOR_HEALTH'),
+    payload: z.object({
+      connectorId: z.string(),
+      enable: z.boolean().optional(),
+    }),
+  }),
   CONNECTOR_HEALTH_UPDATED: z.object({
     type: z.literal('CONNECTOR_HEALTH_UPDATED'),
     payload: z.object({

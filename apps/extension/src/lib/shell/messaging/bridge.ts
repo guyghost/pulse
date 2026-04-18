@@ -76,6 +76,12 @@ export type BridgeMessage =
   | { type: 'AUTH_STATUS' }
   | { type: 'AUTH_RESULT'; payload: { status: AuthStatus; user: AuthUser | null; error?: string } }
   // Connector health (service worker → side panel)
+  | { type: 'GET_CONNECTOR_HEALTH' }
+  | { type: 'CONNECTOR_HEALTH_RESULT'; payload: ConnectorHealthSnapshot[] }
+  | {
+      type: 'RECHECK_CONNECTOR_HEALTH';
+      payload: { connectorId: string; enable?: boolean };
+    }
   | { type: 'CONNECTOR_HEALTH_UPDATED'; payload: ConnectorHealthPayload }
   | {
       type: 'CONNECTOR_SKIPPED';

@@ -16,6 +16,11 @@
  */
 export type CircuitState = 'closed' | 'open' | 'half-open';
 
+/**
+ * User-facing health status derived from the circuit breaker snapshot.
+ */
+export type ConnectorHealthStatus = 'healthy' | 'degraded' | 'broken';
+
 // ============================================================================
 // Health Snapshot
 // ============================================================================
