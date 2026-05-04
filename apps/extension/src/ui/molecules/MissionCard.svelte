@@ -5,6 +5,7 @@
   import { STATUS_LABELS, STATUS_VARIANTS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { Badge } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
+  import { scoreToGrade } from '$lib/core/types/score';
   import { ripple } from '../actions/ripple';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
 
@@ -63,7 +64,8 @@
   );
 
   function barColor(value: number): string {
-    return value >= 70 ? 'bg-blueprint-blue' : value >= 40 ? 'bg-accent-amber' : 'bg-status-red';
+    const grade = scoreToGrade(value);
+    return grade === 'A' ? 'bg-blueprint-blue' : grade === 'B' ? 'bg-accent-amber' : 'bg-status-red';
   }
 
   function toggleExpand() {
@@ -254,7 +256,7 @@
             <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
               <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.stack)} transition-all" style:width="{mission.scoreBreakdown.criteria.stack}%"></div>
             </div>
-            <span class="text-[11px] font-mono font-semibold tabular-nums text-text-primary">{mission.scoreBreakdown.criteria.stack}</span>
+            <span class="text-[11px] font-mono font-semibold text-text-primary">{scoreToGrade(mission.scoreBreakdown.criteria.stack)}</span>
           </div>
         </div>
         <div class="rounded-lg bg-page-canvas px-3 py-2">
@@ -263,7 +265,7 @@
             <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
               <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.tjm)} transition-all" style:width="{mission.scoreBreakdown.criteria.tjm}%"></div>
             </div>
-            <span class="text-[11px] font-mono font-semibold tabular-nums text-text-primary">{mission.scoreBreakdown.criteria.tjm}</span>
+            <span class="text-[11px] font-mono font-semibold text-text-primary">{scoreToGrade(mission.scoreBreakdown.criteria.tjm)}</span>
           </div>
         </div>
         <div class="rounded-lg bg-page-canvas px-3 py-2">
@@ -272,7 +274,7 @@
             <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
               <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.location)} transition-all" style:width="{mission.scoreBreakdown.criteria.location}%"></div>
             </div>
-            <span class="text-[11px] font-mono font-semibold tabular-nums text-text-primary">{mission.scoreBreakdown.criteria.location}</span>
+            <span class="text-[11px] font-mono font-semibold text-text-primary">{scoreToGrade(mission.scoreBreakdown.criteria.location)}</span>
           </div>
         </div>
         <div class="rounded-lg bg-page-canvas px-3 py-2">
@@ -281,7 +283,7 @@
             <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
               <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.remote)} transition-all" style:width="{mission.scoreBreakdown.criteria.remote}%"></div>
             </div>
-            <span class="text-[11px] font-mono font-semibold tabular-nums text-text-primary">{mission.scoreBreakdown.criteria.remote}</span>
+            <span class="text-[11px] font-mono font-semibold text-text-primary">{scoreToGrade(mission.scoreBreakdown.criteria.remote)}</span>
           </div>
         </div>
         {#if mission.scoreBreakdown.semantic !== null}
@@ -291,7 +293,7 @@
               <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
                 <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.semantic}%"></div>
               </div>
-              <span class="text-[11px] font-mono font-semibold tabular-nums text-blueprint-blue">{mission.scoreBreakdown.semantic}</span>
+              <span class="text-[11px] font-mono font-semibold text-blueprint-blue">{scoreToGrade(mission.scoreBreakdown.semantic!)}</span>
             </div>
           </div>
         {/if}
