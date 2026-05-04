@@ -161,7 +161,9 @@
           <div class="flex items-center justify-between gap-3">
             <div class="flex items-center gap-3 min-w-0">
               <div>
-                <p class="text-[10px] font-semibold uppercase tracking-[0.18em] text-blueprint-blue">
+                <p
+                  class="text-[10px] font-semibold uppercase tracking-[0.18em] text-blueprint-blue"
+                >
                   MissionPulse
                 </p>
                 <div class="mt-1 flex items-baseline gap-3">
@@ -212,14 +214,20 @@
           <div class="relative pr-14">
             <div class="max-w-[32rem]">
               <p class="eyebrow text-blueprint-blue">MissionPulse</p>
-              <h2 class="mt-3 font-display text-[clamp(2.75rem,10vw,5.25rem)] font-normal leading-[0.88] tracking-[-0.055em] text-text-primary">
+              <h2
+                class="mt-3 font-display text-[clamp(2.75rem,10vw,5.25rem)] font-normal leading-[0.88] tracking-[-0.055em] text-text-primary"
+              >
                 {page.firstName ? `Bonjour, ${page.firstName}` : 'Radar freelance'}
               </h2>
               <p class="mt-6 max-w-[26rem] text-[0.95rem] leading-[1.6] text-text-subtle">
-                Surveille les pistes utiles, filtre le bruit et garde les meilleures missions à portée de main.
+                Surveille les pistes utiles, filtre le bruit et garde les meilleures missions à
+                portée de main.
               </p>
             </div>
-            <div class="absolute right-0 top-0 flex items-center gap-2" class:flex-row-reverse={page.panelSide === 'left'}>
+            <div
+              class="absolute right-0 top-0 flex items-center gap-2"
+              class:flex-row-reverse={page.panelSide === 'left'}
+            >
               {#if controller.isScanning || page.isLoading}
                 <button
                   class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10 text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
@@ -246,8 +254,12 @@
               >
                 {#if controller.isScanning || page.isLoading}
                   <span class="absolute inset-0 flex items-center justify-center">
-                    <span class="radar-ping absolute h-8 w-8 rounded-full border border-blueprint-blue/40"></span>
-                    <span class="radar-ping animation-delay-500 absolute h-5 w-5 rounded-full border border-blueprint-blue/60"></span>
+                    <span
+                      class="radar-ping absolute h-8 w-8 rounded-full border border-blueprint-blue/40"
+                    ></span>
+                    <span
+                      class="radar-ping animation-delay-500 absolute h-5 w-5 rounded-full border border-blueprint-blue/60"
+                    ></span>
                     <span class="h-2 w-2 rounded-full bg-blueprint-blue"></span>
                   </span>
                 {:else}
@@ -300,7 +312,9 @@
           {/if}
 
           {#if page.isOffline}
-            <div class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-xs text-blueprint-blue">
+            <div
+              class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-xs text-blueprint-blue"
+            >
               <Icon name="database" size={14} />
               <span>Mode hors ligne — Données en cache</span>
             </div>
@@ -321,7 +335,9 @@
             </div>
           </div>
           {#if page.aiStatus === 'after-download'}
-            <p class="mt-2 text-center text-[11px] text-text-muted">Scoring IA en téléchargement...</p>
+            <p class="mt-2 text-center text-[11px] text-text-muted">
+              Scoring IA en téléchargement...
+            </p>
           {:else if page.aiStatus === 'no'}
             <p class="mt-2 text-center text-[11px] text-text-muted">Scoring IA indisponible</p>
           {/if}
@@ -346,12 +362,14 @@
         <!-- Row 1: title + search -->
         {#if controller.isScanning || page.isLoading}
           <div class="flex items-center gap-2 text-xs text-text-muted">
-            <span class="h-3 w-3 animate-spin rounded-full border-2 border-blueprint-blue/20 border-t-blueprint-blue"></span>
+            <span
+              class="h-3 w-3 animate-spin rounded-full border-2 border-blueprint-blue/20 border-t-blueprint-blue"
+            ></span>
             Scraping...
           </div>
         {/if}
 
-        <div class="{controller.isScanning || page.isLoading ? 'mt-2' : ''}">
+        <div class={controller.isScanning || page.isLoading ? 'mt-2' : ''}>
           <SearchInput
             value={page.searchQuery}
             onSearch={page.handleSearch}
@@ -369,23 +387,29 @@
           <button
             class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
               {page.showFavoritesOnly
-                ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+              ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
+              : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
             onclick={page.toggleFavoritesFilter}
             aria-pressed={page.showFavoritesOnly}
             title={page.showFavoritesOnly ? 'Voir toutes (f)' : `Favoris (${page.favoriteCount})`}
           >
-            <Icon name="star" size={12} class={page.showFavoritesOnly ? 'fill-blueprint-blue' : ''} />
+            <Icon
+              name="star"
+              size={12}
+              class={page.showFavoritesOnly ? 'fill-blueprint-blue' : ''}
+            />
             <span class="hidden @[20rem]:inline text-[10px] font-medium">Favoris</span>
             {#if page.favoriteCount > 0}
-              <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium">{page.favoriteCount}</span>
+              <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium"
+                >{page.favoriteCount}</span
+              >
             {/if}
           </button>
           <button
             class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
               {page.showHidden
-                ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+              ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
+              : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
             onclick={page.toggleHiddenFilter}
             aria-pressed={page.showHidden}
             title={page.showHidden ? 'Masquer les ignorées (h)' : `Ignorées (${page.hiddenCount})`}
@@ -393,7 +417,9 @@
             <Icon name={page.showHidden ? 'eye' : 'eye-off'} size={12} />
             <span class="hidden @[20rem]:inline text-[10px] font-medium">Ignorées</span>
             {#if page.hiddenCount > 0}
-              <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium">{page.hiddenCount}</span>
+              <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium"
+                >{page.hiddenCount}</span
+              >
             {/if}
           </button>
 
@@ -412,8 +438,8 @@
           <button
             class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[10px] font-medium transition-all duration-150
               {page.showFilters || page.filterActive
-                ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+              ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
+              : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
             onclick={() => page.setShowFilters(!page.showFilters)}
             aria-expanded={page.showFilters}
             aria-controls="filter-panel"
@@ -526,7 +552,9 @@
     class="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl"
   >
     <span class="text-xs text-text-secondary">
-      {page.comparisonMissionIds.length}/3 sélectionnée{page.comparisonMissionIds.length > 1 ? 's' : ''}
+      {page.comparisonMissionIds.length}/3 sélectionnée{page.comparisonMissionIds.length > 1
+        ? 's'
+        : ''}
     </span>
     {#if page.comparisonMissions.length >= 2}
       <button

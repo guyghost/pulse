@@ -11,12 +11,13 @@
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast } from '$lib/shell/notifications/toast-service';
 
-  const {
-    onNavigateToOnboarding,
-  }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
+  const { onNavigateToOnboarding }: { onBack?: () => void; onNavigateToOnboarding?: () => void } =
+    $props();
 
   const settings = new SettingsPageController({
-    onNavigateToOnboarding: () => { onNavigateToOnboarding?.(); },
+    onNavigateToOnboarding: () => {
+      onNavigateToOnboarding?.();
+    },
   });
 
   const auth = createAuthStore();
@@ -25,19 +26,28 @@
 
   async function handleExportFavorites(format: ExportFormat) {
     const result = await settings.exportFavorites(format);
-    if (!result.ok) { await showToast(result.error, 'error'); return; }
+    if (!result.ok) {
+      await showToast(result.error, 'error');
+      return;
+    }
     await showToast('Export des favoris lancé', 'success');
   }
 
   async function handleCreateBackup() {
     const result = await settings.createBackupFile();
-    if (!result.ok) { await showToast(result.error, 'error'); return; }
+    if (!result.ok) {
+      await showToast(result.error, 'error');
+      return;
+    }
     await showToast('Sauvegarde créée', 'success');
   }
 
   async function handleRestoreBackup() {
     const result = await settings.restoreBackup();
-    if (!result.ok) { await showToast(result.error, 'error'); return; }
+    if (!result.ok) {
+      await showToast(result.error, 'error');
+      return;
+    }
     await settings.load();
     await showToast('Sauvegarde restaurée', 'success');
   }
@@ -80,17 +90,23 @@
       error={auth.error}
       onLogin={async (email, password) => {
         const result = await auth.login(email, password);
-        if (!result.success && result.error) await showToast(result.error, 'error');
+        if (!result.success && result.error) {
+          await showToast(result.error, 'error');
+        }
       }}
       onSignup={async (email, password) => {
         const result = await auth.signup(email, password);
-        if (result.success) await showToast('Compte créé avec succès', 'success');
+        if (result.success) {
+          await showToast('Compte créé avec succès', 'success');
+        }
       }}
       onLogout={async () => {
         await auth.logout();
         await showToast('Déconnecté', 'success');
       }}
-      onOpenDashboard={() => { window.open('https://missionpulse.app/dashboard', '_blank'); }}
+      onOpenDashboard={() => {
+        window.open('https://missionpulse.app/dashboard', '_blank');
+      }}
     />
 
     <!-- Profil -->
@@ -194,13 +210,16 @@
     <!-- IA locale -->
     <div class="section-card rounded-xl p-5 space-y-3">
       <div class="flex items-start gap-3">
-        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6">
+        <div
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
+        >
           <Icon name="cpu" size={14} class="text-blueprint-blue" />
         </div>
         <div>
           <h3 class="text-sm font-medium text-text-primary">IA locale</h3>
           <p class="mt-1 text-xs text-text-subtle">
-            Le scoring sémantique utilise Gemini Nano via la Prompt API de Chrome, sans clé API externe.
+            Le scoring sémantique utilise Gemini Nano via la Prompt API de Chrome, sans clé API
+            externe.
           </p>
         </div>
       </div>
@@ -216,7 +235,9 @@
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Missions / scan</p>
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            Missions / scan
+          </p>
           <p class="mt-1 text-xs font-medium text-text-primary">{settings.maxSemanticPerScan}</p>
         </div>
       </div>
@@ -249,8 +270,12 @@
     <!-- Zone de danger -->
     <DangerZone
       showResetConfirm={settings.showResetConfirm}
-      onShowConfirm={() => { settings.showResetConfirm = true; }}
-      onCancelConfirm={() => { settings.showResetConfirm = false; }}
+      onShowConfirm={() => {
+        settings.showResetConfirm = true;
+      }}
+      onCancelConfirm={() => {
+        settings.showResetConfirm = false;
+      }}
       onConfirmReset={() => settings.resetAll()}
     />
   </div>

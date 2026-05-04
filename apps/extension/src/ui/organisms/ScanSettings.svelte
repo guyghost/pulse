@@ -32,7 +32,9 @@
     </div>
     <button
       class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200
-        {autoScan ? 'border-accent-green/30 bg-accent-green/15' : 'border-border-light bg-surface-white'}"
+        {autoScan
+        ? 'border-accent-green/30 bg-accent-green/15'
+        : 'border-border-light bg-surface-white'}"
       onclick={onToggleAutoScan}
       role="switch"
       aria-checked={autoScan}
@@ -85,7 +87,9 @@
     </div>
     <button
       class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200
-        {notifications ? 'border-accent-green/30 bg-accent-green/15' : 'border-border-light bg-surface-white'}"
+        {notifications
+        ? 'border-accent-green/30 bg-accent-green/15'
+        : 'border-border-light bg-surface-white'}"
       onclick={onToggleNotifications}
       role="switch"
       aria-checked={notifications}

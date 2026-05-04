@@ -17,7 +17,11 @@
             label: 'Baisse',
             class: 'text-status-red bg-status-red/10',
           }
-        : { icon: 'minus' as const, label: 'Stable', class: 'text-blueprint-blue bg-blueprint-blue/10' }
+        : {
+            icon: 'minus' as const,
+            label: 'Stable',
+            class: 'text-blueprint-blue bg-blueprint-blue/10',
+          }
   );
 </script>
 

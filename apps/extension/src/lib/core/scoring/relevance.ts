@@ -151,7 +151,7 @@ const rawTjmScore = (missionTjm: number | null, min: number, max: number): numbe
   }
   const distance = missionTjm < min ? min - missionTjm : missionTjm - max;
   const rangeSize = max - min || 1;
-  return Math.round(Math.max(0, (1 - distance / rangeSize)) * 100);
+  return Math.round(Math.max(0, 1 - distance / rangeSize) * 100);
 };
 
 /**

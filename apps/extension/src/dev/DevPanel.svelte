@@ -168,8 +168,9 @@
                 <div class="flex gap-2">
                   <span class="text-text-muted">{log.time}</span>
                   <span
-                    class={log.direction === '\u2192' ? 'text-blueprint-blue' : 'text-blueprint-blue'}
-                    >{log.direction}</span
+                    class={log.direction === '\u2192'
+                      ? 'text-blueprint-blue'
+                      : 'text-blueprint-blue'}>{log.direction}</span
                   >
                   <span class="text-text-primary">{log.type}</span>
                   <span class="text-text-secondary truncate">{log.summary}</span>

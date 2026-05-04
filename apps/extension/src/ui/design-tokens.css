@@ -69,12 +69,30 @@ body {
   letter-spacing: -0.03px;
 }
 
-.tag--red    { background: var(--color-status-red);    color: #ffffff; }
-.tag--orange { background: var(--color-status-orange); color: #ffffff; }
-.tag--yellow { background: var(--color-status-yellow); color: #ffffff; }
-.tag--violet { background: var(--color-status-violet); color: #ffffff; }
-.tag--blue   { background: var(--color-blueprint-blue); color: #ffffff; }
-.tag--gray   { background: var(--color-subtle-gray);   color: var(--color-text-secondary); }
+.tag--red {
+  background: var(--color-status-red);
+  color: #ffffff;
+}
+.tag--orange {
+  background: var(--color-status-orange);
+  color: #ffffff;
+}
+.tag--yellow {
+  background: var(--color-status-yellow);
+  color: #ffffff;
+}
+.tag--violet {
+  background: var(--color-status-violet);
+  color: #ffffff;
+}
+.tag--blue {
+  background: var(--color-blueprint-blue);
+  color: #ffffff;
+}
+.tag--gray {
+  background: var(--color-subtle-gray);
+  color: var(--color-text-secondary);
+}
 
 /* ================================================
  * Extension shell utilities — Analytical Blueprint

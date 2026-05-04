@@ -89,7 +89,9 @@
   }
 </script>
 
-<div class="panel-shell relative flex h-screen w-full flex-col overflow-hidden bg-page-canvas text-text-primary font-sans">
+<div
+  class="panel-shell relative flex h-screen w-full flex-col overflow-hidden bg-page-canvas text-text-primary font-sans"
+>
   <div class="relative z-10 flex h-full flex-col">
     {#if showOfflineBanner}
       <div

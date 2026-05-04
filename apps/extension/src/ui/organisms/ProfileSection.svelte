@@ -92,14 +92,20 @@
       </div>
 
       <div class="space-y-2">
-        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">Stack technique</p>
+        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
+          Stack technique
+        </p>
         <div class="flex gap-2">
           <input
             type="text"
             placeholder="ex: React, Node.js..."
             class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={stackInput}
-            onkeydown={(e) => { if (e.key === 'Enter') onAddStack(); }}
+            onkeydown={(e) => {
+              if (e.key === 'Enter') {
+                onAddStack();
+              }
+            }}
           />
           <button
             class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
@@ -140,7 +146,10 @@
       {#if profileStack.length > 0}
         <div class="flex flex-wrap gap-1.5 pt-1">
           {#each profileStack as tech}
-            <span class="inline-flex items-center rounded-md bg-blueprint-blue/6 px-2 py-0.5 text-[11px] text-blueprint-blue">{tech}</span>
+            <span
+              class="inline-flex items-center rounded-md bg-blueprint-blue/6 px-2 py-0.5 text-[11px] text-blueprint-blue"
+              >{tech}</span
+            >
           {/each}
         </div>
       {:else}

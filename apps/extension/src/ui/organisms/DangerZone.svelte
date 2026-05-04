@@ -21,7 +21,9 @@
     </div>
     <div>
       <p class="text-sm font-medium text-status-red">Zone dangereuse</p>
-      <p class="mt-0.5 text-xs text-text-subtle">Supprimer toutes les données locales (profil, missions, cache).</p>
+      <p class="mt-0.5 text-xs text-text-subtle">
+        Supprimer toutes les données locales (profil, missions, cache).
+      </p>
     </div>
   </div>
   <div class="mt-4">

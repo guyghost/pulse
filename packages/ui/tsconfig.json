@@ -2,7 +2,8 @@
   "extends": "@pulse/tsconfig/base.json",
   "compilerOptions": {
     "types": ["vitest/globals"],
-    "paths": {}
+    "verbatimModuleSyntax": false,
+    "noEmit": true
   },
   "include": ["src/**/*.ts", "src/**/*.svelte"],
   "exclude": ["node_modules", "dist"]

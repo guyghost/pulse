@@ -40,10 +40,16 @@
   function getRelativeTime(timestamp: number): string {
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) return "à l'instant";
-    if (minutes < 60) return `il y a ${minutes}min`;
+    if (minutes < 1) {
+      return "à l'instant";
+    }
+    if (minutes < 60) {
+      return `il y a ${minutes}min`;
+    }
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `il y a ${hours}h`;
+    if (hours < 24) {
+      return `il y a ${hours}h`;
+    }
     return `il y a ${Math.floor(hours / 24)}j`;
   }
 
@@ -105,10 +111,10 @@
           <button
             class="group flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-all duration-200
               {isFiltered
-                ? 'border-blueprint-blue/30 bg-blueprint-blue/10'
-                : hasData && isEnabled
-                  ? 'border-blueprint-blue/15 bg-blueprint-blue/5 hover:bg-blueprint-blue/10'
-                  : 'border-border-light bg-surface-white opacity-35 hover:opacity-60'}"
+              ? 'border-blueprint-blue/30 bg-blueprint-blue/10'
+              : hasData && isEnabled
+                ? 'border-blueprint-blue/15 bg-blueprint-blue/5 hover:bg-blueprint-blue/10'
+                : 'border-border-light bg-surface-white opacity-35 hover:opacity-60'}"
             onclick={() => {
               if (isFiltered) {
                 onFilterBySource?.(null);
@@ -124,10 +130,10 @@
             <span
               class="inline-block h-1.5 w-1.5 shrink-0 rounded-full
                 {source.sessionStatus === 'connected' && isEnabled
-                  ? 'bg-accent-green'
-                  : source.sessionStatus === 'error'
-                    ? 'bg-status-red'
-                    : 'bg-text-muted'}"
+                ? 'bg-accent-green'
+                : source.sessionStatus === 'error'
+                  ? 'bg-status-red'
+                  : 'bg-text-muted'}"
             ></span>
             <!-- Favicon or initials -->
             {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
@@ -137,7 +143,9 @@
                 width="14"
                 height="14"
                 class="rounded-sm shrink-0"
-                onerror={() => { imgFailed[source.connectorId] = true; }}
+                onerror={() => {
+                  imgFailed[source.connectorId] = true;
+                }}
               />
             {:else}
               <span class="text-[8px] font-bold text-text-secondary shrink-0">
@@ -148,8 +156,12 @@
             {#if hasData}
               <span
                 class="text-[10px] font-mono font-medium
-                  {isFiltered ? 'text-blueprint-blue' : hasData && isEnabled ? 'text-text-secondary' : 'text-text-muted'}"
-              >{missionCount}</span>
+                  {isFiltered
+                  ? 'text-blueprint-blue'
+                  : hasData && isEnabled
+                    ? 'text-text-secondary'
+                    : 'text-text-muted'}">{missionCount}</span
+              >
             {/if}
           </button>
         {/each}
@@ -166,15 +178,17 @@
       <div class="px-4 pt-3 pb-2">
         <div class="flex items-center justify-between">
           <div class="flex items-center gap-2">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">Sources</p>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+              Sources
+            </p>
             {#if !isChecking}
               <span
                 class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-medium
                   {connectedCount === totalSources
-                    ? 'bg-accent-green/10 text-accent-green'
-                    : connectedCount > 0
-                      ? 'bg-blueprint-blue/8 text-blueprint-blue'
-                      : 'bg-subtle-gray text-text-muted'}"
+                  ? 'bg-accent-green/10 text-accent-green'
+                  : connectedCount > 0
+                    ? 'bg-blueprint-blue/8 text-blueprint-blue'
+                    : 'bg-subtle-gray text-text-muted'}"
               >
                 {connectedCount}/{totalSources}
               </span>
@@ -222,8 +236,8 @@
               <button
                 class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200
                   {isEnabled
-                    ? 'border-accent-green/30 bg-accent-green/15'
-                    : 'border-border-light bg-surface-white'}"
+                  ? 'border-accent-green/30 bg-accent-green/15'
+                  : 'border-border-light bg-surface-white'}"
                 onclick={() => onToggleConnector(source.connectorId)}
                 role="switch"
                 aria-checked={isEnabled}
@@ -240,8 +254,8 @@
             <div
               class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors
                 {isActive
-                  ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
-                  : 'border-border-light bg-surface-white'}"
+                ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
+                : 'border-border-light bg-surface-white'}"
             >
               {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
                 <img
@@ -250,7 +264,9 @@
                   width="16"
                   height="16"
                   class="rounded-sm"
-                  onerror={() => { imgFailed[source.connectorId] = true; }}
+                  onerror={() => {
+                    imgFailed[source.connectorId] = true;
+                  }}
                 />
               {:else}
                 <span class="text-[9px] font-bold text-text-secondary">
@@ -261,7 +277,9 @@
 
             <!-- Name + count -->
             <div class="min-w-0 flex-1">
-              <span class="block truncate text-[12px] font-medium text-text-primary">{source.name}</span>
+              <span class="block truncate text-[12px] font-medium text-text-primary"
+                >{source.name}</span
+              >
               {#if missionCount > 0}
                 <span class="block text-[10px] text-text-muted">{missionCount} missions</span>
               {/if}
@@ -316,8 +334,8 @@
                 <button
                   class="rounded-md px-1.5 py-0.5 text-[10px] font-mono font-medium transition-colors
                     {isFiltered
-                      ? 'bg-blueprint-blue/10 text-blueprint-blue'
-                      : 'text-text-muted hover:bg-subtle-gray hover:text-text-primary'}"
+                    ? 'bg-blueprint-blue/10 text-blueprint-blue'
+                    : 'text-text-muted hover:bg-subtle-gray hover:text-text-primary'}"
                   onclick={() => onFilterBySource?.(isFiltered ? null : source.connectorId)}
                   title={isFiltered ? 'Retirer le filtre' : `Filtrer par ${source.name}`}
                 >
@@ -331,7 +349,9 @@
 
       {#if unhealthySnapshots.length > 0}
         <div class="border-t border-border-light px-4 py-3">
-          <p class="text-[10px] uppercase tracking-[0.15em] text-text-muted mb-2">Santé détaillée</p>
+          <p class="text-[10px] uppercase tracking-[0.15em] text-text-muted mb-2">
+            Santé détaillée
+          </p>
           <div class="space-y-2">
             {#each unhealthySnapshots as item (item.connectorId)}
               <ConnectorHealthCard snapshot={item.snapshot} connectorName={item.name} />

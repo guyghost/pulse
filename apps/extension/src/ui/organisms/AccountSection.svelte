@@ -34,7 +34,9 @@
 
   const formattedExpiry = $derived(
     premiumExpiresAt
-      ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(new Date(premiumExpiresAt))
+      ? new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'long', year: 'numeric' }).format(
+          new Date(premiumExpiresAt)
+        )
       : null
   );
 
@@ -50,17 +52,23 @@
   });
 
   function handleLogin() {
-    if (!canSubmit || isLoading) return;
+    if (!canSubmit || isLoading) {
+      return;
+    }
     onLogin(formEmail, formPassword);
   }
 
   function handleSignup() {
-    if (!canSubmit || isLoading) return;
+    if (!canSubmit || isLoading) {
+      return;
+    }
     onSignup(formEmail, formPassword);
   }
 
   function handleKeydown(e: KeyboardEvent) {
-    if (e.key === 'Enter' && canSubmit && !isLoading) handleLogin();
+    if (e.key === 'Enter' && canSubmit && !isLoading) {
+      handleLogin();
+    }
   }
 </script>
 
@@ -73,7 +81,9 @@
     <div>
       <h3 class="text-sm font-medium text-text-primary">Compte</h3>
       {#if !isAuthenticated}
-        <p class="mt-0.5 text-xs text-text-subtle">Connectez-vous pour débloquer les fonctionnalités premium.</p>
+        <p class="mt-0.5 text-xs text-text-subtle">
+          Connectez-vous pour débloquer les fonctionnalités premium.
+        </p>
       {/if}
     </div>
   </div>
@@ -82,12 +92,16 @@
     <div class="mt-4 space-y-3">
       <div class="flex items-center justify-between">
         <div class="flex items-center gap-2.5">
-          <div class="flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-page-canvas">
+          <div
+            class="flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-page-canvas"
+          >
             <Icon name="user" size={13} class="text-text-subtle" />
           </div>
           <span class="text-sm text-text-primary">{email}</span>
         </div>
-        <span class="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-medium {badgeConfig.classes}">
+        <span
+          class="inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[10px] font-medium {badgeConfig.classes}"
+        >
           {#if premiumStatus === 'premium'}<Icon name="crown" size={10} />{/if}
           {badgeConfig.text}
         </span>
@@ -102,7 +116,10 @@
           <p class="text-xs text-text-subtle">
             Passez à Premium pour une IA de scoring améliorée.
             {#if onOpenDashboard}
-              <button class="text-blueprint-blue hover:text-blueprint-blue/80" onclick={onOpenDashboard}>
+              <button
+                class="text-blueprint-blue hover:text-blueprint-blue/80"
+                onclick={onOpenDashboard}
+              >
                 En savoir plus →
               </button>
             {/if}
@@ -113,7 +130,10 @@
           <p class="text-xs text-status-red">
             Abonnement expiré.
             {#if onOpenDashboard}
-              <button class="text-blueprint-blue hover:text-blueprint-blue/80" onclick={onOpenDashboard}>
+              <button
+                class="text-blueprint-blue hover:text-blueprint-blue/80"
+                onclick={onOpenDashboard}
+              >
                 Renouveler →
               </button>
             {/if}
@@ -135,7 +155,10 @@
   {:else}
     <form
       class="mt-4 space-y-2.5"
-      onsubmit={(e) => { e.preventDefault(); handleLogin(); }}
+      onsubmit={(e) => {
+        e.preventDefault();
+        handleLogin();
+      }}
     >
       <div class="relative">
         <div class="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2">

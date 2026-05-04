@@ -44,7 +44,9 @@
 </script>
 
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-  <div class="w-full max-w-md rounded-3xl border border-border-light bg-surface-white p-6 shadow-2xl">
+  <div
+    class="w-full max-w-md rounded-3xl border border-border-light bg-surface-white p-6 shadow-2xl"
+  >
     <!-- Header -->
     <div class="mb-5 flex items-center gap-3">
       {#if error}

@@ -65,7 +65,11 @@
 
   function barColor(value: number): string {
     const grade = scoreToGrade(value);
-    return grade === 'A' ? 'bg-blueprint-blue' : grade === 'B' ? 'bg-accent-amber' : 'bg-status-red';
+    return grade === 'A'
+      ? 'bg-blueprint-blue'
+      : grade === 'B'
+        ? 'bg-accent-amber'
+        : 'bg-status-red';
   }
 
   function toggleExpand() {
@@ -105,9 +109,7 @@
   use:onVisibleAction={() => onVisibleCallback?.()}
   class="group relative cursor-pointer rounded-xl border border-border-light bg-surface-white p-5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
-    : 'border-blueprint-blue/20'} {isHidden
-    ? 'opacity-50'
-    : ''} {tourHighlight === 'seen'
+    : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
     : ''}"
   style="contain: layout style paint;"
@@ -144,7 +146,9 @@
           </span>
         {/if}
       </div>
-      <h3 class="mt-2 text-[0.9375rem] font-medium leading-snug text-text-primary">{mission.title}</h3>
+      <h3 class="mt-2 text-[0.9375rem] font-medium leading-snug text-text-primary">
+        {mission.title}
+      </h3>
       {#if mission.client}
         <p class="mt-1 text-xs text-text-subtle">{mission.client}</p>
       {/if}
@@ -211,7 +215,9 @@
         {#if mission.tjm !== null}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
             <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">TJM</p>
-            <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">{mission.tjm}€<span class="text-text-muted">/j</span></p>
+            <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">
+              {mission.tjm}€<span class="text-text-muted">/j</span>
+            </p>
           </div>
         {/if}
         {#if mission.location}
@@ -234,7 +240,9 @@
         {/if}
         {#if seniorityLabel}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Séniorité</p>
+            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+              Séniorité
+            </p>
             <p class="mt-1 truncate text-text-primary">{seniorityLabel}</p>
           </div>
         {/if}
@@ -257,13 +265,19 @@
     <div class="mt-4 border-t border-border-light pt-3 space-y-1.5">
       {#each lines as line}
         {@const grade = scoreToGrade(line.value)}
-        {@const color = grade === 'A' ? 'bg-accent-green text-surface-white'
-          : grade === 'B' ? 'bg-accent-amber text-surface-white'
-          : grade === 'C' ? 'bg-status-orange text-surface-white'
-          : 'bg-disabled-gray text-text-secondary'}
+        {@const color =
+          grade === 'A'
+            ? 'bg-accent-green text-surface-white'
+            : grade === 'B'
+              ? 'bg-accent-amber text-surface-white'
+              : grade === 'C'
+                ? 'bg-status-orange text-surface-white'
+                : 'bg-disabled-gray text-text-secondary'}
         <div class="flex items-center gap-2.5 py-0.5">
           <span class="text-[11px] text-text-subtle flex-1">{line.label}</span>
-          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold font-mono {color}">
+          <span
+            class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold font-mono {color}"
+          >
             {grade}
           </span>
         </div>
@@ -272,7 +286,9 @@
         {@const sg = scoreToGrade(mission.scoreBreakdown.semantic)}
         <div class="flex items-center gap-2.5 py-0.5">
           <span class="text-[11px] text-blueprint-blue flex-1">IA sémantique</span>
-          <span class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blueprint-blue text-surface-white text-[10px] font-bold font-mono">
+          <span
+            class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blueprint-blue text-surface-white text-[10px] font-bold font-mono"
+          >
             {sg}
           </span>
         </div>

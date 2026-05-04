@@ -204,7 +204,7 @@
   <div class="mt-2 flex flex-col gap-2">
     <button
       use:ripple
-      class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/88 py-3 text-sm font-semibold text-surface-white  transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+      class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/88 py-3 text-sm font-semibold text-surface-white transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
       disabled={!canSubmit || isSaving}
       onclick={handleSubmit}
     >

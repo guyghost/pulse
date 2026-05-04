@@ -45,16 +45,22 @@
 
   const isOffline = $derived(connection.status === 'offline');
 
-  $effect(() => { loadProfileAndAnalysis(); });
+  $effect(() => {
+    loadProfileAndAnalysis();
+  });
 
   $effect(() => {
     try {
       const listener = (message: { type?: string }) => {
-        if (message?.type === 'SCAN_COMPLETE') loadAnalysis();
+        if (message?.type === 'SCAN_COMPLETE') {
+          loadAnalysis();
+        }
       };
       chrome.runtime.onMessage.addListener(listener);
       return () => chrome.runtime.onMessage.removeListener(listener);
-    } catch {}
+    } catch {
+      // Service worker context may not have chrome.runtime
+    }
   });
 
   $effect(() => {
@@ -100,7 +106,9 @@
     {/if}
 
     {#if isOffline}
-      <div class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-xs text-blueprint-blue">
+      <div
+        class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-xs text-blueprint-blue"
+      >
         <Icon name="database" size={14} />
         <span>Mode hors ligne</span>
       </div>
