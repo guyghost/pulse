@@ -62,6 +62,10 @@
         : 'text-text-muted bg-page-canvas'
   );
 
+  function barColor(value: number): string {
+    return value >= 70 ? 'bg-blueprint-blue' : value >= 40 ? 'bg-accent-amber' : 'bg-status-red';
+  }
+
   function toggleExpand() {
     expanded = !expanded;
   }
@@ -243,51 +247,60 @@
   <!-- Score breakdown (expanded only) -->
   {#if expanded && mission.scoreBreakdown}
     <div class="mt-4 border-t border-border-light pt-4">
-      <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted mb-3">Pourquoi ce score</p>
-      <div class="space-y-2.5">
-        <div class="flex items-center gap-3 text-[11px]">
-          <span class="w-20 shrink-0 text-text-secondary">Compétences</span>
-          <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
-            <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.criteria.stack}%"></div>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg bg-page-canvas px-3 py-2">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Compétences</p>
+          <div class="mt-1.5 flex items-center gap-2">
+            <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
+              <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.stack)} transition-all" style:width="{mission.scoreBreakdown.criteria.stack}%"></div>
+            </div>
+            <span class="text-[11px] font-mono font-semibold tabular-nums text-text-primary">{mission.scoreBreakdown.criteria.stack}</span>
           </div>
-          <span class="w-8 text-right font-mono font-medium text-text-primary">{mission.scoreBreakdown.criteria.stack}</span>
         </div>
-        <div class="flex items-center gap-3 text-[11px]">
-          <span class="w-20 shrink-0 text-text-secondary">TJM</span>
-          <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
-            <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.criteria.tjm}%"></div>
+        <div class="rounded-lg bg-page-canvas px-3 py-2">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">TJM</p>
+          <div class="mt-1.5 flex items-center gap-2">
+            <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
+              <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.tjm)} transition-all" style:width="{mission.scoreBreakdown.criteria.tjm}%"></div>
+            </div>
+            <span class="text-[11px] font-mono font-semibold tabular-nums text-text-primary">{mission.scoreBreakdown.criteria.tjm}</span>
           </div>
-          <span class="w-8 text-right font-mono font-medium text-text-primary">{mission.scoreBreakdown.criteria.tjm}</span>
         </div>
-        <div class="flex items-center gap-3 text-[11px]">
-          <span class="w-20 shrink-0 text-text-secondary">Localisation</span>
-          <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
-            <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.criteria.location}%"></div>
+        <div class="rounded-lg bg-page-canvas px-3 py-2">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Localisation</p>
+          <div class="mt-1.5 flex items-center gap-2">
+            <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
+              <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.location)} transition-all" style:width="{mission.scoreBreakdown.criteria.location}%"></div>
+            </div>
+            <span class="text-[11px] font-mono font-semibold tabular-nums text-text-primary">{mission.scoreBreakdown.criteria.location}</span>
           </div>
-          <span class="w-8 text-right font-mono font-medium text-text-primary">{mission.scoreBreakdown.criteria.location}</span>
         </div>
-        <div class="flex items-center gap-3 text-[11px]">
-          <span class="w-20 shrink-0 text-text-secondary">Remote</span>
-          <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
-            <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.criteria.remote}%"></div>
+        <div class="rounded-lg bg-page-canvas px-3 py-2">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Remote</p>
+          <div class="mt-1.5 flex items-center gap-2">
+            <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
+              <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.remote)} transition-all" style:width="{mission.scoreBreakdown.criteria.remote}%"></div>
+            </div>
+            <span class="text-[11px] font-mono font-semibold tabular-nums text-text-primary">{mission.scoreBreakdown.criteria.remote}</span>
           </div>
-          <span class="w-8 text-right font-mono font-medium text-text-primary">{mission.scoreBreakdown.criteria.remote}</span>
         </div>
         {#if mission.scoreBreakdown.semantic !== null}
-          <div class="flex items-center gap-3 text-[11px]">
-            <span class="w-20 shrink-0 text-text-secondary">Sémantique IA</span>
-            <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
-              <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.semantic}%"></div>
+          <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2">
+            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-blueprint-blue">IA sémantique</p>
+            <div class="mt-1.5 flex items-center gap-2">
+              <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
+                <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.semantic}%"></div>
+              </div>
+              <span class="text-[11px] font-mono font-semibold tabular-nums text-blueprint-blue">{mission.scoreBreakdown.semantic}</span>
             </div>
-            <span class="w-8 text-right font-mono font-medium text-blueprint-blue">{mission.scoreBreakdown.semantic}</span>
+          </div>
+        {/if}
+        {#if mission.scoreBreakdown.semanticReason}
+          <div class="col-span-2 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2 text-[11px] text-blueprint-blue">
+            {mission.scoreBreakdown.semanticReason}
           </div>
         {/if}
       </div>
-      {#if mission.scoreBreakdown.semanticReason}
-        <p class="mt-3 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2 text-[11px] text-blueprint-blue">
-          {mission.scoreBreakdown.semanticReason}
-        </p>
-      {/if}
     </div>
   {/if}
 
