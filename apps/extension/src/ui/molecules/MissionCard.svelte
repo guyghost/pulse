@@ -257,7 +257,7 @@
     <div class="mt-4 border-t border-border-light pt-3 space-y-1.5">
       {#each lines as line}
         {@const grade = scoreToGrade(line.value)}
-        {@const color = grade === 'A' ? 'bg-blueprint-blue text-surface-white'
+        {@const color = grade === 'A' ? 'bg-accent-green text-surface-white'
           : grade === 'B' ? 'bg-accent-amber text-surface-white'
           : grade === 'C' ? 'bg-status-orange text-surface-white'
           : 'bg-disabled-gray text-text-secondary'}
