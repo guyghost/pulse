@@ -18,16 +18,18 @@ export type Grade = 'A' | 'B' | 'C' | 'D' | 'F';
 
 /**
  * Breakdown of deterministic (rule-based) scoring by criterion.
- * Each criterion is scored 0-100, bonuses are 0-10.
+ * Each criterion is a match percentage 0-100 (unweighted),
+ * directly gradable via scoreToGrade().
+ * Bonuses are 0-10.
  */
 export interface DeterministicBreakdown {
-  /** Stack technology overlap (0-100, weighted) */
+  /** Stack technology overlap match % (0-100) */
   stack: number;
-  /** Location match (0-100, weighted) */
+  /** Location match % (0-100) */
   location: number;
-  /** TJM (daily rate) fit (0-100, weighted) */
+  /** TJM (daily rate) fit match % (0-100) */
   tjm: number;
-  /** Remote policy match (0-100, weighted) */
+  /** Work mode (remote/hybrid/onsite) match % (0-100) */
   remote: number;
   /** Seniority level match bonus (0-5) */
   seniorityBonus: number;

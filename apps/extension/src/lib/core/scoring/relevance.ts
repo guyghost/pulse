@@ -16,15 +16,14 @@ export interface DeterministicScoreResult {
 /**
  * Score a mission's relevance to a user profile.
  *
- * The score is computed by evaluating four criteria (0-100):
+ * The score is computed by evaluating four criteria as match percentages (0-100):
  * - Stack matching: How well the mission's tech stack matches the profile
  * - Location: Whether the mission location matches the profile's location
  * - TJM: Whether the mission's daily rate falls within the profile's range
- * - Remote: Whether the remote policy matches the profile's preference
+ * - Remote: Whether the work mode matches the profile's preference
  *
- * Plus bonus points (0-10, clamped to 100):
- * - Seniority match: +0 to +5
- * - Start date urgency: +0 to +5
+ * These raw percentages are stored in breakdown.criteria (gradable via scoreToGrade).
+ * The total is the weighted sum of criteria + bonus points (clamped to 100).
  *
  * @param mission - The mission to score
  * @param profile - The user profile to match against
@@ -39,16 +38,19 @@ export const scoreMission = (
   const weights = profile.scoringWeights ?? DEFAULT_SCORING_WEIGHTS;
   const normalizedWeights = normalizeWeights(weights);
 
-  const stackScore = scoreStack(mission.stack, profile.stack, normalizedWeights.stack);
-  const locationScore = scoreLocation(
-    mission.location,
-    profile.location,
-    normalizedWeights.location
-  );
-  const tjmScore = scoreTJM(mission.tjm, profile.tjmMin, profile.tjmMax, normalizedWeights.tjm);
-  const remoteScore = scoreRemote(mission.remote, profile.remote, normalizedWeights.remote);
+  // Raw match percentages (0-100) — directly gradable
+  const stackMatch = rawStackScore(mission.stack, profile.stack);
+  const locationMatch = rawLocationScore(mission.location, profile.location);
+  const tjmMatch = rawTjmScore(mission.tjm, profile.tjmMin, profile.tjmMax);
+  const remoteMatch = rawRemoteScore(mission.remote, profile.remote);
 
-  const baseScore = stackScore + locationScore + tjmScore + remoteScore;
+  // Weighted contribution to total
+  const weightedStack = stackMatch * (normalizedWeights.stack / 100);
+  const weightedLocation = locationMatch * (normalizedWeights.location / 100);
+  const weightedTjm = tjmMatch * (normalizedWeights.tjm / 100);
+  const weightedRemote = remoteMatch * (normalizedWeights.remote / 100);
+
+  const baseScore = weightedStack + weightedLocation + weightedTjm + weightedRemote;
 
   // Bonus points (clamped to 100)
   const seniorityBonus = scoreSeniorityBonus(mission.seniority, profile.seniority);
@@ -58,10 +60,10 @@ export const scoreMission = (
 
   return {
     breakdown: {
-      stack: Math.round(stackScore),
-      location: Math.round(locationScore),
-      tjm: Math.round(tjmScore),
-      remote: Math.round(remoteScore),
+      stack: Math.round(stackMatch),
+      location: Math.round(locationMatch),
+      tjm: Math.round(tjmMatch),
+      remote: Math.round(remoteMatch),
       seniorityBonus,
       startDateBonus,
     },
@@ -94,96 +96,77 @@ const normalizeWeights = (weights: ScoringWeights): ScoringWeights => {
 };
 
 /**
- * Score stack matching based on how many mission technologies match the profile.
- * Returns a proportional score based on match ratio multiplied by the weight.
- * If the profile has no stack defined, returns full weight (doesn't penalize the user).
+ * Raw stack match percentage (0-100).
+ * Returns % of mission stack that matches the profile.
  */
-const scoreStack = (missionStack: string[], profileStack: string[], weight: number): number => {
-  // If profile has no stack, don't penalize - return full weight
+const rawStackScore = (missionStack: string[], profileStack: string[]): number => {
   if (profileStack.length === 0) {
-    return weight;
+    return 100;
   }
   if (missionStack.length === 0) {
     return 0;
   }
   const normalizedProfile = profileStack.filter(Boolean).map((s) => s.toLowerCase());
   const matches = missionStack.filter((s) => s && normalizedProfile.includes(s.toLowerCase()));
-  return (matches.length / missionStack.length) * weight;
+  return (matches.length / missionStack.length) * 100;
 };
 
 /**
- * Score location matching using fuzzy matching.
- * - Exact match: full weight
- * - Synonym match (regional equivalents): 80% of weight
- * - Nearby match (same metropolitan area): 70% of weight
- * - Partial match (token-based): 60% of weight
- * - Unknown location: partial score (half of weight)
- * - No match: 0
+ * Raw location match percentage (0-100).
  */
-const scoreLocation = (
-  missionLocation: string | null,
-  profileLocation: string,
-  weight: number
-): number => {
+const rawLocationScore = (missionLocation: string | null, profileLocation: string): number => {
   if (!profileLocation) {
-    return weight;
+    return 100;
   }
   if (!missionLocation) {
-    return weight * 0.5;
+    return 50;
   }
-
   const match = matchLocation(missionLocation, profileLocation);
-
   switch (match) {
     case 'exact':
-      return weight;
+      return 100;
     case 'synonym':
-      return weight * 0.8;
+      return 80;
     case 'nearby':
-      return weight * 0.7;
+      return 70;
     case 'partial':
-      return weight * 0.6;
+      return 60;
     case 'none':
       return 0;
   }
 };
 
 /**
- * Score TJM (daily rate) matching.
- * - Within range: full weight
- * - Unknown TJM: partial score (roughly half)
- * - Outside range: scaled by distance from range
+ * Raw TJM match percentage (0-100).
+ * - Within range: 100
+ * - Unknown TJM: ~50
+ * - Outside range: scaled by distance
  */
-const scoreTJM = (missionTjm: number | null, min: number, max: number, weight: number): number => {
+const rawTjmScore = (missionTjm: number | null, min: number, max: number): number => {
   if (missionTjm === null) {
-    return weight * 0.48;
-  } // ~12/25 = 0.48
+    return 48;
+  }
   if (missionTjm >= min && missionTjm <= max) {
-    return weight;
+    return 100;
   }
   const distance = missionTjm < min ? min - missionTjm : missionTjm - max;
   const rangeSize = max - min || 1;
-  const ratio = Math.max(0, 1 - distance / rangeSize);
-  return Math.round(ratio * weight);
+  return Math.round(Math.max(0, (1 - distance / rangeSize)) * 100);
 };
 
 /**
- * Score remote policy matching.
- * - Profile accepts any: full weight
- * - Unknown remote policy: partial score (~half)
- * - Exact match: full weight
+ * Raw work mode match percentage (0-100).
+ * - Profile accepts any: 100
+ * - Unknown work mode: ~50
+ * - Exact match: 100
  * - No match: 0
  */
-const scoreRemote = (
-  missionRemote: string | null,
-  profileRemote: string,
-  weight: number
-): number => {
+const rawRemoteScore = (missionRemote: string | null, profileRemote: string): number => {
   if (profileRemote === 'any') {
-    return weight;
+    return 100;
   }
   if (missionRemote === null) {
-    return weight * 0.467;
-  } // ~7/15 = 0.467
-  return missionRemote === profileRemote ? weight : 0;
+    return 47;
+  }
+  return missionRemote === profileRemote ? 100 : 0;
 };

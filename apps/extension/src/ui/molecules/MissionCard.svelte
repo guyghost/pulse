@@ -278,7 +278,7 @@
           </div>
         </div>
         <div class="rounded-lg bg-page-canvas px-3 py-2">
-          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Remote</p>
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Mode de travail</p>
           <div class="mt-1.5 flex items-center gap-2">
             <div class="flex-1 h-2 rounded-full bg-border-light overflow-hidden">
               <div class="h-full rounded-full {barColor(mission.scoreBreakdown.criteria.remote)} transition-all" style:width="{mission.scoreBreakdown.criteria.remote}%"></div>
