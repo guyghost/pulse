@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
 
   const {
     autoScan,
@@ -19,46 +19,44 @@
 </script>
 
 <!-- Scan automatique -->
-<div class="section-card rounded-[1.5rem] p-4">
-  <div class="flex items-center justify-between">
-    <div>
-      <h3 class="text-sm font-semibold text-text-primary">Scan automatique</h3>
-      <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-        Scanner les plateformes en arriere-plan automatiquement.
-      </p>
+<div class="section-card rounded-xl p-5">
+  <div class="flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6">
+        <Icon name="radar" size={14} class="text-blueprint-blue" />
+      </div>
+      <div>
+        <p class="text-sm font-medium text-text-primary">Scan automatique</p>
+        <p class="mt-0.5 text-xs text-text-subtle">Scanner les plateformes en arrière-plan.</p>
+      </div>
     </div>
     <button
-      class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {autoScan
-        ? 'border-accent-emerald/30 bg-accent-emerald/20'
-        : 'border-white/10 bg-white/5'}"
+      class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200
+        {autoScan ? 'border-accent-green/30 bg-accent-green/15' : 'border-border-light bg-surface-white'}"
       onclick={onToggleAutoScan}
       role="switch"
       aria-checked={autoScan}
-      aria-label="Activer le scan automatique"
     >
       <span
-        class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {autoScan
-          ? 'translate-x-6 bg-accent-emerald'
-          : 'translate-x-0.5 bg-text-muted'}"
+        class="inline-block h-4 w-4 rounded-full transition-transform duration-200
+          {autoScan ? 'translate-x-5.5 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
       ></span>
     </button>
   </div>
 </div>
 
-<!-- Intervalle de scan -->
+<!-- Intervalle -->
 <div
-  class="section-card rounded-[1.5rem] p-4 space-y-3 transition-opacity duration-200"
+  class="section-card rounded-xl p-5 space-y-3 transition-opacity duration-200"
   class:opacity-40={!autoScan}
   class:pointer-events-none={!autoScan}
 >
   <div>
-    <h3 class="text-sm font-semibold text-text-primary">Fréquence de scan</h3>
-    <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-      Scanner les plateformes toutes les {scanInterval} minutes.
-    </p>
+    <p class="text-sm font-medium text-text-primary">Fréquence</p>
+    <p class="mt-0.5 text-xs text-text-subtle">Intervalle entre chaque scan automatique.</p>
   </div>
   <div class="flex items-center gap-3">
-    <span class="text-xs text-text-muted">5 min</span>
+    <span class="text-[10px] text-text-muted">5 min</span>
     <input
       type="range"
       min="5"
@@ -66,40 +64,35 @@
       step="5"
       value={scanInterval}
       onchange={onScanIntervalChange}
-      class="flex-1 accent-accent-blue"
+      class="flex-1 accent-blueprint-blue"
     />
-    <span class="text-xs text-text-muted">120 min</span>
+    <span class="text-[10px] text-text-muted">2h</span>
   </div>
-  <p class="text-center text-sm font-semibold text-accent-blue">{scanInterval} min</p>
-  {#if !autoScan}
-    <p class="text-center text-[11px] text-text-muted">
-      Activez le scan automatique pour configurer la fréquence.
-    </p>
-  {/if}
+  <p class="text-center text-sm font-semibold tabular-nums text-text-primary">{scanInterval} min</p>
 </div>
 
 <!-- Notifications -->
-<div class="section-card rounded-[1.5rem] p-4">
-  <div class="flex items-center justify-between">
-    <div>
-      <h3 class="text-sm font-semibold text-text-primary">Notifications</h3>
-      <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-        Recevoir une alerte quand de nouvelles missions arrivent.
-      </p>
+<div class="section-card rounded-xl p-5">
+  <div class="flex items-center justify-between gap-4">
+    <div class="flex items-center gap-3">
+      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6">
+        <Icon name="bell" size={14} class="text-blueprint-blue" />
+      </div>
+      <div>
+        <p class="text-sm font-medium text-text-primary">Notifications</p>
+        <p class="mt-0.5 text-xs text-text-subtle">Alerte quand de nouvelles missions arrivent.</p>
+      </div>
     </div>
     <button
-      class="relative inline-flex h-7 w-12 shrink-0 items-center rounded-full border transition-colors duration-200 {notifications
-        ? 'border-accent-emerald/30 bg-accent-emerald/20'
-        : 'border-white/10 bg-white/5'}"
+      class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200
+        {notifications ? 'border-accent-green/30 bg-accent-green/15' : 'border-border-light bg-surface-white'}"
       onclick={onToggleNotifications}
       role="switch"
       aria-checked={notifications}
-      aria-label="Activer les notifications"
     >
       <span
-        class="inline-block h-5 w-5 rounded-full transition-transform duration-200 {notifications
-          ? 'translate-x-6 bg-accent-emerald'
-          : 'translate-x-0.5 bg-text-muted'}"
+        class="inline-block h-4 w-4 rounded-full transition-transform duration-200
+          {notifications ? 'translate-x-5.5 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
       ></span>
     </button>
   </div>

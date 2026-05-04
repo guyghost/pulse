@@ -1,7 +1,6 @@
 <script lang="ts">
-  import SettingsLayout from '../templates/SettingsLayout.svelte';
-  import Button from '../atoms/Button.svelte';
-  import Icon from '../atoms/Icon.svelte';
+  import { Button } from '@pulse/ui';
+  import { Icon } from '@pulse/ui';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import AccountSection from '../organisms/AccountSection.svelte';
   import ProfileSection from '../organisms/ProfileSection.svelte';
@@ -13,45 +12,32 @@
   import { showToast } from '$lib/shell/notifications/toast-service';
 
   const {
-    onBack,
     onNavigateToOnboarding,
   }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
 
   const settings = new SettingsPageController({
-    onNavigateToOnboarding: () => {
-      onNavigateToOnboarding?.();
-    },
+    onNavigateToOnboarding: () => { onNavigateToOnboarding?.(); },
   });
 
   const auth = createAuthStore();
-
   settings.load();
   auth.checkStatus();
 
   async function handleExportFavorites(format: ExportFormat) {
     const result = await settings.exportFavorites(format);
-    if (!result.ok) {
-      await showToast(result.error, 'error');
-      return;
-    }
+    if (!result.ok) { await showToast(result.error, 'error'); return; }
     await showToast('Export des favoris lancé', 'success');
   }
 
   async function handleCreateBackup() {
     const result = await settings.createBackupFile();
-    if (!result.ok) {
-      await showToast(result.error, 'error');
-      return;
-    }
+    if (!result.ok) { await showToast(result.error, 'error'); return; }
     await showToast('Sauvegarde créée', 'success');
   }
 
   async function handleRestoreBackup() {
     const result = await settings.restoreBackup();
-    if (!result.ok) {
-      await showToast(result.error, 'error');
-      return;
-    }
+    if (!result.ok) { await showToast(result.error, 'error'); return; }
     await settings.load();
     await showToast('Sauvegarde restaurée', 'success');
   }
@@ -67,8 +53,23 @@
   }
 </script>
 
-{#snippet settingsContent()}
-  <div class="space-y-6">
+<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
+  <!-- Hero -->
+  <section class="section-card-strong rounded-2xl px-5 py-4">
+    <div class="flex items-center gap-3">
+      <div
+        class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
+      >
+        <Icon name="settings" size={16} class="text-blueprint-blue" />
+      </div>
+      <div>
+        <p class="eyebrow text-blueprint-blue">Configuration</p>
+        <h2 class="mt-1 text-base font-semibold text-text-primary">Paramètres</h2>
+      </div>
+    </div>
+  </section>
+
+  <div class="mt-4 space-y-4">
     <!-- Compte -->
     <AccountSection
       isAuthenticated={auth.isAuthenticated}
@@ -79,23 +80,17 @@
       error={auth.error}
       onLogin={async (email, password) => {
         const result = await auth.login(email, password);
-        if (!result.success && result.error) {
-          await showToast(result.error, 'error');
-        }
+        if (!result.success && result.error) await showToast(result.error, 'error');
       }}
       onSignup={async (email, password) => {
         const result = await auth.signup(email, password);
-        if (result.success) {
-          await showToast('Compte créé avec succès', 'success');
-        }
+        if (result.success) await showToast('Compte créé avec succès', 'success');
       }}
       onLogout={async () => {
         await auth.logout();
         await showToast('Déconnecté', 'success');
       }}
-      onOpenDashboard={() => {
-        window.open('https://missionpulse.app/dashboard', '_blank');
-      }}
+      onOpenDashboard={() => { window.open('https://missionpulse.app/dashboard', '_blank'); }}
     />
 
     <!-- Profil -->
@@ -127,56 +122,56 @@
     />
 
     <!-- Export -->
-    <div class="section-card rounded-[1.5rem] p-4 space-y-4">
+    <div class="section-card rounded-xl p-5 space-y-4">
       <div>
-        <h3 class="text-sm font-semibold text-text-primary">Export</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+        <h3 class="text-sm font-medium text-text-primary">Export</h3>
+        <p class="mt-1 text-xs text-text-subtle">
           Exporter vos missions favorites dans différents formats.
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
         <button
-          class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
           onclick={() => handleExportFavorites('json')}
           disabled={settings.isExporting}
         >
-          <Icon name="file-json" size={16} class="text-accent-blue" />
+          <Icon name="file-json" size={14} class="text-blueprint-blue" />
           JSON
         </button>
         <button
-          class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
           onclick={() => handleExportFavorites('csv')}
           disabled={settings.isExporting}
         >
-          <Icon name="file-spreadsheet" size={16} class="text-accent-emerald" />
+          <Icon name="file-spreadsheet" size={14} class="text-blueprint-blue" />
           CSV
         </button>
         <button
-          class="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/5 px-4 py-2.5 text-sm font-medium text-text-primary transition-all hover:bg-white/10 disabled:opacity-50"
+          class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
           onclick={() => handleExportFavorites('markdown')}
           disabled={settings.isExporting}
         >
-          <Icon name="file-text" size={16} class="text-accent-amber" />
+          <Icon name="file-text" size={14} class="text-blueprint-blue" />
           Markdown
         </button>
       </div>
       {#if settings.exportSuccess}
-        <p class="text-xs text-accent-emerald">Export réussi !</p>
+        <p class="text-xs text-blueprint-blue">Export réussi !</p>
       {/if}
     </div>
 
-    <!-- Sauvegarde et restauration -->
-    <div class="section-card rounded-[1.5rem] p-4 space-y-4">
+    <!-- Sauvegarde -->
+    <div class="section-card rounded-xl p-5 space-y-4">
       <div>
-        <h3 class="text-sm font-semibold text-text-primary">Sauvegarde</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+        <h3 class="text-sm font-medium text-text-primary">Sauvegarde</h3>
+        <p class="mt-1 text-xs text-text-subtle">
           Sauvegarder ou restaurer vos données (profil, paramètres, favoris).
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
         <Button variant="secondary" onclick={handleCreateBackup}>
           {#snippet children()}
-            <Icon name="download" size={16} class="mr-1" />
+            <Icon name="download" size={14} class="mr-1" />
             Créer une sauvegarde
           {/snippet}
         </Button>
@@ -189,29 +184,30 @@
         />
         <Button variant="ghost" onclick={() => settings.triggerFileSelect()}>
           {#snippet children()}
-            <Icon name="upload" size={16} class="mr-1" />
-            Restaurer depuis une sauvegarde
+            <Icon name="upload" size={14} class="mr-1" />
+            Restaurer
           {/snippet}
         </Button>
       </div>
     </div>
 
     <!-- IA locale -->
-    <div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
-      <div class="flex items-center gap-2">
-        <Icon name="info" size={12} class="text-accent-blue/60" />
+    <div class="section-card rounded-xl p-5 space-y-3">
+      <div class="flex items-start gap-3">
+        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6">
+          <Icon name="cpu" size={14} class="text-blueprint-blue" />
+        </div>
         <div>
-          <h3 class="text-sm font-semibold text-text-primary">IA locale</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-            Le scoring semantique utilise Gemini Nano via la Prompt API de Chrome, sans cle API
-            externe.
+          <h3 class="text-sm font-medium text-text-primary">IA locale</h3>
+          <p class="mt-1 text-xs text-text-subtle">
+            Le scoring sémantique utilise Gemini Nano via la Prompt API de Chrome, sans clé API externe.
           </p>
         </div>
       </div>
-      <div class="grid grid-cols-2 gap-2 text-[11px]">
-        <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
-          <p class="uppercase tracking-[0.18em] text-text-muted">Statut</p>
-          <p class="mt-2 text-sm font-semibold text-white">
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>
+          <p class="mt-1 text-xs font-medium text-text-primary">
             {settings.aiAvailability === 'available'
               ? 'Disponible'
               : settings.aiAvailability === 'after-download'
@@ -219,34 +215,31 @@
                 : 'Indisponible'}
           </p>
         </div>
-        <div class="rounded-[1.2rem] border border-white/8 bg-white/[0.05] px-3 py-3">
-          <p class="uppercase tracking-[0.18em] text-text-muted">Missions / scan</p>
-          <p class="mt-2 text-sm font-semibold text-white">{settings.maxSemanticPerScan}</p>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Missions / scan</p>
+          <p class="mt-1 text-xs font-medium text-text-primary">{settings.maxSemanticPerScan}</p>
         </div>
       </div>
-      <p class="text-xs leading-relaxed text-text-secondary">
-        Les scores sont mis en cache localement pour limiter la latence et eviter les recalculs
-        inutiles.
-      </p>
     </div>
 
-    <div class="section-card rounded-[1.5rem] p-4 space-y-4">
+    <!-- Onboarding -->
+    <div class="section-card rounded-xl p-5 space-y-4">
       <div>
-        <h3 class="text-sm font-semibold text-text-primary">Onboarding</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-          Rejouer l'accompagnement initial ou relancer le tour du feed à tout moment.
+        <h3 class="text-sm font-medium text-text-primary">Onboarding</h3>
+        <p class="mt-1 text-xs text-text-subtle">
+          Rejouer l'accompagnement initial ou relancer le tour du feed.
         </p>
       </div>
       <div class="flex flex-wrap gap-2">
         <Button variant="secondary" onclick={() => settings.restartOnboarding()}>
           {#snippet children()}
-            <Icon name="star" size={16} class="mr-1" />
+            <Icon name="star" size={14} class="mr-1" />
             Rejouer l'onboarding
           {/snippet}
         </Button>
         <Button variant="ghost" onclick={() => settings.replayFeedTour()}>
           {#snippet children()}
-            <Icon name="play" size={16} class="mr-1" />
+            <Icon name="play" size={14} class="mr-1" />
             Revoir le tour du feed
           {/snippet}
         </Button>
@@ -256,18 +249,12 @@
     <!-- Zone de danger -->
     <DangerZone
       showResetConfirm={settings.showResetConfirm}
-      onShowConfirm={() => {
-        settings.showResetConfirm = true;
-      }}
-      onCancelConfirm={() => {
-        settings.showResetConfirm = false;
-      }}
+      onShowConfirm={() => { settings.showResetConfirm = true; }}
+      onCancelConfirm={() => { settings.showResetConfirm = false; }}
       onConfirmReset={() => settings.resetAll()}
     />
   </div>
-{/snippet}
-
-<SettingsLayout {onBack} content={settingsContent} />
+</div>
 
 {#if settings.showBackupModal}
   <BackupRestoreModal

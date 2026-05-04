@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ToastStore } from '$lib/state/toast.svelte.ts';
-  import Toast from '../atoms/Toast.svelte';
+  import { Toast } from '@pulse/ui';
   import { fly } from 'svelte/transition';
   import { flip } from 'svelte/animate';
   import { quintOut } from 'svelte/easing';

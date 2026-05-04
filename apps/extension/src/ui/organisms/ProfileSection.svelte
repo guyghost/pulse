@@ -1,7 +1,7 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
-  import Chip from '../atoms/Chip.svelte';
-  import Button from '../atoms/Button.svelte';
+  import { Icon } from '@pulse/ui';
+  import { Chip } from '@pulse/ui';
+  import { Button } from '@pulse/ui';
 
   let {
     firstName = $bindable(''),
@@ -36,88 +36,81 @@
   } = $props();
 </script>
 
-<div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
+<div class="section-card rounded-xl p-5">
   <div class="flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <Icon name="edit-2" size={12} class="text-accent-blue/60" />
+    <div class="flex items-center gap-3">
+      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6">
+        <Icon name="edit-2" size={14} class="text-blueprint-blue" />
+      </div>
       <div>
-        <h3 class="text-sm font-semibold text-text-primary">Profil</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-          Vos informations de freelance.
-        </p>
+        <h3 class="text-sm font-medium text-text-primary">Profil</h3>
+        <p class="mt-0.5 text-xs text-text-subtle">Vos informations de freelance.</p>
       </div>
     </div>
     <button
-      class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/4 text-text-secondary transition-colors hover:bg-white/8 hover:text-text-primary"
+      class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
       onclick={onToggleEdit}
       title={editing ? 'Annuler' : 'Modifier'}
     >
-      <Icon name={editing ? 'x' : 'edit-2'} size={14} />
+      <Icon name={editing ? 'x' : 'edit-2'} size={13} />
     </button>
   </div>
 
   {#if editing}
-    <div class="space-y-2">
+    <div class="mt-4 space-y-2.5">
       <input
         type="text"
-        placeholder="Prenom"
-        class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+        placeholder="Prénom"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={firstName}
       />
       <input
         type="text"
-        placeholder="Poste (ex: Developpeur React Senior)"
-        class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+        placeholder="Poste (ex: Développeur React Senior)"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={jobTitle}
       />
       <input
         type="text"
         placeholder="Localisation"
-        class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={profileLocation}
       />
       <div class="flex gap-2">
         <input
           type="number"
           placeholder="TJM min"
-          class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
           bind:value={tjmMin}
         />
         <input
           type="number"
           placeholder="TJM max"
-          class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
           bind:value={tjmMax}
         />
       </div>
 
       <div class="space-y-2">
-        <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted"
-          >Stack technique</label
-        >
+        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">Stack technique</p>
         <div class="flex gap-2">
           <input
-            id="stack-input"
             type="text"
             placeholder="ex: React, Node.js..."
-            class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={stackInput}
-            onkeydown={(e) => {
-              if (e.key === 'Enter') {
-                onAddStack();
-              }
-            }}
+            onkeydown={(e) => { if (e.key === 'Enter') onAddStack(); }}
           />
           <button
-            class="inline-flex min-h-12 items-center justify-center rounded-[1.1rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
+            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
             onclick={onAddStack}
             title="Ajouter"
           >
-            <Icon name="plus" size={14} />
+            <Icon name="plus" size={13} />
           </button>
         </div>
         {#if profileStack.length > 0}
-          <div class="flex flex-wrap gap-2 pt-1">
+          <div class="flex flex-wrap gap-1.5 pt-1">
             {#each profileStack as tech}
               <Chip label={tech} selected={true} onclick={() => onRemoveStack(tech)} />
             {/each}
@@ -125,34 +118,33 @@
         {/if}
       </div>
 
-      <Button variant="secondary" onclick={onSave}>
-        {#snippet children()}{profileSaved ? 'Sauvegarde !' : 'Enregistrer le profil'}{/snippet}
-      </Button>
+      <div class="pt-1">
+        <Button variant="secondary" onclick={onSave}>
+          {#snippet children()}{profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}{/snippet}
+        </Button>
+      </div>
       {#if profileError}
-        <p class="text-xs text-red-400">{profileError}</p>
+        <p class="text-xs text-status-red">{profileError}</p>
       {/if}
     </div>
   {:else}
-    <div class="space-y-2 text-sm">
+    <div class="mt-4 space-y-2 text-sm">
       <p class="text-text-primary">
         {firstName || 'Non renseigné'}
-        {jobTitle ? `— ${jobTitle}` : ''}
+        {jobTitle ? ` — ${jobTitle}` : ''}
       </p>
-      <p class="text-text-secondary">{profileLocation || 'Localisation non renseignée'}</p>
+      <p class="text-text-subtle">{profileLocation || 'Localisation non renseignée'}</p>
       {#if tjmMin > 0 || tjmMax > 0}
-        <p class="text-text-secondary">TJM : {tjmMin} – {tjmMax} €/jour</p>
+        <p class="text-text-subtle">TJM : {tjmMin} – {tjmMax} €/jour</p>
       {/if}
       {#if profileStack.length > 0}
         <div class="flex flex-wrap gap-1.5 pt-1">
           {#each profileStack as tech}
-            <span
-              class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue"
-              >{tech}</span
-            >
+            <span class="inline-flex items-center rounded-md bg-blueprint-blue/6 px-2 py-0.5 text-[11px] text-blueprint-blue">{tech}</span>
           {/each}
         </div>
       {:else}
-        <p class="text-text-muted text-xs">Aucune technologie renseignée</p>
+        <p class="text-xs text-text-muted">Aucune technologie renseignée</p>
       {/if}
     </div>
   {/if}

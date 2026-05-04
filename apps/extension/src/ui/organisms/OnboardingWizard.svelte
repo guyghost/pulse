@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { UserProfile } from '$lib/core/types/profile';
-  import Chip from '../atoms/Chip.svelte';
-  import Icon from '../atoms/Icon.svelte';
+  import { Chip } from '@pulse/ui';
+  import { Icon } from '@pulse/ui';
   import { ripple } from '../actions/ripple';
 
   const {
@@ -72,7 +72,7 @@
 <div class="space-y-5 pb-2">
   <div class="space-y-2">
     <div>
-      <p class="text-sm font-semibold text-white">Personnalisez vos résultats</p>
+      <p class="text-sm font-semibold text-text-primary">Personnalisez vos résultats</p>
       <p class="mt-1 text-xs leading-relaxed text-text-secondary">
         Le premier scan peut tourner avec un profil vide. Complétez ces champs pour affiner le
         scoring ensuite.
@@ -87,7 +87,7 @@
     <input
       id="ob-firstname"
       type="text"
-      class="soft-ring w-full rounded-[1.15rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
+      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
       placeholder="ex: Guy"
       bind:value={firstName}
     />
@@ -100,7 +100,7 @@
     <input
       id="ob-jobtitle"
       type="text"
-      class="soft-ring w-full rounded-[1.15rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
+      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
       placeholder="ex: Developpeur React Senior"
       bind:value={jobTitle}
     />
@@ -114,7 +114,7 @@
       <input
         id="ob-stack"
         type="text"
-        class="soft-ring flex-1 rounded-[1.15rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
+        class="soft-ring flex-1 rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
         placeholder="ex: React"
         bind:value={stackInput}
         onkeydown={(e) => {
@@ -124,7 +124,7 @@
         }}
       />
       <button
-        class="inline-flex min-h-12 items-center justify-center rounded-[1.15rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
+        class="inline-flex min-h-12 items-center justify-center rounded-lg border border-border-light bg-subtle-gray px-4 text-text-secondary transition-all duration-200 hover:bg-subtle-gray hover:text-text-primary"
         onclick={addStack}
       >
         <Icon name="plus" size={14} />
@@ -146,7 +146,7 @@
     <input
       id="ob-location"
       type="text"
-      class="soft-ring w-full rounded-[1.15rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
+      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
       placeholder="ex: Paris ou remote"
       bind:value={location}
     />
@@ -156,7 +156,7 @@
     <label for="ob-tjm" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
       >TJM cible (EUR/jour)</label
     >
-    <div class="section-card rounded-[1.25rem] px-4 py-3">
+    <div class="section-card rounded-lg px-4 py-3">
       <div class="flex items-end justify-between gap-3">
         <div>
           <p class="text-xs text-text-secondary">Base de calibration</p>
@@ -168,10 +168,10 @@
           <input
             id="ob-tjm"
             type="number"
-            class="w-28 rounded-2xl border border-white/10 bg-white/5 px-3 py-2.5 text-sm font-semibold text-text-primary font-mono focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15 transition-all duration-200"
+            class="w-28 rounded-2xl border border-border-light bg-page-canvas px-3 py-2.5 text-sm font-semibold text-text-primary font-mono focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
             bind:value={tjm}
           />
-          <span class="text-sm font-mono text-accent-blue">EUR</span>
+          <span class="text-sm font-mono text-blueprint-blue">EUR</span>
         </div>
       </div>
     </div>
@@ -179,15 +179,15 @@
 
   {#if hasError && errorMessage}
     <div
-      class="flex items-start gap-2 rounded-[1rem] border border-accent-red/30 bg-accent-red/10 px-4 py-3 text-xs text-accent-red"
+      class="flex items-start gap-2 rounded-lg border border-status-red/30 bg-status-red/10 px-4 py-3 text-xs text-status-red"
     >
       <Icon name="alert-circle" size={14} />
       <div class="flex-1">
         <p class="font-semibold">Erreur de sauvegarde</p>
-        <p class="mt-0.5 text-accent-red/80">{errorMessage}</p>
+        <p class="mt-0.5 text-status-red/80">{errorMessage}</p>
       </div>
       <button
-        class="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-semibold text-accent-red hover:bg-accent-red/15 transition-colors"
+        class="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-semibold text-status-red hover:bg-status-red/15 transition-colors"
         onclick={onRetry}
       >
         Réessayer
@@ -196,7 +196,7 @@
   {/if}
 
   {#if firstName.trim().length > 0 && jobTitle.trim().length > 0 && stack.length === 0}
-    <p class="text-xs text-accent-amber">
+    <p class="text-xs text-blueprint-blue">
       Ajoutez au moins une technologie pour activer le scoring.
     </p>
   {/if}
@@ -204,7 +204,7 @@
   <div class="mt-2 flex flex-col gap-2">
     <button
       use:ripple
-      class="inline-flex w-full items-center justify-center gap-2 rounded-[1.3rem] border border-accent-blue/25 bg-accent-blue/88 py-3 text-sm font-semibold text-navy-900 shadow-[0_18px_30px_rgba(89,198,255,0.24)] transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+      class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/88 py-3 text-sm font-semibold text-surface-white  transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
       disabled={!canSubmit || isSaving}
       onclick={handleSubmit}
     >
@@ -225,7 +225,7 @@
     </button>
 
     <button
-      class="inline-flex w-full items-center justify-center rounded-[1.15rem] border border-white/10 bg-white/6 py-3 text-sm font-medium text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
+      class="inline-flex w-full items-center justify-center rounded-lg border border-border-light bg-subtle-gray py-3 text-sm font-medium text-text-secondary transition-all duration-200 hover:bg-subtle-gray hover:text-text-primary"
       onclick={onSkip}
       type="button"
     >

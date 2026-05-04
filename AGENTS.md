@@ -11,6 +11,7 @@ pulse/
 ├── apps/extension/   # Extension Chrome (Svelte 5 + Vite + MV3)
 ├── apps/landing/     # Landing page statique (missionpulse.app)
 ├── packages/tsconfig # Shared TypeScript config
+├── packages/design/  # Design system source of truth (tokens, theme, docs)
 ├── turbo.json        # Turborepo pipeline
 └── pnpm-workspace.yaml
 ```
@@ -240,26 +241,45 @@ export class ScanOrchestrator {
 
 ## TailwindCSS 4 — Config CSS-first
 
-La configuration est dans `src/ui/design-tokens.css`, pas dans un fichier JS :
+La source de vérité du design system est dans `packages/design/` :
+
+```
+packages/design/
+├── DESIGN.md          # Référence complète du design (couleurs, typo, composants)
+├── tokens.json        # Tokens DTCG (machine-readable)
+├── theme.css          # Bloc @theme Tailwind v4 (pour l'extension)
+└── variables.css      # CSS custom properties (pour la landing)
+```
+
+L'extension utilise `apps/extension/src/ui/design-tokens.css` qui reprend les tokens du `@theme` ci-dessus.
+La landing utilise `apps/landing/src/app.css` qui importe les custom properties équivalentes.
+
+### Thème — Analytical Blueprint (Light)
 
 ```css
-@import 'tailwindcss';
-
 @theme {
-  --color-navy-900: #0f172a;
-  --color-navy-800: #1e293b;
-  --color-navy-700: #334155;
-  --color-surface: #1e293b;
-  --color-surface-hover: #273548;
-  --color-text-primary: #f8fafc;
-  --color-text-secondary: #94a3b8;
-  --color-accent-blue: #3b82f6;
-  --color-accent-emerald: #10b981;
-  --color-accent-amber: #f59e0b;
-  --color-accent-red: #ef4444;
+  /* Couleurs principales */
+  --color-page-canvas: #f5f5f4;
+  --color-surface-white: #ffffff;
+  --color-blueprint-blue: #0b64e9;
+  --color-text-primary: #0c0a09;
+  --color-text-secondary: #1c1917;
+  --color-text-muted: #a6a09b;
+  --color-text-subtle: #57534d;
+  --color-subtle-gray: #ececea;
+  --color-border-light: #f0efef;
+  --color-disabled-gray: #d4d2d1;
 
-  --font-sans: 'Inter', system-ui, sans-serif;
-  --font-mono: 'JetBrains Mono', monospace;
+  /* Status */
+  --color-status-red: #f24149;
+  --color-status-orange: #f97006;
+  --color-status-yellow: #f9b703;
+  --color-status-violet: #6b4aff;
+
+  /* Typographie */
+  --font-display: 'FH Total Display Regular', ...;  /* Hero headlines */
+  --font-geist: 'Geist', ...;                       /* Body & UI */
+  --font-sans: 'Geist', ...;                         /* Alias Geist */
 }
 ```
 

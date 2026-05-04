@@ -27,10 +27,10 @@
 
   const statusColor = $derived(
     status === 'within'
-      ? 'bg-accent-emerald'
+      ? 'bg-blueprint-blue'
       : status === 'below'
-        ? 'bg-accent-amber'
-        : 'bg-accent-blue'
+        ? 'bg-blueprint-blue'
+        : 'bg-blueprint-blue'
   );
 
   const statusText = $derived(
@@ -57,7 +57,7 @@
     ></div>
     <!-- Mission TJM marker -->
     <div
-      class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full {statusColor} border-2 border-navy-900 shadow-sm"
+      class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full {statusColor} border-2 border-border-900 shadow-sm"
       style:left="calc({position}% - 6px)"
     ></div>
   </div>

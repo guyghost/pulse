@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
   import { setProfileBannerDismissed } from '$lib/shell/storage/first-scan';
 
   const { onSetupProfile }: { onSetupProfile: () => void } = $props();
@@ -18,12 +18,12 @@
 
 {#if !dismissed}
   <div
-    class="mx-4 mb-3 flex items-center gap-3 rounded-2xl border border-accent-blue/20
-           bg-accent-blue/8 px-4 py-3"
+    class="mx-4 mb-3 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20
+           bg-blueprint-blue/8 px-4 py-3"
     role="status"
   >
-    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-blue/15">
-      <Icon name="star" size={16} class="text-accent-blue" />
+    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-blueprint-blue/15">
+      <Icon name="star" size={16} class="text-blueprint-blue" />
     </div>
 
     <div class="min-w-0 flex-1">
@@ -35,15 +35,15 @@
 
     <div class="flex shrink-0 items-center gap-1">
       <button
-        class="rounded-lg border border-accent-blue/30 bg-accent-blue/15 px-3 py-1.5
-               text-[11px] font-medium text-accent-blue transition-colors hover:bg-accent-blue/25"
+        class="rounded-lg border border-blueprint-blue/30 bg-blueprint-blue/15 px-3 py-1.5
+               text-[11px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/25"
         onclick={handleSetupProfile}
       >
         Configurer
       </button>
       <button
         class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted
-               transition-colors hover:bg-white/6 hover:text-text-secondary"
+               transition-colors hover:bg-subtle-gray hover:text-text-secondary"
         onclick={handleDismiss}
         aria-label="Ignorer"
       >

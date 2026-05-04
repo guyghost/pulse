@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
   import CircuitBadge from '../atoms/CircuitBadge.svelte';
   import type { AppError } from '$lib/core/errors';
   import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
@@ -40,26 +40,17 @@
   function getRelativeTime(timestamp: number): string {
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) {
-      return "à l'instant";
-    }
-    if (minutes < 60) {
-      return `il y a ${minutes}min`;
-    }
+    if (minutes < 1) return "à l'instant";
+    if (minutes < 60) return `il y a ${minutes}min`;
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) {
-      return `il y a ${hours}h`;
-    }
+    if (hours < 24) return `il y a ${hours}h`;
     return `il y a ${Math.floor(hours / 24)}j`;
   }
 
   const connectedCount = $derived(sources.filter((s) => s.sessionStatus === 'connected').length);
-
   const totalSources = $derived(sources.length);
-
   const isCompact = $derived(compact && !expanded);
 
-  // Sources triées par nombre de missions décroissant (actives d'abord, puis inactives)
   const sortedSources = $derived(
     [...sources].sort((a, b) => {
       const countA = scanResultCounts.get(a.connectorId) ?? 0;
@@ -80,7 +71,6 @@
     if (!healthSnapshots) {
       return [] as Array<{ connectorId: string; name: string; snapshot: ConnectorHealthSnapshot }>;
     }
-
     return sources
       .map((source) => {
         const snapshot = healthSnapshots.get(source.connectorId);
@@ -101,107 +91,139 @@
 
 {#if sources.length > 0}
   <div
-    class="mt-3 overflow-hidden rounded-[1.25rem] border border-white/8 bg-white/3 transition-all duration-300 ease-in-out"
-    class:px-4={!isCompact}
-    class:py-3={!isCompact}
-    class:px-3={isCompact}
-    class:py-2={isCompact}
+    class="mt-4 overflow-hidden rounded-xl border border-border-light bg-page-canvas transition-all duration-300 ease-in-out"
   >
     {#if isCompact}
-      <!-- Compact mode: favicon row sorted by mission count desc -->
-      <button
-        class="flex w-full items-center gap-2"
-        onclick={toggleExpand}
-        title="Afficher le détail des sources"
-      >
-        <div class="flex items-center gap-1.5">
-          {#each sortedSources as source (source.connectorId)}
-            {@const missionCount = scanResultCounts.get(source.connectorId) ?? 0}
-            {@const hasData = missionCount > 0}
-            <div
-              class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border transition-all duration-300
-                {hasData
-                ? 'border-accent-emerald/25 bg-white/6 shadow-[0_0_6px_rgba(88,217,169,0.1)]'
-                : 'border-white/5 bg-white/2 opacity-30 grayscale'}"
-              title="{source.name}{hasData ? ` — ${missionCount} missions` : ' — aucune mission'}"
-            >
-              {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
-                <img
-                  src={source.icon}
-                  alt={source.name}
-                  width="16"
-                  height="16"
-                  class="rounded-sm"
-                  onerror={() => {
-                    imgFailed[source.connectorId] = true;
-                  }}
-                />
-              {:else}
-                <span class="text-[8px] font-bold text-text-secondary">
-                  {source.name.slice(0, 2).toUpperCase()}
-                </span>
-              {/if}
-            </div>
-          {/each}
-        </div>
-        <Icon name="chevron-down" size={12} class="text-text-muted ml-auto" />
-      </button>
-    {:else}
-      <!-- Expanded mode: full status list -->
-      <div class="flex items-center justify-between">
-        <div class="flex items-center gap-2">
-          <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Sources</p>
-          {#if !isChecking}
+      <!-- ── Compact mode: pill chips with color ── -->
+      <div class="flex items-center gap-2 px-1 py-1">
+        {#each sortedSources as source (source.connectorId)}
+          {@const missionCount = scanResultCounts.get(source.connectorId) ?? 0}
+          {@const hasData = missionCount > 0}
+          {@const isFiltered = activeSourceFilter === source.connectorId}
+          {@const isEnabled = enabledConnectors ? enabledConnectors.has(source.connectorId) : true}
+
+          <button
+            class="group flex items-center gap-1.5 rounded-lg border px-2 py-1.5 transition-all duration-200
+              {isFiltered
+                ? 'border-blueprint-blue/30 bg-blueprint-blue/10'
+                : hasData && isEnabled
+                  ? 'border-blueprint-blue/15 bg-blueprint-blue/5 hover:bg-blueprint-blue/10'
+                  : 'border-border-light bg-surface-white opacity-35 hover:opacity-60'}"
+            onclick={() => {
+              if (isFiltered) {
+                onFilterBySource?.(null);
+              } else if (hasData) {
+                onFilterBySource?.(source.connectorId);
+              } else {
+                toggleExpand();
+              }
+            }}
+            title="{source.name}{hasData ? ` — ${missionCount} missions` : ' — aucune mission'}"
+          >
+            <!-- Status dot -->
             <span
-              class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium
-              {connectedCount === totalSources
-                ? 'border border-accent-emerald/20 bg-accent-emerald/10 text-accent-emerald'
-                : connectedCount > 0
-                  ? 'border border-accent-amber/20 bg-accent-amber/10 text-accent-amber'
-                  : 'border border-white/10 bg-white/5 text-text-muted'}"
-            >
-              {connectedCount}/{totalSources} connectées
-            </span>
-          {/if}
-        </div>
-        <div class="flex items-center gap-1">
-          {#if onRefresh}
-            <button
-              class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-all duration-200 hover:bg-white/6 hover:text-text-primary disabled:opacity-40"
-              onclick={onRefresh}
-              disabled={isChecking}
-              title="Vérifier les connexions"
-            >
-              <span class:animate-spin={isChecking}>
-                <Icon name="refresh-cw" size={12} />
+              class="inline-block h-1.5 w-1.5 shrink-0 rounded-full
+                {source.sessionStatus === 'connected' && isEnabled
+                  ? 'bg-accent-green'
+                  : source.sessionStatus === 'error'
+                    ? 'bg-status-red'
+                    : 'bg-text-muted'}"
+            ></span>
+            <!-- Favicon or initials -->
+            {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
+              <img
+                src={source.icon}
+                alt=""
+                width="14"
+                height="14"
+                class="rounded-sm shrink-0"
+                onerror={() => { imgFailed[source.connectorId] = true; }}
+              />
+            {:else}
+              <span class="text-[8px] font-bold text-text-secondary shrink-0">
+                {source.name.slice(0, 2).toUpperCase()}
               </span>
-            </button>
-          {/if}
-          {#if compact}
-            <button
-              class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-all duration-200 hover:bg-white/6 hover:text-text-primary"
-              onclick={toggleExpand}
-              title="Réduire"
-            >
-              <Icon name="chevron-down" size={12} class="rotate-180" />
-            </button>
-          {/if}
+            {/if}
+            <!-- Mission count -->
+            {#if hasData}
+              <span
+                class="text-[10px] font-mono font-medium
+                  {isFiltered ? 'text-blueprint-blue' : hasData && isEnabled ? 'text-text-secondary' : 'text-text-muted'}"
+              >{missionCount}</span>
+            {/if}
+          </button>
+        {/each}
+        <button
+          class="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-subtle-gray hover:text-text-primary transition-colors"
+          onclick={toggleExpand}
+          title="Afficher le détail des sources"
+        >
+          <Icon name="chevron-down" size={12} />
+        </button>
+      </div>
+    {:else}
+      <!-- ── Expanded mode: full detail rows ── -->
+      <div class="px-4 pt-3 pb-2">
+        <div class="flex items-center justify-between">
+          <div class="flex items-center gap-2">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">Sources</p>
+            {#if !isChecking}
+              <span
+                class="inline-flex items-center gap-1 rounded-md px-1.5 py-0.5 text-[9px] font-medium
+                  {connectedCount === totalSources
+                    ? 'bg-accent-green/10 text-accent-green'
+                    : connectedCount > 0
+                      ? 'bg-blueprint-blue/8 text-blueprint-blue'
+                      : 'bg-subtle-gray text-text-muted'}"
+              >
+                {connectedCount}/{totalSources}
+              </span>
+            {/if}
+          </div>
+          <div class="flex items-center gap-1">
+            {#if onRefresh}
+              <button
+                class="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:opacity-40"
+                onclick={onRefresh}
+                disabled={isChecking}
+                title="Vérifier les connexions"
+              >
+                <span class:animate-spin={isChecking}>
+                  <Icon name="refresh-cw" size={11} />
+                </span>
+              </button>
+            {/if}
+            {#if compact}
+              <button
+                class="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+                onclick={toggleExpand}
+                title="Réduire"
+              >
+                <Icon name="chevron-down" size={11} class="rotate-180" />
+              </button>
+            {/if}
+          </div>
         </div>
       </div>
 
-      <div class="mt-2 space-y-0.5">
-        {#each sources as source (source.connectorId)}
+      <div class="px-4 pb-3">
+        {#each sources as source, i (source.connectorId)}
           {@const missionCount = scanResultCounts.get(source.connectorId) ?? 0}
           {@const isFiltered = activeSourceFilter === source.connectorId}
           {@const isEnabled = enabledConnectors ? enabledConnectors.has(source.connectorId) : true}
-          <div class="flex items-center gap-2.5 py-1.5" class:opacity-40={!isEnabled}>
+          {@const isActive = source.sessionStatus === 'connected' && isEnabled}
+
+          <div
+            class="flex items-center gap-3 py-2.5 {i > 0 ? 'border-t border-border-light' : ''}"
+            class:opacity-40={!isEnabled}
+          >
             <!-- Toggle switch -->
             {#if onToggleConnector}
               <button
                 class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200
                   {isEnabled
-                  ? 'border-accent-emerald/30 bg-accent-emerald/20'
-                  : 'border-white/10 bg-white/5'}"
+                    ? 'border-accent-green/30 bg-accent-green/15'
+                    : 'border-border-light bg-surface-white'}"
                 onclick={() => onToggleConnector(source.connectorId)}
                 role="switch"
                 aria-checked={isEnabled}
@@ -209,24 +231,26 @@
               >
                 <span
                   class="inline-block h-3.5 w-3.5 rounded-full transition-transform duration-200
-                  {isEnabled ? 'translate-x-4 bg-accent-emerald' : 'translate-x-0.5 bg-text-muted'}"
+                    {isEnabled ? 'translate-x-4 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
                 ></span>
               </button>
             {/if}
+
             <!-- Favicon -->
             <div
-              class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/4"
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border transition-colors
+                {isActive
+                  ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
+                  : 'border-border-light bg-surface-white'}"
             >
               {#if source.icon.startsWith('http') && !imgFailed[source.connectorId]}
                 <img
                   src={source.icon}
-                  alt={source.name}
-                  width="14"
-                  height="14"
+                  alt=""
+                  width="16"
+                  height="16"
                   class="rounded-sm"
-                  onerror={() => {
-                    imgFailed[source.connectorId] = true;
-                  }}
+                  onerror={() => { imgFailed[source.connectorId] = true; }}
                 />
               {:else}
                 <span class="text-[9px] font-bold text-text-secondary">
@@ -235,64 +259,43 @@
               {/if}
             </div>
 
-            <!-- Name -->
-            <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">
-              {source.name}
-            </span>
-
-            <!-- Mission count badge (clickable filter) -->
-            {#if missionCount > 0}
-              <button
-                class="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-medium transition-all duration-200
-                  {isFiltered
-                  ? 'border border-accent-blue/40 bg-accent-blue/20 text-accent-blue shadow-glow-blue'
-                  : 'border border-white/10 bg-white/5 text-text-secondary hover:bg-white/10 hover:text-white'}"
-                onclick={() => onFilterBySource?.(isFiltered ? null : source.connectorId)}
-                title={isFiltered ? 'Retirer le filtre' : `Filtrer par ${source.name}`}
-              >
-                {missionCount}
-              </button>
-            {/if}
+            <!-- Name + count -->
+            <div class="min-w-0 flex-1">
+              <span class="block truncate text-[12px] font-medium text-text-primary">{source.name}</span>
+              {#if missionCount > 0}
+                <span class="block text-[10px] text-text-muted">{missionCount} missions</span>
+              {/if}
+            </div>
 
             <!-- Status -->
-            <div class="flex items-center gap-1.5">
-              <!-- Circuit breaker badge (uniquement si circuit non fermé) -->
+            <div class="flex shrink-0 items-center gap-2">
               {#if healthSnapshots}
                 {@const snap = healthSnapshots.get(source.connectorId)}
                 {#if snap && snap.circuitState !== 'closed'}
                   <CircuitBadge state={snap.circuitState} size="sm" showLabel />
                 {/if}
               {/if}
+
               {#if source.sessionStatus === 'checking'}
                 <span class="flex items-center gap-1 text-[10px] text-text-muted">
-                  <span class="animate-spin">
-                    <Icon name="loader" size={12} />
-                  </span>
-                  <span>Vérification...</span>
+                  <span class="animate-spin"><Icon name="loader" size={11} /></span>
                 </span>
               {:else if source.sessionStatus === 'connected'}
-                {#if source.lastSyncAt}
-                  <span class="text-[9px] text-text-muted"
-                    >{getRelativeTime(source.lastSyncAt)}</span
-                  >
-                {/if}
-                <span class="flex items-center gap-1 text-[10px] text-accent-emerald">
-                  <span class="inline-block h-1.5 w-1.5 rounded-full bg-accent-emerald"></span>
-                  <span>Connecté</span>
+                <span class="flex items-center gap-1.5 text-[10px] text-accent-green">
+                  <span class="inline-block h-1.5 w-1.5 rounded-full bg-accent-green"></span>
+                  Connecté
                 </span>
               {:else if source.sessionStatus === 'not-connected'}
                 <button
-                  class="rounded-md border border-accent-blue/20 bg-accent-blue/8 px-2 py-0.5 text-[10px] font-medium text-accent-blue transition-colors hover:bg-accent-blue/15"
+                  class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/6 px-2 py-0.5 text-[10px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/10"
                   onclick={() => handleReconnect(source.url)}
                 >
                   Se connecter
                 </button>
               {:else if source.sessionStatus === 'error'}
-                <span class="flex items-center gap-1 text-[10px] text-red-400">
-                  <Icon name="x-circle" size={12} />
-                  <span class="max-w-32 truncate">
-                    {source.error?.message ?? 'Erreur'}
-                  </span>
+                <span class="flex items-center gap-1 text-[10px] text-status-red">
+                  <Icon name="x-circle" size={11} />
+                  <span class="max-w-28 truncate">{source.error?.message ?? 'Erreur'}</span>
                 </span>
               {/if}
 
@@ -300,12 +303,26 @@
                 {@const snap = healthSnapshots.get(source.connectorId)}
                 {#if snap && deriveHealthStatus(snap) === 'broken' && onRecheckConnector}
                   <button
-                    class="rounded-md border border-red-400/20 bg-red-400/10 px-2 py-0.5 text-[10px] font-medium text-red-300 transition-colors hover:bg-red-400/20"
+                    class="rounded-md border border-status-red/20 bg-status-red/6 px-2 py-0.5 text-[10px] font-medium text-status-red transition-colors hover:bg-status-red/10"
                     onclick={() => onRecheckConnector(source.connectorId, !isEnabled)}
                   >
-                    {isEnabled ? 'Re-check' : 'Activer & scan'}
+                    {isEnabled ? 'Re-check' : 'Activer'}
                   </button>
                 {/if}
+              {/if}
+
+              <!-- Filter by source button -->
+              {#if missionCount > 0}
+                <button
+                  class="rounded-md px-1.5 py-0.5 text-[10px] font-mono font-medium transition-colors
+                    {isFiltered
+                      ? 'bg-blueprint-blue/10 text-blueprint-blue'
+                      : 'text-text-muted hover:bg-subtle-gray hover:text-text-primary'}"
+                  onclick={() => onFilterBySource?.(isFiltered ? null : source.connectorId)}
+                  title={isFiltered ? 'Retirer le filtre' : `Filtrer par ${source.name}`}
+                >
+                  {missionCount}
+                </button>
               {/if}
             </div>
           </div>
@@ -313,11 +330,13 @@
       </div>
 
       {#if unhealthySnapshots.length > 0}
-        <div class="mt-3 space-y-2 border-t border-white/8 pt-3">
-          <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Santé détaillée</p>
-          {#each unhealthySnapshots as item (item.connectorId)}
-            <ConnectorHealthCard snapshot={item.snapshot} connectorName={item.name} />
-          {/each}
+        <div class="border-t border-border-light px-4 py-3">
+          <p class="text-[10px] uppercase tracking-[0.15em] text-text-muted mb-2">Santé détaillée</p>
+          <div class="space-y-2">
+            {#each unhealthySnapshots as item (item.connectorId)}
+              <ConnectorHealthCard snapshot={item.snapshot} connectorName={item.name} />
+            {/each}
+          </div>
         </div>
       {/if}
     {/if}

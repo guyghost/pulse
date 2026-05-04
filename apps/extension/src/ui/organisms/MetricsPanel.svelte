@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
   import { metricsCollector, getWebVitals } from '../../lib/shell/metrics';
   import type { Metric } from '../../lib/core/metrics/types';
 
@@ -159,18 +159,18 @@
 <svelte:window onkeydown={handleKeydown} />
 
 {#if isOpen}
-  <div class="fixed inset-0 z-50 bg-navy-900/95 overflow-auto">
+  <div class="fixed inset-0 z-50 bg-page-canvas/95 overflow-auto">
     <!-- Header -->
     <div
-      class="sticky top-0 flex items-center justify-between px-4 py-3 bg-navy-800 border-b border-navy-700"
+      class="sticky top-0 flex items-center justify-between px-4 py-3 bg-surface-white border-b border-border-700"
     >
       <div class="flex items-center gap-3">
-        <span class="text-sm font-bold text-accent-blue font-mono">METRICS</span>
+        <span class="text-sm font-bold text-blueprint-blue font-mono">METRICS</span>
         <div class="flex gap-1">
           {#each ['overview', 'scan', 'cache', 'timings', 'webvitals'] as tab}
             <button
               class="px-2 py-1 text-[10px] font-mono rounded transition-colors {activeTab === tab
-                ? 'bg-accent-blue text-white'
+                ? 'bg-blueprint-blue text-text-primary'
                 : 'bg-surface text-text-secondary hover:text-text-primary'}"
               onclick={() => (activeTab = tab as typeof activeTab)}
             >
@@ -182,14 +182,14 @@
       <div class="flex items-center gap-2">
         <button
           class="px-2 py-1 text-[10px] font-mono rounded {autoRefresh
-            ? 'bg-accent-emerald/20 text-accent-emerald'
+            ? 'bg-blueprint-blue/20 text-blueprint-blue'
             : 'bg-surface text-text-secondary'} transition-colors"
           onclick={toggleAutoRefresh}
         >
           {autoRefresh ? 'auto-on' : 'auto-off'}
         </button>
         <button
-          class="p-1.5 text-text-secondary hover:text-accent-blue transition-colors"
+          class="p-1.5 text-text-secondary hover:text-blueprint-blue transition-colors"
           onclick={refresh}
           title="Refresh"
         >
@@ -217,7 +217,7 @@
             <div class="text-[10px] uppercase text-text-secondary tracking-wider">
               Avg Scan Time
             </div>
-            <div class="text-2xl font-mono text-accent-blue">
+            <div class="text-2xl font-mono text-blueprint-blue">
               {formatDuration(scanStats().avgScanTime)}
             </div>
           </div>
@@ -225,13 +225,13 @@
             <div class="text-[10px] uppercase text-text-secondary tracking-wider">
               Cache Hit Rate
             </div>
-            <div class="text-2xl font-mono text-accent-emerald">
+            <div class="text-2xl font-mono text-blueprint-blue">
               {cacheStats().lastHitRate.toFixed(1)}%
             </div>
           </div>
           <div class="bg-surface rounded p-3">
             <div class="text-[10px] uppercase text-text-secondary tracking-wider">Dedup Ratio</div>
-            <div class="text-2xl font-mono text-accent-amber">
+            <div class="text-2xl font-mono text-blueprint-blue">
               {scanStats().avgDedup.toFixed(1)}%
             </div>
           </div>
@@ -249,7 +249,7 @@
               <div class="space-y-1">
                 {#each [...missionsByConnector()] as [connectorId, count]}
                   <div
-                    class="flex justify-between items-center py-1 border-b border-navy-700 last:border-0"
+                    class="flex justify-between items-center py-1 border-b border-border-700 last:border-0"
                   >
                     <span class="text-xs text-text-secondary">{connectorId}</span>
                     <span class="text-xs font-mono text-text-primary">{count}</span>
@@ -270,9 +270,9 @@
               <div class="space-y-1 max-h-40 overflow-auto">
                 {#each recentErrors() as error}
                   <div
-                    class="flex justify-between items-center py-1 border-b border-navy-700 last:border-0 text-xs"
+                    class="flex justify-between items-center py-1 border-b border-border-700 last:border-0 text-xs"
                   >
-                    <span class="text-accent-red">{error.tags?.connectorId || 'unknown'}</span>
+                    <span class="text-status-red">{error.tags?.connectorId || 'unknown'}</span>
                     <span class="text-text-muted">{error.tags?.errorType || 'error'}</span>
                     <span class="text-text-muted font-mono">{formatTimestamp(error.timestamp)}</span
                     >
@@ -299,7 +299,7 @@
                 <div class="text-[10px] uppercase text-text-secondary tracking-wider">
                   Avg Duration
                 </div>
-                <div class="text-xl font-mono text-accent-blue">
+                <div class="text-xl font-mono text-blueprint-blue">
                   {formatDuration(scanStats().avgScanTime)}
                 </div>
               </div>
@@ -325,12 +325,12 @@
                   (m) => m.name === 'scan.missions.total' && m.timestamp === metric.timestamp
                 )}
                 <div
-                  class="flex justify-between items-center py-1 border-b border-navy-700 last:border-0 text-xs"
+                  class="flex justify-between items-center py-1 border-b border-border-700 last:border-0 text-xs"
                 >
                   <span class="font-mono text-text-secondary"
                     >{formatTimestamp(metric.timestamp)}</span
                   >
-                  <span class="text-accent-blue">{formatDuration(metric.value)}</span>
+                  <span class="text-blueprint-blue">{formatDuration(metric.value)}</span>
                   <span class="text-text-primary">{missions?.value || '?'} missions</span>
                 </div>
               {/each}
@@ -345,7 +345,7 @@
           <div class="grid grid-cols-2 md:grid-cols-4 gap-3">
             <div class="bg-surface rounded p-3">
               <div class="text-[10px] uppercase text-text-secondary tracking-wider">Hit Rate</div>
-              <div class="text-2xl font-mono text-accent-emerald">
+              <div class="text-2xl font-mono text-blueprint-blue">
                 {cacheStats().lastHitRate.toFixed(1)}%
               </div>
             </div>
@@ -371,12 +371,12 @@
                   (m) => m.name === 'cache.memory.misses' && m.timestamp === metric.timestamp
                 )}
                 <div
-                  class="flex justify-between items-center py-1 border-b border-navy-700 last:border-0 text-xs"
+                  class="flex justify-between items-center py-1 border-b border-border-700 last:border-0 text-xs"
                 >
                   <span class="font-mono text-text-secondary"
                     >{formatTimestamp(metric.timestamp)}</span
                   >
-                  <span class="text-accent-emerald">{metric.value.toFixed(1)}%</span>
+                  <span class="text-blueprint-blue">{metric.value.toFixed(1)}%</span>
                   <span class="text-text-muted"
                     >{hits?.value || 0} hits / {misses?.value || 0} misses</span
                   >
@@ -399,14 +399,14 @@
             <div class="space-y-1">
               {#each [...avgTimings()].sort((a, b) => b[1].avg - a[1].avg) as [op, stats]}
                 <div
-                  class="flex justify-between items-center py-2 border-b border-navy-700 last:border-0"
+                  class="flex justify-between items-center py-2 border-b border-border-700 last:border-0"
                 >
                   <span class="text-xs text-text-secondary">{op}</span>
                   <div class="flex items-center gap-4">
                     <span class="text-[10px] text-text-muted">{stats.count} calls</span>
                     <span class="text-[10px] text-text-muted">min {stats.min}ms</span>
                     <span class="text-[10px] text-text-muted">max {stats.max}ms</span>
-                    <span class="text-xs font-mono text-accent-blue w-16 text-right"
+                    <span class="text-xs font-mono text-blueprint-blue w-16 text-right"
                       >{stats.avg}ms avg</span
                     >
                   </div>
@@ -424,10 +424,10 @@
             <div class="text-[10px] uppercase text-text-secondary tracking-wider">FCP</div>
             <div
               class="text-2xl font-mono {webVitals.fcp < 1800
-                ? 'text-accent-emerald'
+                ? 'text-blueprint-blue'
                 : webVitals.fcp < 3000
-                  ? 'text-accent-amber'
-                  : 'text-accent-red'}"
+                  ? 'text-blueprint-blue'
+                  : 'text-status-red'}"
             >
               {webVitals.fcp > 0 ? `${Math.round(webVitals.fcp)}ms` : '–'}
             </div>
@@ -437,10 +437,10 @@
             <div class="text-[10px] uppercase text-text-secondary tracking-wider">LCP</div>
             <div
               class="text-2xl font-mono {webVitals.lcp < 2500
-                ? 'text-accent-emerald'
+                ? 'text-blueprint-blue'
                 : webVitals.lcp < 4000
-                  ? 'text-accent-amber'
-                  : 'text-accent-red'}"
+                  ? 'text-blueprint-blue'
+                  : 'text-status-red'}"
             >
               {webVitals.lcp > 0 ? `${Math.round(webVitals.lcp)}ms` : '–'}
             </div>
@@ -450,10 +450,10 @@
             <div class="text-[10px] uppercase text-text-secondary tracking-wider">CLS</div>
             <div
               class="text-2xl font-mono {webVitals.cls < 0.1
-                ? 'text-accent-emerald'
+                ? 'text-blueprint-blue'
                 : webVitals.cls < 0.25
-                  ? 'text-accent-amber'
-                  : 'text-accent-red'}"
+                  ? 'text-blueprint-blue'
+                  : 'text-status-red'}"
             >
               {webVitals.cls > 0 ? webVitals.cls.toFixed(3) : '–'}
             </div>
@@ -463,10 +463,10 @@
             <div class="text-[10px] uppercase text-text-secondary tracking-wider">FID</div>
             <div
               class="text-2xl font-mono {webVitals.fid && webVitals.fid < 100
-                ? 'text-accent-emerald'
+                ? 'text-blueprint-blue'
                 : webVitals.fid && webVitals.fid < 300
-                  ? 'text-accent-amber'
-                  : 'text-accent-red'}"
+                  ? 'text-blueprint-blue'
+                  : 'text-status-red'}"
             >
               {webVitals.fid && webVitals.fid > 0 ? `${webVitals.fid}ms` : '–'}
             </div>
@@ -482,7 +482,7 @@
           <div class="space-y-1 max-h-64 overflow-auto">
             {#each allMetrics.filter((m) => m.name.startsWith('webvital.')).reverse() as metric}
               <div
-                class="flex justify-between items-center py-1 border-b border-navy-700 last:border-0 text-xs"
+                class="flex justify-between items-center py-1 border-b border-border-700 last:border-0 text-xs"
               >
                 <span class="text-text-secondary"
                   >{metric.name.replace('webvital.', '').toUpperCase()}</span
@@ -502,15 +502,15 @@
       {/if}
 
       <!-- Footer Actions -->
-      <div class="flex gap-2 mt-6 pt-4 border-t border-navy-700">
+      <div class="flex gap-2 mt-6 pt-4 border-t border-border-700">
         <button
-          class="px-3 py-1.5 text-xs font-mono rounded bg-accent-blue/20 text-accent-blue hover:bg-accent-blue/30 transition-colors"
+          class="px-3 py-1.5 text-xs font-mono rounded bg-blueprint-blue/20 text-blueprint-blue hover:bg-blueprint-blue/30 transition-colors"
           onclick={exportMetrics}
         >
           Export JSON
         </button>
         <button
-          class="px-3 py-1.5 text-xs font-mono rounded bg-accent-red/20 text-accent-red hover:bg-accent-red/30 transition-colors"
+          class="px-3 py-1.5 text-xs font-mono rounded bg-status-red/20 text-status-red hover:bg-status-red/30 transition-colors"
           onclick={resetMetrics}
         >
           Reset All
@@ -524,7 +524,7 @@
 {:else}
   <div class="fixed bottom-2 left-2 z-50">
     <button
-      class="px-2 py-1 text-[9px] font-mono rounded bg-navy-800/80 text-text-muted hover:text-accent-blue transition-colors border border-navy-700/50"
+      class="px-2 py-1 text-[9px] font-mono rounded bg-surface-white/80 text-text-muted hover:text-blueprint-blue transition-colors border border-border-700/50"
       onclick={() => (isOpen = true)}
     >
       Ctrl+Shift+M

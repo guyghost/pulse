@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ConnectorStatus as ConnectorStatusType } from '$lib/core/types/connector-status';
   import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
 
   const {
     name,
@@ -62,20 +62,20 @@
       case 'pending':
         return { icon: 'loader', color: 'text-text-muted', label: 'En attente', spin: false };
       case 'detecting':
-        return { icon: 'loader', color: 'text-accent-blue', label: 'Detection...', spin: true };
+        return { icon: 'loader', color: 'text-blueprint-blue', label: 'Detection...', spin: true };
       case 'fetching':
-        return { icon: 'loader', color: 'text-accent-blue', label: 'Scraping...', spin: true };
+        return { icon: 'loader', color: 'text-blueprint-blue', label: 'Scraping...', spin: true };
       case 'retrying':
         return {
           icon: 'loader',
-          color: 'text-accent-amber',
+          color: 'text-blueprint-blue',
           label: `Retry ${retryCount}/3...`,
           spin: true,
         };
       case 'done':
         return {
           icon: 'check',
-          color: 'text-accent-emerald',
+          color: 'text-blueprint-blue',
           label: `${missionsCount} missions`,
           spin: false,
         };
@@ -105,7 +105,7 @@
 
 <div class="flex items-center gap-2.5 py-1.5">
   <div
-    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]"
+    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white"
   >
     {#if icon.startsWith('http') && !imgFailed}
       <img
@@ -125,7 +125,7 @@
   <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">{name}</span>
   <div class="flex items-center gap-1.5">
     {#if connectorState === 'error' && isSessionError && url}
-      <button class="text-[10px] text-accent-blue hover:underline" onclick={handleReconnect}>
+      <button class="text-[10px] text-blueprint-blue hover:underline" onclick={handleReconnect}>
         Reconnecter
       </button>
     {/if}

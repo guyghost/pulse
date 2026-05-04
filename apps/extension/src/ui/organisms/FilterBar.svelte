@@ -1,6 +1,6 @@
 <script lang="ts">
-  import Chip from '../atoms/Chip.svelte';
-  import Icon from '../atoms/Icon.svelte';
+  import { Chip } from '@pulse/ui';
+  import { Icon } from '@pulse/ui';
   import type { MissionSource, RemoteType } from '$lib/core/types/mission';
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
@@ -54,7 +54,7 @@
   ];
 </script>
 
-<div class="flex flex-col gap-3 rounded-2xl border border-white/6 bg-white/[0.02] p-3">
+<div class="flex flex-col gap-3 rounded-2xl border border-border-light bg-page-canvas p-3">
   <div>
     <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-muted">Source</p>
     <div class="flex flex-wrap gap-1.5">
@@ -111,7 +111,7 @@
 
   {#if hasFilters}
     <button
-      class="self-start text-xs text-accent-blue hover:text-accent-blue/80 transition-colors"
+      class="self-start text-xs text-blueprint-blue hover:text-blueprint-blue/80 transition-colors"
       onclick={() => onClearAll?.()}
     >
       <span class="flex items-center gap-1">

@@ -1,6 +1,6 @@
 <script lang="ts">
   import type { TJMTrend } from '$lib/core/types/tjm';
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
 
   const { trend }: { trend: TJMTrend } = $props();
 
@@ -9,15 +9,15 @@
       ? {
           icon: 'trending-up' as const,
           label: 'Hausse',
-          class: 'text-accent-emerald bg-accent-emerald/10',
+          class: 'text-blueprint-blue bg-blueprint-blue/10',
         }
       : trend === 'down'
         ? {
             icon: 'trending-down' as const,
             label: 'Baisse',
-            class: 'text-accent-red bg-accent-red/10',
+            class: 'text-status-red bg-status-red/10',
           }
-        : { icon: 'minus' as const, label: 'Stable', class: 'text-accent-amber bg-accent-amber/10' }
+        : { icon: 'minus' as const, label: 'Stable', class: 'text-blueprint-blue bg-blueprint-blue/10' }
   );
 </script>
 

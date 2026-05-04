@@ -46,44 +46,15 @@
       <div class="nav__logo">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="36"
-          height="36"
+          width="24"
+          height="24"
           viewBox="0 0 128 128"
         >
-          <rect width="128" height="128" rx="24" fill="#0F172A" />
-          <circle
-            cx="64"
-            cy="64"
-            r="48"
-            fill="none"
-            stroke="#3B82F6"
-            stroke-width="3"
-            opacity="0.15"
-          />
-          <circle
-            cx="64"
-            cy="64"
-            r="32"
-            fill="none"
-            stroke="#3B82F6"
-            stroke-width="3"
-            opacity="0.3"
-          />
-          <circle
-            cx="64"
-            cy="64"
-            r="16"
-            fill="none"
-            stroke="#3B82F6"
-            stroke-width="3"
-            opacity="0.5"
-          />
-          <circle cx="64" cy="64" r="6" fill="#3B82F6" />
           <polyline
-            points="16,64 40,64 48,40 56,80 64,48 72,72 80,56 88,64 112,64"
+            points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
             fill="none"
-            stroke="#10B981"
-            stroke-width="4"
+            stroke="var(--color-text-primary)"
+            stroke-width="8"
             stroke-linecap="round"
             stroke-linejoin="round"
           />
@@ -107,7 +78,7 @@
 <!-- Privacy Content -->
 <main class="privacy-page">
   <div class="container">
-    <article class="privacy-content glass-card" style="padding: var(--space-3xl);">
+    <article class="privacy-content glass-card">
       <h1>Politique de confidentialité</h1>
 
       <p class="last-updated">Dernière mise à jour : Mars 2026</p>
@@ -258,9 +229,7 @@
         <a href="mailto:privacy@missionpulse.app">privacy@missionpulse.app</a>
       </p>
 
-      <p
-        style="margin-top: var(--space-2xl); padding-top: var(--space-xl); border-top: 1px solid var(--glass-border);"
-      >
+      <p class="privacy-return">
         <a href="/" class="btn btn--secondary">← Retour à l'accueil</a>
       </p>
     </article>
@@ -279,40 +248,11 @@
             height="32"
             viewBox="0 0 128 128"
           >
-            <rect width="128" height="128" rx="24" fill="#0F172A" />
-            <circle
-              cx="64"
-              cy="64"
-              r="48"
-              fill="none"
-              stroke="#3B82F6"
-              stroke-width="3"
-              opacity="0.15"
-            />
-            <circle
-              cx="64"
-              cy="64"
-              r="32"
-              fill="none"
-              stroke="#3B82F6"
-              stroke-width="3"
-              opacity="0.3"
-            />
-            <circle
-              cx="64"
-              cy="64"
-              r="16"
-              fill="none"
-              stroke="#3B82F6"
-              stroke-width="3"
-              opacity="0.5"
-            />
-            <circle cx="64" cy="64" r="6" fill="#3B82F6" />
             <polyline
-              points="16,64 40,64 48,40 56,80 64,48 72,72 80,56 88,64 112,64"
+              points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
               fill="none"
-              stroke="#10B981"
-              stroke-width="4"
+              stroke="var(--color-text-primary)"
+              stroke-width="8"
               stroke-linecap="round"
               stroke-linejoin="round"
             />

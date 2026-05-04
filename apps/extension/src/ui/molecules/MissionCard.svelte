@@ -3,8 +3,8 @@
   import type { Mission } from '$lib/core/types/mission';
   import type { ApplicationStatus } from '$lib/core/types/tracking';
   import { STATUS_LABELS, STATUS_VARIANTS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
-  import Badge from '../atoms/Badge.svelte';
-  import Icon from '../atoms/Icon.svelte';
+  import { Badge } from '@pulse/ui';
+  import { Icon } from '@pulse/ui';
   import { ripple } from '../actions/ripple';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
 
@@ -56,14 +56,10 @@
 
   const scoreColor = $derived(
     scoreValue >= 80
-      ? 'text-accent-emerald bg-accent-emerald/15'
+      ? 'text-accent-green bg-accent-green/10'
       : scoreValue >= 50
-        ? 'text-accent-amber bg-accent-amber/15'
-        : 'text-text-muted bg-white/5'
-  );
-
-  const glowClass = $derived(
-    scoreValue >= 80 ? 'shadow-glow-emerald' : scoreValue >= 50 ? 'shadow-glow-blue' : ''
+        ? 'text-accent-amber bg-accent-amber/10'
+        : 'text-text-muted bg-page-canvas'
   );
 
   function toggleExpand() {
@@ -101,12 +97,12 @@
 <div
   use:ripple
   use:onVisibleAction={() => onVisibleCallback?.()}
-  class="section-card relative cursor-pointer rounded-[1.65rem] p-4 transition-all duration-300 ease-out hover:-translate-y-0.5 hover:bg-white/[0.07] active:scale-[0.99] {glowClass} {isSeen
+  class="group relative cursor-pointer rounded-xl border border-border-light bg-surface-white p-5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
-    : 'border-accent-blue/30 shadow-[inset_0_0_0_1px_rgba(89,198,255,0.2),0_18px_36px_rgba(1,7,12,0.26)]'} {isHidden
-    ? 'opacity-55'
+    : 'border-blueprint-blue/20'} {isHidden
+    ? 'opacity-50'
     : ''} {tourHighlight === 'seen'
-    ? 'ring-2 ring-accent-blue/45 ring-offset-2 ring-offset-navy-900'
+    ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
     : ''}"
   style="contain: layout style paint;"
   onclick={toggleExpand}
@@ -119,69 +115,68 @@
     }
   }}
 >
-  <div
-    class="pointer-events-none absolute right-4 top-4 h-20 w-20 rounded-full bg-accent-blue/8 blur-2xl"
-  ></div>
-  <div class="relative flex items-start justify-between gap-3">
+  <!-- Header row -->
+  <div class="flex items-start justify-between gap-3">
     <div class="min-w-0 flex-1">
-      <div class="mb-3 flex flex-wrap items-center gap-2">
+      <div class="flex flex-wrap items-center gap-1.5">
         <Badge label={mission.source} variant="source" />
         {#if trackingStatus}
           <Badge label={STATUS_LABELS[trackingStatus]} variant={STATUS_VARIANTS[trackingStatus]} />
         {/if}
         {#if !isSeen}
           <span
-            class="inline-flex items-center rounded-full border border-accent-blue/18 bg-accent-blue/12 px-2 py-1 text-[11px] font-medium text-accent-blue"
+            class="inline-flex items-center rounded-full bg-blueprint-blue/8 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-blueprint-blue"
           >
             Nouveau
           </span>
         {/if}
         {#if mission.remote}
           <span
-            class="inline-flex items-center rounded-full border border-white/8 bg-white/[0.04] px-2 py-1 text-[11px] capitalize text-text-secondary"
+            class="inline-flex items-center rounded-full border border-border-light px-2 py-0.5 text-[10px] capitalize text-text-subtle"
           >
             {mission.remote}
           </span>
         {/if}
       </div>
-      <h3 class="truncate text-[1rem] font-semibold text-text-primary">{mission.title}</h3>
+      <h3 class="mt-2 text-[0.9375rem] font-medium leading-snug text-text-primary">{mission.title}</h3>
       {#if mission.client}
-        <p class="mt-1 text-xs text-text-secondary">{mission.client}</p>
+        <p class="mt-1 text-xs text-text-subtle">{mission.client}</p>
       {/if}
     </div>
-    <div class="flex items-center gap-2">
+    <div class="flex shrink-0 items-center gap-2">
       {#if mission.scoreBreakdown}
         <span
-          class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor} {tourHighlight ===
+          class="rounded-lg px-2 py-1 text-[11px] font-mono font-semibold {scoreColor} {tourHighlight ===
           'score'
-            ? 'ring-2 ring-accent-blue/50 ring-offset-2 ring-offset-navy-900'
+            ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
           >{mission.scoreBreakdown.grade}{#if mission.scoreBreakdown.semantic !== null}+{/if}</span
         >
       {:else if mission.score !== null}
         <span
-          class="rounded-full px-2.5 py-1 text-xs font-mono font-bold {scoreColor} {tourHighlight ===
+          class="rounded-lg px-2 py-1 text-[11px] font-mono font-semibold {scoreColor} {tourHighlight ===
           'score'
-            ? 'ring-2 ring-accent-blue/50 ring-offset-2 ring-offset-navy-900'
+            ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}">{mission.score}</span
         >
       {/if}
       <div
-        class="flex h-8 w-8 items-center justify-center rounded-full bg-white/[0.04] {tourHighlight ===
+        class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors group-hover:text-text-primary {tourHighlight ===
         'expand'
-          ? 'ring-2 ring-accent-blue/50 ring-offset-2 ring-offset-navy-900'
+          ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
           : ''}"
       >
         <Icon
           name="chevron-down"
           size={14}
-          class="text-text-muted transition-transform duration-200 {expanded ? 'rotate-180' : ''}"
+          class="transition-transform duration-200 {expanded ? 'rotate-180' : ''}"
         />
       </div>
     </div>
   </div>
 
-  <div class="mt-3 flex flex-wrap gap-2">
+  <!-- Tags -->
+  <div class="mt-3 flex flex-wrap gap-1.5">
     {#each mission.stack.slice(0, 3) as tech}
       <Badge label={tech} variant="tech" />
     {/each}
@@ -190,7 +185,7 @@
     {/if}
     {#if mission.scoreBreakdown?.semanticReason ?? mission.semanticReason}
       <span
-        class="inline-flex items-center gap-1 rounded-full border border-accent-blue/20 bg-accent-blue/8 px-2 py-0.5 text-[11px] text-accent-blue"
+        class="inline-flex items-center gap-1 rounded-full border border-blueprint-blue/15 bg-blueprint-blue/5 px-2 py-0.5 text-[10px] text-blueprint-blue"
       >
         {mission.scoreBreakdown?.semanticReason ?? mission.semanticReason}
       </span>
@@ -198,83 +193,151 @@
   </div>
 
   {#if mission.description}
-    <p class="mt-3 line-clamp-2 text-xs leading-relaxed text-text-secondary">
+    <p class="mt-3 line-clamp-2 text-xs leading-relaxed text-text-subtle">
       {mission.description}
     </p>
   {/if}
 
-  <div class="mt-4 grid grid-cols-2 gap-2 text-xs text-text-secondary">
-    {#if mission.tjm !== null}
-      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">TJM</p>
-        <p class="mt-1 font-mono font-semibold text-accent-blue">{mission.tjm}€/j</p>
+  <!-- Detail grid -->
+  {#if expanded}
+    <div class="mt-4 border-t border-border-light pt-4">
+      <div class="grid grid-cols-2 gap-2 text-xs">
+        {#if mission.tjm !== null}
+          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
+            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">TJM</p>
+            <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">{mission.tjm}€<span class="text-text-muted">/j</span></p>
+          </div>
+        {/if}
+        {#if mission.location}
+          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
+            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Zone</p>
+            <p class="mt-1 truncate text-text-primary">{mission.location}</p>
+          </div>
+        {/if}
+        {#if mission.duration}
+          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
+            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Durée</p>
+            <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
+          </div>
+        {/if}
+        {#if mission.startDate}
+          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
+            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Début</p>
+            <p class="mt-1 truncate text-text-primary">{mission.startDate}</p>
+          </div>
+        {/if}
+        {#if seniorityLabel}
+          <div class="rounded-lg bg-page-canvas px-3 py-2.5">
+            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Séniorité</p>
+            <p class="mt-1 truncate text-text-primary">{seniorityLabel}</p>
+          </div>
+        {/if}
+        <div class="rounded-lg bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Source</p>
+          <p class="mt-1 truncate text-text-primary">{mission.source}</p>
+        </div>
       </div>
-    {/if}
-    {#if mission.location}
-      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Zone</p>
-        <p class="mt-1 truncate text-text-primary">{mission.location}</p>
-      </div>
-    {/if}
-    {#if mission.duration}
-      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Durée</p>
-        <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
-      </div>
-    {/if}
-    {#if mission.startDate}
-      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Début</p>
-        <p class="mt-1 truncate text-text-primary">{mission.startDate}</p>
-      </div>
-    {/if}
-    {#if seniorityLabel}
-      <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-        <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Séniorité</p>
-        <p class="mt-1 truncate text-text-primary">{seniorityLabel}</p>
-      </div>
-    {/if}
-    <div class="rounded-2xl border border-white/8 bg-white/[0.03] px-3 py-2">
-      <p class="text-[10px] uppercase tracking-[0.18em] text-text-muted">Source</p>
-      <p class="mt-1 truncate text-text-primary">{mission.source}</p>
     </div>
-  </div>
+  {/if}
 
-  <div class="mt-4 flex justify-end gap-2">
-    <button
-      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] transition-all duration-200 {isFavorite
-        ? 'text-accent-amber'
-        : 'text-text-muted hover:text-text-primary'}"
-      onclick={handleToggleFavorite}
-      title={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+  <!-- Score breakdown (expanded only) -->
+  {#if expanded && mission.scoreBreakdown}
+    <div class="mt-4 border-t border-border-light pt-4">
+      <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted mb-3">Pourquoi ce score</p>
+      <div class="space-y-2.5">
+        <div class="flex items-center gap-3 text-[11px]">
+          <span class="w-20 shrink-0 text-text-secondary">Compétences</span>
+          <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
+            <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.criteria.stack}%"></div>
+          </div>
+          <span class="w-8 text-right font-mono font-medium text-text-primary">{mission.scoreBreakdown.criteria.stack}</span>
+        </div>
+        <div class="flex items-center gap-3 text-[11px]">
+          <span class="w-20 shrink-0 text-text-secondary">TJM</span>
+          <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
+            <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.criteria.tjm}%"></div>
+          </div>
+          <span class="w-8 text-right font-mono font-medium text-text-primary">{mission.scoreBreakdown.criteria.tjm}</span>
+        </div>
+        <div class="flex items-center gap-3 text-[11px]">
+          <span class="w-20 shrink-0 text-text-secondary">Localisation</span>
+          <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
+            <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.criteria.location}%"></div>
+          </div>
+          <span class="w-8 text-right font-mono font-medium text-text-primary">{mission.scoreBreakdown.criteria.location}</span>
+        </div>
+        <div class="flex items-center gap-3 text-[11px]">
+          <span class="w-20 shrink-0 text-text-secondary">Remote</span>
+          <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
+            <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.criteria.remote}%"></div>
+          </div>
+          <span class="w-8 text-right font-mono font-medium text-text-primary">{mission.scoreBreakdown.criteria.remote}</span>
+        </div>
+        {#if mission.scoreBreakdown.semantic !== null}
+          <div class="flex items-center gap-3 text-[11px]">
+            <span class="w-20 shrink-0 text-text-secondary">Sémantique IA</span>
+            <div class="flex-1 h-1.5 rounded-full bg-subtle-gray overflow-hidden">
+              <div class="h-full rounded-full bg-blueprint-blue transition-all" style:width="{mission.scoreBreakdown.semantic}%"></div>
+            </div>
+            <span class="w-8 text-right font-mono font-medium text-blueprint-blue">{mission.scoreBreakdown.semantic}</span>
+          </div>
+        {/if}
+      </div>
+      {#if mission.scoreBreakdown.semanticReason}
+        <p class="mt-3 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2 text-[11px] text-blueprint-blue">
+          {mission.scoreBreakdown.semanticReason}
+        </p>
+      {/if}
+    </div>
+  {/if}
+
+  <!-- Actions — always visible, subtle until hover -->
+  <div class="mt-3 flex items-center justify-between">
+    <div class="flex gap-1">
+      <button
+        class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
+          ? 'text-blueprint-blue hover:text-blueprint-blue'
+          : ''}"
+        onclick={handleToggleFavorite}
+        title={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
+      >
+        <Icon name="star" size={13} class={isFavorite ? 'fill-blueprint-blue' : ''} />
+      </button>
+      <button
+        class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
+        onclick={handleHide}
+        title={isHidden ? 'Restaurer' : 'Masquer'}
+      >
+        <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
+      </button>
+      <button
+        class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+        onclick={handleCopyLink}
+        title="Copier le lien"
+      >
+        <Icon
+          name={copied ? 'check' : 'link'}
+          size={13}
+          class={copied ? 'text-blueprint-blue' : ''}
+        />
+      </button>
+      <button
+        class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+        onclick={handleOpenLink}
+        title="Ouvrir"
+      >
+        <Icon name="external-link" size={13} />
+      </button>
+    </div>
+    <a
+      href={mission.url}
+      target="_blank"
+      rel="noopener noreferrer"
+      class="text-[11px] font-medium text-text-muted transition-colors hover:text-blueprint-blue"
+      onclick={(e) => e.stopPropagation()}
     >
-      <Icon name="star" size={14} class={isFavorite ? 'fill-accent-amber' : ''} />
-    </button>
-    <button
-      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-muted transition-all duration-200 hover:text-accent-red"
-      onclick={handleHide}
-      title={isHidden ? 'Restaurer' : 'Masquer'}
-    >
-      <Icon name={isHidden ? 'eye' : 'x-circle'} size={14} />
-    </button>
-    <button
-      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-muted transition-all duration-200 hover:text-text-primary"
-      onclick={handleCopyLink}
-      title="Copier le lien"
-    >
-      <Icon
-        name={copied ? 'check' : 'link'}
-        size={14}
-        class={copied ? 'text-accent-emerald' : ''}
-      />
-    </button>
-    <button
-      class="inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/8 bg-white/[0.04] text-text-muted transition-all duration-200 hover:text-text-primary"
-      onclick={handleOpenLink}
-      title="Ouvrir"
-    >
-      <Icon name="external-link" size={14} />
-    </button>
+      Voir →
+    </a>
   </div>
 
   {#if trackingStatus && availableTransitions.length > 0 && onStatusTransition}
@@ -283,7 +346,7 @@
         {@const label = STATUS_LABELS[nextStatus]}
         {@const variant = STATUS_VARIANTS[nextStatus]}
         <button
-          class="inline-flex items-center gap-1 rounded-full border border-white/8 bg-white/[0.03] px-2.5 py-1 text-[11px] text-text-secondary transition-all duration-200 hover:bg-white/[0.07] hover:text-text-primary"
+          class="inline-flex items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-[11px] text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
           onclick={(e) => {
             e.stopPropagation();
             onStatusTransition?.(nextStatus);
@@ -296,36 +359,15 @@
   {/if}
 
   {#if expanded && mission.description}
-    <!-- Les animations sont désactivées en mode virtualisé car elles conflit avec le absolute positioning -->
     {#if isVirtualized}
-      <div>
-        <div class="mt-4 border-t border-white/6 pt-4 max-h-32 overflow-y-auto">
-          <p class="text-xs leading-relaxed text-text-secondary">{mission.description}</p>
-        </div>
-        <a
-          href={mission.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-blue hover:underline"
-          onclick={(e) => e.stopPropagation()}
-        >
-          Voir la mission <Icon name="arrow-right" size={12} />
-        </a>
+      <div class="mt-4 border-t border-border-light pt-4">
+        <p class="text-xs leading-relaxed text-text-subtle">{mission.description}</p>
       </div>
     {:else}
       <div transition:slide={{ duration: 200 }}>
-        <div class="mt-4 border-t border-white/6 pt-4">
-          <p class="text-xs leading-relaxed text-text-secondary">{mission.description}</p>
+        <div class="mt-4 border-t border-border-light pt-4">
+          <p class="text-xs leading-relaxed text-text-subtle">{mission.description}</p>
         </div>
-        <a
-          href={mission.url}
-          target="_blank"
-          rel="noopener noreferrer"
-          class="mt-3 inline-flex items-center gap-1 text-xs font-medium text-accent-blue hover:underline"
-          onclick={(e) => e.stopPropagation()}
-        >
-          Voir la mission <Icon name="arrow-right" size={12} />
-        </a>
       </div>
     {/if}
   {/if}

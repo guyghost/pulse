@@ -1,6 +1,5 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
-  import Button from '../atoms/Button.svelte';
+  import { Icon } from '@pulse/ui';
 
   const {
     showResetConfirm,
@@ -15,32 +14,40 @@
   } = $props();
 </script>
 
-<div class="section-card rounded-[1.5rem] border border-red-500/20 p-4 space-y-3">
-  <div>
-    <h3 class="text-sm font-semibold text-red-400">Zone dangereuse</h3>
-    <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-      Supprimer toutes les données locales (profil, missions, cache).
-    </p>
-  </div>
-  {#if showResetConfirm}
-    <div class="flex gap-2">
-      <Button variant="ghost" onclick={onCancelConfirm}>
-        {#snippet children()}Annuler{/snippet}
-      </Button>
-      <button
-        class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-500/30 bg-red-500/20 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/30"
-        onclick={onConfirmReset}
-      >
-        Confirmer la suppression
-      </button>
+<div class="section-card rounded-xl border border-status-red/15 p-5">
+  <div class="flex items-center gap-3">
+    <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-status-red/8">
+      <Icon name="alert-triangle" size={14} class="text-status-red" />
     </div>
-  {:else}
-    <button
-      class="inline-flex min-h-11 items-center justify-center gap-1.5 rounded-xl border border-red-500/20 bg-red-500/10 px-4 py-2.5 text-sm font-semibold text-red-400 transition-all duration-200 hover:bg-red-500/20"
-      onclick={onShowConfirm}
-    >
-      <Icon name="trash-2" size={14} />
-      Reinitialiser tout
-    </button>
-  {/if}
+    <div>
+      <p class="text-sm font-medium text-status-red">Zone dangereuse</p>
+      <p class="mt-0.5 text-xs text-text-subtle">Supprimer toutes les données locales (profil, missions, cache).</p>
+    </div>
+  </div>
+  <div class="mt-4">
+    {#if showResetConfirm}
+      <div class="flex gap-2">
+        <button
+          class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-secondary transition-colors hover:bg-subtle-gray"
+          onclick={onCancelConfirm}
+        >
+          Annuler
+        </button>
+        <button
+          class="rounded-lg border border-status-red/25 bg-status-red/10 px-3 py-2 text-xs font-medium text-status-red transition-colors hover:bg-status-red/15"
+          onclick={onConfirmReset}
+        >
+          Confirmer la suppression
+        </button>
+      </div>
+    {:else}
+      <button
+        class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-xs font-medium text-status-red transition-colors hover:bg-status-red/10"
+        onclick={onShowConfirm}
+      >
+        <Icon name="trash-2" size={12} class="mr-1" />
+        Réinitialiser tout
+      </button>
+    {/if}
+  </div>
 </div>

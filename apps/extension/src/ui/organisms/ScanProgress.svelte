@@ -17,9 +17,9 @@
 </script>
 
 {#if isScanning}
-  <div class="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-white/[0.06]">
+  <div class="mt-4 h-1.5 w-full overflow-hidden rounded-full bg-subtle-gray">
     <div
-      class="h-full rounded-full bg-gradient-to-r from-accent-blue via-accent-emerald to-accent-blue transition-all duration-500 ease-out"
+      class="h-full rounded-full bg-gradient-to-r from-blueprint-blue via-blueprint-blue to-blueprint-blue transition-all duration-500 ease-out"
       style:width="{Math.max(progress, 5)}%"
     ></div>
   </div>

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
 
   interface BrokenConnectorAlert {
     connectorId: string;
@@ -27,7 +27,7 @@
         <Icon name="alert-circle" size={16} class="text-red-400" />
       </div>
       <div class="min-w-0 flex-1">
-        <p class="text-[12px] font-semibold text-white">Santé des connecteurs</p>
+        <p class="text-[12px] font-semibold text-text-primary">Santé des connecteurs</p>
         <p class="mt-1 text-[11px] text-text-secondary">
           {brokenConnectors.length === 1
             ? `${brokenConnectors[0]?.connectorName} rencontre des erreurs répétées.`
@@ -37,7 +37,7 @@
         <div class="mt-3 flex flex-col gap-2">
           {#each brokenConnectors as connector (connector.connectorId)}
             <div
-              class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-white/8 bg-white/5 px-3 py-2"
+              class="flex flex-wrap items-center justify-between gap-2 rounded-xl border border-border-light bg-page-canvas px-3 py-2"
             >
               <div>
                 <p class="text-[11px] font-medium text-text-primary">{connector.connectorName}</p>
@@ -57,7 +57,7 @@
                   </button>
                 {:else}
                   <button
-                    class="rounded-lg border border-accent-blue/25 bg-accent-blue/15 px-3 py-1.5 text-[11px] font-medium text-accent-blue transition-colors hover:bg-accent-blue/25"
+                    class="rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/15 px-3 py-1.5 text-[11px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/25"
                     onclick={() => onEnableAndScan(connector.connectorId)}
                   >
                     Activer &amp; scan

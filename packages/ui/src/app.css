@@ -1,0 +1,130 @@
+@import 'tailwindcss';
+
+@theme {
+  /* ================================================
+   * MissionPulse — Analytical Blueprint Design System
+   * Source of truth: packages/ui/src/app.css
+   * Shared across all apps (extension, landing)
+   * ================================================ */
+
+  /* Colors */
+  --color-page-canvas: #f5f5f4;
+  --color-surface-white: #ffffff;
+  --color-blueprint-blue: #0b64e9;
+  --color-text-primary: #0c0a09;
+  --color-text-secondary: #1c1917;
+  --color-text-muted: #a6a09b;
+  --color-text-subtle: #57534d;
+  --color-subtle-gray: #ececea;
+  --color-border-light: #f0efef;
+  --color-disabled-gray: #d4d2d1;
+  --color-status-red: #f24149;
+  --color-status-orange: #f97006;
+  --color-status-yellow: #f9b703;
+  --color-status-violet: #6b4aff;
+  --color-accent-green: #0d9488;
+  --color-accent-amber: #d97706;
+
+  /* Typography */
+  --font-display: 'FH Total Display Regular', 'Bodoni 72', Didot, Georgia, serif;
+  --font-geist: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-system: 'system-ui', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-sans: 'Geist', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  /* Typography — Scale */
+  --text-caption: 10px;
+  --leading-caption: 1.3;
+  --tracking-caption: -0.03px;
+  --text-body: 14px;
+  --leading-body: 1.3;
+  --tracking-body: -0.02px;
+  --text-heading: 18px;
+  --leading-heading: 1.3;
+  --tracking-heading: -0.02px;
+  --text-heading-lg: 20px;
+  --leading-heading-lg: 1.2;
+  --tracking-heading-lg: -0.02px;
+  --text-display-sm: 24px;
+  --leading-display-sm: 1.2;
+  --tracking-display-sm: -0.02px;
+  --text-display: 28px;
+  --leading-display: 1.2;
+  --tracking-display: -0.02px;
+
+  /* Spacing */
+  --spacing-4: 4px;
+  --spacing-8: 8px;
+  --spacing-12: 12px;
+  --spacing-16: 16px;
+  --spacing-20: 20px;
+  --spacing-24: 24px;
+  --spacing-32: 32px;
+  --spacing-36: 36px;
+  --spacing-40: 40px;
+  --spacing-44: 44px;
+  --spacing-80: 80px;
+  --spacing-120: 120px;
+  --spacing-140: 140px;
+
+  /* Border Radius */
+  --radius-sm: 1px;
+  --radius-md: 6px;
+  --radius-lg: 8px;
+  --radius-xl: 12px;
+  --radius-2xl: 16px;
+  --radius-full: 100px;
+
+  /* Shadows */
+  --shadow-sm: rgba(0, 0, 0, 0.06) 0px 2px 4px 0px;
+  --shadow-subtle: rgba(0, 0, 0, 0.1) 0px 1px 2px 0px;
+  --shadow-subtle-2: rgba(0, 0, 0, 0.04) 0px 1px 2px 0px;
+  --shadow-subtle-3: rgba(0, 0, 0, 0.08) 0px 2px 3px 0px;
+  --shadow-xl: rgba(0, 0, 0, 0.25) 0px 14px 32px 0px;
+}
+
+/* ================================================
+ * Base Styles
+ * ================================================ */
+
+:root {
+  color-scheme: light;
+}
+
+::selection {
+  background: rgba(11, 100, 233, 0.2);
+  color: var(--color-text-primary);
+}
+
+/* ================================================
+ * Utility Classes
+ * ================================================ */
+
+@layer components {
+  .soft-ring {
+    box-shadow: var(--shadow-subtle-2);
+  }
+
+  .eyebrow {
+    font-family: var(--font-system);
+    font-size: var(--text-caption);
+    line-height: var(--leading-caption);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+}
+
+/* ================================================
+ * Radar animation
+ * ================================================ */
+
+@keyframes radar-ping {
+  75%, 100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+.radar-ping {
+  animation: radar-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

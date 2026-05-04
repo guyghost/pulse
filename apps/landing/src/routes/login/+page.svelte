@@ -4,12 +4,15 @@
 
   let { data } = $props();
 
-  const initialEmail = data.email ?? '';
   let formError = $state<string | undefined>(undefined);
-  let email = $state(initialEmail);
+  let email = $state('');
   let submitting = $state(false);
 
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
+
+  $effect(() => {
+    email = data.email ?? '';
+  });
 </script>
 
 <svelte:head>
@@ -25,25 +28,15 @@
       <div class="nav__logo">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="36"
-          height="36"
+          width="24"
+          height="24"
           viewBox="0 0 128 128"
         >
-          <rect width="128" height="128" rx="28" fill="#0F172A" />
-          <circle
-            cx="64"
-            cy="64"
-            r="30"
-            fill="none"
-            stroke="#3B82F6"
-            stroke-width="1.5"
-            opacity="0.25"
-          />
           <polyline
             points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
             fill="none"
-            stroke="#22D3EE"
-            stroke-width="5"
+            stroke="var(--color-text-primary)"
+            stroke-width="8"
             stroke-linecap="round"
             stroke-linejoin="round"
           />
@@ -154,14 +147,14 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: calc(68px + var(--space-2xl)) var(--space-lg) var(--space-2xl);
+    padding: calc(68px + var(--spacing-40)) var(--spacing-24) var(--spacing-40);
   }
 
   .auth-card {
     max-width: 440px;
     width: 100%;
     margin: 0 auto;
-    padding: var(--space-2xl);
+    padding: var(--spacing-40);
   }
 
   .auth-card:hover {
@@ -171,13 +164,13 @@
 
   .auth-card__header {
     text-align: center;
-    margin-bottom: var(--space-xl);
+    margin-bottom: var(--spacing-32);
   }
 
   .auth-card__header h1 {
     font-size: 1.75rem;
-    font-weight: 700;
-    margin-bottom: var(--space-sm);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-8);
   }
 
   .auth-card__header p {
@@ -188,13 +181,13 @@
   .auth-form {
     display: flex;
     flex-direction: column;
-    gap: var(--space-lg);
+    gap: var(--spacing-24);
   }
 
   .form-group {
     display: flex;
     flex-direction: column;
-    gap: var(--space-xs);
+    gap: var(--spacing-4);
   }
 
   .form-label {
@@ -205,10 +198,10 @@
 
   .form-input {
     width: 100%;
-    padding: var(--space-md);
-    background: var(--color-surface-dark);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-lg);
+    padding: var(--spacing-16);
+    background: var(--color-surface-white);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-large);
     color: var(--color-text-primary);
     font-family: var(--font-sans);
     font-size: 0.9375rem;
@@ -221,25 +214,25 @@
 
   .form-input:focus {
     outline: none;
-    border-color: var(--color-accent-cyan);
-    box-shadow: 0 0 0 3px rgba(34, 211, 238, 0.15);
+    border-color: var(--color-blueprint-blue);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-blueprint-blue) 15%, transparent);
   }
 
   .form-error {
     display: flex;
     align-items: center;
-    gap: var(--space-sm);
-    padding: var(--space-md);
-    background: rgba(239, 68, 68, 0.1);
-    border: 1px solid rgba(239, 68, 68, 0.2);
+    gap: var(--spacing-8);
+    padding: var(--spacing-16);
+    background: color-mix(in srgb, var(--color-status-red) 10%, var(--color-surface-white));
+    border: 1px solid color-mix(in srgb, var(--color-status-red) 20%, var(--color-border-light));
     border-radius: var(--radius-md);
-    color: var(--color-accent-red);
+    color: var(--color-status-red);
     font-size: 0.875rem;
   }
 
   .auth-submit {
     width: 100%;
-    margin-top: var(--space-sm);
+    margin-top: var(--spacing-8);
   }
 
   .auth-submit:disabled {
@@ -249,9 +242,9 @@
 
   .auth-footer {
     text-align: center;
-    margin-top: var(--space-xl);
-    padding-top: var(--space-lg);
-    border-top: 1px solid var(--glass-border);
+    margin-top: var(--spacing-32);
+    padding-top: var(--spacing-24);
+    border-top: 1px solid var(--color-border-light);
   }
 
   .auth-footer p {
@@ -260,7 +253,7 @@
   }
 
   .auth-footer a {
-    color: var(--color-accent-cyan);
+    color: var(--color-blueprint-blue);
     font-weight: 500;
   }
 </style>

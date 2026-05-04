@@ -1,6 +1,6 @@
 {
   "name": "@pulse/extension",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "private": true,
   "type": "module",
   "scripts": {
@@ -24,6 +24,7 @@
     "health-check:json": "tsx tests/health/run-health-checks.ts --json"
   },
   "dependencies": {
+    "@pulse/ui": "workspace:*",
     "@supabase/supabase-js": "^2.103.0",
     "lucide-svelte": "^0.460.0",
     "svelte": "^5.0.0",

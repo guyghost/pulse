@@ -1,6 +1,6 @@
 <script lang="ts">
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
   import type { TJMAnalysis } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import { getTJMAnalysis } from '$lib/shell/facades/tjm.facade';
@@ -19,7 +19,6 @@
   async function loadAnalysis() {
     isLoading = true;
     error = null;
-
     try {
       analysis = await getTJMAnalysis(profileStacks.length > 0 ? profileStacks : undefined);
     } catch (err) {
@@ -46,27 +45,18 @@
 
   const isOffline = $derived(connection.status === 'offline');
 
-  // Initial load
-  $effect(() => {
-    loadProfileAndAnalysis();
-  });
+  $effect(() => { loadProfileAndAnalysis(); });
 
-  // Auto-refresh when a scan completes
   $effect(() => {
     try {
       const listener = (message: { type?: string }) => {
-        if (message?.type === 'SCAN_COMPLETE') {
-          loadAnalysis();
-        }
+        if (message?.type === 'SCAN_COMPLETE') loadAnalysis();
       };
       chrome.runtime.onMessage.addListener(listener);
       return () => chrome.runtime.onMessage.removeListener(listener);
-    } catch {
-      // Outside extension context
-    }
+    } catch {}
   });
 
-  // Refresh when profile is updated from Settings
   $effect(() => {
     const handler = () => loadProfileAndAnalysis();
     window.addEventListener('profile-updated', handler);
@@ -75,49 +65,44 @@
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
-  <!-- Compact hero -->
-  <section class="section-card-strong relative overflow-hidden rounded-[1.75rem] px-4 py-4">
-    <div
-      class="pointer-events-none absolute -right-8 top-0 h-28 w-28 rounded-full bg-accent-blue/14 blur-3xl"
-    ></div>
-    <div class="relative flex items-center justify-between gap-3">
+  <!-- Hero -->
+  <section class="section-card-strong rounded-2xl px-5 py-4">
+    <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3">
         <div
-          class="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl border border-accent-blue/20 bg-accent-blue/10"
+          class="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
         >
-          <Icon name="chart-column" size={18} class="text-accent-blue" />
+          <Icon name="chart-column" size={16} class="text-blueprint-blue" />
         </div>
         <div>
-          <h2 class="text-lg font-semibold text-white">Radar marché</h2>
-          <p class="text-[11px] text-text-muted">
-            {#if analysis && !isLoading}
-              Mis à jour le {analysis.lastUpdated ?? '—'}
-            {:else if isLoading}
-              Chargement…
-            {:else}
-              Aucune donnée
-            {/if}
-          </p>
+          <p class="eyebrow text-blueprint-blue">Marché</p>
+          <h2 class="mt-1 text-base font-semibold text-text-primary">Radar TJM</h2>
         </div>
       </div>
       <button
-        class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition-all duration-200 hover:bg-white/10 disabled:opacity-40"
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:opacity-40"
         onclick={() => loadAnalysis()}
         disabled={isLoading}
-        title="Rafraîchir l'analyse"
+        title="Rafraîchir"
       >
         <span class:animate-spin={isLoading}>
-          <Icon name="refresh-cw" size={14} />
+          <Icon name="refresh-cw" size={13} />
         </span>
       </button>
     </div>
 
+    {#if analysis && !isLoading}
+      <p class="mt-3 text-[11px] text-text-muted">
+        Mis à jour le {analysis.lastUpdated ?? '—'}
+      </p>
+    {:else if isLoading}
+      <p class="mt-3 text-[11px] text-text-muted">Chargement…</p>
+    {/if}
+
     {#if isOffline}
-      <div
-        class="mt-3 flex items-center gap-2 rounded-xl border border-accent-amber/20 bg-accent-amber/5 px-3 py-2 text-xs text-accent-amber"
-      >
+      <div class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-xs text-blueprint-blue">
         <Icon name="database" size={14} />
-        <span>Mode hors ligne — Données en cache</span>
+        <span>Mode hors ligne</span>
       </div>
     {/if}
   </section>

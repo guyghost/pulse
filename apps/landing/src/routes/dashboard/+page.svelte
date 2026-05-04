@@ -31,25 +31,15 @@
       <div class="nav__logo">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="36"
-          height="36"
+          width="24"
+          height="24"
           viewBox="0 0 128 128"
         >
-          <rect width="128" height="128" rx="28" fill="#0F172A" />
-          <circle
-            cx="64"
-            cy="64"
-            r="30"
-            fill="none"
-            stroke="#3B82F6"
-            stroke-width="1.5"
-            opacity="0.25"
-          />
           <polyline
             points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
             fill="none"
-            stroke="#22D3EE"
-            stroke-width="5"
+            stroke="var(--color-text-primary)"
+            stroke-width="8"
             stroke-linecap="round"
             stroke-linejoin="round"
           />
@@ -170,14 +160,14 @@
 <style>
   .dashboard-page {
     min-height: 100vh;
-    padding: calc(68px + var(--space-2xl)) var(--space-lg) var(--space-2xl);
+    padding: calc(68px + var(--spacing-40)) var(--spacing-24) var(--spacing-40);
   }
 
   .dashboard-card {
     max-width: 640px;
     width: 100%;
     margin: 0 auto;
-    padding: var(--space-2xl);
+    padding: var(--spacing-40);
   }
 
   .dashboard-card:hover {
@@ -186,7 +176,7 @@
   }
 
   .dashboard-section {
-    padding: var(--space-lg) 0;
+    padding: var(--spacing-24) 0;
   }
 
   .dashboard-section:first-child {
@@ -199,14 +189,14 @@
 
   .dashboard-section h1 {
     font-size: 1.75rem;
-    font-weight: 700;
-    margin-bottom: var(--space-xs);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-4);
   }
 
   .dashboard-section h2 {
     font-size: 1.25rem;
-    font-weight: 600;
-    margin-bottom: var(--space-md);
+    font-weight: var(--font-weight-medium);
+    margin-bottom: var(--spacing-16);
   }
 
   .dashboard-email {
@@ -218,44 +208,44 @@
     font-size: 0.9375rem;
     color: var(--color-text-secondary);
     line-height: 1.7;
-    margin-bottom: var(--space-lg);
+    margin-bottom: var(--spacing-24);
   }
 
   .dashboard-divider {
     height: 1px;
-    background: var(--glass-border);
+    background: var(--color-border-light);
   }
 
   .subscription-card {
-    padding: var(--space-lg);
-    background: var(--color-surface-dark);
-    border: 1px solid var(--glass-border);
-    border-radius: var(--radius-lg);
+    padding: var(--spacing-24);
+    background: var(--color-surface-white);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-large);
   }
 
   .subscription-info {
     display: flex;
     flex-direction: column;
-    gap: var(--space-md);
+    gap: var(--spacing-16);
   }
 
   .subscription-badge {
     display: inline-flex;
     align-items: center;
     width: fit-content;
-    padding: var(--space-xs) var(--space-md);
-    background: var(--glass-bg);
-    border: 1px solid var(--glass-border);
+    padding: var(--spacing-4) var(--spacing-16);
+    background: var(--color-subtle-gray);
+    border: 1px solid var(--color-border-light);
     border-radius: var(--radius-full);
     font-size: 0.875rem;
-    font-weight: 600;
+    font-weight: var(--font-weight-medium);
     color: var(--color-text-secondary);
   }
 
   .subscription-badge--premium {
-    background: rgba(16, 185, 129, 0.1);
-    border-color: rgba(16, 185, 129, 0.2);
-    color: var(--color-accent-emerald);
+    background: color-mix(in srgb, var(--color-blueprint-blue) 10%, var(--color-surface-white));
+    border-color: color-mix(in srgb, var(--color-blueprint-blue) 20%, var(--color-border-light));
+    color: var(--color-blueprint-blue);
   }
 
   .subscription-detail {

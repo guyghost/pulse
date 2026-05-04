@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
 
-  type GlowVariant = 'primary' | 'secondary' | 'glass';
+  type GlowVariant = 'primary' | 'secondary' | 'outline';
   type ButtonSize = 'sm' | 'md' | 'lg';
 
   const {
@@ -9,22 +9,22 @@
     size = 'md',
     disabled = false,
     loading = false,
+    class: className = '',
     onclick,
     children,
-    class: className = '',
   }: {
     variant?: GlowVariant;
     size?: ButtonSize;
     disabled?: boolean;
     loading?: boolean;
+    class?: string;
     onclick?: () => void;
     children: Snippet;
-    class?: string;
   } = $props();
 
   const sizeClasses = $derived(
     size === 'sm'
-      ? 'h-11 px-3 text-sm gap-1.5'
+      ? 'h-9 px-3 text-sm gap-1.5'
       : size === 'lg'
         ? 'h-12 px-6 text-base gap-2.5'
         : 'h-11 px-4 text-sm gap-2'
@@ -32,10 +32,10 @@
 
   const variantClasses = $derived(
     variant === 'primary'
-      ? 'glow-button font-semibold'
+      ? 'bg-blueprint-blue text-surface-white font-semibold hover:bg-blueprint-blue/90'
       : variant === 'secondary'
-        ? 'border border-primary/30 bg-primary/10 text-text-primary hover:bg-primary/20 hover:border-primary/50 transition-all duration-200'
-        : 'glass-button font-medium'
+        ? 'border border-blueprint-blue/30 bg-blueprint-blue/10 text-blueprint-blue hover:bg-blueprint-blue/20 hover:border-blueprint-blue/50'
+        : 'border border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'
   );
 
   const isDisabled = $derived(disabled || loading);
@@ -47,8 +47,6 @@
   disabled={isDisabled}
   {onclick}
   aria-busy={loading}
-  data-testid="glow-button"
-  data-variant={variant}
 >
   {#if loading}
     <svg

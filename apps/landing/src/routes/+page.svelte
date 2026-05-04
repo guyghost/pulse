@@ -1,10 +1,19 @@
 <script lang="ts">
   import { env } from '$env/dynamic/public';
 
+  type ShowcaseStep = 'scanner' | 'qualifier' | 'comparer' | 'postuler';
+
   let mobileMenuOpen = $state(false);
   let scrolled = $state(false);
+  let activeShowcaseStep = $state<ShowcaseStep>('scanner');
 
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
+  const showcaseSteps: { id: ShowcaseStep; label: string }[] = [
+    { id: 'scanner', label: 'Scanner' },
+    { id: 'qualifier', label: 'Qualifier' },
+    { id: 'comparer', label: 'Comparer' },
+    { id: 'postuler', label: 'Postuler' },
+  ];
 
   $effect(() => {
     function onScroll() {
@@ -88,31 +97,21 @@
       <div class="nav__logo">
         <svg
           xmlns="http://www.w3.org/2000/svg"
-          width="36"
-          height="36"
+          width="24"
+          height="24"
           viewBox="0 0 128 128"
         >
-          <rect width="128" height="128" rx="28" fill="#0F172A" />
-          <circle
-            cx="64"
-            cy="64"
-            r="30"
-            fill="none"
-            stroke="#3B82F6"
-            stroke-width="1.5"
-            opacity="0.25"
-          />
           <polyline
             points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
             fill="none"
-            stroke="#22D3EE"
-            stroke-width="5"
+            stroke="var(--color-text-primary)"
+            stroke-width="8"
             stroke-linecap="round"
             stroke-linejoin="round"
           />
         </svg>
       </div>
-      <span class="nav__title">Mission<span>Pulse</span></span>
+      <span class="nav__title">MissionPulse</span>
     </a>
 
     <ul class="nav__menu">
@@ -122,9 +121,7 @@
     </ul>
 
     <div class="nav__actions">
-      <a href="{chromeStoreUrl}" class="btn btn--primary btn--sm"
-        >Installer</a
-      >
+      <a href="{chromeStoreUrl}" class="btn btn--ghost btn--sm">Installer</a>
       <button
         class="nav__mobile-toggle"
         aria-label="Menu"
@@ -169,111 +166,317 @@
   <div class="container hero__container">
     <div class="hero__content fade-in">
       <div class="hero__badge">
-        <span class="hero__badge-dot"></span>
+        <svg
+          width="12"
+          height="12"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <polygon points="5 3 19 12 5 21 5 3"></polygon>
+        </svg>
         Extension Chrome · Gratuit · Open source
       </div>
 
       <h1 class="hero__title">
-        Votre <span class="gradient-text">radar</span><br />freelance
+        Missions.<br /><span class="light-text">Sur pilote auto.</span>
       </h1>
 
-      <p class="hero__subtitle">5 plateformes. Un seul panneau. Scoring IA.</p>
+      <div class="hero__bottom-bar">
+        <p class="hero__description">
+          Le #1 Mission Agent pour freelances tech : scannez vos plateformes,
+          priorisez par score et ne ratez plus les bonnes opportunités.
+        </p>
 
-      <p class="hero__description">
-        MissionPulse scanne Free-Work, LeHibou, Hiway, Collective et Cherry
-        Pick en arrière-plan et classe les missions par pertinence grâce au
-        scoring IA de Gemini Nano. Tout reste sur votre machine.
-      </p>
-
-      <div class="hero__actions">
-        <a href="{chromeStoreUrl}" class="btn btn--primary btn--lg">
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Installer l'extension
-        </a>
-        <a href="#features" class="btn btn--secondary btn--lg">Découvrir</a>
-      </div>
-
-      <div class="hero__meta">
-        <div class="hero__meta-item">
-          <svg
-            class="hero__meta-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-            <polyline points="22 4 12 14.01 9 11.01" />
-          </svg>
-          100% gratuit
-        </div>
-        <div class="hero__meta-item">
-          <svg
-            class="hero__meta-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-          </svg>
-          100% local
-        </div>
-        <div class="hero__meta-item">
-          <svg
-            class="hero__meta-icon"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-          >
-            <circle cx="12" cy="12" r="10" />
-            <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
-          </svg>
-          Zéro tracking
+        <div class="hero__actions">
+          <a href="{chromeStoreUrl}" class="btn btn--primary btn--lg">
+            Essayer gratuitement
+          </a>
         </div>
       </div>
     </div>
+  </div>
+</section>
 
-    <div class="hero__radar fade-in fade-in-delay-2">
-      <div class="radar">
-        <div class="radar__circle radar__circle--1"></div>
-        <div class="radar__circle radar__circle--2"></div>
-        <div class="radar__circle radar__circle--3"></div>
-        <div class="radar__circle radar__circle--4"></div>
-        <div class="radar__line"></div>
-        <div class="radar__line"></div>
-        <div class="radar__line"></div>
-        <div class="radar__line"></div>
-        <div class="radar__line"></div>
-        <div class="radar__line"></div>
-        <div class="radar__line"></div>
-        <div class="radar__line"></div>
-        <div class="radar__ring"></div>
-        <div class="radar__ring"></div>
-        <div class="radar__ring"></div>
-        <div class="radar__ring"></div>
-        <div class="radar__sweep"></div>
-        <div class="radar__center"></div>
-        <div class="radar__blip radar__blip--1"></div>
-        <div class="radar__blip radar__blip--2"></div>
-        <div class="radar__blip radar__blip--3"></div>
-        <div class="radar__blip radar__blip--4"></div>
-        <div class="radar__blip radar__blip--5"></div>
+<!-- Product showcase -->
+<section class="product-showcase" aria-label="Aperçu de MissionPulse">
+  <div class="container">
+    <div class="showcase-shell fade-in">
+      <div class="showcase-logos" aria-label="Plateformes scannées">
+        <img src="/logos/free-work.png" alt="Free-Work" width="112" height="40" />
+        <img src="/logos/lehibou.png" alt="LeHibou" width="112" height="40" />
+        <img src="/logos/hiway.png" alt="Hiway" width="112" height="40" />
+        <img src="/logos/collective.png" alt="Collective" width="112" height="40" />
+        <img src="/logos/cherry-pick.png" alt="Cherry Pick" width="112" height="40" />
+      </div>
+
+      <p class="showcase-caption">
+        Automatisez votre veille mission, du scan multi-plateformes à la shortlist actionnable.
+      </p>
+
+      <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
+        {#each showcaseSteps as step}
+          <button
+            id={`showcase-tab-${step.id}`}
+            class="showcase-tab"
+            class:showcase-tab--active={activeShowcaseStep === step.id}
+            type="button"
+            role="tab"
+            aria-selected={activeShowcaseStep === step.id}
+            aria-controls="showcase-panel"
+            onclick={() => (activeShowcaseStep = step.id)}
+          >
+            {step.label}
+          </button>
+        {/each}
+      </div>
+
+      <div
+        id="showcase-panel"
+        class="app-preview"
+        role="tabpanel"
+        aria-labelledby={`showcase-tab-${activeShowcaseStep}`}
+        aria-label="Aperçu du side panel MissionPulse"
+      >
+        <div class="app-preview__topbar">
+          <div>
+            <p class="app-preview__eyebrow">Side panel</p>
+            <h2 class="app-preview__title">
+              {#if activeShowcaseStep === 'scanner'}
+                MissionPulse Feed
+              {:else if activeShowcaseStep === 'qualifier'}
+                Pourquoi cette mission ?
+              {:else if activeShowcaseStep === 'comparer'}
+                Comparateur de missions
+              {:else}
+                Assistant candidature
+              {/if}
+            </h2>
+          </div>
+          <div class="app-preview__actions" aria-hidden="true">
+            <span></span>
+            <span></span>
+            <span></span>
+          </div>
+        </div>
+
+        <div class="app-preview__toolbar">
+          <span class="app-preview__tab app-preview__tab--active">
+            {#if activeShowcaseStep === 'scanner'}
+              Top missions
+            {:else if activeShowcaseStep === 'qualifier'}
+              Score détaillé
+            {:else if activeShowcaseStep === 'comparer'}
+              Shortlist
+            {:else}
+              Prêt à postuler
+            {/if}
+          </span>
+          <span class="app-preview__pill">
+            {#if activeShowcaseStep === 'scanner'}
+              Scan terminé
+            {:else if activeShowcaseStep === 'qualifier'}
+              96/100
+            {:else if activeShowcaseStep === 'comparer'}
+              3 finalistes
+            {:else}
+              Message prêt
+            {/if}
+          </span>
+          <span class="app-preview__toggle">Auto</span>
+        </div>
+
+        {#if activeShowcaseStep === 'scanner'}
+          <div class="app-preview__body">
+            <div class="score-flow" aria-label="Résumé du scan">
+              <article class="score-card">
+                <span class="score-card__label">Trouvées</span>
+                <strong>42</strong>
+                <span>missions consolidées</span>
+              </article>
+              <article class="score-card">
+                <span class="score-card__label">Dédupliquées</span>
+                <strong>31</strong>
+                <span>opportunités uniques</span>
+              </article>
+              <article class="score-card score-card--highlight">
+                <span class="score-card__label">À contacter</span>
+                <strong>8</strong>
+                <span>scores supérieurs à 85</span>
+              </article>
+            </div>
+
+            <div class="mission-list" aria-label="Missions recommandées">
+              <div class="mission-list__header">
+                <span>Mission</span>
+                <span>Score</span>
+                <span>TJM</span>
+              </div>
+              <article class="mission-row">
+                <div>
+                  <strong>Lead Svelte / TypeScript</strong>
+                  <span>Free-Work · Remote hybride</span>
+                </div>
+                <mark>96</mark>
+                <span>720€</span>
+              </article>
+              <article class="mission-row">
+                <div>
+                  <strong>Architecte Frontend</strong>
+                  <span>LeHibou · Paris</span>
+                </div>
+                <mark>91</mark>
+                <span>780€</span>
+              </article>
+              <article class="mission-row">
+                <div>
+                  <strong>Fullstack Platform</strong>
+                  <span>Hiway · Remote</span>
+                </div>
+                <mark>88</mark>
+                <span>690€</span>
+              </article>
+              <article class="mission-row">
+                <div>
+                  <strong>Consultant Design System</strong>
+                  <span>Collective · Lyon</span>
+                </div>
+                <mark>84</mark>
+                <span>650€</span>
+              </article>
+            </div>
+          </div>
+        {:else if activeShowcaseStep === 'qualifier'}
+          <div class="app-preview__body app-preview__body--detail">
+            <div class="score-flow" aria-label="Facteurs de qualification">
+              <article class="score-card score-card--highlight">
+                <span class="score-card__label">Stack</span>
+                <strong>98%</strong>
+                <span>Svelte, TypeScript, design system</span>
+              </article>
+              <article class="score-card">
+                <span class="score-card__label">TJM</span>
+                <strong>+120€</strong>
+                <span>au-dessus de votre minimum</span>
+              </article>
+              <article class="score-card">
+                <span class="score-card__label">Contrainte</span>
+                <strong>Remote</strong>
+                <span>compatible avec vos préférences</span>
+              </article>
+            </div>
+
+            <div class="insight-panel" aria-label="Explication du score">
+              <h3>Pourquoi elle matche</h3>
+              <p>
+                MissionPulse transforme le scoring en critères lisibles pour décider vite,
+                sans ouvrir chaque annonce une par une.
+              </p>
+              <div class="insight-meter">
+                <span>Compétences clés</span>
+                <strong>38/40</strong>
+                <div><i class="insight-meter__bar insight-meter__bar--95"></i></div>
+              </div>
+              <div class="insight-meter">
+                <span>TJM & durée</span>
+                <strong>27/30</strong>
+                <div><i class="insight-meter__bar insight-meter__bar--90"></i></div>
+              </div>
+              <div class="insight-meter">
+                <span>Localisation</span>
+                <strong>18/20</strong>
+                <div><i class="insight-meter__bar insight-meter__bar--90"></i></div>
+              </div>
+              <ul class="insight-list">
+                <li>Annonce senior sans signaux de régie bas niveau.</li>
+                <li>Stack alignée avec votre profil prioritaire.</li>
+                <li>Client final et durée longue détectés.</li>
+              </ul>
+            </div>
+          </div>
+        {:else if activeShowcaseStep === 'comparer'}
+          <div class="app-preview__body app-preview__body--wide">
+            <div class="compare-board" aria-label="Comparaison de missions">
+              <article class="compare-card compare-card--selected">
+                <span class="compare-card__rank">#1</span>
+                <h3>Lead Svelte</h3>
+                <p>Free-Work · Remote hybride</p>
+                <dl>
+                  <div><dt>Score</dt><dd>96</dd></div>
+                  <div><dt>TJM</dt><dd>720€</dd></div>
+                  <div><dt>Durée</dt><dd>12 mois</dd></div>
+                </dl>
+              </article>
+              <article class="compare-card">
+                <span class="compare-card__rank">#2</span>
+                <h3>Architecte Frontend</h3>
+                <p>LeHibou · Paris</p>
+                <dl>
+                  <div><dt>Score</dt><dd>91</dd></div>
+                  <div><dt>TJM</dt><dd>780€</dd></div>
+                  <div><dt>Durée</dt><dd>6 mois</dd></div>
+                </dl>
+              </article>
+              <article class="compare-card">
+                <span class="compare-card__rank">#3</span>
+                <h3>Fullstack Platform</h3>
+                <p>Hiway · Remote</p>
+                <dl>
+                  <div><dt>Score</dt><dd>88</dd></div>
+                  <div><dt>TJM</dt><dd>690€</dd></div>
+                  <div><dt>Durée</dt><dd>9 mois</dd></div>
+                </dl>
+              </article>
+            </div>
+
+            <div class="decision-panel" aria-label="Aide à la décision">
+              <h3>Décision assistée</h3>
+              <p>Comparez le potentiel réel, pas seulement le TJM.</p>
+              <div class="decision-row"><span>Meilleur fit profil</span><strong>Lead Svelte</strong></div>
+              <div class="decision-row"><span>Meilleur TJM</span><strong>Architecte Frontend</strong></div>
+              <div class="decision-row"><span>Moins de friction</span><strong>Full remote</strong></div>
+            </div>
+          </div>
+        {:else}
+          <div class="app-preview__body app-preview__body--detail">
+            <div class="score-flow" aria-label="Checklist candidature">
+              <article class="score-card score-card--highlight">
+                <span class="score-card__label">Contact</span>
+                <strong>Prêt</strong>
+                <span>lien source et contexte conservés</span>
+              </article>
+              <article class="score-card">
+                <span class="score-card__label">CV</span>
+                <strong>Aligné</strong>
+                <span>mots-clés recommandés extraits</span>
+              </article>
+              <article class="score-card">
+                <span class="score-card__label">Suivi</span>
+                <strong>J+2</strong>
+                <span>relance planifiée dans la shortlist</span>
+              </article>
+            </div>
+
+            <div class="message-panel" aria-label="Message de candidature">
+              <h3>Message de candidature</h3>
+              <p>
+                Bonjour, votre mission Lead Svelte / TypeScript correspond fortement à
+                mon expérience design system et plateformes front complexes.
+              </p>
+              <p>
+                Disponible sous 2 semaines, TJM cible 720€, remote hybride possible.
+                Je peux vous partager deux références proches.
+              </p>
+              <div class="message-actions">
+                <span>Copier le message</span>
+                <span>Ouvrir l’annonce</span>
+              </div>
+            </div>
+          </div>
+        {/if}
       </div>
     </div>
   </div>
@@ -776,21 +979,11 @@
             height="32"
             viewBox="0 0 128 128"
           >
-            <rect width="128" height="128" rx="28" fill="#0F172A" />
-            <circle
-              cx="64"
-              cy="64"
-              r="30"
-              fill="none"
-              stroke="#3B82F6"
-              stroke-width="1.5"
-              opacity="0.25"
-            />
             <polyline
               points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
               fill="none"
-              stroke="#22D3EE"
-              stroke-width="5"
+              stroke="var(--color-text-primary)"
+              stroke-width="8"
               stroke-linecap="round"
               stroke-linejoin="round"
             />

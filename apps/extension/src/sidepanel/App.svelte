@@ -3,7 +3,7 @@
   import TJMPage from '../ui/pages/TJMPage.svelte';
   import SettingsPage from '../ui/pages/SettingsPage.svelte';
   import OnboardingPage from '../ui/pages/OnboardingPage.svelte';
-  import Icon from '../ui/atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
   import ConnectionIndicator from '../ui/atoms/ConnectionIndicator.svelte';
   import ToastContainer from '../ui/organisms/ToastContainer.svelte';
   import { fly, fade } from 'svelte/transition';
@@ -89,23 +89,11 @@
   }
 </script>
 
-<div
-  class="panel-shell relative flex h-screen w-full flex-col overflow-hidden text-text-primary font-sans"
->
-  <div class="panel-grid pointer-events-none absolute inset-0 opacity-45"></div>
-  <div
-    class="pointer-events-none absolute -left-16 top-10 h-40 w-40 rounded-full bg-accent-blue/12 blur-3xl"
-  ></div>
-  <div
-    class="pointer-events-none absolute right-[-2.5rem] top-48 h-36 w-36 rounded-full bg-accent-emerald/10 blur-3xl"
-  ></div>
-  <div
-    class="pointer-events-none absolute bottom-0 left-14 h-32 w-32 rounded-full bg-accent-amber/10 blur-3xl"
-  ></div>
+<div class="panel-shell relative flex h-screen w-full flex-col overflow-hidden bg-page-canvas text-text-primary font-sans">
   <div class="relative z-10 flex h-full flex-col">
     {#if showOfflineBanner}
       <div
-        class="flex items-center justify-center gap-2 border-b border-white/10 bg-accent-red/10 px-4 py-2 text-xs text-accent-red"
+        class="flex items-center justify-center gap-2 border-b border-border-light bg-status-red/8 px-4 py-2 text-xs text-status-red"
         transition:fade={{ duration: 200 }}
       >
         <Icon name="wifi-off" size={12} />
@@ -113,18 +101,18 @@
       </div>
     {/if}
 
-    <div class="px-3 pt-3">
+    <div class="px-4 pt-4">
       <nav
         aria-label="Main navigation"
-        class="section-card flex items-center gap-1 rounded-[1.5rem] p-1.5"
+        class="flex items-center gap-1 rounded-full border border-border-light bg-subtle-gray p-1"
       >
         {#each NAV_ITEMS as item}
           <button
             use:ripple
-            class="flex flex-1 items-center justify-center gap-2 rounded-[1rem] px-3 py-2.5 text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-250 active:scale-[0.985]
+            class="flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-3 text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-200 active:scale-[0.985]
           {nav.currentPage === item.page
-              ? 'bg-white/10 text-white shadow-[inset_0_1px_0_rgba(255,255,255,0.06),0_10px_18px_rgba(1,7,12,0.22)]'
-              : 'text-text-secondary hover:bg-white/[0.04] hover:text-white'}"
+              ? 'bg-surface-white text-text-primary shadow-subtle-2'
+              : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
             aria-current={nav.currentPage === item.page ? 'page' : undefined}
             onclick={() => nav.navigate(item.page)}
           >
@@ -134,7 +122,7 @@
         {/each}
       </nav>
 
-      <div class="mt-2 flex justify-end">
+      <div class="mt-3 flex justify-end">
         <ConnectionIndicator />
       </div>
     </div>
@@ -152,7 +140,7 @@
               <p class="text-sm text-text-secondary">Le feed a rencontré une erreur.</p>
               <button
                 onclick={reset}
-                class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
               >
                 Réessayer
               </button>
@@ -179,7 +167,7 @@
                 <p class="text-sm text-text-secondary">L'onboarding a rencontré une erreur.</p>
                 <button
                   onclick={reset}
-                  class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
                 >
                   Réessayer
                 </button>
@@ -206,7 +194,7 @@
                 <p class="text-sm text-text-secondary">La vue TJM a rencontré une erreur.</p>
                 <button
                   onclick={reset}
-                  class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
                 >
                   Réessayer
                 </button>
@@ -236,7 +224,7 @@
                 <p class="text-sm text-text-secondary">Les paramètres ont rencontré une erreur.</p>
                 <button
                   onclick={reset}
-                  class="rounded-lg bg-accent-blue/20 px-4 py-2 text-xs text-accent-blue hover:bg-accent-blue/30 transition-colors"
+                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
                 >
                   Réessayer
                 </button>

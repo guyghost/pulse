@@ -16,15 +16,15 @@
     switch (state) {
       case 'closed':
         return {
-          dotClass: 'bg-accent-emerald shadow-[0_0_6px_theme(colors.accent-emerald/60%)]',
-          labelClass: 'text-accent-emerald',
+          dotClass: 'bg-blueprint-blue shadow-[0_0_6px_theme(colors.blueprint-blue/60%)]',
+          labelClass: 'text-blueprint-blue',
           label: 'Opérationnel',
           title: 'Connecteur opérationnel',
         };
       case 'half-open':
         return {
-          dotClass: 'bg-accent-amber shadow-[0_0_6px_theme(colors.accent-amber/60%)]',
-          labelClass: 'text-accent-amber',
+          dotClass: 'bg-blueprint-blue shadow-[0_0_6px_theme(colors.blueprint-blue/60%)]',
+          labelClass: 'text-blueprint-blue',
           label: 'Sonde...',
           title: 'Connecteur en cours de récupération',
         };

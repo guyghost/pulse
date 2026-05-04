@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
-  import Icon from '../atoms/Icon.svelte';
-  import Badge from '../atoms/Badge.svelte';
+  import { Icon } from '@pulse/ui';
+  import { Badge } from '@pulse/ui';
 
   const {
     missions,
@@ -48,17 +48,17 @@
     aria-modal="true"
   >
     <div
-      class="w-full max-w-lg animate-slide-up rounded-t-3xl bg-navy-800 border border-white/10 max-h-[85vh] overflow-y-auto"
+      class="w-full max-w-lg animate-slide-up rounded-t-3xl bg-surface-white border border-border-light max-h-[85vh] overflow-y-auto"
     >
       <!-- Header -->
       <div
-        class="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 bg-navy-800/95 backdrop-blur-sm px-4 py-3"
+        class="sticky top-0 z-10 flex items-center justify-between border-b border-border-light bg-surface-white/95 backdrop-blur-sm px-4 py-3"
       >
         <h2 class="text-sm font-semibold text-text-primary">
           Comparaison ({missions.length} missions)
         </h2>
         <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:bg-white/10 hover:text-text-primary transition-colors"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:bg-subtle-gray hover:text-text-primary transition-colors"
           onclick={onClose}
           aria-label="Fermer"
         >
@@ -68,7 +68,7 @@
 
       <!-- Titles row -->
       <div
-        class="grid border-b border-white/6 px-4 py-3"
+        class="grid border-b border-border-light px-4 py-3"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted self-end">Mission</div>
@@ -78,7 +78,7 @@
               href={mission.url}
               target="_blank"
               rel="noopener"
-              class="text-xs font-semibold text-accent-blue hover:underline line-clamp-2"
+              class="text-xs font-semibold text-blueprint-blue hover:underline line-clamp-2"
             >
               {mission.title}
             </a>
@@ -88,7 +88,7 @@
 
       <!-- Stack row -->
       <div
-        class="grid border-b border-white/6 px-4 py-3"
+        class="grid border-b border-border-light px-4 py-3"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">Stack</div>
@@ -96,7 +96,7 @@
           <div class="flex flex-wrap gap-1 px-2">
             {#each mission.stack.slice(0, 5) as tech}
               <span
-                class="inline-flex rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] text-accent-blue"
+                class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-[10px] text-blueprint-blue"
                 >{tech}</span
               >
             {/each}
@@ -110,7 +110,7 @@
       <!-- Data rows -->
       {#each fields as field, i}
         <div
-          class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-white/[0.02]' : ''}"
+          class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
           style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
         >
           <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">{field.label}</div>
@@ -122,7 +122,7 @@
 
       <!-- Actions -->
       <div
-        class="grid px-4 py-3 border-t border-white/6"
+        class="grid px-4 py-3 border-t border-border-light"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div></div>
@@ -132,7 +132,7 @@
               href={mission.url}
               target="_blank"
               rel="noopener"
-              class="inline-flex items-center gap-1 rounded-lg bg-accent-blue/10 px-3 py-1.5 text-xs text-accent-blue hover:bg-accent-blue/20 transition-colors"
+              class="inline-flex items-center gap-1 rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-xs text-blueprint-blue hover:bg-blueprint-blue/20 transition-colors"
             >
               <Icon name="external-link" size={12} />
               Voir

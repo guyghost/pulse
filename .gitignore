@@ -16,3 +16,6 @@ coverage/
 .conductor/
 .svelte-kit/
 .env
+
+# DAO governance state
+.dao/

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { BackupData, ValidationError } from '$lib/core/backup/backup';
-  import Button from '../atoms/Button.svelte';
-  import Icon from '../atoms/Icon.svelte';
+  import { Button } from '@pulse/ui';
+  import { Icon } from '@pulse/ui';
 
   interface Props {
     backup: BackupData | null;
@@ -44,7 +44,7 @@
 </script>
 
 <div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-sm p-4">
-  <div class="w-full max-w-md rounded-3xl border border-white/10 bg-navy-800 p-6 shadow-2xl">
+  <div class="w-full max-w-md rounded-3xl border border-border-light bg-surface-white p-6 shadow-2xl">
     <!-- Header -->
     <div class="mb-5 flex items-center gap-3">
       {#if error}
@@ -56,16 +56,16 @@
           <p class="text-sm text-text-secondary">Impossible de restaurer ce fichier</p>
         </div>
       {:else if backup}
-        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-accent-emerald/20">
-          <Icon name="database" size={20} class="text-accent-emerald" />
+        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blueprint-blue/20">
+          <Icon name="database" size={20} class="text-blueprint-blue" />
         </div>
         <div>
           <h3 class="text-lg font-semibold text-text-primary">Confirmer la restauration</h3>
           <p class="text-sm text-text-secondary">Cela écrasera vos données actuelles</p>
         </div>
       {:else}
-        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-accent-amber/20">
-          <Icon name="loader-2" size={20} class="animate-spin text-accent-amber" />
+        <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blueprint-blue/20">
+          <Icon name="loader-2" size={20} class="animate-spin text-blueprint-blue" />
         </div>
         <div>
           <h3 class="text-lg font-semibold text-text-primary">Analyse...</h3>
@@ -95,7 +95,7 @@
         version: backup.version,
       }}
 
-      <div class="mb-5 space-y-3 rounded-2xl border border-white/10 bg-navy-900/50 p-4">
+      <div class="mb-5 space-y-3 rounded-2xl border border-border-light bg-page-canvas/50 p-4">
         <div class="flex items-center justify-between">
           <span class="text-sm text-text-secondary">Profil</span>
           <span class="text-sm font-medium text-text-primary">
@@ -108,7 +108,7 @@
 
         <div class="flex items-center justify-between">
           <span class="text-sm text-text-secondary">Favoris</span>
-          <span class="text-sm font-medium text-accent-emerald"
+          <span class="text-sm font-medium text-blueprint-blue"
             >{stats.favoritesCount} mission(s)</span
           >
         </div>
@@ -155,7 +155,7 @@
     {:else}
       <div class="mb-5 flex items-center justify-center py-8">
         <div
-          class="h-8 w-8 animate-spin rounded-full border-2 border-accent-blue/30 border-t-accent-blue"
+          class="h-8 w-8 animate-spin rounded-full border-2 border-blueprint-blue/30 border-t-blueprint-blue"
         ></div>
       </div>
 

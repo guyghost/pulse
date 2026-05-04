@@ -2,6 +2,7 @@
   import type { Snippet } from 'svelte';
 
   type GlassVariant = 'default' | 'elevated' | 'glow';
+  type GlassPadding = 'none' | 'sm' | 'md' | 'lg';
 
   const {
     variant = 'default',
@@ -12,7 +13,7 @@
     children,
   }: {
     variant?: GlassVariant;
-    padding?: 'none' | 'sm' | 'md' | 'lg';
+    padding?: GlassPadding;
     class?: string;
     ariaLabel?: string;
     onclick?: (event: MouseEvent | KeyboardEvent) => void;
@@ -25,10 +26,10 @@
 
   const variantClasses = $derived(
     variant === 'elevated'
-      ? 'glass-card-elevated'
+      ? 'bg-surface-white border border-border-light shadow-sm'
       : variant === 'glow'
-        ? 'glass-card-glow'
-        : 'glass-card'
+        ? 'bg-surface-white border border-blueprint-blue/10 shadow-subtle-3'
+        : 'bg-surface-white border border-border-light shadow-subtle-2'
   );
 
   const interactiveClasses = $derived(
@@ -37,24 +38,22 @@
       : ''
   );
 
-  const handleKeydown = (event: KeyboardEvent) => {
+  function handleKeydown(event: KeyboardEvent) {
     if (!onclick || (event.key !== 'Enter' && event.key !== ' ')) {
       return;
     }
-
     event.preventDefault();
     onclick(event);
-  };
+  }
 </script>
 
 <div
-  class="{variantClasses} {paddingClasses} {interactiveClasses} {className}"
+  class="rounded-xl {variantClasses} {paddingClasses} {interactiveClasses} {className}"
   {onclick}
   role={onclick ? 'button' : undefined}
   tabindex={onclick ? 0 : undefined}
   aria-label={onclick ? ariaLabel : undefined}
   onkeydown={onclick ? handleKeydown : undefined}
-  data-testid="glass-card"
 >
   {@render children()}
 </div>

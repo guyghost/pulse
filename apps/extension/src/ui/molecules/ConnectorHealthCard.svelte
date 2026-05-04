@@ -58,8 +58,8 @@
     {isOpen
     ? 'border-red-400/20 bg-red-400/[0.06]'
     : isHealthy
-      ? 'border-white/6 bg-white/[0.03]'
-      : 'border-accent-amber/20 bg-accent-amber/[0.06]'}"
+      ? 'border-border-light bg-page-canvas'
+      : 'border-blueprint-blue/20 bg-blueprint-blue/[0.06]'}"
 >
   <!-- Left: circuit badge + name -->
   <div class="flex min-w-0 items-center gap-2">
@@ -84,7 +84,7 @@
     {#if isOpen}
       <span class="text-red-400/80 text-[10px]">suspendu</span>
     {:else if snapshot.circuitState === 'half-open'}
-      <span class="text-accent-amber/80 text-[10px] animate-pulse">sonde...</span>
+      <span class="text-blueprint-blue/80 text-[10px] animate-pulse">sonde...</span>
     {/if}
   </div>
 </div>
