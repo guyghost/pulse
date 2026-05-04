@@ -202,7 +202,7 @@
     {/if}
   </div>
 
-  {#if mission.description}
+  {#if mission.description && !expanded}
     <p class="mt-3 line-clamp-2 text-xs leading-relaxed text-text-subtle">
       {mission.description}
     </p>
