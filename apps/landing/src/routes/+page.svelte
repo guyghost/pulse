@@ -279,7 +279,7 @@
             {#if activeShowcaseStep === 'scanner'}
               Scan terminé
             {:else if activeShowcaseStep === 'qualifier'}
-              96/100
+              Grade A
             {:else if activeShowcaseStep === 'comparer'}
               3 finalistes
             {:else}
@@ -320,7 +320,7 @@
                   <strong>Lead Svelte / TypeScript</strong>
                   <span>Free-Work · Remote hybride</span>
                 </div>
-                <mark>96</mark>
+                <mark>A</mark>
                 <span>720€</span>
               </article>
               <article class="mission-row">
@@ -328,7 +328,7 @@
                   <strong>Architecte Frontend</strong>
                   <span>LeHibou · Paris</span>
                 </div>
-                <mark>91</mark>
+                <mark>A</mark>
                 <span>780€</span>
               </article>
               <article class="mission-row">
@@ -336,7 +336,7 @@
                   <strong>Fullstack Platform</strong>
                   <span>Hiway · Remote</span>
                 </div>
-                <mark>88</mark>
+                <mark>A</mark>
                 <span>690€</span>
               </article>
               <article class="mission-row">
@@ -344,7 +344,7 @@
                   <strong>Consultant Design System</strong>
                   <span>Collective · Lyon</span>
                 </div>
-                <mark>84</mark>
+                <mark>B</mark>
                 <span>650€</span>
               </article>
             </div>
@@ -354,7 +354,7 @@
             <div class="score-flow" aria-label="Facteurs de qualification">
               <article class="score-card score-card--highlight">
                 <span class="score-card__label">Stack</span>
-                <strong>98%</strong>
+                <strong>A</strong>
                 <span>Svelte, TypeScript, design system</span>
               </article>
               <article class="score-card">
@@ -377,17 +377,17 @@
               </p>
               <div class="insight-meter">
                 <span>Compétences clés</span>
-                <strong>38/40</strong>
+                <strong>A</strong>
                 <div><i class="insight-meter__bar insight-meter__bar--95"></i></div>
               </div>
               <div class="insight-meter">
                 <span>TJM & durée</span>
-                <strong>27/30</strong>
+                <strong>A</strong>
                 <div><i class="insight-meter__bar insight-meter__bar--90"></i></div>
               </div>
               <div class="insight-meter">
                 <span>Localisation</span>
-                <strong>18/20</strong>
+                <strong>A</strong>
                 <div><i class="insight-meter__bar insight-meter__bar--90"></i></div>
               </div>
               <ul class="insight-list">
@@ -405,7 +405,7 @@
                 <h3>Lead Svelte</h3>
                 <p>Free-Work · Remote hybride</p>
                 <dl>
-                  <div><dt>Score</dt><dd>96</dd></div>
+                  <div><dt>Score</dt><dd>A</dd></div>
                   <div><dt>TJM</dt><dd>720€</dd></div>
                   <div><dt>Durée</dt><dd>12 mois</dd></div>
                 </dl>
@@ -415,7 +415,7 @@
                 <h3>Architecte Frontend</h3>
                 <p>LeHibou · Paris</p>
                 <dl>
-                  <div><dt>Score</dt><dd>91</dd></div>
+                  <div><dt>Score</dt><dd>A</dd></div>
                   <div><dt>TJM</dt><dd>780€</dd></div>
                   <div><dt>Durée</dt><dd>6 mois</dd></div>
                 </dl>
@@ -425,7 +425,7 @@
                 <h3>Fullstack Platform</h3>
                 <p>Hiway · Remote</p>
                 <dl>
-                  <div><dt>Score</dt><dd>88</dd></div>
+                  <div><dt>Score</dt><dd>A</dd></div>
                   <div><dt>TJM</dt><dd>690€</dd></div>
                   <div><dt>Durée</dt><dd>9 mois</dd></div>
                 </dl>
