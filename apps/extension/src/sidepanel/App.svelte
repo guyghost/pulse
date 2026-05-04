@@ -120,41 +120,51 @@
       </div>
     {/if}
 
-    <div class="px-4 pt-4 transition-all duration-300 ease-out {feedNavCompact ? 'pb-0' : ''}">
+    <div class="px-4 pt-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
       <nav
         aria-label="Main navigation"
-        class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-all duration-300 ease-out {feedNavCompact
-          ? 'gap-0.5 p-0.5 scale-[0.94] origin-top'
-          : 'gap-1 p-1'}"
+        class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {feedNavCompact
+          ? 'min-h-9 gap-0.5 p-0.5'
+          : 'min-h-12 gap-1 p-1'}"
       >
         {#each NAV_ITEMS as item}
           <button
             use:ripple
-            class="flex items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-300 ease-out active:scale-[0.985]
+            class="flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.985]
           {feedNavCompact
               ? nav.currentPage === item.page
-                ? 'flex-[1.8] gap-1.5 px-3 py-1.5'
-                : 'flex-[0.45] gap-0 px-2 py-1.5'
-              : 'flex-1 gap-2 px-3 py-3'}
+                ? 'flex-1 gap-1.5 px-3 py-1.5'
+                : 'basis-9 flex-none gap-0 px-0 py-1.5'
+              : 'flex-1 basis-0 gap-2 px-3 py-3'}
           {nav.currentPage === item.page
               ? 'bg-surface-white text-text-primary shadow-subtle-2'
               : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
             aria-current={nav.currentPage === item.page ? 'page' : undefined}
             onclick={() => nav.navigate(item.page)}
           >
-            <Icon name={item.icon} size={feedNavCompact ? 13 : 16} />
             <span
-              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-out {feedNavCompact &&
+              class="shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
+            >
+              <Icon name={item.icon} size={feedNavCompact ? 13 : 16} />
+            </span>
+            <span
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {feedNavCompact &&
               nav.currentPage !== item.page
-                ? 'max-w-0 opacity-0'
-                : 'max-w-20 opacity-100'}">{item.label}</span
+                ? 'max-w-0 opacity-0 -translate-x-1'
+                : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
             >
           </button>
         {/each}
       </nav>
 
-      <div class="mt-3 flex justify-end">
-        <ConnectionIndicator />
+      <div
+        class="grid transition-[grid-template-rows,opacity,margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {feedNavCompact
+          ? 'mt-0 grid-rows-[0fr] opacity-0'
+          : 'mt-3 grid-rows-[1fr] opacity-100'}"
+      >
+        <div class="min-h-0 overflow-hidden flex justify-end">
+          <ConnectionIndicator />
+        </div>
       </div>
     </div>
     <main class="relative flex-1 overflow-hidden">
