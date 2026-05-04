@@ -44,6 +44,9 @@
   let shouldAutoOpenTour = $state(false);
   let showTour = $state(false);
   let tourStepIndex = $state(0);
+  let missionScrollTop = $state(0);
+  let hideMissionPulseCard = $state(false);
+  let scrollStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const tourSteps: FeedTourStep[] = [
     {
@@ -144,10 +147,44 @@
 
     tourStepIndex += 1;
   }
+
+  function emitFeedScrollState(isScrolling: boolean, scrollTop: number) {
+    window.dispatchEvent(
+      new CustomEvent('feed:scroll-state', {
+        detail: { isScrolling, scrollTop },
+      })
+    );
+  }
+
+  function handleMissionScroll(event: Event) {
+    const target = event.currentTarget as HTMLElement;
+    const nextScrollTop = target.scrollTop;
+    const scrollingDown = nextScrollTop > missionScrollTop;
+
+    missionScrollTop = nextScrollTop;
+
+    if (scrollingDown && nextScrollTop > 12) {
+      hideMissionPulseCard = true;
+      emitFeedScrollState(true, nextScrollTop);
+    }
+
+    if (scrollStopTimeout) {
+      clearTimeout(scrollStopTimeout);
+    }
+
+    scrollStopTimeout = setTimeout(() => {
+      hideMissionPulseCard = false;
+      emitFeedScrollState(false, missionScrollTop);
+    }, 180);
+  }
 </script>
 
 <div class="relative flex h-full flex-col">
-  <div class="shrink-0 px-4 pt-4">
+  <div
+    class="shrink-0 px-4 pt-4 transition-all duration-300 ease-out {hideMissionPulseCard
+      ? 'max-h-0 overflow-hidden opacity-0 -translate-y-3 pointer-events-none'
+      : 'max-h-[32rem] opacity-100 translate-y-0'}"
+  >
     <!-- ═══════════════════════════════════════════
          Hero card — greeting + filters unified
          ═══════════════════════════════════════════ -->
@@ -498,6 +535,7 @@
   <div
     class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
     use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
+    onscroll={handleMissionScroll}
   >
     <div
       class="rounded-xl transition-all duration-200 {activeTourStep?.id === 'expand' ||

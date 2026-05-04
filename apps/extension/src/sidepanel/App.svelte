@@ -19,6 +19,7 @@
   const nav = createAppNavigation();
   const connection = getConnectionStore();
   let showOfflineBanner = $state(false);
+  let feedNavCompact = $state(false);
 
   // Initialize toast service
   const toastActor = initToastService();
@@ -77,6 +78,22 @@
     }
   });
 
+  $effect(() => {
+    function handleFeedScrollState(event: Event) {
+      const detail = (event as CustomEvent<{ isScrolling: boolean; scrollTop: number }>).detail;
+      feedNavCompact = nav.currentPage === 'feed' && detail.isScrolling && detail.scrollTop > 12;
+    }
+
+    window.addEventListener('feed:scroll-state', handleFeedScrollState);
+    return () => window.removeEventListener('feed:scroll-state', handleFeedScrollState);
+  });
+
+  $effect(() => {
+    if (nav.currentPage !== 'feed') {
+      feedNavCompact = false;
+    }
+  });
+
   if (import.meta.env.DEV) {
     $effect(() => {
       function handleBridgeLog(e: Event) {
@@ -103,23 +120,35 @@
       </div>
     {/if}
 
-    <div class="px-4 pt-4">
+    <div class="px-4 pt-4 transition-all duration-300 ease-out {feedNavCompact ? 'pb-0' : ''}">
       <nav
         aria-label="Main navigation"
-        class="flex items-center gap-1 rounded-full border border-border-light bg-subtle-gray p-1"
+        class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-all duration-300 ease-out {feedNavCompact
+          ? 'gap-0.5 p-0.5 scale-[0.94] origin-top'
+          : 'gap-1 p-1'}"
       >
         {#each NAV_ITEMS as item}
           <button
             use:ripple
-            class="flex flex-1 items-center justify-center gap-2 rounded-full px-3 py-3 text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-200 active:scale-[0.985]
+            class="flex items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-all duration-300 ease-out active:scale-[0.985]
+          {feedNavCompact
+              ? nav.currentPage === item.page
+                ? 'flex-[1.8] gap-1.5 px-3 py-1.5'
+                : 'flex-[0.45] gap-0 px-2 py-1.5'
+              : 'flex-1 gap-2 px-3 py-3'}
           {nav.currentPage === item.page
               ? 'bg-surface-white text-text-primary shadow-subtle-2'
               : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
             aria-current={nav.currentPage === item.page ? 'page' : undefined}
             onclick={() => nav.navigate(item.page)}
           >
-            <Icon name={item.icon} size={16} />
-            <span>{item.label}</span>
+            <Icon name={item.icon} size={feedNavCompact ? 13 : 16} />
+            <span
+              class="overflow-hidden whitespace-nowrap transition-all duration-300 ease-out {feedNavCompact &&
+              nav.currentPage !== item.page
+                ? 'max-w-0 opacity-0'
+                : 'max-w-20 opacity-100'}">{item.label}</span
+            >
           </button>
         {/each}
       </nav>
