@@ -77,7 +77,7 @@ jobs:
           node --input-type=module <<'EOF'
           import { readFileSync, appendFileSync } from 'node:fs';
 
-          const report = JSON.parse(readFileSync('health-report.json', 'utf8'));
+          const report = JSON.parse(readFileSync('apps/extension/health-report.json', 'utf8'));
           const failedResults = report.results.filter((result) => result.status !== 'ok' && result.status !== 'skipped');
           const status = failedResults.length > 0 ? 'failed' : 'passed';
           const failedConnectors = failedResults.map((result) => result.connectorName).join(', ') || 'none';
@@ -110,7 +110,7 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: connector-health-report
-          path: health-report.json
+          path: apps/extension/health-report.json
           retention-days: 14
 
       - name: Get current date
