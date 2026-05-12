@@ -6,6 +6,7 @@ import {
   serializeBackup,
   validateBackup,
 } from '$lib/core/backup/backup';
+import type { AppSettings } from '$lib/core/types/app-settings';
 import {
   exportMissionsToCSV,
   exportMissionsToJSON,
@@ -35,6 +36,22 @@ import { rescoreStoredMissions } from '$lib/shell/scan/rescore';
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
 }
+
+/**
+ * Default settings used to fill missing fields when restoring old backups
+ * that predate the `theme` field addition.
+ */
+const DEFAULT_SETTINGS: AppSettings = {
+  scanIntervalMinutes: 30,
+  enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'],
+  notifications: true,
+  autoScan: true,
+  maxSemanticPerScan: 10,
+  notificationScoreThreshold: 70,
+  respectRateLimits: true,
+  customDelayMs: 0,
+  theme: 'system',
+};
 
 const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({
   firstName: profile.firstName ?? '',
@@ -67,6 +84,7 @@ export class SettingsPageController {
   scanInterval = $state(30);
   notifications = $state(true);
   autoScan = $state(true);
+  theme = $state<'light' | 'dark' | 'system'>('system');
 
   showResetConfirm = $state(false);
 
@@ -117,6 +135,7 @@ export class SettingsPageController {
       this.notifications = settings.notifications;
       this.autoScan = settings.autoScan;
       this.maxSemanticPerScan = settings.maxSemanticPerScan;
+      this.theme = settings.theme;
     } catch {
       // Hors contexte extension
     }
@@ -198,6 +217,17 @@ export class SettingsPageController {
     try {
       const settings = await getSettings();
       await setSettings({ ...settings, autoScan: this.autoScan });
+    } catch {
+      // Hors contexte extension
+    }
+  }
+
+  async updateTheme(value: 'light' | 'dark' | 'system'): Promise<void> {
+    this.theme = value;
+    window.dispatchEvent(new CustomEvent('mp:theme-changed', { detail: value }));
+    try {
+      const settings = await getSettings();
+      await setSettings({ ...settings, theme: value });
     } catch {
       // Hors contexte extension
     }
@@ -350,9 +380,12 @@ export class SettingsPageController {
     try {
       const { profile, settings, favorites, hidden } = this.pendingBackup;
 
+      // Merge with defaults to fill fields missing from old backups (e.g. theme)
+      const restoredSettings: AppSettings = { ...DEFAULT_SETTINGS, ...settings };
+
       await Promise.all([
         saveProfile(withProfileDefaults(profile)),
-        setSettings(settings),
+        setSettings(restoredSettings),
         saveFavorites(favorites),
         saveHidden(hidden),
       ]);

@@ -41,6 +41,7 @@ export const BackupDataSchema = z.object({
     notificationScoreThreshold: z.number(),
     respectRateLimits: z.boolean(),
     customDelayMs: z.number(),
+    theme: z.enum(['light', 'dark', 'system']).default('system'),
   }),
   favorites: z.record(z.number()),
   hidden: z.record(z.number()),

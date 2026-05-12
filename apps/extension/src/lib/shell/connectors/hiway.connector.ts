@@ -108,9 +108,10 @@ export class HiwayConnector extends BaseConnector {
 
       // Client-side TJM filter: Supabase budget column is text (e.g. "TJM 550€", "Selon profil"),
       // so server-side filtering is unreliable. Filter here after numeric parsing.
+      const tjmMin = context?.tjmMin;
       const filtered =
-        context?.tjmMin && context.tjmMin > 0
-          ? missions.filter((m) => m.tjm === null || m.tjm >= context.tjmMin!)
+        tjmMin != null && tjmMin > 0
+          ? missions.filter((m) => m.tjm === null || m.tjm >= tjmMin)
           : missions;
 
       return ok(filtered);

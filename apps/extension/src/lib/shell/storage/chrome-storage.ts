@@ -20,6 +20,7 @@ const SettingsSchema = z.object({
   notificationScoreThreshold: z.number().int().min(0).max(100),
   respectRateLimits: z.boolean(),
   customDelayMs: z.number().int().min(0).max(60000),
+  theme: z.enum(['light', 'dark', 'system']).default('system'),
 });
 
 export type { AppSettings } from '../../core/types/app-settings';
@@ -33,6 +34,7 @@ const DEFAULT_SETTINGS: AppSettings = {
   notificationScoreThreshold: 70,
   respectRateLimits: true,
   customDelayMs: 0,
+  theme: 'system',
 };
 
 export const getSettings = async (): Promise<AppSettings> => {
