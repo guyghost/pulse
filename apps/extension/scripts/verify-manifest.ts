@@ -2,14 +2,17 @@
 /**
  * verify-manifest.ts - Validate Chrome extension manifest.json
  *
- * Usage: tsx scripts/verify-manifest.ts [manifest-path]
+ * Usage: tsx scripts/verify-manifest.ts [manifest-path] [--expected-version <semver>]
  *
  * Validates that manifest.json conforms to Chrome Extension Manifest V3
  * requirements and contains all required fields.
  *
+ * Options:
+ *   --expected-version <semver>  Fail if manifest version doesn't match (used in CI release)
+ *
  * Exit codes:
  *   0 - Valid manifest
- *   1 - Invalid manifest or file not found
+ *   1 - Invalid manifest, file not found, or version mismatch
  */
 
 import { readFileSync, existsSync } from 'fs';
@@ -78,7 +81,7 @@ type ManifestV3 = z.infer<typeof ManifestV3Schema>;
 /**
  * Validates manifest structure using Zod schema.
  */
-const validateSchema = (
+export const validateSchema = (
   manifest: unknown
 ): { success: true; data: ManifestV3 } | { success: false; errors: string[] } => {
   const result = ManifestV3Schema.safeParse(manifest);
@@ -96,7 +99,7 @@ const validateSchema = (
 /**
  * Validates version consistency between package.json and manifest.json.
  */
-const validateVersionConsistency = (
+export const validateVersionConsistency = (
   packageVersion: string,
   manifestVersion: string
 ): { valid: true } | { valid: false; error: string } => {
@@ -109,13 +112,36 @@ const validateVersionConsistency = (
   };
 };
 
+// Pure argument parsing — no side effects
+
+export const parseArgs = (
+  rawArgs: string[]
+): { manifestPath: string | null; expectedVersion: string | null } => {
+  let manifestPath: string | null = null;
+  let expectedVersion: string | null = null;
+
+  const args = [...rawArgs];
+  while (args.length > 0) {
+    const arg = args.shift()!;
+    if (arg === '--expected-version' && args.length > 0) {
+      expectedVersion = args.shift()!;
+    } else if (!arg.startsWith('--')) {
+      manifestPath = arg;
+    }
+  }
+
+  return { manifestPath, expectedVersion };
+};
+
 // Main function
 
-const main = (): void => {
-  const args = process.argv.slice(2);
+export const main = (): void => {
+  const { manifestPath: manifestPathArg, expectedVersion } = parseArgs(process.argv.slice(2));
   const projectRoot = resolve(__dirname, '..');
 
-  const manifestPath = args[0] ? resolve(args[0]) : resolve(projectRoot, 'src/manifest.json');
+  const manifestPath = manifestPathArg
+    ? resolve(manifestPathArg)
+    : resolve(projectRoot, 'src/manifest.json');
   const packageJsonPath = resolve(projectRoot, 'package.json');
 
   console.log(`Verifying manifest: ${manifestPath}\n`);
@@ -152,7 +178,18 @@ const main = (): void => {
 
   console.log('✅ Schema validation passed');
 
-  // Validate version consistency
+  // Validate version against expected version (CI release gate)
+  if (expectedVersion !== null) {
+    if (schemaResult.data.version !== expectedVersion) {
+      console.error(
+        `❌ Version mismatch: manifest has ${schemaResult.data.version}, expected ${expectedVersion}`
+      );
+      process.exit(1);
+    }
+    console.log(`✅ Version matches expected: ${expectedVersion}`);
+  }
+
+  // Validate version consistency with package.json
   if (existsSync(packageJsonPath)) {
     const packageJson = JSON.parse(readFileSync(packageJsonPath, 'utf-8'));
     const versionResult = validateVersionConsistency(
@@ -161,7 +198,8 @@ const main = (): void => {
     );
 
     if (!versionResult.valid) {
-      console.warn(`⚠️  Warning: ${versionResult.error}`);
+      console.error(`❌ Error: ${versionResult.error}`);
+      process.exit(1);
     } else {
       console.log('✅ Version consistency check passed');
     }
@@ -181,4 +219,11 @@ const main = (): void => {
   console.log('\n✅ Manifest is valid for Chrome Extension MV3\n');
 };
 
-main();
+const isExecutedDirectly = (): boolean => {
+  const entryPoint = process.argv[1];
+  return entryPoint ? resolve(entryPoint) === __filename : false;
+};
+
+if (isExecutedDirectly()) {
+  main();
+}

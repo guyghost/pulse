@@ -1,7 +1,7 @@
 {
   "manifest_version": 3,
   "name": "MissionPulse",
-  "version": "0.1.0",
+  "version": "0.2.1",
   "description": "Agent freelance : feed de missions centralisé avec scoring et analyse TJM",
   "minimum_chrome_version": "114",
   "permissions": [
