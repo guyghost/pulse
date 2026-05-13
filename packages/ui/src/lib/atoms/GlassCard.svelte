@@ -16,7 +16,7 @@
     padding?: GlassPadding;
     class?: string;
     ariaLabel?: string;
-    onclick?: (event: MouseEvent | KeyboardEvent) => void;
+    onclick?: (event: MouseEvent) => void;
     children: Snippet;
   } = $props();
 
@@ -37,23 +37,19 @@
       ? 'cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]'
       : ''
   );
-
-  function handleKeydown(event: KeyboardEvent) {
-    if (!onclick || (event.key !== 'Enter' && event.key !== ' ')) {
-      return;
-    }
-    event.preventDefault();
-    onclick(event);
-  }
 </script>
 
-<div
-  class="rounded-xl {variantClasses} {paddingClasses} {interactiveClasses} {className}"
-  {onclick}
-  role={onclick ? 'button' : undefined}
-  tabindex={onclick ? 0 : undefined}
-  aria-label={onclick ? ariaLabel : undefined}
-  onkeydown={onclick ? handleKeydown : undefined}
->
-  {@render children()}
-</div>
+{#if onclick}
+  <button
+    type="button"
+    class="block w-full rounded-xl text-left {variantClasses} {paddingClasses} {interactiveClasses} {className}"
+    {onclick}
+    aria-label={ariaLabel}
+  >
+    {@render children()}
+  </button>
+{:else}
+  <div class="rounded-xl {variantClasses} {paddingClasses} {className}">
+    {@render children()}
+  </div>
+{/if}
