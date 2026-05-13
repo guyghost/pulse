@@ -23,6 +23,46 @@ importers:
         specifier: ^2.0.0
         version: 2.9.3
 
+  apps/dashboard:
+    dependencies:
+      '@pulse/ui':
+        specifier: workspace:*
+        version: link:../../packages/ui
+      '@supabase/ssr':
+        specifier: ^0.6.0
+        version: 0.6.1(@supabase/supabase-js@2.103.0)
+      '@supabase/supabase-js':
+        specifier: ^2.49.0
+        version: 2.103.0
+      svelte:
+        specifier: ^5.0.0
+        version: 5.55.1
+    devDependencies:
+      '@pulse/tsconfig':
+        specifier: workspace:*
+        version: link:../../packages/tsconfig
+      '@sveltejs/adapter-vercel':
+        specifier: ^5.0.0
+        version: 5.10.3(@sveltejs/kit@2.57.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.1)(vite@6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.1)(typescript@5.9.3)(vite@6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)))(rollup@4.60.1)
+      '@sveltejs/kit':
+        specifier: ^2.0.0
+        version: 2.57.0(@sveltejs/vite-plugin-svelte@4.0.4(svelte@5.55.1)(vite@6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)))(svelte@5.55.1)(typescript@5.9.3)(vite@6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@sveltejs/vite-plugin-svelte':
+        specifier: ^4.0.0
+        version: 4.0.4(svelte@5.55.1)(vite@6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
+      '@tailwindcss/vite':
+        specifier: ^4.0.0
+        version: 4.2.2(vite@6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4))
+      svelte-check:
+        specifier: ^4.0.0
+        version: 4.4.6(picomatch@4.0.4)(svelte@5.55.1)(typescript@5.9.3)
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vite:
+        specifier: ^6.0.0
+        version: 6.4.1(@types/node@22.19.17)(jiti@2.6.1)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+
   apps/extension:
     dependencies:
       '@pulse/ui':
