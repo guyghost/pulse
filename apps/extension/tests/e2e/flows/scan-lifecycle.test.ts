@@ -1,11 +1,5 @@
 import { test, expect } from '@playwright/test';
-import {
-  ensureFeedVisible,
-  expectMissionCount,
-  injectMissions,
-  waitForMissions,
-  triggerScan,
-} from '../helpers';
+import { ensureFeedVisible, expectMissionCount, injectMissions, waitForMissions } from '../helpers';
 
 test.describe('Scan Lifecycle', () => {
   test('feed loads with missions on mount', async ({ page }) => {

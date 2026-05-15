@@ -15,8 +15,13 @@
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { createAppNavigation, NAV_ITEMS } from '$lib/state/app-navigation.svelte';
+  import { createThemeStore } from '$lib/state/theme.svelte';
 
   const nav = createAppNavigation();
+  const theme = createThemeStore();
+
+  // Initialize theme on mount
+  theme.init();
   const connection = getConnectionStore();
   let showOfflineBanner = $state(false);
   let feedNavCompact = $state(false);

@@ -4,11 +4,7 @@
  * États: unknown, online, offline, reconnecting, slow
  */
 
-import {
-  subscribeToConnection,
-  type ConnectionInfo,
-  type ConnectionStatus,
-} from '$lib/shell/utils/connection-monitor';
+import { subscribeToConnection, type ConnectionInfo } from '$lib/shell/utils/connection-monitor';
 
 export type ConnectionState = 'unknown' | 'online' | 'offline' | 'reconnecting' | 'slow';
 

@@ -2,6 +2,7 @@
   import { Icon } from '@pulse/ui';
   import { useDebouncedSearch } from '$lib/shell/utils/debounce-svelte.svelte';
 
+  /* eslint-disable prefer-const */
   let {
     value = '',
     onSearch,
@@ -11,6 +12,7 @@
     onSearch?: (query: string) => void;
     inputRef?: HTMLInputElement | null;
   } = $props();
+  /* eslint-enable prefer-const */
 
   const search = useDebouncedSearch((q) => onSearch?.(q), 300);
 

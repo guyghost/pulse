@@ -57,7 +57,6 @@ export async function runCollectiveHealthCheck(screenshotDir: string): Promise<H
     });
 
     const responseTime = Date.now() - startTime;
-    let data: Record<string, unknown>;
 
     const contentType = response.headers.get('content-type') ?? '';
 
@@ -95,7 +94,7 @@ export async function runCollectiveHealthCheck(screenshotDir: string): Promise<H
       };
     }
 
-    data = await response.json();
+    const data: Record<string, unknown> = await response.json();
 
     if (data.errors) {
       const hasAuthError = data.errors.some(

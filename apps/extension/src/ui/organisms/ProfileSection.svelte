@@ -3,6 +3,7 @@
   import { Chip } from '@pulse/ui';
   import { Button } from '@pulse/ui';
 
+  /* eslint-disable prefer-const */
   let {
     firstName = $bindable(''),
     jobTitle = $bindable(''),
@@ -34,6 +35,7 @@
     onAddStack: () => void;
     onRemoveStack: (tech: string) => void;
   } = $props();
+  /* eslint-enable prefer-const */
 </script>
 
 <div class="section-card rounded-xl p-5">

@@ -97,7 +97,7 @@
 
   if (import.meta.env.DEV) {
     $effect(() => {
-      console.log(
+      console.debug(
         '[VirtualMissionFeed] missions:',
         missions?.length ?? 0,
         'visible:',

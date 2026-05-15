@@ -137,6 +137,28 @@
       onScanIntervalChange={handleScanIntervalChange}
     />
 
+    <!-- Apparence -->
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div>
+        <h3 class="text-sm font-medium text-text-primary">Apparence</h3>
+        <p class="mt-1 text-xs text-text-subtle">Choisir le thème de l'interface.</p>
+      </div>
+      <div class="flex gap-2">
+        {#each [{ id: 'light', label: 'Clair', icon: 'sun' }, { id: 'dark', label: 'Sombre', icon: 'moon' }, { id: 'system', label: 'Système', icon: 'monitor' }] as option}
+          <button
+            class="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors
+              {settings.theme === option.id
+              ? 'border-blueprint-blue bg-blueprint-blue/10 text-blueprint-blue'
+              : 'border-border-light bg-page-canvas text-text-primary hover:bg-subtle-gray'}"
+            onclick={() => settings.updateTheme(option.id as 'light' | 'dark' | 'system')}
+          >
+            <Icon name={option.icon} size={14} />
+            {option.label}
+          </button>
+        {/each}
+      </div>
+    </div>
+
     <!-- Export -->
     <div class="section-card rounded-xl p-5 space-y-4">
       <div>

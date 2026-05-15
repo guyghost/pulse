@@ -8,8 +8,13 @@ async function init() {
     await bootstrapDevMode();
   }
 
+  const target = document.getElementById('app');
+  if (!target) {
+    throw new Error('[MissionPulse] Root element #app not found');
+  }
+
   mount(App, {
-    target: document.getElementById('app')!,
+    target,
   });
 }
 

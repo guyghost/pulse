@@ -15,7 +15,7 @@ import {
   parseHiwayJSON,
   type HiwayMissionRow,
 } from '../../../src/lib/core/connectors/hiway-json-parser';
-import { runHiwayHealthCheck } from './hiway.health';
+import { runHiwayHealthCheck as _runHiwayHealthCheck } from './hiway.health';
 
 const BASE_URL = 'https://hiway-missions.fr';
 const SUPABASE_URL = 'https://jhgjtlkfewuiiofxfrvh.supabase.co';

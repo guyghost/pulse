@@ -1,10 +1,20 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { HTMLButtonAttributes } from 'svelte/elements';
 
   type ButtonVariant = 'primary' | 'secondary' | 'ghost';
   type ButtonSize = 'sm' | 'md' | 'lg';
+  type ButtonProps = Omit<HTMLButtonAttributes, 'class' | 'disabled' | 'onclick'> & {
+    variant?: ButtonVariant;
+    size?: ButtonSize;
+    disabled?: boolean;
+    loading?: boolean;
+    class?: string;
+    onclick?: HTMLButtonAttributes['onclick'];
+    children: Snippet;
+  };
 
-  const {
+  let {
     variant = 'primary',
     size = 'md',
     disabled = false,
@@ -12,15 +22,9 @@
     class: className = '',
     onclick,
     children,
-  }: {
-    variant?: ButtonVariant;
-    size?: ButtonSize;
-    disabled?: boolean;
-    loading?: boolean;
-    class?: string;
-    onclick?: () => void;
-    children: Snippet;
-  } = $props();
+    type = 'button',
+    ...rest
+  }: ButtonProps = $props();
 
   const isDisabled = $derived(disabled || loading);
 
@@ -28,21 +32,23 @@
     size === 'sm'
       ? 'h-8 px-3 text-xs gap-1'
       : size === 'lg'
-        ? 'h-12 px-6 text-base gap-2.5'
+        ? 'h-12 px-4 text-base gap-2'
         : 'h-10 px-4 text-sm gap-1.5'
   );
 
   const variantClasses = $derived(
     variant === 'primary'
-      ? 'border border-blueprint-blue/30 bg-blueprint-blue text-surface-white hover:bg-blueprint-blue/90'
+      ? 'border border-blueprint-blue bg-blueprint-blue text-surface-white shadow-subtle-2 hover:bg-blueprint-blue/90'
       : variant === 'secondary'
-        ? 'border border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'
-        : 'text-text-subtle hover:bg-page-canvas hover:text-text-primary'
+        ? 'border border-blueprint-blue/30 bg-subtle-gray text-blueprint-blue shadow-subtle-2 hover:border-blueprint-blue/50 hover:bg-blueprint-blue/8'
+        : 'border border-transparent text-text-subtle hover:bg-page-canvas hover:text-text-primary'
   );
 </script>
 
 <button
-  class="inline-flex items-center justify-center rounded-lg font-medium transition-all duration-150 ease-out disabled:opacity-40 disabled:cursor-not-allowed active:scale-[0.98] {sizeClasses} {variantClasses} {className}"
+  {...rest}
+  {type}
+  class="inline-flex items-center justify-center rounded-lg font-geist font-medium transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 active:translate-y-px {sizeClasses} {variantClasses} {className}"
   disabled={isDisabled}
   {onclick}
   aria-busy={loading}

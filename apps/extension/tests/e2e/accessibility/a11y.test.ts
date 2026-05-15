@@ -2,7 +2,7 @@ import { test, expect } from '@playwright/test';
 import {
   SIDE_PANEL,
   mockNoProfile,
-  completeOnboarding,
+  completeOnboarding as _completeOnboarding,
   ensureFeedVisible,
   injectMissions,
   waitForMissions,

@@ -124,7 +124,7 @@ function logToConsole(error: AppError): void {
       break;
     case 'info':
       if (['debug', 'info'].includes(config.consoleLogLevel)) {
-        console.info(prefix, error.message, logData);
+        console.debug(prefix, error.message, logData);
       }
       break;
     case 'warn':

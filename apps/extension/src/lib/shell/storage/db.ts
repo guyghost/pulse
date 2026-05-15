@@ -106,7 +106,7 @@ export async function saveMissions(missions: Mission[]): Promise<void> {
       if (import.meta.env.DEV && uniqueMissions.length > 0) {
         const dedupedCount = missions.length - uniqueMissions.length;
         if (dedupedCount > 0) {
-          console.log(
+          console.debug(
             `[DB] Saved ${uniqueMissions.length} missions (${dedupedCount} duplicates deduped)`
           );
         }
@@ -310,7 +310,7 @@ export async function upsertMissions(newMissions: Mission[]): Promise<number> {
 
     tx.oncomplete = () => {
       if (import.meta.env.DEV && writtenCount > 0) {
-        console.log(
+        console.debug(
           `[DB] Upserted ${writtenCount} missions (${newMissions.length - uniqueMissions.length} duplicates deduped)`
         );
       }
@@ -447,7 +447,7 @@ export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
 
     tx.oncomplete = () => {
       if (purged > 0 && import.meta.env.DEV) {
-        console.log(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
+        console.debug(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
       }
     };
 

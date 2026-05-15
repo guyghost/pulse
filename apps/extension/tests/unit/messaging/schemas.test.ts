@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import { validateMessage, MessageSchemas } from '../../../src/lib/shell/messaging/schemas';
+import { validateMessage } from '../../../src/lib/shell/messaging/schemas';
 
 // ============================================================================
 // validateMessage — structure de base

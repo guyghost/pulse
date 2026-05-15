@@ -1,5 +1,6 @@
 <script lang="ts">
   import { env } from '$env/dynamic/public';
+  import { theme } from '$lib/theme.svelte';
 
   type ShowcaseStep = 'scanner' | 'qualifier' | 'comparer' | 'postuler';
 
@@ -87,20 +88,11 @@
 </svelte:head>
 
 <!-- Navigation -->
-<nav
-  class="nav"
-  class:nav--scrolled={scrolled}
-  aria-label="Navigation principale"
->
+<nav class="nav" class:nav--scrolled={scrolled} aria-label="Navigation principale">
   <div class="container nav__container">
     <a href="/" class="nav__brand" aria-label="MissionPulse - Accueil">
       <div class="nav__logo">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 128 128"
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 128 128">
           <polyline
             points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
             fill="none"
@@ -121,7 +113,49 @@
     </ul>
 
     <div class="nav__actions">
-      <a href="{chromeStoreUrl}" class="btn btn--ghost btn--sm">Installer</a>
+      <button
+        class="theme-toggle"
+        aria-label="Basculer le thème"
+        title={theme.preference === 'light'
+          ? 'Clair'
+          : theme.preference === 'dark'
+            ? 'Sombre'
+            : 'Système'}
+        onclick={() => theme.cycle()}
+      >
+        {#if theme.resolved === 'dark'}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <path d="M12 3a6 6 0 0 0 9 9 9 9 0 1 1-9-9Z" />
+          </svg>
+        {:else}
+          <svg
+            width="16"
+            height="16"
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            stroke-width="2"
+            stroke-linecap="round"
+            stroke-linejoin="round"
+          >
+            <circle cx="12" cy="12" r="4" />
+            <path d="M12 2v2" /><path d="M12 20v2" />
+            <path d="m4.93 4.93 1.41 1.41" /><path d="m17.66 17.66 1.41 1.41" />
+            <path d="M2 12h2" /><path d="M20 12h2" />
+            <path d="m6.34 17.66-1.41 1.41" /><path d="m19.07 4.93-1.41 1.41" />
+          </svg>
+        {/if}
+      </button>
+      <a href={chromeStoreUrl} class="btn btn--ghost btn--sm">Installer</a>
       <button
         class="nav__mobile-toggle"
         aria-label="Menu"
@@ -151,11 +185,7 @@
         <a href="#platforms" onclick={closeMobileMenu}>Plateformes</a>
       </li>
       <li>
-        <a
-          href="{chromeStoreUrl}"
-          class="btn btn--primary"
-          onclick={closeMobileMenu}>Installer</a
-        >
+        <a href={chromeStoreUrl} class="btn btn--primary" onclick={closeMobileMenu}>Installer</a>
       </li>
     </ul>
   </div>
@@ -187,14 +217,12 @@
 
       <div class="hero__bottom-bar">
         <p class="hero__description">
-          Le #1 Mission Agent pour freelances tech : scannez vos plateformes,
-          priorisez par score et ne ratez plus les bonnes opportunités.
+          Le #1 Mission Agent pour freelances tech : scannez vos plateformes, priorisez par score et
+          ne ratez plus les bonnes opportunités.
         </p>
 
         <div class="hero__actions">
-          <a href="{chromeStoreUrl}" class="btn btn--primary btn--lg">
-            Essayer gratuitement
-          </a>
+          <a href={chromeStoreUrl} class="btn btn--primary btn--lg"> Essayer gratuitement </a>
         </div>
       </div>
     </div>
@@ -372,8 +400,8 @@
             <div class="insight-panel" aria-label="Explication du score">
               <h3>Pourquoi elle matche</h3>
               <p>
-                MissionPulse transforme le scoring en critères lisibles pour décider vite,
-                sans ouvrir chaque annonce une par une.
+                MissionPulse transforme le scoring en critères lisibles pour décider vite, sans
+                ouvrir chaque annonce une par une.
               </p>
               <div class="insight-meter">
                 <span>Compétences clés</span>
@@ -405,9 +433,18 @@
                 <h3>Lead Svelte</h3>
                 <p>Free-Work · Remote hybride</p>
                 <dl>
-                  <div><dt>Score</dt><dd>A</dd></div>
-                  <div><dt>TJM</dt><dd>720€</dd></div>
-                  <div><dt>Durée</dt><dd>12 mois</dd></div>
+                  <div>
+                    <dt>Score</dt>
+                    <dd>A</dd>
+                  </div>
+                  <div>
+                    <dt>TJM</dt>
+                    <dd>720€</dd>
+                  </div>
+                  <div>
+                    <dt>Durée</dt>
+                    <dd>12 mois</dd>
+                  </div>
                 </dl>
               </article>
               <article class="compare-card">
@@ -415,9 +452,18 @@
                 <h3>Architecte Frontend</h3>
                 <p>LeHibou · Paris</p>
                 <dl>
-                  <div><dt>Score</dt><dd>A</dd></div>
-                  <div><dt>TJM</dt><dd>780€</dd></div>
-                  <div><dt>Durée</dt><dd>6 mois</dd></div>
+                  <div>
+                    <dt>Score</dt>
+                    <dd>A</dd>
+                  </div>
+                  <div>
+                    <dt>TJM</dt>
+                    <dd>780€</dd>
+                  </div>
+                  <div>
+                    <dt>Durée</dt>
+                    <dd>6 mois</dd>
+                  </div>
                 </dl>
               </article>
               <article class="compare-card">
@@ -425,9 +471,18 @@
                 <h3>Fullstack Platform</h3>
                 <p>Hiway · Remote</p>
                 <dl>
-                  <div><dt>Score</dt><dd>A</dd></div>
-                  <div><dt>TJM</dt><dd>690€</dd></div>
-                  <div><dt>Durée</dt><dd>9 mois</dd></div>
+                  <div>
+                    <dt>Score</dt>
+                    <dd>A</dd>
+                  </div>
+                  <div>
+                    <dt>TJM</dt>
+                    <dd>690€</dd>
+                  </div>
+                  <div>
+                    <dt>Durée</dt>
+                    <dd>9 mois</dd>
+                  </div>
                 </dl>
               </article>
             </div>
@@ -435,9 +490,15 @@
             <div class="decision-panel" aria-label="Aide à la décision">
               <h3>Décision assistée</h3>
               <p>Comparez le potentiel réel, pas seulement le TJM.</p>
-              <div class="decision-row"><span>Meilleur fit profil</span><strong>Lead Svelte</strong></div>
-              <div class="decision-row"><span>Meilleur TJM</span><strong>Architecte Frontend</strong></div>
-              <div class="decision-row"><span>Moins de friction</span><strong>Full remote</strong></div>
+              <div class="decision-row">
+                <span>Meilleur fit profil</span><strong>Lead Svelte</strong>
+              </div>
+              <div class="decision-row">
+                <span>Meilleur TJM</span><strong>Architecte Frontend</strong>
+              </div>
+              <div class="decision-row">
+                <span>Moins de friction</span><strong>Full remote</strong>
+              </div>
             </div>
           </div>
         {:else}
@@ -463,12 +524,12 @@
             <div class="message-panel" aria-label="Message de candidature">
               <h3>Message de candidature</h3>
               <p>
-                Bonjour, votre mission Lead Svelte / TypeScript correspond fortement à
-                mon expérience design system et plateformes front complexes.
+                Bonjour, votre mission Lead Svelte / TypeScript correspond fortement à mon
+                expérience design system et plateformes front complexes.
               </p>
               <p>
-                Disponible sous 2 semaines, TJM cible 720€, remote hybride possible.
-                Je peux vous partager deux références proches.
+                Disponible sous 2 semaines, TJM cible 720€, remote hybride possible. Je peux vous
+                partager deux références proches.
               </p>
               <div class="message-actions">
                 <span>Copier le message</span>
@@ -512,8 +573,8 @@
     <div class="section-header">
       <h2 class="section-title fade-in">Pour qui ?</h2>
       <p class="section-subtitle fade-in fade-in-delay-1">
-        MissionPulse est conçu pour les freelances tech en France qui cherchent
-        leur prochaine mission
+        MissionPulse est conçu pour les freelances tech en France qui cherchent leur prochaine
+        mission
       </p>
     </div>
 
@@ -528,21 +589,14 @@
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path
-              d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2"
-            /><circle cx="9" cy="7" r="4" />
-            <line x1="19" y1="8" x2="19" y2="14" /><line
-              x1="22"
-              y1="11"
-              x2="16"
-              y2="11"
-            />
+            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
+            <line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" />
           </svg>
         </div>
         <h3 class="feature-card__title">Freelance en recherche</h3>
         <p class="feature-card__desc">
-          Vous passez 30 min/jour à checker Free-Work, LeHibou et Hiway ?
-          MissionPulse le fait en 30 secondes pendant que vous codez.
+          Vous passez 30 min/jour à checker Free-Work, LeHibou et Hiway ? MissionPulse le fait en 30
+          secondes pendant que vous codez.
         </p>
       </article>
 
@@ -563,8 +617,8 @@
         </div>
         <h3 class="feature-card__title">Dev qui veille</h3>
         <p class="feature-card__desc">
-          Vous êtes en mission mais gardez un œil sur le marché ? Le scan
-          automatique vous alerte quand une opportunité pertinente apparaît.
+          Vous êtes en mission mais gardez un œil sur le marché ? Le scan automatique vous alerte
+          quand une opportunité pertinente apparaît.
         </p>
       </article>
 
@@ -585,8 +639,8 @@
         </div>
         <h3 class="feature-card__title">Négociateur de TJM</h3>
         <p class="feature-card__desc">
-          L'analyse TJM historique vous donne la fourchette marché pour votre
-          stack. Négociez avec des données, pas au feeling.
+          L'analyse TJM historique vous donne la fourchette marché pour votre stack. Négociez avec
+          des données, pas au feeling.
         </p>
       </article>
     </div>
@@ -614,15 +668,13 @@
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline
-              points="21 3 21 9 15 9"
-            />
+            <path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" />
           </svg>
         </div>
         <h3 class="feature-card__title">Scan automatique</h3>
         <p class="feature-card__desc">
-          5 plateformes scannées en parallèle, en arrière-plan. Les nouvelles
-          missions arrivent toutes seules dans votre side panel.
+          5 plateformes scannées en parallèle, en arrière-plan. Les nouvelles missions arrivent
+          toutes seules dans votre side panel.
         </p>
       </article>
 
@@ -643,8 +695,8 @@
         </div>
         <h3 class="feature-card__title">Scoring IA</h3>
         <p class="feature-card__desc">
-          Chaque mission reçoit un score basé sur votre stack, TJM, localisation
-          et séniorité. Gemini Nano affine le score sémantiquement.
+          Chaque mission reçoit un score basé sur votre stack, TJM, localisation et séniorité.
+          Gemini Nano affine le score sémantiquement.
         </p>
       </article>
 
@@ -665,8 +717,8 @@
         </div>
         <h3 class="feature-card__title">Dashboard TJM</h3>
         <p class="feature-card__desc">
-          Historique des TJM par stack et par source. Visualisez les tendances
-          du marché et positionnez-vous au bon prix.
+          Historique des TJM par stack et par source. Visualisez les tendances du marché et
+          positionnez-vous au bon prix.
         </p>
       </article>
 
@@ -681,18 +733,13 @@
             stroke-linejoin="round"
           >
             <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <line x1="9" y1="3" x2="9" y2="21" /><line
-              x1="15"
-              y1="3"
-              x2="15"
-              y2="21"
-            />
+            <line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
           </svg>
         </div>
         <h3 class="feature-card__title">Déduplication</h3>
         <p class="feature-card__desc">
-          Les missions postées sur plusieurs plateformes sont fusionnées
-          automatiquement. Plus de doublons dans votre feed.
+          Les missions postées sur plusieurs plateformes sont fusionnées automatiquement. Plus de
+          doublons dans votre feed.
         </p>
       </article>
 
@@ -706,15 +753,15 @@
             stroke-linecap="round"
             stroke-linejoin="round"
           >
-            <path
-              d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9"
-            /><path d="M13.73 21a2 2 0 0 1-3.46 0" />
+            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path
+              d="M13.73 21a2 2 0 0 1-3.46 0"
+            />
           </svg>
         </div>
         <h3 class="feature-card__title">Alertes intelligentes</h3>
         <p class="feature-card__desc">
-          Configurez vos critères (stack + TJM + score) et recevez une
-          notification uniquement pour les missions qui comptent.
+          Configurez vos critères (stack + TJM + score) et recevez une notification uniquement pour
+          les missions qui comptent.
         </p>
       </article>
 
@@ -735,8 +782,8 @@
         </div>
         <h3 class="feature-card__title">100% local &amp; privé</h3>
         <p class="feature-card__desc">
-          Aucun serveur, aucun tracking, aucune collecte. Vos données restent sur
-          votre machine. Le scoring IA tourne en local via Gemini Nano.
+          Aucun serveur, aucun tracking, aucune collecte. Vos données restent sur votre machine. Le
+          scoring IA tourne en local via Gemini Nano.
         </p>
       </article>
     </div>
@@ -748,9 +795,7 @@
   <div class="container">
     <div class="section-header">
       <h2 class="section-title fade-in">Comment ça marche</h2>
-      <p class="section-subtitle fade-in fade-in-delay-1">
-        3 minutes pour être opérationnel
-      </p>
+      <p class="section-subtitle fade-in fade-in-delay-1">3 minutes pour être opérationnel</p>
     </div>
 
     <div class="steps">
@@ -759,8 +804,7 @@
         <div class="step__content">
           <h3 class="step__title">Installez l'extension</h3>
           <p class="step__desc">
-            Un clic depuis le Chrome Web Store. Compatible Chrome, Brave, Edge,
-            Arc et Dia.
+            Un clic depuis le Chrome Web Store. Compatible Chrome, Brave, Edge, Arc et Dia.
           </p>
         </div>
       </div>
@@ -769,8 +813,8 @@
         <div class="step__content">
           <h3 class="step__title">Configurez votre profil</h3>
           <p class="step__desc">
-            Stack, TJM cible, localisation, séniorité, préférences remote. Le
-            scoring s'adapte à vos critères.
+            Stack, TJM cible, localisation, séniorité, préférences remote. Le scoring s'adapte à vos
+            critères.
           </p>
         </div>
       </div>
@@ -779,8 +823,8 @@
         <div class="step__content">
           <h3 class="step__title">Connectez-vous aux plateformes</h3>
           <p class="step__desc">
-            Connectez-vous normalement à Free-Work, LeHibou, etc. MissionPulse
-            utilise vos sessions existantes.
+            Connectez-vous normalement à Free-Work, LeHibou, etc. MissionPulse utilise vos sessions
+            existantes.
           </p>
         </div>
       </div>
@@ -789,8 +833,8 @@
         <div class="step__content">
           <h3 class="step__title">Ouvrez le side panel</h3>
           <p class="step__desc">
-            Cliquez sur l'icône MissionPulse. Les missions arrivent classées
-            par score. Filtrez, comparez, exportez.
+            Cliquez sur l'icône MissionPulse. Les missions arrivent classées par score. Filtrez,
+            comparez, exportez.
           </p>
         </div>
       </div>
@@ -899,8 +943,8 @@
       <div class="tech-stack__info fade-in">
         <h2 class="tech-stack__title">Open source &amp; moderne</h2>
         <p class="tech-stack__desc">
-          MissionPulse est open source. 700+ tests, architecture FC&IS,
-          TypeScript strict. Contributions bienvenues.
+          MissionPulse est open source. 700+ tests, architecture FC&IS, TypeScript strict.
+          Contributions bienvenues.
         </p>
         <a
           href="https://github.com/guyghost/pulse"
@@ -937,11 +981,10 @@
       <div class="cta__content">
         <h2 class="cta__title">Prêt à trouver votre prochaine mission ?</h2>
         <p class="cta__desc">
-          Installation gratuite en 30 secondes. Aucun compte à créer. Vos
-          données restent chez vous.
+          Installation gratuite en 30 secondes. Aucun compte à créer. Vos données restent chez vous.
         </p>
         <a
-          href="{chromeStoreUrl}"
+          href={chromeStoreUrl}
           class="btn btn--primary btn--lg"
           target="_blank"
           rel="noopener noreferrer"
@@ -973,12 +1016,7 @@
     <div class="footer__content">
       <div class="footer__brand">
         <div class="footer__logo">
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="32"
-            height="32"
-            viewBox="0 0 128 128"
-          >
+          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 128 128">
             <polyline
               points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
               fill="none"
@@ -1000,9 +1038,7 @@
           target="_blank"
           rel="noopener noreferrer">GitHub</a
         >
-        <a href="mailto:contact@missionpulse.app" class="footer__link"
-          >Contact</a
-        >
+        <a href="mailto:contact@missionpulse.app" class="footer__link">Contact</a>
       </nav>
 
       <p class="footer__copy">MissionPulse — 2026. Open source.</p>

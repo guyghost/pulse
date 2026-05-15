@@ -24,6 +24,8 @@ Mission Pulse exudes a focused, data-driven clarity, presenting complex financia
 | Status Orange  | `#f97006` | `--color-status-orange`  | Highlighting warnings or moderate priority information.                                                                                             |
 | Status Yellow  | `#f9b703` | `--color-status-yellow`  | For informational highlights or less critical status indicators.                                                                                    |
 | Status Violet  | `#6b4aff` | `--color-status-violet`  | Likely for specific status tags or categories, providing visual distinction.                                                                        |
+| Accent Green   | `#0d9488` | `--color-accent-green`   | Positive or successful supporting signal, used sparingly for secondary status states.                                                               |
+| Accent Amber   | `#d97706` | `--color-accent-amber`   | Cautionary supporting signal, used sparingly for medium-priority status states.                                                                     |
 
 ## Tokens — Typography
 

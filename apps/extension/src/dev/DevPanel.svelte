@@ -53,9 +53,9 @@
 
 {#if isOpen}
   <div
-    class="fixed bottom-0 left-0 right-0 z-50 max-h-[50vh] overflow-y-auto bg-navy-900 border-t-2 border-blueprint-blue shadow-lg"
+    class="fixed bottom-0 left-0 right-0 z-50 max-h-[50vh] overflow-y-auto bg-page-canvas border-t-2 border-blueprint-blue shadow-lg"
   >
-    <div class="flex items-center justify-between px-3 py-2 bg-navy-800 sticky top-0">
+    <div class="flex items-center justify-between px-3 py-2 bg-surface-white sticky top-0">
       <span class="text-xs font-bold text-blueprint-blue font-mono">DEV PANEL</span>
       <button class="text-text-secondary hover:text-text-primary" onclick={() => (isOpen = false)}>
         <Icon name="x" size={14} />
@@ -63,7 +63,7 @@
     </div>
 
     <!-- Tabs -->
-    <div class="flex gap-1 px-3 pt-2 border-b border-navy-700">
+    <div class="flex gap-1 px-3 pt-2 border-b border-border-light">
       <button
         class="px-3 py-1.5 text-[11px] font-mono rounded-t transition-colors {activeTab === 'main'
           ? 'bg-surface text-text-primary'
@@ -252,7 +252,7 @@
 {#if !isOpen}
   <div class="fixed bottom-2 right-2 z-50">
     <button
-      class="px-2 py-1 text-[9px] font-mono rounded bg-navy-800/80 text-text-muted hover:text-blueprint-blue transition-colors border border-navy-700/50"
+      class="px-2 py-1 text-[9px] font-mono rounded bg-surface-white/80 text-text-muted hover:text-blueprint-blue transition-colors border border-border-light"
       onclick={() => (isOpen = true)}
     >
       Ctrl+Shift+D

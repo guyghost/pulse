@@ -1,10 +1,20 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { HTMLButtonAttributes } from 'svelte/elements';
 
   type GlowVariant = 'primary' | 'secondary' | 'outline';
   type ButtonSize = 'sm' | 'md' | 'lg';
+  type GlowButtonProps = Omit<HTMLButtonAttributes, 'class' | 'disabled' | 'onclick'> & {
+    variant?: GlowVariant;
+    size?: ButtonSize;
+    disabled?: boolean;
+    loading?: boolean;
+    class?: string;
+    onclick?: HTMLButtonAttributes['onclick'];
+    children: Snippet;
+  };
 
-  const {
+  let {
     variant = 'primary',
     size = 'md',
     disabled = false,
@@ -12,38 +22,33 @@
     class: className = '',
     onclick,
     children,
-  }: {
-    variant?: GlowVariant;
-    size?: ButtonSize;
-    disabled?: boolean;
-    loading?: boolean;
-    class?: string;
-    onclick?: () => void;
-    children: Snippet;
-  } = $props();
+    type = 'button',
+    ...rest
+  }: GlowButtonProps = $props();
 
   const sizeClasses = $derived(
     size === 'sm'
-      ? 'h-9 px-3 text-sm gap-1.5'
+      ? 'h-8 px-3 text-xs gap-1'
       : size === 'lg'
-        ? 'h-12 px-6 text-base gap-2.5'
-        : 'h-11 px-4 text-sm gap-2'
+        ? 'h-12 px-4 text-base gap-2'
+        : 'h-10 px-4 text-sm gap-1.5'
   );
 
   const variantClasses = $derived(
     variant === 'primary'
-      ? 'bg-blueprint-blue text-surface-white font-semibold hover:bg-blueprint-blue/90'
+      ? 'border border-blueprint-blue bg-blueprint-blue text-surface-white shadow-subtle-3 hover:bg-blueprint-blue/90'
       : variant === 'secondary'
-        ? 'border border-blueprint-blue/30 bg-blueprint-blue/10 text-blueprint-blue hover:bg-blueprint-blue/20 hover:border-blueprint-blue/50'
-        : 'border border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'
+        ? 'border border-blueprint-blue/30 bg-subtle-gray text-blueprint-blue shadow-subtle-2 hover:border-blueprint-blue/50 hover:bg-blueprint-blue/8'
+        : 'border border-border-light bg-surface-white text-text-primary shadow-subtle-2 hover:bg-subtle-gray'
   );
 
   const isDisabled = $derived(disabled || loading);
 </script>
 
 <button
-  type="button"
-  class="inline-flex items-center justify-center rounded-xl font-medium transition-all duration-200 ease-out disabled:opacity-50 disabled:cursor-not-allowed active:scale-[0.98] {sizeClasses} {variantClasses} {className}"
+  {...rest}
+  {type}
+  class="inline-flex items-center justify-center rounded-lg font-geist font-medium transition-colors duration-150 ease-out focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-not-allowed disabled:opacity-50 active:translate-y-px {sizeClasses} {variantClasses} {className}"
   disabled={isDisabled}
   {onclick}
   aria-busy={loading}

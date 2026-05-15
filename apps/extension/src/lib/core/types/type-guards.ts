@@ -5,7 +5,6 @@
 import type { Mission, MissionSource, RemoteType } from './mission';
 import type { UserProfile, SeniorityLevel } from './profile';
 import {
-  MissionSchema,
   MissionSerializedSchema,
   UserProfileSchema,
   SemanticResultSchema,

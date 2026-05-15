@@ -17,11 +17,6 @@ import { z } from 'zod';
 // ============================================================================
 
 const SafeString = z.string().max(4096);
-const SafeUrl = z
-  .string()
-  .url()
-  .max(2048)
-  .refine((u) => u.startsWith('https://'), { message: 'URL must use https://' });
 
 /** Valide qu'un objet sérialisé ne dépasse pas N octets */
 function maxBytes(maxB: number) {

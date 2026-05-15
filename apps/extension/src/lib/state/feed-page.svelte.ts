@@ -9,7 +9,7 @@
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
 import type { SeniorityLevel } from '$lib/core/types/profile';
 import type { FeedState } from './feed.svelte';
-import type { FeedController, SourceStatus } from '$lib/shell/facades/feed-controller.svelte';
+import type { FeedController } from '$lib/shell/facades/feed-controller.svelte';
 import type { AiAvailability } from '$lib/shell/ai/capabilities';
 import type { PanelSide } from '$lib/shell/ui/panel-layout';
 import {
@@ -459,7 +459,7 @@ export function createFeedPageState(
     // Dev logging
     if (import.meta.env.DEV) {
       $effect(() => {
-        console.log(
+        console.debug(
           '[FeedPage] state:',
           feedStore.state,
           'missions:',

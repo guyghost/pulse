@@ -501,7 +501,7 @@ async function _runScanInternal(
   try {
     const purged = await purgeOldMissions(90);
     if (purged > 0 && import.meta.env.DEV) {
-      console.log(`[Scanner] Purged ${purged} old missions`);
+      console.debug(`[Scanner] Purged ${purged} old missions`);
     }
   } catch {
     // Purge failure is non-critical
@@ -539,7 +539,7 @@ async function _runScanInternal(
   });
 
   if (import.meta.env.DEV) {
-    console.log(
+    console.debug(
       `[Scanner] Completed in ${scanDuration}ms, ${scored.length} missions, ${errors.length} errors`
     );
   }

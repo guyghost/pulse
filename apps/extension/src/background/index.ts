@@ -56,7 +56,7 @@ import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 
 if (import.meta.env.DEV) {
-  console.log('[MissionPulse] Service worker started');
+  console.debug('[MissionPulse] Service worker started');
 }
 
 // Trigger expired semantic cache cleanup on startup
@@ -188,7 +188,7 @@ async function handleScanStartFromPanel(): Promise<import('../lib/core/types/mis
   // Si un scan est déjà en cours, retourner vide (mutex du scanner)
   if (isScanRunning()) {
     if (import.meta.env.DEV) {
-      console.log('[MissionPulse] SCAN_START ignored — scan already in progress');
+      console.debug('[MissionPulse] SCAN_START ignored — scan already in progress');
     }
     return [];
   }
@@ -820,7 +820,7 @@ async function setupAlarm() {
       periodInMinutes: settings.scanIntervalMinutes,
     });
     if (import.meta.env.DEV) {
-      console.log(`[MissionPulse] Auto-scan alarm set: every ${settings.scanIntervalMinutes}min`);
+      console.debug(`[MissionPulse] Auto-scan alarm set: every ${settings.scanIntervalMinutes}min`);
     }
   }
 }
@@ -830,7 +830,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     return;
   }
   if (import.meta.env.DEV) {
-    console.log('[MissionPulse] Auto-scan triggered');
+    console.debug('[MissionPulse] Auto-scan triggered');
   }
   try {
     const result = await runScan(undefined, undefined, {
@@ -893,7 +893,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 
   if (import.meta.env.DEV) {
-    console.log('[MissionPulse] Fresh install — starting zero-config first scan');
+    console.debug('[MissionPulse] Fresh install — starting zero-config first scan');
   }
 
   try {
@@ -919,13 +919,13 @@ chrome.runtime.onInstalled.addListener(async (details) => {
     if (activeConnectorIds.length === 0) {
       // No sessions — user will go through normal onboarding
       if (import.meta.env.DEV) {
-        console.log('[MissionPulse] No active sessions found on install, skipping first scan');
+        console.debug('[MissionPulse] No active sessions found on install, skipping first scan');
       }
       return;
     }
 
     if (import.meta.env.DEV) {
-      console.log(
+      console.debug(
         `[MissionPulse] Found ${activeConnectorIds.length} active session(s):`,
         activeConnectorIds
       );
@@ -959,7 +959,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       }
 
       if (import.meta.env.DEV) {
-        console.log(`[MissionPulse] First scan complete: ${result.missions.length} missions`);
+        console.debug(`[MissionPulse] First scan complete: ${result.missions.length} missions`);
       }
     }
   } catch (err) {
@@ -971,7 +971,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
 chrome.action.onUserSettingsChanged.addListener(async (change) => {
   if (change.isOnToolbar) {
     if (import.meta.env.DEV) {
-      console.log('[MissionPulse] Extension pinned to toolbar');
+      console.debug('[MissionPulse] Extension pinned to toolbar');
     }
     const settings = await getSettings();
     if (!settings.autoScan && settings.notifications) {

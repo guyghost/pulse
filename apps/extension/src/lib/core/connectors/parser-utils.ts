@@ -1,4 +1,4 @@
-import type { Mission, MissionSource, RemoteType } from '../types/mission';
+import type { Mission, RemoteType } from '../types/mission';
 import type { SeniorityLevel } from '../types/profile';
 
 /**

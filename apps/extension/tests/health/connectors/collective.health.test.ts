@@ -14,7 +14,7 @@
 
 import { test, expect } from '@playwright/test';
 import { join } from 'node:path';
-import { runCollectiveHealthCheck } from './collective.health';
+import { runCollectiveHealthCheck as _runCollectiveHealthCheck } from './collective.health';
 
 const BASE_URL = 'https://app.collective.work';
 const API_URL = 'https://api.collective.work/graphql';

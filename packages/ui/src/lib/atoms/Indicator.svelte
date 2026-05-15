@@ -7,11 +7,13 @@
     size = 'sm',
     pulse = false,
     class: className = '',
+    ariaLabel,
   }: {
     status: IndicatorStatus;
     size?: IndicatorSize;
     pulse?: boolean;
     class?: string;
+    ariaLabel?: string;
   } = $props();
 
   const colorClass = $derived(
@@ -24,12 +26,15 @@
           : 'bg-disabled-gray'
   );
 
-  const sizeClass = $derived(
-    size === 'lg' ? 'size-3' : size === 'md' ? 'size-2.5' : 'size-2'
-  );
+  const sizeClass = $derived(size === 'lg' ? 'size-3' : size === 'md' ? 'size-2.5' : 'size-2');
 </script>
 
-<span class="inline-block rounded-full {sizeClass} {colorClass} {className}" aria-hidden="true">
+<span
+  class="inline-block rounded-full {sizeClass} {colorClass} {className}"
+  aria-hidden={ariaLabel ? undefined : true}
+  aria-label={ariaLabel}
+  role={ariaLabel ? 'img' : undefined}
+>
   {#if pulse}
     <span class="inline-block size-full rounded-full animate-ping opacity-75 {colorClass}"></span>
   {/if}

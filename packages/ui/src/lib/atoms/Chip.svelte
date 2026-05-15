@@ -1,39 +1,43 @@
 <script lang="ts">
-  type ChipSize = 'sm' | 'md' | 'lg';
+  import type { HTMLButtonAttributes } from 'svelte/elements';
 
-  const {
+  type ChipSize = 'sm' | 'md' | 'lg';
+  type ChipProps = Omit<HTMLButtonAttributes, 'class' | 'disabled' | 'onclick'> & {
+    label: string;
+    selected?: boolean;
+    size?: ChipSize;
+    disabled?: boolean;
+    class?: string;
+    onclick?: HTMLButtonAttributes['onclick'];
+  };
+
+  let {
     label,
     selected = false,
     size = 'md',
     disabled = false,
     class: className = '',
     onclick,
-  }: {
-    label: string;
-    selected?: boolean;
-    size?: ChipSize;
-    disabled?: boolean;
-    class?: string;
-    onclick?: () => void;
-  } = $props();
+    type = 'button',
+    ...rest
+  }: ChipProps = $props();
 
   const sizeClasses = $derived(
-    size === 'sm'
-      ? 'px-2 py-1 text-[10px]'
-      : size === 'lg'
-        ? 'px-4 py-2 text-sm'
-        : 'px-3 py-1.5 text-xs'
+    size === 'sm' ? 'h-7 px-2 text-[10px]' : size === 'lg' ? 'h-9 px-4 text-sm' : 'h-8 px-3 text-xs'
   );
 </script>
 
 <button
-  class="inline-flex items-center rounded-full font-medium transition-colors disabled:opacity-40 disabled:cursor-not-allowed
+  {...rest}
+  {type}
+  class="inline-flex items-center rounded-full font-system font-medium transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40
     {selected
-    ? 'border border-blueprint-blue/25 bg-blueprint-blue/14 text-blueprint-blue'
+    ? 'border border-blueprint-blue/30 bg-blueprint-blue/10 text-blueprint-blue'
     : 'border border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}
     {sizeClasses} {className}"
   {disabled}
   {onclick}
+  aria-pressed={selected}
 >
   {label}
 </button>

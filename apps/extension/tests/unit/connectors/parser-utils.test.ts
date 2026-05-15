@@ -4,7 +4,7 @@ import {
   parseTJM,
   detectRemote,
 } from '../../../src/lib/core/connectors/parser-utils';
-import type { Mission, MissionSource } from '../../../src/lib/core/types/mission';
+import type { MissionSource } from '../../../src/lib/core/types/mission';
 
 describe('parser-utils', () => {
   describe('parseTJM', () => {

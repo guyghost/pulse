@@ -18,17 +18,13 @@
   );
 
   const variantClasses = $derived(
-    variant === 'circle'
-      ? 'rounded-full'
-      : variant === 'card'
-        ? 'rounded-xl'
-        : 'rounded-md'
+    variant === 'circle' ? 'rounded-full' : variant === 'card' ? 'rounded-md' : 'rounded-md'
   );
 </script>
 
 <div
-  class="animate-pulse bg-subtle-gray {variantClasses} {className}"
-  style:width={width}
+  class="animate-pulse bg-subtle-gray/80 {variantClasses} {className}"
+  style:width
   style:height={defaultHeight}
   aria-hidden="true"
 ></div>

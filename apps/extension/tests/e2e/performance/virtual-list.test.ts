@@ -1,6 +1,5 @@
 import { test, expect } from '@playwright/test';
 import { SIDE_PANEL, openDevPanel, closeDevPanel, captureMemoryMetrics } from '../helpers';
-import { generateLargeDataset, generateMockMissions } from '../../fixtures/large-dataset';
 
 test.describe('Performance - Virtual List', () => {
   test('renders large dataset efficiently', async ({ page }) => {

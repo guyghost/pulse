@@ -15,7 +15,7 @@ import {
   parseFreeWorkAPI,
   type FreeWorkApiResponse,
 } from '../../../src/lib/core/connectors/freework-parser';
-import { runFreeWorkHealthCheck } from './freework.health';
+import { runFreeWorkHealthCheck as _runFreeWorkHealthCheck } from './freework.health';
 
 const API_BASE = 'https://www.free-work.com/api/job_postings';
 const TIMEOUT = parseInt(process.env.HEALTH_CHECK_TIMEOUT ?? '30000', 10);

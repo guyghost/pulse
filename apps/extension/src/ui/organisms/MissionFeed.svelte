@@ -54,7 +54,7 @@
 
   if (import.meta.env.DEV) {
     $effect(() => {
-      console.log(
+      console.debug(
         '[MissionFeed] missions prop:',
         missions?.length ?? 0,
         'sortedMissions:',

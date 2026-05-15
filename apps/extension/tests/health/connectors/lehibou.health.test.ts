@@ -16,7 +16,7 @@
 
 import { test, expect } from '@playwright/test';
 import { join } from 'node:path';
-import { runLeHibouHealthCheck } from './lehibou.health';
+import { runLeHibouHealthCheck as _runLeHibouHealthCheck } from './lehibou.health';
 
 const BASE_URL = 'https://www.lehibou.com';
 const MISSIONS_URL = 'https://www.lehibou.com/freelance/missions';
@@ -53,7 +53,7 @@ test.describe('LeHibou Health Check', () => {
     await page.waitForTimeout(2000);
 
     // Take screenshot on failure path
-    const screenshotDir = join(process.cwd(), 'tests/health/screenshots');
+    const _screenshotDir = join(process.cwd(), 'tests/health/screenshots');
 
     console.log(`[LeHibou] Missions page load time: ${responseTime}ms`);
   });

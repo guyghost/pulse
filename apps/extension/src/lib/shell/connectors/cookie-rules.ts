@@ -44,7 +44,9 @@ export const injectCookieRule = async (
   // Log found cookies for diagnostics
   if (import.meta.env.DEV) {
     const cookieNames = cookies.map((c) => c.name).join(', ');
-    console.log(`[cookie-rules] Found ${cookieCount} cookies for ${cookieDomain}: ${cookieNames}`);
+    console.debug(
+      `[cookie-rules] Found ${cookieCount} cookies for ${cookieDomain}: ${cookieNames}`
+    );
   }
 
   await chrome.declarativeNetRequest.updateDynamicRules({

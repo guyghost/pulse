@@ -134,7 +134,7 @@ export class RateLimiter {
       state.tokens -= 1;
 
       if (import.meta.env.DEV) {
-        console.log(
+        console.debug(
           `[RateLimiter] Token acquired for ${domain} (${state.tokens.toFixed(1)} remaining)`
         );
       }
@@ -145,7 +145,9 @@ export class RateLimiter {
     const waitTimeMs = minDelayMs - (elapsedMs % minDelayMs);
 
     if (import.meta.env.DEV) {
-      console.log(`[RateLimiter] Rate limit hit for ${domain}, waiting ${waitTimeMs.toFixed(0)}ms`);
+      console.debug(
+        `[RateLimiter] Rate limit hit for ${domain}, waiting ${waitTimeMs.toFixed(0)}ms`
+      );
     }
 
     // Attendre le prochain token
@@ -218,7 +220,7 @@ export async function delayBetweenPages(connectorId: string, pageNumber: number)
   } // Pas de délai pour la première page
 
   if (import.meta.env.DEV) {
-    console.log(
+    console.debug(
       `[Scanner] Delay ${DEFAULT_PAGE_DELAY_MS}ms before page ${pageNumber} for ${connectorId}`
     );
   }

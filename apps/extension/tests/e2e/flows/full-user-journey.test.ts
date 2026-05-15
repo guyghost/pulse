@@ -10,7 +10,6 @@ import {
   toggleFavoritesFilter,
   showHiddenMissions,
   injectMissions,
-  triggerScan,
 } from '../helpers';
 
 test.describe('Full User Journey', () => {

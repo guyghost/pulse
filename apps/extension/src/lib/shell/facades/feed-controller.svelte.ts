@@ -192,7 +192,7 @@ export function createFeedController(feedStore: {
    */
   async function handleScanComplete(missions: Mission[]): Promise<void> {
     if (import.meta.env.DEV) {
-      console.log(
+      console.debug(
         '[FeedController] handleScanComplete received',
         missions.length,
         'missions from SW'

@@ -47,7 +47,7 @@ export class FreeWorkConnector extends BaseConnector {
   readonly icon = 'https://www.google.com/s2/favicons?domain=free-work.com&sz=32';
 
   /** Free-Work API is public — no session needed */
-  async detectSession(now: number): Promise<Result<boolean, AppError>> {
+  async detectSession(_now: number): Promise<Result<boolean, AppError>> {
     return ok(true);
   }
 
@@ -135,7 +135,7 @@ export class FreeWorkConnector extends BaseConnector {
         const missions = parseFreeWorkAPI(data, new Date(now));
 
         if (import.meta.env.DEV) {
-          console.log(
+          console.debug(
             `[FreeWork] Page ${page}: ${missions.length} missions (total: ${data['hydra:totalItems'] ?? '?'})`
           );
         }
@@ -161,7 +161,7 @@ export class FreeWorkConnector extends BaseConnector {
             });
             allMissions.push(...freshOnPage);
             if (import.meta.env.DEV) {
-              console.log(
+              console.debug(
                 `[FreeWork] Stopping at page ${page}: last mission older than ${MAX_AGE_DAYS} days. Kept ${freshOnPage.length}/${missions.length} from this page.`
               );
             }

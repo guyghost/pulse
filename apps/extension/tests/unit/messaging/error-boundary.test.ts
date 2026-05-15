@@ -148,7 +148,7 @@ describe('withErrorBoundary — error boundary async', () => {
   });
 
   it('attrape une erreur async et appelle sendResponse', async () => {
-    const handler = vi.fn((_msg, _sender, sendResponse: (r: unknown) => void) => {
+    const handler = vi.fn((_msg, _sender, _sendResponse: (r: unknown) => void) => {
       const p = Promise.reject(new Error('async storage failure'));
       p.catch(() => {}); // suppress unhandled rejection in test
       return p as unknown as true;

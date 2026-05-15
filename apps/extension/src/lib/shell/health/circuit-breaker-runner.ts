@@ -20,7 +20,6 @@ import {
 } from '../../core/health/circuit-breaker';
 import { getHealthSnapshot, saveHealthSnapshot } from '../storage/connector-health';
 import type { PlatformConnector } from '../connectors/platform-connector';
-import { err } from '../../core/errors/result';
 import { withResultRetry } from '../utils/retry-strategy';
 
 // ============================================================================
@@ -70,7 +69,7 @@ export async function runWithCircuitBreaker(
     await saveHealthSnapshot(snapshot);
 
     if (import.meta.env.DEV) {
-      console.log(`[CircuitBreaker] ${connector.id}: open → half-open (probe attempt)`);
+      console.debug(`[CircuitBreaker] ${connector.id}: open → half-open (probe attempt)`);
     }
   }
 
@@ -93,7 +92,7 @@ export async function runWithCircuitBreaker(
 
   // Loguer les transitions d'état en dev
   if (import.meta.env.DEV && nextSnapshot.circuitState !== snapshot.circuitState) {
-    console.log(
+    console.debug(
       `[CircuitBreaker] ${connector.id}: ${snapshot.circuitState} → ${nextSnapshot.circuitState}` +
         ` (failures: ${nextSnapshot.consecutiveFailures}, latency: ${latencyMs}ms)`
     );

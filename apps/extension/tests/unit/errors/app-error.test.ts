@@ -9,7 +9,6 @@ import {
   isFatal,
   serializeError,
   deserializeError,
-  type AppError,
 } from '../../../src/lib/core/errors/app-error';
 
 const TS = 1700000000000;

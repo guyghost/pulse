@@ -16,7 +16,7 @@ import {
   type CherryPickMission,
 } from '../../../src/lib/core/connectors/cherrypick-parser';
 import { join } from 'node:path';
-import { runCherryPickHealthCheck } from './cherrypick.health';
+import { runCherryPickHealthCheck as _runCherryPickHealthCheck } from './cherrypick.health';
 
 const BASE_URL = 'https://app.cherry-pick.io';
 const SEARCH_URL = `${BASE_URL}/api/mission/search`;

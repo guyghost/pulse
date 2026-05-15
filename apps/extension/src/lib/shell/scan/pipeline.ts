@@ -13,8 +13,6 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
-import type { DeterministicBreakdown } from '../../core/types/score';
-
 import { deduplicateMissions } from '../../core/scoring/dedup';
 import { filterSalariedMissions } from '../../core/scoring/contract-filter';
 import { scoreMission, type DeterministicScoreResult } from '../../core/scoring/relevance';
@@ -54,7 +52,7 @@ export interface PipelineStage {
  */
 export function createExtractStage(
   connectors: PlatformConnector[],
-  pageDelayMs = 500
+  _pageDelayMs = 500
 ): PipelineStage {
   return {
     name: 'extract',
@@ -113,8 +111,10 @@ export const scoreStage: PipelineStage = {
       return missions;
     }
 
+    const profile = ctx.profile;
+
     return missions.map((m) => {
-      const result: DeterministicScoreResult = scoreMission(m, ctx.profile!, ctx.now);
+      const result: DeterministicScoreResult = scoreMission(m, profile, ctx.now);
       return {
         ...m,
         scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),

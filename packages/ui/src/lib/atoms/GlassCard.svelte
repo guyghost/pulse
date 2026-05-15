@@ -1,55 +1,60 @@
 <script lang="ts">
   import type { Snippet } from 'svelte';
+  import type { HTMLButtonAttributes } from 'svelte/elements';
 
   type GlassVariant = 'default' | 'elevated' | 'glow';
   type GlassPadding = 'none' | 'sm' | 'md' | 'lg';
+  type GlassCardProps = Omit<HTMLButtonAttributes, 'class' | 'onclick'> & {
+    variant?: GlassVariant;
+    padding?: GlassPadding;
+    class?: string;
+    ariaLabel?: string;
+    onclick?: HTMLButtonAttributes['onclick'];
+    children: Snippet;
+  };
 
-  const {
+  let {
     variant = 'default',
     padding = 'md',
     class: className = '',
     ariaLabel,
     onclick,
     children,
-  }: {
-    variant?: GlassVariant;
-    padding?: GlassPadding;
-    class?: string;
-    ariaLabel?: string;
-    onclick?: (event: MouseEvent) => void;
-    children: Snippet;
-  } = $props();
+    type = 'button',
+    ...rest
+  }: GlassCardProps = $props();
 
   const paddingClasses = $derived(
-    padding === 'none' ? '' : padding === 'sm' ? 'p-3' : padding === 'lg' ? 'p-6' : 'p-4'
+    padding === 'none' ? '' : padding === 'sm' ? 'p-3' : padding === 'lg' ? 'p-5' : 'p-4'
   );
 
   const variantClasses = $derived(
     variant === 'elevated'
       ? 'bg-surface-white border border-border-light shadow-sm'
       : variant === 'glow'
-        ? 'bg-surface-white border border-blueprint-blue/10 shadow-subtle-3'
+        ? 'bg-surface-white border border-blueprint-blue/20 shadow-subtle'
         : 'bg-surface-white border border-border-light shadow-subtle-2'
   );
 
   const interactiveClasses = $derived(
     onclick
-      ? 'cursor-pointer transition-all duration-200 hover:scale-[1.01] active:scale-[0.99]'
+      ? 'cursor-pointer transition-colors duration-150 hover:border-blueprint-blue/20 hover:bg-page-canvas/40 active:translate-y-px focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue'
       : ''
   );
 </script>
 
 {#if onclick}
   <button
-    type="button"
-    class="block w-full rounded-xl text-left {variantClasses} {paddingClasses} {interactiveClasses} {className}"
+    {...rest}
+    {type}
+    class="block w-full rounded-md text-left {variantClasses} {paddingClasses} {interactiveClasses} {className}"
     {onclick}
     aria-label={ariaLabel}
   >
     {@render children()}
   </button>
 {:else}
-  <div class="rounded-xl {variantClasses} {paddingClasses} {className}">
+  <div class="rounded-md {variantClasses} {paddingClasses} {className}">
     {@render children()}
   </div>
 {/if}

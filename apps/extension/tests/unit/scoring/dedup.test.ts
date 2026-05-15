@@ -1,7 +1,7 @@
 import { describe, it, expect } from 'vitest';
 import { deduplicateMissions } from '../../../src/lib/core/scoring/dedup';
 import type { Mission } from '../../../src/lib/core/types/mission';
-import type { MissionSource, RemoteType } from '../../../src/lib/core/types/mission';
+import type { MissionSource } from '../../../src/lib/core/types/mission';
 
 function makeMission(overrides: Partial<Mission> = {}): Mission {
   return {

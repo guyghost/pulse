@@ -114,7 +114,10 @@ export const deduplicateMissions = (missions: Mission[], threshold = 0.8): Missi
     let isDuplicate = false;
     for (const idx of candidateIndices) {
       const existing = result[idx];
-      const existingTokens = tokenCache.get(existing.id)!;
+      const existingTokens = tokenCache.get(existing.id);
+      if (!existingTokens) {
+        continue;
+      }
 
       if (jaccardSimilarity(tokens, existingTokens) >= threshold) {
         const existingScore = computeMissionScore(existing);

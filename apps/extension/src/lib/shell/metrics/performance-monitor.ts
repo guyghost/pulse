@@ -1,5 +1,4 @@
 import { metricsCollector } from './collector';
-import type { Metric } from '../../core/metrics/types';
 
 /**
  * Web Vitals et métriques de performance navigateur

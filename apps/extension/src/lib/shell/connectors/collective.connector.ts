@@ -10,7 +10,6 @@ import {
   verifyCookieRule,
   getCookieCount,
   getCookieNames,
-  type CookieRuleResult,
 } from './cookie-rules';
 import { detectBrowser } from '../../core/browser/browser-compat';
 
@@ -151,7 +150,7 @@ export class CollectiveConnector extends BaseConnector {
           };
           this.userSlug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
           if (import.meta.env.DEV) {
-            console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+            console.debug(`[collective] GET_ME: userSlug=${this.userSlug}`);
           }
         }
       } catch {
@@ -172,7 +171,7 @@ export class CollectiveConnector extends BaseConnector {
       // Verify cookie rule is active, re-inject if needed
       const ruleActive = await verifyCookieRule(COOKIE_RULE_ID);
       if (!ruleActive) {
-        console.log('[collective] fetchMissions: cookie rule not active, re-injecting');
+        console.debug('[collective] fetchMissions: cookie rule not active, re-injecting');
         await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
       }
 
@@ -180,7 +179,7 @@ export class CollectiveConnector extends BaseConnector {
       const cookieCount = await getCookieCount(COOKIE_DOMAIN);
       const cookieNames = await getCookieNames(COOKIE_DOMAIN);
       if (import.meta.env.DEV) {
-        console.log(
+        console.debug(
           `[collective] fetchMissions: ${cookieCount} cookies for ${COOKIE_DOMAIN}: [${cookieNames.join(', ')}]`
         );
       }
@@ -200,7 +199,7 @@ export class CollectiveConnector extends BaseConnector {
             };
             this.userSlug = meData.data?.me?.members?.[0]?.collective?.slug ?? null;
             if (import.meta.env.DEV) {
-              console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+              console.debug(`[collective] GET_ME: userSlug=${this.userSlug}`);
             }
           } else {
             if (import.meta.env.DEV) {
@@ -267,7 +266,7 @@ export class CollectiveConnector extends BaseConnector {
 
       const contentType = response.headers.get('content-type') ?? '';
       if (import.meta.env.DEV) {
-        console.log(
+        console.debug(
           `[collective] fetchMissions: HTTP ${response.status}, content-type: ${contentType}`
         );
       }
@@ -340,7 +339,7 @@ export class CollectiveConnector extends BaseConnector {
       const projects = result.data?.results?.projects ?? [];
       const total = result.data?.results?.pagination?.total ?? 0;
       if (import.meta.env.DEV) {
-        console.log(
+        console.debug(
           `[collective] fetchMissions: ${projects.length} projects returned (total: ${total})`
         );
       }

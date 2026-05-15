@@ -1,4 +1,3 @@
-import type { Mission } from '../types/mission';
 import type { SeniorityLevel } from '../types/profile';
 
 /**
