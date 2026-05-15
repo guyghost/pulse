@@ -1,7 +1,11 @@
 import type { Mission } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
 import type { ApplicationStatus } from '../../core/types/tracking';
-import type { GeneratedAsset, GenerationType } from '../../core/types/generation';
+import type {
+  GeneratedAsset,
+  GenerationResultPayload,
+  GenerationType,
+} from '../../core/types/generation';
 import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorState } from '../../core/types/connector-status';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
@@ -61,7 +65,7 @@ export type BridgeMessage =
   | { type: 'TRACKINGS_RESULT'; payload: MissionTracking[] }
   // Generation
   | { type: 'GENERATE_ASSET'; payload: { missionId: string; generationType: GenerationType } }
-  | { type: 'GENERATION_RESULT'; payload: GeneratedAsset | null }
+  | { type: 'GENERATION_RESULT'; payload: GenerationResultPayload }
   | { type: 'GET_GENERATED_ASSETS'; payload: { missionId: string } }
   | { type: 'GENERATED_ASSETS_RESULT'; payload: GeneratedAsset[] }
   // Toast

@@ -15,6 +15,8 @@ export interface AuthUser {
   readonly email: string;
   readonly premiumStatus: PremiumStatus;
   readonly premiumExpiresAt: number | null; // epoch ms
+  readonly creditBalance: number;
+  readonly monthlyCreditsRemaining?: number;
 }
 
 /** Full auth state for the UI */

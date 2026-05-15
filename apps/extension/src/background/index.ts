@@ -42,14 +42,12 @@ import {
   transitionStatus,
   addGeneratedAsset,
 } from '../lib/core/tracking/transitions';
-import { generateAsset } from '../lib/shell/ai/mission-generator';
 import {
   saveGeneratedAsset,
   getGeneratedAssetsForMission,
 } from '../lib/shell/storage/generated-assets';
 import { getSupabaseClient } from '../lib/shell/auth/supabase-client';
 import { saveAuthUser, loadAuthUser, clearAuthUser } from '../lib/shell/auth/auth-storage';
-import { isPremiumActive } from '../lib/core/types/auth';
 import type { GeneratedAsset } from '../lib/core/types/generation';
 import { generatePremium } from '../lib/shell/auth/premium-api';
 import { validateMessage } from '../lib/shell/messaging/schemas';
@@ -57,6 +55,43 @@ import { classifyError } from '../lib/shell/messaging/error-boundary';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
+}
+
+function buildAuthUserFromProfile(
+  user: { id: string; email?: string | null },
+  fallbackEmail: string,
+  profile?: {
+    subscription_status?: string | null;
+    subscription_period_end?: string | null;
+    credit_balance?: number | null;
+  } | null
+): AuthUser {
+  const now = Date.now();
+  let premiumStatus: AuthUser['premiumStatus'] = 'free';
+  let premiumExpiresAt: number | null = null;
+
+  if (profile?.subscription_status === 'premium') {
+    const expiresAt = profile.subscription_period_end
+      ? new Date(profile.subscription_period_end).getTime()
+      : null;
+    if (expiresAt && expiresAt > now) {
+      premiumStatus = 'premium';
+      premiumExpiresAt = expiresAt;
+    } else if (expiresAt && expiresAt <= now) {
+      premiumStatus = 'expired';
+      premiumExpiresAt = expiresAt;
+    } else {
+      premiumStatus = 'premium';
+    }
+  }
+
+  return {
+    id: user.id,
+    email: user.email ?? fallbackEmail,
+    premiumStatus,
+    premiumExpiresAt,
+    creditBalance: profile?.credit_balance ?? 0,
+  };
 }
 
 // Trigger expired semantic cache cleanup on startup
@@ -492,40 +527,51 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         try {
           const mission = await getMissionById(missionId);
           if (!mission) {
-            sendResponse({ type: 'GENERATION_RESULT', payload: null });
+            sendResponse({ type: 'GENERATION_RESULT', payload: { asset: null } });
             return;
           }
 
           const profile = await getProfile();
           if (!profile) {
-            sendResponse({ type: 'GENERATION_RESULT', payload: null });
+            sendResponse({ type: 'GENERATION_RESULT', payload: { asset: null } });
             return;
           }
 
           let asset: GeneratedAsset | null = null;
+          let creditBalance: number | undefined;
+          let creditsConsumed: number | undefined;
 
-          // Try premium backend first if user is premium
           const authUser = await loadAuthUser();
-          if (authUser && isPremiumActive(authUser, Date.now())) {
-            try {
-              asset = await generatePremium(missionId, generationType, mission, profile);
-            } catch (err) {
-              if (import.meta.env.DEV) {
-                console.warn(
-                  '[MissionPulse] Premium generation failed, falling back to Gemini Nano:',
-                  err
-                );
-              }
-            }
+          if (!authUser) {
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: { asset: null, error: 'INSUFFICIENT_CREDITS', creditBalance: 0 },
+            });
+            return;
           }
 
-          // Fall back to Gemini Nano (free, local)
-          if (!asset) {
-            asset = await generateAsset(missionId, generationType, mission, profile);
+          const premiumResult = await generatePremium(missionId, generationType, mission, profile);
+          if (premiumResult.error === 'INSUFFICIENT_CREDITS') {
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: {
+                asset: null,
+                error: 'INSUFFICIENT_CREDITS',
+                creditBalance: premiumResult.creditBalance ?? 0,
+                creditsConsumed: premiumResult.creditsConsumed ?? 0,
+              },
+            });
+            return;
           }
+          asset = premiumResult.asset;
+          creditBalance = premiumResult.creditBalance;
+          creditsConsumed = premiumResult.creditsConsumed;
 
           if (!asset) {
-            sendResponse({ type: 'GENERATION_RESULT', payload: null });
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: { asset: null, error: 'GENERATION_FAILED' },
+            });
             return;
           }
 
@@ -540,10 +586,20 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           const updatedTracking = addGeneratedAsset(tracking, asset.id);
           await saveTracking(updatedTracking);
 
-          sendResponse({ type: 'GENERATION_RESULT', payload: asset });
+          if (typeof creditBalance === 'number' && authUser) {
+            await saveAuthUser({ ...authUser, creditBalance });
+          }
+
+          sendResponse({
+            type: 'GENERATION_RESULT',
+            payload: { asset, creditBalance, creditsConsumed },
+          });
         } catch (err) {
           console.error('[MissionPulse] GENERATE_ASSET error:', err);
-          sendResponse({ type: 'GENERATION_RESULT', payload: null });
+          sendResponse({
+            type: 'GENERATION_RESULT',
+            payload: { asset: null, error: 'GENERATION_FAILED' },
+          });
         }
       })();
       return true;
@@ -584,39 +640,14 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
-          // Query profiles table for premium status
+          // Query profiles table for premium and credit status
           const { data: profile } = await supabase
             .from('profiles')
-            .select('subscription_status, subscription_period_end')
+            .select('subscription_status, subscription_period_end, credit_balance')
             .eq('id', data.user.id)
             .single();
 
-          const now = Date.now();
-          let premiumStatus: AuthUser['premiumStatus'] = 'free';
-          let premiumExpiresAt: number | null = null;
-
-          if (profile?.subscription_status === 'premium') {
-            const expiresAt = profile.subscription_period_end
-              ? new Date(profile.subscription_period_end).getTime()
-              : null;
-            if (expiresAt && expiresAt > now) {
-              premiumStatus = 'premium';
-              premiumExpiresAt = expiresAt;
-            } else if (expiresAt && expiresAt <= now) {
-              premiumStatus = 'expired';
-              premiumExpiresAt = expiresAt;
-            } else {
-              // No expiry set but marked premium — treat as active
-              premiumStatus = 'premium';
-            }
-          }
-
-          const authUser: AuthUser = {
-            id: data.user.id,
-            email: data.user.email ?? email,
-            premiumStatus,
-            premiumExpiresAt,
-          };
+          const authUser = buildAuthUserFromProfile(data.user, email, profile);
 
           await saveAuthUser(authUser);
           sendResponse({
@@ -659,6 +690,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             email: data.user.email ?? email,
             premiumStatus: 'free',
             premiumExpiresAt: null,
+            creditBalance: 0,
           };
 
           await saveAuthUser(authUser);
@@ -718,38 +750,14 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
-          // Active session — refresh premium status from profiles table
+          // Active session — refresh premium and credit status from profiles table
           const { data: profile } = await supabase
             .from('profiles')
-            .select('subscription_status, subscription_period_end')
+            .select('subscription_status, subscription_period_end, credit_balance')
             .eq('id', session.user.id)
             .single();
 
-          const now = Date.now();
-          let premiumStatus: AuthUser['premiumStatus'] = 'free';
-          let premiumExpiresAt: number | null = null;
-
-          if (profile?.subscription_status === 'premium') {
-            const expiresAt = profile.subscription_period_end
-              ? new Date(profile.subscription_period_end).getTime()
-              : null;
-            if (expiresAt && expiresAt > now) {
-              premiumStatus = 'premium';
-              premiumExpiresAt = expiresAt;
-            } else if (expiresAt && expiresAt <= now) {
-              premiumStatus = 'expired';
-              premiumExpiresAt = expiresAt;
-            } else {
-              premiumStatus = 'premium';
-            }
-          }
-
-          const authUser: AuthUser = {
-            id: session.user.id,
-            email: session.user.email ?? '',
-            premiumStatus,
-            premiumExpiresAt,
-          };
+          const authUser = buildAuthUserFromProfile(session.user, '', profile);
 
           await saveAuthUser(authUser);
           sendResponse({

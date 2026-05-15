@@ -23,7 +23,10 @@ export const loadAuthUser = async (): Promise<AuthUser | null> => {
   if (typeof obj.id !== 'string' || typeof obj.email !== 'string') {
     return null;
   }
-  return raw as AuthUser;
+  return {
+    ...(raw as AuthUser),
+    creditBalance: typeof obj.creditBalance === 'number' ? obj.creditBalance : 0,
+  };
 };
 
 /** Clear cached auth user on logout */

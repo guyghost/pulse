@@ -22,6 +22,15 @@ export interface GeneratedAsset {
   readonly modelUsed: string; // e.g. 'gemini-nano', 'unknown'
 }
 
+export type GenerationErrorCode = 'INSUFFICIENT_CREDITS' | 'GENERATION_FAILED';
+
+export interface GenerationResultPayload {
+  readonly asset: GeneratedAsset | null;
+  readonly error?: GenerationErrorCode;
+  readonly creditBalance?: number;
+  readonly creditsConsumed?: number;
+}
+
 /**
  * Human-readable labels for generation types.
  */

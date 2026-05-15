@@ -86,7 +86,7 @@ const ApplicationStatusSchema = z.enum([
 
 // ── Generation ───────────────────────────────────────────────────────────────
 
-const GenerationTypeSchema = z.enum(['cover-letter', 'cv-summary', 'pitch']);
+const GenerationTypeSchema = z.enum(['cover-message', 'cv-summary', 'pitch']);
 
 // ── Auth ─────────────────────────────────────────────────────────────────────
 

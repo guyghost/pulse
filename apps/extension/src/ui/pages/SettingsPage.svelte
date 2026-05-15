@@ -86,6 +86,7 @@
       email={auth.user?.email ?? null}
       premiumStatus={auth.premiumStatus}
       premiumExpiresAt={auth.user?.premiumExpiresAt ?? null}
+      creditBalance={auth.creditBalance}
       isLoading={auth.storeState === 'loading'}
       error={auth.error}
       onLogin={async (email, password) => {
@@ -107,6 +108,7 @@
       onOpenDashboard={() => {
         window.open('https://missionpulse.app/dashboard', '_blank');
       }}
+      onRefresh={() => auth.checkStatus()}
     />
 
     <!-- Profil -->

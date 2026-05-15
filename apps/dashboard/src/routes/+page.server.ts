@@ -1,5 +1,6 @@
 import { env } from '$env/dynamic/public';
 import type { PageServerLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import type { CvSnapshot, MissionApplication, PlatformSyncStatus } from '$lib/core/dashboard';
 
@@ -80,13 +81,23 @@ const mockSyncStatuses: PlatformSyncStatus[] = [
 
 export const load: PageServerLoad = async ({ cookies }) => {
   const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+  const loginUrl = `${env.PUBLIC_LANDING_URL ?? ''}/login`;
+
+  if (!hasSupabaseConfig) {
+    redirect(303, loginUrl);
+  }
+
   const session = hasSupabaseConfig
     ? (await createSupabaseServerClient(cookies).auth.getSession()).data.session
     : null;
 
+  if (!session) {
+    redirect(303, loginUrl);
+  }
+
   return {
     session,
-    loginUrl: `${env.PUBLIC_LANDING_URL ?? ''}/login`,
+    loginUrl,
     applications: mockApplications,
     cv: mockCv,
     syncStatuses: mockSyncStatuses,

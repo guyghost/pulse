@@ -209,7 +209,7 @@ describe('validateMessage — GENERATE_ASSET', () => {
   it('accepte un payload valide', () => {
     const r = validateMessage({
       type: 'GENERATE_ASSET',
-      payload: { missionId: 'm1', generationType: 'cover-letter' },
+      payload: { missionId: 'm1', generationType: 'cover-message' },
     });
     expect(r.valid).toBe(true);
   });

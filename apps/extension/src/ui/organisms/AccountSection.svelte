@@ -2,29 +2,34 @@
   import { Icon } from '@pulse/ui';
   import { Button } from '@pulse/ui';
   import type { PremiumStatus } from '$lib/core/types/auth';
+  import { CREDIT_PACKS, PREMIUM_MONTHLY_CREDITS } from '$lib/core/types/credits';
 
   const {
     isAuthenticated,
     email,
     premiumStatus,
     premiumExpiresAt,
+    creditBalance,
     isLoading,
     error,
     onLogin,
     onSignup,
     onLogout,
     onOpenDashboard,
+    onRefresh,
   }: {
     isAuthenticated: boolean;
     email: string | null;
     premiumStatus: PremiumStatus;
     premiumExpiresAt: number | null;
+    creditBalance: number;
     isLoading: boolean;
     error: string | null;
     onLogin: (email: string, password: string) => void;
     onSignup: (email: string, password: string) => void;
     onLogout: () => void;
     onOpenDashboard?: () => void;
+    onRefresh?: () => void;
   } = $props();
 
   let formEmail = $state('');
@@ -109,7 +114,9 @@
 
       {#if premiumStatus === 'premium' && formattedExpiry}
         <div class="rounded-lg bg-blueprint-blue/5 px-3 py-2">
-          <p class="text-xs text-blueprint-blue">Abonnement actif jusqu'au {formattedExpiry}</p>
+          <p class="text-xs text-blueprint-blue">
+            Abonnement actif jusqu'au {formattedExpiry}. Bonus: {PREMIUM_MONTHLY_CREDITS} crédits/mois.
+          </p>
         </div>
       {:else if premiumStatus === 'free'}
         <div class="rounded-lg bg-page-canvas px-3 py-2">
@@ -140,6 +147,39 @@
           </p>
         </div>
       {/if}
+
+      <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
+        <div class="flex items-center justify-between gap-3">
+          <div>
+            <p class="text-xs font-medium text-text-primary">{creditBalance} crédits disponibles</p>
+            <p class="mt-0.5 text-[11px] text-text-subtle">1 crédit = 1 génération IA</p>
+          </div>
+          {#if onOpenDashboard}
+            <button
+              class="text-xs font-medium text-blueprint-blue hover:text-blueprint-blue/80"
+              onclick={onOpenDashboard}
+            >
+              Acheter
+            </button>
+          {/if}
+        </div>
+        {#if onRefresh}
+          <button
+            class="mt-2 text-[11px] font-medium text-text-subtle hover:text-text-primary"
+            onclick={onRefresh}
+            disabled={isLoading}
+          >
+            J'ai terminé mon paiement
+          </button>
+        {/if}
+        <div class="mt-2 flex flex-wrap gap-1.5">
+          {#each CREDIT_PACKS as pack}
+            <span class="rounded-md bg-surface-white px-2 py-1 text-[10px] text-text-subtle">
+              {pack.credits} crédits
+            </span>
+          {/each}
+        </div>
+      </div>
 
       <div class="pt-1">
         <button

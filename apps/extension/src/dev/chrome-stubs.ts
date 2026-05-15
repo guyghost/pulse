@@ -61,7 +61,7 @@ function createChromeStubs() {
           case 'GENERATE_ASSET':
             // In dev mode, no AI backend available (neither Gemini Nano nor premium GLM)
             console.log('[Chrome Stub] GENERATE_ASSET (no AI in dev mode):', message.payload);
-            return { type: 'GENERATION_RESULT', payload: null };
+            return { type: 'GENERATION_RESULT', payload: { asset: null } };
           case 'GET_GENERATED_ASSETS':
             return { type: 'GENERATED_ASSETS_RESULT', payload: [] };
           case 'SHOW_TOAST':

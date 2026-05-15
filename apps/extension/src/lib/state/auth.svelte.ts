@@ -21,6 +21,7 @@ export function createAuthStore() {
   const isAuthenticated = $derived(authStatus === 'authenticated');
   const isPremium = $derived(isPremiumActive(user, Date.now()));
   const premiumStatus = $derived<PremiumStatus>(user?.premiumStatus ?? 'free');
+  const creditBalance = $derived(user?.creditBalance ?? 0);
 
   /**
    * Check current auth status via bridge.
@@ -171,6 +172,9 @@ export function createAuthStore() {
     },
     get premiumStatus() {
       return premiumStatus;
+    },
+    get creditBalance() {
+      return creditBalance;
     },
     checkStatus,
     login,

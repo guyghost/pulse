@@ -3,7 +3,7 @@
  * Shell module: I/O, async, network.
  *
  * Sends the Supabase JWT for authentication.
- * Returns null if the user is not authenticated, not premium, or on server error.
+ * Returns a typed result so callers can distinguish checkout prompts from backend failures.
  */
 
 import type { GeneratedAsset, GenerationType } from '../../core/types/generation';
@@ -14,6 +14,13 @@ import { getSupabaseClient } from './supabase-client';
 /** The landing backend URL */
 const API_BASE_URL = import.meta.env.DEV ? 'http://localhost:5174' : 'https://missionpulse.app';
 
+export interface PremiumGenerationResult {
+  asset: GeneratedAsset | null;
+  error?: 'INSUFFICIENT_CREDITS' | 'GENERATION_FAILED';
+  creditBalance?: number;
+  creditsConsumed?: number;
+}
+
 /**
  * Generate content using the premium GLM backend.
  */
@@ -22,14 +29,14 @@ export const generatePremium = async (
   type: GenerationType,
   mission: Mission,
   profile: UserProfile
-): Promise<GeneratedAsset | null> => {
+): Promise<PremiumGenerationResult> => {
   const supabase = getSupabaseClient();
   const {
     data: { session },
   } = await supabase.auth.getSession();
 
   if (!session?.access_token) {
-    return null;
+    return { asset: null, error: 'GENERATION_FAILED' };
   }
 
   try {
@@ -59,31 +66,49 @@ export const generatePremium = async (
     });
 
     if (!response.ok) {
-      if (import.meta.env.DEV) {
-        console.warn('[PremiumAPI] Generate failed:', response.status, await response.text());
+      let errorPayload: { error?: string; creditBalance?: number; creditsConsumed?: number } = {};
+      try {
+        errorPayload = await response.json();
+      } catch {
+        // Non-JSON response: fall through to generic failure.
       }
-      return null;
+      if (errorPayload.error === 'INSUFFICIENT_CREDITS') {
+        return {
+          asset: null,
+          error: 'INSUFFICIENT_CREDITS',
+          creditBalance: errorPayload.creditBalance ?? 0,
+          creditsConsumed: errorPayload.creditsConsumed ?? 0,
+        };
+      }
+      if (import.meta.env.DEV) {
+        console.warn('[PremiumAPI] Generate failed:', response.status);
+      }
+      return { asset: null, error: 'GENERATION_FAILED' };
     }
 
     const data = await response.json();
 
     if (!data.content || typeof data.content !== 'string') {
-      return null;
+      return { asset: null, error: 'GENERATION_FAILED' };
     }
 
     const now = Date.now();
     return {
-      id: `gen-${type}-${missionId}-${now}`,
-      missionId,
-      type,
-      content: data.content,
-      createdAt: now,
-      modelUsed: data.model ?? 'glm-4-flash',
+      asset: {
+        id: `gen-${type}-${missionId}-${now}`,
+        missionId,
+        type,
+        content: data.content,
+        createdAt: now,
+        modelUsed: data.model ?? 'glm-4-flash',
+      },
+      creditBalance: typeof data.creditBalance === 'number' ? data.creditBalance : undefined,
+      creditsConsumed: typeof data.creditsConsumed === 'number' ? data.creditsConsumed : undefined,
     };
   } catch (err) {
     if (import.meta.env.DEV) {
       console.error('[PremiumAPI] Generate error:', err);
     }
-    return null;
+    return { asset: null, error: 'GENERATION_FAILED' };
   }
 };
