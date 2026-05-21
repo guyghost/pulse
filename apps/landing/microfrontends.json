@@ -1,0 +1,27 @@
+{
+  "$schema": "https://openapi.vercel.sh/microfrontends.json",
+  "version": "1",
+  "applications": {
+    "landing": {
+      "packageName": "@pulse/landing",
+      "development": {
+        "task": "dev",
+        "local": 5173,
+        "fallback": "https://missionpulse.app"
+      }
+    },
+    "dashboard": {
+      "packageName": "@pulse/dashboard",
+      "routing": [
+        {
+          "paths": ["/dashboard", "/dashboard/:path*"]
+        }
+      ],
+      "development": {
+        "task": "dev",
+        "local": 5174,
+        "fallback": "https://missionpulse.app"
+      }
+    }
+  }
+}

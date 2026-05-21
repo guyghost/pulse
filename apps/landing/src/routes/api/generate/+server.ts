@@ -94,20 +94,21 @@ export const POST: RequestHandler = async ({ request }) => {
     return json({ error: 'Invalid token' }, { status: 401 });
   }
 
+  const userId = user.id;
   const admin = createSupabaseAdminClient();
 
   // Check credit status
   const { data: profile } = await supabase
     .from('profiles')
     .select('subscription_status, subscription_period_end, credit_balance')
-    .eq('id', user.id)
+    .eq('id', userId)
     .single();
 
   const isPremium = profile ? isPremiumProfileActive(profile) : false;
   let creditBalance = profile?.credit_balance ?? 0;
 
   if (isPremium) {
-    creditBalance = (await grantPremiumMonthlyCredits(admin, user.id)) ?? creditBalance;
+    creditBalance = (await grantPremiumMonthlyCredits(admin, userId)) ?? creditBalance;
   }
 
   if (creditBalance <= 0) {
@@ -142,7 +143,7 @@ export const POST: RequestHandler = async ({ request }) => {
     generation_type: type,
     model: glmModel,
   };
-  const reservedBalance = await consumeGenerationCredit(admin, user.id, reservationMetadata);
+  const reservedBalance = await consumeGenerationCredit(admin, userId, reservationMetadata);
 
   if (reservedBalance === null) {
     return json(
@@ -157,7 +158,7 @@ export const POST: RequestHandler = async ({ request }) => {
 
   async function refundReservedCredit(reason: string): Promise<number> {
     return (
-      (await refundGenerationCredit(admin, user.id, {
+      (await refundGenerationCredit(admin, userId, {
         ...reservationMetadata,
         refund_reason: reason,
       })) ?? creditBalance

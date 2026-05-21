@@ -6,6 +6,9 @@ const config = {
     adapter: adapter({
       runtime: 'nodejs22.x',
     }),
+    paths: {
+      base: process.env.PUBLIC_DASHBOARD_BASE_PATH ?? '/dashboard',
+    },
   },
 };
 

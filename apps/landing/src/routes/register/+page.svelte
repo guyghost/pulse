@@ -1,7 +1,12 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
 
-  let { data } = $props();
+  type RegisterForm = {
+    email?: string;
+    success?: boolean;
+  };
+
+  let { form }: { form?: RegisterForm } = $props();
 
   let formError = $state<string | undefined>(undefined);
   let email = $state('');
@@ -10,10 +15,10 @@
   let submitting = $state(false);
 
   $effect(() => {
-    const dataEmail = data.email ?? '';
+    const dataEmail = form?.email ?? '';
 
     email = dataEmail;
-    success = data.success ?? false;
+    success = form?.success ?? false;
     successEmail = dataEmail;
   });
 </script>
@@ -29,12 +34,7 @@
   <div class="container nav__container">
     <a href="/" class="nav__brand" aria-label="MissionPulse - Accueil">
       <div class="nav__logo">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 128 128"
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 128 128">
           <polyline
             points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
             fill="none"
@@ -77,8 +77,7 @@
           <h1>Vérifiez votre email</h1>
           <p>
             Un email de confirmation a été envoyé à
-            <strong>{successEmail}</strong>.
-            Cliquez sur le lien pour activer votre compte.
+            <strong>{successEmail}</strong>. Cliquez sur le lien pour activer votre compte.
           </p>
           <a href="/login" class="btn btn--primary">Aller à la connexion</a>
         </div>
@@ -254,7 +253,9 @@
     color: var(--color-text-primary);
     font-family: var(--font-sans);
     font-size: 0.9375rem;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    transition:
+      border-color var(--transition-fast),
+      box-shadow var(--transition-fast);
   }
 
   .form-input::placeholder {

@@ -143,9 +143,16 @@ const favoriteRowToApplication = (row: FavoriteMissionRow): MissionApplication |
   return favorite ? favoriteMissionToApplication(favorite) : null;
 };
 
+const getLoginUrl = (): string => {
+  const loginPath = `/login?redirectTo=${encodeURIComponent('/dashboard')}`;
+  const landingUrl = env.PUBLIC_LANDING_URL?.replace(/\/$/, '');
+
+  return landingUrl ? `${landingUrl}${loginPath}` : loginPath;
+};
+
 export const load: PageServerLoad = async ({ cookies }) => {
   const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
-  const loginUrl = `${env.PUBLIC_LANDING_URL ?? ''}/login`;
+  const loginUrl = getLoginUrl();
 
   if (!hasSupabaseConfig) {
     const entitlements = getAnonymousEntitlements();

@@ -1,10 +1,11 @@
 import tailwindcss from '@tailwindcss/vite';
 import { sveltekit } from '@sveltejs/kit/vite';
+import { microfrontends } from '@vercel/microfrontends/experimental/vite';
 import { resolve } from 'path';
 import { defineConfig } from 'vite';
 
 export default defineConfig({
-  plugins: [sveltekit(), tailwindcss()],
+  plugins: [microfrontends(), sveltekit(), tailwindcss()],
   resolve: {
     alias: [
       {

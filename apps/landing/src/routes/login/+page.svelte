@@ -7,6 +7,7 @@
   let formError = $state<string | undefined>(undefined);
   let email = $state('');
   let submitting = $state(false);
+  const redirectTo = $derived(data.redirectTo ?? '/dashboard');
 
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
 
@@ -26,12 +27,7 @@
   <div class="container nav__container">
     <a href="/" class="nav__brand" aria-label="MissionPulse - Accueil">
       <div class="nav__logo">
-        <svg
-          xmlns="http://www.w3.org/2000/svg"
-          width="24"
-          height="24"
-          viewBox="0 0 128 128"
-        >
+        <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 128 128">
           <polyline
             points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
             fill="none"
@@ -108,6 +104,8 @@
             autocomplete="email"
           />
         </div>
+
+        <input type="hidden" name="redirectTo" value={redirectTo} />
 
         <div class="form-group">
           <label for="password" class="form-label">Mot de passe</label>
@@ -205,7 +203,9 @@
     color: var(--color-text-primary);
     font-family: var(--font-sans);
     font-size: 0.9375rem;
-    transition: border-color var(--transition-fast), box-shadow var(--transition-fast);
+    transition:
+      border-color var(--transition-fast),
+      box-shadow var(--transition-fast);
   }
 
   .form-input::placeholder {

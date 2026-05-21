@@ -20,6 +20,7 @@ The landing remains the public, non-connected surface. The dashboard becomes the
 - Build: `pnpm --filter @pulse/dashboard build`
 - Typecheck: `pnpm --filter @pulse/dashboard typecheck`
 - Check: `pnpm --filter @pulse/dashboard check`
+- Microfrontend proxy: run landing on `5173`, dashboard on `5174`, then use `pnpm --filter @pulse/landing exec microfrontends proxy --local-apps landing,dashboard`
 
 ## Project Structure
 
@@ -66,6 +67,28 @@ Use Svelte 5 runes only.
 - Ask first: database schema changes, extension manifest changes for external web messaging, adding a router/orchestration framework.
 - Never: store platform credentials, make the dashboard scrape directly, duplicate extension connector logic in the web app.
 
+## Deployment Routing
+
+The public facade is the default Vercel microfrontend app at `missionpulse.app`.
+The connected dashboard is a child app routed under `/dashboard` and built with a SvelteKit base path of `/dashboard`.
+
+Expected Vercel project names for the microfrontends group are:
+
+- `landing` with package name `@pulse/landing`
+- `dashboard` with package name `@pulse/dashboard`
+
+The default app owns `apps/landing/microfrontends.json`. In Vercel, create one microfrontends group with `landing` as the default app and `dashboard` as a child app. The child routing must include `/dashboard` and `/dashboard/:path*`.
+
+Deployment setup:
+
+```bash
+vercel link apps/landing
+vercel link apps/dashboard
+vercel mf create-group --name="MissionPulse" --project=landing --project=dashboard --default-app=landing --project-default-route=dashboard=/dashboard --yes
+```
+
+Each project needs the same Supabase public env vars. The landing also owns checkout and webhook secrets. The dashboard redirects unauthenticated users to `/login?redirectTo=%2Fdashboard`; after login, the landing redirects the user back to `/dashboard`.
+
 ## Success Criteria
 
 - `apps/dashboard` is a workspace package named `@pulse/dashboard`.
@@ -75,6 +98,5 @@ Use Svelte 5 runes only.
 
 ## Open Questions
 
-- Final deployment split: subdomain such as `app.missionpulse.app` or path routing behind a reverse proxy.
 - Extension sync protocol: Chrome external messaging, Supabase-backed queue, or both.
 - Source of truth for applications and CV: Supabase tables, extension IndexedDB, or a hybrid model with explicit sync.
