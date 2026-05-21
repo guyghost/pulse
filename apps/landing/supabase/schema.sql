@@ -30,9 +30,21 @@ create table if not exists public.credit_transactions (
   created_at timestamptz not null default now()
 );
 
+-- Favorite missions synced from the Chrome extension for dashboard display.
+-- The extension remains local-first; this table is populated only for signed-in users.
+create table if not exists public.favorite_missions (
+  user_id uuid references auth.users(id) on delete cascade not null,
+  mission_id text not null,
+  mission jsonb not null,
+  favorited_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, mission_id)
+);
+
 -- 2. Enable RLS
 alter table public.profiles enable row level security;
 alter table public.credit_transactions enable row level security;
+alter table public.favorite_missions enable row level security;
 
 -- 3. RLS policies
 
@@ -46,6 +58,27 @@ drop policy if exists "Users can update own profile" on public.profiles;
 
 create policy "Users can read own credit transactions"
   on public.credit_transactions for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can read own favorite missions" on public.favorite_missions;
+create policy "Users can read own favorite missions"
+  on public.favorite_missions for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Users can insert own favorite missions" on public.favorite_missions;
+create policy "Users can insert own favorite missions"
+  on public.favorite_missions for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can update own favorite missions" on public.favorite_missions;
+create policy "Users can update own favorite missions"
+  on public.favorite_missions for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Users can delete own favorite missions" on public.favorite_missions;
+create policy "Users can delete own favorite missions"
+  on public.favorite_missions for delete
   using (auth.uid() = user_id);
 
 -- Service role can do anything (for webhook handler)
@@ -92,6 +125,13 @@ create trigger on_profile_updated
   for each row
   execute function public.update_updated_at();
 
+drop trigger if exists on_favorite_missions_updated on public.favorite_missions;
+
+create trigger on_favorite_missions_updated
+  before update on public.favorite_missions
+  for each row
+  execute function public.update_updated_at();
+
 -- 6. Index for webhook lookups
 create index if not exists idx_profiles_ls_subscription
   on public.profiles (ls_subscription_id)
@@ -111,6 +151,9 @@ create unique index if not exists idx_credit_transactions_premium_period
 
 create index if not exists idx_credit_transactions_user_created
   on public.credit_transactions (user_id, created_at desc);
+
+create index if not exists idx_favorite_missions_user_favorited
+  on public.favorite_missions (user_id, favorited_at desc);
 
 create or replace function public.grant_premium_monthly_credits(
   p_user_id uuid,

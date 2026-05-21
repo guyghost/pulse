@@ -116,10 +116,14 @@
       bind:firstName={settings.firstName}
       bind:jobTitle={settings.jobTitle}
       bind:profileLocation={settings.profileLocation}
+      bind:profileRemote={settings.profileRemote}
+      bind:seniority={settings.seniority}
       bind:tjmMin={settings.tjmMin}
       bind:tjmMax={settings.tjmMax}
       bind:profileStack={settings.profileStack}
       bind:stackInput={settings.stackInput}
+      bind:searchKeywords={settings.searchKeywords}
+      bind:keywordInput={settings.keywordInput}
       editing={settings.editingProfile}
       profileSaved={settings.profileSaved}
       profileError={settings.profileError}
@@ -127,6 +131,8 @@
       onSave={() => settings.saveProfile()}
       onAddStack={() => settings.addStack()}
       onRemoveStack={(tech) => settings.removeStack(tech)}
+      onAddKeyword={() => settings.addKeyword()}
+      onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
     />
 
     <!-- Scan & Notifications -->

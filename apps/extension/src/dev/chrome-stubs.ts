@@ -107,6 +107,16 @@ function createChromeStubs() {
               type: 'AUTH_RESULT',
               payload: { status: 'unauthenticated', user: null },
             };
+          case 'SYNC_FAVORITE_MISSION':
+            console.log('[Chrome Stub] Favorite sync skipped:', message.payload);
+            return {
+              type: 'FAVORITE_MISSION_SYNCED',
+              payload: {
+                missionId: (message.payload as Record<string, unknown>)?.missionId,
+                synced: false,
+                reason: 'unauthenticated',
+              },
+            };
           default:
             console.log('[Chrome Stub] Unhandled message type:', message.type);
             return null;

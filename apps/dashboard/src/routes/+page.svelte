@@ -1,8 +1,19 @@
 <script lang="ts">
-  import { Badge, Button, Chip } from '@pulse/ui';
-  import { countApplicationsByStage, getCvSyncReadiness } from '$lib/core/dashboard';
+  import { Badge } from '@pulse/ui';
+  import {
+    countApplicationsByStage,
+    filterApplications,
+    getAverageApplicationScore,
+    getCvSyncReadiness,
+    getNextFollowUp,
+    getSyncBlockers,
+  } from '$lib/core/dashboard';
   import type {
     ApplicationStage,
+    DashboardAccountEntitlements,
+    DashboardFeatureAccess,
+    DashboardFeatureArea,
+    DashboardFeatureRequirement,
     MissionApplication,
     PlatformSyncStatus,
   } from '$lib/core/dashboard';
@@ -12,19 +23,50 @@
   const applications = $derived(data.applications as MissionApplication[]);
   const cv = $derived(data.cv);
   const syncStatuses = $derived(data.syncStatuses as PlatformSyncStatus[]);
+  const entitlements = $derived(data.entitlements as DashboardAccountEntitlements);
+  const featureAccess = $derived(data.featureAccess as DashboardFeatureAccess[]);
   const counts = $derived(countApplicationsByStage(applications));
   const readiness = $derived(getCvSyncReadiness(cv, syncStatuses));
   const isConnected = $derived(Boolean(data.session));
-  const averageScore = $derived(
-    Math.round(
-      applications.reduce((total, application) => total + application.score, 0) /
-        Math.max(applications.length, 1)
-    )
+  const enabledFeatureCount = $derived(featureAccess.filter((feature) => feature.enabled).length);
+  let searchQuery = $state('');
+  let selectedSource = $state<'all' | MissionApplication['source']>('all');
+  let selectedApplicationId = $state<string | null>(null);
+  let syncPrepared = $state(false);
+  const averageScore = $derived(getAverageApplicationScore(applications));
+  const nextFollowUp = $derived(getNextFollowUp(applications));
+  const sourceFilters: { label: string; value: 'all' | MissionApplication['source'] }[] = [
+    { label: 'Toutes', value: 'all' },
+    { label: 'Free-Work', value: 'free-work' },
+    { label: 'LeHibou', value: 'lehibou' },
+    { label: 'Hiway', value: 'hiway' },
+    { label: 'Collective', value: 'collective' },
+    { label: 'Cherry Pick', value: 'cherry-pick' },
+  ];
+
+  const sourceLabels: Record<MissionApplication['source'], string> = {
+    linkedin: 'LinkedIn',
+    'free-work': 'Free-Work',
+    lehibou: 'LeHibou',
+    hiway: 'Hiway',
+    collective: 'Collective',
+    'cherry-pick': 'Cherry Pick',
+    malt: 'Malt',
+    other: 'Autre',
+  };
+
+  const filteredApplications = $derived(
+    filterApplications(applications, { query: searchQuery, source: selectedSource }, sourceLabels)
   );
-  const nextFollowUp = $derived(
-    applications.find((application) => application.nextActionAt)?.nextActionAt ?? null
+  const selectedApplication = $derived(
+    filteredApplications.find((application) => application.id === selectedApplicationId) ??
+      filteredApplications[0] ??
+      null
   );
-  const sourceFilters = ['Toutes', 'LinkedIn', 'Free-Work', 'Malt'];
+  const syncBlockers = $derived(getSyncBlockers(cv, syncStatuses));
+  const readyPlatforms = $derived(syncStatuses.filter((platform) => platform.status === 'ready'));
+  const cvSyncAccess = $derived(featureAccess.find((feature) => feature.id === 'cv-sync') ?? null);
+  const canPrepareCvSync = $derived(readiness.canSync && Boolean(cvSyncAccess?.enabled));
 
   const stageLabels: Record<ApplicationStage, string> = {
     draft: 'Brouillon',
@@ -41,11 +83,19 @@
     syncing: 'Synchronisation',
   };
 
-  const sourceLabels: Record<MissionApplication['source'], string> = {
-    linkedin: 'LinkedIn',
-    freework: 'Free-Work',
-    malt: 'Malt',
-    other: 'Autre',
+  const featureAreaLabels: Record<DashboardFeatureArea, string> = {
+    missions: 'Missions',
+    profile: 'Profil',
+    applications: 'Candidatures',
+    automation: 'Automatisation',
+    account: 'Compte',
+  };
+
+  const requirementLabels: Record<DashboardFeatureRequirement, string> = {
+    anonymous: 'Inclus',
+    account: 'Compte',
+    credits: 'Crédits',
+    premium: 'Premium',
   };
 
   const formatDate = (value: string | null) =>
@@ -95,11 +145,11 @@
 
     <nav class="mt-6 space-y-1" aria-label="Navigation dashboard">
       <a
-        class="flex h-9 items-center justify-between rounded-lg bg-text-primary px-3 text-sm font-medium text-surface-white"
+        class="flex h-9 items-center justify-between rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/8 px-3 text-sm font-medium text-blueprint-blue"
         href="/"
       >
         <span>Vue d'ensemble</span>
-        <span class="h-1.5 w-1.5 rounded-full bg-surface-white"></span>
+        <span class="h-1.5 w-1.5 rounded-full bg-blueprint-blue"></span>
       </a>
       <a
         class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
@@ -130,6 +180,12 @@
         <p class="mt-2 text-xs leading-5 text-text-subtle">
           Les mises à jour CV seront exécutées depuis les sessions navigateur existantes.
         </p>
+        <div class="mt-3 flex items-center justify-between border-t border-border-light pt-3">
+          <span class="text-xs text-text-subtle">Features actives</span>
+          <span class="text-xs font-semibold text-text-primary">
+            {enabledFeatureCount}/{featureAccess.length}
+          </span>
+        </div>
       </div>
     </div>
   </aside>
@@ -147,7 +203,14 @@
 
         <div class="flex flex-wrap items-center gap-2">
           {#if isConnected}
-            <Badge label="Session active" variant="success" size="md" />
+            <Badge
+              label={entitlements.subscriptionStatus === 'premium'
+                ? 'Premium actif'
+                : 'Compte actif'}
+              variant="success"
+              size="md"
+            />
+            <Badge label={`${entitlements.creditBalance} crédits`} variant="source" size="md" />
           {:else}
             <a
               class="inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas"
@@ -191,7 +254,7 @@
       </div>
     </header>
 
-    <div class="mx-auto max-w-[1220px] px-4 pb-28 pt-8 md:px-8">
+    <div class="mx-auto max-w-[1220px] px-4 pb-10 pt-8 md:px-8">
       <section class="mb-7">
         <div class="flex flex-col gap-4 md:flex-row md:items-end md:justify-between">
           <div>
@@ -202,15 +265,20 @@
               <span
                 class="rounded-full bg-subtle-gray px-2 py-1 text-xs font-medium text-text-subtle"
               >
-                Beta
+                {enabledFeatureCount}/{featureAccess.length} features
               </span>
             </div>
             <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
-              Suivez les candidatures actives, gardez un CV prêt à publier et préparez les
-              synchronisations via l'extension.
+              Retrouvez les fonctionnalités de l'extension dans le dashboard, avec activation par
+              feature flag selon la session, les crédits et le statut d'achat.
             </p>
           </div>
-          <Button size="sm">Mettre à jour le CV</Button>
+          <a
+            class="inline-flex h-8 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue shadow-subtle-2 hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12"
+            href="#cv"
+          >
+            Vérifier le CV
+          </a>
         </div>
 
         <div class="mt-6 flex border-b border-border-light">
@@ -234,8 +302,8 @@
           <p class="text-sm font-medium text-text-primary">Mode aperçu</p>
           <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
             Les données ci-dessous illustrent le futur dashboard connecté. La session Supabase sera
-            utilisée comme source d'identité dès que le déploiement microfrontend sera branché au
-            domaine final.
+            utilisée comme source d'identité. Les fonctionnalités liées au compte, comme la
+            synchronisation de CV, restent verrouillées dans cet aperçu.
           </p>
         </section>
       {/if}
@@ -268,48 +336,137 @@
         <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
           <p class="text-xs font-medium uppercase text-text-subtle">Prochaine relance</p>
           <div class="mt-3 flex items-end justify-between">
-            <p class="text-3xl font-semibold">{formatDate(nextFollowUp)}</p>
+            <p class="text-3xl font-semibold">{formatDate(nextFollowUp?.nextActionAt ?? null)}</p>
             <Badge label="À traiter" variant="source" />
           </div>
+        </div>
+      </section>
+
+      <section class="mt-6" aria-labelledby="feature-flags-title">
+        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p class="eyebrow text-text-subtle">Feature flipping</p>
+            <h2 id="feature-flags-title" class="mt-1 text-lg font-semibold text-text-primary">
+              Fonctionnalités disponibles sur le dashboard
+            </h2>
+          </div>
+          <p class="text-sm text-text-subtle">
+            {enabledFeatureCount} actives, {featureAccess.length - enabledFeatureCount} verrouillées
+          </p>
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          {#each featureAccess as feature}
+            <article
+              class="rounded-lg border bg-surface-white p-4 shadow-subtle-2 {feature.enabled
+                ? 'border-border-light'
+                : 'border-dashed border-disabled-gray opacity-80'}"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-[11px] font-medium uppercase text-text-muted">
+                    {featureAreaLabels[feature.area]}
+                  </p>
+                  <h3 class="mt-1 text-sm font-semibold text-text-primary">{feature.label}</h3>
+                </div>
+                <Badge
+                  label={feature.enabled
+                    ? requirementLabels[feature.requirement]
+                    : (feature.lockedReason ?? 'Verrouillé')}
+                  variant={feature.enabled ? 'success' : 'warning'}
+                />
+              </div>
+              <p class="mt-3 text-xs leading-5 text-text-subtle">{feature.description}</p>
+            </article>
+          {/each}
         </div>
       </section>
 
       <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section id="applications">
           <div class="rounded-xl border border-border-light bg-surface-white p-3 shadow-sm">
-            <label
-              class="flex h-11 items-center gap-3 rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-subtle"
-            >
-              <svg
-                viewBox="0 0 24 24"
-                class="h-4 w-4"
-                fill="none"
-                stroke="currentColor"
-                stroke-width="2"
-                aria-hidden="true"
+            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+              <label
+                class="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-subtle"
               >
-                <circle cx="11" cy="11" r="7" />
-                <path d="m20 20-3.5-3.5" />
-              </svg>
-              <input
-                class="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
-                placeholder="Rechercher mission, client ou plateforme"
-                type="search"
-              />
-            </label>
+                <svg
+                  viewBox="0 0 24 24"
+                  class="h-4 w-4"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="2"
+                  aria-hidden="true"
+                >
+                  <circle cx="11" cy="11" r="7" />
+                  <path d="m20 20-3.5-3.5" />
+                </svg>
+                <input
+                  class="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
+                  placeholder="Rechercher mission, client ou plateforme"
+                  type="search"
+                  value={searchQuery}
+                  oninput={(event) => {
+                    searchQuery = event.currentTarget.value;
+                  }}
+                />
+              </label>
+              <p class="shrink-0 text-xs font-medium text-text-subtle">
+                {filteredApplications.length}/{applications.length} missions
+              </p>
+            </div>
 
-            <div class="mt-3 flex flex-wrap gap-2">
-              {#each sourceFilters as filter, index}
-                <Chip label={filter} selected={index === 0} size="sm" />
+            <div class="mt-3 flex flex-wrap gap-2" role="toolbar" aria-label="Filtrer par source">
+              {#each sourceFilters as filter}
+                <label
+                  class="inline-flex h-7 cursor-pointer items-center rounded-full border px-2 text-[10px] font-medium transition-colors {selectedSource ===
+                  filter.value
+                    ? 'border-blueprint-blue/30 bg-blueprint-blue/10 text-blueprint-blue'
+                    : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                >
+                  <input
+                    class="mr-1.5 h-3 w-3 accent-blueprint-blue"
+                    type="radio"
+                    name="source-filter"
+                    value={filter.value}
+                    checked={selectedSource === filter.value}
+                    oninput={() => {
+                      selectedSource = filter.value;
+                    }}
+                  />
+                  {filter.label}
+                </label>
               {/each}
             </div>
           </div>
 
-          <div class="mt-4 grid auto-rows-[96px] gap-4 md:grid-cols-2">
-            {#each applications as application}
+          <div class="mt-4 grid auto-rows-[104px] gap-4 md:grid-cols-2">
+            {#if filteredApplications.length === 0}
               <article
-                class="group flex min-h-0 flex-col justify-between rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2 transition duration-200 hover:-translate-y-0.5 hover:shadow-sm {application.stage ===
-                'interview'
+                class="row-span-2 rounded-xl border border-dashed border-border-light bg-surface-white p-5"
+              >
+                <p class="text-sm font-semibold text-text-primary">Aucune mission trouvée</p>
+                <p class="mt-2 text-sm leading-6 text-text-subtle">
+                  Ajustez la recherche ou revenez à toutes les sources.
+                </p>
+                <button
+                  type="button"
+                  class="mt-5 inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas"
+                  onclick={() => {
+                    searchQuery = '';
+                    selectedSource = 'all';
+                  }}
+                >
+                  Réinitialiser
+                </button>
+              </article>
+            {/if}
+
+            {#each filteredApplications as application}
+              <article
+                class="group flex min-h-0 flex-col justify-between rounded-xl border bg-surface-white p-4 shadow-subtle-2 transition duration-200 hover:-translate-y-0.5 hover:shadow-sm {selectedApplication?.id ===
+                application.id
+                  ? 'border-blueprint-blue/40 ring-2 ring-blueprint-blue/10'
+                  : 'border-border-light'} {application.stage === 'interview'
                   ? 'row-span-3'
                   : 'row-span-2'}"
               >
@@ -344,31 +501,73 @@
                       </p>
                     </div>
                   </div>
-                  <div class="flex items-center justify-between border-t border-border-light pt-3">
+                  <div class="flex min-w-0 items-center gap-3 border-t border-border-light pt-3">
                     <Badge label={stageLabels[application.stage]} variant="status" size="md" />
-                    <button class="text-sm font-medium text-text-primary hover:text-blueprint-blue">
-                      Ouvrir
+                    <button
+                      type="button"
+                      class="ml-auto inline-flex h-7 shrink-0 items-center justify-center rounded-md px-2 text-xs font-medium text-text-primary hover:bg-page-canvas hover:text-blueprint-blue"
+                      onclick={() => {
+                        selectedApplicationId = application.id;
+                      }}
+                    >
+                      {selectedApplication?.id === application.id ? 'Sélectionnée' : 'Ouvrir'}
                     </button>
                   </div>
                 </div>
               </article>
             {/each}
-
-            <article
-              class="row-span-2 flex flex-col justify-between rounded-xl border border-dashed border-blueprint-blue/35 bg-blueprint-blue/8 p-4"
-            >
-              <div>
-                <p class="text-sm font-semibold text-text-primary">Nouvelle candidature</p>
-                <p class="mt-2 text-sm leading-6 text-text-subtle">
-                  Importez une mission repérée par l'extension ou préparez une candidature manuelle.
-                </p>
-              </div>
-              <Button variant="secondary" size="sm">Ajouter</Button>
-            </article>
           </div>
         </section>
 
         <div class="space-y-4">
+          {#if selectedApplication}
+            <section class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="eyebrow text-text-subtle">Candidature active</p>
+                  <h2 class="mt-2 text-lg font-semibold leading-tight">
+                    {selectedApplication.title}
+                  </h2>
+                  <p class="mt-1 text-sm text-text-subtle">
+                    {selectedApplication.company} · {selectedApplication.location}
+                  </p>
+                </div>
+                <Badge
+                  label={`${selectedApplication.score}%`}
+                  variant={selectedApplication.score >= 85 ? 'success' : 'warning'}
+                  size="md"
+                />
+              </div>
+
+              <dl class="mt-5 grid grid-cols-2 gap-2 text-xs">
+                <div class="rounded-lg bg-page-canvas px-3 py-2">
+                  <dt class="text-text-muted">Source</dt>
+                  <dd class="mt-1 font-medium text-text-primary">
+                    {sourceLabels[selectedApplication.source]}
+                  </dd>
+                </div>
+                <div class="rounded-lg bg-page-canvas px-3 py-2">
+                  <dt class="text-text-muted">Statut</dt>
+                  <dd class="mt-1 font-medium text-text-primary">
+                    {stageLabels[selectedApplication.stage]}
+                  </dd>
+                </div>
+                <div class="rounded-lg bg-page-canvas px-3 py-2">
+                  <dt class="text-text-muted">Postulé</dt>
+                  <dd class="mt-1 font-medium text-text-primary">
+                    {formatDate(selectedApplication.appliedAt)}
+                  </dd>
+                </div>
+                <div class="rounded-lg bg-page-canvas px-3 py-2">
+                  <dt class="text-text-muted">Relance</dt>
+                  <dd class="mt-1 font-medium text-text-primary">
+                    {formatDate(selectedApplication.nextActionAt)}
+                  </dd>
+                </div>
+              </dl>
+            </section>
+          {/if}
+
           <section
             id="cv"
             class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm"
@@ -400,14 +599,13 @@
               ></div>
             </div>
             <p class="mt-4 text-sm text-text-secondary">{cv.targetRole}</p>
+            <p class="mt-2 text-xs text-text-subtle">
+              Dernière mise à jour : {formatDate(cv.updatedAt)}
+            </p>
             <div class="mt-4 flex flex-wrap gap-2">
               {#each cv.skills as skill}
                 <Badge label={skill} variant="tech" />
               {/each}
-            </div>
-            <div class="mt-5 flex gap-2">
-              <Button size="sm">Éditer</Button>
-              <Button variant="secondary" size="sm">Importer PDF</Button>
             </div>
           </section>
 
@@ -418,8 +616,9 @@
             <p class="eyebrow text-text-subtle">Connecteurs</p>
             <h2 class="mt-2 text-lg font-semibold">Synchronisation extension</h2>
             <p class="mt-1 text-sm leading-6 text-text-subtle">
-              {readiness.readyPlatforms}/{readiness.totalPlatforms} plateformes prêtes. Le dashboard prépare
-              les actions, l'extension exécute la mise à jour dans les sessions navigateur existantes.
+              {readiness.readyPlatforms}/{readiness.totalPlatforms} plateformes prêtes. La synchro CV
+              est activée uniquement pour les comptes connectés; le dashboard prépare le plan, l'extension
+              exécute la mise à jour dans les sessions navigateur existantes.
             </p>
             <div class="mt-5 space-y-3">
               {#each syncStatuses as platform}
@@ -439,57 +638,76 @@
                 </div>
               {/each}
             </div>
-            <Button class="mt-5 w-full" disabled={!readiness.canSync}>Synchroniser le CV</Button>
+
+            {#if syncBlockers.length > 0}
+              <div class="mt-5 rounded-lg border border-border-light bg-page-canvas p-3">
+                <p class="text-xs font-medium uppercase text-text-subtle">À traiter ensuite</p>
+                <ul class="mt-2 space-y-1 text-xs leading-5 text-text-subtle">
+                  {#each syncBlockers as blocker}
+                    <li>{blocker}</li>
+                  {/each}
+                </ul>
+              </div>
+            {/if}
+
+            {#if cvSyncAccess && !cvSyncAccess.enabled}
+              <div class="mt-5 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/8 p-3">
+                <p class="text-xs font-medium uppercase text-blueprint-blue">Feature verrouillée</p>
+                <p class="mt-1 text-xs leading-5 text-text-subtle">
+                  Connectez-vous pour activer la synchronisation CV et associer le plan de mise à
+                  jour à votre compte MissionPulse.
+                </p>
+              </div>
+            {/if}
+
+            <button
+              type="button"
+              class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-blueprint-blue bg-blueprint-blue px-4 text-sm font-medium text-surface-white shadow-subtle-2 hover:bg-blueprint-blue/90 disabled:cursor-not-allowed disabled:opacity-40"
+              disabled={!canPrepareCvSync}
+              onclick={() => {
+                syncPrepared = true;
+              }}
+            >
+              {cvSyncAccess?.enabled
+                ? 'Préparer le plan de synchro'
+                : 'Compte requis pour la synchro CV'}
+            </button>
+
+            {#if syncPrepared}
+              <p
+                class="mt-3 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
+              >
+                Plan prêt pour {readyPlatforms.map((platform) => platform.name).join(', ')}. Les
+                autres plateformes restent dans la checklist.
+              </p>
+            {/if}
           </section>
         </div>
       </div>
-    </div>
 
-    <section
-      class="fixed bottom-4 left-4 right-4 z-30 mx-auto max-w-2xl rounded-2xl border border-border-light bg-surface-white/95 p-3 shadow-xl backdrop-blur lg:left-72"
-      aria-label="Préparation synchronisation CV"
-    >
-      <div class="flex flex-col gap-3 md:flex-row md:items-center">
-        <div
-          class="flex h-14 w-full items-center rounded-xl bg-page-canvas px-4 text-sm text-text-subtle"
-        >
-          Préparer une mise à jour CV pour LinkedIn, Free-Work et les plateformes prêtes...
-        </div>
-        <div class="flex items-center gap-2">
-          <button
-            class="inline-flex h-10 w-10 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-subtle hover:bg-page-canvas"
-            aria-label="Ajouter une référence CV"
+      <section
+        class="mx-auto mt-8 max-w-2xl rounded-xl border border-border-light bg-surface-white/95 p-4 shadow-subtle-2"
+        aria-label="Préparation synchronisation CV"
+      >
+        <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+          <div>
+            <p class="text-sm font-semibold text-text-primary">Prochaine action MVP</p>
+            <p class="mt-1 text-sm leading-6 text-text-subtle">
+              {canPrepareCvSync
+                ? `Préparer la mise à jour CV pour ${readyPlatforms.map((platform) => platform.name).join(', ')}.`
+                : cvSyncAccess && !cvSyncAccess.enabled
+                  ? 'Créer ou connecter un compte pour activer la synchronisation CV.'
+                  : 'Résoudre les préconditions avant de préparer une synchronisation.'}
+            </p>
+          </div>
+          <a
+            class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas"
+            href="#sync"
           >
-            <svg
-              viewBox="0 0 24 24"
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              aria-hidden="true"
-            >
-              <path d="M12 5v14M5 12h14" />
-            </svg>
-          </button>
-          <button
-            class="inline-flex h-10 w-10 items-center justify-center rounded-full bg-text-primary text-surface-white disabled:opacity-40"
-            aria-label="Lancer la synchronisation"
-            disabled={!readiness.canSync}
-          >
-            <svg
-              viewBox="0 0 24 24"
-              class="h-4 w-4"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              aria-hidden="true"
-            >
-              <path d="M12 19V5" />
-              <path d="m5 12 7-7 7 7" />
-            </svg>
-          </button>
+            Voir les connecteurs
+          </a>
         </div>
-      </div>
-    </section>
+      </section>
+    </div>
   </section>
 </main>

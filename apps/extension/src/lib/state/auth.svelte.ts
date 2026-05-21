@@ -11,6 +11,16 @@ import { sendMessage } from '$lib/shell/messaging/bridge';
 
 export type AuthStoreState = 'idle' | 'loading' | 'ready' | 'error';
 
+export const AUTH_STATE_CHANGED_EVENT = 'missionpulse:auth-state-changed';
+
+function notifyAuthStateChanged(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+
+  window.dispatchEvent(new CustomEvent(AUTH_STATE_CHANGED_EVENT));
+}
+
 export function createAuthStore() {
   let storeState = $state<AuthStoreState>('idle');
   let authStatus = $state<AuthStatus>('unknown');
@@ -92,6 +102,8 @@ export function createAuthStore() {
       error = msg;
       storeState = 'error';
       return { success: false, error: msg };
+    } finally {
+      notifyAuthStateChanged();
     }
   }
 
@@ -133,6 +145,8 @@ export function createAuthStore() {
       error = msg;
       storeState = 'error';
       return { success: false, error: msg };
+    } finally {
+      notifyAuthStateChanged();
     }
   }
 
@@ -149,6 +163,7 @@ export function createAuthStore() {
     user = null;
     error = null;
     storeState = 'ready';
+    notifyAuthStateChanged();
   }
 
   return {

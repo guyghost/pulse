@@ -12,17 +12,23 @@ import {
   setOnboardingCompleted,
 } from '$lib/shell/storage/first-scan';
 
-export type Page = 'feed' | 'tjm' | 'settings' | 'onboarding';
+export type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'onboarding';
 
 const PAGE_INDEX: Record<Page, number> = {
   onboarding: -1,
   feed: 0,
-  tjm: 1,
-  settings: 2,
+  profile: 1,
+  cv: 2,
+  applications: 3,
+  tjm: 4,
+  settings: 5,
 };
 
 export const NAV_ITEMS: { page: Page; label: string; icon: string }[] = [
   { page: 'feed', label: 'Feed', icon: 'briefcase' },
+  { page: 'profile', label: 'Profil', icon: 'user' },
+  { page: 'cv', label: 'CV', icon: 'file-text' },
+  { page: 'applications', label: 'Suivi', icon: 'mail' },
   { page: 'tjm', label: 'TJM', icon: 'chart-column' },
   { page: 'settings', label: 'Settings', icon: 'settings' },
 ];

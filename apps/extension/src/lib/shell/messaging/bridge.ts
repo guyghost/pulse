@@ -79,6 +79,12 @@ export type BridgeMessage =
   | { type: 'AUTH_LOGOUT' }
   | { type: 'AUTH_STATUS' }
   | { type: 'AUTH_RESULT'; payload: { status: AuthStatus; user: AuthUser | null; error?: string } }
+  // Account sync
+  | { type: 'SYNC_FAVORITE_MISSION'; payload: { missionId: string; favoritedAt: number | null } }
+  | {
+      type: 'FAVORITE_MISSION_SYNCED';
+      payload: { missionId: string; synced: boolean; reason?: string };
+    }
   // Connector health (service worker → side panel)
   | { type: 'GET_CONNECTOR_HEALTH' }
   | { type: 'CONNECTOR_HEALTH_RESULT'; payload: ConnectorHealthSnapshot[] }

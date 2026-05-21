@@ -172,6 +172,36 @@ describe('validateMessage — AUTH_LOGIN', () => {
 });
 
 // ============================================================================
+// SYNC_FAVORITE_MISSION
+// ============================================================================
+
+describe('validateMessage — SYNC_FAVORITE_MISSION', () => {
+  it('accepte un favori à synchroniser', () => {
+    const r = validateMessage({
+      type: 'SYNC_FAVORITE_MISSION',
+      payload: { missionId: 'm1', favoritedAt: 1773230400000 },
+    });
+    expect(r.valid).toBe(true);
+  });
+
+  it('accepte la suppression distante du favori', () => {
+    const r = validateMessage({
+      type: 'SYNC_FAVORITE_MISSION',
+      payload: { missionId: 'm1', favoritedAt: null },
+    });
+    expect(r.valid).toBe(true);
+  });
+
+  it('rejette les timestamps invalides', () => {
+    const r = validateMessage({
+      type: 'SYNC_FAVORITE_MISSION',
+      payload: { missionId: 'm1', favoritedAt: -1 },
+    });
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
 // SHOW_TOAST
 // ============================================================================
 

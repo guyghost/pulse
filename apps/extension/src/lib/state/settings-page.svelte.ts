@@ -70,10 +70,14 @@ export class SettingsPageController {
   firstName = $state('');
   jobTitle = $state('');
   profileLocation = $state('');
+  profileRemote = $state<UserProfile['remote']>('any');
+  seniority = $state<UserProfile['seniority']>('senior');
   tjmMin = $state(0);
   tjmMax = $state(0);
   profileStack = $state<string[]>([]);
   stackInput = $state('');
+  searchKeywords = $state<string[]>([]);
+  keywordInput = $state('');
   editingProfile = $state(false);
   profileSaved = $state(false);
   profileError = $state<string | null>(null);
@@ -112,9 +116,12 @@ export class SettingsPageController {
       this.firstName = profile.firstName ?? '';
       this.jobTitle = profile.jobTitle ?? '';
       this.profileLocation = profile.location ?? '';
+      this.profileRemote = profile.remote ?? 'any';
+      this.seniority = profile.seniority ?? 'senior';
       this.tjmMin = profile.tjmMin ?? 0;
       this.tjmMax = profile.tjmMax ?? 0;
       this.profileStack = profile.stack ?? [];
+      this.searchKeywords = profile.searchKeywords ?? [];
     } catch {
       // Hors contexte extension
     }
@@ -159,6 +166,20 @@ export class SettingsPageController {
     this.profileStack = this.profileStack.filter((s) => s !== item);
   }
 
+  addKeyword(): void {
+    const trimmed = this.keywordInput.trim();
+    if (!trimmed || this.searchKeywords.includes(trimmed)) {
+      return;
+    }
+
+    this.searchKeywords = [...this.searchKeywords, trimmed];
+    this.keywordInput = '';
+  }
+
+  removeKeyword(item: string): void {
+    this.searchKeywords = this.searchKeywords.filter((keyword) => keyword !== item);
+  }
+
   async saveProfile(): Promise<void> {
     this.profileError = null;
 
@@ -171,10 +192,10 @@ export class SettingsPageController {
         tjmMin: this.tjmMin,
         tjmMax: this.tjmMax,
         stack: [...this.profileStack],
-        remote: current?.remote ?? 'any',
-        seniority: current?.seniority ?? 'senior',
+        remote: this.profileRemote,
+        seniority: this.seniority,
         scoringWeights: current?.scoringWeights,
-        searchKeywords: current?.searchKeywords ?? [],
+        searchKeywords: [...this.searchKeywords],
       });
 
       await saveProfile(nextProfile);

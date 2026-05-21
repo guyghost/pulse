@@ -52,6 +52,7 @@ import type { GeneratedAsset } from '../lib/core/types/generation';
 import { generatePremium } from '../lib/shell/auth/premium-api';
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
+import { syncFavoriteMissionChange } from '../lib/shell/sync/favorite-missions';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -775,6 +776,34 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           });
         }
       })();
+      return true;
+    }
+
+    // ── Account sync handlers ──
+
+    if (message.type === 'SYNC_FAVORITE_MISSION') {
+      const { missionId, favoritedAt } = message.payload;
+
+      syncFavoriteMissionChange(missionId, favoritedAt)
+        .then((result) => {
+          sendResponse({
+            type: 'FAVORITE_MISSION_SYNCED',
+            payload: {
+              missionId,
+              synced: result.synced,
+              ...(!result.synced ? { reason: result.reason } : {}),
+            },
+          });
+        })
+        .catch((err) => {
+          if (import.meta.env.DEV) {
+            console.warn('[MissionPulse] SYNC_FAVORITE_MISSION error:', err);
+          }
+          sendResponse({
+            type: 'FAVORITE_MISSION_SYNCED',
+            payload: { missionId, synced: false, reason: 'remote-error' },
+          });
+        });
       return true;
     }
 

@@ -1,5 +1,8 @@
 <script lang="ts">
   import FeedPage from '../ui/pages/FeedPage.svelte';
+  import ProfilePage from '../ui/pages/ProfilePage.svelte';
+  import CvPage from '../ui/pages/CvPage.svelte';
+  import ApplicationsPage from '../ui/pages/ApplicationsPage.svelte';
   import TJMPage from '../ui/pages/TJMPage.svelte';
   import SettingsPage from '../ui/pages/SettingsPage.svelte';
   import OnboardingPage from '../ui/pages/OnboardingPage.svelte';
@@ -15,13 +18,22 @@
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { createAppNavigation, NAV_ITEMS } from '$lib/state/app-navigation.svelte';
+  import { AUTH_STATE_CHANGED_EVENT, createAuthStore } from '$lib/state/auth.svelte';
   import { createThemeStore } from '$lib/state/theme.svelte';
 
   const nav = createAppNavigation();
+  const auth = createAuthStore();
   const theme = createThemeStore();
+  const visibleNavItems = $derived(
+    auth.isAuthenticated
+      ? NAV_ITEMS
+      : NAV_ITEMS.filter((item) => item.page === 'feed' || item.page === 'settings')
+  );
+  const denseNav = $derived(visibleNavItems.length > 4);
 
   // Initialize theme on mount
   theme.init();
+  auth.checkStatus();
   const connection = getConnectionStore();
   let showOfflineBanner = $state(false);
   let feedNavCompact = $state(false);
@@ -94,6 +106,26 @@
   });
 
   $effect(() => {
+    function handleAuthStateChanged() {
+      void auth.checkStatus();
+    }
+
+    window.addEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthStateChanged);
+    return () => window.removeEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthStateChanged);
+  });
+
+  $effect(() => {
+    if (
+      !auth.isAuthenticated &&
+      nav.currentPage !== 'feed' &&
+      nav.currentPage !== 'settings' &&
+      nav.currentPage !== 'onboarding'
+    ) {
+      nav.navigate('feed');
+    }
+  });
+
+  $effect(() => {
     if (nav.currentPage !== 'feed') {
       feedNavCompact = false;
     }
@@ -130,9 +162,11 @@
         aria-label="Main navigation"
         class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {feedNavCompact
           ? 'min-h-9 gap-0.5 p-0.5'
-          : 'min-h-12 gap-1 p-1'}"
+          : denseNav
+            ? 'min-h-11 gap-0.5 p-0.5'
+            : 'min-h-12 gap-1 p-1'}"
       >
-        {#each NAV_ITEMS as item}
+        {#each visibleNavItems as item}
           <button
             use:ripple
             class="flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.985]
@@ -140,7 +174,11 @@
               ? nav.currentPage === item.page
                 ? 'flex-1 gap-1.5 px-3 py-1.5'
                 : 'basis-9 flex-none gap-0 px-0 py-1.5'
-              : 'flex-1 basis-0 gap-2 px-3 py-3'}
+              : denseNav
+                ? nav.currentPage === item.page
+                  ? 'flex-1 gap-1.5 px-3 py-2'
+                  : 'basis-10 flex-none gap-0 px-0 py-2'
+                : 'flex-1 basis-0 gap-2 px-3 py-3'}
           {nav.currentPage === item.page
               ? 'bg-surface-white text-text-primary shadow-subtle-2'
               : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
@@ -150,11 +188,12 @@
             <span
               class="shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
             >
-              <Icon name={item.icon} size={feedNavCompact ? 13 : 16} />
+              <Icon name={item.icon} size={feedNavCompact || denseNav ? 13 : 16} />
             </span>
             <span
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {feedNavCompact &&
-              nav.currentPage !== item.page
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {(feedNavCompact &&
+                nav.currentPage !== item.page) ||
+              (denseNav && nav.currentPage !== item.page)
                 ? 'max-w-0 opacity-0 -translate-x-1'
                 : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
             >
@@ -238,6 +277,89 @@
               <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
                 <div class="text-4xl">📈</div>
                 <p class="text-sm text-text-secondary">La vue TJM a rencontré une erreur.</p>
+                <button
+                  onclick={reset}
+                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
+                >
+                  Réessayer
+                </button>
+              </div>
+            {/snippet}
+          </svelte:boundary>
+        </div>
+      {/if}
+      {#if nav.currentPage === 'profile'}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 100 }}
+        >
+          <svelte:boundary
+            onerror={(e) => {
+              if (import.meta.env.DEV) console.error('[ProfilePage crash]', e);
+            }}
+          >
+            <ProfilePage onNavigateToOnboarding={nav.resetToOnboarding} />
+            {#snippet failed(error, reset)}
+              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <div class="text-4xl">Profil</div>
+                <p class="text-sm text-text-secondary">Le profil a rencontré une erreur.</p>
+                <button
+                  onclick={reset}
+                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
+                >
+                  Réessayer
+                </button>
+              </div>
+            {/snippet}
+          </svelte:boundary>
+        </div>
+      {/if}
+      {#if nav.currentPage === 'cv'}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 100 }}
+        >
+          <svelte:boundary
+            onerror={(e) => {
+              if (import.meta.env.DEV) console.error('[CvPage crash]', e);
+            }}
+          >
+            <CvPage />
+            {#snippet failed(error, reset)}
+              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <div class="text-4xl">CV</div>
+                <p class="text-sm text-text-secondary">La vue CV a rencontré une erreur.</p>
+                <button
+                  onclick={reset}
+                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
+                >
+                  Réessayer
+                </button>
+              </div>
+            {/snippet}
+          </svelte:boundary>
+        </div>
+      {/if}
+      {#if nav.currentPage === 'applications'}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 100 }}
+        >
+          <svelte:boundary
+            onerror={(e) => {
+              if (import.meta.env.DEV) console.error('[ApplicationsPage crash]', e);
+            }}
+          >
+            <ApplicationsPage />
+            {#snippet failed(error, reset)}
+              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
+                <div class="text-4xl">Candidatures</div>
+                <p class="text-sm text-text-secondary">
+                  Les candidatures ont rencontré une erreur.
+                </p>
                 <button
                   onclick={reset}
                   class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"

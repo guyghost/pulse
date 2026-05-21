@@ -212,6 +212,23 @@ export const MessageSchemas = {
   AUTH_STATUS: z.object({ type: z.literal('AUTH_STATUS') }),
   AUTH_RESULT: z.object({ type: z.literal('AUTH_RESULT'), payload: z.unknown() }),
 
+  // Account sync
+  SYNC_FAVORITE_MISSION: z.object({
+    type: z.literal('SYNC_FAVORITE_MISSION'),
+    payload: z.object({
+      missionId: z.string().max(256),
+      favoritedAt: z.number().int().min(0).nullable(),
+    }),
+  }),
+  FAVORITE_MISSION_SYNCED: z.object({
+    type: z.literal('FAVORITE_MISSION_SYNCED'),
+    payload: z.object({
+      missionId: z.string().max(256),
+      synced: z.boolean(),
+      reason: z.string().max(128).optional(),
+    }),
+  }),
+
   // Connector health
   GET_CONNECTOR_HEALTH: z.object({ type: z.literal('GET_CONNECTOR_HEALTH') }),
   CONNECTOR_HEALTH_RESULT: z.object({

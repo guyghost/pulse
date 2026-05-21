@@ -27,6 +27,7 @@ import {
   toggleHidden,
   filterHidden,
   filterFavoritesOnly,
+  syncFavoriteMission,
 } from '$lib/shell/facades/feed-data.facade';
 import { getFeedSortBy, setFeedSortBy } from '$lib/shell/storage/chrome-storage';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
@@ -194,8 +195,10 @@ export function createFeedPageState(
   }
 
   function handleToggleFavorite(id: string): void {
-    favorites = toggleFavorite(favorites, id, Date.now());
+    const updated = toggleFavorite(favorites, id, Date.now());
+    favorites = updated;
     saveFavorites(favorites).catch(() => {});
+    syncFavoriteMission(id, updated[id] ?? null).catch(() => {});
   }
 
   function handleHide(id: string): void {

@@ -4,6 +4,8 @@
  * Groups missions, seen, favorites, hidden, and connector status access
  * behind a clean API. UI pages import this instead of individual storage modules.
  */
+import { sendMessage } from '../messaging/bridge';
+
 export {
   getMissions,
   getMissionCount,
@@ -29,3 +31,17 @@ export {
   filterHidden,
   filterFavoritesOnly,
 } from '../../core/favorites/favorites';
+
+export async function syncFavoriteMission(
+  missionId: string,
+  favoritedAt: number | null
+): Promise<void> {
+  try {
+    await sendMessage({
+      type: 'SYNC_FAVORITE_MISSION',
+      payload: { missionId, favoritedAt },
+    });
+  } catch {
+    // Account sync is best-effort. Local favorites remain the source for the extension.
+  }
+}
