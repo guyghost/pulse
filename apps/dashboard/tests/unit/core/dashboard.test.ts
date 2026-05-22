@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildMissionScoreUpsertRow,
+  buildMissionUpsertRow,
+} from '../../../../extension/src/lib/core/sync/connected-dashboard';
+import type { Mission } from '../../../../extension/src/lib/core/types/mission';
+import {
   buildDashboardAlertPreferencesPatch,
   buildMissionComparisonSnapshot,
   countApplicationsByStage,
@@ -625,6 +630,74 @@ describe('dashboard core', () => {
         applicationStage: 'selected',
         freshness: 'fresh',
       },
+    ]);
+  });
+
+  it('keeps extension scan sync rows compatible with the dashboard mission feed', () => {
+    const scannedMission: Mission = {
+      id: 'free-work-scan-123',
+      title: 'Lead Svelte 5',
+      client: 'ScaleOps',
+      description: 'Mission Svelte 5 et TypeScript strict',
+      stack: ['Svelte', 'TypeScript'],
+      tjm: 720,
+      location: 'Remote France',
+      remote: 'full',
+      duration: '6 mois',
+      startDate: '2026-06-01',
+      publishedAt: '2026-05-20T08:00:00.000Z',
+      url: 'https://example.com/mission',
+      source: 'free-work',
+      scrapedAt: new Date('2026-05-21T08:00:00.000Z'),
+      seniority: 'senior',
+      scoreBreakdown: {
+        deterministic: 86,
+        semantic: 92,
+        total: 89,
+        grade: 'A',
+        criteria: scoreCriteria,
+        semanticReason: 'Très bon match Svelte',
+      },
+      score: 89,
+      semanticScore: 92,
+      semanticReason: 'Très bon match Svelte',
+    };
+    const remoteMissionId = 'remote-mission-1';
+    const missionRow = buildMissionUpsertRow(scannedMission, 'user-1');
+    const scoreRow = buildMissionScoreUpsertRow(
+      scannedMission,
+      remoteMissionId,
+      new Date('2026-05-21T08:01:00.000Z'),
+      'missionpulse-v1'
+    );
+
+    expect(
+      missionRowsToFeedItems(
+        [{ id: remoteMissionId, ...missionRow }],
+        new Map([[remoteMissionId, scoreRow]]),
+        new Map([[remoteMissionId, { mission_id: remoteMissionId, stage: 'selected' }]]),
+        [],
+        new Date('2026-05-22T10:00:00.000Z')
+      )
+    ).toEqual([
+      expect.objectContaining({
+        id: remoteMissionId,
+        title: 'Lead Svelte 5',
+        client: 'ScaleOps',
+        source: 'free-work',
+        stack: ['Svelte', 'TypeScript'],
+        score: 89,
+        deterministicScore: 86,
+        semanticScore: 92,
+        grade: 'A',
+        scoreCriteria,
+        semanticReason: 'Très bon match Svelte',
+        dailyRate: 720,
+        location: 'Remote France',
+        url: 'https://example.com/mission',
+        applicationStage: 'selected',
+        freshness: 'fresh',
+      }),
     ]);
   });
 
