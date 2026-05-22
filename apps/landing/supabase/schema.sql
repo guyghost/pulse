@@ -552,7 +552,13 @@ create table if not exists public.sync_status (
   user_id uuid references auth.users(id) on delete cascade not null,
   device_id uuid references public.extension_devices(id) on delete cascade not null,
   entity text not null check (
-    entity in ('missions', 'applications', 'candidate_profile', 'connector_health')
+    entity in (
+      'missions',
+      'applications',
+      'candidate_profile',
+      'connector_health',
+      'alert_preferences'
+    )
   ),
   last_pull_at timestamptz,
   last_push_at timestamptz,

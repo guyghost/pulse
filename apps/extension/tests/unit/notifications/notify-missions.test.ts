@@ -3,6 +3,7 @@ import type { Mission } from '$lib/core/types/mission';
 
 const getSettings = vi.fn();
 const getSeenIds = vi.fn();
+const getConnectedAlertPreferences = vi.fn();
 
 const notificationsCreate = vi.fn();
 const sessionGet = vi.fn();
@@ -14,6 +15,10 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
 
 vi.mock('../../../src/lib/shell/storage/seen-missions', () => ({
   getSeenIds,
+}));
+
+vi.mock('../../../src/lib/shell/storage/connected-alert-preferences', () => ({
+  getConnectedAlertPreferences,
 }));
 
 const makeMission = (overrides: Partial<Mission> = {}): Mission => ({
@@ -53,6 +58,7 @@ describe('notifyHighScoreMissions', () => {
     });
 
     getSeenIds.mockResolvedValue([]);
+    getConnectedAlertPreferences.mockResolvedValue(null);
     sessionGet.mockResolvedValue({});
     sessionSet.mockResolvedValue(undefined);
     notificationsCreate.mockResolvedValue(undefined);
@@ -163,6 +169,49 @@ describe('notifyHighScoreMissions', () => {
         message: '• Mission 1\n• Mission 2\n• Mission 3\n• ...et 1 autres',
       })
     );
+  });
+
+  it('uses connected dashboard alert preferences when synchronized', async () => {
+    getConnectedAlertPreferences.mockResolvedValueOnce({
+      enabled: true,
+      scoreThreshold: 80,
+      minDailyRate: 650,
+      requiredStacks: ['Svelte'],
+      maxResults: 1,
+      updatedAt: '2026-05-22T08:00:00.000Z',
+    });
+
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
+    const result = await notifyHighScoreMissions([
+      makeMission({ id: 'react', title: 'React', stack: ['React'], score: 95, tjm: 800 }),
+      makeMission({ id: 'svelte', title: 'Svelte', stack: ['Svelte'], score: 86, tjm: 700 }),
+      makeMission({ id: 'low-tjm', title: 'Low TJM', stack: ['Svelte'], score: 90, tjm: 500 }),
+    ]);
+
+    expect(result).toEqual({ shown: true, notifiedMissionIds: ['svelte'] });
+    expect(notificationsCreate).toHaveBeenCalledWith(
+      'high-score-missions',
+      expect.objectContaining({ message: 'Svelte' })
+    );
+  });
+
+  it('does not notify when connected dashboard alert preferences disable alerts', async () => {
+    getConnectedAlertPreferences.mockResolvedValueOnce({
+      enabled: false,
+      scoreThreshold: 0,
+      minDailyRate: 0,
+      requiredStacks: [],
+      maxResults: 5,
+      updatedAt: '2026-05-22T08:00:00.000Z',
+    });
+
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
+    const result = await notifyHighScoreMissions([makeMission({ score: 99 })]);
+
+    expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
+    expect(notificationsCreate).not.toHaveBeenCalled();
   });
 
   it('returns false when cooldown is still active from session storage', async () => {

@@ -493,7 +493,7 @@ extension_devices (
 sync_status (
   user_id uuid not null references auth.users(id) on delete cascade,
   device_id uuid not null references extension_devices(id) on delete cascade,
-  entity text not null check (entity in ('missions', 'applications', 'candidate_profile', 'connector_health')),
+  entity text not null check (entity in ('missions', 'applications', 'candidate_profile', 'connector_health', 'alert_preferences')),
   last_pull_at timestamptz,
   last_push_at timestamptz,
   pending_upload_count integer not null default 0,

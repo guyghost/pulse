@@ -275,7 +275,8 @@ export type ConnectedSyncEntity =
   | 'missions'
   | 'applications'
   | 'candidate_profile'
-  | 'connector_health';
+  | 'connector_health'
+  | 'alert_preferences';
 
 export type ConnectedSyncState = 'healthy' | 'pending' | 'error' | 'idle';
 
@@ -619,7 +620,8 @@ function isConnectedSyncEntity(value: unknown): value is ConnectedSyncEntity {
     value === 'missions' ||
     value === 'applications' ||
     value === 'candidate_profile' ||
-    value === 'connector_health'
+    value === 'connector_health' ||
+    value === 'alert_preferences'
   );
 }
 
@@ -669,6 +671,7 @@ const CONNECTED_SYNC_ENTITY_LABELS: Record<ConnectedSyncEntity, string> = {
   applications: 'Candidatures',
   candidate_profile: 'Profil CV',
   connector_health: 'Santé connecteurs',
+  alert_preferences: 'Alertes missions',
 };
 
 const SYNC_CONFLICT_ENTITY_LABELS: Record<DashboardSyncConflictEntity, string> = {

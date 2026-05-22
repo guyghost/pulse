@@ -254,7 +254,13 @@ export const MessageSchemas = {
       lastGlobalSync: z.number().int().min(0).nullable(),
       entities: z.array(
         z.object({
-          entity: z.enum(['missions', 'applications', 'candidate_profile', 'connector_health']),
+          entity: z.enum([
+            'missions',
+            'applications',
+            'candidate_profile',
+            'connector_health',
+            'alert_preferences',
+          ]),
           label: z.string().min(1).max(80),
           state: z.enum(['healthy', 'pending', 'error', 'idle']),
           lastPullAt: z.string().nullable(),

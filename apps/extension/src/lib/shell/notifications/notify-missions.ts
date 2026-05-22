@@ -1,8 +1,10 @@
 import type { Mission } from '../../core/types/mission';
 import type { AppSettings } from '../storage/chrome-storage';
 import { filterNotifiableMissions } from '../../core/scoring/notification-filter';
+import { filterSmartNotifications } from '../../core/scoring/smart-notification';
 import { canNotify } from '../../core/scoring/notification-rate-limit';
 import { getSettings } from '../storage/chrome-storage';
+import { getConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { getSeenIds } from '../storage/seen-missions';
 
 // ---------------------------------------------------------------------------
@@ -96,11 +98,20 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
     // If we can't load seen IDs, proceed without filtering
   }
 
-  const notifiableMissions = filterNotifiableMissions(
-    missions,
-    seenIds,
-    settings.notificationScoreThreshold
-  );
+  const connectedAlertPreferences = await getConnectedAlertPreferences();
+
+  if (connectedAlertPreferences && !connectedAlertPreferences.enabled) {
+    return { shown: false, notifiedMissionIds: [] };
+  }
+
+  const notifiableMissions = connectedAlertPreferences
+    ? filterSmartNotifications(missions, seenIds, {
+        scoreThreshold: connectedAlertPreferences.scoreThreshold,
+        requiredStacks: connectedAlertPreferences.requiredStacks,
+        minTJM: connectedAlertPreferences.minDailyRate,
+        maxResults: connectedAlertPreferences.maxResults,
+      })
+    : filterNotifiableMissions(missions, seenIds, settings.notificationScoreThreshold);
 
   if (notifiableMissions.length === 0) {
     return { shown: false, notifiedMissionIds: [] };

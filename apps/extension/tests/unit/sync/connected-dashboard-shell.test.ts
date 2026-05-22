@@ -13,6 +13,7 @@ import {
   pushApplicationsToConnectedDashboard,
   pushConnectorHealthToConnectedDashboard,
   pushCandidateProfileImportToConnectedDashboard,
+  pullAlertPreferencesFromConnectedDashboard,
   pullApplicationsFromConnectedDashboard,
   pushMissionsToConnectedDashboard,
   registerExtensionDevice,
@@ -136,6 +137,14 @@ function createGateway(): ConnectedDashboardSyncGateway {
     insertSyncConflicts: vi.fn(async () => undefined),
     insertProfileImport: vi.fn(async () => undefined),
     upsertSyncStatus: vi.fn(async () => undefined),
+    getDashboardAlertPreferences: vi.fn(async () => ({
+      enabled: true,
+      scoreThreshold: 85,
+      minDailyRate: 700,
+      requiredStacks: ['Svelte'],
+      maxResults: 3,
+      updatedAt: '2026-05-22T08:00:00.000Z',
+    })),
   };
 }
 
@@ -159,6 +168,55 @@ function createReadQuery(data: unknown): MockSupabaseReadQuery {
 }
 
 describe('connected dashboard shell sync', () => {
+  it('pulls dashboard alert preferences into extension local storage', async () => {
+    const storageSet = vi.fn(async () => undefined);
+    vi.stubGlobal('chrome', {
+      storage: {
+        local: {
+          set: storageSet,
+        },
+      },
+    });
+    const gateway = createGateway();
+
+    const result = await pullAlertPreferencesFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      now: new Date('2026-05-22T08:05:00.000Z'),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        pulled: true,
+        preferences: {
+          enabled: true,
+          scoreThreshold: 85,
+          minDailyRate: 700,
+          requiredStacks: ['Svelte'],
+          maxResults: 3,
+          updatedAt: '2026-05-22T08:00:00.000Z',
+        },
+      },
+    });
+    expect(storageSet).toHaveBeenCalledWith({
+      'missionpulse.connectedAlertPreferences': {
+        enabled: true,
+        scoreThreshold: 85,
+        minDailyRate: 700,
+        requiredStacks: ['Svelte'],
+        maxResults: 3,
+        updatedAt: '2026-05-22T08:00:00.000Z',
+      },
+    });
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'alert_preferences',
+        last_pull_at: '2026-05-22T08:05:00.000Z',
+      })
+    );
+  });
+
   it('reads per-entity sync status for the current extension device', async () => {
     vi.stubGlobal('chrome', {
       storage: {

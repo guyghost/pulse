@@ -13,6 +13,7 @@ import {
   buildMissionUpsertRow,
   buildSyncStatusRow,
   mergeRemoteApplicationTracking,
+  remoteAlertPreferencesToConnectedPreferences,
   type ApplicationPipelineEventRow,
   type ApplicationUpsertRow,
   type CandidateEducationInsertRow,
@@ -29,10 +30,12 @@ import {
   type MissionUpsertRow,
   type ProfileImportInsertRow,
   type RemoteApplicationSnapshot,
+  type RemoteAlertPreferencesSnapshot,
   type SyncEntity,
   type SyncStatusRow,
   type SyncConflictInsertRow,
 } from '../../core/sync/connected-dashboard';
+import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
 import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
 import type { MissionDuplicateRelation } from '../../core/scoring/dedup';
 import type { GeneratedAsset } from '../../core/types/generation';
@@ -41,6 +44,7 @@ import type { Mission, MissionSource } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
 import { getSupabaseClient } from '../auth/supabase-client';
 import { getMissionById } from '../storage/db';
+import { saveConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { getGeneratedAsset } from '../storage/generated-assets';
 import { getTracking, saveTrackings } from '../storage/tracking';
 
@@ -56,6 +60,7 @@ const CONNECTED_SYNC_ENTITY_LABELS: Record<SyncEntity, string> = {
   applications: 'Candidatures',
   candidate_profile: 'Profil CV',
   connector_health: 'Santé connecteurs',
+  alert_preferences: 'Alertes missions',
 };
 
 export interface RemoteMissionIdentity {
@@ -103,6 +108,7 @@ export interface ConnectedDashboardSyncGateway {
   insertSyncConflicts(rows: SyncConflictInsertRow[]): Promise<void>;
   insertProfileImport(row: ProfileImportInsertRow): Promise<void>;
   upsertSyncStatus(row: SyncStatusRow): Promise<void>;
+  getDashboardAlertPreferences(userId: string): Promise<ConnectedAlertPreferences | null>;
 }
 
 export interface ConnectedSyncError {
@@ -172,6 +178,17 @@ export interface PullApplicationsResult {
   skippedCount: number;
   trackings: MissionTracking[];
   nextCursor: string | null;
+}
+
+export interface PullAlertPreferencesInput {
+  userId: string;
+  deviceId: string;
+  now: Date;
+}
+
+export interface PullAlertPreferencesResult {
+  pulled: boolean;
+  preferences: ConnectedAlertPreferences | null;
 }
 
 export interface PushConnectorHealthInput {
@@ -354,8 +371,36 @@ function isSyncEntity(value: unknown): value is SyncEntity {
     value === 'missions' ||
     value === 'applications' ||
     value === 'candidate_profile' ||
-    value === 'connector_health'
+    value === 'connector_health' ||
+    value === 'alert_preferences'
   );
+}
+
+function parseRemoteAlertPreferences(data: unknown): ConnectedAlertPreferences | null {
+  const value = Array.isArray(data) ? data[0] : data;
+
+  if (
+    isRecord(value) &&
+    typeof value.enabled === 'boolean' &&
+    typeof value.score_threshold === 'number' &&
+    typeof value.min_daily_rate === 'number' &&
+    Array.isArray(value.required_stacks) &&
+    value.required_stacks.every((stack) => typeof stack === 'string') &&
+    typeof value.max_results === 'number' &&
+    typeof value.updated_at === 'string'
+  ) {
+    const snapshot: RemoteAlertPreferencesSnapshot = {
+      enabled: value.enabled,
+      score_threshold: value.score_threshold,
+      min_daily_rate: value.min_daily_rate,
+      required_stacks: value.required_stacks,
+      max_results: value.max_results,
+      updated_at: value.updated_at,
+    };
+    return remoteAlertPreferencesToConnectedPreferences(snapshot);
+  }
+
+  return null;
 }
 
 function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapshot[] {
@@ -708,6 +753,19 @@ export function createSupabaseConnectedDashboardGateway(
         () => undefined
       );
     },
+    getDashboardAlertPreferences: async (userId) => {
+      const { data, error } = await supabase
+        .from('dashboard_alert_preferences')
+        .select('enabled,score_threshold,min_daily_rate,required_stacks,max_results,updated_at')
+        .eq('user_id', userId)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return parseRemoteAlertPreferences(data);
+    },
   };
 }
 
@@ -942,6 +1000,42 @@ export async function pullApplicationsFromConnectedDashboard(
         userId: input.userId,
         deviceId: input.deviceId,
         entity: 'applications',
+        error: { code: syncError.code, message: syncError.message },
+        retryAfterAt: buildRetryAfterAt(input.now),
+      })
+    );
+    return { ok: false, error: syncError };
+  }
+}
+
+export async function pullAlertPreferencesFromConnectedDashboard(
+  gateway: ConnectedDashboardSyncGateway,
+  input: PullAlertPreferencesInput
+): Promise<ConnectedSyncResult<PullAlertPreferencesResult>> {
+  try {
+    const preferences = await gateway.getDashboardAlertPreferences(input.userId);
+
+    if (preferences) {
+      await saveConnectedAlertPreferences(preferences);
+    }
+
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        entity: 'alert_preferences',
+        lastPullAt: input.now,
+      })
+    );
+
+    return { ok: true, value: { pulled: Boolean(preferences), preferences } };
+  } catch (error) {
+    const syncError = remoteError(error);
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        entity: 'alert_preferences',
         error: { code: syncError.code, message: syncError.message },
         retryAfterAt: buildRetryAfterAt(input.now),
       })
@@ -1395,6 +1489,16 @@ export async function syncConnectedDashboardSnapshot(
 
   if (!pushedHealth.ok) {
     return pushedHealth;
+  }
+
+  const pulledAlertPreferences = await pullAlertPreferencesFromConnectedDashboard(context.gateway, {
+    userId: context.userId,
+    deviceId: context.deviceId,
+    now: context.now,
+  });
+
+  if (!pulledAlertPreferences.ok) {
+    return pulledAlertPreferences;
   }
 
   return {

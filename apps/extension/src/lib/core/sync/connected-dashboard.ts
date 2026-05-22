@@ -6,8 +6,17 @@ import type { GeneratedAsset, GenerationType } from '../types/generation';
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
 import type { Grade } from '../types/score';
 import type { MissionTracking } from '../types/tracking';
+import {
+  normalizeConnectedAlertPreferences,
+  type ConnectedAlertPreferences,
+} from '../types/alert-preferences';
 
-export type SyncEntity = 'missions' | 'applications' | 'candidate_profile' | 'connector_health';
+export type SyncEntity =
+  | 'missions'
+  | 'applications'
+  | 'candidate_profile'
+  | 'connector_health'
+  | 'alert_preferences';
 
 export type ConnectorHealthSyncStatus =
   | 'ready'
@@ -235,6 +244,15 @@ export interface RemoteApplicationSnapshot {
   updated_at: string;
 }
 
+export interface RemoteAlertPreferencesSnapshot {
+  enabled: boolean;
+  score_threshold: number;
+  min_daily_rate: number;
+  required_stacks: string[];
+  max_results: number;
+  updated_at: string;
+}
+
 export interface BuildSyncStatusRowInput {
   userId: string;
   deviceId: string;
@@ -252,6 +270,19 @@ export interface BuildApplicationPullCursorInput {
   skippedCount: number;
   previousCursor: string | null;
   pulledAt: string;
+}
+
+export function remoteAlertPreferencesToConnectedPreferences(
+  snapshot: RemoteAlertPreferencesSnapshot
+): ConnectedAlertPreferences {
+  return normalizeConnectedAlertPreferences({
+    enabled: snapshot.enabled,
+    scoreThreshold: snapshot.score_threshold,
+    minDailyRate: snapshot.min_daily_rate,
+    requiredStacks: snapshot.required_stacks,
+    maxResults: snapshot.max_results,
+    updatedAt: snapshot.updated_at,
+  });
 }
 
 const GENERATED_ASSET_TYPE_MAP: Record<GenerationType, GeneratedApplicationAssetType> = {
