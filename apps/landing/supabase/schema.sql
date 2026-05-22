@@ -355,6 +355,9 @@ create table if not exists public.missions (
   scraped_at timestamptz not null,
   url text not null,
   raw_snapshot jsonb not null default '{}'::jsonb,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now(),
   unique (user_id, source, external_id)

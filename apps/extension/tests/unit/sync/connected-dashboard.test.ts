@@ -147,6 +147,8 @@ describe('connected dashboard sync payload builders', () => {
       published_at: '2026-05-20T08:00:00.000Z',
       scraped_at: '2026-05-21T08:00:00.000Z',
       url: 'https://example.com/mission',
+      revision: 1,
+      updated_by: 'extension',
       raw_snapshot: {
         seniority: 'senior',
         score: 89,

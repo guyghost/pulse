@@ -48,6 +48,8 @@ export interface MissionUpsertRow {
   published_at: string | null;
   scraped_at: string;
   url: string;
+  revision: number;
+  updated_by: 'extension';
   raw_snapshot: Record<string, unknown>;
 }
 
@@ -469,6 +471,8 @@ export function buildMissionUpsertRow(mission: Mission, userId: string): Mission
     published_at: mission.publishedAt,
     scraped_at: mission.scrapedAt.toISOString(),
     url: mission.url,
+    revision: 1,
+    updated_by: 'extension',
     raw_snapshot: {
       seniority: mission.seniority,
       score: mission.scoreBreakdown?.total ?? mission.score,
