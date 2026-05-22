@@ -407,6 +407,8 @@ describe('connected dashboard sync payload builders', () => {
         recentLatenciesMs: [120, 180],
       },
       occurred_at: '2026-05-21T02:00:00.000Z',
+      revision: 1,
+      updated_by: 'extension',
     });
   });
 
@@ -428,6 +430,8 @@ describe('connected dashboard sync payload builders', () => {
       error_message: null,
       details: { kind: 'profile_extractor', extractorId: 'linkedin' },
       occurred_at: '2026-05-22T08:00:00.000Z',
+      revision: 1,
+      updated_by: 'extension',
     });
 
     expect(

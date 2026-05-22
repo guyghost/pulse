@@ -521,6 +521,9 @@ export interface DashboardConnectorHealthEventRow {
   error_code: string | null;
   error_message: string | null;
   occurred_at: string;
+  revision: number;
+  updated_by: string;
+  updated_at: string;
 }
 
 export interface DashboardExtensionDeviceRow {

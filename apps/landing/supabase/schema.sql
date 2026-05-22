@@ -701,7 +701,11 @@ create table if not exists public.connector_health_events (
   error_code text,
   error_message text,
   details jsonb not null default '{}'::jsonb,
-  occurred_at timestamptz not null
+  occurred_at timestamptz not null,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  updated_at timestamptz not null default now()
 );
 
 alter table public.mission_sources enable row level security;
@@ -980,6 +984,12 @@ drop trigger if exists on_candidate_profile_field_suggestions_updated
   on public.candidate_profile_field_suggestions;
 create trigger on_candidate_profile_field_suggestions_updated
   before update on public.candidate_profile_field_suggestions
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_connector_health_events_updated on public.connector_health_events;
+create trigger on_connector_health_events_updated
+  before update on public.connector_health_events
   for each row
   execute function public.update_updated_at();
 

@@ -1310,6 +1310,9 @@ describe('dashboard core', () => {
         error_code: null,
         error_message: null,
         occurred_at: '2026-05-21T08:00:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
+        updated_at: '2026-05-21T08:00:00.000Z',
       },
       {
         source: 'linkedin',
@@ -1317,6 +1320,9 @@ describe('dashboard core', () => {
         error_code: 'permission_required',
         error_message: 'Permission LinkedIn manquante.',
         occurred_at: '2026-05-21T09:00:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
+        updated_at: '2026-05-21T09:00:00.000Z',
       },
       {
         source: 'unknown-source',
@@ -1324,6 +1330,9 @@ describe('dashboard core', () => {
         error_code: null,
         error_message: null,
         occurred_at: '2026-05-21T10:00:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
+        updated_at: '2026-05-21T10:00:00.000Z',
       },
     ]);
 

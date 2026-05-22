@@ -127,6 +127,8 @@ export interface ConnectorHealthEventRow {
   error_message: string | null;
   details: Record<string, unknown>;
   occurred_at: string;
+  revision: number;
+  updated_by: 'extension';
 }
 
 export type ProfileExtractorHealthCode =
@@ -723,6 +725,8 @@ export function buildConnectorHealthEventRow(
       recentLatenciesMs: [...snapshot.recentLatenciesMs],
     },
     occurred_at: occurredAt.toISOString(),
+    revision: 1,
+    updated_by: 'extension',
   };
 }
 
@@ -785,6 +789,8 @@ export function buildProfileExtractorHealthEventRow(input: {
       extractorId: input.source,
     },
     occurred_at: input.occurredAt.toISOString(),
+    revision: 1,
+    updated_by: 'extension',
   };
 }
 
