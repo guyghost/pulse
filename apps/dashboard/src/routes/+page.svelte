@@ -12,6 +12,7 @@
   import type { ActionData, PageData } from './$types';
   import type {
     ApplicationStage,
+    ApplicationTimelineEvent,
     ConnectedSyncStatus,
     DashboardAccountEntitlements,
     DashboardFeatureAccess,
@@ -30,6 +31,7 @@
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
   const tjmRadar = $derived(data.tjmRadar as TjmRadarSnapshot);
   const applications = $derived(data.applications as MissionApplication[]);
+  const applicationTimeline = $derived(data.applicationTimeline as ApplicationTimelineEvent[]);
   const generatedAssets = $derived(data.generatedAssets as GeneratedApplicationAsset[]);
   const cv = $derived(data.cv as CvSnapshot);
   const syncStatuses = $derived(data.syncStatuses as PlatformSyncStatus[]);
@@ -84,6 +86,11 @@
   const selectedGeneratedAssets = $derived(
     selectedApplication
       ? generatedAssets.filter((asset) => asset.applicationId === selectedApplication.id)
+      : []
+  );
+  const selectedTimeline = $derived(
+    selectedApplication
+      ? applicationTimeline.filter((event) => event.applicationId === selectedApplication.id)
       : []
   );
   const recentGeneratedAssets = $derived(generatedAssets.slice(0, 5));
@@ -1025,6 +1032,58 @@
                   Compte requis pour modifier le pipeline.
                 </p>
               {/if}
+
+              <div class="mt-5 border-t border-border-light pt-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-medium uppercase text-text-subtle">Activité pipeline</p>
+                    <p class="mt-1 text-sm text-text-subtle">
+                      {selectedTimeline.length} événements synchronisés
+                    </p>
+                  </div>
+                  <Badge
+                    label={selectedTimeline.length > 0 ? 'Historique' : 'Vide'}
+                    variant={selectedTimeline.length > 0 ? 'success' : 'warning'}
+                  />
+                </div>
+
+                <div class="mt-3 space-y-3">
+                  {#if selectedTimeline.length === 0}
+                    <div
+                      class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3"
+                    >
+                      <p class="text-xs leading-5 text-text-subtle">
+                        Aucun événement pipeline synchronisé pour cette candidature.
+                      </p>
+                    </div>
+                  {/if}
+
+                  {#each selectedTimeline.slice(0, 5) as event}
+                    <article class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <p class="text-sm font-medium text-text-primary">
+                            {event.fromLabel
+                              ? `${event.fromLabel} -> ${event.toLabel}`
+                              : event.toLabel}
+                          </p>
+                          <p class="mt-1 text-xs text-text-subtle">
+                            {event.createdByLabel} · {formatDate(event.occurredAt)}
+                          </p>
+                        </div>
+                        <span
+                          class="shrink-0 rounded-full bg-surface-white px-2 py-1 text-[10px] font-medium text-text-subtle"
+                        >
+                          {event.toLabel}
+                        </span>
+                      </div>
+                      {#if event.note}
+                        <p class="mt-2 text-xs leading-5 text-text-subtle">{event.note}</p>
+                      {/if}
+                    </article>
+                  {/each}
+                </div>
+              </div>
 
               <div class="mt-5 border-t border-border-light pt-4">
                 <div class="flex items-start justify-between gap-3">

@@ -18,6 +18,7 @@ import {
   getSyncBlockers,
   isDashboardPremiumActive,
   missionRowsToFeedItems,
+  pipelineEventRowsToTimeline,
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
   syncRowsToConnectedSyncStatuses,
@@ -845,6 +846,74 @@ describe('dashboard core', () => {
         lastErrorCode: null,
         lastErrorMessage: null,
         updatedAt: '2026-05-22T08:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('maps application pipeline events to a sorted dashboard timeline', () => {
+    expect(
+      pipelineEventRowsToTimeline([
+        {
+          id: 'event-older',
+          application_id: 'app-001',
+          from_stage: 'selected',
+          to_stage: 'application_prepared',
+          note: 'Message recruteur prêt.',
+          occurred_at: '2026-05-21T08:00:00.000Z',
+          created_by: 'extension',
+        },
+        {
+          id: 'event-latest',
+          application_id: 'app-001',
+          from_stage: 'application_prepared',
+          to_stage: 'applied',
+          note: null,
+          occurred_at: '2026-05-22T09:00:00.000Z',
+          created_by: 'dashboard',
+        },
+        {
+          id: 'event-invalid-stage',
+          application_id: 'app-001',
+          from_stage: 'applied',
+          to_stage: 'unknown',
+          note: null,
+          occurred_at: '2026-05-23T09:00:00.000Z',
+          created_by: 'dashboard',
+        },
+        {
+          id: 'event-invalid-creator',
+          application_id: 'app-001',
+          from_stage: 'applied',
+          to_stage: 'interview',
+          note: null,
+          occurred_at: '2026-05-24T09:00:00.000Z',
+          created_by: 'robot',
+        },
+      ])
+    ).toEqual([
+      {
+        id: 'event-latest',
+        applicationId: 'app-001',
+        fromStage: 'application_prepared',
+        fromLabel: 'Candidature préparée',
+        toStage: 'applied',
+        toLabel: 'Postulé',
+        note: null,
+        occurredAt: '2026-05-22T09:00:00.000Z',
+        createdBy: 'dashboard',
+        createdByLabel: 'Dashboard',
+      },
+      {
+        id: 'event-older',
+        applicationId: 'app-001',
+        fromStage: 'selected',
+        fromLabel: 'Sélectionnée',
+        toStage: 'application_prepared',
+        toLabel: 'Candidature préparée',
+        note: 'Message recruteur prêt.',
+        occurredAt: '2026-05-21T08:00:00.000Z',
+        createdBy: 'extension',
+        createdByLabel: 'Extension',
       },
     ]);
   });

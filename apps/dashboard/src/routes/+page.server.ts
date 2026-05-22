@@ -18,9 +18,12 @@ import {
   getDashboardFeatureAccess,
   healthEventsToPlatformSyncStatuses,
   missionRowsToFeedItems,
+  pipelineEventRowsToTimeline,
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
   syncRowsToConnectedSyncStatuses,
+  type ApplicationTimelineEvent,
+  type DashboardApplicationPipelineEventRow,
   type DashboardCandidateProfileRow,
   type DashboardCandidateEducationRow,
   type DashboardCandidateExperienceRow,
@@ -122,6 +125,33 @@ const mockGeneratedAssets: GeneratedApplicationAsset[] = [
       'Résumé orienté architecture frontend, design systems et migration progressive pour mission freelance senior.',
     model: 'gemini-nano',
     createdAt: '2026-05-18T09:00:00.000Z',
+  },
+];
+
+const mockApplicationTimeline: ApplicationTimelineEvent[] = [
+  {
+    id: 'event-preview-2',
+    applicationId: 'app-001',
+    fromStage: 'applied',
+    fromLabel: 'Postulé',
+    toStage: 'interview',
+    toLabel: 'Entretien',
+    note: null,
+    occurredAt: '2026-05-18T09:00:00.000Z',
+    createdBy: 'dashboard',
+    createdByLabel: 'Dashboard',
+  },
+  {
+    id: 'event-preview-1',
+    applicationId: 'app-001',
+    fromStage: 'selected',
+    fromLabel: 'Sélectionnée',
+    toStage: 'applied',
+    toLabel: 'Postulé',
+    note: 'Candidature envoyée depuis le profil recruteur.',
+    occurredAt: '2026-05-08T10:30:00.000Z',
+    createdBy: 'extension',
+    createdByLabel: 'Extension',
   },
 ];
 
@@ -362,6 +392,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       missionFeed: mockMissionFeed,
       tjmRadar: mockTjmRadar,
       applications: mockApplications,
+      applicationTimeline: mockApplicationTimeline,
       generatedAssets: mockGeneratedAssets,
       cv: mockCv,
       syncStatuses: mockSyncStatuses,
@@ -482,6 +513,20 @@ export const load: PageServerLoad = async ({ cookies }) => {
     new Map(canonicalApplications.map((application) => [application.id, application]))
   );
 
+  const { data: pipelineEventRows } =
+    canonicalApplicationIds.length > 0
+      ? await supabase
+          .from('application_pipeline_events')
+          .select('id, application_id, from_stage, to_stage, note, occurred_at, created_by')
+          .eq('user_id', session.user.id)
+          .in('application_id', canonicalApplicationIds)
+          .order('occurred_at', { ascending: false })
+          .limit(100)
+          .returns<DashboardApplicationPipelineEventRow[]>()
+      : { data: [] };
+
+  const applicationTimeline = pipelineEventRowsToTimeline(pipelineEventRows ?? []);
+
   const { data: favoriteRows } = await supabase
     .from('favorite_missions')
     .select('mission_id, mission, favorited_at')
@@ -590,6 +635,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     missionFeed,
     tjmRadar,
     applications: canonicalApplications.length > 0 ? canonicalApplications : syncedApplications,
+    applicationTimeline,
     generatedAssets,
     cv: candidateProfile
       ? profileRowsToCvSnapshot(

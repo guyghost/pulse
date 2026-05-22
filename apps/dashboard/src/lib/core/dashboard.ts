@@ -225,6 +225,21 @@ export interface ConnectedSyncStatus {
   updatedAt: string;
 }
 
+export type ApplicationTimelineCreatedBy = 'dashboard' | 'extension' | 'system';
+
+export interface ApplicationTimelineEvent {
+  id: string;
+  applicationId: string;
+  fromStage: ApplicationStage | null;
+  fromLabel: string | null;
+  toStage: ApplicationStage;
+  toLabel: string;
+  note: string | null;
+  occurredAt: string;
+  createdBy: ApplicationTimelineCreatedBy;
+  createdByLabel: string;
+}
+
 export interface DashboardCanonicalApplicationRow {
   id: string;
   mission_id: string;
@@ -368,6 +383,16 @@ export interface DashboardSyncStatusRow {
   updated_at: string;
 }
 
+export interface DashboardApplicationPipelineEventRow {
+  id: string;
+  application_id: string;
+  from_stage: string | null;
+  to_stage: string;
+  note: string | null;
+  occurred_at: string;
+  created_by: string;
+}
+
 export interface ApplicationStageUpdatePatch {
   stage: ApplicationStage;
   applied_at?: string | null;
@@ -424,6 +449,10 @@ function isConnectedSyncEntity(value: unknown): value is ConnectedSyncEntity {
   );
 }
 
+function isApplicationTimelineCreatedBy(value: unknown): value is ApplicationTimelineCreatedBy {
+  return value === 'dashboard' || value === 'extension' || value === 'system';
+}
+
 const SOURCE_LABELS: Record<ApplicationSource, string> = {
   linkedin: 'LinkedIn',
   'free-work': 'Free-Work',
@@ -446,6 +475,24 @@ const CONNECTED_SYNC_ENTITY_LABELS: Record<ConnectedSyncEntity, string> = {
   applications: 'Candidatures',
   candidate_profile: 'Profil CV',
   connector_health: 'Santé connecteurs',
+};
+
+const APPLICATION_STAGE_LABELS: Record<ApplicationStage, string> = {
+  detected: 'Détectée',
+  selected: 'Sélectionnée',
+  application_prepared: 'Candidature préparée',
+  applied: 'Postulé',
+  interview: 'Entretien',
+  offer: 'Offre',
+  accepted: 'Acceptée',
+  rejected: 'Refusé',
+  archived: 'Archivée',
+};
+
+const APPLICATION_TIMELINE_CREATED_BY_LABELS: Record<ApplicationTimelineCreatedBy, string> = {
+  dashboard: 'Dashboard',
+  extension: 'Extension',
+  system: 'Système',
 };
 
 const EMPTY_TJM_RADAR: TjmRadarSnapshot = {
@@ -646,6 +693,35 @@ export function generatedAssetRowsToHistory(
       ];
     })
     .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+export function pipelineEventRowsToTimeline(
+  rows: DashboardApplicationPipelineEventRow[]
+): ApplicationTimelineEvent[] {
+  return rows
+    .flatMap((row) => {
+      if (!isApplicationStage(row.to_stage) || !isApplicationTimelineCreatedBy(row.created_by)) {
+        return [];
+      }
+
+      const fromStage = isApplicationStage(row.from_stage) ? row.from_stage : null;
+
+      return [
+        {
+          id: row.id,
+          applicationId: row.application_id,
+          fromStage,
+          fromLabel: fromStage ? APPLICATION_STAGE_LABELS[fromStage] : null,
+          toStage: row.to_stage,
+          toLabel: APPLICATION_STAGE_LABELS[row.to_stage],
+          note: row.note,
+          occurredAt: row.occurred_at,
+          createdBy: row.created_by,
+          createdByLabel: APPLICATION_TIMELINE_CREATED_BY_LABELS[row.created_by],
+        },
+      ];
+    })
+    .sort((a, b) => b.occurredAt.localeCompare(a.occurredAt));
 }
 
 function createGeneratedAssetPreview(content: string): string {
