@@ -1199,7 +1199,7 @@ export function profileRowsToCvSnapshot(
     summary: profile.summary,
     updatedAt: profile.updated_at,
     completeness: profile.completeness,
-    targetRole: profile.target_role ?? 'Rôle cible non renseigné',
+    targetRole: profile.target_role ?? '',
     skills: skills.map((item) => item.skill),
     experiences: experiences
       .filter((experience) => isApplicationSource(experience.source))

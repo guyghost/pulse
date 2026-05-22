@@ -1544,9 +1544,9 @@
               </p>
             {/if}
 
-            {#if cv.targetRole}
-              <p class="mt-4 text-sm text-text-secondary">{cv.targetRole}</p>
-            {/if}
+            <p class="mt-4 text-sm text-text-secondary">
+              {cv.targetRole || 'Rôle cible non renseigné'}
+            </p>
             {#if cv.summary}
               <p class="mt-3 text-sm leading-6 text-text-subtle">{cv.summary}</p>
             {/if}
@@ -1761,6 +1761,48 @@
                         </p>
                       {/if}
                     </article>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            {#if cv.education.length > 0}
+              <div class="mt-5 border-t border-border-light pt-4">
+                <p class="text-xs font-medium uppercase text-text-subtle">Formations importées</p>
+                <div class="mt-3 space-y-3">
+                  {#each cv.education.slice(0, 3) as education}
+                    <article class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <h3 class="text-sm font-medium text-text-primary">{education.school}</h3>
+                          <p class="mt-1 text-xs text-text-subtle">
+                            {[education.degree, education.field].filter(Boolean).join(' · ') ||
+                              'Programme non renseigné'}
+                          </p>
+                        </div>
+                        <span class="shrink-0 text-[10px] text-text-muted">
+                          {education.dateRange}
+                        </span>
+                      </div>
+                    </article>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            {#if cv.links.length > 0}
+              <div class="mt-5 border-t border-border-light pt-4">
+                <p class="text-xs font-medium uppercase text-text-subtle">Liens importés</p>
+                <div class="mt-3 flex flex-wrap gap-2">
+                  {#each cv.links as link}
+                    <a
+                      class="inline-flex items-center rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition hover:border-blueprint-blue/30 hover:text-blueprint-blue"
+                      href={link.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      {link.label}
+                    </a>
                   {/each}
                 </div>
               </div>

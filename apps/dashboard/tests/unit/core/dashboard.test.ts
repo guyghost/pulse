@@ -1075,6 +1075,22 @@ describe('dashboard core', () => {
     });
   });
 
+  it('keeps an empty editable CV target role when Supabase stores null', () => {
+    expect(
+      profileRowsToCvSnapshot(
+        {
+          id: 'profile-1',
+          title: 'Consultant Frontend',
+          summary: '',
+          updated_at: '2026-05-22T08:00:00.000Z',
+          completeness: 30,
+          target_role: null,
+        },
+        []
+      ).targetRole
+    ).toBe('');
+  });
+
   it('maps connector health events to platform sync statuses', () => {
     expect(
       healthEventsToPlatformSyncStatuses([
