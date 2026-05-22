@@ -121,6 +121,23 @@ describe('LinkedInProfileExtractor', () => {
     expect(extractorCode(result)).toBe('profile_not_found');
   });
 
+  it('does not request LinkedIn origin permission before validating the active profile tab', async () => {
+    const request = vi.fn(async () => true);
+    const extractor = new LinkedInProfileExtractor(
+      createChromeDouble({
+        contains: async (permissions) => Boolean(permissions.permissions?.length),
+        request,
+        query: async () => [{ id: 9, url: 'https://www.linkedin.com/feed/' } as chrome.tabs.Tab],
+      })
+    );
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('profile_not_found');
+    expect(request).not.toHaveBeenCalled();
+  });
+
   it('returns permission_required when scripting or activeTab is missing', async () => {
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({

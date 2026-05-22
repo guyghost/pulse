@@ -193,17 +193,6 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
     now: number,
     tabId?: number
   ): Promise<Result<CanonicalCandidateProfileDraft, AppError>> {
-    const scriptingReady = await this.ensureExtractionPermission();
-    if (!scriptingReady || !this.chromeApi.scripting?.executeScript || !this.chromeApi.tabs) {
-      return err(
-        createProfileExtractorError(
-          'permission_required',
-          'LinkedIn profile import requires activeTab and scripting permissions.',
-          now
-        )
-      );
-    }
-
     const tab = await this.resolveTab(tabId);
     if (!tab?.id || !tab.url) {
       return err(
@@ -225,6 +214,17 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
             : 'The active tab is not a LinkedIn profile page.',
           now,
           { url: tab.url }
+        )
+      );
+    }
+
+    const scriptingReady = await this.ensureExtractionPermission();
+    if (!scriptingReady || !this.chromeApi.scripting?.executeScript || !this.chromeApi.tabs) {
+      return err(
+        createProfileExtractorError(
+          'permission_required',
+          'LinkedIn profile import requires activeTab and scripting permissions.',
+          now
         )
       );
     }
