@@ -44,6 +44,9 @@ importers:
         specifier: ^5.0.0
         version: 5.55.1
     devDependencies:
+      '@playwright/test':
+        specifier: ^1.59.1
+        version: 1.59.1
       '@pulse/tsconfig':
         specifier: workspace:*
         version: link:../../packages/tsconfig
