@@ -26,6 +26,10 @@ export type LinkedInProfileImportResult =
   | { imported: true; profile: CanonicalCandidateProfileDraft }
   | { imported: false; errorCode: string; errorMessage: string };
 
+export type LinkedInProfilePreviewResult =
+  | { extracted: true; profile: CanonicalCandidateProfileDraft }
+  | { extracted: false; errorCode: string; errorMessage: string };
+
 function looksLikeAuthPage(url: string, text: string): boolean {
   const normalizedUrl = url.toLowerCase();
   const normalizedText = text.toLowerCase();
@@ -105,6 +109,39 @@ export async function importLinkedInProfile(): Promise<LinkedInProfileImportResu
       imported: false,
       errorCode: 'unexpected_response',
       errorMessage: "L'import LinkedIn n'a pas renvoyé de résultat exploitable.",
+    };
+  }
+
+  return response.payload;
+}
+
+export async function previewLinkedInProfile(): Promise<LinkedInProfilePreviewResult> {
+  const response = await sendMessage({ type: 'PREVIEW_LINKEDIN_PROFILE' });
+
+  if (response.type !== 'LINKEDIN_PROFILE_PREVIEWED') {
+    return {
+      extracted: false,
+      errorCode: 'unexpected_response',
+      errorMessage: "L'extraction LinkedIn n'a pas renvoyé de preview exploitable.",
+    };
+  }
+
+  return response.payload;
+}
+
+export async function syncLinkedInProfileImport(
+  profile: CanonicalCandidateProfileDraft
+): Promise<LinkedInProfileImportResult> {
+  const response = await sendMessage({
+    type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
+    payload: { profile },
+  });
+
+  if (response.type !== 'LINKEDIN_PROFILE_IMPORTED') {
+    return {
+      imported: false,
+      errorCode: 'unexpected_response',
+      errorMessage: "La synchronisation LinkedIn n'a pas renvoyé de résultat exploitable.",
     };
   }
 

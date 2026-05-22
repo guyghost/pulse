@@ -52,6 +52,7 @@ import { getSupabaseClient } from '../lib/shell/auth/supabase-client';
 import { saveAuthUser, loadAuthUser, clearAuthUser } from '../lib/shell/auth/auth-storage';
 import type { GeneratedAsset } from '../lib/core/types/generation';
 import type { MissionTracking } from '../lib/core/types/tracking';
+import type { CanonicalCandidateProfileDraft } from '../lib/core/profile-extractors/types';
 import { generatePremium } from '../lib/shell/auth/premium-api';
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
@@ -69,6 +70,9 @@ import { getProfileExtractor } from '../lib/shell/profile-extractors';
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
 }
+
+type LinkedInProfilePreviewMessage = Extract<BridgeMessage, { type: 'LINKEDIN_PROFILE_PREVIEWED' }>;
+type LinkedInProfileImportMessage = Extract<BridgeMessage, { type: 'LINKEDIN_PROFILE_IMPORTED' }>;
 
 function buildAuthUserFromProfile(
   user: { id: string; email?: string | null },
@@ -126,6 +130,69 @@ function recordLinkedInExtractorHealth(input: {
       console.warn('[MissionPulse] LinkedIn extractor health sync failed:', error);
     }
   });
+}
+
+async function previewLinkedInProfile(
+  startedAt: number,
+  tabId?: number
+): Promise<LinkedInProfilePreviewMessage> {
+  const extractor = getProfileExtractor('linkedin');
+  const result = await extractor.extractProfile(startedAt, tabId);
+
+  if (!result.ok) {
+    const errorCode = getBridgeErrorCode(result.error);
+    recordLinkedInExtractorHealth({
+      ok: false,
+      errorCode,
+      errorMessage: result.error.message,
+      occurredAt: new Date(startedAt),
+    });
+    return {
+      type: 'LINKEDIN_PROFILE_PREVIEWED',
+      payload: {
+        extracted: false,
+        errorCode,
+        errorMessage: result.error.message,
+      },
+    };
+  }
+
+  return {
+    type: 'LINKEDIN_PROFILE_PREVIEWED',
+    payload: { extracted: true, profile: result.value },
+  };
+}
+
+async function syncLinkedInProfileImport(
+  profile: CanonicalCandidateProfileDraft,
+  startedAt: number
+): Promise<LinkedInProfileImportMessage> {
+  const synced = await syncConnectedDashboardProfileImport(profile);
+  if (!synced.ok) {
+    recordLinkedInExtractorHealth({
+      ok: false,
+      errorCode: 'sync_failed',
+      errorMessage: synced.error.message,
+      occurredAt: new Date(startedAt),
+    });
+    return {
+      type: 'LINKEDIN_PROFILE_IMPORTED',
+      payload: {
+        imported: false,
+        errorCode: 'sync_failed',
+        errorMessage: synced.error.message,
+      },
+    };
+  }
+
+  recordLinkedInExtractorHealth({
+    ok: true,
+    occurredAt: new Date(startedAt),
+  });
+  return {
+    type: 'LINKEDIN_PROFILE_IMPORTED',
+    payload: { imported: true, profile },
+  };
 }
 
 // Trigger expired semantic cache cleanup on startup
@@ -484,58 +551,74 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
-    if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
-      const extractor = getProfileExtractor('linkedin');
+    if (message.type === 'PREVIEW_LINKEDIN_PROFILE') {
       const startedAt = Date.now();
-      extractor
-        .extractProfile(startedAt, message.payload?.tabId)
-        .then(async (result) => {
-          if (!result.ok) {
-            const errorCode = getBridgeErrorCode(result.error);
-            recordLinkedInExtractorHealth({
-              ok: false,
-              errorCode,
-              errorMessage: result.error.message,
-              occurredAt: new Date(startedAt),
-            });
-            sendResponse({
-              type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: {
-                imported: false,
-                errorCode,
-                errorMessage: result.error.message,
-              },
-            });
-            return;
-          }
-
-          const synced = await syncConnectedDashboardProfileImport(result.value);
-          if (!synced.ok) {
-            recordLinkedInExtractorHealth({
-              ok: false,
-              errorCode: 'sync_failed',
-              errorMessage: synced.error.message,
-              occurredAt: new Date(startedAt),
-            });
-            sendResponse({
-              type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: {
-                imported: false,
-                errorCode: 'sync_failed',
-                errorMessage: synced.error.message,
-              },
-            });
-            return;
-          }
-
+      previewLinkedInProfile(startedAt, message.payload?.tabId)
+        .then((response) => {
+          sendResponse(response);
+        })
+        .catch((error) => {
           recordLinkedInExtractorHealth({
-            ok: true,
+            ok: false,
+            errorCode: 'dom_changed',
+            errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
+            occurredAt: new Date(startedAt),
+          });
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_PREVIEWED',
+            payload: {
+              extracted: false,
+              errorCode: 'dom_changed',
+              errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
+            },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'SYNC_LINKEDIN_PROFILE_IMPORT') {
+      const startedAt = Date.now();
+      syncLinkedInProfileImport(message.payload.profile, startedAt)
+        .then((response) => {
+          sendResponse(response);
+        })
+        .catch((error) => {
+          recordLinkedInExtractorHealth({
+            ok: false,
+            errorCode: 'sync_failed',
+            errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
             occurredAt: new Date(startedAt),
           });
           sendResponse({
             type: 'LINKEDIN_PROFILE_IMPORTED',
-            payload: { imported: true, profile: result.value },
+            payload: {
+              imported: false,
+              errorCode: 'sync_failed',
+              errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
+            },
           });
+        });
+      return true;
+    }
+
+    if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
+      const startedAt = Date.now();
+      previewLinkedInProfile(startedAt, message.payload?.tabId)
+        .then(async (preview) => {
+          if (!preview.payload.extracted) {
+            sendResponse({
+              type: 'LINKEDIN_PROFILE_IMPORTED',
+              payload: {
+                imported: false,
+                errorCode: preview.payload.errorCode,
+                errorMessage: preview.payload.errorMessage,
+              },
+            });
+            return;
+          }
+
+          const response = await syncLinkedInProfileImport(preview.payload.profile, startedAt);
+          sendResponse(response);
         })
         .catch((error) => {
           recordLinkedInExtractorHealth({

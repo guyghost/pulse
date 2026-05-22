@@ -51,6 +51,14 @@ export type BridgeMessage =
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }
+  | { type: 'PREVIEW_LINKEDIN_PROFILE'; payload?: { tabId?: number } }
+  | {
+      type: 'LINKEDIN_PROFILE_PREVIEWED';
+      payload:
+        | { extracted: true; profile: CanonicalCandidateProfileDraft }
+        | { extracted: false; errorCode: string; errorMessage: string };
+    }
+  | { type: 'SYNC_LINKEDIN_PROFILE_IMPORT'; payload: { profile: CanonicalCandidateProfileDraft } }
   | { type: 'IMPORT_LINKEDIN_PROFILE'; payload?: { tabId?: number } }
   | {
       type: 'LINKEDIN_PROFILE_IMPORTED';

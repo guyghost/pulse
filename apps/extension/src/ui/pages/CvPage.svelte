@@ -5,7 +5,9 @@
   import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import {
-    importLinkedInProfile,
+    previewLinkedInProfile,
+    syncLinkedInProfileImport,
+    type LinkedInProfilePreviewResult,
     verifyProfilePage,
     type LinkedInProfileImportResult,
     type VerifyProfileResult,
@@ -34,7 +36,9 @@
   let selectedPlatformId = $state('linkedin');
   let pushedPlatformIds = $state<Set<string>>(new Set());
   let verifyingPlatformId = $state<string | null>(null);
-  let importingLinkedIn = $state(false);
+  let previewingLinkedIn = $state(false);
+  let syncingLinkedIn = $state(false);
+  let linkedInPreviewResult = $state<LinkedInProfilePreviewResult | null>(null);
   let linkedInImportResult = $state<LinkedInProfileImportResult | null>(null);
   let verificationResults = $state<Map<string, VerifyProfileResult>>(new Map());
   let selectedFieldIds = $state<Set<string>>(
@@ -216,19 +220,41 @@
     }
   }
 
-  async function importLinkedIn(): Promise<void> {
-    importingLinkedIn = true;
+  async function previewLinkedIn(): Promise<void> {
+    previewingLinkedIn = true;
     try {
-      const result = await importLinkedInProfile();
+      const result = await previewLinkedInProfile();
+      linkedInPreviewResult = result;
+      linkedInImportResult = null;
+      if (!result.extracted) {
+        await showToast(`LinkedIn: ${result.errorMessage}`, 'error');
+        return;
+      }
+
+      await showToast('Preview LinkedIn prête à synchroniser', 'success');
+    } finally {
+      previewingLinkedIn = false;
+    }
+  }
+
+  async function confirmLinkedInSync(): Promise<void> {
+    if (!linkedInPreviewResult?.extracted) {
+      await showToast("Prévisualisez LinkedIn avant de synchroniser l'import", 'error');
+      return;
+    }
+
+    syncingLinkedIn = true;
+    try {
+      const result = await syncLinkedInProfileImport(linkedInPreviewResult.profile);
       linkedInImportResult = result;
       if (!result.imported) {
         await showToast(`LinkedIn: ${result.errorMessage}`, 'error');
         return;
       }
 
-      await showToast('Profil LinkedIn importé en brouillon CV', 'success');
+      await showToast('Profil LinkedIn synchronisé vers le dashboard', 'success');
     } finally {
-      importingLinkedIn = false;
+      syncingLinkedIn = false;
     }
   }
 
@@ -313,14 +339,14 @@
     <div class="mt-4 flex flex-wrap items-center gap-2">
       <button
         class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90 disabled:opacity-50"
-        onclick={importLinkedIn}
-        disabled={importingLinkedIn}
+        onclick={previewLinkedIn}
+        disabled={previewingLinkedIn || syncingLinkedIn}
       >
         <Icon name="download" size={13} />
-        {importingLinkedIn ? 'Import...' : 'Importer LinkedIn'}
+        {previewingLinkedIn ? 'Extraction...' : 'Prévisualiser LinkedIn'}
       </button>
       <span class="text-xs text-text-subtle">
-        Ouvrez votre profil LinkedIn dans l'onglet actif avant de lancer l'import.
+        Ouvrez votre profil LinkedIn dans l'onglet actif, vérifiez la preview, puis synchronisez.
       </span>
     </div>
   </section>
@@ -406,6 +432,73 @@
           </button>
         </div>
 
+        {#if linkedInPreviewResult}
+          <div
+            class="section-card rounded-xl border p-5 {linkedInPreviewResult.extracted
+              ? 'border-blueprint-blue/20'
+              : 'border-status-orange/20'}"
+          >
+            <div class="flex items-start gap-3">
+              <div
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {linkedInPreviewResult.extracted
+                  ? 'bg-blueprint-blue/8 text-blueprint-blue'
+                  : 'bg-status-orange/10 text-status-orange'}"
+              >
+                <Icon name={linkedInPreviewResult.extracted ? 'eye' : 'alert-triangle'} size={14} />
+              </div>
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-medium text-text-primary">Preview LinkedIn</h3>
+                {#if linkedInPreviewResult.extracted}
+                  <p class="mt-1 text-xs leading-5 text-text-subtle">
+                    {linkedInPreviewResult.profile.title || 'Titre non renseigné'} ·
+                    {linkedInPreviewResult.profile.experiences.length} expérience(s),
+                    {linkedInPreviewResult.profile.skills.length} compétence(s),
+                    {linkedInPreviewResult.profile.education.length} formation(s).
+                  </p>
+                  {#if linkedInPreviewResult.profile.summary}
+                    <p
+                      class="mt-3 max-h-24 overflow-auto rounded-lg border border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-secondary"
+                    >
+                      {linkedInPreviewResult.profile.summary}
+                    </p>
+                  {/if}
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    {#each linkedInPreviewResult.profile.skills.slice(0, 8) as skill}
+                      <span
+                        class="rounded-md bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
+                      >
+                        {skill.skill}
+                      </span>
+                    {/each}
+                  </div>
+                  <div class="mt-4 flex flex-wrap gap-2 border-t border-border-light pt-3">
+                    <button
+                      class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90 disabled:opacity-50"
+                      onclick={confirmLinkedInSync}
+                      disabled={syncingLinkedIn || previewingLinkedIn}
+                    >
+                      <Icon name="upload" size={13} />
+                      {syncingLinkedIn ? 'Synchronisation...' : 'Synchroniser le CV'}
+                    </button>
+                    <button
+                      class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+                      onclick={previewLinkedIn}
+                      disabled={syncingLinkedIn || previewingLinkedIn}
+                    >
+                      <Icon name="refresh-cw" size={13} />
+                      Réextraire
+                    </button>
+                  </div>
+                {:else}
+                  <p class="mt-1 text-xs leading-5 text-text-subtle">
+                    {linkedInPreviewResult.errorCode}: {linkedInPreviewResult.errorMessage}
+                  </p>
+                {/if}
+              </div>
+            </div>
+          </div>
+        {/if}
+
         {#if linkedInImportResult}
           <div
             class="section-card rounded-xl border p-5 {linkedInImportResult.imported
@@ -424,20 +517,9 @@
                 <h3 class="text-sm font-medium text-text-primary">Import LinkedIn</h3>
                 {#if linkedInImportResult.imported}
                   <p class="mt-1 text-xs leading-5 text-text-subtle">
-                    {linkedInImportResult.profile.title || 'Titre non renseigné'} ·
-                    {linkedInImportResult.profile.experiences.length} expérience(s),
-                    {linkedInImportResult.profile.skills.length} compétence(s),
-                    {linkedInImportResult.profile.education.length} formation(s).
+                    Profil CV synchronisé dans Supabase. Le dashboard affichera l'import, les
+                    suggestions de champs et l'historique LinkedIn.
                   </p>
-                  <div class="mt-3 flex flex-wrap gap-2">
-                    {#each linkedInImportResult.profile.skills.slice(0, 8) as skill}
-                      <span
-                        class="rounded-md bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
-                      >
-                        {skill.skill}
-                      </span>
-                    {/each}
-                  </div>
                 {:else}
                   <p class="mt-1 text-xs leading-5 text-text-subtle">
                     {linkedInImportResult.errorCode}: {linkedInImportResult.errorMessage}

@@ -59,6 +59,60 @@ const ProfilePayloadSchema = z
   .passthrough()
   .refine(maxBytes(10_240), { message: 'SAVE_PROFILE payload exceeds 10KB limit' });
 
+const LinkedInTabPayloadSchema = z.object({ tabId: z.number().int().positive().optional() });
+
+const CandidateExperienceDraftSchema = z.object({
+  title: SafeString,
+  company: SafeString.nullable(),
+  location: SafeString.nullable(),
+  startDate: z.string().max(32).nullable(),
+  endDate: z.string().max(32).nullable(),
+  isCurrent: z.boolean(),
+  description: SafeString,
+  skills: z.array(z.string().max(120)).max(100),
+  source: z.literal('linkedin'),
+  sourceExternalId: SafeString.nullable(),
+  positionIndex: z.number().int().min(0).max(500),
+});
+
+const CandidateEducationDraftSchema = z.object({
+  school: SafeString,
+  degree: SafeString.nullable(),
+  field: SafeString.nullable(),
+  startDate: z.string().max(32).nullable(),
+  endDate: z.string().max(32).nullable(),
+  description: SafeString,
+  source: z.literal('linkedin'),
+  positionIndex: z.number().int().min(0).max(500),
+});
+
+const CandidateSkillDraftSchema = z.object({
+  skill: z.string().min(1).max(120),
+  source: z.literal('linkedin'),
+  confidence: z.number().min(0).max(1),
+});
+
+const CandidateLinkDraftSchema = z.object({
+  label: z.string().min(1).max(120),
+  url: z.string().min(1).max(2048),
+  source: z.literal('linkedin'),
+});
+
+const CanonicalCandidateProfileDraftSchema = z
+  .object({
+    title: SafeString,
+    summary: SafeString,
+    experiences: z.array(CandidateExperienceDraftSchema).max(200),
+    skills: z.array(CandidateSkillDraftSchema).max(300),
+    education: z.array(CandidateEducationDraftSchema).max(100),
+    links: z.array(CandidateLinkDraftSchema).max(100),
+    source: z.literal('linkedin'),
+    confidence: z.number().min(0).max(1),
+    capturedAt: z.string().min(1).max(64),
+    profileUrl: z.string().min(1).max(2048),
+  })
+  .refine(maxBytes(80_000), { message: 'LinkedIn profile draft exceeds 80KB limit' });
+
 // ── Scan ─────────────────────────────────────────────────────────────────────
 
 const ScanProgressPhaseSchema = z.enum(['connecting', 'scanning', 'post-processing', 'done']);
@@ -128,14 +182,33 @@ export const MessageSchemas = {
   GET_PROFILE: z.object({ type: z.literal('GET_PROFILE') }),
   PROFILE_RESULT: z.object({ type: z.literal('PROFILE_RESULT'), payload: z.unknown() }),
   SAVE_PROFILE: z.object({ type: z.literal('SAVE_PROFILE'), payload: ProfilePayloadSchema }),
+  PREVIEW_LINKEDIN_PROFILE: z.object({
+    type: z.literal('PREVIEW_LINKEDIN_PROFILE'),
+    payload: LinkedInTabPayloadSchema.optional(),
+  }),
+  LINKEDIN_PROFILE_PREVIEWED: z.object({
+    type: z.literal('LINKEDIN_PROFILE_PREVIEWED'),
+    payload: z.union([
+      z.object({ extracted: z.literal(true), profile: CanonicalCandidateProfileDraftSchema }),
+      z.object({
+        extracted: z.literal(false),
+        errorCode: SafeString,
+        errorMessage: SafeString,
+      }),
+    ]),
+  }),
+  SYNC_LINKEDIN_PROFILE_IMPORT: z.object({
+    type: z.literal('SYNC_LINKEDIN_PROFILE_IMPORT'),
+    payload: z.object({ profile: CanonicalCandidateProfileDraftSchema }),
+  }),
   IMPORT_LINKEDIN_PROFILE: z.object({
     type: z.literal('IMPORT_LINKEDIN_PROFILE'),
-    payload: z.object({ tabId: z.number().int().positive().optional() }).optional(),
+    payload: LinkedInTabPayloadSchema.optional(),
   }),
   LINKEDIN_PROFILE_IMPORTED: z.object({
     type: z.literal('LINKEDIN_PROFILE_IMPORTED'),
     payload: z.union([
-      z.object({ imported: z.literal(true), profile: z.unknown() }),
+      z.object({ imported: z.literal(true), profile: CanonicalCandidateProfileDraftSchema }),
       z.object({
         imported: z.literal(false),
         errorCode: SafeString,

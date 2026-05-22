@@ -1,6 +1,56 @@
 import { describe, it, expect } from 'vitest';
 import { validateMessage } from '../../../src/lib/shell/messaging/schemas';
 
+const linkedinDraft = {
+  title: 'Consultant Svelte senior',
+  summary: 'Résumé LinkedIn normalisé.',
+  experiences: [
+    {
+      title: 'Lead Frontend',
+      company: 'Atelier Nova',
+      location: 'Paris',
+      startDate: '2024-01-01',
+      endDate: null,
+      isCurrent: true,
+      description: 'Pilotage produit Svelte.',
+      skills: ['Svelte', 'TypeScript'],
+      source: 'linkedin',
+      sourceExternalId: 'linkedin-experience-0',
+      positionIndex: 0,
+    },
+  ],
+  skills: [
+    {
+      skill: 'Svelte',
+      source: 'linkedin',
+      confidence: 0.8,
+    },
+  ],
+  education: [
+    {
+      school: 'Université Paris',
+      degree: 'Master',
+      field: 'Informatique',
+      startDate: '2014-01-01',
+      endDate: '2016-01-01',
+      description: '',
+      source: 'linkedin',
+      positionIndex: 0,
+    },
+  ],
+  links: [
+    {
+      label: 'LinkedIn',
+      url: 'https://www.linkedin.com/in/example/',
+      source: 'linkedin',
+    },
+  ],
+  source: 'linkedin',
+  confidence: 0.85,
+  capturedAt: '2026-05-22T10:00:00.000Z',
+  profileUrl: 'https://www.linkedin.com/in/example/',
+};
+
 // ============================================================================
 // validateMessage — structure de base
 // ============================================================================
@@ -94,6 +144,64 @@ describe('validateMessage — IMPORT_LINKEDIN_PROFILE', () => {
     expect(validateMessage({ type: 'IMPORT_LINKEDIN_PROFILE', payload: { tabId: -1 } }).valid).toBe(
       false
     );
+  });
+});
+
+describe('validateMessage — LinkedIn preview and sync import', () => {
+  it('accepte une demande de preview sans payload depuis le side panel', () => {
+    expect(validateMessage({ type: 'PREVIEW_LINKEDIN_PROFILE' }).valid).toBe(true);
+  });
+
+  it("accepte une demande de preview ciblant l'onglet actif connu", () => {
+    expect(
+      validateMessage({ type: 'PREVIEW_LINKEDIN_PROFILE', payload: { tabId: 42 } }).valid
+    ).toBe(true);
+  });
+
+  it('rejette un tabId de preview invalide', () => {
+    expect(
+      validateMessage({ type: 'PREVIEW_LINKEDIN_PROFILE', payload: { tabId: -1 } }).valid
+    ).toBe(false);
+  });
+
+  it('accepte une preview LinkedIn extraite', () => {
+    expect(
+      validateMessage({
+        type: 'LINKEDIN_PROFILE_PREVIEWED',
+        payload: { extracted: true, profile: linkedinDraft },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('accepte une erreur de preview LinkedIn typée', () => {
+    expect(
+      validateMessage({
+        type: 'LINKEDIN_PROFILE_PREVIEWED',
+        payload: {
+          extracted: false,
+          errorCode: 'session_required',
+          errorMessage: 'Session LinkedIn requise.',
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('accepte une demande de sync du draft LinkedIn confirmé', () => {
+    expect(
+      validateMessage({
+        type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
+        payload: { profile: linkedinDraft },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette une demande de sync LinkedIn avec une source non supportée', () => {
+    expect(
+      validateMessage({
+        type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
+        payload: { profile: { ...linkedinDraft, source: 'other' } },
+      }).valid
+    ).toBe(false);
   });
 });
 
