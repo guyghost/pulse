@@ -12,6 +12,7 @@ import {
   buildApplicationStageUpdatePatch,
   buildConnectedDataDeletionRequest,
   buildCvFieldSuggestionResolution,
+  buildEmptyCvSnapshot,
   buildCvProfileUpdatePatch,
   buildMissionSelectionInsertPatch,
   buildTjmRadarSnapshot,
@@ -723,8 +724,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
           profileImports ?? [],
           profileSuggestions ?? []
         )
-      : mockCv,
-    syncStatuses: syncStatuses.length > 0 ? syncStatuses : mockSyncStatuses,
+      : buildEmptyCvSnapshot({ updatedAt: new Date().toISOString() }),
+    syncStatuses,
     connectedSyncStatuses,
   };
 };

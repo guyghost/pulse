@@ -6,6 +6,7 @@ import {
   buildCvProfileUpdatePatch,
   buildConnectedDataDeletionRequest,
   buildCvFieldSuggestionResolution,
+  buildEmptyCvSnapshot,
   buildTjmRadarSnapshot,
   filterApplications,
   favoriteMissionToApplication,
@@ -746,6 +747,23 @@ describe('dashboard core', () => {
           createdAt: '2026-05-22T09:00:00.000Z',
         },
       ],
+    });
+  });
+
+  it('builds an empty connected CV snapshot without preview data', () => {
+    expect(buildEmptyCvSnapshot({ updatedAt: '2026-05-22T12:00:00.000Z' })).toEqual({
+      id: 'empty-cv',
+      title: '',
+      summary: '',
+      updatedAt: '2026-05-22T12:00:00.000Z',
+      completeness: 0,
+      targetRole: '',
+      skills: [],
+      experiences: [],
+      education: [],
+      links: [],
+      imports: [],
+      suggestions: [],
     });
   });
 

@@ -99,6 +99,8 @@
   const cvSyncAccess = $derived(featureAccess.find((feature) => feature.id === 'cv-sync') ?? null);
   const canPrepareCvSync = $derived(readiness.canSync && Boolean(cvSyncAccess?.enabled));
   const latestCvImport = $derived(cv.imports[0] ?? null);
+  const hasCvProfile = $derived(cv.id !== 'empty-cv');
+  const cvDisplayTitle = $derived(cv.title || 'CV à créer');
 
   const stageLabels: Record<ApplicationStage, string> = {
     detected: 'Détectée',
@@ -1202,9 +1204,13 @@
               <div>
                 <p class="eyebrow text-text-subtle">Profil candidat</p>
                 <h2 class="mt-2 text-lg font-semibold">CV principal</h2>
-                <p class="mt-1 text-sm text-text-subtle">{cv.title}</p>
+                <p class="mt-1 text-sm text-text-subtle">{cvDisplayTitle}</p>
               </div>
-              <Badge label={`${cv.completeness}%`} variant="success" size="md" />
+              <Badge
+                label={`${cv.completeness}%`}
+                variant={hasCvProfile ? 'success' : 'warning'}
+                size="md"
+              />
             </div>
             <div class="mt-5 rounded-xl border border-border-light bg-page-canvas p-4">
               <div class="space-y-2">
@@ -1224,7 +1230,18 @@
                 style={`width: ${cv.completeness}%`}
               ></div>
             </div>
-            <p class="mt-4 text-sm text-text-secondary">{cv.targetRole}</p>
+            {#if !hasCvProfile}
+              <p
+                class="mt-4 rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
+              >
+                Aucun CV canonique synchronisé. Créez un profil ici ou importez LinkedIn depuis
+                l'extension connectée.
+              </p>
+            {/if}
+
+            {#if cv.targetRole}
+              <p class="mt-4 text-sm text-text-secondary">{cv.targetRole}</p>
+            {/if}
             {#if cv.summary}
               <p class="mt-3 text-sm leading-6 text-text-subtle">{cv.summary}</p>
             {/if}

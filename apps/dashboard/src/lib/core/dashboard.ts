@@ -451,6 +451,10 @@ export interface ConnectedDataDeletionRequest {
   confirmation: 'SUPPRIMER';
 }
 
+export interface EmptyCvSnapshotInput {
+  updatedAt: string;
+}
+
 export type CvFieldSuggestionResolutionAction = 'apply' | 'dismiss';
 
 export interface CvFieldSuggestionResolutionInput {
@@ -1007,6 +1011,23 @@ export function profileRowsToCvSnapshot(
         },
       ];
     }),
+  };
+}
+
+export function buildEmptyCvSnapshot(input: EmptyCvSnapshotInput): CvSnapshot {
+  return {
+    id: 'empty-cv',
+    title: '',
+    summary: '',
+    updatedAt: input.updatedAt,
+    completeness: 0,
+    targetRole: '',
+    skills: [],
+    experiences: [],
+    education: [],
+    links: [],
+    imports: [],
+    suggestions: [],
   };
 }
 
