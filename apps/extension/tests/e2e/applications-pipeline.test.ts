@@ -136,6 +136,147 @@ async function mockApplicationsPipelineBridge(page: Page) {
   );
 }
 
+async function mockDashboardPullBridge(page: Page) {
+  await page.addInitScript(
+    ({ missionRow }) => {
+      let tracking = {
+        missionId: missionRow.id,
+        currentStatus: 'selected',
+        history: [
+          { from: null, to: 'detected', timestamp: 1779433200000, note: null },
+          { from: 'detected', to: 'selected', timestamp: 1779435000000, note: null },
+        ],
+        generatedAssetIds: [],
+        userRating: null,
+        notes: '',
+        nextActionAt: null,
+      };
+      let retried = false;
+
+      let chromeValue: unknown = undefined;
+      Object.defineProperty(window, 'chrome', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return chromeValue;
+        },
+        set(value: unknown) {
+          chromeValue = value;
+          const chromeApi = value as {
+            runtime?: {
+              sendMessage?: (message: { type: string; payload?: unknown }) => Promise<unknown>;
+            };
+          };
+
+          const originalSendMessage = chromeApi.runtime?.sendMessage;
+          if (!originalSendMessage) {
+            return;
+          }
+
+          chromeApi.runtime.sendMessage = async (message) => {
+            if (message.type === 'AUTH_STATUS') {
+              return {
+                type: 'AUTH_RESULT',
+                payload: {
+                  status: 'authenticated',
+                  user: {
+                    id: 'user-e2e',
+                    email: 'e2e@example.com',
+                    premiumStatus: 'premium',
+                    premiumExpiresAt: null,
+                    creditBalance: 10,
+                  },
+                },
+              };
+            }
+
+            if (message.type === 'GET_FEED_MISSIONS') {
+              return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
+            }
+
+            if (message.type === 'GET_TRACKINGS') {
+              return { type: 'TRACKINGS_RESULT', payload: [tracking] };
+            }
+
+            if (message.type === 'GET_GENERATED_ASSETS') {
+              return { type: 'GENERATED_ASSETS_RESULT', payload: [] };
+            }
+
+            if (message.type === 'GET_CONNECTED_SYNC_STATUS') {
+              return {
+                type: 'CONNECTED_SYNC_STATUS_RESULT',
+                payload: {
+                  authenticated: true,
+                  installId: 'install-e2e',
+                  lastGlobalSync: retried ? 1779437100000 : 1779436800000,
+                  entities: [
+                    {
+                      entity: 'applications',
+                      label: 'Candidatures',
+                      state: retried ? 'healthy' : 'pending',
+                      lastPullAt: retried ? '2026-05-22T10:05:00.000Z' : null,
+                      lastPushAt: null,
+                      pendingUploadCount: 0,
+                      pendingDownloadCount: retried ? 0 : 1,
+                      lastErrorCode: null,
+                      lastErrorMessage: null,
+                      retryAfterAt: null,
+                      updatedAt: retried ? '2026-05-22T10:05:00.000Z' : '2026-05-22T10:00:00.000Z',
+                    },
+                  ],
+                },
+              };
+            }
+
+            if (message.type === 'RETRY_CONNECTED_SYNC') {
+              retried = true;
+              tracking = {
+                ...tracking,
+                currentStatus: 'offer',
+                nextActionAt: '2026-05-24T09:00:00.000Z',
+                history: [
+                  ...tracking.history,
+                  {
+                    from: 'selected',
+                    to: 'application_prepared',
+                    timestamp: 1779436500000,
+                    note: 'Préparée dans le dashboard.',
+                  },
+                  {
+                    from: 'application_prepared',
+                    to: 'applied',
+                    timestamp: 1779436800000,
+                    note: 'Candidature envoyée depuis le dashboard.',
+                  },
+                  {
+                    from: 'applied',
+                    to: 'offer',
+                    timestamp: 1779437100000,
+                    note: 'Offre reçue côté dashboard.',
+                  },
+                ],
+              };
+              return {
+                type: 'CONNECTED_DASHBOARD_SYNCED',
+                payload: {
+                  synced: true,
+                  missions: 0,
+                  applications: 1,
+                  connectorHealth: 0,
+                  pulledApplications: 1,
+                },
+              };
+            }
+
+            return originalSendMessage.call(chromeApi.runtime, message);
+          };
+        },
+      });
+    },
+    { missionRow: mission }
+  );
+}
+
 test.describe('applications pipeline', () => {
   test('refreshes the prepared pipeline state after generating an application asset', async ({
     page,
@@ -163,5 +304,33 @@ test.describe('applications pipeline', () => {
             .__missionPulseBridgeMessages
       )
     ).resolves.toContain('GENERATE_ASSET');
+  });
+
+  test('shows a dashboard stage update after manual connected sync retry', async ({ page }) => {
+    await mockDashboardPullBridge(page);
+    await page.goto(SIDE_PANEL);
+
+    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    await expect(nav).toBeVisible();
+    await nav.getByRole('button', { name: 'Suivi' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Mission Svelte dashboard' })).toBeVisible();
+    await expect(page.getByText('Sélectionnée').first()).toBeVisible();
+
+    await nav.getByRole('button', { name: 'Settings' }).click();
+    const dashboardSync = page.locator('.section-card').filter({ hasText: 'Dashboard connecté' });
+    await expect(dashboardSync.getByText('En attente').first()).toBeVisible();
+    await expect(
+      dashboardSync.locator('p').filter({ hasText: 'Download:' }).filter({ hasText: '1' })
+    ).toBeVisible();
+
+    await dashboardSync.getByRole('button', { name: 'Retenter la sync' }).click();
+    await expect(page.getByText('Synchronisation dashboard relancée')).toBeVisible();
+    await expect(dashboardSync.getByText('Synchronisé', { exact: true })).toBeVisible();
+
+    await nav.getByRole('button', { name: 'Suivi' }).click();
+
+    await expect(page.getByText('Offre').first()).toBeVisible();
+    await expect(page.getByText(/Prochaine action 24 mai/)).toBeVisible();
   });
 });
