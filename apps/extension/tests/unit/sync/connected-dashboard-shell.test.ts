@@ -1120,6 +1120,40 @@ describe('connected dashboard shell sync', () => {
     );
   });
 
+  it('records a failed LinkedIn profile import event when canonical CV persistence fails', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.replaceCandidateProfileChildren).mockRejectedValueOnce(
+      new Error('profile write failed')
+    );
+
+    const result = await pushCandidateProfileImportToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      draft: linkedinDraft,
+      now: new Date('2026-05-22T08:05:00.000Z'),
+      extractorVersion: 'linkedin-v1',
+      rawHash: 'sha256:abc123',
+    });
+
+    expect(result.ok).toBe(false);
+    expect(gateway.insertProfileImport).toHaveBeenCalledWith({
+      user_id: 'user-1',
+      source: 'linkedin',
+      status: 'error',
+      imported_at: '2026-05-22T08:05:00.000Z',
+      extractor_version: 'linkedin-v1',
+      error_code: 'profile-sync-failed',
+      error_message: 'profile write failed',
+      raw_hash: 'sha256:abc123',
+      field_counts: {
+        experiences: 1,
+        education: 0,
+        skills: 2,
+        links: 1,
+      },
+    });
+  });
+
   it('pulls the dashboard candidate profile into a local scoring profile draft', async () => {
     const gateway = createGateway();
     vi.mocked(gateway.getCandidateProfileForScoring).mockResolvedValueOnce({

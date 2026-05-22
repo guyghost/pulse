@@ -854,6 +854,33 @@ export function buildCandidateProfileImportRows(input: {
   };
 }
 
+export function buildCandidateProfileImportErrorRow(input: {
+  draft: CanonicalCandidateProfileDraft;
+  userId: string;
+  importedAt: Date;
+  extractorVersion: string;
+  errorCode: string;
+  errorMessage: string;
+  rawHash?: string | null;
+}): ProfileImportInsertRow {
+  return {
+    user_id: input.userId,
+    source: input.draft.source,
+    status: 'error',
+    imported_at: input.importedAt.toISOString(),
+    extractor_version: input.extractorVersion,
+    error_code: input.errorCode,
+    error_message: input.errorMessage,
+    raw_hash: input.rawHash ?? null,
+    field_counts: {
+      experiences: input.draft.experiences.length,
+      education: input.draft.education.length,
+      skills: input.draft.skills.length,
+      links: input.draft.links.length,
+    },
+  };
+}
+
 export function buildCandidateProfileFieldSuggestionRows(input: {
   draft: CanonicalCandidateProfileDraft;
   userId: string;

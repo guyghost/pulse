@@ -5,6 +5,7 @@ import {
   buildApplicationPullCursor,
   buildApplicationUpsertRow,
   buildCandidateProfileFieldSuggestionRows,
+  buildCandidateProfileImportErrorRow,
   buildCandidateProfileImportRows,
   buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
@@ -1529,6 +1530,7 @@ export async function pushCandidateProfileImportToConnectedDashboard(
     revision: 1,
     rawHash: input.rawHash,
   });
+  let profileImportAttempted = false;
 
   try {
     const existingProfile = await gateway.getCandidateProfile(input.userId);
@@ -1587,6 +1589,7 @@ export async function pushCandidateProfileImportToConnectedDashboard(
     }
     await gateway.insertCandidateProfileFieldSuggestions(suggestionRows);
     await gateway.insertSyncConflicts(conflictRows);
+    profileImportAttempted = true;
     await gateway.insertProfileImport(rows.importEvent);
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({
@@ -1615,6 +1618,21 @@ export async function pushCandidateProfileImportToConnectedDashboard(
       message: baseError.message,
       retryable: true,
     };
+    if (!profileImportAttempted) {
+      await gateway
+        .insertProfileImport(
+          buildCandidateProfileImportErrorRow({
+            draft: input.draft,
+            userId: input.userId,
+            importedAt: input.now,
+            extractorVersion: input.extractorVersion,
+            errorCode: syncError.code,
+            errorMessage: syncError.message,
+            rawHash: input.rawHash,
+          })
+        )
+        .catch(() => undefined);
+    }
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({
         userId: input.userId,

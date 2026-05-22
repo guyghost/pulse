@@ -4,6 +4,7 @@ import {
   buildApplicationSyncConflictRows,
   buildApplicationUpsertRow,
   buildCandidateProfileFieldSuggestionRows,
+  buildCandidateProfileImportErrorRow,
   filterNewCandidateProfileFieldSuggestionRows,
   filterNewSyncConflictRows,
   buildCandidateProfileImportRows,
@@ -576,6 +577,35 @@ describe('connected dashboard sync payload builders', () => {
           skills: 2,
           links: 1,
         },
+      },
+    });
+  });
+
+  it('builds failed canonical CV import rows without raw profile data', () => {
+    expect(
+      buildCandidateProfileImportErrorRow({
+        draft: linkedinDraft,
+        userId: 'user-1',
+        importedAt: new Date('2026-05-22T08:05:00.000Z'),
+        extractorVersion: 'linkedin-v1',
+        errorCode: 'profile-sync-failed',
+        errorMessage: 'profile write failed',
+        rawHash: 'sha256:abc123',
+      })
+    ).toEqual({
+      user_id: 'user-1',
+      source: 'linkedin',
+      status: 'error',
+      imported_at: '2026-05-22T08:05:00.000Z',
+      extractor_version: 'linkedin-v1',
+      error_code: 'profile-sync-failed',
+      error_message: 'profile write failed',
+      raw_hash: 'sha256:abc123',
+      field_counts: {
+        experiences: 1,
+        education: 1,
+        skills: 2,
+        links: 1,
       },
     });
   });
