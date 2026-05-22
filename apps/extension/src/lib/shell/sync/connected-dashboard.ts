@@ -338,6 +338,7 @@ interface SupabaseWriteBuilder {
 interface SupabaseReadBuilder {
   eq(column: string, value: unknown): SupabaseReadBuilder;
   gt(column: string, value: unknown): SupabaseReadBuilder;
+  neq(column: string, value: unknown): SupabaseReadBuilder;
   in(column: string, values: unknown[]): SupabaseReadBuilder;
   order(
     column: string,
@@ -860,7 +861,8 @@ export function createSupabaseConnectedDashboardGateway(
         .select(
           'id,mission_id,stage,user_rating,notes,next_action_at,revision,updated_at,missions!inner(source,external_id)'
         )
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .neq('updated_by', 'extension');
       if (since) {
         query = query.gt('updated_at', since);
       }

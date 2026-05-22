@@ -168,6 +168,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
 interface MockSupabaseReadQuery {
   eq(column: string, value: unknown): MockSupabaseReadQuery;
   gt(column: string, value: unknown): MockSupabaseReadQuery;
+  neq(column: string, value: unknown): MockSupabaseReadQuery;
   order(
     column: string,
     options?: Record<string, unknown>
@@ -178,6 +179,7 @@ function createReadQuery(data: unknown): MockSupabaseReadQuery {
   const query: MockSupabaseReadQuery = {
     eq: vi.fn(() => query),
     gt: vi.fn(() => query),
+    neq: vi.fn(() => query),
     order: vi.fn(async () => ({ data, error: null })),
   };
 
@@ -411,6 +413,31 @@ describe('connected dashboard shell sync', () => {
         },
       ],
     });
+  });
+
+  it('excludes extension-origin application rows when pulling dashboard changes', async () => {
+    const applicationQuery = createReadQuery([]);
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table !== 'applications') {
+          throw new Error(`Unexpected table ${table}`);
+        }
+
+        return { select: vi.fn(() => applicationQuery) };
+      }),
+    } as unknown as Parameters<typeof createSupabaseConnectedDashboardGateway>[0];
+    const gateway = createSupabaseConnectedDashboardGateway(supabase);
+
+    await expect(
+      gateway.listApplicationsUpdatedSince({
+        userId: 'user-1',
+        since: '2026-05-22T08:00:00.000Z',
+      })
+    ).resolves.toEqual([]);
+
+    expect(applicationQuery.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(applicationQuery.gt).toHaveBeenCalledWith('updated_at', '2026-05-22T08:00:00.000Z');
+    expect(applicationQuery.neq).toHaveBeenCalledWith('updated_by', 'extension');
   });
 
   it('syncs LinkedIn extractor health events through the connected dashboard gateway', async () => {
