@@ -2,6 +2,7 @@ import type { User } from '@supabase/supabase-js';
 import {
   buildApplicationPipelineEventRows,
   buildApplicationUpsertRow,
+  buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
@@ -9,12 +10,19 @@ import {
   mergeRemoteApplicationTracking,
   type ApplicationPipelineEventRow,
   type ApplicationUpsertRow,
+  type CandidateEducationInsertRow,
+  type CandidateExperienceInsertRow,
+  type CandidateLinkInsertRow,
+  type CandidateProfileUpsertRow,
+  type CandidateSkillUpsertRow,
   type ConnectorHealthEventRow,
   type MissionScoreUpsertRow,
   type MissionUpsertRow,
+  type ProfileImportInsertRow,
   type RemoteApplicationSnapshot,
   type SyncStatusRow,
 } from '../../core/sync/connected-dashboard';
+import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { Mission, MissionSource } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
@@ -24,6 +32,7 @@ import { getTracking, saveTrackings } from '../storage/tracking';
 
 const INSTALL_ID_STORAGE_KEY = 'missionpulse.connectedSync.installId';
 const DEFAULT_SCORER_VERSION = 'missionpulse-v1';
+const LINKEDIN_PROFILE_EXTRACTOR_VERSION = 'linkedin-v1';
 
 export interface RemoteMissionIdentity {
   id: string;
@@ -55,11 +64,25 @@ export interface ConnectedDashboardSyncGateway {
   }): Promise<RemoteApplicationSnapshot[]>;
   upsertApplicationPipelineEvents(rows: ApplicationPipelineEventRow[]): Promise<void>;
   insertConnectorHealthEvents(rows: ConnectorHealthEventRow[]): Promise<void>;
+  upsertCandidateProfile(row: CandidateProfileUpsertRow): Promise<{ id: string; revision: number }>;
+  replaceCandidateProfileChildren(input: {
+    profileId: string;
+    experiences: CandidateExperienceInsertRow[];
+    education: CandidateEducationInsertRow[];
+    skills: CandidateSkillUpsertRow[];
+    links: CandidateLinkInsertRow[];
+  }): Promise<void>;
+  insertProfileImport(row: ProfileImportInsertRow): Promise<void>;
   upsertSyncStatus(row: SyncStatusRow): Promise<void>;
 }
 
 export interface ConnectedSyncError {
-  code: 'unauthenticated' | 'remote-error' | 'mission-not-found' | 'tracking-not-found';
+  code:
+    | 'unauthenticated'
+    | 'remote-error'
+    | 'mission-not-found'
+    | 'tracking-not-found'
+    | 'profile-sync-failed';
   message: string;
   retryable: boolean;
 }
@@ -129,6 +152,23 @@ export interface PushConnectorHealthResult {
   pushedCount: number;
 }
 
+export interface PushCandidateProfileImportInput {
+  userId: string;
+  deviceId: string;
+  draft: CanonicalCandidateProfileDraft;
+  now: Date;
+  extractorVersion: string;
+  rawHash?: string | null;
+}
+
+export interface PushCandidateProfileImportResult {
+  profileId: string;
+  experiences: number;
+  education: number;
+  skills: number;
+  links: number;
+}
+
 export interface ConnectedDashboardSnapshotInput {
   missions: Mission[];
   trackings: MissionTracking[];
@@ -171,10 +211,16 @@ interface SupabaseReadBuilder {
   }>;
 }
 
+interface SupabaseMutationFilterBuilder {
+  eq(column: string, value: unknown): SupabaseMutationFilterBuilder;
+  select(columns: string): Promise<{ data: unknown; error: { message: string } | null }>;
+}
+
 interface SupabaseTableLike {
   upsert(rows: unknown, options?: Record<string, unknown>): SupabaseWriteBuilder;
   insert(rows: unknown): SupabaseWriteBuilder;
   select(columns: string): SupabaseReadBuilder;
+  delete(): SupabaseMutationFilterBuilder;
 }
 
 interface SupabaseLike {
@@ -292,6 +338,14 @@ function parseSingleId(data: unknown): { id: string } {
   throw new Error('Supabase response did not include an id');
 }
 
+function parseProfileIdentity(data: unknown): { id: string; revision: number } {
+  const value = Array.isArray(data) ? data[0] : data;
+  if (isRecord(value) && typeof value.id === 'string' && typeof value.revision === 'number') {
+    return { id: value.id, revision: value.revision };
+  }
+  throw new Error('Supabase response did not include profile identity');
+}
+
 async function selectOrThrow<T>(
   builder: SupabaseWriteBuilder,
   columns: string,
@@ -375,6 +429,68 @@ export function createSupabaseConnectedDashboardGateway(
         'id',
         () => undefined
       );
+    },
+    upsertCandidateProfile: async (row) =>
+      selectOrThrow(
+        supabase.from('candidate_profiles').upsert(row, { onConflict: 'user_id' }),
+        'id,revision',
+        parseProfileIdentity
+      ),
+    replaceCandidateProfileChildren: async ({
+      profileId,
+      experiences,
+      education,
+      skills,
+      links,
+    }) => {
+      await selectOrThrow(
+        supabase.from('candidate_experiences').delete().eq('profile_id', profileId),
+        'id',
+        () => undefined
+      );
+      await selectOrThrow(
+        supabase.from('candidate_education').delete().eq('profile_id', profileId),
+        'id',
+        () => undefined
+      );
+      await selectOrThrow(
+        supabase.from('candidate_links').delete().eq('profile_id', profileId),
+        'id',
+        () => undefined
+      );
+      await selectOrThrow(
+        supabase.from('candidate_skills').delete().eq('profile_id', profileId),
+        'skill',
+        () => undefined
+      );
+
+      if (experiences.length > 0) {
+        await selectOrThrow(
+          supabase.from('candidate_experiences').insert(experiences),
+          'id',
+          () => undefined
+        );
+      }
+      if (education.length > 0) {
+        await selectOrThrow(
+          supabase.from('candidate_education').insert(education),
+          'id',
+          () => undefined
+        );
+      }
+      if (skills.length > 0) {
+        await selectOrThrow(
+          supabase.from('candidate_skills').upsert(skills, { onConflict: 'profile_id,skill' }),
+          'profile_id,skill',
+          () => undefined
+        );
+      }
+      if (links.length > 0) {
+        await selectOrThrow(supabase.from('candidate_links').insert(links), 'id', () => undefined);
+      }
+    },
+    insertProfileImport: async (row) => {
+      await selectOrThrow(supabase.from('profile_imports').insert(row), 'id', () => undefined);
     },
     upsertSyncStatus: async (row) => {
       await selectOrThrow(
@@ -620,6 +736,118 @@ export async function pushConnectorHealthToConnectedDashboard(
     );
     return { ok: false, error: syncError };
   }
+}
+
+export async function pushCandidateProfileImportToConnectedDashboard(
+  gateway: ConnectedDashboardSyncGateway,
+  input: PushCandidateProfileImportInput
+): Promise<ConnectedSyncResult<PushCandidateProfileImportResult>> {
+  const provisionalRows = buildCandidateProfileImportRows({
+    draft: input.draft,
+    userId: input.userId,
+    profileId: 'pending-profile-id',
+    importedAt: input.now,
+    extractorVersion: input.extractorVersion,
+    revision: 1,
+    rawHash: input.rawHash,
+  });
+
+  try {
+    const profile = await gateway.upsertCandidateProfile(provisionalRows.profile);
+    const rows = buildCandidateProfileImportRows({
+      draft: input.draft,
+      userId: input.userId,
+      profileId: profile.id,
+      importedAt: input.now,
+      extractorVersion: input.extractorVersion,
+      revision: profile.revision,
+      rawHash: input.rawHash,
+    });
+
+    await gateway.replaceCandidateProfileChildren({
+      profileId: profile.id,
+      experiences: rows.experiences,
+      education: rows.education,
+      skills: rows.skills,
+      links: rows.links,
+    });
+    await gateway.insertProfileImport(rows.importEvent);
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        entity: 'candidate_profile',
+        lastPushAt: input.now,
+      })
+    );
+
+    return {
+      ok: true,
+      value: {
+        profileId: profile.id,
+        experiences: rows.experiences.length,
+        education: rows.education.length,
+        skills: rows.skills.length,
+        links: rows.links.length,
+      },
+    };
+  } catch (error) {
+    const baseError = remoteError(error);
+    const syncError: ConnectedSyncError = {
+      code: 'profile-sync-failed',
+      message: baseError.message,
+      retryable: true,
+    };
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        entity: 'candidate_profile',
+        pendingUploadCount: 1,
+        error: { code: syncError.code, message: syncError.message },
+      })
+    );
+    return { ok: false, error: syncError };
+  }
+}
+
+async function hashCandidateProfileDraft(
+  draft: CanonicalCandidateProfileDraft
+): Promise<string | null> {
+  try {
+    const encoded = new TextEncoder().encode(JSON.stringify(draft));
+    const digest = await crypto.subtle.digest('SHA-256', encoded);
+    return `sha256:${[...new Uint8Array(digest)]
+      .map((byte) => byte.toString(16).padStart(2, '0'))
+      .join('')}`;
+  } catch {
+    return null;
+  }
+}
+
+export async function syncConnectedDashboardProfileImport(
+  draft: CanonicalCandidateProfileDraft
+): Promise<ConnectedSyncResult<PushCandidateProfileImportResult>> {
+  const context = await getRuntimeContext();
+  if ('code' in context) {
+    return { ok: false, error: context };
+  }
+
+  const rawHash = await hashCandidateProfileDraft(draft);
+  const result = await pushCandidateProfileImportToConnectedDashboard(context.gateway, {
+    userId: context.userId,
+    deviceId: context.deviceId,
+    draft,
+    now: context.now,
+    extractorVersion: LINKEDIN_PROFILE_EXTRACTOR_VERSION,
+    rawHash,
+  });
+
+  if (result.ok) {
+    await chrome.storage.local.set({ lastGlobalSync: context.now.getTime() });
+  }
+
+  return result;
 }
 
 export async function getOrCreateConnectedSyncInstallId(

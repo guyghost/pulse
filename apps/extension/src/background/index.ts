@@ -58,6 +58,7 @@ import {
   getConnectedDashboardSyncStatus,
   syncConnectedDashboardScan,
   syncConnectedDashboardSnapshot,
+  syncConnectedDashboardProfileImport,
   syncConnectedDashboardTracking,
 } from '../lib/shell/sync/connected-dashboard';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
@@ -437,7 +438,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       const extractor = getProfileExtractor('linkedin');
       extractor
         .extractProfile(Date.now(), message.payload?.tabId)
-        .then((result) => {
+        .then(async (result) => {
           if (!result.ok) {
             sendResponse({
               type: 'LINKEDIN_PROFILE_IMPORTED',
@@ -445,6 +446,19 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
                 imported: false,
                 errorCode: getBridgeErrorCode(result.error),
                 errorMessage: result.error.message,
+              },
+            });
+            return;
+          }
+
+          const synced = await syncConnectedDashboardProfileImport(result.value);
+          if (!synced.ok) {
+            sendResponse({
+              type: 'LINKEDIN_PROFILE_IMPORTED',
+              payload: {
+                imported: false,
+                errorCode: 'sync_failed',
+                errorMessage: synced.error.message,
               },
             });
             return;

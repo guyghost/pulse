@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   pushApplicationsToConnectedDashboard,
   pushConnectorHealthToConnectedDashboard,
+  pushCandidateProfileImportToConnectedDashboard,
   pullApplicationsFromConnectedDashboard,
   pushMissionsToConnectedDashboard,
   registerExtensionDevice,
@@ -10,6 +11,7 @@ import {
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 import type { ConnectorHealthSnapshot } from '../../../src/lib/core/types/health';
+import type { CanonicalCandidateProfileDraft } from '../../../src/lib/core/profile-extractors/types';
 
 const mission: Mission = {
   id: 'free-work-123',
@@ -45,6 +47,36 @@ const tracking: MissionTracking = {
   notes: 'Bon fit',
 };
 
+const linkedinDraft: CanonicalCandidateProfileDraft = {
+  title: 'Lead Frontend Svelte',
+  summary: 'Consultant frontend senior.',
+  source: 'linkedin',
+  confidence: 0.86,
+  capturedAt: '2026-05-22T08:00:00.000Z',
+  profileUrl: 'https://www.linkedin.com/in/example/',
+  experiences: [
+    {
+      title: 'Lead Frontend',
+      company: 'ScaleOps',
+      location: 'Paris',
+      startDate: '2021-01-01',
+      endDate: null,
+      isCurrent: true,
+      description: 'Migration Svelte 5',
+      skills: ['Svelte', 'TypeScript'],
+      source: 'linkedin',
+      sourceExternalId: 'experience-1',
+      positionIndex: 0,
+    },
+  ],
+  education: [],
+  skills: [
+    { skill: 'Svelte', source: 'linkedin', confidence: 0.8 },
+    { skill: 'TypeScript', source: 'linkedin', confidence: 0.8 },
+  ],
+  links: [{ label: 'Portfolio', url: 'https://example.com', source: 'linkedin' }],
+};
+
 function createGateway(): ConnectedDashboardSyncGateway {
   return {
     upsertExtensionDevice: vi.fn(async () => ({ id: 'device-1' })),
@@ -75,6 +107,9 @@ function createGateway(): ConnectedDashboardSyncGateway {
     ]),
     upsertApplicationPipelineEvents: vi.fn(async () => undefined),
     insertConnectorHealthEvents: vi.fn(async () => undefined),
+    upsertCandidateProfile: vi.fn(async () => ({ id: 'profile-1', revision: 3 })),
+    replaceCandidateProfileChildren: vi.fn(async () => undefined),
+    insertProfileImport: vi.fn(async () => undefined),
     upsertSyncStatus: vi.fn(async () => undefined),
   };
 }
@@ -262,6 +297,107 @@ describe('connected dashboard shell sync', () => {
       expect.objectContaining({
         entity: 'connector_health',
         pending_upload_count: 0,
+      })
+    );
+  });
+
+  it('pushes a LinkedIn profile import to canonical CV tables', async () => {
+    const gateway = createGateway();
+
+    const result = await pushCandidateProfileImportToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      draft: linkedinDraft,
+      now: new Date('2026-05-22T08:05:00.000Z'),
+      extractorVersion: 'linkedin-v1',
+      rawHash: 'sha256:abc123',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        profileId: 'profile-1',
+        experiences: 1,
+        education: 0,
+        skills: 2,
+        links: 1,
+      },
+    });
+    expect(gateway.upsertCandidateProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        title: 'Lead Frontend Svelte',
+        completeness: 86,
+      })
+    );
+    expect(gateway.replaceCandidateProfileChildren).toHaveBeenCalledWith({
+      profileId: 'profile-1',
+      experiences: [
+        expect.objectContaining({
+          profile_id: 'profile-1',
+          title: 'Lead Frontend',
+          source: 'linkedin',
+        }),
+      ],
+      education: [],
+      skills: [
+        { profile_id: 'profile-1', skill: 'Svelte', source: 'linkedin', confidence: 0.8 },
+        { profile_id: 'profile-1', skill: 'TypeScript', source: 'linkedin', confidence: 0.8 },
+      ],
+      links: [
+        {
+          profile_id: 'profile-1',
+          label: 'Portfolio',
+          url: 'https://example.com',
+          source: 'linkedin',
+        },
+      ],
+    });
+    expect(gateway.insertProfileImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        source: 'linkedin',
+        status: 'success',
+        raw_hash: 'sha256:abc123',
+      })
+    );
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'candidate_profile',
+        last_push_at: '2026-05-22T08:05:00.000Z',
+        pending_upload_count: 0,
+      })
+    );
+  });
+
+  it('records retryable sync status when profile import persistence fails', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.replaceCandidateProfileChildren).mockRejectedValueOnce(
+      new Error('profile write failed')
+    );
+
+    const result = await pushCandidateProfileImportToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      draft: linkedinDraft,
+      now: new Date('2026-05-22T08:05:00.000Z'),
+      extractorVersion: 'linkedin-v1',
+    });
+
+    expect(result).toEqual({
+      ok: false,
+      error: {
+        code: 'profile-sync-failed',
+        message: 'profile write failed',
+        retryable: true,
+      },
+    });
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'candidate_profile',
+        pending_upload_count: 1,
+        last_error_code: 'profile-sync-failed',
+        last_error_message: 'profile write failed',
       })
     );
   });
