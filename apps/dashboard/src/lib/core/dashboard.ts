@@ -108,6 +108,29 @@ export interface MissionFeedItem {
   freshness: MissionFreshness;
 }
 
+export type TjmTrend = 'up' | 'down' | 'stable' | 'unknown';
+
+export interface TjmRadarSegment {
+  label: string;
+  averageDailyRate: number;
+  minDailyRate: number;
+  maxDailyRate: number;
+  missionCount: number;
+}
+
+export interface TjmRadarSnapshot {
+  missionCount: number;
+  averageDailyRate: number | null;
+  minDailyRate: number | null;
+  maxDailyRate: number | null;
+  trend: TjmTrend;
+  trendDelta: number | null;
+  topSource: string | null;
+  topStack: string | null;
+  sourceSegments: TjmRadarSegment[];
+  stackSegments: TjmRadarSegment[];
+}
+
 export interface DashboardFavoriteMissionSnapshot {
   missionId: string;
   title: string;
@@ -407,6 +430,19 @@ const CONNECTED_SYNC_ENTITY_LABELS: Record<ConnectedSyncEntity, string> = {
   connector_health: 'Santé connecteurs',
 };
 
+const EMPTY_TJM_RADAR: TjmRadarSnapshot = {
+  missionCount: 0,
+  averageDailyRate: null,
+  minDailyRate: null,
+  maxDailyRate: null,
+  trend: 'unknown',
+  trendDelta: null,
+  topSource: null,
+  topStack: null,
+  sourceSegments: [],
+  stackSegments: [],
+};
+
 export function parseDashboardFavoriteMission(
   raw: unknown
 ): DashboardFavoriteMissionSnapshot | null {
@@ -598,6 +634,106 @@ function createGeneratedAssetPreview(content: string): string {
   }
 
   return `${normalized.slice(0, 177).trimEnd()}...`;
+}
+
+export function buildTjmRadarSnapshot(missions: MissionFeedItem[]): TjmRadarSnapshot {
+  const ratedMissions = missions.filter(
+    (mission): mission is MissionFeedItem & { dailyRate: number } =>
+      typeof mission.dailyRate === 'number' && mission.dailyRate > 0
+  );
+
+  if (ratedMissions.length === 0) {
+    return { ...EMPTY_TJM_RADAR, sourceSegments: [], stackSegments: [] };
+  }
+
+  const rates = ratedMissions.map((mission) => mission.dailyRate);
+  const sourceSegments = buildTjmSegments(
+    ratedMissions.map((mission) => ({
+      label: SOURCE_LABELS[mission.source],
+      dailyRate: mission.dailyRate,
+    }))
+  );
+  const stackSegments = buildTjmSegments(
+    ratedMissions.flatMap((mission) =>
+      mission.stack
+        .map((skill) => skill.trim())
+        .filter(Boolean)
+        .map((skill) => ({
+          label: skill,
+          dailyRate: mission.dailyRate,
+        }))
+    )
+  );
+  const trend = calculateTjmTrend(ratedMissions);
+
+  return {
+    missionCount: ratedMissions.length,
+    averageDailyRate: averageRounded(rates),
+    minDailyRate: Math.min(...rates),
+    maxDailyRate: Math.max(...rates),
+    trend: trend.trend,
+    trendDelta: trend.delta,
+    topSource: sourceSegments[0]?.label ?? null,
+    topStack: stackSegments[0]?.label ?? null,
+    sourceSegments,
+    stackSegments,
+  };
+}
+
+function buildTjmSegments(items: { label: string; dailyRate: number }[]): TjmRadarSegment[] {
+  const groups = new Map<string, { label: string; rates: number[] }>();
+
+  for (const item of items) {
+    const key = item.label.toLowerCase();
+    const group = groups.get(key) ?? { label: item.label, rates: [] };
+    group.rates.push(item.dailyRate);
+    groups.set(key, group);
+  }
+
+  return [...groups.values()]
+    .map((group) => ({
+      label: group.label,
+      averageDailyRate: averageRounded(group.rates),
+      minDailyRate: Math.min(...group.rates),
+      maxDailyRate: Math.max(...group.rates),
+      missionCount: group.rates.length,
+    }))
+    .sort(
+      (a, b) =>
+        b.missionCount - a.missionCount ||
+        b.averageDailyRate - a.averageDailyRate ||
+        a.label.localeCompare(b.label)
+    );
+}
+
+function calculateTjmTrend(missions: (MissionFeedItem & { dailyRate: number })[]): {
+  trend: TjmTrend;
+  delta: number | null;
+} {
+  const chronological = [...missions].sort((a, b) => a.scrapedAt.localeCompare(b.scrapedAt));
+
+  if (chronological.length < 4) {
+    return { trend: 'unknown', delta: null };
+  }
+
+  const midpoint = Math.floor(chronological.length / 2);
+  const previousAverage = averageRounded(
+    chronological.slice(0, midpoint).map((mission) => mission.dailyRate)
+  );
+  const recentAverage = averageRounded(
+    chronological.slice(midpoint).map((mission) => mission.dailyRate)
+  );
+  const delta = recentAverage - previousAverage;
+
+  if (Math.abs(delta) < 25) {
+    return { trend: 'stable', delta };
+  }
+
+  return { trend: delta > 0 ? 'up' : 'down', delta };
+}
+
+function averageRounded(values: number[]): number {
+  return Math.round(values.reduce((total, value) => total + value, 0) / values.length);
 }
 
 export function profileRowsToCvSnapshot(

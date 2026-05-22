@@ -9,6 +9,7 @@ import {
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
   buildApplicationStageUpdatePatch,
+  buildTjmRadarSnapshot,
   canonicalRowsToApplications,
   favoriteMissionToApplication,
   generatedAssetRowsToHistory,
@@ -43,6 +44,7 @@ import {
   type MissionApplication,
   type MissionFeedItem,
   type PlatformSyncStatus,
+  type TjmRadarSnapshot,
 } from '$lib/core/dashboard';
 
 const mockApplications: MissionApplication[] = [
@@ -155,6 +157,8 @@ const mockMissionFeed: MissionFeedItem[] = [
     freshness: 'stale',
   },
 ];
+
+const mockTjmRadar: TjmRadarSnapshot = buildTjmRadarSnapshot(mockMissionFeed);
 
 const mockCv: CvSnapshot = {
   id: 'cv-main',
@@ -333,6 +337,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       entitlements,
       featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
       missionFeed: mockMissionFeed,
+      tjmRadar: mockTjmRadar,
       applications: mockApplications,
       generatedAssets: mockGeneratedAssets,
       cv: mockCv,
@@ -402,6 +407,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     missionDuplicateRows ?? [],
     new Date()
   );
+  const tjmRadar = buildTjmRadarSnapshot(missionFeed);
 
   const { data: canonicalApplicationRows } = await supabase
     .from('applications')
@@ -559,6 +565,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     entitlements,
     featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
     missionFeed,
+    tjmRadar,
     applications: canonicalApplications.length > 0 ? canonicalApplications : syncedApplications,
     generatedAssets,
     cv: candidateProfile

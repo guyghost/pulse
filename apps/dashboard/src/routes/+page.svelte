@@ -22,11 +22,13 @@
     MissionApplication,
     MissionFeedItem,
     PlatformSyncStatus,
+    TjmRadarSnapshot,
   } from '$lib/core/dashboard';
 
   let { data, form }: { data: PageData; form?: ActionData } = $props();
 
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
+  const tjmRadar = $derived(data.tjmRadar as TjmRadarSnapshot);
   const applications = $derived(data.applications as MissionApplication[]);
   const generatedAssets = $derived(data.generatedAssets as GeneratedApplicationAsset[]);
   const cv = $derived(data.cv as CvSnapshot);
@@ -117,6 +119,13 @@
     idle: 'Initial',
   };
 
+  const tjmTrendLabels: Record<TjmRadarSnapshot['trend'], string> = {
+    up: 'Marché en hausse',
+    down: 'Marché en baisse',
+    stable: 'Stable',
+    unknown: 'Tendance inconnue',
+  };
+
   const importStatusLabels: Record<CvSnapshot['imports'][number]['status'], string> = {
     success: 'Importé',
     partial: 'Partiel',
@@ -150,6 +159,8 @@
     Object.entries(counts)
       .map(([field, count]) => `${field}: ${count}`)
       .join(' · ');
+
+  const formatDailyRate = (value: number | null) => (value ? `${value}€` : 'N/A');
 
   const copyGeneratedAsset = async (asset: GeneratedApplicationAsset) => {
     await navigator.clipboard.writeText(asset.content);
@@ -212,6 +223,12 @@
         href="#cv"
       >
         Profil CV
+      </a>
+      <a
+        class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
+        href="#tjm"
+      >
+        Radar TJM
       </a>
       <a
         class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
@@ -488,6 +505,142 @@
               </div>
             </article>
           {/each}
+        </div>
+      </section>
+
+      <section id="tjm" class="mt-6" aria-labelledby="tjm-radar-title">
+        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p class="eyebrow text-text-subtle">Radar TJM</p>
+            <h2 id="tjm-radar-title" class="mt-1 text-lg font-semibold text-text-primary">
+              Tendances marché synchronisées
+            </h2>
+          </div>
+          <p class="text-sm text-text-subtle">
+            {tjmRadar.missionCount} missions avec TJM exploitable
+          </p>
+        </div>
+
+        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+          <article
+            class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          >
+            <p class="text-xs font-medium uppercase text-text-subtle">TJM moyen</p>
+            <div class="mt-3 flex items-end justify-between gap-3">
+              <p class="text-3xl font-semibold text-text-primary">
+                {formatDailyRate(tjmRadar.averageDailyRate)}
+              </p>
+              <Badge label={`${tjmRadar.missionCount} offres`} variant="source" />
+            </div>
+          </article>
+          <article
+            class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          >
+            <p class="text-xs font-medium uppercase text-text-subtle">Fourchette</p>
+            <p class="mt-3 text-2xl font-semibold text-text-primary">
+              {formatDailyRate(tjmRadar.minDailyRate)} - {formatDailyRate(tjmRadar.maxDailyRate)}
+            </p>
+            <p class="mt-2 text-xs text-text-subtle">Min / max des missions synchronisées</p>
+          </article>
+          <article
+            class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          >
+            <p class="text-xs font-medium uppercase text-text-subtle">Stack dominante</p>
+            <p class="mt-3 text-2xl font-semibold text-text-primary">
+              {tjmRadar.topStack ?? 'N/A'}
+            </p>
+            <p class="mt-2 text-xs text-text-subtle">Par volume de missions qualifiées</p>
+          </article>
+          <article
+            class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          >
+            <p class="text-xs font-medium uppercase text-text-subtle">Tendance</p>
+            <div class="mt-3 flex items-end justify-between gap-3">
+              <p class="text-lg font-semibold text-text-primary">
+                {tjmTrendLabels[tjmRadar.trend]}
+              </p>
+              <Badge
+                label={tjmRadar.trendDelta === null
+                  ? 'N/A'
+                  : `${tjmRadar.trendDelta > 0 ? '+' : ''}${tjmRadar.trendDelta}€`}
+                variant={tjmRadar.trend === 'up'
+                  ? 'success'
+                  : tjmRadar.trend === 'down'
+                    ? 'warning'
+                    : 'status'}
+              />
+            </div>
+          </article>
+        </div>
+
+        <div class="mt-3 grid gap-3 lg:grid-cols-2">
+          <article
+            class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-sm font-semibold text-text-primary">Par source</h3>
+              <Badge label={tjmRadar.topSource ?? 'N/A'} variant="source" />
+            </div>
+            <div class="mt-3 space-y-2">
+              {#if tjmRadar.sourceSegments.length === 0}
+                <p
+                  class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
+                >
+                  Aucun TJM synchronisé par source.
+                </p>
+              {/if}
+              {#each tjmRadar.sourceSegments.slice(0, 4) as segment}
+                <div class="rounded-lg bg-page-canvas px-3 py-2 text-xs">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="font-medium text-text-primary">{segment.label}</span>
+                    <span class="text-text-subtle">{segment.missionCount} missions</span>
+                  </div>
+                  <div class="mt-2 flex items-center justify-between gap-3">
+                    <span class="text-text-muted">
+                      {formatDailyRate(segment.minDailyRate)} - {formatDailyRate(
+                        segment.maxDailyRate
+                      )}
+                    </span>
+                    <span class="font-semibold text-text-primary">
+                      {formatDailyRate(segment.averageDailyRate)}
+                    </span>
+                  </div>
+                </div>
+              {/each}
+            </div>
+          </article>
+
+          <article
+            class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          >
+            <div class="flex items-center justify-between gap-3">
+              <h3 class="text-sm font-semibold text-text-primary">Par stack</h3>
+              <Badge label={tjmRadar.stackSegments.length.toString()} variant="tech" />
+            </div>
+            <div class="mt-3 space-y-2">
+              {#if tjmRadar.stackSegments.length === 0}
+                <p
+                  class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
+                >
+                  Aucun TJM synchronisé par stack.
+                </p>
+              {/if}
+              {#each tjmRadar.stackSegments.slice(0, 5) as segment}
+                <div class="rounded-lg bg-page-canvas px-3 py-2 text-xs">
+                  <div class="flex items-center justify-between gap-3">
+                    <span class="font-medium text-text-primary">{segment.label}</span>
+                    <span class="font-semibold text-text-primary">
+                      {formatDailyRate(segment.averageDailyRate)}
+                    </span>
+                  </div>
+                  <p class="mt-1 text-text-subtle">
+                    {segment.missionCount} missions · {formatDailyRate(segment.minDailyRate)} -
+                    {formatDailyRate(segment.maxDailyRate)}
+                  </p>
+                </div>
+              {/each}
+            </div>
+          </article>
         </div>
       </section>
 
