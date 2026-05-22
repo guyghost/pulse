@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildMissionComparisonSnapshot,
   countApplicationsByStage,
   canonicalRowsToApplications,
   buildApplicationDetailsUpdatePatch,
@@ -168,6 +169,61 @@ describe('dashboard core', () => {
     expect(
       filterApplications(applications, { query: 'linkedin', source: 'linkedin' }, sourceLabels)
     ).toEqual([applications[0]]);
+  });
+
+  it('builds a dashboard mission comparison shortlist from active pipeline applications', () => {
+    const comparison = buildMissionComparisonSnapshot(
+      [
+        ...applications,
+        {
+          id: 'app-archived',
+          title: 'Ancienne mission',
+          company: 'ArchiveCo',
+          source: 'hiway',
+          stage: 'archived',
+          score: 99,
+          dailyRate: 1200,
+          location: 'Paris',
+          sourceUrl: 'https://example.com/archived',
+          appliedAt: null,
+          nextActionAt: '2026-05-18',
+          notes: '',
+          userRating: 5,
+        },
+        {
+          id: 'app-offer',
+          title: 'Staff Frontend',
+          company: 'OfferOps',
+          source: 'collective',
+          stage: 'offer',
+          score: 88,
+          dailyRate: null,
+          location: 'Remote Europe',
+          sourceUrl: 'https://example.com/offer',
+          appliedAt: '2026-05-12',
+          nextActionAt: null,
+          notes: '',
+          userRating: 4,
+        },
+      ],
+      3
+    );
+
+    expect(comparison.items.map((item) => item.id)).toEqual(['app-offer', 'app-001', 'app-002']);
+    expect(comparison).toMatchObject({
+      bestScoreId: 'app-001',
+      bestRateId: 'app-001',
+      earliestFollowUpId: 'app-001',
+      averageScore: 89,
+      averageDailyRate: 700,
+    });
+    expect(comparison.items[0]).toMatchObject({
+      id: 'app-offer',
+      dailyRateRank: null,
+      followUpRank: null,
+      strengths: ['Score fort', 'Rating utilisateur élevé', 'Pipeline avancé'],
+      risks: ['TJM absent', 'Relance non planifiée'],
+    });
   });
 
   it('derives sync readiness from CV completeness and ready platforms', () => {

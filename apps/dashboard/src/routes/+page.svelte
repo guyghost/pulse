@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Badge } from '@pulse/ui';
   import {
+    buildMissionComparisonSnapshot,
     countApplicationsByStage,
     filterApplications,
     getAverageApplicationScore,
@@ -22,6 +23,7 @@
     CvSnapshot,
     GeneratedApplicationAsset,
     MissionApplication,
+    MissionComparisonSnapshot,
     MissionFeedItem,
     PlatformSyncStatus,
     TjmRadarSnapshot,
@@ -95,6 +97,9 @@
     selectedApplication
       ? applicationTimeline.filter((event) => event.applicationId === selectedApplication.id)
       : []
+  );
+  const missionComparison = $derived(
+    buildMissionComparisonSnapshot(applications, 3) as MissionComparisonSnapshot
   );
   const recentGeneratedAssets = $derived(generatedAssets.slice(0, 5));
   const syncBlockers = $derived(getSyncBlockers(cv, syncStatuses));
@@ -265,6 +270,12 @@
         href="#applications"
       >
         Candidatures
+      </a>
+      <a
+        class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
+        href="#comparison"
+      >
+        Comparaison
       </a>
       <a
         class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
@@ -777,6 +788,98 @@
             </article>
           {/each}
         </div>
+      </section>
+
+      <section id="comparison" class="mt-6" aria-labelledby="mission-comparison-title">
+        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p class="eyebrow text-text-subtle">Shortlist</p>
+            <h2 id="mission-comparison-title" class="mt-1 text-lg font-semibold text-text-primary">
+              Comparaison des missions prioritaires
+            </h2>
+          </div>
+          <p class="text-sm text-text-subtle">
+            {missionComparison.items.length} missions comparées · score moyen
+            {missionComparison.averageScore}%
+          </p>
+        </div>
+
+        {#if missionComparison.items.length === 0}
+          <article class="rounded-xl border border-dashed border-border-light bg-surface-white p-5">
+            <p class="text-sm font-semibold text-text-primary">Aucune shortlist à comparer</p>
+            <p class="mt-2 text-sm leading-6 text-text-subtle">
+              Sélectionnez une mission depuis le feed ou avancez une candidature pour alimenter la
+              comparaison dashboard.
+            </p>
+          </article>
+        {:else}
+          <div class="grid gap-3 lg:grid-cols-3">
+            {#each missionComparison.items as item}
+              <article
+                class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <Badge label={sourceLabels[item.source]} variant="source" />
+                    <h3 class="mt-3 text-base font-semibold leading-tight text-text-primary">
+                      {item.title}
+                    </h3>
+                    <p class="mt-1 text-xs text-text-subtle">{item.company} · {item.location}</p>
+                  </div>
+                  <Badge
+                    label={`#${item.scoreRank} score`}
+                    variant={item.id === missionComparison.bestScoreId ? 'success' : 'status'}
+                  />
+                </div>
+
+                <dl class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                  <div class="rounded-lg bg-page-canvas px-2 py-2">
+                    <dt class="text-text-muted">Score</dt>
+                    <dd class="mt-1 font-semibold text-text-primary">{item.score}%</dd>
+                  </div>
+                  <div class="rounded-lg bg-page-canvas px-2 py-2">
+                    <dt class="text-text-muted">TJM</dt>
+                    <dd class="mt-1 font-semibold text-text-primary">
+                      {formatDailyRate(item.dailyRate)}
+                    </dd>
+                  </div>
+                  <div class="rounded-lg bg-page-canvas px-2 py-2">
+                    <dt class="text-text-muted">Relance</dt>
+                    <dd class="mt-1 font-semibold text-text-primary">
+                      {formatDate(item.nextActionAt)}
+                    </dd>
+                  </div>
+                </dl>
+
+                <div class="mt-4 flex flex-wrap gap-1.5">
+                  <Badge label={stageLabels[item.stage]} variant="status" />
+                  {#if item.id === missionComparison.bestRateId}
+                    <Badge label="Meilleur TJM" variant="success" />
+                  {/if}
+                  {#if item.id === missionComparison.earliestFollowUpId}
+                    <Badge label="Relance proche" variant="warning" />
+                  {/if}
+                  {#if item.userRating}
+                    <Badge label={`${item.userRating}/5`} variant="source" />
+                  {/if}
+                </div>
+
+                <div class="mt-4 grid gap-2 text-xs">
+                  <div class="rounded-lg bg-page-canvas px-3 py-2">
+                    <p class="font-medium text-text-primary">Forces</p>
+                    <p class="mt-1 leading-5 text-text-subtle">{item.strengths.join(' · ')}</p>
+                  </div>
+                  {#if item.risks.length > 0}
+                    <div class="rounded-lg bg-status-orange/8 px-3 py-2">
+                      <p class="font-medium text-status-orange">Points à vérifier</p>
+                      <p class="mt-1 leading-5 text-text-subtle">{item.risks.join(' · ')}</p>
+                    </div>
+                  {/if}
+                </div>
+              </article>
+            {/each}
+          </div>
+        {/if}
       </section>
 
       <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">

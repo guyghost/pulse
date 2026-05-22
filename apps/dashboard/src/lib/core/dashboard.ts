@@ -74,6 +74,34 @@ export interface MissionApplication {
   userRating: number | null;
 }
 
+export interface MissionComparisonItem {
+  id: string;
+  title: string;
+  company: string;
+  source: ApplicationSource;
+  stage: ApplicationStage;
+  score: number;
+  dailyRate: number | null;
+  location: string;
+  sourceUrl: string | null;
+  nextActionAt: string | null;
+  userRating: number | null;
+  scoreRank: number;
+  dailyRateRank: number | null;
+  followUpRank: number | null;
+  strengths: string[];
+  risks: string[];
+}
+
+export interface MissionComparisonSnapshot {
+  items: MissionComparisonItem[];
+  bestScoreId: string | null;
+  bestRateId: string | null;
+  earliestFollowUpId: string | null;
+  averageScore: number;
+  averageDailyRate: number | null;
+}
+
 export type GeneratedApplicationAssetType = 'pitch' | 'cover_message' | 'cv_summary';
 
 export interface GeneratedApplicationAsset {
@@ -1611,6 +1639,205 @@ export const filterApplications = (
     );
   });
 };
+
+const COMPARISON_STAGES = new Set<ApplicationStage>([
+  'selected',
+  'application_prepared',
+  'applied',
+  'interview',
+  'offer',
+]);
+
+const COMPARISON_STAGE_PRIORITY: Record<ApplicationStage, number> = {
+  detected: 0,
+  selected: 1,
+  application_prepared: 2,
+  applied: 3,
+  interview: 4,
+  offer: 5,
+  accepted: 0,
+  rejected: 0,
+  archived: 0,
+};
+
+export function buildMissionComparisonSnapshot(
+  applications: MissionApplication[],
+  limit = 3
+): MissionComparisonSnapshot {
+  const candidates = applications
+    .filter((application) => COMPARISON_STAGES.has(application.stage))
+    .sort(compareApplicationsForShortlist)
+    .slice(0, Math.max(0, limit));
+
+  if (candidates.length === 0) {
+    return {
+      items: [],
+      bestScoreId: null,
+      bestRateId: null,
+      earliestFollowUpId: null,
+      averageScore: 0,
+      averageDailyRate: null,
+    };
+  }
+
+  const scoreRanks = rankBy(candidates, (application) => application.score, 'desc');
+  const dailyRateRanks = rankByNullable(candidates, (application) => application.dailyRate, 'desc');
+  const followUpRanks = rankByNullable(
+    candidates,
+    (application) => application.nextActionAt,
+    'asc'
+  );
+  const averageDailyRate = averageNullable(candidates.map((application) => application.dailyRate));
+
+  return {
+    items: candidates.map((application) => ({
+      id: application.id,
+      title: application.title,
+      company: application.company,
+      source: application.source,
+      stage: application.stage,
+      score: application.score,
+      dailyRate: application.dailyRate,
+      location: application.location,
+      sourceUrl: application.sourceUrl,
+      nextActionAt: application.nextActionAt,
+      userRating: application.userRating,
+      scoreRank: scoreRanks.get(application.id) ?? 1,
+      dailyRateRank: dailyRateRanks.get(application.id) ?? null,
+      followUpRank: followUpRanks.get(application.id) ?? null,
+      strengths: buildComparisonStrengths(application, averageDailyRate),
+      risks: buildComparisonRisks(application),
+    })),
+    bestScoreId: scoreRanksToFirstId(scoreRanks),
+    bestRateId: scoreRanksToFirstId(dailyRateRanks),
+    earliestFollowUpId: scoreRanksToFirstId(followUpRanks),
+    averageScore: getAverageApplicationScore(candidates),
+    averageDailyRate,
+  };
+}
+
+function compareApplicationsForShortlist(
+  left: MissionApplication,
+  right: MissionApplication
+): number {
+  return (
+    COMPARISON_STAGE_PRIORITY[right.stage] - COMPARISON_STAGE_PRIORITY[left.stage] ||
+    right.score - left.score ||
+    (right.userRating ?? 0) - (left.userRating ?? 0) ||
+    (right.dailyRate ?? 0) - (left.dailyRate ?? 0) ||
+    (left.nextActionAt ?? '9999-12-31').localeCompare(right.nextActionAt ?? '9999-12-31') ||
+    left.title.localeCompare(right.title)
+  );
+}
+
+function rankBy<T extends { id: string }>(
+  items: T[],
+  selector: (item: T) => number,
+  direction: 'asc' | 'desc'
+): Map<string, number> {
+  return new Map(
+    [...items]
+      .sort((left, right) => {
+        const delta = selector(left) - selector(right);
+        return direction === 'asc' ? delta : -delta;
+      })
+      .map((item, index) => [item.id, index + 1])
+  );
+}
+
+function rankByNullable<T extends { id: string }, V extends number | string>(
+  items: T[],
+  selector: (item: T) => V | null,
+  direction: 'asc' | 'desc'
+): Map<string, number> {
+  return new Map(
+    items
+      .flatMap((item) => {
+        const value = selector(item);
+        return value === null ? [] : [{ item, value }];
+      })
+      .sort((left, right) => {
+        const delta =
+          typeof left.value === 'number' && typeof right.value === 'number'
+            ? left.value - right.value
+            : String(left.value).localeCompare(String(right.value));
+        return direction === 'asc' ? delta : -delta;
+      })
+      .map(({ item }, index) => [item.id, index + 1])
+  );
+}
+
+function scoreRanksToFirstId(ranks: Map<string, number>): string | null {
+  for (const [id, rank] of ranks.entries()) {
+    if (rank === 1) {
+      return id;
+    }
+  }
+
+  return null;
+}
+
+function averageNullable(values: (number | null)[]): number | null {
+  const numericValues = values.filter((value): value is number => value !== null);
+
+  if (numericValues.length === 0) {
+    return null;
+  }
+
+  return averageRounded(numericValues);
+}
+
+function buildComparisonStrengths(
+  application: MissionApplication,
+  averageDailyRate: number | null
+): string[] {
+  const strengths: string[] = [];
+
+  if (application.score >= 85) {
+    strengths.push('Score fort');
+  }
+
+  if (
+    application.dailyRate !== null &&
+    averageDailyRate !== null &&
+    application.dailyRate >= averageDailyRate
+  ) {
+    strengths.push('TJM au-dessus de la shortlist');
+  }
+
+  if (application.userRating !== null && application.userRating >= 4) {
+    strengths.push('Rating utilisateur élevé');
+  }
+
+  if (application.stage === 'interview' || application.stage === 'offer') {
+    strengths.push('Pipeline avancé');
+  }
+
+  return strengths.length > 0 ? strengths : ['Opportunité à qualifier'];
+}
+
+function buildComparisonRisks(application: MissionApplication): string[] {
+  const risks: string[] = [];
+
+  if (application.score < 70) {
+    risks.push('Score faible');
+  }
+
+  if (application.dailyRate === null) {
+    risks.push('TJM absent');
+  }
+
+  if (
+    application.nextActionAt === null &&
+    (application.stage === 'applied' ||
+      application.stage === 'interview' ||
+      application.stage === 'offer')
+  ) {
+    risks.push('Relance non planifiée');
+  }
+
+  return risks;
+}
 
 export const getCvSyncReadiness = (cv: CvSnapshot, statuses: PlatformSyncStatus[]) => {
   const readyPlatforms = statuses.filter((status) => status.status === 'ready').length;
