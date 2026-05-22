@@ -60,6 +60,7 @@ describe('connected dashboard schema', () => {
     expect(tableBlock('candidate_profile_field_suggestions')).toContain(
       "field in ('title', 'summary', 'location', 'target_role')"
     );
+    expect(tableBlock('generated_application_assets')).toContain('client_asset_id text not null');
     expect(tableBlock('sync_status')).toContain("'alert_preferences'");
     expect(tableBlock('dashboard_alert_preferences')).toContain('score_threshold integer');
     expect(tableBlock('dashboard_alert_preferences')).toContain('required_stacks text[]');

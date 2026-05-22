@@ -472,7 +472,7 @@ create table if not exists public.generated_application_assets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   application_id uuid references public.applications(id) on delete cascade not null,
-  client_asset_id text,
+  client_asset_id text not null,
   type text not null check (type in ('pitch', 'cover_message', 'cv_summary')),
   content text not null,
   model text not null,
