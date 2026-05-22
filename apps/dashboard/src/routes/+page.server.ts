@@ -3,9 +3,18 @@ import type { PageServerLoad } from './$types';
 import { redirect } from '@sveltejs/kit';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
+  canonicalRowsToApplications,
   favoriteMissionToApplication,
   getDashboardFeatureAccess,
+  healthEventsToPlatformSyncStatuses,
   parseDashboardFavoriteMission,
+  profileRowsToCvSnapshot,
+  type DashboardCandidateProfileRow,
+  type DashboardCandidateSkillRow,
+  type DashboardCanonicalApplicationRow,
+  type DashboardCanonicalMissionRow,
+  type DashboardCanonicalMissionScoreRow,
+  type DashboardConnectorHealthEventRow,
   type CvSnapshot,
   type DashboardAccountEntitlements,
   type DashboardSubscriptionStatus,
@@ -176,14 +185,48 @@ export const load: PageServerLoad = async ({ cookies }) => {
     redirect(303, loginUrl);
   }
 
-  const { data: profile } = await createSupabaseServerClient(cookies)
+  const supabase = createSupabaseServerClient(cookies);
+
+  const { data: profile } = await supabase
     .from('profiles')
     .select('subscription_status, subscription_period_end, credit_balance')
     .eq('id', session.user.id)
     .single<DashboardProfileRow>();
 
   const entitlements = getAuthenticatedEntitlements(profile ?? null);
-  const { data: favoriteRows } = await createSupabaseServerClient(cookies)
+  const { data: canonicalApplicationRows } = await supabase
+    .from('applications')
+    .select('id, mission_id, stage, applied_at, next_action_at')
+    .eq('user_id', session.user.id)
+    .order('updated_at', { ascending: false })
+    .limit(100)
+    .returns<DashboardCanonicalApplicationRow[]>();
+
+  const missionIds = [...new Set((canonicalApplicationRows ?? []).map((row) => row.mission_id))];
+  const { data: canonicalMissionRows } =
+    missionIds.length > 0
+      ? await supabase
+          .from('missions')
+          .select('id, title, client, source, tjm, location')
+          .in('id', missionIds)
+          .returns<DashboardCanonicalMissionRow[]>()
+      : { data: [] };
+  const { data: canonicalScoreRows } =
+    missionIds.length > 0
+      ? await supabase
+          .from('mission_scores')
+          .select('mission_id, total_score')
+          .in('mission_id', missionIds)
+          .returns<DashboardCanonicalMissionScoreRow[]>()
+      : { data: [] };
+
+  const canonicalApplications = canonicalRowsToApplications(
+    canonicalApplicationRows ?? [],
+    new Map((canonicalMissionRows ?? []).map((row) => [row.id, row])),
+    new Map((canonicalScoreRows ?? []).map((row) => [row.mission_id, row]))
+  );
+
+  const { data: favoriteRows } = await supabase
     .from('favorite_missions')
     .select('mission_id, mission, favorited_at')
     .eq('user_id', session.user.id)
@@ -197,13 +240,39 @@ export const load: PageServerLoad = async ({ cookies }) => {
       return application ? [application] : [];
     }) ?? [];
 
+  const { data: candidateProfile } = await supabase
+    .from('candidate_profiles')
+    .select('id, title, updated_at, completeness, target_role')
+    .eq('user_id', session.user.id)
+    .maybeSingle<DashboardCandidateProfileRow>();
+
+  const { data: candidateSkills } = candidateProfile
+    ? await supabase
+        .from('candidate_skills')
+        .select('skill')
+        .eq('profile_id', candidateProfile.id)
+        .returns<DashboardCandidateSkillRow[]>()
+    : { data: [] };
+
+  const { data: connectorHealthRows } = await supabase
+    .from('connector_health_events')
+    .select('source, status, occurred_at')
+    .eq('user_id', session.user.id)
+    .order('occurred_at', { ascending: false })
+    .limit(50)
+    .returns<DashboardConnectorHealthEventRow[]>();
+
+  const syncStatuses = healthEventsToPlatformSyncStatuses(connectorHealthRows ?? []);
+
   return {
     session,
     loginUrl,
     entitlements,
     featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
-    applications: syncedApplications,
-    cv: mockCv,
-    syncStatuses: mockSyncStatuses,
+    applications: canonicalApplications.length > 0 ? canonicalApplications : syncedApplications,
+    cv: candidateProfile
+      ? profileRowsToCvSnapshot(candidateProfile, candidateSkills ?? [])
+      : mockCv,
+    syncStatuses: syncStatuses.length > 0 ? syncStatuses : mockSyncStatuses,
   };
 };

@@ -100,6 +100,46 @@ export interface PlatformSyncStatus {
   lastSyncAt: string | null;
 }
 
+export interface DashboardCanonicalApplicationRow {
+  id: string;
+  mission_id: string;
+  stage: string;
+  applied_at: string | null;
+  next_action_at: string | null;
+}
+
+export interface DashboardCanonicalMissionRow {
+  id: string;
+  title: string;
+  client: string | null;
+  source: string;
+  tjm: number | null;
+  location: string | null;
+}
+
+export interface DashboardCanonicalMissionScoreRow {
+  mission_id: string;
+  total_score: number;
+}
+
+export interface DashboardCandidateProfileRow {
+  id: string;
+  title: string;
+  updated_at: string;
+  completeness: number;
+  target_role: string | null;
+}
+
+export interface DashboardCandidateSkillRow {
+  skill: string;
+}
+
+export interface DashboardConnectorHealthEventRow {
+  source: string;
+  status: 'ready' | 'needs_permission' | 'needs_session' | 'blocked' | 'error' | 'syncing';
+  occurred_at: string;
+}
+
 export interface ApplicationFilters {
   query: string;
   source: 'all' | ApplicationSource;
@@ -117,6 +157,21 @@ function isApplicationSource(value: unknown): value is ApplicationSource {
     value === 'other'
   );
 }
+
+function isApplicationStage(value: unknown): value is ApplicationStage {
+  return APPLICATION_STAGES.includes(value as ApplicationStage);
+}
+
+const SOURCE_LABELS: Record<ApplicationSource, string> = {
+  linkedin: 'LinkedIn',
+  'free-work': 'Free-Work',
+  lehibou: 'LeHibou',
+  hiway: 'Hiway',
+  collective: 'Collective',
+  'cherry-pick': 'Cherry Pick',
+  malt: 'Malt',
+  other: 'Autre',
+};
 
 export function parseDashboardFavoriteMission(
   raw: unknown
@@ -171,6 +226,91 @@ export function favoriteMissionToApplication(
     appliedAt: null,
     nextActionAt: null,
   };
+}
+
+export function canonicalRowsToApplications(
+  applicationRows: DashboardCanonicalApplicationRow[],
+  missionsById: Map<string, DashboardCanonicalMissionRow>,
+  scoresByMissionId: Map<string, DashboardCanonicalMissionScoreRow>
+): MissionApplication[] {
+  return applicationRows.flatMap((application) => {
+    const mission = missionsById.get(application.mission_id);
+
+    if (
+      !mission ||
+      !isApplicationSource(mission.source) ||
+      !isApplicationStage(application.stage)
+    ) {
+      return [];
+    }
+
+    const score = scoresByMissionId.get(application.mission_id)?.total_score ?? 0;
+
+    return [
+      {
+        id: application.id,
+        title: mission.title,
+        company: mission.client ?? 'Client non renseigné',
+        source: mission.source,
+        stage: application.stage,
+        score,
+        dailyRate: mission.tjm,
+        location: mission.location ?? 'Localisation non renseignée',
+        appliedAt: application.applied_at,
+        nextActionAt: application.next_action_at,
+      },
+    ];
+  });
+}
+
+export function profileRowsToCvSnapshot(
+  profile: DashboardCandidateProfileRow,
+  skills: DashboardCandidateSkillRow[]
+): CvSnapshot {
+  return {
+    id: profile.id,
+    title: profile.title,
+    updatedAt: profile.updated_at,
+    completeness: profile.completeness,
+    targetRole: profile.target_role ?? 'Rôle cible non renseigné',
+    skills: skills.map((item) => item.skill),
+  };
+}
+
+function healthEventToPlatformStatus(
+  status: DashboardConnectorHealthEventRow['status']
+): PlatformSyncStatus['status'] {
+  if (status === 'ready') {
+    return 'ready';
+  }
+  if (status === 'syncing') {
+    return 'syncing';
+  }
+  return 'needs-session';
+}
+
+export function healthEventsToPlatformSyncStatuses(
+  events: DashboardConnectorHealthEventRow[]
+): PlatformSyncStatus[] {
+  const latestBySource = new Map<ApplicationSource, DashboardConnectorHealthEventRow>();
+
+  for (const event of events) {
+    if (!isApplicationSource(event.source)) {
+      continue;
+    }
+
+    const current = latestBySource.get(event.source);
+    if (!current || current.occurred_at < event.occurred_at) {
+      latestBySource.set(event.source, event);
+    }
+  }
+
+  return [...latestBySource.entries()].map(([source, event]) => ({
+    id: source,
+    name: SOURCE_LABELS[source],
+    status: healthEventToPlatformStatus(event.status),
+    lastSyncAt: event.occurred_at,
+  }));
 }
 
 export const DASHBOARD_FEATURES: readonly DashboardFeatureDefinition[] = [

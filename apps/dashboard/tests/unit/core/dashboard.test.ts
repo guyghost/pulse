@@ -1,15 +1,18 @@
 import { describe, expect, it } from 'vitest';
 import {
   countApplicationsByStage,
+  canonicalRowsToApplications,
   filterApplications,
   favoriteMissionToApplication,
   getAverageApplicationScore,
+  healthEventsToPlatformSyncStatuses,
   getCvSyncReadiness,
   getDashboardFeatureAccess,
   getNextFollowUp,
   getSyncBlockers,
   isDashboardPremiumActive,
   parseDashboardFavoriteMission,
+  profileRowsToCvSnapshot,
   type ApplicationSource,
   type CvSnapshot,
   type DashboardAccountEntitlements,
@@ -226,5 +229,112 @@ describe('dashboard core', () => {
       score: 91,
       dailyRate: 700,
     });
+  });
+
+  it('maps canonical Supabase application rows to dashboard applications', () => {
+    expect(
+      canonicalRowsToApplications(
+        [
+          {
+            id: 'application-1',
+            mission_id: 'mission-1',
+            stage: 'offer',
+            applied_at: '2026-05-21T08:00:00.000Z',
+            next_action_at: '2026-05-24T08:00:00.000Z',
+          },
+          {
+            id: 'application-2',
+            mission_id: 'missing-mission',
+            stage: 'selected',
+            applied_at: null,
+            next_action_at: null,
+          },
+        ],
+        new Map([
+          [
+            'mission-1',
+            {
+              id: 'mission-1',
+              title: 'Lead Svelte',
+              client: 'ScaleOps',
+              source: 'free-work',
+              tjm: 720,
+              location: 'Remote France',
+            },
+          ],
+        ]),
+        new Map([['mission-1', { mission_id: 'mission-1', total_score: 91 }]])
+      )
+    ).toEqual([
+      {
+        id: 'application-1',
+        title: 'Lead Svelte',
+        company: 'ScaleOps',
+        source: 'free-work',
+        stage: 'offer',
+        score: 91,
+        dailyRate: 720,
+        location: 'Remote France',
+        appliedAt: '2026-05-21T08:00:00.000Z',
+        nextActionAt: '2026-05-24T08:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('maps canonical profile rows to a dashboard CV snapshot', () => {
+    expect(
+      profileRowsToCvSnapshot(
+        {
+          id: 'profile-1',
+          title: 'Consultant Frontend',
+          updated_at: '2026-05-21T08:00:00.000Z',
+          completeness: 82,
+          target_role: 'Lead Svelte',
+        },
+        [{ skill: 'Svelte' }, { skill: 'TypeScript' }]
+      )
+    ).toEqual({
+      id: 'profile-1',
+      title: 'Consultant Frontend',
+      updatedAt: '2026-05-21T08:00:00.000Z',
+      completeness: 82,
+      targetRole: 'Lead Svelte',
+      skills: ['Svelte', 'TypeScript'],
+    });
+  });
+
+  it('maps connector health events to platform sync statuses', () => {
+    expect(
+      healthEventsToPlatformSyncStatuses([
+        {
+          source: 'free-work',
+          status: 'ready',
+          occurred_at: '2026-05-21T08:00:00.000Z',
+        },
+        {
+          source: 'linkedin',
+          status: 'blocked',
+          occurred_at: '2026-05-21T09:00:00.000Z',
+        },
+        {
+          source: 'unknown-source',
+          status: 'ready',
+          occurred_at: '2026-05-21T10:00:00.000Z',
+        },
+      ])
+    ).toEqual([
+      {
+        id: 'free-work',
+        name: 'Free-Work',
+        status: 'ready',
+        lastSyncAt: '2026-05-21T08:00:00.000Z',
+      },
+      {
+        id: 'linkedin',
+        name: 'LinkedIn',
+        status: 'needs-session',
+        lastSyncAt: '2026-05-21T09:00:00.000Z',
+      },
+    ]);
   });
 });
