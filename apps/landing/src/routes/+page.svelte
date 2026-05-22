@@ -982,7 +982,8 @@
       <div class="cta__content">
         <h2 class="cta__title">Prêt à trouver votre prochaine mission ?</h2>
         <p class="cta__desc">
-          Installation gratuite en 30 secondes. Aucun compte à créer. Vos données restent chez vous.
+          Installation gratuite en 30 secondes. Compte requis seulement pour le dashboard connecté
+          optionnel; l'exécution plateforme reste dans votre navigateur.
         </p>
         <a
           href={chromeStoreUrl}
