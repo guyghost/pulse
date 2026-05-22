@@ -56,6 +56,7 @@ import {
   type DashboardSubscriptionStatus,
   type MissionApplication,
 } from '$lib/core/dashboard';
+import { markEntityPendingExtensionPull } from '$lib/server/sync-status';
 
 type DashboardProfileRow = {
   subscription_status: string | null;
@@ -979,6 +980,13 @@ export const actions: Actions = {
       });
     }
 
+    await markEntityPendingExtensionPull(
+      supabase,
+      session.user.id,
+      'applications',
+      new Date().toISOString()
+    );
+
     return { detailsSuccess: 'Détails de candidature enregistrés.' };
   },
 
@@ -1079,6 +1087,13 @@ export const actions: Actions = {
           "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
       });
     }
+
+    await markEntityPendingExtensionPull(
+      supabase,
+      session.user.id,
+      'applications',
+      event.occurredAt
+    );
 
     return { selectionSuccess: `Mission sélectionnée: ${mission.title}.` };
   },
@@ -1181,6 +1196,13 @@ export const actions: Actions = {
           "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",
       });
     }
+
+    await markEntityPendingExtensionPull(
+      supabase,
+      session.user.id,
+      'applications',
+      event.occurredAt
+    );
 
     return { selectionSuccess: `Mission archivée: ${mission.title}.` };
   },
@@ -1288,6 +1310,13 @@ export const actions: Actions = {
           "La candidature a changé depuis l'ouverture de la page. Rechargez avant de modifier l'étape.",
       });
     }
+
+    await markEntityPendingExtensionPull(
+      supabase,
+      session.user.id,
+      'applications',
+      event.occurredAt
+    );
 
     return { transitionSuccess: `Candidature passée en ${toStage}.` };
   },
