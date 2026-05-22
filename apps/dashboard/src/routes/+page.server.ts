@@ -1325,6 +1325,7 @@ export const actions: Actions = {
             archived_at: patch.archived_at,
             revision: existingApplication.revision + 1,
             updated_by: patch.updated_by,
+            updated_at: event.occurredAt,
           })
           .eq('id', existingApplication.id)
           .eq('user_id', session.user.id)
@@ -1531,6 +1532,7 @@ export const actions: Actions = {
             archived_at: patch.archived_at,
             revision: existingApplication.revision + 1,
             updated_by: patch.updated_by,
+            updated_at: event.occurredAt,
           })
           .eq('id', existingApplication.id)
           .eq('user_id', session.user.id)
