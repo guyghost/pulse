@@ -260,7 +260,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
           supabase
             .from('mission_scores')
             .select(
-              'mission_id, deterministic_score, semantic_score, total_score, grade, semantic_reason'
+              'mission_id, deterministic_score, semantic_score, total_score, grade, criteria, semantic_reason'
             )
             .in('mission_id', missionFeedIds)
             .returns<DashboardMissionFeedScoreRow[]>(),

@@ -27,6 +27,7 @@
     MissionApplication,
     MissionComparisonSnapshot,
     MissionFeedItem,
+    MissionScoreCriteria,
     PlatformSyncStatus,
     TjmRadarSnapshot,
   } from '$lib/core/dashboard';
@@ -237,6 +238,16 @@
 
   const formatDailyRate = (value: number | null) => (value ? `${value}€` : 'N/A');
   const formatStacks = (stacks: string[]) => stacks.join(', ');
+  const scoreCriteriaLabels: { key: keyof MissionScoreCriteria; label: string }[] = [
+    { key: 'stack', label: 'Stack' },
+    { key: 'tjm', label: 'TJM' },
+    { key: 'location', label: 'Localisation' },
+    { key: 'remote', label: 'Remote' },
+    { key: 'seniorityBonus', label: 'Séniorité' },
+    { key: 'startDateBonus', label: 'Démarrage' },
+  ];
+  const formatScoreCriterion = (value: number | null) =>
+    typeof value === 'number' ? `${value}` : 'N/A';
 
   const copyGeneratedAsset = async (asset: GeneratedApplicationAsset) => {
     await navigator.clipboard.writeText(asset.content);
@@ -640,6 +651,17 @@
                   {mission.semanticReason}
                 </p>
               {/if}
+
+              <div class="mt-3 grid grid-cols-3 gap-1.5 text-[10px]">
+                {#each scoreCriteriaLabels as criterion}
+                  <div class="rounded-md border border-border-light bg-surface-white px-2 py-1.5">
+                    <p class="text-text-muted">{criterion.label}</p>
+                    <p class="mt-0.5 font-medium text-text-primary">
+                      {formatScoreCriterion(mission.scoreCriteria[criterion.key])}
+                    </p>
+                  </div>
+                {/each}
+              </div>
 
               <div class="mt-3 flex flex-wrap gap-1.5">
                 {#each mission.stack.slice(0, 4) as skill}

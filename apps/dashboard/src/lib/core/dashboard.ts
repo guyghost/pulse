@@ -145,6 +145,15 @@ export interface GeneratedApplicationAsset {
 
 export type MissionFreshness = 'fresh' | 'stale';
 
+export interface MissionScoreCriteria {
+  stack: number | null;
+  tjm: number | null;
+  location: number | null;
+  remote: number | null;
+  seniorityBonus: number | null;
+  startDateBonus: number | null;
+}
+
 export interface MissionFeedItem {
   id: string;
   title: string;
@@ -155,6 +164,7 @@ export interface MissionFeedItem {
   deterministicScore: number | null;
   semanticScore: number | null;
   grade: string | null;
+  scoreCriteria: MissionScoreCriteria;
   semanticReason: string | null;
   dailyRate: number | null;
   location: string | null;
@@ -397,6 +407,7 @@ export interface DashboardMissionFeedScoreRow {
   semantic_score: number | null;
   total_score: number;
   grade: string | null;
+  criteria: unknown;
   semantic_reason: string | null;
 }
 
@@ -864,6 +875,7 @@ export function missionRowsToFeedItems(
           deterministicScore: score?.deterministic_score ?? null,
           semanticScore: score?.semantic_score ?? null,
           grade: score?.grade ?? null,
+          scoreCriteria: parseMissionScoreCriteria(score?.criteria ?? null),
           semanticReason: score?.semantic_reason ?? null,
           dailyRate: mission.tjm,
           location: mission.location,
@@ -891,6 +903,26 @@ function countMissionDuplicates(rows: DashboardMissionDuplicateRow[]): Map<strin
   }
 
   return counts;
+}
+
+function parseScoreCriterion(criteria: unknown, key: keyof MissionScoreCriteria): number | null {
+  if (!criteria || typeof criteria !== 'object') {
+    return null;
+  }
+
+  const value = (criteria as Record<string, unknown>)[key];
+  return typeof value === 'number' && Number.isFinite(value) ? Math.round(value) : null;
+}
+
+function parseMissionScoreCriteria(criteria: unknown): MissionScoreCriteria {
+  return {
+    stack: parseScoreCriterion(criteria, 'stack'),
+    tjm: parseScoreCriterion(criteria, 'tjm'),
+    location: parseScoreCriterion(criteria, 'location'),
+    remote: parseScoreCriterion(criteria, 'remote'),
+    seniorityBonus: parseScoreCriterion(criteria, 'seniorityBonus'),
+    startDateBonus: parseScoreCriterion(criteria, 'startDateBonus'),
+  };
 }
 
 export function generatedAssetRowsToHistory(

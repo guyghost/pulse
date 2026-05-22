@@ -51,6 +51,24 @@ const sourceLabels: Record<ApplicationSource, string> = {
   other: 'Autre',
 };
 
+const scoreCriteria = {
+  stack: 80,
+  tjm: 100,
+  location: 60,
+  remote: 100,
+  seniorityBonus: 5,
+  startDateBonus: 3,
+};
+
+const emptyScoreCriteria = {
+  stack: null,
+  tjm: null,
+  location: null,
+  remote: null,
+  seniorityBonus: null,
+  startDateBonus: null,
+};
+
 const applications: MissionApplication[] = [
   {
     id: 'app-001',
@@ -485,6 +503,7 @@ describe('dashboard core', () => {
               semantic_score: 90,
               total_score: 87,
               grade: 'A',
+              criteria: scoreCriteria,
               semantic_reason: 'Très bon match Svelte',
             },
           ],
@@ -509,6 +528,7 @@ describe('dashboard core', () => {
         deterministicScore: 82,
         semanticScore: 90,
         grade: 'A',
+        scoreCriteria,
         semanticReason: 'Très bon match Svelte',
         dailyRate: 720,
         location: 'Remote France',
@@ -556,6 +576,7 @@ describe('dashboard core', () => {
             semantic_score: 90,
             total_score: 87,
             grade: 'A',
+            criteria: scoreCriteria,
             semantic_reason: null,
           },
         ],
@@ -567,6 +588,7 @@ describe('dashboard core', () => {
             semantic_score: null,
             total_score: 72,
             grade: 'B',
+            criteria: {},
             semantic_reason: null,
           },
         ],
@@ -606,6 +628,7 @@ describe('dashboard core', () => {
           deterministicScore: 90,
           semanticScore: null,
           grade: 'A',
+          scoreCriteria: emptyScoreCriteria,
           semanticReason: null,
           dailyRate: 500,
           location: 'Paris',
@@ -625,6 +648,7 @@ describe('dashboard core', () => {
           deterministicScore: 85,
           semanticScore: null,
           grade: 'B',
+          scoreCriteria: emptyScoreCriteria,
           semanticReason: null,
           dailyRate: 600,
           location: 'Remote',
@@ -644,6 +668,7 @@ describe('dashboard core', () => {
           deterministicScore: 80,
           semanticScore: null,
           grade: 'B',
+          scoreCriteria: emptyScoreCriteria,
           semanticReason: null,
           dailyRate: 700,
           location: 'Lyon',
@@ -663,6 +688,7 @@ describe('dashboard core', () => {
           deterministicScore: 78,
           semanticScore: null,
           grade: 'B',
+          scoreCriteria: emptyScoreCriteria,
           semanticReason: null,
           dailyRate: 900,
           location: 'Remote',
@@ -682,6 +708,7 @@ describe('dashboard core', () => {
           deterministicScore: 70,
           semanticScore: null,
           grade: null,
+          scoreCriteria: emptyScoreCriteria,
           semanticReason: null,
           dailyRate: null,
           location: null,
