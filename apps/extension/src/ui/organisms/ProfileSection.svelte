@@ -155,6 +155,8 @@
         <div class="flex gap-2">
           <input
             type="text"
+            aria-label="Stack technique"
+            id="stack-input"
             placeholder="ex: React, Node.js..."
             class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={stackInput}
@@ -188,6 +190,7 @@
         <div class="flex gap-2">
           <input
             type="text"
+            aria-label="Mot-clé de recherche"
             placeholder="ex: SaaS, marketplace, data..."
             class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={keywordInput}

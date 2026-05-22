@@ -38,6 +38,7 @@
       onclick={onToggleAutoScan}
       role="switch"
       aria-checked={autoScan}
+      aria-label="Activer le scan automatique"
     >
       <span
         class="inline-block h-4 w-4 rounded-full transition-transform duration-200
@@ -57,6 +58,13 @@
     <p class="text-sm font-medium text-text-primary">Fréquence</p>
     <p class="mt-0.5 text-xs text-text-subtle">Intervalle entre chaque scan automatique.</p>
   </div>
+  {#if !autoScan}
+    <p
+      class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs text-text-subtle"
+    >
+      Activez le scan automatique pour modifier la fréquence.
+    </p>
+  {/if}
   <div class="flex items-center gap-3">
     <span class="text-[10px] text-text-muted">5 min</span>
     <input
@@ -66,6 +74,7 @@
       step="5"
       value={scanInterval}
       onchange={onScanIntervalChange}
+      aria-label="Fréquence de scan"
       class="flex-1 accent-blueprint-blue"
     />
     <span class="text-[10px] text-text-muted">2h</span>
@@ -93,6 +102,7 @@
       onclick={onToggleNotifications}
       role="switch"
       aria-checked={notifications}
+      aria-label="Activer les notifications"
     >
       <span
         class="inline-block h-4 w-4 rounded-full transition-transform duration-200
