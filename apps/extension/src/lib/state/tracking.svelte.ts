@@ -106,6 +106,38 @@ export function createTrackingStore() {
     }
   }
 
+  async function updateNextActionAt(missionId: string, nextActionAt: string | null): Promise<void> {
+    try {
+      const { sendMessage } = await import('$lib/shell/messaging/bridge');
+      const response = await sendMessage({
+        type: 'UPDATE_TRACKING_DETAILS',
+        payload: { missionId, nextActionAt },
+      });
+
+      if (response.type === 'TRACKING_UPDATED' && response.payload) {
+        const updated = response.payload as MissionTracking;
+        const newMap = new Map(trackings);
+        newMap.set(updated.missionId, updated);
+        trackings = newMap;
+      }
+    } catch {
+      try {
+        const { getTracking, saveTracking } = await import('$lib/shell/storage/tracking');
+        const { createTracking, setTrackingNextActionAt } =
+          await import('$lib/core/tracking/transitions');
+
+        const tracking = (await getTracking(missionId)) ?? createTracking(missionId, Date.now());
+        const updated = setTrackingNextActionAt(tracking, nextActionAt);
+        await saveTracking(updated);
+        const newMap = new Map(trackings);
+        newMap.set(updated.missionId, updated);
+        trackings = newMap;
+      } catch (err) {
+        error = err instanceof Error ? err.message : 'Failed to update next action';
+      }
+    }
+  }
+
   /**
    * Get tracking for a specific mission.
    */
@@ -136,6 +168,7 @@ export function createTrackingStore() {
     },
     loadTrackings,
     transitionStatus,
+    updateNextActionAt,
     getTrackingForMission,
     getStatusLabel,
   };

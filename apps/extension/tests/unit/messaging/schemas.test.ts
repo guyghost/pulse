@@ -272,6 +272,36 @@ describe('validateMessage — UPDATE_TRACKING', () => {
 });
 
 // ============================================================================
+// UPDATE_TRACKING_DETAILS — champs de suivi synchronises
+// ============================================================================
+
+describe('validateMessage — UPDATE_TRACKING_DETAILS', () => {
+  it('accepte une prochaine action ISO', () => {
+    const r = validateMessage({
+      type: 'UPDATE_TRACKING_DETAILS',
+      payload: { missionId: 'm1', nextActionAt: '2026-05-24T09:00:00.000Z' },
+    });
+    expect(r.valid).toBe(true);
+  });
+
+  it('accepte la suppression de prochaine action', () => {
+    const r = validateMessage({
+      type: 'UPDATE_TRACKING_DETAILS',
+      payload: { missionId: 'm1', nextActionAt: null },
+    });
+    expect(r.valid).toBe(true);
+  });
+
+  it('rejette une date invalide', () => {
+    const r = validateMessage({
+      type: 'UPDATE_TRACKING_DETAILS',
+      payload: { missionId: 'm1', nextActionAt: 'demain' },
+    });
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
 // AUTH — email/password
 // ============================================================================
 

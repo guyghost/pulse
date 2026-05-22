@@ -10,6 +10,8 @@ const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
 const getMissions = vi.fn();
 const saveConnectorStatuses = vi.fn();
+const getTracking = vi.fn();
+const saveTracking = vi.fn();
 const getAllTrackings = vi.fn();
 const getGeneratedAssetsForMission = vi.fn();
 const getAllHealthSnapshots = vi.fn();
@@ -17,6 +19,7 @@ const resetHealthSnapshot = vi.fn();
 const syncConnectedDashboardScan = vi.fn();
 const syncConnectedDashboardSnapshot = vi.fn();
 const syncConnectedDashboardProfileExtractorHealth = vi.fn();
+const syncConnectedDashboardTracking = vi.fn();
 const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
@@ -142,8 +145,8 @@ vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
 }));
 
 vi.mock('../../../src/lib/shell/storage/tracking', () => ({
-  getTracking: vi.fn(async () => null),
-  saveTracking: vi.fn(async () => undefined),
+  getTracking,
+  saveTracking,
   getAllTrackings,
   getTrackingsByStatus: vi.fn(async () => []),
 }));
@@ -174,7 +177,7 @@ vi.mock('../../../src/lib/shell/sync/connected-dashboard', () => ({
   syncConnectedDashboardSnapshot,
   syncConnectedDashboardProfileExtractorHealth,
   syncConnectedDashboardProfileImport: vi.fn(),
-  syncConnectedDashboardTracking: vi.fn(),
+  syncConnectedDashboardTracking,
 }));
 
 describe('background auto-scan notifications', () => {
@@ -213,6 +216,8 @@ describe('background auto-scan notifications', () => {
       notifiedMissionIds: ['mission-1'],
     });
     getMissions.mockResolvedValue([makeMission()]);
+    getTracking.mockResolvedValue(null);
+    saveTracking.mockResolvedValue(undefined);
     getAllTrackings.mockResolvedValue([]);
     getGeneratedAssetsForMission.mockResolvedValue([]);
     getAllHealthSnapshots.mockResolvedValue(new Map());
@@ -227,6 +232,10 @@ describe('background auto-scan notifications', () => {
     syncConnectedDashboardProfileExtractorHealth.mockResolvedValue({
       ok: true,
       value: { pushedCount: 1 },
+    });
+    syncConnectedDashboardTracking.mockResolvedValue({
+      ok: true,
+      value: { pushedCount: 1, skippedCount: 0 },
     });
   });
 
@@ -297,6 +306,49 @@ describe('background auto-scan notifications', () => {
         skippedApplications: 0,
         connectorHealth: 0,
       },
+    });
+  });
+
+  it('updates tracking details and triggers connected dashboard sync', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+    getTracking.mockResolvedValueOnce({
+      missionId: 'mission-1',
+      currentStatus: 'selected',
+      history: [
+        { from: null, to: 'detected', timestamp: 1779340800000, note: null },
+        { from: 'detected', to: 'selected', timestamp: 1779344400000, note: null },
+      ],
+      generatedAssetIds: [],
+      userRating: null,
+      notes: 'A relancer',
+      nextActionAt: null,
+    });
+
+    const handled = messageListener?.(
+      {
+        type: 'UPDATE_TRACKING_DETAILS',
+        payload: { missionId: 'mission-1', nextActionAt: '2026-05-24T09:00:00.000Z' },
+      },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(saveTracking).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'mission-1',
+        nextActionAt: '2026-05-24T09:00:00.000Z',
+      })
+    );
+    expect(syncConnectedDashboardTracking).toHaveBeenCalledWith('mission-1');
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'TRACKING_UPDATED',
+      payload: expect.objectContaining({
+        missionId: 'mission-1',
+        nextActionAt: '2026-05-24T09:00:00.000Z',
+      }),
     });
   });
 });

@@ -42,6 +42,7 @@ import {
 import {
   createTracking,
   transitionStatus,
+  setTrackingNextActionAt,
   addGeneratedAssetAndMarkPrepared,
 } from '../lib/core/tracking/transitions';
 import {
@@ -727,6 +728,39 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               userRating: null,
               notes: '',
               nextActionAt: null,
+            },
+          });
+        }
+      })();
+      return true;
+    }
+
+    if (message.type === 'UPDATE_TRACKING_DETAILS') {
+      const { missionId, nextActionAt } = message.payload;
+
+      (async () => {
+        try {
+          const tracking = (await getTracking(missionId)) ?? createTracking(missionId, Date.now());
+          const updated =
+            nextActionAt === undefined ? tracking : setTrackingNextActionAt(tracking, nextActionAt);
+
+          await saveTracking(updated);
+          syncConnectedDashboardTracking(missionId).catch(() => {
+            /* Non-critical: connected dashboard sync */
+          });
+          sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+        } catch (err) {
+          console.error('[MissionPulse] UPDATE_TRACKING_DETAILS error:', err);
+          sendResponse({
+            type: 'TRACKING_UPDATED',
+            payload: {
+              missionId,
+              currentStatus: 'detected',
+              history: [],
+              generatedAssetIds: [],
+              userRating: null,
+              notes: '',
+              nextActionAt: nextActionAt ?? null,
             },
           });
         }

@@ -59,6 +59,21 @@ function createChromeStubs() {
               },
             };
           }
+          case 'UPDATE_TRACKING_DETAILS': {
+            const p = message.payload as Record<string, unknown> | undefined;
+            return {
+              type: 'TRACKING_UPDATED',
+              payload: {
+                missionId: p?.missionId,
+                currentStatus: 'detected',
+                history: [],
+                generatedAssetIds: [],
+                userRating: null,
+                notes: '',
+                nextActionAt: p?.nextActionAt ?? null,
+              },
+            };
+          }
           case 'GENERATE_ASSET':
             // In dev mode, no AI backend available (neither Gemini Nano nor premium GLM)
             console.log('[Chrome Stub] GENERATE_ASSET (no AI in dev mode):', message.payload);

@@ -77,6 +77,10 @@ export type BridgeMessage =
       type: 'UPDATE_TRACKING';
       payload: { missionId: string; status: ApplicationStatus; note?: string };
     }
+  | {
+      type: 'UPDATE_TRACKING_DETAILS';
+      payload: { missionId: string; nextActionAt?: string | null };
+    }
   | { type: 'TRACKING_UPDATED'; payload: MissionTracking }
   | { type: 'GET_TRACKINGS'; payload?: { status?: ApplicationStatus } }
   | { type: 'TRACKINGS_RESULT'; payload: MissionTracking[] }

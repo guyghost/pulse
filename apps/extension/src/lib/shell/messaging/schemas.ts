@@ -139,6 +139,13 @@ const ApplicationStatusSchema = z.enum([
   'rejected',
   'archived',
 ]);
+const IsoDateTimeOrNullSchema = z
+  .string()
+  .max(64)
+  .refine((value) => Number.isFinite(Date.parse(value)), {
+    message: 'Expected an ISO-parseable date string',
+  })
+  .nullable();
 
 // ── Generation ───────────────────────────────────────────────────────────────
 
@@ -248,6 +255,13 @@ export const MessageSchemas = {
       missionId: z.string().max(256),
       status: ApplicationStatusSchema,
       note: z.string().max(2048).optional(),
+    }),
+  }),
+  UPDATE_TRACKING_DETAILS: z.object({
+    type: z.literal('UPDATE_TRACKING_DETAILS'),
+    payload: z.object({
+      missionId: z.string().max(256),
+      nextActionAt: IsoDateTimeOrNullSchema.optional(),
     }),
   }),
   TRACKING_UPDATED: z.object({ type: z.literal('TRACKING_UPDATED'), payload: z.unknown() }),

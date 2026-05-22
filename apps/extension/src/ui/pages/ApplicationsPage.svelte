@@ -17,6 +17,7 @@
   let selectedMissionId = $state<string | null>(null);
   let assets = $state<GeneratedAsset[]>([]);
   let generatingType = $state<GenerationType | null>(null);
+  let nextActionInput = $state('');
 
   const statuses: ApplicationStatus[] = [
     'detected',
@@ -52,6 +53,10 @@
 
   const selectedStatus = $derived<ApplicationStatus>(selectedTracking?.currentStatus ?? 'detected');
   const nextStatuses = $derived<ApplicationStatus[]>(VALID_TRANSITIONS[selectedStatus] ?? []);
+
+  $effect(() => {
+    nextActionInput = isoToDateTimeLocal(selectedTracking?.nextActionAt ?? null);
+  });
 
   const statusCounts = $derived.by(() => {
     const counts = new Map<ApplicationStatus, number>();
@@ -111,6 +116,30 @@
     }).format(new Date(timestamp));
   }
 
+  function isoToDateTimeLocal(value: string | null): string {
+    if (!value) {
+      return '';
+    }
+
+    const timestamp = Date.parse(value);
+    if (!Number.isFinite(timestamp)) {
+      return '';
+    }
+
+    const date = new Date(timestamp);
+    const offsetMs = date.getTimezoneOffset() * 60_000;
+    return new Date(timestamp - offsetMs).toISOString().slice(0, 16);
+  }
+
+  function dateTimeLocalToIso(value: string): string | null {
+    if (!value) {
+      return null;
+    }
+
+    const timestamp = new Date(value).getTime();
+    return Number.isFinite(timestamp) ? new Date(timestamp).toISOString() : null;
+  }
+
   async function loadAssets(missionId: string): Promise<void> {
     try {
       const response = await sendMessage({
@@ -134,6 +163,25 @@
     }
     await tracking.transitionStatus(selectedMission.id, status);
     await showToast(`Statut: ${STATUS_LABELS[status]}`, 'success');
+  }
+
+  async function saveNextAction(): Promise<void> {
+    if (!selectedMission) {
+      return;
+    }
+
+    await tracking.updateNextActionAt(selectedMission.id, dateTimeLocalToIso(nextActionInput));
+    await showToast('Prochaine action mise à jour', 'success');
+  }
+
+  async function clearNextAction(): Promise<void> {
+    if (!selectedMission) {
+      return;
+    }
+
+    nextActionInput = '';
+    await tracking.updateNextActionAt(selectedMission.id, null);
+    await showToast('Prochaine action effacée', 'success');
   }
 
   async function generate(type: GenerationType): Promise<void> {
@@ -315,6 +363,40 @@
                   {STATUS_LABELS[status]}
                 </button>
               {/each}
+            </div>
+
+            <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3">
+              <label
+                for="application-next-action"
+                class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted"
+              >
+                Prochaine action
+              </label>
+              <div class="mt-2 flex flex-wrap gap-2">
+                <input
+                  id="application-next-action"
+                  type="datetime-local"
+                  class="min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+                  bind:value={nextActionInput}
+                  aria-label="Prochaine action"
+                />
+                <button
+                  class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+                  onclick={saveNextAction}
+                >
+                  <Icon name="save" size={12} />
+                  Enregistrer
+                </button>
+                {#if selectedTracking?.nextActionAt}
+                  <button
+                    class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
+                    onclick={clearNextAction}
+                  >
+                    <Icon name="x" size={12} />
+                    Effacer
+                  </button>
+                {/if}
+              </div>
             </div>
           </div>
 
