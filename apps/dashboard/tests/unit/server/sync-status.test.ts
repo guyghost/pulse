@@ -40,6 +40,11 @@ type InsertRow = {
   updated_at: string;
 };
 
+type UpsertOptions = {
+  onConflict: string;
+  ignoreDuplicates: boolean;
+};
+
 function createSelectBuilder<T>(result: QueryResult<T[]>, eqCalls: EqCall[]): SelectThenable<T> {
   const builder: SelectThenable<T> = {
     eq(column: string, value: string) {
@@ -76,6 +81,7 @@ function createSupabaseMock(options: {
   const statusSelectEqCalls: EqCall[] = [];
   const statusUpdateEqCalls: EqCall[] = [];
   const insertedRows: InsertRow[][] = [];
+  const upsertedRows: Array<{ rows: InsertRow[]; options: UpsertOptions }> = [];
   const updateValues: unknown[] = [];
 
   return {
@@ -84,6 +90,7 @@ function createSupabaseMock(options: {
       statusSelectEqCalls,
       statusUpdateEqCalls,
       insertedRows,
+      upsertedRows,
       updateValues,
     },
     supabase: {
@@ -122,6 +129,10 @@ function createSupabaseMock(options: {
             }),
             insert: vi.fn((rows: InsertRow[]) => {
               insertedRows.push(rows);
+              return Promise.resolve({ data: null, error: options.insertError ?? null });
+            }),
+            upsert: vi.fn((rows: InsertRow[], upsertOptions: UpsertOptions) => {
+              upsertedRows.push({ rows, options: upsertOptions });
               return Promise.resolve({ data: null, error: options.insertError ?? null });
             }),
           };
@@ -165,17 +176,24 @@ describe('dashboard sync status server helper', () => {
         updated_at: '2026-05-22T10:00:00.000Z',
       },
     ]);
-    expect(calls.insertedRows).toEqual([
-      [
-        {
-          user_id: 'user-1',
-          device_id: 'device-2',
-          entity: 'applications',
-          pending_upload_count: 0,
-          pending_download_count: 1,
-          updated_at: '2026-05-22T10:00:00.000Z',
+    expect(calls.insertedRows).toEqual([]);
+    expect(calls.upsertedRows).toEqual([
+      {
+        rows: [
+          {
+            user_id: 'user-1',
+            device_id: 'device-2',
+            entity: 'applications',
+            pending_upload_count: 0,
+            pending_download_count: 1,
+            updated_at: '2026-05-22T10:00:00.000Z',
+          },
+        ],
+        options: {
+          onConflict: 'device_id,entity',
+          ignoreDuplicates: true,
         },
-      ],
+      },
     ]);
   });
 

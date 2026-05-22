@@ -52,6 +52,10 @@ type SyncStatusTable = {
     updated_at: string;
   }): UpdateBuilder;
   insert(rows: PendingPullSyncStatusInsertRow[]): InsertBuilder;
+  upsert(
+    rows: PendingPullSyncStatusInsertRow[],
+    options: { onConflict: 'device_id,entity'; ignoreDuplicates: true }
+  ): InsertBuilder;
 };
 
 type DashboardSyncStatusSupabase = {
@@ -121,7 +125,7 @@ export async function markEntityPendingExtensionPull(
   }
 
   if (missingDeviceIds.length > 0) {
-    const insertResult = await syncStatusTable(supabase).insert(
+    const insertResult = await syncStatusTable(supabase).upsert(
       missingDeviceIds.map((deviceId) => ({
         user_id: userId,
         device_id: deviceId,
@@ -129,7 +133,8 @@ export async function markEntityPendingExtensionPull(
         pending_upload_count: 0,
         pending_download_count: 1,
         updated_at: updatedAt,
-      }))
+      })),
+      { onConflict: 'device_id,entity', ignoreDuplicates: true }
     );
 
     if (insertResult.error) {
