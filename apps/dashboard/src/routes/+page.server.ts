@@ -25,6 +25,7 @@ import {
   pipelineEventRowsToTimeline,
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
+  syncConflictRowsToDashboardConflicts,
   syncRowsToConnectedSyncStatuses,
   type DashboardApplicationPipelineEventRow,
   type DashboardCandidateProfileRow,
@@ -44,6 +45,7 @@ import {
   type DashboardMissionFeedRow,
   type DashboardMissionFeedScoreRow,
   type DashboardProfileImportRow,
+  type DashboardSyncConflictRow,
   type DashboardSyncStatusRow,
   type DashboardAccountEntitlements,
   type DashboardSubscriptionStatus,
@@ -205,6 +207,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       cv: buildEmptyCvSnapshot({ updatedAt: new Date().toISOString() }),
       syncStatuses: [],
       connectedSyncStatuses: [],
+      syncConflicts: [],
     };
   }
 
@@ -440,9 +443,29 @@ export const load: PageServerLoad = async ({ cookies }) => {
           .returns<DashboardSyncStatusRow[]>()
       : { data: [] };
 
+  const extensionDevicesById = new Map(
+    (extensionDeviceRows ?? []).map((device) => [device.id, device])
+  );
+
   const connectedSyncStatuses = syncRowsToConnectedSyncStatuses(
     syncStatusRows ?? [],
-    new Map((extensionDeviceRows ?? []).map((device) => [device.id, device]))
+    extensionDevicesById
+  );
+
+  const { data: syncConflictRows } = await supabase
+    .from('sync_conflicts')
+    .select(
+      'id, device_id, entity, entity_id, field, local_value, remote_value, local_updated_by, remote_updated_by, status, detected_at'
+    )
+    .eq('user_id', session.user.id)
+    .eq('status', 'pending')
+    .order('detected_at', { ascending: false })
+    .limit(20)
+    .returns<DashboardSyncConflictRow[]>();
+
+  const syncConflicts = syncConflictRowsToDashboardConflicts(
+    syncConflictRows ?? [],
+    extensionDevicesById
   );
 
   return {
@@ -469,6 +492,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       : buildEmptyCvSnapshot({ updatedAt: new Date().toISOString() }),
     syncStatuses,
     connectedSyncStatuses,
+    syncConflicts,
   };
 };
 
@@ -628,6 +652,7 @@ export const actions: Actions = {
       await deleteRowsByUserId(supabase, 'candidate_profiles', session.user.id);
       await deleteRowsByUserId(supabase, 'profile_imports', session.user.id);
       await deleteRowsByUserId(supabase, 'connector_health_events', session.user.id);
+      await deleteRowsByUserId(supabase, 'sync_conflicts', session.user.id);
       await deleteRowsByUserId(supabase, 'sync_status', session.user.id);
       await deleteRowsByUserId(supabase, 'extension_devices', session.user.id);
       await deleteRowsByUserId(supabase, 'favorite_missions', session.user.id);

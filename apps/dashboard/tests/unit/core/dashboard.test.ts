@@ -25,6 +25,7 @@ import {
   pipelineEventRowsToTimeline,
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
+  syncConflictRowsToDashboardConflicts,
   syncRowsToConnectedSyncStatuses,
   type ApplicationSource,
   type CvSnapshot,
@@ -924,6 +925,97 @@ describe('dashboard core', () => {
         lastErrorMessage: null,
         retryAfterAt: null,
         updatedAt: '2026-05-22T08:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('maps sync conflict rows to dashboard conflicts and filters invalid states', () => {
+    expect(
+      syncConflictRowsToDashboardConflicts(
+        [
+          {
+            id: 'conflict-older',
+            device_id: 'device-1',
+            entity: 'candidate_profile',
+            entity_id: 'profile-1',
+            field: 'summary',
+            local_value: 'Résumé LinkedIn',
+            remote_value: 'Résumé dashboard',
+            local_updated_by: 'extension',
+            remote_updated_by: 'dashboard',
+            status: 'pending',
+            detected_at: '2026-05-22T08:00:00.000Z',
+          },
+          {
+            id: 'conflict-latest',
+            device_id: null,
+            entity: 'applications',
+            entity_id: 'application-1',
+            field: 'stage',
+            local_value: 'interview',
+            remote_value: 'offer',
+            local_updated_by: 'extension',
+            remote_updated_by: 'dashboard',
+            status: 'pending',
+            detected_at: '2026-05-22T09:00:00.000Z',
+          },
+          {
+            id: 'conflict-invalid',
+            device_id: 'device-1',
+            entity: 'candidate_profile',
+            entity_id: 'profile-1',
+            field: 'summary',
+            local_value: 'x',
+            remote_value: 'y',
+            local_updated_by: 'robot',
+            remote_updated_by: 'dashboard',
+            status: 'pending',
+            detected_at: '2026-05-22T10:00:00.000Z',
+          },
+        ],
+        new Map([
+          [
+            'device-1',
+            {
+              id: 'device-1',
+              install_id: 'install-1',
+              browser: 'Chrome',
+              extension_version: '0.4.0',
+              last_seen_at: '2026-05-22T08:30:00.000Z',
+            },
+          ],
+        ])
+      )
+    ).toEqual([
+      {
+        id: 'conflict-latest',
+        deviceId: null,
+        deviceLabel: 'Dashboard',
+        entity: 'applications',
+        entityLabel: 'Candidature',
+        entityId: 'application-1',
+        field: 'stage',
+        localValue: 'interview',
+        remoteValue: 'offer',
+        localUpdatedBy: 'extension',
+        remoteUpdatedBy: 'dashboard',
+        status: 'pending',
+        detectedAt: '2026-05-22T09:00:00.000Z',
+      },
+      {
+        id: 'conflict-older',
+        deviceId: 'device-1',
+        deviceLabel: 'Chrome 0.4.0',
+        entity: 'candidate_profile',
+        entityLabel: 'Profil CV',
+        entityId: 'profile-1',
+        field: 'summary',
+        localValue: 'Résumé LinkedIn',
+        remoteValue: 'Résumé dashboard',
+        localUpdatedBy: 'extension',
+        remoteUpdatedBy: 'dashboard',
+        status: 'pending',
+        detectedAt: '2026-05-22T08:00:00.000Z',
       },
     ]);
   });

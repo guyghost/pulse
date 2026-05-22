@@ -5,6 +5,7 @@ import {
   buildApplicationUpsertRow,
   buildCandidateProfileFieldSuggestionRows,
   buildCandidateProfileImportRows,
+  buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
   buildGeneratedApplicationAssetUpsertRow,
   buildMissionDuplicateUpsertRows,
@@ -29,6 +30,7 @@ import {
   type ProfileImportInsertRow,
   type RemoteApplicationSnapshot,
   type SyncStatusRow,
+  type SyncConflictInsertRow,
 } from '../../core/sync/connected-dashboard';
 import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
 import type { MissionDuplicateRelation } from '../../core/scoring/dedup';
@@ -90,6 +92,7 @@ export interface ConnectedDashboardSyncGateway {
     links: CandidateLinkInsertRow[];
   }): Promise<void>;
   insertCandidateProfileFieldSuggestions(rows: CandidateProfileFieldSuggestionRow[]): Promise<void>;
+  insertSyncConflicts(rows: SyncConflictInsertRow[]): Promise<void>;
   insertProfileImport(row: ProfileImportInsertRow): Promise<void>;
   upsertSyncStatus(row: SyncStatusRow): Promise<void>;
 }
@@ -601,6 +604,12 @@ export function createSupabaseConnectedDashboardGateway(
         () => undefined
       );
     },
+    insertSyncConflicts: async (rows) => {
+      if (rows.length === 0) {
+        return;
+      }
+      await selectOrThrow(supabase.from('sync_conflicts').insert(rows), 'id', () => undefined);
+    },
     insertProfileImport: async (row) => {
       await selectOrThrow(supabase.from('profile_imports').insert(row), 'id', () => undefined);
     },
@@ -921,6 +930,12 @@ export async function pushCandidateProfileImportToConnectedDashboard(
       userId: input.userId,
       profile: existingProfile,
     });
+    const conflictRows = buildCandidateProfileSyncConflictRows({
+      suggestions: suggestionRows,
+      deviceId: input.deviceId,
+      profileId: profile.id,
+      detectedAt: input.now.toISOString(),
+    });
 
     await gateway.replaceCandidateProfileChildren({
       profileId: profile.id,
@@ -930,6 +945,7 @@ export async function pushCandidateProfileImportToConnectedDashboard(
       links: rows.links,
     });
     await gateway.insertCandidateProfileFieldSuggestions(suggestionRows);
+    await gateway.insertSyncConflicts(conflictRows);
     await gateway.insertProfileImport(rows.importEvent);
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({

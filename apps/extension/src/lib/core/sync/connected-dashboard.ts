@@ -149,6 +149,20 @@ export interface CandidateProfileFieldSuggestionRow {
   status: 'pending';
 }
 
+export interface SyncConflictInsertRow {
+  user_id: string;
+  device_id: string;
+  entity: 'candidate_profile';
+  entity_id: string;
+  field: CandidateProfileSuggestionField;
+  local_value: string | null;
+  remote_value: string | null;
+  local_updated_by: 'extension';
+  remote_updated_by: 'dashboard';
+  status: 'pending';
+  detected_at: string;
+}
+
 export interface CandidateExperienceInsertRow {
   profile_id: string;
   title: string;
@@ -596,6 +610,27 @@ export function buildCandidateProfileFieldSuggestionRows(input: {
       },
     ];
   });
+}
+
+export function buildCandidateProfileSyncConflictRows(input: {
+  suggestions: CandidateProfileFieldSuggestionRow[];
+  deviceId: string;
+  profileId: string;
+  detectedAt: string;
+}): SyncConflictInsertRow[] {
+  return input.suggestions.map((suggestion) => ({
+    user_id: suggestion.user_id,
+    device_id: input.deviceId,
+    entity: 'candidate_profile',
+    entity_id: input.profileId,
+    field: suggestion.field,
+    local_value: suggestion.suggested_value,
+    remote_value: suggestion.current_value,
+    local_updated_by: 'extension',
+    remote_updated_by: 'dashboard',
+    status: 'pending',
+    detected_at: input.detectedAt,
+  }));
 }
 
 export function buildTrackingFromRemoteApplication(

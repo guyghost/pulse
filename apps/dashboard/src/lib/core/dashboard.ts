@@ -241,6 +241,40 @@ export interface ConnectedSyncStatus {
   updatedAt: string;
 }
 
+export type DashboardSyncConflictEntity = 'applications' | 'candidate_profile';
+export type DashboardSyncConflictStatus = 'pending' | 'resolved' | 'dismissed';
+export type DashboardSyncConflictActor = 'dashboard' | 'extension' | 'system';
+
+export interface DashboardSyncConflictRow {
+  id: string;
+  device_id: string | null;
+  entity: string;
+  entity_id: string;
+  field: string;
+  local_value: string | null;
+  remote_value: string | null;
+  local_updated_by: string;
+  remote_updated_by: string;
+  status: string;
+  detected_at: string;
+}
+
+export interface DashboardSyncConflict {
+  id: string;
+  deviceId: string | null;
+  deviceLabel: string;
+  entity: DashboardSyncConflictEntity;
+  entityLabel: string;
+  entityId: string;
+  field: string;
+  localValue: string | null;
+  remoteValue: string | null;
+  localUpdatedBy: DashboardSyncConflictActor;
+  remoteUpdatedBy: DashboardSyncConflictActor;
+  status: DashboardSyncConflictStatus;
+  detectedAt: string;
+}
+
 export type ApplicationTimelineCreatedBy = 'dashboard' | 'extension' | 'system';
 
 export interface ApplicationTimelineEvent {
@@ -522,6 +556,18 @@ function isConnectedSyncEntity(value: unknown): value is ConnectedSyncEntity {
   );
 }
 
+function isDashboardSyncConflictEntity(value: unknown): value is DashboardSyncConflictEntity {
+  return value === 'applications' || value === 'candidate_profile';
+}
+
+function isDashboardSyncConflictStatus(value: unknown): value is DashboardSyncConflictStatus {
+  return value === 'pending' || value === 'resolved' || value === 'dismissed';
+}
+
+function isDashboardSyncConflictActor(value: unknown): value is DashboardSyncConflictActor {
+  return value === 'dashboard' || value === 'extension' || value === 'system';
+}
+
 function isCvFieldSuggestionField(value: unknown): value is CvFieldSuggestionField {
   return value === 'title' || value === 'summary' || value === 'target_role';
 }
@@ -556,6 +602,11 @@ const CONNECTED_SYNC_ENTITY_LABELS: Record<ConnectedSyncEntity, string> = {
   applications: 'Candidatures',
   candidate_profile: 'Profil CV',
   connector_health: 'Santé connecteurs',
+};
+
+const SYNC_CONFLICT_ENTITY_LABELS: Record<DashboardSyncConflictEntity, string> = {
+  applications: 'Candidature',
+  candidate_profile: 'Profil CV',
 };
 
 const APPLICATION_STAGE_LABELS: Record<ApplicationStage, string> = {
@@ -1138,6 +1189,52 @@ export function syncRowsToConnectedSyncStatuses(
     );
 }
 
+export function syncConflictRowsToDashboardConflicts(
+  rows: DashboardSyncConflictRow[],
+  devicesById: Map<string, DashboardExtensionDeviceRow>
+): DashboardSyncConflict[] {
+  return rows
+    .flatMap((row) => {
+      if (
+        !isDashboardSyncConflictEntity(row.entity) ||
+        !isDashboardSyncConflictStatus(row.status) ||
+        !isDashboardSyncConflictActor(row.local_updated_by) ||
+        !isDashboardSyncConflictActor(row.remote_updated_by)
+      ) {
+        return [];
+      }
+
+      const device = row.device_id ? (devicesById.get(row.device_id) ?? null) : null;
+
+      return [
+        {
+          id: row.id,
+          deviceId: row.device_id,
+          deviceLabel: row.device_id
+            ? formatExtensionDeviceLabel(device, row.device_id)
+            : 'Dashboard',
+          entity: row.entity,
+          entityLabel: SYNC_CONFLICT_ENTITY_LABELS[row.entity],
+          entityId: row.entity_id,
+          field: row.field,
+          localValue: row.local_value,
+          remoteValue: row.remote_value,
+          localUpdatedBy: row.local_updated_by,
+          remoteUpdatedBy: row.remote_updated_by,
+          status: row.status,
+          detectedAt: row.detected_at,
+        },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        getSyncConflictStatusRank(a.status) - getSyncConflictStatusRank(b.status) ||
+        b.detectedAt.localeCompare(a.detectedAt) ||
+        a.entityLabel.localeCompare(b.entityLabel) ||
+        a.field.localeCompare(b.field)
+    );
+}
+
 function formatExtensionDeviceLabel(
   device: DashboardExtensionDeviceRow | null,
   fallbackId: string
@@ -1177,6 +1274,16 @@ function getConnectedSyncStateRank(state: ConnectedSyncState): number {
     return 2;
   }
   return 3;
+}
+
+function getSyncConflictStatusRank(status: DashboardSyncConflictStatus): number {
+  if (status === 'pending') {
+    return 0;
+  }
+  if (status === 'resolved') {
+    return 1;
+  }
+  return 2;
 }
 
 export function getNextApplicationStages(stage: ApplicationStage): ApplicationStage[] {

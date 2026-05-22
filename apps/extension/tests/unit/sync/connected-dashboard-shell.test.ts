@@ -123,6 +123,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
     upsertCandidateProfile: vi.fn(async () => ({ id: 'profile-1', revision: 3 })),
     replaceCandidateProfileChildren: vi.fn(async () => undefined),
     insertCandidateProfileFieldSuggestions: vi.fn(async () => undefined),
+    insertSyncConflicts: vi.fn(async () => undefined),
     insertProfileImport: vi.fn(async () => undefined),
     upsertSyncStatus: vi.fn(async () => undefined),
   };
@@ -522,6 +523,23 @@ describe('connected dashboard shell sync', () => {
         current_value: 'Architecte frontend',
         suggested_value: 'Lead Frontend Svelte',
       }),
+    ]);
+    expect(gateway.insertSyncConflicts).toHaveBeenCalledWith([
+      expect.objectContaining({
+        user_id: 'user-1',
+        device_id: 'device-1',
+        entity: 'candidate_profile',
+        entity_id: 'profile-1',
+        field: 'title',
+        remote_value: 'Profil dashboard',
+        local_value: 'Lead Frontend Svelte',
+        remote_updated_by: 'dashboard',
+        local_updated_by: 'extension',
+        status: 'pending',
+        detected_at: '2026-05-22T08:05:00.000Z',
+      }),
+      expect.objectContaining({ field: 'summary' }),
+      expect.objectContaining({ field: 'target_role' }),
     ]);
   });
 

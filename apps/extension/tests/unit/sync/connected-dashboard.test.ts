@@ -4,6 +4,7 @@ import {
   buildApplicationUpsertRow,
   buildCandidateProfileFieldSuggestionRows,
   buildCandidateProfileImportRows,
+  buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
   buildGeneratedApplicationAssetUpsertRow,
   buildMissionDuplicateUpsertRows,
@@ -520,6 +521,41 @@ describe('connected dashboard sync payload builders', () => {
         },
       })
     ).toEqual([]);
+  });
+
+  it('builds sync conflict rows from dashboard-edited CV suggestions', () => {
+    expect(
+      buildCandidateProfileSyncConflictRows({
+        suggestions: [
+          {
+            user_id: 'user-1',
+            profile_id: 'profile-1',
+            field: 'summary',
+            current_value: 'Résumé dashboard',
+            suggested_value: 'Résumé LinkedIn',
+            source: 'linkedin',
+            status: 'pending',
+          },
+        ],
+        deviceId: 'device-1',
+        profileId: 'profile-1',
+        detectedAt: '2026-05-22T08:05:00.000Z',
+      })
+    ).toEqual([
+      {
+        user_id: 'user-1',
+        device_id: 'device-1',
+        entity: 'candidate_profile',
+        entity_id: 'profile-1',
+        field: 'summary',
+        local_value: 'Résumé LinkedIn',
+        remote_value: 'Résumé dashboard',
+        local_updated_by: 'extension',
+        remote_updated_by: 'dashboard',
+        status: 'pending',
+        detected_at: '2026-05-22T08:05:00.000Z',
+      },
+    ]);
   });
 
   it('builds local tracking records from remote dashboard applications', () => {

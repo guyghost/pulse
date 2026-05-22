@@ -18,6 +18,7 @@
     DashboardFeatureAccess,
     DashboardFeatureArea,
     DashboardFeatureRequirement,
+    DashboardSyncConflict,
     CvSnapshot,
     GeneratedApplicationAsset,
     MissionApplication,
@@ -36,6 +37,7 @@
   const cv = $derived(data.cv as CvSnapshot);
   const syncStatuses = $derived(data.syncStatuses as PlatformSyncStatus[]);
   const connectedSyncStatuses = $derived(data.connectedSyncStatuses as ConnectedSyncStatus[]);
+  const syncConflicts = $derived(data.syncConflicts as DashboardSyncConflict[]);
   const entitlements = $derived(data.entitlements as DashboardAccountEntitlements);
   const featureAccess = $derived(data.featureAccess as DashboardFeatureAccess[]);
   const configurationMissing = $derived(Boolean(data.configurationMissing));
@@ -99,6 +101,14 @@
   const readyPlatforms = $derived(syncStatuses.filter((platform) => platform.status === 'ready'));
   const cvSyncAccess = $derived(featureAccess.find((feature) => feature.id === 'cv-sync') ?? null);
   const canPrepareCvSync = $derived(readiness.canSync && Boolean(cvSyncAccess?.enabled));
+  const hasSyncActionRequired = $derived(
+    syncConflicts.length > 0 || connectedSyncStatuses.some((status) => status.state === 'error')
+  );
+  const syncConflictCountText = $derived(
+    `${syncConflicts.length} champ${syncConflicts.length > 1 ? 's' : ''} attend${
+      syncConflicts.length > 1 ? 'ent' : ''
+    } un arbitrage.`
+  );
   const latestCvImport = $derived(cv.imports[0] ?? null);
   const hasCvProfile = $derived(cv.id !== 'empty-cv');
   const cvDisplayTitle = $derived(cv.title || 'CV à créer');
@@ -127,6 +137,18 @@
     pending: 'En attente',
     error: 'Erreur',
     idle: 'Initial',
+  };
+
+  const syncConflictStatusLabels: Record<DashboardSyncConflict['status'], string> = {
+    pending: 'À arbitrer',
+    resolved: 'Résolu',
+    dismissed: 'Ignoré',
+  };
+
+  const syncConflictActorLabels: Record<DashboardSyncConflict['localUpdatedBy'], string> = {
+    dashboard: 'Dashboard',
+    extension: 'Extension',
+    system: 'Système',
   };
 
   const tjmTrendLabels: Record<TjmRadarSnapshot['trend'], string> = {
@@ -1520,14 +1542,12 @@
                   </p>
                 </div>
                 <Badge
-                  label={connectedSyncStatuses.some((status) => status.state === 'error')
+                  label={hasSyncActionRequired
                     ? 'Action requise'
                     : connectedSyncStatuses.some((status) => status.state === 'pending')
                       ? 'En attente'
                       : 'Stable'}
-                  variant={connectedSyncStatuses.some((status) => status.state === 'error')
-                    ? 'warning'
-                    : 'success'}
+                  variant={hasSyncActionRequired ? 'warning' : 'success'}
                 />
               </div>
 
@@ -1593,6 +1613,64 @@
                 {/each}
               </div>
             </div>
+
+            {#if syncConflicts.length > 0}
+              <div class="mt-5 rounded-lg border border-status-orange/20 bg-status-orange/8 p-3">
+                <div class="flex items-center justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-medium uppercase text-status-orange">
+                      Conflits de synchronisation
+                    </p>
+                    <p class="mt-1 text-xs leading-5 text-text-subtle">
+                      {syncConflictCountText}
+                    </p>
+                  </div>
+                  <Badge label="Action requise" variant="warning" />
+                </div>
+
+                <div class="mt-3 space-y-2">
+                  {#each syncConflicts as conflict}
+                    <article
+                      class="rounded-lg border border-status-orange/15 bg-surface-white px-3 py-3"
+                    >
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <p class="text-sm font-medium text-text-primary">
+                            {conflict.entityLabel} · {conflict.field}
+                          </p>
+                          <p class="mt-1 text-xs leading-5 text-text-subtle">
+                            {conflict.deviceLabel} · {formatDateTime(conflict.detectedAt)}
+                          </p>
+                        </div>
+                        <Badge
+                          label={syncConflictStatusLabels[conflict.status]}
+                          variant="warning"
+                        />
+                      </div>
+
+                      <div class="mt-3 grid gap-2 text-xs md:grid-cols-2">
+                        <div class="rounded-lg bg-page-canvas px-2 py-2">
+                          <p class="font-medium text-text-subtle">
+                            {syncConflictActorLabels[conflict.remoteUpdatedBy]}
+                          </p>
+                          <p class="mt-1 break-words leading-5 text-text-primary">
+                            {conflict.remoteValue ?? 'Vide'}
+                          </p>
+                        </div>
+                        <div class="rounded-lg bg-page-canvas px-2 py-2">
+                          <p class="font-medium text-text-subtle">
+                            {syncConflictActorLabels[conflict.localUpdatedBy]}
+                          </p>
+                          <p class="mt-1 break-words leading-5 text-text-primary">
+                            {conflict.localValue ?? 'Vide'}
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  {/each}
+                </div>
+              </div>
+            {/if}
 
             <div class="mt-5 space-y-3">
               {#each syncStatuses as platform}

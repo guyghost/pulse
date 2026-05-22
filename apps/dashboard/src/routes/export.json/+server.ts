@@ -11,6 +11,7 @@ const USER_OWNED_TABLES = [
   'connector_health_events',
   'extension_devices',
   'sync_status',
+  'sync_conflicts',
   'favorite_missions',
   'candidate_profile_field_suggestions',
 ] as const;

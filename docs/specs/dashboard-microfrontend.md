@@ -505,6 +505,23 @@ sync_status (
   primary key (device_id, entity)
 )
 
+sync_conflicts (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  device_id uuid references extension_devices(id) on delete set null,
+  entity text not null check (entity in ('applications', 'candidate_profile')),
+  entity_id uuid not null,
+  field text not null,
+  local_value text,
+  remote_value text,
+  local_updated_by text not null check (local_updated_by in ('dashboard', 'extension', 'system')),
+  remote_updated_by text not null check (remote_updated_by in ('dashboard', 'extension', 'system')),
+  status text not null default 'pending' check (status in ('pending', 'resolved', 'dismissed')),
+  detected_at timestamptz not null,
+  resolved_at timestamptz,
+  created_at timestamptz not null default now()
+)
+
 connector_health_events (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
