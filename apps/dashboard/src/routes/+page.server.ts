@@ -1722,12 +1722,14 @@ export const actions: Actions = {
       stage: ApplicationStage;
       revision: number;
       updated_by: 'dashboard';
+      updated_at: string;
       applied_at?: string | null;
       archived_at?: string | null;
     } = {
       stage: patch.stage,
       revision: application.revision + 1,
       updated_by: patch.updated_by,
+      updated_at: event.occurredAt,
     };
 
     if (patch.applied_at !== undefined) {

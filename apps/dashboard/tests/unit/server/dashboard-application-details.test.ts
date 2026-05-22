@@ -13,6 +13,7 @@ type EqCall = {
 type ApplicationDetailsRow = {
   id: string;
   revision: number;
+  stage?: string;
 };
 
 const supabaseMock = vi.hoisted(() => ({
@@ -21,6 +22,10 @@ const supabaseMock = vi.hoisted(() => ({
 
 const syncStatusMock = vi.hoisted(() => ({
   markEntityPendingExtensionPull: vi.fn(),
+}));
+
+const pipelineEventsMock = vi.hoisted(() => ({
+  upsertDashboardPipelineEvent: vi.fn(async () => true),
 }));
 
 vi.mock('../../../src/lib/server/supabase', () => ({
@@ -34,6 +39,10 @@ vi.mock('../../../src/lib/server/supabase', () => ({
 
 vi.mock('../../../src/lib/server/sync-status', () => ({
   markEntityPendingExtensionPull: syncStatusMock.markEntityPendingExtensionPull,
+}));
+
+vi.mock('../../../src/lib/server/pipeline-events', () => ({
+  upsertDashboardPipelineEvent: pipelineEventsMock.upsertDashboardPipelineEvent,
 }));
 
 vi.mock('$env/dynamic/public', () => ({
@@ -125,6 +134,17 @@ function createDetailsRequest(): Request {
   });
 }
 
+function createTransitionRequest(): Request {
+  const formData = new FormData();
+  formData.set('applicationId', 'application-1');
+  formData.set('toStage', 'application_prepared');
+
+  return new Request('http://localhost/dashboard?/transitionApplication', {
+    method: 'POST',
+    body: formData,
+  });
+}
+
 describe('dashboard application details action', () => {
   afterEach(() => {
     vi.useRealTimers();
@@ -172,6 +192,54 @@ describe('dashboard application details action', () => {
       'user-1',
       'applications',
       '2026-05-22T10:00:00.000Z'
+    );
+  });
+
+  it('stamps canonical application stage updates with the pipeline event time', async () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-05-22T11:00:00.000Z'));
+    supabaseMock.current = createSupabaseApplicationDetailsMock({
+      application: { id: 'application-1', stage: 'selected', revision: 4 },
+    });
+
+    const { actions } = await import('../../../src/routes/+page.server');
+    const transitionApplication = actions.transitionApplication;
+    if (!transitionApplication) {
+      throw new Error('transitionApplication action is not registered.');
+    }
+
+    const result = await transitionApplication({
+      cookies: {},
+      request: createTransitionRequest(),
+    } as unknown as Parameters<typeof transitionApplication>[0]);
+
+    expect(result).toEqual({ transitionSuccess: 'Candidature passée en application_prepared.' });
+    expect(supabaseMock.current.updateValues).toEqual([
+      {
+        stage: 'application_prepared',
+        revision: 5,
+        updated_by: 'dashboard',
+        archived_at: null,
+        updated_at: '2026-05-22T11:00:00.000Z',
+      },
+    ]);
+    expect(pipelineEventsMock.upsertDashboardPipelineEvent).toHaveBeenCalledWith(
+      supabaseMock.current.supabase,
+      'user-1',
+      expect.objectContaining({
+        applicationId: 'application-1',
+        fromStage: 'selected',
+        toStage: 'application_prepared',
+        occurredAt: '2026-05-22T11:00:00.000Z',
+        createdBy: 'dashboard',
+      }),
+      { source: 'dashboard' }
+    );
+    expect(syncStatusMock.markEntityPendingExtensionPull).toHaveBeenCalledWith(
+      supabaseMock.current.supabase,
+      'user-1',
+      'applications',
+      '2026-05-22T11:00:00.000Z'
     );
   });
 });
