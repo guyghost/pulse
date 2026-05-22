@@ -174,6 +174,7 @@ export interface RemoteCandidateProfileSnapshot {
 }
 
 export type CandidateProfileSuggestionField = 'title' | 'summary' | 'target_role';
+export type ApplicationSyncConflictField = 'stage' | 'notes' | 'user_rating' | 'next_action_at';
 
 export interface CandidateProfileFieldSuggestionRow {
   user_id: string;
@@ -188,9 +189,9 @@ export interface CandidateProfileFieldSuggestionRow {
 export interface SyncConflictInsertRow {
   user_id: string;
   device_id: string;
-  entity: 'candidate_profile';
+  entity: 'applications' | 'candidate_profile';
   entity_id: string;
-  field: CandidateProfileSuggestionField;
+  field: ApplicationSyncConflictField | CandidateProfileSuggestionField;
   local_value: string | null;
   remote_value: string | null;
   local_updated_by: 'extension';
@@ -865,6 +866,66 @@ export function buildCandidateProfileSyncConflictRows(input: {
     status: 'pending',
     detected_at: input.detectedAt,
   }));
+}
+
+function conflictValue(value: ApplicationStage | number | string | null): string | null {
+  return value === null ? null : String(value);
+}
+
+export function buildApplicationSyncConflictRows(input: {
+  userId: string;
+  deviceId: string;
+  existing: MissionTracking | null;
+  remote: RemoteApplicationSnapshot;
+  detectedAt: string;
+}): SyncConflictInsertRow[] {
+  if (!input.existing) {
+    return [];
+  }
+
+  const localRevision = Math.max(1, input.existing.history.length);
+  if (localRevision < input.remote.revision) {
+    return [];
+  }
+
+  const fields: Array<{
+    field: ApplicationSyncConflictField;
+    local: ApplicationStage | number | string | null;
+    remote: ApplicationStage | number | string | null;
+  }> = [
+    { field: 'stage', local: input.existing.currentStatus, remote: input.remote.stage },
+    { field: 'notes', local: input.existing.notes, remote: input.remote.notes },
+    { field: 'user_rating', local: input.existing.userRating, remote: input.remote.user_rating },
+    {
+      field: 'next_action_at',
+      local: input.existing.nextActionAt ?? null,
+      remote: input.remote.next_action_at,
+    },
+  ];
+
+  return fields.flatMap(({ field, local, remote }) => {
+    const localValue = conflictValue(local);
+    const remoteValue = conflictValue(remote);
+    if (localValue === remoteValue) {
+      return [];
+    }
+
+    return [
+      {
+        user_id: input.userId,
+        device_id: input.deviceId,
+        entity: 'applications',
+        entity_id: input.remote.id,
+        field,
+        local_value: localValue,
+        remote_value: remoteValue,
+        local_updated_by: 'extension',
+        remote_updated_by: 'dashboard',
+        status: 'pending',
+        detected_at: input.detectedAt,
+      },
+    ];
+  });
 }
 
 export function buildTrackingFromRemoteApplication(

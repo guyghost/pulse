@@ -1005,6 +1005,66 @@ describe('connected dashboard shell sync', () => {
     );
   });
 
+  it('records application sync conflicts before applying overlapping dashboard edits locally', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.listApplicationsUpdatedSince).mockResolvedValueOnce([
+      {
+        id: 'application-1',
+        mission_id: 'remote-mission-1',
+        mission_source: 'free-work',
+        mission_external_id: 'free-work-123',
+        stage: 'offer',
+        user_rating: 5,
+        notes: 'Offre reçue côté dashboard',
+        next_action_at: '2026-05-28T09:00:00.000Z',
+        revision: 2,
+        updated_at: '2026-05-21T11:00:00.000Z',
+      },
+    ]);
+
+    const result = await pullApplicationsFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      localMissionIdsByRemoteId: new Map([['remote-mission-1', 'free-work-123']]),
+      existingTrackings: new Map([[tracking.missionId, tracking]]),
+      since: new Date('2026-05-21T09:00:00.000Z'),
+      now: new Date('2026-05-21T12:00:00.000Z'),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(gateway.insertSyncConflicts).toHaveBeenCalledWith([
+      expect.objectContaining({
+        entity: 'applications',
+        entity_id: 'application-1',
+        field: 'stage',
+        local_value: 'selected',
+        remote_value: 'offer',
+        detected_at: '2026-05-21T12:00:00.000Z',
+      }),
+      expect.objectContaining({
+        entity: 'applications',
+        entity_id: 'application-1',
+        field: 'notes',
+        local_value: 'Bon fit',
+        remote_value: 'Offre reçue côté dashboard',
+      }),
+      expect.objectContaining({
+        entity: 'applications',
+        entity_id: 'application-1',
+        field: 'user_rating',
+        local_value: null,
+        remote_value: '5',
+      }),
+      expect.objectContaining({
+        entity: 'applications',
+        entity_id: 'application-1',
+        field: 'next_action_at',
+        local_value: '2026-05-24T09:00:00.000Z',
+        remote_value: '2026-05-28T09:00:00.000Z',
+      }),
+    ]);
+  });
+
   it('maps pulled applications by mission external id when remote id was not pushed in this sync', async () => {
     const gateway = createGateway();
 

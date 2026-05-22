@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import {
   buildApplicationPipelineEventRows,
+  buildApplicationSyncConflictRows,
   buildApplicationUpsertRow,
   buildCandidateProfileFieldSuggestionRows,
   buildCandidateProfileImportRows,
@@ -812,6 +813,109 @@ describe('connected dashboard sync payload builders', () => {
       notes: 'Offre reçue',
       nextActionAt: '2026-05-28T09:00:00.000Z',
     });
+  });
+
+  it('builds application sync conflicts when local revision can overlap dashboard edits', () => {
+    const remoteApplication: RemoteApplicationSnapshot = {
+      id: 'application-1',
+      mission_id: 'remote-mission-1',
+      mission_source: 'free-work',
+      mission_external_id: 'free-work-123',
+      stage: 'offer',
+      user_rating: 5,
+      notes: 'Offre reçue côté dashboard',
+      next_action_at: '2026-05-28T09:00:00.000Z',
+      revision: 4,
+      updated_at: '2026-05-21T11:00:00.000Z',
+    };
+
+    expect(
+      buildApplicationSyncConflictRows({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        existing: tracking,
+        remote: remoteApplication,
+        detectedAt: '2026-05-21T12:00:00.000Z',
+      })
+    ).toEqual([
+      {
+        user_id: 'user-1',
+        device_id: 'device-1',
+        entity: 'applications',
+        entity_id: 'application-1',
+        field: 'stage',
+        local_value: 'applied',
+        remote_value: 'offer',
+        local_updated_by: 'extension',
+        remote_updated_by: 'dashboard',
+        status: 'pending',
+        detected_at: '2026-05-21T12:00:00.000Z',
+      },
+      {
+        user_id: 'user-1',
+        device_id: 'device-1',
+        entity: 'applications',
+        entity_id: 'application-1',
+        field: 'notes',
+        local_value: 'Relancer mercredi',
+        remote_value: 'Offre reçue côté dashboard',
+        local_updated_by: 'extension',
+        remote_updated_by: 'dashboard',
+        status: 'pending',
+        detected_at: '2026-05-21T12:00:00.000Z',
+      },
+      {
+        user_id: 'user-1',
+        device_id: 'device-1',
+        entity: 'applications',
+        entity_id: 'application-1',
+        field: 'user_rating',
+        local_value: '4',
+        remote_value: '5',
+        local_updated_by: 'extension',
+        remote_updated_by: 'dashboard',
+        status: 'pending',
+        detected_at: '2026-05-21T12:00:00.000Z',
+      },
+      {
+        user_id: 'user-1',
+        device_id: 'device-1',
+        entity: 'applications',
+        entity_id: 'application-1',
+        field: 'next_action_at',
+        local_value: '2026-05-24T09:00:00.000Z',
+        remote_value: '2026-05-28T09:00:00.000Z',
+        local_updated_by: 'extension',
+        remote_updated_by: 'dashboard',
+        status: 'pending',
+        detected_at: '2026-05-21T12:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('does not create application conflicts when dashboard revision is newer than local history', () => {
+    const remoteApplication: RemoteApplicationSnapshot = {
+      id: 'application-1',
+      mission_id: 'remote-mission-1',
+      mission_source: 'free-work',
+      mission_external_id: 'free-work-123',
+      stage: 'offer',
+      user_rating: 5,
+      notes: 'Offre reçue',
+      next_action_at: '2026-05-28T09:00:00.000Z',
+      revision: 5,
+      updated_at: '2026-05-21T11:00:00.000Z',
+    };
+
+    expect(
+      buildApplicationSyncConflictRows({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        existing: tracking,
+        remote: remoteApplication,
+        detectedAt: '2026-05-21T12:00:00.000Z',
+      })
+    ).toEqual([]);
   });
 
   it('advances the application pull cursor only when every remote row is handled', () => {

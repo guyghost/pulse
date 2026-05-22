@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 import {
   buildApplicationPipelineEventRows,
+  buildApplicationSyncConflictRows,
   buildApplicationPullCursor,
   buildApplicationUpsertRow,
   buildCandidateProfileFieldSuggestionRows,
@@ -1161,6 +1162,7 @@ export async function pullApplicationsFromConnectedDashboard(
       since: input.since ? input.since.toISOString() : null,
     });
     const trackings: MissionTracking[] = [];
+    const conflictRows: SyncConflictInsertRow[] = [];
     let skippedCount = 0;
 
     for (const application of remoteApplications) {
@@ -1172,9 +1174,20 @@ export async function pullApplicationsFromConnectedDashboard(
         continue;
       }
 
+      const existingTracking = input.existingTrackings.get(localMissionId) ?? null;
+      conflictRows.push(
+        ...buildApplicationSyncConflictRows({
+          userId: input.userId,
+          deviceId: input.deviceId,
+          existing: existingTracking,
+          remote: application,
+          detectedAt: input.now.toISOString(),
+        })
+      );
+
       trackings.push(
         mergeRemoteApplicationTracking(
-          input.existingTrackings.get(localMissionId) ?? null,
+          existingTracking,
           application,
           localMissionId,
           input.now.getTime()
@@ -1189,6 +1202,7 @@ export async function pullApplicationsFromConnectedDashboard(
       pulledAt: input.now.toISOString(),
     });
 
+    await gateway.insertSyncConflicts(conflictRows);
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({
         userId: input.userId,
