@@ -113,6 +113,12 @@ function createGateway(): ConnectedDashboardSyncGateway {
     ]),
     upsertMissionScores: vi.fn(async () => undefined),
     upsertMissionDuplicates: vi.fn(async () => undefined),
+    insertDetectedApplications: vi.fn(async () => [
+      {
+        id: 'application-detected-1',
+        mission_id: 'remote-mission-1',
+      },
+    ]),
     upsertApplications: vi.fn(async () => [
       {
         id: 'application-1',
@@ -450,6 +456,20 @@ describe('connected dashboard shell sync', () => {
         total_score: 84,
       }),
     ]);
+    expect(gateway.insertDetectedApplications).toHaveBeenCalledWith([
+      {
+        user_id: 'user-1',
+        mission_id: 'remote-mission-1',
+        stage: 'detected',
+        user_rating: null,
+        notes: '',
+        next_action_at: null,
+        applied_at: null,
+        archived_at: null,
+        revision: 1,
+        updated_by: 'extension',
+      },
+    ]);
     expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
       expect.objectContaining({
         entity: 'missions',
@@ -505,6 +525,9 @@ describe('connected dashboard shell sync', () => {
     ]);
     expect(gateway.upsertMissionScores).toHaveBeenCalledWith([
       expect.objectContaining({ mission_id: 'remote-canonical' }),
+    ]);
+    expect(gateway.insertDetectedApplications).toHaveBeenCalledWith([
+      expect.objectContaining({ mission_id: 'remote-canonical', stage: 'detected' }),
     ]);
     expect(gateway.upsertMissionDuplicates).toHaveBeenCalledWith([
       {

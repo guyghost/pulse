@@ -7,6 +7,7 @@ import {
   buildCandidateProfileImportRows,
   buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
+  buildDetectedApplicationInsertRow,
   buildGeneratedApplicationAssetUpsertRow,
   buildMissionDuplicateUpsertRows,
   buildMissionScoreUpsertRow,
@@ -91,6 +92,7 @@ export interface ConnectedDashboardSyncGateway {
   upsertMissions(rows: MissionUpsertRow[]): Promise<RemoteMissionIdentity[]>;
   upsertMissionScores(rows: MissionScoreUpsertRow[]): Promise<void>;
   upsertMissionDuplicates(rows: MissionDuplicateUpsertRow[]): Promise<void>;
+  insertDetectedApplications(rows: ApplicationUpsertRow[]): Promise<RemoteApplicationIdentity[]>;
   upsertApplications(rows: ApplicationUpsertRow[]): Promise<RemoteApplicationIdentity[]>;
   listApplicationsUpdatedSince(input: {
     userId: string;
@@ -703,6 +705,17 @@ export function createSupabaseConnectedDashboardGateway(
         () => undefined
       );
     },
+    insertDetectedApplications: async (rows) =>
+      rows.length === 0
+        ? []
+        : selectOrThrow(
+            supabase.from('applications').upsert(rows, {
+              onConflict: 'user_id,mission_id',
+              ignoreDuplicates: true,
+            }),
+            'id,mission_id',
+            parseRemoteApplicationIdentities
+          ),
     upsertApplications: async (rows) =>
       rows.length === 0
         ? []
@@ -951,6 +964,14 @@ export async function pushMissionsToConnectedDashboard(
         input.userId,
         remoteMissionIds
       )
+    );
+    await gateway.insertDetectedApplications(
+      input.missions.flatMap((mission) => {
+        const remoteMissionId = remoteMissionIds.get(mission.id);
+        return remoteMissionId
+          ? [buildDetectedApplicationInsertRow(input.userId, remoteMissionId)]
+          : [];
+      })
     );
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({

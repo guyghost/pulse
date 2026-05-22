@@ -6,6 +6,7 @@ import {
   buildCandidateProfileImportRows,
   buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
+  buildDetectedApplicationInsertRow,
   buildGeneratedApplicationAssetUpsertRow,
   buildMissionDuplicateUpsertRows,
   buildApplicationPullCursor,
@@ -232,6 +233,23 @@ describe('connected dashboard sync payload builders', () => {
       applied_at: '2026-05-21T08:20:00.000Z',
       archived_at: null,
       revision: 3,
+      updated_by: 'extension',
+    });
+  });
+
+  it('builds detected application insert rows for synced missions', () => {
+    expect(
+      buildDetectedApplicationInsertRow('user-1', '9af09db6-e3ea-45c7-8d8a-6bb71dfb4c34')
+    ).toEqual({
+      user_id: 'user-1',
+      mission_id: '9af09db6-e3ea-45c7-8d8a-6bb71dfb4c34',
+      stage: 'detected',
+      user_rating: null,
+      notes: '',
+      next_action_at: null,
+      applied_at: null,
+      archived_at: null,
+      revision: 1,
       updated_by: 'extension',
     });
   });

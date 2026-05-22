@@ -511,6 +511,24 @@ export function buildApplicationUpsertRow(
   };
 }
 
+export function buildDetectedApplicationInsertRow(
+  userId: string,
+  remoteMissionId: string
+): ApplicationUpsertRow {
+  return {
+    user_id: userId,
+    mission_id: remoteMissionId,
+    stage: 'detected',
+    user_rating: null,
+    notes: '',
+    next_action_at: null,
+    applied_at: null,
+    archived_at: null,
+    revision: 1,
+    updated_by: 'extension',
+  };
+}
+
 export function buildApplicationPipelineEventRows(
   tracking: MissionTracking,
   userId: string,
