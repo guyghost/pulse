@@ -1,4 +1,5 @@
 import type { ApplicationEventCreator, ApplicationStage } from '@pulse/domain';
+import type { CanonicalCandidateProfileDraft } from '../profile-extractors/types';
 import type { ConnectorHealthSnapshot } from '../types/health';
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
 import type { Grade } from '../types/score';
@@ -91,6 +92,77 @@ export interface SyncStatusRow {
   pending_download_count: number;
   last_error_code: string | null;
   last_error_message: string | null;
+}
+
+export interface CandidateProfileUpsertRow {
+  user_id: string;
+  title: string;
+  summary: string;
+  target_role: string | null;
+  completeness: number;
+  revision: number;
+}
+
+export interface CandidateExperienceInsertRow {
+  profile_id: string;
+  title: string;
+  company: string | null;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  is_current: boolean;
+  description: string;
+  skills: string[];
+  source: string;
+  source_external_id: string | null;
+  position_index: number;
+}
+
+export interface CandidateEducationInsertRow {
+  profile_id: string;
+  school: string;
+  degree: string | null;
+  field: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  description: string;
+  source: string;
+  position_index: number;
+}
+
+export interface CandidateSkillUpsertRow {
+  profile_id: string;
+  skill: string;
+  source: string;
+  confidence: number;
+}
+
+export interface CandidateLinkInsertRow {
+  profile_id: string;
+  label: string;
+  url: string;
+  source: string;
+}
+
+export interface ProfileImportInsertRow {
+  user_id: string;
+  source: string;
+  status: 'success' | 'partial' | 'error';
+  imported_at: string;
+  extractor_version: string;
+  error_code: string | null;
+  error_message: string | null;
+  raw_hash: string | null;
+  field_counts: Record<string, number>;
+}
+
+export interface CandidateProfileImportRows {
+  profile: CandidateProfileUpsertRow;
+  experiences: CandidateExperienceInsertRow[];
+  education: CandidateEducationInsertRow[];
+  skills: CandidateSkillUpsertRow[];
+  links: CandidateLinkInsertRow[];
+  importEvent: ProfileImportInsertRow;
 }
 
 export interface RemoteApplicationSnapshot {
@@ -303,6 +375,82 @@ export function buildSyncStatusRow(input: BuildSyncStatusRowInput): SyncStatusRo
     pending_download_count: input.pendingDownloadCount ?? 0,
     last_error_code: input.error?.code ?? null,
     last_error_message: input.error?.message ?? null,
+  };
+}
+
+export function buildCandidateProfileImportRows(input: {
+  draft: CanonicalCandidateProfileDraft;
+  userId: string;
+  profileId: string;
+  importedAt: Date;
+  extractorVersion: string;
+  revision: number;
+  rawHash?: string | null;
+}): CandidateProfileImportRows {
+  const completeness = clampScore(input.draft.confidence * 100);
+
+  return {
+    profile: {
+      user_id: input.userId,
+      title: input.draft.title || 'Profil LinkedIn importé',
+      summary: input.draft.summary,
+      target_role: input.draft.title || null,
+      completeness,
+      revision: input.revision,
+    },
+    experiences: input.draft.experiences.map((experience) => ({
+      profile_id: input.profileId,
+      title: experience.title,
+      company: experience.company,
+      location: experience.location,
+      start_date: experience.startDate,
+      end_date: experience.endDate,
+      is_current: experience.isCurrent,
+      description: experience.description,
+      skills: [...experience.skills],
+      source: experience.source,
+      source_external_id: experience.sourceExternalId,
+      position_index: experience.positionIndex,
+    })),
+    education: input.draft.education.map((education) => ({
+      profile_id: input.profileId,
+      school: education.school,
+      degree: education.degree,
+      field: education.field,
+      start_date: education.startDate,
+      end_date: education.endDate,
+      description: education.description,
+      source: education.source,
+      position_index: education.positionIndex,
+    })),
+    skills: input.draft.skills.map((skill) => ({
+      profile_id: input.profileId,
+      skill: skill.skill,
+      source: skill.source,
+      confidence: skill.confidence,
+    })),
+    links: input.draft.links.map((link) => ({
+      profile_id: input.profileId,
+      label: link.label,
+      url: link.url,
+      source: link.source,
+    })),
+    importEvent: {
+      user_id: input.userId,
+      source: input.draft.source,
+      status: completeness >= 50 ? 'success' : 'partial',
+      imported_at: input.importedAt.toISOString(),
+      extractor_version: input.extractorVersion,
+      error_code: null,
+      error_message: null,
+      raw_hash: input.rawHash ?? null,
+      field_counts: {
+        experiences: input.draft.experiences.length,
+        education: input.draft.education.length,
+        skills: input.draft.skills.length,
+        links: input.draft.links.length,
+      },
+    },
   };
 }
 

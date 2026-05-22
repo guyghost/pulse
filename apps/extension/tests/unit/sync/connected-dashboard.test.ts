@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildApplicationPipelineEventRows,
   buildApplicationUpsertRow,
+  buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
@@ -13,6 +14,7 @@ import {
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 import type { ConnectorHealthSnapshot } from '../../../src/lib/core/types/health';
+import type { CanonicalCandidateProfileDraft } from '../../../src/lib/core/profile-extractors/types';
 
 const mission: Mission = {
   id: 'free-work-123',
@@ -67,6 +69,47 @@ const tracking: MissionTracking = {
   generatedAssetIds: ['asset-1'],
   userRating: 4,
   notes: 'Relancer mercredi',
+};
+
+const linkedinDraft: CanonicalCandidateProfileDraft = {
+  title: 'Lead Frontend Svelte',
+  summary: 'Consultant frontend senior.',
+  source: 'linkedin',
+  confidence: 0.86,
+  capturedAt: '2026-05-22T08:00:00.000Z',
+  profileUrl: 'https://www.linkedin.com/in/example/',
+  experiences: [
+    {
+      title: 'Lead Frontend',
+      company: 'ScaleOps',
+      location: 'Paris',
+      startDate: '2021-01-01',
+      endDate: null,
+      isCurrent: true,
+      description: 'Migration Svelte 5',
+      skills: ['Svelte', 'TypeScript'],
+      source: 'linkedin',
+      sourceExternalId: 'experience-1',
+      positionIndex: 0,
+    },
+  ],
+  education: [
+    {
+      school: 'Université Paris Cité',
+      degree: 'Master',
+      field: 'Informatique',
+      startDate: '2014-01-01',
+      endDate: '2016-01-01',
+      description: '',
+      source: 'linkedin',
+      positionIndex: 0,
+    },
+  ],
+  skills: [
+    { skill: 'Svelte', source: 'linkedin', confidence: 0.8 },
+    { skill: 'TypeScript', source: 'linkedin', confidence: 0.8 },
+  ],
+  links: [{ label: 'Portfolio', url: 'https://example.com', source: 'linkedin' }],
 };
 
 describe('connected dashboard sync payload builders', () => {
@@ -267,6 +310,86 @@ describe('connected dashboard sync payload builders', () => {
       pending_download_count: 1,
       last_error_code: 'remote-error',
       last_error_message: 'Supabase unavailable',
+    });
+  });
+
+  it('builds canonical CV import rows from a LinkedIn profile draft', () => {
+    expect(
+      buildCandidateProfileImportRows({
+        draft: linkedinDraft,
+        userId: 'user-1',
+        profileId: 'profile-1',
+        importedAt: new Date('2026-05-22T08:05:00.000Z'),
+        extractorVersion: 'linkedin-v1',
+        revision: 4,
+        rawHash: 'sha256:abc123',
+      })
+    ).toEqual({
+      profile: {
+        user_id: 'user-1',
+        title: 'Lead Frontend Svelte',
+        summary: 'Consultant frontend senior.',
+        target_role: 'Lead Frontend Svelte',
+        completeness: 86,
+        revision: 4,
+      },
+      experiences: [
+        {
+          profile_id: 'profile-1',
+          title: 'Lead Frontend',
+          company: 'ScaleOps',
+          location: 'Paris',
+          start_date: '2021-01-01',
+          end_date: null,
+          is_current: true,
+          description: 'Migration Svelte 5',
+          skills: ['Svelte', 'TypeScript'],
+          source: 'linkedin',
+          source_external_id: 'experience-1',
+          position_index: 0,
+        },
+      ],
+      education: [
+        {
+          profile_id: 'profile-1',
+          school: 'Université Paris Cité',
+          degree: 'Master',
+          field: 'Informatique',
+          start_date: '2014-01-01',
+          end_date: '2016-01-01',
+          description: '',
+          source: 'linkedin',
+          position_index: 0,
+        },
+      ],
+      skills: [
+        { profile_id: 'profile-1', skill: 'Svelte', source: 'linkedin', confidence: 0.8 },
+        { profile_id: 'profile-1', skill: 'TypeScript', source: 'linkedin', confidence: 0.8 },
+      ],
+      links: [
+        {
+          profile_id: 'profile-1',
+          label: 'Portfolio',
+          url: 'https://example.com',
+          source: 'linkedin',
+        },
+      ],
+      importEvent: {
+        user_id: 'user-1',
+        source: 'linkedin',
+        status: 'success',
+        imported_at: '2026-05-22T08:05:00.000Z',
+        extractor_version: 'linkedin-v1',
+        error_code: null,
+        error_message: null,
+        raw_hash: 'sha256:abc123',
+        field_counts: {
+          experiences: 1,
+          education: 1,
+          skills: 2,
+          links: 1,
+        },
+      },
     });
   });
 
