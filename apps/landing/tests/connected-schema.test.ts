@@ -84,5 +84,13 @@ describe('connected dashboard schema', () => {
     }
     expect(pipelineEvents).toContain('from_stage text check');
     expect(pipelineEvents).toContain('from_stage is null or from_stage in');
+    expect(pipelineEvents).toContain('constraint application_pipeline_events_transition_check');
+    expect(pipelineEvents).toContain("from_stage is null and to_stage = 'detected'");
+    expect(pipelineEvents).toContain(
+      "from_stage = 'detected' and to_stage in ('selected', 'archived')"
+    );
+    expect(pipelineEvents).toContain(
+      "from_stage = 'offer' and to_stage in ('accepted', 'rejected', 'archived')"
+    );
   });
 });
