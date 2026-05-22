@@ -784,7 +784,7 @@
         <p class="feature-card__desc">
           Les plateformes sont consultées depuis vos sessions navigateur, sans stocker vos
           identifiants. La synchronisation cloud du dashboard est optionnelle et limitée aux
-          snapshots normalisés.
+          snapshots normalisés via Supabase; jamais vos mots de passe, cookies ou jetons de session.
         </p>
       </article>
     </div>

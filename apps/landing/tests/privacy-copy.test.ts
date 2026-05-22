@@ -30,6 +30,8 @@ describe('connected privacy copy', () => {
     expect(homePage).toContain('dashboard connecté optionnel');
     expect(homePage).toMatch(/Compte requis seulement pour le dashboard connecté\s+optionnel/);
     expect(homePage).toContain("l'exécution plateforme reste dans votre navigateur");
+    expect(homePage).toContain('snapshots normalisés via Supabase');
+    expect(homePage).toContain('mots de passe, cookies ou jetons de session');
     expect(privacyPage).toContain("L'exécution plateforme reste locale dans votre navigateur");
     expect(privacyPage).toContain('snapshots normalisés via Supabase');
     expect(privacyPage).toContain('Nous ne synchronisons pas les mots de passe');
