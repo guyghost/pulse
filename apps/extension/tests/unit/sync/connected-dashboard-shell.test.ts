@@ -414,8 +414,111 @@ describe('connected dashboard shell sync', () => {
           retryAfterAt: null,
           updatedAt: '2026-05-22T08:00:00.000Z',
         },
+        {
+          entity: 'candidate_profile',
+          label: 'Profil CV',
+          state: 'idle',
+          lastPullAt: null,
+          lastPushAt: null,
+          pendingUploadCount: 0,
+          pendingDownloadCount: 0,
+          lastErrorCode: null,
+          lastErrorMessage: null,
+          retryAfterAt: null,
+          updatedAt: '2026-05-22T08:01:00.000Z',
+        },
+        {
+          entity: 'connector_health',
+          label: 'Santé connecteurs',
+          state: 'idle',
+          lastPullAt: null,
+          lastPushAt: null,
+          pendingUploadCount: 0,
+          pendingDownloadCount: 0,
+          lastErrorCode: null,
+          lastErrorMessage: null,
+          retryAfterAt: null,
+          updatedAt: '2026-05-22T08:01:00.000Z',
+        },
+        {
+          entity: 'alert_preferences',
+          label: 'Alertes missions',
+          state: 'idle',
+          lastPullAt: null,
+          lastPushAt: null,
+          pendingUploadCount: 0,
+          pendingDownloadCount: 0,
+          lastErrorCode: null,
+          lastErrorMessage: null,
+          retryAfterAt: null,
+          updatedAt: '2026-05-22T08:01:00.000Z',
+        },
       ],
     });
+  });
+
+  it('fills missing connected sync entities with idle rows for the current device', async () => {
+    vi.stubGlobal('chrome', {
+      storage: {
+        local: {
+          get: vi.fn(async () => ({
+            'missionpulse.connectedSync.installId': 'install-1',
+            lastGlobalSync: 1779340800000,
+          })),
+        },
+      },
+    });
+
+    const deviceQuery = createReadQuery([{ id: 'device-1' }]);
+    const statusQuery = createReadQuery([
+      {
+        entity: 'missions',
+        last_pull_at: null,
+        last_push_at: '2026-05-22T08:00:00.000Z',
+        pending_upload_count: 0,
+        pending_download_count: 0,
+        last_error_code: null,
+        last_error_message: null,
+        retry_after_at: null,
+        updated_at: '2026-05-22T08:00:00.000Z',
+      },
+    ]);
+
+    supabaseClientMock.getSupabaseClient.mockReturnValueOnce({
+      auth: {
+        getSession: vi.fn(async () => ({
+          data: { session: { user: { id: 'user-1' } } },
+        })),
+      },
+      from: vi.fn((table: string) => ({
+        select: vi.fn(() => (table === 'extension_devices' ? deviceQuery : statusQuery)),
+      })),
+    });
+
+    const status = await getConnectedDashboardSyncStatus();
+
+    expect(status.entities.map((entity) => entity.entity)).toEqual([
+      'missions',
+      'applications',
+      'candidate_profile',
+      'connector_health',
+      'alert_preferences',
+    ]);
+    expect(status.entities).toContainEqual(
+      expect.objectContaining({
+        entity: 'applications',
+        label: 'Candidatures',
+        state: 'idle',
+        lastPullAt: null,
+        lastPushAt: null,
+        pendingUploadCount: 0,
+        pendingDownloadCount: 0,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        retryAfterAt: null,
+        updatedAt: '2026-05-22T08:00:00.000Z',
+      })
+    );
   });
 
   it('excludes extension-origin application rows when pulling dashboard changes', async () => {

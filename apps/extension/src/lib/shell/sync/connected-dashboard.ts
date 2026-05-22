@@ -85,6 +85,14 @@ const CONNECTED_SYNC_ENTITY_LABELS: Record<SyncEntity, string> = {
   alert_preferences: 'Alertes missions',
 };
 
+const CONNECTED_SYNC_ENTITIES = [
+  'missions',
+  'applications',
+  'candidate_profile',
+  'connector_health',
+  'alert_preferences',
+] as const satisfies readonly SyncEntity[];
+
 export interface RemoteMissionIdentity {
   id: string;
   source: MissionSource;
@@ -1794,16 +1802,40 @@ function getEntitySyncStateRank(state: ConnectedDashboardSyncState): number {
   if (state === 'pending') {
     return 1;
   }
-  if (state === 'idle') {
+  if (state === 'healthy') {
     return 2;
   }
   return 3;
 }
 
+function getSyncEntityRank(entity: SyncEntity): number {
+  return CONNECTED_SYNC_ENTITIES.indexOf(entity);
+}
+
 function syncStatusRowsToEntityStatuses(
-  rows: RemoteSyncStatusSnapshot[]
+  rows: RemoteSyncStatusSnapshot[],
+  fallbackUpdatedAt: string | null = null
 ): ConnectedDashboardEntitySyncStatus[] {
-  return rows
+  const rowsByEntity = new Map(rows.map((row) => [row.entity, row]));
+  const latestRemoteUpdatedAt = rows
+    .map((row) => row.updated_at)
+    .sort((a, b) => b.localeCompare(a))[0];
+  const idleUpdatedAt = latestRemoteUpdatedAt ?? fallbackUpdatedAt ?? new Date(0).toISOString();
+
+  return CONNECTED_SYNC_ENTITIES.map(
+    (entity): RemoteSyncStatusSnapshot =>
+      rowsByEntity.get(entity) ?? {
+        entity,
+        last_pull_at: null,
+        last_push_at: null,
+        pending_upload_count: 0,
+        pending_download_count: 0,
+        last_error_code: null,
+        last_error_message: null,
+        retry_after_at: null,
+        updated_at: idleUpdatedAt,
+      }
+  )
     .map((row) => ({
       entity: row.entity,
       label: CONNECTED_SYNC_ENTITY_LABELS[row.entity],
@@ -1821,7 +1853,7 @@ function syncStatusRowsToEntityStatuses(
       (a, b) =>
         getEntitySyncStateRank(a.state) - getEntitySyncStateRank(b.state) ||
         b.updatedAt.localeCompare(a.updatedAt) ||
-        a.label.localeCompare(b.label)
+        getSyncEntityRank(a.entity) - getSyncEntityRank(b.entity)
     );
 }
 
@@ -1847,7 +1879,8 @@ async function getRegisteredDeviceId(
 async function getRemoteEntitySyncStatuses(
   supabase: SupabaseLike,
   userId: string,
-  deviceId: string
+  deviceId: string,
+  fallbackUpdatedAt: string | null = null
 ): Promise<ConnectedDashboardEntitySyncStatus[]> {
   const { data, error } = await supabase
     .from('sync_status')
@@ -1862,7 +1895,7 @@ async function getRemoteEntitySyncStatuses(
     throw new Error(error.message);
   }
 
-  return syncStatusRowsToEntityStatuses(parseRemoteSyncStatusSnapshots(data));
+  return syncStatusRowsToEntityStatuses(parseRemoteSyncStatusSnapshots(data), fallbackUpdatedAt);
 }
 
 async function getRuntimeContext(): Promise<
@@ -2223,7 +2256,14 @@ export async function getConnectedDashboardSyncStatus(): Promise<ConnectedDashbo
   if (authenticated && userId && supabase && typeof installId === 'string') {
     try {
       const deviceId = await getRegisteredDeviceId(supabase, userId, installId);
-      entities = deviceId ? await getRemoteEntitySyncStatuses(supabase, userId, deviceId) : [];
+      entities = deviceId
+        ? await getRemoteEntitySyncStatuses(
+            supabase,
+            userId,
+            deviceId,
+            typeof lastGlobalSync === 'number' ? formatEpochMs(lastGlobalSync) : null
+          )
+        : [];
     } catch {
       entities = [];
     }
