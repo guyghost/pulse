@@ -411,6 +411,29 @@ describe('background auto-scan notifications', () => {
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
   });
 
+  it('does not advance connected dashboard last sync when scan sync fails', async () => {
+    syncConnectedDashboardScan.mockResolvedValueOnce({
+      ok: false,
+      error: {
+        code: 'remote-error',
+        message: 'Supabase unavailable',
+        retryable: true,
+      },
+    });
+
+    await alarmListener?.({ name: 'auto-scan' });
+
+    expect(chrome.storage.local.set).not.toHaveBeenCalledWith({
+      lastGlobalSync: expect.any(Number),
+    });
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      connectedDashboardRetrySnapshot: expect.objectContaining({
+        sourceMissions: expect.any(Array),
+        duplicateRelations: expect.any(Array),
+      }),
+    });
+  });
+
   it('handles explicit connected dashboard retry messages', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();

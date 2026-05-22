@@ -590,13 +590,6 @@ async function persistScanResults(
   const { missions, errors } = result;
   const now = Date.now();
 
-  // Persist last sync timestamp
-  try {
-    await chrome.storage.local.set({ lastGlobalSync: now });
-  } catch {
-    /* Non-critical: sync timestamp */
-  }
-
   // Persist connector statuses
   const statusMap = new Map<string, { missions: number; error: string | null }>();
   for (const mission of missions) {
