@@ -58,6 +58,78 @@ const SeenMissionIdsSchema = z
 
 const FeedSortSchema = z.enum(['score', 'date', 'tjm']);
 
+const TJMRegionSchema = z.enum([
+  'ile-de-france',
+  'lyon',
+  'marseille',
+  'toulouse',
+  'bordeaux',
+  'nantes',
+  'lille',
+  'strasbourg',
+  'rennes',
+  'grenoble',
+  'montpellier',
+  'nice',
+  'remote',
+  'other',
+]);
+
+const TJMTrendSchema = z.enum(['up', 'stable', 'down']);
+
+const TJMRangeSchema = z
+  .object({
+    min: z.number(),
+    max: z.number(),
+    median: z.number(),
+  })
+  .strict();
+
+const TJMAnalysisSchema = z
+  .object({
+    trend: TJMTrendSchema,
+    confidence: z.number().min(0).max(1),
+    dataPoints: z.number().int().min(0),
+    junior: TJMRangeSchema,
+    confirmed: TJMRangeSchema,
+    senior: TJMRangeSchema,
+    trendDetail: z.string().nullable(),
+    recommendation: z.string().nullable(),
+    lastUpdated: z.string().nullable(),
+    topStacks: z.array(
+      z
+        .object({
+          stack: z.string().min(1).max(120),
+          average: z.number(),
+          trend: TJMTrendSchema,
+          sampleCount: z.number().int().min(0),
+          lastUpdated: z.string().nullable(),
+        })
+        .strict()
+    ),
+    regionInsights: z.array(
+      z
+        .object({
+          region: TJMRegionSchema,
+          label: z.string().min(1).max(120),
+          average: z.number(),
+          min: z.number(),
+          max: z.number(),
+          sampleCount: z.number().int().min(0),
+          trend: TJMTrendSchema,
+        })
+        .strict()
+    ),
+  })
+  .strict();
+
+const TJMAnalysisRequestSchema = z
+  .object({
+    profileStacks: z.array(z.string().min(1).max(120)).max(50).optional(),
+    region: TJMRegionSchema.optional(),
+  })
+  .strict();
+
 const PersistedConnectorStatusSchema = z
   .object({
     connectorId: z.string().min(1).max(120),
@@ -328,6 +400,14 @@ export const MessageSchemas = {
   FEED_SORT_SAVED: z.object({
     type: z.literal('FEED_SORT_SAVED'),
     payload: z.object({ saved: z.boolean() }),
+  }),
+  GET_TJM_ANALYSIS: z.object({
+    type: z.literal('GET_TJM_ANALYSIS'),
+    payload: TJMAnalysisRequestSchema.optional(),
+  }),
+  TJM_ANALYSIS_RESULT: z.object({
+    type: z.literal('TJM_ANALYSIS_RESULT'),
+    payload: z.object({ analysis: TJMAnalysisSchema.nullable() }).strict(),
   }),
   GET_SEEN_MISSIONS: z.object({ type: z.literal('GET_SEEN_MISSIONS') }),
   SEEN_MISSIONS_RESULT: z.object({

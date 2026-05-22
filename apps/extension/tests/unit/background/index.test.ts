@@ -28,6 +28,7 @@ const getAllTrackings = vi.fn();
 const getGeneratedAssetsForMission = vi.fn();
 const getAllHealthSnapshots = vi.fn();
 const resetHealthSnapshot = vi.fn();
+const loadTJMHistory = vi.fn();
 const syncConnectedDashboardScan = vi.fn();
 const syncConnectedDashboardSnapshot = vi.fn();
 const syncConnectedDashboardProfileExtractorHealth = vi.fn();
@@ -225,6 +226,10 @@ vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
   resetHealthSnapshot,
 }));
 
+vi.mock('../../../src/lib/shell/storage/tjm-history', () => ({
+  loadTJMHistory,
+}));
+
 vi.mock('../../../src/lib/shell/notifications/notify-missions', () => ({
   notifyHighScoreMissions,
   setupNotificationClickHandler,
@@ -338,6 +343,7 @@ describe('background auto-scan notifications', () => {
     getAllTrackings.mockResolvedValue([]);
     getGeneratedAssetsForMission.mockResolvedValue([]);
     getAllHealthSnapshots.mockResolvedValue(new Map());
+    loadTJMHistory.mockResolvedValue({ records: [] });
     syncConnectedDashboardScan.mockResolvedValue({
       ok: true,
       value: { missions: 1, connectorHealth: 0 },
@@ -655,6 +661,58 @@ describe('background auto-scan notifications', () => {
     expect(statusesResponse).toHaveBeenCalledWith({
       type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
       payload: statuses,
+    });
+  });
+
+  it('routes TJM analysis through the service worker shell', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const response = vi.fn();
+    loadTJMHistory.mockResolvedValueOnce({
+      records: [
+        {
+          stack: 'svelte',
+          date: '2026-05-21',
+          min: 700,
+          max: 800,
+          average: 750,
+          sampleCount: 2,
+          seniority: 'senior',
+          region: 'remote',
+        },
+        {
+          stack: 'react',
+          date: '2026-05-21',
+          min: 500,
+          max: 600,
+          average: 550,
+          sampleCount: 1,
+          seniority: 'confirmed',
+          region: 'ile-de-france',
+        },
+      ],
+    });
+
+    expect(
+      messageListener?.(
+        {
+          type: 'GET_TJM_ANALYSIS',
+          payload: { profileStacks: ['Svelte'], region: 'remote' },
+        },
+        {},
+        response
+      )
+    ).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(loadTJMHistory).toHaveBeenCalled();
+    expect(response).toHaveBeenCalledWith({
+      type: 'TJM_ANALYSIS_RESULT',
+      payload: {
+        analysis: expect.objectContaining({
+          dataPoints: 1,
+          topStacks: [expect.objectContaining({ stack: 'svelte' })],
+        }),
+      },
     });
   });
 

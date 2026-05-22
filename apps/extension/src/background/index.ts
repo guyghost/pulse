@@ -15,6 +15,8 @@ import type { PersistedConnectorStatus } from '../lib/core/types/connector-statu
 import type { AuthUser } from '../lib/core/types/auth';
 import type { Mission } from '../lib/core/types/mission';
 import type { MissionDuplicateRelation } from '../lib/core/scoring/dedup';
+import { analyzeTJMHistory } from '../lib/core/tjm-history';
+import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
 import {
   DEFAULT_SETTINGS,
   getFeedSortBy,
@@ -91,6 +93,7 @@ import {
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
 import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
+import { loadTJMHistory } from '../lib/shell/storage/tjm-history';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -142,6 +145,35 @@ function parseStoredMission(value: unknown): Mission | null {
     ...(value as unknown as StoredMission),
     scrapedAt: new Date(scrapedAtMs),
   };
+}
+
+function buildTJMAnalysis(
+  history: TJMHistory,
+  profileStacks: string[] | undefined,
+  region: TJMRegion | undefined
+) {
+  const hasStackFilter = profileStacks !== undefined && profileStacks.length > 0;
+  const hasRegionFilter = region !== undefined;
+
+  if (!hasStackFilter && !hasRegionFilter) {
+    return analyzeTJMHistory(history);
+  }
+
+  const normalizedStacks = hasStackFilter
+    ? new Set(profileStacks.map((stack) => stack.toLowerCase().trim()).filter(Boolean))
+    : null;
+
+  return analyzeTJMHistory({
+    records: history.records.filter((record) => {
+      if (normalizedStacks && !normalizedStacks.has(record.stack)) {
+        return false;
+      }
+      if (hasRegionFilter && record.region !== region) {
+        return false;
+      }
+      return true;
+    }),
+  });
 }
 
 function parseDuplicateRelation(value: unknown): MissionDuplicateRelation | null {
@@ -739,6 +771,27 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] GET_FEED_MISSIONS error:', err);
           sendResponse({ type: 'FEED_MISSIONS_RESULT', payload: [] });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_TJM_ANALYSIS') {
+      loadTJMHistory()
+        .then((history) => {
+          sendResponse({
+            type: 'TJM_ANALYSIS_RESULT',
+            payload: {
+              analysis: buildTJMAnalysis(
+                history,
+                message.payload?.profileStacks,
+                message.payload?.region
+              ),
+            },
+          });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_TJM_ANALYSIS error:', err);
+          sendResponse({ type: 'TJM_ANALYSIS_RESULT', payload: { analysis: null } });
         });
       return true;
     }

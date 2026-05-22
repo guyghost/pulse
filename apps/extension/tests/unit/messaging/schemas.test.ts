@@ -663,6 +663,37 @@ describe('validateMessage — connected dashboard sync', () => {
 });
 
 // ============================================================================
+// TJM analysis
+// ============================================================================
+
+describe('validateMessage — TJM analysis', () => {
+  it('accepte une demande d’analyse TJM filtrée', () => {
+    const r = validateMessage({
+      type: 'GET_TJM_ANALYSIS',
+      payload: { profileStacks: ['Svelte', 'TypeScript'], region: 'remote' },
+    });
+    expect(r.valid).toBe(true);
+  });
+
+  it('accepte un résultat d’analyse TJM nullable', () => {
+    expect(
+      validateMessage({
+        type: 'TJM_ANALYSIS_RESULT',
+        payload: { analysis: null },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette une région TJM inconnue', () => {
+    const r = validateMessage({
+      type: 'GET_TJM_ANALYSIS',
+      payload: { region: 'moon' },
+    });
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
 // SHOW_TOAST
 // ============================================================================
 
