@@ -18,6 +18,7 @@ import {
   cancelCurrentScan,
   isScanRunning,
   ScanError,
+  type ScanResult,
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
 import { getConnectorIds, getConnectors } from '../lib/shell/connectors/index';
@@ -261,7 +262,7 @@ async function handleScanStartFromPanel(): Promise<import('../lib/core/types/mis
   );
 
   // Persist connector statuses + update badge (same as alarm handler)
-  await persistScanResults(result.missions, result.errors);
+  await persistScanResults(result);
 
   return result.missions;
 }
@@ -309,7 +310,7 @@ async function recheckConnectorHealth(
 
   try {
     const result = await runScan(undefined, undefined, { pageDelayMs: 300 });
-    await persistScanResults(result.missions, result.errors);
+    await persistScanResults(result);
 
     try {
       await chrome.runtime.sendMessage({ type: 'SCAN_COMPLETE', payload: result.missions });
@@ -339,9 +340,9 @@ async function syncConnectedDashboardFromLocalState() {
 }
 
 async function persistScanResults(
-  missions: import('../lib/core/types/mission').Mission[],
-  errors: { connectorId: string; message: string }[]
+  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>
 ): Promise<void> {
+  const { missions, errors } = result;
   const now = Date.now();
 
   // Persist last sync timestamp
@@ -382,7 +383,10 @@ async function persistScanResults(
 
   try {
     const healthSnapshots = await loadConnectorHealthSnapshots();
-    await syncConnectedDashboardScan(missions, healthSnapshots);
+    await syncConnectedDashboardScan(missions, healthSnapshots, {
+      sourceMissions: result.sourceMissions,
+      duplicateRelations: result.duplicateRelations,
+    });
   } catch {
     /* Non-critical: connected dashboard sync */
   }
@@ -1035,7 +1039,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     });
 
     // Persist results + badge + notifications (shared logic)
-    await persistScanResults(result.missions, result.errors);
+    await persistScanResults(result);
 
     // Notify side panel with final missions (for immediate UI update)
     if (result.missions.length > 0) {

@@ -699,11 +699,12 @@ export function missionRowsToFeedItems(
   now: Date
 ): MissionFeedItem[] {
   const duplicateCounts = countMissionDuplicates(duplicateRows);
+  const duplicateMissionIds = new Set(duplicateRows.map((row) => row.duplicate_mission_id));
   const freshCutoff = now.getTime() - 48 * 60 * 60 * 1000;
 
   return missionRows
     .flatMap((mission) => {
-      if (!isApplicationSource(mission.source)) {
+      if (!isApplicationSource(mission.source) || duplicateMissionIds.has(mission.id)) {
         return [];
       }
 
@@ -748,7 +749,6 @@ function countMissionDuplicates(rows: DashboardMissionDuplicateRow[]): Map<strin
 
   for (const row of rows) {
     counts.set(row.canonical_mission_id, (counts.get(row.canonical_mission_id) ?? 0) + 1);
-    counts.set(row.duplicate_mission_id, (counts.get(row.duplicate_mission_id) ?? 0) + 1);
   }
 
   return counts;

@@ -1,5 +1,17 @@
 import type { Mission } from '../types/mission';
 
+export interface MissionDuplicateRelation {
+  readonly canonicalMissionId: string;
+  readonly duplicateMissionId: string;
+  readonly confidence: number;
+  readonly reason: string;
+}
+
+export interface DeduplicateMissionsResult {
+  readonly missions: Mission[];
+  readonly duplicateRelations: MissionDuplicateRelation[];
+}
+
 /**
  * Tokenizes text into a set of lowercase words (length > 2)
  */
@@ -64,8 +76,12 @@ const computeMissionScore = (mission: Mission): number =>
  * @param threshold - Jaccard similarity threshold (default 0.8)
  * @returns Deduplicated array, keeping higher-quality duplicates
  */
-export const deduplicateMissions = (missions: Mission[], threshold = 0.8): Mission[] => {
+export const deduplicateMissionsDetailed = (
+  missions: Mission[],
+  threshold = 0.8
+): DeduplicateMissionsResult => {
   const result: Mission[] = [];
+  const duplicateRelations: MissionDuplicateRelation[] = [];
   const tokenCache = new Map<string, Set<string>>();
 
   // Inverted index (token → set of result indices containing it)
@@ -119,13 +135,36 @@ export const deduplicateMissions = (missions: Mission[], threshold = 0.8): Missi
         continue;
       }
 
-      if (jaccardSimilarity(tokens, existingTokens) >= threshold) {
+      const confidence = jaccardSimilarity(tokens, existingTokens);
+      if (confidence >= threshold) {
         const existingScore = computeMissionScore(existing);
 
         if (missionScore > existingScore) {
+          for (let relationIndex = 0; relationIndex < duplicateRelations.length; relationIndex++) {
+            const relation = duplicateRelations[relationIndex];
+            if (relation.canonicalMissionId === existing.id) {
+              duplicateRelations[relationIndex] = {
+                ...relation,
+                canonicalMissionId: mission.id,
+              };
+            }
+          }
+          duplicateRelations.push({
+            canonicalMissionId: mission.id,
+            duplicateMissionId: existing.id,
+            confidence,
+            reason: 'same_structured_signature',
+          });
           // Replace with higher-quality mission
           updateInvertedIndex(idx, existingTokens, tokens);
           result[idx] = mission;
+        } else {
+          duplicateRelations.push({
+            canonicalMissionId: existing.id,
+            duplicateMissionId: mission.id,
+            confidence,
+            reason: 'same_structured_signature',
+          });
         }
         isDuplicate = true;
         break;
@@ -140,5 +179,8 @@ export const deduplicateMissions = (missions: Mission[], threshold = 0.8): Missi
     }
   }
 
-  return result;
+  return { missions: result, duplicateRelations };
 };
+
+export const deduplicateMissions = (missions: Mission[], threshold = 0.8): Mission[] =>
+  deduplicateMissionsDetailed(missions, threshold).missions;

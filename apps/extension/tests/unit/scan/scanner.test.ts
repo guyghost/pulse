@@ -25,6 +25,10 @@ vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
 
 vi.mock('../../../src/lib/core/scoring/dedup', () => ({
   deduplicateMissions: vi.fn((missions: Mission[]) => missions),
+  deduplicateMissionsDetailed: vi.fn((missions: Mission[]) => ({
+    missions,
+    duplicateRelations: [],
+  })),
 }));
 
 vi.mock('../../../src/lib/core/scoring/relevance', () => ({
@@ -115,7 +119,7 @@ import { runScan, ScanError } from '../../../src/lib/shell/scan/scanner';
 import { getConnectors, getConnector } from '../../../src/lib/shell/connectors/index';
 import { getSettings } from '../../../src/lib/shell/storage/chrome-storage';
 import { getProfile, saveMissions } from '../../../src/lib/shell/storage/db';
-import { deduplicateMissions } from '../../../src/lib/core/scoring/dedup';
+import { deduplicateMissionsDetailed } from '../../../src/lib/core/scoring/dedup';
 import { isOnline } from '../../../src/lib/shell/utils/connection-monitor';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -201,7 +205,10 @@ beforeEach(() => {
   (saveMissions as Mock).mockResolvedValue(undefined);
 
   // Default: dedup passes through
-  (deduplicateMissions as Mock).mockImplementation((m: Mission[]) => m);
+  (deduplicateMissionsDetailed as Mock).mockImplementation((missions: Mission[]) => ({
+    missions,
+    duplicateRelations: [],
+  }));
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -402,25 +409,46 @@ describe('scanner — runScan', () => {
     (getConnectors as Mock).mockResolvedValue([c1, c2]);
 
     // Mock dedup to actually remove duplicates (by title)
-    (deduplicateMissions as Mock).mockImplementation((missions: Mission[]) => {
+    (deduplicateMissionsDetailed as Mock).mockImplementation((missions: Mission[]) => {
       const seen = new Map<string, Mission>();
+      const duplicateRelations: {
+        canonicalMissionId: string;
+        duplicateMissionId: string;
+        confidence: number;
+        reason: string;
+      }[] = [];
       for (const m of missions) {
         if (!seen.has(m.title)) {
           seen.set(m.title, m);
+        } else {
+          duplicateRelations.push({
+            canonicalMissionId: seen.get(m.title)?.id ?? m.id,
+            duplicateMissionId: m.id,
+            confidence: 1,
+            reason: 'test_duplicate_title',
+          });
         }
       }
-      return [...seen.values()];
+      return { missions: [...seen.values()], duplicateRelations };
     });
 
     const result = await runScan(undefined, undefined, { pageDelayMs: 0 });
 
-    // deduplicateMissions was called with all 3 missions
-    expect(deduplicateMissions).toHaveBeenCalledTimes(1);
-    const dedupArg = (deduplicateMissions as Mock).mock.calls[0][0] as Mission[];
+    // deduplicateMissionsDetailed was called with all 3 missions
+    expect(deduplicateMissionsDetailed).toHaveBeenCalledTimes(1);
+    const dedupArg = (deduplicateMissionsDetailed as Mock).mock.calls[0][0] as Mission[];
     expect(dedupArg).toHaveLength(3);
 
     // Result should have 2 unique missions (after dedup by title)
     expect(result.missions).toHaveLength(2);
+    expect(result.duplicateRelations).toEqual([
+      {
+        canonicalMissionId: 'dup-1',
+        duplicateMissionId: 'dup-2',
+        confidence: 1,
+        reason: 'test_duplicate_title',
+      },
+    ]);
   });
 
   // 9. Offline check

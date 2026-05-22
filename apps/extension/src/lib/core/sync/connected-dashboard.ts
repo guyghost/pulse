@@ -1,5 +1,6 @@
 import type { ApplicationEventCreator, ApplicationStage } from '@pulse/domain';
 import type { CanonicalCandidateProfileDraft } from '../profile-extractors/types';
+import type { MissionDuplicateRelation } from '../scoring/dedup';
 import type { ConnectorHealthSnapshot } from '../types/health';
 import type { GeneratedAsset, GenerationType } from '../types/generation';
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
@@ -46,6 +47,14 @@ export interface MissionScoreUpsertRow {
   semantic_reason: string | null;
   scorer_version: string;
   scored_at: string;
+}
+
+export interface MissionDuplicateUpsertRow {
+  user_id: string;
+  canonical_mission_id: string;
+  duplicate_mission_id: string;
+  confidence: number;
+  reason: string;
 }
 
 export interface ApplicationUpsertRow {
@@ -311,6 +320,30 @@ export function buildMissionScoreUpsertRow(
     scorer_version: scorerVersion,
     scored_at: scoredAt.toISOString(),
   };
+}
+
+export function buildMissionDuplicateUpsertRows(
+  relations: MissionDuplicateRelation[],
+  userId: string,
+  remoteMissionIds: Map<string, string>
+): MissionDuplicateUpsertRow[] {
+  return relations.flatMap((relation) => {
+    const canonicalMissionId = remoteMissionIds.get(relation.canonicalMissionId);
+    const duplicateMissionId = remoteMissionIds.get(relation.duplicateMissionId);
+    if (!canonicalMissionId || !duplicateMissionId || canonicalMissionId === duplicateMissionId) {
+      return [];
+    }
+
+    return [
+      {
+        user_id: userId,
+        canonical_mission_id: canonicalMissionId,
+        duplicate_mission_id: duplicateMissionId,
+        confidence: Math.max(0, Math.min(1, relation.confidence)),
+        reason: relation.reason,
+      },
+    ];
+  });
 }
 
 function firstTransitionTo(tracking: MissionTracking, stage: ApplicationStage): string | null {

@@ -98,6 +98,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
       },
     ]),
     upsertMissionScores: vi.fn(async () => undefined),
+    upsertMissionDuplicates: vi.fn(async () => undefined),
     upsertApplications: vi.fn(async () => [
       {
         id: 'application-1',
@@ -187,6 +188,63 @@ describe('connected dashboard shell sync', () => {
         last_error_code: null,
       })
     );
+  });
+
+  it('pushes duplicate source missions and mission duplicate relations', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.upsertMissions).mockResolvedValueOnce([
+      {
+        id: 'remote-canonical',
+        source: 'free-work',
+        external_id: 'free-work-123',
+      },
+      {
+        id: 'remote-duplicate',
+        source: 'lehibou',
+        external_id: 'lehibou-456',
+      },
+    ]);
+    const duplicateMission: Mission = {
+      ...mission,
+      id: 'lehibou-456',
+      source: 'lehibou',
+      url: 'https://lehibou.example/mission',
+    };
+
+    const result = await pushMissionsToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      missions: [mission],
+      sourceMissions: [mission, duplicateMission],
+      duplicateRelations: [
+        {
+          canonicalMissionId: 'free-work-123',
+          duplicateMissionId: 'lehibou-456',
+          confidence: 0.92,
+          reason: 'same_structured_signature',
+        },
+      ],
+      now: new Date('2026-05-21T09:00:00.000Z'),
+      scorerVersion: 'missionpulse-v1',
+    });
+
+    expect(result.ok).toBe(true);
+    expect(gateway.upsertMissions).toHaveBeenCalledWith([
+      expect.objectContaining({ external_id: 'free-work-123', source: 'free-work' }),
+      expect.objectContaining({ external_id: 'lehibou-456', source: 'lehibou' }),
+    ]);
+    expect(gateway.upsertMissionScores).toHaveBeenCalledWith([
+      expect.objectContaining({ mission_id: 'remote-canonical' }),
+    ]);
+    expect(gateway.upsertMissionDuplicates).toHaveBeenCalledWith([
+      {
+        user_id: 'user-1',
+        canonical_mission_id: 'remote-canonical',
+        duplicate_mission_id: 'remote-duplicate',
+        confidence: 0.92,
+        reason: 'same_structured_signature',
+      },
+    ]);
   });
 
   it('records retryable sync status when mission push fails', async () => {

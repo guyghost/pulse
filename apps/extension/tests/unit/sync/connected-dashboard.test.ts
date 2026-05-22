@@ -6,6 +6,7 @@ import {
   buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
   buildGeneratedApplicationAssetUpsertRow,
+  buildMissionDuplicateUpsertRows,
   buildApplicationPullCursor,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
@@ -169,6 +170,40 @@ describe('connected dashboard sync payload builders', () => {
       scorer_version: 'missionpulse-v1',
       scored_at: '2026-05-21T08:01:00.000Z',
     });
+  });
+
+  it('builds mission duplicate rows from remote mission identities', () => {
+    expect(
+      buildMissionDuplicateUpsertRows(
+        [
+          {
+            canonicalMissionId: 'free-work-123',
+            duplicateMissionId: 'lehibou-456',
+            confidence: 1.2,
+            reason: 'same_structured_signature',
+          },
+          {
+            canonicalMissionId: 'missing',
+            duplicateMissionId: 'lehibou-456',
+            confidence: 0.9,
+            reason: 'same_structured_signature',
+          },
+        ],
+        'user-1',
+        new Map([
+          ['free-work-123', 'remote-canonical'],
+          ['lehibou-456', 'remote-duplicate'],
+        ])
+      )
+    ).toEqual([
+      {
+        user_id: 'user-1',
+        canonical_mission_id: 'remote-canonical',
+        duplicate_mission_id: 'remote-duplicate',
+        confidence: 1,
+        reason: 'same_structured_signature',
+      },
+    ]);
   });
 
   it('builds application upsert rows from local tracking state', () => {

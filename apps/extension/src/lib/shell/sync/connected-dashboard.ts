@@ -7,6 +7,7 @@ import {
   buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
   buildGeneratedApplicationAssetUpsertRow,
+  buildMissionDuplicateUpsertRows,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
   buildSyncStatusRow,
@@ -22,6 +23,7 @@ import {
   type ConnectorHealthEventRow,
   type ExistingCandidateProfileSnapshot,
   type GeneratedApplicationAssetUpsertRow,
+  type MissionDuplicateUpsertRow,
   type MissionScoreUpsertRow,
   type MissionUpsertRow,
   type ProfileImportInsertRow,
@@ -29,6 +31,7 @@ import {
   type SyncStatusRow,
 } from '../../core/sync/connected-dashboard';
 import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
+import type { MissionDuplicateRelation } from '../../core/scoring/dedup';
 import type { GeneratedAsset } from '../../core/types/generation';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { Mission, MissionSource } from '../../core/types/mission';
@@ -68,6 +71,7 @@ export interface ConnectedDashboardSyncGateway {
   upsertExtensionDevice(row: ExtensionDeviceRow): Promise<{ id: string }>;
   upsertMissions(rows: MissionUpsertRow[]): Promise<RemoteMissionIdentity[]>;
   upsertMissionScores(rows: MissionScoreUpsertRow[]): Promise<void>;
+  upsertMissionDuplicates(rows: MissionDuplicateUpsertRow[]): Promise<void>;
   upsertApplications(rows: ApplicationUpsertRow[]): Promise<RemoteApplicationIdentity[]>;
   listApplicationsUpdatedSince(input: {
     userId: string;
@@ -117,6 +121,8 @@ export interface PushMissionsInput {
   userId: string;
   deviceId: string;
   missions: Mission[];
+  sourceMissions?: Mission[];
+  duplicateRelations?: MissionDuplicateRelation[];
   now: Date;
   scorerVersion: string;
 }
@@ -188,6 +194,8 @@ export interface PushCandidateProfileImportResult {
 
 export interface ConnectedDashboardSnapshotInput {
   missions: Mission[];
+  sourceMissions?: Mission[];
+  duplicateRelations?: MissionDuplicateRelation[];
   trackings: MissionTracking[];
   generatedAssetsByMissionId?: Map<string, GeneratedAsset[]>;
   healthSnapshots: ConnectorHealthSnapshot[];
@@ -445,6 +453,18 @@ export function createSupabaseConnectedDashboardGateway(
         () => undefined
       );
     },
+    upsertMissionDuplicates: async (rows) => {
+      if (rows.length === 0) {
+        return;
+      }
+      await selectOrThrow(
+        supabase
+          .from('mission_duplicates')
+          .upsert(rows, { onConflict: 'canonical_mission_id,duplicate_mission_id' }),
+        'canonical_mission_id,duplicate_mission_id',
+        () => undefined
+      );
+    },
     upsertApplications: async (rows) =>
       rows.length === 0
         ? []
@@ -617,7 +637,11 @@ export async function pushMissionsToConnectedDashboard(
   input: PushMissionsInput
 ): Promise<ConnectedSyncResult<PushMissionsResult>> {
   try {
-    const missionRows = input.missions.map((mission) =>
+    const allSourceMissions = new Map<string, Mission>();
+    for (const mission of [...input.missions, ...(input.sourceMissions ?? [])]) {
+      allSourceMissions.set(mission.id, mission);
+    }
+    const missionRows = [...allSourceMissions.values()].map((mission) =>
       buildMissionUpsertRow(mission, input.userId)
     );
     const remoteMissions = await gateway.upsertMissions(missionRows);
@@ -634,6 +658,13 @@ export async function pushMissionsToConnectedDashboard(
         : [];
     });
     await gateway.upsertMissionScores(scoreRows);
+    await gateway.upsertMissionDuplicates(
+      buildMissionDuplicateUpsertRows(
+        input.duplicateRelations ?? [],
+        input.userId,
+        remoteMissionIds
+      )
+    );
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({
         userId: input.userId,
@@ -651,7 +682,7 @@ export async function pushMissionsToConnectedDashboard(
         userId: input.userId,
         deviceId: input.deviceId,
         entity: 'missions',
-        pendingUploadCount: input.missions.length,
+        pendingUploadCount: input.sourceMissions?.length ?? input.missions.length,
         error: { code: syncError.code, message: syncError.message },
         retryAfterAt: buildRetryAfterAt(input.now),
       })
@@ -1064,10 +1095,16 @@ async function getRuntimeContext(): Promise<
 
 export async function syncConnectedDashboardScan(
   missions: Mission[],
-  healthSnapshots: ConnectorHealthSnapshot[] = []
+  healthSnapshots: ConnectorHealthSnapshot[] = [],
+  options: {
+    sourceMissions?: Mission[];
+    duplicateRelations?: MissionDuplicateRelation[];
+  } = {}
 ): Promise<ConnectedSyncResult<{ missions: number; connectorHealth: number }>> {
   const synced = await syncConnectedDashboardSnapshot({
     missions,
+    sourceMissions: options.sourceMissions,
+    duplicateRelations: options.duplicateRelations,
     trackings: [],
     healthSnapshots,
   });
@@ -1097,6 +1134,8 @@ export async function syncConnectedDashboardSnapshot(
     userId: context.userId,
     deviceId: context.deviceId,
     missions: input.missions,
+    sourceMissions: input.sourceMissions,
+    duplicateRelations: input.duplicateRelations,
     now: context.now,
     scorerVersion: DEFAULT_SCORER_VERSION,
   });

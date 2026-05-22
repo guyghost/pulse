@@ -6,7 +6,10 @@ import { buildSearchContext } from '../../core/connectors/search-context';
 import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
 import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
-import { deduplicateMissions } from '../../core/scoring/dedup';
+import {
+  deduplicateMissionsDetailed,
+  type MissionDuplicateRelation,
+} from '../../core/scoring/dedup';
 import { filterSalariedMissions } from '../../core/scoring/contract-filter';
 import { filterStaleMissions } from '../../core/scoring/mission-freshness';
 import { scoreMission } from '../../core/scoring/relevance';
@@ -61,6 +64,8 @@ export class ScanError extends Error {
 
 export interface ScanResult {
   missions: Mission[];
+  sourceMissions: Mission[];
+  duplicateRelations: MissionDuplicateRelation[];
   errors: { connectorId: string; message: string }[];
 }
 
@@ -168,7 +173,12 @@ async function _runScanInternal(
     } catch {
       /* Non-critical: scan state is UI-only */
     }
-    return { missions: [], errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }] };
+    return {
+      missions: [],
+      sourceMissions: [],
+      duplicateRelations: [],
+      errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }],
+    };
   }
 
   // Validate connector IDs and report unknown ones as errors
@@ -188,7 +198,7 @@ async function _runScanInternal(
     } catch {
       /* Non-critical: scan state is UI-only */
     }
-    return { missions: [], errors };
+    return { missions: [], sourceMissions: [], duplicateRelations: [], errors };
   }
 
   // Load all connectors in parallel (they're lazy-loaded, so this loads only enabled ones)
@@ -221,7 +231,7 @@ async function _runScanInternal(
     } catch {
       /* Non-critical: scan state is UI-only */
     }
-    return { missions: [], errors };
+    return { missions: [], sourceMissions: [], duplicateRelations: [], errors };
   }
 
   // Load profile early for connector search filtering + scoring
@@ -429,7 +439,8 @@ async function _runScanInternal(
 
   // Deduplicate
   const missionsBeforeDedup = allMissions.length;
-  const deduped = deduplicateMissions(allMissions);
+  const dedupedResult = deduplicateMissionsDetailed(allMissions);
+  const deduped = dedupedResult.missions;
   const dedupRatio = calculateDedupRatio(missionsBeforeDedup, deduped.length);
 
   // Filter out salaried positions (CDD/CDI) — safety net after connector filters
@@ -437,6 +448,10 @@ async function _runScanInternal(
 
   // Filter out stale missions (too old — likely filled or cancelled)
   const freshOnly = filterStaleMissions(freelanceOnly, new Date());
+  const eligibleSourceMissions = filterStaleMissions(
+    filterSalariedMissions(allMissions),
+    new Date()
+  );
   emitDetailed('post-processing', 1, 3);
 
   // Score against profile (already loaded above for connector filtering)
@@ -497,6 +512,23 @@ async function _runScanInternal(
     }
   }
 
+  const scoredIds = new Set(scored.map((mission) => mission.id));
+  const eligibleSourceMissionsById = new Map(
+    eligibleSourceMissions.map((mission) => [mission.id, mission])
+  );
+  const duplicateRelations = dedupedResult.duplicateRelations.filter(
+    (relation) =>
+      scoredIds.has(relation.canonicalMissionId) &&
+      eligibleSourceMissionsById.has(relation.duplicateMissionId)
+  );
+  const sourceMissions = [
+    ...scored,
+    ...duplicateRelations.flatMap((relation) => {
+      const mission = eligibleSourceMissionsById.get(relation.duplicateMissionId);
+      return mission ? [mission] : [];
+    }),
+  ];
+
   // Purge old missions (older than 90 days) - non-blocking, silent failure
   try {
     const purged = await purgeOldMissions(90);
@@ -550,5 +582,5 @@ async function _runScanInternal(
     /* Non-critical: scan state is UI-only */
   }
   emitDetailed('done', connectors.length, connectors.length);
-  return { missions: scored, errors };
+  return { missions: scored, sourceMissions, duplicateRelations, errors };
 }

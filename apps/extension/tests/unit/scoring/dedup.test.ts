@@ -1,5 +1,8 @@
 import { describe, it, expect } from 'vitest';
-import { deduplicateMissions } from '../../../src/lib/core/scoring/dedup';
+import {
+  deduplicateMissions,
+  deduplicateMissionsDetailed,
+} from '../../../src/lib/core/scoring/dedup';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { MissionSource } from '../../../src/lib/core/types/mission';
 
@@ -67,6 +70,35 @@ describe('deduplicateMissions', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('2');
     expect(result[0].tjm).toBe(600);
+  });
+
+  it('reports duplicate relations against the retained canonical mission', () => {
+    const result = deduplicateMissionsDetailed([
+      makeMission({
+        id: 'source-1',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        tjm: 500,
+        description: 'Short',
+      }),
+      makeMission({
+        id: 'source-2',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        tjm: 650,
+        description: 'Longer description',
+      }),
+    ]);
+
+    expect(result.missions.map((mission) => mission.id)).toEqual(['source-2']);
+    expect(result.duplicateRelations).toEqual([
+      {
+        canonicalMissionId: 'source-2',
+        duplicateMissionId: 'source-1',
+        confidence: 1,
+        reason: 'same_structured_signature',
+      },
+    ]);
   });
 
   it('deduplicates near-duplicate titles', () => {

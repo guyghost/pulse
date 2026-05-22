@@ -344,6 +344,17 @@ describe('dashboard core', () => {
             scraped_at: '2026-05-20T08:00:00.000Z',
             url: 'https://example.com/2',
           },
+          {
+            id: 'mission-duplicate',
+            title: 'Lead Svelte duplicate',
+            client: 'ScaleOps',
+            source: 'lehibou',
+            stack: ['Svelte'],
+            tjm: 700,
+            location: 'Remote',
+            scraped_at: '2026-05-22T08:05:00.000Z',
+            url: 'https://example.com/duplicate',
+          },
         ],
         new Map([
           [
