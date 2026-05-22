@@ -15,6 +15,7 @@ import {
 
 interface LinkedInDomProfileSnapshot {
   profileUrl: string;
+  blockedReason?: string;
   sections: {
     headline?: string;
     summary?: string;
@@ -78,6 +79,26 @@ function classifyLinkedInUrl(url: string): ProfileExtractorErrorCode | null {
 function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   const clean = (value: string | null | undefined): string =>
     (value ?? '').replace(/\s+/g, ' ').trim();
+  const blockedReasonFromText = (value: string): string | null => {
+    const text = value.toLowerCase();
+    if (text.includes('security verification')) {
+      return 'security verification required';
+    }
+    if (text.includes('unusual activity')) {
+      return 'unusual activity challenge';
+    }
+    if (text.includes('verify your identity')) {
+      return 'identity verification required';
+    }
+    if (text.includes('temporarily restricted')) {
+      return 'temporarily restricted session';
+    }
+    if (text.includes('checkpoint') || text.includes('challenge')) {
+      return 'linkedin checkpoint challenge';
+    }
+
+    return null;
+  };
   const text = (selector: string): string => clean(document.querySelector(selector)?.textContent);
   const allTexts = (selector: string): string[] =>
     [...document.querySelectorAll(selector)].map((item) => clean(item.textContent)).filter(Boolean);
@@ -127,6 +148,7 @@ function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   const experience = sectionByHeading(['experience', 'expérience']);
   const education = sectionByHeading(['education', 'formation']);
   const skills = sectionByHeading(['skills', 'compétences']);
+  const blockedReason = blockedReasonFromText(clean(document.body?.innerText));
   const headline =
     text('.pv-text-details__left-panel .text-body-medium') ||
     text('[data-generated-suggestion-target]') ||
@@ -144,6 +166,7 @@ function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
 
   return {
     profileUrl: window.location.href,
+    ...(blockedReason ? { blockedReason } : {}),
     sections: {
       headline,
       summary: clean(summary),
@@ -257,6 +280,16 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
             'LinkedIn did not return profile data from the active tab.',
             now,
             { url: tab.url }
+          )
+        );
+      }
+      if (snapshot.blockedReason) {
+        return err(
+          createProfileExtractorError(
+            'rate_limited_or_blocked',
+            'LinkedIn blocked profile extraction with a challenge or checkpoint.',
+            now,
+            { url: tab.url, reason: snapshot.blockedReason }
           )
         );
       }

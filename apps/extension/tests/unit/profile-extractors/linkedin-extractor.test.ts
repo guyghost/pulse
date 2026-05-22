@@ -206,6 +206,33 @@ describe('LinkedInProfileExtractor', () => {
     expect(extractorCode(result)).toBe('rate_limited_or_blocked');
   });
 
+  it('returns rate_limited_or_blocked when LinkedIn serves a challenge DOM on a profile URL', async () => {
+    const extractor = new LinkedInProfileExtractor(
+      createChromeDouble({
+        executeScript: async () => [
+          {
+            frameId: 0,
+            result: {
+              profileUrl: 'https://www.linkedin.com/in/example/',
+              blockedReason: 'security verification required',
+              sections: {
+                experiences: [],
+                skills: [],
+                education: [],
+                links: [],
+              },
+            },
+          },
+        ],
+      })
+    );
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('rate_limited_or_blocked');
+  });
+
   it('returns dom_changed when LinkedIn returns an empty sanitized payload', async () => {
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({
