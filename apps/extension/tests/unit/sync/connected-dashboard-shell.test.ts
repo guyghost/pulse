@@ -546,6 +546,58 @@ describe('connected dashboard shell sync', () => {
     expect(applicationQuery.neq).toHaveBeenCalledWith('updated_by', 'extension');
   });
 
+  it('increments sync status revision from the current remote row when upserting', async () => {
+    const statusQuery = createReadQuery([{ revision: 7 }]);
+    const upsertSyncStatus = vi.fn(() => ({
+      select: vi.fn(async () => ({
+        data: [{ device_id: 'device-1', entity: 'missions' }],
+        error: null,
+      })),
+    }));
+    const supabase = {
+      from: vi.fn((table: string) => {
+        if (table !== 'sync_status') {
+          throw new Error(`Unexpected table ${table}`);
+        }
+
+        return {
+          select: vi.fn(() => statusQuery),
+          upsert: upsertSyncStatus,
+        };
+      }),
+    } as unknown as Parameters<typeof createSupabaseConnectedDashboardGateway>[0];
+    const gateway = createSupabaseConnectedDashboardGateway(supabase);
+
+    await gateway.upsertSyncStatus({
+      user_id: 'user-1',
+      device_id: 'device-1',
+      entity: 'missions',
+      last_pull_at: null,
+      last_push_at: '2026-05-22T08:00:00.000Z',
+      pending_upload_count: 0,
+      pending_download_count: 0,
+      last_error_code: null,
+      last_error_message: null,
+      retry_after_at: null,
+      revision: 1,
+      updated_by: 'extension',
+    });
+
+    expect(statusQuery.eq).toHaveBeenCalledWith('user_id', 'user-1');
+    expect(statusQuery.eq).toHaveBeenCalledWith('device_id', 'device-1');
+    expect(statusQuery.eq).toHaveBeenCalledWith('entity', 'missions');
+    expect(upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        device_id: 'device-1',
+        entity: 'missions',
+        revision: 8,
+        updated_by: 'extension',
+      }),
+      { onConflict: 'device_id,entity' }
+    );
+  });
+
   it('syncs LinkedIn extractor health events through the connected dashboard gateway', async () => {
     const storageGet = vi.fn(async () => ({
       'missionpulse.connectedSync.installId': 'install-1',
@@ -575,6 +627,7 @@ describe('connected dashboard shell sync', () => {
         error: null,
       })),
     }));
+    const syncStatusRevisionQuery = createReadQuery([{ revision: 4 }]);
 
     supabaseClientMock.getSupabaseClient.mockReturnValueOnce({
       auth: {
@@ -590,7 +643,7 @@ describe('connected dashboard shell sync', () => {
           return { insert: insertHealthEvent };
         }
         if (table === 'sync_status') {
-          return { upsert: upsertSyncStatus };
+          return { select: vi.fn(() => syncStatusRevisionQuery), upsert: upsertSyncStatus };
         }
         throw new Error(`Unexpected table ${table}`);
       }),
@@ -622,6 +675,7 @@ describe('connected dashboard shell sync', () => {
         device_id: 'device-1',
         entity: 'connector_health',
         pending_upload_count: 0,
+        revision: 5,
       }),
       { onConflict: 'device_id,entity' }
     );

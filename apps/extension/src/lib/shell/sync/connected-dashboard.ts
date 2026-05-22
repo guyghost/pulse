@@ -764,6 +764,11 @@ function parsePendingSyncConflictFields(data: unknown): SyncConflictField[] {
   );
 }
 
+function parseCurrentSyncStatusRevision(data: unknown): number | null {
+  const value = Array.isArray(data) ? data[0] : data;
+  return isRecord(value) && typeof value.revision === 'number' ? value.revision : null;
+}
+
 async function selectOrThrow<T>(
   builder: SupabaseWriteBuilder,
   columns: string,
@@ -1072,8 +1077,26 @@ export function createSupabaseConnectedDashboardGateway(
       await selectOrThrow(supabase.from('profile_imports').insert(row), 'id', () => undefined);
     },
     upsertSyncStatus: async (row) => {
+      const { data, error } = await supabase
+        .from('sync_status')
+        .select('revision')
+        .eq('user_id', row.user_id)
+        .eq('device_id', row.device_id)
+        .eq('entity', row.entity)
+        .order('updated_at', { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      const currentRevision = parseCurrentSyncStatusRevision(data);
       await selectOrThrow(
-        supabase.from('sync_status').upsert(row, { onConflict: 'device_id,entity' }),
+        supabase
+          .from('sync_status')
+          .upsert(
+            { ...row, revision: currentRevision === null ? row.revision : currentRevision + 1 },
+            { onConflict: 'device_id,entity' }
+          ),
         'device_id,entity',
         () => undefined
       );
