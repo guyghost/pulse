@@ -1,6 +1,6 @@
 import type { Result } from '../errors/result';
 
-export type ProfileExtractorSource = 'linkedin';
+export type ProfileExtractorSource = string;
 
 export interface RawExperience {
   title?: string;

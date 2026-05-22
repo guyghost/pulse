@@ -12,12 +12,13 @@ export function createProfileExtractorError(
   code: ProfileExtractorErrorCode,
   message: string,
   now: number,
-  context: Record<string, unknown> = {}
+  context: Record<string, unknown> = {},
+  platformId = 'linkedin'
 ): AppError {
   return createConnectorError(
     message,
     {
-      connectorId: 'linkedin',
+      connectorId: platformId,
       phase: code === 'session_required' || code === 'permission_required' ? 'detect' : 'parse',
       recoverable: code !== 'dom_changed',
       context: {

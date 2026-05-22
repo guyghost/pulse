@@ -1,16 +1,42 @@
 import { LinkedInProfileExtractor } from './linkedin.extractor';
 import type { PlatformProfileExtractor } from './platform-profile-extractor';
 
-export function getProfileExtractors(): PlatformProfileExtractor[] {
-  return [new LinkedInProfileExtractor()];
+export type ProfileExtractorFactory = () => PlatformProfileExtractor;
+export type ProfileExtractorFactories = Record<string, ProfileExtractorFactory>;
+
+export interface ProfileExtractorRegistry {
+  list(): PlatformProfileExtractor[];
+  get(id: string): PlatformProfileExtractor;
 }
 
-export function getProfileExtractor(id: PlatformProfileExtractor['id']): PlatformProfileExtractor {
-  if (id === 'linkedin') {
-    return new LinkedInProfileExtractor();
-  }
+const defaultProfileExtractorFactories: ProfileExtractorFactories = {
+  linkedin: () => new LinkedInProfileExtractor(),
+};
 
-  throw new Error(`Unknown profile extractor: ${id}`);
+export function createProfileExtractorRegistry(
+  factories: ProfileExtractorFactories = defaultProfileExtractorFactories
+): ProfileExtractorRegistry {
+  return {
+    list() {
+      return Object.values(factories).map((createExtractor) => createExtractor());
+    },
+    get(id: string) {
+      const createExtractor = factories[id];
+      if (!createExtractor) {
+        throw new Error(`Unknown profile extractor: ${id}`);
+      }
+
+      return createExtractor();
+    },
+  };
+}
+
+export function getProfileExtractors(): PlatformProfileExtractor[] {
+  return createProfileExtractorRegistry().list();
+}
+
+export function getProfileExtractor(id: string): PlatformProfileExtractor {
+  return createProfileExtractorRegistry().get(id);
 }
 
 export { LinkedInProfileExtractor };

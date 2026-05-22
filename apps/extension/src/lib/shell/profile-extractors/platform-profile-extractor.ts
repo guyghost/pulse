@@ -3,7 +3,7 @@ import type { Result } from '../../core/errors/result';
 import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
 
 export interface PlatformProfileExtractor {
-  readonly id: 'linkedin';
+  readonly id: string;
   readonly name: string;
 
   detectSession(now: number): Promise<Result<boolean, AppError>>;

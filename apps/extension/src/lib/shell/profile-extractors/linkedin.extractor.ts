@@ -46,7 +46,7 @@ interface ChromeLike {
 }
 
 function getChromeApi(): ChromeLike {
-  return chrome;
+  return typeof chrome === 'undefined' ? {} : chrome;
 }
 
 function isLinkedInProfileUrl(url: string): boolean {
