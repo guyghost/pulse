@@ -1,4 +1,4 @@
-import { APPLICATION_STAGES, type ApplicationStage } from '@pulse/domain';
+import { APPLICATION_STAGES, APPLICATION_TRANSITIONS, type ApplicationStage } from '@pulse/domain';
 
 export type { ApplicationStage };
 
@@ -138,6 +138,13 @@ export interface DashboardConnectorHealthEventRow {
   source: string;
   status: 'ready' | 'needs_permission' | 'needs_session' | 'blocked' | 'error' | 'syncing';
   occurred_at: string;
+}
+
+export interface ApplicationStageUpdatePatch {
+  stage: ApplicationStage;
+  applied_at?: string | null;
+  archived_at?: string | null;
+  updated_by: 'dashboard';
 }
 
 export interface ApplicationFilters {
@@ -311,6 +318,22 @@ export function healthEventsToPlatformSyncStatuses(
     status: healthEventToPlatformStatus(event.status),
     lastSyncAt: event.occurred_at,
   }));
+}
+
+export function getNextApplicationStages(stage: ApplicationStage): ApplicationStage[] {
+  return [...APPLICATION_TRANSITIONS[stage]];
+}
+
+export function buildApplicationStageUpdatePatch(
+  stage: ApplicationStage,
+  occurredAt: string
+): ApplicationStageUpdatePatch {
+  return {
+    stage,
+    applied_at: stage === 'applied' ? occurredAt : stage === 'detected' ? null : undefined,
+    archived_at: stage === 'archived' ? occurredAt : null,
+    updated_by: 'dashboard',
+  };
 }
 
 export const DASHBOARD_FEATURES: readonly DashboardFeatureDefinition[] = [

@@ -5,9 +5,11 @@
     filterApplications,
     getAverageApplicationScore,
     getCvSyncReadiness,
+    getNextApplicationStages,
     getNextFollowUp,
     getSyncBlockers,
   } from '$lib/core/dashboard';
+  import type { ActionData, PageData } from './$types';
   import type {
     ApplicationStage,
     DashboardAccountEntitlements,
@@ -18,7 +20,7 @@
     PlatformSyncStatus,
   } from '$lib/core/dashboard';
 
-  let { data } = $props();
+  let { data, form }: { data: PageData; form?: ActionData } = $props();
 
   const applications = $derived(data.applications as MissionApplication[]);
   const cv = $derived(data.cv);
@@ -62,6 +64,9 @@
     filteredApplications.find((application) => application.id === selectedApplicationId) ??
       filteredApplications[0] ??
       null
+  );
+  const selectedNextStages = $derived(
+    selectedApplication ? getNextApplicationStages(selectedApplication.stage) : []
   );
   const syncBlockers = $derived(getSyncBlockers(cv, syncStatuses));
   const readyPlatforms = $derived(syncStatuses.filter((platform) => platform.status === 'ready'));
@@ -569,6 +574,57 @@
                   </dd>
                 </div>
               </dl>
+
+              {#if form?.transitionError}
+                <p
+                  class="mt-4 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
+                >
+                  {form.transitionError}
+                </p>
+              {/if}
+
+              {#if form?.transitionSuccess}
+                <p
+                  class="mt-4 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
+                >
+                  {form.transitionSuccess}
+                </p>
+              {/if}
+
+              {#if isConnected && selectedNextStages.length > 0}
+                <form
+                  method="POST"
+                  action="?/transitionApplication"
+                  class="mt-5 border-t border-border-light pt-4"
+                >
+                  <input type="hidden" name="applicationId" value={selectedApplication.id} />
+                  <p class="text-xs font-medium uppercase text-text-subtle">Changer d'étape</p>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    {#each selectedNextStages as stage}
+                      <button
+                        type="submit"
+                        name="toStage"
+                        value={stage}
+                        class="inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:border-blueprint-blue/35 hover:bg-blueprint-blue/8 hover:text-blueprint-blue"
+                      >
+                        {stageLabels[stage]}
+                      </button>
+                    {/each}
+                  </div>
+                </form>
+              {:else if isConnected}
+                <p
+                  class="mt-4 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs leading-5 text-text-subtle"
+                >
+                  Cette candidature est dans un état final.
+                </p>
+              {:else}
+                <p
+                  class="mt-4 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs leading-5 text-text-subtle"
+                >
+                  Compte requis pour modifier le pipeline.
+                </p>
+              {/if}
             </section>
           {/if}
 

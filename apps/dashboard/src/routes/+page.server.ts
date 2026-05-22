@@ -1,8 +1,14 @@
 import { env } from '$env/dynamic/public';
-import type { PageServerLoad } from './$types';
-import { redirect } from '@sveltejs/kit';
+import type { Actions, PageServerLoad } from './$types';
+import { fail, redirect } from '@sveltejs/kit';
+import {
+  APPLICATION_STAGES,
+  transitionApplicationStage,
+  type ApplicationStage,
+} from '@pulse/domain';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
+  buildApplicationStageUpdatePatch,
   canonicalRowsToApplications,
   favoriteMissionToApplication,
   getDashboardFeatureAccess,
@@ -109,6 +115,12 @@ type FavoriteMissionRow = {
   favorited_at: string | null;
 };
 
+type ApplicationTransitionRow = {
+  id: string;
+  stage: string;
+  revision: number;
+};
+
 const normalizeSubscriptionStatus = (value: string | null): DashboardSubscriptionStatus =>
   value === 'premium' ? 'premium' : value === 'expired' ? 'expired' : 'free';
 
@@ -158,6 +170,9 @@ const getLoginUrl = (): string => {
 
   return landingUrl ? `${landingUrl}${loginPath}` : loginPath;
 };
+
+const isApplicationStage = (value: unknown): value is ApplicationStage =>
+  APPLICATION_STAGES.includes(value as ApplicationStage);
 
 export const load: PageServerLoad = async ({ cookies }) => {
   const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
@@ -275,4 +290,113 @@ export const load: PageServerLoad = async ({ cookies }) => {
       : mockCv,
     syncStatuses: syncStatuses.length > 0 ? syncStatuses : mockSyncStatuses,
   };
+};
+
+export const actions: Actions = {
+  transitionApplication: async ({ cookies, request }) => {
+    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasSupabaseConfig) {
+      return fail(503, { transitionError: 'Configuration Supabase absente.' });
+    }
+
+    const supabase = createSupabaseServerClient(cookies);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return fail(401, { transitionError: 'Session requise.' });
+    }
+
+    const formData = await request.formData();
+    const applicationId = formData.get('applicationId');
+    const toStage = formData.get('toStage');
+
+    if (typeof applicationId !== 'string' || !isApplicationStage(toStage)) {
+      return fail(400, { transitionError: 'Transition invalide.' });
+    }
+
+    const { data: application, error: readError } = await supabase
+      .from('applications')
+      .select('id, stage, revision')
+      .eq('id', applicationId)
+      .eq('user_id', session.user.id)
+      .single<ApplicationTransitionRow>();
+
+    if (readError || !application || !isApplicationStage(application.stage)) {
+      return fail(404, { transitionError: 'Candidature introuvable.' });
+    }
+
+    const occurredAt = new Date();
+    const event = transitionApplicationStage({
+      applicationId,
+      fromStage: application.stage,
+      toStage,
+      occurredAt,
+      createdBy: 'dashboard',
+      clientEventId: `dashboard:${applicationId}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+    });
+
+    if (!event) {
+      return fail(400, { transitionError: 'Transition non autorisée.' });
+    }
+
+    const { error: insertError } = await supabase.from('application_pipeline_events').insert({
+      user_id: session.user.id,
+      application_id: applicationId,
+      from_stage: event.fromStage,
+      to_stage: event.toStage,
+      note: event.note,
+      metadata: { source: 'dashboard' },
+      occurred_at: event.occurredAt,
+      created_by: event.createdBy,
+      client_event_id: event.clientEventId,
+    });
+
+    if (insertError) {
+      return fail(500, { transitionError: "L'événement pipeline n'a pas pu être enregistré." });
+    }
+
+    const patch = buildApplicationStageUpdatePatch(toStage, event.occurredAt);
+    const updatePayload: {
+      stage: ApplicationStage;
+      revision: number;
+      updated_by: 'dashboard';
+      applied_at?: string | null;
+      archived_at?: string | null;
+    } = {
+      stage: patch.stage,
+      revision: application.revision + 1,
+      updated_by: patch.updated_by,
+    };
+
+    if (patch.applied_at !== undefined) {
+      updatePayload.applied_at = patch.applied_at;
+    }
+    if (patch.archived_at !== undefined) {
+      updatePayload.archived_at = patch.archived_at;
+    }
+
+    const { error: updateError } = await supabase
+      .from('applications')
+      .update(updatePayload)
+      .eq('id', applicationId)
+      .eq('user_id', session.user.id)
+      .eq('revision', application.revision)
+      .select('id')
+      .single<{ id: string }>();
+
+    if (updateError) {
+      if (updateError.code !== 'PGRST116') {
+        return fail(500, { transitionError: "La candidature n'a pas pu être mise à jour." });
+      }
+
+      return fail(409, {
+        transitionError:
+          "La candidature a changé depuis l'ouverture de la page. Rechargez avant de modifier l'étape.",
+      });
+    }
+
+    return { transitionSuccess: `Candidature passée en ${toStage}.` };
+  },
 };

@@ -4,6 +4,8 @@ import {
   canonicalRowsToApplications,
   filterApplications,
   favoriteMissionToApplication,
+  buildApplicationStageUpdatePatch,
+  getNextApplicationStages,
   getAverageApplicationScore,
   healthEventsToPlatformSyncStatuses,
   getCvSyncReadiness,
@@ -336,5 +338,26 @@ describe('dashboard core', () => {
         lastSyncAt: '2026-05-21T09:00:00.000Z',
       },
     ]);
+  });
+
+  it('lists canonical next stages for dashboard actions', () => {
+    expect(getNextApplicationStages('detected')).toEqual(['selected', 'archived']);
+    expect(getNextApplicationStages('offer')).toEqual(['accepted', 'rejected', 'archived']);
+  });
+
+  it('builds application stage update patches without ambient time', () => {
+    expect(buildApplicationStageUpdatePatch('applied', '2026-05-21T08:00:00.000Z')).toEqual({
+      stage: 'applied',
+      applied_at: '2026-05-21T08:00:00.000Z',
+      archived_at: null,
+      updated_by: 'dashboard',
+    });
+
+    expect(buildApplicationStageUpdatePatch('archived', '2026-05-22T08:00:00.000Z')).toEqual({
+      stage: 'archived',
+      applied_at: undefined,
+      archived_at: '2026-05-22T08:00:00.000Z',
+      updated_by: 'dashboard',
+    });
   });
 });
