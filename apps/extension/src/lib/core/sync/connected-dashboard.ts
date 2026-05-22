@@ -186,6 +186,13 @@ export interface BuildSyncStatusRowInput {
   error?: { code: string; message: string } | null;
 }
 
+export interface BuildApplicationPullCursorInput {
+  remoteApplications: RemoteApplicationSnapshot[];
+  skippedCount: number;
+  previousCursor: string | null;
+  pulledAt: string;
+}
+
 function clampScore(score: number): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -505,4 +512,17 @@ export function mergeRemoteApplicationTracking(
     userRating: application.user_rating,
     notes: application.notes,
   };
+}
+
+export function buildApplicationPullCursor(input: BuildApplicationPullCursorInput): string | null {
+  if (input.skippedCount > 0) {
+    return input.previousCursor;
+  }
+
+  const latestRemoteUpdate = input.remoteApplications
+    .map((application) => application.updated_at)
+    .filter((value) => Number.isFinite(Date.parse(value)))
+    .sort((a, b) => b.localeCompare(a))[0];
+
+  return latestRemoteUpdate ?? input.pulledAt;
 }

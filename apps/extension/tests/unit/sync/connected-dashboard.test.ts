@@ -4,6 +4,7 @@ import {
   buildApplicationUpsertRow,
   buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
+  buildApplicationPullCursor,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
   buildTrackingFromRemoteApplication,
@@ -451,5 +452,55 @@ describe('connected dashboard sync payload builders', () => {
       userRating: 5,
       notes: 'Offre reçue',
     });
+  });
+
+  it('advances the application pull cursor only when every remote row is handled', () => {
+    const remoteApplications: RemoteApplicationSnapshot[] = [
+      {
+        id: 'application-older',
+        mission_id: 'remote-mission-1',
+        stage: 'selected',
+        user_rating: null,
+        notes: '',
+        revision: 2,
+        updated_at: '2026-05-21T10:00:00.000Z',
+      },
+      {
+        id: 'application-newer',
+        mission_id: 'remote-mission-2',
+        stage: 'offer',
+        user_rating: 5,
+        notes: 'Offre reçue',
+        revision: 5,
+        updated_at: '2026-05-21T12:00:00.000Z',
+      },
+    ];
+
+    expect(
+      buildApplicationPullCursor({
+        remoteApplications,
+        skippedCount: 0,
+        previousCursor: '2026-05-21T09:00:00.000Z',
+        pulledAt: '2026-05-21T13:00:00.000Z',
+      })
+    ).toBe('2026-05-21T12:00:00.000Z');
+
+    expect(
+      buildApplicationPullCursor({
+        remoteApplications,
+        skippedCount: 1,
+        previousCursor: '2026-05-21T09:00:00.000Z',
+        pulledAt: '2026-05-21T13:00:00.000Z',
+      })
+    ).toBe('2026-05-21T09:00:00.000Z');
+
+    expect(
+      buildApplicationPullCursor({
+        remoteApplications: [],
+        skippedCount: 0,
+        previousCursor: null,
+        pulledAt: '2026-05-21T13:00:00.000Z',
+      })
+    ).toBe('2026-05-21T13:00:00.000Z');
   });
 });

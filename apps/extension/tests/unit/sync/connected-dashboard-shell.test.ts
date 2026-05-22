@@ -419,6 +419,7 @@ describe('connected dashboard shell sync', () => {
       value: {
         pulledCount: 1,
         skippedCount: 0,
+        nextCursor: '2026-05-21T11:00:00.000Z',
         trackings: [
           {
             ...tracking,
@@ -469,6 +470,7 @@ describe('connected dashboard shell sync', () => {
         pulledCount: 0,
         skippedCount: 1,
         trackings: [],
+        nextCursor: null,
       },
     });
     expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(

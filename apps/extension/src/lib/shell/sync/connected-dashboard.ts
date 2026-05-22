@@ -1,6 +1,7 @@
 import type { User } from '@supabase/supabase-js';
 import {
   buildApplicationPipelineEventRows,
+  buildApplicationPullCursor,
   buildApplicationUpsertRow,
   buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
@@ -31,6 +32,8 @@ import { getMissionById } from '../storage/db';
 import { getTracking, saveTrackings } from '../storage/tracking';
 
 const INSTALL_ID_STORAGE_KEY = 'missionpulse.connectedSync.installId';
+const APPLICATION_PULL_CURSOR_STORAGE_KEY =
+  'missionpulse.connectedSync.cursor.applications.lastPullAt';
 const DEFAULT_SCORER_VERSION = 'missionpulse-v1';
 const LINKEDIN_PROFILE_EXTRACTOR_VERSION = 'linkedin-v1';
 
@@ -139,6 +142,7 @@ export interface PullApplicationsResult {
   pulledCount: number;
   skippedCount: number;
   trackings: MissionTracking[];
+  nextCursor: string | null;
 }
 
 export interface PushConnectorHealthInput {
@@ -677,6 +681,13 @@ export async function pullApplicationsFromConnectedDashboard(
       );
     }
 
+    const nextCursor = buildApplicationPullCursor({
+      remoteApplications,
+      skippedCount,
+      previousCursor: input.since ? input.since.toISOString() : null,
+      pulledAt: input.now.toISOString(),
+    });
+
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({
         userId: input.userId,
@@ -689,7 +700,7 @@ export async function pullApplicationsFromConnectedDashboard(
 
     return {
       ok: true,
-      value: { pulledCount: trackings.length, skippedCount, trackings },
+      value: { pulledCount: trackings.length, skippedCount, trackings, nextCursor },
     };
   } catch (error) {
     const syncError = remoteError(error);
@@ -864,6 +875,20 @@ export async function getOrCreateConnectedSyncInstallId(
   return installId;
 }
 
+async function getApplicationPullCursor(): Promise<string | null> {
+  const stored = await chrome.storage.local.get(APPLICATION_PULL_CURSOR_STORAGE_KEY);
+  const cursor = stored[APPLICATION_PULL_CURSOR_STORAGE_KEY];
+  return typeof cursor === 'string' && Number.isFinite(Date.parse(cursor)) ? cursor : null;
+}
+
+async function setApplicationPullCursor(cursor: string | null): Promise<void> {
+  if (!cursor) {
+    return;
+  }
+
+  await chrome.storage.local.set({ [APPLICATION_PULL_CURSOR_STORAGE_KEY]: cursor });
+}
+
 async function getRuntimeContext(): Promise<
   | {
       userId: string;
@@ -984,18 +1009,21 @@ export async function syncConnectedDashboardSnapshot(
       localMissionId,
     ])
   );
+  const applicationPullCursor = await getApplicationPullCursor();
   const pulledApplications = await pullApplicationsFromConnectedDashboard(context.gateway, {
     userId: context.userId,
     deviceId: context.deviceId,
     localMissionIdsByRemoteId,
     existingTrackings,
-    since: null,
+    since: applicationPullCursor ? new Date(applicationPullCursor) : null,
     now: context.now,
   });
 
   if (!pulledApplications.ok) {
     return pulledApplications;
   }
+
+  await setApplicationPullCursor(pulledApplications.value.nextCursor);
 
   if (pulledApplications.value.trackings.length > 0) {
     await saveTrackings(pulledApplications.value.trackings);
@@ -1079,6 +1107,7 @@ export async function syncConnectedDashboardTracking(
     return pushedApplications;
   }
 
+  const applicationPullCursor = await getApplicationPullCursor();
   const pulledApplications = await pullApplicationsFromConnectedDashboard(context.gateway, {
     userId: context.userId,
     deviceId: context.deviceId,
@@ -1088,11 +1117,14 @@ export async function syncConnectedDashboardTracking(
       )
     ),
     existingTrackings: new Map([[tracking.missionId, tracking]]),
-    since: null,
+    since: applicationPullCursor ? new Date(applicationPullCursor) : null,
     now: context.now,
   });
   if (pulledApplications.ok && pulledApplications.value.trackings.length > 0) {
+    await setApplicationPullCursor(pulledApplications.value.nextCursor);
     await saveTrackings(pulledApplications.value.trackings);
+  } else if (pulledApplications.ok) {
+    await setApplicationPullCursor(pulledApplications.value.nextCursor);
   }
 
   return { ok: true, value: { applications: pushedApplications.value.pushedCount } };
