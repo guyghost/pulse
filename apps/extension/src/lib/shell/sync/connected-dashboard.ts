@@ -336,6 +336,14 @@ function buildRetryAfterAt(now: Date): Date {
   return new Date(now.getTime() + SYNC_RETRY_DELAY_MS);
 }
 
+async function markConnectedDashboardSynced(now: Date): Promise<void> {
+  try {
+    await chrome.storage.local.set({ lastGlobalSync: now.getTime() });
+  } catch {
+    // Non-critical: entity sync_status rows remain the authoritative remote state.
+  }
+}
+
 function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null;
 }
@@ -1358,7 +1366,7 @@ export async function syncConnectedDashboardProfileImport(
   });
 
   if (result.ok) {
-    await chrome.storage.local.set({ lastGlobalSync: context.now.getTime() });
+    await markConnectedDashboardSynced(context.now);
   }
 
   return result;
@@ -1392,6 +1400,7 @@ export async function syncConnectedDashboardProfileExtractorHealth(
         lastPushAt: context.now,
       })
     );
+    await markConnectedDashboardSynced(context.now);
 
     return { ok: true, value: { pushedCount: 1 } };
   } catch (error) {
@@ -1736,6 +1745,8 @@ export async function syncConnectedDashboardSnapshot(
     return pulledAlertPreferences;
   }
 
+  await markConnectedDashboardSynced(context.now);
+
   return {
     ok: true,
     value: {
@@ -1827,6 +1838,8 @@ export async function syncConnectedDashboardTracking(
   } else if (pulledApplications.ok) {
     await setApplicationPullCursor(pulledApplications.value.nextCursor);
   }
+
+  await markConnectedDashboardSynced(context.now);
 
   return { ok: true, value: { applications: pushedApplications.value.pushedCount } };
 }

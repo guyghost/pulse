@@ -321,6 +321,7 @@ describe('connected dashboard shell sync', () => {
     const storageGet = vi.fn(async () => ({
       'missionpulse.connectedSync.installId': 'install-1',
     }));
+    const storageSet = vi.fn(async () => undefined);
     vi.stubGlobal('chrome', {
       runtime: {
         getManifest: vi.fn(() => ({ version: '0.2.1' })),
@@ -328,7 +329,7 @@ describe('connected dashboard shell sync', () => {
       storage: {
         local: {
           get: storageGet,
-          set: vi.fn(async () => undefined),
+          set: storageSet,
         },
       },
     });
@@ -395,6 +396,7 @@ describe('connected dashboard shell sync', () => {
       }),
       { onConflict: 'device_id,entity' }
     );
+    expect(storageSet).toHaveBeenCalledWith({ lastGlobalSync: expect.any(Number) });
   });
 
   it('registers an extension device with last_seen_at', async () => {
