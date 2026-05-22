@@ -515,7 +515,8 @@ create table if not exists public.candidate_experiences (
   is_current boolean not null default false,
   description text not null default '',
   skills text[] not null default '{}',
-  source text references public.mission_sources(id) not null,
+  source text references public.mission_sources(id) not null
+    check (source in ('linkedin', 'malt', 'other')),
   source_external_id text,
   position_index integer not null default 0,
   check (end_date is null or start_date is null or start_date <= end_date)
@@ -530,7 +531,8 @@ create table if not exists public.candidate_education (
   start_date date,
   end_date date,
   description text not null default '',
-  source text references public.mission_sources(id) not null,
+  source text references public.mission_sources(id) not null
+    check (source in ('linkedin', 'malt', 'other')),
   position_index integer not null default 0,
   check (end_date is null or start_date is null or start_date <= end_date)
 );
@@ -538,7 +540,8 @@ create table if not exists public.candidate_education (
 create table if not exists public.candidate_skills (
   profile_id uuid references public.candidate_profiles(id) on delete cascade not null,
   skill text not null,
-  source text references public.mission_sources(id) not null,
+  source text references public.mission_sources(id) not null
+    check (source in ('linkedin', 'malt', 'other')),
   confidence numeric check (confidence is null or (confidence >= 0 and confidence <= 1)),
   primary key (profile_id, skill)
 );
@@ -549,12 +552,14 @@ create table if not exists public.candidate_links (
   label text not null,
   url text not null,
   source text references public.mission_sources(id) not null
+    check (source in ('linkedin', 'malt', 'other'))
 );
 
 create table if not exists public.profile_imports (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
-  source text references public.mission_sources(id) not null,
+  source text references public.mission_sources(id) not null
+    check (source in ('linkedin', 'malt', 'other')),
   status text not null check (status in ('success', 'partial', 'error')),
   imported_at timestamptz not null,
   extractor_version text not null,
@@ -634,7 +639,8 @@ create table if not exists public.candidate_profile_field_suggestions (
   field text not null check (field in ('title', 'summary', 'location', 'target_role')),
   current_value text,
   suggested_value text,
-  source text references public.mission_sources(id) not null,
+  source text references public.mission_sources(id) not null
+    check (source in ('linkedin', 'malt', 'other')),
   status text not null default 'pending' check (status in ('pending', 'applied', 'dismissed')),
   created_at timestamptz not null default now(),
   resolved_at timestamptz,

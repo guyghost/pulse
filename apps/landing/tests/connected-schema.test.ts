@@ -81,6 +81,23 @@ describe('connected dashboard schema', () => {
     expect(schemaSql).toContain('(user_id, profile_id, field, source)');
   });
 
+  it('limits canonical CV imports to profile-capable sources', () => {
+    const profileSourceTables = [
+      'candidate_experiences',
+      'candidate_education',
+      'candidate_skills',
+      'candidate_links',
+      'profile_imports',
+      'candidate_profile_field_suggestions',
+    ];
+
+    for (const tableName of profileSourceTables) {
+      expect(tableBlock(tableName), `${tableName} should reject mission-only sources`).toContain(
+        "source in ('linkedin', 'malt', 'other')"
+      );
+    }
+  });
+
   it('preserves the canonical application pipeline stages in SQL constraints', () => {
     const applications = tableBlock('applications');
     const pipelineEvents = tableBlock('application_pipeline_events');
