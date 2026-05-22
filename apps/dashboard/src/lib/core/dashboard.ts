@@ -790,6 +790,8 @@ const CONNECTED_PLATFORM_SOURCES = [
   'linkedin',
 ] as const satisfies readonly ApplicationSource[];
 
+const CV_SYNC_PLATFORM_SOURCES = ['linkedin'] as const satisfies readonly ApplicationSource[];
+
 const GENERATED_ASSET_LABELS: Record<GeneratedApplicationAssetType, string> = {
   pitch: 'Pitch',
   cover_message: 'Message recruteur',
@@ -2367,12 +2369,20 @@ function normalizeRequiredStacks(stacks: string[]): string[] {
   return normalized.slice(0, 12);
 }
 
+export const getReadyCvSyncPlatforms = (statuses: PlatformSyncStatus[]): PlatformSyncStatus[] => {
+  const cvSyncPlatformSources = new Set<ApplicationSource>(CV_SYNC_PLATFORM_SOURCES);
+
+  return statuses.filter(
+    (status) => cvSyncPlatformSources.has(status.id) && status.status === 'ready'
+  );
+};
+
 export const getCvSyncReadiness = (cv: CvSnapshot, statuses: PlatformSyncStatus[]) => {
-  const readyPlatforms = statuses.filter((status) => status.status === 'ready').length;
+  const readyPlatforms = getReadyCvSyncPlatforms(statuses).length;
 
   return {
     readyPlatforms,
-    totalPlatforms: statuses.length,
+    totalPlatforms: CV_SYNC_PLATFORM_SOURCES.length,
     canSync: cv.completeness >= 80 && readyPlatforms > 0,
   };
 };

@@ -27,6 +27,7 @@ import {
   getCvSyncReadiness,
   getDashboardFeatureAccess,
   getNextFollowUp,
+  getReadyCvSyncPlatforms,
   getSyncBlockers,
   isDashboardPremiumActive,
   mergeApplicationCompatibilityFallbacks,
@@ -319,14 +320,42 @@ describe('dashboard core', () => {
     ).toBeNull();
   });
 
-  it('derives sync readiness from CV completeness and ready platforms', () => {
+  it('derives CV sync readiness from LinkedIn profile extractor readiness', () => {
     expect(getCvSyncReadiness(cv, syncStatuses)).toEqual({
       readyPlatforms: 1,
-      totalPlatforms: 3,
+      totalPlatforms: 1,
       canSync: true,
     });
 
     expect(getCvSyncReadiness({ ...cv, completeness: 70 }, syncStatuses).canSync).toBe(false);
+  });
+
+  it('does not treat ready mission connectors as CV profile extractor readiness', () => {
+    const missionOnlyStatuses: PlatformSyncStatus[] = [
+      {
+        id: 'free-work',
+        name: 'Free-Work',
+        status: 'ready',
+        lastSyncAt: '2026-05-12T09:10:00.000Z',
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      },
+      {
+        id: 'linkedin',
+        name: 'LinkedIn',
+        status: 'needs-permission',
+        lastSyncAt: null,
+        lastErrorCode: 'permission_required',
+        lastErrorMessage: 'Permission LinkedIn manquante.',
+      },
+    ];
+
+    expect(getCvSyncReadiness(cv, missionOnlyStatuses)).toEqual({
+      readyPlatforms: 0,
+      totalPlatforms: 1,
+      canSync: false,
+    });
+    expect(getReadyCvSyncPlatforms(missionOnlyStatuses)).toEqual([]);
   });
 
   it('lists actionable sync blockers', () => {

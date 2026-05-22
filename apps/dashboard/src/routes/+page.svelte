@@ -9,6 +9,7 @@
     getCvSyncReadiness,
     getNextApplicationStages,
     getNextFollowUp,
+    getReadyCvSyncPlatforms,
     getSyncBlockers,
   } from '$lib/core/dashboard';
   import type { ActionData, PageData } from './$types';
@@ -134,7 +135,7 @@
   );
   const recentGeneratedAssets = $derived(generatedAssets.slice(0, 5));
   const syncBlockers = $derived(getSyncBlockers(cv, syncStatuses));
-  const readyPlatforms = $derived(syncStatuses.filter((platform) => platform.status === 'ready'));
+  const readyPlatforms = $derived(getReadyCvSyncPlatforms(syncStatuses));
   const cvSyncAccess = $derived(featureAccess.find((feature) => feature.id === 'cv-sync') ?? null);
   const canPrepareCvSync = $derived(readiness.canSync && Boolean(cvSyncAccess?.enabled));
   const hasSyncActionRequired = $derived(
@@ -1940,8 +1941,8 @@
             <h2 class="mt-2 text-lg font-semibold">Synchronisation extension</h2>
             <p class="mt-1 text-sm leading-6 text-text-subtle">
               {readiness.readyPlatforms}/{readiness.totalPlatforms} plateformes prêtes. La synchro CV
-              est activée uniquement pour les comptes connectés; le dashboard prépare le plan, l'extension
-              exécute la mise à jour dans les sessions navigateur existantes.
+              est activée uniquement pour les comptes connectés; le dashboard prépare le plan, et l'extension
+              extrait LinkedIn depuis la session navigateur existante.
             </p>
 
             <div class="mt-5 rounded-lg border border-border-light bg-page-canvas p-3">
@@ -2385,7 +2386,7 @@
       >
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div>
-            <p class="text-sm font-semibold text-text-primary">Prochaine action MVP</p>
+            <p class="text-sm font-semibold text-text-primary">Prochaine action CV</p>
             <p class="mt-1 text-sm leading-6 text-text-subtle">
               {canPrepareCvSync
                 ? `Préparer la mise à jour CV pour ${readyPlatforms.map((platform) => platform.name).join(', ')}.`
