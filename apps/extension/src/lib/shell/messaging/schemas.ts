@@ -221,6 +221,12 @@ const ApplicationStatusSchema = z.enum([
   'rejected',
   'archived',
 ]);
+const StatusTransitionSchema = z.object({
+  from: ApplicationStatusSchema.nullable(),
+  to: ApplicationStatusSchema,
+  timestamp: z.number().int().min(0),
+  note: z.string().max(2048).nullable(),
+});
 const IsoDateTimeOrNullSchema = z
   .string()
   .max(64)
@@ -228,6 +234,17 @@ const IsoDateTimeOrNullSchema = z
     message: 'Expected an ISO-parseable date string',
   })
   .nullable();
+const MissionTrackingSchema = z
+  .object({
+    missionId: z.string().max(256),
+    currentStatus: ApplicationStatusSchema,
+    history: z.array(StatusTransitionSchema).min(1).max(200),
+    generatedAssetIds: z.array(z.string().max(256)).max(100),
+    userRating: z.number().int().min(1).max(5).nullable(),
+    notes: z.string().max(10_000),
+    nextActionAt: IsoDateTimeOrNullSchema.optional(),
+  })
+  .refine(maxBytes(40_000), { message: 'Mission tracking payload exceeds 40KB limit' });
 
 // ── Generation ───────────────────────────────────────────────────────────────
 
@@ -516,7 +533,10 @@ export const MessageSchemas = {
       nextActionAt: IsoDateTimeOrNullSchema.optional(),
     }),
   }),
-  TRACKING_UPDATED: z.object({ type: z.literal('TRACKING_UPDATED'), payload: z.unknown() }),
+  TRACKING_UPDATED: z.object({
+    type: z.literal('TRACKING_UPDATED'),
+    payload: MissionTrackingSchema,
+  }),
   GET_TRACKINGS: z.object({
     type: z.literal('GET_TRACKINGS'),
     payload: z.object({ status: ApplicationStatusSchema.optional() }).optional(),

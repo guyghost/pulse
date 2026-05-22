@@ -497,6 +497,55 @@ describe('validateMessage — UPDATE_TRACKING_DETAILS', () => {
 });
 
 // ============================================================================
+// TRACKING_UPDATED — payload canonique
+// ============================================================================
+
+describe('validateMessage — TRACKING_UPDATED', () => {
+  it('accepte un tracking canonique complet', () => {
+    const r = validateMessage({
+      type: 'TRACKING_UPDATED',
+      payload: {
+        missionId: 'm1',
+        currentStatus: 'application_prepared',
+        history: [
+          { from: null, to: 'detected', timestamp: 1779436800000, note: null },
+          { from: 'detected', to: 'selected', timestamp: 1779436900000, note: null },
+          {
+            from: 'selected',
+            to: 'application_prepared',
+            timestamp: 1779437000000,
+            note: 'Pitch prêt',
+          },
+        ],
+        generatedAssetIds: ['asset-1'],
+        userRating: 4,
+        notes: 'Bon fit Svelte',
+        nextActionAt: '2026-05-24T09:00:00.000Z',
+      },
+    });
+
+    expect(r.valid).toBe(true);
+  });
+
+  it('rejette un tracking contenant un statut legacy', () => {
+    const r = validateMessage({
+      type: 'TRACKING_UPDATED',
+      payload: {
+        missionId: 'm1',
+        currentStatus: 'interested',
+        history: [{ from: null, to: 'new', timestamp: 1779436800000, note: null }],
+        generatedAssetIds: [],
+        userRating: null,
+        notes: '',
+        nextActionAt: null,
+      },
+    });
+
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
 // AUTH — email/password
 // ============================================================================
 
