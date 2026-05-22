@@ -1379,72 +1379,80 @@ describe('dashboard core', () => {
   });
 
   it('maps sync rows to dashboard connected sync statuses ordered by actionability', () => {
-    expect(
-      syncRowsToConnectedSyncStatuses(
+    const statuses = syncRowsToConnectedSyncStatuses(
+      [
+        {
+          device_id: 'device-1',
+          entity: 'missions',
+          last_pull_at: '2026-05-22T07:00:00.000Z',
+          last_push_at: '2026-05-22T08:00:00.000Z',
+          pending_upload_count: 0,
+          pending_download_count: 0,
+          last_error_code: null,
+          last_error_message: null,
+          retry_after_at: null,
+          updated_at: '2026-05-22T08:00:00.000Z',
+        },
+        {
+          device_id: 'device-1',
+          entity: 'applications',
+          last_pull_at: '2026-05-22T07:00:00.000Z',
+          last_push_at: null,
+          pending_upload_count: 2,
+          pending_download_count: 1,
+          last_error_code: null,
+          last_error_message: null,
+          retry_after_at: null,
+          updated_at: '2026-05-22T09:00:00.000Z',
+        },
+        {
+          device_id: 'device-2',
+          entity: 'candidate_profile',
+          last_pull_at: null,
+          last_push_at: null,
+          pending_upload_count: 0,
+          pending_download_count: 0,
+          last_error_code: 'sync_failed',
+          last_error_message: 'Supabase indisponible',
+          retry_after_at: '2026-05-22T06:05:00.000Z',
+          updated_at: '2026-05-22T06:00:00.000Z',
+        },
+        {
+          device_id: 'device-1',
+          entity: 'unknown',
+          last_pull_at: null,
+          last_push_at: null,
+          pending_upload_count: 0,
+          pending_download_count: 0,
+          last_error_code: null,
+          last_error_message: null,
+          retry_after_at: null,
+          updated_at: '2026-05-22T10:00:00.000Z',
+        },
+      ],
+      new Map([
         [
+          'device-1',
           {
-            device_id: 'device-1',
-            entity: 'missions',
-            last_pull_at: '2026-05-22T07:00:00.000Z',
-            last_push_at: '2026-05-22T08:00:00.000Z',
-            pending_upload_count: 0,
-            pending_download_count: 0,
-            last_error_code: null,
-            last_error_message: null,
-            retry_after_at: null,
-            updated_at: '2026-05-22T08:00:00.000Z',
-          },
-          {
-            device_id: 'device-1',
-            entity: 'applications',
-            last_pull_at: '2026-05-22T07:00:00.000Z',
-            last_push_at: null,
-            pending_upload_count: 2,
-            pending_download_count: 1,
-            last_error_code: null,
-            last_error_message: null,
-            retry_after_at: null,
-            updated_at: '2026-05-22T09:00:00.000Z',
-          },
-          {
-            device_id: 'device-2',
-            entity: 'candidate_profile',
-            last_pull_at: null,
-            last_push_at: null,
-            pending_upload_count: 0,
-            pending_download_count: 0,
-            last_error_code: 'sync_failed',
-            last_error_message: 'Supabase indisponible',
-            retry_after_at: '2026-05-22T06:05:00.000Z',
-            updated_at: '2026-05-22T06:00:00.000Z',
-          },
-          {
-            device_id: 'device-1',
-            entity: 'unknown',
-            last_pull_at: null,
-            last_push_at: null,
-            pending_upload_count: 0,
-            pending_download_count: 0,
-            last_error_code: null,
-            last_error_message: null,
-            retry_after_at: null,
-            updated_at: '2026-05-22T10:00:00.000Z',
+            id: 'device-1',
+            install_id: 'install-1',
+            browser: 'Chrome',
+            extension_version: '0.4.0',
+            last_seen_at: '2026-05-22T08:30:00.000Z',
           },
         ],
-        new Map([
-          [
-            'device-1',
-            {
-              id: 'device-1',
-              install_id: 'install-1',
-              browser: 'Chrome',
-              extension_version: '0.4.0',
-              last_seen_at: '2026-05-22T08:30:00.000Z',
-            },
-          ],
-        ])
-      )
-    ).toEqual([
+      ])
+    );
+
+    expect(statuses.map((status) => status.entity)).toEqual([
+      'candidate_profile',
+      'applications',
+      'candidate_profile',
+      'connector_health',
+      'alert_preferences',
+      'missions',
+    ]);
+    expect(statuses).toMatchObject([
       {
         deviceId: 'device-2',
         deviceLabel: 'Extension device-2',
@@ -1478,6 +1486,27 @@ describe('dashboard core', () => {
       {
         deviceId: 'device-1',
         deviceLabel: 'Chrome 0.4.0',
+        entity: 'candidate_profile',
+        state: 'idle',
+        updatedAt: '2026-05-22T08:30:00.000Z',
+      },
+      {
+        deviceId: 'device-1',
+        deviceLabel: 'Chrome 0.4.0',
+        entity: 'connector_health',
+        state: 'idle',
+        updatedAt: '2026-05-22T08:30:00.000Z',
+      },
+      {
+        deviceId: 'device-1',
+        deviceLabel: 'Chrome 0.4.0',
+        entity: 'alert_preferences',
+        state: 'idle',
+        updatedAt: '2026-05-22T08:30:00.000Z',
+      },
+      {
+        deviceId: 'device-1',
+        deviceLabel: 'Chrome 0.4.0',
         entity: 'missions',
         label: 'Missions',
         state: 'healthy',
@@ -1491,6 +1520,60 @@ describe('dashboard core', () => {
         updatedAt: '2026-05-22T08:00:00.000Z',
       },
     ]);
+  });
+
+  it('keeps every connected sync entity visible for registered devices without rows yet', () => {
+    const statuses = syncRowsToConnectedSyncStatuses(
+      [
+        {
+          device_id: 'device-1',
+          entity: 'missions',
+          last_pull_at: null,
+          last_push_at: '2026-05-22T08:00:00.000Z',
+          pending_upload_count: 0,
+          pending_download_count: 0,
+          last_error_code: null,
+          last_error_message: null,
+          retry_after_at: null,
+          updated_at: '2026-05-22T08:00:00.000Z',
+        },
+      ],
+      new Map([
+        [
+          'device-1',
+          {
+            id: 'device-1',
+            install_id: 'install-1',
+            browser: 'Chrome',
+            extension_version: '0.4.0',
+            last_seen_at: '2026-05-22T08:30:00.000Z',
+          },
+        ],
+      ])
+    );
+
+    expect(statuses.map((status) => status.entity)).toEqual([
+      'applications',
+      'candidate_profile',
+      'connector_health',
+      'alert_preferences',
+      'missions',
+    ]);
+    expect(statuses.filter((status) => status.state === 'idle')).toHaveLength(4);
+    expect(statuses.find((status) => status.entity === 'applications')).toMatchObject({
+      deviceId: 'device-1',
+      deviceLabel: 'Chrome 0.4.0',
+      label: 'Candidatures',
+      state: 'idle',
+      lastPullAt: null,
+      lastPushAt: null,
+      pendingUploadCount: 0,
+      pendingDownloadCount: 0,
+      lastErrorCode: null,
+      lastErrorMessage: null,
+      retryAfterAt: null,
+      updatedAt: '2026-05-22T08:30:00.000Z',
+    });
   });
 
   it('maps sync conflict rows to dashboard conflicts and filters invalid states', () => {

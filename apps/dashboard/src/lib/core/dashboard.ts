@@ -836,6 +836,14 @@ const CONNECTED_SYNC_ENTITY_LABELS: Record<ConnectedSyncEntity, string> = {
   alert_preferences: 'Alertes missions',
 };
 
+const CONNECTED_SYNC_ENTITIES = [
+  'missions',
+  'applications',
+  'candidate_profile',
+  'connector_health',
+  'alert_preferences',
+] as const satisfies readonly ConnectedSyncEntity[];
+
 const SYNC_CONFLICT_ENTITY_LABELS: Record<DashboardSyncConflictEntity, string> = {
   applications: 'Candidature',
   candidate_profile: 'Profil CV',
@@ -1497,7 +1505,43 @@ export function syncRowsToConnectedSyncStatuses(
   rows: DashboardSyncStatusRow[],
   devicesById: Map<string, DashboardExtensionDeviceRow>
 ): ConnectedSyncStatus[] {
-  return rows
+  const rowsByDeviceAndEntity = new Map<string, DashboardSyncStatusRow>();
+  const validRows: DashboardSyncStatusRow[] = [];
+
+  for (const row of rows) {
+    if (!isConnectedSyncEntity(row.entity)) {
+      continue;
+    }
+
+    validRows.push(row);
+    rowsByDeviceAndEntity.set(`${row.device_id}:${row.entity}`, row);
+  }
+
+  const expandedDeviceRows = [...devicesById.keys()].flatMap((deviceId) => {
+    const device = devicesById.get(deviceId) ?? null;
+    const fallbackUpdatedAt = device?.last_seen_at ?? '1970-01-01T00:00:00.000Z';
+
+    return CONNECTED_SYNC_ENTITIES.map((entity): DashboardSyncStatusRow => {
+      const row = rowsByDeviceAndEntity.get(`${deviceId}:${entity}`);
+      return (
+        row ?? {
+          device_id: deviceId,
+          entity,
+          last_pull_at: null,
+          last_push_at: null,
+          pending_upload_count: 0,
+          pending_download_count: 0,
+          last_error_code: null,
+          last_error_message: null,
+          retry_after_at: null,
+          updated_at: fallbackUpdatedAt,
+        }
+      );
+    });
+  });
+  const orphanRows = validRows.filter((row) => !devicesById.has(row.device_id));
+
+  return [...expandedDeviceRows, ...orphanRows]
     .flatMap((row) => {
       if (!isConnectedSyncEntity(row.entity)) {
         return [];
@@ -1527,6 +1571,7 @@ export function syncRowsToConnectedSyncStatuses(
       (a, b) =>
         getConnectedSyncStateRank(a.state) - getConnectedSyncStateRank(b.state) ||
         b.updatedAt.localeCompare(a.updatedAt) ||
+        getConnectedSyncEntityRank(a.entity) - getConnectedSyncEntityRank(b.entity) ||
         a.label.localeCompare(b.label)
     );
 }
@@ -1616,6 +1661,10 @@ function getConnectedSyncStateRank(state: ConnectedSyncState): number {
     return 2;
   }
   return 3;
+}
+
+function getConnectedSyncEntityRank(entity: ConnectedSyncEntity): number {
+  return CONNECTED_SYNC_ENTITIES.indexOf(entity);
 }
 
 function getSyncConflictStatusRank(status: DashboardSyncConflictStatus): number {
