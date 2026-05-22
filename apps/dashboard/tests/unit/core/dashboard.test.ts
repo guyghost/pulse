@@ -6,6 +6,7 @@ import {
   canonicalRowsToApplications,
   dashboardAlertPreferencesRowToSnapshot,
   buildApplicationDetailsUpdatePatch,
+  buildDashboardPipelineClientEventId,
   buildApplicationSyncConflictResolution,
   buildCvProfileUpdatePatch,
   buildConnectedDataDeletionRequest,
@@ -1454,6 +1455,28 @@ describe('dashboard core', () => {
       archived_at: '2026-05-22T08:00:00.000Z',
       updated_by: 'dashboard',
     });
+  });
+
+  it('builds deterministic dashboard pipeline event ids for idempotent inserts', () => {
+    expect(
+      buildDashboardPipelineClientEventId({
+        action: 'transition',
+        applicationId: 'app-001',
+        revision: 3,
+        fromStage: 'selected',
+        toStage: 'application_prepared',
+      })
+    ).toBe('dashboard:transition:app-001:3:selected:application_prepared');
+
+    expect(
+      buildDashboardPipelineClientEventId({
+        action: 'select',
+        applicationId: 'app-001',
+        revision: 1,
+        fromStage: null,
+        toStage: 'detected',
+      })
+    ).toBe('dashboard:select:app-001:1:none:detected');
   });
 
   it('builds the insert patch for selecting a detected mission', () => {

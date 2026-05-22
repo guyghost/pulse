@@ -555,6 +555,16 @@ export interface ApplicationStageUpdatePatch {
   updated_by: 'dashboard';
 }
 
+export type DashboardPipelineClientEventAction = 'select' | 'archive' | 'transition' | 'conflict';
+
+export interface DashboardPipelineClientEventIdInput {
+  action: DashboardPipelineClientEventAction;
+  applicationId: string;
+  revision: number;
+  fromStage: ApplicationStage | null;
+  toStage: ApplicationStage;
+}
+
 export interface ApplicationSelectionInsertPatch {
   stage: 'selected';
   notes: string;
@@ -1559,6 +1569,19 @@ export function buildApplicationStageUpdatePatch(
     archived_at: stage === 'archived' ? occurredAt : null,
     updated_by: 'dashboard',
   };
+}
+
+export function buildDashboardPipelineClientEventId(
+  input: DashboardPipelineClientEventIdInput
+): string {
+  return [
+    'dashboard',
+    input.action,
+    input.applicationId,
+    String(input.revision),
+    input.fromStage ?? 'none',
+    input.toStage,
+  ].join(':');
 }
 
 export function buildMissionSelectionInsertPatch(): ApplicationSelectionInsertPatch {

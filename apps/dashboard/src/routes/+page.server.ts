@@ -13,6 +13,7 @@ import {
   buildApplicationDetailsUpdatePatch,
   buildApplicationStageUpdatePatch,
   buildApplicationSyncConflictResolution,
+  buildDashboardPipelineClientEventId,
   buildConnectedDataDeletionRequest,
   buildCvFieldSuggestionResolution,
   buildEmptyCvSnapshot,
@@ -836,7 +837,13 @@ export const actions: Actions = {
           toStage: resolution.stageTransition,
           occurredAt,
           createdBy: 'dashboard',
-          clientEventId: `dashboard:conflict:${application.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+          clientEventId: buildDashboardPipelineClientEventId({
+            action: 'conflict',
+            applicationId: application.id,
+            revision: application.revision,
+            fromStage: application.stage,
+            toStage: resolution.stageTransition,
+          }),
           note: 'Conflit de synchronisation résolu depuis le dashboard.',
         });
 
@@ -1249,7 +1256,13 @@ export const actions: Actions = {
           toStage: 'selected',
           occurredAt,
           createdBy: 'dashboard',
-          clientEventId: `dashboard:select:${existingApplication.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+          clientEventId: buildDashboardPipelineClientEventId({
+            action: 'select',
+            applicationId: existingApplication.id,
+            revision: existingApplication.revision,
+            fromStage: 'detected',
+            toStage: 'selected',
+          }),
           note: 'Mission sélectionnée depuis le feed dashboard.',
         });
 
@@ -1342,7 +1355,13 @@ export const actions: Actions = {
       toStage: 'selected',
       occurredAt,
       createdBy: 'dashboard',
-      clientEventId: `dashboard:select:${application.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+      clientEventId: buildDashboardPipelineClientEventId({
+        action: 'select',
+        applicationId: application.id,
+        revision: patch.revision,
+        fromStage: 'detected',
+        toStage: 'selected',
+      }),
       note: 'Mission sélectionnée depuis le feed dashboard.',
     });
 
@@ -1428,7 +1447,13 @@ export const actions: Actions = {
           toStage: 'archived',
           occurredAt,
           createdBy: 'dashboard',
-          clientEventId: `dashboard:archive:${existingApplication.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+          clientEventId: buildDashboardPipelineClientEventId({
+            action: 'archive',
+            applicationId: existingApplication.id,
+            revision: existingApplication.revision,
+            fromStage: 'detected',
+            toStage: 'archived',
+          }),
           note: 'Mission archivée depuis le feed dashboard.',
         });
 
@@ -1522,7 +1547,13 @@ export const actions: Actions = {
       toStage: 'archived',
       occurredAt,
       createdBy: 'dashboard',
-      clientEventId: `dashboard:archive:${application.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+      clientEventId: buildDashboardPipelineClientEventId({
+        action: 'archive',
+        applicationId: application.id,
+        revision: patch.revision,
+        fromStage: 'detected',
+        toStage: 'archived',
+      }),
       note: 'Mission archivée depuis le feed dashboard.',
     });
 
@@ -1600,7 +1631,13 @@ export const actions: Actions = {
       toStage,
       occurredAt,
       createdBy: 'dashboard',
-      clientEventId: `dashboard:${applicationId}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+      clientEventId: buildDashboardPipelineClientEventId({
+        action: 'transition',
+        applicationId,
+        revision: application.revision,
+        fromStage: application.stage,
+        toStage,
+      }),
     });
 
     if (!event) {
