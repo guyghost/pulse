@@ -3,6 +3,7 @@ import {
   countApplicationsByStage,
   canonicalRowsToApplications,
   buildApplicationDetailsUpdatePatch,
+  buildCvProfileUpdatePatch,
   buildTjmRadarSnapshot,
   filterApplications,
   favoriteMissionToApplication,
@@ -971,5 +972,30 @@ describe('dashboard core', () => {
 
     expect(buildApplicationDetailsUpdatePatch('', 6, null)).toBeNull();
     expect(buildApplicationDetailsUpdatePatch('', 3, '25/05/2026')).toBeNull();
+  });
+
+  it('builds validated canonical CV profile update patches', () => {
+    expect(
+      buildCvProfileUpdatePatch(
+        '  Consultant Frontend Senior  ',
+        '  Architecture Svelte, TypeScript et design systems.  ',
+        '  Lead Frontend Svelte  '
+      )
+    ).toEqual({
+      title: 'Consultant Frontend Senior',
+      summary: 'Architecture Svelte, TypeScript et design systems.',
+      target_role: 'Lead Frontend Svelte',
+    });
+
+    expect(buildCvProfileUpdatePatch('Profil', '', '')).toEqual({
+      title: 'Profil',
+      summary: '',
+      target_role: null,
+    });
+
+    expect(buildCvProfileUpdatePatch('', 'Résumé', 'Lead')).toBeNull();
+    expect(buildCvProfileUpdatePatch('x'.repeat(121), '', '')).toBeNull();
+    expect(buildCvProfileUpdatePatch('Profil', 'x'.repeat(4001), '')).toBeNull();
+    expect(buildCvProfileUpdatePatch('Profil', '', 'x'.repeat(121))).toBeNull();
   });
 });

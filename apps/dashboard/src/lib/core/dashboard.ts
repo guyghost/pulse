@@ -416,6 +416,12 @@ export interface ApplicationDetailsUpdatePatch {
   updated_by: 'dashboard';
 }
 
+export interface CvProfileUpdatePatch {
+  title: string;
+  summary: string;
+  target_role: string | null;
+}
+
 export interface ApplicationFilters {
   query: string;
   source: 'all' | ApplicationSource;
@@ -1096,6 +1102,31 @@ export function buildApplicationDetailsUpdatePatch(
     user_rating: userRating,
     next_action_at: nextActionDate ? `${nextActionDate}T12:00:00.000Z` : null,
     updated_by: 'dashboard',
+  };
+}
+
+export function buildCvProfileUpdatePatch(
+  title: string,
+  summary: string,
+  targetRole: string
+): CvProfileUpdatePatch | null {
+  const normalizedTitle = title.trim();
+  const normalizedSummary = summary.trim();
+  const normalizedTargetRole = targetRole.trim();
+
+  if (
+    normalizedTitle.length === 0 ||
+    normalizedTitle.length > 120 ||
+    normalizedSummary.length > 4000 ||
+    normalizedTargetRole.length > 120
+  ) {
+    return null;
+  }
+
+  return {
+    title: normalizedTitle,
+    summary: normalizedSummary,
+    target_role: normalizedTargetRole.length > 0 ? normalizedTargetRole : null,
   };
 }
 

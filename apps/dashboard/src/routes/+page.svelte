@@ -1226,6 +1226,67 @@
               Dernière mise à jour : {formatDate(cv.updatedAt)}
             </p>
 
+            {#if form?.cvError}
+              <p
+                class="mt-4 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
+              >
+                {form.cvError}
+              </p>
+            {/if}
+
+            {#if form?.cvSuccess}
+              <p
+                class="mt-4 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
+              >
+                {form.cvSuccess}
+              </p>
+            {/if}
+
+            <form
+              method="POST"
+              action="?/updateCvProfile"
+              class="mt-5 border-t border-border-light pt-4"
+            >
+              <p class="text-xs font-medium uppercase text-text-subtle">Édition canonique</p>
+              <label class="mt-3 block text-xs font-medium text-text-subtle" for="cv-title">
+                Titre du profil
+                <input
+                  id="cv-title"
+                  name="title"
+                  value={cv.title}
+                  maxlength="120"
+                  class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                />
+              </label>
+              <label class="mt-3 block text-xs font-medium text-text-subtle" for="cv-target-role">
+                Rôle cible
+                <input
+                  id="cv-target-role"
+                  name="targetRole"
+                  value={cv.targetRole}
+                  maxlength="120"
+                  class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                />
+              </label>
+              <label class="mt-3 block text-xs font-medium text-text-subtle" for="cv-summary">
+                Résumé
+                <textarea
+                  id="cv-summary"
+                  name="summary"
+                  maxlength="4000"
+                  class="mt-1 min-h-24 w-full resize-y rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-sm leading-6 text-text-primary outline-none focus:border-blueprint-blue/40"
+                  value={cv.summary}
+                ></textarea>
+              </label>
+              <button
+                type="submit"
+                class="mt-3 inline-flex h-8 items-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-40"
+                disabled={!isConnected}
+              >
+                Enregistrer le profil CV
+              </button>
+            </form>
+
             <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
               <div class="rounded-lg bg-page-canvas px-3 py-2">
                 <p class="text-text-muted">Expériences</p>

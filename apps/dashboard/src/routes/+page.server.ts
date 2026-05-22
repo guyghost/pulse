@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
   buildApplicationDetailsUpdatePatch,
   buildApplicationStageUpdatePatch,
+  buildCvProfileUpdatePatch,
   buildMissionSelectionInsertPatch,
   buildTjmRadarSnapshot,
   canonicalRowsToApplications,
@@ -313,6 +314,11 @@ type ApplicationTransitionRow = {
 };
 
 type ApplicationDetailsRow = {
+  id: string;
+  revision: number;
+};
+
+type CvProfileEditRow = {
   id: string;
   revision: number;
 };
@@ -656,6 +662,98 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
+  updateCvProfile: async ({ cookies, request }) => {
+    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasSupabaseConfig) {
+      return fail(503, { cvError: 'Configuration Supabase absente.' });
+    }
+
+    const supabase = createSupabaseServerClient(cookies);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return fail(401, { cvError: 'Session requise.' });
+    }
+
+    const formData = await request.formData();
+    const title = formData.get('title');
+    const summary = formData.get('summary');
+    const targetRole = formData.get('targetRole');
+
+    if (
+      typeof title !== 'string' ||
+      typeof summary !== 'string' ||
+      typeof targetRole !== 'string'
+    ) {
+      return fail(400, { cvError: 'Profil CV invalide.' });
+    }
+
+    const patch = buildCvProfileUpdatePatch(title, summary, targetRole);
+    if (!patch) {
+      return fail(400, {
+        cvError: 'Titre requis. Résumé et rôle cible trop longs refusés.',
+      });
+    }
+
+    const updatedAt = new Date().toISOString();
+    const { data: currentProfile, error: readError } = await supabase
+      .from('candidate_profiles')
+      .select('id, revision')
+      .eq('user_id', session.user.id)
+      .maybeSingle<CvProfileEditRow>();
+
+    if (readError) {
+      return fail(500, { cvError: "Le profil CV n'a pas pu être lu." });
+    }
+
+    if (!currentProfile) {
+      const { error: insertError } = await supabase
+        .from('candidate_profiles')
+        .insert({
+          user_id: session.user.id,
+          ...patch,
+          completeness: 20,
+          revision: 1,
+          updated_at: updatedAt,
+        })
+        .select('id')
+        .single<{ id: string }>();
+
+      if (insertError) {
+        return fail(500, { cvError: "Le profil CV n'a pas pu être créé." });
+      }
+
+      return { cvSuccess: 'Profil CV créé.' };
+    }
+
+    const { error: updateError } = await supabase
+      .from('candidate_profiles')
+      .update({
+        ...patch,
+        revision: currentProfile.revision + 1,
+        updated_at: updatedAt,
+      })
+      .eq('id', currentProfile.id)
+      .eq('user_id', session.user.id)
+      .eq('revision', currentProfile.revision)
+      .select('id')
+      .single<{ id: string }>();
+
+    if (updateError) {
+      if (updateError.code !== 'PGRST116') {
+        return fail(500, { cvError: "Le profil CV n'a pas pu être enregistré." });
+      }
+
+      return fail(409, {
+        cvError: "Le profil CV a changé depuis l'ouverture de la page. Rechargez avant d'éditer.",
+      });
+    }
+
+    return { cvSuccess: 'Profil CV enregistré.' };
+  },
+
   updateApplicationDetails: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
