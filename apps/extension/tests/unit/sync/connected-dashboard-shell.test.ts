@@ -492,6 +492,14 @@ describe('connected dashboard shell sync', () => {
         last_error_code: null,
       })
     );
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'applications',
+        last_push_at: '2026-05-21T09:00:00.000Z',
+        pending_upload_count: 0,
+        last_error_code: null,
+      })
+    );
   });
 
   it('pushes duplicate source missions and mission duplicate relations', async () => {

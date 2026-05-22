@@ -1000,6 +1000,14 @@ export async function pushMissionsToConnectedDashboard(
       buildSyncStatusRow({
         userId: input.userId,
         deviceId: input.deviceId,
+        entity: 'applications',
+        lastPushAt: input.now,
+      })
+    );
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
         entity: 'missions',
         lastPushAt: input.now,
       })
