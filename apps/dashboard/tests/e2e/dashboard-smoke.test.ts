@@ -28,6 +28,10 @@ test.describe('connected dashboard smoke', () => {
     await expect(page.getByRole('heading', { name: 'Synchronisation extension' })).toBeVisible();
     await expect(page.getByText('Alertes missions')).toBeVisible();
     await expect(page.getByText('Aucun appareil extension enregistré')).toBeVisible();
+    const syncSection = page.locator('section#sync');
+    await expect(syncSection.getByText('Free-Work', { exact: true })).toBeVisible();
+    await expect(syncSection.getByText('LinkedIn', { exact: true })).toBeVisible();
+    await expect(syncSection.getByText('Extension requise').first()).toBeVisible();
   });
 
   test('renders connected data export and delete privacy controls safely when signed out', async ({

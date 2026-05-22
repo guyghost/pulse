@@ -236,6 +236,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
     const entitlements = getAnonymousEntitlements();
     const missionFeed: [] = [];
 
+    const syncStatuses = healthEventsToPlatformSyncStatuses([]);
+
     return {
       session: null,
       loginUrl,
@@ -248,7 +250,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       applicationTimeline: [],
       generatedAssets: [],
       cv: buildEmptyCvSnapshot({ updatedAt: new Date().toISOString() }),
-      syncStatuses: [],
+      syncStatuses,
       connectedSyncStatuses: [],
       syncConflicts: [],
       alertPreferences: dashboardAlertPreferencesRowToSnapshot(null, new Date().toISOString()),
