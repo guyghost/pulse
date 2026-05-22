@@ -372,7 +372,11 @@ create table if not exists public.mission_scores (
   criteria jsonb not null default '{}'::jsonb,
   semantic_reason text,
   scorer_version text not null,
-  scored_at timestamptz not null
+  scored_at timestamptz not null,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.mission_duplicates (
@@ -876,6 +880,12 @@ create policy "Users can manage own connector health events"
 drop trigger if exists on_missions_updated on public.missions;
 create trigger on_missions_updated
   before update on public.missions
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_mission_scores_updated on public.mission_scores;
+create trigger on_mission_scores_updated
+  before update on public.mission_scores
   for each row
   execute function public.update_updated_at();
 

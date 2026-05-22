@@ -184,6 +184,8 @@ describe('connected dashboard sync payload builders', () => {
       semantic_reason: 'Très bon match Svelte',
       scorer_version: 'missionpulse-v1',
       scored_at: '2026-05-21T08:01:00.000Z',
+      revision: 1,
+      updated_by: 'extension',
     });
   });
 

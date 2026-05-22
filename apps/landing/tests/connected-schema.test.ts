@@ -52,6 +52,9 @@ describe('connected dashboard schema', () => {
   it('includes columns required by extension-dashboard sync conflict handling', () => {
     expect(tableBlock('missions')).toContain('revision bigint not null');
     expect(tableBlock('missions')).toContain('updated_by text not null');
+    expect(tableBlock('mission_scores')).toContain('revision bigint not null');
+    expect(tableBlock('mission_scores')).toContain('updated_by text not null');
+    expect(tableBlock('mission_scores')).toContain('updated_at timestamptz not null default now()');
     expect(tableBlock('candidate_profiles')).toContain('updated_by text not null');
     expect(tableBlock('sync_status')).toContain('retry_after_at timestamptz');
     expect(tableBlock('sync_conflicts')).toContain(

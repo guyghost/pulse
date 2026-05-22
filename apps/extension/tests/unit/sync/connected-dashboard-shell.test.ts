@@ -572,6 +572,8 @@ describe('connected dashboard shell sync', () => {
         mission_id: 'remote-mission-1',
         deterministic_score: 84,
         total_score: 84,
+        revision: 1,
+        updated_by: 'extension',
       }),
     ]);
     expect(gateway.insertDetectedApplications).toHaveBeenCalledWith([

@@ -63,6 +63,8 @@ export interface MissionScoreUpsertRow {
   semantic_reason: string | null;
   scorer_version: string;
   scored_at: string;
+  revision: number;
+  updated_by: 'extension';
 }
 
 export interface MissionDuplicateUpsertRow {
@@ -508,6 +510,8 @@ export function buildMissionScoreUpsertRow(
     semantic_reason: mission.scoreBreakdown?.semanticReason ?? mission.semanticReason,
     scorer_version: scorerVersion,
     scored_at: scoredAt.toISOString(),
+    revision: 1,
+    updated_by: 'extension',
   };
 }
 
