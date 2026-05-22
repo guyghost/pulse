@@ -1,7 +1,9 @@
 import { test, expect } from '@playwright/test';
 import {
   showHiddenMissions,
+  allMissionsToggle,
   ensureFeedVisible,
+  favoritesToggle,
   waitForMissions,
   expectMissionCount,
 } from './helpers';
@@ -72,11 +74,11 @@ test.describe('Hidden Missions Flow', () => {
     await expectMissionCount(page, initialCount - 1);
 
     // Show only favorites
-    await page.getByTitle('Voir favoris').click();
+    await favoritesToggle(page).click();
     await expectMissionCount(page, 1);
 
     // Back to all
-    await page.getByTitle('Voir toutes').click();
+    await allMissionsToggle(page).click();
     await expectMissionCount(page, initialCount - 1);
     await expect(page.getByRole('button', { name: /Voir les 1 mission/ })).toBeVisible({
       timeout: 5000,

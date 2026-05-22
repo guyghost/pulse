@@ -4,6 +4,8 @@ import {
   expectMissionCount,
   feedSearchInput,
   injectMissions,
+  missionCards,
+  scanButton,
   setFeedState,
 } from './helpers';
 
@@ -130,7 +132,7 @@ test.describe('Feed', () => {
     await expectMissionCount(page, 5);
 
     // Cards should be visible — the IntersectionObserver marks them as seen
-    const firstCard = page.locator('[role="button"]').first();
+    const firstCard = missionCards(page).first();
     await expect(firstCard).toBeVisible();
 
     // New cards should have a visual indicator (border-l-4 class for left border)
@@ -166,7 +168,7 @@ test.describe('Feed', () => {
 
     await expectMissionCount(page, 5);
 
-    const firstCard = page.locator('[role="button"]').first();
+    const firstCard = missionCards(page).first();
     await expect(firstCard).toBeVisible();
 
     // Verify all action buttons exist and are enabled (interactive)
@@ -197,7 +199,7 @@ test.describe('Feed', () => {
 
     await expectMissionCount(page, 5);
 
-    const firstCard = page.locator('[role="button"]').first();
+    const firstCard = missionCards(page).first();
     const starBtn = firstCard.getByTitle('Ajouter aux favoris');
     await expect(starBtn).toBeVisible();
 
@@ -222,7 +224,7 @@ test.describe('Feed', () => {
     await expectMissionCount(page, 5);
 
     // Hide the first mission
-    const firstCard = page.locator('[role="button"]').first();
+    const firstCard = missionCards(page).first();
     const hideBtn = firstCard.getByTitle('Masquer');
     await hideBtn.click();
 
@@ -244,7 +246,7 @@ test.describe('Feed', () => {
     await expectMissionCount(page, 5);
 
     // Favorite the first mission
-    const firstCard = page.locator('[role="button"]').first();
+    const firstCard = missionCards(page).first();
     await firstCard.getByTitle('Ajouter aux favoris').click();
     await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 1000 });
 
@@ -269,7 +271,7 @@ test.describe('Feed', () => {
     // Favorites filter button — text is "Favoris" when not active
     await expect(page.getByRole('button', { name: /Favoris/ })).toBeVisible();
     // Refresh/scan button is visible (title changes based on state)
-    await expect(page.getByTitle(/Lancer le scan|Rafraichir|Scan en cours/)).toBeVisible();
+    await expect(scanButton(page)).toBeVisible();
   });
 
   test('ARIA attributes for accessibility are properly set', async ({ page }) => {

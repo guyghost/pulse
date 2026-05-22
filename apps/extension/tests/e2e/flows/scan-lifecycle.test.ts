@@ -4,6 +4,8 @@ import {
   expectMissionCount,
   feedSearchInput,
   injectMissions,
+  scanButton,
+  clearFeedSearch,
   waitForMissions,
 } from '../helpers';
 
@@ -18,7 +20,7 @@ test.describe('Scan Lifecycle', () => {
   test('refresh button is visible and clickable', async ({ page }) => {
     await ensureFeedVisible(page);
 
-    const refreshBtn = page.getByTitle('Rafraichir');
+    const refreshBtn = scanButton(page);
     await expect(refreshBtn).toBeVisible();
     await expect(refreshBtn).toBeEnabled();
   });
@@ -59,7 +61,7 @@ test.describe('Scan Lifecycle', () => {
     await expect(feedSearchInput(page)).toHaveValue('React');
 
     // Clear search restores all
-    await feedSearchInput(page).clear();
+    await clearFeedSearch(page);
     await page.waitForTimeout(300);
     await expectMissionCount(page, 10);
   });

@@ -1,24 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { SIDE_PANEL, injectMissions, toggleOffline } from './helpers';
-
-async function ensureFeedIsVisible(page: Page) {
-  await page.goto(SIDE_PANEL);
-
-  if (
-    await page
-      .getByText('Votre profil cible')
-      .isVisible()
-      .catch(() => false)
-  ) {
-    await page.locator('#ob-firstname').fill('Jean');
-    await page.locator('#ob-jobtitle').fill('Développeur React Senior');
-    await page.locator('#ob-location').fill('Paris');
-    await page.getByRole('button', { name: /C'est parti/ }).click();
-  }
-
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Feed' })).toBeVisible();
-}
+import { ensureFeedVisible, injectMissions, toggleOffline } from './helpers';
 
 async function seedTJMHistory(page: Page) {
   await page.evaluate(async () => {
@@ -81,14 +62,14 @@ async function seedTJMHistory(page: Page) {
 
 test.describe('TJM page', () => {
   test('shows TJM tab in main navigation', async ({ page }) => {
-    await ensureFeedIsVisible(page);
+    await ensureFeedVisible(page);
     await expect(
       page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })
     ).toBeVisible();
   });
 
   test('shows an empty state when no TJM history exists', async ({ page }) => {
-    await ensureFeedIsVisible(page);
+    await ensureFeedVisible(page);
 
     await page.evaluate(async () => {
       await chrome.storage.local.remove('tjm_history');
@@ -102,7 +83,7 @@ test.describe('TJM page', () => {
   });
 
   test('renders dashboard data when TJM history is available', async ({ page }) => {
-    await ensureFeedIsVisible(page);
+    await ensureFeedVisible(page);
     await seedTJMHistory(page);
 
     await page
@@ -118,7 +99,7 @@ test.describe('TJM page', () => {
   });
 
   test('shows cached TJM data while offline', async ({ page }) => {
-    await ensureFeedIsVisible(page);
+    await ensureFeedVisible(page);
     await injectMissions(page, 3);
     await seedTJMHistory(page);
 

@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { ensureFeedVisible, waitForMissions, expectMissionCount } from './helpers';
+import {
+  allMissionsToggle,
+  ensureFeedVisible,
+  favoritesToggle,
+  waitForMissions,
+  expectMissionCount,
+} from './helpers';
 
 test.describe('Favorites Flow', () => {
   test('marks a mission as favorite and star becomes filled', async ({ page }) => {
@@ -38,13 +44,13 @@ test.describe('Favorites Flow', () => {
     await expect(card.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 3000 });
 
     // Toggle favorites filter
-    await page.getByTitle('Voir favoris').click();
+    await favoritesToggle(page).click();
     await page.waitForTimeout(500);
 
     await expectMissionCount(page, 1);
 
     // Toggle back
-    await page.getByTitle('Voir toutes').click();
+    await allMissionsToggle(page).click();
     await expectMissionCount(page, initialCount);
   });
 
@@ -52,7 +58,7 @@ test.describe('Favorites Flow', () => {
     await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
-    await page.getByTitle('Voir favoris').click();
+    await favoritesToggle(page).click();
     await page.waitForTimeout(500);
 
     await expectMissionCount(page, 0);

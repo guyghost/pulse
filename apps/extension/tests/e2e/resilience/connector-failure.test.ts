@@ -1,8 +1,10 @@
 import { test, expect } from '@playwright/test';
 import {
   ensureFeedVisible,
-  openDevPanel,
+  expectMissionCount,
   injectMissions,
+  missionCards,
+  scanButton,
   waitForMissions,
   setFeedState,
 } from '../helpers';
@@ -13,11 +15,10 @@ test.describe('Connector Resilience', () => {
     await ensureFeedVisible(page);
 
     // Simuler une erreur 500 via le dev panel
-    await openDevPanel(page);
     await setFeedState(page, 'error');
 
     // Vérifier le message d'erreur
-    await expect(page.getByText(/Erreur|error/i)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('[Dev] Simulated error')).toBeVisible({ timeout: 3000 });
   });
 
   test('continues scanning when one connector fails', async ({ page }) => {
@@ -28,11 +29,11 @@ test.describe('Connector Resilience', () => {
     await waitForMissions(page, 5, 5000);
 
     // Vérifier que les missions sont affichées (les autres connecteurs ont continué)
-    const missionCount = await page.locator('[role="button"]').count();
+    const missionCount = await missionCards(page).count();
     expect(missionCount).toBe(5);
 
     // Vérifier que le compteur affiche 5 missions
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 5, 2000);
   });
 
   test('shows typed error message for connector failure', async ({ page }) => {
@@ -225,7 +226,7 @@ test.describe('Connector Resilience', () => {
     await waitForMissions(page, 1, 10000);
 
     // Vérifier qu'on a des missions malgré les échecs
-    const missionCount = await page.locator('text=/\\d+ mission/').textContent();
+    const missionCount = await page.locator('text=/\\d+ mission/').first().textContent();
     expect(missionCount).toMatch(/\d+ mission/);
   });
 
@@ -367,7 +368,7 @@ test.describe('Connector Resilience', () => {
     });
 
     // Relancer le scan
-    await page.getByTitle('Rafraichir').click();
+    await scanButton(page).click();
 
     // Attendre que ça fonctionne
     await waitForMissions(page, 1, 10000);

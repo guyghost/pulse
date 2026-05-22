@@ -57,10 +57,14 @@
 
   function devInjectMissions(count: number) {
     const missions = generateMockMissions(count);
+    window.localStorage.setItem('__missionpulse_dev_missions', JSON.stringify(missions));
     window.dispatchEvent(new CustomEvent('dev:missions', { detail: missions }));
   }
 
   function devSetState(state: 'empty' | 'loading' | 'loaded' | 'error') {
+    if (state === 'empty') {
+      window.localStorage.setItem('__missionpulse_dev_missions', JSON.stringify([]));
+    }
     window.dispatchEvent(new CustomEvent('dev:feed-state', { detail: state }));
   }
 

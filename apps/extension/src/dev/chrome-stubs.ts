@@ -1,6 +1,27 @@
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
 import { analyzeTJMHistory } from '$lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
+import type { Mission } from '$lib/core/types/mission';
+
+const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
+const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
+
+function readDevStorage<T>(key: string, fallback: T): T {
+  try {
+    const raw = window.localStorage.getItem(key);
+    return raw ? (JSON.parse(raw) as T) : fallback;
+  } catch {
+    return fallback;
+  }
+}
+
+function writeDevStorage(key: string, value: unknown): void {
+  try {
+    window.localStorage.setItem(key, JSON.stringify(value));
+  } catch {
+    // Dev-only persistence should never break the app shell.
+  }
+}
 
 const storage: Record<string, unknown> = {
   settings: {
@@ -14,11 +35,12 @@ const storage: Record<string, unknown> = {
     customDelayMs: 0,
     theme: 'system',
   },
-  favoriteMissions: {},
+  favoriteMissions: readDevStorage<Record<string, number>>(DEV_FAVORITES_STORAGE_KEY, {}),
   hiddenMissions: {},
   seenMissions: [],
   newMissionCount: 0,
   feedSortBy: 'score',
+  profile: mockProfile,
   first_scan_done: true,
   profile_banner_dismissed: false,
   onboarding_completed: true,
@@ -42,9 +64,10 @@ function createChromeStubs() {
             storage.settings = message.payload;
             return { type: 'SETTINGS_SAVED', payload: { saved: true, settings: message.payload } };
           case 'GET_PROFILE':
-            return { type: 'PROFILE_RESULT', payload: mockProfile };
+            return { type: 'PROFILE_RESULT', payload: storage.profile ?? null };
           case 'SAVE_PROFILE':
             console.log('[Chrome Stub] Profile saved:', message.payload);
+            storage.profile = message.payload;
             return { type: 'PROFILE_RESULT', payload: message.payload };
           case 'VERIFY_PROFILE_PAGE': {
             const p = message.payload as Record<string, unknown> | undefined;
@@ -60,12 +83,18 @@ function createChromeStubs() {
           case 'GET_FEED_MISSIONS':
             return {
               type: 'FEED_MISSIONS_RESULT',
-              payload: mockMissions.map((m) => ({ ...m, scrapedAt: new Date() })),
+              payload: readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions).map(
+                (m) => ({
+                  ...m,
+                  scrapedAt: new Date(),
+                })
+              ),
             };
           case 'GET_FEED_FAVORITES':
             return { type: 'FEED_FAVORITES_RESULT', payload: storage.favoriteMissions };
           case 'SAVE_FEED_FAVORITES':
             storage.favoriteMissions = message.payload;
+            writeDevStorage(DEV_FAVORITES_STORAGE_KEY, message.payload);
             return { type: 'FEED_FAVORITES_SAVED', payload: { saved: true } };
           case 'GET_FEED_HIDDEN':
             return { type: 'FEED_HIDDEN_RESULT', payload: storage.hiddenMissions };
@@ -151,9 +180,10 @@ function createChromeStubs() {
             return { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } };
           case 'SCAN_START':
             setTimeout(() => {
+              const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions);
               window.dispatchEvent(
                 new CustomEvent('dev:missions', {
-                  detail: mockMissions.map((m) => ({ ...m, scrapedAt: new Date() })),
+                  detail: missions.map((m) => ({ ...m, scrapedAt: new Date() })),
                 })
               );
             }, 800);

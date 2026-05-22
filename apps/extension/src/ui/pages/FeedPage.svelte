@@ -211,7 +211,10 @@
                   >
                     MissionPulse
                   </p>
-                  <div class="mt-1 flex items-baseline gap-3">
+                  <div
+                    class="mt-1 flex items-baseline gap-3"
+                    aria-label={`${page.visibleCount} missions visibles`}
+                  >
                     <span class="text-lg font-semibold text-text-primary">{page.visibleCount}</span>
                     <span class="text-[10px] text-text-muted">missions</span>
                     {#if page.favoriteCount > 0}
@@ -371,7 +374,10 @@
             {/if}
 
             <div class="mt-6 grid grid-cols-3 gap-3">
-              <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
+              <div
+                class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5"
+                aria-label={`${page.visibleCount} missions visibles`}
+              >
                 <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Visibles</p>
                 <p class="mt-2 text-xl font-semibold text-text-primary">{page.visibleCount}</p>
               </div>
@@ -549,6 +555,7 @@
 
   <!-- ── Mission feed ── -->
   <div
+    data-testid="mission-feed"
     class="flex-1 overflow-y-auto px-4 pb-5 transition-[padding,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {hideMissionPulseCard
       ? 'pt-2'
       : 'pt-4'}"

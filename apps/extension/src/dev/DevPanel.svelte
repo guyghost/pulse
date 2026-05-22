@@ -111,11 +111,11 @@
           <input
             type="range"
             min="0"
-            max="50"
+            max="500"
             bind:value={missionCount}
             class="flex-1 accent-blueprint-blue"
           />
-          <span class="text-xs font-mono text-text-secondary w-6 text-right">{missionCount}</span>
+          <span class="text-xs font-mono text-text-secondary w-10 text-right">{missionCount}</span>
           <button
             class="px-2 py-1 text-[11px] font-mono rounded bg-blueprint-blue/20 text-blueprint-blue hover:bg-blueprint-blue/30 transition-colors"
             onclick={() => onInjectMissions?.(missionCount)}
