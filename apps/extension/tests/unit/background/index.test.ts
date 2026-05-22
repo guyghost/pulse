@@ -8,11 +8,25 @@ const saveSeenIds = vi.fn();
 const setNewMissionCount = vi.fn();
 const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
+const getMissions = vi.fn();
+const saveConnectorStatuses = vi.fn();
+const getAllTrackings = vi.fn();
+const getAllHealthSnapshots = vi.fn();
+const resetHealthSnapshot = vi.fn();
+const syncConnectedDashboardScan = vi.fn();
+const syncConnectedDashboardSnapshot = vi.fn();
 const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
 
 let alarmListener: ((alarm: { name: string }) => Promise<void>) | undefined;
+let messageListener:
+  | ((
+      message: unknown,
+      sender: chrome.runtime.MessageSender,
+      sendResponse: (response: unknown) => void
+    ) => boolean | void)
+  | undefined;
 
 const makeMission = (overrides: Partial<Mission> = {}): Mission => ({
   id: 'mission-1',
@@ -39,7 +53,17 @@ vi.stubGlobal('chrome', {
   },
   runtime: {
     onMessage: {
-      addListener: vi.fn(),
+      addListener: vi.fn(
+        (
+          listener: (
+            message: unknown,
+            sender: chrome.runtime.MessageSender,
+            sendResponse: (response: unknown) => void
+          ) => boolean | void
+        ) => {
+          messageListener = listener;
+        }
+      ),
     },
     onInstalled: {
       addListener: vi.fn(),
@@ -91,6 +115,15 @@ vi.stubGlobal('chrome', {
 
 vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
   getSettings,
+  setSettings: vi.fn(async () => undefined),
+}));
+
+vi.mock('../../../src/lib/shell/storage/db', () => ({
+  getProfile: vi.fn(async () => null),
+  saveProfile: vi.fn(async () => undefined),
+  saveConnectorStatuses,
+  getMissionById: vi.fn(async () => null),
+  getMissions,
 }));
 
 vi.mock('../../../src/lib/shell/scan/scanner', () => ({
@@ -106,9 +139,33 @@ vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
   setNewMissionCount,
 }));
 
+vi.mock('../../../src/lib/shell/storage/tracking', () => ({
+  getTracking: vi.fn(async () => null),
+  saveTracking: vi.fn(async () => undefined),
+  getAllTrackings,
+  getTrackingsByStatus: vi.fn(async () => []),
+}));
+
+vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
+  getAllHealthSnapshots,
+  resetHealthSnapshot,
+}));
+
 vi.mock('../../../src/lib/shell/notifications/notify-missions', () => ({
   notifyHighScoreMissions,
   setupNotificationClickHandler,
+}));
+
+vi.mock('../../../src/lib/shell/sync/connected-dashboard', () => ({
+  getConnectedDashboardSyncStatus: vi.fn(async () => ({
+    authenticated: true,
+    installId: 'install-1',
+    lastGlobalSync: 1779340800000,
+  })),
+  syncConnectedDashboardScan,
+  syncConnectedDashboardSnapshot,
+  syncConnectedDashboardProfileImport: vi.fn(),
+  syncConnectedDashboardTracking: vi.fn(),
 }));
 
 describe('background auto-scan notifications', () => {
@@ -145,6 +202,17 @@ describe('background auto-scan notifications', () => {
     notifyHighScoreMissions.mockResolvedValue({
       shown: true,
       notifiedMissionIds: ['mission-1'],
+    });
+    getMissions.mockResolvedValue([makeMission()]);
+    getAllTrackings.mockResolvedValue([]);
+    getAllHealthSnapshots.mockResolvedValue(new Map());
+    syncConnectedDashboardScan.mockResolvedValue({
+      ok: true,
+      value: { missions: 1, connectorHealth: 0 },
+    });
+    syncConnectedDashboardSnapshot.mockResolvedValue({
+      ok: true,
+      value: { missions: 1, applications: 0, skippedApplications: 0, connectorHealth: 0 },
     });
   });
 
@@ -188,5 +256,32 @@ describe('background auto-scan notifications', () => {
     expect(setNewMissionCount).toHaveBeenCalledWith(0);
     expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
+  });
+
+  it('handles explicit connected dashboard retry messages', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.({ type: 'RETRY_CONNECTED_SYNC' }, {}, sendResponse);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(getMissions).toHaveBeenCalled();
+    expect(getAllTrackings).toHaveBeenCalled();
+    expect(syncConnectedDashboardSnapshot).toHaveBeenCalledWith({
+      missions: [expect.objectContaining({ id: 'mission-1' })],
+      trackings: [],
+      healthSnapshots: [],
+    });
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'CONNECTED_DASHBOARD_SYNCED',
+      payload: {
+        synced: true,
+        missions: 1,
+        applications: 0,
+        skippedApplications: 0,
+        connectorHealth: 0,
+      },
+    });
   });
 });

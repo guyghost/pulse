@@ -255,6 +255,7 @@ export const MessageSchemas = {
     }),
   }),
   SYNC_CONNECTED_DASHBOARD: z.object({ type: z.literal('SYNC_CONNECTED_DASHBOARD') }),
+  RETRY_CONNECTED_SYNC: z.object({ type: z.literal('RETRY_CONNECTED_SYNC') }),
   CONNECTED_DASHBOARD_SYNCED: z.object({
     type: z.literal('CONNECTED_DASHBOARD_SYNCED'),
     payload: z.object({

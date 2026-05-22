@@ -556,6 +556,7 @@ Keep `favorite_missions` during migration as a compatibility source. It should b
   - pipeline events: insert-only with `client_event_id`.
   - profile import: transaction-like batch from normalized profile snapshot.
 - Pull uses `updated_at > cursor` and excludes rows last written by the same device when possible.
+- Manual retry from the side panel uses the `RETRY_CONNECTED_SYNC` bridge message and replays the same local snapshot reconciliation path as scheduled sync.
 
 ### Conflict Resolution
 

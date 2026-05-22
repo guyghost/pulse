@@ -97,6 +97,7 @@ export type BridgeMessage =
   | { type: 'GET_CONNECTED_SYNC_STATUS' }
   | { type: 'CONNECTED_SYNC_STATUS_RESULT'; payload: ConnectedDashboardSyncStatus }
   | { type: 'SYNC_CONNECTED_DASHBOARD' }
+  | { type: 'RETRY_CONNECTED_SYNC' }
   | {
       type: 'CONNECTED_DASHBOARD_SYNCED';
       payload: {

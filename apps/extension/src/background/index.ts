@@ -309,6 +309,15 @@ async function recheckConnectorHealth(
   }
 }
 
+async function syncConnectedDashboardFromLocalState() {
+  const [missions, trackings, healthSnapshots] = await Promise.all([
+    getMissions(),
+    getAllTrackings(),
+    loadConnectorHealthSnapshots(),
+  ]);
+  return syncConnectedDashboardSnapshot({ missions, trackings, healthSnapshots });
+}
+
 async function persistScanResults(
   missions: import('../lib/core/types/mission').Mission[],
   errors: { connectorId: string; message: string }[]
@@ -893,15 +902,8 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
-    if (message.type === 'SYNC_CONNECTED_DASHBOARD') {
-      (async () => {
-        const [missions, trackings, healthSnapshots] = await Promise.all([
-          getMissions(),
-          getAllTrackings(),
-          loadConnectorHealthSnapshots(),
-        ]);
-        return syncConnectedDashboardSnapshot({ missions, trackings, healthSnapshots });
-      })()
+    if (message.type === 'SYNC_CONNECTED_DASHBOARD' || message.type === 'RETRY_CONNECTED_SYNC') {
+      syncConnectedDashboardFromLocalState()
         .then((result) => {
           if (!result.ok) {
             sendResponse({
@@ -923,7 +925,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         })
         .catch((err) => {
           if (import.meta.env.DEV) {
-            console.warn('[MissionPulse] SYNC_CONNECTED_DASHBOARD error:', err);
+            console.warn(`[MissionPulse] ${message.type} error:`, err);
           }
           sendResponse({
             type: 'CONNECTED_DASHBOARD_SYNCED',

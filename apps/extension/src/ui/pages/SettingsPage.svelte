@@ -10,6 +10,8 @@
   import { createAuthStore } from '$lib/state/auth.svelte';
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast } from '$lib/shell/notifications/toast-service';
+  import { sendMessage } from '$lib/shell/messaging/bridge';
+  import type { BridgeMessage } from '$lib/shell/messaging/bridge';
 
   const DASHBOARD_BASE_URL =
     import.meta.env.VITE_DASHBOARD_URL ??
@@ -38,6 +40,58 @@
   const auth = createAuthStore();
   settings.load();
   auth.checkStatus();
+
+  let connectedSyncStatus = $state<{
+    authenticated: boolean;
+    installId: string | null;
+    lastGlobalSync: number | null;
+  } | null>(null);
+  let connectedSyncLoading = $state(false);
+  let connectedSyncRetrying = $state(false);
+  let connectedSyncError = $state<string | null>(null);
+
+  async function loadConnectedSyncStatus() {
+    connectedSyncLoading = true;
+    connectedSyncError = null;
+    try {
+      const response = await sendMessage({ type: 'GET_CONNECTED_SYNC_STATUS' });
+      if (response.type === 'CONNECTED_SYNC_STATUS_RESULT') {
+        connectedSyncStatus = response.payload;
+      }
+    } catch (error) {
+      connectedSyncError = error instanceof Error ? error.message : 'Statut de sync indisponible';
+    } finally {
+      connectedSyncLoading = false;
+    }
+  }
+
+  async function retryConnectedSync() {
+    connectedSyncRetrying = true;
+    connectedSyncError = null;
+    try {
+      const response: BridgeMessage = await sendMessage({ type: 'RETRY_CONNECTED_SYNC' });
+      if (response.type !== 'CONNECTED_DASHBOARD_SYNCED') {
+        connectedSyncError = 'Réponse de sync inattendue';
+        return;
+      }
+
+      if (!response.payload.synced) {
+        connectedSyncError = response.payload.reason ?? 'Retry de sync impossible';
+        await showToast(connectedSyncError, 'error');
+        return;
+      }
+
+      await showToast('Synchronisation dashboard relancée', 'success');
+      await loadConnectedSyncStatus();
+    } catch (error) {
+      connectedSyncError = error instanceof Error ? error.message : 'Retry de sync impossible';
+      await showToast(connectedSyncError, 'error');
+    } finally {
+      connectedSyncRetrying = false;
+    }
+  }
+
+  loadConnectedSyncStatus();
 
   async function handleExportFavorites(format: ExportFormat) {
     const result = await settings.exportFavorites(format);
@@ -125,6 +179,77 @@
       }}
       onRefresh={() => auth.checkStatus()}
     />
+
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <h3 class="text-sm font-medium text-text-primary">Dashboard connecté</h3>
+          <p class="mt-1 text-xs text-text-subtle">
+            Relancer l'envoi des missions, candidatures et statuts connecteurs vers Supabase.
+          </p>
+        </div>
+        <span
+          class="rounded-full border px-2 py-1 text-[10px] font-medium {connectedSyncStatus?.authenticated
+            ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
+            : 'border-border-light bg-page-canvas text-text-subtle'}"
+        >
+          {connectedSyncStatus?.authenticated ? 'Connecté' : 'Déconnecté'}
+        </span>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            Installation
+          </p>
+          <p class="mt-1 truncate text-xs font-medium text-text-primary">
+            {connectedSyncStatus?.installId ?? 'Non enregistrée'}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            Dernière sync
+          </p>
+          <p class="mt-1 text-xs font-medium text-text-primary">
+            {connectedSyncStatus?.lastGlobalSync
+              ? new Intl.DateTimeFormat('fr-FR', {
+                  day: '2-digit',
+                  month: 'short',
+                  hour: '2-digit',
+                  minute: '2-digit',
+                }).format(new Date(connectedSyncStatus.lastGlobalSync))
+              : 'Aucune'}
+          </p>
+        </div>
+      </div>
+
+      {#if connectedSyncError}
+        <p
+          class="rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
+        >
+          {connectedSyncError}
+        </p>
+      {/if}
+
+      <div class="flex flex-wrap gap-2">
+        <Button
+          variant="secondary"
+          onclick={retryConnectedSync}
+          disabled={connectedSyncRetrying || connectedSyncLoading}
+        >
+          {#snippet children()}
+            <Icon name="refresh-cw" size={14} class="mr-1" />
+            {connectedSyncRetrying ? 'Synchronisation...' : 'Retenter la sync'}
+          {/snippet}
+        </Button>
+        <Button variant="ghost" onclick={loadConnectedSyncStatus} disabled={connectedSyncLoading}>
+          {#snippet children()}
+            <Icon name="database" size={14} class="mr-1" />
+            Actualiser
+          {/snippet}
+        </Button>
+      </div>
+    </div>
 
     <!-- Profil -->
     <ProfileSection

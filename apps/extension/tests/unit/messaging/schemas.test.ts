@@ -236,6 +236,10 @@ describe('validateMessage — connected dashboard sync', () => {
     expect(validateMessage({ type: 'SYNC_CONNECTED_DASHBOARD' }).valid).toBe(true);
   });
 
+  it('accepte une demande explicite de retry sync connecté', () => {
+    expect(validateMessage({ type: 'RETRY_CONNECTED_SYNC' }).valid).toBe(true);
+  });
+
   it('accepte un résultat de statut sync connecté', () => {
     const r = validateMessage({
       type: 'CONNECTED_SYNC_STATUS_RESULT',
