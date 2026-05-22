@@ -63,6 +63,21 @@ describe('connected dashboard schema', () => {
     expect(tableBlock('dashboard_alert_preferences')).toContain('required_stacks text[]');
   });
 
+  it('enforces one pending sync conflict or CV suggestion per field', () => {
+    expect(schemaSql).toContain(
+      'create unique index if not exists idx_sync_conflicts_pending_unique'
+    );
+    expect(schemaSql).toContain("where status = 'pending'");
+    expect(schemaSql).toContain(
+      "coalesce(device_id, '00000000-0000-0000-0000-000000000000'::uuid)"
+    );
+    expect(schemaSql).toContain(
+      'create unique index if not exists idx_candidate_profile_field_suggestions_pending_unique'
+    );
+    expect(schemaSql).toContain('on public.candidate_profile_field_suggestions');
+    expect(schemaSql).toContain('(user_id, profile_id, field, source)');
+  });
+
   it('preserves the canonical application pipeline stages in SQL constraints', () => {
     const applications = tableBlock('applications');
     const pipelineEvents = tableBlock('application_pipeline_events');

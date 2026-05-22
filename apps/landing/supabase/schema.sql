@@ -924,11 +924,25 @@ create index if not exists idx_extension_devices_user_last_seen
 create index if not exists idx_sync_conflicts_user_pending
   on public.sync_conflicts (user_id, status, detected_at desc);
 
+create unique index if not exists idx_sync_conflicts_pending_unique
+  on public.sync_conflicts (
+    user_id,
+    coalesce(device_id, '00000000-0000-0000-0000-000000000000'::uuid),
+    entity,
+    entity_id,
+    field
+  )
+  where status = 'pending';
+
 create index if not exists idx_candidate_profile_field_suggestions_user_pending
   on public.candidate_profile_field_suggestions (user_id, status, created_at desc);
 
 create index if not exists idx_candidate_profile_field_suggestions_profile
   on public.candidate_profile_field_suggestions (profile_id, created_at desc);
+
+create unique index if not exists idx_candidate_profile_field_suggestions_pending_unique
+  on public.candidate_profile_field_suggestions (user_id, profile_id, field, source)
+  where status = 'pending';
 
 create index if not exists idx_connector_health_events_user_occurred
   on public.connector_health_events (user_id, occurred_at desc);
