@@ -5,6 +5,7 @@ import {
   buildApplicationUpsertRow,
   buildCandidateProfileFieldSuggestionRows,
   filterNewCandidateProfileFieldSuggestionRows,
+  filterNewSyncConflictRows,
   buildCandidateProfileImportRows,
   buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
@@ -1014,6 +1015,32 @@ describe('connected dashboard sync payload builders', () => {
         detectedAt: '2026-05-21T12:00:00.000Z',
       })
     ).toEqual([]);
+  });
+
+  it('filters sync conflict rows that already have pending dashboard conflicts', () => {
+    const rows = buildApplicationSyncConflictRows({
+      userId: 'user-1',
+      deviceId: 'device-1',
+      existing: tracking,
+      remote: {
+        id: 'application-1',
+        mission_id: 'remote-mission-1',
+        mission_source: 'free-work',
+        mission_external_id: 'free-work-123',
+        stage: 'offer',
+        user_rating: 5,
+        notes: 'Offre reçue côté dashboard',
+        next_action_at: '2026-05-28T09:00:00.000Z',
+        revision: 4,
+        updated_at: '2026-05-21T11:00:00.000Z',
+      },
+      detectedAt: '2026-05-21T12:00:00.000Z',
+    });
+
+    expect(filterNewSyncConflictRows(rows, ['stage', 'notes'])).toEqual([
+      expect.objectContaining({ field: 'user_rating' }),
+      expect.objectContaining({ field: 'next_action_at' }),
+    ]);
   });
 
   it('advances the application pull cursor only when every remote row is handled', () => {

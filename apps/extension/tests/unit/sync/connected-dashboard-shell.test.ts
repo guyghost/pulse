@@ -148,6 +148,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
     upsertCandidateProfile: vi.fn(async () => ({ id: 'profile-1', revision: 3 })),
     replaceCandidateProfileChildren: vi.fn(async () => undefined),
     listPendingCandidateProfileSuggestionFields: vi.fn(async () => []),
+    listPendingSyncConflictFields: vi.fn(async () => []),
     insertCandidateProfileFieldSuggestions: vi.fn(async () => undefined),
     insertSyncConflicts: vi.fn(async () => undefined),
     insertProfileImport: vi.fn(async () => undefined),
@@ -1244,6 +1245,46 @@ describe('connected dashboard shell sync', () => {
         local_value: '2026-05-24T09:00:00.000Z',
         remote_value: '2026-05-28T09:00:00.000Z',
       }),
+    ]);
+  });
+
+  it('does not recreate pending application sync conflicts on repeated dashboard pulls', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.listApplicationsUpdatedSince).mockResolvedValueOnce([
+      {
+        id: 'application-1',
+        mission_id: 'remote-mission-1',
+        mission_source: 'free-work',
+        mission_external_id: 'free-work-123',
+        stage: 'offer',
+        user_rating: 5,
+        notes: 'Offre reçue côté dashboard',
+        next_action_at: '2026-05-28T09:00:00.000Z',
+        revision: 2,
+        updated_at: '2026-05-21T11:00:00.000Z',
+      },
+    ]);
+    vi.mocked(gateway.listPendingSyncConflictFields).mockResolvedValueOnce(['stage', 'notes']);
+
+    const result = await pullApplicationsFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      localMissionIdsByRemoteId: new Map([['remote-mission-1', 'free-work-123']]),
+      existingTrackings: new Map([['free-work-123', tracking]]),
+      since: new Date('2026-05-21T09:00:00.000Z'),
+      now: new Date('2026-05-21T12:00:00.000Z'),
+    });
+
+    expect(result.ok).toBe(true);
+    expect(gateway.listPendingSyncConflictFields).toHaveBeenCalledWith({
+      userId: 'user-1',
+      deviceId: 'device-1',
+      entity: 'applications',
+      entityId: 'application-1',
+    });
+    expect(gateway.insertSyncConflicts).toHaveBeenCalledWith([
+      expect.objectContaining({ field: 'user_rating' }),
+      expect.objectContaining({ field: 'next_action_at' }),
     ]);
   });
 

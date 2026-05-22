@@ -17,6 +17,7 @@ import {
   buildProfileExtractorHealthEventRow,
   buildSyncStatusRow,
   filterNewCandidateProfileFieldSuggestionRows,
+  filterNewSyncConflictRows,
   mergeRemoteApplicationTracking,
   remoteCandidateProfileToUserProfile,
   remoteAlertPreferencesToConnectedPreferences,
@@ -42,6 +43,7 @@ import {
   type SyncEntity,
   type SyncStatusRow,
   type SyncConflictInsertRow,
+  type SyncConflictField,
 } from '../../core/sync/connected-dashboard';
 import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
 import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
@@ -129,6 +131,12 @@ export interface ConnectedDashboardSyncGateway {
     links: CandidateLinkInsertRow[];
   }): Promise<void>;
   insertCandidateProfileFieldSuggestions(rows: CandidateProfileFieldSuggestionRow[]): Promise<void>;
+  listPendingSyncConflictFields(input: {
+    userId: string;
+    deviceId: string;
+    entity: SyncConflictInsertRow['entity'];
+    entityId: string;
+  }): Promise<SyncConflictField[]>;
   insertSyncConflicts(rows: SyncConflictInsertRow[]): Promise<void>;
   insertProfileImport(row: ProfileImportInsertRow): Promise<void>;
   upsertSyncStatus(row: SyncStatusRow): Promise<void>;
@@ -709,6 +717,26 @@ function parsePendingCandidateProfileSuggestionFields(
   );
 }
 
+function isSyncConflictField(value: unknown): value is SyncConflictField {
+  return (
+    value === 'stage' ||
+    value === 'notes' ||
+    value === 'user_rating' ||
+    value === 'next_action_at' ||
+    isCandidateProfileSuggestionField(value)
+  );
+}
+
+function parsePendingSyncConflictFields(data: unknown): SyncConflictField[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap((row) =>
+    isRecord(row) && isSyncConflictField(row.field) ? [row.field] : []
+  );
+}
+
 async function selectOrThrow<T>(
   builder: SupabaseWriteBuilder,
   columns: string,
@@ -972,6 +1000,23 @@ export function createSupabaseConnectedDashboardGateway(
         'id',
         () => undefined
       );
+    },
+    listPendingSyncConflictFields: async ({ userId, deviceId, entity, entityId }) => {
+      const { data, error } = await supabase
+        .from('sync_conflicts')
+        .select('field')
+        .eq('user_id', userId)
+        .eq('device_id', deviceId)
+        .eq('entity', entity)
+        .eq('entity_id', entityId)
+        .eq('status', 'pending')
+        .order('detected_at', { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return parsePendingSyncConflictFields(data);
     },
     insertSyncConflicts: async (rows) => {
       if (rows.length === 0) {
@@ -1272,15 +1317,23 @@ export async function pullApplicationsFromConnectedDashboard(
       }
 
       const existingTracking = input.existingTrackings.get(localMissionId) ?? null;
-      conflictRows.push(
-        ...buildApplicationSyncConflictRows({
-          userId: input.userId,
-          deviceId: input.deviceId,
-          existing: existingTracking,
-          remote: application,
-          detectedAt: input.now.toISOString(),
-        })
-      );
+      const candidateConflictRows = buildApplicationSyncConflictRows({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        existing: existingTracking,
+        remote: application,
+        detectedAt: input.now.toISOString(),
+      });
+      const pendingConflictFields =
+        candidateConflictRows.length > 0
+          ? await gateway.listPendingSyncConflictFields({
+              userId: input.userId,
+              deviceId: input.deviceId,
+              entity: 'applications',
+              entityId: application.id,
+            })
+          : [];
+      conflictRows.push(...filterNewSyncConflictRows(candidateConflictRows, pendingConflictFields));
 
       trackings.push(
         mergeRemoteApplicationTracking(

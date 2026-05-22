@@ -179,6 +179,7 @@ export interface RemoteCandidateProfileSnapshot {
 
 export type CandidateProfileSuggestionField = 'title' | 'summary' | 'target_role';
 export type ApplicationSyncConflictField = 'stage' | 'notes' | 'user_rating' | 'next_action_at';
+export type SyncConflictField = ApplicationSyncConflictField | CandidateProfileSuggestionField;
 
 export interface CandidateProfileFieldSuggestionRow {
   user_id: string;
@@ -195,7 +196,7 @@ export interface SyncConflictInsertRow {
   device_id: string;
   entity: 'applications' | 'candidate_profile';
   entity_id: string;
-  field: ApplicationSyncConflictField | CandidateProfileSuggestionField;
+  field: SyncConflictField;
   local_value: string | null;
   remote_value: string | null;
   local_updated_by: 'extension';
@@ -883,6 +884,18 @@ export function buildCandidateProfileSyncConflictRows(input: {
     status: 'pending',
     detected_at: input.detectedAt,
   }));
+}
+
+export function filterNewSyncConflictRows(
+  rows: SyncConflictInsertRow[],
+  pendingFields: readonly SyncConflictField[]
+): SyncConflictInsertRow[] {
+  if (rows.length === 0 || pendingFields.length === 0) {
+    return rows;
+  }
+
+  const pending = new Set<SyncConflictField>(pendingFields);
+  return rows.filter((row) => !pending.has(row.field));
 }
 
 function conflictValue(value: ApplicationStage | number | string | null): string | null {
