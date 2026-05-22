@@ -129,6 +129,8 @@ function createGateway(): ConnectedDashboardSyncGateway {
       {
         id: 'application-1',
         mission_id: 'remote-mission-1',
+        mission_source: 'free-work',
+        mission_external_id: 'free-work-123',
         stage: 'offer',
         user_rating: 5,
         notes: 'Offre reçue',
@@ -1003,8 +1005,68 @@ describe('connected dashboard shell sync', () => {
     );
   });
 
-  it('records pending downloads when pulled applications do not map to local missions', async () => {
+  it('maps pulled applications by mission external id when remote id was not pushed in this sync', async () => {
     const gateway = createGateway();
+
+    const result = await pullApplicationsFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      localMissionIdsByRemoteId: new Map(),
+      existingTrackings: new Map(),
+      since: null,
+      now: new Date('2026-05-21T12:00:00.000Z'),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        pulledCount: 1,
+        skippedCount: 0,
+        trackings: [
+          {
+            missionId: 'free-work-123',
+            currentStatus: 'offer',
+            history: [
+              {
+                from: null,
+                to: 'offer',
+                timestamp: 1779364800000,
+                note: 'Import dashboard revision 5',
+              },
+            ],
+            generatedAssetIds: [],
+            userRating: 5,
+            notes: 'Offre reçue',
+            nextActionAt: '2026-05-28T09:00:00.000Z',
+          },
+        ],
+        nextCursor: '2026-05-21T11:00:00.000Z',
+      },
+    });
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'applications',
+        pending_download_count: 0,
+      })
+    );
+  });
+
+  it('records pending downloads when pulled applications expose no local mission identity', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.listApplicationsUpdatedSince).mockResolvedValueOnce([
+      {
+        id: 'application-1',
+        mission_id: 'remote-mission-1',
+        mission_source: null,
+        mission_external_id: null,
+        stage: 'offer',
+        user_rating: 5,
+        notes: 'Offre reçue',
+        next_action_at: '2026-05-28T09:00:00.000Z',
+        revision: 5,
+        updated_at: '2026-05-21T11:00:00.000Z',
+      },
+    ]);
 
     const result = await pullApplicationsFromConnectedDashboard(gateway, {
       userId: 'user-1',

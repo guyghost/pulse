@@ -750,6 +750,8 @@ describe('connected dashboard sync payload builders', () => {
     const remoteApplication: RemoteApplicationSnapshot = {
       id: 'application-1',
       mission_id: 'remote-mission-1',
+      mission_source: 'free-work',
+      mission_external_id: 'free-work-123',
       stage: 'interview',
       user_rating: 5,
       notes: 'Entretien mardi',
@@ -782,6 +784,8 @@ describe('connected dashboard sync payload builders', () => {
     const remoteApplication: RemoteApplicationSnapshot = {
       id: 'application-1',
       mission_id: 'remote-mission-1',
+      mission_source: 'free-work',
+      mission_external_id: 'free-work-123',
       stage: 'offer',
       user_rating: 5,
       notes: 'Offre reçue',
@@ -815,6 +819,8 @@ describe('connected dashboard sync payload builders', () => {
       {
         id: 'application-older',
         mission_id: 'remote-mission-1',
+        mission_source: 'free-work',
+        mission_external_id: 'free-work-123',
         stage: 'selected',
         user_rating: null,
         notes: '',
@@ -825,6 +831,8 @@ describe('connected dashboard sync payload builders', () => {
       {
         id: 'application-newer',
         mission_id: 'remote-mission-2',
+        mission_source: 'lehibou',
+        mission_external_id: 'lehibou-456',
         stage: 'offer',
         user_rating: 5,
         notes: 'Offre reçue',

@@ -48,6 +48,7 @@ import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { Mission, MissionSource } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 import type { MissionTracking } from '../../core/types/tracking';
+import { isMissionSource } from '../../core/types/type-guards';
 import { getSupabaseClient } from '../auth/supabase-client';
 import { getMissionById, getProfile, saveProfile } from '../storage/db';
 import { saveConnectedAlertPreferences } from '../storage/connected-alert-preferences';
@@ -450,6 +451,7 @@ function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapsh
   }
 
   return data.flatMap((item) => {
+    const mission = isRecord(item) ? parseRemoteApplicationMissionIdentity(item.missions) : null;
     if (
       isRecord(item) &&
       typeof item.id === 'string' &&
@@ -465,6 +467,8 @@ function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapsh
         {
           id: item.id,
           mission_id: item.mission_id,
+          mission_source: mission?.source ?? null,
+          mission_external_id: mission?.externalId ?? null,
           stage: item.stage,
           user_rating: item.user_rating,
           notes: item.notes,
@@ -476,6 +480,22 @@ function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapsh
     }
     return [];
   });
+}
+
+function parseRemoteApplicationMissionIdentity(
+  value: unknown
+): { source: MissionSource; externalId: string } | null {
+  const row = Array.isArray(value) ? value[0] : value;
+  if (
+    isRecord(row) &&
+    isMissionSource(row.source) &&
+    typeof row.external_id === 'string' &&
+    row.external_id.length > 0
+  ) {
+    return { source: row.source, externalId: row.external_id };
+  }
+
+  return null;
 }
 
 interface RemoteSyncStatusSnapshot {
@@ -729,7 +749,9 @@ export function createSupabaseConnectedDashboardGateway(
     listApplicationsUpdatedSince: async ({ userId, since }) => {
       let query = supabase
         .from('applications')
-        .select('id,mission_id,stage,user_rating,notes,next_action_at,revision,updated_at')
+        .select(
+          'id,mission_id,stage,user_rating,notes,next_action_at,revision,updated_at,missions!inner(source,external_id)'
+        )
         .eq('user_id', userId);
       if (since) {
         query = query.gt('updated_at', since);
@@ -1142,7 +1164,9 @@ export async function pullApplicationsFromConnectedDashboard(
     let skippedCount = 0;
 
     for (const application of remoteApplications) {
-      const localMissionId = input.localMissionIdsByRemoteId.get(application.mission_id);
+      const localMissionId =
+        input.localMissionIdsByRemoteId.get(application.mission_id) ??
+        application.mission_external_id;
       if (!localMissionId) {
         skippedCount++;
         continue;

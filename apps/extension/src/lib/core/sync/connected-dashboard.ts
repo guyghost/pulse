@@ -264,6 +264,8 @@ export interface CandidateProfileImportRows {
 export interface RemoteApplicationSnapshot {
   id: string;
   mission_id: string;
+  mission_source: MissionSource | null;
+  mission_external_id: string | null;
   stage: ApplicationStage;
   user_rating: number | null;
   notes: string;
