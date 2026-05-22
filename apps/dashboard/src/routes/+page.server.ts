@@ -574,6 +574,13 @@ export const actions: Actions = {
       return fail(500, { alertError: "Les préférences d'alertes n'ont pas pu être enregistrées." });
     }
 
+    await markEntityPendingExtensionPull(
+      supabase,
+      session.user.id,
+      'alert_preferences',
+      new Date().toISOString()
+    );
+
     return { alertSuccess: "Préférences d'alertes enregistrées." };
   },
 
@@ -684,6 +691,15 @@ export const actions: Actions = {
 
     if (conflictUpdateError) {
       return fail(500, { cvError: "Le conflit de synchronisation n'a pas pu être traité." });
+    }
+
+    if (resolution.profile) {
+      await markEntityPendingExtensionPull(
+        supabase,
+        session.user.id,
+        'candidate_profile',
+        resolvedAt
+      );
     }
 
     return {
@@ -875,6 +891,13 @@ export const actions: Actions = {
         return fail(500, { cvError: "Le profil CV n'a pas pu être créé." });
       }
 
+      await markEntityPendingExtensionPull(
+        supabase,
+        session.user.id,
+        'candidate_profile',
+        updatedAt
+      );
+
       return { cvSuccess: 'Profil CV créé.' };
     }
 
@@ -901,6 +924,8 @@ export const actions: Actions = {
         cvError: "Le profil CV a changé depuis l'ouverture de la page. Rechargez avant d'éditer.",
       });
     }
+
+    await markEntityPendingExtensionPull(supabase, session.user.id, 'candidate_profile', updatedAt);
 
     return { cvSuccess: 'Profil CV enregistré.' };
   },
