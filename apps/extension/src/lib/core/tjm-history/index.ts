@@ -592,7 +592,9 @@ export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
   }
 
   // Check if any records have real seniority data
-  const hasRealSeniority = history.records.some((r) => r.seniority !== null);
+  const hasRealSeniority = history.records.some(
+    (r) => r.seniority !== null && r.seniority !== undefined
+  );
 
   let junior: TJMRange;
   let confirmed: TJMRange;

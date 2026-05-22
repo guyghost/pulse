@@ -1,10 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { SIDE_PANEL, openDevPanel, closeDevPanel, captureMemoryMetrics } from '../helpers';
+import {
+  captureMemoryMetrics,
+  closeDevPanel,
+  ensureFeedVisible,
+  feedSearchInput,
+  openDevPanel,
+} from '../helpers';
 
 test.describe('Performance - Virtual List', () => {
   test('renders large dataset efficiently', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Ouvrir le dev panel
     await openDevPanel(page);
@@ -34,8 +39,7 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('only renders visible items in DOM', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter 500 missions
     await openDevPanel(page);
@@ -64,8 +68,7 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('handles rapid scrolling efficiently', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter 300 missions
     await openDevPanel(page);
@@ -108,8 +111,7 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('no memory leaks with large dataset', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Mesurer mémoire de départ
     const initialMemory = await captureMemoryMetrics(page);
@@ -162,8 +164,7 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('smooth scroll performance with 500 items', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter 500 missions
     await openDevPanel(page);
@@ -209,8 +210,7 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('search performance with large dataset', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter 300 missions
     await openDevPanel(page);
@@ -225,7 +225,7 @@ test.describe('Performance - Virtual List', () => {
 
     // Mesurer le temps de recherche
     const searchStart = Date.now();
-    const searchInput = page.getByPlaceholder('Rechercher...');
+    const searchInput = feedSearchInput(page);
     await searchInput.fill('React');
 
     // Attendre que les résultats se mettent à jour
@@ -249,8 +249,7 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('filter toggle performance with large dataset', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter 200 missions
     await openDevPanel(page);
@@ -292,8 +291,7 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('maintains scroll position when filtering', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter 200 missions
     await openDevPanel(page);

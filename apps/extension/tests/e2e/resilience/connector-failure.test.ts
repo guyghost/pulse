@@ -1,6 +1,6 @@
 import { test, expect } from '@playwright/test';
 import {
-  SIDE_PANEL,
+  ensureFeedVisible,
   openDevPanel,
   injectMissions,
   waitForMissions,
@@ -10,8 +10,7 @@ import { generateBalancedDataset } from '../../fixtures/large-dataset';
 
 test.describe('Connector Resilience', () => {
   test('handles connector HTTP 500 error gracefully', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Simuler une erreur 500 via le dev panel
     await openDevPanel(page);
@@ -22,8 +21,7 @@ test.describe('Connector Resilience', () => {
   });
 
   test('continues scanning when one connector fails', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter des missions normalement
     await injectMissions(page, 5);
@@ -87,14 +85,13 @@ test.describe('Connector Resilience', () => {
       });
     });
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre un peu pour voir si une erreur s'affiche
     await page.waitForTimeout(2000);
 
     // L'application doit rester fonctionnelle
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
   });
 
   test('handles DOM changed scenario (parser failure)', async ({ page }) => {
@@ -148,14 +145,13 @@ test.describe('Connector Resilience', () => {
       });
     });
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre l'erreur
     await page.waitForTimeout(1500);
 
     // L'application doit rester fonctionnelle malgré l'erreur de parsing
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
   });
 
   test('handles multiple connector failures with partial success', async ({ page }) => {
@@ -223,8 +219,7 @@ test.describe('Connector Resilience', () => {
       });
     }, missions);
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre que les missions apparaissent
     await waitForMissions(page, 1, 10000);
@@ -274,14 +269,13 @@ test.describe('Connector Resilience', () => {
       });
     });
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre le timeout
     await page.waitForTimeout(500);
 
     // L'application doit rester fonctionnelle
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
   });
 
   test('error recovery allows retry', async ({ page }) => {
@@ -362,8 +356,7 @@ test.describe('Connector Resilience', () => {
       });
     }, shouldFail);
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre l'erreur
     await page.waitForTimeout(500);

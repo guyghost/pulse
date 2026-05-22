@@ -1,4 +1,6 @@
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
+import { analyzeTJMHistory } from '$lib/core/tjm-history';
+import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
 
 const storage: Record<string, unknown> = {
   settings: {
@@ -75,6 +77,33 @@ function createChromeStubs() {
           case 'SAVE_FEED_SORT':
             storage.feedSortBy = message.payload;
             return { type: 'FEED_SORT_SAVED', payload: { saved: true } };
+          case 'GET_TJM_ANALYSIS': {
+            const history = storage.tjm_history as TJMHistory | undefined;
+            const payload = message.payload as
+              | { profileStacks?: string[]; region?: TJMRegion }
+              | undefined;
+            const normalizedStacks =
+              payload?.profileStacks && payload.profileStacks.length > 0
+                ? new Set(payload.profileStacks.map((stack) => stack.toLowerCase().trim()))
+                : null;
+            const records = history?.records ?? [];
+            const filteredRecords = records.filter((record) => {
+              if (normalizedStacks && !normalizedStacks.has(record.stack.toLowerCase().trim())) {
+                return false;
+              }
+              if (payload?.region && record.region !== payload.region) {
+                return false;
+              }
+              return true;
+            });
+
+            return {
+              type: 'TJM_ANALYSIS_RESULT',
+              payload: {
+                analysis: analyzeTJMHistory({ records: filteredRecords }),
+              },
+            };
+          }
           case 'GET_SEEN_MISSIONS':
             return { type: 'SEEN_MISSIONS_RESULT', payload: storage.seenMissions };
           case 'SAVE_SEEN_MISSIONS':
@@ -221,7 +250,16 @@ function createChromeStubs() {
           case 'AUTH_STATUS':
             return {
               type: 'AUTH_RESULT',
-              payload: { status: 'unauthenticated', user: null },
+              payload: {
+                status: 'authenticated',
+                user: {
+                  id: 'dev-user',
+                  email: 'dev@missionpulse.local',
+                  premiumStatus: 'premium',
+                  premiumExpiresAt: null,
+                  creditBalance: 25,
+                },
+              },
             };
           case 'SYNC_FAVORITE_MISSION':
             console.log('[Chrome Stub] Favorite sync skipped:', message.payload);

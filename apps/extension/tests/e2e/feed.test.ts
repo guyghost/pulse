@@ -1,5 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
-import { SIDE_PANEL, injectMissions, setFeedState } from './helpers';
+import {
+  SIDE_PANEL,
+  expectMissionCount,
+  feedSearchInput,
+  injectMissions,
+  setFeedState,
+} from './helpers';
 
 /**
  * Mock chrome to simulate a user who has already completed onboarding.
@@ -64,7 +70,7 @@ test.describe('Feed', () => {
     await page.goto(SIDE_PANEL);
 
     // Wait for feed to be ready - search input is always visible on feed
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     // Wait for the feed to show something - either missions or empty state
     await expect(page.getByText(/(Aucune mission|\d+ missions)/).first()).toBeVisible({
@@ -76,7 +82,7 @@ test.describe('Feed', () => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     await setFeedState(page, 'empty');
 
@@ -87,50 +93,41 @@ test.describe('Feed', () => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     await injectMissions(page, 5);
 
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 5000 });
-
-    // Get initial mission count
-    const initialText = await page.locator('text=/\\d+ mission/').textContent();
-    const initialCount = parseInt(initialText?.match(/\d+/)?.[0] || '0', 10);
+    await expectMissionCount(page, 5);
 
     // Search
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    await feedSearchInput(page).fill('React');
     await page.waitForTimeout(500);
 
     // Results should update - verify search input contains the search term
-    await expect(page.getByPlaceholder('Rechercher...')).toHaveValue('React');
+    await expect(feedSearchInput(page)).toHaveValue('React');
 
-    // If there are results, verify count is displayed
-    const resultsText = await page.locator('text=/\\d+ mission/').textContent();
-    const resultsCount = parseInt(resultsText?.match(/\d+/)?.[0] || '0', 10);
-
-    // Search results should be <= initial count (filtered)
-    expect(resultsCount).toBeLessThanOrEqual(initialCount);
+    await expect(page.getByText(/React/).first()).toBeVisible();
   });
 
   test('error state shows error message', async ({ page }) => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     await setFeedState(page, 'error');
 
-    await expect(page.getByText('Erreur')).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText('[Dev] Simulated error')).toBeVisible({ timeout: 2000 });
   });
 
   test('new missions show unseen indicator (blue left border)', async ({ page }) => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     await injectMissions(page, 5);
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 5000 });
+    await expectMissionCount(page, 5);
 
     // Cards should be visible — the IntersectionObserver marks them as seen
     const firstCard = page.locator('[role="button"]').first();
@@ -163,11 +160,11 @@ test.describe('Feed', () => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     await injectMissions(page, 5);
 
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 5000 });
+    await expectMissionCount(page, 5);
 
     const firstCard = page.locator('[role="button"]').first();
     await expect(firstCard).toBeVisible();
@@ -194,11 +191,11 @@ test.describe('Feed', () => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     await injectMissions(page, 5);
 
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 5000 });
+    await expectMissionCount(page, 5);
 
     const firstCard = page.locator('[role="button"]').first();
     const starBtn = firstCard.getByTitle('Ajouter aux favoris');
@@ -218,11 +215,11 @@ test.describe('Feed', () => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     await injectMissions(page, 5);
 
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 5000 });
+    await expectMissionCount(page, 5);
 
     // Hide the first mission
     const firstCard = page.locator('[role="button"]').first();
@@ -230,21 +227,21 @@ test.describe('Feed', () => {
     await hideBtn.click();
 
     // Mission count should decrease
-    await expect(page.getByText('4 missions')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 4, 2000);
 
     // "Voir les masquees" link should appear
-    await expect(page.getByText(/Voir les \d+ masquee/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Voir les \d+ mission.*masqu/i })).toBeVisible();
   });
 
   test('favorites toggle filters to favorites only', async ({ page }) => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     await injectMissions(page, 5);
 
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 5000 });
+    await expectMissionCount(page, 5);
 
     // Favorite the first mission
     const firstCard = page.locator('[role="button"]').first();
@@ -252,22 +249,22 @@ test.describe('Feed', () => {
     await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 1000 });
 
     // Click favorites filter in header — button shows "Favoris" text
-    await page.getByRole('button', { name: /Favoris/ }).click();
+    await page.getByTitle(/Favoris/).click();
     await page.waitForTimeout(300);
 
     // Should show only 1 mission (the favorited one)
-    await expect(page.getByText('1 mission')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 1, 2000);
 
     // Toggle back to all — button now shows "Voir toutes (f)"
-    await page.getByRole('button', { name: /Voir toutes/ }).click();
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 2000 });
+    await page.getByTitle(/Voir toutes/).click();
+    await expectMissionCount(page, 5, 2000);
   });
 
   test('header star button and refresh button are visible', async ({ page }) => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible({ timeout: 10000 });
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
     // Favorites filter button — text is "Favoris" when not active
     await expect(page.getByRole('button', { name: /Favoris/ })).toBeVisible();
@@ -282,28 +279,25 @@ test.describe('Feed', () => {
     // Verify we're on the feed by checking navigation is visible
     await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
     // Verify feed content exists — check for search input (always visible in feed)
-    await expect(page.getByPlaceholder('Rechercher...')).toBeVisible();
+    await expect(feedSearchInput(page)).toBeVisible();
 
     // Test aria-pressed on favorites toggle — button shows "Favoris" text when not active
-    const favoritesToggle = page.getByRole('button', { name: /Favoris/ });
+    const favoritesToggle = page.getByTitle(/Favoris/);
     await expect(favoritesToggle).toHaveAttribute('aria-pressed', 'false');
 
     await favoritesToggle.click();
-    await expect(favoritesToggle).toHaveAttribute('aria-pressed', 'true');
+    await expect(page.getByTitle(/Voir toutes/)).toHaveAttribute('aria-pressed', 'true');
     // When active, button shows "Voir toutes (f)"
-    await page.getByRole('button', { name: /Voir toutes/ }).click();
-    await expect(page.getByRole('button', { name: /Favoris/ })).toHaveAttribute(
-      'aria-pressed',
-      'false'
-    );
+    await page.getByTitle(/Voir toutes/).click();
+    await expect(page.getByTitle(/Favoris/)).toHaveAttribute('aria-pressed', 'false');
 
     // Test aria-expanded on filter toggle
-    const filterToggle = page.getByRole('button', { name: /Afficher les filtres/ });
+    const filterToggle = page.getByTitle('Afficher les filtres');
     await expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
     await expect(filterToggle).toHaveAttribute('aria-controls', 'filter-panel');
 
     await filterToggle.click();
-    await expect(filterToggle).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByTitle('Masquer les filtres')).toHaveAttribute('aria-expanded', 'true');
     // Filter panel uses role="group" with aria-label "Options de filtrage"
     const filterPanel = page.getByRole('group', { name: /Options de filtrage/ });
     await expect(filterPanel).toBeVisible();

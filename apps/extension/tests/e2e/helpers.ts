@@ -4,6 +4,21 @@ import type { UserProfile } from '../../src/lib/core/types/profile';
 import type { Mission } from '../../src/lib/core/types/mission';
 
 export const SIDE_PANEL = '/src/sidepanel/index.html';
+export const FEED_SEARCH_PLACEHOLDER = 'Rechercher une mission, une stack, un client...';
+
+export function feedSearchInput(page: Page): Locator {
+  return page.getByRole('textbox', { name: FEED_SEARCH_PLACEHOLDER });
+}
+
+export async function expectFeedReady(page: Page) {
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+    timeout: 10000,
+  });
+  await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute('aria-current', 'page', {
+    timeout: 10000,
+  });
+  await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
+}
 
 // ============================================================================
 // Dev Panel Helpers
@@ -77,6 +92,12 @@ export async function mockNoProfile(page: Page) {
             if (msg?.type === 'GET_PROFILE') {
               return { type: 'PROFILE_RESULT', payload: null };
             }
+            if (msg?.type === 'GET_FIRST_SCAN_DONE') {
+              return { type: 'FIRST_SCAN_DONE_RESULT', payload: false };
+            }
+            if (msg?.type === 'GET_ONBOARDING_COMPLETED') {
+              return { type: 'ONBOARDING_COMPLETED_RESULT', payload: false };
+            }
             return origSend.call((val as Record<string, unknown>).runtime, msg);
           };
         }
@@ -98,6 +119,10 @@ export async function fillOnboardingForm(page: Page, profile: Partial<UserProfil
   if (profile.location) {
     await page.locator('#ob-location').fill(profile.location);
   }
+  if (profile.stack?.[0]) {
+    await page.locator('#ob-stack').fill(profile.stack[0]);
+    await page.locator('#ob-stack + button').click();
+  }
 }
 
 /**
@@ -108,11 +133,12 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
     firstName: 'Test',
     jobTitle: 'Développeur Fullstack',
     location: 'Paris',
+    stack: ['React'],
     ...profile,
   };
 
   await fillOnboardingForm(page, defaultProfile);
-  await page.getByRole('button', { name: /C.est parti|Commencer/ }).click();
+  await page.getByRole('button', { name: /Sauvegarder mon profil|C.est parti|Commencer/ }).click();
 }
 
 /**
@@ -131,7 +157,7 @@ export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile
     }
 
     const onboardingVisible = await page
-      .getByText('Votre profil cible')
+      .locator('#ob-firstname')
       .isVisible()
       .catch(() => false);
     if (onboardingVisible) {
@@ -153,10 +179,7 @@ export async function ensureFeedVisible(page: Page, profile: Partial<UserProfile
     await ensureOnce();
   }
 
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
-    timeout: 10000,
-  });
-  await expect(page.getByRole('button', { name: 'Feed' })).toBeVisible();
+  await expectFeedReady(page);
 }
 
 // ============================================================================
@@ -396,7 +419,9 @@ export async function getDisplayedMissionCount(page: Page): Promise<number> {
  * Utilise aria-label pour éviter les collisions de texte.
  */
 export async function expectMissionCount(page: Page, count: number, timeout = 5000) {
-  await expect(page.locator(`[aria-label="${count} missions visibles"]`)).toBeVisible({ timeout });
+  await expect(
+    page.getByText(new RegExp(`^${count}/${count} mission${count > 1 ? 's' : ''} tri`)).first()
+  ).toBeVisible({ timeout });
 }
 
 /**

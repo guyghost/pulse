@@ -1,6 +1,7 @@
 import { test, expect } from '@playwright/test';
 import {
   ensureFeedVisible,
+  feedSearchInput,
   injectMissions,
   waitForMissions,
   toggleOffline,
@@ -138,7 +139,7 @@ test.describe('Offline Mode', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    await feedSearchInput(page).fill('React');
     await page.waitForTimeout(500);
 
     const resultsText = await page.locator('text=/\\d+ mission/').first().textContent();
@@ -147,7 +148,7 @@ test.describe('Offline Mode', () => {
     const resultsCount = parseInt(resultsText?.match(/\d+/)?.[0] || '0', 10);
     expect(resultsCount).toBeLessThanOrEqual(initialCount);
 
-    await page.getByPlaceholder('Rechercher...').clear();
+    await feedSearchInput(page).clear();
     await page.waitForTimeout(300);
     await expect(page.getByText(`${initialCount} missions`, { exact: true }).first()).toBeVisible({
       timeout: 2000,

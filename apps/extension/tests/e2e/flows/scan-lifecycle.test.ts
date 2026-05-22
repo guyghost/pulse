@@ -1,5 +1,11 @@
 import { test, expect } from '@playwright/test';
-import { ensureFeedVisible, expectMissionCount, injectMissions, waitForMissions } from '../helpers';
+import {
+  ensureFeedVisible,
+  expectMissionCount,
+  feedSearchInput,
+  injectMissions,
+  waitForMissions,
+} from '../helpers';
 
 test.describe('Scan Lifecycle', () => {
   test('feed loads with missions on mount', async ({ page }) => {
@@ -47,13 +53,13 @@ test.describe('Scan Lifecycle', () => {
     await waitForMissions(page, 10, 5000);
 
     // Search
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    await feedSearchInput(page).fill('React');
     await page.waitForTimeout(500);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toHaveValue('React');
+    await expect(feedSearchInput(page)).toHaveValue('React');
 
     // Clear search restores all
-    await page.getByPlaceholder('Rechercher...').clear();
+    await feedSearchInput(page).clear();
     await page.waitForTimeout(300);
     await expectMissionCount(page, 10);
   });
