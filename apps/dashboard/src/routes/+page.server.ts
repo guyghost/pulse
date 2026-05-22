@@ -1224,11 +1224,13 @@ export const actions: Actions = {
       return fail(404, { detailsError: 'Candidature introuvable.' });
     }
 
+    const updatedAt = new Date().toISOString();
     const { error: updateError } = await supabase
       .from('applications')
       .update({
         ...patch,
         revision: application.revision + 1,
+        updated_at: updatedAt,
       })
       .eq('id', applicationId)
       .eq('user_id', session.user.id)
@@ -1247,12 +1249,7 @@ export const actions: Actions = {
       });
     }
 
-    await markEntityPendingExtensionPull(
-      supabase,
-      session.user.id,
-      'applications',
-      new Date().toISOString()
-    );
+    await markEntityPendingExtensionPull(supabase, session.user.id, 'applications', updatedAt);
 
     return { detailsSuccess: 'Détails de candidature enregistrés.' };
   },
