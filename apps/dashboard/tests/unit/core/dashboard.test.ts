@@ -1470,13 +1470,13 @@ describe('dashboard core', () => {
 
     expect(
       buildDashboardPipelineClientEventId({
-        action: 'select',
+        action: 'detect',
         applicationId: 'app-001',
         revision: 1,
         fromStage: null,
         toStage: 'detected',
       })
-    ).toBe('dashboard:select:app-001:1:none:detected');
+    ).toBe('dashboard:detect:app-001:1:none:detected');
   });
 
   it('builds the insert patch for selecting a detected mission', () => {

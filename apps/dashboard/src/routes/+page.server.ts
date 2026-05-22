@@ -1321,6 +1321,22 @@ export const actions: Actions = {
     }
 
     const occurredAt = new Date();
+    const detectedAt = new Date(occurredAt.getTime() - 1);
+    const detectedEvent = transitionApplicationStage({
+      applicationId: application.id,
+      fromStage: null,
+      toStage: 'detected',
+      occurredAt: detectedAt,
+      createdBy: 'dashboard',
+      clientEventId: buildDashboardPipelineClientEventId({
+        action: 'detect',
+        applicationId: application.id,
+        revision: patch.revision,
+        fromStage: null,
+        toStage: 'detected',
+      }),
+      note: 'Mission détectée depuis le feed dashboard.',
+    });
     const event = transitionApplicationStage({
       applicationId: application.id,
       fromStage: 'detected',
@@ -1341,12 +1357,25 @@ export const actions: Actions = {
       return fail(500, { selectionError: 'Transition de sélection invalide.' });
     }
 
+    if (!detectedEvent) {
+      return fail(500, { selectionError: 'Transition de détection invalide.' });
+    }
+
+    const detectedEventInserted = await upsertDashboardPipelineEvent(
+      supabase,
+      session.user.id,
+      detectedEvent,
+      {
+        source: 'dashboard_feed',
+        mission_id: missionId,
+      }
+    );
     const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
       source: 'dashboard_feed',
       mission_id: missionId,
     });
 
-    if (!eventInserted) {
+    if (!detectedEventInserted || !eventInserted) {
       return fail(500, {
         selectionError:
           "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
@@ -1480,6 +1509,7 @@ export const actions: Actions = {
     }
 
     const occurredAt = new Date();
+    const detectedAt = new Date(occurredAt.getTime() - 1);
     const patch = buildMissionArchiveInsertPatch(occurredAt.toISOString());
     const { data: application, error: insertError } = await supabase
       .from('applications')
@@ -1501,6 +1531,21 @@ export const actions: Actions = {
 
     const event = transitionApplicationStage({
       applicationId: application.id,
+      fromStage: null,
+      toStage: 'detected',
+      occurredAt: detectedAt,
+      createdBy: 'dashboard',
+      clientEventId: buildDashboardPipelineClientEventId({
+        action: 'detect',
+        applicationId: application.id,
+        revision: patch.revision,
+        fromStage: null,
+        toStage: 'detected',
+      }),
+      note: 'Mission détectée depuis le feed dashboard.',
+    });
+    const archivedEvent = transitionApplicationStage({
+      applicationId: application.id,
       fromStage: 'detected',
       toStage: 'archived',
       occurredAt,
@@ -1515,7 +1560,7 @@ export const actions: Actions = {
       note: 'Mission archivée depuis le feed dashboard.',
     });
 
-    if (!event) {
+    if (!event || !archivedEvent) {
       return fail(500, { selectionError: "Transition d'archivage invalide." });
     }
 
@@ -1523,8 +1568,17 @@ export const actions: Actions = {
       source: 'dashboard_feed',
       mission_id: missionId,
     });
+    const archivedEventInserted = await upsertDashboardPipelineEvent(
+      supabase,
+      session.user.id,
+      archivedEvent,
+      {
+        source: 'dashboard_feed',
+        mission_id: missionId,
+      }
+    );
 
-    if (!eventInserted) {
+    if (!eventInserted || !archivedEventInserted) {
       return fail(500, {
         selectionError:
           "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",

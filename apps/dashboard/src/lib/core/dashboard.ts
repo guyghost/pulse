@@ -555,7 +555,12 @@ export interface ApplicationStageUpdatePatch {
   updated_by: 'dashboard';
 }
 
-export type DashboardPipelineClientEventAction = 'select' | 'archive' | 'transition' | 'conflict';
+export type DashboardPipelineClientEventAction =
+  | 'detect'
+  | 'select'
+  | 'archive'
+  | 'transition'
+  | 'conflict';
 
 export interface DashboardPipelineClientEventIdInput {
   action: DashboardPipelineClientEventAction;
