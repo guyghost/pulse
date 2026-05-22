@@ -841,6 +841,28 @@ export function canonicalRowsToApplications(
   });
 }
 
+export function mergeApplicationCompatibilityFallbacks(
+  canonicalApplications: MissionApplication[],
+  favoriteApplications: MissionApplication[]
+): MissionApplication[] {
+  const canonicalIds = new Set(canonicalApplications.map((application) => application.id));
+  const canonicalUrls = new Set(
+    canonicalApplications.flatMap((application) =>
+      application.sourceUrl ? [application.sourceUrl] : []
+    )
+  );
+
+  const compatibleFavorites = favoriteApplications.filter((application) => {
+    if (canonicalIds.has(application.id)) {
+      return false;
+    }
+
+    return !application.sourceUrl || !canonicalUrls.has(application.sourceUrl);
+  });
+
+  return [...canonicalApplications, ...compatibleFavorites];
+}
+
 export function missionRowsToFeedItems(
   missionRows: DashboardMissionFeedRow[],
   scoresByMissionId: Map<string, DashboardMissionFeedScoreRow>,

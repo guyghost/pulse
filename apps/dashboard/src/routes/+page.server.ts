@@ -25,6 +25,7 @@ import {
   generatedAssetRowsToHistory,
   getDashboardFeatureAccess,
   healthEventsToPlatformSyncStatuses,
+  mergeApplicationCompatibilityFallbacks,
   missionRowsToFeedItems,
   pipelineEventRowsToTimeline,
   parseDashboardFavoriteMission,
@@ -496,7 +497,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
     missionFeed,
     tjmRadar,
-    applications: canonicalApplications.length > 0 ? canonicalApplications : syncedApplications,
+    applications: mergeApplicationCompatibilityFallbacks(canonicalApplications, syncedApplications),
     applicationTimeline,
     generatedAssets,
     cv: candidateProfile

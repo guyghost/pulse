@@ -27,6 +27,7 @@ import {
   getNextFollowUp,
   getSyncBlockers,
   isDashboardPremiumActive,
+  mergeApplicationCompatibilityFallbacks,
   missionRowsToFeedItems,
   pipelineEventRowsToTimeline,
   parseDashboardFavoriteMission,
@@ -454,6 +455,32 @@ describe('dashboard core', () => {
         userRating: 5,
       },
     ]);
+  });
+
+  it('keeps compatible favorite applications when canonical applications already exist', () => {
+    const canonical = [
+      {
+        ...applications[0],
+        id: 'canonical-1',
+        sourceUrl: 'https://example.com/app-001',
+      },
+    ];
+    const favorites = [
+      {
+        ...applications[0],
+        id: 'favorite-duplicate-url',
+        sourceUrl: 'https://example.com/app-001',
+      },
+      {
+        ...applications[1],
+        id: 'favorite-only',
+        sourceUrl: 'https://example.com/favorite-only',
+      },
+    ];
+
+    expect(
+      mergeApplicationCompatibilityFallbacks(canonical, favorites).map((item) => item.id)
+    ).toEqual(['canonical-1', 'favorite-only']);
   });
 
   it('maps mission rows to a score-sorted dashboard feed with freshness and duplicates', () => {
