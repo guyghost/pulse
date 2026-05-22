@@ -50,6 +50,7 @@ const applications: MissionApplication[] = [
     score: 92,
     dailyRate: 720,
     location: 'Paris hybride',
+    sourceUrl: 'https://example.com/app-001',
     appliedAt: '2026-05-08',
     nextActionAt: '2026-05-19',
     notes: 'Relancer le recruteur.',
@@ -64,6 +65,7 @@ const applications: MissionApplication[] = [
     score: 86,
     dailyRate: 680,
     location: 'Remote France',
+    sourceUrl: 'https://example.com/app-002',
     appliedAt: '2026-05-11',
     nextActionAt: null,
     notes: '',
@@ -78,6 +80,7 @@ const applications: MissionApplication[] = [
     score: 78,
     dailyRate: 650,
     location: 'Lyon',
+    sourceUrl: 'https://example.com/app-003',
     appliedAt: null,
     nextActionAt: '2026-05-20',
     notes: 'À comparer avec une mission remote.',
@@ -248,6 +251,7 @@ describe('dashboard core', () => {
       stage: 'selected',
       score: 91,
       dailyRate: 700,
+      sourceUrl: 'https://example.com/mission',
     });
   });
 
@@ -284,6 +288,7 @@ describe('dashboard core', () => {
               source: 'free-work',
               tjm: 720,
               location: 'Remote France',
+              url: 'https://example.com/mission-1',
             },
           ],
         ]),
@@ -299,6 +304,7 @@ describe('dashboard core', () => {
         score: 91,
         dailyRate: 720,
         location: 'Remote France',
+        sourceUrl: 'https://example.com/mission-1',
         appliedAt: '2026-05-21T08:00:00.000Z',
         nextActionAt: '2026-05-24T08:00:00.000Z',
         notes: 'Bon échange.',

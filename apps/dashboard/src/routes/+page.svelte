@@ -901,6 +901,17 @@
                 </div>
               </dl>
 
+              {#if selectedApplication.sourceUrl}
+                <a
+                  class="mt-4 inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:border-blueprint-blue/35 hover:bg-blueprint-blue/8 hover:text-blueprint-blue"
+                  href={selectedApplication.sourceUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                >
+                  Ouvrir la mission source
+                </a>
+              {/if}
+
               {#if form?.transitionError}
                 <p
                   class="mt-4 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"

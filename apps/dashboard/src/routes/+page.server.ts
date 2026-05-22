@@ -62,6 +62,7 @@ const mockApplications: MissionApplication[] = [
     score: 92,
     dailyRate: 720,
     location: 'Paris hybride',
+    sourceUrl: 'https://example.com/mission-preview-1',
     appliedAt: '2026-05-08',
     nextActionAt: '2026-05-19',
     notes: 'Relancer après le prochain entretien.',
@@ -76,6 +77,7 @@ const mockApplications: MissionApplication[] = [
     score: 86,
     dailyRate: 680,
     location: 'Remote France',
+    sourceUrl: 'https://example.com/mission-preview-2',
     appliedAt: '2026-05-11',
     nextActionAt: null,
     notes: '',
@@ -90,6 +92,7 @@ const mockApplications: MissionApplication[] = [
     score: 78,
     dailyRate: 650,
     location: 'Lyon',
+    sourceUrl: 'https://example.com/mission-preview-3',
     appliedAt: null,
     nextActionAt: '2026-05-20',
     notes: 'À préparer après vérification du CV.',
@@ -476,7 +479,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     missionIds.length > 0
       ? await supabase
           .from('missions')
-          .select('id, title, client, source, tjm, location')
+          .select('id, title, client, source, tjm, location, url')
           .in('id', missionIds)
           .returns<DashboardCanonicalMissionRow[]>()
       : { data: [] };

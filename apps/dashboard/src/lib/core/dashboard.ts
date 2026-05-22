@@ -67,6 +67,7 @@ export interface MissionApplication {
   score: number;
   dailyRate: number | null;
   location: string;
+  sourceUrl: string | null;
   appliedAt: string | null;
   nextActionAt: string | null;
   notes: string;
@@ -257,6 +258,7 @@ export interface DashboardCanonicalMissionRow {
   source: string;
   tjm: number | null;
   location: string | null;
+  url: string | null;
 }
 
 export interface DashboardCanonicalMissionScoreRow {
@@ -558,6 +560,7 @@ export function favoriteMissionToApplication(
     score: favorite.score ?? 0,
     dailyRate: favorite.tjm,
     location: favorite.location ?? 'Localisation non renseignée',
+    sourceUrl: favorite.url,
     appliedAt: null,
     nextActionAt: null,
     notes: '',
@@ -593,6 +596,7 @@ export function canonicalRowsToApplications(
         score,
         dailyRate: mission.tjm,
         location: mission.location ?? 'Localisation non renseignée',
+        sourceUrl: mission.url,
         appliedAt: application.applied_at,
         nextActionAt: application.next_action_at,
         notes: application.notes,
