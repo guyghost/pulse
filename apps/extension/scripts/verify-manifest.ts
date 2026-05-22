@@ -36,6 +36,7 @@ const ManifestV3Schema = z.object({
   description: z.string().optional(),
   permissions: z.array(z.string()).optional(),
   host_permissions: z.array(z.string()).optional(),
+  optional_host_permissions: z.array(z.string()).optional(),
   background: z
     .object({
       service_worker: z.string(),
@@ -112,6 +113,33 @@ export const validateVersionConsistency = (
   };
 };
 
+/**
+ * Validates the least-privilege permissions required by the LinkedIn profile import flow.
+ */
+export const validateLinkedInProfileImportPermissions = (
+  manifest: Pick<ManifestV3, 'permissions' | 'optional_host_permissions'>
+): { valid: true } | { valid: false; errors: string[] } => {
+  const permissions = new Set(manifest.permissions ?? []);
+  const optionalHostPermissions = new Set(manifest.optional_host_permissions ?? []);
+  const errors: string[] = [];
+
+  if (!permissions.has('scripting')) {
+    errors.push('permissions must include "scripting" for user-triggered LinkedIn DOM extraction');
+  }
+
+  if (!permissions.has('activeTab')) {
+    errors.push('permissions must include "activeTab" for active LinkedIn profile imports');
+  }
+
+  if (!optionalHostPermissions.has('https://www.linkedin.com/*')) {
+    errors.push(
+      'optional_host_permissions must include "https://www.linkedin.com/*" for least-privilege LinkedIn access'
+    );
+  }
+
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+};
+
 // Pure argument parsing — no side effects
 
 export const parseArgs = (
@@ -178,6 +206,15 @@ export const main = (): void => {
 
   console.log('✅ Schema validation passed');
 
+  const linkedInPermissionsResult = validateLinkedInProfileImportPermissions(schemaResult.data);
+  if (!linkedInPermissionsResult.valid) {
+    console.error('❌ LinkedIn profile import permissions validation failed:\n');
+    linkedInPermissionsResult.errors.forEach((error) => console.error(`  - ${error}`));
+    process.exit(1);
+  }
+
+  console.log('✅ LinkedIn profile import permissions check passed');
+
   // Validate version against expected version (CI release gate)
   if (expectedVersion !== null) {
     if (schemaResult.data.version !== expectedVersion) {
@@ -214,6 +251,9 @@ export const main = (): void => {
   console.log(`   Manifest Version: ${data.manifest_version}`);
   console.log(`   Permissions:     ${data.permissions?.join(', ') || 'none'}`);
   console.log(`   Host Permissions: ${data.host_permissions?.length || 0} patterns`);
+  console.log(
+    `   Optional Host Permissions: ${data.optional_host_permissions?.length || 0} patterns`
+  );
   console.log(`   Service Worker:  ${data.background?.service_worker || 'none'}`);
 
   console.log('\n✅ Manifest is valid for Chrome Extension MV3\n');

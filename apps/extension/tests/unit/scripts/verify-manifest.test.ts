@@ -1,6 +1,9 @@
 import { describe, it, expect } from 'vitest';
+import { readFileSync } from 'fs';
+import { resolve } from 'path';
 import {
   parseArgs,
+  validateLinkedInProfileImportPermissions,
   validateSchema,
   validateVersionConsistency,
 } from '../../../scripts/verify-manifest.ts';
@@ -26,12 +29,15 @@ const FULL_REAL_MANIFEST = {
     'alarms',
     'notifications',
     'declarativeNetRequest',
+    'scripting',
+    'activeTab',
   ],
   host_permissions: [
     'https://www.free-work.com/*',
     'https://*.lehibou.com/*',
     'https://hiway-missions.fr/*',
   ],
+  optional_host_permissions: ['https://www.linkedin.com/*'],
   background: {
     service_worker: 'src/background/index.ts',
     type: 'module',
@@ -212,6 +218,18 @@ describe('validateSchema', () => {
     expect(result.success).toBe(true);
   });
 
+  it('should preserve optional host permissions for least-privilege platform access', () => {
+    const result = validateSchema({
+      ...MINIMAL_VALID_MANIFEST,
+      optional_host_permissions: ['https://www.linkedin.com/*'],
+    });
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data.optional_host_permissions).toEqual(['https://www.linkedin.com/*']);
+    }
+  });
+
   /**
    * OpenSpec scenario: Accept manifest with background service_worker.
    */
@@ -369,6 +387,38 @@ describe('parseArgs', () => {
       manifestPath: 'dist/manifest.json',
       expectedVersion: null,
     });
+  });
+});
+
+describe('validateLinkedInProfileImportPermissions', () => {
+  it('should accept the actual manifest LinkedIn profile import permission model', () => {
+    const manifest: unknown = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'src/manifest.json'), 'utf-8')
+    );
+    const schemaResult = validateSchema(manifest);
+
+    expect(schemaResult.success).toBe(true);
+    if (schemaResult.success) {
+      expect(validateLinkedInProfileImportPermissions(schemaResult.data)).toEqual({ valid: true });
+    }
+  });
+
+  it('should reject manifests missing activeTab, scripting, or optional LinkedIn access', () => {
+    const result = validateLinkedInProfileImportPermissions({
+      permissions: ['storage'],
+      optional_host_permissions: [],
+    });
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('"scripting"'),
+          expect.stringContaining('"activeTab"'),
+          expect.stringContaining('https://www.linkedin.com/*'),
+        ])
+      );
+    }
   });
 });
 
