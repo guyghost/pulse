@@ -7,6 +7,7 @@ import {
   buildConnectedDataDeletionRequest,
   buildCvFieldSuggestionResolution,
   buildEmptyCvSnapshot,
+  buildMissionArchiveInsertPatch,
   buildTjmRadarSnapshot,
   filterApplications,
   favoriteMissionToApplication,
@@ -1116,6 +1117,16 @@ describe('dashboard core', () => {
       notes: '',
       revision: 1,
       updated_by: 'dashboard',
+    });
+  });
+
+  it('builds the insert patch for archiving a detected mission from the feed', () => {
+    expect(buildMissionArchiveInsertPatch('2026-05-22T10:00:00.000Z')).toEqual({
+      stage: 'archived',
+      notes: '',
+      revision: 1,
+      updated_by: 'dashboard',
+      archived_at: '2026-05-22T10:00:00.000Z',
     });
   });
 

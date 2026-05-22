@@ -469,6 +469,14 @@ export interface ApplicationSelectionInsertPatch {
   updated_by: 'dashboard';
 }
 
+export interface MissionArchiveInsertPatch {
+  stage: 'archived';
+  notes: string;
+  revision: 1;
+  updated_by: 'dashboard';
+  archived_at: string;
+}
+
 export interface ApplicationDetailsUpdatePatch {
   notes: string;
   user_rating: number | null;
@@ -1313,6 +1321,16 @@ export function buildMissionSelectionInsertPatch(): ApplicationSelectionInsertPa
     notes: '',
     revision: 1,
     updated_by: 'dashboard',
+  };
+}
+
+export function buildMissionArchiveInsertPatch(archivedAt: string): MissionArchiveInsertPatch {
+  return {
+    stage: 'archived',
+    notes: '',
+    revision: 1,
+    updated_by: 'dashboard',
+    archived_at: archivedAt,
   };
 }
 

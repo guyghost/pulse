@@ -567,15 +567,26 @@
                 {#if mission.applicationStage}
                   <Badge label={stageLabels[mission.applicationStage]} variant="status" />
                 {:else if isConnected}
-                  <form method="POST" action="?/selectMission">
-                    <input type="hidden" name="missionId" value={mission.id} />
-                    <button
-                      type="submit"
-                      class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
-                    >
-                      Sélectionner
-                    </button>
-                  </form>
+                  <div class="flex items-center gap-2">
+                    <form method="POST" action="?/archiveMission">
+                      <input type="hidden" name="missionId" value={mission.id} />
+                      <button
+                        type="submit"
+                        class="text-xs font-medium text-text-subtle hover:text-text-primary"
+                      >
+                        Archiver
+                      </button>
+                    </form>
+                    <form method="POST" action="?/selectMission">
+                      <input type="hidden" name="missionId" value={mission.id} />
+                      <button
+                        type="submit"
+                        class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
+                      >
+                        Sélectionner
+                      </button>
+                    </form>
+                  </div>
                 {:else}
                   <a
                     class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
