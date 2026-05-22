@@ -4,6 +4,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import {
   APPLICATION_STAGES,
   transitionApplicationStage,
+  type ApplicationPipelineEvent,
   type ApplicationStage,
 } from '@pulse/domain';
 import { createSupabaseServerClient } from '$lib/server/supabase';
@@ -808,6 +809,9 @@ export const actions: Actions = {
         return fail(404, { syncConflictError: 'Candidature liée au conflit introuvable.' });
       }
 
+      let pipelineEvent: ApplicationPipelineEvent | null = null;
+      let pipelineEventMetadata: Record<string, string> | null = null;
+
       if (resolution.stageTransition && resolution.stageTransition !== application.stage) {
         const occurredAt = new Date(resolvedAt);
         const event = transitionApplicationStage({
@@ -833,16 +837,11 @@ export const actions: Actions = {
           });
         }
 
-        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+        pipelineEvent = event;
+        pipelineEventMetadata = {
           source: 'sync_conflict',
           conflict_id: conflict.id,
-        });
-
-        if (!eventInserted) {
-          return fail(500, {
-            syncConflictError: "L'événement pipeline du conflit n'a pas pu être enregistré.",
-          });
-        }
+        };
       }
 
       const updatePayload: ApplicationConflictUpdatePayload = {
@@ -886,6 +885,21 @@ export const actions: Actions = {
           syncConflictError:
             "La candidature a changé depuis l'ouverture de la page. Rechargez avant de résoudre.",
         });
+      }
+
+      if (pipelineEvent && pipelineEventMetadata) {
+        const eventInserted = await upsertDashboardPipelineEvent(
+          supabase,
+          session.user.id,
+          pipelineEvent,
+          pipelineEventMetadata
+        );
+
+        if (!eventInserted) {
+          return fail(500, {
+            syncConflictError: "L'événement pipeline du conflit n'a pas pu être enregistré.",
+          });
+        }
       }
     }
 
@@ -1249,18 +1263,6 @@ export const actions: Actions = {
           return fail(500, { selectionError: 'Transition de sélection invalide.' });
         }
 
-        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
-          source: 'dashboard_feed',
-          mission_id: missionId,
-        });
-
-        if (!eventInserted) {
-          return fail(500, {
-            selectionError:
-              "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
-          });
-        }
-
         const patch = buildApplicationStageUpdatePatch('selected', event.occurredAt);
         const { error: updateError } = await supabase
           .from('applications')
@@ -1284,6 +1286,18 @@ export const actions: Actions = {
           return fail(409, {
             selectionError:
               "La candidature a changé depuis l'ouverture de la page. Rechargez avant de sélectionner.",
+          });
+        }
+
+        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+          source: 'dashboard_feed',
+          mission_id: missionId,
+        });
+
+        if (!eventInserted) {
+          return fail(500, {
+            selectionError:
+              "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
           });
         }
 
@@ -1455,18 +1469,6 @@ export const actions: Actions = {
           return fail(500, { selectionError: "Transition d'archivage invalide." });
         }
 
-        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
-          source: 'dashboard_feed',
-          mission_id: missionId,
-        });
-
-        if (!eventInserted) {
-          return fail(500, {
-            selectionError:
-              "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",
-          });
-        }
-
         const patch = buildApplicationStageUpdatePatch('archived', event.occurredAt);
         const { error: updateError } = await supabase
           .from('applications')
@@ -1490,6 +1492,18 @@ export const actions: Actions = {
           return fail(409, {
             selectionError:
               "La candidature a changé depuis l'ouverture de la page. Rechargez avant d'archiver.",
+          });
+        }
+
+        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+          source: 'dashboard_feed',
+          mission_id: missionId,
+        });
+
+        if (!eventInserted) {
+          return fail(500, {
+            selectionError:
+              "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",
           });
         }
 
@@ -1649,14 +1663,6 @@ export const actions: Actions = {
       return fail(400, { transitionError: 'Transition non autorisée.' });
     }
 
-    const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
-      source: 'dashboard',
-    });
-
-    if (!eventInserted) {
-      return fail(500, { transitionError: "L'événement pipeline n'a pas pu être enregistré." });
-    }
-
     const patch = buildApplicationStageUpdatePatch(toStage, event.occurredAt);
     const updatePayload: {
       stage: ApplicationStage;
@@ -1695,6 +1701,14 @@ export const actions: Actions = {
         transitionError:
           "La candidature a changé depuis l'ouverture de la page. Rechargez avant de modifier l'étape.",
       });
+    }
+
+    const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+      source: 'dashboard',
+    });
+
+    if (!eventInserted) {
+      return fail(500, { transitionError: "L'événement pipeline n'a pas pu être enregistré." });
     }
 
     await markEntityPendingExtensionPull(
