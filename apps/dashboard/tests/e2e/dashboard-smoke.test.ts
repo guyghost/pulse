@@ -26,4 +26,26 @@ test.describe('connected dashboard smoke', () => {
     await expect(page.getByText('Alertes missions')).toBeVisible();
     await expect(page.getByText('Aucun appareil extension enregistré')).toBeVisible();
   });
+
+  test('renders connected data export and delete privacy controls safely when signed out', async ({
+    page,
+  }) => {
+    await page.goto('/dashboard/');
+
+    await expect(page.getByRole('heading', { name: 'Données connectées' })).toBeVisible();
+    await expect(
+      page.getByText('Les sessions et credentials des plateformes ne sont jamais stockés.')
+    ).toBeVisible();
+
+    const exportLink = page.getByRole('link', { name: 'Export JSON' });
+    await expect(exportLink).toBeVisible();
+    await expect(exportLink).toHaveAttribute('aria-disabled', 'true');
+    await expect(exportLink).toHaveAttribute('href', /\/login/);
+
+    await expect(page.getByLabel('Confirmation suppression')).toBeVisible();
+    await expect(page.getByPlaceholder('SUPPRIMER')).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: 'Supprimer les données connectées' })
+    ).toBeDisabled();
+  });
 });
