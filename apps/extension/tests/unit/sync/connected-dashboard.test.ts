@@ -1119,9 +1119,18 @@ describe('connected dashboard sync payload builders', () => {
       buildApplicationPullCursor({
         remoteApplications: [],
         skippedCount: 0,
+        previousCursor: '2026-05-21T09:00:00.000Z',
+        pulledAt: '2026-05-21T13:00:00.000Z',
+      })
+    ).toBe('2026-05-21T09:00:00.000Z');
+
+    expect(
+      buildApplicationPullCursor({
+        remoteApplications: [],
+        skippedCount: 0,
         previousCursor: null,
         pulledAt: '2026-05-21T13:00:00.000Z',
       })
-    ).toBe('2026-05-21T13:00:00.000Z');
+    ).toBeNull();
   });
 });

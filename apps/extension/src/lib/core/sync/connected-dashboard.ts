@@ -1139,5 +1139,5 @@ export function buildApplicationPullCursor(input: BuildApplicationPullCursorInpu
     .filter((value) => Number.isFinite(Date.parse(value)))
     .sort((a, b) => b.localeCompare(a))[0];
 
-  return latestRemoteUpdate ?? input.pulledAt;
+  return latestRemoteUpdate ?? input.previousCursor;
 }
