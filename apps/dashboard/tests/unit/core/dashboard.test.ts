@@ -13,6 +13,7 @@ import {
   buildMissionArchiveInsertPatch,
   buildTjmRadarSnapshot,
   filterApplications,
+  filterMissionFeedItems,
   favoriteMissionToApplication,
   buildApplicationStageUpdatePatch,
   buildMissionSelectionInsertPatch,
@@ -518,6 +519,78 @@ describe('dashboard core', () => {
         freshness: 'fresh',
       },
     ]);
+  });
+
+  it('filters mission feed items by source, query, score, and freshness', () => {
+    const feed = missionRowsToFeedItems(
+      [
+        {
+          id: 'mission-1',
+          title: 'Lead Svelte',
+          client: 'ScaleOps',
+          source: 'free-work',
+          stack: ['Svelte', 'TypeScript'],
+          tjm: 720,
+          location: 'Remote France',
+          scraped_at: '2026-05-22T08:00:00.000Z',
+          url: 'https://example.com/1',
+        },
+        {
+          id: 'mission-2',
+          title: 'Architecte React',
+          client: 'Blue Factory',
+          source: 'lehibou',
+          stack: ['React'],
+          tjm: 620,
+          location: 'Paris',
+          scraped_at: '2026-05-18T08:00:00.000Z',
+          url: 'https://example.com/2',
+        },
+      ],
+      new Map([
+        [
+          'mission-1',
+          {
+            mission_id: 'mission-1',
+            deterministic_score: 82,
+            semantic_score: 90,
+            total_score: 87,
+            grade: 'A',
+            semantic_reason: null,
+          },
+        ],
+        [
+          'mission-2',
+          {
+            mission_id: 'mission-2',
+            deterministic_score: 72,
+            semantic_score: null,
+            total_score: 72,
+            grade: 'B',
+            semantic_reason: null,
+          },
+        ],
+      ]),
+      new Map(),
+      [],
+      new Date('2026-05-22T10:00:00.000Z')
+    );
+
+    expect(
+      filterMissionFeedItems(
+        feed,
+        { query: 'typescript', source: 'all', minScore: 80, freshness: 'fresh' },
+        sourceLabels
+      ).map((mission) => mission.id)
+    ).toEqual(['mission-1']);
+
+    expect(
+      filterMissionFeedItems(
+        feed,
+        { query: 'blue', source: 'lehibou', minScore: null, freshness: 'stale' },
+        sourceLabels
+      ).map((mission) => mission.id)
+    ).toEqual(['mission-2']);
   });
 
   it('builds a TJM radar snapshot from synced mission feed items', () => {

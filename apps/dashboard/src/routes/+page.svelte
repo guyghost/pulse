@@ -4,6 +4,7 @@
     buildMissionComparisonSnapshot,
     countApplicationsByStage,
     filterApplications,
+    filterMissionFeedItems,
     getAverageApplicationScore,
     getCvSyncReadiness,
     getNextApplicationStages,
@@ -54,6 +55,10 @@
   );
   let searchQuery = $state('');
   let selectedSource = $state<'all' | MissionApplication['source']>('all');
+  let missionFeedQuery = $state('');
+  let missionFeedSource = $state<'all' | MissionApplication['source']>('all');
+  let missionFeedMinScore = $state(0);
+  let missionFeedFreshness = $state<'all' | MissionFeedItem['freshness']>('all');
   let selectedApplicationId = $state<string | null>(null);
   let syncPrepared = $state(false);
   let copiedAssetId = $state<string | null>(null);
@@ -61,11 +66,14 @@
   const nextFollowUp = $derived(getNextFollowUp(applications));
   const sourceFilters: { label: string; value: 'all' | MissionApplication['source'] }[] = [
     { label: 'Toutes', value: 'all' },
+    { label: 'LinkedIn', value: 'linkedin' },
     { label: 'Free-Work', value: 'free-work' },
     { label: 'LeHibou', value: 'lehibou' },
     { label: 'Hiway', value: 'hiway' },
     { label: 'Collective', value: 'collective' },
     { label: 'Cherry Pick', value: 'cherry-pick' },
+    { label: 'Malt', value: 'malt' },
+    { label: 'Autre', value: 'other' },
   ];
 
   const sourceLabels: Record<MissionApplication['source'], string> = {
@@ -81,6 +89,18 @@
 
   const filteredApplications = $derived(
     filterApplications(applications, { query: searchQuery, source: selectedSource }, sourceLabels)
+  );
+  const filteredMissionFeed = $derived(
+    filterMissionFeedItems(
+      missionFeed,
+      {
+        query: missionFeedQuery,
+        source: missionFeedSource,
+        minScore: missionFeedMinScore > 0 ? missionFeedMinScore : null,
+        freshness: missionFeedFreshness,
+      },
+      sourceLabels
+    )
   );
   const selectedApplication = $derived(
     filteredApplications.find((application) => application.id === selectedApplicationId) ??
@@ -490,7 +510,8 @@
             </h2>
           </div>
           <p class="text-sm text-text-subtle">
-            {missionFeed.length} synchronisées, {freshMissionCount} fraîches
+            {filteredMissionFeed.length}/{missionFeed.length} affichées, {freshMissionCount}
+            fraîches
           </p>
         </div>
 
@@ -510,6 +531,51 @@
           </p>
         {/if}
 
+        <div
+          class="mb-3 grid gap-3 rounded-xl border border-border-light bg-surface-white p-3 md:grid-cols-[minmax(0,1fr)_160px_150px_140px]"
+        >
+          <label class="min-w-0 text-xs font-medium text-text-subtle">
+            Recherche
+            <input
+              class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
+              placeholder="Mission, client, stack"
+              bind:value={missionFeedQuery}
+            />
+          </label>
+          <label class="text-xs font-medium text-text-subtle">
+            Source
+            <select
+              class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
+              bind:value={missionFeedSource}
+            >
+              {#each sourceFilters as source}
+                <option value={source.value}>{source.label}</option>
+              {/each}
+            </select>
+          </label>
+          <label class="text-xs font-medium text-text-subtle">
+            Score min.
+            <input
+              class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
+              type="number"
+              min="0"
+              max="100"
+              bind:value={missionFeedMinScore}
+            />
+          </label>
+          <label class="text-xs font-medium text-text-subtle">
+            Fraîcheur
+            <select
+              class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
+              bind:value={missionFeedFreshness}
+            >
+              <option value="all">Toutes</option>
+              <option value="fresh">Récentes</option>
+              <option value="stale">À revoir</option>
+            </select>
+          </label>
+        </div>
+
         <div class="grid gap-3 lg:grid-cols-3">
           {#if missionFeed.length === 0}
             <article
@@ -520,9 +586,18 @@
                 Lancez un scan depuis l'extension connectée pour alimenter le dashboard Supabase.
               </p>
             </article>
+          {:else if filteredMissionFeed.length === 0}
+            <article
+              class="rounded-xl border border-dashed border-border-light bg-surface-white p-5"
+            >
+              <p class="text-sm font-semibold text-text-primary">Aucune mission ne correspond</p>
+              <p class="mt-2 text-sm leading-6 text-text-subtle">
+                Ajustez la recherche, la source, le score ou la fraîcheur.
+              </p>
+            </article>
           {/if}
 
-          {#each missionFeed.slice(0, 6) as mission}
+          {#each filteredMissionFeed.slice(0, 6) as mission}
             <article
               class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
             >

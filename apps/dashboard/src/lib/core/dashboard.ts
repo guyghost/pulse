@@ -596,6 +596,13 @@ export interface ApplicationFilters {
   source: 'all' | ApplicationSource;
 }
 
+export interface MissionFeedFilters {
+  query: string;
+  source: 'all' | ApplicationSource;
+  minScore: number | null;
+  freshness: 'all' | MissionFreshness;
+}
+
 function isApplicationSource(value: unknown): value is ApplicationSource {
   return (
     value === 'linkedin' ||
@@ -1651,12 +1658,14 @@ export const getNextFollowUp = (applications: MissionApplication[]) =>
     .filter((application) => application.nextActionAt)
     .sort((a, b) => (a.nextActionAt ?? '').localeCompare(b.nextActionAt ?? ''))[0] ?? null;
 
+const normalizeSearch = (value: string) => value.trim().toLowerCase();
+
 export const filterApplications = (
   applications: MissionApplication[],
   filters: ApplicationFilters,
   sourceLabels: Record<ApplicationSource, string>
 ) => {
-  const normalizedQuery = filters.query.trim().toLowerCase();
+  const normalizedQuery = normalizeSearch(filters.query);
 
   return applications.filter((application) => {
     const matchesSource = filters.source === 'all' || application.source === filters.source;
@@ -1677,6 +1686,43 @@ export const filterApplications = (
         .toLowerCase()
         .includes(normalizedQuery)
     );
+  });
+};
+
+export const filterMissionFeedItems = (
+  missions: MissionFeedItem[],
+  filters: MissionFeedFilters,
+  sourceLabels: Record<ApplicationSource, string>
+) => {
+  const normalizedQuery = normalizeSearch(filters.query);
+  const minScore =
+    typeof filters.minScore === 'number' && Number.isFinite(filters.minScore)
+      ? Math.max(0, Math.min(100, filters.minScore))
+      : null;
+
+  return missions.filter((mission) => {
+    const matchesSource = filters.source === 'all' || mission.source === filters.source;
+    const matchesScore = minScore === null || mission.score >= minScore;
+    const matchesFreshness = filters.freshness === 'all' || mission.freshness === filters.freshness;
+
+    if (!matchesSource || !matchesScore || !matchesFreshness) {
+      return false;
+    }
+
+    if (!normalizedQuery) {
+      return true;
+    }
+
+    return [
+      mission.title,
+      mission.client ?? '',
+      mission.location ?? '',
+      sourceLabels[mission.source],
+      ...mission.stack,
+    ]
+      .join(' ')
+      .toLowerCase()
+      .includes(normalizedQuery);
   });
 };
 
