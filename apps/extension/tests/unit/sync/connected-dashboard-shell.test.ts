@@ -815,10 +815,10 @@ describe('connected dashboard shell sync', () => {
       ok: true,
       value: {
         profileId: 'profile-1',
-        experiences: 1,
+        experiences: 0,
         education: 0,
-        skills: 2,
-        links: 1,
+        skills: 0,
+        links: 0,
         suggestions: 3,
       },
     });
@@ -860,6 +860,50 @@ describe('connected dashboard shell sync', () => {
       expect.objectContaining({ field: 'summary' }),
       expect.objectContaining({ field: 'target_role' }),
     ]);
+  });
+
+  it('preserves canonical CV child rows when a LinkedIn import conflicts with dashboard edits', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.getCandidateProfile).mockResolvedValueOnce({
+      id: 'profile-1',
+      title: 'Profil dashboard',
+      summary: 'Résumé manuel',
+      target_role: 'Architecte frontend',
+      revision: 8,
+      updated_at: '2026-05-22T08:00:00.000Z',
+      updated_by: 'dashboard',
+    });
+
+    const result = await pushCandidateProfileImportToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      draft: linkedinDraft,
+      now: new Date('2026-05-22T08:05:00.000Z'),
+      extractorVersion: 'linkedin-v1',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        profileId: 'profile-1',
+        experiences: 0,
+        education: 0,
+        skills: 0,
+        links: 0,
+        suggestions: 3,
+      },
+    });
+    expect(gateway.replaceCandidateProfileChildren).not.toHaveBeenCalled();
+    expect(gateway.insertProfileImport).toHaveBeenCalledWith(
+      expect.objectContaining({
+        field_counts: {
+          experiences: 1,
+          education: 0,
+          skills: 2,
+          links: 1,
+        },
+      })
+    );
   });
 
   it('records retryable sync status when profile import persistence fails', async () => {

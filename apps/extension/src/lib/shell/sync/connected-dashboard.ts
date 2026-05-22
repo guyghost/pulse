@@ -1378,13 +1378,24 @@ export async function pushCandidateProfileImportToConnectedDashboard(
       detectedAt: input.now.toISOString(),
     });
 
-    await gateway.replaceCandidateProfileChildren({
-      profileId: profile.id,
-      experiences: rows.experiences,
-      education: rows.education,
-      skills: rows.skills,
-      links: rows.links,
-    });
+    const syncedChildren = isDashboardEditedProfile
+      ? { experiences: 0, education: 0, skills: 0, links: 0 }
+      : {
+          experiences: rows.experiences.length,
+          education: rows.education.length,
+          skills: rows.skills.length,
+          links: rows.links.length,
+        };
+
+    if (!isDashboardEditedProfile) {
+      await gateway.replaceCandidateProfileChildren({
+        profileId: profile.id,
+        experiences: rows.experiences,
+        education: rows.education,
+        skills: rows.skills,
+        links: rows.links,
+      });
+    }
     await gateway.insertCandidateProfileFieldSuggestions(suggestionRows);
     await gateway.insertSyncConflicts(conflictRows);
     await gateway.insertProfileImport(rows.importEvent);
@@ -1401,10 +1412,10 @@ export async function pushCandidateProfileImportToConnectedDashboard(
       ok: true,
       value: {
         profileId: profile.id,
-        experiences: rows.experiences.length,
-        education: rows.education.length,
-        skills: rows.skills.length,
-        links: rows.links.length,
+        experiences: syncedChildren.experiences,
+        education: syncedChildren.education,
+        skills: syncedChildren.skills,
+        links: syncedChildren.links,
         suggestions: suggestionRows.length,
       },
     };
