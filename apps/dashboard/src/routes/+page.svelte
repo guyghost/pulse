@@ -2046,11 +2046,21 @@
                         <button
                           type="submit"
                           name="resolutionAction"
-                          value="resolved"
+                          value="keep_remote"
                           class="rounded-md bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition hover:bg-blueprint-blue/90"
                         >
-                          Marquer résolu
+                          Garder {syncConflictActorLabels[conflict.remoteUpdatedBy]}
                         </button>
+                        {#if conflict.entity === 'applications'}
+                          <button
+                            type="submit"
+                            name="resolutionAction"
+                            value="apply_local"
+                            class="rounded-md border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 py-2 text-xs font-medium text-blueprint-blue transition hover:border-blueprint-blue/40"
+                          >
+                            Appliquer {syncConflictActorLabels[conflict.localUpdatedBy]}
+                          </button>
+                        {/if}
                         <button
                           type="submit"
                           name="resolutionAction"

@@ -611,7 +611,46 @@ export interface SyncConflictResolutionPatch {
   resolved_at: string;
 }
 
-export type SyncConflictResolutionAction = 'applied' | 'resolved' | 'dismissed';
+export type SyncConflictResolutionAction =
+  | 'applied'
+  | 'resolved'
+  | 'keep_remote'
+  | 'apply_local'
+  | 'dismissed';
+
+export type ApplicationSyncConflictField = 'stage' | 'notes' | 'user_rating' | 'next_action_at';
+
+export interface ApplicationSyncConflictResolutionInput {
+  field: string;
+  localValue: string | null;
+  action: SyncConflictResolutionAction;
+  resolvedAt: string;
+}
+
+export interface ApplicationSyncConflictResolution {
+  conflict: SyncConflictResolutionPatch;
+  application:
+    | {
+        stage: ApplicationStage;
+        applied_at?: string | null;
+        archived_at?: string | null;
+        updated_by: 'dashboard';
+      }
+    | {
+        notes: string;
+        updated_by: 'dashboard';
+      }
+    | {
+        user_rating: number | null;
+        updated_by: 'dashboard';
+      }
+    | {
+        next_action_at: string | null;
+        updated_by: 'dashboard';
+      }
+    | null;
+  stageTransition: ApplicationStage | null;
+}
 
 export interface ApplicationFilters {
   query: string;
@@ -666,6 +705,12 @@ function isDashboardSyncConflictStatus(value: unknown): value is DashboardSyncCo
 
 function isDashboardSyncConflictActor(value: unknown): value is DashboardSyncConflictActor {
   return value === 'dashboard' || value === 'extension' || value === 'system';
+}
+
+function isApplicationSyncConflictField(value: unknown): value is ApplicationSyncConflictField {
+  return (
+    value === 'stage' || value === 'notes' || value === 'user_rating' || value === 'next_action_at'
+  );
 }
 
 function isCvFieldSuggestionField(value: unknown): value is CvFieldSuggestionField {
@@ -1614,6 +1659,97 @@ export function buildSyncConflictResolutionPatch(
   return {
     status: action === 'dismissed' ? 'dismissed' : 'resolved',
     resolved_at: resolvedAt,
+  };
+}
+
+function parseSyncConflictRating(value: string | null): number | null | undefined {
+  if (value === null || value === '') {
+    return null;
+  }
+
+  const rating = Number(value);
+  if (!Number.isInteger(rating) || rating < 1 || rating > 5) {
+    return undefined;
+  }
+
+  return rating;
+}
+
+function isSyncConflictDateTime(value: string): boolean {
+  return /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d{3})?Z$/.test(value);
+}
+
+export function buildApplicationSyncConflictResolution(
+  input: ApplicationSyncConflictResolutionInput
+): ApplicationSyncConflictResolution | null {
+  if (
+    input.action === 'dismissed' ||
+    input.action === 'resolved' ||
+    input.action === 'keep_remote'
+  ) {
+    return {
+      conflict: buildSyncConflictResolutionPatch(input.action, input.resolvedAt),
+      application: null,
+      stageTransition: null,
+    };
+  }
+
+  if (input.action !== 'apply_local' || !isApplicationSyncConflictField(input.field)) {
+    return null;
+  }
+
+  const conflict = buildSyncConflictResolutionPatch(input.action, input.resolvedAt);
+
+  if (input.field === 'stage') {
+    if (!isApplicationStage(input.localValue)) {
+      return null;
+    }
+
+    return {
+      conflict,
+      application: buildApplicationStageUpdatePatch(input.localValue, input.resolvedAt),
+      stageTransition: input.localValue,
+    };
+  }
+
+  if (input.field === 'notes') {
+    return {
+      conflict,
+      application: {
+        notes: input.localValue ?? '',
+        updated_by: 'dashboard',
+      },
+      stageTransition: null,
+    };
+  }
+
+  if (input.field === 'user_rating') {
+    const rating = parseSyncConflictRating(input.localValue);
+    if (rating === undefined) {
+      return null;
+    }
+
+    return {
+      conflict,
+      application: {
+        user_rating: rating,
+        updated_by: 'dashboard',
+      },
+      stageTransition: null,
+    };
+  }
+
+  if (input.localValue !== null && !isSyncConflictDateTime(input.localValue)) {
+    return null;
+  }
+
+  return {
+    conflict,
+    application: {
+      next_action_at: input.localValue,
+      updated_by: 'dashboard',
+    },
+    stageTransition: null,
   };
 }
 

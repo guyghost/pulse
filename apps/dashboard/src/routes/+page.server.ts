@@ -4,6 +4,7 @@ import { fail, redirect } from '@sveltejs/kit';
 import {
   APPLICATION_STAGES,
   transitionApplicationStage,
+  type ApplicationPipelineEvent,
   type ApplicationStage,
 } from '@pulse/domain';
 import { createSupabaseServerClient } from '$lib/server/supabase';
@@ -11,6 +12,7 @@ import {
   buildDashboardAlertPreferencesPatch,
   buildApplicationDetailsUpdatePatch,
   buildApplicationStageUpdatePatch,
+  buildApplicationSyncConflictResolution,
   buildConnectedDataDeletionRequest,
   buildCvFieldSuggestionResolution,
   buildEmptyCvSnapshot,
@@ -82,6 +84,17 @@ type ApplicationDetailsRow = {
   revision: number;
 };
 
+type ApplicationConflictUpdatePayload = {
+  revision: number;
+  updated_by: 'dashboard';
+  stage?: ApplicationStage;
+  applied_at?: string | null;
+  archived_at?: string | null;
+  notes?: string;
+  user_rating?: number | null;
+  next_action_at?: string | null;
+};
+
 type CvProfileEditRow = {
   id: string;
   revision: number;
@@ -111,6 +124,14 @@ type CandidateProfileIdentityRow = {
 
 type SyncConflictIdentityRow = {
   id: string;
+};
+
+type SyncConflictResolutionRow = {
+  id: string;
+  entity: string;
+  entity_id: string;
+  field: string;
+  local_value: string | null;
 };
 
 const normalizeSubscriptionStatus = (value: string | null): DashboardSubscriptionStatus =>
@@ -169,8 +190,13 @@ const isApplicationStage = (value: unknown): value is ApplicationStage =>
 const isCvSuggestionResolutionAction = (value: unknown): value is 'apply' | 'dismiss' =>
   value === 'apply' || value === 'dismiss';
 
-const isManualSyncConflictResolutionAction = (value: unknown): value is 'resolved' | 'dismissed' =>
-  value === 'resolved' || value === 'dismissed';
+const isManualSyncConflictResolutionAction = (
+  value: unknown
+): value is 'resolved' | 'keep_remote' | 'apply_local' | 'dismissed' =>
+  value === 'resolved' ||
+  value === 'keep_remote' ||
+  value === 'apply_local' ||
+  value === 'dismissed';
 
 const deleteRowsByUserId = async (
   supabase: ReturnType<typeof createSupabaseServerClient>,
@@ -198,6 +224,27 @@ const deleteProfileChildRows = async (
   if (error) {
     throw new Error(error.message);
   }
+};
+
+const insertDashboardPipelineEvent = async (
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  userId: string,
+  event: ApplicationPipelineEvent,
+  metadata: Record<string, string>
+): Promise<boolean> => {
+  const { error } = await supabase.from('application_pipeline_events').insert({
+    user_id: userId,
+    application_id: event.applicationId,
+    from_stage: event.fromStage,
+    to_stage: event.toStage,
+    note: event.note,
+    metadata,
+    occurred_at: event.occurredAt,
+    created_by: event.createdBy,
+    client_event_id: event.clientEventId,
+  });
+
+  return !error;
 };
 
 export const load: PageServerLoad = async ({ cookies }) => {
@@ -737,19 +784,125 @@ export const actions: Actions = {
 
     const { data: conflict, error: readError } = await supabase
       .from('sync_conflicts')
-      .select('id')
+      .select('id, entity, entity_id, field, local_value')
       .eq('id', conflictId)
       .eq('user_id', session.user.id)
       .eq('status', 'pending')
-      .single<SyncConflictIdentityRow>();
+      .single<SyncConflictResolutionRow>();
 
     if (readError || !conflict) {
       return fail(404, { syncConflictError: 'Conflit de synchronisation introuvable.' });
     }
 
+    const resolvedAt = new Date().toISOString();
+    const resolution =
+      conflict.entity === 'applications'
+        ? buildApplicationSyncConflictResolution({
+            field: conflict.field,
+            localValue: conflict.local_value,
+            action: resolutionAction,
+            resolvedAt,
+          })
+        : {
+            conflict: buildSyncConflictResolutionPatch(resolutionAction, resolvedAt),
+            application: null,
+            stageTransition: null,
+          };
+
+    if (!resolution || (conflict.entity !== 'applications' && resolutionAction === 'apply_local')) {
+      return fail(400, { syncConflictError: 'Résolution incompatible avec ce conflit.' });
+    }
+
+    if (resolution.application) {
+      const { data: application, error: applicationReadError } = await supabase
+        .from('applications')
+        .select('id, stage, revision')
+        .eq('id', conflict.entity_id)
+        .eq('user_id', session.user.id)
+        .single<ApplicationTransitionRow>();
+
+      if (applicationReadError || !application || !isApplicationStage(application.stage)) {
+        return fail(404, { syncConflictError: 'Candidature liée au conflit introuvable.' });
+      }
+
+      if (resolution.stageTransition && resolution.stageTransition !== application.stage) {
+        const occurredAt = new Date(resolvedAt);
+        const event = transitionApplicationStage({
+          applicationId: application.id,
+          fromStage: application.stage,
+          toStage: resolution.stageTransition,
+          occurredAt,
+          createdBy: 'dashboard',
+          clientEventId: `dashboard:conflict:${application.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+          note: 'Conflit de synchronisation résolu depuis le dashboard.',
+        });
+
+        if (!event) {
+          return fail(400, {
+            syncConflictError:
+              'La valeur extension ne respecte pas la progression canonique du pipeline.',
+          });
+        }
+
+        const eventInserted = await insertDashboardPipelineEvent(supabase, session.user.id, event, {
+          source: 'sync_conflict',
+          conflict_id: conflict.id,
+        });
+
+        if (!eventInserted) {
+          return fail(500, {
+            syncConflictError: "L'événement pipeline du conflit n'a pas pu être enregistré.",
+          });
+        }
+      }
+
+      const updatePayload: ApplicationConflictUpdatePayload = {
+        revision: application.revision + 1,
+        updated_by: 'dashboard',
+      };
+
+      if ('stage' in resolution.application) {
+        updatePayload.stage = resolution.application.stage;
+        if (resolution.application.applied_at !== undefined) {
+          updatePayload.applied_at = resolution.application.applied_at;
+        }
+        if (resolution.application.archived_at !== undefined) {
+          updatePayload.archived_at = resolution.application.archived_at;
+        }
+      } else if ('notes' in resolution.application) {
+        updatePayload.notes = resolution.application.notes;
+      } else if ('user_rating' in resolution.application) {
+        updatePayload.user_rating = resolution.application.user_rating;
+      } else {
+        updatePayload.next_action_at = resolution.application.next_action_at;
+      }
+
+      const { error: applicationUpdateError } = await supabase
+        .from('applications')
+        .update(updatePayload)
+        .eq('id', application.id)
+        .eq('user_id', session.user.id)
+        .eq('revision', application.revision)
+        .select('id')
+        .single<{ id: string }>();
+
+      if (applicationUpdateError) {
+        if (applicationUpdateError.code !== 'PGRST116') {
+          return fail(500, {
+            syncConflictError: "La valeur du conflit n'a pas pu être appliquée.",
+          });
+        }
+
+        return fail(409, {
+          syncConflictError:
+            "La candidature a changé depuis l'ouverture de la page. Rechargez avant de résoudre.",
+        });
+      }
+    }
+
     const { error: updateError } = await supabase
       .from('sync_conflicts')
-      .update(buildSyncConflictResolutionPatch(resolutionAction, new Date().toISOString()))
+      .update(resolution.conflict)
       .eq('id', conflict.id)
       .eq('user_id', session.user.id)
       .eq('status', 'pending')
@@ -760,9 +913,17 @@ export const actions: Actions = {
       return fail(500, { syncConflictError: "Le conflit n'a pas pu être traité." });
     }
 
+    if (conflict.entity === 'applications') {
+      await markEntityPendingExtensionPull(supabase, session.user.id, 'applications', resolvedAt);
+    }
+
     return {
       syncConflictSuccess:
-        resolutionAction === 'resolved' ? 'Conflit marqué résolu.' : 'Conflit ignoré.',
+        resolutionAction === 'apply_local'
+          ? 'Valeur extension appliquée.'
+          : resolutionAction === 'dismissed'
+            ? 'Conflit ignoré.'
+            : 'Valeur dashboard conservée.',
     };
   },
 

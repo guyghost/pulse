@@ -6,6 +6,7 @@ import {
   canonicalRowsToApplications,
   dashboardAlertPreferencesRowToSnapshot,
   buildApplicationDetailsUpdatePatch,
+  buildApplicationSyncConflictResolution,
   buildCvProfileUpdatePatch,
   buildConnectedDataDeletionRequest,
   buildCvFieldSuggestionResolution,
@@ -1528,5 +1529,148 @@ describe('dashboard core', () => {
       status: 'resolved',
       resolved_at: '2026-05-22T10:00:00.000Z',
     });
+  });
+
+  it('builds application sync conflict resolutions that apply extension values', () => {
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'notes',
+        localValue: 'Note conservée côté extension',
+        action: 'apply_local',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toEqual({
+      conflict: {
+        status: 'resolved',
+        resolved_at: '2026-05-22T10:00:00.000Z',
+      },
+      application: {
+        notes: 'Note conservée côté extension',
+        updated_by: 'dashboard',
+      },
+      stageTransition: null,
+    });
+
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'user_rating',
+        localValue: '5',
+        action: 'apply_local',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toMatchObject({
+      application: {
+        user_rating: 5,
+        updated_by: 'dashboard',
+      },
+      stageTransition: null,
+    });
+
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'next_action_at',
+        localValue: '2026-05-28T09:00:00.000Z',
+        action: 'apply_local',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toMatchObject({
+      application: {
+        next_action_at: '2026-05-28T09:00:00.000Z',
+        updated_by: 'dashboard',
+      },
+      stageTransition: null,
+    });
+  });
+
+  it('builds application sync conflict stage resolutions through the canonical pipeline', () => {
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'stage',
+        localValue: 'offer',
+        action: 'apply_local',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toEqual({
+      conflict: {
+        status: 'resolved',
+        resolved_at: '2026-05-22T10:00:00.000Z',
+      },
+      application: {
+        stage: 'offer',
+        applied_at: undefined,
+        archived_at: null,
+        updated_by: 'dashboard',
+      },
+      stageTransition: 'offer',
+    });
+  });
+
+  it('does not mutate applications when keeping dashboard conflict values', () => {
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'notes',
+        localValue: 'Note extension',
+        action: 'keep_remote',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toEqual({
+      conflict: {
+        status: 'resolved',
+        resolved_at: '2026-05-22T10:00:00.000Z',
+      },
+      application: null,
+      stageTransition: null,
+    });
+
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'notes',
+        localValue: 'Note extension',
+        action: 'dismissed',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toEqual({
+      conflict: {
+        status: 'dismissed',
+        resolved_at: '2026-05-22T10:00:00.000Z',
+      },
+      application: null,
+      stageTransition: null,
+    });
+  });
+
+  it('rejects invalid application sync conflict values', () => {
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'stage',
+        localValue: 'done',
+        action: 'apply_local',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toBeNull();
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'user_rating',
+        localValue: '8',
+        action: 'apply_local',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toBeNull();
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'next_action_at',
+        localValue: '28/05/2026',
+        action: 'apply_local',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toBeNull();
+    expect(
+      buildApplicationSyncConflictResolution({
+        field: 'unknown',
+        localValue: 'x',
+        action: 'apply_local',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toBeNull();
   });
 });
