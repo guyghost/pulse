@@ -39,7 +39,17 @@ import {
 } from '../lib/shell/notifications/notify-missions';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 import { getAllHealthSnapshots, resetHealthSnapshot } from '../lib/shell/storage/connector-health';
-import { setFirstScanDone, getFirstScanDone } from '../lib/shell/storage/first-scan';
+import {
+  clearOnboardingCompleted,
+  getFeedTourSeen,
+  getFirstScanDone,
+  getOnboardingCompleted,
+  getProfileBannerDismissed,
+  setFeedTourSeen,
+  setFirstScanDone,
+  setOnboardingCompleted,
+  setProfileBannerDismissed,
+} from '../lib/shell/storage/first-scan';
 import { createDefaultProfile } from '../lib/core/profile/defaults';
 import {
   getTracking,
@@ -746,6 +756,102 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] OPEN_EXTERNAL_URL error:', err);
           sendResponse({ type: 'EXTERNAL_URL_OPENED', payload: { opened: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_FIRST_SCAN_DONE') {
+      getFirstScanDone()
+        .then((done) => {
+          sendResponse({ type: 'FIRST_SCAN_DONE_RESULT', payload: done });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FIRST_SCAN_DONE error:', err);
+          sendResponse({ type: 'FIRST_SCAN_DONE_RESULT', payload: false });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_PROFILE_BANNER_DISMISSED') {
+      getProfileBannerDismissed()
+        .then((dismissed) => {
+          sendResponse({ type: 'PROFILE_BANNER_DISMISSED_RESULT', payload: dismissed });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_PROFILE_BANNER_DISMISSED error:', err);
+          sendResponse({ type: 'PROFILE_BANNER_DISMISSED_RESULT', payload: false });
+        });
+      return true;
+    }
+
+    if (message.type === 'SET_PROFILE_BANNER_DISMISSED') {
+      setProfileBannerDismissed()
+        .then(() => {
+          sendResponse({ type: 'PROFILE_BANNER_DISMISSED_SET', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SET_PROFILE_BANNER_DISMISSED error:', err);
+          sendResponse({ type: 'PROFILE_BANNER_DISMISSED_SET', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_ONBOARDING_COMPLETED') {
+      getOnboardingCompleted()
+        .then((completed) => {
+          sendResponse({ type: 'ONBOARDING_COMPLETED_RESULT', payload: completed });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_ONBOARDING_COMPLETED error:', err);
+          sendResponse({ type: 'ONBOARDING_COMPLETED_RESULT', payload: false });
+        });
+      return true;
+    }
+
+    if (message.type === 'SET_ONBOARDING_COMPLETED') {
+      setOnboardingCompleted()
+        .then(() => {
+          sendResponse({ type: 'ONBOARDING_COMPLETED_SET', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SET_ONBOARDING_COMPLETED error:', err);
+          sendResponse({ type: 'ONBOARDING_COMPLETED_SET', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'CLEAR_ONBOARDING_COMPLETED') {
+      clearOnboardingCompleted()
+        .then(() => {
+          sendResponse({ type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] CLEAR_ONBOARDING_COMPLETED error:', err);
+          sendResponse({ type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_FEED_TOUR_SEEN') {
+      getFeedTourSeen()
+        .then((seen) => {
+          sendResponse({ type: 'FEED_TOUR_SEEN_RESULT', payload: seen });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FEED_TOUR_SEEN error:', err);
+          sendResponse({ type: 'FEED_TOUR_SEEN_RESULT', payload: false });
+        });
+      return true;
+    }
+
+    if (message.type === 'SET_FEED_TOUR_SEEN') {
+      setFeedTourSeen()
+        .then(() => {
+          sendResponse({ type: 'FEED_TOUR_SEEN_SET', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SET_FEED_TOUR_SEEN error:', err);
+          sendResponse({ type: 'FEED_TOUR_SEEN_SET', payload: { saved: false } });
         });
       return true;
     }

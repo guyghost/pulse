@@ -1,6 +1,6 @@
 <script lang="ts">
   import { Icon } from '@pulse/ui';
-  import { setProfileBannerDismissed } from '$lib/shell/storage/first-scan';
+  import { setProfileBannerDismissed } from '$lib/shell/facades/app-flags.facade';
 
   const { onSetupProfile }: { onSetupProfile: () => void } = $props();
 

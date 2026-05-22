@@ -13,6 +13,7 @@
   import { sendMessage } from '$lib/shell/messaging/bridge';
   import type { BridgeMessage } from '$lib/shell/messaging/bridge';
   import type { ConnectedDashboardSyncStatus } from '$lib/shell/sync/connected-dashboard';
+  import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
 
   const DASHBOARD_BASE_URL =
     import.meta.env.VITE_DASHBOARD_URL ??
@@ -189,7 +190,7 @@
         await showToast('Déconnecté', 'success');
       }}
       onOpenDashboard={() => {
-        window.open(getDashboardUrl(), '_blank');
+        openExternalUrl(getDashboardUrl()).catch(() => {});
       }}
       onRefresh={() => auth.checkStatus()}
     />

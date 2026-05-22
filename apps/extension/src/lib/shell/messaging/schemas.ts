@@ -351,6 +351,46 @@ export const MessageSchemas = {
     type: z.literal('EXTERNAL_URL_OPENED'),
     payload: z.object({ opened: z.boolean() }),
   }),
+  GET_FIRST_SCAN_DONE: z.object({ type: z.literal('GET_FIRST_SCAN_DONE') }),
+  FIRST_SCAN_DONE_RESULT: z.object({
+    type: z.literal('FIRST_SCAN_DONE_RESULT'),
+    payload: z.boolean(),
+  }),
+  GET_PROFILE_BANNER_DISMISSED: z.object({ type: z.literal('GET_PROFILE_BANNER_DISMISSED') }),
+  PROFILE_BANNER_DISMISSED_RESULT: z.object({
+    type: z.literal('PROFILE_BANNER_DISMISSED_RESULT'),
+    payload: z.boolean(),
+  }),
+  SET_PROFILE_BANNER_DISMISSED: z.object({ type: z.literal('SET_PROFILE_BANNER_DISMISSED') }),
+  PROFILE_BANNER_DISMISSED_SET: z.object({
+    type: z.literal('PROFILE_BANNER_DISMISSED_SET'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  GET_ONBOARDING_COMPLETED: z.object({ type: z.literal('GET_ONBOARDING_COMPLETED') }),
+  ONBOARDING_COMPLETED_RESULT: z.object({
+    type: z.literal('ONBOARDING_COMPLETED_RESULT'),
+    payload: z.boolean(),
+  }),
+  SET_ONBOARDING_COMPLETED: z.object({ type: z.literal('SET_ONBOARDING_COMPLETED') }),
+  ONBOARDING_COMPLETED_SET: z.object({
+    type: z.literal('ONBOARDING_COMPLETED_SET'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  CLEAR_ONBOARDING_COMPLETED: z.object({ type: z.literal('CLEAR_ONBOARDING_COMPLETED') }),
+  ONBOARDING_COMPLETED_CLEARED: z.object({
+    type: z.literal('ONBOARDING_COMPLETED_CLEARED'),
+    payload: z.object({ cleared: z.boolean() }),
+  }),
+  GET_FEED_TOUR_SEEN: z.object({ type: z.literal('GET_FEED_TOUR_SEEN') }),
+  FEED_TOUR_SEEN_RESULT: z.object({
+    type: z.literal('FEED_TOUR_SEEN_RESULT'),
+    payload: z.boolean(),
+  }),
+  SET_FEED_TOUR_SEEN: z.object({ type: z.literal('SET_FEED_TOUR_SEEN') }),
+  FEED_TOUR_SEEN_SET: z.object({
+    type: z.literal('FEED_TOUR_SEEN_SET'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
   GET_PERSISTED_CONNECTOR_STATUSES: z.object({
     type: z.literal('GET_PERSISTED_CONNECTOR_STATUSES'),
   }),

@@ -31,6 +31,14 @@ const syncConnectedDashboardProfileExtractorHealth = vi.fn();
 const syncConnectedDashboardTracking = vi.fn();
 const verifyProfilePage = vi.fn();
 const resetLocalData = vi.fn();
+const getFirstScanDone = vi.fn();
+const getProfileBannerDismissed = vi.fn();
+const setProfileBannerDismissed = vi.fn();
+const getOnboardingCompleted = vi.fn();
+const setOnboardingCompleted = vi.fn();
+const clearOnboardingCompleted = vi.fn();
+const getFeedTourSeen = vi.fn();
+const setFeedTourSeen = vi.fn();
 const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
@@ -223,6 +231,18 @@ vi.mock('../../../src/lib/shell/storage/local-data-reset', () => ({
   resetLocalData,
 }));
 
+vi.mock('../../../src/lib/shell/storage/first-scan', () => ({
+  getFirstScanDone,
+  setFirstScanDone: vi.fn(async () => undefined),
+  getProfileBannerDismissed,
+  setProfileBannerDismissed,
+  getOnboardingCompleted,
+  setOnboardingCompleted,
+  clearOnboardingCompleted,
+  getFeedTourSeen,
+  setFeedTourSeen,
+}));
+
 describe('background auto-scan notifications', () => {
   beforeAll(async () => {
     getSettings.mockResolvedValue({
@@ -236,6 +256,14 @@ describe('background auto-scan notifications', () => {
     setSettings.mockResolvedValue(undefined);
     getFeedSortBy.mockResolvedValue('score');
     setFeedSortBy.mockResolvedValue(undefined);
+    getFirstScanDone.mockResolvedValue(true);
+    getProfileBannerDismissed.mockResolvedValue(false);
+    setProfileBannerDismissed.mockResolvedValue(undefined);
+    getOnboardingCompleted.mockResolvedValue(true);
+    setOnboardingCompleted.mockResolvedValue(undefined);
+    clearOnboardingCompleted.mockResolvedValue(undefined);
+    getFeedTourSeen.mockResolvedValue(false);
+    setFeedTourSeen.mockResolvedValue(undefined);
     await import('../../../src/background/index.ts');
   });
 
@@ -272,6 +300,14 @@ describe('background auto-scan notifications', () => {
     saveHidden.mockResolvedValue(undefined);
     getFeedSortBy.mockResolvedValue('score');
     setFeedSortBy.mockResolvedValue(undefined);
+    getFirstScanDone.mockResolvedValue(true);
+    getProfileBannerDismissed.mockResolvedValue(false);
+    setProfileBannerDismissed.mockResolvedValue(undefined);
+    getOnboardingCompleted.mockResolvedValue(true);
+    setOnboardingCompleted.mockResolvedValue(undefined);
+    clearOnboardingCompleted.mockResolvedValue(undefined);
+    getFeedTourSeen.mockResolvedValue(false);
+    setFeedTourSeen.mockResolvedValue(undefined);
     getTracking.mockResolvedValue(null);
     saveTracking.mockResolvedValue(undefined);
     getAllTrackings.mockResolvedValue([]);
@@ -617,6 +653,76 @@ describe('background auto-scan notifications', () => {
     expect(openResponse).toHaveBeenCalledWith({
       type: 'EXTERNAL_URL_OPENED',
       payload: { opened: true },
+    });
+  });
+
+  it('routes side panel app flags through the service worker shell', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const firstScanResponse = vi.fn();
+    const bannerReadResponse = vi.fn();
+    const bannerWriteResponse = vi.fn();
+    const onboardingReadResponse = vi.fn();
+    const onboardingWriteResponse = vi.fn();
+    const onboardingClearResponse = vi.fn();
+    const tourReadResponse = vi.fn();
+    const tourWriteResponse = vi.fn();
+
+    getFirstScanDone.mockResolvedValueOnce(true);
+    getProfileBannerDismissed.mockResolvedValueOnce(false);
+    getOnboardingCompleted.mockResolvedValueOnce(true);
+    getFeedTourSeen.mockResolvedValueOnce(false);
+
+    expect(messageListener?.({ type: 'GET_FIRST_SCAN_DONE' }, {}, firstScanResponse)).toBe(true);
+    expect(
+      messageListener?.({ type: 'GET_PROFILE_BANNER_DISMISSED' }, {}, bannerReadResponse)
+    ).toBe(true);
+    expect(
+      messageListener?.({ type: 'SET_PROFILE_BANNER_DISMISSED' }, {}, bannerWriteResponse)
+    ).toBe(true);
+    expect(
+      messageListener?.({ type: 'GET_ONBOARDING_COMPLETED' }, {}, onboardingReadResponse)
+    ).toBe(true);
+    expect(
+      messageListener?.({ type: 'SET_ONBOARDING_COMPLETED' }, {}, onboardingWriteResponse)
+    ).toBe(true);
+    expect(
+      messageListener?.({ type: 'CLEAR_ONBOARDING_COMPLETED' }, {}, onboardingClearResponse)
+    ).toBe(true);
+    expect(messageListener?.({ type: 'GET_FEED_TOUR_SEEN' }, {}, tourReadResponse)).toBe(true);
+    expect(messageListener?.({ type: 'SET_FEED_TOUR_SEEN' }, {}, tourWriteResponse)).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(firstScanResponse).toHaveBeenCalledWith({
+      type: 'FIRST_SCAN_DONE_RESULT',
+      payload: true,
+    });
+    expect(bannerReadResponse).toHaveBeenCalledWith({
+      type: 'PROFILE_BANNER_DISMISSED_RESULT',
+      payload: false,
+    });
+    expect(bannerWriteResponse).toHaveBeenCalledWith({
+      type: 'PROFILE_BANNER_DISMISSED_SET',
+      payload: { saved: true },
+    });
+    expect(onboardingReadResponse).toHaveBeenCalledWith({
+      type: 'ONBOARDING_COMPLETED_RESULT',
+      payload: true,
+    });
+    expect(onboardingWriteResponse).toHaveBeenCalledWith({
+      type: 'ONBOARDING_COMPLETED_SET',
+      payload: { saved: true },
+    });
+    expect(onboardingClearResponse).toHaveBeenCalledWith({
+      type: 'ONBOARDING_COMPLETED_CLEARED',
+      payload: { cleared: true },
+    });
+    expect(tourReadResponse).toHaveBeenCalledWith({
+      type: 'FEED_TOUR_SEEN_RESULT',
+      payload: false,
+    });
+    expect(tourWriteResponse).toHaveBeenCalledWith({
+      type: 'FEED_TOUR_SEEN_SET',
+      payload: { saved: true },
     });
   });
 

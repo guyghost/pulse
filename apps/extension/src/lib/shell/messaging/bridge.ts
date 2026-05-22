@@ -75,6 +75,22 @@ export type BridgeMessage =
   | { type: 'EXTENSION_BADGE_CLEARED'; payload: { cleared: boolean } }
   | { type: 'OPEN_EXTERNAL_URL'; payload: { url: string } }
   | { type: 'EXTERNAL_URL_OPENED'; payload: { opened: boolean } }
+  | { type: 'GET_FIRST_SCAN_DONE' }
+  | { type: 'FIRST_SCAN_DONE_RESULT'; payload: boolean }
+  | { type: 'GET_PROFILE_BANNER_DISMISSED' }
+  | { type: 'PROFILE_BANNER_DISMISSED_RESULT'; payload: boolean }
+  | { type: 'SET_PROFILE_BANNER_DISMISSED' }
+  | { type: 'PROFILE_BANNER_DISMISSED_SET'; payload: { saved: boolean } }
+  | { type: 'GET_ONBOARDING_COMPLETED' }
+  | { type: 'ONBOARDING_COMPLETED_RESULT'; payload: boolean }
+  | { type: 'SET_ONBOARDING_COMPLETED' }
+  | { type: 'ONBOARDING_COMPLETED_SET'; payload: { saved: boolean } }
+  | { type: 'CLEAR_ONBOARDING_COMPLETED' }
+  | { type: 'ONBOARDING_COMPLETED_CLEARED'; payload: { cleared: boolean } }
+  | { type: 'GET_FEED_TOUR_SEEN' }
+  | { type: 'FEED_TOUR_SEEN_RESULT'; payload: boolean }
+  | { type: 'SET_FEED_TOUR_SEEN' }
+  | { type: 'FEED_TOUR_SEEN_SET'; payload: { saved: boolean } }
   | { type: 'GET_PERSISTED_CONNECTOR_STATUSES' }
   | { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT'; payload: PersistedConnectorStatus[] }
   | { type: 'GET_SETTINGS' }

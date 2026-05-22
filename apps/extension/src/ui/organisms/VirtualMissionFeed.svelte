@@ -20,6 +20,7 @@
     onToggleFavorite,
     onHide,
     onCopyLink,
+    onOpenLink,
   }: {
     missions?: Mission[];
     isLoading?: boolean;
@@ -34,6 +35,7 @@
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
     onCopyLink?: (id: string) => void;
+    onOpenLink?: (url: string) => void;
   } = $props();
 
   // Unwrap Svelte 5 $state proxy — proxied arrays aren't iterable in template context
@@ -176,6 +178,7 @@
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}
           onCopyLink={() => onCopyLink?.(mission.id)}
+          {onOpenLink}
         />
       {/each}
     </div>

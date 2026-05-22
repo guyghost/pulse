@@ -10,7 +10,7 @@ import {
   getFirstScanDone,
   getOnboardingCompleted,
   setOnboardingCompleted,
-} from '$lib/shell/storage/first-scan';
+} from '$lib/shell/facades/app-flags.facade';
 
 export type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'onboarding';
 

@@ -17,6 +17,10 @@ const storage: Record<string, unknown> = {
   seenMissions: [],
   newMissionCount: 0,
   feedSortBy: 'score',
+  first_scan_done: true,
+  profile_banner_dismissed: false,
+  onboarding_completed: true,
+  feed_tour_seen: false,
   tjm_history: generateMockTJMHistory(),
 };
 
@@ -87,6 +91,32 @@ function createChromeStubs() {
           case 'OPEN_EXTERNAL_URL':
             console.log('[Chrome Stub] Open external URL:', message.payload);
             return { type: 'EXTERNAL_URL_OPENED', payload: { opened: true } };
+          case 'GET_FIRST_SCAN_DONE':
+            return { type: 'FIRST_SCAN_DONE_RESULT', payload: storage.first_scan_done === true };
+          case 'GET_PROFILE_BANNER_DISMISSED':
+            return {
+              type: 'PROFILE_BANNER_DISMISSED_RESULT',
+              payload: storage.profile_banner_dismissed === true,
+            };
+          case 'SET_PROFILE_BANNER_DISMISSED':
+            storage.profile_banner_dismissed = true;
+            return { type: 'PROFILE_BANNER_DISMISSED_SET', payload: { saved: true } };
+          case 'GET_ONBOARDING_COMPLETED':
+            return {
+              type: 'ONBOARDING_COMPLETED_RESULT',
+              payload: storage.onboarding_completed === true,
+            };
+          case 'SET_ONBOARDING_COMPLETED':
+            storage.onboarding_completed = true;
+            return { type: 'ONBOARDING_COMPLETED_SET', payload: { saved: true } };
+          case 'CLEAR_ONBOARDING_COMPLETED':
+            storage.onboarding_completed = false;
+            return { type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: true } };
+          case 'GET_FEED_TOUR_SEEN':
+            return { type: 'FEED_TOUR_SEEN_RESULT', payload: storage.feed_tour_seen === true };
+          case 'SET_FEED_TOUR_SEEN':
+            storage.feed_tour_seen = true;
+            return { type: 'FEED_TOUR_SEEN_SET', payload: { saved: true } };
           case 'SCAN_START':
             setTimeout(() => {
               window.dispatchEvent(

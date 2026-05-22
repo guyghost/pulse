@@ -21,9 +21,7 @@
   }
 
   function handleReconnect(url: string): void {
-    openExternalUrl(url).catch(() => {
-      window.open(url, '_blank', 'noopener,noreferrer');
-    });
+    openExternalUrl(url).catch(() => {});
   }
 
   const scanEntries = $derived(statuses ? [...statuses.entries()] : []);

@@ -116,6 +116,21 @@ describe('validateMessage — messages sans payload', () => {
   it('accepte RESET_LOCAL_DATA', () => {
     expect(validateMessage({ type: 'RESET_LOCAL_DATA' }).valid).toBe(true);
   });
+
+  it('accepte les messages de flags side panel sans payload', () => {
+    for (const type of [
+      'GET_FIRST_SCAN_DONE',
+      'GET_PROFILE_BANNER_DISMISSED',
+      'SET_PROFILE_BANNER_DISMISSED',
+      'GET_ONBOARDING_COMPLETED',
+      'SET_ONBOARDING_COMPLETED',
+      'CLEAR_ONBOARDING_COMPLETED',
+      'GET_FEED_TOUR_SEEN',
+      'SET_FEED_TOUR_SEEN',
+    ]) {
+      expect(validateMessage({ type }).valid).toBe(true);
+    }
+  });
 });
 
 // ============================================================================

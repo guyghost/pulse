@@ -20,6 +20,7 @@
     onToggleFavorite,
     onHide,
     onCopyLink,
+    onOpenLink,
     trackingStatus = null as ApplicationStatus | null,
     onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
   }: {
@@ -33,6 +34,7 @@
     onToggleFavorite?: () => void;
     onHide?: () => void;
     onCopyLink?: () => void;
+    onOpenLink?: (url: string) => void;
     trackingStatus?: ApplicationStatus | null;
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
   } = $props();
@@ -100,7 +102,7 @@
 
   function handleOpenLink(e: MouseEvent) {
     e.stopPropagation();
-    window.open(mission.url, '_blank');
+    onOpenLink?.(mission.url);
   }
 </script>
 
@@ -339,15 +341,13 @@
         <Icon name="external-link" size={13} />
       </button>
     </div>
-    <a
-      href={mission.url}
-      target="_blank"
-      rel="noopener noreferrer"
+    <button
+      type="button"
       class="text-[11px] font-medium text-text-muted transition-colors hover:text-blueprint-blue"
-      onclick={(e) => e.stopPropagation()}
+      onclick={handleOpenLink}
     >
       Voir →
-    </a>
+    </button>
   </div>
 
   {#if trackingStatus && availableTransitions.length > 0 && onStatusTransition}

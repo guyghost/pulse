@@ -19,6 +19,7 @@
     onToggleFavorite,
     onHide,
     onCopyLink,
+    onOpenLink,
   }: {
     missions?: Mission[];
     isLoading?: boolean;
@@ -32,6 +33,7 @@
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
     onCopyLink?: (id: string) => void;
+    onOpenLink?: (url: string) => void;
   } = $props();
 
   // Use $derived.by for explicit reactivity with defensive checks
@@ -128,6 +130,7 @@
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}
           onCopyLink={() => onCopyLink?.(mission.id)}
+          {onOpenLink}
         />
       </div>
     {/each}

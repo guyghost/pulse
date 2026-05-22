@@ -19,6 +19,7 @@
     onFilterBySource,
     onToggleConnector,
     onRecheckConnector,
+    onReconnect,
     healthSnapshots,
   }: {
     sources: SourceStatus[];
@@ -31,6 +32,7 @@
     onFilterBySource?: (connectorId: string | null) => void;
     onToggleConnector?: (connectorId: string) => void;
     onRecheckConnector?: (connectorId: string, enable?: boolean) => void;
+    onReconnect?: (url: string) => void;
     healthSnapshots?: Map<string, ConnectorHealthSnapshot>;
   } = $props();
 
@@ -66,7 +68,7 @@
   );
 
   function handleReconnect(url: string) {
-    window.open(url, '_blank');
+    onReconnect?.(url);
   }
 
   const unhealthySnapshots = $derived.by(() => {

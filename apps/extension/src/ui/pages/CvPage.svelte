@@ -2,7 +2,7 @@
   import { Icon } from '@pulse/ui';
   import type { UserProfile } from '$lib/core/types/profile';
   import type { ProfileFieldComparison } from '$lib/core/profile/profile-sync';
-  import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
+  import { getConnectorsMeta, openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import {
     previewLinkedInProfile,
@@ -187,7 +187,7 @@
   async function pushPlatform(platform: ProfilePlatform): Promise<void> {
     await navigator.clipboard.writeText(buildPlatformPayload(platform, selectedFields));
     pushedPlatformIds = new Set([...pushedPlatformIds, platform.id]);
-    window.open(platform.profileUrl, '_blank', 'noopener,noreferrer');
+    await openExternalUrl(platform.profileUrl).catch(() => {});
     await showToast(`${platform.name}: mise à jour prête à coller`, 'success');
   }
 

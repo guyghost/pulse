@@ -25,7 +25,8 @@
     getFirstScanDone,
     getProfileBannerDismissed,
     setFeedTourSeen,
-  } from '$lib/shell/storage/first-scan';
+  } from '$lib/shell/facades/app-flags.facade';
+  import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
 
@@ -91,6 +92,10 @@
         isEnabled: enabled.has(snapshot.connectorId),
       }));
   });
+
+  function handleOpenExternalUrl(url: string): void {
+    openExternalUrl(url).catch(() => {});
+  }
 
   (async () => {
     const [firstScanDone, bannerDismissed, profile, feedTourSeen] = await Promise.all([
@@ -251,6 +256,7 @@
               }}
               onToggleConnector={(id) => controller.handleToggleConnector(id)}
               onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
+              onReconnect={handleOpenExternalUrl}
             />
           {:else}
             <!-- Full: hero with description, progress, stats -->
@@ -342,6 +348,7 @@
                 }}
                 onToggleConnector={(id) => controller.handleToggleConnector(id)}
                 onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
+                onReconnect={handleOpenExternalUrl}
               />
             {/if}
 
@@ -567,6 +574,7 @@
         onToggleFavorite={page.handleToggleFavorite}
         onHide={page.handleHide}
         onCopyLink={page.handleCopyLink}
+        onOpenLink={handleOpenExternalUrl}
         tourStep={activeTourStep?.id ?? null}
       />
     </div>
