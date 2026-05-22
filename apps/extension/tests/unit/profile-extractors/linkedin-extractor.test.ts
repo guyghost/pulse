@@ -10,7 +10,8 @@ const linkedinTab = {
 
 function createChromeDouble(
   overrides: Partial<{
-    contains: () => Promise<boolean>;
+    contains: (permissions: chrome.permissions.Permissions) => Promise<boolean>;
+    request: (permissions: chrome.permissions.Permissions) => Promise<boolean>;
     query: () => Promise<chrome.tabs.Tab[]>;
     executeScript: () => Promise<chrome.scripting.InjectionResult<unknown>[]>;
     getAllCookies: () => Promise<chrome.cookies.Cookie[]>;
@@ -19,6 +20,7 @@ function createChromeDouble(
   return {
     permissions: {
       contains: vi.fn(overrides.contains ?? (async () => true)),
+      request: vi.fn(overrides.request ?? (async () => true)),
     },
     tabs: {
       get: vi.fn(async () => linkedinTab),
@@ -88,6 +90,24 @@ describe('LinkedInProfileExtractor', () => {
     }
   });
 
+  it('requests the optional LinkedIn origin permission when it is not granted yet', async () => {
+    const requestedPermissions: chrome.permissions.Permissions[] = [];
+    const extractor = new LinkedInProfileExtractor(
+      createChromeDouble({
+        contains: async (permissions) => Boolean(permissions.permissions?.length),
+        request: async (permissions) => {
+          requestedPermissions.push(permissions);
+          return true;
+        },
+      })
+    );
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(true);
+    expect(requestedPermissions).toEqual([{ origins: ['https://www.linkedin.com/*'] }]);
+  });
+
   it('returns profile_not_found when the active tab is not a LinkedIn profile', async () => {
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({
@@ -112,6 +132,48 @@ describe('LinkedInProfileExtractor', () => {
 
     expect(result.ok).toBe(false);
     expect(extractorCode(result)).toBe('permission_required');
+  });
+
+  it('returns permission_required when the optional LinkedIn origin permission is refused', async () => {
+    const extractor = new LinkedInProfileExtractor(
+      createChromeDouble({
+        contains: async (permissions) => Boolean(permissions.permissions?.length),
+        request: async () => false,
+      })
+    );
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('permission_required');
+  });
+
+  it('returns session_required when LinkedIn redirects to login', async () => {
+    const extractor = new LinkedInProfileExtractor(
+      createChromeDouble({
+        query: async () => [{ id: 9, url: 'https://www.linkedin.com/login' } as chrome.tabs.Tab],
+      })
+    );
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('session_required');
+  });
+
+  it('returns rate_limited_or_blocked when LinkedIn shows a checkpoint', async () => {
+    const extractor = new LinkedInProfileExtractor(
+      createChromeDouble({
+        query: async () => [
+          { id: 9, url: 'https://www.linkedin.com/checkpoint/challenge/' } as chrome.tabs.Tab,
+        ],
+      })
+    );
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('rate_limited_or_blocked');
   });
 
   it('returns dom_changed when LinkedIn returns an empty sanitized payload', async () => {

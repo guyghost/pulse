@@ -31,6 +31,7 @@ interface ChromeLike {
   };
   permissions?: {
     contains(permissions: chrome.permissions.Permissions): Promise<boolean>;
+    request?(permissions: chrome.permissions.Permissions): Promise<boolean>;
   };
   scripting?: {
     executeScript(
@@ -192,7 +193,7 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
     now: number,
     tabId?: number
   ): Promise<Result<CanonicalCandidateProfileDraft, AppError>> {
-    const scriptingReady = await this.hasScriptingPermission();
+    const scriptingReady = await this.ensureExtractionPermission();
     if (!scriptingReady || !this.chromeApi.scripting?.executeScript || !this.chromeApi.tabs) {
       return err(
         createProfileExtractorError(
@@ -276,12 +277,28 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
     }
   }
 
-  private async hasScriptingPermission(): Promise<boolean> {
+  private async ensureExtractionPermission(): Promise<boolean> {
     if (!this.chromeApi.permissions?.contains) {
       return false;
     }
 
-    return this.chromeApi.permissions.contains({ permissions: ['scripting', 'activeTab'] });
+    const hasScriptApis = await this.chromeApi.permissions.contains({
+      permissions: ['scripting', 'activeTab'],
+    });
+    if (!hasScriptApis) {
+      return false;
+    }
+
+    const hasLinkedInOrigin = await this.chromeApi.permissions.contains({
+      origins: ['https://www.linkedin.com/*'],
+    });
+    if (hasLinkedInOrigin) {
+      return true;
+    }
+
+    return (
+      this.chromeApi.permissions.request?.({ origins: ['https://www.linkedin.com/*'] }) ?? false
+    );
   }
 
   private async resolveTab(tabId?: number): Promise<chrome.tabs.Tab | null> {
