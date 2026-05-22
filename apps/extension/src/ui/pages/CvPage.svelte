@@ -282,6 +282,25 @@
     return pushedPlatformIds.has(platform.id) ? 'Prêt' : 'À vérifier';
   }
 
+  function getLinkedInRecoveryHint(errorCode: string): string {
+    switch (errorCode) {
+      case 'permission_required':
+        return "Autorisez l'accès LinkedIn dans Chrome, puis relancez la preview.";
+      case 'session_required':
+        return 'Connectez-vous à LinkedIn dans le navigateur avant de relancer la preview.';
+      case 'profile_not_found':
+        return 'Ouvrez un onglet de profil LinkedIn public ou connecté avant de relancer.';
+      case 'dom_changed':
+        return "Le profil LinkedIn ne correspond plus au parser attendu; l'import manuel reste disponible.";
+      case 'rate_limited_or_blocked':
+        return 'Attendez la fin du blocage LinkedIn ou vérifiez le profil dans un nouvel onglet.';
+      case 'sync_failed':
+        return 'Gardez la preview ouverte et relancez la synchronisation vers le dashboard.';
+      default:
+        return "Relancez l'action ou gardez le CV canonique prêt pour une mise à jour manuelle.";
+    }
+  }
+
   function getComparisonRows(result: VerifyProfileResult | null): ProfileFieldComparison[] {
     return result?.comparisons ?? [];
   }
@@ -493,6 +512,9 @@
                   <p class="mt-1 text-xs leading-5 text-text-subtle">
                     {linkedInPreviewResult.errorCode}: {linkedInPreviewResult.errorMessage}
                   </p>
+                  <p class="mt-2 text-xs leading-5 text-text-secondary">
+                    {getLinkedInRecoveryHint(linkedInPreviewResult.errorCode)}
+                  </p>
                 {/if}
               </div>
             </div>
@@ -523,6 +545,9 @@
                 {:else}
                   <p class="mt-1 text-xs leading-5 text-text-subtle">
                     {linkedInImportResult.errorCode}: {linkedInImportResult.errorMessage}
+                  </p>
+                  <p class="mt-2 text-xs leading-5 text-text-secondary">
+                    {getLinkedInRecoveryHint(linkedInImportResult.errorCode)}
                   </p>
                 {/if}
               </div>

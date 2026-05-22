@@ -31,11 +31,25 @@ const linkedInProfile = {
   profileUrl: 'https://www.linkedin.com/in/example/',
 };
 
-type LinkedInBridgeMode = 'success' | 'session-required';
+type LinkedInBridgeMode = 'success' | 'session-required' | 'permission-required';
+
+const linkedInPreviewErrors: Record<
+  Exclude<LinkedInBridgeMode, 'success'>,
+  { errorCode: string; errorMessage: string }
+> = {
+  'session-required': {
+    errorCode: 'session_required',
+    errorMessage: 'Session LinkedIn requise.',
+  },
+  'permission-required': {
+    errorCode: 'permission_required',
+    errorMessage: 'Autorisation LinkedIn refusée.',
+  },
+};
 
 async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeMode) {
   await page.addInitScript(
-    ({ bridgeMode, profile }) => {
+    ({ bridgeMode, profile, previewErrors }) => {
       let chromeValue: unknown = undefined;
       Object.defineProperty(window, 'chrome', {
         configurable: true,
@@ -74,13 +88,14 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
             }
 
             if (message.type === 'PREVIEW_LINKEDIN_PROFILE') {
-              if (bridgeMode === 'session-required') {
+              if (bridgeMode !== 'success') {
+                const error = previewErrors[bridgeMode];
                 return {
                   type: 'LINKEDIN_PROFILE_PREVIEWED',
                   payload: {
                     extracted: false,
-                    errorCode: 'session_required',
-                    errorMessage: 'Session LinkedIn requise.',
+                    errorCode: error.errorCode,
+                    errorMessage: error.errorMessage,
                   },
                 };
               }
@@ -103,7 +118,7 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
         },
       });
     },
-    { bridgeMode: mode, profile: linkedInProfile }
+    { bridgeMode: mode, profile: linkedInProfile, previewErrors: linkedInPreviewErrors }
   );
 }
 
@@ -144,6 +159,22 @@ test.describe('LinkedIn profile import flow', () => {
 
     await expect(page.getByRole('heading', { name: 'Preview LinkedIn' })).toBeVisible();
     await expect(page.getByText('session_required: Session LinkedIn requise.')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Synchroniser le CV' })).not.toBeVisible();
+  });
+
+  test('shows recovery guidance for missing LinkedIn permissions', async ({ page }) => {
+    await mockAuthenticatedLinkedInBridge(page, 'permission-required');
+    await openCvPage(page);
+
+    await page.getByRole('button', { name: 'Prévisualiser LinkedIn' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Preview LinkedIn' })).toBeVisible();
+    await expect(
+      page.getByText('permission_required: Autorisation LinkedIn refusée.')
+    ).toBeVisible();
+    await expect(
+      page.getByText("Autorisez l'accès LinkedIn dans Chrome, puis relancez la preview.")
+    ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Synchroniser le CV' })).not.toBeVisible();
   });
 });
