@@ -16,6 +16,7 @@ const storage: Record<string, unknown> = {
   hiddenMissions: {},
   seenMissions: [],
   newMissionCount: 0,
+  feedSortBy: 'score',
   tjm_history: generateMockTJMHistory(),
 };
 
@@ -65,6 +66,11 @@ function createChromeStubs() {
           case 'SAVE_FEED_HIDDEN':
             storage.hiddenMissions = message.payload;
             return { type: 'FEED_HIDDEN_SAVED', payload: { saved: true } };
+          case 'GET_FEED_SORT':
+            return { type: 'FEED_SORT_RESULT', payload: storage.feedSortBy };
+          case 'SAVE_FEED_SORT':
+            storage.feedSortBy = message.payload;
+            return { type: 'FEED_SORT_SAVED', payload: { saved: true } };
           case 'GET_SEEN_MISSIONS':
             return { type: 'SEEN_MISSIONS_RESULT', payload: storage.seenMissions };
           case 'SAVE_SEEN_MISSIONS':
@@ -75,6 +81,12 @@ function createChromeStubs() {
             return { type: 'NEW_MISSION_COUNT_RESET', payload: { reset: true } };
           case 'GET_PERSISTED_CONNECTOR_STATUSES':
             return { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT', payload: [] };
+          case 'CLEAR_EXTENSION_BADGE':
+            storage.newMissionCount = 0;
+            return { type: 'EXTENSION_BADGE_CLEARED', payload: { cleared: true } };
+          case 'OPEN_EXTERNAL_URL':
+            console.log('[Chrome Stub] Open external URL:', message.payload);
+            return { type: 'EXTERNAL_URL_OPENED', payload: { opened: true } };
           case 'SCAN_START':
             setTimeout(() => {
               window.dispatchEvent(

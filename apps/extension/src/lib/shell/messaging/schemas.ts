@@ -56,6 +56,8 @@ const SeenMissionIdsSchema = z
   .max(10_000)
   .refine(maxBytes(160_000), { message: 'Seen mission ids payload exceeds 160KB limit' });
 
+const FeedSortSchema = z.enum(['score', 'date', 'tjm']);
+
 const PersistedConnectorStatusSchema = z
   .object({
     connectorId: z.string().min(1).max(120),
@@ -297,6 +299,19 @@ export const MessageSchemas = {
     type: z.literal('FEED_HIDDEN_SAVED'),
     payload: z.object({ saved: z.boolean() }),
   }),
+  GET_FEED_SORT: z.object({ type: z.literal('GET_FEED_SORT') }),
+  FEED_SORT_RESULT: z.object({
+    type: z.literal('FEED_SORT_RESULT'),
+    payload: FeedSortSchema,
+  }),
+  SAVE_FEED_SORT: z.object({
+    type: z.literal('SAVE_FEED_SORT'),
+    payload: FeedSortSchema,
+  }),
+  FEED_SORT_SAVED: z.object({
+    type: z.literal('FEED_SORT_SAVED'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
   GET_SEEN_MISSIONS: z.object({ type: z.literal('GET_SEEN_MISSIONS') }),
   SEEN_MISSIONS_RESULT: z.object({
     type: z.literal('SEEN_MISSIONS_RESULT'),
@@ -314,6 +329,27 @@ export const MessageSchemas = {
   NEW_MISSION_COUNT_RESET: z.object({
     type: z.literal('NEW_MISSION_COUNT_RESET'),
     payload: z.object({ reset: z.boolean() }),
+  }),
+  CLEAR_EXTENSION_BADGE: z.object({ type: z.literal('CLEAR_EXTENSION_BADGE') }),
+  EXTENSION_BADGE_CLEARED: z.object({
+    type: z.literal('EXTENSION_BADGE_CLEARED'),
+    payload: z.object({ cleared: z.boolean() }),
+  }),
+  OPEN_EXTERNAL_URL: z.object({
+    type: z.literal('OPEN_EXTERNAL_URL'),
+    payload: z.object({
+      url: z
+        .string()
+        .url()
+        .max(2048)
+        .refine((value) => value.startsWith('https://'), {
+          message: 'External URLs must use HTTPS',
+        }),
+    }),
+  }),
+  EXTERNAL_URL_OPENED: z.object({
+    type: z.literal('EXTERNAL_URL_OPENED'),
+    payload: z.object({ opened: z.boolean() }),
   }),
   GET_PERSISTED_CONNECTOR_STATUSES: z.object({
     type: z.literal('GET_PERSISTED_CONNECTOR_STATUSES'),

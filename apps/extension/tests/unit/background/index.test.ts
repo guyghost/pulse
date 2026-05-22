@@ -3,6 +3,8 @@ import type { Mission } from '../../../src/lib/core/types/mission';
 
 const getSettings = vi.fn();
 const setSettings = vi.fn();
+const getFeedSortBy = vi.fn();
+const setFeedSortBy = vi.fn();
 const runScan = vi.fn();
 const getSeenIds = vi.fn();
 const saveSeenIds = vi.fn();
@@ -125,7 +127,7 @@ vi.stubGlobal('chrome', {
   },
   tabs: {
     query: vi.fn(),
-    create: vi.fn(),
+    create: vi.fn(async () => ({})),
   },
 });
 
@@ -143,6 +145,8 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
   },
   getSettings,
   setSettings,
+  getFeedSortBy,
+  setFeedSortBy,
 }));
 
 vi.mock('../../../src/lib/shell/storage/db', () => ({
@@ -230,6 +234,8 @@ describe('background auto-scan notifications', () => {
       notificationScoreThreshold: 70,
     });
     setSettings.mockResolvedValue(undefined);
+    getFeedSortBy.mockResolvedValue('score');
+    setFeedSortBy.mockResolvedValue(undefined);
     await import('../../../src/background/index.ts');
   });
 
@@ -264,6 +270,8 @@ describe('background auto-scan notifications', () => {
     saveFavorites.mockResolvedValue(undefined);
     getHidden.mockResolvedValue({});
     saveHidden.mockResolvedValue(undefined);
+    getFeedSortBy.mockResolvedValue('score');
+    setFeedSortBy.mockResolvedValue(undefined);
     getTracking.mockResolvedValue(null);
     saveTracking.mockResolvedValue(undefined);
     getAllTrackings.mockResolvedValue([]);
@@ -479,6 +487,7 @@ describe('background auto-scan notifications', () => {
     const missionsResponse = vi.fn();
     const favoritesResponse = vi.fn();
     const hiddenResponse = vi.fn();
+    const sortResponse = vi.fn();
     const seenResponse = vi.fn();
     const statusesResponse = vi.fn();
 
@@ -498,12 +507,14 @@ describe('background auto-scan notifications', () => {
     getMissions.mockResolvedValueOnce([makeMission()]);
     getFavorites.mockResolvedValueOnce(favorites);
     getHidden.mockResolvedValueOnce(hidden);
+    getFeedSortBy.mockResolvedValueOnce('date');
     getSeenIds.mockResolvedValueOnce(['mission-1']);
     getConnectorStatuses.mockResolvedValueOnce(statuses);
 
     expect(messageListener?.({ type: 'GET_FEED_MISSIONS' }, {}, missionsResponse)).toBe(true);
     expect(messageListener?.({ type: 'GET_FEED_FAVORITES' }, {}, favoritesResponse)).toBe(true);
     expect(messageListener?.({ type: 'GET_FEED_HIDDEN' }, {}, hiddenResponse)).toBe(true);
+    expect(messageListener?.({ type: 'GET_FEED_SORT' }, {}, sortResponse)).toBe(true);
     expect(messageListener?.({ type: 'GET_SEEN_MISSIONS' }, {}, seenResponse)).toBe(true);
     expect(
       messageListener?.({ type: 'GET_PERSISTED_CONNECTOR_STATUSES' }, {}, statusesResponse)
@@ -522,6 +533,10 @@ describe('background auto-scan notifications', () => {
       type: 'FEED_HIDDEN_RESULT',
       payload: hidden,
     });
+    expect(sortResponse).toHaveBeenCalledWith({
+      type: 'FEED_SORT_RESULT',
+      payload: 'date',
+    });
     expect(seenResponse).toHaveBeenCalledWith({
       type: 'SEEN_MISSIONS_RESULT',
       payload: ['mission-1'],
@@ -536,8 +551,11 @@ describe('background auto-scan notifications', () => {
     expect(messageListener).toBeTypeOf('function');
     const favoritesResponse = vi.fn();
     const hiddenResponse = vi.fn();
+    const sortResponse = vi.fn();
     const seenResponse = vi.fn();
     const resetResponse = vi.fn();
+    const badgeResponse = vi.fn();
+    const openResponse = vi.fn();
     const favorites = { 'mission-1': 1779436800000 };
     const hidden = { 'mission-2': 1779436900000 };
     const seenIds = ['mission-1', 'mission-2'];
@@ -548,22 +566,40 @@ describe('background auto-scan notifications', () => {
     expect(
       messageListener?.({ type: 'SAVE_FEED_HIDDEN', payload: hidden }, {}, hiddenResponse)
     ).toBe(true);
+    expect(messageListener?.({ type: 'SAVE_FEED_SORT', payload: 'tjm' }, {}, sortResponse)).toBe(
+      true
+    );
     expect(
       messageListener?.({ type: 'SAVE_SEEN_MISSIONS', payload: seenIds }, {}, seenResponse)
     ).toBe(true);
     expect(messageListener?.({ type: 'RESET_NEW_MISSION_COUNT' }, {}, resetResponse)).toBe(true);
+    expect(messageListener?.({ type: 'CLEAR_EXTENSION_BADGE' }, {}, badgeResponse)).toBe(true);
+    expect(
+      messageListener?.(
+        { type: 'OPEN_EXTERNAL_URL', payload: { url: 'https://www.free-work.com/' } },
+        {},
+        openResponse
+      )
+    ).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(saveFavorites).toHaveBeenCalledWith(favorites);
     expect(saveHidden).toHaveBeenCalledWith(hidden);
+    expect(setFeedSortBy).toHaveBeenCalledWith('tjm');
     expect(saveSeenIds).toHaveBeenCalledWith(seenIds);
     expect(resetNewMissionCount).toHaveBeenCalled();
+    expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
+    expect(chrome.tabs.create).toHaveBeenCalledWith({ url: 'https://www.free-work.com/' });
     expect(favoritesResponse).toHaveBeenCalledWith({
       type: 'FEED_FAVORITES_SAVED',
       payload: { saved: true },
     });
     expect(hiddenResponse).toHaveBeenCalledWith({
       type: 'FEED_HIDDEN_SAVED',
+      payload: { saved: true },
+    });
+    expect(sortResponse).toHaveBeenCalledWith({
+      type: 'FEED_SORT_SAVED',
       payload: { saved: true },
     });
     expect(seenResponse).toHaveBeenCalledWith({
@@ -573,6 +609,14 @@ describe('background auto-scan notifications', () => {
     expect(resetResponse).toHaveBeenCalledWith({
       type: 'NEW_MISSION_COUNT_RESET',
       payload: { reset: true },
+    });
+    expect(badgeResponse).toHaveBeenCalledWith({
+      type: 'EXTENSION_BADGE_CLEARED',
+      payload: { cleared: true },
+    });
+    expect(openResponse).toHaveBeenCalledWith({
+      type: 'EXTERNAL_URL_OPENED',
+      payload: { opened: true },
     });
   });
 

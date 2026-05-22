@@ -22,6 +22,9 @@ import {
   getMissions,
   getProfile,
   resetNewMissionCount,
+  clearExtensionBadge,
+  getFeedSortBy,
+  setFeedSortBy,
   markAsSeen,
   toggleFavorite,
   toggleHidden,
@@ -29,7 +32,6 @@ import {
   filterFavoritesOnly,
   syncFavoriteMission,
 } from '$lib/shell/facades/feed-data.facade';
-import { getFeedSortBy, setFeedSortBy } from '$lib/shell/storage/chrome-storage';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
 import {
@@ -335,12 +337,8 @@ export function createFeedPageState(
 
     // Reset badge on mount
     $effect(() => {
-      try {
-        chrome.action.setBadgeText({ text: '' });
-        resetNewMissionCount();
-      } catch {
-        // Outside extension context
-      }
+      clearExtensionBadge().catch(() => {});
+      resetNewMissionCount().catch(() => {});
     });
 
     // Keyboard shortcuts

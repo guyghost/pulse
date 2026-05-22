@@ -9,9 +9,8 @@
 import type { Mission } from '$lib/core/types/mission';
 import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
 import type { ConnectorStatus, PersistedConnectorStatus } from '$lib/core/types/connector-status';
-import type { BridgeMessage } from '../messaging/bridge';
 import type { AppError } from '$lib/core/errors/app-error';
-import { sendMessage } from '../messaging/bridge';
+import { sendMessage, subscribeMessages } from '../messaging/bridge';
 import {
   getMissions,
   getConnectorStatuses,
@@ -417,7 +416,7 @@ export function createFeedController(feedStore: {
 
   function setupBridgeListener(): void {
     try {
-      const listener = (message: BridgeMessage) => {
+      bridgeListenerCleanup = subscribeMessages((message) => {
         // Progression détaillée pendant le scan
         if (message?.type === 'SCAN_PROGRESS' && message.payload) {
           const payload = message.payload;
@@ -453,12 +452,7 @@ export function createFeedController(feedStore: {
           const { message: errorMsg, code } = message.payload as { message: string; code: string };
           feedStore.setError(humanizeScanError(errorMsg, code));
         }
-      };
-
-      chrome.runtime.onMessage.addListener(listener);
-      bridgeListenerCleanup = () => {
-        chrome.runtime.onMessage.removeListener(listener);
-      };
+      });
     } catch {
       // Outside extension context
     }

@@ -20,6 +20,7 @@ const connectorsMock = vi.hoisted(() => ({
 
 const bridgeMock = vi.hoisted(() => ({
   sendMessage: vi.fn(),
+  subscribeMessages: vi.fn(() => vi.fn()),
 }));
 
 vi.mock('../../../src/lib/shell/facades/feed-data.facade', () => feedDataMock);
@@ -27,6 +28,7 @@ vi.mock('../../../src/lib/shell/facades/settings.facade', () => settingsMock);
 vi.mock('../../../src/lib/shell/connectors/index', () => connectorsMock);
 vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
   sendMessage: bridgeMock.sendMessage,
+  subscribeMessages: bridgeMock.subscribeMessages,
 }));
 
 import { createFeedController } from '../../../src/lib/shell/facades/feed-controller.svelte';

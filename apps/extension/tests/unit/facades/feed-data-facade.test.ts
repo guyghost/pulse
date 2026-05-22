@@ -10,14 +10,18 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
 }));
 
 import {
+  clearExtensionBadge,
   getConnectorStatuses,
   getFavorites,
+  getFeedSortBy,
   getHidden,
   getMissions,
   getProfile,
   getSeenIds,
+  openExternalUrl,
   resetNewMissionCount,
   saveFavorites,
+  setFeedSortBy,
   saveHidden,
   saveSeenIds,
 } from '../../../src/lib/shell/facades/feed-data.facade';
@@ -144,5 +148,43 @@ describe('feed data facade profile bridge', () => {
 
     await expect(resetNewMissionCount()).resolves.toBeUndefined();
     expect(bridgeMock.sendMessage).toHaveBeenCalledWith({ type: 'RESET_NEW_MISSION_COUNT' });
+  });
+
+  it('loads and saves feed sort through the service worker bridge', async () => {
+    bridgeMock.sendMessage
+      .mockResolvedValueOnce({ type: 'FEED_SORT_RESULT', payload: 'date' })
+      .mockResolvedValueOnce({ type: 'FEED_SORT_SAVED', payload: { saved: true } });
+
+    await expect(getFeedSortBy()).resolves.toBe('date');
+    await expect(setFeedSortBy('tjm')).resolves.toBeUndefined();
+
+    expect(bridgeMock.sendMessage).toHaveBeenNthCalledWith(1, { type: 'GET_FEED_SORT' });
+    expect(bridgeMock.sendMessage).toHaveBeenNthCalledWith(2, {
+      type: 'SAVE_FEED_SORT',
+      payload: 'tjm',
+    });
+  });
+
+  it('clears the extension badge through the service worker bridge', async () => {
+    bridgeMock.sendMessage.mockResolvedValue({
+      type: 'EXTENSION_BADGE_CLEARED',
+      payload: { cleared: true },
+    });
+
+    await expect(clearExtensionBadge()).resolves.toBeUndefined();
+    expect(bridgeMock.sendMessage).toHaveBeenCalledWith({ type: 'CLEAR_EXTENSION_BADGE' });
+  });
+
+  it('opens external URLs through the service worker bridge', async () => {
+    bridgeMock.sendMessage.mockResolvedValue({
+      type: 'EXTERNAL_URL_OPENED',
+      payload: { opened: true },
+    });
+
+    await expect(openExternalUrl('https://www.free-work.com/')).resolves.toBeUndefined();
+    expect(bridgeMock.sendMessage).toHaveBeenCalledWith({
+      type: 'OPEN_EXTERNAL_URL',
+      payload: { url: 'https://www.free-work.com/' },
+    });
   });
 });

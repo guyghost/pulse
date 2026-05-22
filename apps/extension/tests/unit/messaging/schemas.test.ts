@@ -356,6 +356,7 @@ describe('validateMessage — feed local data bridge', () => {
     expect(validateMessage({ type: 'GET_FEED_MISSIONS' }).valid).toBe(true);
     expect(validateMessage({ type: 'GET_FEED_FAVORITES' }).valid).toBe(true);
     expect(validateMessage({ type: 'GET_FEED_HIDDEN' }).valid).toBe(true);
+    expect(validateMessage({ type: 'GET_FEED_SORT' }).valid).toBe(true);
     expect(validateMessage({ type: 'GET_SEEN_MISSIONS' }).valid).toBe(true);
     expect(validateMessage({ type: 'GET_PERSISTED_CONNECTOR_STATUSES' }).valid).toBe(true);
   });
@@ -371,12 +372,24 @@ describe('validateMessage — feed local data bridge', () => {
     expect(validateMessage({ type: 'SAVE_SEEN_MISSIONS', payload: ['mission-1'] }).valid).toBe(
       true
     );
+    expect(validateMessage({ type: 'SAVE_FEED_SORT', payload: 'date' }).valid).toBe(true);
     expect(validateMessage({ type: 'RESET_NEW_MISSION_COUNT' }).valid).toBe(true);
+    expect(validateMessage({ type: 'CLEAR_EXTENSION_BADGE' }).valid).toBe(true);
+    expect(
+      validateMessage({ type: 'OPEN_EXTERNAL_URL', payload: { url: 'https://www.free-work.com/' } })
+        .valid
+    ).toBe(true);
   });
 
   it('rejette les timestamps feed négatifs', () => {
     expect(
       validateMessage({ type: 'SAVE_FEED_FAVORITES', payload: { 'mission-1': -1 } }).valid
+    ).toBe(false);
+  });
+
+  it('rejette les URLs externes non HTTPS', () => {
+    expect(
+      validateMessage({ type: 'OPEN_EXTERNAL_URL', payload: { url: 'http://example.com/' } }).valid
     ).toBe(false);
   });
 

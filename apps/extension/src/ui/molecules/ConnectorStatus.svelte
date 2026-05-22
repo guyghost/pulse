@@ -9,12 +9,14 @@
     url = '',
     status = null,
     persisted = null,
+    onReconnect,
   }: {
     name: string;
     icon?: string;
     url?: string;
     status?: ConnectorStatusType | null;
     persisted?: PersistedConnectorStatus | null;
+    onReconnect?: (url: string) => void;
   } = $props();
 
   let imgFailed = $state(false);
@@ -95,11 +97,7 @@
     if (!url) {
       return;
     }
-    try {
-      chrome.tabs.create({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
+    onReconnect?.(url);
   }
 </script>
 

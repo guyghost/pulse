@@ -61,12 +61,20 @@ export type BridgeMessage =
   | { type: 'FEED_HIDDEN_RESULT'; payload: Record<string, number> }
   | { type: 'SAVE_FEED_HIDDEN'; payload: Record<string, number> }
   | { type: 'FEED_HIDDEN_SAVED'; payload: { saved: boolean } }
+  | { type: 'GET_FEED_SORT' }
+  | { type: 'FEED_SORT_RESULT'; payload: 'score' | 'date' | 'tjm' }
+  | { type: 'SAVE_FEED_SORT'; payload: 'score' | 'date' | 'tjm' }
+  | { type: 'FEED_SORT_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_SEEN_MISSIONS' }
   | { type: 'SEEN_MISSIONS_RESULT'; payload: string[] }
   | { type: 'SAVE_SEEN_MISSIONS'; payload: string[] }
   | { type: 'SEEN_MISSIONS_SAVED'; payload: { saved: boolean } }
   | { type: 'RESET_NEW_MISSION_COUNT' }
   | { type: 'NEW_MISSION_COUNT_RESET'; payload: { reset: boolean } }
+  | { type: 'CLEAR_EXTENSION_BADGE' }
+  | { type: 'EXTENSION_BADGE_CLEARED'; payload: { cleared: boolean } }
+  | { type: 'OPEN_EXTERNAL_URL'; payload: { url: string } }
+  | { type: 'EXTERNAL_URL_OPENED'; payload: { opened: boolean } }
   | { type: 'GET_PERSISTED_CONNECTOR_STATUSES' }
   | { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT'; payload: PersistedConnectorStatus[] }
   | { type: 'GET_SETTINGS' }

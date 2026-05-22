@@ -13,7 +13,13 @@ import type {
 } from '../lib/shell/messaging/bridge';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { AuthUser } from '../lib/core/types/auth';
-import { DEFAULT_SETTINGS, getSettings, setSettings } from '../lib/shell/storage/chrome-storage';
+import {
+  DEFAULT_SETTINGS,
+  getFeedSortBy,
+  getSettings,
+  setFeedSortBy,
+  setSettings,
+} from '../lib/shell/storage/chrome-storage';
 import {
   runScan,
   cancelCurrentScan,
@@ -658,6 +664,30 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    if (message.type === 'GET_FEED_SORT') {
+      getFeedSortBy()
+        .then((sortBy) => {
+          sendResponse({ type: 'FEED_SORT_RESULT', payload: sortBy });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FEED_SORT error:', err);
+          sendResponse({ type: 'FEED_SORT_RESULT', payload: 'score' });
+        });
+      return true;
+    }
+
+    if (message.type === 'SAVE_FEED_SORT') {
+      setFeedSortBy(message.payload)
+        .then(() => {
+          sendResponse({ type: 'FEED_SORT_SAVED', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SAVE_FEED_SORT error:', err);
+          sendResponse({ type: 'FEED_SORT_SAVED', payload: { saved: false } });
+        });
+      return true;
+    }
+
     if (message.type === 'GET_SEEN_MISSIONS') {
       getSeenIds()
         .then((seenIds) => {
@@ -690,6 +720,32 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] RESET_NEW_MISSION_COUNT error:', err);
           sendResponse({ type: 'NEW_MISSION_COUNT_RESET', payload: { reset: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'CLEAR_EXTENSION_BADGE') {
+      chrome.action
+        .setBadgeText({ text: '' })
+        .then(() => {
+          sendResponse({ type: 'EXTENSION_BADGE_CLEARED', payload: { cleared: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] CLEAR_EXTENSION_BADGE error:', err);
+          sendResponse({ type: 'EXTENSION_BADGE_CLEARED', payload: { cleared: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'OPEN_EXTERNAL_URL') {
+      chrome.tabs
+        .create({ url: message.payload.url })
+        .then(() => {
+          sendResponse({ type: 'EXTERNAL_URL_OPENED', payload: { opened: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] OPEN_EXTERNAL_URL error:', err);
+          sendResponse({ type: 'EXTERNAL_URL_OPENED', payload: { opened: false } });
         });
       return true;
     }

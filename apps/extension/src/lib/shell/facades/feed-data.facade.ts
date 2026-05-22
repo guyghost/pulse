@@ -9,6 +9,8 @@ import type { UserProfile } from '../../core/types/profile';
 import type { Mission } from '../../core/types/mission';
 import type { PersistedConnectorStatus } from '../../core/types/connector-status';
 
+export type FeedSortBy = 'score' | 'date' | 'tjm';
+
 export { getConnectorsMeta, detectAllConnectorSessions } from '../connectors/index';
 export { markAsSeen } from '../../core/seen/mark-seen';
 export {
@@ -52,6 +54,18 @@ export async function saveHidden(hidden: Record<string, number>): Promise<void> 
   }
 }
 
+export async function getFeedSortBy(): Promise<FeedSortBy> {
+  const response = await sendMessage({ type: 'GET_FEED_SORT' });
+  return response.type === 'FEED_SORT_RESULT' ? response.payload : 'score';
+}
+
+export async function setFeedSortBy(sortBy: FeedSortBy): Promise<void> {
+  const response = await sendMessage({ type: 'SAVE_FEED_SORT', payload: sortBy });
+  if (response.type !== 'FEED_SORT_SAVED' || !response.payload.saved) {
+    throw new Error('Feed sort save failed.');
+  }
+}
+
 export async function getSeenIds(): Promise<string[]> {
   const response = await sendMessage({ type: 'GET_SEEN_MISSIONS' });
   return response.type === 'SEEN_MISSIONS_RESULT' ? response.payload : [];
@@ -68,6 +82,20 @@ export async function resetNewMissionCount(): Promise<void> {
   const response = await sendMessage({ type: 'RESET_NEW_MISSION_COUNT' });
   if (response.type !== 'NEW_MISSION_COUNT_RESET' || !response.payload.reset) {
     throw new Error('New mission count reset failed.');
+  }
+}
+
+export async function clearExtensionBadge(): Promise<void> {
+  const response = await sendMessage({ type: 'CLEAR_EXTENSION_BADGE' });
+  if (response.type !== 'EXTENSION_BADGE_CLEARED' || !response.payload.cleared) {
+    throw new Error('Extension badge clear failed.');
+  }
+}
+
+export async function openExternalUrl(url: string): Promise<void> {
+  const response = await sendMessage({ type: 'OPEN_EXTERNAL_URL', payload: { url } });
+  if (response.type !== 'EXTERNAL_URL_OPENED' || !response.payload.opened) {
+    throw new Error('External URL open failed.');
   }
 }
 
