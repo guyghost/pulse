@@ -30,7 +30,10 @@ type ProfileChildTable = (typeof PROFILE_CHILD_TABLES)[number];
 type ConnectedExportPayload = {
   exportedAt: string;
   userId: string;
-  tables: Record<UserOwnedTable | 'candidate_profiles' | ProfileChildTable, unknown[]>;
+  tables: Record<
+    UserOwnedTable | 'candidate_profiles' | 'mission_scores' | ProfileChildTable,
+    unknown[]
+  >;
 };
 
 const readUserRows = async (
@@ -65,6 +68,31 @@ const readProfileChildRows = async (
   return data ?? [];
 };
 
+const readMissionScoreRows = async (
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  missionIds: string[]
+): Promise<unknown[]> => {
+  if (missionIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from('mission_scores')
+    .select('*')
+    .in('mission_id', missionIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return data ?? [];
+};
+
+const extractStringIds = (rows: unknown[]): string[] =>
+  rows
+    .map((row) => (typeof row === 'object' && row !== null && 'id' in row ? row.id : null))
+    .filter((id): id is string => typeof id === 'string');
+
 export const GET: RequestHandler = async ({ cookies }) => {
   const supabase = createSupabaseServerClient(cookies);
   const {
@@ -86,16 +114,17 @@ export const GET: RequestHandler = async ({ cookies }) => {
     }
 
     const profileRows = profiles ?? [];
-    const profileIds = profileRows
-      .map((profile) =>
-        typeof profile === 'object' && profile !== null && 'id' in profile ? profile.id : null
-      )
-      .filter((id): id is string => typeof id === 'string');
+    const profileIds = extractStringIds(profileRows);
 
     const userTableRows = await Promise.all(
       USER_OWNED_TABLES.map(
         async (table) => [table, await readUserRows(supabase, table, session.user.id)] as const
       )
+    );
+    const userTables = Object.fromEntries(userTableRows) as Record<UserOwnedTable, unknown[]>;
+    const missionScoreRows = await readMissionScoreRows(
+      supabase,
+      extractStringIds(userTables.missions)
     );
     const profileChildRows = await Promise.all(
       PROFILE_CHILD_TABLES.map(
@@ -108,7 +137,8 @@ export const GET: RequestHandler = async ({ cookies }) => {
       userId: session.user.id,
       tables: {
         candidate_profiles: profileRows,
-        ...Object.fromEntries(userTableRows),
+        ...userTables,
+        mission_scores: missionScoreRows,
         ...Object.fromEntries(profileChildRows),
       } as ConnectedExportPayload['tables'],
     };
