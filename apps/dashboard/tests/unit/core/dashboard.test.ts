@@ -1818,6 +1818,7 @@ describe('dashboard core', () => {
         resolved_at: '2026-05-22T10:00:00.000Z',
         revision: 5,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T10:00:00.000Z',
       },
       profile: {
         summary: 'Résumé importé',
@@ -1839,6 +1840,7 @@ describe('dashboard core', () => {
         resolved_at: '2026-05-22T10:00:00.000Z',
         revision: 3,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T10:00:00.000Z',
       },
       profile: {
         target_role: null,
@@ -1860,6 +1862,7 @@ describe('dashboard core', () => {
         resolved_at: '2026-05-22T10:00:00.000Z',
         revision: 10,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T10:00:00.000Z',
       },
       profile: {
         location: 'Paris',
@@ -1881,6 +1884,7 @@ describe('dashboard core', () => {
         resolved_at: '2026-05-22T10:00:00.000Z',
         revision: 2,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T10:00:00.000Z',
       },
       profile: null,
     });
@@ -1911,6 +1915,7 @@ describe('dashboard core', () => {
       resolved_at: '2026-05-22T10:00:00.000Z',
       revision: 2,
       updated_by: 'dashboard',
+      updated_at: '2026-05-22T10:00:00.000Z',
     });
 
     expect(buildSyncConflictResolutionPatch('dismissed', '2026-05-22T10:00:00.000Z', 1)).toEqual({
@@ -1918,6 +1923,7 @@ describe('dashboard core', () => {
       resolved_at: '2026-05-22T10:00:00.000Z',
       revision: 2,
       updated_by: 'dashboard',
+      updated_at: '2026-05-22T10:00:00.000Z',
     });
 
     expect(buildSyncConflictResolutionPatch('resolved', '2026-05-22T10:00:00.000Z', 1)).toEqual({
@@ -1925,6 +1931,7 @@ describe('dashboard core', () => {
       resolved_at: '2026-05-22T10:00:00.000Z',
       revision: 2,
       updated_by: 'dashboard',
+      updated_at: '2026-05-22T10:00:00.000Z',
     });
   });
 
@@ -1943,6 +1950,7 @@ describe('dashboard core', () => {
         resolved_at: '2026-05-22T10:00:00.000Z',
         revision: 2,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T10:00:00.000Z',
       },
       application: {
         notes: 'Note conservée côté extension',
@@ -1999,6 +2007,7 @@ describe('dashboard core', () => {
         resolved_at: '2026-05-22T10:00:00.000Z',
         revision: 2,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T10:00:00.000Z',
       },
       application: {
         stage: 'offer',
@@ -2025,6 +2034,7 @@ describe('dashboard core', () => {
         resolved_at: '2026-05-22T10:00:00.000Z',
         revision: 2,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T10:00:00.000Z',
       },
       application: null,
       stageTransition: null,
@@ -2044,6 +2054,7 @@ describe('dashboard core', () => {
         resolved_at: '2026-05-22T10:00:00.000Z',
         revision: 2,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T10:00:00.000Z',
       },
       application: null,
       stageTransition: null,

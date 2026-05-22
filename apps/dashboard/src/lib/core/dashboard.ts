@@ -645,6 +645,7 @@ export interface CvFieldSuggestionResolution {
     resolved_at: string;
     revision: number;
     updated_by: 'dashboard';
+    updated_at: string;
   };
   profile:
     | {
@@ -671,6 +672,7 @@ export interface SyncConflictResolutionPatch {
   resolved_at: string;
   revision: number;
   updated_by: 'dashboard';
+  updated_at: string;
 }
 
 export type SyncConflictResolutionAction =
@@ -1788,6 +1790,7 @@ export function buildCvFieldSuggestionResolution(
         resolved_at: input.resolvedAt,
         revision: input.revision + 1,
         updated_by: 'dashboard',
+        updated_at: input.resolvedAt,
       },
       profile: null,
     };
@@ -1808,6 +1811,7 @@ export function buildCvFieldSuggestionResolution(
         resolved_at: input.resolvedAt,
         revision: input.revision + 1,
         updated_by: 'dashboard',
+        updated_at: input.resolvedAt,
       },
       profile: {
         title: input.suggestedValue.trim(),
@@ -1823,6 +1827,7 @@ export function buildCvFieldSuggestionResolution(
         resolved_at: input.resolvedAt,
         revision: input.revision + 1,
         updated_by: 'dashboard',
+        updated_at: input.resolvedAt,
       },
       profile: {
         summary: input.suggestedValue?.trim() ?? '',
@@ -1838,6 +1843,7 @@ export function buildCvFieldSuggestionResolution(
         resolved_at: input.resolvedAt,
         revision: input.revision + 1,
         updated_by: 'dashboard',
+        updated_at: input.resolvedAt,
       },
       profile: {
         location: input.suggestedValue?.trim() || null,
@@ -1852,6 +1858,7 @@ export function buildCvFieldSuggestionResolution(
       resolved_at: input.resolvedAt,
       revision: input.revision + 1,
       updated_by: 'dashboard',
+      updated_at: input.resolvedAt,
     },
     profile: {
       target_role: input.suggestedValue?.trim() || null,
@@ -1870,6 +1877,7 @@ export function buildSyncConflictResolutionPatch(
     resolved_at: resolvedAt,
     revision: currentRevision + 1,
     updated_by: 'dashboard',
+    updated_at: resolvedAt,
   };
 }
 

@@ -218,6 +218,7 @@ describe('dashboard sync conflict action', () => {
         resolved_at: '2026-05-22T14:00:00.000Z',
         revision: 4,
         updated_by: 'dashboard',
+        updated_at: '2026-05-22T14:00:00.000Z',
       },
     });
     expect(syncStatusMock.markEntityPendingExtensionPull).toHaveBeenCalledWith(
