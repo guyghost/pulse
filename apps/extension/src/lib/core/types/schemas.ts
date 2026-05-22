@@ -78,6 +78,7 @@ export const MissionSchema = z.object({
   remote: RemoteTypeSchema.nullable(),
   duration: z.string().nullable(),
   startDate: z.string().nullable(),
+  publishedAt: z.string().nullable(),
   url: z.string(),
   source: MissionSourceSchema,
   scrapedAt: z.date(),
@@ -102,9 +103,7 @@ export const MissionSerializedSchema = z.object({
   startDate: z.string().nullable(),
   url: z.string(),
   source: MissionSourceSchema,
-  scrapedAt: z
-    .union([z.date(), z.string()])
-    .transform((val) => (typeof val === 'string' ? new Date(val) : val)),
+  scrapedAt: z.union([z.date(), z.string()]),
   seniority: SeniorityLevelSchema.nullable(),
   scoreBreakdown: ScoreBreakdownSchema.nullable(),
   score: z.number().nullable(),
@@ -182,10 +181,7 @@ export const AppSettingsSchema = z.object({
 // Schéma pour les settings sérialisés (dates en string)
 export const AppSettingsSerializedSchema = z.object({
   schemaVersion: z.number().default(1),
-  lastSyncAt: z
-    .union([z.date(), z.string()])
-    .optional()
-    .transform((val) => (typeof val === 'string' ? new Date(val) : val)),
+  lastSyncAt: z.union([z.date(), z.string()]).optional(),
   theme: z.enum(['light', 'dark', 'system']).default('system'),
   notificationsEnabled: z.boolean().default(true),
 });

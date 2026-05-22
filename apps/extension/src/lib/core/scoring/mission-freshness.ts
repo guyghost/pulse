@@ -9,6 +9,7 @@
  */
 
 import type { Mission } from '../types/mission';
+import { parseIsoDateTimeToEpochMs } from '../utils/iso-time';
 
 /** Default maximum age in days before a mission is considered stale */
 export const DEFAULT_MAX_AGE_DAYS = 30;
@@ -31,12 +32,12 @@ export function isMissionFresh(
     return true; // No date → can't determine age → keep
   }
 
-  const publishedDate = new Date(mission.publishedAt);
-  if (isNaN(publishedDate.getTime())) {
+  const publishedTimestamp = parseIsoDateTimeToEpochMs(mission.publishedAt);
+  if (publishedTimestamp === null) {
     return true; // Invalid date → keep
   }
 
-  const ageMs = now.getTime() - publishedDate.getTime();
+  const ageMs = now.getTime() - publishedTimestamp;
   const maxAgeMs = maxAgeDays * 24 * 60 * 60 * 1000;
 
   return ageMs <= maxAgeMs;

@@ -5,6 +5,7 @@ import {
   serializeBackup,
   parseBackupJson,
   getBackupStats,
+  generateBackupFilename,
 } from '../../../src/lib/core/backup/backup';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 import type { AppSettings } from '../../../src/lib/core/types/app-settings';
@@ -46,6 +47,8 @@ function createTestSettings(overrides?: Partial<AppSettings>): AppSettings {
 const BASE_FAVORITES: Record<string, number> = { 'mission-1': Date.now() };
 const BASE_HIDDEN: Record<string, number> = { 'mission-2': Date.now() };
 const NOW = 1_700_000_000_000;
+const formatDateKey = (timestamp: number): string =>
+  new Date(timestamp).toISOString().split('T')[0];
 
 // ---------------------------------------------------------------------------
 // Tests
@@ -229,6 +232,15 @@ describe('getBackupStats', () => {
     expect(stats.jobTitle).toBe('Backend Dev');
     expect(stats.favoritesCount).toBe(2);
     expect(stats.hiddenCount).toBe(1);
+    expect(stats.timestamp).toBe(NOW);
     expect(stats.version).toBe(1);
+  });
+});
+
+describe('generateBackupFilename', () => {
+  it('uses an injected date formatter', () => {
+    expect(generateBackupFilename(NOW, formatDateKey)).toBe(
+      'missionpulse-backup-2023-11-14.pulse-backup'
+    );
   });
 });

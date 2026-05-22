@@ -30,6 +30,11 @@ export const MISSIONPULSE_DB_NAME = 'missionpulse';
 const DB_NAME = MISSIONPULSE_DB_NAME;
 const DB_VERSION = 3;
 
+const deserializeStoredDate = (value: string): Date | null => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
@@ -157,7 +162,7 @@ export async function getMissionsBySource(source: MissionSource): Promise<Missio
       const validMissions: Mission[] = [];
 
       for (const raw of rawMissions) {
-        const mission = parseMission(raw);
+        const mission = parseMission(raw, deserializeStoredDate);
         if (mission) {
           validMissions.push(mission);
         }
@@ -190,7 +195,7 @@ export async function getRecentMissions(maxAgeDays: number): Promise<Mission[]> 
       const validMissions: Mission[] = [];
 
       for (const raw of rawMissions) {
-        const mission = parseMission(raw);
+        const mission = parseMission(raw, deserializeStoredDate);
         if (mission) {
           validMissions.push(mission);
         }
@@ -257,7 +262,7 @@ export async function getMissionsPaginated(
   // Parse and validate missions
   const validMissions: Mission[] = [];
   for (const raw of rawMissions) {
-    const mission = parseMission(raw);
+    const mission = parseMission(raw, deserializeStoredDate);
     if (mission) {
       validMissions.push(mission);
     }
@@ -331,7 +336,7 @@ export async function getMissionById(id: string): Promise<Mission | null> {
   if (!raw) {
     return null;
   }
-  return parseMission(raw) ?? null;
+  return parseMission(raw, deserializeStoredDate) ?? null;
 }
 
 export function clearMissions(): Promise<void> {

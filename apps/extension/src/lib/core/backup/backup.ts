@@ -210,7 +210,7 @@ export function getBackupStats(backup: BackupData): {
   jobTitle: string;
   favoritesCount: number;
   hiddenCount: number;
-  date: Date;
+  timestamp: number;
   version: number;
 } {
   return {
@@ -218,7 +218,7 @@ export function getBackupStats(backup: BackupData): {
     jobTitle: backup.profile.jobTitle,
     favoritesCount: Object.keys(backup.favorites).length,
     hiddenCount: Object.keys(backup.hidden).length,
-    date: new Date(backup.timestamp),
+    timestamp: backup.timestamp,
     version: backup.version,
   };
 }
@@ -227,8 +227,10 @@ export function getBackupStats(backup: BackupData): {
  * Génère un nom de fichier pour le backup
  * Pure function
  */
-export function generateBackupFilename(timestamp: number): string {
-  const date = new Date(timestamp);
-  const dateStr = date.toISOString().split('T')[0]; // YYYY-MM-DD
+export function generateBackupFilename(
+  timestamp: number,
+  formatDateKey: (timestamp: number) => string
+): string {
+  const dateStr = formatDateKey(timestamp); // YYYY-MM-DD
   return `missionpulse-backup-${dateStr}.pulse-backup`;
 }

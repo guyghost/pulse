@@ -67,6 +67,11 @@ const makeValidProfile = (overrides: Partial<UserProfile> = {}): UserProfile => 
   ...overrides,
 });
 
+const deserializeDate = (value: string): Date | null => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
 // ============================================================================
 // isMission
 // ============================================================================
@@ -77,12 +82,12 @@ describe('isMission', () => {
     expect(isMission(mission)).toBe(true);
   });
 
-  it('returns true for mission with serialized date', () => {
+  it('returns false for mission with serialized date without shell deserializer', () => {
     const serialized = {
       ...makeValidMission(),
       scrapedAt: '2026-01-01T00:00:00.000Z',
     };
-    expect(isMission(serialized)).toBe(true);
+    expect(isMission(serialized)).toBe(false);
   });
 
   it('returns false for null', () => {
@@ -273,7 +278,7 @@ describe('parseMission', () => {
       ...makeValidMission(),
       scrapedAt: '2026-01-01T00:00:00.000Z',
     };
-    const result = parseMission(input);
+    const result = parseMission(input, deserializeDate);
     expect(result).not.toBeNull();
     expect(result!.id).toBe('test-1');
     expect(result!.scrapedAt).toBeInstanceOf(Date);

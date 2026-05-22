@@ -67,6 +67,9 @@ const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({
   searchKeywords: profile.searchKeywords ?? [],
 });
 
+const formatBackupDateKey = (timestamp: number): string =>
+  new Date(timestamp).toISOString().split('T')[0] ?? 'backup';
+
 export class SettingsPageController {
   firstName = $state('');
   jobTitle = $state('');
@@ -346,7 +349,7 @@ export class SettingsPageController {
 
       const backup = createBackup(profile, settings, favorites, hidden, Date.now());
       const json = serializeBackup(backup);
-      const filename = generateBackupFilename(backup.timestamp);
+      const filename = generateBackupFilename(backup.timestamp, formatBackupDateKey);
       downloadJSON(json, filename);
 
       return { ok: true, value: undefined };
