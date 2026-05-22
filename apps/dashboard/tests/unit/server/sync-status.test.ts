@@ -173,6 +173,7 @@ describe('dashboard sync status server helper', () => {
         pending_download_count: 1,
         last_error_code: null,
         last_error_message: null,
+        retry_after_at: null,
         updated_at: '2026-05-22T10:00:00.000Z',
       },
     ]);

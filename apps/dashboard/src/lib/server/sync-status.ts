@@ -49,6 +49,7 @@ type SyncStatusTable = {
     pending_download_count: number;
     last_error_code: null;
     last_error_message: null;
+    retry_after_at: null;
     updated_at: string;
   }): UpdateBuilder;
   insert(rows: PendingPullSyncStatusInsertRow[]): InsertBuilder;
@@ -114,6 +115,7 @@ export async function markEntityPendingExtensionPull(
         pending_download_count: 1,
         last_error_code: null,
         last_error_message: null,
+        retry_after_at: null,
         updated_at: updatedAt,
       })
       .eq('user_id', userId)
