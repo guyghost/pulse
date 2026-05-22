@@ -7,6 +7,7 @@ import {
   buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
   buildDetectedApplicationInsertRow,
+  buildDetectedApplicationPipelineEventRow,
   buildGeneratedApplicationAssetUpsertRow,
   buildMissionDuplicateUpsertRows,
   buildApplicationPullCursor,
@@ -251,6 +252,22 @@ describe('connected dashboard sync payload builders', () => {
       archived_at: null,
       revision: 1,
       updated_by: 'extension',
+    });
+  });
+
+  it('builds idempotent detected pipeline event rows for synced missions', () => {
+    expect(
+      buildDetectedApplicationPipelineEventRow(mission, 'user-1', 'application-1', 'install-1')
+    ).toEqual({
+      user_id: 'user-1',
+      application_id: 'application-1',
+      from_stage: null,
+      to_stage: 'detected',
+      note: null,
+      metadata: { localMissionId: 'free-work-123' },
+      occurred_at: '2026-05-21T08:00:00.000Z',
+      created_by: 'extension',
+      client_event_id: 'install-1:free-work-123:1779350400000:none:detected',
     });
   });
 

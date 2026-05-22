@@ -432,6 +432,7 @@ describe('connected dashboard shell sync', () => {
     const result = await pushMissionsToConnectedDashboard(gateway, {
       userId: 'user-1',
       deviceId: 'device-1',
+      installId: 'install-1',
       missions: [mission],
       now: new Date('2026-05-21T09:00:00.000Z'),
       scorerVersion: 'missionpulse-v1',
@@ -470,6 +471,19 @@ describe('connected dashboard shell sync', () => {
         updated_by: 'extension',
       },
     ]);
+    expect(gateway.upsertApplicationPipelineEvents).toHaveBeenCalledWith([
+      {
+        user_id: 'user-1',
+        application_id: 'application-detected-1',
+        from_stage: null,
+        to_stage: 'detected',
+        note: null,
+        metadata: { localMissionId: 'free-work-123' },
+        occurred_at: '2026-05-21T08:00:00.000Z',
+        created_by: 'extension',
+        client_event_id: 'install-1:free-work-123:1779350400000:none:detected',
+      },
+    ]);
     expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
       expect.objectContaining({
         entity: 'missions',
@@ -504,6 +518,7 @@ describe('connected dashboard shell sync', () => {
     const result = await pushMissionsToConnectedDashboard(gateway, {
       userId: 'user-1',
       deviceId: 'device-1',
+      installId: 'install-1',
       missions: [mission],
       sourceMissions: [mission, duplicateMission],
       duplicateRelations: [
@@ -547,6 +562,7 @@ describe('connected dashboard shell sync', () => {
     const result = await pushMissionsToConnectedDashboard(gateway, {
       userId: 'user-1',
       deviceId: 'device-1',
+      installId: 'install-1',
       missions: [mission],
       now: new Date('2026-05-21T09:00:00.000Z'),
       scorerVersion: 'missionpulse-v1',
@@ -1015,6 +1031,7 @@ describe('connected dashboard shell sync', () => {
     const pushedMissions = await pushMissionsToConnectedDashboard(gateway, {
       userId: 'user-1',
       deviceId: 'device-1',
+      installId: 'install-1',
       missions: [mission],
       now,
       scorerVersion: 'missionpulse-v1',

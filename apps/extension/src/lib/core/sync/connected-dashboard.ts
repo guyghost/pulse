@@ -529,6 +529,31 @@ export function buildDetectedApplicationInsertRow(
   };
 }
 
+export function buildDetectedApplicationPipelineEventRow(
+  mission: Mission,
+  userId: string,
+  applicationId: string,
+  clientEventPrefix: string
+): ApplicationPipelineEventRow {
+  return {
+    user_id: userId,
+    application_id: applicationId,
+    from_stage: null,
+    to_stage: 'detected',
+    note: null,
+    metadata: { localMissionId: mission.id },
+    occurred_at: mission.scrapedAt.toISOString(),
+    created_by: 'extension',
+    client_event_id: [
+      clientEventPrefix,
+      mission.id,
+      String(mission.scrapedAt.getTime()),
+      'none',
+      'detected',
+    ].join(':'),
+  };
+}
+
 export function buildApplicationPipelineEventRows(
   tracking: MissionTracking,
   userId: string,

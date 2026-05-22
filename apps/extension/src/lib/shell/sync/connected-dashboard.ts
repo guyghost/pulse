@@ -8,6 +8,7 @@ import {
   buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
   buildDetectedApplicationInsertRow,
+  buildDetectedApplicationPipelineEventRow,
   buildGeneratedApplicationAssetUpsertRow,
   buildMissionDuplicateUpsertRows,
   buildMissionScoreUpsertRow,
@@ -144,6 +145,7 @@ export interface RegisterExtensionDeviceInput {
 export interface PushMissionsInput {
   userId: string;
   deviceId: string;
+  installId: string;
   missions: Mission[];
   sourceMissions?: Mission[];
   duplicateRelations?: MissionDuplicateRelation[];
@@ -965,11 +967,32 @@ export async function pushMissionsToConnectedDashboard(
         remoteMissionIds
       )
     );
-    await gateway.insertDetectedApplications(
+    const detectedApplications = await gateway.insertDetectedApplications(
       input.missions.flatMap((mission) => {
         const remoteMissionId = remoteMissionIds.get(mission.id);
         return remoteMissionId
           ? [buildDetectedApplicationInsertRow(input.userId, remoteMissionId)]
+          : [];
+      })
+    );
+    const missionsByRemoteId = new Map(
+      input.missions.flatMap((mission) => {
+        const remoteMissionId = remoteMissionIds.get(mission.id);
+        return remoteMissionId ? [[remoteMissionId, mission] as const] : [];
+      })
+    );
+    await gateway.upsertApplicationPipelineEvents(
+      detectedApplications.flatMap((application) => {
+        const mission = missionsByRemoteId.get(application.mission_id);
+        return mission
+          ? [
+              buildDetectedApplicationPipelineEventRow(
+                mission,
+                input.userId,
+                application.id,
+                input.installId
+              ),
+            ]
           : [];
       })
     );
@@ -1662,6 +1685,7 @@ export async function syncConnectedDashboardSnapshot(
   const pushedMissions = await pushMissionsToConnectedDashboard(context.gateway, {
     userId: context.userId,
     deviceId: context.deviceId,
+    installId: context.installId,
     missions: input.missions,
     sourceMissions: input.sourceMissions,
     duplicateRelations: input.duplicateRelations,
@@ -1825,6 +1849,7 @@ export async function syncConnectedDashboardTracking(
   const pushedMissions = await pushMissionsToConnectedDashboard(context.gateway, {
     userId: context.userId,
     deviceId: context.deviceId,
+    installId: context.installId,
     missions: [mission],
     now: context.now,
     scorerVersion: DEFAULT_SCORER_VERSION,
