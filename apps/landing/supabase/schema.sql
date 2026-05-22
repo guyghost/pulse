@@ -631,7 +631,7 @@ create table if not exists public.candidate_profile_field_suggestions (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   profile_id uuid references public.candidate_profiles(id) on delete cascade not null,
-  field text not null check (field in ('title', 'summary', 'target_role')),
+  field text not null check (field in ('title', 'summary', 'location', 'target_role')),
   current_value text,
   suggested_value text,
   source text references public.mission_sources(id) not null,

@@ -646,6 +646,7 @@ function parseExistingCandidateProfile(data: unknown): ExistingCandidateProfileS
     typeof value.id === 'string' &&
     typeof value.title === 'string' &&
     typeof value.summary === 'string' &&
+    (typeof value.location === 'string' || value.location === null) &&
     (typeof value.target_role === 'string' || value.target_role === null) &&
     typeof value.revision === 'number' &&
     typeof value.updated_at === 'string' &&
@@ -655,6 +656,7 @@ function parseExistingCandidateProfile(data: unknown): ExistingCandidateProfileS
       id: value.id,
       title: value.title,
       summary: value.summary,
+      location: value.location,
       target_role: value.target_role,
       revision: value.revision,
       updated_at: value.updated_at,
@@ -715,7 +717,9 @@ function parseCandidateSkillRows(data: unknown): string[] {
 function isCandidateProfileSuggestionField(
   value: unknown
 ): value is CandidateProfileSuggestionField {
-  return value === 'title' || value === 'summary' || value === 'target_role';
+  return (
+    value === 'title' || value === 'summary' || value === 'location' || value === 'target_role'
+  );
 }
 
 function parsePendingCandidateProfileSuggestionFields(
@@ -909,7 +913,7 @@ export function createSupabaseConnectedDashboardGateway(
     getCandidateProfile: async (userId) => {
       const query = supabase
         .from('candidate_profiles')
-        .select('id,title,summary,target_role,revision,updated_at,updated_by')
+        .select('id,title,summary,location,target_role,revision,updated_at,updated_by')
         .eq('user_id', userId);
       const { data, error } = await query.order('updated_at', { ascending: false });
       if (error) {

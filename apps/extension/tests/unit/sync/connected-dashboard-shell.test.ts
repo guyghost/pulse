@@ -956,6 +956,7 @@ describe('connected dashboard shell sync', () => {
       id: 'profile-1',
       title: 'Profil dashboard',
       summary: 'Résumé manuel',
+      location: 'Lyon',
       target_role: 'Architecte frontend',
       revision: 8,
       updated_at: '2026-05-22T08:00:00.000Z',
@@ -978,7 +979,7 @@ describe('connected dashboard shell sync', () => {
         education: 0,
         skills: 0,
         links: 0,
-        suggestions: 3,
+        suggestions: 4,
       },
     });
     expect(gateway.upsertCandidateProfile).not.toHaveBeenCalled();
@@ -994,6 +995,12 @@ describe('connected dashboard shell sync', () => {
         field: 'summary',
         current_value: 'Résumé manuel',
         suggested_value: 'Consultant frontend senior.',
+      }),
+      expect.objectContaining({
+        profile_id: 'profile-1',
+        field: 'location',
+        current_value: 'Lyon',
+        suggested_value: 'Paris',
       }),
       expect.objectContaining({
         profile_id: 'profile-1',
@@ -1017,6 +1024,7 @@ describe('connected dashboard shell sync', () => {
         detected_at: '2026-05-22T08:05:00.000Z',
       }),
       expect.objectContaining({ field: 'summary' }),
+      expect.objectContaining({ field: 'location' }),
       expect.objectContaining({ field: 'target_role' }),
     ]);
   });
@@ -1027,6 +1035,7 @@ describe('connected dashboard shell sync', () => {
       id: 'profile-1',
       title: 'Profil dashboard',
       summary: 'Résumé manuel',
+      location: 'Lyon',
       target_role: 'Architecte frontend',
       revision: 8,
       updated_at: '2026-05-22T08:00:00.000Z',
@@ -1052,7 +1061,7 @@ describe('connected dashboard shell sync', () => {
         education: 0,
         skills: 0,
         links: 0,
-        suggestions: 2,
+        suggestions: 3,
       },
     });
     expect(gateway.listPendingCandidateProfileSuggestionFields).toHaveBeenCalledWith({
@@ -1062,10 +1071,12 @@ describe('connected dashboard shell sync', () => {
     });
     expect(gateway.insertCandidateProfileFieldSuggestions).toHaveBeenCalledWith([
       expect.objectContaining({ field: 'title' }),
+      expect.objectContaining({ field: 'location' }),
       expect.objectContaining({ field: 'target_role' }),
     ]);
     expect(gateway.insertSyncConflicts).toHaveBeenCalledWith([
       expect.objectContaining({ field: 'title' }),
+      expect.objectContaining({ field: 'location' }),
       expect.objectContaining({ field: 'target_role' }),
     ]);
   });
@@ -1076,6 +1087,7 @@ describe('connected dashboard shell sync', () => {
       id: 'profile-1',
       title: 'Profil dashboard',
       summary: 'Résumé manuel',
+      location: 'Lyon',
       target_role: 'Architecte frontend',
       revision: 8,
       updated_at: '2026-05-22T08:00:00.000Z',
@@ -1098,7 +1110,7 @@ describe('connected dashboard shell sync', () => {
         education: 0,
         skills: 0,
         links: 0,
-        suggestions: 3,
+        suggestions: 4,
       },
     });
     expect(gateway.replaceCandidateProfileChildren).not.toHaveBeenCalled();

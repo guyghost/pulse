@@ -516,6 +516,7 @@ describe('connected dashboard sync payload builders', () => {
         user_id: 'user-1',
         title: 'Lead Frontend Svelte',
         summary: 'Consultant frontend senior.',
+        location: 'Paris',
         target_role: 'Lead Frontend Svelte',
         completeness: 86,
         revision: 4,
@@ -619,6 +620,7 @@ describe('connected dashboard sync payload builders', () => {
           id: 'profile-1',
           title: 'Consultant Frontend manuel',
           summary: 'Résumé édité dans le dashboard.',
+          location: 'Lyon',
           target_role: 'Architecte Svelte',
           revision: 7,
           updated_at: '2026-05-22T09:00:00.000Z',
@@ -647,6 +649,15 @@ describe('connected dashboard sync payload builders', () => {
       {
         user_id: 'user-1',
         profile_id: 'profile-1',
+        field: 'location',
+        current_value: 'Lyon',
+        suggested_value: 'Paris',
+        source: 'linkedin',
+        status: 'pending',
+      },
+      {
+        user_id: 'user-1',
+        profile_id: 'profile-1',
         field: 'target_role',
         current_value: 'Architecte Svelte',
         suggested_value: 'Lead Frontend Svelte',
@@ -663,6 +674,7 @@ describe('connected dashboard sync payload builders', () => {
           id: 'profile-1',
           title: 'Lead Frontend Svelte',
           summary: 'Consultant frontend senior.',
+          location: 'Paris',
           target_role: 'Lead Frontend Svelte',
           revision: 3,
           updated_at: '2026-05-22T08:00:00.000Z',
@@ -715,6 +727,7 @@ describe('connected dashboard sync payload builders', () => {
         id: 'profile-1',
         title: 'Consultant Frontend manuel',
         summary: 'Résumé édité dans le dashboard.',
+        location: 'Lyon',
         target_role: 'Architecte Svelte',
         revision: 7,
         updated_at: '2026-05-22T09:00:00.000Z',
@@ -724,6 +737,7 @@ describe('connected dashboard sync payload builders', () => {
 
     expect(filterNewCandidateProfileFieldSuggestionRows(rows, ['summary'])).toEqual([
       expect.objectContaining({ field: 'title' }),
+      expect.objectContaining({ field: 'location' }),
       expect.objectContaining({ field: 'target_role' }),
     ]);
   });

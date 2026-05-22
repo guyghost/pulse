@@ -58,7 +58,7 @@ describe('connected dashboard schema', () => {
       "entity in ('applications', 'candidate_profile')"
     );
     expect(tableBlock('candidate_profile_field_suggestions')).toContain(
-      "field in ('title', 'summary', 'target_role')"
+      "field in ('title', 'summary', 'location', 'target_role')"
     );
     expect(tableBlock('sync_status')).toContain("'alert_preferences'");
     expect(tableBlock('dashboard_alert_preferences')).toContain('score_threshold integer');

@@ -149,6 +149,7 @@ export interface CandidateProfileUpsertRow {
   user_id: string;
   title: string;
   summary: string;
+  location: string | null;
   target_role: string | null;
   completeness: number;
   revision: number;
@@ -159,6 +160,7 @@ export interface ExistingCandidateProfileSnapshot {
   id: string;
   title: string;
   summary: string;
+  location: string | null;
   target_role: string | null;
   revision: number;
   updated_at: string;
@@ -179,7 +181,7 @@ export interface RemoteCandidateProfileSnapshot {
   skills: string[];
 }
 
-export type CandidateProfileSuggestionField = 'title' | 'summary' | 'target_role';
+export type CandidateProfileSuggestionField = 'title' | 'summary' | 'location' | 'target_role';
 export type ApplicationSyncConflictField = 'stage' | 'notes' | 'user_rating' | 'next_action_at';
 export type SyncConflictField = ApplicationSyncConflictField | CandidateProfileSuggestionField;
 
@@ -777,6 +779,16 @@ export function buildSyncStatusRow(input: BuildSyncStatusRowInput): SyncStatusRo
   };
 }
 
+function deriveCandidateProfileLocation(draft: CanonicalCandidateProfileDraft): string | null {
+  const currentExperience = draft.experiences.find(
+    (experience) => experience.isCurrent && experience.location?.trim()
+  );
+  const firstLocatedExperience =
+    currentExperience ?? draft.experiences.find((experience) => experience.location?.trim());
+
+  return firstLocatedExperience?.location?.trim() || null;
+}
+
 export function buildCandidateProfileImportRows(input: {
   draft: CanonicalCandidateProfileDraft;
   userId: string;
@@ -793,6 +805,7 @@ export function buildCandidateProfileImportRows(input: {
       user_id: input.userId,
       title: input.draft.title || 'Profil LinkedIn importé',
       summary: input.draft.summary,
+      location: deriveCandidateProfileLocation(input.draft),
       target_role: input.draft.title || null,
       completeness,
       revision: input.revision,
@@ -894,16 +907,22 @@ export function buildCandidateProfileFieldSuggestionRows(input: {
   const suggestedValues: Record<CandidateProfileSuggestionField, string | null> = {
     title: input.draft.title || 'Profil LinkedIn importé',
     summary: input.draft.summary,
+    location: deriveCandidateProfileLocation(input.draft),
     target_role: input.draft.title || null,
   };
   const currentValues: Record<CandidateProfileSuggestionField, string | null> = {
     title: profile.title,
     summary: profile.summary,
+    location: profile.location,
     target_role: profile.target_role,
   };
-  const fields: CandidateProfileSuggestionField[] = ['title', 'summary', 'target_role'];
+  const fields: CandidateProfileSuggestionField[] = ['title', 'summary', 'location', 'target_role'];
 
   return fields.flatMap((field) => {
+    if (field === 'location' && suggestedValues[field] === null) {
+      return [];
+    }
+
     if (currentValues[field] === suggestedValues[field]) {
       return [];
     }
