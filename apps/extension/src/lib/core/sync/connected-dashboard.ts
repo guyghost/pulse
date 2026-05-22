@@ -73,6 +73,8 @@ export interface MissionDuplicateUpsertRow {
   duplicate_mission_id: string;
   confidence: number;
   reason: string;
+  revision: number;
+  updated_by: 'extension';
 }
 
 export interface ApplicationUpsertRow {
@@ -534,6 +536,8 @@ export function buildMissionDuplicateUpsertRows(
         duplicate_mission_id: duplicateMissionId,
         confidence: Math.max(0, Math.min(1, relation.confidence)),
         reason: relation.reason,
+        revision: 1,
+        updated_by: 'extension',
       },
     ];
   });

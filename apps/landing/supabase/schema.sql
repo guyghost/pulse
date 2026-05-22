@@ -385,7 +385,11 @@ create table if not exists public.mission_duplicates (
   duplicate_mission_id uuid references public.missions(id) on delete cascade not null,
   confidence numeric not null check (confidence >= 0 and confidence <= 1),
   reason text not null,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   primary key (canonical_mission_id, duplicate_mission_id),
   check (canonical_mission_id <> duplicate_mission_id)
 );
@@ -886,6 +890,12 @@ create trigger on_missions_updated
 drop trigger if exists on_mission_scores_updated on public.mission_scores;
 create trigger on_mission_scores_updated
   before update on public.mission_scores
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_mission_duplicates_updated on public.mission_duplicates;
+create trigger on_mission_duplicates_updated
+  before update on public.mission_duplicates
   for each row
   execute function public.update_updated_at();
 

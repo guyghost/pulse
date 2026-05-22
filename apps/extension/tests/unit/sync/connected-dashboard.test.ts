@@ -219,6 +219,8 @@ describe('connected dashboard sync payload builders', () => {
         duplicate_mission_id: 'remote-duplicate',
         confidence: 1,
         reason: 'same_structured_signature',
+        revision: 1,
+        updated_by: 'extension',
       },
     ]);
   });

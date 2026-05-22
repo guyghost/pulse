@@ -55,6 +55,11 @@ describe('connected dashboard schema', () => {
     expect(tableBlock('mission_scores')).toContain('revision bigint not null');
     expect(tableBlock('mission_scores')).toContain('updated_by text not null');
     expect(tableBlock('mission_scores')).toContain('updated_at timestamptz not null default now()');
+    expect(tableBlock('mission_duplicates')).toContain('revision bigint not null');
+    expect(tableBlock('mission_duplicates')).toContain('updated_by text not null');
+    expect(tableBlock('mission_duplicates')).toContain(
+      'updated_at timestamptz not null default now()'
+    );
     expect(tableBlock('candidate_profiles')).toContain('updated_by text not null');
     expect(tableBlock('sync_status')).toContain('retry_after_at timestamptz');
     expect(tableBlock('sync_conflicts')).toContain(
