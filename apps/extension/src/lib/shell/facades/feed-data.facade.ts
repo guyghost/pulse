@@ -5,6 +5,7 @@
  * behind a clean API. UI pages import this instead of individual storage modules.
  */
 import { sendMessage } from '../messaging/bridge';
+import type { UserProfile } from '../../core/types/profile';
 
 export {
   getMissions,
@@ -13,7 +14,6 @@ export {
   getMissionsBySource,
   getRecentMissions,
   upsertMissions,
-  getProfile,
   getConnectorStatuses,
   saveConnectorStatuses,
   type PaginatedMissions,
@@ -31,6 +31,11 @@ export {
   filterHidden,
   filterFavoritesOnly,
 } from '../../core/favorites/favorites';
+
+export async function getProfile(): Promise<UserProfile | null> {
+  const response = await sendMessage({ type: 'GET_PROFILE' });
+  return response.type === 'PROFILE_RESULT' ? response.payload : null;
+}
 
 export async function syncFavoriteMission(
   missionId: string,
