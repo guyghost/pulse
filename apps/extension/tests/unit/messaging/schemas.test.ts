@@ -281,6 +281,30 @@ describe('validateMessage — LinkedIn preview and sync import', () => {
       }).valid
     ).toBe(false);
   });
+
+  it('rejette une source mission-only pour un draft de profil canonique', () => {
+    const freeWorkDraft = {
+      ...linkedinDraft,
+      source: 'free-work',
+      experiences: linkedinDraft.experiences.map((experience) => ({
+        ...experience,
+        source: 'free-work',
+      })),
+      skills: linkedinDraft.skills.map((skill) => ({ ...skill, source: 'free-work' })),
+      education: linkedinDraft.education.map((education) => ({
+        ...education,
+        source: 'free-work',
+      })),
+      links: linkedinDraft.links.map((link) => ({ ...link, source: 'free-work' })),
+    };
+
+    expect(
+      validateMessage({
+        type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
+        payload: { profile: freeWorkDraft },
+      }).valid
+    ).toBe(false);
+  });
 });
 
 describe('validateMessage — VERIFY_PROFILE_PAGE', () => {

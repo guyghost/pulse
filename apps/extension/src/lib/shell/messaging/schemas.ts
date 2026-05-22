@@ -215,13 +215,7 @@ const VerifyProfileResultSchema = z.object({
   }),
 });
 
-const ProfileExtractorSourceSchema = z
-  .string()
-  .min(1)
-  .max(80)
-  .regex(/^[a-z0-9][a-z0-9-]*$/, {
-    message: 'Profile extractor source must be a stable platform id',
-  });
+const ProfileExtractorSourceSchema = z.enum(['linkedin', 'malt', 'other']);
 
 const CandidateExperienceDraftSchema = z.object({
   title: SafeString,
