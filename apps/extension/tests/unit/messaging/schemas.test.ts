@@ -251,11 +251,33 @@ describe('validateMessage — LinkedIn preview and sync import', () => {
     ).toBe(true);
   });
 
-  it('rejette une demande de sync LinkedIn avec une source non supportée', () => {
+  it('accepte un draft de profil canonique venant d’une autre plateforme enregistrable', () => {
+    const maltDraft = {
+      ...linkedinDraft,
+      source: 'malt',
+      profileUrl: 'https://www.malt.fr/profile/example',
+      experiences: linkedinDraft.experiences.map((experience) => ({
+        ...experience,
+        source: 'malt',
+      })),
+      skills: linkedinDraft.skills.map((skill) => ({ ...skill, source: 'malt' })),
+      education: linkedinDraft.education.map((education) => ({ ...education, source: 'malt' })),
+      links: linkedinDraft.links.map((link) => ({ ...link, source: 'malt' })),
+    };
+
     expect(
       validateMessage({
         type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
-        payload: { profile: { ...linkedinDraft, source: 'other' } },
+        payload: { profile: maltDraft },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette un draft de profil dont les sources enfants ne correspondent pas à la source racine', () => {
+    expect(
+      validateMessage({
+        type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
+        payload: { profile: { ...linkedinDraft, source: 'malt' } },
       }).valid
     ).toBe(false);
   });

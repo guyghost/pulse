@@ -215,6 +215,14 @@ const VerifyProfileResultSchema = z.object({
   }),
 });
 
+const ProfileExtractorSourceSchema = z
+  .string()
+  .min(1)
+  .max(80)
+  .regex(/^[a-z0-9][a-z0-9-]*$/, {
+    message: 'Profile extractor source must be a stable platform id',
+  });
+
 const CandidateExperienceDraftSchema = z.object({
   title: SafeString,
   company: SafeString.nullable(),
@@ -224,7 +232,7 @@ const CandidateExperienceDraftSchema = z.object({
   isCurrent: z.boolean(),
   description: SafeString,
   skills: z.array(z.string().max(120)).max(100),
-  source: z.literal('linkedin'),
+  source: ProfileExtractorSourceSchema,
   sourceExternalId: SafeString.nullable(),
   positionIndex: z.number().int().min(0).max(500),
 });
@@ -236,20 +244,20 @@ const CandidateEducationDraftSchema = z.object({
   startDate: z.string().max(32).nullable(),
   endDate: z.string().max(32).nullable(),
   description: SafeString,
-  source: z.literal('linkedin'),
+  source: ProfileExtractorSourceSchema,
   positionIndex: z.number().int().min(0).max(500),
 });
 
 const CandidateSkillDraftSchema = z.object({
   skill: z.string().min(1).max(120),
-  source: z.literal('linkedin'),
+  source: ProfileExtractorSourceSchema,
   confidence: z.number().min(0).max(1),
 });
 
 const CandidateLinkDraftSchema = z.object({
   label: z.string().min(1).max(120),
   url: z.string().min(1).max(2048),
-  source: z.literal('linkedin'),
+  source: ProfileExtractorSourceSchema,
 });
 
 const CanonicalCandidateProfileDraftSchema = z
@@ -260,12 +268,20 @@ const CanonicalCandidateProfileDraftSchema = z
     skills: z.array(CandidateSkillDraftSchema).max(300),
     education: z.array(CandidateEducationDraftSchema).max(100),
     links: z.array(CandidateLinkDraftSchema).max(100),
-    source: z.literal('linkedin'),
+    source: ProfileExtractorSourceSchema,
     confidence: z.number().min(0).max(1),
     capturedAt: z.string().min(1).max(64),
     profileUrl: z.string().min(1).max(2048),
   })
-  .refine(maxBytes(80_000), { message: 'LinkedIn profile draft exceeds 80KB limit' });
+  .refine(
+    (draft) =>
+      draft.experiences.every((experience) => experience.source === draft.source) &&
+      draft.skills.every((skill) => skill.source === draft.source) &&
+      draft.education.every((education) => education.source === draft.source) &&
+      draft.links.every((link) => link.source === draft.source),
+    { message: 'Profile draft child sources must match the root source' }
+  )
+  .refine(maxBytes(80_000), { message: 'Platform profile draft exceeds 80KB limit' });
 
 // ── Scan ─────────────────────────────────────────────────────────────────────
 
