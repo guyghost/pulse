@@ -9,6 +9,7 @@ export {
   setTrackingRating,
   setTrackingNotes,
   addGeneratedAsset,
+  addGeneratedAssetAndMarkPrepared,
   getLastTransitionTime,
   countByStatus,
 } from './transitions';

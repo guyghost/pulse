@@ -6,6 +6,7 @@ import {
   setTrackingRating,
   setTrackingNotes,
   addGeneratedAsset,
+  addGeneratedAssetAndMarkPrepared,
   getLastTransitionTime,
   countByStatus,
 } from '../../../src/lib/core/tracking/transitions';
@@ -232,6 +233,58 @@ describe('tracking transitions', () => {
       const step2 = addGeneratedAsset(step1, 'asset-2');
 
       expect(step2.generatedAssetIds).toEqual(['asset-1', 'asset-2']);
+    });
+  });
+
+  describe('addGeneratedAssetAndMarkPrepared', () => {
+    it('adds an asset and advances detected missions through selected to prepared', () => {
+      const tracking = createTracking('m1', 1000);
+      const updated = addGeneratedAssetAndMarkPrepared(tracking, 'asset-1', 2000);
+
+      expect(updated.currentStatus).toBe('application_prepared');
+      expect(updated.generatedAssetIds).toEqual(['asset-1']);
+      expect(updated.history.slice(1)).toEqual([
+        {
+          from: 'detected',
+          to: 'selected',
+          timestamp: 2000,
+          note: 'Mission sélectionnée automatiquement après génération.',
+        },
+        {
+          from: 'selected',
+          to: 'application_prepared',
+          timestamp: 2000,
+          note: 'Candidature préparée par assistant.',
+        },
+      ]);
+    });
+
+    it('advances selected missions to prepared without duplicating assets', () => {
+      const tracking = transitionStatus(createTracking('m1', 1000), 'selected', 1500)!;
+      const withAsset = addGeneratedAssetAndMarkPrepared(tracking, 'asset-1', 2000);
+      const repeated = addGeneratedAssetAndMarkPrepared(withAsset, 'asset-1', 3000);
+
+      expect(repeated.currentStatus).toBe('application_prepared');
+      expect(repeated.generatedAssetIds).toEqual(['asset-1']);
+      expect(repeated.history).toHaveLength(3);
+      expect(repeated.history[2]).toMatchObject({
+        from: 'selected',
+        to: 'application_prepared',
+        timestamp: 2000,
+      });
+    });
+
+    it('does not regress applications already past the prepared stage', () => {
+      let tracking = createTracking('m1', 1000);
+      tracking = transitionStatus(tracking, 'selected', 1500)!;
+      tracking = transitionStatus(tracking, 'application_prepared', 2000)!;
+      tracking = transitionStatus(tracking, 'applied', 2500)!;
+
+      const updated = addGeneratedAssetAndMarkPrepared(tracking, 'asset-1', 3000);
+
+      expect(updated.currentStatus).toBe('applied');
+      expect(updated.generatedAssetIds).toEqual(['asset-1']);
+      expect(updated.history).toHaveLength(4);
     });
   });
 

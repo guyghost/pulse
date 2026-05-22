@@ -42,7 +42,7 @@ import {
 import {
   createTracking,
   transitionStatus,
-  addGeneratedAsset,
+  addGeneratedAssetAndMarkPrepared,
 } from '../lib/core/tracking/transitions';
 import {
   saveGeneratedAsset,
@@ -730,7 +730,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           if (!tracking) {
             tracking = createTracking(missionId, Date.now());
           }
-          const updatedTracking = addGeneratedAsset(tracking, asset.id);
+          const updatedTracking = addGeneratedAssetAndMarkPrepared(tracking, asset.id, Date.now());
           await saveTracking(updatedTracking);
           syncConnectedDashboardTracking(missionId).catch(() => {
             /* Non-critical: connected dashboard sync */

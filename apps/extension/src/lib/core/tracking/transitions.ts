@@ -97,6 +97,51 @@ export const addGeneratedAsset = (tracking: MissionTracking, assetId: string): M
 };
 
 /**
+ * Add a generated application asset and materialize the canonical prepared stage when possible.
+ *
+ * Generating a pitch/message is an explicit "prepare application" action. If the mission was only
+ * detected or selected, we advance through valid pipeline transitions so Supabase receives a
+ * coherent application timeline. Later terminal/advanced stages are not regressed.
+ */
+export const addGeneratedAssetAndMarkPrepared = (
+  tracking: MissionTracking,
+  assetId: string,
+  timestamp: number
+): MissionTracking => {
+  const withAsset = addGeneratedAsset(tracking, assetId);
+
+  if (withAsset.currentStatus === 'detected') {
+    const selected = transitionStatus(
+      withAsset,
+      'selected',
+      timestamp,
+      'Mission sélectionnée automatiquement après génération.'
+    );
+    return selected
+      ? (transitionStatus(
+          selected,
+          'application_prepared',
+          timestamp,
+          'Candidature préparée par assistant.'
+        ) ?? selected)
+      : withAsset;
+  }
+
+  if (withAsset.currentStatus === 'selected') {
+    return (
+      transitionStatus(
+        withAsset,
+        'application_prepared',
+        timestamp,
+        'Candidature préparée par assistant.'
+      ) ?? withAsset
+    );
+  }
+
+  return withAsset;
+};
+
+/**
  * Get the timestamp of the last status change.
  * Returns null if tracking has no history.
  */
