@@ -2,6 +2,7 @@ import type { Mission } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
 import type { ApplicationStatus } from '../../core/types/tracking';
 import type { PersistedConnectorStatus } from '../../core/types/connector-status';
+import type { AppSettings } from '../../core/types/app-settings';
 import type {
   GeneratedAsset,
   GenerationResultPayload,
@@ -68,6 +69,11 @@ export type BridgeMessage =
   | { type: 'NEW_MISSION_COUNT_RESET'; payload: { reset: boolean } }
   | { type: 'GET_PERSISTED_CONNECTOR_STATUSES' }
   | { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT'; payload: PersistedConnectorStatus[] }
+  | { type: 'GET_SETTINGS' }
+  | { type: 'SETTINGS_RESULT'; payload: AppSettings }
+  | { type: 'SAVE_SETTINGS'; payload: AppSettings }
+  | { type: 'SETTINGS_SAVED'; payload: { saved: boolean; settings: AppSettings | null } }
+  | { type: 'SETTINGS_UPDATED'; payload: AppSettings }
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }

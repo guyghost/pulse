@@ -6,7 +6,16 @@ const storage: Record<string, unknown> = {
     enabledConnectors: ['free-work'],
     notifications: true,
     autoScan: true,
+    maxSemanticPerScan: 10,
+    notificationScoreThreshold: 70,
+    respectRateLimits: true,
+    customDelayMs: 0,
+    theme: 'system',
   },
+  favoriteMissions: {},
+  hiddenMissions: {},
+  seenMissions: [],
+  newMissionCount: 0,
   tjm_history: generateMockTJMHistory(),
 };
 
@@ -20,6 +29,11 @@ function createChromeStubs() {
         console.log('[Chrome Stub] sendMessage:', message.type);
 
         switch (message.type) {
+          case 'GET_SETTINGS':
+            return { type: 'SETTINGS_RESULT', payload: storage.settings };
+          case 'SAVE_SETTINGS':
+            storage.settings = message.payload;
+            return { type: 'SETTINGS_SAVED', payload: { saved: true, settings: message.payload } };
           case 'GET_PROFILE':
             return { type: 'PROFILE_RESULT', payload: mockProfile };
           case 'SAVE_PROFILE':
@@ -36,6 +50,31 @@ function createChromeStubs() {
               },
             };
           }
+          case 'GET_FEED_MISSIONS':
+            return {
+              type: 'FEED_MISSIONS_RESULT',
+              payload: mockMissions.map((m) => ({ ...m, scrapedAt: new Date() })),
+            };
+          case 'GET_FEED_FAVORITES':
+            return { type: 'FEED_FAVORITES_RESULT', payload: storage.favoriteMissions };
+          case 'SAVE_FEED_FAVORITES':
+            storage.favoriteMissions = message.payload;
+            return { type: 'FEED_FAVORITES_SAVED', payload: { saved: true } };
+          case 'GET_FEED_HIDDEN':
+            return { type: 'FEED_HIDDEN_RESULT', payload: storage.hiddenMissions };
+          case 'SAVE_FEED_HIDDEN':
+            storage.hiddenMissions = message.payload;
+            return { type: 'FEED_HIDDEN_SAVED', payload: { saved: true } };
+          case 'GET_SEEN_MISSIONS':
+            return { type: 'SEEN_MISSIONS_RESULT', payload: storage.seenMissions };
+          case 'SAVE_SEEN_MISSIONS':
+            storage.seenMissions = message.payload;
+            return { type: 'SEEN_MISSIONS_SAVED', payload: { saved: true } };
+          case 'RESET_NEW_MISSION_COUNT':
+            storage.newMissionCount = 0;
+            return { type: 'NEW_MISSION_COUNT_RESET', payload: { reset: true } };
+          case 'GET_PERSISTED_CONNECTOR_STATUSES':
+            return { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT', payload: [] };
           case 'SCAN_START':
             setTimeout(() => {
               window.dispatchEvent(

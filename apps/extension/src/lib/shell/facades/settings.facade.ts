@@ -5,9 +5,23 @@
  */
 
 import type { UserProfile } from '$lib/core/types/profile';
+import type { AppSettings } from '$lib/core/types/app-settings';
 import { sendMessage } from '$lib/shell/messaging/bridge';
 
-export { getSettings, setSettings } from '../storage/chrome-storage';
+export async function getSettings(): Promise<AppSettings> {
+  const response = await sendMessage({ type: 'GET_SETTINGS' });
+  if (response.type !== 'SETTINGS_RESULT') {
+    throw new Error('Settings load failed.');
+  }
+  return response.payload;
+}
+
+export async function setSettings(settings: AppSettings): Promise<void> {
+  const response = await sendMessage({ type: 'SAVE_SETTINGS', payload: settings });
+  if (response.type !== 'SETTINGS_SAVED' || !response.payload.saved) {
+    throw new Error('Settings save failed.');
+  }
+}
 
 export async function getProfile(): Promise<UserProfile | null> {
   const response = await sendMessage({ type: 'GET_PROFILE' });

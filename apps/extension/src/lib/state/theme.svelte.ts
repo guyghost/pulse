@@ -1,5 +1,6 @@
 import type { ThemePreference } from '$lib/core/types/app-settings';
 import { getSettings, setSettings } from '$lib/shell/facades/settings.facade';
+import { subscribeMessages } from '$lib/shell/messaging/bridge';
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -45,18 +46,12 @@ export function createThemeStore() {
       }
     });
 
-    // Listen for settings changes from other contexts (e.g. SettingsPage)
-    if (typeof chrome !== 'undefined' && chrome.storage?.onChanged) {
-      chrome.storage.onChanged.addListener((changes) => {
-        if (changes.settings?.newValue) {
-          const newTheme = changes.settings.newValue.theme as ThemePreference | undefined;
-          if (newTheme && newTheme !== preference) {
-            preference = newTheme;
-            sync();
-          }
-        }
-      });
-    }
+    subscribeMessages((message) => {
+      if (message.type === 'SETTINGS_UPDATED' && message.payload.theme !== preference) {
+        preference = message.payload.theme;
+        sync();
+      }
+    });
 
     // Cross-module sync for dev mode (no chrome.storage events)
     window.addEventListener('mp:theme-changed', (e) => {

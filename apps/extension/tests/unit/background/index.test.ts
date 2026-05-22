@@ -2,6 +2,7 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
 
 const getSettings = vi.fn();
+const setSettings = vi.fn();
 const runScan = vi.fn();
 const getSeenIds = vi.fn();
 const saveSeenIds = vi.fn();
@@ -129,8 +130,19 @@ vi.stubGlobal('chrome', {
 });
 
 vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
+  DEFAULT_SETTINGS: {
+    scanIntervalMinutes: 30,
+    enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'],
+    notifications: true,
+    autoScan: true,
+    maxSemanticPerScan: 10,
+    notificationScoreThreshold: 70,
+    respectRateLimits: true,
+    customDelayMs: 0,
+    theme: 'system',
+  },
   getSettings,
-  setSettings: vi.fn(async () => undefined),
+  setSettings,
 }));
 
 vi.mock('../../../src/lib/shell/storage/db', () => ({
@@ -217,6 +229,7 @@ describe('background auto-scan notifications', () => {
       maxSemanticPerScan: 10,
       notificationScoreThreshold: 70,
     });
+    setSettings.mockResolvedValue(undefined);
     await import('../../../src/background/index.ts');
   });
 
@@ -423,6 +436,41 @@ describe('background auto-scan notifications', () => {
         ],
         summary: { matches: 1, mismatches: 0, missing: 0 },
       },
+    });
+  });
+
+  it('routes settings through the service worker shell', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const settings = {
+      scanIntervalMinutes: 45,
+      enabledConnectors: ['free-work'],
+      notifications: false,
+      autoScan: true,
+      maxSemanticPerScan: 5,
+      notificationScoreThreshold: 80,
+      respectRateLimits: true,
+      customDelayMs: 1000,
+      theme: 'dark' as const,
+    };
+    const getResponse = vi.fn();
+    const saveResponse = vi.fn();
+    getSettings.mockResolvedValueOnce(settings);
+
+    expect(messageListener?.({ type: 'GET_SETTINGS' }, {}, getResponse)).toBe(true);
+    expect(messageListener?.({ type: 'SAVE_SETTINGS', payload: settings }, {}, saveResponse)).toBe(
+      true
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(getResponse).toHaveBeenCalledWith({ type: 'SETTINGS_RESULT', payload: settings });
+    expect(setSettings).toHaveBeenCalledWith(settings);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'SETTINGS_UPDATED',
+      payload: settings,
+    });
+    expect(saveResponse).toHaveBeenCalledWith({
+      type: 'SETTINGS_SAVED',
+      payload: { saved: true, settings },
     });
   });
 

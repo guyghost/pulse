@@ -68,6 +68,20 @@ const PersistedConnectorStatusSchema = z
   })
   .strict();
 
+const AppSettingsSchema = z
+  .object({
+    scanIntervalMinutes: z.number().int().min(1).max(1440),
+    enabledConnectors: z.array(z.string().min(1).max(120)).max(50),
+    notifications: z.boolean(),
+    autoScan: z.boolean(),
+    maxSemanticPerScan: z.number().int().min(0).max(100),
+    notificationScoreThreshold: z.number().int().min(0).max(100),
+    respectRateLimits: z.boolean(),
+    customDelayMs: z.number().int().min(0).max(60000),
+    theme: z.enum(['light', 'dark', 'system']),
+  })
+  .strict();
+
 // ── Profile ──────────────────────────────────────────────────────────────────
 
 const ProfilePayloadSchema = z
@@ -307,6 +321,26 @@ export const MessageSchemas = {
   PERSISTED_CONNECTOR_STATUSES_RESULT: z.object({
     type: z.literal('PERSISTED_CONNECTOR_STATUSES_RESULT'),
     payload: z.array(PersistedConnectorStatusSchema).max(50),
+  }),
+  GET_SETTINGS: z.object({ type: z.literal('GET_SETTINGS') }),
+  SETTINGS_RESULT: z.object({
+    type: z.literal('SETTINGS_RESULT'),
+    payload: AppSettingsSchema,
+  }),
+  SAVE_SETTINGS: z.object({
+    type: z.literal('SAVE_SETTINGS'),
+    payload: AppSettingsSchema,
+  }),
+  SETTINGS_SAVED: z.object({
+    type: z.literal('SETTINGS_SAVED'),
+    payload: z.object({
+      saved: z.boolean(),
+      settings: AppSettingsSchema.nullable(),
+    }),
+  }),
+  SETTINGS_UPDATED: z.object({
+    type: z.literal('SETTINGS_UPDATED'),
+    payload: AppSettingsSchema,
   }),
   // Profile
   GET_PROFILE: z.object({ type: z.literal('GET_PROFILE') }),

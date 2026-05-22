@@ -51,6 +51,18 @@ const linkedinDraft = {
   profileUrl: 'https://www.linkedin.com/in/example/',
 };
 
+const validSettings = {
+  scanIntervalMinutes: 30,
+  enabledConnectors: ['free-work', 'lehibou'],
+  notifications: true,
+  autoScan: true,
+  maxSemanticPerScan: 10,
+  notificationScoreThreshold: 70,
+  respectRateLimits: true,
+  customDelayMs: 0,
+  theme: 'system',
+};
+
 // ============================================================================
 // validateMessage — structure de base
 // ============================================================================
@@ -126,6 +138,30 @@ describe('validateMessage — SAVE_PROFILE', () => {
     if (!r.valid) {
       expect(r.errors.some((e) => e.includes('10KB'))).toBe(true);
     }
+  });
+});
+
+describe('validateMessage — settings bridge', () => {
+  it('accepte les messages de lecture et sauvegarde settings', () => {
+    expect(validateMessage({ type: 'GET_SETTINGS' }).valid).toBe(true);
+    expect(validateMessage({ type: 'SETTINGS_RESULT', payload: validSettings }).valid).toBe(true);
+    expect(validateMessage({ type: 'SAVE_SETTINGS', payload: validSettings }).valid).toBe(true);
+    expect(validateMessage({ type: 'SETTINGS_UPDATED', payload: validSettings }).valid).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_SAVED',
+        payload: { saved: true, settings: validSettings },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette des settings invalides', () => {
+    expect(
+      validateMessage({
+        type: 'SAVE_SETTINGS',
+        payload: { ...validSettings, scanIntervalMinutes: 0 },
+      }).valid
+    ).toBe(false);
   });
 });
 

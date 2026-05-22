@@ -13,7 +13,7 @@ import type {
 } from '../lib/shell/messaging/bridge';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { AuthUser } from '../lib/core/types/auth';
-import { getSettings, setSettings } from '../lib/shell/storage/chrome-storage';
+import { DEFAULT_SETTINGS, getSettings, setSettings } from '../lib/shell/storage/chrome-storage';
 import {
   runScan,
   cancelCurrentScan,
@@ -550,6 +550,38 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
           sendResponse({ type: 'PROFILE_RESULT', payload: null });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_SETTINGS') {
+      getSettings()
+        .then((settings) => {
+          sendResponse({ type: 'SETTINGS_RESULT', payload: settings });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_SETTINGS error:', err);
+          sendResponse({ type: 'SETTINGS_RESULT', payload: DEFAULT_SETTINGS });
+        });
+      return true;
+    }
+
+    if (message.type === 'SAVE_SETTINGS') {
+      setSettings(message.payload)
+        .then(() => {
+          chrome.runtime
+            .sendMessage({ type: 'SETTINGS_UPDATED', payload: message.payload })
+            .catch(() => {
+              // Side panel may be closed.
+            });
+          sendResponse({
+            type: 'SETTINGS_SAVED',
+            payload: { saved: true, settings: message.payload },
+          });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SAVE_SETTINGS error:', err);
+          sendResponse({ type: 'SETTINGS_SAVED', payload: { saved: false, settings: null } });
         });
       return true;
     }

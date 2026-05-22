@@ -25,7 +25,7 @@ const SettingsSchema = z.object({
 
 export type { AppSettings } from '../../core/types/app-settings';
 
-const DEFAULT_SETTINGS: AppSettings = {
+export const DEFAULT_SETTINGS: AppSettings = {
   scanIntervalMinutes: 30,
   enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'],
   notifications: true,
