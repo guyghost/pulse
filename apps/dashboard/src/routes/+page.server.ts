@@ -30,6 +30,7 @@ import {
   type DashboardCandidateEducationRow,
   type DashboardCandidateExperienceRow,
   type DashboardCandidateLinkRow,
+  type DashboardCandidateProfileFieldSuggestionRow,
   type DashboardCandidateSkillRow,
   type DashboardCanonicalApplicationRow,
   type DashboardCanonicalMissionRow,
@@ -240,6 +241,18 @@ const mockCv: CvSnapshot = {
       errorCode: null,
       errorMessage: null,
       fieldCounts: { experiences: 1, education: 0, skills: 5, links: 0 },
+    },
+  ],
+  suggestions: [
+    {
+      id: 'suggestion-preview',
+      field: 'summary',
+      fieldLabel: 'Résumé',
+      currentValue: 'Résumé édité dans le dashboard.',
+      suggestedValue: 'Résumé importé depuis LinkedIn.',
+      source: 'linkedin',
+      status: 'pending',
+      createdAt: '2026-05-12T09:00:00.000Z',
     },
   ],
 };
@@ -595,6 +608,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     { data: candidateEducation },
     { data: candidateLinks },
     { data: profileImports },
+    { data: profileSuggestions },
   ] = candidateProfile
     ? await Promise.all([
         supabase
@@ -630,8 +644,17 @@ export const load: PageServerLoad = async ({ cookies }) => {
           .order('imported_at', { ascending: false })
           .limit(5)
           .returns<DashboardProfileImportRow[]>(),
+        supabase
+          .from('candidate_profile_field_suggestions')
+          .select('id, field, current_value, suggested_value, source, status, created_at')
+          .eq('user_id', session.user.id)
+          .eq('profile_id', candidateProfile.id)
+          .eq('status', 'pending')
+          .order('created_at', { ascending: false })
+          .limit(10)
+          .returns<DashboardCandidateProfileFieldSuggestionRow[]>(),
       ])
-    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const { data: connectorHealthRows } = await supabase
     .from('connector_health_events')
@@ -686,7 +709,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
           candidateExperiences ?? [],
           candidateEducation ?? [],
           candidateLinks ?? [],
-          profileImports ?? []
+          profileImports ?? [],
+          profileSuggestions ?? []
         )
       : mockCv,
     syncStatuses: syncStatuses.length > 0 ? syncStatuses : mockSyncStatuses,

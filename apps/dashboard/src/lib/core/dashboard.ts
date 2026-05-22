@@ -159,6 +159,7 @@ export interface CvSnapshot {
   education: CvEducation[];
   links: CvLink[];
   imports: CvImport[];
+  suggestions: CvFieldSuggestion[];
 }
 
 export interface CvExperience {
@@ -194,6 +195,19 @@ export interface CvImport {
   errorCode: string | null;
   errorMessage: string | null;
   fieldCounts: Record<string, number>;
+}
+
+export type CvFieldSuggestionField = 'title' | 'summary' | 'target_role';
+
+export interface CvFieldSuggestion {
+  id: string;
+  field: CvFieldSuggestionField;
+  fieldLabel: string;
+  currentValue: string | null;
+  suggestedValue: string | null;
+  source: ApplicationSource;
+  status: 'pending' | 'applied' | 'dismissed';
+  createdAt: string;
 }
 
 export interface PlatformSyncStatus {
@@ -359,6 +373,16 @@ export interface DashboardProfileImportRow {
   field_counts: unknown;
 }
 
+export interface DashboardCandidateProfileFieldSuggestionRow {
+  id: string;
+  field: string;
+  current_value: string | null;
+  suggested_value: string | null;
+  source: string;
+  status: string;
+  created_at: string;
+}
+
 export interface DashboardConnectorHealthEventRow {
   source: string;
   status: 'ready' | 'needs_permission' | 'needs_session' | 'blocked' | 'error' | 'syncing';
@@ -462,6 +486,14 @@ function isConnectedSyncEntity(value: unknown): value is ConnectedSyncEntity {
   );
 }
 
+function isCvFieldSuggestionField(value: unknown): value is CvFieldSuggestionField {
+  return value === 'title' || value === 'summary' || value === 'target_role';
+}
+
+function isCvFieldSuggestionStatus(value: unknown): value is CvFieldSuggestion['status'] {
+  return value === 'pending' || value === 'applied' || value === 'dismissed';
+}
+
 function isApplicationTimelineCreatedBy(value: unknown): value is ApplicationTimelineCreatedBy {
   return value === 'dashboard' || value === 'extension' || value === 'system';
 }
@@ -506,6 +538,12 @@ const APPLICATION_TIMELINE_CREATED_BY_LABELS: Record<ApplicationTimelineCreatedB
   dashboard: 'Dashboard',
   extension: 'Extension',
   system: 'Système',
+};
+
+const CV_FIELD_SUGGESTION_LABELS: Record<CvFieldSuggestionField, string> = {
+  title: 'Titre',
+  summary: 'Résumé',
+  target_role: 'Rôle cible',
 };
 
 const EMPTY_TJM_RADAR: TjmRadarSnapshot = {
@@ -855,7 +893,8 @@ export function profileRowsToCvSnapshot(
   experiences: DashboardCandidateExperienceRow[] = [],
   education: DashboardCandidateEducationRow[] = [],
   links: DashboardCandidateLinkRow[] = [],
-  imports: DashboardProfileImportRow[] = []
+  imports: DashboardProfileImportRow[] = [],
+  suggestions: DashboardCandidateProfileFieldSuggestionRow[] = []
 ): CvSnapshot {
   return {
     id: profile.id,
@@ -913,6 +952,28 @@ export function profileRowsToCvSnapshot(
           errorCode: item.error_code,
           errorMessage: item.error_message,
           fieldCounts: parseFieldCounts(item.field_counts),
+        },
+      ];
+    }),
+    suggestions: suggestions.flatMap((item) => {
+      if (
+        !isApplicationSource(item.source) ||
+        !isCvFieldSuggestionField(item.field) ||
+        !isCvFieldSuggestionStatus(item.status)
+      ) {
+        return [];
+      }
+
+      return [
+        {
+          id: item.id,
+          field: item.field,
+          fieldLabel: CV_FIELD_SUGGESTION_LABELS[item.field],
+          currentValue: item.current_value,
+          suggestedValue: item.suggested_value,
+          source: item.source,
+          status: item.status,
+          createdAt: item.created_at,
         },
       ];
     }),

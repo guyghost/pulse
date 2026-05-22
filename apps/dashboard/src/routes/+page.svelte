@@ -139,6 +139,12 @@
     error: 'Erreur',
   };
 
+  const suggestionStatusLabels: Record<CvSnapshot['suggestions'][number]['status'], string> = {
+    pending: 'À valider',
+    applied: 'Appliquée',
+    dismissed: 'Ignorée',
+  };
+
   const featureAreaLabels: Record<DashboardFeatureArea, string> = {
     missions: 'Missions',
     profile: 'Profil',
@@ -1333,6 +1339,54 @@
                     {latestCvImport.errorCode}: {latestCvImport.errorMessage}
                   </p>
                 {/if}
+              </div>
+            {/if}
+
+            {#if cv.suggestions.length > 0}
+              <div class="mt-5 border-t border-border-light pt-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-medium uppercase text-text-subtle">
+                      Suggestions d'import
+                    </p>
+                    <p class="mt-1 text-sm text-text-subtle">
+                      Champs préservés après édition dashboard
+                    </p>
+                  </div>
+                  <Badge label={`${cv.suggestions.length}`} variant="warning" />
+                </div>
+
+                <div class="mt-3 space-y-3">
+                  {#each cv.suggestions as suggestion}
+                    <article class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <p class="text-sm font-medium text-text-primary">
+                            {suggestion.fieldLabel}
+                          </p>
+                          <p class="mt-1 text-xs text-text-subtle">
+                            {sourceLabels[suggestion.source]} · {formatDate(suggestion.createdAt)}
+                          </p>
+                        </div>
+                        <Badge label={suggestionStatusLabels[suggestion.status]} variant="source" />
+                      </div>
+                      <div class="mt-3 grid gap-2 text-xs">
+                        <div class="rounded-lg bg-surface-white px-3 py-2">
+                          <p class="text-text-muted">Valeur dashboard</p>
+                          <p class="mt-1 leading-5 text-text-primary">
+                            {suggestion.currentValue ?? 'Vide'}
+                          </p>
+                        </div>
+                        <div class="rounded-lg bg-surface-white px-3 py-2">
+                          <p class="text-text-muted">Proposition importée</p>
+                          <p class="mt-1 leading-5 text-text-primary">
+                            {suggestion.suggestedValue ?? 'Vide'}
+                          </p>
+                        </div>
+                      </div>
+                    </article>
+                  {/each}
+                </div>
               </div>
             {/if}
 

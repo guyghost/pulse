@@ -102,6 +102,7 @@ const cv: CvSnapshot = {
   education: [],
   links: [],
   imports: [],
+  suggestions: [],
 };
 
 const syncStatuses: PlatformSyncStatus[] = [
@@ -669,6 +670,26 @@ describe('dashboard core', () => {
             error_message: null,
             field_counts: { experiences: 1, skills: 2 },
           },
+        ],
+        [
+          {
+            id: 'suggestion-1',
+            field: 'summary',
+            current_value: 'Résumé dashboard.',
+            suggested_value: 'Résumé LinkedIn.',
+            source: 'linkedin',
+            status: 'pending',
+            created_at: '2026-05-22T09:00:00.000Z',
+          },
+          {
+            id: 'suggestion-ignored',
+            field: 'unknown',
+            current_value: null,
+            suggested_value: null,
+            source: 'linkedin',
+            status: 'pending',
+            created_at: '2026-05-22T10:00:00.000Z',
+          },
         ]
       )
     ).toEqual({
@@ -710,6 +731,18 @@ describe('dashboard core', () => {
           errorCode: null,
           errorMessage: null,
           fieldCounts: { experiences: 1, skills: 2 },
+        },
+      ],
+      suggestions: [
+        {
+          id: 'suggestion-1',
+          field: 'summary',
+          fieldLabel: 'Résumé',
+          currentValue: 'Résumé dashboard.',
+          suggestedValue: 'Résumé LinkedIn.',
+          source: 'linkedin',
+          status: 'pending',
+          createdAt: '2026-05-22T09:00:00.000Z',
         },
       ],
     });
