@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   buildApplicationPipelineEventRows,
   buildApplicationUpsertRow,
+  buildCandidateProfileFieldSuggestionRows,
   buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
   buildApplicationPullCursor,
@@ -333,6 +334,7 @@ describe('connected dashboard sync payload builders', () => {
         target_role: 'Lead Frontend Svelte',
         completeness: 86,
         revision: 4,
+        updated_by: 'extension',
       },
       experiences: [
         {
@@ -392,6 +394,68 @@ describe('connected dashboard sync payload builders', () => {
         },
       },
     });
+  });
+
+  it('builds field suggestions instead of overwriting dashboard-edited CV fields', () => {
+    expect(
+      buildCandidateProfileFieldSuggestionRows({
+        draft: linkedinDraft,
+        userId: 'user-1',
+        profile: {
+          id: 'profile-1',
+          title: 'Consultant Frontend manuel',
+          summary: 'Résumé édité dans le dashboard.',
+          target_role: 'Architecte Svelte',
+          revision: 7,
+          updated_at: '2026-05-22T09:00:00.000Z',
+          updated_by: 'dashboard',
+        },
+      })
+    ).toEqual([
+      {
+        user_id: 'user-1',
+        profile_id: 'profile-1',
+        field: 'title',
+        current_value: 'Consultant Frontend manuel',
+        suggested_value: 'Lead Frontend Svelte',
+        source: 'linkedin',
+        status: 'pending',
+      },
+      {
+        user_id: 'user-1',
+        profile_id: 'profile-1',
+        field: 'summary',
+        current_value: 'Résumé édité dans le dashboard.',
+        suggested_value: 'Consultant frontend senior.',
+        source: 'linkedin',
+        status: 'pending',
+      },
+      {
+        user_id: 'user-1',
+        profile_id: 'profile-1',
+        field: 'target_role',
+        current_value: 'Architecte Svelte',
+        suggested_value: 'Lead Frontend Svelte',
+        source: 'linkedin',
+        status: 'pending',
+      },
+    ]);
+
+    expect(
+      buildCandidateProfileFieldSuggestionRows({
+        draft: linkedinDraft,
+        userId: 'user-1',
+        profile: {
+          id: 'profile-1',
+          title: 'Lead Frontend Svelte',
+          summary: 'Consultant frontend senior.',
+          target_role: 'Lead Frontend Svelte',
+          revision: 3,
+          updated_at: '2026-05-22T08:00:00.000Z',
+          updated_by: 'extension',
+        },
+      })
+    ).toEqual([]);
   });
 
   it('builds local tracking records from remote dashboard applications', () => {

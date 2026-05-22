@@ -3,6 +3,7 @@ import {
   buildApplicationPipelineEventRows,
   buildApplicationPullCursor,
   buildApplicationUpsertRow,
+  buildCandidateProfileFieldSuggestionRows,
   buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
   buildMissionScoreUpsertRow,
@@ -13,10 +14,12 @@ import {
   type ApplicationUpsertRow,
   type CandidateEducationInsertRow,
   type CandidateExperienceInsertRow,
+  type CandidateProfileFieldSuggestionRow,
   type CandidateLinkInsertRow,
   type CandidateProfileUpsertRow,
   type CandidateSkillUpsertRow,
   type ConnectorHealthEventRow,
+  type ExistingCandidateProfileSnapshot,
   type MissionScoreUpsertRow,
   type MissionUpsertRow,
   type ProfileImportInsertRow,
@@ -67,6 +70,7 @@ export interface ConnectedDashboardSyncGateway {
   }): Promise<RemoteApplicationSnapshot[]>;
   upsertApplicationPipelineEvents(rows: ApplicationPipelineEventRow[]): Promise<void>;
   insertConnectorHealthEvents(rows: ConnectorHealthEventRow[]): Promise<void>;
+  getCandidateProfile(userId: string): Promise<ExistingCandidateProfileSnapshot | null>;
   upsertCandidateProfile(row: CandidateProfileUpsertRow): Promise<{ id: string; revision: number }>;
   replaceCandidateProfileChildren(input: {
     profileId: string;
@@ -75,6 +79,7 @@ export interface ConnectedDashboardSyncGateway {
     skills: CandidateSkillUpsertRow[];
     links: CandidateLinkInsertRow[];
   }): Promise<void>;
+  insertCandidateProfileFieldSuggestions(rows: CandidateProfileFieldSuggestionRow[]): Promise<void>;
   insertProfileImport(row: ProfileImportInsertRow): Promise<void>;
   upsertSyncStatus(row: SyncStatusRow): Promise<void>;
 }
@@ -171,6 +176,7 @@ export interface PushCandidateProfileImportResult {
   education: number;
   skills: number;
   links: number;
+  suggestions: number;
 }
 
 export interface ConnectedDashboardSnapshotInput {
@@ -350,6 +356,43 @@ function parseProfileIdentity(data: unknown): { id: string; revision: number } {
   throw new Error('Supabase response did not include profile identity');
 }
 
+function isProfileUpdatedBy(
+  value: unknown
+): value is ExistingCandidateProfileSnapshot['updated_by'] {
+  return value === 'dashboard' || value === 'extension' || value === 'system';
+}
+
+function parseExistingCandidateProfile(data: unknown): ExistingCandidateProfileSnapshot | null {
+  const value = Array.isArray(data) ? data[0] : data;
+
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.summary === 'string' &&
+    (typeof value.target_role === 'string' || value.target_role === null) &&
+    typeof value.revision === 'number' &&
+    typeof value.updated_at === 'string' &&
+    isProfileUpdatedBy(value.updated_by)
+  ) {
+    return {
+      id: value.id,
+      title: value.title,
+      summary: value.summary,
+      target_role: value.target_role,
+      revision: value.revision,
+      updated_at: value.updated_at,
+      updated_by: value.updated_by,
+    };
+  }
+
+  return null;
+}
+
 async function selectOrThrow<T>(
   builder: SupabaseWriteBuilder,
   columns: string,
@@ -434,6 +477,17 @@ export function createSupabaseConnectedDashboardGateway(
         () => undefined
       );
     },
+    getCandidateProfile: async (userId) => {
+      const query = supabase
+        .from('candidate_profiles')
+        .select('id,title,summary,target_role,revision,updated_at,updated_by')
+        .eq('user_id', userId);
+      const { data, error } = await query.order('updated_at', { ascending: false });
+      if (error) {
+        throw new Error(error.message);
+      }
+      return parseExistingCandidateProfile(data);
+    },
     upsertCandidateProfile: async (row) =>
       selectOrThrow(
         supabase.from('candidate_profiles').upsert(row, { onConflict: 'user_id' }),
@@ -492,6 +546,16 @@ export function createSupabaseConnectedDashboardGateway(
       if (links.length > 0) {
         await selectOrThrow(supabase.from('candidate_links').insert(links), 'id', () => undefined);
       }
+    },
+    insertCandidateProfileFieldSuggestions: async (rows) => {
+      if (rows.length === 0) {
+        return;
+      }
+      await selectOrThrow(
+        supabase.from('candidate_profile_field_suggestions').insert(rows),
+        'id',
+        () => undefined
+      );
     },
     insertProfileImport: async (row) => {
       await selectOrThrow(supabase.from('profile_imports').insert(row), 'id', () => undefined);
@@ -764,7 +828,11 @@ export async function pushCandidateProfileImportToConnectedDashboard(
   });
 
   try {
-    const profile = await gateway.upsertCandidateProfile(provisionalRows.profile);
+    const existingProfile = await gateway.getCandidateProfile(input.userId);
+    const isDashboardEditedProfile = existingProfile?.updated_by === 'dashboard';
+    const profile = isDashboardEditedProfile
+      ? { id: existingProfile.id, revision: existingProfile.revision }
+      : await gateway.upsertCandidateProfile(provisionalRows.profile);
     const rows = buildCandidateProfileImportRows({
       draft: input.draft,
       userId: input.userId,
@@ -774,6 +842,11 @@ export async function pushCandidateProfileImportToConnectedDashboard(
       revision: profile.revision,
       rawHash: input.rawHash,
     });
+    const suggestionRows = buildCandidateProfileFieldSuggestionRows({
+      draft: input.draft,
+      userId: input.userId,
+      profile: existingProfile,
+    });
 
     await gateway.replaceCandidateProfileChildren({
       profileId: profile.id,
@@ -782,6 +855,7 @@ export async function pushCandidateProfileImportToConnectedDashboard(
       skills: rows.skills,
       links: rows.links,
     });
+    await gateway.insertCandidateProfileFieldSuggestions(suggestionRows);
     await gateway.insertProfileImport(rows.importEvent);
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({
@@ -800,6 +874,7 @@ export async function pushCandidateProfileImportToConnectedDashboard(
         education: rows.education.length,
         skills: rows.skills.length,
         links: rows.links.length,
+        suggestions: suggestionRows.length,
       },
     };
   } catch (error) {

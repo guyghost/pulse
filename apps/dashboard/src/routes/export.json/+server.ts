@@ -12,6 +12,7 @@ const USER_OWNED_TABLES = [
   'extension_devices',
   'sync_status',
   'favorite_missions',
+  'candidate_profile_field_suggestions',
 ] as const;
 
 const PROFILE_CHILD_TABLES = [

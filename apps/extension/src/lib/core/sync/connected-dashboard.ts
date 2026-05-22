@@ -101,6 +101,29 @@ export interface CandidateProfileUpsertRow {
   target_role: string | null;
   completeness: number;
   revision: number;
+  updated_by: 'extension';
+}
+
+export interface ExistingCandidateProfileSnapshot {
+  id: string;
+  title: string;
+  summary: string;
+  target_role: string | null;
+  revision: number;
+  updated_at: string;
+  updated_by: 'dashboard' | 'extension' | 'system';
+}
+
+export type CandidateProfileSuggestionField = 'title' | 'summary' | 'target_role';
+
+export interface CandidateProfileFieldSuggestionRow {
+  user_id: string;
+  profile_id: string;
+  field: CandidateProfileSuggestionField;
+  current_value: string | null;
+  suggested_value: string | null;
+  source: string;
+  status: 'pending';
 }
 
 export interface CandidateExperienceInsertRow {
@@ -404,6 +427,7 @@ export function buildCandidateProfileImportRows(input: {
       target_role: input.draft.title || null,
       completeness,
       revision: input.revision,
+      updated_by: 'extension',
     },
     experiences: input.draft.experiences.map((experience) => ({
       profile_id: input.profileId,
@@ -459,6 +483,47 @@ export function buildCandidateProfileImportRows(input: {
       },
     },
   };
+}
+
+export function buildCandidateProfileFieldSuggestionRows(input: {
+  draft: CanonicalCandidateProfileDraft;
+  userId: string;
+  profile: ExistingCandidateProfileSnapshot | null;
+}): CandidateProfileFieldSuggestionRow[] {
+  if (!input.profile || input.profile.updated_by !== 'dashboard') {
+    return [];
+  }
+
+  const profile = input.profile;
+  const suggestedValues: Record<CandidateProfileSuggestionField, string | null> = {
+    title: input.draft.title || 'Profil LinkedIn importé',
+    summary: input.draft.summary,
+    target_role: input.draft.title || null,
+  };
+  const currentValues: Record<CandidateProfileSuggestionField, string | null> = {
+    title: profile.title,
+    summary: profile.summary,
+    target_role: profile.target_role,
+  };
+  const fields: CandidateProfileSuggestionField[] = ['title', 'summary', 'target_role'];
+
+  return fields.flatMap((field) => {
+    if (currentValues[field] === suggestedValues[field]) {
+      return [];
+    }
+
+    return [
+      {
+        user_id: input.userId,
+        profile_id: profile.id,
+        field,
+        current_value: currentValues[field],
+        suggested_value: suggestedValues[field],
+        source: input.draft.source,
+        status: 'pending',
+      },
+    ];
+  });
 }
 
 export function buildTrackingFromRemoteApplication(

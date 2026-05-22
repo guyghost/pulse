@@ -107,8 +107,10 @@ function createGateway(): ConnectedDashboardSyncGateway {
     ]),
     upsertApplicationPipelineEvents: vi.fn(async () => undefined),
     insertConnectorHealthEvents: vi.fn(async () => undefined),
+    getCandidateProfile: vi.fn(async () => null),
     upsertCandidateProfile: vi.fn(async () => ({ id: 'profile-1', revision: 3 })),
     replaceCandidateProfileChildren: vi.fn(async () => undefined),
+    insertCandidateProfileFieldSuggestions: vi.fn(async () => undefined),
     insertProfileImport: vi.fn(async () => undefined),
     upsertSyncStatus: vi.fn(async () => undefined),
   };
@@ -321,6 +323,7 @@ describe('connected dashboard shell sync', () => {
         education: 0,
         skills: 2,
         links: 1,
+        suggestions: 0,
       },
     });
     expect(gateway.upsertCandidateProfile).toHaveBeenCalledWith(
@@ -328,6 +331,7 @@ describe('connected dashboard shell sync', () => {
         user_id: 'user-1',
         title: 'Lead Frontend Svelte',
         completeness: 86,
+        updated_by: 'extension',
       })
     );
     expect(gateway.replaceCandidateProfileChildren).toHaveBeenCalledWith({
@@ -368,6 +372,60 @@ describe('connected dashboard shell sync', () => {
         pending_upload_count: 0,
       })
     );
+  });
+
+  it('creates field suggestions when a LinkedIn import conflicts with dashboard CV edits', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.getCandidateProfile).mockResolvedValueOnce({
+      id: 'profile-1',
+      title: 'Profil dashboard',
+      summary: 'Résumé manuel',
+      target_role: 'Architecte frontend',
+      revision: 8,
+      updated_at: '2026-05-22T08:00:00.000Z',
+      updated_by: 'dashboard',
+    });
+
+    const result = await pushCandidateProfileImportToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      draft: linkedinDraft,
+      now: new Date('2026-05-22T08:05:00.000Z'),
+      extractorVersion: 'linkedin-v1',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        profileId: 'profile-1',
+        experiences: 1,
+        education: 0,
+        skills: 2,
+        links: 1,
+        suggestions: 3,
+      },
+    });
+    expect(gateway.upsertCandidateProfile).not.toHaveBeenCalled();
+    expect(gateway.insertCandidateProfileFieldSuggestions).toHaveBeenCalledWith([
+      expect.objectContaining({
+        profile_id: 'profile-1',
+        field: 'title',
+        current_value: 'Profil dashboard',
+        suggested_value: 'Lead Frontend Svelte',
+      }),
+      expect.objectContaining({
+        profile_id: 'profile-1',
+        field: 'summary',
+        current_value: 'Résumé manuel',
+        suggested_value: 'Consultant frontend senior.',
+      }),
+      expect.objectContaining({
+        profile_id: 'profile-1',
+        field: 'target_role',
+        current_value: 'Architecte frontend',
+        suggested_value: 'Lead Frontend Svelte',
+      }),
+    ]);
   });
 
   it('records retryable sync status when profile import persistence fails', async () => {

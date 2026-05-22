@@ -742,6 +742,7 @@ export const actions: Actions = {
       await deleteRowsByUserId(supabase, 'applications', session.user.id);
       await deleteRowsByUserId(supabase, 'mission_duplicates', session.user.id);
       await deleteRowsByUserId(supabase, 'missions', session.user.id);
+      await deleteRowsByUserId(supabase, 'candidate_profile_field_suggestions', session.user.id);
       await deleteRowsByUserId(supabase, 'candidate_profiles', session.user.id);
       await deleteRowsByUserId(supabase, 'profile_imports', session.user.id);
       await deleteRowsByUserId(supabase, 'connector_health_events', session.user.id);
@@ -809,6 +810,7 @@ export const actions: Actions = {
           ...patch,
           completeness: 20,
           revision: 1,
+          updated_by: 'dashboard',
           updated_at: updatedAt,
         })
         .select('id')
@@ -826,6 +828,7 @@ export const actions: Actions = {
       .update({
         ...patch,
         revision: currentProfile.revision + 1,
+        updated_by: 'dashboard',
         updated_at: updatedAt,
       })
       .eq('id', currentProfile.id)
