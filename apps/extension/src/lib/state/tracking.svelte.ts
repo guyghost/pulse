@@ -8,6 +8,7 @@
 import type { MissionTracking } from '$lib/core/types/tracking';
 import type { ApplicationStatus } from '$lib/core/types/tracking';
 import { STATUS_LABELS } from '$lib/core/types/tracking';
+import { sendMessage } from '$lib/shell/messaging/bridge';
 
 export type TrackingState = 'idle' | 'loading' | 'loaded' | 'error';
 
@@ -17,15 +18,13 @@ export function createTrackingStore() {
   let error = $state<string | null>(null);
 
   /**
-   * Load tracking records (from bridge or local storage).
+   * Load tracking records from the service worker bridge.
    */
   async function loadTrackings(): Promise<void> {
     state = 'loading';
     error = null;
 
     try {
-      // Try bridge first (extension context)
-      const { sendMessage } = await import('$lib/shell/messaging/bridge');
       const response = await sendMessage({
         type: 'GET_TRACKINGS',
         payload: {},
@@ -33,31 +32,15 @@ export function createTrackingStore() {
 
       if (response.type === 'TRACKINGS_RESULT' && Array.isArray(response.payload)) {
         const map = new Map<string, MissionTracking>();
-        for (const t of response.payload as MissionTracking[]) {
+        for (const t of response.payload) {
           map.set(t.missionId, t);
         }
         trackings = map;
         state = 'loaded';
       } else {
-        // Fallback: load directly from storage
-        await loadFromStorage();
+        error = 'Failed to load tracking data';
+        state = 'error';
       }
-    } catch {
-      // Outside extension context — load from IndexedDB directly
-      await loadFromStorage();
-    }
-  }
-
-  async function loadFromStorage(): Promise<void> {
-    try {
-      const { getAllTrackings } = await import('$lib/shell/storage/tracking');
-      const records = await getAllTrackings();
-      const map = new Map<string, MissionTracking>();
-      for (const t of records) {
-        map.set(t.missionId, t);
-      }
-      trackings = map;
-      state = 'loaded';
     } catch (err) {
       error = err instanceof Error ? err.message : 'Failed to load tracking data';
       state = 'error';
@@ -73,68 +56,41 @@ export function createTrackingStore() {
     note?: string
   ): Promise<void> {
     try {
-      const { sendMessage } = await import('$lib/shell/messaging/bridge');
       const response = await sendMessage({
         type: 'UPDATE_TRACKING',
         payload: { missionId, status: newStatus, note },
       });
 
       if (response.type === 'TRACKING_UPDATED' && response.payload) {
-        const updated = response.payload as MissionTracking;
+        const updated = response.payload;
         const newMap = new Map(trackings);
         newMap.set(updated.missionId, updated);
         trackings = newMap;
+      } else {
+        error = 'Failed to update tracking';
       }
-    } catch {
-      // Outside extension context — try direct storage
-      try {
-        const { getTracking, saveTracking } = await import('$lib/shell/storage/tracking');
-        const { transitionStatus: transition } = await import('$lib/core/tracking/transitions');
-        const { createTracking } = await import('$lib/core/tracking/transitions');
-
-        const tracking = (await getTracking(missionId)) ?? createTracking(missionId, Date.now());
-        const updated = transition(tracking, newStatus, Date.now(), note ?? null);
-        if (updated) {
-          await saveTracking(updated);
-          const newMap = new Map(trackings);
-          newMap.set(updated.missionId, updated);
-          trackings = newMap;
-        }
-      } catch (err) {
-        error = err instanceof Error ? err.message : 'Failed to update tracking';
-      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to update tracking';
     }
   }
 
   async function updateNextActionAt(missionId: string, nextActionAt: string | null): Promise<void> {
     try {
-      const { sendMessage } = await import('$lib/shell/messaging/bridge');
       const response = await sendMessage({
         type: 'UPDATE_TRACKING_DETAILS',
         payload: { missionId, nextActionAt },
       });
 
       if (response.type === 'TRACKING_UPDATED' && response.payload) {
-        const updated = response.payload as MissionTracking;
+        const updated = response.payload;
         const newMap = new Map(trackings);
         newMap.set(updated.missionId, updated);
         trackings = newMap;
+      } else {
+        error = 'Failed to update next action';
       }
-    } catch {
-      try {
-        const { getTracking, saveTracking } = await import('$lib/shell/storage/tracking');
-        const { createTracking, setTrackingNextActionAt } =
-          await import('$lib/core/tracking/transitions');
-
-        const tracking = (await getTracking(missionId)) ?? createTracking(missionId, Date.now());
-        const updated = setTrackingNextActionAt(tracking, nextActionAt);
-        await saveTracking(updated);
-        const newMap = new Map(trackings);
-        newMap.set(updated.missionId, updated);
-        trackings = newMap;
-      } catch (err) {
-        error = err instanceof Error ? err.message : 'Failed to update next action';
-      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to update next action';
     }
   }
 
