@@ -18,11 +18,13 @@
     DashboardFeatureRequirement,
     CvSnapshot,
     MissionApplication,
+    MissionFeedItem,
     PlatformSyncStatus,
   } from '$lib/core/dashboard';
 
   let { data, form }: { data: PageData; form?: ActionData } = $props();
 
+  const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
   const applications = $derived(data.applications as MissionApplication[]);
   const cv = $derived(data.cv as CvSnapshot);
   const syncStatuses = $derived(data.syncStatuses as PlatformSyncStatus[]);
@@ -32,6 +34,9 @@
   const readiness = $derived(getCvSyncReadiness(cv, syncStatuses));
   const isConnected = $derived(Boolean(data.session));
   const enabledFeatureCount = $derived(featureAccess.filter((feature) => feature.enabled).length);
+  const freshMissionCount = $derived(
+    missionFeed.filter((mission) => mission.freshness === 'fresh').length
+  );
   let searchQuery = $state('');
   let selectedSource = $state<'all' | MissionApplication['source']>('all');
   let selectedApplicationId = $state<string | null>(null);
@@ -361,6 +366,105 @@
             <p class="text-3xl font-semibold">{formatDate(nextFollowUp?.nextActionAt ?? null)}</p>
             <Badge label="À traiter" variant="source" />
           </div>
+        </div>
+      </section>
+
+      <section class="mt-6" aria-labelledby="mission-feed-title">
+        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+          <div>
+            <p class="eyebrow text-text-subtle">Feed connecté</p>
+            <h2 id="mission-feed-title" class="mt-1 text-lg font-semibold text-text-primary">
+              Missions détectées par l'extension
+            </h2>
+          </div>
+          <p class="text-sm text-text-subtle">
+            {missionFeed.length} synchronisées, {freshMissionCount} fraîches
+          </p>
+        </div>
+
+        <div class="grid gap-3 lg:grid-cols-3">
+          {#if missionFeed.length === 0}
+            <article
+              class="rounded-xl border border-dashed border-border-light bg-surface-white p-5"
+            >
+              <p class="text-sm font-semibold text-text-primary">Aucune mission synchronisée</p>
+              <p class="mt-2 text-sm leading-6 text-text-subtle">
+                Lancez un scan depuis l'extension connectée pour alimenter le dashboard Supabase.
+              </p>
+            </article>
+          {/if}
+
+          {#each missionFeed.slice(0, 6) as mission}
+            <article
+              class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+            >
+              <div class="flex items-start justify-between gap-3">
+                <Badge label={sourceLabels[mission.source]} variant="source" />
+                <Badge
+                  label={`${mission.score}%${mission.grade ? ` · ${mission.grade}` : ''}`}
+                  variant={mission.score >= 85 ? 'success' : 'warning'}
+                />
+              </div>
+              <h3 class="mt-3 text-sm font-semibold leading-tight text-text-primary">
+                {mission.title}
+              </h3>
+              <p class="mt-1 text-xs text-text-subtle">
+                {mission.client ?? 'Client non renseigné'} ·
+                {mission.location ?? 'Localisation non renseignée'}
+              </p>
+
+              <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
+                <div class="rounded-lg bg-page-canvas px-2 py-2">
+                  <p class="text-text-muted">TJM</p>
+                  <p class="mt-1 font-medium text-text-primary">
+                    {mission.dailyRate ? `${mission.dailyRate}€` : 'N/A'}
+                  </p>
+                </div>
+                <div class="rounded-lg bg-page-canvas px-2 py-2">
+                  <p class="text-text-muted">Fraîcheur</p>
+                  <p class="mt-1 font-medium text-text-primary">
+                    {mission.freshness === 'fresh' ? 'Récente' : 'À revoir'}
+                  </p>
+                </div>
+                <div class="rounded-lg bg-page-canvas px-2 py-2">
+                  <p class="text-text-muted">Doublons</p>
+                  <p class="mt-1 font-medium text-text-primary">{mission.duplicateCount}</p>
+                </div>
+              </div>
+
+              {#if mission.semanticReason}
+                <p class="mt-3 line-clamp-2 text-xs leading-5 text-text-subtle">
+                  {mission.semanticReason}
+                </p>
+              {/if}
+
+              <div class="mt-3 flex flex-wrap gap-1.5">
+                {#each mission.stack.slice(0, 4) as skill}
+                  <span
+                    class="rounded-md bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
+                  >
+                    {skill}
+                  </span>
+                {/each}
+              </div>
+
+              <div class="mt-4 flex items-center justify-between border-t border-border-light pt-3">
+                <span class="text-xs text-text-subtle">{formatDate(mission.scrapedAt)}</span>
+                {#if mission.applicationStage}
+                  <Badge label={stageLabels[mission.applicationStage]} variant="status" />
+                {:else}
+                  <a
+                    class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
+                    href={mission.url}
+                    target="_blank"
+                    rel="noreferrer"
+                  >
+                    Ouvrir
+                  </a>
+                {/if}
+              </div>
+            </article>
+          {/each}
         </div>
       </section>
 

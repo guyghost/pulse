@@ -13,6 +13,7 @@ import {
   favoriteMissionToApplication,
   getDashboardFeatureAccess,
   healthEventsToPlatformSyncStatuses,
+  missionRowsToFeedItems,
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
   type DashboardCandidateProfileRow,
@@ -24,11 +25,16 @@ import {
   type DashboardCanonicalMissionRow,
   type DashboardCanonicalMissionScoreRow,
   type DashboardConnectorHealthEventRow,
+  type DashboardMissionDuplicateRow,
+  type DashboardMissionFeedApplicationRow,
+  type DashboardMissionFeedRow,
+  type DashboardMissionFeedScoreRow,
   type DashboardProfileImportRow,
   type CvSnapshot,
   type DashboardAccountEntitlements,
   type DashboardSubscriptionStatus,
   type MissionApplication,
+  type MissionFeedItem,
   type PlatformSyncStatus,
 } from '$lib/core/dashboard';
 
@@ -68,6 +74,47 @@ const mockApplications: MissionApplication[] = [
     location: 'Lyon',
     appliedAt: null,
     nextActionAt: '2026-05-20',
+  },
+];
+
+const mockMissionFeed: MissionFeedItem[] = [
+  {
+    id: 'mission-preview-1',
+    title: 'Lead Svelte / TypeScript',
+    client: 'Atelier Nova',
+    source: 'free-work',
+    stack: ['Svelte 5', 'TypeScript', 'TailwindCSS'],
+    score: 92,
+    deterministicScore: 88,
+    semanticScore: 96,
+    grade: 'A',
+    semanticReason: 'Stack et séniorité fortement alignées au profil cible.',
+    dailyRate: 720,
+    location: 'Paris hybride',
+    scrapedAt: '2026-05-22T08:00:00.000Z',
+    url: 'https://example.com/mission-preview-1',
+    duplicateCount: 1,
+    applicationStage: 'selected',
+    freshness: 'fresh',
+  },
+  {
+    id: 'mission-preview-2',
+    title: 'Architecte Frontend freelance',
+    client: 'ScaleOps',
+    source: 'collective',
+    stack: ['Design systems', 'Architecture frontend'],
+    score: 86,
+    deterministicScore: 86,
+    semanticScore: null,
+    grade: 'B',
+    semanticReason: null,
+    dailyRate: 680,
+    location: 'Remote France',
+    scrapedAt: '2026-05-20T08:00:00.000Z',
+    url: 'https://example.com/mission-preview-2',
+    duplicateCount: 0,
+    applicationStage: null,
+    freshness: 'stale',
   },
 ];
 
@@ -216,6 +263,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       loginUrl,
       entitlements,
       featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
+      missionFeed: mockMissionFeed,
       applications: mockApplications,
       cv: mockCv,
       syncStatuses: mockSyncStatuses,
@@ -239,6 +287,51 @@ export const load: PageServerLoad = async ({ cookies }) => {
     .single<DashboardProfileRow>();
 
   const entitlements = getAuthenticatedEntitlements(profile ?? null);
+  const { data: missionFeedRows } = await supabase
+    .from('missions')
+    .select('id, title, client, source, stack, tjm, location, scraped_at, url')
+    .eq('user_id', session.user.id)
+    .order('scraped_at', { ascending: false })
+    .limit(100)
+    .returns<DashboardMissionFeedRow[]>();
+
+  const missionFeedIds = (missionFeedRows ?? []).map((row) => row.id);
+  const [
+    { data: missionFeedScoreRows },
+    { data: missionFeedApplicationRows },
+    { data: missionDuplicateRows },
+  ] =
+    missionFeedIds.length > 0
+      ? await Promise.all([
+          supabase
+            .from('mission_scores')
+            .select(
+              'mission_id, deterministic_score, semantic_score, total_score, grade, semantic_reason'
+            )
+            .in('mission_id', missionFeedIds)
+            .returns<DashboardMissionFeedScoreRow[]>(),
+          supabase
+            .from('applications')
+            .select('mission_id, stage')
+            .eq('user_id', session.user.id)
+            .in('mission_id', missionFeedIds)
+            .returns<DashboardMissionFeedApplicationRow[]>(),
+          supabase
+            .from('mission_duplicates')
+            .select('canonical_mission_id, duplicate_mission_id')
+            .eq('user_id', session.user.id)
+            .returns<DashboardMissionDuplicateRow[]>(),
+        ])
+      : [{ data: [] }, { data: [] }, { data: [] }];
+
+  const missionFeed = missionRowsToFeedItems(
+    missionFeedRows ?? [],
+    new Map((missionFeedScoreRows ?? []).map((row) => [row.mission_id, row])),
+    new Map((missionFeedApplicationRows ?? []).map((row) => [row.mission_id, row])),
+    missionDuplicateRows ?? [],
+    new Date()
+  );
+
   const { data: canonicalApplicationRows } = await supabase
     .from('applications')
     .select('id, mission_id, stage, applied_at, next_action_at')
@@ -350,6 +443,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     loginUrl,
     entitlements,
     featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
+    missionFeed,
     applications: canonicalApplications.length > 0 ? canonicalApplications : syncedApplications,
     cv: candidateProfile
       ? profileRowsToCvSnapshot(

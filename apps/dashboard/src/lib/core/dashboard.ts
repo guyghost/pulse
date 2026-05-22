@@ -71,6 +71,28 @@ export interface MissionApplication {
   nextActionAt: string | null;
 }
 
+export type MissionFreshness = 'fresh' | 'stale';
+
+export interface MissionFeedItem {
+  id: string;
+  title: string;
+  client: string | null;
+  source: ApplicationSource;
+  stack: string[];
+  score: number;
+  deterministicScore: number | null;
+  semanticScore: number | null;
+  grade: string | null;
+  semanticReason: string | null;
+  dailyRate: number | null;
+  location: string | null;
+  scrapedAt: string;
+  url: string;
+  duplicateCount: number;
+  applicationStage: ApplicationStage | null;
+  freshness: MissionFreshness;
+}
+
 export interface DashboardFavoriteMissionSnapshot {
   missionId: string;
   title: string;
@@ -160,6 +182,37 @@ export interface DashboardCanonicalMissionRow {
 export interface DashboardCanonicalMissionScoreRow {
   mission_id: string;
   total_score: number;
+}
+
+export interface DashboardMissionFeedRow {
+  id: string;
+  title: string;
+  client: string | null;
+  source: string;
+  stack: string[];
+  tjm: number | null;
+  location: string | null;
+  scraped_at: string;
+  url: string;
+}
+
+export interface DashboardMissionFeedScoreRow {
+  mission_id: string;
+  deterministic_score: number;
+  semantic_score: number | null;
+  total_score: number;
+  grade: string | null;
+  semantic_reason: string | null;
+}
+
+export interface DashboardMissionFeedApplicationRow {
+  mission_id: string;
+  stage: string;
+}
+
+export interface DashboardMissionDuplicateRow {
+  canonical_mission_id: string;
+  duplicate_mission_id: string;
 }
 
 export interface DashboardCandidateProfileRow {
@@ -349,6 +402,69 @@ export function canonicalRowsToApplications(
       },
     ];
   });
+}
+
+export function missionRowsToFeedItems(
+  missionRows: DashboardMissionFeedRow[],
+  scoresByMissionId: Map<string, DashboardMissionFeedScoreRow>,
+  applicationsByMissionId: Map<string, DashboardMissionFeedApplicationRow>,
+  duplicateRows: DashboardMissionDuplicateRow[],
+  now: Date
+): MissionFeedItem[] {
+  const duplicateCounts = countMissionDuplicates(duplicateRows);
+  const freshCutoff = now.getTime() - 48 * 60 * 60 * 1000;
+
+  return missionRows
+    .flatMap((mission) => {
+      if (!isApplicationSource(mission.source)) {
+        return [];
+      }
+
+      const score = scoresByMissionId.get(mission.id) ?? null;
+      const applicationStage = applicationsByMissionId.get(mission.id)?.stage ?? null;
+      const scrapedAtMs = Date.parse(mission.scraped_at);
+      const freshness: MissionFreshness =
+        Number.isFinite(scrapedAtMs) && scrapedAtMs >= freshCutoff ? 'fresh' : 'stale';
+
+      return [
+        {
+          id: mission.id,
+          title: mission.title,
+          client: mission.client,
+          source: mission.source,
+          stack: [...mission.stack],
+          score: score?.total_score ?? 0,
+          deterministicScore: score?.deterministic_score ?? null,
+          semanticScore: score?.semantic_score ?? null,
+          grade: score?.grade ?? null,
+          semanticReason: score?.semantic_reason ?? null,
+          dailyRate: mission.tjm,
+          location: mission.location,
+          scrapedAt: mission.scraped_at,
+          url: mission.url,
+          duplicateCount: duplicateCounts.get(mission.id) ?? 0,
+          applicationStage: isApplicationStage(applicationStage) ? applicationStage : null,
+          freshness,
+        },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        b.score - a.score ||
+        Date.parse(b.scrapedAt) - Date.parse(a.scrapedAt) ||
+        a.title.localeCompare(b.title)
+    );
+}
+
+function countMissionDuplicates(rows: DashboardMissionDuplicateRow[]): Map<string, number> {
+  const counts = new Map<string, number>();
+
+  for (const row of rows) {
+    counts.set(row.canonical_mission_id, (counts.get(row.canonical_mission_id) ?? 0) + 1);
+    counts.set(row.duplicate_mission_id, (counts.get(row.duplicate_mission_id) ?? 0) + 1);
+  }
+
+  return counts;
 }
 
 export function profileRowsToCvSnapshot(

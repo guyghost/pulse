@@ -13,6 +13,7 @@ import {
   getNextFollowUp,
   getSyncBlockers,
   isDashboardPremiumActive,
+  missionRowsToFeedItems,
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
   type ApplicationSource,
@@ -284,6 +285,78 @@ describe('dashboard core', () => {
         location: 'Remote France',
         appliedAt: '2026-05-21T08:00:00.000Z',
         nextActionAt: '2026-05-24T08:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('maps mission rows to a score-sorted dashboard feed with freshness and duplicates', () => {
+    expect(
+      missionRowsToFeedItems(
+        [
+          {
+            id: 'mission-1',
+            title: 'Lead Svelte',
+            client: 'ScaleOps',
+            source: 'free-work',
+            stack: ['Svelte', 'TypeScript'],
+            tjm: 720,
+            location: 'Remote France',
+            scraped_at: '2026-05-22T08:00:00.000Z',
+            url: 'https://example.com/1',
+          },
+          {
+            id: 'mission-2',
+            title: 'React legacy',
+            client: null,
+            source: 'unknown',
+            stack: [],
+            tjm: null,
+            location: null,
+            scraped_at: '2026-05-20T08:00:00.000Z',
+            url: 'https://example.com/2',
+          },
+        ],
+        new Map([
+          [
+            'mission-1',
+            {
+              mission_id: 'mission-1',
+              deterministic_score: 82,
+              semantic_score: 90,
+              total_score: 87,
+              grade: 'A',
+              semantic_reason: 'Très bon match Svelte',
+            },
+          ],
+        ]),
+        new Map([['mission-1', { mission_id: 'mission-1', stage: 'selected' }]]),
+        [
+          {
+            canonical_mission_id: 'mission-1',
+            duplicate_mission_id: 'mission-duplicate',
+          },
+        ],
+        new Date('2026-05-22T10:00:00.000Z')
+      )
+    ).toEqual([
+      {
+        id: 'mission-1',
+        title: 'Lead Svelte',
+        client: 'ScaleOps',
+        source: 'free-work',
+        stack: ['Svelte', 'TypeScript'],
+        score: 87,
+        deterministicScore: 82,
+        semanticScore: 90,
+        grade: 'A',
+        semanticReason: 'Très bon match Svelte',
+        dailyRate: 720,
+        location: 'Remote France',
+        scrapedAt: '2026-05-22T08:00:00.000Z',
+        url: 'https://example.com/1',
+        duplicateCount: 1,
+        applicationStage: 'selected',
+        freshness: 'fresh',
       },
     ]);
   });
