@@ -3,7 +3,6 @@
   import OnboardingWizard from '../organisms/OnboardingWizard.svelte';
   import type { UserProfile } from '$lib/core/types/profile';
   import { saveProfile } from '$lib/shell/facades/settings.facade';
-  import { rescoreStoredMissions } from '$lib/shell/scan/rescore';
   import { createOnboardingStore } from '$lib/state/onboarding.svelte';
 
   const { onComplete, onSkip }: { onComplete?: () => void; onSkip?: () => void } = $props();
@@ -26,8 +25,6 @@
 
     try {
       await saveProfile(profile);
-      const rescored = await rescoreStoredMissions(profile);
-      window.dispatchEvent(new CustomEvent('missions-rescored', { detail: rescored }));
       window.dispatchEvent(new CustomEvent('profile-updated'));
       onboarding.saveSuccess();
       onComplete?.();

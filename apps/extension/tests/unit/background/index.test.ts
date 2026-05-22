@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
+import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 const getSettings = vi.fn();
 const setSettings = vi.fn();
@@ -12,6 +13,8 @@ const setNewMissionCount = vi.fn();
 const resetNewMissionCount = vi.fn();
 const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
+const getProfile = vi.fn();
+const saveProfile = vi.fn();
 const getMissions = vi.fn();
 const saveConnectorStatuses = vi.fn();
 const getConnectorStatuses = vi.fn();
@@ -31,6 +34,7 @@ const syncConnectedDashboardProfileExtractorHealth = vi.fn();
 const syncConnectedDashboardTracking = vi.fn();
 const verifyProfilePage = vi.fn();
 const resetLocalData = vi.fn();
+const rescoreStoredMissions = vi.fn();
 const getFirstScanDone = vi.fn();
 const getProfileBannerDismissed = vi.fn();
 const setProfileBannerDismissed = vi.fn();
@@ -71,6 +75,18 @@ const makeMission = (overrides: Partial<Mission> = {}): Mission => ({
   semanticReason: null,
   ...overrides,
 });
+
+const profile: UserProfile = {
+  firstName: 'Guy',
+  stack: ['Svelte', 'TypeScript'],
+  tjmMin: 650,
+  tjmMax: 900,
+  location: 'Paris',
+  remote: 'hybrid',
+  seniority: 'senior',
+  jobTitle: 'Lead Frontend',
+  searchKeywords: ['mission svelte'],
+};
 
 vi.stubGlobal('chrome', {
   sidePanel: {
@@ -158,12 +174,16 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
 }));
 
 vi.mock('../../../src/lib/shell/storage/db', () => ({
-  getProfile: vi.fn(async () => null),
-  saveProfile: vi.fn(async () => undefined),
+  getProfile,
+  saveProfile,
   saveConnectorStatuses,
   getConnectorStatuses,
   getMissionById: vi.fn(async () => null),
   getMissions,
+}));
+
+vi.mock('../../../src/lib/shell/scan/rescore', () => ({
+  rescoreStoredMissions,
 }));
 
 vi.mock('../../../src/lib/shell/scan/scanner', () => ({
@@ -308,6 +328,8 @@ describe('background auto-scan notifications', () => {
     clearOnboardingCompleted.mockResolvedValue(undefined);
     getFeedTourSeen.mockResolvedValue(false);
     setFeedTourSeen.mockResolvedValue(undefined);
+    getProfile.mockResolvedValue(null);
+    saveProfile.mockResolvedValue(undefined);
     getTracking.mockResolvedValue(null);
     saveTracking.mockResolvedValue(undefined);
     getAllTrackings.mockResolvedValue([]);
@@ -334,6 +356,7 @@ describe('background auto-scan notifications', () => {
       comparisons: [{ fieldId: 'title', label: 'Titre', expected: 'Lead Svelte', status: 'match' }],
       summary: { matches: 1, mismatches: 0, missing: 0 },
     });
+    rescoreStoredMissions.mockResolvedValue([makeMission({ id: 'rescored-1', score: 96 })]);
     resetLocalData.mockResolvedValue(undefined);
   });
 
@@ -437,6 +460,23 @@ describe('background auto-scan notifications', () => {
         connectorHealth: 0,
       },
     });
+  });
+
+  it('saves profiles through the service worker and rescored missions locally', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.({ type: 'SAVE_PROFILE', payload: profile }, {}, sendResponse);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(saveProfile).toHaveBeenCalledWith(profile);
+    expect(rescoreStoredMissions).toHaveBeenCalledWith(profile);
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'MISSIONS_UPDATED',
+      payload: [expect.objectContaining({ id: 'rescored-1', score: 96 })],
+    });
+    expect(sendResponse).toHaveBeenCalledWith({ type: 'PROFILE_RESULT', payload: profile });
   });
 
   it('updates tracking details and triggers connected dashboard sync', async () => {

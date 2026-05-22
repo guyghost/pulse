@@ -447,6 +447,10 @@ export function createFeedController(feedStore: {
           handleScanComplete(message.payload).catch(() => {});
         }
 
+        if (message?.type === 'MISSIONS_UPDATED' && Array.isArray(message.payload)) {
+          feedStore.setMissions(message.payload);
+        }
+
         // Erreur du scan (auto-scan du background)
         if (message?.type === 'SCAN_ERROR' && message.payload) {
           const { message: errorMsg, code } = message.payload as { message: string; code: string };

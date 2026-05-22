@@ -32,7 +32,6 @@ import { getMissions } from '$lib/shell/facades/feed-data.facade';
 import { sendMessage } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/storage/first-scan';
-import { rescoreStoredMissions } from '$lib/shell/scan/rescore';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
@@ -203,11 +202,8 @@ export class SettingsPageController {
       });
 
       await saveProfile(nextProfile);
-      const rescored = await rescoreStoredMissions(nextProfile);
-
       this.editingProfile = false;
       this.profileSaved = true;
-      window.dispatchEvent(new CustomEvent('missions-rescored', { detail: rescored }));
       window.dispatchEvent(new CustomEvent('profile-updated'));
       setTimeout(() => {
         this.profileSaved = false;

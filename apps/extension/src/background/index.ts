@@ -30,6 +30,7 @@ import {
   type ScanResult,
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
+import { rescoreStoredMissions } from '../lib/shell/scan/rescore';
 import { getConnectorIds, getConnectors } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { getFavorites, saveFavorites, getHidden, saveHidden } from '../lib/shell/storage/favorites';
@@ -674,14 +675,26 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     }
 
     if (message.type === 'SAVE_PROFILE') {
-      saveProfile(message.payload)
-        .then(() => {
+      (async () => {
+        try {
+          await saveProfile(message.payload);
+
+          try {
+            const rescored = await rescoreStoredMissions(message.payload);
+            await chrome.runtime.sendMessage({ type: 'MISSIONS_UPDATED', payload: rescored });
+          } catch (err) {
+            if (import.meta.env.DEV) {
+              console.warn('[MissionPulse] Profile saved but mission rescore failed:', err);
+            }
+          }
+
           sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
-        })
-        .catch((err) => {
-          console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', message);
           sendResponse({ type: 'PROFILE_RESULT', payload: null });
-        });
+        }
+      })();
       return true;
     }
 
