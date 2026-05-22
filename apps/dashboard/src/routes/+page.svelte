@@ -21,6 +21,7 @@
     DashboardFeatureRequirement,
     DashboardSyncConflict,
     CvSnapshot,
+    DashboardAlertPreferences,
     GeneratedApplicationAsset,
     MissionApplication,
     MissionComparisonSnapshot,
@@ -40,6 +41,7 @@
   const syncStatuses = $derived(data.syncStatuses as PlatformSyncStatus[]);
   const connectedSyncStatuses = $derived(data.connectedSyncStatuses as ConnectedSyncStatus[]);
   const syncConflicts = $derived(data.syncConflicts as DashboardSyncConflict[]);
+  const alertPreferences = $derived(data.alertPreferences as DashboardAlertPreferences);
   const entitlements = $derived(data.entitlements as DashboardAccountEntitlements);
   const featureAccess = $derived(data.featureAccess as DashboardFeatureAccess[]);
   const configurationMissing = $derived(Boolean(data.configurationMissing));
@@ -214,6 +216,7 @@
       .join(' · ');
 
   const formatDailyRate = (value: number | null) => (value ? `${value}€` : 'N/A');
+  const formatStacks = (stacks: string[]) => stacks.join(', ');
 
   const copyGeneratedAsset = async (asset: GeneratedApplicationAsset) => {
     await navigator.clipboard.writeText(asset.content);
@@ -1646,6 +1649,114 @@
               est activée uniquement pour les comptes connectés; le dashboard prépare le plan, l'extension
               exécute la mise à jour dans les sessions navigateur existantes.
             </p>
+
+            <div class="mt-5 rounded-lg border border-border-light bg-page-canvas p-3">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs font-medium uppercase text-text-subtle">Alertes missions</p>
+                  <p class="mt-1 text-sm leading-5 text-text-subtle">
+                    Critères connectés que l'extension pourra appliquer lors des prochains scans.
+                  </p>
+                </div>
+                <Badge
+                  label={alertPreferences.enabled ? 'Actives' : 'En pause'}
+                  variant={alertPreferences.enabled ? 'success' : 'warning'}
+                />
+              </div>
+
+              {#if form?.alertError}
+                <p
+                  class="mt-3 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
+                >
+                  {form.alertError}
+                </p>
+              {/if}
+
+              {#if form?.alertSuccess}
+                <p
+                  class="mt-3 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
+                >
+                  {form.alertSuccess}
+                </p>
+              {/if}
+
+              <form method="POST" action="?/updateAlertPreferences" class="mt-4 grid gap-3">
+                <label class="inline-flex items-center gap-2 text-xs font-medium text-text-subtle">
+                  <input
+                    class="h-4 w-4 accent-blueprint-blue"
+                    type="checkbox"
+                    name="enabled"
+                    checked={alertPreferences.enabled}
+                  />
+                  Alertes activées
+                </label>
+
+                <div class="grid gap-3 md:grid-cols-3">
+                  <label class="block text-xs font-medium text-text-subtle" for="alert-score">
+                    Score minimum
+                    <input
+                      id="alert-score"
+                      name="scoreThreshold"
+                      type="number"
+                      min="0"
+                      max="100"
+                      value={alertPreferences.scoreThreshold}
+                      class="mt-1 h-9 w-full rounded-lg border border-border-light bg-surface-white px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                    />
+                  </label>
+                  <label class="block text-xs font-medium text-text-subtle" for="alert-tjm">
+                    TJM minimum
+                    <input
+                      id="alert-tjm"
+                      name="minDailyRate"
+                      type="number"
+                      min="0"
+                      max="5000"
+                      value={alertPreferences.minDailyRate}
+                      class="mt-1 h-9 w-full rounded-lg border border-border-light bg-surface-white px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                    />
+                  </label>
+                  <label class="block text-xs font-medium text-text-subtle" for="alert-results">
+                    Résultats max
+                    <input
+                      id="alert-results"
+                      name="maxResults"
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={alertPreferences.maxResults}
+                      class="mt-1 h-9 w-full rounded-lg border border-border-light bg-surface-white px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                    />
+                  </label>
+                </div>
+
+                <label class="block text-xs font-medium text-text-subtle" for="alert-stacks">
+                  Stacks requises
+                  <input
+                    id="alert-stacks"
+                    name="requiredStacks"
+                    value={formatStacks(alertPreferences.requiredStacks)}
+                    placeholder="Svelte, TypeScript"
+                    class="mt-1 h-9 w-full rounded-lg border border-border-light bg-surface-white px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-blueprint-blue/40"
+                  />
+                </label>
+
+                <div
+                  class="flex items-center justify-between gap-3 border-t border-border-light pt-3"
+                >
+                  <p class="text-xs leading-5 text-text-subtle">
+                    Mis à jour {formatDateTime(alertPreferences.updatedAt)}
+                  </p>
+                  <button
+                    type="submit"
+                    class="inline-flex h-8 items-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-40"
+                    disabled={!isConnected}
+                  >
+                    Enregistrer
+                  </button>
+                </div>
+              </form>
+            </div>
 
             <div class="mt-5 rounded-lg border border-border-light bg-page-canvas p-3">
               <div class="flex items-center justify-between gap-3">

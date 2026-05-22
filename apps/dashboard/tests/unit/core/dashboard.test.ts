@@ -1,8 +1,10 @@
 import { describe, expect, it } from 'vitest';
 import {
+  buildDashboardAlertPreferencesPatch,
   buildMissionComparisonSnapshot,
   countApplicationsByStage,
   canonicalRowsToApplications,
+  dashboardAlertPreferencesRowToSnapshot,
   buildApplicationDetailsUpdatePatch,
   buildCvProfileUpdatePatch,
   buildConnectedDataDeletionRequest,
@@ -224,6 +226,64 @@ describe('dashboard core', () => {
       strengths: ['Score fort', 'Rating utilisateur élevé', 'Pipeline avancé'],
       risks: ['TJM absent', 'Relance non planifiée'],
     });
+  });
+
+  it('maps and validates connected dashboard alert preferences', () => {
+    expect(
+      dashboardAlertPreferencesRowToSnapshot(
+        {
+          enabled: true,
+          score_threshold: 82,
+          min_daily_rate: 650,
+          required_stacks: ['Svelte', 'svelte', ' TypeScript '],
+          max_results: 4,
+          updated_at: '2026-05-22T10:00:00.000Z',
+        },
+        '2026-05-22T09:00:00.000Z'
+      )
+    ).toEqual({
+      enabled: true,
+      scoreThreshold: 82,
+      minDailyRate: 650,
+      requiredStacks: ['Svelte', 'TypeScript'],
+      maxResults: 4,
+      updatedAt: '2026-05-22T10:00:00.000Z',
+    });
+
+    expect(dashboardAlertPreferencesRowToSnapshot(null, '2026-05-22T09:00:00.000Z')).toMatchObject({
+      enabled: true,
+      scoreThreshold: 70,
+      minDailyRate: 0,
+      requiredStacks: [],
+      maxResults: 5,
+      updatedAt: '2026-05-22T09:00:00.000Z',
+    });
+
+    expect(
+      buildDashboardAlertPreferencesPatch({
+        enabled: false,
+        scoreThreshold: 85,
+        minDailyRate: 700,
+        requiredStacksText: 'Svelte, TypeScript, svelte',
+        maxResults: 6,
+      })
+    ).toEqual({
+      enabled: false,
+      score_threshold: 85,
+      min_daily_rate: 700,
+      required_stacks: ['Svelte', 'TypeScript'],
+      max_results: 6,
+    });
+
+    expect(
+      buildDashboardAlertPreferencesPatch({
+        enabled: true,
+        scoreThreshold: 101,
+        minDailyRate: 700,
+        requiredStacksText: '',
+        maxResults: 6,
+      })
+    ).toBeNull();
   });
 
   it('derives sync readiness from CV completeness and ready platforms', () => {

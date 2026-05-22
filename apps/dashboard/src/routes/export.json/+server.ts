@@ -9,6 +9,7 @@ const USER_OWNED_TABLES = [
   'mission_duplicates',
   'profile_imports',
   'connector_health_events',
+  'dashboard_alert_preferences',
   'extension_devices',
   'sync_status',
   'sync_conflicts',

@@ -8,6 +8,7 @@ import {
 } from '@pulse/domain';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
+  buildDashboardAlertPreferencesPatch,
   buildApplicationDetailsUpdatePatch,
   buildApplicationStageUpdatePatch,
   buildConnectedDataDeletionRequest,
@@ -19,6 +20,7 @@ import {
   buildSyncConflictResolutionPatch,
   buildTjmRadarSnapshot,
   canonicalRowsToApplications,
+  dashboardAlertPreferencesRowToSnapshot,
   favoriteMissionToApplication,
   generatedAssetRowsToHistory,
   getDashboardFeatureAccess,
@@ -50,6 +52,7 @@ import {
   type DashboardSyncConflictRow,
   type DashboardSyncStatusRow,
   type DashboardAccountEntitlements,
+  type DashboardAlertPreferencesRow,
   type DashboardSubscriptionStatus,
   type MissionApplication,
 } from '$lib/core/dashboard';
@@ -210,6 +213,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       syncStatuses: [],
       connectedSyncStatuses: [],
       syncConflicts: [],
+      alertPreferences: dashboardAlertPreferencesRowToSnapshot(null, new Date().toISOString()),
     };
   }
 
@@ -470,6 +474,12 @@ export const load: PageServerLoad = async ({ cookies }) => {
     extensionDevicesById
   );
 
+  const { data: alertPreferencesRow } = await supabase
+    .from('dashboard_alert_preferences')
+    .select('enabled, score_threshold, min_daily_rate, required_stacks, max_results, updated_at')
+    .eq('user_id', session.user.id)
+    .maybeSingle<DashboardAlertPreferencesRow>();
+
   return {
     session,
     loginUrl,
@@ -495,10 +505,70 @@ export const load: PageServerLoad = async ({ cookies }) => {
     syncStatuses,
     connectedSyncStatuses,
     syncConflicts,
+    alertPreferences: dashboardAlertPreferencesRowToSnapshot(
+      alertPreferencesRow ?? null,
+      new Date().toISOString()
+    ),
   };
 };
 
 export const actions: Actions = {
+  updateAlertPreferences: async ({ cookies, request }) => {
+    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasSupabaseConfig) {
+      return fail(503, { alertError: 'Configuration Supabase absente.' });
+    }
+
+    const supabase = createSupabaseServerClient(cookies);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return fail(401, { alertError: 'Session requise.' });
+    }
+
+    const formData = await request.formData();
+    const scoreThreshold = Number(formData.get('scoreThreshold'));
+    const minDailyRate = Number(formData.get('minDailyRate'));
+    const requiredStacksText = formData.get('requiredStacks');
+    const maxResults = Number(formData.get('maxResults'));
+    const enabled = formData.get('enabled') === 'on';
+
+    if (typeof requiredStacksText !== 'string') {
+      return fail(400, { alertError: "Préférences d'alertes invalides." });
+    }
+
+    const patch = buildDashboardAlertPreferencesPatch({
+      enabled,
+      scoreThreshold,
+      minDailyRate,
+      requiredStacksText,
+      maxResults,
+    });
+
+    if (!patch) {
+      return fail(400, {
+        alertError: 'Seuil, TJM ou nombre de résultats hors limites.',
+      });
+    }
+
+    const { error } = await supabase.from('dashboard_alert_preferences').upsert(
+      {
+        user_id: session.user.id,
+        ...patch,
+        updated_by: 'dashboard',
+      },
+      { onConflict: 'user_id' }
+    );
+
+    if (error) {
+      return fail(500, { alertError: "Les préférences d'alertes n'ont pas pu être enregistrées." });
+    }
+
+    return { alertSuccess: "Préférences d'alertes enregistrées." };
+  },
+
   resolveCvSuggestion: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
@@ -667,6 +737,7 @@ export const actions: Actions = {
       await deleteRowsByUserId(supabase, 'candidate_profiles', session.user.id);
       await deleteRowsByUserId(supabase, 'profile_imports', session.user.id);
       await deleteRowsByUserId(supabase, 'connector_health_events', session.user.id);
+      await deleteRowsByUserId(supabase, 'dashboard_alert_preferences', session.user.id);
       await deleteRowsByUserId(supabase, 'sync_conflicts', session.user.id);
       await deleteRowsByUserId(supabase, 'sync_status', session.user.id);
       await deleteRowsByUserId(supabase, 'extension_devices', session.user.id);

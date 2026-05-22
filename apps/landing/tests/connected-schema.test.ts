@@ -33,6 +33,7 @@ describe('connected dashboard schema', () => {
       'profile_imports',
       'extension_devices',
       'sync_status',
+      'dashboard_alert_preferences',
       'sync_conflicts',
       'candidate_profile_field_suggestions',
       'connector_health_events',
@@ -57,6 +58,8 @@ describe('connected dashboard schema', () => {
     expect(tableBlock('candidate_profile_field_suggestions')).toContain(
       "field in ('title', 'summary', 'target_role')"
     );
+    expect(tableBlock('dashboard_alert_preferences')).toContain('score_threshold integer');
+    expect(tableBlock('dashboard_alert_preferences')).toContain('required_stacks text[]');
   });
 
   it('preserves the canonical application pipeline stages in SQL constraints', () => {

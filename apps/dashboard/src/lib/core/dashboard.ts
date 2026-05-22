@@ -102,6 +102,32 @@ export interface MissionComparisonSnapshot {
   averageDailyRate: number | null;
 }
 
+export interface DashboardAlertPreferencesRow {
+  enabled: boolean;
+  score_threshold: number;
+  min_daily_rate: number;
+  required_stacks: string[];
+  max_results: number;
+  updated_at: string;
+}
+
+export interface DashboardAlertPreferences {
+  enabled: boolean;
+  scoreThreshold: number;
+  minDailyRate: number;
+  requiredStacks: string[];
+  maxResults: number;
+  updatedAt: string;
+}
+
+export interface DashboardAlertPreferencesPatch {
+  enabled: boolean;
+  score_threshold: number;
+  min_daily_rate: number;
+  required_stacks: string[];
+  max_results: number;
+}
+
 export type GeneratedApplicationAssetType = 'pitch' | 'cover_message' | 'cv_summary';
 
 export interface GeneratedApplicationAsset {
@@ -685,6 +711,15 @@ const EMPTY_TJM_RADAR: TjmRadarSnapshot = {
   topStack: null,
   sourceSegments: [],
   stackSegments: [],
+};
+
+export const DEFAULT_DASHBOARD_ALERT_PREFERENCES: DashboardAlertPreferences = {
+  enabled: true,
+  scoreThreshold: 70,
+  minDailyRate: 0,
+  requiredStacks: [],
+  maxResults: 5,
+  updatedAt: '',
 };
 
 export function parseDashboardFavoriteMission(
@@ -1837,6 +1872,82 @@ function buildComparisonRisks(application: MissionApplication): string[] {
   }
 
   return risks;
+}
+
+export function dashboardAlertPreferencesRowToSnapshot(
+  row: DashboardAlertPreferencesRow | null,
+  fallbackUpdatedAt: string
+): DashboardAlertPreferences {
+  if (!row) {
+    return {
+      ...DEFAULT_DASHBOARD_ALERT_PREFERENCES,
+      requiredStacks: [],
+      updatedAt: fallbackUpdatedAt,
+    };
+  }
+
+  return {
+    enabled: row.enabled,
+    scoreThreshold: row.score_threshold,
+    minDailyRate: row.min_daily_rate,
+    requiredStacks: normalizeRequiredStacks(row.required_stacks),
+    maxResults: row.max_results,
+    updatedAt: row.updated_at,
+  };
+}
+
+export function buildDashboardAlertPreferencesPatch(input: {
+  enabled: boolean;
+  scoreThreshold: number;
+  minDailyRate: number;
+  requiredStacksText: string;
+  maxResults: number;
+}): DashboardAlertPreferencesPatch | null {
+  if (
+    !Number.isInteger(input.scoreThreshold) ||
+    input.scoreThreshold < 0 ||
+    input.scoreThreshold > 100 ||
+    !Number.isInteger(input.minDailyRate) ||
+    input.minDailyRate < 0 ||
+    input.minDailyRate > 5000 ||
+    !Number.isInteger(input.maxResults) ||
+    input.maxResults < 1 ||
+    input.maxResults > 20
+  ) {
+    return null;
+  }
+
+  return {
+    enabled: input.enabled,
+    score_threshold: input.scoreThreshold,
+    min_daily_rate: input.minDailyRate,
+    required_stacks: normalizeRequiredStacks(
+      input.requiredStacksText
+        .split(',')
+        .map((stack) => stack.trim())
+        .filter(Boolean)
+    ),
+    max_results: input.maxResults,
+  };
+}
+
+function normalizeRequiredStacks(stacks: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const stack of stacks) {
+    const clean = stack.trim();
+    const key = clean.toLowerCase();
+
+    if (!clean || seen.has(key)) {
+      continue;
+    }
+
+    normalized.push(clean.slice(0, 40));
+    seen.add(key);
+  }
+
+  return normalized.slice(0, 12);
 }
 
 export const getCvSyncReadiness = (cv: CvSnapshot, statuses: PlatformSyncStatus[]) => {

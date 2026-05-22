@@ -505,6 +505,18 @@ sync_status (
   primary key (device_id, entity)
 )
 
+dashboard_alert_preferences (
+  user_id uuid primary key references auth.users(id) on delete cascade,
+  enabled boolean not null default true,
+  score_threshold integer not null default 70 check (score_threshold between 0 and 100),
+  min_daily_rate integer not null default 0 check (min_daily_rate between 0 and 5000),
+  required_stacks text[] not null default '{}',
+  max_results integer not null default 5 check (max_results between 1 and 20),
+  updated_by text not null default 'dashboard'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  updated_at timestamptz not null default now()
+)
+
 sync_conflicts (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
@@ -552,6 +564,7 @@ Keep `favorite_missions` during migration as a compatibility source. It should b
   - Notes, ratings, next action dates.
   - Canonical CV edits.
   - User preferences that affect connected dashboard behavior.
+  - Connected alert preferences used by extension scans.
 - Extension <- Supabase:
   - Canonical applications for local side panel.
   - Candidate profile/settings used for scoring.
