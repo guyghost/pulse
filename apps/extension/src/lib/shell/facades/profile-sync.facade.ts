@@ -1,9 +1,11 @@
 import type { ProfileSyncField } from '$lib/core/profile/profile-sync';
+import type { CanonicalCandidateProfileDraft } from '$lib/core/profile-extractors/types';
 import {
   compareProfileText,
   summarizeProfileComparison,
   type ProfileFieldComparison,
 } from '$lib/core/profile/profile-sync';
+import { sendMessage } from '$lib/shell/messaging/bridge';
 
 export type ProfilePageReadResult =
   | { status: 'available'; finalUrl: string; text: string }
@@ -19,6 +21,10 @@ export interface VerifyProfileResult {
     missing: number;
   };
 }
+
+export type LinkedInProfileImportResult =
+  | { imported: true; profile: CanonicalCandidateProfileDraft }
+  | { imported: false; errorCode: string; errorMessage: string };
 
 function looksLikeAuthPage(url: string, text: string): boolean {
   const normalizedUrl = url.toLowerCase();
@@ -89,4 +95,18 @@ export async function verifyProfilePage(
     comparisons,
     summary: summarizeProfileComparison(comparisons),
   };
+}
+
+export async function importLinkedInProfile(): Promise<LinkedInProfileImportResult> {
+  const response = await sendMessage({ type: 'IMPORT_LINKEDIN_PROFILE' });
+
+  if (response.type !== 'LINKEDIN_PROFILE_IMPORTED') {
+    return {
+      imported: false,
+      errorCode: 'unexpected_response',
+      errorMessage: "L'import LinkedIn n'a pas renvoyé de résultat exploitable.",
+    };
+  }
+
+  return response.payload;
 }

@@ -128,6 +128,21 @@ export const MessageSchemas = {
   GET_PROFILE: z.object({ type: z.literal('GET_PROFILE') }),
   PROFILE_RESULT: z.object({ type: z.literal('PROFILE_RESULT'), payload: z.unknown() }),
   SAVE_PROFILE: z.object({ type: z.literal('SAVE_PROFILE'), payload: ProfilePayloadSchema }),
+  IMPORT_LINKEDIN_PROFILE: z.object({
+    type: z.literal('IMPORT_LINKEDIN_PROFILE'),
+    payload: z.object({ tabId: z.number().int().positive().optional() }).optional(),
+  }),
+  LINKEDIN_PROFILE_IMPORTED: z.object({
+    type: z.literal('LINKEDIN_PROFILE_IMPORTED'),
+    payload: z.union([
+      z.object({ imported: z.literal(true), profile: z.unknown() }),
+      z.object({
+        imported: z.literal(false),
+        errorCode: SafeString,
+        errorMessage: SafeString,
+      }),
+    ]),
+  }),
 
   // Scan
   SCAN_START: z.object({ type: z.literal('SCAN_START') }),

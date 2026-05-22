@@ -76,6 +76,28 @@ describe('validateMessage — SAVE_PROFILE', () => {
 });
 
 // ============================================================================
+// IMPORT_LINKEDIN_PROFILE
+// ============================================================================
+
+describe('validateMessage — IMPORT_LINKEDIN_PROFILE', () => {
+  it('accepte une demande sans payload depuis le side panel', () => {
+    expect(validateMessage({ type: 'IMPORT_LINKEDIN_PROFILE' }).valid).toBe(true);
+  });
+
+  it("accepte une demande ciblant l'onglet actif connu", () => {
+    expect(validateMessage({ type: 'IMPORT_LINKEDIN_PROFILE', payload: { tabId: 42 } }).valid).toBe(
+      true
+    );
+  });
+
+  it('rejette un tabId invalide', () => {
+    expect(validateMessage({ type: 'IMPORT_LINKEDIN_PROFILE', payload: { tabId: -1 } }).valid).toBe(
+      false
+    );
+  });
+});
+
+// ============================================================================
 // MISSIONS_UPDATED — limite 500 items
 // ============================================================================
 

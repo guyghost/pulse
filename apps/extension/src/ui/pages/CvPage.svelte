@@ -5,7 +5,9 @@
   import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import {
+    importLinkedInProfile,
     verifyProfilePage,
+    type LinkedInProfileImportResult,
     type VerifyProfileResult,
   } from '$lib/shell/facades/profile-sync.facade';
   import { showToast } from '$lib/shell/notifications/toast-service';
@@ -32,6 +34,8 @@
   let selectedPlatformId = $state('linkedin');
   let pushedPlatformIds = $state<Set<string>>(new Set());
   let verifyingPlatformId = $state<string | null>(null);
+  let importingLinkedIn = $state(false);
+  let linkedInImportResult = $state<LinkedInProfileImportResult | null>(null);
   let verificationResults = $state<Map<string, VerifyProfileResult>>(new Map());
   let selectedFieldIds = $state<Set<string>>(
     new Set(['title', 'summary', 'stack', 'location', 'remote', 'tjm'])
@@ -212,6 +216,22 @@
     }
   }
 
+  async function importLinkedIn(): Promise<void> {
+    importingLinkedIn = true;
+    try {
+      const result = await importLinkedInProfile();
+      linkedInImportResult = result;
+      if (!result.imported) {
+        await showToast(`LinkedIn: ${result.errorMessage}`, 'error');
+        return;
+      }
+
+      await showToast('Profil LinkedIn importé en brouillon CV', 'success');
+    } finally {
+      importingLinkedIn = false;
+    }
+  }
+
   function getVerificationLabel(result: VerifyProfileResult | null): string {
     if (!result) {
       return 'À vérifier';
@@ -288,6 +308,20 @@
         ></div>
       </div>
       <span class="text-xs font-medium text-text-primary">{profileCompleteness}%</span>
+    </div>
+
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+      <button
+        class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90 disabled:opacity-50"
+        onclick={importLinkedIn}
+        disabled={importingLinkedIn}
+      >
+        <Icon name="download" size={13} />
+        {importingLinkedIn ? 'Import...' : 'Importer LinkedIn'}
+      </button>
+      <span class="text-xs text-text-subtle">
+        Ouvrez votre profil LinkedIn dans l'onglet actif avant de lancer l'import.
+      </span>
     </div>
   </section>
 
@@ -371,6 +405,48 @@
             Copier
           </button>
         </div>
+
+        {#if linkedInImportResult}
+          <div
+            class="section-card rounded-xl border p-5 {linkedInImportResult.imported
+              ? 'border-blueprint-blue/20'
+              : 'border-status-orange/20'}"
+          >
+            <div class="flex items-start gap-3">
+              <div
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {linkedInImportResult.imported
+                  ? 'bg-blueprint-blue/8 text-blueprint-blue'
+                  : 'bg-status-orange/10 text-status-orange'}"
+              >
+                <Icon name={linkedInImportResult.imported ? 'check' : 'alert-triangle'} size={14} />
+              </div>
+              <div class="min-w-0 flex-1">
+                <h3 class="text-sm font-medium text-text-primary">Import LinkedIn</h3>
+                {#if linkedInImportResult.imported}
+                  <p class="mt-1 text-xs leading-5 text-text-subtle">
+                    {linkedInImportResult.profile.title || 'Titre non renseigné'} ·
+                    {linkedInImportResult.profile.experiences.length} expérience(s),
+                    {linkedInImportResult.profile.skills.length} compétence(s),
+                    {linkedInImportResult.profile.education.length} formation(s).
+                  </p>
+                  <div class="mt-3 flex flex-wrap gap-2">
+                    {#each linkedInImportResult.profile.skills.slice(0, 8) as skill}
+                      <span
+                        class="rounded-md bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
+                      >
+                        {skill.skill}
+                      </span>
+                    {/each}
+                  </div>
+                {:else}
+                  <p class="mt-1 text-xs leading-5 text-text-subtle">
+                    {linkedInImportResult.errorCode}: {linkedInImportResult.errorMessage}
+                  </p>
+                {/if}
+              </div>
+            </div>
+          </div>
+        {/if}
 
         {#if selectedVerification}
           <div class="section-card rounded-xl p-5">

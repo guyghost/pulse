@@ -60,6 +60,7 @@ import {
   syncConnectedDashboardSnapshot,
   syncConnectedDashboardTracking,
 } from '../lib/shell/sync/connected-dashboard';
+import { getProfileExtractor } from '../lib/shell/profile-extractors';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -100,6 +101,11 @@ function buildAuthUserFromProfile(
     premiumExpiresAt,
     creditBalance: profile?.credit_balance ?? 0,
   };
+}
+
+function getBridgeErrorCode(error: import('../lib/core/errors/app-error').AppError): string {
+  const code = error.context?.profileExtractorCode;
+  return typeof code === 'string' ? code : error.type;
 }
 
 // Trigger expired semantic cache cleanup on startup
@@ -423,6 +429,41 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
           sendResponse({ type: 'PROFILE_RESULT', payload: null });
+        });
+      return true;
+    }
+
+    if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
+      const extractor = getProfileExtractor('linkedin');
+      extractor
+        .extractProfile(Date.now(), message.payload?.tabId)
+        .then((result) => {
+          if (!result.ok) {
+            sendResponse({
+              type: 'LINKEDIN_PROFILE_IMPORTED',
+              payload: {
+                imported: false,
+                errorCode: getBridgeErrorCode(result.error),
+                errorMessage: result.error.message,
+              },
+            });
+            return;
+          }
+
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_IMPORTED',
+            payload: { imported: true, profile: result.value },
+          });
+        })
+        .catch((error) => {
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_IMPORTED',
+            payload: {
+              imported: false,
+              errorCode: 'dom_changed',
+              errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
+            },
+          });
         });
       return true;
     }

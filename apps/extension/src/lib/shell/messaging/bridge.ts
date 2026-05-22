@@ -7,6 +7,7 @@ import type {
   GenerationType,
 } from '../../core/types/generation';
 import type { UserProfile } from '../../core/types/profile';
+import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
 import type { ConnectorState } from '../../core/types/connector-status';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { AuthStatus, AuthUser } from '../../core/types/auth';
@@ -50,6 +51,13 @@ export type BridgeMessage =
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }
+  | { type: 'IMPORT_LINKEDIN_PROFILE'; payload?: { tabId?: number } }
+  | {
+      type: 'LINKEDIN_PROFILE_IMPORTED';
+      payload:
+        | { imported: true; profile: CanonicalCandidateProfileDraft }
+        | { imported: false; errorCode: string; errorMessage: string };
+    }
   // Scan orchestration (panel ↔ service worker)
   | { type: 'SCAN_START' }
   | { type: 'SCAN_PROGRESS'; payload: ScanProgressPayload }
