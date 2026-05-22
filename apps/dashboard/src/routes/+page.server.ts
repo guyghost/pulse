@@ -4,7 +4,6 @@ import { fail, redirect } from '@sveltejs/kit';
 import {
   APPLICATION_STAGES,
   transitionApplicationStage,
-  type ApplicationPipelineEvent,
   type ApplicationStage,
 } from '@pulse/domain';
 import { createSupabaseServerClient } from '$lib/server/supabase';
@@ -61,6 +60,7 @@ import {
   type MissionApplication,
 } from '$lib/core/dashboard';
 import { markEntityPendingExtensionPull } from '$lib/server/sync-status';
+import { upsertDashboardPipelineEvent } from '$lib/server/pipeline-events';
 
 type DashboardProfileRow = {
   subscription_status: string | null;
@@ -225,27 +225,6 @@ const deleteProfileChildRows = async (
   if (error) {
     throw new Error(error.message);
   }
-};
-
-const insertDashboardPipelineEvent = async (
-  supabase: ReturnType<typeof createSupabaseServerClient>,
-  userId: string,
-  event: ApplicationPipelineEvent,
-  metadata: Record<string, string>
-): Promise<boolean> => {
-  const { error } = await supabase.from('application_pipeline_events').insert({
-    user_id: userId,
-    application_id: event.applicationId,
-    from_stage: event.fromStage,
-    to_stage: event.toStage,
-    note: event.note,
-    metadata,
-    occurred_at: event.occurredAt,
-    created_by: event.createdBy,
-    client_event_id: event.clientEventId,
-  });
-
-  return !error;
 };
 
 export const load: PageServerLoad = async ({ cookies }) => {
@@ -854,7 +833,7 @@ export const actions: Actions = {
           });
         }
 
-        const eventInserted = await insertDashboardPipelineEvent(supabase, session.user.id, event, {
+        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
           source: 'sync_conflict',
           conflict_id: conflict.id,
         });
@@ -1270,19 +1249,12 @@ export const actions: Actions = {
           return fail(500, { selectionError: 'Transition de sélection invalide.' });
         }
 
-        const { error: eventError } = await supabase.from('application_pipeline_events').insert({
-          user_id: session.user.id,
-          application_id: existingApplication.id,
-          from_stage: event.fromStage,
-          to_stage: event.toStage,
-          note: event.note,
-          metadata: { source: 'dashboard_feed', mission_id: missionId },
-          occurred_at: event.occurredAt,
-          created_by: event.createdBy,
-          client_event_id: event.clientEventId,
+        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+          source: 'dashboard_feed',
+          mission_id: missionId,
         });
 
-        if (eventError) {
+        if (!eventInserted) {
           return fail(500, {
             selectionError:
               "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
@@ -1369,19 +1341,12 @@ export const actions: Actions = {
       return fail(500, { selectionError: 'Transition de sélection invalide.' });
     }
 
-    const { error: eventError } = await supabase.from('application_pipeline_events').insert({
-      user_id: session.user.id,
-      application_id: application.id,
-      from_stage: event.fromStage,
-      to_stage: event.toStage,
-      note: event.note,
-      metadata: { source: 'dashboard_feed', mission_id: missionId },
-      occurred_at: event.occurredAt,
-      created_by: event.createdBy,
-      client_event_id: event.clientEventId,
+    const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+      source: 'dashboard_feed',
+      mission_id: missionId,
     });
 
-    if (eventError) {
+    if (!eventInserted) {
       return fail(500, {
         selectionError:
           "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
@@ -1461,19 +1426,12 @@ export const actions: Actions = {
           return fail(500, { selectionError: "Transition d'archivage invalide." });
         }
 
-        const { error: eventError } = await supabase.from('application_pipeline_events').insert({
-          user_id: session.user.id,
-          application_id: existingApplication.id,
-          from_stage: event.fromStage,
-          to_stage: event.toStage,
-          note: event.note,
-          metadata: { source: 'dashboard_feed', mission_id: missionId },
-          occurred_at: event.occurredAt,
-          created_by: event.createdBy,
-          client_event_id: event.clientEventId,
+        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+          source: 'dashboard_feed',
+          mission_id: missionId,
         });
 
-        if (eventError) {
+        if (!eventInserted) {
           return fail(500, {
             selectionError:
               "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",
@@ -1561,19 +1519,12 @@ export const actions: Actions = {
       return fail(500, { selectionError: "Transition d'archivage invalide." });
     }
 
-    const { error: eventError } = await supabase.from('application_pipeline_events').insert({
-      user_id: session.user.id,
-      application_id: application.id,
-      from_stage: event.fromStage,
-      to_stage: event.toStage,
-      note: event.note,
-      metadata: { source: 'dashboard_feed', mission_id: missionId },
-      occurred_at: event.occurredAt,
-      created_by: event.createdBy,
-      client_event_id: event.clientEventId,
+    const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+      source: 'dashboard_feed',
+      mission_id: missionId,
     });
 
-    if (eventError) {
+    if (!eventInserted) {
       return fail(500, {
         selectionError:
           "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",
@@ -1644,19 +1595,11 @@ export const actions: Actions = {
       return fail(400, { transitionError: 'Transition non autorisée.' });
     }
 
-    const { error: insertError } = await supabase.from('application_pipeline_events').insert({
-      user_id: session.user.id,
-      application_id: applicationId,
-      from_stage: event.fromStage,
-      to_stage: event.toStage,
-      note: event.note,
-      metadata: { source: 'dashboard' },
-      occurred_at: event.occurredAt,
-      created_by: event.createdBy,
-      client_event_id: event.clientEventId,
+    const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
+      source: 'dashboard',
     });
 
-    if (insertError) {
+    if (!eventInserted) {
       return fail(500, { transitionError: "L'événement pipeline n'a pas pu être enregistré." });
     }
 
