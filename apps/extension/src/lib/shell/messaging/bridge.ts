@@ -97,6 +97,8 @@ export type BridgeMessage =
   | { type: 'TOAST_SHOWN' }
   // Profile
   | { type: 'PROFILE_UPDATED' }
+  | { type: 'RESET_LOCAL_DATA' }
+  | { type: 'LOCAL_DATA_RESET'; payload: { reset: boolean; reason?: string } }
   // Auth
   | { type: 'AUTH_LOGIN'; payload: { email: string; password: string } }
   | { type: 'AUTH_SIGNUP'; payload: { email: string; password: string } }

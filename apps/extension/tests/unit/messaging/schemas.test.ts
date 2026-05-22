@@ -100,6 +100,10 @@ describe('validateMessage — messages sans payload', () => {
   it('accepte AUTH_LOGOUT', () => {
     expect(validateMessage({ type: 'AUTH_LOGOUT' }).valid).toBe(true);
   });
+
+  it('accepte RESET_LOCAL_DATA', () => {
+    expect(validateMessage({ type: 'RESET_LOCAL_DATA' }).valid).toBe(true);
+  });
 });
 
 // ============================================================================
@@ -260,6 +264,26 @@ describe('validateMessage — VERIFY_PROFILE_PAGE', () => {
         },
       }).valid
     ).toBe(false);
+  });
+});
+
+describe('validateMessage — LOCAL_DATA_RESET', () => {
+  it('accepte un reset local réussi', () => {
+    expect(
+      validateMessage({
+        type: 'LOCAL_DATA_RESET',
+        payload: { reset: true },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('accepte un reset local échoué avec raison typée', () => {
+    expect(
+      validateMessage({
+        type: 'LOCAL_DATA_RESET',
+        payload: { reset: false, reason: 'IndexedDB deletion is blocked.' },
+      }).valid
+    ).toBe(true);
   });
 });
 

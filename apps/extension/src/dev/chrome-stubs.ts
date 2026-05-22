@@ -97,6 +97,11 @@ function createChromeStubs() {
           case 'PROFILE_UPDATED':
             console.log('[Chrome Stub] Profile updated notification');
             return null;
+          case 'RESET_LOCAL_DATA':
+            for (const key of Object.keys(storage)) {
+              delete storage[key];
+            }
+            return { type: 'LOCAL_DATA_RESET', payload: { reset: true } };
           case 'AUTH_LOGIN':
             console.log(
               '[Chrome Stub] Auth login stub:',

@@ -366,6 +366,14 @@ export const MessageSchemas = {
 
   // Profile events
   PROFILE_UPDATED: z.object({ type: z.literal('PROFILE_UPDATED') }),
+  RESET_LOCAL_DATA: z.object({ type: z.literal('RESET_LOCAL_DATA') }),
+  LOCAL_DATA_RESET: z.object({
+    type: z.literal('LOCAL_DATA_RESET'),
+    payload: z.object({
+      reset: z.boolean(),
+      reason: SafeString.optional(),
+    }),
+  }),
 
   // Auth
   AUTH_LOGIN: z.object({

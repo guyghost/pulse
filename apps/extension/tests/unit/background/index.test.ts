@@ -21,9 +21,11 @@ const syncConnectedDashboardSnapshot = vi.fn();
 const syncConnectedDashboardProfileExtractorHealth = vi.fn();
 const syncConnectedDashboardTracking = vi.fn();
 const verifyProfilePage = vi.fn();
+const resetLocalData = vi.fn();
 const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
+const clearChromeStorage = vi.fn(async () => undefined);
 
 let alarmListener: ((alarm: { name: string }) => Promise<void>) | undefined;
 let messageListener:
@@ -90,6 +92,7 @@ vi.stubGlobal('chrome', {
       get: vi.fn(async () => ({})),
       set: vi.fn(async () => undefined),
       remove: vi.fn(async () => undefined),
+      clear: clearChromeStorage,
     },
     onChanged: {
       addListener: vi.fn(),
@@ -185,6 +188,10 @@ vi.mock('../../../src/lib/shell/profile/profile-page-verification', () => ({
   verifyProfilePage,
 }));
 
+vi.mock('../../../src/lib/shell/storage/local-data-reset', () => ({
+  resetLocalData,
+}));
+
 describe('background auto-scan notifications', () => {
   beforeAll(async () => {
     getSettings.mockResolvedValue({
@@ -200,6 +207,7 @@ describe('background auto-scan notifications', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    clearChromeStorage.mockResolvedValue(undefined);
     getSettings.mockResolvedValue({
       scanIntervalMinutes: 30,
       enabledConnectors: ['free-work'],
@@ -247,6 +255,7 @@ describe('background auto-scan notifications', () => {
       comparisons: [{ fieldId: 'title', label: 'Titre', expected: 'Lead Svelte', status: 'match' }],
       summary: { matches: 1, mismatches: 0, missing: 0 },
     });
+    resetLocalData.mockResolvedValue(undefined);
   });
 
   it('persists notified mission ids so they are not alerted again on the next scan', async () => {
@@ -392,6 +401,21 @@ describe('background auto-scan notifications', () => {
         ],
         summary: { matches: 1, mismatches: 0, missing: 0 },
       },
+    });
+  });
+
+  it('resets local extension data from the service worker shell', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.({ type: 'RESET_LOCAL_DATA' }, {}, sendResponse);
+    await new Promise((resolve) => setTimeout(resolve, 20));
+
+    expect(handled).toBe(true);
+    expect(resetLocalData).toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'LOCAL_DATA_RESET',
+      payload: { reset: true },
     });
   });
 });

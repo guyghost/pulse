@@ -68,6 +68,7 @@ import {
 } from '../lib/shell/sync/connected-dashboard';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
 import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
+import { resetLocalData } from '../lib/shell/storage/local-data-reset';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -1161,6 +1162,23 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         // No listeners, ignore
       });
       return false;
+    }
+
+    if (message.type === 'RESET_LOCAL_DATA') {
+      resetLocalData()
+        .then(() => {
+          sendResponse({ type: 'LOCAL_DATA_RESET', payload: { reset: true } });
+        })
+        .catch((err) => {
+          sendResponse({
+            type: 'LOCAL_DATA_RESET',
+            payload: {
+              reset: false,
+              reason: err instanceof Error ? err.message : 'Erreur inconnue',
+            },
+          });
+        });
+      return true;
     }
   } catch (err: unknown) {
     // Error boundary — protège le service worker contre les crashes inattendus

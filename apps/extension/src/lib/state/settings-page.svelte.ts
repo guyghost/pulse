@@ -29,10 +29,10 @@ import {
   saveProfile,
 } from '$lib/shell/facades/settings.facade';
 import { getMissions } from '$lib/shell/facades/feed-data.facade';
+import { sendMessage } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/storage/first-scan';
 import { rescoreStoredMissions } from '$lib/shell/scan/rescore';
-import { MISSIONPULSE_DB_NAME } from '$lib/shell/storage/db';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
@@ -267,14 +267,14 @@ export class SettingsPageController {
 
   async resetAll(): Promise<void> {
     try {
-      // Use chrome.storage.local.clear() — this is Shell code, acceptable here
-      // since SettingsPageController is in shell/state layer
-      await chrome.storage.local.clear();
-      await new Promise<void>((resolve, reject) => {
-        const request = indexedDB.deleteDatabase(MISSIONPULSE_DB_NAME);
-        request.onsuccess = () => resolve();
-        request.onerror = () => reject(request.error);
-      });
+      const response = await sendMessage({ type: 'RESET_LOCAL_DATA' });
+      if (response.type !== 'LOCAL_DATA_RESET' || !response.payload.reset) {
+        throw new Error(
+          response.type === 'LOCAL_DATA_RESET'
+            ? (response.payload.reason ?? 'Reset local impossible')
+            : 'Réponse reset local invalide'
+        );
+      }
       this.showResetConfirm = false;
       this.options.onNavigateToOnboarding?.();
     } catch {
