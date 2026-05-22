@@ -89,6 +89,7 @@ type ApplicationDetailsRow = {
 type ApplicationConflictUpdatePayload = {
   revision: number;
   updated_by: 'dashboard';
+  updated_at: string;
   stage?: ApplicationStage;
   applied_at?: string | null;
   archived_at?: string | null;
@@ -903,6 +904,7 @@ export const actions: Actions = {
       const updatePayload: ApplicationConflictUpdatePayload = {
         revision: application.revision + 1,
         updated_by: 'dashboard',
+        updated_at: resolvedAt,
       };
 
       if ('stage' in resolution.application) {
