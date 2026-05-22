@@ -1123,6 +1123,15 @@ describe('dashboard core', () => {
             created_at: '2026-05-22T09:00:00.000Z',
           },
           {
+            id: 'suggestion-location',
+            field: 'location',
+            current_value: 'Lyon',
+            suggested_value: 'Paris',
+            source: 'linkedin',
+            status: 'pending',
+            created_at: '2026-05-22T09:30:00.000Z',
+          },
+          {
             id: 'suggestion-ignored',
             field: 'unknown',
             current_value: null,
@@ -1189,6 +1198,16 @@ describe('dashboard core', () => {
           source: 'linkedin',
           status: 'pending',
           createdAt: '2026-05-22T09:00:00.000Z',
+        },
+        {
+          id: 'suggestion-location',
+          field: 'location',
+          fieldLabel: 'Localisation',
+          currentValue: 'Lyon',
+          suggestedValue: 'Paris',
+          source: 'linkedin',
+          status: 'pending',
+          createdAt: '2026-05-22T09:30:00.000Z',
         },
       ],
     });
@@ -1773,6 +1792,24 @@ describe('dashboard core', () => {
       },
       profile: {
         target_role: null,
+        updated_by: 'dashboard',
+      },
+    });
+
+    expect(
+      buildCvFieldSuggestionResolution({
+        field: 'location',
+        suggestedValue: ' Paris ',
+        action: 'apply',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toEqual({
+      suggestion: {
+        status: 'applied',
+        resolved_at: '2026-05-22T10:00:00.000Z',
+      },
+      profile: {
+        location: 'Paris',
         updated_by: 'dashboard',
       },
     });

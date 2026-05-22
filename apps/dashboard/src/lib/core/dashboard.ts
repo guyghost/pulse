@@ -272,7 +272,7 @@ export interface CvImport {
   fieldCounts: Record<string, number>;
 }
 
-export type CvFieldSuggestionField = 'title' | 'summary' | 'target_role';
+export type CvFieldSuggestionField = 'title' | 'summary' | 'location' | 'target_role';
 
 export interface CvFieldSuggestion {
   id: string;
@@ -637,6 +637,10 @@ export interface CvFieldSuggestionResolution {
         updated_by: 'dashboard';
       }
     | {
+        location: string | null;
+        updated_by: 'dashboard';
+      }
+    | {
         target_role: string | null;
         updated_by: 'dashboard';
       }
@@ -751,7 +755,9 @@ function isApplicationSyncConflictField(value: unknown): value is ApplicationSyn
 }
 
 function isCvFieldSuggestionField(value: unknown): value is CvFieldSuggestionField {
-  return value === 'title' || value === 'summary' || value === 'target_role';
+  return (
+    value === 'title' || value === 'summary' || value === 'location' || value === 'target_role'
+  );
 }
 
 function isCvFieldSuggestionStatus(value: unknown): value is CvFieldSuggestion['status'] {
@@ -832,6 +838,7 @@ const APPLICATION_TIMELINE_CREATED_BY_LABELS: Record<ApplicationTimelineCreatedB
 const CV_FIELD_SUGGESTION_LABELS: Record<CvFieldSuggestionField, string> = {
   title: 'Titre',
   summary: 'Résumé',
+  location: 'Localisation',
   target_role: 'Rôle cible',
 };
 
@@ -1791,6 +1798,19 @@ export function buildCvFieldSuggestionResolution(
       },
       profile: {
         summary: input.suggestedValue?.trim() ?? '',
+        updated_by: 'dashboard',
+      },
+    };
+  }
+
+  if (input.field === 'location') {
+    return {
+      suggestion: {
+        status: 'applied',
+        resolved_at: input.resolvedAt,
+      },
+      profile: {
+        location: input.suggestedValue?.trim() || null,
         updated_by: 'dashboard',
       },
     };
