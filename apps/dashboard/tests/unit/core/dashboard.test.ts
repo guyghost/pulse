@@ -139,18 +139,24 @@ const syncStatuses: PlatformSyncStatus[] = [
     name: 'LinkedIn',
     status: 'ready',
     lastSyncAt: '2026-05-12T09:10:00.000Z',
+    lastErrorCode: null,
+    lastErrorMessage: null,
   },
   {
     id: 'free-work',
     name: 'Free-Work',
     status: 'needs-session',
     lastSyncAt: null,
+    lastErrorCode: 'session_required',
+    lastErrorMessage: 'Connexion Free-Work expirée.',
   },
   {
     id: 'malt',
     name: 'Malt',
     status: 'needs-extension',
     lastSyncAt: null,
+    lastErrorCode: null,
+    lastErrorMessage: null,
   },
 ];
 
@@ -1030,16 +1036,22 @@ describe('dashboard core', () => {
         {
           source: 'free-work',
           status: 'ready',
+          error_code: null,
+          error_message: null,
           occurred_at: '2026-05-21T08:00:00.000Z',
         },
         {
           source: 'linkedin',
-          status: 'blocked',
+          status: 'needs_permission',
+          error_code: 'permission_required',
+          error_message: 'Permission LinkedIn manquante.',
           occurred_at: '2026-05-21T09:00:00.000Z',
         },
         {
           source: 'unknown-source',
           status: 'ready',
+          error_code: null,
+          error_message: null,
           occurred_at: '2026-05-21T10:00:00.000Z',
         },
       ])
@@ -1049,12 +1061,16 @@ describe('dashboard core', () => {
         name: 'Free-Work',
         status: 'ready',
         lastSyncAt: '2026-05-21T08:00:00.000Z',
+        lastErrorCode: null,
+        lastErrorMessage: null,
       },
       {
         id: 'linkedin',
         name: 'LinkedIn',
-        status: 'needs-session',
+        status: 'needs-permission',
         lastSyncAt: '2026-05-21T09:00:00.000Z',
+        lastErrorCode: 'permission_required',
+        lastErrorMessage: 'Permission LinkedIn manquante.',
       },
     ]);
   });

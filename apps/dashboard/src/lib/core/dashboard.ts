@@ -277,8 +277,17 @@ export interface CvFieldSuggestion {
 export interface PlatformSyncStatus {
   id: ApplicationSource;
   name: string;
-  status: 'ready' | 'needs-extension' | 'needs-session' | 'syncing';
+  status:
+    | 'ready'
+    | 'needs-extension'
+    | 'needs-session'
+    | 'needs-permission'
+    | 'blocked'
+    | 'error'
+    | 'syncing';
   lastSyncAt: string | null;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
 }
 
 export type ConnectedSyncEntity =
@@ -487,6 +496,8 @@ export interface DashboardCandidateProfileFieldSuggestionRow {
 export interface DashboardConnectorHealthEventRow {
   source: string;
   status: 'ready' | 'needs_permission' | 'needs_session' | 'blocked' | 'error' | 'syncing';
+  error_code: string | null;
+  error_message: string | null;
   occurred_at: string;
 }
 
@@ -1266,7 +1277,16 @@ function healthEventToPlatformStatus(
   if (status === 'syncing') {
     return 'syncing';
   }
-  return 'needs-session';
+  if (status === 'needs_permission') {
+    return 'needs-permission';
+  }
+  if (status === 'needs_session') {
+    return 'needs-session';
+  }
+  if (status === 'blocked') {
+    return 'blocked';
+  }
+  return 'error';
 }
 
 export function healthEventsToPlatformSyncStatuses(
@@ -1290,6 +1310,8 @@ export function healthEventsToPlatformSyncStatuses(
     name: SOURCE_LABELS[source],
     status: healthEventToPlatformStatus(event.status),
     lastSyncAt: event.occurred_at,
+    lastErrorCode: event.error_code,
+    lastErrorMessage: event.error_message,
   }));
 }
 
@@ -2075,6 +2097,22 @@ export const getSyncBlockers = (cv: CvSnapshot, statuses: PlatformSyncStatus[]) 
   statuses.forEach((status) => {
     if (status.status === 'needs-session') {
       blockers.push(`Reconnecter la session ${status.name}`);
+    }
+
+    if (status.status === 'needs-permission') {
+      blockers.push(`Autoriser ${status.name} dans l'extension`);
+    }
+
+    if (status.status === 'blocked') {
+      blockers.push(
+        `Débloquer ${status.name}${status.lastErrorMessage ? `: ${status.lastErrorMessage}` : ''}`
+      );
+    }
+
+    if (status.status === 'error') {
+      blockers.push(
+        `Corriger ${status.name}${status.lastErrorMessage ? `: ${status.lastErrorMessage}` : ''}`
+      );
     }
 
     if (status.status === 'needs-extension') {

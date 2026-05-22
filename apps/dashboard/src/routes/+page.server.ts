@@ -430,7 +430,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
   const { data: connectorHealthRows } = await supabase
     .from('connector_health_events')
-    .select('source, status, occurred_at')
+    .select('source, status, error_code, error_message, occurred_at')
     .eq('user_id', session.user.id)
     .order('occurred_at', { ascending: false })
     .limit(50)

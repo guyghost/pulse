@@ -165,6 +165,9 @@
     ready: 'Prêt',
     'needs-extension': 'Extension requise',
     'needs-session': 'Session requise',
+    'needs-permission': 'Permission requise',
+    blocked: 'Bloqué',
+    error: 'Erreur',
     syncing: 'Synchronisation',
   };
 
@@ -256,6 +259,18 @@
   ];
   const formatScoreCriterion = (value: number | null) =>
     typeof value === 'number' ? `${value}` : 'N/A';
+
+  function getPlatformStatusBadgeVariant(
+    status: PlatformSyncStatus['status']
+  ): 'success' | 'warning' | 'error' {
+    if (status === 'ready') {
+      return 'success';
+    }
+    if (status === 'blocked' || status === 'error') {
+      return 'error';
+    }
+    return 'warning';
+  }
 
   const copyGeneratedAsset = async (asset: GeneratedApplicationAsset) => {
     await navigator.clipboard.writeText(asset.content);
@@ -2064,9 +2079,16 @@
                   </div>
                   <Badge
                     label={statusLabels[platform.status]}
-                    variant={platform.status === 'ready' ? 'success' : 'warning'}
+                    variant={getPlatformStatusBadgeVariant(platform.status)}
                   />
                 </div>
+                {#if platform.lastErrorMessage}
+                  <p
+                    class="mt-2 rounded-md border border-status-orange/20 bg-status-orange/8 px-2 py-1.5 text-xs leading-5 text-status-orange"
+                  >
+                    {platform.lastErrorCode ?? 'connector_health'}: {platform.lastErrorMessage}
+                  </p>
+                {/if}
               {/each}
             </div>
 
