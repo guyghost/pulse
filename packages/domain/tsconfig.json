@@ -1,0 +1,9 @@
+{
+  "extends": "@pulse/tsconfig/base.json",
+  "compilerOptions": {
+    "types": ["vitest/globals"],
+    "verbatimModuleSyntax": false
+  },
+  "include": ["src/**/*.ts", "tests/**/*.ts"],
+  "exclude": ["node_modules", "dist"]
+}

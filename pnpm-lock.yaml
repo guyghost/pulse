@@ -194,6 +194,18 @@ importers:
         specifier: ^3.0.0
         version: 3.2.4(@types/node@22.19.17)(jiti@2.6.1)(jsdom@28.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
 
+  packages/domain:
+    devDependencies:
+      '@pulse/tsconfig':
+        specifier: workspace:*
+        version: link:../tsconfig
+      typescript:
+        specifier: ^5.7.0
+        version: 5.9.3
+      vitest:
+        specifier: ^3.0.0
+        version: 3.2.4(@types/node@22.19.17)(jiti@2.6.1)(jsdom@28.1.0)(lightningcss@1.32.0)(tsx@4.21.0)(yaml@2.8.4)
+
   packages/tsconfig: {}
 
   packages/ui:
