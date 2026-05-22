@@ -84,6 +84,20 @@ describe('connected dashboard schema', () => {
     expect(tableBlock('candidate_profile_field_suggestions')).toContain(
       "field in ('title', 'summary', 'location', 'target_role')"
     );
+    for (const profileSyncTable of ['profile_imports', 'candidate_profile_field_suggestions']) {
+      expect(
+        tableBlock(profileSyncTable),
+        `${profileSyncTable} should carry sync revision`
+      ).toContain('revision bigint not null');
+      expect(
+        tableBlock(profileSyncTable),
+        `${profileSyncTable} should carry sync writer`
+      ).toContain('updated_by text not null');
+      expect(
+        tableBlock(profileSyncTable),
+        `${profileSyncTable} should carry update timestamp`
+      ).toContain('updated_at timestamptz not null default now()');
+    }
     expect(tableBlock('generated_application_assets')).toContain('client_asset_id text not null');
     expect(tableBlock('generated_application_assets')).toContain('revision bigint not null');
     expect(tableBlock('generated_application_assets')).toContain('updated_by text not null');

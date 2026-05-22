@@ -598,6 +598,10 @@ create table if not exists public.profile_imports (
   error_code text,
   error_message text,
   raw_hash text,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  updated_at timestamptz not null default now(),
   field_counts jsonb not null default '{}'::jsonb
 );
 
@@ -674,7 +678,11 @@ create table if not exists public.candidate_profile_field_suggestions (
   source text references public.mission_sources(id) not null
     check (source in ('linkedin', 'malt', 'other')),
   status text not null default 'pending' check (status in ('pending', 'applied', 'dismissed')),
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   resolved_at timestamptz,
   check (
     (status = 'pending' and resolved_at is null)
@@ -959,6 +967,19 @@ create trigger on_candidate_skills_updated
 drop trigger if exists on_candidate_links_updated on public.candidate_links;
 create trigger on_candidate_links_updated
   before update on public.candidate_links
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_profile_imports_updated on public.profile_imports;
+create trigger on_profile_imports_updated
+  before update on public.profile_imports
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_candidate_profile_field_suggestions_updated
+  on public.candidate_profile_field_suggestions;
+create trigger on_candidate_profile_field_suggestions_updated
+  before update on public.candidate_profile_field_suggestions
   for each row
   execute function public.update_updated_at();
 

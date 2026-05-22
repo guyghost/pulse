@@ -1208,6 +1208,8 @@ describe('connected dashboard shell sync', () => {
       error_code: 'profile-sync-failed',
       error_message: 'profile write failed',
       raw_hash: 'sha256:abc123',
+      revision: 1,
+      updated_by: 'extension',
       field_counts: {
         experiences: 1,
         education: 0,

@@ -598,6 +598,8 @@ describe('connected dashboard sync payload builders', () => {
         error_code: null,
         error_message: null,
         raw_hash: 'sha256:abc123',
+        revision: 4,
+        updated_by: 'extension',
         field_counts: {
           experiences: 1,
           education: 1,
@@ -628,6 +630,8 @@ describe('connected dashboard sync payload builders', () => {
       error_code: 'profile-sync-failed',
       error_message: 'profile write failed',
       raw_hash: 'sha256:abc123',
+      revision: 1,
+      updated_by: 'extension',
       field_counts: {
         experiences: 1,
         education: 1,
@@ -662,6 +666,8 @@ describe('connected dashboard sync payload builders', () => {
         suggested_value: 'Lead Frontend Svelte',
         source: 'linkedin',
         status: 'pending',
+        revision: 7,
+        updated_by: 'extension',
       },
       {
         user_id: 'user-1',
@@ -671,6 +677,8 @@ describe('connected dashboard sync payload builders', () => {
         suggested_value: 'Consultant frontend senior.',
         source: 'linkedin',
         status: 'pending',
+        revision: 7,
+        updated_by: 'extension',
       },
       {
         user_id: 'user-1',
@@ -680,6 +688,8 @@ describe('connected dashboard sync payload builders', () => {
         suggested_value: 'Paris',
         source: 'linkedin',
         status: 'pending',
+        revision: 7,
+        updated_by: 'extension',
       },
       {
         user_id: 'user-1',
@@ -689,6 +699,8 @@ describe('connected dashboard sync payload builders', () => {
         suggested_value: 'Lead Frontend Svelte',
         source: 'linkedin',
         status: 'pending',
+        revision: 7,
+        updated_by: 'extension',
       },
     ]);
 
@@ -722,6 +734,8 @@ describe('connected dashboard sync payload builders', () => {
             suggested_value: 'Résumé LinkedIn',
             source: 'linkedin',
             status: 'pending',
+            revision: 3,
+            updated_by: 'extension',
           },
         ],
         deviceId: 'device-1',

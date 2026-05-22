@@ -1110,6 +1110,9 @@ describe('dashboard core', () => {
             error_code: null,
             error_message: null,
             field_counts: { experiences: 1, skills: 2 },
+            revision: 4,
+            updated_by: 'extension',
+            updated_at: '2026-05-22T08:00:00.000Z',
           },
         ],
         [
@@ -1120,7 +1123,10 @@ describe('dashboard core', () => {
             suggested_value: 'Résumé LinkedIn.',
             source: 'linkedin',
             status: 'pending',
+            revision: 3,
+            updated_by: 'extension',
             created_at: '2026-05-22T09:00:00.000Z',
+            updated_at: '2026-05-22T09:00:00.000Z',
           },
           {
             id: 'suggestion-location',
@@ -1129,7 +1135,10 @@ describe('dashboard core', () => {
             suggested_value: 'Paris',
             source: 'linkedin',
             status: 'pending',
+            revision: 3,
+            updated_by: 'extension',
             created_at: '2026-05-22T09:30:00.000Z',
+            updated_at: '2026-05-22T09:30:00.000Z',
           },
           {
             id: 'suggestion-ignored',
@@ -1138,7 +1147,10 @@ describe('dashboard core', () => {
             suggested_value: null,
             source: 'linkedin',
             status: 'pending',
+            revision: 1,
+            updated_by: 'extension',
             created_at: '2026-05-22T10:00:00.000Z',
+            updated_at: '2026-05-22T10:00:00.000Z',
           },
         ]
       )
@@ -1249,6 +1261,9 @@ describe('dashboard core', () => {
             error_code: 'profile-sync-failed',
             error_message: 'profile write failed',
             field_counts: { experiences: 1, education: 0, skills: 2, links: 1 },
+            revision: 1,
+            updated_by: 'extension',
+            updated_at: '2026-05-22T08:05:00.000Z',
           },
         ],
       }).imports
@@ -1766,11 +1781,14 @@ describe('dashboard core', () => {
         suggestedValue: 'Résumé importé',
         action: 'apply',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        revision: 4,
       })
     ).toEqual({
       suggestion: {
         status: 'applied',
         resolved_at: '2026-05-22T10:00:00.000Z',
+        revision: 5,
+        updated_by: 'dashboard',
       },
       profile: {
         summary: 'Résumé importé',
@@ -1784,11 +1802,14 @@ describe('dashboard core', () => {
         suggestedValue: null,
         action: 'apply',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        revision: 2,
       })
     ).toEqual({
       suggestion: {
         status: 'applied',
         resolved_at: '2026-05-22T10:00:00.000Z',
+        revision: 3,
+        updated_by: 'dashboard',
       },
       profile: {
         target_role: null,
@@ -1802,11 +1823,14 @@ describe('dashboard core', () => {
         suggestedValue: ' Paris ',
         action: 'apply',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        revision: 9,
       })
     ).toEqual({
       suggestion: {
         status: 'applied',
         resolved_at: '2026-05-22T10:00:00.000Z',
+        revision: 10,
+        updated_by: 'dashboard',
       },
       profile: {
         location: 'Paris',
@@ -1820,11 +1844,14 @@ describe('dashboard core', () => {
         suggestedValue: 'Titre ignoré',
         action: 'dismiss',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        revision: 1,
       })
     ).toEqual({
       suggestion: {
         status: 'dismissed',
         resolved_at: '2026-05-22T10:00:00.000Z',
+        revision: 2,
+        updated_by: 'dashboard',
       },
       profile: null,
     });
@@ -1835,6 +1862,7 @@ describe('dashboard core', () => {
         suggestedValue: 'Valeur',
         action: 'apply',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        revision: 1,
       })
     ).toBeNull();
     expect(
@@ -1843,6 +1871,7 @@ describe('dashboard core', () => {
         suggestedValue: null,
         action: 'apply',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        revision: 1,
       })
     ).toBeNull();
   });

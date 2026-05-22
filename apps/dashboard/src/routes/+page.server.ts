@@ -107,6 +107,7 @@ type CvSuggestionResolutionRow = {
   profile_id: string;
   field: string;
   suggested_value: string | null;
+  revision: number;
 };
 
 type MissionSelectionRow = {
@@ -420,7 +421,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
   const { data: profileImports } = await supabase
     .from('profile_imports')
     .select(
-      'id, source, status, imported_at, extractor_version, error_code, error_message, field_counts'
+      'id, source, status, imported_at, extractor_version, error_code, error_message, field_counts, revision, updated_by, updated_at'
     )
     .eq('user_id', session.user.id)
     .order('imported_at', { ascending: false })
@@ -461,7 +462,9 @@ export const load: PageServerLoad = async ({ cookies }) => {
           .returns<DashboardCandidateLinkRow[]>(),
         supabase
           .from('candidate_profile_field_suggestions')
-          .select('id, field, current_value, suggested_value, source, status, created_at')
+          .select(
+            'id, field, current_value, suggested_value, source, status, revision, updated_by, created_at, updated_at'
+          )
           .eq('user_id', session.user.id)
           .eq('profile_id', candidateProfile.id)
           .eq('status', 'pending')
@@ -647,7 +650,7 @@ export const actions: Actions = {
 
     const { data: suggestion, error: suggestionError } = await supabase
       .from('candidate_profile_field_suggestions')
-      .select('id, profile_id, field, suggested_value')
+      .select('id, profile_id, field, suggested_value, revision')
       .eq('id', suggestionId)
       .eq('user_id', session.user.id)
       .eq('status', 'pending')
@@ -663,6 +666,7 @@ export const actions: Actions = {
       suggestedValue: suggestion.suggested_value,
       action: resolutionAction,
       resolvedAt,
+      revision: suggestion.revision,
     });
 
     if (!resolution) {
@@ -711,6 +715,7 @@ export const actions: Actions = {
       .eq('id', suggestion.id)
       .eq('user_id', session.user.id)
       .eq('status', 'pending')
+      .eq('revision', suggestion.revision)
       .select('id')
       .single<{ id: string }>();
 

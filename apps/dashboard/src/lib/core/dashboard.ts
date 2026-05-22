@@ -497,6 +497,9 @@ export interface DashboardProfileImportRow {
   error_code: string | null;
   error_message: string | null;
   field_counts: unknown;
+  revision: number;
+  updated_by: string;
+  updated_at: string;
 }
 
 export interface DashboardCandidateProfileFieldSuggestionRow {
@@ -506,7 +509,10 @@ export interface DashboardCandidateProfileFieldSuggestionRow {
   suggested_value: string | null;
   source: string;
   status: string;
+  revision: number;
+  updated_by: string;
   created_at: string;
+  updated_at: string;
 }
 
 export interface DashboardConnectorHealthEventRow {
@@ -620,12 +626,15 @@ export interface CvFieldSuggestionResolutionInput {
   suggestedValue: string | null;
   action: CvFieldSuggestionResolutionAction;
   resolvedAt: string;
+  revision: number;
 }
 
 export interface CvFieldSuggestionResolution {
   suggestion: {
     status: 'applied' | 'dismissed';
     resolved_at: string;
+    revision: number;
+    updated_by: 'dashboard';
   };
   profile:
     | {
@@ -1764,6 +1773,8 @@ export function buildCvFieldSuggestionResolution(
       suggestion: {
         status: 'dismissed',
         resolved_at: input.resolvedAt,
+        revision: input.revision + 1,
+        updated_by: 'dashboard',
       },
       profile: null,
     };
@@ -1782,6 +1793,8 @@ export function buildCvFieldSuggestionResolution(
       suggestion: {
         status: 'applied',
         resolved_at: input.resolvedAt,
+        revision: input.revision + 1,
+        updated_by: 'dashboard',
       },
       profile: {
         title: input.suggestedValue.trim(),
@@ -1795,6 +1808,8 @@ export function buildCvFieldSuggestionResolution(
       suggestion: {
         status: 'applied',
         resolved_at: input.resolvedAt,
+        revision: input.revision + 1,
+        updated_by: 'dashboard',
       },
       profile: {
         summary: input.suggestedValue?.trim() ?? '',
@@ -1808,6 +1823,8 @@ export function buildCvFieldSuggestionResolution(
       suggestion: {
         status: 'applied',
         resolved_at: input.resolvedAt,
+        revision: input.revision + 1,
+        updated_by: 'dashboard',
       },
       profile: {
         location: input.suggestedValue?.trim() || null,
@@ -1820,6 +1837,8 @@ export function buildCvFieldSuggestionResolution(
     suggestion: {
       status: 'applied',
       resolved_at: input.resolvedAt,
+      revision: input.revision + 1,
+      updated_by: 'dashboard',
     },
     profile: {
       target_role: input.suggestedValue?.trim() || null,

@@ -199,6 +199,8 @@ export interface CandidateProfileFieldSuggestionRow {
   suggested_value: string | null;
   source: string;
   status: 'pending';
+  revision: number;
+  updated_by: 'extension';
 }
 
 export interface SyncConflictInsertRow {
@@ -273,6 +275,8 @@ export interface ProfileImportInsertRow {
   error_code: string | null;
   error_message: string | null;
   raw_hash: string | null;
+  revision: number;
+  updated_by: 'extension';
   field_counts: Record<string, number>;
 }
 
@@ -885,6 +889,8 @@ export function buildCandidateProfileImportRows(input: {
       error_code: null,
       error_message: null,
       raw_hash: input.rawHash ?? null,
+      revision: input.revision,
+      updated_by: 'extension',
       field_counts: {
         experiences: input.draft.experiences.length,
         education: input.draft.education.length,
@@ -913,6 +919,8 @@ export function buildCandidateProfileImportErrorRow(input: {
     error_code: input.errorCode,
     error_message: input.errorMessage,
     raw_hash: input.rawHash ?? null,
+    revision: 1,
+    updated_by: 'extension',
     field_counts: {
       experiences: input.draft.experiences.length,
       education: input.draft.education.length,
@@ -964,6 +972,8 @@ export function buildCandidateProfileFieldSuggestionRows(input: {
         suggested_value: suggestedValues[field],
         source: input.draft.source,
         status: 'pending',
+        revision: profile.revision,
+        updated_by: 'extension',
       },
     ];
   });
