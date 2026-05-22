@@ -15,6 +15,7 @@ import {
   buildEmptyCvSnapshot,
   buildCvProfileUpdatePatch,
   buildMissionSelectionInsertPatch,
+  buildSyncConflictResolutionPatch,
   buildTjmRadarSnapshot,
   canonicalRowsToApplications,
   favoriteMissionToApplication,
@@ -591,6 +592,19 @@ export const actions: Actions = {
 
     if (suggestionUpdateError) {
       return fail(500, { cvError: "La suggestion n'a pas pu être marquée comme traitée." });
+    }
+
+    const { error: conflictUpdateError } = await supabase
+      .from('sync_conflicts')
+      .update(buildSyncConflictResolutionPatch(resolution.suggestion.status, resolvedAt))
+      .eq('user_id', session.user.id)
+      .eq('entity', 'candidate_profile')
+      .eq('entity_id', suggestion.profile_id)
+      .eq('field', suggestion.field)
+      .eq('status', 'pending');
+
+    if (conflictUpdateError) {
+      return fail(500, { cvError: "Le conflit de synchronisation n'a pas pu être traité." });
     }
 
     return {

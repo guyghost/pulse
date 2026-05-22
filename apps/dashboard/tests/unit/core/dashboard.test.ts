@@ -12,6 +12,7 @@ import {
   favoriteMissionToApplication,
   buildApplicationStageUpdatePatch,
   buildMissionSelectionInsertPatch,
+  buildSyncConflictResolutionPatch,
   generatedAssetRowsToHistory,
   getNextApplicationStages,
   getAverageApplicationScore,
@@ -1240,5 +1241,17 @@ describe('dashboard core', () => {
         resolvedAt: '2026-05-22T10:00:00.000Z',
       })
     ).toBeNull();
+  });
+
+  it('builds sync conflict resolution patches from CV suggestion outcomes', () => {
+    expect(buildSyncConflictResolutionPatch('applied', '2026-05-22T10:00:00.000Z')).toEqual({
+      status: 'resolved',
+      resolved_at: '2026-05-22T10:00:00.000Z',
+    });
+
+    expect(buildSyncConflictResolutionPatch('dismissed', '2026-05-22T10:00:00.000Z')).toEqual({
+      status: 'dismissed',
+      resolved_at: '2026-05-22T10:00:00.000Z',
+    });
   });
 });

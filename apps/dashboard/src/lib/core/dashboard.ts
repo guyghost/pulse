@@ -521,6 +521,11 @@ export interface CvFieldSuggestionResolution {
     | null;
 }
 
+export interface SyncConflictResolutionPatch {
+  status: 'resolved' | 'dismissed';
+  resolved_at: string;
+}
+
 export interface ApplicationFilters {
   query: string;
   source: 'all' | ApplicationSource;
@@ -1430,6 +1435,16 @@ export function buildCvFieldSuggestionResolution(
       target_role: input.suggestedValue?.trim() || null,
       updated_by: 'dashboard',
     },
+  };
+}
+
+export function buildSyncConflictResolutionPatch(
+  suggestionStatus: CvFieldSuggestionResolution['suggestion']['status'],
+  resolvedAt: string
+): SyncConflictResolutionPatch {
+  return {
+    status: suggestionStatus === 'applied' ? 'resolved' : 'dismissed',
+    resolved_at: resolvedAt,
   };
 }
 
