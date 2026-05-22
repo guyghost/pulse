@@ -501,6 +501,9 @@ sync_status (
   last_error_code text,
   last_error_message text,
   retry_after_at timestamptz,
+  revision bigint not null default 1,
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
   updated_at timestamptz not null default now(),
   primary key (device_id, entity)
 )

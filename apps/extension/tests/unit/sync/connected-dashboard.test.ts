@@ -517,6 +517,7 @@ describe('connected dashboard sync payload builders', () => {
       last_error_code: 'remote-error',
       last_error_message: 'Supabase unavailable',
       retry_after_at: '2026-05-21T02:05:00.000Z',
+      updated_by: 'extension',
     });
   });
 

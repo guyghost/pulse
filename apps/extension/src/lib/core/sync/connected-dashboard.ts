@@ -153,6 +153,7 @@ export interface SyncStatusRow {
   last_error_code: string | null;
   last_error_message: string | null;
   retry_after_at: string | null;
+  updated_by: 'extension';
 }
 
 export interface CandidateProfileUpsertRow {
@@ -816,6 +817,7 @@ export function buildSyncStatusRow(input: BuildSyncStatusRowInput): SyncStatusRo
     last_error_code: input.error?.code ?? null,
     last_error_message: input.error?.message ?? null,
     retry_after_at: input.error ? (input.retryAfterAt?.toISOString() ?? null) : null,
+    updated_by: 'extension',
   };
 }
 

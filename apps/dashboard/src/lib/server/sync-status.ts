@@ -18,6 +18,7 @@ type ExtensionDeviceIdentityRow = {
 
 type SyncStatusIdentityRow = {
   device_id: string;
+  revision: number;
 };
 
 type PendingPullSyncStatusInsertRow = {
@@ -26,6 +27,8 @@ type PendingPullSyncStatusInsertRow = {
   entity: DashboardWritableSyncEntity;
   pending_upload_count: number;
   pending_download_count: number;
+  revision: number;
+  updated_by: 'dashboard';
   updated_at: string;
 };
 
@@ -34,7 +37,7 @@ type SelectBuilder<T> = {
 };
 
 type UpdateBuilder = {
-  eq(column: string, value: string): UpdateBuilder & Promise<SupabaseResult<null>>;
+  eq(column: string, value: string | number): UpdateBuilder & Promise<SupabaseResult<null>>;
 };
 
 type InsertBuilder = Promise<SupabaseResult<null>>;
@@ -50,6 +53,8 @@ type SyncStatusTable = {
     last_error_code: null;
     last_error_message: null;
     retry_after_at: null;
+    revision: number;
+    updated_by: 'dashboard';
     updated_at: string;
   }): UpdateBuilder;
   insert(rows: PendingPullSyncStatusInsertRow[]): InsertBuilder;
@@ -96,7 +101,7 @@ export async function markEntityPendingExtensionPull(
   }
 
   const statusesResult = await syncStatusTable(supabase)
-    .select('device_id')
+    .select('device_id,revision')
     .eq('user_id', userId)
     .eq('entity', entity);
 
@@ -109,17 +114,21 @@ export async function markEntityPendingExtensionPull(
     .map((device) => device.id)
     .filter((deviceId) => !existingDeviceIds.has(deviceId));
 
-  if (existingDeviceIds.size > 0) {
+  for (const status of statusesResult.data ?? []) {
     const updateResult = await syncStatusTable(supabase)
       .update({
         pending_download_count: 1,
         last_error_code: null,
         last_error_message: null,
         retry_after_at: null,
+        revision: status.revision + 1,
+        updated_by: 'dashboard',
         updated_at: updatedAt,
       })
       .eq('user_id', userId)
-      .eq('entity', entity);
+      .eq('entity', entity)
+      .eq('device_id', status.device_id)
+      .eq('revision', status.revision);
 
     if (updateResult.error) {
       return { ok: false, reason: 'update-failed' };
@@ -134,6 +143,8 @@ export async function markEntityPendingExtensionPull(
         entity,
         pending_upload_count: 0,
         pending_download_count: 1,
+        revision: 1,
+        updated_by: 'dashboard',
         updated_at: updatedAt,
       })),
       { onConflict: 'device_id,entity', ignoreDuplicates: true }

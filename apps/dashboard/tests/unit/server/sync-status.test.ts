@@ -12,7 +12,7 @@ type QueryResult<T> = {
 
 type EqCall = {
   column: string;
-  value: string;
+  value: unknown;
 };
 
 type SelectThenable<T> = PromiseLike<QueryResult<T[]>> & {
@@ -20,7 +20,7 @@ type SelectThenable<T> = PromiseLike<QueryResult<T[]>> & {
 };
 
 type UpdateThenable = PromiseLike<QueryResult<null>> & {
-  eq(column: string, value: string): UpdateThenable;
+  eq(column: string, value: unknown): UpdateThenable;
 };
 
 type ExtensionDeviceIdentityRow = {
@@ -29,6 +29,7 @@ type ExtensionDeviceIdentityRow = {
 
 type SyncStatusIdentityRow = {
   device_id: string;
+  revision: number;
 };
 
 type InsertRow = {
@@ -37,6 +38,8 @@ type InsertRow = {
   entity: string;
   pending_upload_count: number;
   pending_download_count: number;
+  revision: number;
+  updated_by: 'dashboard';
   updated_at: string;
 };
 
@@ -59,7 +62,7 @@ function createSelectBuilder<T>(result: QueryResult<T[]>, eqCalls: EqCall[]): Se
 
 function createUpdateBuilder(result: QueryResult<null>, eqCalls: EqCall[]): UpdateThenable {
   const builder: UpdateThenable = {
-    eq(column: string, value: string) {
+    eq(column: string, value: unknown) {
       eqCalls.push({ column, value });
       return builder;
     },
@@ -148,7 +151,7 @@ describe('dashboard sync status server helper', () => {
   it('marks existing application sync statuses pending and creates missing device rows', async () => {
     const { supabase, calls } = createSupabaseMock({
       devices: [{ id: 'device-1' }, { id: 'device-2' }],
-      statuses: [{ device_id: 'device-1' }],
+      statuses: [{ device_id: 'device-1', revision: 3 }],
     });
 
     const result = await markEntityPendingExtensionPull(
@@ -167,6 +170,8 @@ describe('dashboard sync status server helper', () => {
     expect(calls.statusUpdateEqCalls).toEqual([
       { column: 'user_id', value: 'user-1' },
       { column: 'entity', value: 'applications' },
+      { column: 'device_id', value: 'device-1' },
+      { column: 'revision', value: 3 },
     ]);
     expect(calls.updateValues).toEqual([
       {
@@ -174,6 +179,8 @@ describe('dashboard sync status server helper', () => {
         last_error_code: null,
         last_error_message: null,
         retry_after_at: null,
+        revision: 4,
+        updated_by: 'dashboard',
         updated_at: '2026-05-22T10:00:00.000Z',
       },
     ]);
@@ -187,6 +194,8 @@ describe('dashboard sync status server helper', () => {
             entity: 'applications',
             pending_upload_count: 0,
             pending_download_count: 1,
+            revision: 1,
+            updated_by: 'dashboard',
             updated_at: '2026-05-22T10:00:00.000Z',
           },
         ],

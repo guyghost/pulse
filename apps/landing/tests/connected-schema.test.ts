@@ -83,6 +83,8 @@ describe('connected dashboard schema', () => {
       );
     }
     expect(tableBlock('sync_status')).toContain('retry_after_at timestamptz');
+    expect(tableBlock('sync_status')).toContain('revision bigint not null');
+    expect(tableBlock('sync_status')).toContain('updated_by text not null');
     expect(tableBlock('sync_conflicts')).toContain(
       "entity in ('applications', 'candidate_profile')"
     );
