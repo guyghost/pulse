@@ -7,6 +7,7 @@ import type {
   GenerationType,
 } from '../../core/types/generation';
 import type { UserProfile } from '../../core/types/profile';
+import type { ProfileSyncField, VerifyProfileResult } from '../../core/profile/profile-sync';
 import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
 import type { ConnectorState } from '../../core/types/connector-status';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
@@ -51,6 +52,8 @@ export type BridgeMessage =
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }
+  | { type: 'VERIFY_PROFILE_PAGE'; payload: { url: string; fields: ProfileSyncField[] } }
+  | { type: 'PROFILE_PAGE_VERIFIED'; payload: VerifyProfileResult }
   | { type: 'PREVIEW_LINKEDIN_PROFILE'; payload?: { tabId?: number } }
   | {
       type: 'LINKEDIN_PROFILE_PREVIEWED';

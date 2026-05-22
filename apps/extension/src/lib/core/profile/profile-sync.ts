@@ -13,6 +13,21 @@ export interface ProfileFieldComparison {
   status: ProfileSyncStatus;
 }
 
+export type ProfilePageReadResult =
+  | { status: 'available'; finalUrl: string }
+  | { status: 'auth-required'; finalUrl: string }
+  | { status: 'blocked'; finalUrl: string; reason: string };
+
+export interface VerifyProfileResult {
+  read: ProfilePageReadResult;
+  comparisons: ProfileFieldComparison[];
+  summary: {
+    matches: number;
+    mismatches: number;
+    missing: number;
+  };
+}
+
 const normalize = (value: string): string =>
   value
     .toLowerCase()

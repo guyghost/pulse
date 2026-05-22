@@ -61,6 +61,51 @@ const ProfilePayloadSchema = z
 
 const LinkedInTabPayloadSchema = z.object({ tabId: z.number().int().positive().optional() });
 
+const ProfileSyncFieldSchema = z.object({
+  id: z.string().min(1).max(120),
+  label: z.string().min(1).max(120),
+  value: z.string().max(4096),
+});
+
+const ProfileFieldComparisonSchema = z.object({
+  fieldId: z.string().max(120),
+  label: z.string().max(120),
+  expected: z.string().max(4096),
+  status: z.enum(['match', 'mismatch', 'missing', 'unknown']),
+});
+
+const ProfilePageReadResultSchema = z.union([
+  z
+    .object({
+      status: z.literal('available'),
+      finalUrl: z.string().min(1).max(2048),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('auth-required'),
+      finalUrl: z.string().min(1).max(2048),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('blocked'),
+      finalUrl: z.string().min(1).max(2048),
+      reason: z.string().max(4096),
+    })
+    .strict(),
+]);
+
+const VerifyProfileResultSchema = z.object({
+  read: ProfilePageReadResultSchema,
+  comparisons: z.array(ProfileFieldComparisonSchema).max(50),
+  summary: z.object({
+    matches: z.number().int().min(0),
+    mismatches: z.number().int().min(0),
+    missing: z.number().int().min(0),
+  }),
+});
+
 const CandidateExperienceDraftSchema = z.object({
   title: SafeString,
   company: SafeString.nullable(),
@@ -189,6 +234,25 @@ export const MessageSchemas = {
   GET_PROFILE: z.object({ type: z.literal('GET_PROFILE') }),
   PROFILE_RESULT: z.object({ type: z.literal('PROFILE_RESULT'), payload: z.unknown() }),
   SAVE_PROFILE: z.object({ type: z.literal('SAVE_PROFILE'), payload: ProfilePayloadSchema }),
+  VERIFY_PROFILE_PAGE: z.object({
+    type: z.literal('VERIFY_PROFILE_PAGE'),
+    payload: z
+      .object({
+        url: z
+          .string()
+          .url()
+          .max(2048)
+          .refine((value) => value.startsWith('https://'), {
+            message: 'Profile verification URL must use HTTPS',
+          }),
+        fields: z.array(ProfileSyncFieldSchema).max(20),
+      })
+      .refine(maxBytes(40_000), { message: 'VERIFY_PROFILE_PAGE payload exceeds 40KB limit' }),
+  }),
+  PROFILE_PAGE_VERIFIED: z.object({
+    type: z.literal('PROFILE_PAGE_VERIFIED'),
+    payload: VerifyProfileResultSchema,
+  }),
   PREVIEW_LINKEDIN_PROFILE: z.object({
     type: z.literal('PREVIEW_LINKEDIN_PROFILE'),
     payload: LinkedInTabPayloadSchema.optional(),

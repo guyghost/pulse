@@ -20,6 +20,7 @@ const syncConnectedDashboardScan = vi.fn();
 const syncConnectedDashboardSnapshot = vi.fn();
 const syncConnectedDashboardProfileExtractorHealth = vi.fn();
 const syncConnectedDashboardTracking = vi.fn();
+const verifyProfilePage = vi.fn();
 const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
@@ -180,6 +181,10 @@ vi.mock('../../../src/lib/shell/sync/connected-dashboard', () => ({
   syncConnectedDashboardTracking,
 }));
 
+vi.mock('../../../src/lib/shell/profile/profile-page-verification', () => ({
+  verifyProfilePage,
+}));
+
 describe('background auto-scan notifications', () => {
   beforeAll(async () => {
     getSettings.mockResolvedValue({
@@ -236,6 +241,11 @@ describe('background auto-scan notifications', () => {
     syncConnectedDashboardTracking.mockResolvedValue({
       ok: true,
       value: { pushedCount: 1, skippedCount: 0 },
+    });
+    verifyProfilePage.mockResolvedValue({
+      read: { status: 'available', finalUrl: 'https://www.linkedin.com/in/example/' },
+      comparisons: [{ fieldId: 'title', label: 'Titre', expected: 'Lead Svelte', status: 'match' }],
+      summary: { matches: 1, mismatches: 0, missing: 0 },
     });
   });
 
@@ -349,6 +359,39 @@ describe('background auto-scan notifications', () => {
         missionId: 'mission-1',
         nextActionAt: '2026-05-24T09:00:00.000Z',
       }),
+    });
+  });
+
+  it('routes profile page verification through the service worker shell', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.(
+      {
+        type: 'VERIFY_PROFILE_PAGE',
+        payload: {
+          url: 'https://www.linkedin.com/in/example/',
+          fields: [{ id: 'title', label: 'Titre', value: 'Lead Svelte' }],
+        },
+      },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(verifyProfilePage).toHaveBeenCalledWith('https://www.linkedin.com/in/example/', [
+      { id: 'title', label: 'Titre', value: 'Lead Svelte' },
+    ]);
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'PROFILE_PAGE_VERIFIED',
+      payload: {
+        read: { status: 'available', finalUrl: 'https://www.linkedin.com/in/example/' },
+        comparisons: [
+          { fieldId: 'title', label: 'Titre', expected: 'Lead Svelte', status: 'match' },
+        ],
+        summary: { matches: 1, mismatches: 0, missing: 0 },
+      },
     });
   });
 });

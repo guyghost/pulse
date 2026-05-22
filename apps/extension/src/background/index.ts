@@ -67,6 +67,7 @@ import {
   syncConnectedDashboardTracking,
 } from '../lib/shell/sync/connected-dashboard';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
+import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -548,6 +549,28 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
           sendResponse({ type: 'PROFILE_RESULT', payload: null });
+        });
+      return true;
+    }
+
+    if (message.type === 'VERIFY_PROFILE_PAGE') {
+      verifyProfilePage(message.payload.url, message.payload.fields)
+        .then((result) => {
+          sendResponse({ type: 'PROFILE_PAGE_VERIFIED', payload: result });
+        })
+        .catch((err) => {
+          sendResponse({
+            type: 'PROFILE_PAGE_VERIFIED',
+            payload: {
+              read: {
+                status: 'blocked',
+                finalUrl: message.payload.url,
+                reason: err instanceof Error ? err.message : 'Erreur inconnue',
+              },
+              comparisons: [],
+              summary: { matches: 0, mismatches: 0, missing: 0 },
+            },
+          });
         });
       return true;
     }

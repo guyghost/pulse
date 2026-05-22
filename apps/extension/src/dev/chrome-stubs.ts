@@ -25,6 +25,17 @@ function createChromeStubs() {
           case 'SAVE_PROFILE':
             console.log('[Chrome Stub] Profile saved:', message.payload);
             return { type: 'PROFILE_RESULT', payload: message.payload };
+          case 'VERIFY_PROFILE_PAGE': {
+            const p = message.payload as Record<string, unknown> | undefined;
+            return {
+              type: 'PROFILE_PAGE_VERIFIED',
+              payload: {
+                read: { status: 'blocked', finalUrl: String(p?.url ?? ''), reason: 'dev-mode' },
+                comparisons: [],
+                summary: { matches: 0, mismatches: 0, missing: 0 },
+              },
+            };
+          }
           case 'SCAN_START':
             setTimeout(() => {
               window.dispatchEvent(

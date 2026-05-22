@@ -205,6 +205,64 @@ describe('validateMessage — LinkedIn preview and sync import', () => {
   });
 });
 
+describe('validateMessage — VERIFY_PROFILE_PAGE', () => {
+  it('accepte une vérification de profil avec champs attendus', () => {
+    expect(
+      validateMessage({
+        type: 'VERIFY_PROFILE_PAGE',
+        payload: {
+          url: 'https://www.linkedin.com/in/example/',
+          fields: [{ id: 'title', label: 'Titre', value: 'Lead Svelte' }],
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette une URL de vérification invalide', () => {
+    expect(
+      validateMessage({
+        type: 'VERIFY_PROFILE_PAGE',
+        payload: {
+          url: 'not-a-url',
+          fields: [{ id: 'title', label: 'Titre', value: 'Lead Svelte' }],
+        },
+      }).valid
+    ).toBe(false);
+  });
+
+  it('accepte un résultat de vérification sans texte de page brut', () => {
+    expect(
+      validateMessage({
+        type: 'PROFILE_PAGE_VERIFIED',
+        payload: {
+          read: { status: 'available', finalUrl: 'https://www.linkedin.com/in/example/' },
+          comparisons: [
+            { fieldId: 'title', label: 'Titre', expected: 'Lead Svelte', status: 'match' },
+          ],
+          summary: { matches: 1, mismatches: 0, missing: 0 },
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette un résultat qui renvoie le texte brut de la page au side panel', () => {
+    expect(
+      validateMessage({
+        type: 'PROFILE_PAGE_VERIFIED',
+        payload: {
+          read: {
+            status: 'available',
+            finalUrl: 'https://www.linkedin.com/in/example/',
+            text: 'raw page',
+          },
+          comparisons: [],
+          summary: { matches: 0, mismatches: 0, missing: 0 },
+        },
+      }).valid
+    ).toBe(false);
+  });
+});
+
 // ============================================================================
 // MISSIONS_UPDATED — limite 500 items
 // ============================================================================
