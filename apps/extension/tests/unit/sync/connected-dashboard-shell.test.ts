@@ -125,6 +125,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
         mission_id: 'remote-mission-1',
       },
     ]),
+    listApplicationsByMissionIds: vi.fn(async () => []),
     listApplicationsUpdatedSince: vi.fn(async () => [
       {
         id: 'application-1',
@@ -631,6 +632,50 @@ describe('connected dashboard shell sync', () => {
         client_event_id: 'install-1:free-work-123:1779344400000:detected:selected',
       }),
     ]);
+  });
+
+  it('does not overwrite dashboard applications with a newer remote revision', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.listApplicationsByMissionIds).mockResolvedValueOnce([
+      {
+        id: 'application-1',
+        mission_id: 'remote-mission-1',
+        mission_source: 'free-work',
+        mission_external_id: 'free-work-123',
+        stage: 'offer',
+        user_rating: 5,
+        notes: 'Offre validée côté dashboard',
+        next_action_at: '2026-05-28T09:00:00.000Z',
+        revision: 5,
+        updated_at: '2026-05-21T11:00:00.000Z',
+      },
+    ]);
+
+    const result = await pushApplicationsToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      installId: 'install-1',
+      trackings: [tracking],
+      remoteMissionIds: new Map([['free-work-123', 'remote-mission-1']]),
+      now: new Date('2026-05-21T09:00:00.000Z'),
+    });
+
+    expect(result).toEqual({ ok: true, value: { pushedCount: 0, skippedCount: 1 } });
+    expect(gateway.listApplicationsByMissionIds).toHaveBeenCalledWith({
+      userId: 'user-1',
+      missionIds: ['remote-mission-1'],
+    });
+    expect(gateway.upsertApplications).not.toHaveBeenCalled();
+    expect(gateway.upsertApplicationPipelineEvents).not.toHaveBeenCalled();
+    expect(gateway.upsertGeneratedApplicationAssets).not.toHaveBeenCalled();
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'applications',
+        last_push_at: '2026-05-21T09:00:00.000Z',
+        pending_upload_count: 1,
+        pending_download_count: 1,
+      })
+    );
   });
 
   it('pushes generated application assets with idempotent client ids', async () => {

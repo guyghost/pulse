@@ -97,6 +97,10 @@ export interface ConnectedDashboardSyncGateway {
   upsertMissionDuplicates(rows: MissionDuplicateUpsertRow[]): Promise<void>;
   insertDetectedApplications(rows: ApplicationUpsertRow[]): Promise<RemoteApplicationIdentity[]>;
   upsertApplications(rows: ApplicationUpsertRow[]): Promise<RemoteApplicationIdentity[]>;
+  listApplicationsByMissionIds(input: {
+    userId: string;
+    missionIds: string[];
+  }): Promise<RemoteApplicationSnapshot[]>;
   listApplicationsUpdatedSince(input: {
     userId: string;
     since: string | null;
@@ -304,6 +308,7 @@ interface SupabaseWriteBuilder {
 interface SupabaseReadBuilder {
   eq(column: string, value: unknown): SupabaseReadBuilder;
   gt(column: string, value: unknown): SupabaseReadBuilder;
+  in(column: string, values: unknown[]): SupabaseReadBuilder;
   order(
     column: string,
     options?: Record<string, unknown>
@@ -747,6 +752,23 @@ export function createSupabaseConnectedDashboardGateway(
             'id,mission_id',
             parseRemoteApplicationIdentities
           ),
+    listApplicationsByMissionIds: async ({ userId, missionIds }) => {
+      if (missionIds.length === 0) {
+        return [];
+      }
+      const { data, error } = await supabase
+        .from('applications')
+        .select(
+          'id,mission_id,stage,user_rating,notes,next_action_at,revision,updated_at,missions!inner(source,external_id)'
+        )
+        .eq('user_id', userId)
+        .in('mission_id', missionIds)
+        .order('updated_at', { ascending: true });
+      if (error) {
+        throw new Error(error.message);
+      }
+      return parseRemoteApplicationSnapshots(data);
+    },
     listApplicationsUpdatedSince: async ({ userId, since }) => {
       let query = supabase
         .from('applications')
@@ -1091,11 +1113,38 @@ export async function pushApplicationsToConnectedDashboard(
       return { ok: true, value: { pushedCount: 0, skippedCount } };
     }
 
-    const remoteApplications = await gateway.upsertApplications(eligible.map((item) => item.row));
+    const existingRemoteApplications = await gateway.listApplicationsByMissionIds({
+      userId: input.userId,
+      missionIds: eligible.map((item) => item.row.mission_id),
+    });
+    const existingRemoteByMissionId = new Map(
+      existingRemoteApplications.map((application) => [application.mission_id, application])
+    );
+    const writable = eligible.filter((item) => {
+      const remote = existingRemoteByMissionId.get(item.row.mission_id);
+      return !remote || remote.revision <= item.row.revision;
+    });
+    const staleCount = eligible.length - writable.length;
+
+    if (writable.length === 0) {
+      await gateway.upsertSyncStatus(
+        buildSyncStatusRow({
+          userId: input.userId,
+          deviceId: input.deviceId,
+          entity: 'applications',
+          lastPushAt: input.now,
+          pendingUploadCount: skippedCount + staleCount,
+          pendingDownloadCount: staleCount,
+        })
+      );
+      return { ok: true, value: { pushedCount: 0, skippedCount: skippedCount + staleCount } };
+    }
+
+    const remoteApplications = await gateway.upsertApplications(writable.map((item) => item.row));
     const applicationIdsByMission = new Map(
       remoteApplications.map((application) => [application.mission_id, application.id])
     );
-    const eventRows = eligible.flatMap((item) => {
+    const eventRows = writable.flatMap((item) => {
       const applicationId = applicationIdsByMission.get(item.row.mission_id);
       return applicationId
         ? buildApplicationPipelineEventRows(
@@ -1108,7 +1157,7 @@ export async function pushApplicationsToConnectedDashboard(
           )
         : [];
     });
-    const assetRows = eligible.flatMap((item) => {
+    const assetRows = writable.flatMap((item) => {
       const applicationId = applicationIdsByMission.get(item.row.mission_id);
       const assets = input.generatedAssetsByMissionId?.get(item.tracking.missionId) ?? [];
       return applicationId
@@ -1131,11 +1180,15 @@ export async function pushApplicationsToConnectedDashboard(
         deviceId: input.deviceId,
         entity: 'applications',
         lastPushAt: input.now,
-        pendingUploadCount: skippedCount,
+        pendingUploadCount: skippedCount + staleCount,
+        pendingDownloadCount: staleCount,
       })
     );
 
-    return { ok: true, value: { pushedCount: remoteApplications.length, skippedCount } };
+    return {
+      ok: true,
+      value: { pushedCount: remoteApplications.length, skippedCount: skippedCount + staleCount },
+    };
   } catch (error) {
     const syncError = remoteError(error);
     await gateway.upsertSyncStatus(
