@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   pushApplicationsToConnectedDashboard,
   pushConnectorHealthToConnectedDashboard,
+  pullApplicationsFromConnectedDashboard,
   pushMissionsToConnectedDashboard,
   registerExtensionDevice,
   type ConnectedDashboardSyncGateway,
@@ -59,6 +60,17 @@ function createGateway(): ConnectedDashboardSyncGateway {
       {
         id: 'application-1',
         mission_id: 'remote-mission-1',
+      },
+    ]),
+    listApplicationsUpdatedSince: vi.fn(async () => [
+      {
+        id: 'application-1',
+        mission_id: 'remote-mission-1',
+        stage: 'offer',
+        user_rating: 5,
+        notes: 'Offre reçue',
+        revision: 5,
+        updated_at: '2026-05-21T11:00:00.000Z',
       },
     ]),
     upsertApplicationPipelineEvents: vi.fn(async () => undefined),
@@ -250,6 +262,83 @@ describe('connected dashboard shell sync', () => {
       expect.objectContaining({
         entity: 'connector_health',
         pending_upload_count: 0,
+      })
+    );
+  });
+
+  it('pulls remote dashboard applications into local tracking records', async () => {
+    const gateway = createGateway();
+
+    const result = await pullApplicationsFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      localMissionIdsByRemoteId: new Map([['remote-mission-1', 'free-work-123']]),
+      existingTrackings: new Map([['free-work-123', tracking]]),
+      since: new Date('2026-05-21T09:00:00.000Z'),
+      now: new Date('2026-05-21T12:00:00.000Z'),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        pulledCount: 1,
+        skippedCount: 0,
+        trackings: [
+          {
+            ...tracking,
+            currentStatus: 'offer',
+            history: [
+              ...tracking.history,
+              {
+                from: 'selected',
+                to: 'offer',
+                timestamp: 1779364800000,
+                note: 'Sync dashboard revision 5',
+              },
+            ],
+            userRating: 5,
+            notes: 'Offre reçue',
+          },
+        ],
+      },
+    });
+    expect(gateway.listApplicationsUpdatedSince).toHaveBeenCalledWith({
+      userId: 'user-1',
+      since: '2026-05-21T09:00:00.000Z',
+    });
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'applications',
+        last_pull_at: '2026-05-21T12:00:00.000Z',
+        pending_download_count: 0,
+      })
+    );
+  });
+
+  it('records pending downloads when pulled applications do not map to local missions', async () => {
+    const gateway = createGateway();
+
+    const result = await pullApplicationsFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      localMissionIdsByRemoteId: new Map(),
+      existingTrackings: new Map(),
+      since: null,
+      now: new Date('2026-05-21T12:00:00.000Z'),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        pulledCount: 0,
+        skippedCount: 1,
+        trackings: [],
+      },
+    });
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'applications',
+        pending_download_count: 1,
       })
     );
   });

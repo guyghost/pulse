@@ -93,6 +93,16 @@ export interface SyncStatusRow {
   last_error_message: string | null;
 }
 
+export interface RemoteApplicationSnapshot {
+  id: string;
+  mission_id: string;
+  stage: ApplicationStage;
+  user_rating: number | null;
+  notes: string;
+  revision: number;
+  updated_at: string;
+}
+
 export interface BuildSyncStatusRowInput {
   userId: string;
   deviceId: string;
@@ -293,5 +303,58 @@ export function buildSyncStatusRow(input: BuildSyncStatusRowInput): SyncStatusRo
     pending_download_count: input.pendingDownloadCount ?? 0,
     last_error_code: input.error?.code ?? null,
     last_error_message: input.error?.message ?? null,
+  };
+}
+
+export function buildTrackingFromRemoteApplication(
+  application: RemoteApplicationSnapshot,
+  localMissionId: string,
+  pulledAt: number
+): MissionTracking {
+  return {
+    missionId: localMissionId,
+    currentStatus: application.stage,
+    history: [
+      {
+        from: null,
+        to: application.stage,
+        timestamp: pulledAt,
+        note: `Import dashboard revision ${application.revision}`,
+      },
+    ],
+    generatedAssetIds: [],
+    userRating: application.user_rating,
+    notes: application.notes,
+  };
+}
+
+export function mergeRemoteApplicationTracking(
+  existing: MissionTracking | null,
+  application: RemoteApplicationSnapshot,
+  localMissionId: string,
+  pulledAt: number
+): MissionTracking {
+  if (!existing) {
+    return buildTrackingFromRemoteApplication(application, localMissionId, pulledAt);
+  }
+
+  const statusChanged = existing.currentStatus !== application.stage;
+
+  return {
+    ...existing,
+    currentStatus: application.stage,
+    history: statusChanged
+      ? [
+          ...existing.history,
+          {
+            from: existing.currentStatus,
+            to: application.stage,
+            timestamp: pulledAt,
+            note: `Sync dashboard revision ${application.revision}`,
+          },
+        ]
+      : existing.history,
+    userRating: application.user_rating,
+    notes: application.notes,
   };
 }

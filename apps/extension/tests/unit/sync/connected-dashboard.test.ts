@@ -5,7 +5,10 @@ import {
   buildConnectorHealthEventRow,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
+  buildTrackingFromRemoteApplication,
   buildSyncStatusRow,
+  mergeRemoteApplicationTracking,
+  type RemoteApplicationSnapshot,
 } from '../../../src/lib/core/sync/connected-dashboard';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
@@ -264,6 +267,66 @@ describe('connected dashboard sync payload builders', () => {
       pending_download_count: 1,
       last_error_code: 'remote-error',
       last_error_message: 'Supabase unavailable',
+    });
+  });
+
+  it('builds local tracking records from remote dashboard applications', () => {
+    const remoteApplication: RemoteApplicationSnapshot = {
+      id: 'application-1',
+      mission_id: 'remote-mission-1',
+      stage: 'interview',
+      user_rating: 5,
+      notes: 'Entretien mardi',
+      revision: 4,
+      updated_at: '2026-05-21T10:00:00.000Z',
+    };
+
+    expect(
+      buildTrackingFromRemoteApplication(remoteApplication, 'free-work-123', 1779361200000)
+    ).toEqual({
+      missionId: 'free-work-123',
+      currentStatus: 'interview',
+      history: [
+        {
+          from: null,
+          to: 'interview',
+          timestamp: 1779361200000,
+          note: 'Import dashboard revision 4',
+        },
+      ],
+      generatedAssetIds: [],
+      userRating: 5,
+      notes: 'Entretien mardi',
+    });
+  });
+
+  it('merges remote dashboard application changes into existing local tracking', () => {
+    const remoteApplication: RemoteApplicationSnapshot = {
+      id: 'application-1',
+      mission_id: 'remote-mission-1',
+      stage: 'offer',
+      user_rating: 5,
+      notes: 'Offre reçue',
+      revision: 5,
+      updated_at: '2026-05-21T11:00:00.000Z',
+    };
+
+    expect(
+      mergeRemoteApplicationTracking(tracking, remoteApplication, 'free-work-123', 1779364800000)
+    ).toEqual({
+      ...tracking,
+      currentStatus: 'offer',
+      history: [
+        ...tracking.history,
+        {
+          from: 'applied',
+          to: 'offer',
+          timestamp: 1779364800000,
+          note: 'Sync dashboard revision 5',
+        },
+      ],
+      userRating: 5,
+      notes: 'Offre reçue',
     });
   });
 });

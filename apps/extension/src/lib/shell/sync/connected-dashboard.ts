@@ -6,11 +6,13 @@ import {
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
   buildSyncStatusRow,
+  mergeRemoteApplicationTracking,
   type ApplicationPipelineEventRow,
   type ApplicationUpsertRow,
   type ConnectorHealthEventRow,
   type MissionScoreUpsertRow,
   type MissionUpsertRow,
+  type RemoteApplicationSnapshot,
   type SyncStatusRow,
 } from '../../core/sync/connected-dashboard';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
@@ -18,7 +20,7 @@ import type { Mission, MissionSource } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
 import { getSupabaseClient } from '../auth/supabase-client';
 import { getMissionById } from '../storage/db';
-import { getTracking } from '../storage/tracking';
+import { getTracking, saveTrackings } from '../storage/tracking';
 
 const INSTALL_ID_STORAGE_KEY = 'missionpulse.connectedSync.installId';
 const DEFAULT_SCORER_VERSION = 'missionpulse-v1';
@@ -47,6 +49,10 @@ export interface ConnectedDashboardSyncGateway {
   upsertMissions(rows: MissionUpsertRow[]): Promise<RemoteMissionIdentity[]>;
   upsertMissionScores(rows: MissionScoreUpsertRow[]): Promise<void>;
   upsertApplications(rows: ApplicationUpsertRow[]): Promise<RemoteApplicationIdentity[]>;
+  listApplicationsUpdatedSince(input: {
+    userId: string;
+    since: string | null;
+  }): Promise<RemoteApplicationSnapshot[]>;
   upsertApplicationPipelineEvents(rows: ApplicationPipelineEventRow[]): Promise<void>;
   insertConnectorHealthEvents(rows: ConnectorHealthEventRow[]): Promise<void>;
   upsertSyncStatus(row: SyncStatusRow): Promise<void>;
@@ -97,6 +103,21 @@ export interface PushApplicationsResult {
   skippedCount: number;
 }
 
+export interface PullApplicationsInput {
+  userId: string;
+  deviceId: string;
+  localMissionIdsByRemoteId: Map<string, string>;
+  existingTrackings: Map<string, MissionTracking>;
+  since: Date | null;
+  now: Date;
+}
+
+export interface PullApplicationsResult {
+  pulledCount: number;
+  skippedCount: number;
+  trackings: MissionTracking[];
+}
+
 export interface PushConnectorHealthInput {
   userId: string;
   deviceId: string;
@@ -138,9 +159,22 @@ interface SupabaseWriteBuilder {
   select(columns: string): Promise<{ data: unknown; error: { message: string } | null }>;
 }
 
+interface SupabaseReadBuilder {
+  eq(column: string, value: unknown): SupabaseReadBuilder;
+  gt(column: string, value: unknown): SupabaseReadBuilder;
+  order(
+    column: string,
+    options?: Record<string, unknown>
+  ): Promise<{
+    data: unknown;
+    error: { message: string } | null;
+  }>;
+}
+
 interface SupabaseTableLike {
   upsert(rows: unknown, options?: Record<string, unknown>): SupabaseWriteBuilder;
   insert(rows: unknown): SupabaseWriteBuilder;
+  select(columns: string): SupabaseReadBuilder;
 }
 
 interface SupabaseLike {
@@ -192,6 +226,52 @@ function parseRemoteApplicationIdentities(data: unknown): RemoteApplicationIdent
   return data.flatMap((item) => {
     if (isRecord(item) && typeof item.id === 'string' && typeof item.mission_id === 'string') {
       return [{ id: item.id, mission_id: item.mission_id }];
+    }
+    return [];
+  });
+}
+
+function isApplicationStage(value: unknown): value is RemoteApplicationSnapshot['stage'] {
+  return (
+    value === 'detected' ||
+    value === 'selected' ||
+    value === 'application_prepared' ||
+    value === 'applied' ||
+    value === 'interview' ||
+    value === 'offer' ||
+    value === 'accepted' ||
+    value === 'rejected' ||
+    value === 'archived'
+  );
+}
+
+function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapshot[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap((item) => {
+    if (
+      isRecord(item) &&
+      typeof item.id === 'string' &&
+      typeof item.mission_id === 'string' &&
+      isApplicationStage(item.stage) &&
+      (typeof item.user_rating === 'number' || item.user_rating === null) &&
+      typeof item.notes === 'string' &&
+      typeof item.revision === 'number' &&
+      typeof item.updated_at === 'string'
+    ) {
+      return [
+        {
+          id: item.id,
+          mission_id: item.mission_id,
+          stage: item.stage,
+          user_rating: item.user_rating,
+          notes: item.notes,
+          revision: item.revision,
+          updated_at: item.updated_at,
+        },
+      ];
     }
     return [];
   });
@@ -260,6 +340,20 @@ export function createSupabaseConnectedDashboardGateway(
             'id,mission_id',
             parseRemoteApplicationIdentities
           ),
+    listApplicationsUpdatedSince: async ({ userId, since }) => {
+      let query = supabase
+        .from('applications')
+        .select('id,mission_id,stage,user_rating,notes,revision,updated_at')
+        .eq('user_id', userId);
+      if (since) {
+        query = query.gt('updated_at', since);
+      }
+      const { data, error } = await query.order('updated_at', { ascending: true });
+      if (error) {
+        throw new Error(error.message);
+      }
+      return parseRemoteApplicationSnapshots(data);
+    },
     upsertApplicationPipelineEvents: async (rows) => {
       if (rows.length === 0) {
         return;
@@ -438,6 +532,63 @@ export async function pushApplicationsToConnectedDashboard(
   }
 }
 
+export async function pullApplicationsFromConnectedDashboard(
+  gateway: ConnectedDashboardSyncGateway,
+  input: PullApplicationsInput
+): Promise<ConnectedSyncResult<PullApplicationsResult>> {
+  try {
+    const remoteApplications = await gateway.listApplicationsUpdatedSince({
+      userId: input.userId,
+      since: input.since ? input.since.toISOString() : null,
+    });
+    const trackings: MissionTracking[] = [];
+    let skippedCount = 0;
+
+    for (const application of remoteApplications) {
+      const localMissionId = input.localMissionIdsByRemoteId.get(application.mission_id);
+      if (!localMissionId) {
+        skippedCount++;
+        continue;
+      }
+
+      trackings.push(
+        mergeRemoteApplicationTracking(
+          input.existingTrackings.get(localMissionId) ?? null,
+          application,
+          localMissionId,
+          input.now.getTime()
+        )
+      );
+    }
+
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        entity: 'applications',
+        lastPullAt: input.now,
+        pendingDownloadCount: skippedCount,
+      })
+    );
+
+    return {
+      ok: true,
+      value: { pulledCount: trackings.length, skippedCount, trackings },
+    };
+  } catch (error) {
+    const syncError = remoteError(error);
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        entity: 'applications',
+        error: { code: syncError.code, message: syncError.message },
+      })
+    );
+    return { ok: false, error: syncError };
+  }
+}
+
 export async function pushConnectorHealthToConnectedDashboard(
   gateway: ConnectedDashboardSyncGateway,
   input: PushConnectorHealthInput
@@ -595,6 +746,33 @@ export async function syncConnectedDashboardSnapshot(
     return pushedApplications;
   }
 
+  const existingTrackings = new Map(
+    input.trackings.map((tracking) => [tracking.missionId, tracking])
+  );
+  const remoteMissionIdsByLocalId = pushedMissions.value.remoteMissionIds;
+  const localMissionIdsByRemoteId = new Map(
+    [...remoteMissionIdsByLocalId.entries()].map(([localMissionId, remoteMissionId]) => [
+      remoteMissionId,
+      localMissionId,
+    ])
+  );
+  const pulledApplications = await pullApplicationsFromConnectedDashboard(context.gateway, {
+    userId: context.userId,
+    deviceId: context.deviceId,
+    localMissionIdsByRemoteId,
+    existingTrackings,
+    since: null,
+    now: context.now,
+  });
+
+  if (!pulledApplications.ok) {
+    return pulledApplications;
+  }
+
+  if (pulledApplications.value.trackings.length > 0) {
+    await saveTrackings(pulledApplications.value.trackings);
+  }
+
   const pushedHealth = await pushConnectorHealthToConnectedDashboard(context.gateway, {
     userId: context.userId,
     deviceId: context.deviceId,
@@ -671,6 +849,22 @@ export async function syncConnectedDashboardTracking(
   });
   if (!pushedApplications.ok) {
     return pushedApplications;
+  }
+
+  const pulledApplications = await pullApplicationsFromConnectedDashboard(context.gateway, {
+    userId: context.userId,
+    deviceId: context.deviceId,
+    localMissionIdsByRemoteId: new Map(
+      [...pushedMissions.value.remoteMissionIds.entries()].map(
+        ([localMissionId, remoteMissionId]) => [remoteMissionId, localMissionId]
+      )
+    ),
+    existingTrackings: new Map([[tracking.missionId, tracking]]),
+    since: null,
+    now: context.now,
+  });
+  if (pulledApplications.ok && pulledApplications.value.trackings.length > 0) {
+    await saveTrackings(pulledApplications.value.trackings);
   }
 
   return { ok: true, value: { applications: pushedApplications.value.pushedCount } };
