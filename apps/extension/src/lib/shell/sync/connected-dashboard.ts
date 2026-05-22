@@ -16,6 +16,7 @@ import {
   buildMissionUpsertRow,
   buildProfileExtractorHealthEventRow,
   buildSyncStatusRow,
+  filterNewCandidateProfileFieldSuggestionRows,
   mergeRemoteApplicationTracking,
   remoteCandidateProfileToUserProfile,
   remoteAlertPreferencesToConnectedPreferences,
@@ -24,6 +25,7 @@ import {
   type CandidateEducationInsertRow,
   type CandidateExperienceInsertRow,
   type CandidateProfileFieldSuggestionRow,
+  type CandidateProfileSuggestionField,
   type CandidateLinkInsertRow,
   type CandidateProfileUpsertRow,
   type CandidateSkillUpsertRow,
@@ -113,6 +115,11 @@ export interface ConnectedDashboardSyncGateway {
   insertConnectorHealthEvents(rows: ConnectorHealthEventRow[]): Promise<void>;
   getCandidateProfile(userId: string): Promise<ExistingCandidateProfileSnapshot | null>;
   getCandidateProfileForScoring(userId: string): Promise<RemoteCandidateProfileSnapshot | null>;
+  listPendingCandidateProfileSuggestionFields(input: {
+    userId: string;
+    profileId: string;
+    source: string;
+  }): Promise<CandidateProfileSuggestionField[]>;
   upsertCandidateProfile(row: CandidateProfileUpsertRow): Promise<{ id: string; revision: number }>;
   replaceCandidateProfileChildren(input: {
     profileId: string;
@@ -684,6 +691,24 @@ function parseCandidateSkillRows(data: unknown): string[] {
   return data.flatMap((row) => (isRecord(row) && typeof row.skill === 'string' ? [row.skill] : []));
 }
 
+function isCandidateProfileSuggestionField(
+  value: unknown
+): value is CandidateProfileSuggestionField {
+  return value === 'title' || value === 'summary' || value === 'target_role';
+}
+
+function parsePendingCandidateProfileSuggestionFields(
+  data: unknown
+): CandidateProfileSuggestionField[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap((row) =>
+    isRecord(row) && isCandidateProfileSuggestionField(row.field) ? [row.field] : []
+  );
+}
+
 async function selectOrThrow<T>(
   builder: SupabaseWriteBuilder,
   columns: string,
@@ -832,6 +857,22 @@ export function createSupabaseConnectedDashboardGateway(
         throw new Error(error.message);
       }
       return parseExistingCandidateProfile(data);
+    },
+    listPendingCandidateProfileSuggestionFields: async ({ userId, profileId, source }) => {
+      const { data, error } = await supabase
+        .from('candidate_profile_field_suggestions')
+        .select('field')
+        .eq('user_id', userId)
+        .eq('profile_id', profileId)
+        .eq('source', source)
+        .eq('status', 'pending')
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        throw new Error(error.message);
+      }
+
+      return parsePendingCandidateProfileSuggestionFields(data);
     },
     getCandidateProfileForScoring: async (userId) => {
       const profileQuery = supabase
@@ -1424,11 +1465,21 @@ export async function pushCandidateProfileImportToConnectedDashboard(
       revision: profile.revision,
       rawHash: input.rawHash,
     });
-    const suggestionRows = buildCandidateProfileFieldSuggestionRows({
-      draft: input.draft,
-      userId: input.userId,
-      profile: existingProfile,
-    });
+    const pendingSuggestionFields = isDashboardEditedProfile
+      ? await gateway.listPendingCandidateProfileSuggestionFields({
+          userId: input.userId,
+          profileId: profile.id,
+          source: input.draft.source,
+        })
+      : [];
+    const suggestionRows = filterNewCandidateProfileFieldSuggestionRows(
+      buildCandidateProfileFieldSuggestionRows({
+        draft: input.draft,
+        userId: input.userId,
+        profile: existingProfile,
+      }),
+      pendingSuggestionFields
+    );
     const conflictRows = buildCandidateProfileSyncConflictRows({
       suggestions: suggestionRows,
       deviceId: input.deviceId,

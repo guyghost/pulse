@@ -852,6 +852,18 @@ export function buildCandidateProfileFieldSuggestionRows(input: {
   });
 }
 
+export function filterNewCandidateProfileFieldSuggestionRows(
+  rows: CandidateProfileFieldSuggestionRow[],
+  pendingFields: readonly CandidateProfileSuggestionField[]
+): CandidateProfileFieldSuggestionRow[] {
+  if (rows.length === 0 || pendingFields.length === 0) {
+    return rows;
+  }
+
+  const pending = new Set<CandidateProfileSuggestionField>(pendingFields);
+  return rows.filter((row) => !pending.has(row.field));
+}
+
 export function buildCandidateProfileSyncConflictRows(input: {
   suggestions: CandidateProfileFieldSuggestionRow[];
   deviceId: string;

@@ -4,6 +4,7 @@ import {
   buildApplicationSyncConflictRows,
   buildApplicationUpsertRow,
   buildCandidateProfileFieldSuggestionRows,
+  filterNewCandidateProfileFieldSuggestionRows,
   buildCandidateProfileImportRows,
   buildCandidateProfileSyncConflictRows,
   buildConnectorHealthEventRow,
@@ -669,6 +670,27 @@ describe('connected dashboard sync payload builders', () => {
         status: 'pending',
         detected_at: '2026-05-22T08:05:00.000Z',
       },
+    ]);
+  });
+
+  it('filters CV field suggestions that are already pending remotely', () => {
+    const rows = buildCandidateProfileFieldSuggestionRows({
+      draft: linkedinDraft,
+      userId: 'user-1',
+      profile: {
+        id: 'profile-1',
+        title: 'Consultant Frontend manuel',
+        summary: 'Résumé édité dans le dashboard.',
+        target_role: 'Architecte Svelte',
+        revision: 7,
+        updated_at: '2026-05-22T09:00:00.000Z',
+        updated_by: 'dashboard',
+      },
+    });
+
+    expect(filterNewCandidateProfileFieldSuggestionRows(rows, ['summary'])).toEqual([
+      expect.objectContaining({ field: 'title' }),
+      expect.objectContaining({ field: 'target_role' }),
     ]);
   });
 

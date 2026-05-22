@@ -147,6 +147,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
     getCandidateProfileForScoring: vi.fn(async () => null),
     upsertCandidateProfile: vi.fn(async () => ({ id: 'profile-1', revision: 3 })),
     replaceCandidateProfileChildren: vi.fn(async () => undefined),
+    listPendingCandidateProfileSuggestionFields: vi.fn(async () => []),
     insertCandidateProfileFieldSuggestions: vi.fn(async () => undefined),
     insertSyncConflicts: vi.fn(async () => undefined),
     insertProfileImport: vi.fn(async () => undefined),
@@ -934,6 +935,55 @@ describe('connected dashboard shell sync', () => {
         detected_at: '2026-05-22T08:05:00.000Z',
       }),
       expect.objectContaining({ field: 'summary' }),
+      expect.objectContaining({ field: 'target_role' }),
+    ]);
+  });
+
+  it('does not recreate pending CV field suggestions during LinkedIn import retries', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.getCandidateProfile).mockResolvedValueOnce({
+      id: 'profile-1',
+      title: 'Profil dashboard',
+      summary: 'Résumé manuel',
+      target_role: 'Architecte frontend',
+      revision: 8,
+      updated_at: '2026-05-22T08:00:00.000Z',
+      updated_by: 'dashboard',
+    });
+    vi.mocked(gateway.listPendingCandidateProfileSuggestionFields).mockResolvedValueOnce([
+      'summary',
+    ]);
+
+    const result = await pushCandidateProfileImportToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      draft: linkedinDraft,
+      now: new Date('2026-05-22T08:05:00.000Z'),
+      extractorVersion: 'linkedin-v1',
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        profileId: 'profile-1',
+        experiences: 0,
+        education: 0,
+        skills: 0,
+        links: 0,
+        suggestions: 2,
+      },
+    });
+    expect(gateway.listPendingCandidateProfileSuggestionFields).toHaveBeenCalledWith({
+      userId: 'user-1',
+      profileId: 'profile-1',
+      source: 'linkedin',
+    });
+    expect(gateway.insertCandidateProfileFieldSuggestions).toHaveBeenCalledWith([
+      expect.objectContaining({ field: 'title' }),
+      expect.objectContaining({ field: 'target_role' }),
+    ]);
+    expect(gateway.insertSyncConflicts).toHaveBeenCalledWith([
+      expect.objectContaining({ field: 'title' }),
       expect.objectContaining({ field: 'target_role' }),
     ]);
   });
