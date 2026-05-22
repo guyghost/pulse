@@ -11,13 +11,11 @@ import { APPLICATION_TRANSITIONS, type ApplicationStage } from '@pulse/domain';
  * Application status lifecycle for a mission.
  *
  * Valid transitions:
- *   new → interested → applying → applied → (rejected | accepted)
- *   new → archived
- *   interested → archived
- *   applied → rejected
- *   applied → accepted
+ *   detected → selected → application_prepared → applied → interview → offer
+ *   offer → accepted | rejected | archived
+ *   terminal stages can be archived for history.
  *
- * Any status → archived (can always archive)
+ * Legacy local records are migrated by the shell storage adapter.
  */
 export type ApplicationStatus = ApplicationStage;
 

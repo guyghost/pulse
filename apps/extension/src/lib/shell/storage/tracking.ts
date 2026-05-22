@@ -6,6 +6,7 @@
 
 import type { MissionTracking } from '../../core/types/tracking';
 import type { ApplicationStatus } from '../../core/types/tracking';
+import { normalizeStoredMissionTracking } from '../../core/tracking/migration';
 
 const DB_NAME = 'missionpulse';
 const TRACKING_STORE = 'mission_tracking';
@@ -92,7 +93,7 @@ export async function getTracking(missionId: string): Promise<MissionTracking | 
 
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
-      resolve(request.result ?? null);
+      resolve(normalizeStoredMissionTracking(request.result));
     };
     request.onerror = () => reject(request.error);
   });
@@ -108,7 +109,16 @@ export async function getAllTrackings(): Promise<MissionTracking[]> {
   const request = store.getAll();
 
   return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
+    request.onsuccess = () => {
+      resolve(
+        Array.isArray(request.result)
+          ? request.result.flatMap((item) => {
+              const tracking = normalizeStoredMissionTracking(item);
+              return tracking ? [tracking] : [];
+            })
+          : []
+      );
+    };
     request.onerror = () => reject(request.error);
   });
 }
@@ -117,16 +127,8 @@ export async function getAllTrackings(): Promise<MissionTracking[]> {
  * Get tracking records filtered by status.
  */
 export async function getTrackingsByStatus(status: ApplicationStatus): Promise<MissionTracking[]> {
-  const db = await openDBWithTracking();
-  const tx = db.transaction(TRACKING_STORE, 'readonly');
-  const store = tx.objectStore(TRACKING_STORE);
-  const index = store.index('currentStatus');
-  const request = index.getAll(status);
-
-  return new Promise((resolve, reject) => {
-    request.onsuccess = () => resolve(request.result);
-    request.onerror = () => reject(request.error);
-  });
+  const trackings = await getAllTrackings();
+  return trackings.filter((tracking) => tracking.currentStatus === status);
 }
 
 /**
