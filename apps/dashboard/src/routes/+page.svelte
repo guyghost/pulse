@@ -65,6 +65,14 @@
   let copiedAssetId = $state<string | null>(null);
   const averageScore = $derived(getAverageApplicationScore(applications));
   const nextFollowUp = $derived(getNextFollowUp(applications));
+  const applicationCountBadgeLabel = $derived(
+    applications.length > 0
+      ? `${applications.length} suivie${applications.length > 1 ? 's' : ''}`
+      : 'Aucune sync'
+  );
+  const averageScoreBadgeLabel = $derived(averageScore > 0 ? 'Score synchronisé' : 'Sans score');
+  const interviewBadgeLabel = $derived(counts.interview > 0 ? 'Prioritaire' : 'Aucun');
+  const nextFollowUpBadgeLabel = $derived(nextFollowUp ? 'À traiter' : 'Aucune relance');
   const sourceFilters: { label: string; value: 'all' | MissionApplication['source'] }[] = [
     { label: 'Toutes', value: 'all' },
     { label: 'LinkedIn', value: 'linkedin' },
@@ -486,28 +494,37 @@
           <p class="text-xs font-medium uppercase text-text-subtle">Candidatures</p>
           <div class="mt-3 flex items-end justify-between">
             <p class="text-3xl font-semibold">{applications.length}</p>
-            <Badge label="+2 cette semaine" variant="success" />
+            <Badge
+              label={applicationCountBadgeLabel}
+              variant={applications.length > 0 ? 'success' : 'source'}
+            />
           </div>
         </div>
         <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
           <p class="text-xs font-medium uppercase text-text-subtle">Taux moyen</p>
           <div class="mt-3 flex items-end justify-between">
             <p class="text-3xl font-semibold">{averageScore}%</p>
-            <Badge label="Score IA" variant="status" />
+            <Badge
+              label={averageScoreBadgeLabel}
+              variant={averageScore > 0 ? 'status' : 'source'}
+            />
           </div>
         </div>
         <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
           <p class="text-xs font-medium uppercase text-text-subtle">Entretiens</p>
           <div class="mt-3 flex items-end justify-between">
             <p class="text-3xl font-semibold">{counts.interview}</p>
-            <Badge label="Prioritaire" variant="warning" />
+            <Badge
+              label={interviewBadgeLabel}
+              variant={counts.interview > 0 ? 'warning' : 'source'}
+            />
           </div>
         </div>
         <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
           <p class="text-xs font-medium uppercase text-text-subtle">Prochaine relance</p>
           <div class="mt-3 flex items-end justify-between">
             <p class="text-3xl font-semibold">{formatDate(nextFollowUp?.nextActionAt ?? null)}</p>
-            <Badge label="À traiter" variant="source" />
+            <Badge label={nextFollowUpBadgeLabel} variant={nextFollowUp ? 'warning' : 'source'} />
           </div>
         </div>
       </section>

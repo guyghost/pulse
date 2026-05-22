@@ -7,6 +7,9 @@ test.describe('connected dashboard smoke', () => {
     await page.goto('/dashboard/');
 
     await expect(page.getByText('Configuration Supabase absente')).toBeVisible();
+    await expect(page.getByText('Aucune sync')).toBeVisible();
+    await expect(page.getByText('Sans score')).toBeVisible();
+    await expect(page.getByText('Aucune relance')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: "Missions détectées par l'extension" })
     ).toBeVisible();
