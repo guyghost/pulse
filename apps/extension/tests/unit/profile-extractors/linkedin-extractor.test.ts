@@ -161,6 +161,19 @@ describe('LinkedInProfileExtractor', () => {
     expect(extractorCode(result)).toBe('session_required');
   });
 
+  it('returns session_required when the active profile tab has no LinkedIn session cookie', async () => {
+    const chromeDouble = createChromeDouble({
+      getAllCookies: async () => [],
+    });
+    const extractor = new LinkedInProfileExtractor(chromeDouble);
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('session_required');
+    expect(chromeDouble.scripting?.executeScript).not.toHaveBeenCalled();
+  });
+
   it('returns rate_limited_or_blocked when LinkedIn shows a checkpoint', async () => {
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({

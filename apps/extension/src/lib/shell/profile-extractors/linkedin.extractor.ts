@@ -229,6 +229,21 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
       );
     }
 
+    const session = await this.detectSession(now);
+    if (!session.ok) {
+      return session;
+    }
+    if (!session.value) {
+      return err(
+        createProfileExtractorError(
+          'session_required',
+          'LinkedIn requires an authenticated browser session before import.',
+          now,
+          { url: tab.url }
+        )
+      );
+    }
+
     try {
       const [result] = await this.chromeApi.scripting.executeScript({
         target: { tabId: tab.id },
