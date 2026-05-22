@@ -69,6 +69,8 @@ export interface MissionApplication {
   location: string;
   appliedAt: string | null;
   nextActionAt: string | null;
+  notes: string;
+  userRating: number | null;
 }
 
 export type GeneratedApplicationAssetType = 'pitch' | 'cover_message' | 'cv_summary';
@@ -227,6 +229,8 @@ export interface DashboardCanonicalApplicationRow {
   id: string;
   mission_id: string;
   stage: string;
+  notes: string;
+  user_rating: number | null;
   applied_at: string | null;
   next_action_at: string | null;
 }
@@ -378,6 +382,13 @@ export interface ApplicationSelectionInsertPatch {
   updated_by: 'dashboard';
 }
 
+export interface ApplicationDetailsUpdatePatch {
+  notes: string;
+  user_rating: number | null;
+  next_action_at: string | null;
+  updated_by: 'dashboard';
+}
+
 export interface ApplicationFilters {
   query: string;
   source: 'all' | ApplicationSource;
@@ -502,6 +513,8 @@ export function favoriteMissionToApplication(
     location: favorite.location ?? 'Localisation non renseignée',
     appliedAt: null,
     nextActionAt: null,
+    notes: '',
+    userRating: null,
   };
 }
 
@@ -535,6 +548,8 @@ export function canonicalRowsToApplications(
         location: mission.location ?? 'Localisation non renseignée',
         appliedAt: application.applied_at,
         nextActionAt: application.next_action_at,
+        notes: application.notes,
+        userRating: application.user_rating,
       },
     ];
   });
@@ -979,6 +994,27 @@ export function buildMissionSelectionInsertPatch(): ApplicationSelectionInsertPa
     stage: 'selected',
     notes: '',
     revision: 1,
+    updated_by: 'dashboard',
+  };
+}
+
+export function buildApplicationDetailsUpdatePatch(
+  notes: string,
+  userRating: number | null,
+  nextActionDate: string | null
+): ApplicationDetailsUpdatePatch | null {
+  if (userRating !== null && (!Number.isInteger(userRating) || userRating < 1 || userRating > 5)) {
+    return null;
+  }
+
+  if (nextActionDate !== null && !/^\d{4}-\d{2}-\d{2}$/.test(nextActionDate)) {
+    return null;
+  }
+
+  return {
+    notes: notes.trim(),
+    user_rating: userRating,
+    next_action_at: nextActionDate ? `${nextActionDate}T12:00:00.000Z` : null,
     updated_by: 'dashboard',
   };
 }

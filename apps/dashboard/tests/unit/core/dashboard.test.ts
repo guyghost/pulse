@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import {
   countApplicationsByStage,
   canonicalRowsToApplications,
+  buildApplicationDetailsUpdatePatch,
   buildTjmRadarSnapshot,
   filterApplications,
   favoriteMissionToApplication,
@@ -50,6 +51,8 @@ const applications: MissionApplication[] = [
     location: 'Paris hybride',
     appliedAt: '2026-05-08',
     nextActionAt: '2026-05-19',
+    notes: 'Relancer le recruteur.',
+    userRating: 5,
   },
   {
     id: 'app-002',
@@ -62,6 +65,8 @@ const applications: MissionApplication[] = [
     location: 'Remote France',
     appliedAt: '2026-05-11',
     nextActionAt: null,
+    notes: '',
+    userRating: null,
   },
   {
     id: 'app-003',
@@ -74,6 +79,8 @@ const applications: MissionApplication[] = [
     location: 'Lyon',
     appliedAt: null,
     nextActionAt: '2026-05-20',
+    notes: 'À comparer avec une mission remote.',
+    userRating: 4,
   },
 ];
 
@@ -251,6 +258,8 @@ describe('dashboard core', () => {
             id: 'application-1',
             mission_id: 'mission-1',
             stage: 'offer',
+            notes: 'Bon échange.',
+            user_rating: 5,
             applied_at: '2026-05-21T08:00:00.000Z',
             next_action_at: '2026-05-24T08:00:00.000Z',
           },
@@ -258,6 +267,8 @@ describe('dashboard core', () => {
             id: 'application-2',
             mission_id: 'missing-mission',
             stage: 'selected',
+            notes: '',
+            user_rating: null,
             applied_at: null,
             next_action_at: null,
           },
@@ -289,6 +300,8 @@ describe('dashboard core', () => {
         location: 'Remote France',
         appliedAt: '2026-05-21T08:00:00.000Z',
         nextActionAt: '2026-05-24T08:00:00.000Z',
+        notes: 'Bon échange.',
+        userRating: 5,
       },
     ]);
   });
@@ -864,5 +877,24 @@ describe('dashboard core', () => {
       revision: 1,
       updated_by: 'dashboard',
     });
+  });
+
+  it('builds validated application details update patches', () => {
+    expect(buildApplicationDetailsUpdatePatch('  Relancer lundi  ', 4, '2026-05-25')).toEqual({
+      notes: 'Relancer lundi',
+      user_rating: 4,
+      next_action_at: '2026-05-25T12:00:00.000Z',
+      updated_by: 'dashboard',
+    });
+
+    expect(buildApplicationDetailsUpdatePatch('', null, null)).toEqual({
+      notes: '',
+      user_rating: null,
+      next_action_at: null,
+      updated_by: 'dashboard',
+    });
+
+    expect(buildApplicationDetailsUpdatePatch('', 6, null)).toBeNull();
+    expect(buildApplicationDetailsUpdatePatch('', 3, '25/05/2026')).toBeNull();
   });
 });

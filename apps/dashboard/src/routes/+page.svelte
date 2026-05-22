@@ -910,6 +910,87 @@
                 </p>
               {/if}
 
+              {#if form?.detailsError}
+                <p
+                  class="mt-4 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
+                >
+                  {form.detailsError}
+                </p>
+              {/if}
+
+              {#if form?.detailsSuccess}
+                <p
+                  class="mt-4 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
+                >
+                  {form.detailsSuccess}
+                </p>
+              {/if}
+
+              <form
+                method="POST"
+                action="?/updateApplicationDetails"
+                class="mt-5 border-t border-border-light pt-4"
+              >
+                <input type="hidden" name="applicationId" value={selectedApplication.id} />
+                <p class="text-xs font-medium uppercase text-text-subtle">Suivi opérationnel</p>
+                <label
+                  class="mt-3 block text-xs font-medium text-text-subtle"
+                  for="application-notes"
+                >
+                  Notes
+                </label>
+                <textarea
+                  id="application-notes"
+                  name="notes"
+                  class="mt-1 min-h-20 w-full resize-y rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-sm leading-6 text-text-primary outline-none focus:border-blueprint-blue/40"
+                  value={selectedApplication.notes}
+                ></textarea>
+
+                <div class="mt-3 grid grid-cols-2 gap-2">
+                  <label
+                    class="block text-xs font-medium text-text-subtle"
+                    for="application-rating"
+                  >
+                    Rating
+                    <select
+                      id="application-rating"
+                      name="userRating"
+                      class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                    >
+                      <option value="" selected={selectedApplication.userRating === null}>
+                        Non notée
+                      </option>
+                      {#each [1, 2, 3, 4, 5] as rating}
+                        <option value={rating} selected={selectedApplication.userRating === rating}>
+                          {rating}/5
+                        </option>
+                      {/each}
+                    </select>
+                  </label>
+                  <label
+                    class="block text-xs font-medium text-text-subtle"
+                    for="application-follow-up"
+                  >
+                    Prochaine relance
+                    <input
+                      id="application-follow-up"
+                      name="nextActionDate"
+                      type="date"
+                      value={selectedApplication.nextActionAt?.slice(0, 10) ?? ''}
+                      class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                    />
+                  </label>
+                </div>
+
+                <button
+                  type="submit"
+                  class="mt-3 inline-flex h-8 items-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-40"
+                  disabled={!isConnected}
+                >
+                  Enregistrer le suivi
+                </button>
+              </form>
+
               {#if isConnected && selectedNextStages.length > 0}
                 <form
                   method="POST"

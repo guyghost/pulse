@@ -8,6 +8,7 @@ import {
 } from '@pulse/domain';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
+  buildApplicationDetailsUpdatePatch,
   buildApplicationStageUpdatePatch,
   buildMissionSelectionInsertPatch,
   buildTjmRadarSnapshot,
@@ -60,6 +61,8 @@ const mockApplications: MissionApplication[] = [
     location: 'Paris hybride',
     appliedAt: '2026-05-08',
     nextActionAt: '2026-05-19',
+    notes: 'Relancer après le prochain entretien.',
+    userRating: 5,
   },
   {
     id: 'app-002',
@@ -72,6 +75,8 @@ const mockApplications: MissionApplication[] = [
     location: 'Remote France',
     appliedAt: '2026-05-11',
     nextActionAt: null,
+    notes: '',
+    userRating: null,
   },
   {
     id: 'app-003',
@@ -84,6 +89,8 @@ const mockApplications: MissionApplication[] = [
     location: 'Lyon',
     appliedAt: null,
     nextActionAt: '2026-05-20',
+    notes: 'À préparer après vérification du CV.',
+    userRating: 4,
   },
 ];
 
@@ -272,6 +279,11 @@ type ApplicationTransitionRow = {
   revision: number;
 };
 
+type ApplicationDetailsRow = {
+  id: string;
+  revision: number;
+};
+
 type MissionSelectionRow = {
   id: string;
   title: string;
@@ -422,7 +434,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
   const { data: canonicalApplicationRows } = await supabase
     .from('applications')
-    .select('id, mission_id, stage, applied_at, next_action_at')
+    .select('id, mission_id, stage, notes, user_rating, applied_at, next_action_at')
     .eq('user_id', session.user.id)
     .order('updated_at', { ascending: false })
     .limit(100)
@@ -595,6 +607,84 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
+  updateApplicationDetails: async ({ cookies, request }) => {
+    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasSupabaseConfig) {
+      return fail(503, { detailsError: 'Configuration Supabase absente.' });
+    }
+
+    const supabase = createSupabaseServerClient(cookies);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return fail(401, { detailsError: 'Session requise.' });
+    }
+
+    const formData = await request.formData();
+    const applicationId = formData.get('applicationId');
+    const notes = formData.get('notes');
+    const userRating = formData.get('userRating');
+    const nextActionDate = formData.get('nextActionDate');
+
+    if (
+      typeof applicationId !== 'string' ||
+      typeof notes !== 'string' ||
+      typeof userRating !== 'string' ||
+      typeof nextActionDate !== 'string'
+    ) {
+      return fail(400, { detailsError: 'Détails de candidature invalides.' });
+    }
+
+    const parsedRating = userRating === '' ? null : Number(userRating);
+    const patch = buildApplicationDetailsUpdatePatch(
+      notes,
+      parsedRating,
+      nextActionDate === '' ? null : nextActionDate
+    );
+
+    if (!patch) {
+      return fail(400, { detailsError: 'Note, rating ou relance invalide.' });
+    }
+
+    const { data: application, error: readError } = await supabase
+      .from('applications')
+      .select('id, revision')
+      .eq('id', applicationId)
+      .eq('user_id', session.user.id)
+      .single<ApplicationDetailsRow>();
+
+    if (readError || !application) {
+      return fail(404, { detailsError: 'Candidature introuvable.' });
+    }
+
+    const { error: updateError } = await supabase
+      .from('applications')
+      .update({
+        ...patch,
+        revision: application.revision + 1,
+      })
+      .eq('id', applicationId)
+      .eq('user_id', session.user.id)
+      .eq('revision', application.revision)
+      .select('id')
+      .single<{ id: string }>();
+
+    if (updateError) {
+      if (updateError.code !== 'PGRST116') {
+        return fail(500, { detailsError: "Les détails n'ont pas pu être enregistrés." });
+      }
+
+      return fail(409, {
+        detailsError:
+          "La candidature a changé depuis l'ouverture de la page. Rechargez avant d'enregistrer.",
+      });
+    }
+
+    return { detailsSuccess: 'Détails de candidature enregistrés.' };
+  },
+
   selectMission: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
