@@ -40,6 +40,19 @@ const humanizeScanError = (message: string, code: string): string => {
   }
 };
 
+async function readLastGlobalSyncFromServiceWorker(): Promise<number | null> {
+  try {
+    const response = await sendMessage({ type: 'GET_CONNECTED_SYNC_STATUS' });
+    if (response.type !== 'CONNECTED_SYNC_STATUS_RESULT') {
+      return null;
+    }
+
+    return response.payload.lastGlobalSync;
+  } catch {
+    return null;
+  }
+}
+
 // Re-export SourceStatus types for consumers
 export type SourceSessionStatus = 'checking' | 'connected' | 'not-connected' | 'error';
 
@@ -255,8 +268,7 @@ export function createFeedController(feedStore: {
       const [stored, settings] = await Promise.all([getMissions(), getSettings()]);
       if (stored.length > 0) {
         feedStore.setMissions(stored);
-        const result = await chrome.storage.local.get('lastGlobalSync');
-        const lastSync = result.lastGlobalSync as number | undefined;
+        const lastSync = await readLastGlobalSyncFromServiceWorker();
         const intervalMs = settings.scanIntervalMinutes * 60 * 1000;
         if (lastSync && Date.now() - lastSync < intervalMs) {
           return;
@@ -468,9 +480,9 @@ export function createFeedController(feedStore: {
 
     // Load last scan timestamp
     try {
-      const result = await chrome.storage.local.get('lastGlobalSync');
-      if (result.lastGlobalSync) {
-        lastScanAt = result.lastGlobalSync as number;
+      const lastSync = await readLastGlobalSyncFromServiceWorker();
+      if (lastSync) {
+        lastScanAt = lastSync;
       }
     } catch {
       /* Non-critical */
