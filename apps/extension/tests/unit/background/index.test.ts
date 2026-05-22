@@ -43,6 +43,7 @@ const setOnboardingCompleted = vi.fn();
 const clearOnboardingCompleted = vi.fn();
 const getFeedTourSeen = vi.fn();
 const setFeedTourSeen = vi.fn();
+const clearFeedTourSeen = vi.fn();
 const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
@@ -261,6 +262,7 @@ vi.mock('../../../src/lib/shell/storage/first-scan', () => ({
   clearOnboardingCompleted,
   getFeedTourSeen,
   setFeedTourSeen,
+  clearFeedTourSeen,
 }));
 
 describe('background auto-scan notifications', () => {
@@ -284,6 +286,7 @@ describe('background auto-scan notifications', () => {
     clearOnboardingCompleted.mockResolvedValue(undefined);
     getFeedTourSeen.mockResolvedValue(false);
     setFeedTourSeen.mockResolvedValue(undefined);
+    clearFeedTourSeen.mockResolvedValue(undefined);
     await import('../../../src/background/index.ts');
   });
 
@@ -738,6 +741,7 @@ describe('background auto-scan notifications', () => {
     const onboardingClearResponse = vi.fn();
     const tourReadResponse = vi.fn();
     const tourWriteResponse = vi.fn();
+    const tourClearResponse = vi.fn();
 
     getFirstScanDone.mockResolvedValueOnce(true);
     getProfileBannerDismissed.mockResolvedValueOnce(false);
@@ -762,6 +766,7 @@ describe('background auto-scan notifications', () => {
     ).toBe(true);
     expect(messageListener?.({ type: 'GET_FEED_TOUR_SEEN' }, {}, tourReadResponse)).toBe(true);
     expect(messageListener?.({ type: 'SET_FEED_TOUR_SEEN' }, {}, tourWriteResponse)).toBe(true);
+    expect(messageListener?.({ type: 'CLEAR_FEED_TOUR_SEEN' }, {}, tourClearResponse)).toBe(true);
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(firstScanResponse).toHaveBeenCalledWith({
@@ -795,6 +800,10 @@ describe('background auto-scan notifications', () => {
     expect(tourWriteResponse).toHaveBeenCalledWith({
       type: 'FEED_TOUR_SEEN_SET',
       payload: { saved: true },
+    });
+    expect(tourClearResponse).toHaveBeenCalledWith({
+      type: 'FEED_TOUR_SEEN_CLEARED',
+      payload: { cleared: true },
     });
   });
 

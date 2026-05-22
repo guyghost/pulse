@@ -408,6 +408,11 @@ export const MessageSchemas = {
     type: z.literal('FEED_TOUR_SEEN_SET'),
     payload: z.object({ saved: z.boolean() }),
   }),
+  CLEAR_FEED_TOUR_SEEN: z.object({ type: z.literal('CLEAR_FEED_TOUR_SEEN') }),
+  FEED_TOUR_SEEN_CLEARED: z.object({
+    type: z.literal('FEED_TOUR_SEEN_CLEARED'),
+    payload: z.object({ cleared: z.boolean() }),
+  }),
   GET_PERSISTED_CONNECTOR_STATUSES: z.object({
     type: z.literal('GET_PERSISTED_CONNECTOR_STATUSES'),
   }),

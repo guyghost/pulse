@@ -43,6 +43,7 @@ import {
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 import { getAllHealthSnapshots, resetHealthSnapshot } from '../lib/shell/storage/connector-health';
 import {
+  clearFeedTourSeen,
   clearOnboardingCompleted,
   getFeedTourSeen,
   getFirstScanDone,
@@ -980,6 +981,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] SET_FEED_TOUR_SEEN error:', err);
           sendResponse({ type: 'FEED_TOUR_SEEN_SET', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'CLEAR_FEED_TOUR_SEEN') {
+      clearFeedTourSeen()
+        .then(() => {
+          sendResponse({ type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] CLEAR_FEED_TOUR_SEEN error:', err);
+          sendResponse({ type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: false } });
         });
       return true;
     }

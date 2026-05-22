@@ -91,6 +91,8 @@ export type BridgeMessage =
   | { type: 'FEED_TOUR_SEEN_RESULT'; payload: boolean }
   | { type: 'SET_FEED_TOUR_SEEN' }
   | { type: 'FEED_TOUR_SEEN_SET'; payload: { saved: boolean } }
+  | { type: 'CLEAR_FEED_TOUR_SEEN' }
+  | { type: 'FEED_TOUR_SEEN_CLEARED'; payload: { cleared: boolean } }
   | { type: 'GET_PERSISTED_CONNECTOR_STATUSES' }
   | { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT'; payload: PersistedConnectorStatus[] }
   | { type: 'GET_SETTINGS' }

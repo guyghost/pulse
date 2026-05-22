@@ -117,6 +117,9 @@ function createChromeStubs() {
           case 'SET_FEED_TOUR_SEEN':
             storage.feed_tour_seen = true;
             return { type: 'FEED_TOUR_SEEN_SET', payload: { saved: true } };
+          case 'CLEAR_FEED_TOUR_SEEN':
+            storage.feed_tour_seen = false;
+            return { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } };
           case 'SCAN_START':
             setTimeout(() => {
               window.dispatchEvent(

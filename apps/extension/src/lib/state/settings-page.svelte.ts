@@ -31,7 +31,7 @@ import {
 import { getMissions } from '$lib/shell/facades/feed-data.facade';
 import { sendMessage } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
-import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/storage/first-scan';
+import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;

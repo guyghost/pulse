@@ -127,6 +127,7 @@ describe('validateMessage — messages sans payload', () => {
       'CLEAR_ONBOARDING_COMPLETED',
       'GET_FEED_TOUR_SEEN',
       'SET_FEED_TOUR_SEEN',
+      'CLEAR_FEED_TOUR_SEEN',
     ]) {
       expect(validateMessage({ type }).valid).toBe(true);
     }

@@ -47,3 +47,10 @@ export async function setFeedTourSeen(): Promise<void> {
     throw new Error('Feed tour flag save failed.');
   }
 }
+
+export async function clearFeedTourSeen(): Promise<void> {
+  const response = await sendMessage({ type: 'CLEAR_FEED_TOUR_SEEN' });
+  if (response.type !== 'FEED_TOUR_SEEN_CLEARED' || !response.payload.cleared) {
+    throw new Error('Feed tour flag clear failed.');
+  }
+}

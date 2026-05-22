@@ -9,6 +9,7 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
 }));
 
 import {
+  clearFeedTourSeen,
   clearOnboardingCompleted,
   getFeedTourSeen,
   getFirstScanDone,
@@ -51,12 +52,14 @@ describe('app flags facade', () => {
       .mockResolvedValueOnce({ type: 'PROFILE_BANNER_DISMISSED_SET', payload: { saved: true } })
       .mockResolvedValueOnce({ type: 'ONBOARDING_COMPLETED_SET', payload: { saved: true } })
       .mockResolvedValueOnce({ type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: true } })
-      .mockResolvedValueOnce({ type: 'FEED_TOUR_SEEN_SET', payload: { saved: true } });
+      .mockResolvedValueOnce({ type: 'FEED_TOUR_SEEN_SET', payload: { saved: true } })
+      .mockResolvedValueOnce({ type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } });
 
     await expect(setProfileBannerDismissed()).resolves.toBeUndefined();
     await expect(setOnboardingCompleted()).resolves.toBeUndefined();
     await expect(clearOnboardingCompleted()).resolves.toBeUndefined();
     await expect(setFeedTourSeen()).resolves.toBeUndefined();
+    await expect(clearFeedTourSeen()).resolves.toBeUndefined();
 
     expect(bridgeMock.sendMessage).toHaveBeenNthCalledWith(1, {
       type: 'SET_PROFILE_BANNER_DISMISSED',
@@ -68,5 +71,6 @@ describe('app flags facade', () => {
       type: 'CLEAR_ONBOARDING_COMPLETED',
     });
     expect(bridgeMock.sendMessage).toHaveBeenNthCalledWith(4, { type: 'SET_FEED_TOUR_SEEN' });
+    expect(bridgeMock.sendMessage).toHaveBeenNthCalledWith(5, { type: 'CLEAR_FEED_TOUR_SEEN' });
   });
 });
