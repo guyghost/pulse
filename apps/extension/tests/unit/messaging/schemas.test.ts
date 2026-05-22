@@ -247,6 +247,21 @@ describe('validateMessage — connected dashboard sync', () => {
         authenticated: true,
         installId: 'install-1',
         lastGlobalSync: 1779340800000,
+        entities: [
+          {
+            entity: 'applications',
+            label: 'Candidatures',
+            state: 'error',
+            lastPullAt: '2026-05-22T08:00:00.000Z',
+            lastPushAt: null,
+            pendingUploadCount: 0,
+            pendingDownloadCount: 1,
+            lastErrorCode: 'remote-error',
+            lastErrorMessage: 'Supabase indisponible',
+            retryAfterAt: '2026-05-22T08:05:00.000Z',
+            updatedAt: '2026-05-22T08:00:00.000Z',
+          },
+        ],
       },
     });
     expect(r.valid).toBe(true);

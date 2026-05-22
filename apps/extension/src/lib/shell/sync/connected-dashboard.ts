@@ -29,6 +29,7 @@ import {
   type MissionUpsertRow,
   type ProfileImportInsertRow,
   type RemoteApplicationSnapshot,
+  type SyncEntity,
   type SyncStatusRow,
   type SyncConflictInsertRow,
 } from '../../core/sync/connected-dashboard';
@@ -49,6 +50,13 @@ const APPLICATION_PULL_CURSOR_STORAGE_KEY =
 const DEFAULT_SCORER_VERSION = 'missionpulse-v1';
 const LINKEDIN_PROFILE_EXTRACTOR_VERSION = 'linkedin-v1';
 const SYNC_RETRY_DELAY_MS = 5 * 60 * 1000;
+
+const CONNECTED_SYNC_ENTITY_LABELS: Record<SyncEntity, string> = {
+  missions: 'Missions',
+  applications: 'Candidatures',
+  candidate_profile: 'Profil CV',
+  connector_health: 'Santé connecteurs',
+};
 
 export interface RemoteMissionIdentity {
   id: string;
@@ -215,6 +223,23 @@ export interface ConnectedDashboardSyncStatus {
   authenticated: boolean;
   installId: string | null;
   lastGlobalSync: number | null;
+  entities: ConnectedDashboardEntitySyncStatus[];
+}
+
+export type ConnectedDashboardSyncState = 'healthy' | 'pending' | 'error' | 'idle';
+
+export interface ConnectedDashboardEntitySyncStatus {
+  entity: SyncEntity;
+  label: string;
+  state: ConnectedDashboardSyncState;
+  lastPullAt: string | null;
+  lastPushAt: string | null;
+  pendingUploadCount: number;
+  pendingDownloadCount: number;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  retryAfterAt: string | null;
+  updatedAt: string;
 }
 
 interface SupabaseAuthLike {
@@ -324,6 +349,15 @@ function isApplicationStage(value: unknown): value is RemoteApplicationSnapshot[
   );
 }
 
+function isSyncEntity(value: unknown): value is SyncEntity {
+  return (
+    value === 'missions' ||
+    value === 'applications' ||
+    value === 'candidate_profile' ||
+    value === 'connector_health'
+  );
+}
+
 function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapshot[] {
   if (!Array.isArray(data)) {
     return [];
@@ -354,6 +388,60 @@ function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapsh
     }
     return [];
   });
+}
+
+interface RemoteSyncStatusSnapshot {
+  entity: SyncEntity;
+  last_pull_at: string | null;
+  last_push_at: string | null;
+  pending_upload_count: number;
+  pending_download_count: number;
+  last_error_code: string | null;
+  last_error_message: string | null;
+  retry_after_at: string | null;
+  updated_at: string;
+}
+
+function parseRemoteSyncStatusSnapshots(data: unknown): RemoteSyncStatusSnapshot[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap((item) => {
+    if (
+      isRecord(item) &&
+      isSyncEntity(item.entity) &&
+      (typeof item.last_pull_at === 'string' || item.last_pull_at === null) &&
+      (typeof item.last_push_at === 'string' || item.last_push_at === null) &&
+      typeof item.pending_upload_count === 'number' &&
+      typeof item.pending_download_count === 'number' &&
+      (typeof item.last_error_code === 'string' || item.last_error_code === null) &&
+      (typeof item.last_error_message === 'string' || item.last_error_message === null) &&
+      (typeof item.retry_after_at === 'string' || item.retry_after_at === null) &&
+      typeof item.updated_at === 'string'
+    ) {
+      return [
+        {
+          entity: item.entity,
+          last_pull_at: item.last_pull_at,
+          last_push_at: item.last_push_at,
+          pending_upload_count: item.pending_upload_count,
+          pending_download_count: item.pending_download_count,
+          last_error_code: item.last_error_code,
+          last_error_message: item.last_error_message,
+          retry_after_at: item.retry_after_at,
+          updated_at: item.updated_at,
+        },
+      ];
+    }
+
+    return [];
+  });
+}
+
+function parseDeviceId(data: unknown): string | null {
+  const value = Array.isArray(data) ? data[0] : data;
+  return isRecord(value) && typeof value.id === 'string' ? value.id : null;
 }
 
 function parseSingleId(data: unknown): { id: string } {
@@ -1055,6 +1143,100 @@ async function setApplicationPullCursor(cursor: string | null): Promise<void> {
   await chrome.storage.local.set({ [APPLICATION_PULL_CURSOR_STORAGE_KEY]: cursor });
 }
 
+function getEntitySyncState(row: RemoteSyncStatusSnapshot): ConnectedDashboardSyncState {
+  if (row.last_error_code || row.last_error_message) {
+    return 'error';
+  }
+
+  if (row.pending_upload_count > 0 || row.pending_download_count > 0) {
+    return 'pending';
+  }
+
+  if (row.last_pull_at || row.last_push_at) {
+    return 'healthy';
+  }
+
+  return 'idle';
+}
+
+function getEntitySyncStateRank(state: ConnectedDashboardSyncState): number {
+  if (state === 'error') {
+    return 0;
+  }
+  if (state === 'pending') {
+    return 1;
+  }
+  if (state === 'idle') {
+    return 2;
+  }
+  return 3;
+}
+
+function syncStatusRowsToEntityStatuses(
+  rows: RemoteSyncStatusSnapshot[]
+): ConnectedDashboardEntitySyncStatus[] {
+  return rows
+    .map((row) => ({
+      entity: row.entity,
+      label: CONNECTED_SYNC_ENTITY_LABELS[row.entity],
+      state: getEntitySyncState(row),
+      lastPullAt: row.last_pull_at,
+      lastPushAt: row.last_push_at,
+      pendingUploadCount: row.pending_upload_count,
+      pendingDownloadCount: row.pending_download_count,
+      lastErrorCode: row.last_error_code,
+      lastErrorMessage: row.last_error_message,
+      retryAfterAt: row.retry_after_at,
+      updatedAt: row.updated_at,
+    }))
+    .sort(
+      (a, b) =>
+        getEntitySyncStateRank(a.state) - getEntitySyncStateRank(b.state) ||
+        b.updatedAt.localeCompare(a.updatedAt) ||
+        a.label.localeCompare(b.label)
+    );
+}
+
+async function getRegisteredDeviceId(
+  supabase: SupabaseLike,
+  userId: string,
+  installId: string
+): Promise<string | null> {
+  const { data, error } = await supabase
+    .from('extension_devices')
+    .select('id')
+    .eq('user_id', userId)
+    .eq('install_id', installId)
+    .order('last_seen_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return parseDeviceId(data);
+}
+
+async function getRemoteEntitySyncStatuses(
+  supabase: SupabaseLike,
+  userId: string,
+  deviceId: string
+): Promise<ConnectedDashboardEntitySyncStatus[]> {
+  const { data, error } = await supabase
+    .from('sync_status')
+    .select(
+      'entity,last_pull_at,last_push_at,pending_upload_count,pending_download_count,last_error_code,last_error_message,retry_after_at,updated_at'
+    )
+    .eq('user_id', userId)
+    .eq('device_id', deviceId)
+    .order('updated_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message);
+  }
+
+  return syncStatusRowsToEntityStatuses(parseRemoteSyncStatusSnapshots(data));
+}
+
 async function getRuntimeContext(): Promise<
   | {
       userId: string;
@@ -1312,12 +1494,15 @@ export async function syncConnectedDashboardTracking(
 
 export async function getConnectedDashboardSyncStatus(): Promise<ConnectedDashboardSyncStatus> {
   let authenticated = false;
+  let userId: string | null = null;
+  let supabase: SupabaseLike | null = null;
   try {
-    const supabase = getSupabaseClient() as unknown as SupabaseLike;
+    supabase = getSupabaseClient() as unknown as SupabaseLike;
     const {
       data: { session },
     } = await supabase.auth.getSession();
-    authenticated = Boolean(session?.user.id);
+    userId = session?.user.id ?? null;
+    authenticated = Boolean(userId);
   } catch {
     authenticated = false;
   }
@@ -1325,10 +1510,21 @@ export async function getConnectedDashboardSyncStatus(): Promise<ConnectedDashbo
   const stored = await chrome.storage.local.get([INSTALL_ID_STORAGE_KEY, 'lastGlobalSync']);
   const installId = stored[INSTALL_ID_STORAGE_KEY];
   const lastGlobalSync = stored.lastGlobalSync;
+  let entities: ConnectedDashboardEntitySyncStatus[] = [];
+
+  if (authenticated && userId && supabase && typeof installId === 'string') {
+    try {
+      const deviceId = await getRegisteredDeviceId(supabase, userId, installId);
+      entities = deviceId ? await getRemoteEntitySyncStatuses(supabase, userId, deviceId) : [];
+    } catch {
+      entities = [];
+    }
+  }
 
   return {
     authenticated,
     installId: typeof installId === 'string' ? installId : null,
     lastGlobalSync: typeof lastGlobalSync === 'number' ? lastGlobalSync : null,
+    entities,
   };
 }

@@ -12,6 +12,7 @@
   import { showToast } from '$lib/shell/notifications/toast-service';
   import { sendMessage } from '$lib/shell/messaging/bridge';
   import type { BridgeMessage } from '$lib/shell/messaging/bridge';
+  import type { ConnectedDashboardSyncStatus } from '$lib/shell/sync/connected-dashboard';
 
   const DASHBOARD_BASE_URL =
     import.meta.env.VITE_DASHBOARD_URL ??
@@ -41,14 +42,27 @@
   settings.load();
   auth.checkStatus();
 
-  let connectedSyncStatus = $state<{
-    authenticated: boolean;
-    installId: string | null;
-    lastGlobalSync: number | null;
-  } | null>(null);
+  let connectedSyncStatus = $state<ConnectedDashboardSyncStatus | null>(null);
   let connectedSyncLoading = $state(false);
   let connectedSyncRetrying = $state(false);
   let connectedSyncError = $state<string | null>(null);
+  const connectedSyncEntities = $derived(connectedSyncStatus?.entities ?? []);
+  const connectedSyncHasError = $derived(
+    connectedSyncEntities.some((entity) => entity.state === 'error')
+  );
+  const connectedSyncHasPending = $derived(
+    connectedSyncEntities.some((entity) => entity.state === 'pending')
+  );
+
+  const connectedSyncStateLabels: Record<
+    ConnectedDashboardSyncStatus['entities'][number]['state'],
+    string
+  > = {
+    healthy: 'Synchronisé',
+    pending: 'En attente',
+    error: 'Erreur',
+    idle: 'Initial',
+  };
 
   async function loadConnectedSyncStatus() {
     connectedSyncLoading = true;
@@ -190,10 +204,20 @@
         </div>
         <span
           class="rounded-full border px-2 py-1 text-[10px] font-medium {connectedSyncStatus?.authenticated
-            ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
+            ? connectedSyncHasError
+              ? 'border-status-red/20 bg-status-red/8 text-status-red'
+              : connectedSyncHasPending
+                ? 'border-status-orange/20 bg-status-orange/8 text-status-orange'
+                : 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
             : 'border-border-light bg-page-canvas text-text-subtle'}"
         >
-          {connectedSyncStatus?.authenticated ? 'Connecté' : 'Déconnecté'}
+          {connectedSyncStatus?.authenticated
+            ? connectedSyncHasError
+              ? 'Action requise'
+              : connectedSyncHasPending
+                ? 'En attente'
+                : 'Connecté'
+            : 'Déconnecté'}
         </span>
       </div>
 
@@ -222,6 +246,79 @@
           </p>
         </div>
       </div>
+
+      {#if connectedSyncEntities.length > 0}
+        <div class="space-y-2">
+          {#each connectedSyncEntities as entity}
+            <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+              <div class="flex items-start justify-between gap-3">
+                <div>
+                  <p class="text-xs font-medium text-text-primary">{entity.label}</p>
+                  <p class="mt-1 text-[11px] leading-4 text-text-subtle">
+                    Push: {entity.lastPushAt
+                      ? new Intl.DateTimeFormat('fr-FR', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }).format(new Date(entity.lastPushAt))
+                      : 'Aucun'} · Pull: {entity.lastPullAt
+                      ? new Intl.DateTimeFormat('fr-FR', {
+                          day: '2-digit',
+                          month: 'short',
+                          hour: '2-digit',
+                          minute: '2-digit',
+                        }).format(new Date(entity.lastPullAt))
+                      : 'Aucun'}
+                  </p>
+                </div>
+                <span
+                  class="rounded-full border px-2 py-1 text-[10px] font-medium {entity.state ===
+                  'error'
+                    ? 'border-status-red/20 bg-status-red/8 text-status-red'
+                    : entity.state === 'pending'
+                      ? 'border-status-orange/20 bg-status-orange/8 text-status-orange'
+                      : 'border-border-light bg-surface-white text-text-subtle'}"
+                >
+                  {connectedSyncStateLabels[entity.state]}
+                </span>
+              </div>
+
+              <div class="mt-2 grid grid-cols-2 gap-2 text-[11px]">
+                <p class="rounded-md bg-surface-white px-2 py-1 text-text-subtle">
+                  Upload: <span class="font-medium text-text-primary"
+                    >{entity.pendingUploadCount}</span
+                  >
+                </p>
+                <p class="rounded-md bg-surface-white px-2 py-1 text-text-subtle">
+                  Download: <span class="font-medium text-text-primary"
+                    >{entity.pendingDownloadCount}</span
+                  >
+                </p>
+              </div>
+
+              {#if entity.lastErrorMessage}
+                <p
+                  class="mt-2 rounded-md border border-status-red/20 bg-status-red/8 px-2 py-1.5 text-[11px] leading-4 text-status-red"
+                >
+                  {entity.lastErrorCode ?? 'sync_error'}: {entity.lastErrorMessage}
+                </p>
+              {/if}
+
+              {#if entity.retryAfterAt}
+                <p class="mt-2 text-[11px] leading-4 text-text-subtle">
+                  Retry après {new Intl.DateTimeFormat('fr-FR', {
+                    day: '2-digit',
+                    month: 'short',
+                    hour: '2-digit',
+                    minute: '2-digit',
+                  }).format(new Date(entity.retryAfterAt))}
+                </p>
+              {/if}
+            </div>
+          {/each}
+        </div>
+      {/if}
 
       {#if connectedSyncError}
         <p

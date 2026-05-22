@@ -1,5 +1,15 @@
 import { describe, expect, it, vi } from 'vitest';
+
+const supabaseClientMock = vi.hoisted(() => ({
+  getSupabaseClient: vi.fn(),
+}));
+
+vi.mock('../../../src/lib/shell/auth/supabase-client', () => ({
+  getSupabaseClient: supabaseClientMock.getSupabaseClient,
+}));
+
 import {
+  getConnectedDashboardSyncStatus,
   pushApplicationsToConnectedDashboard,
   pushConnectorHealthToConnectedDashboard,
   pushCandidateProfileImportToConnectedDashboard,
@@ -129,7 +139,121 @@ function createGateway(): ConnectedDashboardSyncGateway {
   };
 }
 
+interface MockSupabaseReadQuery {
+  eq(column: string, value: unknown): MockSupabaseReadQuery;
+  gt(column: string, value: unknown): MockSupabaseReadQuery;
+  order(
+    column: string,
+    options?: Record<string, unknown>
+  ): Promise<{ data: unknown; error: { message: string } | null }>;
+}
+
+function createReadQuery(data: unknown): MockSupabaseReadQuery {
+  const query: MockSupabaseReadQuery = {
+    eq: vi.fn(() => query),
+    gt: vi.fn(() => query),
+    order: vi.fn(async () => ({ data, error: null })),
+  };
+
+  return query;
+}
+
 describe('connected dashboard shell sync', () => {
+  it('reads per-entity sync status for the current extension device', async () => {
+    vi.stubGlobal('chrome', {
+      storage: {
+        local: {
+          get: vi.fn(async () => ({
+            'missionpulse.connectedSync.installId': 'install-1',
+            lastGlobalSync: 1779340800000,
+          })),
+        },
+      },
+    });
+
+    const deviceQuery = createReadQuery([{ id: 'device-1' }]);
+    const statusQuery = createReadQuery([
+      {
+        entity: 'missions',
+        last_pull_at: null,
+        last_push_at: '2026-05-22T08:00:00.000Z',
+        pending_upload_count: 0,
+        pending_download_count: 0,
+        last_error_code: null,
+        last_error_message: null,
+        retry_after_at: null,
+        updated_at: '2026-05-22T08:00:00.000Z',
+      },
+      {
+        entity: 'applications',
+        last_pull_at: '2026-05-22T07:00:00.000Z',
+        last_push_at: null,
+        pending_upload_count: 2,
+        pending_download_count: 1,
+        last_error_code: 'remote-error',
+        last_error_message: 'Supabase indisponible',
+        retry_after_at: '2026-05-22T08:05:00.000Z',
+        updated_at: '2026-05-22T08:01:00.000Z',
+      },
+      {
+        entity: 'unknown',
+        last_pull_at: null,
+        last_push_at: null,
+        pending_upload_count: 0,
+        pending_download_count: 0,
+        last_error_code: null,
+        last_error_message: null,
+        retry_after_at: null,
+        updated_at: '2026-05-22T08:02:00.000Z',
+      },
+    ]);
+
+    supabaseClientMock.getSupabaseClient.mockReturnValueOnce({
+      auth: {
+        getSession: vi.fn(async () => ({
+          data: { session: { user: { id: 'user-1' } } },
+        })),
+      },
+      from: vi.fn((table: string) => ({
+        select: vi.fn(() => (table === 'extension_devices' ? deviceQuery : statusQuery)),
+      })),
+    });
+
+    await expect(getConnectedDashboardSyncStatus()).resolves.toEqual({
+      authenticated: true,
+      installId: 'install-1',
+      lastGlobalSync: 1779340800000,
+      entities: [
+        {
+          entity: 'applications',
+          label: 'Candidatures',
+          state: 'error',
+          lastPullAt: '2026-05-22T07:00:00.000Z',
+          lastPushAt: null,
+          pendingUploadCount: 2,
+          pendingDownloadCount: 1,
+          lastErrorCode: 'remote-error',
+          lastErrorMessage: 'Supabase indisponible',
+          retryAfterAt: '2026-05-22T08:05:00.000Z',
+          updatedAt: '2026-05-22T08:01:00.000Z',
+        },
+        {
+          entity: 'missions',
+          label: 'Missions',
+          state: 'healthy',
+          lastPullAt: null,
+          lastPushAt: '2026-05-22T08:00:00.000Z',
+          pendingUploadCount: 0,
+          pendingDownloadCount: 0,
+          lastErrorCode: null,
+          lastErrorMessage: null,
+          retryAfterAt: null,
+          updatedAt: '2026-05-22T08:00:00.000Z',
+        },
+      ],
+    });
+  });
+
   it('registers an extension device with last_seen_at', async () => {
     const gateway = createGateway();
 

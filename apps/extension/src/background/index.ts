@@ -923,7 +923,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch(() => {
           sendResponse({
             type: 'CONNECTED_SYNC_STATUS_RESULT',
-            payload: { authenticated: false, installId: null, lastGlobalSync: null },
+            payload: { authenticated: false, installId: null, lastGlobalSync: null, entities: [] },
           });
         });
       return true;

@@ -252,6 +252,21 @@ export const MessageSchemas = {
       authenticated: z.boolean(),
       installId: z.string().nullable(),
       lastGlobalSync: z.number().int().min(0).nullable(),
+      entities: z.array(
+        z.object({
+          entity: z.enum(['missions', 'applications', 'candidate_profile', 'connector_health']),
+          label: z.string().min(1).max(80),
+          state: z.enum(['healthy', 'pending', 'error', 'idle']),
+          lastPullAt: z.string().nullable(),
+          lastPushAt: z.string().nullable(),
+          pendingUploadCount: z.number().int().min(0),
+          pendingDownloadCount: z.number().int().min(0),
+          lastErrorCode: z.string().nullable(),
+          lastErrorMessage: z.string().nullable(),
+          retryAfterAt: z.string().nullable(),
+          updatedAt: z.string(),
+        })
+      ),
     }),
   }),
   SYNC_CONNECTED_DASHBOARD: z.object({ type: z.literal('SYNC_CONNECTED_DASHBOARD') }),

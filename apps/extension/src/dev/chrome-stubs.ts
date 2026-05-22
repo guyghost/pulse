@@ -124,6 +124,7 @@ function createChromeStubs() {
                 authenticated: false,
                 installId: null,
                 lastGlobalSync: null,
+                entities: [],
               },
             };
           case 'SYNC_CONNECTED_DASHBOARD':

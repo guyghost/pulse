@@ -167,6 +167,7 @@ vi.mock('../../../src/lib/shell/sync/connected-dashboard', () => ({
     authenticated: true,
     installId: 'install-1',
     lastGlobalSync: 1779340800000,
+    entities: [],
   })),
   syncConnectedDashboardScan,
   syncConnectedDashboardSnapshot,
