@@ -621,11 +621,13 @@ export const actions: Actions = {
       });
     }
 
+    const updatedAt = new Date().toISOString();
     const { error } = await supabase.from('dashboard_alert_preferences').upsert(
       {
         user_id: session.user.id,
         ...patch,
         updated_by: 'dashboard',
+        updated_at: updatedAt,
       },
       { onConflict: 'user_id' }
     );
@@ -634,12 +636,7 @@ export const actions: Actions = {
       return fail(500, { alertError: "Les préférences d'alertes n'ont pas pu être enregistrées." });
     }
 
-    await markEntityPendingExtensionPull(
-      supabase,
-      session.user.id,
-      'alert_preferences',
-      new Date().toISOString()
-    );
+    await markEntityPendingExtensionPull(supabase, session.user.id, 'alert_preferences', updatedAt);
 
     return { alertSuccess: "Préférences d'alertes enregistrées." };
   },
