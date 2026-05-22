@@ -366,6 +366,18 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
   }
 }
 
+export async function clearProfile(): Promise<void> {
+  await withStore<void>('profile', 'readwrite', (store) => store.delete('current'));
+
+  try {
+    await clearSemanticCache();
+  } catch {
+    if (import.meta.env.DEV) {
+      console.warn('[DB] Impossible de vider le cache sémantique après suppression du profil');
+    }
+  }
+}
+
 export async function getProfile(): Promise<UserProfile | null> {
   const result = await withStore<unknown>('profile', 'readonly', (store) => store.get('current'));
 

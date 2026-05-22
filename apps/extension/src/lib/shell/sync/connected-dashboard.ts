@@ -21,6 +21,7 @@ import {
   mergeRemoteApplicationTracking,
   remoteCandidateProfileToUserProfile,
   remoteAlertPreferencesToConnectedPreferences,
+  shouldClearLocalCandidateProfile,
   type ApplicationPipelineEventRow,
   type ApplicationUpsertRow,
   type CandidateEducationInsertRow,
@@ -55,11 +56,16 @@ import type { UserProfile } from '../../core/types/profile';
 import type { MissionTracking } from '../../core/types/tracking';
 import { isMissionSource } from '../../core/types/type-guards';
 import { getSupabaseClient } from '../auth/supabase-client';
-import { getMissionById, getProfile, saveProfile } from '../storage/db';
+import { clearProfile, getMissionById, getProfile, saveProfile } from '../storage/db';
 import {
   clearConnectedAlertPreferences,
   saveConnectedAlertPreferences,
 } from '../storage/connected-alert-preferences';
+import {
+  clearConnectedCandidateProfileCache,
+  getConnectedCandidateProfileCache,
+  saveConnectedCandidateProfileCache,
+} from '../storage/connected-profile-cache';
 import { getGeneratedAsset } from '../storage/generated-assets';
 import { getTracking, saveTrackings } from '../storage/tracking';
 
@@ -1975,10 +1981,35 @@ export async function syncConnectedDashboardSnapshot(
   if (pulledCandidateProfile.value.profile) {
     try {
       await saveProfile(pulledCandidateProfile.value.profile);
+      await saveConnectedCandidateProfileCache(pulledCandidateProfile.value.profile);
     } catch (error) {
       const syncError: ConnectedSyncError = {
         code: 'profile-sync-failed',
         message: error instanceof Error ? error.message : 'Local profile save failed.',
+        retryable: true,
+      };
+      await context.gateway.upsertSyncStatus(
+        buildSyncStatusRow({
+          userId: context.userId,
+          deviceId: context.deviceId,
+          entity: 'candidate_profile',
+          error: { code: syncError.code, message: syncError.message },
+          retryAfterAt: buildRetryAfterAt(context.now),
+        })
+      );
+      return { ok: false, error: syncError };
+    }
+  } else {
+    try {
+      const lastConnectedProfile = await getConnectedCandidateProfileCache();
+      if (shouldClearLocalCandidateProfile(existingProfile, lastConnectedProfile)) {
+        await clearProfile();
+      }
+      await clearConnectedCandidateProfileCache();
+    } catch (error) {
+      const syncError: ConnectedSyncError = {
+        code: 'profile-sync-failed',
+        message: error instanceof Error ? error.message : 'Local profile clear failed.',
         retryable: true,
       };
       await context.gateway.upsertSyncStatus(

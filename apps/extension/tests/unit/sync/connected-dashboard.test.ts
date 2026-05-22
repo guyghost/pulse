@@ -21,6 +21,7 @@ import {
   buildSyncStatusRow,
   mergeRemoteApplicationTracking,
   remoteCandidateProfileToUserProfile,
+  shouldClearLocalCandidateProfile,
   type RemoteApplicationSnapshot,
 } from '../../../src/lib/core/sync/connected-dashboard';
 import type { Mission } from '../../../src/lib/core/types/mission';
@@ -768,6 +769,31 @@ describe('connected dashboard sync payload builders', () => {
       searchKeywords: [],
       scoringWeights: undefined,
     });
+  });
+
+  it('clears a local profile only when it still matches the last connected dashboard copy', () => {
+    const connectedProfile = {
+      firstName: 'Guy',
+      stack: ['Svelte', 'TypeScript'],
+      tjmMin: 650,
+      tjmMax: 900,
+      location: 'Paris',
+      remote: 'hybrid' as const,
+      seniority: 'senior' as const,
+      jobTitle: 'Architecte frontend',
+      searchKeywords: ['svelte mission'],
+      scoringWeights: { stack: 40, location: 20, tjm: 25, remote: 15 },
+    };
+
+    expect(shouldClearLocalCandidateProfile(connectedProfile, connectedProfile)).toBe(true);
+    expect(
+      shouldClearLocalCandidateProfile(
+        { ...connectedProfile, stack: ['Svelte', 'TypeScript', 'Node.js'] },
+        connectedProfile
+      )
+    ).toBe(false);
+    expect(shouldClearLocalCandidateProfile(null, connectedProfile)).toBe(false);
+    expect(shouldClearLocalCandidateProfile(connectedProfile, null)).toBe(false);
   });
 
   it('preserves the local scoring stack when the dashboard profile has no skills yet', () => {

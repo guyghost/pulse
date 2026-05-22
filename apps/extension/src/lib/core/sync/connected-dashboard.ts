@@ -383,6 +383,44 @@ export function remoteCandidateProfileToUserProfile(
   };
 }
 
+export function shouldClearLocalCandidateProfile(
+  existingProfile: UserProfile | null,
+  lastConnectedProfile: UserProfile | null
+): boolean {
+  if (!existingProfile || !lastConnectedProfile) {
+    return false;
+  }
+
+  const weights = existingProfile.scoringWeights;
+  const connectedWeights = lastConnectedProfile.scoringWeights;
+  const sameWeights =
+    weights === undefined && connectedWeights === undefined
+      ? true
+      : weights !== undefined &&
+        connectedWeights !== undefined &&
+        weights.stack === connectedWeights.stack &&
+        weights.location === connectedWeights.location &&
+        weights.tjm === connectedWeights.tjm &&
+        weights.remote === connectedWeights.remote;
+
+  return (
+    existingProfile.firstName === lastConnectedProfile.firstName &&
+    existingProfile.jobTitle === lastConnectedProfile.jobTitle &&
+    existingProfile.location === lastConnectedProfile.location &&
+    existingProfile.remote === lastConnectedProfile.remote &&
+    existingProfile.seniority === lastConnectedProfile.seniority &&
+    existingProfile.tjmMin === lastConnectedProfile.tjmMin &&
+    existingProfile.tjmMax === lastConnectedProfile.tjmMax &&
+    existingProfile.stack.length === lastConnectedProfile.stack.length &&
+    existingProfile.stack.every((item, index) => item === lastConnectedProfile.stack[index]) &&
+    existingProfile.searchKeywords.length === lastConnectedProfile.searchKeywords.length &&
+    existingProfile.searchKeywords.every(
+      (item, index) => item === lastConnectedProfile.searchKeywords[index]
+    ) &&
+    sameWeights
+  );
+}
+
 const GENERATED_ASSET_TYPE_MAP: Record<GenerationType, GeneratedApplicationAssetType> = {
   pitch: 'pitch',
   'cover-message': 'cover_message',
