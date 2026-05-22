@@ -14,6 +14,7 @@ import {
   buildTrackingFromRemoteApplication,
   buildSyncStatusRow,
   mergeRemoteApplicationTracking,
+  remoteCandidateProfileToUserProfile,
   type RemoteApplicationSnapshot,
 } from '../../../src/lib/core/sync/connected-dashboard';
 import type { Mission } from '../../../src/lib/core/types/mission';
@@ -556,6 +557,81 @@ describe('connected dashboard sync payload builders', () => {
         detected_at: '2026-05-22T08:05:00.000Z',
       },
     ]);
+  });
+
+  it('maps remote dashboard candidate profile snapshots to local scoring profiles', () => {
+    expect(
+      remoteCandidateProfileToUserProfile(
+        {
+          id: 'profile-1',
+          title: 'Lead Frontend Svelte',
+          summary: 'Profil dashboard',
+          location: 'Paris',
+          target_role: 'Architecte frontend',
+          tjm_min: 650,
+          tjm_max: 900,
+          remote_preference: 'hybrid',
+          seniority: 'senior',
+          updated_at: '2026-05-22T08:00:00.000Z',
+          skills: ['Svelte', 'TypeScript', 'svelte', ' '],
+        },
+        {
+          firstName: 'Guy',
+          stack: ['React'],
+          tjmMin: 500,
+          tjmMax: 700,
+          location: 'Lyon',
+          remote: 'full',
+          seniority: 'confirmed',
+          jobTitle: 'Développeur frontend',
+          searchKeywords: ['svelte mission'],
+          scoringWeights: { stack: 40, location: 20, tjm: 25, remote: 15 },
+        }
+      )
+    ).toEqual({
+      firstName: 'Guy',
+      stack: ['Svelte', 'TypeScript'],
+      tjmMin: 650,
+      tjmMax: 900,
+      location: 'Paris',
+      remote: 'hybrid',
+      seniority: 'senior',
+      jobTitle: 'Architecte frontend',
+      searchKeywords: ['svelte mission'],
+      scoringWeights: { stack: 40, location: 20, tjm: 25, remote: 15 },
+    });
+  });
+
+  it('uses safe local scoring defaults when dashboard profile fields are partial', () => {
+    expect(
+      remoteCandidateProfileToUserProfile(
+        {
+          id: 'profile-1',
+          title: '',
+          summary: '',
+          location: null,
+          target_role: null,
+          tjm_min: null,
+          tjm_max: 9000,
+          remote_preference: null,
+          seniority: null,
+          updated_at: '2026-05-22T08:00:00.000Z',
+          skills: [],
+        },
+        null
+      )
+    ).toEqual({
+      firstName: 'Freelance',
+      stack: [],
+      tjmMin: 0,
+      tjmMax: 5000,
+      location: '',
+      remote: 'any',
+      seniority: 'senior',
+      jobTitle: 'Freelance tech',
+      searchKeywords: [],
+      scoringWeights: undefined,
+    });
   });
 
   it('builds local tracking records from remote dashboard applications', () => {

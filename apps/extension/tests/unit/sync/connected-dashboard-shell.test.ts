@@ -15,6 +15,7 @@ import {
   pushCandidateProfileImportToConnectedDashboard,
   pullAlertPreferencesFromConnectedDashboard,
   pullApplicationsFromConnectedDashboard,
+  pullCandidateProfileFromConnectedDashboard,
   pushMissionsToConnectedDashboard,
   registerExtensionDevice,
   type ConnectedDashboardSyncGateway,
@@ -131,6 +132,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
     upsertGeneratedApplicationAssets: vi.fn(async () => undefined),
     insertConnectorHealthEvents: vi.fn(async () => undefined),
     getCandidateProfile: vi.fn(async () => null),
+    getCandidateProfileForScoring: vi.fn(async () => null),
     upsertCandidateProfile: vi.fn(async () => ({ id: 'profile-1', revision: 3 })),
     replaceCandidateProfileChildren: vi.fn(async () => undefined),
     insertCandidateProfileFieldSuggestions: vi.fn(async () => undefined),
@@ -754,6 +756,65 @@ describe('connected dashboard shell sync', () => {
         last_error_code: 'profile-sync-failed',
         last_error_message: 'profile write failed',
         retry_after_at: '2026-05-22T08:10:00.000Z',
+      })
+    );
+  });
+
+  it('pulls the dashboard candidate profile into a local scoring profile draft', async () => {
+    const gateway = createGateway();
+    vi.mocked(gateway.getCandidateProfileForScoring).mockResolvedValueOnce({
+      id: 'profile-1',
+      title: 'Lead Frontend Svelte',
+      summary: 'Profil dashboard',
+      location: 'Paris',
+      target_role: 'Architecte frontend',
+      tjm_min: 650,
+      tjm_max: 850,
+      remote_preference: 'hybrid',
+      seniority: 'senior',
+      updated_at: '2026-05-22T08:00:00.000Z',
+      skills: ['Svelte', 'TypeScript'],
+    });
+
+    const result = await pullCandidateProfileFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      existingProfile: {
+        firstName: 'Guy',
+        stack: ['React'],
+        tjmMin: 500,
+        tjmMax: 700,
+        location: 'Lyon',
+        remote: 'full',
+        seniority: 'confirmed',
+        jobTitle: 'Développeur frontend',
+        searchKeywords: ['mission svelte'],
+      },
+      now: new Date('2026-05-22T08:05:00.000Z'),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: {
+        pulled: true,
+        profile: {
+          firstName: 'Guy',
+          stack: ['Svelte', 'TypeScript'],
+          tjmMin: 650,
+          tjmMax: 850,
+          location: 'Paris',
+          remote: 'hybrid',
+          seniority: 'senior',
+          jobTitle: 'Architecte frontend',
+          searchKeywords: ['mission svelte'],
+          scoringWeights: undefined,
+        },
+      },
+    });
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'candidate_profile',
+        last_pull_at: '2026-05-22T08:05:00.000Z',
       })
     );
   });

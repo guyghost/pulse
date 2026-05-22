@@ -4,6 +4,7 @@ import type { MissionDuplicateRelation } from '../scoring/dedup';
 import type { ConnectorHealthSnapshot } from '../types/health';
 import type { GeneratedAsset, GenerationType } from '../types/generation';
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
+import type { SeniorityLevel, UserProfile } from '../types/profile';
 import type { Grade } from '../types/score';
 import type { MissionTracking } from '../types/tracking';
 import {
@@ -146,6 +147,20 @@ export interface ExistingCandidateProfileSnapshot {
   updated_by: 'dashboard' | 'extension' | 'system';
 }
 
+export interface RemoteCandidateProfileSnapshot {
+  id: string;
+  title: string;
+  summary: string;
+  location: string | null;
+  target_role: string | null;
+  tjm_min: number | null;
+  tjm_max: number | null;
+  remote_preference: RemoteType | 'any' | null;
+  seniority: SeniorityLevel | null;
+  updated_at: string;
+  skills: string[];
+}
+
 export type CandidateProfileSuggestionField = 'title' | 'summary' | 'target_role';
 
 export interface CandidateProfileFieldSuggestionRow {
@@ -283,6 +298,67 @@ export function remoteAlertPreferencesToConnectedPreferences(
     maxResults: snapshot.max_results,
     updatedAt: snapshot.updated_at,
   });
+}
+
+function clampDailyRate(value: number | null | undefined, fallback: number): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) {
+    return Math.max(0, Math.min(5000, Math.round(fallback)));
+  }
+
+  return Math.max(0, Math.min(5000, Math.round(value)));
+}
+
+function normalizeSkillList(skills: string[]): string[] {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+
+  for (const skill of skills) {
+    const trimmed = skill.trim();
+    const key = trimmed.toLowerCase();
+    if (!trimmed || seen.has(key)) {
+      continue;
+    }
+
+    seen.add(key);
+    normalized.push(trimmed);
+    if (normalized.length === 20) {
+      break;
+    }
+  }
+
+  return normalized;
+}
+
+export function remoteCandidateProfileToUserProfile(
+  snapshot: RemoteCandidateProfileSnapshot,
+  existingProfile: UserProfile | null
+): UserProfile {
+  const tjmMin = clampDailyRate(snapshot.tjm_min, existingProfile?.tjmMin ?? 0);
+  const tjmMax = Math.max(
+    tjmMin,
+    clampDailyRate(snapshot.tjm_max, existingProfile?.tjmMax ?? 5000)
+  );
+  const firstName = existingProfile?.firstName.trim() || 'Freelance';
+  const jobTitle =
+    snapshot.target_role?.trim() ||
+    snapshot.title.trim() ||
+    existingProfile?.jobTitle.trim() ||
+    'Freelance tech';
+
+  return {
+    firstName,
+    stack: normalizeSkillList(snapshot.skills),
+    tjmMin,
+    tjmMax,
+    location: snapshot.location?.trim() || existingProfile?.location || '',
+    remote: snapshot.remote_preference ?? existingProfile?.remote ?? 'any',
+    seniority: snapshot.seniority ?? existingProfile?.seniority ?? 'senior',
+    jobTitle,
+    searchKeywords: existingProfile ? [...existingProfile.searchKeywords] : [],
+    scoringWeights: existingProfile?.scoringWeights
+      ? { ...existingProfile.scoringWeights }
+      : undefined,
+  };
 }
 
 const GENERATED_ASSET_TYPE_MAP: Record<GenerationType, GeneratedApplicationAssetType> = {

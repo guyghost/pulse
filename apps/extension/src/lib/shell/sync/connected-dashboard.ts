@@ -13,6 +13,7 @@ import {
   buildMissionUpsertRow,
   buildSyncStatusRow,
   mergeRemoteApplicationTracking,
+  remoteCandidateProfileToUserProfile,
   remoteAlertPreferencesToConnectedPreferences,
   type ApplicationPipelineEventRow,
   type ApplicationUpsertRow,
@@ -31,6 +32,7 @@ import {
   type ProfileImportInsertRow,
   type RemoteApplicationSnapshot,
   type RemoteAlertPreferencesSnapshot,
+  type RemoteCandidateProfileSnapshot,
   type SyncEntity,
   type SyncStatusRow,
   type SyncConflictInsertRow,
@@ -41,9 +43,10 @@ import type { MissionDuplicateRelation } from '../../core/scoring/dedup';
 import type { GeneratedAsset } from '../../core/types/generation';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { Mission, MissionSource } from '../../core/types/mission';
+import type { UserProfile } from '../../core/types/profile';
 import type { MissionTracking } from '../../core/types/tracking';
 import { getSupabaseClient } from '../auth/supabase-client';
-import { getMissionById } from '../storage/db';
+import { getMissionById, getProfile, saveProfile } from '../storage/db';
 import { saveConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { getGeneratedAsset } from '../storage/generated-assets';
 import { getTracking, saveTrackings } from '../storage/tracking';
@@ -96,6 +99,7 @@ export interface ConnectedDashboardSyncGateway {
   upsertGeneratedApplicationAssets(rows: GeneratedApplicationAssetUpsertRow[]): Promise<void>;
   insertConnectorHealthEvents(rows: ConnectorHealthEventRow[]): Promise<void>;
   getCandidateProfile(userId: string): Promise<ExistingCandidateProfileSnapshot | null>;
+  getCandidateProfileForScoring(userId: string): Promise<RemoteCandidateProfileSnapshot | null>;
   upsertCandidateProfile(row: CandidateProfileUpsertRow): Promise<{ id: string; revision: number }>;
   replaceCandidateProfileChildren(input: {
     profileId: string;
@@ -189,6 +193,18 @@ export interface PullAlertPreferencesInput {
 export interface PullAlertPreferencesResult {
   pulled: boolean;
   preferences: ConnectedAlertPreferences | null;
+}
+
+export interface PullCandidateProfileInput {
+  userId: string;
+  deviceId: string;
+  existingProfile: UserProfile | null;
+  now: Date;
+}
+
+export interface PullCandidateProfileResult {
+  pulled: boolean;
+  profile: UserProfile | null;
 }
 
 export interface PushConnectorHealthInput {
@@ -518,6 +534,22 @@ function isProfileUpdatedBy(
   return value === 'dashboard' || value === 'extension' || value === 'system';
 }
 
+function isRemotePreference(
+  value: unknown
+): value is RemoteCandidateProfileSnapshot['remote_preference'] {
+  return (
+    value === 'full' ||
+    value === 'hybrid' ||
+    value === 'onsite' ||
+    value === 'any' ||
+    value === null
+  );
+}
+
+function isSeniorityLevel(value: unknown): value is RemoteCandidateProfileSnapshot['seniority'] {
+  return value === 'junior' || value === 'confirmed' || value === 'senior' || value === null;
+}
+
 function parseExistingCandidateProfile(data: unknown): ExistingCandidateProfileSnapshot | null {
   const value = Array.isArray(data) ? data[0] : data;
 
@@ -547,6 +579,53 @@ function parseExistingCandidateProfile(data: unknown): ExistingCandidateProfileS
   }
 
   return null;
+}
+
+function parseRemoteCandidateProfileBase(
+  data: unknown
+): Omit<RemoteCandidateProfileSnapshot, 'skills'> | null {
+  const value = Array.isArray(data) ? data[0] : data;
+
+  if (value === null || value === undefined) {
+    return null;
+  }
+
+  if (
+    isRecord(value) &&
+    typeof value.id === 'string' &&
+    typeof value.title === 'string' &&
+    typeof value.summary === 'string' &&
+    (typeof value.location === 'string' || value.location === null) &&
+    (typeof value.target_role === 'string' || value.target_role === null) &&
+    (typeof value.tjm_min === 'number' || value.tjm_min === null) &&
+    (typeof value.tjm_max === 'number' || value.tjm_max === null) &&
+    isRemotePreference(value.remote_preference) &&
+    isSeniorityLevel(value.seniority) &&
+    typeof value.updated_at === 'string'
+  ) {
+    return {
+      id: value.id,
+      title: value.title,
+      summary: value.summary,
+      location: value.location,
+      target_role: value.target_role,
+      tjm_min: value.tjm_min,
+      tjm_max: value.tjm_max,
+      remote_preference: value.remote_preference,
+      seniority: value.seniority,
+      updated_at: value.updated_at,
+    };
+  }
+
+  return null;
+}
+
+function parseCandidateSkillRows(data: unknown): string[] {
+  if (!Array.isArray(data)) {
+    return [];
+  }
+
+  return data.flatMap((row) => (isRecord(row) && typeof row.skill === 'string' ? [row.skill] : []));
 }
 
 async function selectOrThrow<T>(
@@ -667,6 +746,36 @@ export function createSupabaseConnectedDashboardGateway(
         throw new Error(error.message);
       }
       return parseExistingCandidateProfile(data);
+    },
+    getCandidateProfileForScoring: async (userId) => {
+      const profileQuery = supabase
+        .from('candidate_profiles')
+        .select(
+          'id,title,summary,location,target_role,tjm_min,tjm_max,remote_preference,seniority,updated_at'
+        )
+        .eq('user_id', userId);
+      const { data: profileData, error: profileError } = await profileQuery.order('updated_at', {
+        ascending: false,
+      });
+      if (profileError) {
+        throw new Error(profileError.message);
+      }
+
+      const profile = parseRemoteCandidateProfileBase(profileData);
+      if (!profile) {
+        return null;
+      }
+
+      const { data: skillData, error: skillError } = await supabase
+        .from('candidate_skills')
+        .select('skill')
+        .eq('profile_id', profile.id)
+        .order('skill', { ascending: true });
+      if (skillError) {
+        throw new Error(skillError.message);
+      }
+
+      return { ...profile, skills: parseCandidateSkillRows(skillData) };
     },
     upsertCandidateProfile: async (row) =>
       selectOrThrow(
@@ -1036,6 +1145,41 @@ export async function pullAlertPreferencesFromConnectedDashboard(
         userId: input.userId,
         deviceId: input.deviceId,
         entity: 'alert_preferences',
+        error: { code: syncError.code, message: syncError.message },
+        retryAfterAt: buildRetryAfterAt(input.now),
+      })
+    );
+    return { ok: false, error: syncError };
+  }
+}
+
+export async function pullCandidateProfileFromConnectedDashboard(
+  gateway: ConnectedDashboardSyncGateway,
+  input: PullCandidateProfileInput
+): Promise<ConnectedSyncResult<PullCandidateProfileResult>> {
+  try {
+    const snapshot = await gateway.getCandidateProfileForScoring(input.userId);
+    const profile = snapshot
+      ? remoteCandidateProfileToUserProfile(snapshot, input.existingProfile)
+      : null;
+
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        entity: 'candidate_profile',
+        lastPullAt: input.now,
+      })
+    );
+
+    return { ok: true, value: { pulled: Boolean(profile), profile } };
+  } catch (error) {
+    const syncError = remoteError(error);
+    await gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: input.userId,
+        deviceId: input.deviceId,
+        entity: 'candidate_profile',
         error: { code: syncError.code, message: syncError.message },
         retryAfterAt: buildRetryAfterAt(input.now),
       })
@@ -1478,6 +1622,40 @@ export async function syncConnectedDashboardSnapshot(
 
   if (pulledApplications.value.trackings.length > 0) {
     await saveTrackings(pulledApplications.value.trackings);
+  }
+
+  const existingProfile = await getProfile();
+  const pulledCandidateProfile = await pullCandidateProfileFromConnectedDashboard(context.gateway, {
+    userId: context.userId,
+    deviceId: context.deviceId,
+    existingProfile,
+    now: context.now,
+  });
+
+  if (!pulledCandidateProfile.ok) {
+    return pulledCandidateProfile;
+  }
+
+  if (pulledCandidateProfile.value.profile) {
+    try {
+      await saveProfile(pulledCandidateProfile.value.profile);
+    } catch (error) {
+      const syncError: ConnectedSyncError = {
+        code: 'profile-sync-failed',
+        message: error instanceof Error ? error.message : 'Local profile save failed.',
+        retryable: true,
+      };
+      await context.gateway.upsertSyncStatus(
+        buildSyncStatusRow({
+          userId: context.userId,
+          deviceId: context.deviceId,
+          entity: 'candidate_profile',
+          error: { code: syncError.code, message: syncError.message },
+          retryAfterAt: buildRetryAfterAt(context.now),
+        })
+      );
+      return { ok: false, error: syncError };
+    }
   }
 
   const pushedHealth = await pushConnectorHealthToConnectedDashboard(context.gateway, {
