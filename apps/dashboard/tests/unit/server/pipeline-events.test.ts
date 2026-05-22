@@ -83,6 +83,8 @@ describe('dashboard pipeline event server helper', () => {
           occurred_at: '2026-05-22T10:00:00.000Z',
           created_by: 'dashboard',
           client_event_id: 'dashboard:select:application-1:1:detected:selected',
+          revision: 1,
+          updated_by: 'dashboard',
         },
         options: {
           onConflict: 'user_id,client_event_id',

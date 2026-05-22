@@ -60,6 +60,11 @@ describe('connected dashboard schema', () => {
     expect(tableBlock('mission_duplicates')).toContain(
       'updated_at timestamptz not null default now()'
     );
+    expect(tableBlock('application_pipeline_events')).toContain('revision bigint not null');
+    expect(tableBlock('application_pipeline_events')).toContain('updated_by text not null');
+    expect(tableBlock('application_pipeline_events')).toContain(
+      'updated_at timestamptz not null default now()'
+    );
     expect(tableBlock('candidate_profiles')).toContain('updated_by text not null');
     for (const cvChildTable of [
       'candidate_experiences',

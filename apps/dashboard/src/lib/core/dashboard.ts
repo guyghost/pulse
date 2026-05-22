@@ -555,6 +555,9 @@ export interface DashboardApplicationPipelineEventRow {
   note: string | null;
   occurred_at: string;
   created_by: string;
+  revision: number;
+  updated_by: string;
+  updated_at: string;
 }
 
 export interface ApplicationStageUpdatePatch {

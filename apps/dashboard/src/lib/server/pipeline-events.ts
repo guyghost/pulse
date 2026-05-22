@@ -18,6 +18,8 @@ type PipelineEventUpsertRow = {
   occurred_at: string;
   created_by: ApplicationPipelineEvent['createdBy'];
   client_event_id: string;
+  revision: number;
+  updated_by: ApplicationPipelineEvent['createdBy'];
 };
 
 type PipelineEventsTable = {
@@ -52,6 +54,8 @@ export async function upsertDashboardPipelineEvent(
       occurred_at: event.occurredAt,
       created_by: event.createdBy,
       client_event_id: event.clientEventId,
+      revision: 1,
+      updated_by: event.createdBy,
     },
     { onConflict: 'user_id,client_event_id', ignoreDuplicates: true }
   );

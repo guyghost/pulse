@@ -601,6 +601,8 @@ describe('connected dashboard shell sync', () => {
         occurred_at: '2026-05-21T08:00:00.000Z',
         created_by: 'extension',
         client_event_id: 'install-1:free-work-123:1779350400000:none:detected',
+        revision: 1,
+        updated_by: 'extension',
       },
     ]);
     expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(

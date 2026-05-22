@@ -388,7 +388,9 @@ export const load: PageServerLoad = async ({ cookies }) => {
     canonicalApplicationIds.length > 0
       ? await supabase
           .from('application_pipeline_events')
-          .select('id, application_id, from_stage, to_stage, note, occurred_at, created_by')
+          .select(
+            'id, application_id, from_stage, to_stage, note, occurred_at, created_by, revision, updated_by, updated_at'
+          )
           .eq('user_id', session.user.id)
           .in('application_id', canonicalApplicationIds)
           .order('occurred_at', { ascending: false })

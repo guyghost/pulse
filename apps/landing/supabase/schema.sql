@@ -460,7 +460,10 @@ create table if not exists public.application_pipeline_events (
   occurred_at timestamptz not null,
   created_by text not null check (created_by in ('dashboard', 'extension', 'system')),
   client_event_id text not null,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null check (updated_by in ('dashboard', 'extension', 'system')),
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   constraint application_pipeline_events_transition_check check (
     (from_stage is null and to_stage = 'detected')
     or (from_stage = 'detected' and to_stage in ('selected', 'archived'))
@@ -934,6 +937,13 @@ create trigger on_mission_duplicates_updated
 drop trigger if exists on_applications_updated on public.applications;
 create trigger on_applications_updated
   before update on public.applications
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_application_pipeline_events_updated
+  on public.application_pipeline_events;
+create trigger on_application_pipeline_events_updated
+  before update on public.application_pipeline_events
   for each row
   execute function public.update_updated_at();
 

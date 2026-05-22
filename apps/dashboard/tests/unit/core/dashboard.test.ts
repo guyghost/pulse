@@ -1590,6 +1590,9 @@ describe('dashboard core', () => {
           note: 'Message recruteur prêt.',
           occurred_at: '2026-05-21T08:00:00.000Z',
           created_by: 'extension',
+          revision: 1,
+          updated_by: 'extension',
+          updated_at: '2026-05-21T08:00:00.000Z',
         },
         {
           id: 'event-latest',
@@ -1599,6 +1602,9 @@ describe('dashboard core', () => {
           note: null,
           occurred_at: '2026-05-22T09:00:00.000Z',
           created_by: 'dashboard',
+          revision: 1,
+          updated_by: 'dashboard',
+          updated_at: '2026-05-22T09:00:00.000Z',
         },
         {
           id: 'event-invalid-stage',
@@ -1608,6 +1614,9 @@ describe('dashboard core', () => {
           note: null,
           occurred_at: '2026-05-23T09:00:00.000Z',
           created_by: 'dashboard',
+          revision: 1,
+          updated_by: 'dashboard',
+          updated_at: '2026-05-23T09:00:00.000Z',
         },
         {
           id: 'event-invalid-creator',
@@ -1617,6 +1626,9 @@ describe('dashboard core', () => {
           note: null,
           occurred_at: '2026-05-24T09:00:00.000Z',
           created_by: 'robot',
+          revision: 1,
+          updated_by: 'system',
+          updated_at: '2026-05-24T09:00:00.000Z',
         },
       ])
     ).toEqual([

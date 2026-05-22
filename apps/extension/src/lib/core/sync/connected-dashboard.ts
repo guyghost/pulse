@@ -100,6 +100,8 @@ export interface ApplicationPipelineEventRow {
   occurred_at: string;
   created_by: ApplicationEventCreator;
   client_event_id: string;
+  revision: number;
+  updated_by: ApplicationEventCreator;
 }
 
 export type TimestampFormatter = (timestamp: number) => string;
@@ -628,6 +630,8 @@ export function buildDetectedApplicationPipelineEventRow(
       'none',
       'detected',
     ].join(':'),
+    revision: 1,
+    updated_by: 'extension',
   };
 }
 
@@ -655,6 +659,8 @@ export function buildApplicationPipelineEventRows(
       transition.from ?? 'none',
       transition.to,
     ].join(':'),
+    revision: 1,
+    updated_by: createdBy,
   }));
 }
 
