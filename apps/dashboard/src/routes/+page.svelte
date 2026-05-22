@@ -16,6 +16,7 @@
     DashboardFeatureAccess,
     DashboardFeatureArea,
     DashboardFeatureRequirement,
+    CvSnapshot,
     MissionApplication,
     PlatformSyncStatus,
   } from '$lib/core/dashboard';
@@ -23,7 +24,7 @@
   let { data, form }: { data: PageData; form?: ActionData } = $props();
 
   const applications = $derived(data.applications as MissionApplication[]);
-  const cv = $derived(data.cv);
+  const cv = $derived(data.cv as CvSnapshot);
   const syncStatuses = $derived(data.syncStatuses as PlatformSyncStatus[]);
   const entitlements = $derived(data.entitlements as DashboardAccountEntitlements);
   const featureAccess = $derived(data.featureAccess as DashboardFeatureAccess[]);
@@ -72,6 +73,7 @@
   const readyPlatforms = $derived(syncStatuses.filter((platform) => platform.status === 'ready'));
   const cvSyncAccess = $derived(featureAccess.find((feature) => feature.id === 'cv-sync') ?? null);
   const canPrepareCvSync = $derived(readiness.canSync && Boolean(cvSyncAccess?.enabled));
+  const latestCvImport = $derived(cv.imports[0] ?? null);
 
   const stageLabels: Record<ApplicationStage, string> = {
     detected: 'Détectée',
@@ -90,6 +92,12 @@
     'needs-extension': 'Extension requise',
     'needs-session': 'Session requise',
     syncing: 'Synchronisation',
+  };
+
+  const importStatusLabels: Record<CvSnapshot['imports'][number]['status'], string> = {
+    success: 'Importé',
+    partial: 'Partiel',
+    error: 'Erreur',
   };
 
   const featureAreaLabels: Record<DashboardFeatureArea, string> = {
@@ -114,6 +122,11 @@
           month: 'short',
         }).format(new Date(value))
       : 'Aucune';
+
+  const formatFieldCounts = (counts: Record<string, number>) =>
+    Object.entries(counts)
+      .map(([field, count]) => `${field}: ${count}`)
+      .join(' · ');
 </script>
 
 <svelte:head>
@@ -659,14 +672,106 @@
               ></div>
             </div>
             <p class="mt-4 text-sm text-text-secondary">{cv.targetRole}</p>
+            {#if cv.summary}
+              <p class="mt-3 text-sm leading-6 text-text-subtle">{cv.summary}</p>
+            {/if}
             <p class="mt-2 text-xs text-text-subtle">
               Dernière mise à jour : {formatDate(cv.updatedAt)}
             </p>
+
+            <div class="mt-4 grid grid-cols-3 gap-2 text-xs">
+              <div class="rounded-lg bg-page-canvas px-3 py-2">
+                <p class="text-text-muted">Expériences</p>
+                <p class="mt-1 font-medium text-text-primary">{cv.experiences.length}</p>
+              </div>
+              <div class="rounded-lg bg-page-canvas px-3 py-2">
+                <p class="text-text-muted">Formations</p>
+                <p class="mt-1 font-medium text-text-primary">{cv.education.length}</p>
+              </div>
+              <div class="rounded-lg bg-page-canvas px-3 py-2">
+                <p class="text-text-muted">Liens</p>
+                <p class="mt-1 font-medium text-text-primary">{cv.links.length}</p>
+              </div>
+            </div>
+
             <div class="mt-4 flex flex-wrap gap-2">
               {#each cv.skills as skill}
                 <Badge label={skill} variant="tech" />
               {/each}
             </div>
+
+            {#if latestCvImport}
+              <div class="mt-5 rounded-lg border border-border-light bg-page-canvas p-3">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-medium uppercase text-text-subtle">Dernier import</p>
+                    <p class="mt-1 text-sm font-medium text-text-primary">
+                      {sourceLabels[latestCvImport.source]} · {latestCvImport.extractorVersion}
+                    </p>
+                  </div>
+                  <Badge
+                    label={importStatusLabels[latestCvImport.status]}
+                    variant={latestCvImport.status === 'error' ? 'warning' : 'success'}
+                  />
+                </div>
+                <p class="mt-2 text-xs leading-5 text-text-subtle">
+                  {formatDate(latestCvImport.importedAt)}
+                  {#if formatFieldCounts(latestCvImport.fieldCounts)}
+                    · {formatFieldCounts(latestCvImport.fieldCounts)}
+                  {/if}
+                </p>
+                {#if latestCvImport.errorMessage}
+                  <p class="mt-2 text-xs leading-5 text-status-orange">
+                    {latestCvImport.errorCode}: {latestCvImport.errorMessage}
+                  </p>
+                {/if}
+              </div>
+            {/if}
+
+            {#if cv.experiences.length > 0}
+              <div class="mt-5 border-t border-border-light pt-4">
+                <p class="text-xs font-medium uppercase text-text-subtle">Expériences importées</p>
+                <div class="mt-3 space-y-3">
+                  {#each cv.experiences.slice(0, 3) as experience}
+                    <article class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <div class="min-w-0">
+                          <h3 class="text-sm font-medium text-text-primary">{experience.title}</h3>
+                          <p class="mt-1 text-xs text-text-subtle">
+                            {experience.company ?? 'Entreprise non renseignée'} ·
+                            {experience.location ?? 'Lieu non renseigné'}
+                          </p>
+                        </div>
+                        <span class="shrink-0 text-[10px] text-text-muted">
+                          {experience.dateRange}
+                        </span>
+                      </div>
+                      {#if experience.description}
+                        <p class="mt-2 line-clamp-2 text-xs leading-5 text-text-subtle">
+                          {experience.description}
+                        </p>
+                      {/if}
+                    </article>
+                  {/each}
+                </div>
+              </div>
+            {/if}
+
+            {#if cv.imports.length > 1}
+              <div class="mt-5 border-t border-border-light pt-4">
+                <p class="text-xs font-medium uppercase text-text-subtle">Historique imports</p>
+                <div class="mt-3 space-y-2">
+                  {#each cv.imports.slice(1) as item}
+                    <div class="flex items-center justify-between gap-3 text-xs">
+                      <span class="text-text-secondary">
+                        {sourceLabels[item.source]} · {formatDate(item.importedAt)}
+                      </span>
+                      <span class="text-text-subtle">{importStatusLabels[item.status]}</span>
+                    </div>
+                  {/each}
+                </div>
+              </div>
+            {/if}
           </section>
 
           <section

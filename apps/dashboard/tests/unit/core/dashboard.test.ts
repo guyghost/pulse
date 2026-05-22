@@ -75,10 +75,15 @@ const applications: MissionApplication[] = [
 const cv: CvSnapshot = {
   id: 'cv-main',
   title: 'CV Consultant Frontend Senior',
+  summary: 'Consultant frontend senior.',
   updatedAt: '2026-05-12T08:30:00.000Z',
   completeness: 84,
   targetRole: 'Lead Frontend Svelte / TypeScript',
   skills: ['Svelte 5', 'TypeScript'],
+  experiences: [],
+  education: [],
+  links: [],
+  imports: [],
 };
 
 const syncStatuses: PlatformSyncStatus[] = [
@@ -289,19 +294,92 @@ describe('dashboard core', () => {
         {
           id: 'profile-1',
           title: 'Consultant Frontend',
+          summary: 'Consultant frontend senior.',
           updated_at: '2026-05-21T08:00:00.000Z',
           completeness: 82,
           target_role: 'Lead Svelte',
         },
-        [{ skill: 'Svelte' }, { skill: 'TypeScript' }]
+        [{ skill: 'Svelte' }, { skill: 'TypeScript' }],
+        [
+          {
+            title: 'Lead Frontend',
+            company: 'ScaleOps',
+            location: 'Paris',
+            start_date: '2021-01-01',
+            end_date: null,
+            is_current: true,
+            description: 'Migration Svelte',
+            skills: ['Svelte'],
+            source: 'linkedin',
+            position_index: 0,
+          },
+        ],
+        [
+          {
+            school: 'Université Paris Cité',
+            degree: 'Master',
+            field: 'Informatique',
+            start_date: '2014-01-01',
+            end_date: '2016-01-01',
+            source: 'linkedin',
+            position_index: 0,
+          },
+        ],
+        [{ label: 'Portfolio', url: 'https://example.com', source: 'linkedin' }],
+        [
+          {
+            id: 'import-1',
+            source: 'linkedin',
+            status: 'success',
+            imported_at: '2026-05-22T08:00:00.000Z',
+            extractor_version: 'linkedin-v1',
+            error_code: null,
+            error_message: null,
+            field_counts: { experiences: 1, skills: 2 },
+          },
+        ]
       )
     ).toEqual({
       id: 'profile-1',
       title: 'Consultant Frontend',
+      summary: 'Consultant frontend senior.',
       updatedAt: '2026-05-21T08:00:00.000Z',
       completeness: 82,
       targetRole: 'Lead Svelte',
       skills: ['Svelte', 'TypeScript'],
+      experiences: [
+        {
+          title: 'Lead Frontend',
+          company: 'ScaleOps',
+          location: 'Paris',
+          dateRange: '2021-01 - Présent',
+          description: 'Migration Svelte',
+          skills: ['Svelte'],
+          source: 'linkedin',
+        },
+      ],
+      education: [
+        {
+          school: 'Université Paris Cité',
+          degree: 'Master',
+          field: 'Informatique',
+          dateRange: '2014-01 - 2016-01',
+          source: 'linkedin',
+        },
+      ],
+      links: [{ label: 'Portfolio', url: 'https://example.com', source: 'linkedin' }],
+      imports: [
+        {
+          id: 'import-1',
+          source: 'linkedin',
+          status: 'success',
+          importedAt: '2026-05-22T08:00:00.000Z',
+          extractorVersion: 'linkedin-v1',
+          errorCode: null,
+          errorMessage: null,
+          fieldCounts: { experiences: 1, skills: 2 },
+        },
+      ],
     });
   });
 

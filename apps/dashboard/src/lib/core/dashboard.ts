@@ -87,10 +87,50 @@ export interface DashboardFavoriteMissionSnapshot {
 export interface CvSnapshot {
   id: string;
   title: string;
+  summary: string;
   updatedAt: string;
   completeness: number;
   targetRole: string;
   skills: string[];
+  experiences: CvExperience[];
+  education: CvEducation[];
+  links: CvLink[];
+  imports: CvImport[];
+}
+
+export interface CvExperience {
+  title: string;
+  company: string | null;
+  location: string | null;
+  dateRange: string;
+  description: string;
+  skills: string[];
+  source: ApplicationSource;
+}
+
+export interface CvEducation {
+  school: string;
+  degree: string | null;
+  field: string | null;
+  dateRange: string;
+  source: ApplicationSource;
+}
+
+export interface CvLink {
+  label: string;
+  url: string;
+  source: ApplicationSource;
+}
+
+export interface CvImport {
+  id: string;
+  source: ApplicationSource;
+  status: 'success' | 'partial' | 'error';
+  importedAt: string;
+  extractorVersion: string;
+  errorCode: string | null;
+  errorMessage: string | null;
+  fieldCounts: Record<string, number>;
 }
 
 export interface PlatformSyncStatus {
@@ -125,6 +165,7 @@ export interface DashboardCanonicalMissionScoreRow {
 export interface DashboardCandidateProfileRow {
   id: string;
   title: string;
+  summary: string;
   updated_at: string;
   completeness: number;
   target_role: string | null;
@@ -132,6 +173,46 @@ export interface DashboardCandidateProfileRow {
 
 export interface DashboardCandidateSkillRow {
   skill: string;
+}
+
+export interface DashboardCandidateExperienceRow {
+  title: string;
+  company: string | null;
+  location: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  is_current: boolean;
+  description: string;
+  skills: string[];
+  source: string;
+  position_index: number;
+}
+
+export interface DashboardCandidateEducationRow {
+  school: string;
+  degree: string | null;
+  field: string | null;
+  start_date: string | null;
+  end_date: string | null;
+  source: string;
+  position_index: number;
+}
+
+export interface DashboardCandidateLinkRow {
+  label: string;
+  url: string;
+  source: string;
+}
+
+export interface DashboardProfileImportRow {
+  id: string;
+  source: string;
+  status: string;
+  imported_at: string;
+  extractor_version: string;
+  error_code: string | null;
+  error_message: string | null;
+  field_counts: unknown;
 }
 
 export interface DashboardConnectorHealthEventRow {
@@ -272,16 +353,103 @@ export function canonicalRowsToApplications(
 
 export function profileRowsToCvSnapshot(
   profile: DashboardCandidateProfileRow,
-  skills: DashboardCandidateSkillRow[]
+  skills: DashboardCandidateSkillRow[],
+  experiences: DashboardCandidateExperienceRow[] = [],
+  education: DashboardCandidateEducationRow[] = [],
+  links: DashboardCandidateLinkRow[] = [],
+  imports: DashboardProfileImportRow[] = []
 ): CvSnapshot {
   return {
     id: profile.id,
     title: profile.title,
+    summary: profile.summary,
     updatedAt: profile.updated_at,
     completeness: profile.completeness,
     targetRole: profile.target_role ?? 'Rôle cible non renseigné',
     skills: skills.map((item) => item.skill),
+    experiences: experiences
+      .filter((experience) => isApplicationSource(experience.source))
+      .sort((a, b) => a.position_index - b.position_index)
+      .map((experience) => ({
+        title: experience.title,
+        company: experience.company,
+        location: experience.location,
+        dateRange: formatProfileDateRange(
+          experience.start_date,
+          experience.end_date,
+          experience.is_current
+        ),
+        description: experience.description,
+        skills: [...experience.skills],
+        source: experience.source as ApplicationSource,
+      })),
+    education: education
+      .filter((item) => isApplicationSource(item.source))
+      .sort((a, b) => a.position_index - b.position_index)
+      .map((item) => ({
+        school: item.school,
+        degree: item.degree,
+        field: item.field,
+        dateRange: formatProfileDateRange(item.start_date, item.end_date, false),
+        source: item.source as ApplicationSource,
+      })),
+    links: links
+      .filter((link) => isApplicationSource(link.source))
+      .map((link) => ({
+        label: link.label,
+        url: link.url,
+        source: link.source as ApplicationSource,
+      })),
+    imports: imports.flatMap((item) => {
+      if (!isApplicationSource(item.source) || !isCvImportStatus(item.status)) {
+        return [];
+      }
+
+      return [
+        {
+          id: item.id,
+          source: item.source,
+          status: item.status,
+          importedAt: item.imported_at,
+          extractorVersion: item.extractor_version,
+          errorCode: item.error_code,
+          errorMessage: item.error_message,
+          fieldCounts: parseFieldCounts(item.field_counts),
+        },
+      ];
+    }),
   };
+}
+
+function isCvImportStatus(value: string): value is CvImport['status'] {
+  return value === 'success' || value === 'partial' || value === 'error';
+}
+
+function parseFieldCounts(value: unknown): Record<string, number> {
+  if (!value || typeof value !== 'object') {
+    return {};
+  }
+
+  return Object.fromEntries(
+    Object.entries(value).flatMap(([key, count]) =>
+      typeof count === 'number' ? [[key, count]] : []
+    )
+  );
+}
+
+function formatProfileDateRange(
+  startDate: string | null,
+  endDate: string | null,
+  isCurrent: boolean
+): string {
+  const start = startDate?.slice(0, 7) ?? '';
+  const end = isCurrent ? 'Présent' : (endDate?.slice(0, 7) ?? '');
+
+  if (!start && !end) {
+    return 'Dates non renseignées';
+  }
+
+  return [start, end].filter(Boolean).join(' - ');
 }
 
 function healthEventToPlatformStatus(

@@ -16,11 +16,15 @@ import {
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
   type DashboardCandidateProfileRow,
+  type DashboardCandidateEducationRow,
+  type DashboardCandidateExperienceRow,
+  type DashboardCandidateLinkRow,
   type DashboardCandidateSkillRow,
   type DashboardCanonicalApplicationRow,
   type DashboardCanonicalMissionRow,
   type DashboardCanonicalMissionScoreRow,
   type DashboardConnectorHealthEventRow,
+  type DashboardProfileImportRow,
   type CvSnapshot,
   type DashboardAccountEntitlements,
   type DashboardSubscriptionStatus,
@@ -70,6 +74,7 @@ const mockApplications: MissionApplication[] = [
 const mockCv: CvSnapshot = {
   id: 'cv-main',
   title: 'CV Consultant Frontend Senior',
+  summary: 'Profil aperçu: import LinkedIn et données CV seront synchronisés via Supabase.',
   updatedAt: '2026-05-12T08:30:00.000Z',
   completeness: 84,
   targetRole: 'Lead Frontend Svelte / TypeScript',
@@ -79,6 +84,31 @@ const mockCv: CvSnapshot = {
     'Design systems',
     'Chrome extensions',
     'Architecture frontend',
+  ],
+  experiences: [
+    {
+      title: 'Lead Frontend',
+      company: 'ScaleOps',
+      location: 'Paris',
+      dateRange: '2021-01 - Présent',
+      description: 'Architecture Svelte, design system et extension Chrome.',
+      skills: ['Svelte 5', 'TypeScript'],
+      source: 'linkedin',
+    },
+  ],
+  education: [],
+  links: [],
+  imports: [
+    {
+      id: 'import-preview',
+      source: 'linkedin',
+      status: 'success',
+      importedAt: '2026-05-12T08:30:00.000Z',
+      extractorVersion: 'linkedin-v1',
+      errorCode: null,
+      errorMessage: null,
+      fieldCounts: { experiences: 1, education: 0, skills: 5, links: 0 },
+    },
   ],
 };
 
@@ -257,17 +287,53 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
   const { data: candidateProfile } = await supabase
     .from('candidate_profiles')
-    .select('id, title, updated_at, completeness, target_role')
+    .select('id, title, summary, updated_at, completeness, target_role')
     .eq('user_id', session.user.id)
     .maybeSingle<DashboardCandidateProfileRow>();
 
-  const { data: candidateSkills } = candidateProfile
-    ? await supabase
-        .from('candidate_skills')
-        .select('skill')
-        .eq('profile_id', candidateProfile.id)
-        .returns<DashboardCandidateSkillRow[]>()
-    : { data: [] };
+  const [
+    { data: candidateSkills },
+    { data: candidateExperiences },
+    { data: candidateEducation },
+    { data: candidateLinks },
+    { data: profileImports },
+  ] = candidateProfile
+    ? await Promise.all([
+        supabase
+          .from('candidate_skills')
+          .select('skill')
+          .eq('profile_id', candidateProfile.id)
+          .returns<DashboardCandidateSkillRow[]>(),
+        supabase
+          .from('candidate_experiences')
+          .select(
+            'title, company, location, start_date, end_date, is_current, description, skills, source, position_index'
+          )
+          .eq('profile_id', candidateProfile.id)
+          .order('position_index', { ascending: true })
+          .returns<DashboardCandidateExperienceRow[]>(),
+        supabase
+          .from('candidate_education')
+          .select('school, degree, field, start_date, end_date, source, position_index')
+          .eq('profile_id', candidateProfile.id)
+          .order('position_index', { ascending: true })
+          .returns<DashboardCandidateEducationRow[]>(),
+        supabase
+          .from('candidate_links')
+          .select('label, url, source')
+          .eq('profile_id', candidateProfile.id)
+          .returns<DashboardCandidateLinkRow[]>(),
+        supabase
+          .from('profile_imports')
+          .select(
+            'id, source, status, imported_at, extractor_version, error_code, error_message, field_counts'
+          )
+          .eq('user_id', session.user.id)
+          .order('imported_at', { ascending: false })
+          .limit(5)
+          .returns<DashboardProfileImportRow[]>(),
+      ])
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const { data: connectorHealthRows } = await supabase
     .from('connector_health_events')
@@ -286,7 +352,14 @@ export const load: PageServerLoad = async ({ cookies }) => {
     featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
     applications: canonicalApplications.length > 0 ? canonicalApplications : syncedApplications,
     cv: candidateProfile
-      ? profileRowsToCvSnapshot(candidateProfile, candidateSkills ?? [])
+      ? profileRowsToCvSnapshot(
+          candidateProfile,
+          candidateSkills ?? [],
+          candidateExperiences ?? [],
+          candidateEducation ?? [],
+          candidateLinks ?? [],
+          profileImports ?? []
+        )
       : mockCv,
     syncStatuses: syncStatuses.length > 0 ? syncStatuses : mockSyncStatuses,
   };
