@@ -102,6 +102,7 @@ type MissionSelectionRow = {
 type ExistingApplicationSelectionRow = {
   id: string;
   stage: string;
+  revision: number;
 };
 
 type CandidateProfileIdentityRow = {
@@ -1051,12 +1052,83 @@ export const actions: Actions = {
 
     const { data: existingApplication } = await supabase
       .from('applications')
-      .select('id, stage')
+      .select('id, stage, revision')
       .eq('mission_id', missionId)
       .eq('user_id', session.user.id)
       .maybeSingle<ExistingApplicationSelectionRow>();
 
     if (existingApplication) {
+      if (existingApplication.stage === 'detected') {
+        const occurredAt = new Date();
+        const event = transitionApplicationStage({
+          applicationId: existingApplication.id,
+          fromStage: 'detected',
+          toStage: 'selected',
+          occurredAt,
+          createdBy: 'dashboard',
+          clientEventId: `dashboard:select:${existingApplication.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+          note: 'Mission sélectionnée depuis le feed dashboard.',
+        });
+
+        if (!event) {
+          return fail(500, { selectionError: 'Transition de sélection invalide.' });
+        }
+
+        const { error: eventError } = await supabase.from('application_pipeline_events').insert({
+          user_id: session.user.id,
+          application_id: existingApplication.id,
+          from_stage: event.fromStage,
+          to_stage: event.toStage,
+          note: event.note,
+          metadata: { source: 'dashboard_feed', mission_id: missionId },
+          occurred_at: event.occurredAt,
+          created_by: event.createdBy,
+          client_event_id: event.clientEventId,
+        });
+
+        if (eventError) {
+          return fail(500, {
+            selectionError:
+              "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
+          });
+        }
+
+        const patch = buildApplicationStageUpdatePatch('selected', event.occurredAt);
+        const { error: updateError } = await supabase
+          .from('applications')
+          .update({
+            stage: patch.stage,
+            archived_at: patch.archived_at,
+            revision: existingApplication.revision + 1,
+            updated_by: patch.updated_by,
+          })
+          .eq('id', existingApplication.id)
+          .eq('user_id', session.user.id)
+          .eq('revision', existingApplication.revision)
+          .select('id')
+          .single<{ id: string }>();
+
+        if (updateError) {
+          if (updateError.code !== 'PGRST116') {
+            return fail(500, { selectionError: "La mission n'a pas pu être sélectionnée." });
+          }
+
+          return fail(409, {
+            selectionError:
+              "La candidature a changé depuis l'ouverture de la page. Rechargez avant de sélectionner.",
+          });
+        }
+
+        await markEntityPendingExtensionPull(
+          supabase,
+          session.user.id,
+          'applications',
+          event.occurredAt
+        );
+
+        return { selectionSuccess: `Mission sélectionnée: ${mission.title}.` };
+      }
+
       return {
         selectionSuccess: `Mission déjà suivie en ${existingApplication.stage}.`,
       };
@@ -1159,12 +1231,83 @@ export const actions: Actions = {
 
     const { data: existingApplication } = await supabase
       .from('applications')
-      .select('id, stage')
+      .select('id, stage, revision')
       .eq('mission_id', missionId)
       .eq('user_id', session.user.id)
       .maybeSingle<ExistingApplicationSelectionRow>();
 
     if (existingApplication) {
+      if (existingApplication.stage === 'detected') {
+        const occurredAt = new Date();
+        const event = transitionApplicationStage({
+          applicationId: existingApplication.id,
+          fromStage: 'detected',
+          toStage: 'archived',
+          occurredAt,
+          createdBy: 'dashboard',
+          clientEventId: `dashboard:archive:${existingApplication.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+          note: 'Mission archivée depuis le feed dashboard.',
+        });
+
+        if (!event) {
+          return fail(500, { selectionError: "Transition d'archivage invalide." });
+        }
+
+        const { error: eventError } = await supabase.from('application_pipeline_events').insert({
+          user_id: session.user.id,
+          application_id: existingApplication.id,
+          from_stage: event.fromStage,
+          to_stage: event.toStage,
+          note: event.note,
+          metadata: { source: 'dashboard_feed', mission_id: missionId },
+          occurred_at: event.occurredAt,
+          created_by: event.createdBy,
+          client_event_id: event.clientEventId,
+        });
+
+        if (eventError) {
+          return fail(500, {
+            selectionError:
+              "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",
+          });
+        }
+
+        const patch = buildApplicationStageUpdatePatch('archived', event.occurredAt);
+        const { error: updateError } = await supabase
+          .from('applications')
+          .update({
+            stage: patch.stage,
+            archived_at: patch.archived_at,
+            revision: existingApplication.revision + 1,
+            updated_by: patch.updated_by,
+          })
+          .eq('id', existingApplication.id)
+          .eq('user_id', session.user.id)
+          .eq('revision', existingApplication.revision)
+          .select('id')
+          .single<{ id: string }>();
+
+        if (updateError) {
+          if (updateError.code !== 'PGRST116') {
+            return fail(500, { selectionError: "La mission n'a pas pu être archivée." });
+          }
+
+          return fail(409, {
+            selectionError:
+              "La candidature a changé depuis l'ouverture de la page. Rechargez avant d'archiver.",
+          });
+        }
+
+        await markEntityPendingExtensionPull(
+          supabase,
+          session.user.id,
+          'applications',
+          event.occurredAt
+        );
+
+        return { selectionSuccess: `Mission archivée: ${mission.title}.` };
+      }
+
       return {
         selectionSuccess: `Mission déjà suivie en ${existingApplication.stage}.`,
       };
