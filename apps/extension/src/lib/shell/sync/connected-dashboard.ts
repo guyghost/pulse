@@ -466,6 +466,7 @@ function parseRemoteAlertPreferences(data: unknown): ConnectedAlertPreferences |
     Array.isArray(value.required_stacks) &&
     value.required_stacks.every((stack) => typeof stack === 'string') &&
     typeof value.max_results === 'number' &&
+    typeof value.revision === 'number' &&
     typeof value.updated_at === 'string'
   ) {
     const snapshot: RemoteAlertPreferencesSnapshot = {
@@ -474,6 +475,7 @@ function parseRemoteAlertPreferences(data: unknown): ConnectedAlertPreferences |
       min_daily_rate: value.min_daily_rate,
       required_stacks: value.required_stacks,
       max_results: value.max_results,
+      revision: value.revision,
       updated_at: value.updated_at,
     };
     return remoteAlertPreferencesToConnectedPreferences(snapshot);
@@ -1071,7 +1073,9 @@ export function createSupabaseConnectedDashboardGateway(
     getDashboardAlertPreferences: async (userId) => {
       const { data, error } = await supabase
         .from('dashboard_alert_preferences')
-        .select('enabled,score_threshold,min_daily_rate,required_stacks,max_results,updated_at')
+        .select(
+          'enabled,score_threshold,min_daily_rate,required_stacks,max_results,revision,updated_at'
+        )
         .eq('user_id', userId)
         .order('updated_at', { ascending: false });
 

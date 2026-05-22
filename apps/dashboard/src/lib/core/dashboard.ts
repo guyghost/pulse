@@ -108,6 +108,8 @@ export interface DashboardAlertPreferencesRow {
   min_daily_rate: number;
   required_stacks: string[];
   max_results: number;
+  revision: number;
+  updated_by: string;
   updated_at: string;
 }
 
@@ -126,6 +128,7 @@ export interface DashboardAlertPreferencesPatch {
   min_daily_rate: number;
   required_stacks: string[];
   max_results: number;
+  revision: number;
 }
 
 export type GeneratedApplicationAssetType = 'pitch' | 'cover_message' | 'cv_summary';
@@ -2366,6 +2369,7 @@ export function buildDashboardAlertPreferencesPatch(input: {
   minDailyRate: number;
   requiredStacksText: string;
   maxResults: number;
+  currentRevision: number | null;
 }): DashboardAlertPreferencesPatch | null {
   if (
     !Number.isInteger(input.scoreThreshold) ||
@@ -2376,7 +2380,9 @@ export function buildDashboardAlertPreferencesPatch(input: {
     input.minDailyRate > 5000 ||
     !Number.isInteger(input.maxResults) ||
     input.maxResults < 1 ||
-    input.maxResults > 20
+    input.maxResults > 20 ||
+    (input.currentRevision !== null &&
+      (!Number.isInteger(input.currentRevision) || input.currentRevision < 1))
   ) {
     return null;
   }
@@ -2392,6 +2398,7 @@ export function buildDashboardAlertPreferencesPatch(input: {
         .filter(Boolean)
     ),
     max_results: input.maxResults,
+    revision: input.currentRevision === null ? 1 : input.currentRevision + 1,
   };
 }
 

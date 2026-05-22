@@ -117,6 +117,11 @@ describe('connected dashboard schema', () => {
     expect(tableBlock('sync_status')).toContain("'alert_preferences'");
     expect(tableBlock('dashboard_alert_preferences')).toContain('score_threshold integer');
     expect(tableBlock('dashboard_alert_preferences')).toContain('required_stacks text[]');
+    expect(tableBlock('dashboard_alert_preferences')).toContain('revision bigint not null');
+    expect(tableBlock('dashboard_alert_preferences')).toContain('updated_by text not null');
+    expect(tableBlock('dashboard_alert_preferences')).toContain(
+      'updated_at timestamptz not null default now()'
+    );
   });
 
   it('enforces one pending sync conflict or CV suggestion per field', () => {

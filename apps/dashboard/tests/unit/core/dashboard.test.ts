@@ -276,6 +276,8 @@ describe('dashboard core', () => {
           min_daily_rate: 650,
           required_stacks: ['Svelte', 'svelte', ' TypeScript '],
           max_results: 4,
+          revision: 3,
+          updated_by: 'dashboard',
           updated_at: '2026-05-22T10:00:00.000Z',
         },
         '2026-05-22T09:00:00.000Z'
@@ -305,6 +307,7 @@ describe('dashboard core', () => {
         minDailyRate: 700,
         requiredStacksText: 'Svelte, TypeScript, svelte',
         maxResults: 6,
+        currentRevision: 3,
       })
     ).toEqual({
       enabled: false,
@@ -312,6 +315,7 @@ describe('dashboard core', () => {
       min_daily_rate: 700,
       required_stacks: ['Svelte', 'TypeScript'],
       max_results: 6,
+      revision: 4,
     });
 
     expect(
@@ -321,6 +325,7 @@ describe('dashboard core', () => {
         minDailyRate: 700,
         requiredStacksText: '',
         maxResults: 6,
+        currentRevision: null,
       })
     ).toBeNull();
   });

@@ -160,6 +160,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
       minDailyRate: 700,
       requiredStacks: ['Svelte'],
       maxResults: 3,
+      revision: 2,
       updatedAt: '2026-05-22T08:00:00.000Z',
     })),
   };
@@ -267,6 +268,7 @@ describe('connected dashboard shell sync', () => {
           minDailyRate: 700,
           requiredStacks: ['Svelte'],
           maxResults: 3,
+          revision: 2,
           updatedAt: '2026-05-22T08:00:00.000Z',
         },
       },
@@ -278,6 +280,7 @@ describe('connected dashboard shell sync', () => {
         minDailyRate: 700,
         requiredStacks: ['Svelte'],
         maxResults: 3,
+        revision: 2,
         updatedAt: '2026-05-22T08:00:00.000Z',
       },
     });

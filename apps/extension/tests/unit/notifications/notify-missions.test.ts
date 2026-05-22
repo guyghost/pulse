@@ -178,6 +178,7 @@ describe('notifyHighScoreMissions', () => {
       minDailyRate: 650,
       requiredStacks: ['Svelte'],
       maxResults: 1,
+      revision: 2,
       updatedAt: '2026-05-22T08:00:00.000Z',
     });
 
@@ -203,6 +204,7 @@ describe('notifyHighScoreMissions', () => {
       minDailyRate: 0,
       requiredStacks: [],
       maxResults: 5,
+      revision: 2,
       updatedAt: '2026-05-22T08:00:00.000Z',
     });
 

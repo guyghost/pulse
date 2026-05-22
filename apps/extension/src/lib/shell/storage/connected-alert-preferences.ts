@@ -12,6 +12,7 @@ const ConnectedAlertPreferencesSchema = z.object({
   minDailyRate: z.number().int().min(0).max(5000),
   requiredStacks: z.array(z.string()),
   maxResults: z.number().int().min(1).max(20),
+  revision: z.number().int().min(1),
   updatedAt: z.string(),
 });
 

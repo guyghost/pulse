@@ -312,6 +312,7 @@ export interface RemoteAlertPreferencesSnapshot {
   min_daily_rate: number;
   required_stacks: string[];
   max_results: number;
+  revision: number;
   updated_at: string;
 }
 
@@ -343,6 +344,7 @@ export function remoteAlertPreferencesToConnectedPreferences(
     minDailyRate: snapshot.min_daily_rate,
     requiredStacks: snapshot.required_stacks,
     maxResults: snapshot.max_results,
+    revision: snapshot.revision,
     updatedAt: snapshot.updated_at,
   });
 }

@@ -4,6 +4,7 @@ export interface ConnectedAlertPreferences {
   minDailyRate: number;
   requiredStacks: string[];
   maxResults: number;
+  revision: number;
   updatedAt: string;
 }
 
@@ -13,6 +14,7 @@ export const DEFAULT_CONNECTED_ALERT_PREFERENCES: ConnectedAlertPreferences = {
   minDailyRate: 0,
   requiredStacks: [],
   maxResults: 5,
+  revision: 1,
   updatedAt: '',
 };
 
@@ -36,6 +38,7 @@ export function normalizeConnectedAlertPreferences(
     minDailyRate: Math.max(0, Math.min(5000, Math.round(preferences.minDailyRate))),
     requiredStacks: requiredStacks.slice(0, 12),
     maxResults: Math.max(1, Math.min(20, Math.round(preferences.maxResults))),
+    revision: Math.max(1, Math.round(preferences.revision)),
     updatedAt: preferences.updatedAt,
   };
 }

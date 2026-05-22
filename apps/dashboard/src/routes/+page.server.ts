@@ -526,7 +526,9 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
   const { data: alertPreferencesRow } = await supabase
     .from('dashboard_alert_preferences')
-    .select('enabled, score_threshold, min_daily_rate, required_stacks, max_results, updated_at')
+    .select(
+      'enabled, score_threshold, min_daily_rate, required_stacks, max_results, revision, updated_by, updated_at'
+    )
     .eq('user_id', session.user.id)
     .maybeSingle<DashboardAlertPreferencesRow>();
 
@@ -592,12 +594,23 @@ export const actions: Actions = {
       return fail(400, { alertError: "Préférences d'alertes invalides." });
     }
 
+    const { data: existingPreferences, error: existingPreferencesError } = await supabase
+      .from('dashboard_alert_preferences')
+      .select('revision')
+      .eq('user_id', session.user.id)
+      .maybeSingle<{ revision: number }>();
+
+    if (existingPreferencesError) {
+      return fail(500, { alertError: "Les préférences d'alertes n'ont pas pu être chargées." });
+    }
+
     const patch = buildDashboardAlertPreferencesPatch({
       enabled,
       scoreThreshold,
       minDailyRate,
       requiredStacksText,
       maxResults,
+      currentRevision: existingPreferences?.revision ?? null,
     });
 
     if (!patch) {
