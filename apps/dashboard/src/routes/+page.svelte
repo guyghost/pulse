@@ -645,7 +645,15 @@
               class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
             >
               <div class="flex items-start justify-between gap-3">
-                <Badge label={sourceLabels[mission.source]} variant="source" />
+                <div class="flex flex-wrap gap-1.5">
+                  <Badge label={sourceLabels[mission.source]} variant="source" />
+                  {#if mission.sourceHealthStatus}
+                    <Badge
+                      label={`Santé: ${statusLabels[mission.sourceHealthStatus]}`}
+                      variant={getPlatformStatusBadgeVariant(mission.sourceHealthStatus)}
+                    />
+                  {/if}
+                </div>
                 <Badge
                   label={`${mission.score}%${mission.grade ? ` · ${mission.grade}` : ''}`}
                   variant={mission.score >= 85 ? 'success' : 'warning'}
@@ -681,6 +689,14 @@
               {#if mission.semanticReason}
                 <p class="mt-3 line-clamp-2 text-xs leading-5 text-text-subtle">
                   {mission.semanticReason}
+                </p>
+              {/if}
+              {#if mission.sourceHealthErrorMessage}
+                <p
+                  class="mt-3 rounded-md border border-status-orange/20 bg-status-orange/8 px-2 py-1.5 text-xs leading-5 text-status-orange"
+                >
+                  {mission.sourceHealthErrorCode ?? 'connector_health'}:
+                  {mission.sourceHealthErrorMessage}
                 </p>
               {/if}
 

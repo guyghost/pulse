@@ -173,6 +173,9 @@ export interface MissionFeedItem {
   duplicateCount: number;
   applicationStage: ApplicationStage | null;
   freshness: MissionFreshness;
+  sourceHealthStatus?: PlatformSyncStatus['status'];
+  sourceHealthErrorCode?: string | null;
+  sourceHealthErrorMessage?: string | null;
 }
 
 export type TjmTrend = 'up' | 'down' | 'stable' | 'unknown';
@@ -924,7 +927,8 @@ export function missionRowsToFeedItems(
   scoresByMissionId: Map<string, DashboardMissionFeedScoreRow>,
   applicationsByMissionId: Map<string, DashboardMissionFeedApplicationRow>,
   duplicateRows: DashboardMissionDuplicateRow[],
-  now: Date
+  now: Date,
+  sourceHealthBySource: Map<ApplicationSource, PlatformSyncStatus> = new Map()
 ): MissionFeedItem[] {
   const duplicateCounts = countMissionDuplicates(duplicateRows);
   const duplicateMissionIds = new Set(duplicateRows.map((row) => row.duplicate_mission_id));
@@ -941,6 +945,7 @@ export function missionRowsToFeedItems(
       const scrapedAtMs = Date.parse(mission.scraped_at);
       const freshness: MissionFreshness =
         Number.isFinite(scrapedAtMs) && scrapedAtMs >= freshCutoff ? 'fresh' : 'stale';
+      const sourceHealth = sourceHealthBySource.get(mission.source);
 
       return [
         {
@@ -962,6 +967,13 @@ export function missionRowsToFeedItems(
           duplicateCount: duplicateCounts.get(mission.id) ?? 0,
           applicationStage: isApplicationStage(applicationStage) ? applicationStage : null,
           freshness,
+          ...(sourceHealth
+            ? {
+                sourceHealthStatus: sourceHealth.status,
+                sourceHealthErrorCode: sourceHealth.lastErrorCode,
+                sourceHealthErrorMessage: sourceHealth.lastErrorMessage,
+              }
+            : {}),
         },
       ];
     })

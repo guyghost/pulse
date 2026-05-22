@@ -328,12 +328,23 @@ export const load: PageServerLoad = async ({ cookies }) => {
         ])
       : [{ data: [] }, { data: [] }, { data: [] }];
 
+  const { data: connectorHealthRows } = await supabase
+    .from('connector_health_events')
+    .select('source, status, error_code, error_message, occurred_at')
+    .eq('user_id', session.user.id)
+    .order('occurred_at', { ascending: false })
+    .limit(50)
+    .returns<DashboardConnectorHealthEventRow[]>();
+
+  const syncStatuses = healthEventsToPlatformSyncStatuses(connectorHealthRows ?? []);
+
   const missionFeed = missionRowsToFeedItems(
     missionFeedRows ?? [],
     new Map((missionFeedScoreRows ?? []).map((row) => [row.mission_id, row])),
     new Map((missionFeedApplicationRows ?? []).map((row) => [row.mission_id, row])),
     missionDuplicateRows ?? [],
-    new Date()
+    new Date(),
+    new Map(syncStatuses.map((status) => [status.id, status]))
   );
   const tjmRadar = buildTjmRadarSnapshot(missionFeed);
 
@@ -474,16 +485,6 @@ export const load: PageServerLoad = async ({ cookies }) => {
           .returns<DashboardCandidateProfileFieldSuggestionRow[]>(),
       ])
     : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
-
-  const { data: connectorHealthRows } = await supabase
-    .from('connector_health_events')
-    .select('source, status, error_code, error_message, occurred_at')
-    .eq('user_id', session.user.id)
-    .order('occurred_at', { ascending: false })
-    .limit(50)
-    .returns<DashboardConnectorHealthEventRow[]>();
-
-  const syncStatuses = healthEventsToPlatformSyncStatuses(connectorHealthRows ?? []);
 
   const { data: extensionDeviceRows } = await supabase
     .from('extension_devices')

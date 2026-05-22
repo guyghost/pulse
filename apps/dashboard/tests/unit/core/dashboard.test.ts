@@ -575,6 +575,50 @@ describe('dashboard core', () => {
     ]);
   });
 
+  it('attaches source health to mission feed items', () => {
+    expect(
+      missionRowsToFeedItems(
+        [
+          {
+            id: 'mission-1',
+            title: 'Lead Svelte',
+            client: 'ScaleOps',
+            source: 'free-work',
+            stack: ['Svelte'],
+            tjm: 720,
+            location: 'Remote France',
+            scraped_at: '2026-05-22T08:00:00.000Z',
+            url: 'https://example.com/1',
+          },
+        ],
+        new Map(),
+        new Map(),
+        [],
+        new Date('2026-05-22T10:00:00.000Z'),
+        new Map([
+          [
+            'free-work',
+            {
+              id: 'free-work',
+              name: 'Free-Work',
+              status: 'needs-session',
+              lastSyncAt: '2026-05-22T09:00:00.000Z',
+              lastErrorCode: 'session_required',
+              lastErrorMessage: 'Reconnectez Free-Work.',
+            },
+          ],
+        ])
+      )
+    ).toEqual([
+      expect.objectContaining({
+        id: 'mission-1',
+        sourceHealthStatus: 'needs-session',
+        sourceHealthErrorCode: 'session_required',
+        sourceHealthErrorMessage: 'Reconnectez Free-Work.',
+      }),
+    ]);
+  });
+
   it('filters mission feed items by source, query, score, and freshness', () => {
     const feed = missionRowsToFeedItems(
       [
