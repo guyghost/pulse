@@ -769,6 +769,8 @@ describe('connected dashboard sync payload builders', () => {
         remote_updated_by: 'dashboard',
         status: 'pending',
         detected_at: '2026-05-22T08:05:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
       },
     ]);
   });
@@ -1075,6 +1077,8 @@ describe('connected dashboard sync payload builders', () => {
         remote_updated_by: 'dashboard',
         status: 'pending',
         detected_at: '2026-05-21T12:00:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
       },
       {
         user_id: 'user-1',
@@ -1088,6 +1092,8 @@ describe('connected dashboard sync payload builders', () => {
         remote_updated_by: 'dashboard',
         status: 'pending',
         detected_at: '2026-05-21T12:00:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
       },
       {
         user_id: 'user-1',
@@ -1101,6 +1107,8 @@ describe('connected dashboard sync payload builders', () => {
         remote_updated_by: 'dashboard',
         status: 'pending',
         detected_at: '2026-05-21T12:00:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
       },
       {
         user_id: 'user-1',
@@ -1114,6 +1122,8 @@ describe('connected dashboard sync payload builders', () => {
         remote_updated_by: 'dashboard',
         status: 'pending',
         detected_at: '2026-05-21T12:00:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
       },
     ]);
   });

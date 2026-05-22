@@ -135,6 +135,7 @@ type SyncConflictResolutionRow = {
   entity_id: string;
   field: string;
   local_value: string | null;
+  revision: number;
 };
 
 const normalizeSubscriptionStatus = (value: string | null): DashboardSubscriptionStatus =>
@@ -511,7 +512,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
   const { data: syncConflictRows } = await supabase
     .from('sync_conflicts')
     .select(
-      'id, device_id, entity, entity_id, field, local_value, remote_value, local_updated_by, remote_updated_by, status, detected_at'
+      'id, device_id, entity, entity_id, field, local_value, remote_value, local_updated_by, remote_updated_by, status, detected_at, revision'
     )
     .eq('user_id', session.user.id)
     .eq('status', 'pending')
@@ -740,17 +741,40 @@ export const actions: Actions = {
       return fail(500, { cvError: "La suggestion n'a pas pu être marquée comme traitée." });
     }
 
-    const { error: conflictUpdateError } = await supabase
+    const { data: pendingConflict, error: conflictReadError } = await supabase
       .from('sync_conflicts')
-      .update(buildSyncConflictResolutionPatch(resolution.suggestion.status, resolvedAt))
+      .select('id, revision')
       .eq('user_id', session.user.id)
       .eq('entity', 'candidate_profile')
       .eq('entity_id', suggestion.profile_id)
       .eq('field', suggestion.field)
-      .eq('status', 'pending');
+      .eq('status', 'pending')
+      .maybeSingle<{ id: string; revision: number }>();
 
-    if (conflictUpdateError) {
-      return fail(500, { cvError: "Le conflit de synchronisation n'a pas pu être traité." });
+    if (conflictReadError) {
+      return fail(500, { cvError: "Le conflit de synchronisation n'a pas pu être lu." });
+    }
+
+    if (pendingConflict) {
+      const { error: conflictUpdateError } = await supabase
+        .from('sync_conflicts')
+        .update(
+          buildSyncConflictResolutionPatch(
+            resolution.suggestion.status,
+            resolvedAt,
+            pendingConflict.revision
+          )
+        )
+        .eq('id', pendingConflict.id)
+        .eq('user_id', session.user.id)
+        .eq('status', 'pending')
+        .eq('revision', pendingConflict.revision)
+        .select('id')
+        .single<{ id: string }>();
+
+      if (conflictUpdateError) {
+        return fail(500, { cvError: "Le conflit de synchronisation n'a pas pu être traité." });
+      }
     }
 
     if (resolution.profile) {
@@ -795,7 +819,7 @@ export const actions: Actions = {
 
     const { data: conflict, error: readError } = await supabase
       .from('sync_conflicts')
-      .select('id, entity, entity_id, field, local_value')
+      .select('id, entity, entity_id, field, local_value, revision')
       .eq('id', conflictId)
       .eq('user_id', session.user.id)
       .eq('status', 'pending')
@@ -813,9 +837,14 @@ export const actions: Actions = {
             localValue: conflict.local_value,
             action: resolutionAction,
             resolvedAt,
+            currentRevision: conflict.revision,
           })
         : {
-            conflict: buildSyncConflictResolutionPatch(resolutionAction, resolvedAt),
+            conflict: buildSyncConflictResolutionPatch(
+              resolutionAction,
+              resolvedAt,
+              conflict.revision
+            ),
             application: null,
             stageTransition: null,
           };
@@ -936,6 +965,7 @@ export const actions: Actions = {
       .eq('id', conflict.id)
       .eq('user_id', session.user.id)
       .eq('status', 'pending')
+      .eq('revision', conflict.revision)
       .select('id')
       .single<SyncConflictIdentityRow>();
 

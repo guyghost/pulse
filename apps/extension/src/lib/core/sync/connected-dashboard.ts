@@ -219,6 +219,8 @@ export interface SyncConflictInsertRow {
   remote_updated_by: 'dashboard';
   status: 'pending';
   detected_at: string;
+  revision: number;
+  updated_by: 'extension';
 }
 
 export interface CandidateExperienceInsertRow {
@@ -1023,6 +1025,8 @@ export function buildCandidateProfileSyncConflictRows(input: {
     remote_updated_by: 'dashboard',
     status: 'pending',
     detected_at: input.detectedAt,
+    revision: 1,
+    updated_by: 'extension',
   }));
 }
 
@@ -1093,6 +1097,8 @@ export function buildApplicationSyncConflictRows(input: {
         remote_updated_by: 'dashboard',
         status: 'pending',
         detected_at: input.detectedAt,
+        revision: 1,
+        updated_by: 'extension',
       },
     ];
   });

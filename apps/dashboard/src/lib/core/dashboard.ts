@@ -345,6 +345,7 @@ export interface DashboardSyncConflictRow {
   remote_updated_by: string;
   status: string;
   detected_at: string;
+  revision: number;
 }
 
 export interface DashboardSyncConflict {
@@ -668,6 +669,8 @@ export interface CvFieldSuggestionResolution {
 export interface SyncConflictResolutionPatch {
   status: 'resolved' | 'dismissed';
   resolved_at: string;
+  revision: number;
+  updated_by: 'dashboard';
 }
 
 export type SyncConflictResolutionAction =
@@ -684,6 +687,7 @@ export interface ApplicationSyncConflictResolutionInput {
   localValue: string | null;
   action: SyncConflictResolutionAction;
   resolvedAt: string;
+  currentRevision: number;
 }
 
 export interface ApplicationSyncConflictResolution {
@@ -1858,11 +1862,14 @@ export function buildCvFieldSuggestionResolution(
 
 export function buildSyncConflictResolutionPatch(
   action: SyncConflictResolutionAction,
-  resolvedAt: string
+  resolvedAt: string,
+  currentRevision: number
 ): SyncConflictResolutionPatch {
   return {
     status: action === 'dismissed' ? 'dismissed' : 'resolved',
     resolved_at: resolvedAt,
+    revision: currentRevision + 1,
+    updated_by: 'dashboard',
   };
 }
 
@@ -1892,7 +1899,11 @@ export function buildApplicationSyncConflictResolution(
     input.action === 'keep_remote'
   ) {
     return {
-      conflict: buildSyncConflictResolutionPatch(input.action, input.resolvedAt),
+      conflict: buildSyncConflictResolutionPatch(
+        input.action,
+        input.resolvedAt,
+        input.currentRevision
+      ),
       application: null,
       stageTransition: null,
     };
@@ -1902,7 +1913,11 @@ export function buildApplicationSyncConflictResolution(
     return null;
   }
 
-  const conflict = buildSyncConflictResolutionPatch(input.action, input.resolvedAt);
+  const conflict = buildSyncConflictResolutionPatch(
+    input.action,
+    input.resolvedAt,
+    input.currentRevision
+  );
 
   if (input.field === 'stage') {
     if (!isApplicationStage(input.localValue)) {

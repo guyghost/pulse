@@ -1509,6 +1509,7 @@ describe('dashboard core', () => {
             remote_updated_by: 'dashboard',
             status: 'pending',
             detected_at: '2026-05-22T08:00:00.000Z',
+            revision: 1,
           },
           {
             id: 'conflict-latest',
@@ -1522,6 +1523,7 @@ describe('dashboard core', () => {
             remote_updated_by: 'dashboard',
             status: 'pending',
             detected_at: '2026-05-22T09:00:00.000Z',
+            revision: 1,
           },
           {
             id: 'conflict-invalid',
@@ -1535,6 +1537,7 @@ describe('dashboard core', () => {
             remote_updated_by: 'dashboard',
             status: 'pending',
             detected_at: '2026-05-22T10:00:00.000Z',
+            revision: 1,
           },
         ],
         new Map([
@@ -1903,19 +1906,25 @@ describe('dashboard core', () => {
   });
 
   it('builds sync conflict resolution patches from CV suggestion outcomes', () => {
-    expect(buildSyncConflictResolutionPatch('applied', '2026-05-22T10:00:00.000Z')).toEqual({
+    expect(buildSyncConflictResolutionPatch('applied', '2026-05-22T10:00:00.000Z', 1)).toEqual({
       status: 'resolved',
       resolved_at: '2026-05-22T10:00:00.000Z',
+      revision: 2,
+      updated_by: 'dashboard',
     });
 
-    expect(buildSyncConflictResolutionPatch('dismissed', '2026-05-22T10:00:00.000Z')).toEqual({
+    expect(buildSyncConflictResolutionPatch('dismissed', '2026-05-22T10:00:00.000Z', 1)).toEqual({
       status: 'dismissed',
       resolved_at: '2026-05-22T10:00:00.000Z',
+      revision: 2,
+      updated_by: 'dashboard',
     });
 
-    expect(buildSyncConflictResolutionPatch('resolved', '2026-05-22T10:00:00.000Z')).toEqual({
+    expect(buildSyncConflictResolutionPatch('resolved', '2026-05-22T10:00:00.000Z', 1)).toEqual({
       status: 'resolved',
       resolved_at: '2026-05-22T10:00:00.000Z',
+      revision: 2,
+      updated_by: 'dashboard',
     });
   });
 
@@ -1926,11 +1935,14 @@ describe('dashboard core', () => {
         localValue: 'Note conservée côté extension',
         action: 'apply_local',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toEqual({
       conflict: {
         status: 'resolved',
         resolved_at: '2026-05-22T10:00:00.000Z',
+        revision: 2,
+        updated_by: 'dashboard',
       },
       application: {
         notes: 'Note conservée côté extension',
@@ -1945,6 +1957,7 @@ describe('dashboard core', () => {
         localValue: '5',
         action: 'apply_local',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toMatchObject({
       application: {
@@ -1960,6 +1973,7 @@ describe('dashboard core', () => {
         localValue: '2026-05-28T09:00:00.000Z',
         action: 'apply_local',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toMatchObject({
       application: {
@@ -1977,11 +1991,14 @@ describe('dashboard core', () => {
         localValue: 'offer',
         action: 'apply_local',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toEqual({
       conflict: {
         status: 'resolved',
         resolved_at: '2026-05-22T10:00:00.000Z',
+        revision: 2,
+        updated_by: 'dashboard',
       },
       application: {
         stage: 'offer',
@@ -2000,11 +2017,14 @@ describe('dashboard core', () => {
         localValue: 'Note extension',
         action: 'keep_remote',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toEqual({
       conflict: {
         status: 'resolved',
         resolved_at: '2026-05-22T10:00:00.000Z',
+        revision: 2,
+        updated_by: 'dashboard',
       },
       application: null,
       stageTransition: null,
@@ -2016,11 +2036,14 @@ describe('dashboard core', () => {
         localValue: 'Note extension',
         action: 'dismissed',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toEqual({
       conflict: {
         status: 'dismissed',
         resolved_at: '2026-05-22T10:00:00.000Z',
+        revision: 2,
+        updated_by: 'dashboard',
       },
       application: null,
       stageTransition: null,
@@ -2034,6 +2057,7 @@ describe('dashboard core', () => {
         localValue: 'done',
         action: 'apply_local',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toBeNull();
     expect(
@@ -2042,6 +2066,7 @@ describe('dashboard core', () => {
         localValue: '8',
         action: 'apply_local',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toBeNull();
     expect(
@@ -2050,6 +2075,7 @@ describe('dashboard core', () => {
         localValue: '28/05/2026',
         action: 'apply_local',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toBeNull();
     expect(
@@ -2058,6 +2084,7 @@ describe('dashboard core', () => {
         localValue: 'x',
         action: 'apply_local',
         resolvedAt: '2026-05-22T10:00:00.000Z',
+        currentRevision: 1,
       })
     ).toBeNull();
   });

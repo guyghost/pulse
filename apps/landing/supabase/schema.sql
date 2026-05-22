@@ -669,7 +669,11 @@ create table if not exists public.sync_conflicts (
   status text not null default 'pending' check (status in ('pending', 'resolved', 'dismissed')),
   detected_at timestamptz not null,
   resolved_at timestamptz,
-  created_at timestamptz not null default now()
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.candidate_profile_field_suggestions (
@@ -995,6 +999,12 @@ drop trigger if exists on_candidate_profile_field_suggestions_updated
   on public.candidate_profile_field_suggestions;
 create trigger on_candidate_profile_field_suggestions_updated
   before update on public.candidate_profile_field_suggestions
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_sync_conflicts_updated on public.sync_conflicts;
+create trigger on_sync_conflicts_updated
+  before update on public.sync_conflicts
   for each row
   execute function public.update_updated_at();
 

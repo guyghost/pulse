@@ -86,6 +86,9 @@ describe('connected dashboard schema', () => {
     expect(tableBlock('sync_conflicts')).toContain(
       "entity in ('applications', 'candidate_profile')"
     );
+    expect(tableBlock('sync_conflicts')).toContain('revision bigint not null');
+    expect(tableBlock('sync_conflicts')).toContain('updated_by text not null');
+    expect(tableBlock('sync_conflicts')).toContain('updated_at timestamptz not null default now()');
     expect(tableBlock('candidate_profile_field_suggestions')).toContain(
       "field in ('title', 'summary', 'location', 'target_role')"
     );

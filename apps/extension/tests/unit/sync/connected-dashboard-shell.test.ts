@@ -1381,6 +1381,8 @@ describe('connected dashboard shell sync', () => {
         local_value: 'selected',
         remote_value: 'offer',
         detected_at: '2026-05-21T12:00:00.000Z',
+        revision: 1,
+        updated_by: 'extension',
       }),
       expect.objectContaining({
         entity: 'applications',

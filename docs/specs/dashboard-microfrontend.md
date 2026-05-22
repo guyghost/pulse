@@ -512,6 +512,7 @@ dashboard_alert_preferences (
   min_daily_rate integer not null default 0 check (min_daily_rate between 0 and 5000),
   required_stacks text[] not null default '{}',
   max_results integer not null default 5 check (max_results between 1 and 20),
+  revision bigint not null default 1,
   updated_by text not null default 'dashboard'
     check (updated_by in ('dashboard', 'extension', 'system')),
   updated_at timestamptz not null default now()
@@ -531,6 +532,10 @@ sync_conflicts (
   status text not null default 'pending' check (status in ('pending', 'resolved', 'dismissed')),
   detected_at timestamptz not null,
   resolved_at timestamptz,
+  revision bigint not null default 1,
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  updated_at timestamptz not null default now(),
   created_at timestamptz not null default now()
 )
 
