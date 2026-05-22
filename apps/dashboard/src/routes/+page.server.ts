@@ -9,6 +9,7 @@ import {
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
   buildApplicationStageUpdatePatch,
+  buildMissionSelectionInsertPatch,
   buildTjmRadarSnapshot,
   canonicalRowsToApplications,
   favoriteMissionToApplication,
@@ -269,6 +270,16 @@ type ApplicationTransitionRow = {
   id: string;
   stage: string;
   revision: number;
+};
+
+type MissionSelectionRow = {
+  id: string;
+  title: string;
+};
+
+type ExistingApplicationSelectionRow = {
+  id: string;
+  stage: string;
 };
 
 const normalizeSubscriptionStatus = (value: string | null): DashboardSubscriptionStatus =>
@@ -584,6 +595,107 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
+  selectMission: async ({ cookies, request }) => {
+    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasSupabaseConfig) {
+      return fail(503, { selectionError: 'Configuration Supabase absente.' });
+    }
+
+    const supabase = createSupabaseServerClient(cookies);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return fail(401, { selectionError: 'Session requise.' });
+    }
+
+    const formData = await request.formData();
+    const missionId = formData.get('missionId');
+
+    if (typeof missionId !== 'string' || missionId.length === 0) {
+      return fail(400, { selectionError: 'Mission invalide.' });
+    }
+
+    const { data: mission, error: missionError } = await supabase
+      .from('missions')
+      .select('id, title')
+      .eq('id', missionId)
+      .eq('user_id', session.user.id)
+      .single<MissionSelectionRow>();
+
+    if (missionError || !mission) {
+      return fail(404, { selectionError: 'Mission introuvable.' });
+    }
+
+    const { data: existingApplication } = await supabase
+      .from('applications')
+      .select('id, stage')
+      .eq('mission_id', missionId)
+      .eq('user_id', session.user.id)
+      .maybeSingle<ExistingApplicationSelectionRow>();
+
+    if (existingApplication) {
+      return {
+        selectionSuccess: `Mission déjà suivie en ${existingApplication.stage}.`,
+      };
+    }
+
+    const patch = buildMissionSelectionInsertPatch();
+    const { data: application, error: insertError } = await supabase
+      .from('applications')
+      .insert({
+        user_id: session.user.id,
+        mission_id: missionId,
+        stage: patch.stage,
+        notes: patch.notes,
+        revision: patch.revision,
+        updated_by: patch.updated_by,
+      })
+      .select('id')
+      .single<{ id: string }>();
+
+    if (insertError || !application) {
+      return fail(500, { selectionError: "La mission n'a pas pu être sélectionnée." });
+    }
+
+    const occurredAt = new Date();
+    const event = transitionApplicationStage({
+      applicationId: application.id,
+      fromStage: 'detected',
+      toStage: 'selected',
+      occurredAt,
+      createdBy: 'dashboard',
+      clientEventId: `dashboard:select:${application.id}:${occurredAt.getTime()}:${crypto.randomUUID()}`,
+      note: 'Mission sélectionnée depuis le feed dashboard.',
+    });
+
+    if (!event) {
+      return fail(500, { selectionError: 'Transition de sélection invalide.' });
+    }
+
+    const { error: eventError } = await supabase.from('application_pipeline_events').insert({
+      user_id: session.user.id,
+      application_id: application.id,
+      from_stage: event.fromStage,
+      to_stage: event.toStage,
+      note: event.note,
+      metadata: { source: 'dashboard_feed', mission_id: missionId },
+      occurred_at: event.occurredAt,
+      created_by: event.createdBy,
+      client_event_id: event.clientEventId,
+    });
+
+    if (eventError) {
+      return fail(500, {
+        selectionError:
+          "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
+      });
+    }
+
+    return { selectionSuccess: `Mission sélectionnée: ${mission.title}.` };
+  },
+
   transitionApplication: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {

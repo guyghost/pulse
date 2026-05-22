@@ -6,6 +6,7 @@ import {
   filterApplications,
   favoriteMissionToApplication,
   buildApplicationStageUpdatePatch,
+  buildMissionSelectionInsertPatch,
   generatedAssetRowsToHistory,
   getNextApplicationStages,
   getAverageApplicationScore,
@@ -852,6 +853,15 @@ describe('dashboard core', () => {
       stage: 'archived',
       applied_at: undefined,
       archived_at: '2026-05-22T08:00:00.000Z',
+      updated_by: 'dashboard',
+    });
+  });
+
+  it('builds the insert patch for selecting a detected mission', () => {
+    expect(buildMissionSelectionInsertPatch()).toEqual({
+      stage: 'selected',
+      notes: '',
+      revision: 1,
       updated_by: 'dashboard',
     });
   });

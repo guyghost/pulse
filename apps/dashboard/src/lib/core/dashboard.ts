@@ -371,6 +371,13 @@ export interface ApplicationStageUpdatePatch {
   updated_by: 'dashboard';
 }
 
+export interface ApplicationSelectionInsertPatch {
+  stage: 'selected';
+  notes: string;
+  revision: 1;
+  updated_by: 'dashboard';
+}
+
 export interface ApplicationFilters {
   query: string;
   source: 'all' | ApplicationSource;
@@ -963,6 +970,15 @@ export function buildApplicationStageUpdatePatch(
     stage,
     applied_at: stage === 'applied' ? occurredAt : stage === 'detected' ? null : undefined,
     archived_at: stage === 'archived' ? occurredAt : null,
+    updated_by: 'dashboard',
+  };
+}
+
+export function buildMissionSelectionInsertPatch(): ApplicationSelectionInsertPatch {
+  return {
+    stage: 'selected',
+    notes: '',
+    revision: 1,
     updated_by: 'dashboard',
   };
 }

@@ -422,6 +422,22 @@
           </p>
         </div>
 
+        {#if form?.selectionError}
+          <p
+            class="mb-3 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
+          >
+            {form.selectionError}
+          </p>
+        {/if}
+
+        {#if form?.selectionSuccess}
+          <p
+            class="mb-3 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
+          >
+            {form.selectionSuccess}
+          </p>
+        {/if}
+
         <div class="grid gap-3 lg:grid-cols-3">
           {#if missionFeed.length === 0}
             <article
@@ -492,6 +508,16 @@
                 <span class="text-xs text-text-subtle">{formatDate(mission.scrapedAt)}</span>
                 {#if mission.applicationStage}
                   <Badge label={stageLabels[mission.applicationStage]} variant="status" />
+                {:else if isConnected}
+                  <form method="POST" action="?/selectMission">
+                    <input type="hidden" name="missionId" value={mission.id} />
+                    <button
+                      type="submit"
+                      class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
+                    >
+                      Sélectionner
+                    </button>
+                  </form>
                 {:else}
                   <a
                     class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
