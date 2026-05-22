@@ -1380,5 +1380,10 @@ describe('dashboard core', () => {
       status: 'dismissed',
       resolved_at: '2026-05-22T10:00:00.000Z',
     });
+
+    expect(buildSyncConflictResolutionPatch('resolved', '2026-05-22T10:00:00.000Z')).toEqual({
+      status: 'resolved',
+      resolved_at: '2026-05-22T10:00:00.000Z',
+    });
   });
 });

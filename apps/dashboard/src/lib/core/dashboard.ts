@@ -589,6 +589,8 @@ export interface SyncConflictResolutionPatch {
   resolved_at: string;
 }
 
+export type SyncConflictResolutionAction = 'applied' | 'resolved' | 'dismissed';
+
 export interface ApplicationFilters {
   query: string;
   source: 'all' | ApplicationSource;
@@ -1523,11 +1525,11 @@ export function buildCvFieldSuggestionResolution(
 }
 
 export function buildSyncConflictResolutionPatch(
-  suggestionStatus: CvFieldSuggestionResolution['suggestion']['status'],
+  action: SyncConflictResolutionAction,
   resolvedAt: string
 ): SyncConflictResolutionPatch {
   return {
-    status: suggestionStatus === 'applied' ? 'resolved' : 'dismissed',
+    status: action === 'dismissed' ? 'dismissed' : 'resolved',
     resolved_at: resolvedAt,
   };
 }

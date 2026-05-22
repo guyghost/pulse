@@ -1853,6 +1853,22 @@
                   <Badge label="Action requise" variant="warning" />
                 </div>
 
+                {#if form?.syncConflictError}
+                  <p
+                    class="mt-3 rounded-md border border-status-red/20 bg-status-red/10 px-3 py-2 text-xs text-status-red"
+                  >
+                    {form.syncConflictError}
+                  </p>
+                {/if}
+
+                {#if form?.syncConflictSuccess}
+                  <p
+                    class="mt-3 rounded-md border border-accent-green/20 bg-accent-green/10 px-3 py-2 text-xs text-accent-green"
+                  >
+                    {form.syncConflictSuccess}
+                  </p>
+                {/if}
+
                 <div class="mt-3 space-y-2">
                   {#each syncConflicts as conflict}
                     <article
@@ -1891,6 +1907,30 @@
                           </p>
                         </div>
                       </div>
+
+                      <form
+                        method="POST"
+                        action="?/resolveSyncConflict"
+                        class="mt-3 flex flex-wrap gap-2"
+                      >
+                        <input type="hidden" name="conflictId" value={conflict.id} />
+                        <button
+                          type="submit"
+                          name="resolutionAction"
+                          value="resolved"
+                          class="rounded-md bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition hover:bg-blueprint-blue/90"
+                        >
+                          Marquer résolu
+                        </button>
+                        <button
+                          type="submit"
+                          name="resolutionAction"
+                          value="dismissed"
+                          class="rounded-md border border-border-light px-3 py-2 text-xs font-medium text-text-secondary transition hover:border-text-muted"
+                        >
+                          Ignorer
+                        </button>
+                      </form>
                     </article>
                   {/each}
                 </div>

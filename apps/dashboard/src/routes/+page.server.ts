@@ -106,6 +106,10 @@ type CandidateProfileIdentityRow = {
   id: string;
 };
 
+type SyncConflictIdentityRow = {
+  id: string;
+};
+
 const normalizeSubscriptionStatus = (value: string | null): DashboardSubscriptionStatus =>
   value === 'premium' ? 'premium' : value === 'expired' ? 'expired' : 'free';
 
@@ -161,6 +165,9 @@ const isApplicationStage = (value: unknown): value is ApplicationStage =>
 
 const isCvSuggestionResolutionAction = (value: unknown): value is 'apply' | 'dismiss' =>
   value === 'apply' || value === 'dismiss';
+
+const isManualSyncConflictResolutionAction = (value: unknown): value is 'resolved' | 'dismissed' =>
+  value === 'resolved' || value === 'dismissed';
 
 const deleteRowsByUserId = async (
   supabase: ReturnType<typeof createSupabaseServerClient>,
@@ -683,6 +690,60 @@ export const actions: Actions = {
         resolution.suggestion.status === 'applied'
           ? 'Suggestion CV appliquée.'
           : 'Suggestion CV ignorée.',
+    };
+  },
+
+  resolveSyncConflict: async ({ cookies, request }) => {
+    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasSupabaseConfig) {
+      return fail(503, { syncConflictError: 'Configuration Supabase absente.' });
+    }
+
+    const supabase = createSupabaseServerClient(cookies);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return fail(401, { syncConflictError: 'Session requise.' });
+    }
+
+    const formData = await request.formData();
+    const conflictId = formData.get('conflictId');
+    const resolutionAction = formData.get('resolutionAction');
+
+    if (typeof conflictId !== 'string' || !isManualSyncConflictResolutionAction(resolutionAction)) {
+      return fail(400, { syncConflictError: 'Résolution de conflit invalide.' });
+    }
+
+    const { data: conflict, error: readError } = await supabase
+      .from('sync_conflicts')
+      .select('id')
+      .eq('id', conflictId)
+      .eq('user_id', session.user.id)
+      .eq('status', 'pending')
+      .single<SyncConflictIdentityRow>();
+
+    if (readError || !conflict) {
+      return fail(404, { syncConflictError: 'Conflit de synchronisation introuvable.' });
+    }
+
+    const { error: updateError } = await supabase
+      .from('sync_conflicts')
+      .update(buildSyncConflictResolutionPatch(resolutionAction, new Date().toISOString()))
+      .eq('id', conflict.id)
+      .eq('user_id', session.user.id)
+      .eq('status', 'pending')
+      .select('id')
+      .single<SyncConflictIdentityRow>();
+
+    if (updateError) {
+      return fail(500, { syncConflictError: "Le conflit n'a pas pu être traité." });
+    }
+
+    return {
+      syncConflictSuccess:
+        resolutionAction === 'resolved' ? 'Conflit marqué résolu.' : 'Conflit ignoré.',
     };
   },
 
