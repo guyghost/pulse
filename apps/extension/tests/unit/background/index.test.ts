@@ -16,6 +16,7 @@ const getAllHealthSnapshots = vi.fn();
 const resetHealthSnapshot = vi.fn();
 const syncConnectedDashboardScan = vi.fn();
 const syncConnectedDashboardSnapshot = vi.fn();
+const syncConnectedDashboardProfileExtractorHealth = vi.fn();
 const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
@@ -171,6 +172,7 @@ vi.mock('../../../src/lib/shell/sync/connected-dashboard', () => ({
   })),
   syncConnectedDashboardScan,
   syncConnectedDashboardSnapshot,
+  syncConnectedDashboardProfileExtractorHealth,
   syncConnectedDashboardProfileImport: vi.fn(),
   syncConnectedDashboardTracking: vi.fn(),
 }));
@@ -221,6 +223,10 @@ describe('background auto-scan notifications', () => {
     syncConnectedDashboardSnapshot.mockResolvedValue({
       ok: true,
       value: { missions: 1, applications: 0, skippedApplications: 0, connectorHealth: 0 },
+    });
+    syncConnectedDashboardProfileExtractorHealth.mockResolvedValue({
+      ok: true,
+      value: { pushedCount: 1 },
     });
   });
 

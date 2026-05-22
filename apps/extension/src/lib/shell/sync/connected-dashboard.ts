@@ -11,6 +11,7 @@ import {
   buildMissionDuplicateUpsertRows,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
+  buildProfileExtractorHealthEventRow,
   buildSyncStatusRow,
   mergeRemoteApplicationTracking,
   remoteCandidateProfileToUserProfile,
@@ -234,6 +235,14 @@ export interface PushCandidateProfileImportResult {
   skills: number;
   links: number;
   suggestions: number;
+}
+
+export interface SyncProfileExtractorHealthInput {
+  source: 'linkedin';
+  ok: boolean;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  occurredAt?: Date;
 }
 
 export interface ConnectedDashboardSnapshotInput {
@@ -1351,6 +1360,52 @@ export async function syncConnectedDashboardProfileImport(
   }
 
   return result;
+}
+
+export async function syncConnectedDashboardProfileExtractorHealth(
+  input: SyncProfileExtractorHealthInput
+): Promise<ConnectedSyncResult<{ pushedCount: number }>> {
+  const context = await getRuntimeContext();
+  if ('code' in context) {
+    return { ok: false, error: context };
+  }
+
+  try {
+    await context.gateway.insertConnectorHealthEvents([
+      buildProfileExtractorHealthEventRow({
+        userId: context.userId,
+        deviceId: context.deviceId,
+        source: input.source,
+        ok: input.ok,
+        errorCode: input.errorCode,
+        errorMessage: input.errorMessage,
+        occurredAt: input.occurredAt ?? context.now,
+      }),
+    ]);
+    await context.gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: context.userId,
+        deviceId: context.deviceId,
+        entity: 'connector_health',
+        lastPushAt: context.now,
+      })
+    );
+
+    return { ok: true, value: { pushedCount: 1 } };
+  } catch (error) {
+    const syncError = remoteError(error);
+    await context.gateway.upsertSyncStatus(
+      buildSyncStatusRow({
+        userId: context.userId,
+        deviceId: context.deviceId,
+        entity: 'connector_health',
+        pendingUploadCount: 1,
+        error: { code: syncError.code, message: syncError.message },
+        retryAfterAt: buildRetryAfterAt(context.now),
+      })
+    );
+    return { ok: false, error: syncError };
+  }
 }
 
 export async function getOrCreateConnectedSyncInstallId(

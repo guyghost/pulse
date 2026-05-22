@@ -114,6 +114,15 @@ export interface ConnectorHealthEventRow {
   occurred_at: string;
 }
 
+export type ProfileExtractorHealthCode =
+  | 'permission_required'
+  | 'session_required'
+  | 'profile_not_found'
+  | 'dom_changed'
+  | 'rate_limited_or_blocked'
+  | 'sync_failed'
+  | 'unknown';
+
 export interface SyncStatusRow {
   user_id: string;
   device_id: string;
@@ -583,6 +592,68 @@ export function buildConnectorHealthEventRow(
       recentLatenciesMs: [...snapshot.recentLatenciesMs],
     },
     occurred_at: occurredAt.toISOString(),
+  };
+}
+
+function profileExtractorStatusFromCode(
+  ok: boolean,
+  code: ProfileExtractorHealthCode | null
+): ConnectorHealthSyncStatus {
+  if (ok) {
+    return 'ready';
+  }
+  if (code === 'permission_required') {
+    return 'needs_permission';
+  }
+  if (code === 'session_required') {
+    return 'needs_session';
+  }
+  if (code === 'rate_limited_or_blocked') {
+    return 'blocked';
+  }
+  return 'error';
+}
+
+export function normalizeProfileExtractorHealthCode(
+  value: string | null | undefined
+): ProfileExtractorHealthCode | null {
+  if (
+    value === 'permission_required' ||
+    value === 'session_required' ||
+    value === 'profile_not_found' ||
+    value === 'dom_changed' ||
+    value === 'rate_limited_or_blocked' ||
+    value === 'sync_failed'
+  ) {
+    return value;
+  }
+
+  return value ? 'unknown' : null;
+}
+
+export function buildProfileExtractorHealthEventRow(input: {
+  userId: string;
+  deviceId: string;
+  source: string;
+  ok: boolean;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  occurredAt: Date;
+}): ConnectorHealthEventRow {
+  const code = normalizeProfileExtractorHealthCode(input.errorCode);
+
+  return {
+    user_id: input.userId,
+    device_id: input.deviceId,
+    source: input.source,
+    status: profileExtractorStatusFromCode(input.ok, code),
+    error_code: input.ok ? null : code,
+    error_message: input.ok ? null : (input.errorMessage ?? null),
+    details: {
+      kind: 'profile_extractor',
+      extractorId: input.source,
+    },
+    occurred_at: input.occurredAt.toISOString(),
   };
 }
 

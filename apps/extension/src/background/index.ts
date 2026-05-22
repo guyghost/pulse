@@ -60,6 +60,7 @@ import {
   getConnectedDashboardSyncStatus,
   syncConnectedDashboardScan,
   syncConnectedDashboardSnapshot,
+  syncConnectedDashboardProfileExtractorHealth,
   syncConnectedDashboardProfileImport,
   syncConnectedDashboardTracking,
 } from '../lib/shell/sync/connected-dashboard';
@@ -109,6 +110,22 @@ function buildAuthUserFromProfile(
 function getBridgeErrorCode(error: import('../lib/core/errors/app-error').AppError): string {
   const code = error.context?.profileExtractorCode;
   return typeof code === 'string' ? code : error.type;
+}
+
+function recordLinkedInExtractorHealth(input: {
+  ok: boolean;
+  errorCode?: string | null;
+  errorMessage?: string | null;
+  occurredAt: Date;
+}): void {
+  syncConnectedDashboardProfileExtractorHealth({
+    source: 'linkedin',
+    ...input,
+  }).catch((error) => {
+    if (import.meta.env.DEV) {
+      console.warn('[MissionPulse] LinkedIn extractor health sync failed:', error);
+    }
+  });
 }
 
 // Trigger expired semantic cache cleanup on startup
@@ -469,15 +486,23 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
     if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
       const extractor = getProfileExtractor('linkedin');
+      const startedAt = Date.now();
       extractor
-        .extractProfile(Date.now(), message.payload?.tabId)
+        .extractProfile(startedAt, message.payload?.tabId)
         .then(async (result) => {
           if (!result.ok) {
+            const errorCode = getBridgeErrorCode(result.error);
+            recordLinkedInExtractorHealth({
+              ok: false,
+              errorCode,
+              errorMessage: result.error.message,
+              occurredAt: new Date(startedAt),
+            });
             sendResponse({
               type: 'LINKEDIN_PROFILE_IMPORTED',
               payload: {
                 imported: false,
-                errorCode: getBridgeErrorCode(result.error),
+                errorCode,
                 errorMessage: result.error.message,
               },
             });
@@ -486,6 +511,12 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
           const synced = await syncConnectedDashboardProfileImport(result.value);
           if (!synced.ok) {
+            recordLinkedInExtractorHealth({
+              ok: false,
+              errorCode: 'sync_failed',
+              errorMessage: synced.error.message,
+              occurredAt: new Date(startedAt),
+            });
             sendResponse({
               type: 'LINKEDIN_PROFILE_IMPORTED',
               payload: {
@@ -497,12 +528,22 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
+          recordLinkedInExtractorHealth({
+            ok: true,
+            occurredAt: new Date(startedAt),
+          });
           sendResponse({
             type: 'LINKEDIN_PROFILE_IMPORTED',
             payload: { imported: true, profile: result.value },
           });
         })
         .catch((error) => {
+          recordLinkedInExtractorHealth({
+            ok: false,
+            errorCode: 'dom_changed',
+            errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
+            occurredAt: new Date(startedAt),
+          });
           sendResponse({
             type: 'LINKEDIN_PROFILE_IMPORTED',
             payload: {

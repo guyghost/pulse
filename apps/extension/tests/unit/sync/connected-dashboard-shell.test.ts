@@ -13,6 +13,7 @@ import {
   pushApplicationsToConnectedDashboard,
   pushConnectorHealthToConnectedDashboard,
   pushCandidateProfileImportToConnectedDashboard,
+  syncConnectedDashboardProfileExtractorHealth,
   pullAlertPreferencesFromConnectedDashboard,
   pullApplicationsFromConnectedDashboard,
   pullCandidateProfileFromConnectedDashboard,
@@ -312,6 +313,86 @@ describe('connected dashboard shell sync', () => {
         },
       ],
     });
+  });
+
+  it('syncs LinkedIn extractor health events through the connected dashboard gateway', async () => {
+    const storageGet = vi.fn(async () => ({
+      'missionpulse.connectedSync.installId': 'install-1',
+    }));
+    vi.stubGlobal('chrome', {
+      runtime: {
+        getManifest: vi.fn(() => ({ version: '0.2.1' })),
+      },
+      storage: {
+        local: {
+          get: storageGet,
+          set: vi.fn(async () => undefined),
+        },
+      },
+    });
+
+    const upsertExtensionDevice = vi.fn(() => ({
+      select: vi.fn(async () => ({ data: [{ id: 'device-1' }], error: null })),
+    }));
+    const insertHealthEvent = vi.fn(() => ({
+      select: vi.fn(async () => ({ data: [{ id: 'health-1' }], error: null })),
+    }));
+    const upsertSyncStatus = vi.fn(() => ({
+      select: vi.fn(async () => ({
+        data: [{ device_id: 'device-1', entity: 'connector_health' }],
+        error: null,
+      })),
+    }));
+
+    supabaseClientMock.getSupabaseClient.mockReturnValueOnce({
+      auth: {
+        getSession: vi.fn(async () => ({
+          data: { session: { user: { id: 'user-1' } } },
+        })),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'extension_devices') {
+          return { upsert: upsertExtensionDevice };
+        }
+        if (table === 'connector_health_events') {
+          return { insert: insertHealthEvent };
+        }
+        if (table === 'sync_status') {
+          return { upsert: upsertSyncStatus };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    });
+
+    const result = await syncConnectedDashboardProfileExtractorHealth({
+      source: 'linkedin',
+      ok: false,
+      errorCode: 'session_required',
+      errorMessage: 'LinkedIn session required.',
+      occurredAt: new Date('2026-05-22T08:00:00.000Z'),
+    });
+
+    expect(result).toEqual({ ok: true, value: { pushedCount: 1 } });
+    expect(insertHealthEvent).toHaveBeenCalledWith([
+      expect.objectContaining({
+        user_id: 'user-1',
+        device_id: 'device-1',
+        source: 'linkedin',
+        status: 'needs_session',
+        error_code: 'session_required',
+        error_message: 'LinkedIn session required.',
+        occurred_at: '2026-05-22T08:00:00.000Z',
+      }),
+    ]);
+    expect(upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        user_id: 'user-1',
+        device_id: 'device-1',
+        entity: 'connector_health',
+        pending_upload_count: 0,
+      }),
+      { onConflict: 'device_id,entity' }
+    );
   });
 
   it('registers an extension device with last_seen_at', async () => {

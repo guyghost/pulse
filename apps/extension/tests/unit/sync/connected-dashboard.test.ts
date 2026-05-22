@@ -11,6 +11,7 @@ import {
   buildApplicationPullCursor,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
+  buildProfileExtractorHealthEventRow,
   buildTrackingFromRemoteApplication,
   buildSyncStatusRow,
   mergeRemoteApplicationTracking,
@@ -353,6 +354,76 @@ describe('connected dashboard sync payload builders', () => {
       },
       occurred_at: '2026-05-21T02:00:00.000Z',
     });
+  });
+
+  it('maps profile extractor outcomes to connector health event rows', () => {
+    expect(
+      buildProfileExtractorHealthEventRow({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        source: 'linkedin',
+        ok: true,
+        occurredAt: new Date('2026-05-22T08:00:00.000Z'),
+      })
+    ).toEqual({
+      user_id: 'user-1',
+      device_id: 'device-1',
+      source: 'linkedin',
+      status: 'ready',
+      error_code: null,
+      error_message: null,
+      details: { kind: 'profile_extractor', extractorId: 'linkedin' },
+      occurred_at: '2026-05-22T08:00:00.000Z',
+    });
+
+    expect(
+      buildProfileExtractorHealthEventRow({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        source: 'linkedin',
+        ok: false,
+        errorCode: 'permission_required',
+        errorMessage: 'Permission requise',
+        occurredAt: new Date('2026-05-22T08:00:00.000Z'),
+      })
+    ).toMatchObject({
+      status: 'needs_permission',
+      error_code: 'permission_required',
+      error_message: 'Permission requise',
+    });
+
+    expect(
+      buildProfileExtractorHealthEventRow({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        source: 'linkedin',
+        ok: false,
+        errorCode: 'session_required',
+        occurredAt: new Date('2026-05-22T08:00:00.000Z'),
+      })
+    ).toMatchObject({ status: 'needs_session', error_code: 'session_required' });
+
+    expect(
+      buildProfileExtractorHealthEventRow({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        source: 'linkedin',
+        ok: false,
+        errorCode: 'rate_limited_or_blocked',
+        occurredAt: new Date('2026-05-22T08:00:00.000Z'),
+      })
+    ).toMatchObject({ status: 'blocked', error_code: 'rate_limited_or_blocked' });
+
+    expect(
+      buildProfileExtractorHealthEventRow({
+        userId: 'user-1',
+        deviceId: 'device-1',
+        source: 'linkedin',
+        ok: false,
+        errorCode: 'sync_failed',
+        occurredAt: new Date('2026-05-22T08:00:00.000Z'),
+      })
+    ).toMatchObject({ status: 'error', error_code: 'sync_failed' });
   });
 
   it('builds sync status rows with retryable error reporting', () => {
