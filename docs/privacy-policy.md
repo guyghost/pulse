@@ -1,19 +1,20 @@
 # Politique de confidentialite — MissionPulse
 
-**Date de derniere mise a jour** : 2026-04-02
+**Date de derniere mise a jour** : 2026-05-22
 
 ---
 
 ## 1. Donnees collectees
 
-MissionPulse collecte et traite les donnees suivantes, **toutes stockees localement** sur votre appareil :
+MissionPulse collecte et traite les donnees suivantes pour faire fonctionner l'extension locale et, si vous connectez un compte MissionPulse, le dashboard connecte optionnel :
 
 - **Profil utilisateur** : prenom, intitule de poste, competences, TJM cible, preferences de remote et seniorite — renseignes lors de l'onboarding et dans les parametres.
 - **Missions** : titre, description, TJM, localisation, source, date de publication et metadonnees de scoring — extraites depuis les plateformes connectees.
 - **Preferences** : intervalle de scan, connecteurs actives, seuils de notification, parametres d'analyse locale.
 - **Donnees locales de fonctionnement** : favoris, missions masquees, missions deja vues, cache semantique local, historique TJM et etat des connecteurs.
+- **Donnees synchronisees du dashboard** : snapshots normalises de missions, scores, pipeline de candidature, assets generes, profil CV canonique, historique d'import et etat de synchronisation.
 
-Aucune donnee n'est transmise a nos serveurs. L'ensemble du stockage applicatif s'effectue localement dans le navigateur.
+L'execution plateforme reste locale dans votre navigateur. La synchronisation cloud est optionnelle et limitee aux donnees produit normalisees necessaires au dashboard connecte.
 
 ---
 
@@ -24,8 +25,10 @@ Les donnees sont stockees via plusieurs mecanismes du navigateur :
 - **chrome.storage.local** : parametres, favoris, missions masquees, cache semantique local et autres donnees legeres.
 - **IndexedDB** : profil, missions scrapees, historique TJM, etats de connecteurs et donnees plus volumineuses.
 - **Stockage de session** : certains etats temporaires de scan ou d'interface peuvent etre gardes localement pendant l'execution.
+- **Supabase** : si vous connectez un compte MissionPulse, le dashboard peut synchroniser des snapshots normalisés via Supabase pour vos missions, candidatures, assets generes, CV canonique, conflits et statuts de synchronisation.
 
 La suppression de l'extension entraine la suppression des donnees associees a son stockage local.
+Le dashboard fournit aussi des controles d'export et de suppression des donnees connectees.
 
 ---
 
@@ -53,18 +56,21 @@ Plateformes actuellement supportees :
 
 MissionPulse **ne modifie, ne cree et ne supprime aucun cookie utilisateur**. Ces acces servent uniquement au fonctionnement local de l'extension.
 
+Nous ne synchronisons pas les mots de passe, cookies, jetons de session des plateformes, ni le HTML brut LinkedIn. Les imports LinkedIn stockent uniquement les champs normalises necessaires au CV, un hash et des compteurs de champs.
+
 ---
 
 ## 5. Permissions
 
-| Permission | Utilisation |
-|---|---|
-| `sidePanel` | Affiche le panneau lateral contenant le feed, le dashboard TJM et les parametres. |
-| `storage` | Sauvegarde locale des preferences, caches et donnees de fonctionnement. |
-| `cookies` | Detection de session sur les plateformes supportees lorsque c'est necessaire. |
-| `alarms` | Planification des cycles de scan automatiques a intervalles reguliers. |
-| `notifications` | Alertes lors de la detection de nouvelles missions pertinentes. |
-| `declarativeNetRequest` | Application de regles reseau temporaires necessaires a certains connecteurs. |
+| Permission                | Utilisation                                                                       |
+| ------------------------- | --------------------------------------------------------------------------------- |
+| `sidePanel`               | Affiche le panneau lateral contenant le feed, le dashboard TJM et les parametres. |
+| `storage`                 | Sauvegarde locale des preferences, caches et donnees de fonctionnement.           |
+| `cookies`                 | Detection de session sur les plateformes supportees lorsque c'est necessaire.     |
+| `scripting` / `activeTab` | Import LinkedIn declenche par l'utilisateur depuis un onglet de profil ouvert.    |
+| `alarms`                  | Planification des cycles de scan automatiques a intervalles reguliers.            |
+| `notifications`           | Alertes lors de la detection de nouvelles missions pertinentes.                   |
+| `declarativeNetRequest`   | Application de regles reseau temporaires necessaires a certains connecteurs.      |
 
 ---
 
@@ -72,7 +78,7 @@ MissionPulse **ne modifie, ne cree et ne supprime aucun cookie utilisateur**. Ce
 
 MissionPulse peut communiquer directement depuis votre navigateur avec les domaines des plateformes supportees pour recuperer les missions, ainsi qu'avec les services strictement necessaires a leur fonctionnement selon les permissions declarees.
 
-Aucun backend MissionPulse n'intervient dans ce traitement.
+Aucun backend MissionPulse ne scrape les plateformes a votre place. Le dashboard connecte utilise Supabase uniquement pour stocker et synchroniser les donnees produit de votre compte.
 
 ---
 
@@ -84,4 +90,4 @@ Pour toute question relative a la confidentialite de vos donnees, veuillez nous 
 
 ---
 
-*MissionPulse est un projet open-source. Le code est disponible pour audit.*
+_MissionPulse est un projet open-source. Le code est disponible pour audit._
