@@ -237,6 +237,7 @@ export interface ConnectedSyncStatus {
   pendingDownloadCount: number;
   lastErrorCode: string | null;
   lastErrorMessage: string | null;
+  retryAfterAt: string | null;
   updatedAt: string;
 }
 
@@ -406,6 +407,7 @@ export interface DashboardSyncStatusRow {
   pending_download_count: number;
   last_error_code: string | null;
   last_error_message: string | null;
+  retry_after_at: string | null;
   updated_at: string;
 }
 
@@ -1123,6 +1125,7 @@ export function syncRowsToConnectedSyncStatuses(
           pendingDownloadCount: row.pending_download_count,
           lastErrorCode: row.last_error_code,
           lastErrorMessage: row.last_error_message,
+          retryAfterAt: row.retry_after_at,
           updatedAt: row.updated_at,
         },
       ];

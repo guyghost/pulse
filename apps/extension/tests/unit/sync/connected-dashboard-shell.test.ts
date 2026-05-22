@@ -204,6 +204,7 @@ describe('connected dashboard shell sync', () => {
         pending_upload_count: 1,
         last_error_code: 'remote-error',
         last_error_message: 'Supabase unavailable',
+        retry_after_at: '2026-05-21T09:05:00.000Z',
       })
     );
   });
@@ -456,6 +457,7 @@ describe('connected dashboard shell sync', () => {
         pending_upload_count: 1,
         last_error_code: 'profile-sync-failed',
         last_error_message: 'profile write failed',
+        retry_after_at: '2026-05-22T08:10:00.000Z',
       })
     );
   });

@@ -293,6 +293,7 @@ const mockConnectedSyncStatuses: ConnectedSyncStatus[] = [
     pendingDownloadCount: 0,
     lastErrorCode: null,
     lastErrorMessage: null,
+    retryAfterAt: null,
     updatedAt: '2026-05-22T08:05:00.000Z',
   },
   {
@@ -307,6 +308,7 @@ const mockConnectedSyncStatuses: ConnectedSyncStatus[] = [
     pendingDownloadCount: 0,
     lastErrorCode: null,
     lastErrorMessage: null,
+    retryAfterAt: null,
     updatedAt: '2026-05-22T08:10:00.000Z',
   },
 ];
@@ -692,7 +694,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       ? await supabase
           .from('sync_status')
           .select(
-            'device_id, entity, last_pull_at, last_push_at, pending_upload_count, pending_download_count, last_error_code, last_error_message, updated_at'
+            'device_id, entity, last_pull_at, last_push_at, pending_upload_count, pending_download_count, last_error_code, last_error_message, retry_after_at, updated_at'
           )
           .eq('user_id', session.user.id)
           .in('device_id', extensionDeviceIds)

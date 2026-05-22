@@ -39,6 +39,7 @@ const APPLICATION_PULL_CURSOR_STORAGE_KEY =
   'missionpulse.connectedSync.cursor.applications.lastPullAt';
 const DEFAULT_SCORER_VERSION = 'missionpulse-v1';
 const LINKEDIN_PROFILE_EXTRACTOR_VERSION = 'linkedin-v1';
+const SYNC_RETRY_DELAY_MS = 5 * 60 * 1000;
 
 export interface RemoteMissionIdentity {
   id: string;
@@ -244,6 +245,10 @@ function remoteError(error: unknown): ConnectedSyncError {
     message: error instanceof Error ? error.message : String(error),
     retryable: true,
   };
+}
+
+function buildRetryAfterAt(now: Date): Date {
+  return new Date(now.getTime() + SYNC_RETRY_DELAY_MS);
 }
 
 function isRecord(value: unknown): value is Record<string, unknown> {
@@ -629,6 +634,7 @@ export async function pushMissionsToConnectedDashboard(
         entity: 'missions',
         pendingUploadCount: input.missions.length,
         error: { code: syncError.code, message: syncError.message },
+        retryAfterAt: buildRetryAfterAt(input.now),
       })
     );
     return { ok: false, error: syncError };
@@ -710,6 +716,7 @@ export async function pushApplicationsToConnectedDashboard(
         entity: 'applications',
         pendingUploadCount: input.trackings.length,
         error: { code: syncError.code, message: syncError.message },
+        retryAfterAt: buildRetryAfterAt(input.now),
       })
     );
     return { ok: false, error: syncError };
@@ -774,6 +781,7 @@ export async function pullApplicationsFromConnectedDashboard(
         deviceId: input.deviceId,
         entity: 'applications',
         error: { code: syncError.code, message: syncError.message },
+        retryAfterAt: buildRetryAfterAt(input.now),
       })
     );
     return { ok: false, error: syncError };
@@ -807,6 +815,7 @@ export async function pushConnectorHealthToConnectedDashboard(
         entity: 'connector_health',
         pendingUploadCount: input.snapshots.length,
         error: { code: syncError.code, message: syncError.message },
+        retryAfterAt: buildRetryAfterAt(input.now),
       })
     );
     return { ok: false, error: syncError };
@@ -891,6 +900,7 @@ export async function pushCandidateProfileImportToConnectedDashboard(
         entity: 'candidate_profile',
         pendingUploadCount: 1,
         error: { code: syncError.code, message: syncError.message },
+        retryAfterAt: buildRetryAfterAt(input.now),
       })
     );
     return { ok: false, error: syncError };

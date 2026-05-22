@@ -815,6 +815,7 @@ describe('dashboard core', () => {
             pending_download_count: 0,
             last_error_code: null,
             last_error_message: null,
+            retry_after_at: null,
             updated_at: '2026-05-22T08:00:00.000Z',
           },
           {
@@ -826,6 +827,7 @@ describe('dashboard core', () => {
             pending_download_count: 1,
             last_error_code: null,
             last_error_message: null,
+            retry_after_at: null,
             updated_at: '2026-05-22T09:00:00.000Z',
           },
           {
@@ -837,6 +839,7 @@ describe('dashboard core', () => {
             pending_download_count: 0,
             last_error_code: 'sync_failed',
             last_error_message: 'Supabase indisponible',
+            retry_after_at: '2026-05-22T06:05:00.000Z',
             updated_at: '2026-05-22T06:00:00.000Z',
           },
           {
@@ -848,6 +851,7 @@ describe('dashboard core', () => {
             pending_download_count: 0,
             last_error_code: null,
             last_error_message: null,
+            retry_after_at: null,
             updated_at: '2026-05-22T10:00:00.000Z',
           },
         ],
@@ -877,6 +881,7 @@ describe('dashboard core', () => {
         pendingDownloadCount: 0,
         lastErrorCode: 'sync_failed',
         lastErrorMessage: 'Supabase indisponible',
+        retryAfterAt: '2026-05-22T06:05:00.000Z',
         updatedAt: '2026-05-22T06:00:00.000Z',
       },
       {
@@ -891,6 +896,7 @@ describe('dashboard core', () => {
         pendingDownloadCount: 1,
         lastErrorCode: null,
         lastErrorMessage: null,
+        retryAfterAt: null,
         updatedAt: '2026-05-22T09:00:00.000Z',
       },
       {
@@ -905,6 +911,7 @@ describe('dashboard core', () => {
         pendingDownloadCount: 0,
         lastErrorCode: null,
         lastErrorMessage: null,
+        retryAfterAt: null,
         updatedAt: '2026-05-22T08:00:00.000Z',
       },
     ]);

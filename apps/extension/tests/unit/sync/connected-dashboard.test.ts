@@ -301,6 +301,7 @@ describe('connected dashboard sync payload builders', () => {
         pendingUploadCount: 2,
         pendingDownloadCount: 1,
         error: { code: 'remote-error', message: 'Supabase unavailable' },
+        retryAfterAt: new Date('2026-05-21T02:05:00.000Z'),
       })
     ).toEqual({
       user_id: 'user-1',
@@ -312,6 +313,7 @@ describe('connected dashboard sync payload builders', () => {
       pending_download_count: 1,
       last_error_code: 'remote-error',
       last_error_message: 'Supabase unavailable',
+      retry_after_at: '2026-05-21T02:05:00.000Z',
     });
   });
 

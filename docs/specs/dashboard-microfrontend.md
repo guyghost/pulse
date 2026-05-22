@@ -498,6 +498,7 @@ sync_status (
   pending_download_count integer not null default 0,
   last_error_code text,
   last_error_message text,
+  retry_after_at timestamptz,
   updated_at timestamptz not null default now(),
   primary key (device_id, entity)
 )

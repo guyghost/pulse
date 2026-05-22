@@ -170,6 +170,16 @@
         }).format(new Date(value))
       : 'Aucune';
 
+  const formatDateTime = (value: string | null) =>
+    value
+      ? new Intl.DateTimeFormat('fr-FR', {
+          day: '2-digit',
+          month: 'short',
+          hour: '2-digit',
+          minute: '2-digit',
+        }).format(new Date(value))
+      : 'Aucune';
+
   const formatFieldCounts = (counts: Record<string, number>) =>
     Object.entries(counts)
       .map(([field, count]) => `${field}: ${count}`)
@@ -1560,6 +1570,12 @@
                         class="mt-2 rounded-md border border-status-orange/20 bg-status-orange/8 px-2 py-1.5 text-xs leading-5 text-status-orange"
                       >
                         {status.lastErrorCode ?? 'sync_error'}: {status.lastErrorMessage}
+                      </p>
+                    {/if}
+
+                    {#if status.retryAfterAt}
+                      <p class="mt-2 text-xs leading-5 text-text-subtle">
+                        Nouvelle tentative après {formatDateTime(status.retryAfterAt)}
                       </p>
                     {/if}
                   </article>

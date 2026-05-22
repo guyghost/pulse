@@ -92,6 +92,7 @@ export interface SyncStatusRow {
   pending_download_count: number;
   last_error_code: string | null;
   last_error_message: string | null;
+  retry_after_at: string | null;
 }
 
 export interface CandidateProfileUpsertRow {
@@ -207,6 +208,7 @@ export interface BuildSyncStatusRowInput {
   pendingUploadCount?: number;
   pendingDownloadCount?: number;
   error?: { code: string; message: string } | null;
+  retryAfterAt?: Date | null;
 }
 
 export interface BuildApplicationPullCursorInput {
@@ -405,6 +407,7 @@ export function buildSyncStatusRow(input: BuildSyncStatusRowInput): SyncStatusRo
     pending_download_count: input.pendingDownloadCount ?? 0,
     last_error_code: input.error?.code ?? null,
     last_error_message: input.error?.message ?? null,
+    retry_after_at: input.error ? (input.retryAfterAt?.toISOString() ?? null) : null,
   };
 }
 
