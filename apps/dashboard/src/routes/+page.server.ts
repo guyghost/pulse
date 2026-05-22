@@ -415,12 +415,21 @@ export const load: PageServerLoad = async ({ cookies }) => {
     .eq('user_id', session.user.id)
     .maybeSingle<DashboardCandidateProfileRow>();
 
+  const { data: profileImports } = await supabase
+    .from('profile_imports')
+    .select(
+      'id, source, status, imported_at, extractor_version, error_code, error_message, field_counts'
+    )
+    .eq('user_id', session.user.id)
+    .order('imported_at', { ascending: false })
+    .limit(5)
+    .returns<DashboardProfileImportRow[]>();
+
   const [
     { data: candidateSkills },
     { data: candidateExperiences },
     { data: candidateEducation },
     { data: candidateLinks },
-    { data: profileImports },
     { data: profileSuggestions },
   ] = candidateProfile
     ? await Promise.all([
@@ -449,15 +458,6 @@ export const load: PageServerLoad = async ({ cookies }) => {
           .eq('profile_id', candidateProfile.id)
           .returns<DashboardCandidateLinkRow[]>(),
         supabase
-          .from('profile_imports')
-          .select(
-            'id, source, status, imported_at, extractor_version, error_code, error_message, field_counts'
-          )
-          .eq('user_id', session.user.id)
-          .order('imported_at', { ascending: false })
-          .limit(5)
-          .returns<DashboardProfileImportRow[]>(),
-        supabase
           .from('candidate_profile_field_suggestions')
           .select('id, field, current_value, suggested_value, source, status, created_at')
           .eq('user_id', session.user.id)
@@ -467,7 +467,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
           .limit(10)
           .returns<DashboardCandidateProfileFieldSuggestionRow[]>(),
       ])
-    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
+    : [{ data: [] }, { data: [] }, { data: [] }, { data: [] }, { data: [] }];
 
   const { data: extensionDeviceRows } = await supabase
     .from('extension_devices')
@@ -542,7 +542,10 @@ export const load: PageServerLoad = async ({ cookies }) => {
           profileImports ?? [],
           profileSuggestions ?? []
         )
-      : buildEmptyCvSnapshot({ updatedAt: new Date().toISOString() }),
+      : buildEmptyCvSnapshot({
+          updatedAt: new Date().toISOString(),
+          imports: profileImports ?? [],
+        }),
     syncStatuses,
     connectedSyncStatuses,
     syncConflicts,

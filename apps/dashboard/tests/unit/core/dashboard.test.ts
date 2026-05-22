@@ -1096,6 +1096,37 @@ describe('dashboard core', () => {
     });
   });
 
+  it('keeps failed import history visible before the canonical CV exists', () => {
+    expect(
+      buildEmptyCvSnapshot({
+        updatedAt: '2026-05-22T12:00:00.000Z',
+        imports: [
+          {
+            id: 'import-1',
+            source: 'linkedin',
+            status: 'error',
+            imported_at: '2026-05-22T08:05:00.000Z',
+            extractor_version: 'linkedin-v1',
+            error_code: 'profile-sync-failed',
+            error_message: 'profile write failed',
+            field_counts: { experiences: 1, education: 0, skills: 2, links: 1 },
+          },
+        ],
+      }).imports
+    ).toEqual([
+      {
+        id: 'import-1',
+        source: 'linkedin',
+        status: 'error',
+        importedAt: '2026-05-22T08:05:00.000Z',
+        extractorVersion: 'linkedin-v1',
+        errorCode: 'profile-sync-failed',
+        errorMessage: 'profile write failed',
+        fieldCounts: { experiences: 1, education: 0, skills: 2, links: 1 },
+      },
+    ]);
+  });
+
   it('keeps an empty editable CV target role when Supabase stores null', () => {
     expect(
       profileRowsToCvSnapshot(

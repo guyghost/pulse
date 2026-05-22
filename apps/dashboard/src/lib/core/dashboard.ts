@@ -610,6 +610,7 @@ export interface ConnectedDataDeletionRequest {
 
 export interface EmptyCvSnapshotInput {
   updatedAt: string;
+  imports?: DashboardProfileImportRow[];
 }
 
 export type CvFieldSuggestionResolutionAction = 'apply' | 'dismiss';
@@ -1282,24 +1283,7 @@ export function profileRowsToCvSnapshot(
         url: link.url,
         source: link.source as ApplicationSource,
       })),
-    imports: imports.flatMap((item) => {
-      if (!isApplicationSource(item.source) || !isCvImportStatus(item.status)) {
-        return [];
-      }
-
-      return [
-        {
-          id: item.id,
-          source: item.source,
-          status: item.status,
-          importedAt: item.imported_at,
-          extractorVersion: item.extractor_version,
-          errorCode: item.error_code,
-          errorMessage: item.error_message,
-          fieldCounts: parseFieldCounts(item.field_counts),
-        },
-      ];
-    }),
+    imports: profileImportRowsToCvImports(imports),
     suggestions: suggestions.flatMap((item) => {
       if (
         !isApplicationSource(item.source) ||
@@ -1342,9 +1326,30 @@ export function buildEmptyCvSnapshot(input: EmptyCvSnapshotInput): CvSnapshot {
     experiences: [],
     education: [],
     links: [],
-    imports: [],
+    imports: profileImportRowsToCvImports(input.imports ?? []),
     suggestions: [],
   };
+}
+
+export function profileImportRowsToCvImports(imports: DashboardProfileImportRow[]): CvImport[] {
+  return imports.flatMap((item) => {
+    if (!isApplicationSource(item.source) || !isCvImportStatus(item.status)) {
+      return [];
+    }
+
+    return [
+      {
+        id: item.id,
+        source: item.source,
+        status: item.status,
+        importedAt: item.imported_at,
+        extractorVersion: item.extractor_version,
+        errorCode: item.error_code,
+        errorMessage: item.error_message,
+        fieldCounts: parseFieldCounts(item.field_counts),
+      },
+    ];
+  });
 }
 
 function isCvImportStatus(value: string): value is CvImport['status'] {
