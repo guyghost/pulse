@@ -542,6 +542,8 @@ describe('connected dashboard sync payload builders', () => {
           source: 'linkedin',
           source_external_id: 'experience-1',
           position_index: 0,
+          revision: 4,
+          updated_by: 'extension',
         },
       ],
       education: [
@@ -555,11 +557,27 @@ describe('connected dashboard sync payload builders', () => {
           description: '',
           source: 'linkedin',
           position_index: 0,
+          revision: 4,
+          updated_by: 'extension',
         },
       ],
       skills: [
-        { profile_id: 'profile-1', skill: 'Svelte', source: 'linkedin', confidence: 0.8 },
-        { profile_id: 'profile-1', skill: 'TypeScript', source: 'linkedin', confidence: 0.8 },
+        {
+          profile_id: 'profile-1',
+          skill: 'Svelte',
+          source: 'linkedin',
+          confidence: 0.8,
+          revision: 4,
+          updated_by: 'extension',
+        },
+        {
+          profile_id: 'profile-1',
+          skill: 'TypeScript',
+          source: 'linkedin',
+          confidence: 0.8,
+          revision: 4,
+          updated_by: 'extension',
+        },
       ],
       links: [
         {
@@ -567,6 +585,8 @@ describe('connected dashboard sync payload builders', () => {
           label: 'Portfolio',
           url: 'https://example.com',
           source: 'linkedin',
+          revision: 4,
+          updated_by: 'extension',
         },
       ],
       importEvent: {

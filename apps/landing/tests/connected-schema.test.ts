@@ -61,6 +61,22 @@ describe('connected dashboard schema', () => {
       'updated_at timestamptz not null default now()'
     );
     expect(tableBlock('candidate_profiles')).toContain('updated_by text not null');
+    for (const cvChildTable of [
+      'candidate_experiences',
+      'candidate_education',
+      'candidate_skills',
+      'candidate_links',
+    ]) {
+      expect(tableBlock(cvChildTable), `${cvChildTable} should carry sync revision`).toContain(
+        'revision bigint not null'
+      );
+      expect(tableBlock(cvChildTable), `${cvChildTable} should carry sync writer`).toContain(
+        'updated_by text not null'
+      );
+      expect(tableBlock(cvChildTable), `${cvChildTable} should carry update timestamp`).toContain(
+        'updated_at timestamptz not null default now()'
+      );
+    }
     expect(tableBlock('sync_status')).toContain('retry_after_at timestamptz');
     expect(tableBlock('sync_conflicts')).toContain(
       "entity in ('applications', 'candidate_profile')"

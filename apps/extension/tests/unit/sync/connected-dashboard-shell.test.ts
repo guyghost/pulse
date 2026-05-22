@@ -923,12 +923,28 @@ describe('connected dashboard shell sync', () => {
           profile_id: 'profile-1',
           title: 'Lead Frontend',
           source: 'linkedin',
+          revision: 3,
+          updated_by: 'extension',
         }),
       ],
       education: [],
       skills: [
-        { profile_id: 'profile-1', skill: 'Svelte', source: 'linkedin', confidence: 0.8 },
-        { profile_id: 'profile-1', skill: 'TypeScript', source: 'linkedin', confidence: 0.8 },
+        {
+          profile_id: 'profile-1',
+          skill: 'Svelte',
+          source: 'linkedin',
+          confidence: 0.8,
+          revision: 3,
+          updated_by: 'extension',
+        },
+        {
+          profile_id: 'profile-1',
+          skill: 'TypeScript',
+          source: 'linkedin',
+          confidence: 0.8,
+          revision: 3,
+          updated_by: 'extension',
+        },
       ],
       links: [
         {
@@ -936,6 +952,8 @@ describe('connected dashboard shell sync', () => {
           label: 'Portfolio',
           url: 'https://example.com',
           source: 'linkedin',
+          revision: 3,
+          updated_by: 'extension',
         },
       ],
     });

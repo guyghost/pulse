@@ -228,6 +228,8 @@ export interface CandidateExperienceInsertRow {
   source: string;
   source_external_id: string | null;
   position_index: number;
+  revision: number;
+  updated_by: 'extension';
 }
 
 export interface CandidateEducationInsertRow {
@@ -240,6 +242,8 @@ export interface CandidateEducationInsertRow {
   description: string;
   source: string;
   position_index: number;
+  revision: number;
+  updated_by: 'extension';
 }
 
 export interface CandidateSkillUpsertRow {
@@ -247,6 +251,8 @@ export interface CandidateSkillUpsertRow {
   skill: string;
   source: string;
   confidence: number;
+  revision: number;
+  updated_by: 'extension';
 }
 
 export interface CandidateLinkInsertRow {
@@ -254,6 +260,8 @@ export interface CandidateLinkInsertRow {
   label: string;
   url: string;
   source: string;
+  revision: number;
+  updated_by: 'extension';
 }
 
 export interface ProfileImportInsertRow {
@@ -836,6 +844,8 @@ export function buildCandidateProfileImportRows(input: {
       source: experience.source,
       source_external_id: experience.sourceExternalId,
       position_index: experience.positionIndex,
+      revision: input.revision,
+      updated_by: 'extension',
     })),
     education: input.draft.education.map((education) => ({
       profile_id: input.profileId,
@@ -847,18 +857,24 @@ export function buildCandidateProfileImportRows(input: {
       description: education.description,
       source: education.source,
       position_index: education.positionIndex,
+      revision: input.revision,
+      updated_by: 'extension',
     })),
     skills: input.draft.skills.map((skill) => ({
       profile_id: input.profileId,
       skill: skill.skill,
       source: skill.source,
       confidence: skill.confidence,
+      revision: input.revision,
+      updated_by: 'extension',
     })),
     links: input.draft.links.map((link) => ({
       profile_id: input.profileId,
       label: link.label,
       url: link.url,
       source: link.source,
+      revision: input.revision,
+      updated_by: 'extension',
     })),
     importEvent: {
       user_id: input.userId,

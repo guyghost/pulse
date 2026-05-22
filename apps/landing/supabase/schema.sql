@@ -531,6 +531,11 @@ create table if not exists public.candidate_experiences (
     check (source in ('linkedin', 'malt', 'other')),
   source_external_id text,
   position_index integer not null default 0,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   check (end_date is null or start_date is null or start_date <= end_date)
 );
 
@@ -546,6 +551,11 @@ create table if not exists public.candidate_education (
   source text references public.mission_sources(id) not null
     check (source in ('linkedin', 'malt', 'other')),
   position_index integer not null default 0,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   check (end_date is null or start_date is null or start_date <= end_date)
 );
 
@@ -555,6 +565,11 @@ create table if not exists public.candidate_skills (
   source text references public.mission_sources(id) not null
     check (source in ('linkedin', 'malt', 'other')),
   confidence numeric check (confidence is null or (confidence >= 0 and confidence <= 1)),
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   primary key (profile_id, skill)
 );
 
@@ -564,7 +579,12 @@ create table if not exists public.candidate_links (
   label text not null,
   url text not null,
   source text references public.mission_sources(id) not null
-    check (source in ('linkedin', 'malt', 'other'))
+    check (source in ('linkedin', 'malt', 'other')),
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now()
 );
 
 create table if not exists public.profile_imports (
@@ -915,6 +935,30 @@ create trigger on_generated_application_assets_updated
 drop trigger if exists on_candidate_profiles_updated on public.candidate_profiles;
 create trigger on_candidate_profiles_updated
   before update on public.candidate_profiles
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_candidate_experiences_updated on public.candidate_experiences;
+create trigger on_candidate_experiences_updated
+  before update on public.candidate_experiences
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_candidate_education_updated on public.candidate_education;
+create trigger on_candidate_education_updated
+  before update on public.candidate_education
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_candidate_skills_updated on public.candidate_skills;
+create trigger on_candidate_skills_updated
+  before update on public.candidate_skills
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_candidate_links_updated on public.candidate_links;
+create trigger on_candidate_links_updated
+  before update on public.candidate_links
   for each row
   execute function public.update_updated_at();
 
