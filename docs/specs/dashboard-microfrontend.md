@@ -386,11 +386,13 @@ generated_application_assets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid not null references auth.users(id) on delete cascade,
   application_id uuid not null references applications(id) on delete cascade,
+  client_asset_id text,
   type text not null check (type in ('pitch', 'cover_message', 'cv_summary')),
   content text not null,
   model text not null,
   credit_transaction_id uuid,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, client_asset_id)
 )
 ```
 
@@ -525,7 +527,7 @@ Keep `favorite_missions` during migration as a compatibility source. It should b
 - Extension -> Supabase:
   - Scanned missions and score snapshots.
   - Application state changes made in the side panel.
-  - Generated assets created in the extension.
+  - Generated assets created in the extension, upserted idempotently with `client_asset_id`.
   - LinkedIn profile import output.
   - Connector/extractor health events.
 - Dashboard -> Supabase:

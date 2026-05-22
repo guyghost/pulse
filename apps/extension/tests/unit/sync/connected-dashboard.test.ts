@@ -5,6 +5,7 @@ import {
   buildCandidateProfileFieldSuggestionRows,
   buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
+  buildGeneratedApplicationAssetUpsertRow,
   buildApplicationPullCursor,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
@@ -247,6 +248,32 @@ describe('connected dashboard sync payload builders', () => {
         client_event_id: 'install-1:free-work-123:1779351600000:application_prepared:applied',
       },
     ]);
+  });
+
+  it('builds idempotent generated asset rows with dashboard type names', () => {
+    expect(
+      buildGeneratedApplicationAssetUpsertRow(
+        {
+          id: 'asset-1',
+          missionId: 'free-work-123',
+          type: 'cover-message',
+          content: 'Bonjour, votre mission m’intéresse.',
+          createdAt: 1779364800000,
+          modelUsed: 'gemini-nano',
+        },
+        'user-1',
+        'application-1',
+        '2026-05-21T12:00:00.000Z'
+      )
+    ).toEqual({
+      user_id: 'user-1',
+      application_id: 'application-1',
+      client_asset_id: 'asset-1',
+      type: 'cover_message',
+      content: 'Bonjour, votre mission m’intéresse.',
+      model: 'gemini-nano',
+      created_at: '2026-05-21T12:00:00.000Z',
+    });
   });
 
   it('builds connector health event rows from health snapshots', () => {

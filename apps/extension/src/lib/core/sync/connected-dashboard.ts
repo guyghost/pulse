@@ -1,6 +1,7 @@
 import type { ApplicationEventCreator, ApplicationStage } from '@pulse/domain';
 import type { CanonicalCandidateProfileDraft } from '../profile-extractors/types';
 import type { ConnectorHealthSnapshot } from '../types/health';
+import type { GeneratedAsset, GenerationType } from '../types/generation';
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
 import type { Grade } from '../types/score';
 import type { MissionTracking } from '../types/tracking';
@@ -69,6 +70,18 @@ export interface ApplicationPipelineEventRow {
   occurred_at: string;
   created_by: ApplicationEventCreator;
   client_event_id: string;
+}
+
+export type GeneratedApplicationAssetType = 'pitch' | 'cover_message' | 'cv_summary';
+
+export interface GeneratedApplicationAssetUpsertRow {
+  user_id: string;
+  application_id: string;
+  client_asset_id: string;
+  type: GeneratedApplicationAssetType;
+  content: string;
+  model: string;
+  created_at: string;
 }
 
 export interface ConnectorHealthEventRow {
@@ -218,6 +231,12 @@ export interface BuildApplicationPullCursorInput {
   pulledAt: string;
 }
 
+const GENERATED_ASSET_TYPE_MAP: Record<GenerationType, GeneratedApplicationAssetType> = {
+  pitch: 'pitch',
+  'cover-message': 'cover_message',
+  'cv-summary': 'cv_summary',
+};
+
 function clampScore(score: number): number {
   return Math.max(0, Math.min(100, Math.round(score)));
 }
@@ -343,6 +362,23 @@ export function buildApplicationPipelineEventRows(
       transition.to,
     ].join(':'),
   }));
+}
+
+export function buildGeneratedApplicationAssetUpsertRow(
+  asset: GeneratedAsset,
+  userId: string,
+  applicationId: string,
+  createdAt: string
+): GeneratedApplicationAssetUpsertRow {
+  return {
+    user_id: userId,
+    application_id: applicationId,
+    client_asset_id: asset.id,
+    type: GENERATED_ASSET_TYPE_MAP[asset.type],
+    content: asset.content,
+    model: asset.modelUsed,
+    created_at: createdAt,
+  };
 }
 
 function healthStatusFromSnapshot(snapshot: ConnectorHealthSnapshot): ConnectorHealthSyncStatus {

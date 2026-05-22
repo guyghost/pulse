@@ -11,6 +11,7 @@ const setupNotificationClickHandler = vi.fn();
 const getMissions = vi.fn();
 const saveConnectorStatuses = vi.fn();
 const getAllTrackings = vi.fn();
+const getGeneratedAssetsForMission = vi.fn();
 const getAllHealthSnapshots = vi.fn();
 const resetHealthSnapshot = vi.fn();
 const syncConnectedDashboardScan = vi.fn();
@@ -146,6 +147,11 @@ vi.mock('../../../src/lib/shell/storage/tracking', () => ({
   getTrackingsByStatus: vi.fn(async () => []),
 }));
 
+vi.mock('../../../src/lib/shell/storage/generated-assets', () => ({
+  saveGeneratedAsset: vi.fn(async () => undefined),
+  getGeneratedAssetsForMission,
+}));
+
 vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
   getAllHealthSnapshots,
   resetHealthSnapshot,
@@ -205,6 +211,7 @@ describe('background auto-scan notifications', () => {
     });
     getMissions.mockResolvedValue([makeMission()]);
     getAllTrackings.mockResolvedValue([]);
+    getGeneratedAssetsForMission.mockResolvedValue([]);
     getAllHealthSnapshots.mockResolvedValue(new Map());
     syncConnectedDashboardScan.mockResolvedValue({
       ok: true,
@@ -271,6 +278,7 @@ describe('background auto-scan notifications', () => {
     expect(syncConnectedDashboardSnapshot).toHaveBeenCalledWith({
       missions: [expect.objectContaining({ id: 'mission-1' })],
       trackings: [],
+      generatedAssetsByMissionId: new Map(),
       healthSnapshots: [],
     });
     expect(sendResponse).toHaveBeenCalledWith({

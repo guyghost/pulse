@@ -50,6 +50,7 @@ import {
 import { getSupabaseClient } from '../lib/shell/auth/supabase-client';
 import { saveAuthUser, loadAuthUser, clearAuthUser } from '../lib/shell/auth/auth-storage';
 import type { GeneratedAsset } from '../lib/core/types/generation';
+import type { MissionTracking } from '../lib/core/types/tracking';
 import { generatePremium } from '../lib/shell/auth/premium-api';
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
@@ -281,6 +282,19 @@ async function loadConnectorHealthSnapshots() {
   return [...snapshots.values()];
 }
 
+async function loadGeneratedAssetsByMissionId(
+  trackings: MissionTracking[]
+): Promise<Map<string, GeneratedAsset[]>> {
+  const entries = await Promise.all(
+    trackings.map(async (tracking) => {
+      const assets = await getGeneratedAssetsForMission(tracking.missionId);
+      return [tracking.missionId, assets] as const;
+    })
+  );
+
+  return new Map(entries.filter(([, assets]) => assets.length > 0));
+}
+
 async function recheckConnectorHealth(
   connectorId: string,
   enable = false
@@ -315,7 +329,13 @@ async function syncConnectedDashboardFromLocalState() {
     getAllTrackings(),
     loadConnectorHealthSnapshots(),
   ]);
-  return syncConnectedDashboardSnapshot({ missions, trackings, healthSnapshots });
+  const generatedAssetsByMissionId = await loadGeneratedAssetsByMissionId(trackings);
+  return syncConnectedDashboardSnapshot({
+    missions,
+    trackings,
+    generatedAssetsByMissionId,
+    healthSnapshots,
+  });
 }
 
 async function persistScanResults(
@@ -667,6 +687,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           }
           const updatedTracking = addGeneratedAsset(tracking, asset.id);
           await saveTracking(updatedTracking);
+          syncConnectedDashboardTracking(missionId).catch(() => {
+            /* Non-critical: connected dashboard sync */
+          });
 
           if (typeof creditBalance === 'number' && authUser) {
             await saveAuthUser({ ...authUser, creditBalance });

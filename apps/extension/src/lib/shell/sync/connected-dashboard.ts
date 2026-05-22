@@ -6,6 +6,7 @@ import {
   buildCandidateProfileFieldSuggestionRows,
   buildCandidateProfileImportRows,
   buildConnectorHealthEventRow,
+  buildGeneratedApplicationAssetUpsertRow,
   buildMissionScoreUpsertRow,
   buildMissionUpsertRow,
   buildSyncStatusRow,
@@ -20,6 +21,7 @@ import {
   type CandidateSkillUpsertRow,
   type ConnectorHealthEventRow,
   type ExistingCandidateProfileSnapshot,
+  type GeneratedApplicationAssetUpsertRow,
   type MissionScoreUpsertRow,
   type MissionUpsertRow,
   type ProfileImportInsertRow,
@@ -27,11 +29,13 @@ import {
   type SyncStatusRow,
 } from '../../core/sync/connected-dashboard';
 import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
+import type { GeneratedAsset } from '../../core/types/generation';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { Mission, MissionSource } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
 import { getSupabaseClient } from '../auth/supabase-client';
 import { getMissionById } from '../storage/db';
+import { getGeneratedAsset } from '../storage/generated-assets';
 import { getTracking, saveTrackings } from '../storage/tracking';
 
 const INSTALL_ID_STORAGE_KEY = 'missionpulse.connectedSync.installId';
@@ -70,6 +74,7 @@ export interface ConnectedDashboardSyncGateway {
     since: string | null;
   }): Promise<RemoteApplicationSnapshot[]>;
   upsertApplicationPipelineEvents(rows: ApplicationPipelineEventRow[]): Promise<void>;
+  upsertGeneratedApplicationAssets(rows: GeneratedApplicationAssetUpsertRow[]): Promise<void>;
   insertConnectorHealthEvents(rows: ConnectorHealthEventRow[]): Promise<void>;
   getCandidateProfile(userId: string): Promise<ExistingCandidateProfileSnapshot | null>;
   upsertCandidateProfile(row: CandidateProfileUpsertRow): Promise<{ id: string; revision: number }>;
@@ -127,6 +132,7 @@ export interface PushApplicationsInput {
   installId: string;
   trackings: MissionTracking[];
   remoteMissionIds: Map<string, string>;
+  generatedAssetsByMissionId?: Map<string, GeneratedAsset[]>;
   now: Date;
 }
 
@@ -183,6 +189,7 @@ export interface PushCandidateProfileImportResult {
 export interface ConnectedDashboardSnapshotInput {
   missions: Mission[];
   trackings: MissionTracking[];
+  generatedAssetsByMissionId?: Map<string, GeneratedAsset[]>;
   healthSnapshots: ConnectorHealthSnapshot[];
 }
 
@@ -472,6 +479,18 @@ export function createSupabaseConnectedDashboardGateway(
         () => undefined
       );
     },
+    upsertGeneratedApplicationAssets: async (rows) => {
+      if (rows.length === 0) {
+        return;
+      }
+      await selectOrThrow(
+        supabase
+          .from('generated_application_assets')
+          .upsert(rows, { onConflict: 'user_id,client_asset_id' }),
+        'id',
+        () => undefined
+      );
+    },
     insertConnectorHealthEvents: async (rows) => {
       if (rows.length === 0) {
         return;
@@ -694,8 +713,23 @@ export async function pushApplicationsToConnectedDashboard(
           )
         : [];
     });
+    const assetRows = eligible.flatMap((item) => {
+      const applicationId = applicationIdsByMission.get(item.row.mission_id);
+      const assets = input.generatedAssetsByMissionId?.get(item.tracking.missionId) ?? [];
+      return applicationId
+        ? assets.map((asset) =>
+            buildGeneratedApplicationAssetUpsertRow(
+              asset,
+              input.userId,
+              applicationId,
+              new Date(asset.createdAt).toISOString()
+            )
+          )
+        : [];
+    });
 
     await gateway.upsertApplicationPipelineEvents(eventRows);
+    await gateway.upsertGeneratedApplicationAssets(assetRows);
     await gateway.upsertSyncStatus(
       buildSyncStatusRow({
         userId: input.userId,
@@ -1077,6 +1111,7 @@ export async function syncConnectedDashboardSnapshot(
     installId: context.installId,
     trackings: input.trackings,
     remoteMissionIds: pushedMissions.value.remoteMissionIds,
+    generatedAssetsByMissionId: input.generatedAssetsByMissionId,
     now: context.now,
   });
 
@@ -1169,6 +1204,10 @@ export async function syncConnectedDashboardTracking(
     };
   }
 
+  const generatedAssets = (
+    await Promise.all(tracking.generatedAssetIds.map((assetId) => getGeneratedAsset(assetId)))
+  ).filter((asset): asset is GeneratedAsset => asset !== null);
+
   const pushedMissions = await pushMissionsToConnectedDashboard(context.gateway, {
     userId: context.userId,
     deviceId: context.deviceId,
@@ -1186,6 +1225,7 @@ export async function syncConnectedDashboardTracking(
     installId: context.installId,
     trackings: [tracking],
     remoteMissionIds: pushedMissions.value.remoteMissionIds,
+    generatedAssetsByMissionId: new Map([[tracking.missionId, generatedAssets]]),
     now: context.now,
   });
   if (!pushedApplications.ok) {

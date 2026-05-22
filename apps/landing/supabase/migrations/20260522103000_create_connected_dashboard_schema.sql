@@ -144,11 +144,13 @@ create table if not exists public.generated_application_assets (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   application_id uuid references public.applications(id) on delete cascade not null,
+  client_asset_id text,
   type text not null check (type in ('pitch', 'cover_message', 'cv_summary')),
   content text not null,
   model text not null,
   credit_transaction_id uuid references public.credit_transactions(id) on delete set null,
-  created_at timestamptz not null default now()
+  created_at timestamptz not null default now(),
+  unique (user_id, client_asset_id)
 );
 
 create table if not exists public.candidate_profiles (

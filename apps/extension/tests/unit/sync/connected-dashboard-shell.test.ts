@@ -10,6 +10,7 @@ import {
 } from '../../../src/lib/shell/sync/connected-dashboard';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
+import type { GeneratedAsset } from '../../../src/lib/core/types/generation';
 import type { ConnectorHealthSnapshot } from '../../../src/lib/core/types/health';
 import type { CanonicalCandidateProfileDraft } from '../../../src/lib/core/profile-extractors/types';
 
@@ -45,6 +46,15 @@ const tracking: MissionTracking = {
   generatedAssetIds: [],
   userRating: null,
   notes: 'Bon fit',
+};
+
+const generatedAsset: GeneratedAsset = {
+  id: 'asset-1',
+  missionId: 'free-work-123',
+  type: 'cover-message',
+  content: 'Message de candidature',
+  createdAt: 1779364800000,
+  modelUsed: 'gemini-nano',
 };
 
 const linkedinDraft: CanonicalCandidateProfileDraft = {
@@ -106,6 +116,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
       },
     ]),
     upsertApplicationPipelineEvents: vi.fn(async () => undefined),
+    upsertGeneratedApplicationAssets: vi.fn(async () => undefined),
     insertConnectorHealthEvents: vi.fn(async () => undefined),
     getCandidateProfile: vi.fn(async () => null),
     upsertCandidateProfile: vi.fn(async () => ({ id: 'profile-1', revision: 3 })),
@@ -241,6 +252,33 @@ describe('connected dashboard shell sync', () => {
         to_stage: 'selected',
         client_event_id: 'install-1:free-work-123:1779344400000:detected:selected',
       }),
+    ]);
+  });
+
+  it('pushes generated application assets with idempotent client ids', async () => {
+    const gateway = createGateway();
+
+    const result = await pushApplicationsToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      installId: 'install-1',
+      trackings: [{ ...tracking, generatedAssetIds: ['asset-1'] }],
+      remoteMissionIds: new Map([['free-work-123', 'remote-mission-1']]),
+      generatedAssetsByMissionId: new Map([['free-work-123', [generatedAsset]]]),
+      now: new Date('2026-05-21T09:00:00.000Z'),
+    });
+
+    expect(result).toEqual({ ok: true, value: { pushedCount: 1, skippedCount: 0 } });
+    expect(gateway.upsertGeneratedApplicationAssets).toHaveBeenCalledWith([
+      {
+        user_id: 'user-1',
+        application_id: 'application-1',
+        client_asset_id: 'asset-1',
+        type: 'cover_message',
+        content: 'Message de candidature',
+        model: 'gemini-nano',
+        created_at: '2026-05-21T12:00:00.000Z',
+      },
     ]);
   });
 
