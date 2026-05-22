@@ -6,6 +6,7 @@
   import { getTJMAnalysis } from '$lib/shell/facades/tjm.facade';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { getProfile } from '$lib/shell/facades/settings.facade';
+  import { subscribeMessages } from '$lib/shell/messaging/bridge';
 
   let analysis = $state<TJMAnalysis | null>(null);
   let isLoading = $state(true);
@@ -50,17 +51,13 @@
   });
 
   $effect(() => {
-    try {
-      const listener = (message: { type?: string }) => {
-        if (message?.type === 'SCAN_COMPLETE') {
-          loadAnalysis();
-        }
-      };
-      chrome.runtime.onMessage.addListener(listener);
-      return () => chrome.runtime.onMessage.removeListener(listener);
-    } catch {
-      // Service worker context may not have chrome.runtime
-    }
+    const unsubscribe = subscribeMessages((message) => {
+      if (message.type === 'SCAN_COMPLETE') {
+        loadAnalysis();
+      }
+    });
+
+    return unsubscribe;
   });
 
   $effect(() => {

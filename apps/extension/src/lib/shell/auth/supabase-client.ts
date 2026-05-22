@@ -10,10 +10,15 @@ import { createClient, type SupabaseClient } from '@supabase/supabase-js';
 
 const SUPABASE_URL = 'https://jhgjtlkfewuiiofxfrvh.supabase.co';
 
-// TODO: Set the actual anon key before deploy.
-// This is a public key (safe to embed in client-side code) — it's not a secret.
-// Supabase RLS policies enforce data access rules.
-const SUPABASE_ANON_KEY = 'PLACEHOLDER_SET_BEFORE_DEPLOY';
+const SUPABASE_ANON_KEY =
+  import.meta.env.VITE_SUPABASE_ANON_KEY ??
+  import.meta.env.PUBLIC_SUPABASE_ANON_KEY ??
+  import.meta.env.PUBLIC_SUPABASE_KEY ??
+  '';
+
+const NORMALIZED_SUPABASE_ANON_KEY = SUPABASE_ANON_KEY.trim();
+
+const hasSupabaseKey = NORMALIZED_SUPABASE_ANON_KEY.length > 0;
 
 let client: SupabaseClient | null = null;
 
@@ -23,7 +28,11 @@ let client: SupabaseClient | null = null;
  */
 export const getSupabaseClient = (): SupabaseClient => {
   if (!client) {
-    client = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
+    if (!hasSupabaseKey) {
+      throw new Error('Missing VITE_SUPABASE_ANON_KEY for MissionPulse extension.');
+    }
+
+    client = createClient(SUPABASE_URL, NORMALIZED_SUPABASE_ANON_KEY, {
       auth: {
         storage: {
           getItem: async (key: string): Promise<string | null> => {

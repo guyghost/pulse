@@ -56,11 +56,19 @@ export function createAuthStore() {
           error = payload.error;
         }
         storeState = 'ready';
+        return;
       }
+
+      authStatus = 'unauthenticated';
+      user = null;
+      error = 'Unexpected response from auth status';
+      storeState = 'ready';
+      return;
     } catch {
       // Outside extension context or error
       storeState = 'ready';
       authStatus = 'unauthenticated';
+      user = null;
     }
   }
 

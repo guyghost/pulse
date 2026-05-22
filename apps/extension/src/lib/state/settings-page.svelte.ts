@@ -32,6 +32,7 @@ import { getMissions } from '$lib/shell/facades/feed-data.facade';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/storage/first-scan';
 import { rescoreStoredMissions } from '$lib/shell/scan/rescore';
+import { MISSIONPULSE_DB_NAME } from '$lib/shell/storage/db';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
@@ -269,12 +270,11 @@ export class SettingsPageController {
       // Use chrome.storage.local.clear() — this is Shell code, acceptable here
       // since SettingsPageController is in shell/state layer
       await chrome.storage.local.clear();
-      const databases = await indexedDB.databases();
-      for (const db of databases) {
-        if (db.name) {
-          indexedDB.deleteDatabase(db.name);
-        }
-      }
+      await new Promise<void>((resolve, reject) => {
+        const request = indexedDB.deleteDatabase(MISSIONPULSE_DB_NAME);
+        request.onsuccess = () => resolve();
+        request.onerror = () => reject(request.error);
+      });
       this.showResetConfirm = false;
       this.options.onNavigateToOnboarding?.();
     } catch {

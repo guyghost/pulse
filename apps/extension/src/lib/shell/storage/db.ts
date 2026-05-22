@@ -26,7 +26,8 @@ export interface PaginatedQueryOptions {
   filterSource?: MissionSource;
 }
 
-const DB_NAME = 'missionpulse';
+export const MISSIONPULSE_DB_NAME = 'missionpulse';
+const DB_NAME = MISSIONPULSE_DB_NAME;
 const DB_VERSION = 3;
 
 export function openDB(): Promise<IDBDatabase> {

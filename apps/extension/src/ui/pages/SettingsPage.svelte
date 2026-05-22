@@ -11,6 +11,21 @@
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast } from '$lib/shell/notifications/toast-service';
 
+  const DASHBOARD_BASE_URL =
+    import.meta.env.VITE_DASHBOARD_URL ??
+    import.meta.env.PUBLIC_DASHBOARD_URL ??
+    import.meta.env.PUBLIC_DASHBOARD_BASE_URL ??
+    'https://missionpulse.app';
+
+  function getDashboardUrl() {
+    const trimmed = DASHBOARD_BASE_URL.trim().replace(/\/$/, '');
+    if (!trimmed) {
+      return 'https://missionpulse.app/dashboard';
+    }
+
+    return trimmed.endsWith('/dashboard') ? trimmed : `${trimmed}/dashboard`;
+  }
+
   const { onNavigateToOnboarding }: { onBack?: () => void; onNavigateToOnboarding?: () => void } =
     $props();
 
@@ -106,7 +121,7 @@
         await showToast('Déconnecté', 'success');
       }}
       onOpenDashboard={() => {
-        window.open('https://missionpulse.app/dashboard', '_blank');
+        window.open(getDashboardUrl(), '_blank');
       }}
       onRefresh={() => auth.checkStatus()}
     />

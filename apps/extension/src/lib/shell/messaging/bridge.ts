@@ -125,3 +125,23 @@ export function onMessage(
     return handler(message, sender, sendResponse);
   });
 }
+
+export function subscribeMessages(
+  handler: (message: BridgeMessage, sender: chrome.runtime.MessageSender) => void
+): () => void {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) {
+    return () => {};
+  }
+
+  const listener = (
+    message: BridgeMessage,
+    sender: chrome.runtime.MessageSender,
+    _sendResponse: (response: BridgeMessage) => void
+  ): void => {
+    devLog('←', message.type, 'payload' in message ? message.payload : undefined);
+    handler(message, sender);
+  };
+
+  chrome.runtime.onMessage.addListener(listener);
+  return () => chrome.runtime.onMessage.removeListener(listener);
+}

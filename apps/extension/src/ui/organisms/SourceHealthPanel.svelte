@@ -66,11 +66,7 @@
   );
 
   function handleReconnect(url: string) {
-    try {
-      chrome.tabs.create({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
+    window.open(url, '_blank');
   }
 
   const unhealthySnapshots = $derived.by(() => {
