@@ -1994,10 +1994,15 @@ export async function syncConnectedDashboardTracking(
     since: applicationPullCursor ? new Date(applicationPullCursor) : null,
     now: context.now,
   });
-  if (pulledApplications.ok && pulledApplications.value.trackings.length > 0) {
+
+  if (!pulledApplications.ok) {
+    return pulledApplications;
+  }
+
+  if (pulledApplications.value.trackings.length > 0) {
     await setApplicationPullCursor(pulledApplications.value.nextCursor);
     await saveTrackings(pulledApplications.value.trackings);
-  } else if (pulledApplications.ok) {
+  } else {
     await setApplicationPullCursor(pulledApplications.value.nextCursor);
   }
 
