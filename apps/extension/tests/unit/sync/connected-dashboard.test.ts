@@ -76,6 +76,7 @@ const tracking: MissionTracking = {
   generatedAssetIds: ['asset-1'],
   userRating: 4,
   notes: 'Relancer mercredi',
+  nextActionAt: '2026-05-24T09:00:00.000Z',
 };
 
 const linkedinDraft: CanonicalCandidateProfileDraft = {
@@ -224,6 +225,7 @@ describe('connected dashboard sync payload builders', () => {
       stage: 'applied',
       user_rating: 4,
       notes: 'Relancer mercredi',
+      next_action_at: '2026-05-24T09:00:00.000Z',
       applied_at: '2026-05-21T08:20:00.000Z',
       archived_at: null,
       revision: 3,
@@ -712,6 +714,7 @@ describe('connected dashboard sync payload builders', () => {
       stage: 'interview',
       user_rating: 5,
       notes: 'Entretien mardi',
+      next_action_at: '2026-05-26T09:00:00.000Z',
       revision: 4,
       updated_at: '2026-05-21T10:00:00.000Z',
     };
@@ -732,6 +735,7 @@ describe('connected dashboard sync payload builders', () => {
       generatedAssetIds: [],
       userRating: 5,
       notes: 'Entretien mardi',
+      nextActionAt: '2026-05-26T09:00:00.000Z',
     });
   });
 
@@ -742,6 +746,7 @@ describe('connected dashboard sync payload builders', () => {
       stage: 'offer',
       user_rating: 5,
       notes: 'Offre reçue',
+      next_action_at: '2026-05-28T09:00:00.000Z',
       revision: 5,
       updated_at: '2026-05-21T11:00:00.000Z',
     };
@@ -762,6 +767,7 @@ describe('connected dashboard sync payload builders', () => {
       ],
       userRating: 5,
       notes: 'Offre reçue',
+      nextActionAt: '2026-05-28T09:00:00.000Z',
     });
   });
 
@@ -773,6 +779,7 @@ describe('connected dashboard sync payload builders', () => {
         stage: 'selected',
         user_rating: null,
         notes: '',
+        next_action_at: null,
         revision: 2,
         updated_at: '2026-05-21T10:00:00.000Z',
       },
@@ -782,6 +789,7 @@ describe('connected dashboard sync payload builders', () => {
         stage: 'offer',
         user_rating: 5,
         notes: 'Offre reçue',
+        next_action_at: '2026-05-28T09:00:00.000Z',
         revision: 5,
         updated_at: '2026-05-21T12:00:00.000Z',
       },

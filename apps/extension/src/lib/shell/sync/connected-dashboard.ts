@@ -441,6 +441,7 @@ function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapsh
       isApplicationStage(item.stage) &&
       (typeof item.user_rating === 'number' || item.user_rating === null) &&
       typeof item.notes === 'string' &&
+      (typeof item.next_action_at === 'string' || item.next_action_at === null) &&
       typeof item.revision === 'number' &&
       typeof item.updated_at === 'string'
     ) {
@@ -451,6 +452,7 @@ function parseRemoteApplicationSnapshots(data: unknown): RemoteApplicationSnapsh
           stage: item.stage,
           user_rating: item.user_rating,
           notes: item.notes,
+          next_action_at: item.next_action_at,
           revision: item.revision,
           updated_at: item.updated_at,
         },
@@ -700,7 +702,7 @@ export function createSupabaseConnectedDashboardGateway(
     listApplicationsUpdatedSince: async ({ userId, since }) => {
       let query = supabase
         .from('applications')
-        .select('id,mission_id,stage,user_rating,notes,revision,updated_at')
+        .select('id,mission_id,stage,user_rating,notes,next_action_at,revision,updated_at')
         .eq('user_id', userId);
       if (since) {
         query = query.gt('updated_at', since);

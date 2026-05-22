@@ -27,6 +27,7 @@ export const createTracking = (missionId: string, timestamp: number): MissionTra
   generatedAssetIds: [],
   userRating: null,
   notes: '',
+  nextActionAt: null,
 });
 
 /**
@@ -84,6 +85,21 @@ export const setTrackingRating = (
  */
 export const setTrackingNotes = (tracking: MissionTracking, notes: string): MissionTracking => {
   return { ...tracking, notes };
+};
+
+/**
+ * Update the next follow-up/action timestamp on a tracking record.
+ * Timestamp must be an ISO-parseable date string or null.
+ */
+export const setTrackingNextActionAt = (
+  tracking: MissionTracking,
+  nextActionAt: string | null
+): MissionTracking => {
+  if (nextActionAt !== null && !Number.isFinite(Date.parse(nextActionAt))) {
+    return tracking.nextActionAt === undefined ? { ...tracking, nextActionAt: null } : tracking;
+  }
+
+  return { ...tracking, nextActionAt };
 };
 
 /**

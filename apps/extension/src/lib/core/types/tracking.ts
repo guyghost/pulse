@@ -44,6 +44,8 @@ export interface MissionTracking {
   readonly userRating: number | null;
   /** Free-text user notes */
   readonly notes: string;
+  /** Next follow-up/action timestamp synchronized with the connected dashboard. */
+  readonly nextActionAt?: string | null;
 }
 
 /**

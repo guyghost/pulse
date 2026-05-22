@@ -8,6 +8,7 @@ export {
   transitionStatus,
   setTrackingRating,
   setTrackingNotes,
+  setTrackingNextActionAt,
   addGeneratedAsset,
   addGeneratedAssetAndMarkPrepared,
   getLastTransitionTime,

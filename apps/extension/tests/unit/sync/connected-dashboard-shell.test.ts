@@ -59,6 +59,7 @@ const tracking: MissionTracking = {
   generatedAssetIds: [],
   userRating: null,
   notes: 'Bon fit',
+  nextActionAt: '2026-05-24T09:00:00.000Z',
 };
 
 const generatedAsset: GeneratedAsset = {
@@ -125,6 +126,7 @@ function createGateway(): ConnectedDashboardSyncGateway {
         stage: 'offer',
         user_rating: 5,
         notes: 'Offre reçue',
+        next_action_at: '2026-05-28T09:00:00.000Z',
         revision: 5,
         updated_at: '2026-05-21T11:00:00.000Z',
       },
@@ -562,6 +564,7 @@ describe('connected dashboard shell sync', () => {
         user_id: 'user-1',
         mission_id: 'remote-mission-1',
         stage: 'selected',
+        next_action_at: '2026-05-24T09:00:00.000Z',
         revision: 2,
       }),
     ]);
@@ -933,6 +936,7 @@ describe('connected dashboard shell sync', () => {
             ],
             userRating: 5,
             notes: 'Offre reçue',
+            nextActionAt: '2026-05-28T09:00:00.000Z',
           },
         ],
       },
@@ -1043,6 +1047,7 @@ describe('connected dashboard shell sync', () => {
             ],
             userRating: 5,
             notes: 'Offre reçue',
+            nextActionAt: '2026-05-28T09:00:00.000Z',
           },
         ],
       },

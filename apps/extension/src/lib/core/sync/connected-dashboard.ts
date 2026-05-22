@@ -73,6 +73,7 @@ export interface ApplicationUpsertRow {
   stage: ApplicationStage;
   user_rating: number | null;
   notes: string;
+  next_action_at: string | null;
   applied_at: string | null;
   archived_at: string | null;
   revision: number;
@@ -264,6 +265,7 @@ export interface RemoteApplicationSnapshot {
   stage: ApplicationStage;
   user_rating: number | null;
   notes: string;
+  next_action_at: string | null;
   revision: number;
   updated_at: string;
 }
@@ -494,6 +496,7 @@ export function buildApplicationUpsertRow(
     stage: tracking.currentStatus,
     user_rating: tracking.userRating,
     notes: tracking.notes,
+    next_action_at: tracking.nextActionAt ?? null,
     applied_at: firstTransitionTo(tracking, 'applied'),
     archived_at: firstTransitionTo(tracking, 'archived'),
     revision,
@@ -830,6 +833,7 @@ export function buildTrackingFromRemoteApplication(
     generatedAssetIds: [],
     userRating: application.user_rating,
     notes: application.notes,
+    nextActionAt: application.next_action_at,
   };
 }
 
@@ -861,6 +865,7 @@ export function mergeRemoteApplicationTracking(
       : existing.history,
     userRating: application.user_rating,
     notes: application.notes,
+    nextActionAt: application.next_action_at,
   };
 }
 

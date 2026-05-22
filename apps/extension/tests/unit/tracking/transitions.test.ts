@@ -5,6 +5,7 @@ import {
   transitionStatus,
   setTrackingRating,
   setTrackingNotes,
+  setTrackingNextActionAt,
   addGeneratedAsset,
   addGeneratedAssetAndMarkPrepared,
   getLastTransitionTime,
@@ -75,6 +76,7 @@ describe('tracking transitions', () => {
       expect(tracking.generatedAssetIds).toEqual([]);
       expect(tracking.userRating).toBeNull();
       expect(tracking.notes).toBe('');
+      expect(tracking.nextActionAt).toBeNull();
     });
   });
 
@@ -208,6 +210,32 @@ describe('tracking transitions', () => {
       const cleared = setTrackingNotes(noted, '');
 
       expect(cleared.notes).toBe('');
+    });
+  });
+
+  describe('setTrackingNextActionAt', () => {
+    it('sets a follow-up timestamp', () => {
+      const tracking = createTracking('m1', 1000);
+      const updated = setTrackingNextActionAt(tracking, '2026-05-24T09:00:00.000Z');
+
+      expect(updated.nextActionAt).toBe('2026-05-24T09:00:00.000Z');
+    });
+
+    it('clears the follow-up timestamp', () => {
+      const tracking = setTrackingNextActionAt(
+        createTracking('m1', 1000),
+        '2026-05-24T09:00:00.000Z'
+      );
+      const updated = setTrackingNextActionAt(tracking, null);
+
+      expect(updated.nextActionAt).toBeNull();
+    });
+
+    it('ignores invalid timestamps', () => {
+      const tracking = createTracking('m1', 1000);
+      const updated = setTrackingNextActionAt(tracking, 'demain');
+
+      expect(updated.nextActionAt).toBeNull();
     });
   });
 
