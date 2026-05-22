@@ -12,6 +12,7 @@
     "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error"
   },
   "dependencies": {
+    "@pulse/domain": "workspace:*",
     "@pulse/ui": "workspace:*",
     "@supabase/ssr": "^0.6.0",
     "@supabase/supabase-js": "^2.49.0",

@@ -19,10 +19,12 @@
   let generatingType = $state<GenerationType | null>(null);
 
   const statuses: ApplicationStatus[] = [
-    'new',
-    'interested',
-    'applying',
+    'detected',
+    'selected',
+    'application_prepared',
     'applied',
+    'interview',
+    'offer',
     'accepted',
     'rejected',
     'archived',
@@ -36,7 +38,7 @@
         mission,
         record: tracking.getTrackingForMission(mission.id) ?? null,
       }))
-      .filter(({ record }) => record && record.currentStatus !== 'new')
+      .filter(({ record }) => record && record.currentStatus !== 'detected')
       .sort((a, b) => getLastActivity(b.record) - getLastActivity(a.record));
   });
 
@@ -48,7 +50,7 @@
     selectedMission ? tracking.getTrackingForMission(selectedMission.id) : null
   );
 
-  const selectedStatus = $derived<ApplicationStatus>(selectedTracking?.currentStatus ?? 'new');
+  const selectedStatus = $derived<ApplicationStatus>(selectedTracking?.currentStatus ?? 'detected');
   const nextStatuses = $derived<ApplicationStatus[]>(VALID_TRANSITIONS[selectedStatus] ?? []);
 
   const statusCounts = $derived.by(() => {
@@ -239,7 +241,7 @@
                 <span
                   class="rounded-md bg-surface-white px-2 py-0.5 text-[10px] font-medium text-text-subtle"
                 >
-                  {STATUS_LABELS[item.record?.currentStatus ?? 'new']}
+                  {STATUS_LABELS[item.record?.currentStatus ?? 'detected']}
                 </span>
                 <span class="text-[10px] text-text-muted"
                   >{formatDate(getLastActivity(item.record))}</span

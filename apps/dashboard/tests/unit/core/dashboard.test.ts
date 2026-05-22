@@ -58,7 +58,7 @@ const applications: MissionApplication[] = [
     title: 'Mission design system',
     company: 'Bluefoundry',
     source: 'malt',
-    stage: 'draft',
+    stage: 'selected',
     score: 78,
     dailyRate: 650,
     location: 'Lyon',
@@ -100,11 +100,15 @@ const syncStatuses: PlatformSyncStatus[] = [
 describe('dashboard core', () => {
   it('counts applications by stage without mutating input', () => {
     expect(countApplicationsByStage(applications)).toEqual({
-      draft: 1,
+      detected: 0,
+      selected: 1,
+      application_prepared: 0,
       applied: 1,
       interview: 1,
       offer: 0,
+      accepted: 0,
       rejected: 0,
+      archived: 0,
     });
   });
 
@@ -218,7 +222,7 @@ describe('dashboard core', () => {
       title: 'Mission Svelte',
       company: 'ScaleOps',
       source: 'free-work',
-      stage: 'draft',
+      stage: 'selected',
       score: 91,
       dailyRate: 700,
     });

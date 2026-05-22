@@ -69,11 +69,15 @@
   const canPrepareCvSync = $derived(readiness.canSync && Boolean(cvSyncAccess?.enabled));
 
   const stageLabels: Record<ApplicationStage, string> = {
-    draft: 'Brouillon',
+    detected: 'Détectée',
+    selected: 'Sélectionnée',
+    application_prepared: 'Candidature préparée',
     applied: 'Postulé',
     interview: 'Entretien',
     offer: 'Offre',
+    accepted: 'Acceptée',
     rejected: 'Refusé',
+    archived: 'Archivée',
   };
 
   const statusLabels: Record<PlatformSyncStatus['status'], string> = {

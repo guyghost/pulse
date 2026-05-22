@@ -1,3 +1,5 @@
+import { APPLICATION_TRANSITIONS, type ApplicationStage } from '@pulse/domain';
+
 /**
  * Mission tracking types — pure types for application lifecycle management.
  *
@@ -17,14 +19,7 @@
  *
  * Any status → archived (can always archive)
  */
-export type ApplicationStatus =
-  | 'new'
-  | 'interested'
-  | 'applying'
-  | 'applied'
-  | 'rejected'
-  | 'accepted'
-  | 'archived';
+export type ApplicationStatus = ApplicationStage;
 
 /**
  * A single status transition event in the tracking history.
@@ -55,24 +50,20 @@ export interface MissionTracking {
  * Valid transition map — defines the state machine.
  * Each key maps to the set of valid next statuses.
  */
-export const VALID_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = {
-  new: ['interested', 'archived'],
-  interested: ['applying', 'archived'],
-  applying: ['applied', 'archived'],
-  applied: ['rejected', 'accepted', 'archived'],
-  rejected: ['archived'],
-  accepted: ['archived'],
-  archived: ['new'], // Allow re-activating from archive
-};
+export const VALID_TRANSITIONS: Record<ApplicationStatus, ApplicationStatus[]> = Object.fromEntries(
+  Object.entries(APPLICATION_TRANSITIONS).map(([stage, nextStages]) => [stage, [...nextStages]])
+) as Record<ApplicationStatus, ApplicationStatus[]>;
 
 /**
  * Human-readable labels for each status.
  */
 export const STATUS_LABELS: Record<ApplicationStatus, string> = {
-  new: 'Nouveau',
-  interested: 'Intéressé',
-  applying: 'En cours',
+  detected: 'Détectée',
+  selected: 'Sélectionnée',
+  application_prepared: 'Préparée',
   applied: 'Candidaté',
+  interview: 'Entretien',
+  offer: 'Offre',
   rejected: 'Refusé',
   accepted: 'Accepté',
   archived: 'Archivé',
@@ -85,10 +76,12 @@ export const STATUS_VARIANTS: Record<
   ApplicationStatus,
   'emerald' | 'blue' | 'amber' | 'red' | 'gray' | 'purple'
 > = {
-  new: 'blue',
-  interested: 'purple',
-  applying: 'amber',
+  detected: 'blue',
+  selected: 'purple',
+  application_prepared: 'amber',
   applied: 'emerald',
+  interview: 'purple',
+  offer: 'amber',
   rejected: 'red',
   accepted: 'emerald',
   archived: 'gray',

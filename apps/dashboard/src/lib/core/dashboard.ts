@@ -1,4 +1,6 @@
-export type ApplicationStage = 'draft' | 'applied' | 'interview' | 'offer' | 'rejected';
+import { APPLICATION_STAGES, type ApplicationStage } from '@pulse/domain';
+
+export type { ApplicationStage };
 
 export type ApplicationSource =
   | 'linkedin'
@@ -162,7 +164,7 @@ export function favoriteMissionToApplication(
     title: favorite.title,
     company: favorite.client ?? 'Client non renseigné',
     source: favorite.source,
-    stage: 'draft',
+    stage: 'selected',
     score: favorite.score ?? 0,
     dailyRate: favorite.tjm,
     location: favorite.location ?? 'Localisation non renseignée',
@@ -271,13 +273,10 @@ export const countApplicationsByStage = (applications: MissionApplication[]) =>
       ...counts,
       [application.stage]: counts[application.stage] + 1,
     }),
-    {
-      draft: 0,
-      applied: 0,
-      interview: 0,
-      offer: 0,
-      rejected: 0,
-    }
+    Object.fromEntries(APPLICATION_STAGES.map((stage) => [stage, 0])) as Record<
+      ApplicationStage,
+      number
+    >
   );
 
 export const getAverageApplicationScore = (applications: MissionApplication[]) =>

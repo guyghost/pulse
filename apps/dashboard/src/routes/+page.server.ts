@@ -43,7 +43,7 @@ const mockApplications: MissionApplication[] = [
     title: 'Mission migration design system',
     company: 'Bluefoundry',
     source: 'malt',
-    stage: 'draft',
+    stage: 'selected',
     score: 78,
     dailyRate: 650,
     location: 'Lyon',

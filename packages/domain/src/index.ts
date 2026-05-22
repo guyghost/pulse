@@ -43,7 +43,7 @@ export const APPLICATION_STAGES = [
   'archived',
 ] as const satisfies readonly ApplicationStage[];
 
-const APPLICATION_TRANSITIONS: Record<ApplicationStage, readonly ApplicationStage[]> = {
+export const APPLICATION_TRANSITIONS: Record<ApplicationStage, readonly ApplicationStage[]> = {
   detected: ['selected', 'archived'],
   selected: ['application_prepared', 'applied', 'archived'],
   application_prepared: ['applied', 'archived'],

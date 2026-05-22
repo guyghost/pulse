@@ -5,6 +5,7 @@
  * All timestamps are injected from the shell.
  */
 
+import { APPLICATION_STAGES } from '@pulse/domain';
 import type { ApplicationStatus, MissionTracking, StatusTransition } from '../types/tracking';
 import { VALID_TRANSITIONS } from '../types/tracking';
 
@@ -21,8 +22,8 @@ export const isValidTransition = (from: ApplicationStatus, to: ApplicationStatus
  */
 export const createTracking = (missionId: string, timestamp: number): MissionTracking => ({
   missionId,
-  currentStatus: 'new',
-  history: [{ from: null, to: 'new', timestamp, note: null }],
+  currentStatus: 'detected',
+  history: [{ from: null, to: 'detected', timestamp, note: null }],
   generatedAssetIds: [],
   userRating: null,
   notes: '',
@@ -110,17 +111,12 @@ export const getLastTransitionTime = (tracking: MissionTracking): number | null 
  * Count how many missions have each status.
  */
 export const countByStatus = (trackings: MissionTracking[]): Record<ApplicationStatus, number> => {
-  const counts: Record<string, number> = {
-    new: 0,
-    interested: 0,
-    applying: 0,
-    applied: 0,
-    rejected: 0,
-    accepted: 0,
-    archived: 0,
-  };
+  const counts = Object.fromEntries(APPLICATION_STAGES.map((stage) => [stage, 0])) as Record<
+    ApplicationStatus,
+    number
+  >;
   for (const t of trackings) {
     counts[t.currentStatus] = (counts[t.currentStatus] ?? 0) + 1;
   }
-  return counts as Record<ApplicationStatus, number>;
+  return counts;
 };

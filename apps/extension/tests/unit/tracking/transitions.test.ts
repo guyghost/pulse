@@ -13,40 +13,44 @@ import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 
 describe('tracking transitions', () => {
   describe('isValidTransition', () => {
-    it('allows new → interested', () => {
-      expect(isValidTransition('new', 'interested')).toBe(true);
+    it('allows detected → selected', () => {
+      expect(isValidTransition('detected', 'selected')).toBe(true);
     });
 
-    it('allows new → archived', () => {
-      expect(isValidTransition('new', 'archived')).toBe(true);
+    it('allows detected → archived', () => {
+      expect(isValidTransition('detected', 'archived')).toBe(true);
     });
 
-    it('allows interested → applying', () => {
-      expect(isValidTransition('interested', 'applying')).toBe(true);
+    it('allows selected → application_prepared', () => {
+      expect(isValidTransition('selected', 'application_prepared')).toBe(true);
     });
 
-    it('allows applying → applied', () => {
-      expect(isValidTransition('applying', 'applied')).toBe(true);
+    it('allows application_prepared → applied', () => {
+      expect(isValidTransition('application_prepared', 'applied')).toBe(true);
     });
 
-    it('allows applied → rejected', () => {
-      expect(isValidTransition('applied', 'rejected')).toBe(true);
+    it('allows applied → interview', () => {
+      expect(isValidTransition('applied', 'interview')).toBe(true);
     });
 
-    it('allows applied → accepted', () => {
-      expect(isValidTransition('applied', 'accepted')).toBe(true);
+    it('allows interview → offer', () => {
+      expect(isValidTransition('interview', 'offer')).toBe(true);
     });
 
-    it('allows archived → new (re-activate)', () => {
-      expect(isValidTransition('archived', 'new')).toBe(true);
+    it('allows offer → accepted', () => {
+      expect(isValidTransition('offer', 'accepted')).toBe(true);
     });
 
-    it('rejects new → applied (skipping steps)', () => {
-      expect(isValidTransition('new', 'applied')).toBe(false);
+    it('allows archived → detected (re-activate)', () => {
+      expect(isValidTransition('archived', 'detected')).toBe(true);
     });
 
-    it('rejects new → new (same status)', () => {
-      expect(isValidTransition('new', 'new')).toBe(false);
+    it('rejects detected → applied (skipping steps)', () => {
+      expect(isValidTransition('detected', 'applied')).toBe(false);
+    });
+
+    it('rejects detected → detected (same status)', () => {
+      expect(isValidTransition('detected', 'detected')).toBe(false);
     });
 
     it('rejects rejected → applied (backwards)', () => {
@@ -55,15 +59,15 @@ describe('tracking transitions', () => {
   });
 
   describe('createTracking', () => {
-    it('creates a tracking record with "new" status', () => {
+    it('creates a tracking record with "detected" status', () => {
       const tracking = createTracking('mission-1', 1000);
 
       expect(tracking.missionId).toBe('mission-1');
-      expect(tracking.currentStatus).toBe('new');
+      expect(tracking.currentStatus).toBe('detected');
       expect(tracking.history).toHaveLength(1);
       expect(tracking.history[0]).toEqual({
         from: null,
-        to: 'new',
+        to: 'detected',
         timestamp: 1000,
         note: null,
       });
@@ -74,16 +78,16 @@ describe('tracking transitions', () => {
   });
 
   describe('transitionStatus', () => {
-    it('transitions from new to interested', () => {
+    it('transitions from detected to selected', () => {
       const tracking = createTracking('m1', 1000);
-      const updated = transitionStatus(tracking, 'interested', 2000);
+      const updated = transitionStatus(tracking, 'selected', 2000);
 
       expect(updated).not.toBeNull();
-      expect(updated!.currentStatus).toBe('interested');
+      expect(updated!.currentStatus).toBe('selected');
       expect(updated!.history).toHaveLength(2);
       expect(updated!.history[1]).toEqual({
-        from: 'new',
-        to: 'interested',
+        from: 'detected',
+        to: 'selected',
         timestamp: 2000,
         note: null,
       });
@@ -91,7 +95,7 @@ describe('tracking transitions', () => {
 
     it('transitions with a note', () => {
       const tracking = createTracking('m1', 1000);
-      const updated = transitionStatus(tracking, 'interested', 2000, 'Bonne mission');
+      const updated = transitionStatus(tracking, 'selected', 2000, 'Bonne mission');
 
       expect(updated!.history[1].note).toBe('Bonne mission');
     });
@@ -105,29 +109,31 @@ describe('tracking transitions', () => {
 
     it('preserves immutability', () => {
       const tracking = createTracking('m1', 1000);
-      const updated = transitionStatus(tracking, 'interested', 2000);
+      const updated = transitionStatus(tracking, 'selected', 2000);
 
       // Original should be unchanged
-      expect(tracking.currentStatus).toBe('new');
+      expect(tracking.currentStatus).toBe('detected');
       expect(tracking.history).toHaveLength(1);
-      expect(updated!.currentStatus).toBe('interested');
+      expect(updated!.currentStatus).toBe('selected');
     });
 
-    it('supports full lifecycle: new → interested → applying → applied → accepted', () => {
+    it('supports full lifecycle: detected → selected → application_prepared → applied → interview → offer → accepted', () => {
       let tracking = createTracking('m1', 1000);
-      tracking = transitionStatus(tracking, 'interested', 2000)!;
-      tracking = transitionStatus(tracking, 'applying', 3000)!;
+      tracking = transitionStatus(tracking, 'selected', 2000)!;
+      tracking = transitionStatus(tracking, 'application_prepared', 3000)!;
       tracking = transitionStatus(tracking, 'applied', 4000)!;
-      tracking = transitionStatus(tracking, 'accepted', 5000)!;
+      tracking = transitionStatus(tracking, 'interview', 5000)!;
+      tracking = transitionStatus(tracking, 'offer', 6000)!;
+      tracking = transitionStatus(tracking, 'accepted', 7000)!;
 
       expect(tracking.currentStatus).toBe('accepted');
-      expect(tracking.history).toHaveLength(5);
+      expect(tracking.history).toHaveLength(7);
     });
 
     it('supports rejection path', () => {
       let tracking = createTracking('m1', 1000);
-      tracking = transitionStatus(tracking, 'interested', 2000)!;
-      tracking = transitionStatus(tracking, 'applying', 3000)!;
+      tracking = transitionStatus(tracking, 'selected', 2000)!;
+      tracking = transitionStatus(tracking, 'application_prepared', 3000)!;
       tracking = transitionStatus(tracking, 'applied', 4000)!;
       tracking = transitionStatus(tracking, 'rejected', 5000)!;
 
@@ -135,15 +141,15 @@ describe('tracking transitions', () => {
     });
 
     it('allows archiving from any active status', () => {
-      const statuses = ['new', 'interested', 'applying', 'applied'] as const;
+      const statuses = ['detected', 'selected', 'application_prepared', 'applied'] as const;
 
       for (const status of statuses) {
         let tracking = createTracking('m1', 1000);
-        if (status !== 'new') {
+        if (status !== 'detected') {
           // Walk through to get to the desired status
-          tracking = transitionStatus(tracking, 'interested', 2000)!;
-          if (status === 'applying' || status === 'applied') {
-            tracking = transitionStatus(tracking, 'applying', 3000)!;
+          tracking = transitionStatus(tracking, 'selected', 2000)!;
+          if (status === 'application_prepared' || status === 'applied') {
+            tracking = transitionStatus(tracking, 'application_prepared', 3000)!;
             if (status === 'applied') {
               tracking = transitionStatus(tracking, 'applied', 4000)!;
             }
@@ -232,7 +238,7 @@ describe('tracking transitions', () => {
   describe('getLastTransitionTime', () => {
     it('returns the last transition timestamp', () => {
       const tracking = createTracking('m1', 1000);
-      const updated = transitionStatus(tracking, 'interested', 2000)!;
+      const updated = transitionStatus(tracking, 'selected', 2000)!;
 
       expect(getLastTransitionTime(updated)).toBe(2000);
     });
@@ -249,14 +255,14 @@ describe('tracking transitions', () => {
       const trackings: MissionTracking[] = [
         createTracking('m1', 1000),
         createTracking('m2', 1000),
-        transitionStatus(createTracking('m3', 1000), 'interested', 2000)!,
+        transitionStatus(createTracking('m3', 1000), 'selected', 2000)!,
         transitionStatus(createTracking('m4', 1000), 'archived', 2000)!,
       ];
 
       const counts = countByStatus(trackings);
 
-      expect(counts.new).toBe(2);
-      expect(counts.interested).toBe(1);
+      expect(counts.detected).toBe(2);
+      expect(counts.selected).toBe(1);
       expect(counts.archived).toBe(1);
       expect(counts.applied).toBe(0);
     });
@@ -264,7 +270,7 @@ describe('tracking transitions', () => {
     it('returns zero counts for empty array', () => {
       const counts = countByStatus([]);
 
-      expect(counts.new).toBe(0);
+      expect(counts.detected).toBe(0);
       expect(counts.applied).toBe(0);
     });
   });

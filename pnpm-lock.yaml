@@ -25,6 +25,9 @@ importers:
 
   apps/dashboard:
     dependencies:
+      '@pulse/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@pulse/ui':
         specifier: workspace:*
         version: link:../../packages/ui
@@ -71,6 +74,9 @@ importers:
 
   apps/extension:
     dependencies:
+      '@pulse/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@pulse/ui':
         specifier: workspace:*
         version: link:../../packages/ui

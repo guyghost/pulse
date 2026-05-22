@@ -75,13 +75,15 @@ const ConnectorProgressSchema = z.object({
 // ── Tracking ─────────────────────────────────────────────────────────────────
 
 const ApplicationStatusSchema = z.enum([
-  'interested',
+  'detected',
+  'selected',
+  'application_prepared',
   'applied',
   'interview',
   'offer',
   'accepted',
   'rejected',
-  'withdrawn',
+  'archived',
 ]);
 
 // ── Generation ───────────────────────────────────────────────────────────────
