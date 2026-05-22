@@ -1069,6 +1069,18 @@ describe('connected dashboard shell sync', () => {
               ...tracking.history,
               {
                 from: 'selected',
+                to: 'application_prepared',
+                timestamp: 1779364799998,
+                note: null,
+              },
+              {
+                from: 'application_prepared',
+                to: 'applied',
+                timestamp: 1779364799999,
+                note: null,
+              },
+              {
+                from: 'applied',
                 to: 'offer',
                 timestamp: 1779364800000,
                 note: 'Sync dashboard revision 5',
@@ -1178,6 +1190,30 @@ describe('connected dashboard shell sync', () => {
             history: [
               {
                 from: null,
+                to: 'detected',
+                timestamp: 1779364799996,
+                note: null,
+              },
+              {
+                from: 'detected',
+                to: 'selected',
+                timestamp: 1779364799997,
+                note: null,
+              },
+              {
+                from: 'selected',
+                to: 'application_prepared',
+                timestamp: 1779364799998,
+                note: null,
+              },
+              {
+                from: 'application_prepared',
+                to: 'applied',
+                timestamp: 1779364799999,
+                note: null,
+              },
+              {
+                from: 'applied',
                 to: 'offer',
                 timestamp: 1779364800000,
                 note: 'Import dashboard revision 5',
@@ -1301,6 +1337,18 @@ describe('connected dashboard shell sync', () => {
               ...tracking.history,
               {
                 from: 'selected',
+                to: 'application_prepared',
+                timestamp: 1779364799998,
+                note: null,
+              },
+              {
+                from: 'application_prepared',
+                to: 'applied',
+                timestamp: 1779364799999,
+                note: null,
+              },
+              {
+                from: 'applied',
                 to: 'offer',
                 timestamp: 1779364800000,
                 note: 'Sync dashboard revision 5',

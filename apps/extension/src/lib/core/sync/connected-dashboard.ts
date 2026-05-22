@@ -1,4 +1,8 @@
-import type { ApplicationEventCreator, ApplicationStage } from '@pulse/domain';
+import {
+  APPLICATION_TRANSITIONS,
+  type ApplicationEventCreator,
+  type ApplicationStage,
+} from '@pulse/domain';
 import type { CanonicalCandidateProfileDraft } from '../profile-extractors/types';
 import type { MissionDuplicateRelation } from '../scoring/dedup';
 import type { ConnectorHealthSnapshot } from '../types/health';
@@ -6,7 +10,7 @@ import type { GeneratedAsset, GenerationType } from '../types/generation';
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
 import type { SeniorityLevel, UserProfile } from '../types/profile';
 import type { Grade } from '../types/score';
-import type { MissionTracking } from '../types/tracking';
+import type { MissionTracking, StatusTransition } from '../types/tracking';
 import {
   normalizeConnectedAlertPreferences,
   type ConnectedAlertPreferences,
@@ -929,6 +933,87 @@ export function buildApplicationSyncConflictRows(input: {
   });
 }
 
+const REMOTE_APPLICATION_IMPORT_PATHS = {
+  detected: ['detected'],
+  selected: ['detected', 'selected'],
+  application_prepared: ['detected', 'selected', 'application_prepared'],
+  applied: ['detected', 'selected', 'application_prepared', 'applied'],
+  interview: ['detected', 'selected', 'application_prepared', 'applied', 'interview'],
+  offer: ['detected', 'selected', 'application_prepared', 'applied', 'offer'],
+  accepted: ['detected', 'selected', 'application_prepared', 'applied', 'offer', 'accepted'],
+  rejected: ['detected', 'selected', 'application_prepared', 'applied', 'rejected'],
+  archived: ['detected', 'archived'],
+} as const satisfies Record<ApplicationStage, readonly ApplicationStage[]>;
+
+function findApplicationStagePath(
+  fromStage: ApplicationStage | null,
+  toStage: ApplicationStage
+): ApplicationStage[] {
+  if (fromStage === toStage) {
+    return [];
+  }
+
+  const importPath: readonly ApplicationStage[] = REMOTE_APPLICATION_IMPORT_PATHS[toStage];
+  if (fromStage === null) {
+    return [...importPath];
+  }
+
+  const fromIndex = importPath.indexOf(fromStage);
+  if (fromIndex >= 0) {
+    return [...importPath.slice(fromIndex + 1)];
+  }
+
+  const queue: Array<{ stage: ApplicationStage; path: ApplicationStage[] }> = [
+    { stage: fromStage, path: [] },
+  ];
+  const visited = new Set<ApplicationStage>([fromStage]);
+
+  for (let index = 0; index < queue.length; index += 1) {
+    const current = queue[index];
+    if (!current) {
+      continue;
+    }
+
+    for (const nextStage of APPLICATION_TRANSITIONS[current.stage]) {
+      if (visited.has(nextStage)) {
+        continue;
+      }
+
+      const nextPath = [...current.path, nextStage];
+      if (nextStage === toStage) {
+        return nextPath;
+      }
+
+      visited.add(nextStage);
+      queue.push({ stage: nextStage, path: nextPath });
+    }
+  }
+
+  return [];
+}
+
+function buildRemoteApplicationTransitions(input: {
+  fromStage: ApplicationStage | null;
+  toStage: ApplicationStage;
+  pulledAt: number;
+  note: string;
+}): StatusTransition[] {
+  const path = findApplicationStagePath(input.fromStage, input.toStage);
+  const firstTimestamp = input.pulledAt - Math.max(0, path.length - 1);
+  let previousStage = input.fromStage;
+
+  return path.map((stage, index) => {
+    const transition: StatusTransition = {
+      from: previousStage,
+      to: stage,
+      timestamp: firstTimestamp + index,
+      note: index === path.length - 1 ? input.note : null,
+    };
+    previousStage = stage;
+    return transition;
+  });
+}
+
 export function buildTrackingFromRemoteApplication(
   application: RemoteApplicationSnapshot,
   localMissionId: string,
@@ -937,14 +1022,12 @@ export function buildTrackingFromRemoteApplication(
   return {
     missionId: localMissionId,
     currentStatus: application.stage,
-    history: [
-      {
-        from: null,
-        to: application.stage,
-        timestamp: pulledAt,
-        note: `Import dashboard revision ${application.revision}`,
-      },
-    ],
+    history: buildRemoteApplicationTransitions({
+      fromStage: null,
+      toStage: application.stage,
+      pulledAt,
+      note: `Import dashboard revision ${application.revision}`,
+    }),
     generatedAssetIds: [],
     userRating: application.user_rating,
     notes: application.notes,
@@ -968,15 +1051,14 @@ export function mergeRemoteApplicationTracking(
     ...existing,
     currentStatus: application.stage,
     history: statusChanged
-      ? [
-          ...existing.history,
-          {
-            from: existing.currentStatus,
-            to: application.stage,
-            timestamp: pulledAt,
+      ? existing.history.concat(
+          buildRemoteApplicationTransitions({
+            fromStage: existing.currentStatus,
+            toStage: application.stage,
+            pulledAt,
             note: `Sync dashboard revision ${application.revision}`,
-          },
-        ]
+          })
+        )
       : existing.history,
     userRating: application.user_rating,
     notes: application.notes,

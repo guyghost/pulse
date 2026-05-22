@@ -792,14 +792,42 @@ describe('connected dashboard sync payload builders', () => {
       updated_at: '2026-05-21T10:00:00.000Z',
     };
 
-    expect(
-      buildTrackingFromRemoteApplication(remoteApplication, 'free-work-123', 1779361200000)
-    ).toEqual({
+    const importedTracking = buildTrackingFromRemoteApplication(
+      remoteApplication,
+      'free-work-123',
+      1779361200000
+    );
+
+    expect(importedTracking).toEqual({
       missionId: 'free-work-123',
       currentStatus: 'interview',
       history: [
         {
           from: null,
+          to: 'detected',
+          timestamp: 1779361199996,
+          note: null,
+        },
+        {
+          from: 'detected',
+          to: 'selected',
+          timestamp: 1779361199997,
+          note: null,
+        },
+        {
+          from: 'selected',
+          to: 'application_prepared',
+          timestamp: 1779361199998,
+          note: null,
+        },
+        {
+          from: 'application_prepared',
+          to: 'applied',
+          timestamp: 1779361199999,
+          note: null,
+        },
+        {
+          from: 'applied',
           to: 'interview',
           timestamp: 1779361200000,
           note: 'Import dashboard revision 4',
@@ -810,6 +838,23 @@ describe('connected dashboard sync payload builders', () => {
       notes: 'Entretien mardi',
       nextActionAt: '2026-05-26T09:00:00.000Z',
     });
+
+    expect(
+      buildApplicationPipelineEventRows(
+        importedTracking,
+        'user-1',
+        'application-1',
+        'extension',
+        'install-1',
+        formatTimestamp
+      ).map((row) => [row.from_stage, row.to_stage])
+    ).toEqual([
+      [null, 'detected'],
+      ['detected', 'selected'],
+      ['selected', 'application_prepared'],
+      ['application_prepared', 'applied'],
+      ['applied', 'interview'],
+    ]);
   });
 
   it('merges remote dashboard application changes into existing local tracking', () => {
