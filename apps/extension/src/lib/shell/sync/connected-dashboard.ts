@@ -325,8 +325,13 @@ interface SupabaseAuthLike {
   }>;
 }
 
+interface SupabaseWriteError {
+  code?: string;
+  message: string;
+}
+
 interface SupabaseWriteBuilder {
-  select(columns: string): Promise<{ data: unknown; error: { message: string } | null }>;
+  select(columns: string): Promise<{ data: unknown; error: SupabaseWriteError | null }>;
 }
 
 interface SupabaseReadBuilder {
@@ -755,6 +760,23 @@ async function selectOrThrow<T>(
   return parse(data);
 }
 
+function isUniqueViolation(error: SupabaseWriteError | null): boolean {
+  return error?.code === '23505' || /duplicate key value/i.test(error?.message ?? '');
+}
+
+async function insertOrIgnoreDuplicate(
+  builder: SupabaseWriteBuilder,
+  columns: string
+): Promise<void> {
+  const { error } = await builder.select(columns);
+  if (isUniqueViolation(error)) {
+    return;
+  }
+  if (error) {
+    throw new Error(error.message);
+  }
+}
+
 export function createSupabaseConnectedDashboardGateway(
   supabase: SupabaseLike
 ): ConnectedDashboardSyncGateway {
@@ -1001,10 +1023,9 @@ export function createSupabaseConnectedDashboardGateway(
       if (rows.length === 0) {
         return;
       }
-      await selectOrThrow(
+      await insertOrIgnoreDuplicate(
         supabase.from('candidate_profile_field_suggestions').insert(rows),
-        'id',
-        () => undefined
+        'id'
       );
     },
     listPendingSyncConflictFields: async ({ userId, deviceId, entity, entityId }) => {
@@ -1028,7 +1049,7 @@ export function createSupabaseConnectedDashboardGateway(
       if (rows.length === 0) {
         return;
       }
-      await selectOrThrow(supabase.from('sync_conflicts').insert(rows), 'id', () => undefined);
+      await insertOrIgnoreDuplicate(supabase.from('sync_conflicts').insert(rows), 'id');
     },
     insertProfileImport: async (row) => {
       await selectOrThrow(supabase.from('profile_imports').insert(row), 'id', () => undefined);

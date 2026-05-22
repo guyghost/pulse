@@ -9,6 +9,7 @@ vi.mock('../../../src/lib/shell/auth/supabase-client', () => ({
 }));
 
 import {
+  createSupabaseConnectedDashboardGateway,
   getConnectedDashboardSyncStatus,
   pushApplicationsToConnectedDashboard,
   pushConnectorHealthToConnectedDashboard,
@@ -184,6 +185,59 @@ function createReadQuery(data: unknown): MockSupabaseReadQuery {
 }
 
 describe('connected dashboard shell sync', () => {
+  it('ignores duplicate pending conflict inserts created by concurrent sync retries', async () => {
+    const duplicateError = {
+      code: '23505',
+      message: 'duplicate key value violates unique constraint',
+    };
+    const insert = vi.fn(() => ({
+      select: vi.fn(async () => ({ data: null, error: duplicateError })),
+    }));
+    const supabase = {
+      auth: {
+        getSession: vi.fn(),
+      },
+      from: vi.fn((table: string) => {
+        if (table === 'sync_conflicts' || table === 'candidate_profile_field_suggestions') {
+          return { insert };
+        }
+        throw new Error(`Unexpected table ${table}`);
+      }),
+    } as unknown as Parameters<typeof createSupabaseConnectedDashboardGateway>[0];
+    const gateway = createSupabaseConnectedDashboardGateway(supabase);
+
+    await expect(
+      gateway.insertSyncConflicts([
+        {
+          user_id: 'user-1',
+          device_id: 'device-1',
+          entity: 'applications',
+          entity_id: 'application-1',
+          field: 'stage',
+          local_value: 'selected',
+          remote_value: 'offer',
+          local_updated_by: 'extension',
+          remote_updated_by: 'dashboard',
+          status: 'pending',
+          detected_at: '2026-05-22T08:00:00.000Z',
+        },
+      ])
+    ).resolves.toBeUndefined();
+    await expect(
+      gateway.insertCandidateProfileFieldSuggestions([
+        {
+          user_id: 'user-1',
+          profile_id: 'profile-1',
+          field: 'summary',
+          current_value: 'Resume dashboard',
+          suggested_value: 'Resume LinkedIn',
+          source: 'linkedin',
+          status: 'pending',
+        },
+      ])
+    ).resolves.toBeUndefined();
+  });
+
   it('pulls dashboard alert preferences into extension local storage', async () => {
     const storageSet = vi.fn(async () => undefined);
     vi.stubGlobal('chrome', {
