@@ -1149,48 +1149,65 @@ describe('dashboard core', () => {
   });
 
   it('maps connector health events to platform sync statuses', () => {
-    expect(
-      healthEventsToPlatformSyncStatuses([
-        {
-          source: 'free-work',
-          status: 'ready',
-          error_code: null,
-          error_message: null,
-          occurred_at: '2026-05-21T08:00:00.000Z',
-        },
-        {
-          source: 'linkedin',
-          status: 'needs_permission',
-          error_code: 'permission_required',
-          error_message: 'Permission LinkedIn manquante.',
-          occurred_at: '2026-05-21T09:00:00.000Z',
-        },
-        {
-          source: 'unknown-source',
-          status: 'ready',
-          error_code: null,
-          error_message: null,
-          occurred_at: '2026-05-21T10:00:00.000Z',
-        },
-      ])
-    ).toEqual([
+    const statuses = healthEventsToPlatformSyncStatuses([
       {
-        id: 'free-work',
-        name: 'Free-Work',
+        source: 'free-work',
         status: 'ready',
-        lastSyncAt: '2026-05-21T08:00:00.000Z',
-        lastErrorCode: null,
-        lastErrorMessage: null,
+        error_code: null,
+        error_message: null,
+        occurred_at: '2026-05-21T08:00:00.000Z',
       },
       {
-        id: 'linkedin',
-        name: 'LinkedIn',
-        status: 'needs-permission',
-        lastSyncAt: '2026-05-21T09:00:00.000Z',
-        lastErrorCode: 'permission_required',
-        lastErrorMessage: 'Permission LinkedIn manquante.',
+        source: 'linkedin',
+        status: 'needs_permission',
+        error_code: 'permission_required',
+        error_message: 'Permission LinkedIn manquante.',
+        occurred_at: '2026-05-21T09:00:00.000Z',
+      },
+      {
+        source: 'unknown-source',
+        status: 'ready',
+        error_code: null,
+        error_message: null,
+        occurred_at: '2026-05-21T10:00:00.000Z',
       },
     ]);
+
+    expect(statuses).toContainEqual({
+      id: 'free-work',
+      name: 'Free-Work',
+      status: 'ready',
+      lastSyncAt: '2026-05-21T08:00:00.000Z',
+      lastErrorCode: null,
+      lastErrorMessage: null,
+    });
+    expect(statuses).toContainEqual({
+      id: 'linkedin',
+      name: 'LinkedIn',
+      status: 'needs-permission',
+      lastSyncAt: '2026-05-21T09:00:00.000Z',
+      lastErrorCode: 'permission_required',
+      lastErrorMessage: 'Permission LinkedIn manquante.',
+    });
+    expect(statuses.find((status) => status.id === 'lehibou')).toMatchObject({
+      status: 'needs-extension',
+      lastSyncAt: null,
+    });
+  });
+
+  it('keeps every connected mission and profile platform visible without health events', () => {
+    const statuses = healthEventsToPlatformSyncStatuses([]);
+
+    expect(statuses.map((status) => status.id)).toEqual([
+      'free-work',
+      'lehibou',
+      'hiway',
+      'collective',
+      'cherry-pick',
+      'linkedin',
+    ]);
+    expect(statuses.every((status) => status.status === 'needs-extension')).toBe(true);
+    expect(statuses.every((status) => status.lastSyncAt === null)).toBe(true);
   });
 
   it('maps sync rows to dashboard connected sync statuses ordered by actionability', () => {

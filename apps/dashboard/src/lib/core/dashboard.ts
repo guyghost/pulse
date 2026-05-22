@@ -781,6 +781,15 @@ const SOURCE_LABELS: Record<ApplicationSource, string> = {
   other: 'Autre',
 };
 
+const CONNECTED_PLATFORM_SOURCES = [
+  'free-work',
+  'lehibou',
+  'hiway',
+  'collective',
+  'cherry-pick',
+  'linkedin',
+] as const satisfies readonly ApplicationSource[];
+
 const GENERATED_ASSET_LABELS: Record<GeneratedApplicationAssetType, string> = {
   pitch: 'Pitch',
   cover_message: 'Message recruteur',
@@ -1420,14 +1429,35 @@ export function healthEventsToPlatformSyncStatuses(
     }
   }
 
-  return [...latestBySource.entries()].map(([source, event]) => ({
-    id: source,
-    name: SOURCE_LABELS[source],
-    status: healthEventToPlatformStatus(event.status),
-    lastSyncAt: event.occurred_at,
-    lastErrorCode: event.error_code,
-    lastErrorMessage: event.error_message,
-  }));
+  const connectedPlatformSources = new Set<ApplicationSource>(CONNECTED_PLATFORM_SOURCES);
+  const sources = [
+    ...CONNECTED_PLATFORM_SOURCES,
+    ...[...latestBySource.keys()].filter((source) => !connectedPlatformSources.has(source)),
+  ];
+
+  return sources.map((source) => {
+    const event = latestBySource.get(source) ?? null;
+
+    if (!event) {
+      return {
+        id: source,
+        name: SOURCE_LABELS[source],
+        status: 'needs-extension',
+        lastSyncAt: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      };
+    }
+
+    return {
+      id: source,
+      name: SOURCE_LABELS[source],
+      status: healthEventToPlatformStatus(event.status),
+      lastSyncAt: event.occurred_at,
+      lastErrorCode: event.error_code,
+      lastErrorMessage: event.error_message,
+    };
+  });
 }
 
 export function syncRowsToConnectedSyncStatuses(
