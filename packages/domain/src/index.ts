@@ -13,7 +13,7 @@ export type ApplicationEventCreator = 'dashboard' | 'extension' | 'system';
 
 export interface ApplicationPipelineEvent {
   applicationId: string;
-  fromStage: ApplicationStage;
+  fromStage: ApplicationStage | null;
   toStage: ApplicationStage;
   occurredAt: string;
   createdBy: ApplicationEventCreator;
@@ -23,7 +23,7 @@ export interface ApplicationPipelineEvent {
 
 export interface ApplicationTransitionInput {
   applicationId: string;
-  fromStage: ApplicationStage;
+  fromStage: ApplicationStage | null;
   toStage: ApplicationStage;
   occurredAt: Date;
   createdBy: ApplicationEventCreator;
@@ -73,9 +73,13 @@ const LEGACY_STAGE_MAP: Record<string, ApplicationStage> = {
 };
 
 export function isAllowedApplicationTransition(
-  fromStage: ApplicationStage,
+  fromStage: ApplicationStage | null,
   toStage: ApplicationStage
 ): boolean {
+  if (fromStage === null) {
+    return toStage === 'detected';
+  }
+
   return APPLICATION_TRANSITIONS[fromStage].includes(toStage);
 }
 

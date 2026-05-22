@@ -61,6 +61,27 @@ describe('application pipeline', () => {
     });
   });
 
+  it('creates the initial detected pipeline event with a null source stage', () => {
+    expect(
+      transitionApplicationStage({
+        applicationId: 'app-123',
+        fromStage: null,
+        toStage: 'detected',
+        occurredAt: new Date('2026-05-22T08:00:00.000Z'),
+        createdBy: 'extension',
+        clientEventId: 'evt-initial',
+      })
+    ).toEqual({
+      applicationId: 'app-123',
+      fromStage: null,
+      toStage: 'detected',
+      occurredAt: '2026-05-22T08:00:00.000Z',
+      createdBy: 'extension',
+      clientEventId: 'evt-initial',
+      note: null,
+    });
+  });
+
   it('returns null instead of emitting invalid transition events', () => {
     expect(
       transitionApplicationStage({
@@ -70,6 +91,19 @@ describe('application pipeline', () => {
         occurredAt: new Date('2026-05-22T08:00:00.000Z'),
         createdBy: 'dashboard',
         clientEventId: 'evt-124',
+      })
+    ).toBeNull();
+  });
+
+  it('rejects null source stages for non-initial pipeline events', () => {
+    expect(
+      transitionApplicationStage({
+        applicationId: 'app-123',
+        fromStage: null,
+        toStage: 'selected',
+        occurredAt: new Date('2026-05-22T08:00:00.000Z'),
+        createdBy: 'extension',
+        clientEventId: 'evt-invalid-initial',
       })
     ).toBeNull();
   });
