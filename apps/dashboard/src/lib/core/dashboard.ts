@@ -422,6 +422,11 @@ export interface CvProfileUpdatePatch {
   target_role: string | null;
 }
 
+export interface ConnectedDataDeletionRequest {
+  confirmed: true;
+  confirmation: 'SUPPRIMER';
+}
+
 export interface ApplicationFilters {
   query: string;
   source: 'all' | ApplicationSource;
@@ -1127,6 +1132,19 @@ export function buildCvProfileUpdatePatch(
     title: normalizedTitle,
     summary: normalizedSummary,
     target_role: normalizedTargetRole.length > 0 ? normalizedTargetRole : null,
+  };
+}
+
+export function buildConnectedDataDeletionRequest(
+  confirmation: string
+): ConnectedDataDeletionRequest | null {
+  if (confirmation !== 'SUPPRIMER') {
+    return null;
+  }
+
+  return {
+    confirmed: true,
+    confirmation,
   };
 }
 

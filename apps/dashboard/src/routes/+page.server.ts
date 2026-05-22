@@ -10,6 +10,7 @@ import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
   buildApplicationDetailsUpdatePatch,
   buildApplicationStageUpdatePatch,
+  buildConnectedDataDeletionRequest,
   buildCvProfileUpdatePatch,
   buildMissionSelectionInsertPatch,
   buildTjmRadarSnapshot,
@@ -333,6 +334,10 @@ type ExistingApplicationSelectionRow = {
   stage: string;
 };
 
+type CandidateProfileIdentityRow = {
+  id: string;
+};
+
 const normalizeSubscriptionStatus = (value: string | null): DashboardSubscriptionStatus =>
   value === 'premium' ? 'premium' : value === 'expired' ? 'expired' : 'free';
 
@@ -385,6 +390,34 @@ const getLoginUrl = (): string => {
 
 const isApplicationStage = (value: unknown): value is ApplicationStage =>
   APPLICATION_STAGES.includes(value as ApplicationStage);
+
+const deleteRowsByUserId = async (
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  table: string,
+  userId: string
+): Promise<void> => {
+  const { error } = await supabase.from(table).delete().eq('user_id', userId);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
+
+const deleteProfileChildRows = async (
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  table: string,
+  profileIds: string[]
+): Promise<void> => {
+  if (profileIds.length === 0) {
+    return;
+  }
+
+  const { error } = await supabase.from(table).delete().in('profile_id', profileIds);
+
+  if (error) {
+    throw new Error(error.message);
+  }
+};
 
 export const load: PageServerLoad = async ({ cookies }) => {
   const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
@@ -662,6 +695,66 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
+  deleteConnectedData: async ({ cookies, request }) => {
+    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasSupabaseConfig) {
+      return fail(503, { privacyError: 'Configuration Supabase absente.' });
+    }
+
+    const supabase = createSupabaseServerClient(cookies);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return fail(401, { privacyError: 'Session requise.' });
+    }
+
+    const formData = await request.formData();
+    const confirmation = formData.get('confirmation');
+
+    if (typeof confirmation !== 'string' || !buildConnectedDataDeletionRequest(confirmation)) {
+      return fail(400, { privacyError: 'Confirmation invalide.' });
+    }
+
+    try {
+      const { data: profiles, error: profilesError } = await supabase
+        .from('candidate_profiles')
+        .select('id')
+        .eq('user_id', session.user.id)
+        .returns<CandidateProfileIdentityRow[]>();
+
+      if (profilesError) {
+        throw new Error(profilesError.message);
+      }
+
+      const profileIds = (profiles ?? []).map((profile) => profile.id);
+
+      await Promise.all([
+        deleteProfileChildRows(supabase, 'candidate_experiences', profileIds),
+        deleteProfileChildRows(supabase, 'candidate_education', profileIds),
+        deleteProfileChildRows(supabase, 'candidate_skills', profileIds),
+        deleteProfileChildRows(supabase, 'candidate_links', profileIds),
+      ]);
+
+      await deleteRowsByUserId(supabase, 'generated_application_assets', session.user.id);
+      await deleteRowsByUserId(supabase, 'application_pipeline_events', session.user.id);
+      await deleteRowsByUserId(supabase, 'applications', session.user.id);
+      await deleteRowsByUserId(supabase, 'mission_duplicates', session.user.id);
+      await deleteRowsByUserId(supabase, 'missions', session.user.id);
+      await deleteRowsByUserId(supabase, 'candidate_profiles', session.user.id);
+      await deleteRowsByUserId(supabase, 'profile_imports', session.user.id);
+      await deleteRowsByUserId(supabase, 'connector_health_events', session.user.id);
+      await deleteRowsByUserId(supabase, 'sync_status', session.user.id);
+      await deleteRowsByUserId(supabase, 'extension_devices', session.user.id);
+      await deleteRowsByUserId(supabase, 'favorite_missions', session.user.id);
+    } catch {
+      return fail(500, { privacyError: "Les données connectées n'ont pas pu être supprimées." });
+    }
+
+    return { privacySuccess: 'Données connectées supprimées.' };
+  },
+
   updateCvProfile: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {

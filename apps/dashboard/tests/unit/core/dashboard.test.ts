@@ -4,6 +4,7 @@ import {
   canonicalRowsToApplications,
   buildApplicationDetailsUpdatePatch,
   buildCvProfileUpdatePatch,
+  buildConnectedDataDeletionRequest,
   buildTjmRadarSnapshot,
   filterApplications,
   favoriteMissionToApplication,
@@ -997,5 +998,15 @@ describe('dashboard core', () => {
     expect(buildCvProfileUpdatePatch('x'.repeat(121), '', '')).toBeNull();
     expect(buildCvProfileUpdatePatch('Profil', 'x'.repeat(4001), '')).toBeNull();
     expect(buildCvProfileUpdatePatch('Profil', '', 'x'.repeat(121))).toBeNull();
+  });
+
+  it('validates connected data deletion confirmation', () => {
+    expect(buildConnectedDataDeletionRequest('SUPPRIMER')).toEqual({
+      confirmed: true,
+      confirmation: 'SUPPRIMER',
+    });
+
+    expect(buildConnectedDataDeletionRequest(' supprimer ')).toBeNull();
+    expect(buildConnectedDataDeletionRequest('DELETE')).toBeNull();
   });
 });

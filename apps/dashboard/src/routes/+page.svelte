@@ -1538,6 +1538,72 @@
 
       <section
         class="mx-auto mt-8 max-w-2xl rounded-xl border border-border-light bg-surface-white/95 p-4 shadow-subtle-2"
+        aria-labelledby="privacy-title"
+      >
+        <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
+          <div>
+            <p class="eyebrow text-text-subtle">Confidentialité</p>
+            <h2 id="privacy-title" class="mt-1 text-lg font-semibold text-text-primary">
+              Données connectées
+            </h2>
+            <p class="mt-2 text-sm leading-6 text-text-subtle">
+              Exportez les données synchronisées via Supabase ou supprimez les snapshots connectés
+              du dashboard. Les sessions et credentials des plateformes ne sont jamais stockés.
+            </p>
+          </div>
+          <a
+            class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas aria-disabled:pointer-events-none aria-disabled:opacity-40"
+            href={isConnected ? '/export.json' : data.loginUrl || '/login'}
+            download={isConnected ? 'missionpulse-connected-data.json' : undefined}
+            aria-disabled={!isConnected}
+          >
+            Export JSON
+          </a>
+        </div>
+
+        {#if form?.privacyError}
+          <p
+            class="mt-4 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
+          >
+            {form.privacyError}
+          </p>
+        {/if}
+
+        {#if form?.privacySuccess}
+          <p
+            class="mt-4 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
+          >
+            {form.privacySuccess}
+          </p>
+        {/if}
+
+        <form
+          method="POST"
+          action="?/deleteConnectedData"
+          class="mt-5 border-t border-border-light pt-4"
+        >
+          <label class="block text-xs font-medium text-text-subtle" for="privacy-confirmation">
+            Confirmation suppression
+            <input
+              id="privacy-confirmation"
+              name="confirmation"
+              placeholder="SUPPRIMER"
+              class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-status-red/40"
+              autocomplete="off"
+            />
+          </label>
+          <button
+            type="submit"
+            class="mt-3 inline-flex h-8 items-center rounded-lg border border-status-red/25 bg-status-red/8 px-3 text-xs font-semibold text-status-red hover:border-status-red/40 hover:bg-status-red/12 disabled:cursor-not-allowed disabled:opacity-40"
+            disabled={!isConnected}
+          >
+            Supprimer les données connectées
+          </button>
+        </form>
+      </section>
+
+      <section
+        class="mx-auto mt-8 max-w-2xl rounded-xl border border-border-light bg-surface-white/95 p-4 shadow-subtle-2"
         aria-label="Préparation synchronisation CV"
       >
         <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
