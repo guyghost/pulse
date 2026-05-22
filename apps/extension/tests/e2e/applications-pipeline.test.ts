@@ -277,6 +277,135 @@ async function mockDashboardPullBridge(page: Page) {
   );
 }
 
+async function mockExtensionPushBridge(page: Page) {
+  await page.addInitScript(
+    ({ missionRow }) => {
+      type BridgeMessage = { type: string; payload?: unknown };
+      const bridgeMessages: BridgeMessage[] = [];
+      let hasPendingApplicationUpload = false;
+      let tracking = {
+        missionId: missionRow.id,
+        currentStatus: 'selected',
+        history: [
+          { from: null, to: 'detected', timestamp: 1779433200000, note: null },
+          { from: 'detected', to: 'selected', timestamp: 1779435000000, note: null },
+        ],
+        generatedAssetIds: [],
+        userRating: null,
+        notes: '',
+        nextActionAt: null,
+      };
+
+      Object.defineProperty(window, '__missionPulseBridgeMessages', {
+        configurable: true,
+        value: bridgeMessages,
+      });
+
+      let chromeValue: unknown = undefined;
+      Object.defineProperty(window, 'chrome', {
+        configurable: true,
+        enumerable: true,
+        get() {
+          return chromeValue;
+        },
+        set(value: unknown) {
+          chromeValue = value;
+          const chromeApi = value as {
+            runtime?: {
+              sendMessage?: (message: BridgeMessage) => Promise<unknown>;
+            };
+          };
+
+          const originalSendMessage = chromeApi.runtime?.sendMessage;
+          if (!originalSendMessage) {
+            return;
+          }
+
+          chromeApi.runtime.sendMessage = async (message) => {
+            bridgeMessages.push(message);
+
+            if (message.type === 'AUTH_STATUS') {
+              return {
+                type: 'AUTH_RESULT',
+                payload: {
+                  status: 'authenticated',
+                  user: {
+                    id: 'user-e2e',
+                    email: 'e2e@example.com',
+                    premiumStatus: 'premium',
+                    premiumExpiresAt: null,
+                    creditBalance: 10,
+                  },
+                },
+              };
+            }
+
+            if (message.type === 'GET_FEED_MISSIONS') {
+              return { type: 'FEED_MISSIONS_RESULT', payload: [missionRow] };
+            }
+
+            if (message.type === 'GET_TRACKINGS') {
+              return { type: 'TRACKINGS_RESULT', payload: [tracking] };
+            }
+
+            if (message.type === 'GET_GENERATED_ASSETS') {
+              return { type: 'GENERATED_ASSETS_RESULT', payload: [] };
+            }
+
+            if (message.type === 'UPDATE_TRACKING') {
+              const payload = message.payload as { status?: string; note?: string | null };
+              tracking = {
+                ...tracking,
+                currentStatus: payload.status ?? tracking.currentStatus,
+                history: [
+                  ...tracking.history,
+                  {
+                    from: tracking.currentStatus,
+                    to: payload.status ?? tracking.currentStatus,
+                    timestamp: 1779437400000,
+                    note: payload.note ?? null,
+                  },
+                ],
+              };
+              hasPendingApplicationUpload = true;
+              return { type: 'TRACKING_UPDATED', payload: tracking };
+            }
+
+            if (message.type === 'GET_CONNECTED_SYNC_STATUS') {
+              return {
+                type: 'CONNECTED_SYNC_STATUS_RESULT',
+                payload: {
+                  authenticated: true,
+                  installId: 'install-e2e',
+                  lastGlobalSync: 1779437400000,
+                  entities: [
+                    {
+                      entity: 'applications',
+                      label: 'Candidatures',
+                      state: hasPendingApplicationUpload ? 'pending' : 'healthy',
+                      lastPullAt: '2026-05-22T10:00:00.000Z',
+                      lastPushAt: hasPendingApplicationUpload ? null : '2026-05-22T10:00:00.000Z',
+                      pendingUploadCount: hasPendingApplicationUpload ? 1 : 0,
+                      pendingDownloadCount: 0,
+                      lastErrorCode: null,
+                      lastErrorMessage: null,
+                      retryAfterAt: null,
+                      updatedAt: '2026-05-22T10:10:00.000Z',
+                    },
+                  ],
+                },
+              };
+            }
+
+            return originalSendMessage.call(chromeApi.runtime, message);
+          };
+        },
+      });
+    },
+    { missionRow: mission }
+  );
+}
+
 test.describe('applications pipeline', () => {
   test('refreshes the prepared pipeline state after generating an application asset', async ({
     page,
@@ -332,5 +461,45 @@ test.describe('applications pipeline', () => {
 
     await expect(page.getByText('Offre').first()).toBeVisible();
     await expect(page.getByText(/Prochaine action 24 mai/)).toBeVisible();
+  });
+
+  test('queues an application upload after an extension stage update', async ({ page }) => {
+    await mockExtensionPushBridge(page);
+    await page.goto(SIDE_PANEL);
+
+    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    await expect(nav).toBeVisible();
+    await nav.getByRole('button', { name: 'Suivi' }).click();
+
+    await expect(page.getByRole('heading', { name: 'Mission Svelte dashboard' })).toBeVisible();
+    await expect(page.getByText('Sélectionnée').first()).toBeVisible();
+
+    await page.getByRole('button', { name: 'Préparée' }).click();
+
+    await expect(page.getByText('Statut: Préparée')).toBeVisible();
+    await expect(page.getByText('Préparée').first()).toBeVisible();
+    await expect(
+      page.evaluate(() => {
+        const messages = (window as unknown as { __missionPulseBridgeMessages: unknown[] })
+          .__missionPulseBridgeMessages;
+        return messages.find(
+          (message): message is { type: string; payload: { status?: string } } =>
+            typeof message === 'object' &&
+            message !== null &&
+            'type' in message &&
+            (message as { type: unknown }).type === 'UPDATE_TRACKING'
+        );
+      })
+    ).resolves.toMatchObject({
+      type: 'UPDATE_TRACKING',
+      payload: { missionId: mission.id, status: 'application_prepared' },
+    });
+
+    await nav.getByRole('button', { name: 'Settings' }).click();
+    const dashboardSync = page.locator('.section-card').filter({ hasText: 'Dashboard connecté' });
+    await expect(dashboardSync.getByText('En attente').first()).toBeVisible();
+    await expect(
+      dashboardSync.locator('p').filter({ hasText: 'Upload:' }).filter({ hasText: '1' })
+    ).toBeVisible();
   });
 });
