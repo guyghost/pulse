@@ -1,5 +1,86 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import { ensureFeedVisible } from './helpers';
+
+async function mockConnectedSyncFailure(page: Page) {
+  await page.addInitScript(() => {
+    let chromeValue: unknown = undefined;
+    let retried = false;
+
+    Object.defineProperty(window, 'chrome', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return chromeValue;
+      },
+      set(value: unknown) {
+        chromeValue = value;
+        const chromeApi = value as {
+          runtime?: {
+            sendMessage?: (message: { type: string; payload?: unknown }) => Promise<unknown>;
+          };
+        };
+        const originalSendMessage = chromeApi.runtime?.sendMessage;
+        if (!originalSendMessage) {
+          return;
+        }
+
+        chromeApi.runtime.sendMessage = async (message) => {
+          if (message.type === 'AUTH_STATUS') {
+            return {
+              type: 'AUTH_RESULT',
+              payload: {
+                status: 'authenticated',
+                user: {
+                  id: 'user-e2e',
+                  email: 'e2e@example.com',
+                  premiumStatus: 'premium',
+                  premiumExpiresAt: null,
+                  creditBalance: 10,
+                },
+              },
+            };
+          }
+
+          if (message.type === 'GET_CONNECTED_SYNC_STATUS') {
+            return {
+              type: 'CONNECTED_SYNC_STATUS_RESULT',
+              payload: {
+                authenticated: true,
+                installId: 'install-e2e',
+                lastGlobalSync: 1779436800000,
+                entities: [
+                  {
+                    entity: 'missions',
+                    label: 'Missions',
+                    state: retried ? 'healthy' : 'error',
+                    lastPullAt: null,
+                    lastPushAt: retried ? '2026-05-22T10:05:00.000Z' : null,
+                    pendingUploadCount: retried ? 0 : 2,
+                    pendingDownloadCount: 0,
+                    lastErrorCode: retried ? null : 'remote-error',
+                    lastErrorMessage: retried ? null : 'Supabase indisponible',
+                    retryAfterAt: retried ? null : '2026-05-22T10:05:00.000Z',
+                    updatedAt: retried ? '2026-05-22T10:05:00.000Z' : '2026-05-22T10:00:00.000Z',
+                  },
+                ],
+              },
+            };
+          }
+
+          if (message.type === 'RETRY_CONNECTED_SYNC') {
+            retried = true;
+            return {
+              type: 'CONNECTED_DASHBOARD_SYNCED',
+              payload: { synced: true, missions: 1, applications: 0, connectorHealth: 0 },
+            };
+          }
+
+          return originalSendMessage.call(chromeApi.runtime, message);
+        };
+      },
+    });
+  });
+}
 
 test.describe('Settings Flow', () => {
   test('navigates to settings and displays profile section', async ({ page }) => {
@@ -186,5 +267,28 @@ test.describe('Settings Flow', () => {
     await expect(page.getByText('Sauvegarde').first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('Créer une sauvegarde')).toBeVisible();
     await expect(page.getByText('Restaurer depuis une sauvegarde')).toBeVisible();
+  });
+
+  test('connected dashboard sync errors are visible and manually recoverable', async ({ page }) => {
+    await mockConnectedSyncFailure(page);
+    await ensureFeedVisible(page);
+    await page.getByRole('button', { name: 'Settings' }).click();
+
+    const dashboardSync = page.locator('.section-card').filter({ hasText: 'Dashboard connecté' });
+    await expect(dashboardSync).toBeVisible();
+    await expect(dashboardSync.getByText('Action requise')).toBeVisible();
+    await expect(dashboardSync.getByText('Missions', { exact: true })).toBeVisible();
+    await expect(dashboardSync.getByText('remote-error: Supabase indisponible')).toBeVisible();
+    await expect(dashboardSync.getByText(/Retry après/)).toBeVisible();
+    await expect(
+      dashboardSync.locator('p').filter({ hasText: 'Upload:' }).filter({ hasText: '2' })
+    ).toBeVisible();
+
+    await dashboardSync.getByRole('button', { name: 'Retenter la sync' }).click();
+
+    await expect(page.getByText('Synchronisation dashboard relancée')).toBeVisible();
+    await expect(dashboardSync.getByText('Connecté', { exact: true })).toBeVisible();
+    await expect(dashboardSync.getByText('Synchronisé', { exact: true })).toBeVisible();
+    await expect(dashboardSync.getByText('remote-error: Supabase indisponible')).not.toBeVisible();
   });
 });
