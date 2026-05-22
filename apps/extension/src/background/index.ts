@@ -13,6 +13,8 @@ import type {
 } from '../lib/shell/messaging/bridge';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { AuthUser } from '../lib/core/types/auth';
+import type { Mission } from '../lib/core/types/mission';
+import type { MissionDuplicateRelation } from '../lib/core/scoring/dedup';
 import {
   DEFAULT_SETTINGS,
   getFeedSortBy,
@@ -94,6 +96,107 @@ if (import.meta.env.DEV) {
 
 type LinkedInProfilePreviewMessage = Extract<BridgeMessage, { type: 'LINKEDIN_PROFILE_PREVIEWED' }>;
 type LinkedInProfileImportMessage = Extract<BridgeMessage, { type: 'LINKEDIN_PROFILE_IMPORTED' }>;
+
+const CONNECTED_DASHBOARD_RETRY_SNAPSHOT_KEY = 'connectedDashboardRetrySnapshot';
+
+type StoredMission = Omit<Mission, 'scrapedAt'> & { scrapedAt: string };
+
+type ConnectedDashboardRetrySnapshot = {
+  sourceMissions: StoredMission[];
+  duplicateRelations: MissionDuplicateRelation[];
+};
+
+function serializeMissionForRetry(mission: Mission): StoredMission {
+  return {
+    ...mission,
+    scrapedAt: mission.scrapedAt.toISOString(),
+  };
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null;
+}
+
+function parseStoredMission(value: unknown): Mission | null {
+  if (
+    !isRecord(value) ||
+    typeof value.id !== 'string' ||
+    typeof value.title !== 'string' ||
+    typeof value.description !== 'string' ||
+    !Array.isArray(value.stack) ||
+    typeof value.url !== 'string' ||
+    typeof value.source !== 'string' ||
+    typeof value.scrapedAt !== 'string'
+  ) {
+    return null;
+  }
+
+  const scrapedAtMs = Date.parse(value.scrapedAt);
+  if (!Number.isFinite(scrapedAtMs)) {
+    return null;
+  }
+
+  return {
+    ...(value as unknown as StoredMission),
+    scrapedAt: new Date(scrapedAtMs),
+  };
+}
+
+function parseDuplicateRelation(value: unknown): MissionDuplicateRelation | null {
+  if (
+    !isRecord(value) ||
+    typeof value.canonicalMissionId !== 'string' ||
+    typeof value.duplicateMissionId !== 'string' ||
+    typeof value.confidence !== 'number' ||
+    typeof value.reason !== 'string'
+  ) {
+    return null;
+  }
+
+  return {
+    canonicalMissionId: value.canonicalMissionId,
+    duplicateMissionId: value.duplicateMissionId,
+    confidence: value.confidence,
+    reason: value.reason,
+  };
+}
+
+async function saveConnectedDashboardRetrySnapshot(input: {
+  sourceMissions: Mission[];
+  duplicateRelations: MissionDuplicateRelation[];
+}): Promise<void> {
+  const snapshot: ConnectedDashboardRetrySnapshot = {
+    sourceMissions: input.sourceMissions.map(serializeMissionForRetry),
+    duplicateRelations: [...input.duplicateRelations],
+  };
+  await chrome.storage.local.set({ [CONNECTED_DASHBOARD_RETRY_SNAPSHOT_KEY]: snapshot });
+}
+
+async function loadConnectedDashboardRetrySnapshot(): Promise<{
+  sourceMissions: Mission[];
+  duplicateRelations: MissionDuplicateRelation[];
+}> {
+  const stored = await chrome.storage.local.get(CONNECTED_DASHBOARD_RETRY_SNAPSHOT_KEY);
+  const snapshot = stored[CONNECTED_DASHBOARD_RETRY_SNAPSHOT_KEY];
+  if (!isRecord(snapshot)) {
+    return { sourceMissions: [], duplicateRelations: [] };
+  }
+
+  return {
+    sourceMissions: Array.isArray(snapshot.sourceMissions)
+      ? snapshot.sourceMissions.flatMap((mission) => {
+          const parsed = parseStoredMission(mission);
+          return parsed ? [parsed] : [];
+        })
+      : [],
+    duplicateRelations: Array.isArray(snapshot.duplicateRelations)
+      ? snapshot.duplicateRelations.flatMap((relation) => {
+          const parsed = parseDuplicateRelation(relation);
+          return parsed ? [parsed] : [];
+        })
+      : [],
+  };
+}
 
 function buildAuthUserFromProfile(
   user: { id: string; email?: string | null },
@@ -435,9 +538,12 @@ async function syncConnectedDashboardFromLocalState() {
     getAllTrackings(),
     loadConnectorHealthSnapshots(),
   ]);
+  const retrySnapshot = await loadConnectedDashboardRetrySnapshot();
   const generatedAssetsByMissionId = await loadGeneratedAssetsByMissionId(trackings);
   return syncConnectedDashboardSnapshot({
     missions,
+    sourceMissions: retrySnapshot.sourceMissions,
+    duplicateRelations: retrySnapshot.duplicateRelations,
     trackings,
     generatedAssetsByMissionId,
     healthSnapshots,
@@ -484,6 +590,15 @@ async function persistScanResults(
     await saveConnectorStatuses(persistedStatuses);
   } catch {
     /* Non-critical: status persistence */
+  }
+
+  try {
+    await saveConnectedDashboardRetrySnapshot({
+      sourceMissions: result.sourceMissions ?? missions,
+      duplicateRelations: result.duplicateRelations ?? [],
+    });
+  } catch {
+    /* Non-critical: retry snapshot */
   }
 
   try {

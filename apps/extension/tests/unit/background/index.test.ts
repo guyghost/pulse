@@ -382,6 +382,24 @@ describe('background auto-scan notifications', () => {
   it('handles explicit connected dashboard retry messages', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
+      connectedDashboardRetrySnapshot: {
+        sourceMissions: [
+          {
+            ...makeMission({ id: 'mission-duplicate', source: 'lehibou' }),
+            scrapedAt: '2026-01-01T00:00:00.000Z',
+          },
+        ],
+        duplicateRelations: [
+          {
+            canonicalMissionId: 'mission-1',
+            duplicateMissionId: 'mission-duplicate',
+            confidence: 0.92,
+            reason: 'same-client-title',
+          },
+        ],
+      },
+    });
 
     const handled = messageListener?.({ type: 'RETRY_CONNECTED_SYNC' }, {}, sendResponse);
     await new Promise((resolve) => setTimeout(resolve, 0));
@@ -391,6 +409,20 @@ describe('background auto-scan notifications', () => {
     expect(getAllTrackings).toHaveBeenCalled();
     expect(syncConnectedDashboardSnapshot).toHaveBeenCalledWith({
       missions: [expect.objectContaining({ id: 'mission-1' })],
+      sourceMissions: [
+        expect.objectContaining({
+          id: 'mission-duplicate',
+          scrapedAt: new Date('2026-01-01T00:00:00.000Z'),
+        }),
+      ],
+      duplicateRelations: [
+        {
+          canonicalMissionId: 'mission-1',
+          duplicateMissionId: 'mission-duplicate',
+          confidence: 0.92,
+          reason: 'same-client-title',
+        },
+      ],
       trackings: [],
       generatedAssetsByMissionId: new Map(),
       healthSnapshots: [],
