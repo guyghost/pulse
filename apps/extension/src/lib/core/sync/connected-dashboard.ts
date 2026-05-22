@@ -360,10 +360,11 @@ export function remoteCandidateProfileToUserProfile(
     snapshot.title.trim() ||
     existingProfile?.jobTitle.trim() ||
     'Freelance tech';
+  const dashboardSkills = normalizeSkillList(snapshot.skills);
 
   return {
     firstName,
-    stack: normalizeSkillList(snapshot.skills),
+    stack: dashboardSkills.length > 0 ? dashboardSkills : [...(existingProfile?.stack ?? [])],
     tjmMin,
     tjmMax,
     location: snapshot.location?.trim() || existingProfile?.location || '',

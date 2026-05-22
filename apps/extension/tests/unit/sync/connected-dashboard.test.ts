@@ -747,6 +747,37 @@ describe('connected dashboard sync payload builders', () => {
     });
   });
 
+  it('preserves the local scoring stack when the dashboard profile has no skills yet', () => {
+    expect(
+      remoteCandidateProfileToUserProfile(
+        {
+          id: 'profile-1',
+          title: 'Architecte Frontend',
+          summary: '',
+          location: 'Paris',
+          target_role: null,
+          tjm_min: 650,
+          tjm_max: 900,
+          remote_preference: 'hybrid',
+          seniority: 'senior',
+          updated_at: '2026-05-22T08:00:00.000Z',
+          skills: [],
+        },
+        {
+          firstName: 'Guy',
+          stack: ['Svelte', 'TypeScript'],
+          tjmMin: 500,
+          tjmMax: 700,
+          location: 'Lyon',
+          remote: 'full',
+          seniority: 'confirmed',
+          jobTitle: 'Développeur frontend',
+          searchKeywords: ['mission svelte'],
+        }
+      ).stack
+    ).toEqual(['Svelte', 'TypeScript']);
+  });
+
   it('builds local tracking records from remote dashboard applications', () => {
     const remoteApplication: RemoteApplicationSnapshot = {
       id: 'application-1',
