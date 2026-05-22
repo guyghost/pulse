@@ -208,6 +208,17 @@
     applied: 'Appliquée',
     dismissed: 'Ignorée',
   };
+  const remotePreferenceLabels: Record<NonNullable<CvSnapshot['remotePreference']>, string> = {
+    full: 'Remote',
+    hybrid: 'Hybride',
+    onsite: 'Sur site',
+    any: 'Indifférent',
+  };
+  const seniorityLabels: Record<NonNullable<CvSnapshot['seniority']>, string> = {
+    junior: 'Junior',
+    confirmed: 'Confirmé',
+    senior: 'Senior',
+  };
 
   const featureAreaLabels: Record<DashboardFeatureArea, string> = {
     missions: 'Missions',
@@ -1554,6 +1565,37 @@
               Dernière mise à jour : {formatDate(cv.updatedAt)}
             </p>
 
+            <div class="mt-4 grid gap-2 text-xs sm:grid-cols-2">
+              <div class="rounded-lg bg-page-canvas px-3 py-2">
+                <p class="text-text-muted">Localisation</p>
+                <p class="mt-1 font-medium text-text-primary">
+                  {cv.location || 'Non renseignée'}
+                </p>
+              </div>
+              <div class="rounded-lg bg-page-canvas px-3 py-2">
+                <p class="text-text-muted">TJM cible</p>
+                <p class="mt-1 font-medium text-text-primary">
+                  {cv.tjmMin !== null || cv.tjmMax !== null
+                    ? `${cv.tjmMin ?? 0}€ - ${cv.tjmMax ?? 5000}€`
+                    : 'Non renseigné'}
+                </p>
+              </div>
+              <div class="rounded-lg bg-page-canvas px-3 py-2">
+                <p class="text-text-muted">Remote</p>
+                <p class="mt-1 font-medium text-text-primary">
+                  {cv.remotePreference
+                    ? remotePreferenceLabels[cv.remotePreference]
+                    : 'Non renseigné'}
+                </p>
+              </div>
+              <div class="rounded-lg bg-page-canvas px-3 py-2">
+                <p class="text-text-muted">Séniorité</p>
+                <p class="mt-1 font-medium text-text-primary">
+                  {cv.seniority ? seniorityLabels[cv.seniority] : 'Non renseignée'}
+                </p>
+              </div>
+            </div>
+
             {#if form?.cvError}
               <p
                 class="mt-4 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
@@ -1606,6 +1648,71 @@
                   value={cv.summary}
                 ></textarea>
               </label>
+              <div class="mt-3 grid gap-3 sm:grid-cols-2">
+                <label class="block text-xs font-medium text-text-subtle" for="cv-location">
+                  Localisation
+                  <input
+                    id="cv-location"
+                    name="location"
+                    value={cv.location}
+                    maxlength="120"
+                    class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                  />
+                </label>
+                <label class="block text-xs font-medium text-text-subtle" for="cv-remote">
+                  Remote
+                  <select
+                    id="cv-remote"
+                    name="remotePreference"
+                    value={cv.remotePreference ?? ''}
+                    class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                  >
+                    <option value="">Non renseigné</option>
+                    <option value="full">Remote</option>
+                    <option value="hybrid">Hybride</option>
+                    <option value="onsite">Sur site</option>
+                    <option value="any">Indifférent</option>
+                  </select>
+                </label>
+                <label class="block text-xs font-medium text-text-subtle" for="cv-tjm-min">
+                  TJM minimum
+                  <input
+                    id="cv-tjm-min"
+                    name="tjmMin"
+                    type="number"
+                    min="0"
+                    max="5000"
+                    value={cv.tjmMin ?? ''}
+                    class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                  />
+                </label>
+                <label class="block text-xs font-medium text-text-subtle" for="cv-tjm-max">
+                  TJM maximum
+                  <input
+                    id="cv-tjm-max"
+                    name="tjmMax"
+                    type="number"
+                    min="0"
+                    max="5000"
+                    value={cv.tjmMax ?? ''}
+                    class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                  />
+                </label>
+                <label class="block text-xs font-medium text-text-subtle" for="cv-seniority">
+                  Séniorité
+                  <select
+                    id="cv-seniority"
+                    name="seniority"
+                    value={cv.seniority ?? ''}
+                    class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none focus:border-blueprint-blue/40"
+                  >
+                    <option value="">Non renseignée</option>
+                    <option value="junior">Junior</option>
+                    <option value="confirmed">Confirmé</option>
+                    <option value="senior">Senior</option>
+                  </select>
+                </label>
+              </div>
               <button
                 type="submit"
                 class="mt-3 inline-flex h-8 items-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-40"

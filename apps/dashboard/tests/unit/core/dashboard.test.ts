@@ -126,6 +126,11 @@ const cv: CvSnapshot = {
   updatedAt: '2026-05-12T08:30:00.000Z',
   completeness: 84,
   targetRole: 'Lead Frontend Svelte / TypeScript',
+  location: 'Paris',
+  tjmMin: 650,
+  tjmMax: 900,
+  remotePreference: 'hybrid',
+  seniority: 'senior',
   skills: ['Svelte 5', 'TypeScript'],
   experiences: [],
   education: [],
@@ -941,6 +946,11 @@ describe('dashboard core', () => {
           updated_at: '2026-05-21T08:00:00.000Z',
           completeness: 82,
           target_role: 'Lead Svelte',
+          location: 'Paris',
+          tjm_min: 650,
+          tjm_max: 900,
+          remote_preference: 'hybrid',
+          seniority: 'senior',
         },
         [{ skill: 'Svelte' }, { skill: 'TypeScript' }],
         [
@@ -1009,6 +1019,11 @@ describe('dashboard core', () => {
       updatedAt: '2026-05-21T08:00:00.000Z',
       completeness: 82,
       targetRole: 'Lead Svelte',
+      location: 'Paris',
+      tjmMin: 650,
+      tjmMax: 900,
+      remotePreference: 'hybrid',
+      seniority: 'senior',
       skills: ['Svelte', 'TypeScript'],
       experiences: [
         {
@@ -1066,6 +1081,11 @@ describe('dashboard core', () => {
       updatedAt: '2026-05-22T12:00:00.000Z',
       completeness: 0,
       targetRole: '',
+      location: '',
+      tjmMin: null,
+      tjmMax: null,
+      remotePreference: null,
+      seniority: null,
       skills: [],
       experiences: [],
       education: [],
@@ -1085,6 +1105,11 @@ describe('dashboard core', () => {
           updated_at: '2026-05-22T08:00:00.000Z',
           completeness: 30,
           target_role: null,
+          location: null,
+          tjm_min: null,
+          tjm_max: null,
+          remote_preference: null,
+          seniority: null,
         },
         []
       ).targetRole
@@ -1474,24 +1499,44 @@ describe('dashboard core', () => {
       buildCvProfileUpdatePatch(
         '  Consultant Frontend Senior  ',
         '  Architecture Svelte, TypeScript et design systems.  ',
-        '  Lead Frontend Svelte  '
+        '  Lead Frontend Svelte  ',
+        '  Paris  ',
+        '650',
+        '900',
+        'hybrid',
+        'senior'
       )
     ).toEqual({
       title: 'Consultant Frontend Senior',
       summary: 'Architecture Svelte, TypeScript et design systems.',
       target_role: 'Lead Frontend Svelte',
+      location: 'Paris',
+      tjm_min: 650,
+      tjm_max: 900,
+      remote_preference: 'hybrid',
+      seniority: 'senior',
     });
 
     expect(buildCvProfileUpdatePatch('Profil', '', '')).toEqual({
       title: 'Profil',
       summary: '',
       target_role: null,
+      location: null,
+      tjm_min: null,
+      tjm_max: null,
+      remote_preference: null,
+      seniority: null,
     });
 
     expect(buildCvProfileUpdatePatch('', 'Résumé', 'Lead')).toBeNull();
     expect(buildCvProfileUpdatePatch('x'.repeat(121), '', '')).toBeNull();
     expect(buildCvProfileUpdatePatch('Profil', 'x'.repeat(4001), '')).toBeNull();
     expect(buildCvProfileUpdatePatch('Profil', '', 'x'.repeat(121))).toBeNull();
+    expect(buildCvProfileUpdatePatch('Profil', '', '', 'x'.repeat(121))).toBeNull();
+    expect(buildCvProfileUpdatePatch('Profil', '', '', '', '900', '650')).toBeNull();
+    expect(buildCvProfileUpdatePatch('Profil', '', '', '', 'abc', '')).toBeNull();
+    expect(buildCvProfileUpdatePatch('Profil', '', '', '', '', '', 'remote')).toBeNull();
+    expect(buildCvProfileUpdatePatch('Profil', '', '', '', '', '', '', 'expert')).toBeNull();
   });
 
   it('validates connected data deletion confirmation', () => {

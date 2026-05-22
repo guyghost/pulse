@@ -221,6 +221,11 @@ export interface CvSnapshot {
   updatedAt: string;
   completeness: number;
   targetRole: string;
+  location: string;
+  tjmMin: number | null;
+  tjmMax: number | null;
+  remotePreference: CvRemotePreference | null;
+  seniority: CvSeniority | null;
   skills: string[];
   experiences: CvExperience[];
   education: CvEducation[];
@@ -228,6 +233,9 @@ export interface CvSnapshot {
   imports: CvImport[];
   suggestions: CvFieldSuggestion[];
 }
+
+export type CvRemotePreference = 'full' | 'hybrid' | 'onsite' | 'any';
+export type CvSeniority = 'junior' | 'confirmed' | 'senior';
 
 export interface CvExperience {
   title: string;
@@ -440,6 +448,11 @@ export interface DashboardCandidateProfileRow {
   updated_at: string;
   completeness: number;
   target_role: string | null;
+  location: string | null;
+  tjm_min: number | null;
+  tjm_max: number | null;
+  remote_preference: string | null;
+  seniority: string | null;
 }
 
 export interface DashboardCandidateSkillRow {
@@ -568,6 +581,11 @@ export interface CvProfileUpdatePatch {
   title: string;
   summary: string;
   target_role: string | null;
+  location: string | null;
+  tjm_min: number | null;
+  tjm_max: number | null;
+  remote_preference: CvRemotePreference | null;
+  seniority: CvSeniority | null;
 }
 
 export interface ConnectedDataDeletionRequest {
@@ -722,6 +740,14 @@ function isCvFieldSuggestionField(value: unknown): value is CvFieldSuggestionFie
 
 function isCvFieldSuggestionStatus(value: unknown): value is CvFieldSuggestion['status'] {
   return value === 'pending' || value === 'applied' || value === 'dismissed';
+}
+
+function isCvRemotePreference(value: unknown): value is CvRemotePreference {
+  return value === 'full' || value === 'hybrid' || value === 'onsite' || value === 'any';
+}
+
+function isCvSeniority(value: unknown): value is CvSeniority {
+  return value === 'junior' || value === 'confirmed' || value === 'senior';
 }
 
 function isApplicationTimelineCreatedBy(value: unknown): value is ApplicationTimelineCreatedBy {
@@ -1200,6 +1226,13 @@ export function profileRowsToCvSnapshot(
     updatedAt: profile.updated_at,
     completeness: profile.completeness,
     targetRole: profile.target_role ?? '',
+    location: profile.location ?? '',
+    tjmMin: profile.tjm_min,
+    tjmMax: profile.tjm_max,
+    remotePreference: isCvRemotePreference(profile.remote_preference)
+      ? profile.remote_preference
+      : null,
+    seniority: isCvSeniority(profile.seniority) ? profile.seniority : null,
     skills: skills.map((item) => item.skill),
     experiences: experiences
       .filter((experience) => isApplicationSource(experience.source))
@@ -1285,6 +1318,11 @@ export function buildEmptyCvSnapshot(input: EmptyCvSnapshotInput): CvSnapshot {
     updatedAt: input.updatedAt,
     completeness: 0,
     targetRole: '',
+    location: '',
+    tjmMin: null,
+    tjmMax: null,
+    remotePreference: null,
+    seniority: null,
     skills: [],
     experiences: [],
     education: [],
@@ -1566,17 +1604,33 @@ export function buildApplicationDetailsUpdatePatch(
 export function buildCvProfileUpdatePatch(
   title: string,
   summary: string,
-  targetRole: string
+  targetRole: string,
+  location = '',
+  tjmMin = '',
+  tjmMax = '',
+  remotePreference = '',
+  seniority = ''
 ): CvProfileUpdatePatch | null {
   const normalizedTitle = title.trim();
   const normalizedSummary = summary.trim();
   const normalizedTargetRole = targetRole.trim();
+  const normalizedLocation = location.trim();
+  const parsedTjmMin = parseOptionalDailyRate(tjmMin);
+  const parsedTjmMax = parseOptionalDailyRate(tjmMax);
+  const normalizedRemotePreference = remotePreference.trim();
+  const normalizedSeniority = seniority.trim();
 
   if (
     normalizedTitle.length === 0 ||
     normalizedTitle.length > 120 ||
     normalizedSummary.length > 4000 ||
-    normalizedTargetRole.length > 120
+    normalizedTargetRole.length > 120 ||
+    normalizedLocation.length > 120 ||
+    parsedTjmMin === undefined ||
+    parsedTjmMax === undefined ||
+    (parsedTjmMin !== null && parsedTjmMax !== null && parsedTjmMin > parsedTjmMax) ||
+    (normalizedRemotePreference.length > 0 && !isCvRemotePreference(normalizedRemotePreference)) ||
+    (normalizedSeniority.length > 0 && !isCvSeniority(normalizedSeniority))
   ) {
     return null;
   }
@@ -1585,7 +1639,32 @@ export function buildCvProfileUpdatePatch(
     title: normalizedTitle,
     summary: normalizedSummary,
     target_role: normalizedTargetRole.length > 0 ? normalizedTargetRole : null,
+    location: normalizedLocation.length > 0 ? normalizedLocation : null,
+    tjm_min: parsedTjmMin,
+    tjm_max: parsedTjmMax,
+    remote_preference:
+      normalizedRemotePreference.length > 0 && isCvRemotePreference(normalizedRemotePreference)
+        ? normalizedRemotePreference
+        : null,
+    seniority:
+      normalizedSeniority.length > 0 && isCvSeniority(normalizedSeniority)
+        ? normalizedSeniority
+        : null,
   };
+}
+
+function parseOptionalDailyRate(value: string): number | null | undefined {
+  const trimmed = value.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isInteger(parsed) || parsed < 0 || parsed > 5000) {
+    return undefined;
+  }
+
+  return parsed;
 }
 
 export function buildConnectedDataDeletionRequest(

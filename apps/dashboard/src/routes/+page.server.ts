@@ -428,7 +428,9 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
   const { data: candidateProfile } = await supabase
     .from('candidate_profiles')
-    .select('id, title, summary, updated_at, completeness, target_role')
+    .select(
+      'id, title, summary, updated_at, completeness, target_role, location, tjm_min, tjm_max, remote_preference, seniority'
+    )
     .eq('user_id', session.user.id)
     .maybeSingle<DashboardCandidateProfileRow>();
 
@@ -1010,19 +1012,38 @@ export const actions: Actions = {
     const title = formData.get('title');
     const summary = formData.get('summary');
     const targetRole = formData.get('targetRole');
+    const location = formData.get('location');
+    const tjmMin = formData.get('tjmMin');
+    const tjmMax = formData.get('tjmMax');
+    const remotePreference = formData.get('remotePreference');
+    const seniority = formData.get('seniority');
 
     if (
       typeof title !== 'string' ||
       typeof summary !== 'string' ||
-      typeof targetRole !== 'string'
+      typeof targetRole !== 'string' ||
+      typeof location !== 'string' ||
+      typeof tjmMin !== 'string' ||
+      typeof tjmMax !== 'string' ||
+      typeof remotePreference !== 'string' ||
+      typeof seniority !== 'string'
     ) {
       return fail(400, { cvError: 'Profil CV invalide.' });
     }
 
-    const patch = buildCvProfileUpdatePatch(title, summary, targetRole);
+    const patch = buildCvProfileUpdatePatch(
+      title,
+      summary,
+      targetRole,
+      location,
+      tjmMin,
+      tjmMax,
+      remotePreference,
+      seniority
+    );
     if (!patch) {
       return fail(400, {
-        cvError: 'Titre requis. Résumé et rôle cible trop longs refusés.',
+        cvError: 'Profil CV invalide: titre, TJM, localisation ou préférences hors limites.',
       });
     }
 
