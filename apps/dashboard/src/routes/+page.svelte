@@ -1384,6 +1384,31 @@
                           </p>
                         </div>
                       </div>
+                      <form
+                        method="POST"
+                        action="?/resolveCvSuggestion"
+                        class="mt-3 flex flex-wrap gap-2 border-t border-border-light pt-3"
+                      >
+                        <input type="hidden" name="suggestionId" value={suggestion.id} />
+                        <button
+                          type="submit"
+                          name="resolutionAction"
+                          value="apply"
+                          class="inline-flex h-8 items-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-40"
+                          disabled={!isConnected}
+                        >
+                          Appliquer
+                        </button>
+                        <button
+                          type="submit"
+                          name="resolutionAction"
+                          value="dismiss"
+                          class="inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-surface-white/70 disabled:cursor-not-allowed disabled:opacity-40"
+                          disabled={!isConnected}
+                        >
+                          Ignorer
+                        </button>
+                      </form>
                     </article>
                   {/each}
                 </div>

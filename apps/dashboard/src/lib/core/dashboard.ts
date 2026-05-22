@@ -451,6 +451,36 @@ export interface ConnectedDataDeletionRequest {
   confirmation: 'SUPPRIMER';
 }
 
+export type CvFieldSuggestionResolutionAction = 'apply' | 'dismiss';
+
+export interface CvFieldSuggestionResolutionInput {
+  field: string;
+  suggestedValue: string | null;
+  action: CvFieldSuggestionResolutionAction;
+  resolvedAt: string;
+}
+
+export interface CvFieldSuggestionResolution {
+  suggestion: {
+    status: 'applied' | 'dismissed';
+    resolved_at: string;
+  };
+  profile:
+    | {
+        title: string;
+        updated_by: 'dashboard';
+      }
+    | {
+        summary: string;
+        updated_by: 'dashboard';
+      }
+    | {
+        target_role: string | null;
+        updated_by: 'dashboard';
+      }
+    | null;
+}
+
 export interface ApplicationFilters {
   query: string;
   source: 'all' | ApplicationSource;
@@ -1206,6 +1236,69 @@ export function buildConnectedDataDeletionRequest(
   return {
     confirmed: true,
     confirmation,
+  };
+}
+
+export function buildCvFieldSuggestionResolution(
+  input: CvFieldSuggestionResolutionInput
+): CvFieldSuggestionResolution | null {
+  if (!isCvFieldSuggestionField(input.field)) {
+    return null;
+  }
+
+  if (input.action === 'dismiss') {
+    return {
+      suggestion: {
+        status: 'dismissed',
+        resolved_at: input.resolvedAt,
+      },
+      profile: null,
+    };
+  }
+
+  if (input.action !== 'apply') {
+    return null;
+  }
+
+  if (input.field === 'title') {
+    if (!input.suggestedValue || input.suggestedValue.trim().length === 0) {
+      return null;
+    }
+
+    return {
+      suggestion: {
+        status: 'applied',
+        resolved_at: input.resolvedAt,
+      },
+      profile: {
+        title: input.suggestedValue.trim(),
+        updated_by: 'dashboard',
+      },
+    };
+  }
+
+  if (input.field === 'summary') {
+    return {
+      suggestion: {
+        status: 'applied',
+        resolved_at: input.resolvedAt,
+      },
+      profile: {
+        summary: input.suggestedValue?.trim() ?? '',
+        updated_by: 'dashboard',
+      },
+    };
+  }
+
+  return {
+    suggestion: {
+      status: 'applied',
+      resolved_at: input.resolvedAt,
+    },
+    profile: {
+      target_role: input.suggestedValue?.trim() || null,
+      updated_by: 'dashboard',
+    },
   };
 }
 

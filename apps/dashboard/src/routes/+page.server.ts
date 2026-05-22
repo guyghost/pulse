@@ -11,6 +11,7 @@ import {
   buildApplicationDetailsUpdatePatch,
   buildApplicationStageUpdatePatch,
   buildConnectedDataDeletionRequest,
+  buildCvFieldSuggestionResolution,
   buildCvProfileUpdatePatch,
   buildMissionSelectionInsertPatch,
   buildTjmRadarSnapshot,
@@ -337,6 +338,13 @@ type CvProfileEditRow = {
   revision: number;
 };
 
+type CvSuggestionResolutionRow = {
+  id: string;
+  profile_id: string;
+  field: string;
+  suggested_value: string | null;
+};
+
 type MissionSelectionRow = {
   id: string;
   title: string;
@@ -403,6 +411,9 @@ const getLoginUrl = (): string => {
 
 const isApplicationStage = (value: unknown): value is ApplicationStage =>
   APPLICATION_STAGES.includes(value as ApplicationStage);
+
+const isCvSuggestionResolutionAction = (value: unknown): value is 'apply' | 'dismiss' =>
+  value === 'apply' || value === 'dismiss';
 
 const deleteRowsByUserId = async (
   supabase: ReturnType<typeof createSupabaseServerClient>,
@@ -719,6 +730,110 @@ export const load: PageServerLoad = async ({ cookies }) => {
 };
 
 export const actions: Actions = {
+  resolveCvSuggestion: async ({ cookies, request }) => {
+    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+    if (!hasSupabaseConfig) {
+      return fail(503, { cvError: 'Configuration Supabase absente.' });
+    }
+
+    const supabase = createSupabaseServerClient(cookies);
+    const {
+      data: { session },
+    } = await supabase.auth.getSession();
+
+    if (!session) {
+      return fail(401, { cvError: 'Session requise.' });
+    }
+
+    const formData = await request.formData();
+    const suggestionId = formData.get('suggestionId');
+    const resolutionAction = formData.get('resolutionAction');
+
+    if (typeof suggestionId !== 'string' || !isCvSuggestionResolutionAction(resolutionAction)) {
+      return fail(400, { cvError: 'Suggestion CV invalide.' });
+    }
+
+    const { data: suggestion, error: suggestionError } = await supabase
+      .from('candidate_profile_field_suggestions')
+      .select('id, profile_id, field, suggested_value')
+      .eq('id', suggestionId)
+      .eq('user_id', session.user.id)
+      .eq('status', 'pending')
+      .single<CvSuggestionResolutionRow>();
+
+    if (suggestionError || !suggestion) {
+      return fail(404, { cvError: 'Suggestion CV introuvable.' });
+    }
+
+    const resolvedAt = new Date().toISOString();
+    const resolution = buildCvFieldSuggestionResolution({
+      field: suggestion.field,
+      suggestedValue: suggestion.suggested_value,
+      action: resolutionAction,
+      resolvedAt,
+    });
+
+    if (!resolution) {
+      return fail(400, { cvError: 'Suggestion CV incompatible avec le champ cible.' });
+    }
+
+    if (resolution.profile) {
+      const { data: profile, error: profileError } = await supabase
+        .from('candidate_profiles')
+        .select('id, revision')
+        .eq('id', suggestion.profile_id)
+        .eq('user_id', session.user.id)
+        .single<CvProfileEditRow>();
+
+      if (profileError || !profile) {
+        return fail(404, { cvError: 'Profil CV introuvable.' });
+      }
+
+      const { error: profileUpdateError } = await supabase
+        .from('candidate_profiles')
+        .update({
+          ...resolution.profile,
+          revision: profile.revision + 1,
+          updated_at: resolvedAt,
+        })
+        .eq('id', profile.id)
+        .eq('user_id', session.user.id)
+        .eq('revision', profile.revision)
+        .select('id')
+        .single<{ id: string }>();
+
+      if (profileUpdateError) {
+        if (profileUpdateError.code !== 'PGRST116') {
+          return fail(500, { cvError: "La suggestion n'a pas pu être appliquée." });
+        }
+
+        return fail(409, {
+          cvError: "Le profil CV a changé depuis l'ouverture de la page. Rechargez avant d'éditer.",
+        });
+      }
+    }
+
+    const { error: suggestionUpdateError } = await supabase
+      .from('candidate_profile_field_suggestions')
+      .update(resolution.suggestion)
+      .eq('id', suggestion.id)
+      .eq('user_id', session.user.id)
+      .eq('status', 'pending')
+      .select('id')
+      .single<{ id: string }>();
+
+    if (suggestionUpdateError) {
+      return fail(500, { cvError: "La suggestion n'a pas pu être marquée comme traitée." });
+    }
+
+    return {
+      cvSuccess:
+        resolution.suggestion.status === 'applied'
+          ? 'Suggestion CV appliquée.'
+          : 'Suggestion CV ignorée.',
+    };
+  },
+
   deleteConnectedData: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {

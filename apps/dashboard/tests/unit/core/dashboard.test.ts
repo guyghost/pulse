@@ -5,6 +5,7 @@ import {
   buildApplicationDetailsUpdatePatch,
   buildCvProfileUpdatePatch,
   buildConnectedDataDeletionRequest,
+  buildCvFieldSuggestionResolution,
   buildTjmRadarSnapshot,
   filterApplications,
   favoriteMissionToApplication,
@@ -1041,5 +1042,75 @@ describe('dashboard core', () => {
 
     expect(buildConnectedDataDeletionRequest(' supprimer ')).toBeNull();
     expect(buildConnectedDataDeletionRequest('DELETE')).toBeNull();
+  });
+
+  it('builds validated CV suggestion resolution patches', () => {
+    expect(
+      buildCvFieldSuggestionResolution({
+        field: 'summary',
+        suggestedValue: 'Résumé importé',
+        action: 'apply',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toEqual({
+      suggestion: {
+        status: 'applied',
+        resolved_at: '2026-05-22T10:00:00.000Z',
+      },
+      profile: {
+        summary: 'Résumé importé',
+        updated_by: 'dashboard',
+      },
+    });
+
+    expect(
+      buildCvFieldSuggestionResolution({
+        field: 'target_role',
+        suggestedValue: null,
+        action: 'apply',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toEqual({
+      suggestion: {
+        status: 'applied',
+        resolved_at: '2026-05-22T10:00:00.000Z',
+      },
+      profile: {
+        target_role: null,
+        updated_by: 'dashboard',
+      },
+    });
+
+    expect(
+      buildCvFieldSuggestionResolution({
+        field: 'title',
+        suggestedValue: 'Titre ignoré',
+        action: 'dismiss',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toEqual({
+      suggestion: {
+        status: 'dismissed',
+        resolved_at: '2026-05-22T10:00:00.000Z',
+      },
+      profile: null,
+    });
+
+    expect(
+      buildCvFieldSuggestionResolution({
+        field: 'unknown',
+        suggestedValue: 'Valeur',
+        action: 'apply',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toBeNull();
+    expect(
+      buildCvFieldSuggestionResolution({
+        field: 'title',
+        suggestedValue: null,
+        action: 'apply',
+        resolvedAt: '2026-05-22T10:00:00.000Z',
+      })
+    ).toBeNull();
   });
 });
