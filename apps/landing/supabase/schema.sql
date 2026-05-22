@@ -477,7 +477,11 @@ create table if not exists public.generated_application_assets (
   content text not null,
   model text not null,
   credit_transaction_id uuid references public.credit_transactions(id) on delete set null,
+  revision bigint not null default 1 check (revision > 0),
+  updated_by text not null default 'extension'
+    check (updated_by in ('dashboard', 'extension', 'system')),
   created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
   unique (user_id, client_asset_id)
 );
 
@@ -878,6 +882,13 @@ create trigger on_missions_updated
 drop trigger if exists on_applications_updated on public.applications;
 create trigger on_applications_updated
   before update on public.applications
+  for each row
+  execute function public.update_updated_at();
+
+drop trigger if exists on_generated_application_assets_updated
+  on public.generated_application_assets;
+create trigger on_generated_application_assets_updated
+  before update on public.generated_application_assets
   for each row
   execute function public.update_updated_at();
 

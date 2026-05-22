@@ -109,6 +109,8 @@ export interface GeneratedApplicationAssetUpsertRow {
   type: GeneratedApplicationAssetType;
   content: string;
   model: string;
+  revision: number;
+  updated_by: 'extension';
   created_at: string;
 }
 
@@ -647,6 +649,8 @@ export function buildGeneratedApplicationAssetUpsertRow(
     type: GENERATED_ASSET_TYPE_MAP[asset.type],
     content: asset.content,
     model: asset.modelUsed,
+    revision: 1,
+    updated_by: 'extension',
     created_at: createdAt,
   };
 }

@@ -814,6 +814,8 @@ describe('connected dashboard shell sync', () => {
         type: 'cover_message',
         content: 'Message de candidature',
         model: 'gemini-nano',
+        revision: 1,
+        updated_by: 'extension',
         created_at: '2026-05-21T12:00:00.000Z',
       },
     ]);

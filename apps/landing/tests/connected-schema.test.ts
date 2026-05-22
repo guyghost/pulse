@@ -61,6 +61,11 @@ describe('connected dashboard schema', () => {
       "field in ('title', 'summary', 'location', 'target_role')"
     );
     expect(tableBlock('generated_application_assets')).toContain('client_asset_id text not null');
+    expect(tableBlock('generated_application_assets')).toContain('revision bigint not null');
+    expect(tableBlock('generated_application_assets')).toContain('updated_by text not null');
+    expect(tableBlock('generated_application_assets')).toContain(
+      'updated_at timestamptz not null default now()'
+    );
     expect(tableBlock('sync_status')).toContain("'alert_preferences'");
     expect(tableBlock('dashboard_alert_preferences')).toContain('score_threshold integer');
     expect(tableBlock('dashboard_alert_preferences')).toContain('required_stacks text[]');
