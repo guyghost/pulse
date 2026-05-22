@@ -79,6 +79,8 @@ const tracking: MissionTracking = {
   nextActionAt: '2026-05-24T09:00:00.000Z',
 };
 
+const formatTimestamp = (timestamp: number): string => new Date(timestamp).toISOString();
+
 const linkedinDraft: CanonicalCandidateProfileDraft = {
   title: 'Lead Frontend Svelte',
   summary: 'Consultant frontend senior.',
@@ -217,7 +219,8 @@ describe('connected dashboard sync payload builders', () => {
         'user-1',
         '9af09db6-e3ea-45c7-8d8a-6bb71dfb4c34',
         3,
-        'extension'
+        'extension',
+        formatTimestamp
       )
     ).toEqual({
       user_id: 'user-1',
@@ -240,7 +243,8 @@ describe('connected dashboard sync payload builders', () => {
         'user-1',
         'application-1',
         'extension',
-        'install-1'
+        'install-1',
+        formatTimestamp
       )
     ).toEqual([
       {

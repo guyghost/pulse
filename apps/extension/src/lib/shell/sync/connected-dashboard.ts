@@ -336,6 +336,10 @@ function buildRetryAfterAt(now: Date): Date {
   return new Date(now.getTime() + SYNC_RETRY_DELAY_MS);
 }
 
+function formatEpochMs(timestamp: number): string {
+  return new Date(timestamp).toISOString();
+}
+
 async function markConnectedDashboardSynced(now: Date): Promise<void> {
   try {
     await chrome.storage.local.set({ lastGlobalSync: now.getTime() });
@@ -990,7 +994,8 @@ export async function pushApplicationsToConnectedDashboard(
                 input.userId,
                 remoteMissionId,
                 Math.max(1, tracking.history.length),
-                'extension'
+                'extension',
+                formatEpochMs
               ),
             },
           ]
@@ -1023,7 +1028,8 @@ export async function pushApplicationsToConnectedDashboard(
             input.userId,
             applicationId,
             'extension',
-            input.installId
+            input.installId,
+            formatEpochMs
           )
         : [];
     });

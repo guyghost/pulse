@@ -92,6 +92,8 @@ export interface ApplicationPipelineEventRow {
   client_event_id: string;
 }
 
+export type TimestampFormatter = (timestamp: number) => string;
+
 export type GeneratedApplicationAssetType = 'pitch' | 'cover_message' | 'cv_summary';
 
 export interface GeneratedApplicationAssetUpsertRow {
@@ -478,9 +480,13 @@ export function buildMissionDuplicateUpsertRows(
   });
 }
 
-function firstTransitionTo(tracking: MissionTracking, stage: ApplicationStage): string | null {
+function firstTransitionTo(
+  tracking: MissionTracking,
+  stage: ApplicationStage,
+  formatTimestamp: TimestampFormatter
+): string | null {
   const transition = tracking.history.find((item) => item.to === stage);
-  return transition ? new Date(transition.timestamp).toISOString() : null;
+  return transition ? formatTimestamp(transition.timestamp) : null;
 }
 
 export function buildApplicationUpsertRow(
@@ -488,7 +494,8 @@ export function buildApplicationUpsertRow(
   userId: string,
   remoteMissionId: string,
   revision: number,
-  updatedBy: ApplicationEventCreator
+  updatedBy: ApplicationEventCreator,
+  formatTimestamp: TimestampFormatter
 ): ApplicationUpsertRow {
   return {
     user_id: userId,
@@ -497,8 +504,8 @@ export function buildApplicationUpsertRow(
     user_rating: tracking.userRating,
     notes: tracking.notes,
     next_action_at: tracking.nextActionAt ?? null,
-    applied_at: firstTransitionTo(tracking, 'applied'),
-    archived_at: firstTransitionTo(tracking, 'archived'),
+    applied_at: firstTransitionTo(tracking, 'applied', formatTimestamp),
+    archived_at: firstTransitionTo(tracking, 'archived', formatTimestamp),
     revision,
     updated_by: updatedBy,
   };
@@ -509,7 +516,8 @@ export function buildApplicationPipelineEventRows(
   userId: string,
   applicationId: string,
   createdBy: ApplicationEventCreator,
-  clientEventPrefix: string
+  clientEventPrefix: string,
+  formatTimestamp: TimestampFormatter
 ): ApplicationPipelineEventRow[] {
   return tracking.history.map((transition) => ({
     user_id: userId,
@@ -518,7 +526,7 @@ export function buildApplicationPipelineEventRows(
     to_stage: transition.to,
     note: transition.note,
     metadata: { localMissionId: tracking.missionId },
-    occurred_at: new Date(transition.timestamp).toISOString(),
+    occurred_at: formatTimestamp(transition.timestamp),
     created_by: createdBy,
     client_event_id: [
       clientEventPrefix,
