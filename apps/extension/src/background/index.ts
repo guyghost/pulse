@@ -726,6 +726,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               generatedAssetIds: [],
               userRating: null,
               notes: '',
+              nextActionAt: null,
             },
           });
         }

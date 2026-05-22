@@ -93,6 +93,24 @@
     }).format(new Date(timestamp));
   }
 
+  function formatNextAction(nextActionAt: string | null | undefined): string | null {
+    if (!nextActionAt) {
+      return null;
+    }
+
+    const timestamp = Date.parse(nextActionAt);
+    if (!Number.isFinite(timestamp)) {
+      return null;
+    }
+
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(timestamp));
+  }
+
   async function loadAssets(missionId: string): Promise<void> {
     try {
       const response = await sendMessage({
@@ -243,9 +261,10 @@
                 >
                   {STATUS_LABELS[item.record?.currentStatus ?? 'detected']}
                 </span>
-                <span class="text-[10px] text-text-muted"
-                  >{formatDate(getLastActivity(item.record))}</span
-                >
+                <span class="text-[10px] text-text-muted">
+                  {formatNextAction(item.record?.nextActionAt) ??
+                    formatDate(getLastActivity(item.record))}
+                </span>
               </div>
             </button>
           {/each}
@@ -266,6 +285,14 @@
                 <p class="mt-1 text-xs leading-5 text-text-subtle">
                   {formatMissionMeta(selectedMission)}
                 </p>
+                {#if formatNextAction(selectedTracking?.nextActionAt)}
+                  <p
+                    class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2 py-1 text-[11px] font-medium text-blueprint-blue"
+                  >
+                    <Icon name="calendar-clock" size={12} />
+                    Prochaine action {formatNextAction(selectedTracking?.nextActionAt)}
+                  </p>
+                {/if}
               </div>
               <a
                 href={selectedMission.url}

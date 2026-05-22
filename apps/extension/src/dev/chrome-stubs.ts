@@ -55,6 +55,7 @@ function createChromeStubs() {
                 generatedAssetIds: [],
                 userRating: null,
                 notes: '',
+                nextActionAt: null,
               },
             };
           }
