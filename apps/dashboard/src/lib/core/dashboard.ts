@@ -2377,8 +2377,24 @@ export const getReadyCvSyncPlatforms = (statuses: PlatformSyncStatus[]): Platfor
   );
 };
 
+function getCvSyncPlatformStatuses(statuses: PlatformSyncStatus[]): PlatformSyncStatus[] {
+  const statusesBySource = new Map(statuses.map((status) => [status.id, status]));
+
+  return CV_SYNC_PLATFORM_SOURCES.map(
+    (source) =>
+      statusesBySource.get(source) ?? {
+        id: source,
+        name: SOURCE_LABELS[source],
+        status: 'needs-extension',
+        lastSyncAt: null,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+      }
+  );
+}
+
 export const getCvSyncReadiness = (cv: CvSnapshot, statuses: PlatformSyncStatus[]) => {
-  const readyPlatforms = getReadyCvSyncPlatforms(statuses).length;
+  const readyPlatforms = getReadyCvSyncPlatforms(getCvSyncPlatformStatuses(statuses)).length;
 
   return {
     readyPlatforms,
@@ -2389,12 +2405,13 @@ export const getCvSyncReadiness = (cv: CvSnapshot, statuses: PlatformSyncStatus[
 
 export const getSyncBlockers = (cv: CvSnapshot, statuses: PlatformSyncStatus[]) => {
   const blockers: string[] = [];
+  const cvSyncStatuses = getCvSyncPlatformStatuses(statuses);
 
   if (cv.completeness < 80) {
     blockers.push('Compléter le CV à 80% minimum');
   }
 
-  statuses.forEach((status) => {
+  cvSyncStatuses.forEach((status) => {
     if (status.status === 'needs-session') {
       blockers.push(`Reconnecter la session ${status.name}`);
     }

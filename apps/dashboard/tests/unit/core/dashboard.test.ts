@@ -358,11 +358,29 @@ describe('dashboard core', () => {
     expect(getReadyCvSyncPlatforms(missionOnlyStatuses)).toEqual([]);
   });
 
-  it('lists actionable sync blockers', () => {
-    expect(getSyncBlockers(cv, syncStatuses)).toEqual([
-      'Reconnecter la session Free-Work',
-      "Activer le connecteur Malt dans l'extension",
-    ]);
+  it('lists actionable CV sync blockers from LinkedIn extractor status only', () => {
+    expect(getSyncBlockers(cv, syncStatuses)).toEqual([]);
+
+    expect(
+      getSyncBlockers(cv, [
+        {
+          id: 'free-work',
+          name: 'Free-Work',
+          status: 'needs-session',
+          lastSyncAt: null,
+          lastErrorCode: 'session_required',
+          lastErrorMessage: 'Connexion Free-Work expirée.',
+        },
+        {
+          id: 'linkedin',
+          name: 'LinkedIn',
+          status: 'needs-permission',
+          lastSyncAt: null,
+          lastErrorCode: 'permission_required',
+          lastErrorMessage: 'Permission LinkedIn manquante.',
+        },
+      ])
+    ).toEqual(["Autoriser LinkedIn dans l'extension"]);
 
     expect(getSyncBlockers({ ...cv, completeness: 60 }, [syncStatuses[0]])).toEqual([
       'Compléter le CV à 80% minimum',
