@@ -540,4 +540,88 @@ describe('connected dashboard shell sync', () => {
       })
     );
   });
+
+  it('covers scan push followed by dashboard application pull in one connected flow', async () => {
+    const gateway = createGateway();
+    const now = new Date('2026-05-21T09:00:00.000Z');
+
+    const pushedMissions = await pushMissionsToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      missions: [mission],
+      now,
+      scorerVersion: 'missionpulse-v1',
+    });
+
+    expect(pushedMissions.ok).toBe(true);
+    if (!pushedMissions.ok) {
+      return;
+    }
+
+    const pushedApplications = await pushApplicationsToConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      installId: 'install-1',
+      trackings: [tracking],
+      remoteMissionIds: pushedMissions.value.remoteMissionIds,
+      now,
+    });
+
+    expect(pushedApplications).toEqual({
+      ok: true,
+      value: { pushedCount: 1, skippedCount: 0 },
+    });
+
+    const remoteMissionId = pushedMissions.value.remoteMissionIds.get(mission.id);
+    expect(remoteMissionId).toBe('remote-mission-1');
+
+    const pulledApplications = await pullApplicationsFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      localMissionIdsByRemoteId: new Map([[remoteMissionId ?? '', mission.id]]),
+      existingTrackings: new Map([[tracking.missionId, tracking]]),
+      since: null,
+      now: new Date('2026-05-21T12:00:00.000Z'),
+    });
+
+    expect(pulledApplications).toEqual({
+      ok: true,
+      value: {
+        pulledCount: 1,
+        skippedCount: 0,
+        nextCursor: '2026-05-21T11:00:00.000Z',
+        trackings: [
+          {
+            ...tracking,
+            currentStatus: 'offer',
+            history: [
+              ...tracking.history,
+              {
+                from: 'selected',
+                to: 'offer',
+                timestamp: 1779364800000,
+                note: 'Sync dashboard revision 5',
+              },
+            ],
+            userRating: 5,
+            notes: 'Offre reçue',
+          },
+        ],
+      },
+    });
+    expect(gateway.upsertMissions).toHaveBeenCalledWith([
+      expect.objectContaining({ external_id: 'free-work-123' }),
+    ]);
+    expect(gateway.upsertApplications).toHaveBeenCalledWith([
+      expect.objectContaining({ mission_id: 'remote-mission-1', stage: 'selected' }),
+    ]);
+    expect(gateway.upsertApplicationPipelineEvents).toHaveBeenCalledWith([
+      expect.objectContaining({ to_stage: 'detected' }),
+      expect.objectContaining({ to_stage: 'selected' }),
+    ]);
+    expect(gateway.listApplicationsUpdatedSince).toHaveBeenCalledWith({
+      userId: 'user-1',
+      since: null,
+    });
+  });
 });
