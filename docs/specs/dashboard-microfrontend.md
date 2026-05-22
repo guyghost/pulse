@@ -142,20 +142,26 @@ export function normalizePipelineEvent(
 - SvelteKit microfrontend package `@pulse/dashboard`.
 - Supabase SSR session bootstrap and redirect to landing login.
 - Account entitlements derived from `profiles`.
-- Data read from `favorite_missions` and converted to draft applications.
-- Mock CV and mock connector statuses.
-- UI sections for applications, CV, sync readiness, feature access.
+- Connected feed loaded from Supabase `missions`, `mission_scores`, `mission_duplicates`, and
+  `connector_health_events`.
+- Canonical applications loaded from Supabase `applications` with synchronized pipeline events,
+  generated application assets, next actions, notes, ratings, and stage transitions.
+- Canonical CV loaded from Supabase `candidate_profiles` plus experiences, education, skills,
+  links, import history, and field suggestions.
+- Sync status, connector health, alert preferences, and pending conflicts loaded from Supabase.
+- UI sections for mission feed, applications, comparison/shortlist, TJM radar, CV, sync readiness,
+  connector health, alert preferences, export, and connected-data deletion.
 - Pure dashboard helpers and unit tests in `src/lib/core/dashboard.ts`.
 
-Dashboard gaps:
+Dashboard implementation evidence:
 
-- No canonical Supabase model for missions, applications, CV, pipeline events, sync status, or connector health.
-- Applications are read from synced favorites only.
-- Current dashboard stage model is `draft | applied | interview | offer | rejected`, not the canonical pipeline.
-- No real CV editor/import history/profile source provenance.
-- No real connector health from Supabase.
-- No actions persist application stage changes.
-- No realtime or pull-based sync status.
+- `apps/dashboard/src/routes/+page.server.ts` reads and writes connected Supabase product tables.
+- `apps/dashboard/src/routes/+page.svelte` renders the connected product surface.
+- `apps/dashboard/tests/unit/core/dashboard.test.ts` covers dashboard view-model transforms.
+- `apps/dashboard/tests/unit/server/*.test.ts` covers Supabase write actions, conflict
+  resolution, sync status, export, and data deletion.
+- `apps/dashboard/tests/e2e/dashboard-smoke.test.ts` verifies the connected surfaces render even
+  without local Supabase configuration.
 
 ### Extension Current State
 
@@ -168,21 +174,27 @@ Dashboard gaps:
 - Local mission storage in IndexedDB.
 - Local tracking storage in IndexedDB.
 - Auth via Supabase JS and chrome.storage-backed session persistence.
-- Best-effort Supabase sync for favorite missions only.
-- Bridge handlers for scan, tracking, generated assets, auth, favorite sync, and connector health.
+- Supabase sync for missions, mission scores, duplicate relations, applications, pipeline events,
+  generated assets, canonical CV imports, sync status, alert preferences, conflicts, and connector
+  health.
+- Canonical shared application pipeline stages from `@pulse/domain`.
+- LinkedIn profile/CV extractor v1 with pure parser, shell connector, optional host permission,
+  `activeTab`, `scripting`, typed errors, preview, and Supabase import.
+- Bridge handlers for scan, tracking, generated assets, auth, favorite compatibility, connected
+  dashboard sync, LinkedIn preview/import, and connector health.
 - UI pages for feed, applications, CV/profile sync draft, TJM, settings, and connector health.
 
-Extension gaps:
+Extension implementation evidence:
 
-- Supabase sync is limited to `favorite_missions`; no missions/applications/pipeline/CV/sync-status sync.
-- Tracking stage models are inconsistent:
-  - Core tracking: `new | interested | applying | applied | rejected | accepted | archived`.
-  - Bridge schema: `interested | applied | interview | offer | accepted | rejected | withdrawn`.
-  - Dashboard: `draft | applied | interview | offer | rejected`.
-- No LinkedIn connector or profile extractor.
-- No `linkedin.com` host permission, and no `scripting` / `activeTab` path for DOM extraction.
-- `CvPage.svelte` prepares manual clipboard payloads; it does not import or sync a canonical CV.
-- Side panel state has some direct fallback reads from IndexedDB for dev/offline. Runtime interactions should converge through service worker bridge.
+- `apps/extension/src/lib/core/sync/connected-dashboard.ts` builds pure sync payloads and merges
+  remote dashboard state.
+- `apps/extension/src/lib/shell/sync/connected-dashboard.ts` orchestrates Supabase I/O.
+- `apps/extension/src/lib/core/profile-extractors/linkedin-parser.ts` normalizes LinkedIn payloads
+  without I/O.
+- `apps/extension/src/lib/shell/profile-extractors/linkedin.extractor.ts` performs Chrome session
+  and DOM extraction in the shell.
+- `apps/extension/tests/unit/sync/*.test.ts`, `apps/extension/tests/unit/profile-extractors/*.test.ts`,
+  and `apps/extension/tests/e2e/linkedin-import.test.ts` cover connected sync and LinkedIn v1.
 
 ### Existing Spec Open Questions
 
@@ -193,21 +205,21 @@ Replaced decisions:
 
 ## Promise Gap Matrix
 
-| Landing promise              | Current implementation                                                                       | Missing work                                                                      | Priority |
-| ---------------------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------- | -------- |
-| 5 platforms scanned          | Extension has Free-Work, LeHibou, Hiway, Collective, Cherry Pick connectors and parser tests | Sync scan outputs to Supabase `missions`; expose connector health in dashboard    | P0       |
-| Centralized mission feed     | Extension feed exists; dashboard reads only favorite snapshots                               | Dashboard feed from Supabase `missions`, filters, score, source, dedup groups     | P0       |
-| Scoring IA with Gemini Nano  | Extension scoring and semantic cache exist                                                   | Persist score breakdown/semantic result to Supabase; dashboard explanation UI     | P1       |
-| Deduplication                | Extension core dedup exists                                                                  | Persist canonical mission identity and duplicate source records                   | P1       |
-| Smart alerts                 | Extension notifications exist                                                                | Dashboard notification preferences and sync of alert-worthy missions              | P2       |
-| Mission comparison/shortlist | Extension comparison UI exists; dashboard has application cards                              | Supabase shortlist/selected state, dashboard comparison view                      | P1       |
-| Application assistant        | Extension generated assets exist behind credits                                              | Dashboard generated asset history, prepared application status, copy/open actions | P1       |
-| Pipeline follow-up           | Extension tracking exists locally, dashboard mock stage UI exists                            | Canonical application pipeline, events, follow-up dates, conflict resolution      | P0       |
-| Dashboard TJM/history        | Extension TJM history exists locally; dashboard no real TJM                                  | Supabase `mission_market_rates` or derived views, dashboard TJM trend widgets     | P2       |
-| Existing browser sessions    | Extension connectors use cookies/fetch sessions                                              | LinkedIn profile extraction via user session and typed errors                     | P0       |
-| 100% local/private           | Extension local execution exists, but Supabase is now product decision                       | Update promise to local execution + explicit cloud sync controls                  | P0       |
-| No platform credentials      | Preserved; auth is only MissionPulse/Supabase                                                | Keep credential boundary in spec, tests, and privacy copy                         | P0       |
-| Open source/tests/FC&IS      | Repo has ADRs and many tests                                                                 | Keep new parser/sync core pure and tested                                         | P0       |
+| Landing promise              | Current implementation                                                                        | Missing work                                                                       | Priority |
+| ---------------------------- | --------------------------------------------------------------------------------------------- | ---------------------------------------------------------------------------------- | -------- |
+| 5 platforms scanned          | Extension has Free-Work, LeHibou, Hiway, Collective, Cherry Pick connectors and parser tests  | Done: scan output syncs to Supabase `missions`; connector health renders dashboard | Done     |
+| Centralized mission feed     | Dashboard feed reads Supabase `missions`, scores, sources, duplicates, filters, and freshness | Done                                                                               | Done     |
+| Scoring IA with Gemini Nano  | Extension scoring and semantic cache persist score breakdowns to Supabase mission scores      | Done: dashboard score criteria and semantic reason UI                              | Done     |
+| Deduplication                | Extension dedup persists canonical mission identity and duplicate source records              | Done                                                                               | Done     |
+| Smart alerts                 | Extension notifications plus dashboard alert preferences sync                                 | Done                                                                               | Done     |
+| Mission comparison/shortlist | Dashboard comparison uses selected/active Supabase applications                               | Done                                                                               | Done     |
+| Application assistant        | Generated assets sync to Supabase and render in dashboard history with copy/open actions      | Done                                                                               | Done     |
+| Pipeline follow-up           | Shared canonical pipeline, events, next actions, conflicts, dashboard and extension sync      | Done                                                                               | Done     |
+| Dashboard TJM/history        | Dashboard TJM radar derives trends by source and stack from synchronized missions             | Done                                                                               | Done     |
+| Existing browser sessions    | Extension connectors use browser sessions; LinkedIn v1 extracts profile via active tab        | Done                                                                               | Done     |
+| 100% local/private           | Public copy now says local execution plus optional Supabase dashboard sync                    | Done                                                                               | Done     |
+| No platform credentials      | Credentials/cookies/session tokens excluded from synced data and covered by tests/copy        | Done                                                                               | Done     |
+| Open source/tests/FC&IS      | Core/shell boundaries, parser tests, sync tests, E2E, and strict typecheck are in place       | Done                                                                               | Done     |
 
 ## Target Product Surface
 
