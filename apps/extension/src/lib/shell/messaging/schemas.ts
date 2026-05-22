@@ -230,6 +230,27 @@ export const MessageSchemas = {
       reason: z.string().max(128).optional(),
     }),
   }),
+  GET_CONNECTED_SYNC_STATUS: z.object({ type: z.literal('GET_CONNECTED_SYNC_STATUS') }),
+  CONNECTED_SYNC_STATUS_RESULT: z.object({
+    type: z.literal('CONNECTED_SYNC_STATUS_RESULT'),
+    payload: z.object({
+      authenticated: z.boolean(),
+      installId: z.string().nullable(),
+      lastGlobalSync: z.number().int().min(0).nullable(),
+    }),
+  }),
+  SYNC_CONNECTED_DASHBOARD: z.object({ type: z.literal('SYNC_CONNECTED_DASHBOARD') }),
+  CONNECTED_DASHBOARD_SYNCED: z.object({
+    type: z.literal('CONNECTED_DASHBOARD_SYNCED'),
+    payload: z.object({
+      synced: z.boolean(),
+      missions: z.number().int().min(0).optional(),
+      applications: z.number().int().min(0).optional(),
+      skippedApplications: z.number().int().min(0).optional(),
+      connectorHealth: z.number().int().min(0).optional(),
+      reason: z.string().max(256).optional(),
+    }),
+  }),
 
   // Connector health
   GET_CONNECTOR_HEALTH: z.object({ type: z.literal('GET_CONNECTOR_HEALTH') }),

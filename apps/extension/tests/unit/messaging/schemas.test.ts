@@ -202,6 +202,43 @@ describe('validateMessage — SYNC_FAVORITE_MISSION', () => {
 });
 
 // ============================================================================
+// Connected dashboard sync
+// ============================================================================
+
+describe('validateMessage — connected dashboard sync', () => {
+  it('accepte une demande de statut sync connecté', () => {
+    expect(validateMessage({ type: 'GET_CONNECTED_SYNC_STATUS' }).valid).toBe(true);
+  });
+
+  it('accepte une demande de retry manuel', () => {
+    expect(validateMessage({ type: 'SYNC_CONNECTED_DASHBOARD' }).valid).toBe(true);
+  });
+
+  it('accepte un résultat de statut sync connecté', () => {
+    const r = validateMessage({
+      type: 'CONNECTED_SYNC_STATUS_RESULT',
+      payload: {
+        authenticated: true,
+        installId: 'install-1',
+        lastGlobalSync: 1779340800000,
+      },
+    });
+    expect(r.valid).toBe(true);
+  });
+
+  it('rejette un résultat de sync connecté avec compteurs négatifs', () => {
+    const r = validateMessage({
+      type: 'CONNECTED_DASHBOARD_SYNCED',
+      payload: {
+        synced: true,
+        missions: -1,
+      },
+    });
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
 // SHOW_TOAST
 // ============================================================================
 

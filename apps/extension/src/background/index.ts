@@ -3,6 +3,7 @@ import {
   saveProfile,
   saveConnectorStatuses,
   getMissionById,
+  getMissions,
 } from '../lib/shell/storage/db';
 import type {
   BridgeMessage,
@@ -53,6 +54,12 @@ import { generatePremium } from '../lib/shell/auth/premium-api';
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 import { syncFavoriteMissionChange } from '../lib/shell/sync/favorite-missions';
+import {
+  getConnectedDashboardSyncStatus,
+  syncConnectedDashboardScan,
+  syncConnectedDashboardSnapshot,
+  syncConnectedDashboardTracking,
+} from '../lib/shell/sync/connected-dashboard';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -337,6 +344,13 @@ async function persistScanResults(
     /* Non-critical: status persistence */
   }
 
+  try {
+    const healthSnapshots = await loadConnectorHealthSnapshots();
+    await syncConnectedDashboardScan(missions, healthSnapshots);
+  } catch {
+    /* Non-critical: connected dashboard sync */
+  }
+
   if (missions.length === 0) {
     await clearNewMissionBadge();
     return;
@@ -485,6 +499,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           }
 
           await saveTracking(updated);
+          syncConnectedDashboardTracking(missionId).catch(() => {
+            /* Non-critical: connected dashboard sync */
+          });
           sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING error:', err);
@@ -802,6 +819,60 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           sendResponse({
             type: 'FAVORITE_MISSION_SYNCED',
             payload: { missionId, synced: false, reason: 'remote-error' },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_CONNECTED_SYNC_STATUS') {
+      getConnectedDashboardSyncStatus()
+        .then((status) => {
+          sendResponse({ type: 'CONNECTED_SYNC_STATUS_RESULT', payload: status });
+        })
+        .catch(() => {
+          sendResponse({
+            type: 'CONNECTED_SYNC_STATUS_RESULT',
+            payload: { authenticated: false, installId: null, lastGlobalSync: null },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'SYNC_CONNECTED_DASHBOARD') {
+      (async () => {
+        const [missions, trackings, healthSnapshots] = await Promise.all([
+          getMissions(),
+          getAllTrackings(),
+          loadConnectorHealthSnapshots(),
+        ]);
+        return syncConnectedDashboardSnapshot({ missions, trackings, healthSnapshots });
+      })()
+        .then((result) => {
+          if (!result.ok) {
+            sendResponse({
+              type: 'CONNECTED_DASHBOARD_SYNCED',
+              payload: { synced: false, reason: result.error.code },
+            });
+            return;
+          }
+          sendResponse({
+            type: 'CONNECTED_DASHBOARD_SYNCED',
+            payload: {
+              synced: true,
+              missions: result.value.missions,
+              applications: result.value.applications,
+              skippedApplications: result.value.skippedApplications,
+              connectorHealth: result.value.connectorHealth,
+            },
+          });
+        })
+        .catch((err) => {
+          if (import.meta.env.DEV) {
+            console.warn('[MissionPulse] SYNC_CONNECTED_DASHBOARD error:', err);
+          }
+          sendResponse({
+            type: 'CONNECTED_DASHBOARD_SYNCED',
+            payload: { synced: false, reason: 'remote-error' },
           });
         });
       return true;

@@ -117,6 +117,23 @@ function createChromeStubs() {
                 reason: 'unauthenticated',
               },
             };
+          case 'GET_CONNECTED_SYNC_STATUS':
+            return {
+              type: 'CONNECTED_SYNC_STATUS_RESULT',
+              payload: {
+                authenticated: false,
+                installId: null,
+                lastGlobalSync: null,
+              },
+            };
+          case 'SYNC_CONNECTED_DASHBOARD':
+            return {
+              type: 'CONNECTED_DASHBOARD_SYNCED',
+              payload: {
+                synced: false,
+                reason: 'dev-mode',
+              },
+            };
           default:
             console.log('[Chrome Stub] Unhandled message type:', message.type);
             return null;

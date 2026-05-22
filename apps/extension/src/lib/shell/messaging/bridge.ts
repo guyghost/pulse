@@ -12,6 +12,7 @@ import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { AuthStatus, AuthUser } from '../../core/types/auth';
 import type { AppError } from '../../core/errors/app-error';
 import type { ToastType } from '../../state/toast.svelte';
+import type { ConnectedDashboardSyncStatus } from '../sync/connected-dashboard';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -84,6 +85,20 @@ export type BridgeMessage =
   | {
       type: 'FAVORITE_MISSION_SYNCED';
       payload: { missionId: string; synced: boolean; reason?: string };
+    }
+  | { type: 'GET_CONNECTED_SYNC_STATUS' }
+  | { type: 'CONNECTED_SYNC_STATUS_RESULT'; payload: ConnectedDashboardSyncStatus }
+  | { type: 'SYNC_CONNECTED_DASHBOARD' }
+  | {
+      type: 'CONNECTED_DASHBOARD_SYNCED';
+      payload: {
+        synced: boolean;
+        missions?: number;
+        applications?: number;
+        skippedApplications?: number;
+        connectorHealth?: number;
+        reason?: string;
+      };
     }
   // Connector health (service worker → side panel)
   | { type: 'GET_CONNECTOR_HEALTH' }
