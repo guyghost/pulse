@@ -26,7 +26,6 @@ import {
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
   syncRowsToConnectedSyncStatuses,
-  type ApplicationTimelineEvent,
   type DashboardApplicationPipelineEventRow,
   type DashboardCandidateProfileRow,
   type DashboardCandidateEducationRow,
@@ -46,272 +45,10 @@ import {
   type DashboardMissionFeedScoreRow,
   type DashboardProfileImportRow,
   type DashboardSyncStatusRow,
-  type ConnectedSyncStatus,
-  type CvSnapshot,
   type DashboardAccountEntitlements,
   type DashboardSubscriptionStatus,
-  type GeneratedApplicationAsset,
   type MissionApplication,
-  type MissionFeedItem,
-  type PlatformSyncStatus,
-  type TjmRadarSnapshot,
 } from '$lib/core/dashboard';
-
-const mockApplications: MissionApplication[] = [
-  {
-    id: 'app-001',
-    title: 'Lead Svelte / TypeScript',
-    company: 'Atelier Nova',
-    source: 'linkedin',
-    stage: 'interview',
-    score: 92,
-    dailyRate: 720,
-    location: 'Paris hybride',
-    sourceUrl: 'https://example.com/mission-preview-1',
-    appliedAt: '2026-05-08',
-    nextActionAt: '2026-05-19',
-    notes: 'Relancer après le prochain entretien.',
-    userRating: 5,
-  },
-  {
-    id: 'app-002',
-    title: 'Architecte Frontend freelance',
-    company: 'ScaleOps',
-    source: 'free-work',
-    stage: 'applied',
-    score: 86,
-    dailyRate: 680,
-    location: 'Remote France',
-    sourceUrl: 'https://example.com/mission-preview-2',
-    appliedAt: '2026-05-11',
-    nextActionAt: null,
-    notes: '',
-    userRating: null,
-  },
-  {
-    id: 'app-003',
-    title: 'Mission migration design system',
-    company: 'Bluefoundry',
-    source: 'malt',
-    stage: 'selected',
-    score: 78,
-    dailyRate: 650,
-    location: 'Lyon',
-    sourceUrl: 'https://example.com/mission-preview-3',
-    appliedAt: null,
-    nextActionAt: '2026-05-20',
-    notes: 'À préparer après vérification du CV.',
-    userRating: 4,
-  },
-];
-
-const mockGeneratedAssets: GeneratedApplicationAsset[] = [
-  {
-    id: 'asset-preview-1',
-    applicationId: 'app-001',
-    applicationTitle: 'Lead Svelte / TypeScript',
-    company: 'Atelier Nova',
-    type: 'pitch',
-    label: 'Pitch',
-    content:
-      "Bonjour, je peux accompagner Atelier Nova sur la mission Lead Svelte avec une approche progressive, des standards TypeScript stricts et une forte expérience d'architecture frontend.",
-    preview:
-      "Bonjour, je peux accompagner Atelier Nova sur la mission Lead Svelte avec une approche progressive, des standards TypeScript stricts et une forte expérience d'architecture frontend.",
-    model: 'gemini-nano',
-    createdAt: '2026-05-20T08:30:00.000Z',
-  },
-  {
-    id: 'asset-preview-2',
-    applicationId: 'app-002',
-    applicationTitle: 'Architecte Frontend freelance',
-    company: 'ScaleOps',
-    type: 'cv_summary',
-    label: 'Résumé CV',
-    content:
-      'Résumé orienté architecture frontend, design systems et migration progressive pour mission freelance senior.',
-    preview:
-      'Résumé orienté architecture frontend, design systems et migration progressive pour mission freelance senior.',
-    model: 'gemini-nano',
-    createdAt: '2026-05-18T09:00:00.000Z',
-  },
-];
-
-const mockApplicationTimeline: ApplicationTimelineEvent[] = [
-  {
-    id: 'event-preview-2',
-    applicationId: 'app-001',
-    fromStage: 'applied',
-    fromLabel: 'Postulé',
-    toStage: 'interview',
-    toLabel: 'Entretien',
-    note: null,
-    occurredAt: '2026-05-18T09:00:00.000Z',
-    createdBy: 'dashboard',
-    createdByLabel: 'Dashboard',
-  },
-  {
-    id: 'event-preview-1',
-    applicationId: 'app-001',
-    fromStage: 'selected',
-    fromLabel: 'Sélectionnée',
-    toStage: 'applied',
-    toLabel: 'Postulé',
-    note: 'Candidature envoyée depuis le profil recruteur.',
-    occurredAt: '2026-05-08T10:30:00.000Z',
-    createdBy: 'extension',
-    createdByLabel: 'Extension',
-  },
-];
-
-const mockMissionFeed: MissionFeedItem[] = [
-  {
-    id: 'mission-preview-1',
-    title: 'Lead Svelte / TypeScript',
-    client: 'Atelier Nova',
-    source: 'free-work',
-    stack: ['Svelte 5', 'TypeScript', 'TailwindCSS'],
-    score: 92,
-    deterministicScore: 88,
-    semanticScore: 96,
-    grade: 'A',
-    semanticReason: 'Stack et séniorité fortement alignées au profil cible.',
-    dailyRate: 720,
-    location: 'Paris hybride',
-    scrapedAt: '2026-05-22T08:00:00.000Z',
-    url: 'https://example.com/mission-preview-1',
-    duplicateCount: 1,
-    applicationStage: 'selected',
-    freshness: 'fresh',
-  },
-  {
-    id: 'mission-preview-2',
-    title: 'Architecte Frontend freelance',
-    client: 'ScaleOps',
-    source: 'collective',
-    stack: ['Design systems', 'Architecture frontend'],
-    score: 86,
-    deterministicScore: 86,
-    semanticScore: null,
-    grade: 'B',
-    semanticReason: null,
-    dailyRate: 680,
-    location: 'Remote France',
-    scrapedAt: '2026-05-20T08:00:00.000Z',
-    url: 'https://example.com/mission-preview-2',
-    duplicateCount: 0,
-    applicationStage: null,
-    freshness: 'stale',
-  },
-];
-
-const mockTjmRadar: TjmRadarSnapshot = buildTjmRadarSnapshot(mockMissionFeed);
-
-const mockCv: CvSnapshot = {
-  id: 'cv-main',
-  title: 'CV Consultant Frontend Senior',
-  summary: 'Profil aperçu: import LinkedIn et données CV seront synchronisés via Supabase.',
-  updatedAt: '2026-05-12T08:30:00.000Z',
-  completeness: 84,
-  targetRole: 'Lead Frontend Svelte / TypeScript',
-  skills: [
-    'Svelte 5',
-    'TypeScript',
-    'Design systems',
-    'Chrome extensions',
-    'Architecture frontend',
-  ],
-  experiences: [
-    {
-      title: 'Lead Frontend',
-      company: 'ScaleOps',
-      location: 'Paris',
-      dateRange: '2021-01 - Présent',
-      description: 'Architecture Svelte, design system et extension Chrome.',
-      skills: ['Svelte 5', 'TypeScript'],
-      source: 'linkedin',
-    },
-  ],
-  education: [],
-  links: [],
-  imports: [
-    {
-      id: 'import-preview',
-      source: 'linkedin',
-      status: 'success',
-      importedAt: '2026-05-12T08:30:00.000Z',
-      extractorVersion: 'linkedin-v1',
-      errorCode: null,
-      errorMessage: null,
-      fieldCounts: { experiences: 1, education: 0, skills: 5, links: 0 },
-    },
-  ],
-  suggestions: [
-    {
-      id: 'suggestion-preview',
-      field: 'summary',
-      fieldLabel: 'Résumé',
-      currentValue: 'Résumé édité dans le dashboard.',
-      suggestedValue: 'Résumé importé depuis LinkedIn.',
-      source: 'linkedin',
-      status: 'pending',
-      createdAt: '2026-05-12T09:00:00.000Z',
-    },
-  ],
-};
-
-const mockSyncStatuses: PlatformSyncStatus[] = [
-  {
-    id: 'linkedin',
-    name: 'LinkedIn',
-    status: 'ready',
-    lastSyncAt: '2026-05-12T09:10:00.000Z',
-  },
-  {
-    id: 'free-work',
-    name: 'Free-Work',
-    status: 'needs-session',
-    lastSyncAt: null,
-  },
-  {
-    id: 'malt',
-    name: 'Malt',
-    status: 'needs-extension',
-    lastSyncAt: null,
-  },
-];
-
-const mockConnectedSyncStatuses: ConnectedSyncStatus[] = [
-  {
-    deviceId: 'device-preview',
-    deviceLabel: 'Chrome 0.4.0',
-    entity: 'missions',
-    label: 'Missions',
-    state: 'healthy',
-    lastPullAt: '2026-05-22T08:00:00.000Z',
-    lastPushAt: '2026-05-22T08:05:00.000Z',
-    pendingUploadCount: 0,
-    pendingDownloadCount: 0,
-    lastErrorCode: null,
-    lastErrorMessage: null,
-    retryAfterAt: null,
-    updatedAt: '2026-05-22T08:05:00.000Z',
-  },
-  {
-    deviceId: 'device-preview',
-    deviceLabel: 'Chrome 0.4.0',
-    entity: 'candidate_profile',
-    label: 'Profil CV',
-    state: 'pending',
-    lastPullAt: '2026-05-22T07:00:00.000Z',
-    lastPushAt: null,
-    pendingUploadCount: 1,
-    pendingDownloadCount: 0,
-    lastErrorCode: null,
-    lastErrorMessage: null,
-    retryAfterAt: null,
-    updatedAt: '2026-05-22T08:10:00.000Z',
-  },
-];
 
 type DashboardProfileRow = {
   subscription_status: string | null;
@@ -452,20 +189,22 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
   if (!hasSupabaseConfig) {
     const entitlements = getAnonymousEntitlements();
+    const missionFeed: [] = [];
 
     return {
       session: null,
       loginUrl,
+      configurationMissing: true,
       entitlements,
       featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
-      missionFeed: mockMissionFeed,
-      tjmRadar: mockTjmRadar,
-      applications: mockApplications,
-      applicationTimeline: mockApplicationTimeline,
-      generatedAssets: mockGeneratedAssets,
-      cv: mockCv,
-      syncStatuses: mockSyncStatuses,
-      connectedSyncStatuses: mockConnectedSyncStatuses,
+      missionFeed,
+      tjmRadar: buildTjmRadarSnapshot(missionFeed),
+      applications: [],
+      applicationTimeline: [],
+      generatedAssets: [],
+      cv: buildEmptyCvSnapshot({ updatedAt: new Date().toISOString() }),
+      syncStatuses: [],
+      connectedSyncStatuses: [],
     };
   }
 
@@ -709,6 +448,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
   return {
     session,
     loginUrl,
+    configurationMissing: false,
     entitlements,
     featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
     missionFeed,

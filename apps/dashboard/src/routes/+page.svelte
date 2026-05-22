@@ -38,6 +38,7 @@
   const connectedSyncStatuses = $derived(data.connectedSyncStatuses as ConnectedSyncStatus[]);
   const entitlements = $derived(data.entitlements as DashboardAccountEntitlements);
   const featureAccess = $derived(data.featureAccess as DashboardFeatureAccess[]);
+  const configurationMissing = $derived(Boolean(data.configurationMissing));
   const counts = $derived(countApplicationsByStage(applications));
   const readiness = $derived(getCvSyncReadiness(cv, syncStatuses));
   const isConnected = $derived(Boolean(data.session));
@@ -387,15 +388,25 @@
         </div>
       </section>
 
-      {#if !isConnected}
+      {#if configurationMissing}
+        <section
+          class="mb-6 rounded-lg border border-status-orange/30 bg-status-orange/10 p-4 shadow-subtle-2"
+        >
+          <p class="text-sm font-medium text-text-primary">Configuration Supabase absente</p>
+          <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
+            Le dashboard connecté n'affiche que les données synchronisées depuis Supabase. Ajoutez
+            `PUBLIC_SUPABASE_URL` et `PUBLIC_SUPABASE_ANON_KEY`, puis connectez-vous pour charger
+            vos missions, candidatures, CV et statuts de synchronisation.
+          </p>
+        </section>
+      {:else if !isConnected}
         <section
           class="mb-6 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/8 p-4 shadow-subtle-2"
         >
-          <p class="text-sm font-medium text-text-primary">Mode aperçu</p>
+          <p class="text-sm font-medium text-text-primary">Connexion requise</p>
           <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
-            Les données ci-dessous illustrent le futur dashboard connecté. La session Supabase sera
-            utilisée comme source d'identité. Les fonctionnalités liées au compte, comme la
-            synchronisation de CV, restent verrouillées dans cet aperçu.
+            Connectez-vous pour charger les données synchronisées via Supabase. Le dashboard ne lit
+            pas les sessions plateforme et n'utilise pas de données de démonstration.
           </p>
         </section>
       {/if}
