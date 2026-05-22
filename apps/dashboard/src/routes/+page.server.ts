@@ -1370,6 +1370,7 @@ export const actions: Actions = {
       };
     }
 
+    const occurredAt = new Date();
     const patch = buildMissionSelectionInsertPatch();
     const { data: application, error: insertError } = await supabase
       .from('applications')
@@ -1380,6 +1381,7 @@ export const actions: Actions = {
         notes: patch.notes,
         revision: patch.revision,
         updated_by: patch.updated_by,
+        updated_at: occurredAt.toISOString(),
       })
       .select('id')
       .single<{ id: string }>();
@@ -1388,7 +1390,6 @@ export const actions: Actions = {
       return fail(500, { selectionError: "La mission n'a pas pu être sélectionnée." });
     }
 
-    const occurredAt = new Date();
     const detectedAt = new Date(occurredAt.getTime() - 1);
     const detectedEvent = transitionApplicationStage({
       applicationId: application.id,
@@ -1590,6 +1591,7 @@ export const actions: Actions = {
         revision: patch.revision,
         updated_by: patch.updated_by,
         archived_at: patch.archived_at,
+        updated_at: occurredAt.toISOString(),
       })
       .select('id')
       .single<{ id: string }>();
@@ -1658,7 +1660,7 @@ export const actions: Actions = {
       supabase,
       session.user.id,
       'applications',
-      event.occurredAt
+      archivedEvent.occurredAt
     );
 
     return { selectionSuccess: `Mission archivée: ${mission.title}.` };
