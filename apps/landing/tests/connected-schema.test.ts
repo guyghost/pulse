@@ -82,5 +82,7 @@ describe('connected dashboard schema', () => {
       expect(applications).toContain(`'${stage}'`);
       expect(pipelineEvents).toContain(`'${stage}'`);
     }
+    expect(pipelineEvents).toContain('from_stage text check');
+    expect(pipelineEvents).toContain('from_stage is null or from_stage in');
   });
 });

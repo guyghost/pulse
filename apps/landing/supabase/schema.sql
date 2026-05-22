@@ -418,7 +418,19 @@ create table if not exists public.application_pipeline_events (
   id uuid primary key default gen_random_uuid(),
   user_id uuid references auth.users(id) on delete cascade not null,
   application_id uuid references public.applications(id) on delete cascade not null,
-  from_stage text,
+  from_stage text check (
+    from_stage is null or from_stage in (
+      'detected',
+      'selected',
+      'application_prepared',
+      'applied',
+      'interview',
+      'offer',
+      'accepted',
+      'rejected',
+      'archived'
+    )
+  ),
   to_stage text not null check (
     to_stage in (
       'detected',
