@@ -6,10 +6,16 @@ const runScan = vi.fn();
 const getSeenIds = vi.fn();
 const saveSeenIds = vi.fn();
 const setNewMissionCount = vi.fn();
+const resetNewMissionCount = vi.fn();
 const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
 const getMissions = vi.fn();
 const saveConnectorStatuses = vi.fn();
+const getConnectorStatuses = vi.fn();
+const getFavorites = vi.fn();
+const saveFavorites = vi.fn();
+const getHidden = vi.fn();
+const saveHidden = vi.fn();
 const getTracking = vi.fn();
 const saveTracking = vi.fn();
 const getAllTrackings = vi.fn();
@@ -131,6 +137,7 @@ vi.mock('../../../src/lib/shell/storage/db', () => ({
   getProfile: vi.fn(async () => null),
   saveProfile: vi.fn(async () => undefined),
   saveConnectorStatuses,
+  getConnectorStatuses,
   getMissionById: vi.fn(async () => null),
   getMissions,
 }));
@@ -144,8 +151,16 @@ vi.mock('../../../src/lib/shell/storage/seen-missions', () => ({
   saveSeenIds,
 }));
 
+vi.mock('../../../src/lib/shell/storage/favorites', () => ({
+  getFavorites,
+  saveFavorites,
+  getHidden,
+  saveHidden,
+}));
+
 vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
   setNewMissionCount,
+  resetNewMissionCount,
 }));
 
 vi.mock('../../../src/lib/shell/storage/tracking', () => ({
@@ -217,6 +232,7 @@ describe('background auto-scan notifications', () => {
       notificationScoreThreshold: 70,
     });
     getSeenIds.mockResolvedValue(['already-seen']);
+    saveSeenIds.mockResolvedValue(undefined);
     runScan.mockResolvedValue({
       missions: [
         makeMission({ id: 'mission-1', score: 92 }),
@@ -229,6 +245,12 @@ describe('background auto-scan notifications', () => {
       notifiedMissionIds: ['mission-1'],
     });
     getMissions.mockResolvedValue([makeMission()]);
+    resetNewMissionCount.mockResolvedValue(undefined);
+    getConnectorStatuses.mockResolvedValue([]);
+    getFavorites.mockResolvedValue({});
+    saveFavorites.mockResolvedValue(undefined);
+    getHidden.mockResolvedValue({});
+    saveHidden.mockResolvedValue(undefined);
     getTracking.mockResolvedValue(null);
     saveTracking.mockResolvedValue(undefined);
     getAllTrackings.mockResolvedValue([]);
@@ -401,6 +423,108 @@ describe('background auto-scan notifications', () => {
         ],
         summary: { matches: 1, mismatches: 0, missing: 0 },
       },
+    });
+  });
+
+  it('routes feed local data through the service worker shell', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const missionsResponse = vi.fn();
+    const favoritesResponse = vi.fn();
+    const hiddenResponse = vi.fn();
+    const seenResponse = vi.fn();
+    const statusesResponse = vi.fn();
+
+    const favorites = { 'mission-1': 1779436800000 };
+    const hidden = { 'mission-2': 1779436900000 };
+    const statuses = [
+      {
+        connectorId: 'free-work',
+        connectorName: 'Free-Work',
+        lastState: 'done' as const,
+        missionsCount: 2,
+        error: null,
+        lastSyncAt: 1779436800000,
+        lastSuccessAt: 1779436800000,
+      },
+    ];
+    getMissions.mockResolvedValueOnce([makeMission()]);
+    getFavorites.mockResolvedValueOnce(favorites);
+    getHidden.mockResolvedValueOnce(hidden);
+    getSeenIds.mockResolvedValueOnce(['mission-1']);
+    getConnectorStatuses.mockResolvedValueOnce(statuses);
+
+    expect(messageListener?.({ type: 'GET_FEED_MISSIONS' }, {}, missionsResponse)).toBe(true);
+    expect(messageListener?.({ type: 'GET_FEED_FAVORITES' }, {}, favoritesResponse)).toBe(true);
+    expect(messageListener?.({ type: 'GET_FEED_HIDDEN' }, {}, hiddenResponse)).toBe(true);
+    expect(messageListener?.({ type: 'GET_SEEN_MISSIONS' }, {}, seenResponse)).toBe(true);
+    expect(
+      messageListener?.({ type: 'GET_PERSISTED_CONNECTOR_STATUSES' }, {}, statusesResponse)
+    ).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(missionsResponse).toHaveBeenCalledWith({
+      type: 'FEED_MISSIONS_RESULT',
+      payload: [expect.objectContaining({ id: 'mission-1' })],
+    });
+    expect(favoritesResponse).toHaveBeenCalledWith({
+      type: 'FEED_FAVORITES_RESULT',
+      payload: favorites,
+    });
+    expect(hiddenResponse).toHaveBeenCalledWith({
+      type: 'FEED_HIDDEN_RESULT',
+      payload: hidden,
+    });
+    expect(seenResponse).toHaveBeenCalledWith({
+      type: 'SEEN_MISSIONS_RESULT',
+      payload: ['mission-1'],
+    });
+    expect(statusesResponse).toHaveBeenCalledWith({
+      type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
+      payload: statuses,
+    });
+  });
+
+  it('routes feed local writes through the service worker shell', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const favoritesResponse = vi.fn();
+    const hiddenResponse = vi.fn();
+    const seenResponse = vi.fn();
+    const resetResponse = vi.fn();
+    const favorites = { 'mission-1': 1779436800000 };
+    const hidden = { 'mission-2': 1779436900000 };
+    const seenIds = ['mission-1', 'mission-2'];
+
+    expect(
+      messageListener?.({ type: 'SAVE_FEED_FAVORITES', payload: favorites }, {}, favoritesResponse)
+    ).toBe(true);
+    expect(
+      messageListener?.({ type: 'SAVE_FEED_HIDDEN', payload: hidden }, {}, hiddenResponse)
+    ).toBe(true);
+    expect(
+      messageListener?.({ type: 'SAVE_SEEN_MISSIONS', payload: seenIds }, {}, seenResponse)
+    ).toBe(true);
+    expect(messageListener?.({ type: 'RESET_NEW_MISSION_COUNT' }, {}, resetResponse)).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(saveFavorites).toHaveBeenCalledWith(favorites);
+    expect(saveHidden).toHaveBeenCalledWith(hidden);
+    expect(saveSeenIds).toHaveBeenCalledWith(seenIds);
+    expect(resetNewMissionCount).toHaveBeenCalled();
+    expect(favoritesResponse).toHaveBeenCalledWith({
+      type: 'FEED_FAVORITES_SAVED',
+      payload: { saved: true },
+    });
+    expect(hiddenResponse).toHaveBeenCalledWith({
+      type: 'FEED_HIDDEN_SAVED',
+      payload: { saved: true },
+    });
+    expect(seenResponse).toHaveBeenCalledWith({
+      type: 'SEEN_MISSIONS_SAVED',
+      payload: { saved: true },
+    });
+    expect(resetResponse).toHaveBeenCalledWith({
+      type: 'NEW_MISSION_COUNT_RESET',
+      payload: { reset: true },
     });
   });
 

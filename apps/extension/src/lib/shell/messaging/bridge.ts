@@ -1,6 +1,7 @@
 import type { Mission } from '../../core/types/mission';
 import type { MissionTracking } from '../../core/types/tracking';
 import type { ApplicationStatus } from '../../core/types/tracking';
+import type { PersistedConnectorStatus } from '../../core/types/connector-status';
 import type {
   GeneratedAsset,
   GenerationResultPayload,
@@ -49,6 +50,24 @@ export interface ConnectorHealthPayload {
 
 export type BridgeMessage =
   | { type: 'MISSIONS_UPDATED'; payload: Mission[] }
+  | { type: 'GET_FEED_MISSIONS' }
+  | { type: 'FEED_MISSIONS_RESULT'; payload: Mission[] }
+  | { type: 'GET_FEED_FAVORITES' }
+  | { type: 'FEED_FAVORITES_RESULT'; payload: Record<string, number> }
+  | { type: 'SAVE_FEED_FAVORITES'; payload: Record<string, number> }
+  | { type: 'FEED_FAVORITES_SAVED'; payload: { saved: boolean } }
+  | { type: 'GET_FEED_HIDDEN' }
+  | { type: 'FEED_HIDDEN_RESULT'; payload: Record<string, number> }
+  | { type: 'SAVE_FEED_HIDDEN'; payload: Record<string, number> }
+  | { type: 'FEED_HIDDEN_SAVED'; payload: { saved: boolean } }
+  | { type: 'GET_SEEN_MISSIONS' }
+  | { type: 'SEEN_MISSIONS_RESULT'; payload: string[] }
+  | { type: 'SAVE_SEEN_MISSIONS'; payload: string[] }
+  | { type: 'SEEN_MISSIONS_SAVED'; payload: { saved: boolean } }
+  | { type: 'RESET_NEW_MISSION_COUNT' }
+  | { type: 'NEW_MISSION_COUNT_RESET'; payload: { reset: boolean } }
+  | { type: 'GET_PERSISTED_CONNECTOR_STATUSES' }
+  | { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT'; payload: PersistedConnectorStatus[] }
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }

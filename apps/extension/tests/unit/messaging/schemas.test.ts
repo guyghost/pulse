@@ -315,6 +315,55 @@ describe('validateMessage — MISSIONS_UPDATED', () => {
   });
 });
 
+describe('validateMessage — feed local data bridge', () => {
+  it('accepte les demandes de lecture feed sans payload', () => {
+    expect(validateMessage({ type: 'GET_FEED_MISSIONS' }).valid).toBe(true);
+    expect(validateMessage({ type: 'GET_FEED_FAVORITES' }).valid).toBe(true);
+    expect(validateMessage({ type: 'GET_FEED_HIDDEN' }).valid).toBe(true);
+    expect(validateMessage({ type: 'GET_SEEN_MISSIONS' }).valid).toBe(true);
+    expect(validateMessage({ type: 'GET_PERSISTED_CONNECTOR_STATUSES' }).valid).toBe(true);
+  });
+
+  it('accepte les écritures feed locales bornées', () => {
+    expect(
+      validateMessage({ type: 'SAVE_FEED_FAVORITES', payload: { 'mission-1': 1779436800000 } })
+        .valid
+    ).toBe(true);
+    expect(
+      validateMessage({ type: 'SAVE_FEED_HIDDEN', payload: { 'mission-2': 1779436800000 } }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'SAVE_SEEN_MISSIONS', payload: ['mission-1'] }).valid).toBe(
+      true
+    );
+    expect(validateMessage({ type: 'RESET_NEW_MISSION_COUNT' }).valid).toBe(true);
+  });
+
+  it('rejette les timestamps feed négatifs', () => {
+    expect(
+      validateMessage({ type: 'SAVE_FEED_FAVORITES', payload: { 'mission-1': -1 } }).valid
+    ).toBe(false);
+  });
+
+  it('accepte les statuts connecteurs persistés', () => {
+    expect(
+      validateMessage({
+        type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
+        payload: [
+          {
+            connectorId: 'free-work',
+            connectorName: 'Free-Work',
+            lastState: 'done',
+            missionsCount: 2,
+            error: null,
+            lastSyncAt: 1779436800000,
+            lastSuccessAt: 1779436800000,
+          },
+        ],
+      }).valid
+    ).toBe(true);
+  });
+});
+
 // ============================================================================
 // UPDATE_TRACKING — statuts valides
 // ============================================================================

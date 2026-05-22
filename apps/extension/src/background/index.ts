@@ -2,6 +2,7 @@ import {
   getProfile,
   saveProfile,
   saveConnectorStatuses,
+  getConnectorStatuses,
   getMissionById,
   getMissions,
 } from '../lib/shell/storage/db';
@@ -23,7 +24,8 @@ import {
 } from '../lib/shell/scan/scanner';
 import { getConnectorIds, getConnectors } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
-import { setNewMissionCount } from '../lib/shell/storage/session-storage';
+import { getFavorites, saveFavorites, getHidden, saveHidden } from '../lib/shell/storage/favorites';
+import { setNewMissionCount, resetNewMissionCount } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
   notifyHighScoreMissions,
@@ -541,8 +543,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     }
 
     if (message.type === 'SAVE_PROFILE') {
-      // Profile is now saved directly from the side panel via IndexedDB.
-      // Keep handler for backwards compatibility with queued messages.
       saveProfile(message.payload)
         .then(() => {
           sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
@@ -550,6 +550,114 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', err.message);
           sendResponse({ type: 'PROFILE_RESULT', payload: null });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_FEED_MISSIONS') {
+      getMissions()
+        .then((missions) => {
+          sendResponse({ type: 'FEED_MISSIONS_RESULT', payload: missions });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FEED_MISSIONS error:', err);
+          sendResponse({ type: 'FEED_MISSIONS_RESULT', payload: [] });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_PERSISTED_CONNECTOR_STATUSES') {
+      getConnectorStatuses()
+        .then((statuses) => {
+          sendResponse({ type: 'PERSISTED_CONNECTOR_STATUSES_RESULT', payload: statuses });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_PERSISTED_CONNECTOR_STATUSES error:', err);
+          sendResponse({ type: 'PERSISTED_CONNECTOR_STATUSES_RESULT', payload: [] });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_FEED_FAVORITES') {
+      getFavorites()
+        .then((favorites) => {
+          sendResponse({ type: 'FEED_FAVORITES_RESULT', payload: favorites });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FEED_FAVORITES error:', err);
+          sendResponse({ type: 'FEED_FAVORITES_RESULT', payload: {} });
+        });
+      return true;
+    }
+
+    if (message.type === 'SAVE_FEED_FAVORITES') {
+      saveFavorites(message.payload)
+        .then(() => {
+          sendResponse({ type: 'FEED_FAVORITES_SAVED', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SAVE_FEED_FAVORITES error:', err);
+          sendResponse({ type: 'FEED_FAVORITES_SAVED', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_FEED_HIDDEN') {
+      getHidden()
+        .then((hidden) => {
+          sendResponse({ type: 'FEED_HIDDEN_RESULT', payload: hidden });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FEED_HIDDEN error:', err);
+          sendResponse({ type: 'FEED_HIDDEN_RESULT', payload: {} });
+        });
+      return true;
+    }
+
+    if (message.type === 'SAVE_FEED_HIDDEN') {
+      saveHidden(message.payload)
+        .then(() => {
+          sendResponse({ type: 'FEED_HIDDEN_SAVED', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SAVE_FEED_HIDDEN error:', err);
+          sendResponse({ type: 'FEED_HIDDEN_SAVED', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_SEEN_MISSIONS') {
+      getSeenIds()
+        .then((seenIds) => {
+          sendResponse({ type: 'SEEN_MISSIONS_RESULT', payload: seenIds });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_SEEN_MISSIONS error:', err);
+          sendResponse({ type: 'SEEN_MISSIONS_RESULT', payload: [] });
+        });
+      return true;
+    }
+
+    if (message.type === 'SAVE_SEEN_MISSIONS') {
+      saveSeenIds(message.payload)
+        .then(() => {
+          sendResponse({ type: 'SEEN_MISSIONS_SAVED', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SAVE_SEEN_MISSIONS error:', err);
+          sendResponse({ type: 'SEEN_MISSIONS_SAVED', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'RESET_NEW_MISSION_COUNT') {
+      resetNewMissionCount()
+        .then(() => {
+          sendResponse({ type: 'NEW_MISSION_COUNT_RESET', payload: { reset: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] RESET_NEW_MISSION_COUNT error:', err);
+          sendResponse({ type: 'NEW_MISSION_COUNT_RESET', payload: { reset: false } });
         });
       return true;
     }

@@ -47,6 +47,27 @@ const MissionsPayloadSchema = z.array(MissionSchema).max(500, {
   message: 'MISSIONS_UPDATED payload exceeds 500 items limit',
 });
 
+const FeedIdTimestampMapSchema = z
+  .record(z.string().max(256), z.number().int().min(0))
+  .refine(maxBytes(120_000), { message: 'Feed id map payload exceeds 120KB limit' });
+
+const SeenMissionIdsSchema = z
+  .array(z.string().min(1).max(256))
+  .max(10_000)
+  .refine(maxBytes(160_000), { message: 'Seen mission ids payload exceeds 160KB limit' });
+
+const PersistedConnectorStatusSchema = z
+  .object({
+    connectorId: z.string().min(1).max(120),
+    connectorName: z.string().min(1).max(120),
+    lastState: z.enum(['done', 'error']),
+    missionsCount: z.number().int().min(0),
+    error: z.record(z.string(), z.unknown()).nullable(),
+    lastSyncAt: z.number().int().min(0),
+    lastSuccessAt: z.number().int().min(0).nullable(),
+  })
+  .strict();
+
 // ── Profile ──────────────────────────────────────────────────────────────────
 
 const ProfilePayloadSchema = z
@@ -230,6 +251,63 @@ const ConnectorHealthSnapshotSchema = z.object({
  * Les messages sans payload utilisent z.undefined() ou z.unknown().
  */
 export const MessageSchemas = {
+  // Feed local data
+  GET_FEED_MISSIONS: z.object({ type: z.literal('GET_FEED_MISSIONS') }),
+  FEED_MISSIONS_RESULT: z.object({
+    type: z.literal('FEED_MISSIONS_RESULT'),
+    payload: MissionsPayloadSchema,
+  }),
+  GET_FEED_FAVORITES: z.object({ type: z.literal('GET_FEED_FAVORITES') }),
+  FEED_FAVORITES_RESULT: z.object({
+    type: z.literal('FEED_FAVORITES_RESULT'),
+    payload: FeedIdTimestampMapSchema,
+  }),
+  SAVE_FEED_FAVORITES: z.object({
+    type: z.literal('SAVE_FEED_FAVORITES'),
+    payload: FeedIdTimestampMapSchema,
+  }),
+  FEED_FAVORITES_SAVED: z.object({
+    type: z.literal('FEED_FAVORITES_SAVED'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  GET_FEED_HIDDEN: z.object({ type: z.literal('GET_FEED_HIDDEN') }),
+  FEED_HIDDEN_RESULT: z.object({
+    type: z.literal('FEED_HIDDEN_RESULT'),
+    payload: FeedIdTimestampMapSchema,
+  }),
+  SAVE_FEED_HIDDEN: z.object({
+    type: z.literal('SAVE_FEED_HIDDEN'),
+    payload: FeedIdTimestampMapSchema,
+  }),
+  FEED_HIDDEN_SAVED: z.object({
+    type: z.literal('FEED_HIDDEN_SAVED'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  GET_SEEN_MISSIONS: z.object({ type: z.literal('GET_SEEN_MISSIONS') }),
+  SEEN_MISSIONS_RESULT: z.object({
+    type: z.literal('SEEN_MISSIONS_RESULT'),
+    payload: SeenMissionIdsSchema,
+  }),
+  SAVE_SEEN_MISSIONS: z.object({
+    type: z.literal('SAVE_SEEN_MISSIONS'),
+    payload: SeenMissionIdsSchema,
+  }),
+  SEEN_MISSIONS_SAVED: z.object({
+    type: z.literal('SEEN_MISSIONS_SAVED'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  RESET_NEW_MISSION_COUNT: z.object({ type: z.literal('RESET_NEW_MISSION_COUNT') }),
+  NEW_MISSION_COUNT_RESET: z.object({
+    type: z.literal('NEW_MISSION_COUNT_RESET'),
+    payload: z.object({ reset: z.boolean() }),
+  }),
+  GET_PERSISTED_CONNECTOR_STATUSES: z.object({
+    type: z.literal('GET_PERSISTED_CONNECTOR_STATUSES'),
+  }),
+  PERSISTED_CONNECTOR_STATUSES_RESULT: z.object({
+    type: z.literal('PERSISTED_CONNECTOR_STATUSES_RESULT'),
+    payload: z.array(PersistedConnectorStatusSchema).max(50),
+  }),
   // Profile
   GET_PROFILE: z.object({ type: z.literal('GET_PROFILE') }),
   PROFILE_RESULT: z.object({ type: z.literal('PROFILE_RESULT'), payload: z.unknown() }),
