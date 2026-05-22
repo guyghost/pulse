@@ -35,3 +35,7 @@ export async function saveConnectedAlertPreferences(
     [CONNECTED_ALERT_PREFERENCES_KEY]: normalizeConnectedAlertPreferences(preferences),
   });
 }
+
+export async function clearConnectedAlertPreferences(): Promise<void> {
+  await chrome.storage.local.remove(CONNECTED_ALERT_PREFERENCES_KEY);
+}

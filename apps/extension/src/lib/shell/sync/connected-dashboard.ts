@@ -52,7 +52,10 @@ import type { MissionTracking } from '../../core/types/tracking';
 import { isMissionSource } from '../../core/types/type-guards';
 import { getSupabaseClient } from '../auth/supabase-client';
 import { getMissionById, getProfile, saveProfile } from '../storage/db';
-import { saveConnectedAlertPreferences } from '../storage/connected-alert-preferences';
+import {
+  clearConnectedAlertPreferences,
+  saveConnectedAlertPreferences,
+} from '../storage/connected-alert-preferences';
 import { getGeneratedAsset } from '../storage/generated-assets';
 import { getTracking, saveTrackings } from '../storage/tracking';
 
@@ -1294,6 +1297,8 @@ export async function pullAlertPreferencesFromConnectedDashboard(
 
     if (preferences) {
       await saveConnectedAlertPreferences(preferences);
+    } else {
+      await clearConnectedAlertPreferences();
     }
 
     await gateway.upsertSyncStatus(

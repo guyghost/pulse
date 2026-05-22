@@ -231,6 +231,37 @@ describe('connected dashboard shell sync', () => {
     );
   });
 
+  it('clears stale local alert preferences when the dashboard has no alert row', async () => {
+    const storageRemove = vi.fn(async () => undefined);
+    vi.stubGlobal('chrome', {
+      storage: {
+        local: {
+          remove: storageRemove,
+        },
+      },
+    });
+    const gateway = createGateway();
+    vi.mocked(gateway.getDashboardAlertPreferences).mockResolvedValueOnce(null);
+
+    const result = await pullAlertPreferencesFromConnectedDashboard(gateway, {
+      userId: 'user-1',
+      deviceId: 'device-1',
+      now: new Date('2026-05-22T08:05:00.000Z'),
+    });
+
+    expect(result).toEqual({
+      ok: true,
+      value: { pulled: false, preferences: null },
+    });
+    expect(storageRemove).toHaveBeenCalledWith('missionpulse.connectedAlertPreferences');
+    expect(gateway.upsertSyncStatus).toHaveBeenCalledWith(
+      expect.objectContaining({
+        entity: 'alert_preferences',
+        pending_download_count: 0,
+      })
+    );
+  });
+
   it('reads per-entity sync status for the current extension device', async () => {
     vi.stubGlobal('chrome', {
       storage: {
