@@ -177,6 +177,29 @@ export interface PlatformSyncStatus {
   lastSyncAt: string | null;
 }
 
+export type ConnectedSyncEntity =
+  | 'missions'
+  | 'applications'
+  | 'candidate_profile'
+  | 'connector_health';
+
+export type ConnectedSyncState = 'healthy' | 'pending' | 'error' | 'idle';
+
+export interface ConnectedSyncStatus {
+  deviceId: string;
+  deviceLabel: string;
+  entity: ConnectedSyncEntity;
+  label: string;
+  state: ConnectedSyncState;
+  lastPullAt: string | null;
+  lastPushAt: string | null;
+  pendingUploadCount: number;
+  pendingDownloadCount: number;
+  lastErrorCode: string | null;
+  lastErrorMessage: string | null;
+  updatedAt: string;
+}
+
 export interface DashboardCanonicalApplicationRow {
   id: string;
   mission_id: string;
@@ -298,6 +321,26 @@ export interface DashboardConnectorHealthEventRow {
   occurred_at: string;
 }
 
+export interface DashboardExtensionDeviceRow {
+  id: string;
+  install_id: string;
+  browser: string | null;
+  extension_version: string;
+  last_seen_at: string | null;
+}
+
+export interface DashboardSyncStatusRow {
+  device_id: string;
+  entity: string;
+  last_pull_at: string | null;
+  last_push_at: string | null;
+  pending_upload_count: number;
+  pending_download_count: number;
+  last_error_code: string | null;
+  last_error_message: string | null;
+  updated_at: string;
+}
+
 export interface ApplicationStageUpdatePatch {
   stage: ApplicationStage;
   applied_at?: string | null;
@@ -331,6 +374,15 @@ function isGeneratedApplicationAssetType(value: unknown): value is GeneratedAppl
   return value === 'pitch' || value === 'cover_message' || value === 'cv_summary';
 }
 
+function isConnectedSyncEntity(value: unknown): value is ConnectedSyncEntity {
+  return (
+    value === 'missions' ||
+    value === 'applications' ||
+    value === 'candidate_profile' ||
+    value === 'connector_health'
+  );
+}
+
 const SOURCE_LABELS: Record<ApplicationSource, string> = {
   linkedin: 'LinkedIn',
   'free-work': 'Free-Work',
@@ -346,6 +398,13 @@ const GENERATED_ASSET_LABELS: Record<GeneratedApplicationAssetType, string> = {
   pitch: 'Pitch',
   cover_message: 'Message recruteur',
   cv_summary: 'Résumé CV',
+};
+
+const CONNECTED_SYNC_ENTITY_LABELS: Record<ConnectedSyncEntity, string> = {
+  missions: 'Missions',
+  applications: 'Candidatures',
+  candidate_profile: 'Profil CV',
+  connector_health: 'Santé connecteurs',
 };
 
 export function parseDashboardFavoriteMission(
@@ -676,6 +735,84 @@ export function healthEventsToPlatformSyncStatuses(
     status: healthEventToPlatformStatus(event.status),
     lastSyncAt: event.occurred_at,
   }));
+}
+
+export function syncRowsToConnectedSyncStatuses(
+  rows: DashboardSyncStatusRow[],
+  devicesById: Map<string, DashboardExtensionDeviceRow>
+): ConnectedSyncStatus[] {
+  return rows
+    .flatMap((row) => {
+      if (!isConnectedSyncEntity(row.entity)) {
+        return [];
+      }
+
+      const device = devicesById.get(row.device_id) ?? null;
+
+      return [
+        {
+          deviceId: row.device_id,
+          deviceLabel: formatExtensionDeviceLabel(device, row.device_id),
+          entity: row.entity,
+          label: CONNECTED_SYNC_ENTITY_LABELS[row.entity],
+          state: getConnectedSyncState(row),
+          lastPullAt: row.last_pull_at,
+          lastPushAt: row.last_push_at,
+          pendingUploadCount: row.pending_upload_count,
+          pendingDownloadCount: row.pending_download_count,
+          lastErrorCode: row.last_error_code,
+          lastErrorMessage: row.last_error_message,
+          updatedAt: row.updated_at,
+        },
+      ];
+    })
+    .sort(
+      (a, b) =>
+        getConnectedSyncStateRank(a.state) - getConnectedSyncStateRank(b.state) ||
+        b.updatedAt.localeCompare(a.updatedAt) ||
+        a.label.localeCompare(b.label)
+    );
+}
+
+function formatExtensionDeviceLabel(
+  device: DashboardExtensionDeviceRow | null,
+  fallbackId: string
+): string {
+  if (!device) {
+    return `Extension ${fallbackId.slice(0, 8)}`;
+  }
+
+  const browser = device.browser ?? 'Chrome';
+  return `${browser} ${device.extension_version}`;
+}
+
+function getConnectedSyncState(row: DashboardSyncStatusRow): ConnectedSyncState {
+  if (row.last_error_code || row.last_error_message) {
+    return 'error';
+  }
+
+  if (row.pending_upload_count > 0 || row.pending_download_count > 0) {
+    return 'pending';
+  }
+
+  if (row.last_pull_at || row.last_push_at) {
+    return 'healthy';
+  }
+
+  return 'idle';
+}
+
+function getConnectedSyncStateRank(state: ConnectedSyncState): number {
+  if (state === 'error') {
+    return 0;
+  }
+  if (state === 'pending') {
+    return 1;
+  }
+  if (state === 'idle') {
+    return 2;
+  }
+  return 3;
 }
 
 export function getNextApplicationStages(stage: ApplicationStage): ApplicationStage[] {

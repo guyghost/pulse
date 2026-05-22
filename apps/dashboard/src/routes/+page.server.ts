@@ -17,6 +17,7 @@ import {
   missionRowsToFeedItems,
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
+  syncRowsToConnectedSyncStatuses,
   type DashboardCandidateProfileRow,
   type DashboardCandidateEducationRow,
   type DashboardCandidateExperienceRow,
@@ -26,12 +27,15 @@ import {
   type DashboardCanonicalMissionRow,
   type DashboardCanonicalMissionScoreRow,
   type DashboardConnectorHealthEventRow,
+  type DashboardExtensionDeviceRow,
   type DashboardGeneratedApplicationAssetRow,
   type DashboardMissionDuplicateRow,
   type DashboardMissionFeedApplicationRow,
   type DashboardMissionFeedRow,
   type DashboardMissionFeedScoreRow,
   type DashboardProfileImportRow,
+  type DashboardSyncStatusRow,
+  type ConnectedSyncStatus,
   type CvSnapshot,
   type DashboardAccountEntitlements,
   type DashboardSubscriptionStatus,
@@ -214,6 +218,37 @@ const mockSyncStatuses: PlatformSyncStatus[] = [
   },
 ];
 
+const mockConnectedSyncStatuses: ConnectedSyncStatus[] = [
+  {
+    deviceId: 'device-preview',
+    deviceLabel: 'Chrome 0.4.0',
+    entity: 'missions',
+    label: 'Missions',
+    state: 'healthy',
+    lastPullAt: '2026-05-22T08:00:00.000Z',
+    lastPushAt: '2026-05-22T08:05:00.000Z',
+    pendingUploadCount: 0,
+    pendingDownloadCount: 0,
+    lastErrorCode: null,
+    lastErrorMessage: null,
+    updatedAt: '2026-05-22T08:05:00.000Z',
+  },
+  {
+    deviceId: 'device-preview',
+    deviceLabel: 'Chrome 0.4.0',
+    entity: 'candidate_profile',
+    label: 'Profil CV',
+    state: 'pending',
+    lastPullAt: '2026-05-22T07:00:00.000Z',
+    lastPushAt: null,
+    pendingUploadCount: 1,
+    pendingDownloadCount: 0,
+    lastErrorCode: null,
+    lastErrorMessage: null,
+    updatedAt: '2026-05-22T08:10:00.000Z',
+  },
+];
+
 type DashboardProfileRow = {
   subscription_status: string | null;
   subscription_period_end: string | null;
@@ -302,6 +337,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       generatedAssets: mockGeneratedAssets,
       cv: mockCv,
       syncStatuses: mockSyncStatuses,
+      connectedSyncStatuses: mockConnectedSyncStatuses,
     };
   }
 
@@ -491,6 +527,32 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
   const syncStatuses = healthEventsToPlatformSyncStatuses(connectorHealthRows ?? []);
 
+  const { data: extensionDeviceRows } = await supabase
+    .from('extension_devices')
+    .select('id, install_id, browser, extension_version, last_seen_at')
+    .eq('user_id', session.user.id)
+    .order('last_seen_at', { ascending: false, nullsFirst: false })
+    .limit(10)
+    .returns<DashboardExtensionDeviceRow[]>();
+
+  const extensionDeviceIds = (extensionDeviceRows ?? []).map((device) => device.id);
+  const { data: syncStatusRows } =
+    extensionDeviceIds.length > 0
+      ? await supabase
+          .from('sync_status')
+          .select(
+            'device_id, entity, last_pull_at, last_push_at, pending_upload_count, pending_download_count, last_error_code, last_error_message, updated_at'
+          )
+          .eq('user_id', session.user.id)
+          .in('device_id', extensionDeviceIds)
+          .returns<DashboardSyncStatusRow[]>()
+      : { data: [] };
+
+  const connectedSyncStatuses = syncRowsToConnectedSyncStatuses(
+    syncStatusRows ?? [],
+    new Map((extensionDeviceRows ?? []).map((device) => [device.id, device]))
+  );
+
   return {
     session,
     loginUrl,
@@ -510,6 +572,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
         )
       : mockCv,
     syncStatuses: syncStatuses.length > 0 ? syncStatuses : mockSyncStatuses,
+    connectedSyncStatuses,
   };
 };
 

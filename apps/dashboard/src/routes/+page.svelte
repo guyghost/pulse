@@ -12,6 +12,7 @@
   import type { ActionData, PageData } from './$types';
   import type {
     ApplicationStage,
+    ConnectedSyncStatus,
     DashboardAccountEntitlements,
     DashboardFeatureAccess,
     DashboardFeatureArea,
@@ -30,6 +31,7 @@
   const generatedAssets = $derived(data.generatedAssets as GeneratedApplicationAsset[]);
   const cv = $derived(data.cv as CvSnapshot);
   const syncStatuses = $derived(data.syncStatuses as PlatformSyncStatus[]);
+  const connectedSyncStatuses = $derived(data.connectedSyncStatuses as ConnectedSyncStatus[]);
   const entitlements = $derived(data.entitlements as DashboardAccountEntitlements);
   const featureAccess = $derived(data.featureAccess as DashboardFeatureAccess[]);
   const counts = $derived(countApplicationsByStage(applications));
@@ -106,6 +108,13 @@
     'needs-extension': 'Extension requise',
     'needs-session': 'Session requise',
     syncing: 'Synchronisation',
+  };
+
+  const connectedSyncStateLabels: Record<ConnectedSyncStatus['state'], string> = {
+    healthy: 'Synchronisé',
+    pending: 'En attente',
+    error: 'Erreur',
+    idle: 'Initial',
   };
 
   const importStatusLabels: Record<CvSnapshot['imports'][number]['status'], string> = {
@@ -993,6 +1002,84 @@
               est activée uniquement pour les comptes connectés; le dashboard prépare le plan, l'extension
               exécute la mise à jour dans les sessions navigateur existantes.
             </p>
+
+            <div class="mt-5 rounded-lg border border-border-light bg-page-canvas p-3">
+              <div class="flex items-center justify-between gap-3">
+                <div>
+                  <p class="text-xs font-medium uppercase text-text-subtle">File de sync</p>
+                  <p class="mt-1 text-sm text-text-subtle">
+                    {connectedSyncStatuses.length} entités suivies via Supabase
+                  </p>
+                </div>
+                <Badge
+                  label={connectedSyncStatuses.some((status) => status.state === 'error')
+                    ? 'Action requise'
+                    : connectedSyncStatuses.some((status) => status.state === 'pending')
+                      ? 'En attente'
+                      : 'Stable'}
+                  variant={connectedSyncStatuses.some((status) => status.state === 'error')
+                    ? 'warning'
+                    : 'success'}
+                />
+              </div>
+
+              <div class="mt-3 space-y-2">
+                {#if connectedSyncStatuses.length === 0}
+                  <p
+                    class="rounded-lg border border-dashed border-border-light bg-surface-white p-3 text-xs leading-5 text-text-subtle"
+                  >
+                    Aucun appareil extension enregistré dans Supabase pour le moment.
+                  </p>
+                {/if}
+
+                {#each connectedSyncStatuses as status}
+                  <article class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <div>
+                        <p class="text-sm font-medium text-text-primary">{status.label}</p>
+                        <p class="mt-1 text-xs text-text-subtle">{status.deviceLabel}</p>
+                      </div>
+                      <Badge
+                        label={connectedSyncStateLabels[status.state]}
+                        variant={status.state === 'error'
+                          ? 'warning'
+                          : status.state === 'healthy'
+                            ? 'success'
+                            : 'source'}
+                      />
+                    </div>
+
+                    <div class="mt-3 grid grid-cols-2 gap-2 text-xs">
+                      <div class="rounded-lg bg-page-canvas px-2 py-2">
+                        <p class="text-text-muted">Upload</p>
+                        <p class="mt-1 font-medium text-text-primary">
+                          {status.pendingUploadCount} en attente
+                        </p>
+                      </div>
+                      <div class="rounded-lg bg-page-canvas px-2 py-2">
+                        <p class="text-text-muted">Download</p>
+                        <p class="mt-1 font-medium text-text-primary">
+                          {status.pendingDownloadCount} en attente
+                        </p>
+                      </div>
+                    </div>
+
+                    <p class="mt-2 text-xs leading-5 text-text-subtle">
+                      Push: {formatDate(status.lastPushAt)} · Pull: {formatDate(status.lastPullAt)}
+                    </p>
+
+                    {#if status.lastErrorMessage}
+                      <p
+                        class="mt-2 rounded-md border border-status-orange/20 bg-status-orange/8 px-2 py-1.5 text-xs leading-5 text-status-orange"
+                      >
+                        {status.lastErrorCode ?? 'sync_error'}: {status.lastErrorMessage}
+                      </p>
+                    {/if}
+                  </article>
+                {/each}
+              </div>
+            </div>
+
             <div class="mt-5 space-y-3">
               {#each syncStatuses as platform}
                 <div

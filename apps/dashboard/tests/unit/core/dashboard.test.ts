@@ -17,6 +17,7 @@ import {
   missionRowsToFeedItems,
   parseDashboardFavoriteMission,
   profileRowsToCvSnapshot,
+  syncRowsToConnectedSyncStatuses,
   type ApplicationSource,
   type CvSnapshot,
   type DashboardAccountEntitlements,
@@ -558,6 +559,114 @@ describe('dashboard core', () => {
         name: 'LinkedIn',
         status: 'needs-session',
         lastSyncAt: '2026-05-21T09:00:00.000Z',
+      },
+    ]);
+  });
+
+  it('maps sync rows to dashboard connected sync statuses ordered by actionability', () => {
+    expect(
+      syncRowsToConnectedSyncStatuses(
+        [
+          {
+            device_id: 'device-1',
+            entity: 'missions',
+            last_pull_at: '2026-05-22T07:00:00.000Z',
+            last_push_at: '2026-05-22T08:00:00.000Z',
+            pending_upload_count: 0,
+            pending_download_count: 0,
+            last_error_code: null,
+            last_error_message: null,
+            updated_at: '2026-05-22T08:00:00.000Z',
+          },
+          {
+            device_id: 'device-1',
+            entity: 'applications',
+            last_pull_at: '2026-05-22T07:00:00.000Z',
+            last_push_at: null,
+            pending_upload_count: 2,
+            pending_download_count: 1,
+            last_error_code: null,
+            last_error_message: null,
+            updated_at: '2026-05-22T09:00:00.000Z',
+          },
+          {
+            device_id: 'device-2',
+            entity: 'candidate_profile',
+            last_pull_at: null,
+            last_push_at: null,
+            pending_upload_count: 0,
+            pending_download_count: 0,
+            last_error_code: 'sync_failed',
+            last_error_message: 'Supabase indisponible',
+            updated_at: '2026-05-22T06:00:00.000Z',
+          },
+          {
+            device_id: 'device-1',
+            entity: 'unknown',
+            last_pull_at: null,
+            last_push_at: null,
+            pending_upload_count: 0,
+            pending_download_count: 0,
+            last_error_code: null,
+            last_error_message: null,
+            updated_at: '2026-05-22T10:00:00.000Z',
+          },
+        ],
+        new Map([
+          [
+            'device-1',
+            {
+              id: 'device-1',
+              install_id: 'install-1',
+              browser: 'Chrome',
+              extension_version: '0.4.0',
+              last_seen_at: '2026-05-22T08:30:00.000Z',
+            },
+          ],
+        ])
+      )
+    ).toEqual([
+      {
+        deviceId: 'device-2',
+        deviceLabel: 'Extension device-2',
+        entity: 'candidate_profile',
+        label: 'Profil CV',
+        state: 'error',
+        lastPullAt: null,
+        lastPushAt: null,
+        pendingUploadCount: 0,
+        pendingDownloadCount: 0,
+        lastErrorCode: 'sync_failed',
+        lastErrorMessage: 'Supabase indisponible',
+        updatedAt: '2026-05-22T06:00:00.000Z',
+      },
+      {
+        deviceId: 'device-1',
+        deviceLabel: 'Chrome 0.4.0',
+        entity: 'applications',
+        label: 'Candidatures',
+        state: 'pending',
+        lastPullAt: '2026-05-22T07:00:00.000Z',
+        lastPushAt: null,
+        pendingUploadCount: 2,
+        pendingDownloadCount: 1,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        updatedAt: '2026-05-22T09:00:00.000Z',
+      },
+      {
+        deviceId: 'device-1',
+        deviceLabel: 'Chrome 0.4.0',
+        entity: 'missions',
+        label: 'Missions',
+        state: 'healthy',
+        lastPullAt: '2026-05-22T07:00:00.000Z',
+        lastPushAt: '2026-05-22T08:00:00.000Z',
+        pendingUploadCount: 0,
+        pendingDownloadCount: 0,
+        lastErrorCode: null,
+        lastErrorMessage: null,
+        updatedAt: '2026-05-22T08:00:00.000Z',
       },
     ]);
   });
