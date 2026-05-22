@@ -55,7 +55,7 @@
   <meta name="title" content="MissionPulse — Votre radar freelance" />
   <meta
     name="description"
-    content="MissionPulse scanne 5 plateformes freelance (Free-Work, LeHibou, Hiway, Collective, Cherry Pick) et vous livre les missions les plus pertinentes avec scoring IA. 100% gratuit, 100% local."
+    content="MissionPulse scanne 5 plateformes freelance (Free-Work, LeHibou, Hiway, Collective, Cherry Pick) depuis votre navigateur et synchronise le dashboard connecté sur demande."
   />
   <meta
     name="keywords"
@@ -70,7 +70,7 @@
   <meta property="og:title" content="MissionPulse — Votre radar freelance" />
   <meta
     property="og:description"
-    content="5 plateformes. Un seul panneau. Scoring IA. MissionPulse scanne Free-Work, LeHibou, Hiway, Collective et Cherry Pick en arrière-plan."
+    content="5 plateformes. Un side panel local. Un dashboard connecté optionnel. MissionPulse scanne Free-Work, LeHibou, Hiway, Collective et Cherry Pick en arrière-plan."
   />
   <meta property="og:image" content="https://missionpulse.app/og-image.png" />
   <meta property="og:locale" content="fr_FR" />
@@ -82,7 +82,7 @@
   <meta name="twitter:title" content="MissionPulse — Votre radar freelance" />
   <meta
     name="twitter:description"
-    content="5 plateformes. Un seul panneau. Scoring IA. Extension Chrome gratuite pour freelances tech."
+    content="5 plateformes. Side panel local. Dashboard connecté optionnel. Extension Chrome gratuite pour freelances tech."
   />
   <meta name="twitter:image" content="https://missionpulse.app/og-image.png" />
 </svelte:head>
@@ -552,8 +552,8 @@
         <div class="stat-item__label">Plateformes scannées</div>
       </div>
       <div class="stat-item fade-in fade-in-delay-1">
-        <div class="stat-item__value">100%</div>
-        <div class="stat-item__label">Données locales</div>
+        <div class="stat-item__value">Local</div>
+        <div class="stat-item__label">Exécution navigateur</div>
       </div>
       <div class="stat-item fade-in fade-in-delay-2">
         <div class="stat-item__value">IA</div>
@@ -780,10 +780,11 @@
             <circle cx="12" cy="16" r="1" />
           </svg>
         </div>
-        <h3 class="feature-card__title">100% local &amp; privé</h3>
+        <h3 class="feature-card__title">Local-first &amp; privé</h3>
         <p class="feature-card__desc">
-          Aucun serveur, aucun tracking, aucune collecte. Vos données restent sur votre machine. Le
-          scoring IA tourne en local via Gemini Nano.
+          Les plateformes sont consultées depuis vos sessions navigateur, sans stocker vos
+          identifiants. La synchronisation cloud du dashboard est optionnelle et limitée aux
+          snapshots normalisés.
         </p>
       </article>
     </div>
