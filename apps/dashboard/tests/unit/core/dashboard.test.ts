@@ -5,6 +5,7 @@ import {
   filterApplications,
   favoriteMissionToApplication,
   buildApplicationStageUpdatePatch,
+  generatedAssetRowsToHistory,
   getNextApplicationStages,
   getAverageApplicationScore,
   healthEventsToPlatformSyncStatuses,
@@ -357,6 +358,76 @@ describe('dashboard core', () => {
         duplicateCount: 1,
         applicationStage: 'selected',
         freshness: 'fresh',
+      },
+    ]);
+  });
+
+  it('maps generated application asset rows to dashboard history', () => {
+    const longContent =
+      'Bonjour, je peux accompagner votre équipe sur la migration Svelte avec une approche progressive, un design system stable et une attention forte portée à la qualité TypeScript.';
+
+    expect(
+      generatedAssetRowsToHistory(
+        [
+          {
+            id: 'asset-older',
+            application_id: 'app-001',
+            type: 'pitch',
+            content: 'Pitch court',
+            model: 'gemini-nano',
+            created_at: '2026-05-21T08:00:00.000Z',
+          },
+          {
+            id: 'asset-latest',
+            application_id: 'app-001',
+            type: 'cover_message',
+            content: longContent.repeat(2),
+            model: 'gemini-nano',
+            created_at: '2026-05-22T08:00:00.000Z',
+          },
+          {
+            id: 'asset-unknown-type',
+            application_id: 'app-001',
+            type: 'unknown',
+            content: 'ignored',
+            model: 'gemini-nano',
+            created_at: '2026-05-23T08:00:00.000Z',
+          },
+          {
+            id: 'asset-missing-application',
+            application_id: 'missing',
+            type: 'pitch',
+            content: 'ignored',
+            model: 'gemini-nano',
+            created_at: '2026-05-24T08:00:00.000Z',
+          },
+        ],
+        new Map(applications.map((application) => [application.id, application]))
+      )
+    ).toEqual([
+      {
+        id: 'asset-latest',
+        applicationId: 'app-001',
+        applicationTitle: 'Lead Svelte',
+        company: 'Atelier Nova',
+        type: 'cover_message',
+        label: 'Message recruteur',
+        content: longContent.repeat(2),
+        preview: `${longContent.repeat(2).slice(0, 177).trimEnd()}...`,
+        model: 'gemini-nano',
+        createdAt: '2026-05-22T08:00:00.000Z',
+      },
+      {
+        id: 'asset-older',
+        applicationId: 'app-001',
+        applicationTitle: 'Lead Svelte',
+        company: 'Atelier Nova',
+        type: 'pitch',
+        label: 'Pitch',
+        content: 'Pitch court',
+        preview: 'Pitch court',
+        model: 'gemini-nano',
+        createdAt: '2026-05-21T08:00:00.000Z',
       },
     ]);
   });

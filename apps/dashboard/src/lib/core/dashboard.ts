@@ -71,6 +71,21 @@ export interface MissionApplication {
   nextActionAt: string | null;
 }
 
+export type GeneratedApplicationAssetType = 'pitch' | 'cover_message' | 'cv_summary';
+
+export interface GeneratedApplicationAsset {
+  id: string;
+  applicationId: string;
+  applicationTitle: string;
+  company: string;
+  type: GeneratedApplicationAssetType;
+  label: string;
+  content: string;
+  preview: string;
+  model: string;
+  createdAt: string;
+}
+
 export type MissionFreshness = 'fresh' | 'stale';
 
 export interface MissionFeedItem {
@@ -182,6 +197,15 @@ export interface DashboardCanonicalMissionRow {
 export interface DashboardCanonicalMissionScoreRow {
   mission_id: string;
   total_score: number;
+}
+
+export interface DashboardGeneratedApplicationAssetRow {
+  id: string;
+  application_id: string;
+  type: string;
+  content: string;
+  model: string;
+  created_at: string;
 }
 
 export interface DashboardMissionFeedRow {
@@ -303,6 +327,10 @@ function isApplicationStage(value: unknown): value is ApplicationStage {
   return APPLICATION_STAGES.includes(value as ApplicationStage);
 }
 
+function isGeneratedApplicationAssetType(value: unknown): value is GeneratedApplicationAssetType {
+  return value === 'pitch' || value === 'cover_message' || value === 'cv_summary';
+}
+
 const SOURCE_LABELS: Record<ApplicationSource, string> = {
   linkedin: 'LinkedIn',
   'free-work': 'Free-Work',
@@ -312,6 +340,12 @@ const SOURCE_LABELS: Record<ApplicationSource, string> = {
   'cherry-pick': 'Cherry Pick',
   malt: 'Malt',
   other: 'Autre',
+};
+
+const GENERATED_ASSET_LABELS: Record<GeneratedApplicationAssetType, string> = {
+  pitch: 'Pitch',
+  cover_message: 'Message recruteur',
+  cv_summary: 'Résumé CV',
 };
 
 export function parseDashboardFavoriteMission(
@@ -465,6 +499,46 @@ function countMissionDuplicates(rows: DashboardMissionDuplicateRow[]): Map<strin
   }
 
   return counts;
+}
+
+export function generatedAssetRowsToHistory(
+  rows: DashboardGeneratedApplicationAssetRow[],
+  applicationsById: Map<string, MissionApplication>
+): GeneratedApplicationAsset[] {
+  return rows
+    .flatMap((row) => {
+      const application = applicationsById.get(row.application_id);
+
+      if (!application || !isGeneratedApplicationAssetType(row.type)) {
+        return [];
+      }
+
+      return [
+        {
+          id: row.id,
+          applicationId: row.application_id,
+          applicationTitle: application.title,
+          company: application.company,
+          type: row.type,
+          label: GENERATED_ASSET_LABELS[row.type],
+          content: row.content,
+          preview: createGeneratedAssetPreview(row.content),
+          model: row.model,
+          createdAt: row.created_at,
+        },
+      ];
+    })
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
+}
+
+function createGeneratedAssetPreview(content: string): string {
+  const normalized = content.replace(/\s+/g, ' ').trim();
+
+  if (normalized.length <= 180) {
+    return normalized;
+  }
+
+  return `${normalized.slice(0, 177).trimEnd()}...`;
 }
 
 export function profileRowsToCvSnapshot(

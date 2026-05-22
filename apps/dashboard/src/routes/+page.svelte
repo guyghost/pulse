@@ -17,6 +17,7 @@
     DashboardFeatureArea,
     DashboardFeatureRequirement,
     CvSnapshot,
+    GeneratedApplicationAsset,
     MissionApplication,
     MissionFeedItem,
     PlatformSyncStatus,
@@ -26,6 +27,7 @@
 
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
   const applications = $derived(data.applications as MissionApplication[]);
+  const generatedAssets = $derived(data.generatedAssets as GeneratedApplicationAsset[]);
   const cv = $derived(data.cv as CvSnapshot);
   const syncStatuses = $derived(data.syncStatuses as PlatformSyncStatus[]);
   const entitlements = $derived(data.entitlements as DashboardAccountEntitlements);
@@ -41,6 +43,7 @@
   let selectedSource = $state<'all' | MissionApplication['source']>('all');
   let selectedApplicationId = $state<string | null>(null);
   let syncPrepared = $state(false);
+  let copiedAssetId = $state<string | null>(null);
   const averageScore = $derived(getAverageApplicationScore(applications));
   const nextFollowUp = $derived(getNextFollowUp(applications));
   const sourceFilters: { label: string; value: 'all' | MissionApplication['source'] }[] = [
@@ -74,6 +77,12 @@
   const selectedNextStages = $derived(
     selectedApplication ? getNextApplicationStages(selectedApplication.stage) : []
   );
+  const selectedGeneratedAssets = $derived(
+    selectedApplication
+      ? generatedAssets.filter((asset) => asset.applicationId === selectedApplication.id)
+      : []
+  );
+  const recentGeneratedAssets = $derived(generatedAssets.slice(0, 5));
   const syncBlockers = $derived(getSyncBlockers(cv, syncStatuses));
   const readyPlatforms = $derived(syncStatuses.filter((platform) => platform.status === 'ready'));
   const cvSyncAccess = $derived(featureAccess.find((feature) => feature.id === 'cv-sync') ?? null);
@@ -132,6 +141,11 @@
     Object.entries(counts)
       .map(([field, count]) => `${field}: ${count}`)
       .join(' · ');
+
+  const copyGeneratedAsset = async (asset: GeneratedApplicationAsset) => {
+    await navigator.clipboard.writeText(asset.content);
+    copiedAssetId = asset.id;
+  };
 </script>
 
 <svelte:head>
@@ -742,8 +756,98 @@
                   Compte requis pour modifier le pipeline.
                 </p>
               {/if}
+
+              <div class="mt-5 border-t border-border-light pt-4">
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-xs font-medium uppercase text-text-subtle">
+                      Assistant candidature
+                    </p>
+                    <p class="mt-1 text-sm text-text-subtle">
+                      {selectedGeneratedAssets.length} contenus générés pour cette mission
+                    </p>
+                  </div>
+                  <Badge
+                    label={selectedGeneratedAssets.length > 0 ? 'Historique' : 'À préparer'}
+                    variant={selectedGeneratedAssets.length > 0 ? 'success' : 'warning'}
+                  />
+                </div>
+
+                <div class="mt-3 space-y-3">
+                  {#if selectedGeneratedAssets.length === 0}
+                    <div
+                      class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3"
+                    >
+                      <p class="text-xs leading-5 text-text-subtle">
+                        Aucun pitch, message recruteur ou résumé CV synchronisé pour cette
+                        candidature. Les contenus créés dans l'extension apparaîtront ici.
+                      </p>
+                    </div>
+                  {/if}
+
+                  {#each selectedGeneratedAssets as asset}
+                    <article class="rounded-lg border border-border-light bg-page-canvas p-3">
+                      <div class="flex items-start justify-between gap-3">
+                        <div>
+                          <p class="text-sm font-medium text-text-primary">{asset.label}</p>
+                          <p class="mt-1 text-xs text-text-subtle">
+                            {asset.model} · {formatDate(asset.createdAt)}
+                          </p>
+                        </div>
+                        <button
+                          type="button"
+                          class="inline-flex h-7 shrink-0 items-center rounded-md border border-border-light bg-surface-white px-2 text-xs font-medium text-text-primary hover:border-blueprint-blue/35 hover:text-blueprint-blue"
+                          onclick={() => copyGeneratedAsset(asset)}
+                        >
+                          {copiedAssetId === asset.id ? 'Copié' : 'Copier'}
+                        </button>
+                      </div>
+                      <p class="mt-3 text-xs leading-5 text-text-subtle">{asset.preview}</p>
+                    </article>
+                  {/each}
+                </div>
+              </div>
             </section>
           {/if}
+
+          <section class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm">
+            <div class="flex items-start justify-between gap-4">
+              <div>
+                <p class="eyebrow text-text-subtle">Historique IA</p>
+                <h2 class="mt-2 text-lg font-semibold">Assets générés</h2>
+              </div>
+              <Badge label={`${generatedAssets.length}`} variant="source" size="md" />
+            </div>
+
+            <div class="mt-4 space-y-3">
+              {#if recentGeneratedAssets.length === 0}
+                <p
+                  class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
+                >
+                  Aucun contenu généré synchronisé pour le moment.
+                </p>
+              {/if}
+
+              {#each recentGeneratedAssets as asset}
+                <article class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <p class="text-sm font-medium text-text-primary">{asset.label}</p>
+                      <p class="mt-1 truncate text-xs text-text-subtle">
+                        {asset.applicationTitle} · {asset.company}
+                      </p>
+                    </div>
+                    <span class="shrink-0 text-[10px] text-text-muted">
+                      {formatDate(asset.createdAt)}
+                    </span>
+                  </div>
+                  <p class="mt-2 line-clamp-2 text-xs leading-5 text-text-subtle">
+                    {asset.preview}
+                  </p>
+                </article>
+              {/each}
+            </div>
+          </section>
 
           <section
             id="cv"

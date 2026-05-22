@@ -11,6 +11,7 @@ import {
   buildApplicationStageUpdatePatch,
   canonicalRowsToApplications,
   favoriteMissionToApplication,
+  generatedAssetRowsToHistory,
   getDashboardFeatureAccess,
   healthEventsToPlatformSyncStatuses,
   missionRowsToFeedItems,
@@ -25,6 +26,7 @@ import {
   type DashboardCanonicalMissionRow,
   type DashboardCanonicalMissionScoreRow,
   type DashboardConnectorHealthEventRow,
+  type DashboardGeneratedApplicationAssetRow,
   type DashboardMissionDuplicateRow,
   type DashboardMissionFeedApplicationRow,
   type DashboardMissionFeedRow,
@@ -33,6 +35,7 @@ import {
   type CvSnapshot,
   type DashboardAccountEntitlements,
   type DashboardSubscriptionStatus,
+  type GeneratedApplicationAsset,
   type MissionApplication,
   type MissionFeedItem,
   type PlatformSyncStatus,
@@ -74,6 +77,37 @@ const mockApplications: MissionApplication[] = [
     location: 'Lyon',
     appliedAt: null,
     nextActionAt: '2026-05-20',
+  },
+];
+
+const mockGeneratedAssets: GeneratedApplicationAsset[] = [
+  {
+    id: 'asset-preview-1',
+    applicationId: 'app-001',
+    applicationTitle: 'Lead Svelte / TypeScript',
+    company: 'Atelier Nova',
+    type: 'pitch',
+    label: 'Pitch',
+    content:
+      "Bonjour, je peux accompagner Atelier Nova sur la mission Lead Svelte avec une approche progressive, des standards TypeScript stricts et une forte expérience d'architecture frontend.",
+    preview:
+      "Bonjour, je peux accompagner Atelier Nova sur la mission Lead Svelte avec une approche progressive, des standards TypeScript stricts et une forte expérience d'architecture frontend.",
+    model: 'gemini-nano',
+    createdAt: '2026-05-20T08:30:00.000Z',
+  },
+  {
+    id: 'asset-preview-2',
+    applicationId: 'app-002',
+    applicationTitle: 'Architecte Frontend freelance',
+    company: 'ScaleOps',
+    type: 'cv_summary',
+    label: 'Résumé CV',
+    content:
+      'Résumé orienté architecture frontend, design systems et migration progressive pour mission freelance senior.',
+    preview:
+      'Résumé orienté architecture frontend, design systems et migration progressive pour mission freelance senior.',
+    model: 'gemini-nano',
+    createdAt: '2026-05-18T09:00:00.000Z',
   },
 ];
 
@@ -265,6 +299,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
       missionFeed: mockMissionFeed,
       applications: mockApplications,
+      generatedAssets: mockGeneratedAssets,
       cv: mockCv,
       syncStatuses: mockSyncStatuses,
     };
@@ -364,6 +399,24 @@ export const load: PageServerLoad = async ({ cookies }) => {
     new Map((canonicalScoreRows ?? []).map((row) => [row.mission_id, row]))
   );
 
+  const canonicalApplicationIds = canonicalApplications.map((application) => application.id);
+  const { data: generatedAssetRows } =
+    canonicalApplicationIds.length > 0
+      ? await supabase
+          .from('generated_application_assets')
+          .select('id, application_id, type, content, model, created_at')
+          .eq('user_id', session.user.id)
+          .in('application_id', canonicalApplicationIds)
+          .order('created_at', { ascending: false })
+          .limit(50)
+          .returns<DashboardGeneratedApplicationAssetRow[]>()
+      : { data: [] };
+
+  const generatedAssets = generatedAssetRowsToHistory(
+    generatedAssetRows ?? [],
+    new Map(canonicalApplications.map((application) => [application.id, application]))
+  );
+
   const { data: favoriteRows } = await supabase
     .from('favorite_missions')
     .select('mission_id, mission, favorited_at')
@@ -445,6 +498,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
     featureAccess: getDashboardFeatureAccess(entitlements, new Date()),
     missionFeed,
     applications: canonicalApplications.length > 0 ? canonicalApplications : syncedApplications,
+    generatedAssets,
     cv: candidateProfile
       ? profileRowsToCvSnapshot(
           candidateProfile,
