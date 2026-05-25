@@ -2,7 +2,7 @@
   "$schema": "https://openapi.vercel.sh/microfrontends.json",
   "version": "1",
   "applications": {
-    "landing": {
+    "pulse": {
       "packageName": "@pulse/landing",
       "development": {
         "task": "dev",
@@ -10,7 +10,7 @@
         "fallback": "https://missionpulse.app"
       }
     },
-    "dashboard": {
+    "pulse-dashboard": {
       "packageName": "@pulse/dashboard",
       "routing": [
         {
