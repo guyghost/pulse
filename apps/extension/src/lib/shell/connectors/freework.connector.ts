@@ -4,10 +4,22 @@ import type { ConnectorSearchContext } from '../../core/connectors/search-contex
 import { parseFreeWorkAPI, type FreeWorkApiResponse } from '../../core/connectors/freework-parser';
 import { delayBetweenPages } from '../utils/rate-limiter';
 import { type Result, type AppError, ok, err, createConnectorError } from '$lib/core/errors';
+import {
+  type RequestHeaderRuleHeader,
+  injectRequestHeaderRule,
+  removeCookieRule,
+} from './cookie-rules';
 
 const BASE_URL = 'https://www.free-work.com';
 const API_BASE = `${BASE_URL}/api/job_postings`;
 const ITEMS_PER_PAGE = 50;
+const HEADER_RULE_ID = 3;
+const REQUEST_DOMAIN = 'www.free-work.com';
+const URL_FILTER = '|https://www.free-work.com/api/';
+const FREEWORK_HEADERS: RequestHeaderRuleHeader[] = [
+  { header: 'Origin', value: BASE_URL },
+  { header: 'Referer', value: `${BASE_URL}/` },
+];
 /** Max age in days — stop paginating when missions are older than this */
 const MAX_AGE_DAYS = 30;
 
@@ -56,6 +68,12 @@ export class FreeWorkConnector extends BaseConnector {
     context?: ConnectorSearchContext
   ): Promise<Result<Mission[], AppError>> {
     try {
+      await injectRequestHeaderRule({
+        ruleId: HEADER_RULE_ID,
+        urlFilter: URL_FILTER,
+        requestDomains: [REQUEST_DOMAIN],
+        requestHeaders: FREEWORK_HEADERS,
+      });
       const allMissions: Mission[] = [];
 
       for (let page = 1; ; page++) {
@@ -182,6 +200,8 @@ export class FreeWorkConnector extends BaseConnector {
           now
         )
       );
+    } finally {
+      await removeCookieRule(HEADER_RULE_ID);
     }
   }
 }

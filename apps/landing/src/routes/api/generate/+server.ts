@@ -10,36 +10,9 @@ import {
   isPremiumProfileActive,
   refundGenerationCredit,
 } from '$lib/server/credits';
+import { parseGenerateBodyText, type GenerateBody } from '$lib/server/generate-validation';
 
-type GenerationType = 'pitch' | 'cover-message' | 'cv-summary';
-
-interface GenerateBody {
-  missionId?: string;
-  type?: GenerationType;
-  prompt?: string;
-  mission?: {
-    title?: string;
-    description?: string;
-    client?: string;
-    stack?: string[];
-    location?: string;
-  };
-  profile?: {
-    jobTitle?: string;
-    stack?: string[];
-    seniority?: string;
-    location?: string;
-  };
-}
-
-function buildPrompt(body: GenerateBody): string | null {
-  if (body.prompt?.trim()) {
-    return body.prompt.trim();
-  }
-  if (!body.type || !body.mission || !body.profile) {
-    return null;
-  }
-
+function buildPrompt(body: GenerateBody): string {
   const mission = body.mission;
   const profile = body.profile;
   const generationLabel =
@@ -95,9 +68,23 @@ export const POST: RequestHandler = async ({ request }) => {
   }
 
   const userId = user.id;
-  const admin = createSupabaseAdminClient();
+
+  // Parse and validate request body before any credit mutation. Direct prompt
+  // injection is intentionally not part of the accepted schema.
+  const parsedBody = parseGenerateBodyText(
+    await request.text(),
+    request.headers.get('content-length')
+  );
+  if (!parsedBody.ok) {
+    return json({ error: parsedBody.error }, { status: parsedBody.status });
+  }
+
+  const body = parsedBody.body;
+  const { type } = body;
+  const prompt = buildPrompt(body);
 
   // Check credit status
+  const admin = createSupabaseAdminClient();
   const { data: profile } = await supabase
     .from('profiles')
     .select('subscription_status, subscription_period_end, credit_balance')
@@ -120,15 +107,6 @@ export const POST: RequestHandler = async ({ request }) => {
       },
       { status: 402 }
     );
-  }
-
-  // Parse request body
-  const body = (await request.json()) as GenerateBody;
-  const { type } = body;
-  const prompt = buildPrompt(body);
-
-  if (!prompt || !type) {
-    return json({ error: 'Missing prompt or type' }, { status: 400 });
   }
 
   const glmApiKey = env.GLM_API_KEY;

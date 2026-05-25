@@ -3,14 +3,19 @@ import type { Mission } from '../../core/types/mission';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import { type Result, type AppError, ok, err, createConnectorError } from '$lib/core/errors';
 import { createMission, stripHtml } from '$lib/core/connectors/parser-utils';
-import { injectCookieRule, removeCookieRule } from './cookie-rules';
+import { type RequestHeaderRuleHeader, injectCookieRule, removeCookieRule } from './cookie-rules';
 
 const API_BASE = 'https://api.lehibou.com/api';
 const MISSIONS_URL = `${API_BASE}/search/mission/list`;
 const COOKIE_DOMAIN = '.lehibou.com';
 const COOKIE_RULE_ID = 10;
-const URL_FILTER = 'api.lehibou.com';
+const REQUEST_DOMAIN = 'api.lehibou.com';
+const URL_FILTER = '|https://api.lehibou.com/api/';
 const ITEMS_PER_PAGE = 50;
+const LEHIBOU_HEADERS: RequestHeaderRuleHeader[] = [
+  { header: 'Origin', value: 'https://www.lehibou.com' },
+  { header: 'Referer', value: 'https://www.lehibou.com/' },
+];
 
 interface LeHibouMission {
   id: string;
@@ -88,7 +93,13 @@ export class LeHibouConnector extends BaseConnector {
     context?: ConnectorSearchContext
   ): Promise<Result<Mission[], AppError>> {
     try {
-      await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
+      await injectCookieRule(
+        COOKIE_DOMAIN,
+        URL_FILTER,
+        COOKIE_RULE_ID,
+        [REQUEST_DOMAIN],
+        LEHIBOU_HEADERS
+      );
       const allMissions: Mission[] = [];
 
       for (let page = 1; ; page++) {
@@ -116,7 +127,6 @@ export class LeHibouConnector extends BaseConnector {
         });
 
         if (!response.ok) {
-          await removeCookieRule(COOKIE_RULE_ID);
           return err(
             createConnectorError(
               `LeHibou API error: ${response.status}`,
@@ -158,10 +168,8 @@ export class LeHibouConnector extends BaseConnector {
         }
       }
 
-      await removeCookieRule(COOKIE_RULE_ID);
       return ok(allMissions);
     } catch (e) {
-      await removeCookieRule(COOKIE_RULE_ID);
       const message = e instanceof Error ? e.message : String(e);
       return err(
         createConnectorError(
@@ -170,6 +178,8 @@ export class LeHibouConnector extends BaseConnector {
           now
         )
       );
+    } finally {
+      await removeCookieRule(COOKIE_RULE_ID);
     }
   }
 }

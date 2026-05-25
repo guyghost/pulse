@@ -13,6 +13,52 @@ export interface CookieRuleResult {
   warning?: string;
 }
 
+export const CONNECTOR_DYNAMIC_RULE_IDS = [1, 2, 3, 10, 11] as const;
+
+export interface RequestHeaderRuleHeader {
+  header: string;
+  value: string;
+}
+
+export interface RequestHeaderRuleOptions {
+  ruleId: number;
+  urlFilter: string;
+  requestDomains: string[];
+  requestHeaders: RequestHeaderRuleHeader[];
+  priority?: number;
+}
+
+export const injectRequestHeaderRule = async ({
+  ruleId,
+  urlFilter,
+  requestDomains,
+  requestHeaders,
+  priority = 2,
+}: RequestHeaderRuleOptions): Promise<void> => {
+  await chrome.declarativeNetRequest.updateDynamicRules({
+    removeRuleIds: [ruleId],
+    addRules: [
+      {
+        id: ruleId,
+        priority,
+        action: {
+          type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
+          requestHeaders: requestHeaders.map(({ header, value }) => ({
+            header,
+            operation: 'set' as chrome.declarativeNetRequest.HeaderOperation,
+            value,
+          })),
+        },
+        condition: {
+          urlFilter,
+          requestDomains,
+          resourceTypes: ['xmlhttprequest' as chrome.declarativeNetRequest.ResourceType],
+        },
+      },
+    ],
+  });
+};
+
 /**
  * Injects a declarativeNetRequest rule to attach cookies to cross-origin requests.
  * This is necessary because `credentials: 'include'` from extension context
@@ -21,12 +67,16 @@ export interface CookieRuleResult {
  * @param cookieDomain - Domain to fetch cookies from (e.g., '.example.com')
  * @param urlFilter - URL filter pattern for the rule (e.g., 'api.example.com')
  * @param ruleId - Unique rule ID for this connector
+ * @param requestDomains - Exact request domains where the rule may apply
+ * @param additionalRequestHeaders - Additional headers to set for this same request window
  * @returns CookieRuleResult with success status and diagnostics
  */
 export const injectCookieRule = async (
   cookieDomain: string,
   urlFilter: string,
-  ruleId: number
+  ruleId: number,
+  requestDomains: string[],
+  additionalRequestHeaders: RequestHeaderRuleHeader[] = []
 ): Promise<CookieRuleResult> => {
   const cookies = await chrome.cookies.getAll({ domain: cookieDomain });
   const cookieCount = cookies.length;
@@ -49,28 +99,11 @@ export const injectCookieRule = async (
     );
   }
 
-  await chrome.declarativeNetRequest.updateDynamicRules({
-    removeRuleIds: [ruleId],
-    addRules: [
-      {
-        id: ruleId,
-        priority: 2,
-        action: {
-          type: 'modifyHeaders' as chrome.declarativeNetRequest.RuleActionType,
-          requestHeaders: [
-            {
-              header: 'Cookie',
-              operation: 'set' as chrome.declarativeNetRequest.HeaderOperation,
-              value: cookieHeader,
-            },
-          ],
-        },
-        condition: {
-          urlFilter,
-          resourceTypes: ['xmlhttprequest' as chrome.declarativeNetRequest.ResourceType],
-        },
-      },
-    ],
+  await injectRequestHeaderRule({
+    ruleId,
+    urlFilter,
+    requestDomains,
+    requestHeaders: [{ header: 'Cookie', value: cookieHeader }, ...additionalRequestHeaders],
   });
 
   return { success: true, cookieCount };
@@ -86,6 +119,16 @@ export const removeCookieRule = async (ruleId: number): Promise<void> => {
     await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [ruleId] });
   } catch {
     // Rule may not exist — ignore
+  }
+};
+
+export const clearConnectorDynamicRules = async (
+  ruleIds: readonly number[] = CONNECTOR_DYNAMIC_RULE_IDS
+): Promise<void> => {
+  try {
+    await chrome.declarativeNetRequest.updateDynamicRules({ removeRuleIds: [...ruleIds] });
+  } catch {
+    // Cleanup is best-effort; connectors re-inject their short-lived rules when needed.
   }
 };
 
