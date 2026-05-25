@@ -110,7 +110,7 @@ export class HiwayConnector extends BaseConnector {
       // so server-side filtering is unreliable. Filter here after numeric parsing.
       const tjmMin = context?.tjmMin;
       const filtered =
-        tjmMin != null && tjmMin > 0
+        tjmMin !== null && tjmMin !== undefined && tjmMin > 0
           ? missions.filter((m) => m.tjm === null || m.tjm >= tjmMin)
           : missions;
 

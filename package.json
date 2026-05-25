@@ -18,14 +18,20 @@
     "supabase:stop": "supabase stop --workdir apps/landing",
     "supabase:status": "supabase status --workdir apps/landing",
     "supabase:reset": "supabase db reset --workdir apps/landing",
+    "ci:check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
     "clean": "turbo clean && rm -rf node_modules .turbo",
     "prepare": "simple-git-hooks"
   },
   "simple-git-hooks": {
-    "pre-commit": "pnpm lint-staged"
+    "pre-commit": "pnpm lint-staged",
+    "pre-push": "pnpm ci:check"
   },
   "lint-staged": {
-    "*.{ts,svelte}": [
+    "apps/extension/**/*.{ts,svelte}": [
+      "pnpm --filter @pulse/extension exec eslint --fix",
+      "prettier --write"
+    ],
+    "{apps/dashboard,apps/landing,packages}/**/*.{ts,svelte}": [
       "prettier --write"
     ],
     "*.{css,json,md}": [
