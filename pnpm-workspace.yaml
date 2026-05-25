@@ -1,3 +1,9 @@
 packages:
   - "apps/*"
   - "packages/*"
+overrides:
+  devalue: ">=5.6.4"
+  picomatch: ">=4.0.4"
+  rollup: ">=4.0.0"
+onlyBuiltDependencies:
+  - esbuild

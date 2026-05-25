@@ -1,5 +1,5 @@
-import type { Actions, PageServerLoad } from './$types';
-import { fail, redirect } from '@sveltejs/kit';
+import type { PageServerLoad } from './$types';
+import { redirect } from '@sveltejs/kit';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 
 const defaultRedirectPath = '/dashboard';
@@ -32,26 +32,4 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
     email: '',
     redirectTo,
   };
-};
-
-export const actions: Actions = {
-  login: async ({ request, cookies }) => {
-    const formData = await request.formData();
-    const email = formData.get('email') as string;
-    const password = formData.get('password') as string;
-    const redirectTo = normalizeRedirectPath(formData.get('redirectTo'));
-
-    if (!email || !password) {
-      return fail(400, { error: 'Email et mot de passe requis', email, redirectTo });
-    }
-
-    const supabase = createSupabaseServerClient(cookies);
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
-
-    if (error) {
-      return fail(400, { error: error.message, email, redirectTo });
-    }
-
-    redirect(303, redirectTo);
-  },
 };

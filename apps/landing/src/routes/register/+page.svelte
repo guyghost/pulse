@@ -1,26 +1,25 @@
 <script lang="ts">
-  import { enhance } from '$app/forms';
-
-  type RegisterForm = {
-    email?: string;
-    success?: boolean;
-  };
-
-  let { form }: { form?: RegisterForm } = $props();
+  import { passkeyErrorMessage, requestPasskeyAccountSetup } from '$lib/auth/passkey';
 
   let formError = $state<string | undefined>(undefined);
   let email = $state('');
-  let success = $state(false);
-  let successEmail = $state('');
+  let linkSent = $state(false);
   let submitting = $state(false);
 
-  $effect(() => {
-    const dataEmail = form?.email ?? '';
+  async function handlePasskeyRegistration(event: SubmitEvent) {
+    event.preventDefault();
+    submitting = true;
+    formError = undefined;
 
-    email = dataEmail;
-    success = form?.success ?? false;
-    successEmail = dataEmail;
-  });
+    try {
+      await requestPasskeyAccountSetup(email);
+      linkSent = true;
+    } catch (error) {
+      formError = passkeyErrorMessage(error);
+    } finally {
+      submitting = false;
+    }
+  }
 </script>
 
 <svelte:head>
@@ -57,58 +56,27 @@
 <main class="auth-page">
   <div class="container">
     <div class="auth-card glass-card">
-      {#if success}
-        <div class="auth-success">
-          <div class="auth-success__icon">
-            <svg
-              width="48"
-              height="48"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M22 11.08V12a10 10 0 1 1-5.93-9.14" />
-              <polyline points="22 4 12 14.01 9 11.01" />
-            </svg>
-          </div>
+      {#if linkSent}
+        <div class="auth-card__header">
           <h1>Vérifiez votre email</h1>
+          <p>Le lien securise ouvrira la derniere etape de creation du passkey.</p>
+        </div>
+
+        <div class="auth-message" data-testid="register-link-sent">
           <p>
-            Un email de confirmation a été envoyé à
-            <strong>{successEmail}</strong>. Cliquez sur le lien pour activer votre compte.
+            Nous avons envoye un lien a <strong>{email}</strong>. Ouvrez-le dans ce navigateur pour
+            enregistrer votre passkey et acceder au dashboard.
           </p>
-          <a href="/login" class="btn btn--primary">Aller à la connexion</a>
         </div>
       {:else}
         <div class="auth-card__header">
           <h1>Créer un compte</h1>
-          <p>Commencez avec MissionPulse gratuitement</p>
+          <p>Demarrez sans mot de passe, puis finalisez avec un passkey</p>
         </div>
 
-        <form
-          class="auth-form"
-          method="POST"
-          action="?/register"
-          use:enhance={() => {
-            submitting = true;
-            formError = undefined;
-            return async ({ result, update }) => {
-              submitting = false;
-              if (result.type === 'failure' && result.data?.error) {
-                formError = result.data.error as string;
-              }
-              if (result.type === 'success' && result.data?.success) {
-                success = true;
-                successEmail = result.data.email as string;
-              }
-              await update();
-            };
-          }}
-        >
+        <form class="auth-form" onsubmit={handlePasskeyRegistration}>
           {#if formError}
-            <div class="form-error" role="alert">
+            <div class="form-error" role="alert" data-testid="register-passkey-error">
               <svg
                 width="16"
                 height="16"
@@ -137,54 +105,37 @@
               placeholder="vous@exemple.com"
               bind:value={email}
               required
-              autocomplete="email"
+              autocomplete="email webauthn"
+              data-testid="register-email"
             />
           </div>
 
-          <div class="form-group">
-            <label for="password" class="form-label">Mot de passe</label>
-            <input
-              id="password"
-              name="password"
-              type="password"
-              class="form-input"
-              placeholder="Minimum 8 caractères"
-              required
-              autocomplete="new-password"
-              minlength="8"
-            />
-          </div>
-
-          <div class="form-group">
-            <label for="confirmPassword" class="form-label">Confirmer le mot de passe</label>
-            <input
-              id="confirmPassword"
-              name="confirmPassword"
-              type="password"
-              class="form-input"
-              placeholder="••••••••"
-              required
-              autocomplete="new-password"
-              minlength="8"
-            />
-          </div>
-
-          <button type="submit" class="btn btn--primary auth-submit" disabled={submitting}>
+          <button
+            type="submit"
+            class="btn btn--primary auth-submit"
+            disabled={submitting}
+            data-testid="register-passkey-submit"
+          >
             {#if submitting}
-              Création…
+              Envoi du lien...
             {:else}
-              Créer mon compte
+              Recevoir mon lien de creation
             {/if}
           </button>
-        </form>
 
-        <div class="auth-footer">
-          <p>
-            Déjà un compte ?
-            <a href="/login">Se connecter</a>
+          <p class="auth-note">
+            Le lien valide votre email, puis MissionPulse demandera le passkey natif de votre
+            appareil avant d'ouvrir le dashboard.
           </p>
-        </div>
+        </form>
       {/if}
+
+      <div class="auth-footer">
+        <p>
+          Déjà un compte ?
+          <a href="/login">Se connecter</a>
+        </p>
+      </div>
     </div>
   </div>
 </main>
@@ -280,6 +231,23 @@
     font-size: 0.875rem;
   }
 
+  .auth-message {
+    padding: var(--spacing-24);
+    background: color-mix(in srgb, var(--color-blueprint-blue) 8%, var(--color-surface-white));
+    border: 1px solid color-mix(in srgb, var(--color-blueprint-blue) 18%, var(--color-border-light));
+    border-radius: var(--radius-md);
+    color: var(--color-text-secondary);
+    line-height: 1.7;
+  }
+
+  .auth-message p {
+    margin: 0;
+  }
+
+  .auth-message strong {
+    color: var(--color-text-primary);
+  }
+
   .auth-submit {
     width: 100%;
     margin-top: var(--spacing-8);
@@ -288,6 +256,14 @@
   .auth-submit:disabled {
     opacity: 0.6;
     cursor: not-allowed;
+  }
+
+  .auth-note {
+    margin: 0;
+    color: var(--color-text-subtle);
+    font-size: 0.875rem;
+    line-height: 1.6;
+    text-align: center;
   }
 
   .auth-footer {
@@ -305,40 +281,5 @@
   .auth-footer a {
     color: var(--color-blueprint-blue);
     font-weight: 500;
-  }
-
-  .auth-success {
-    text-align: center;
-    padding: var(--spacing-32) 0;
-  }
-
-  .auth-success__icon {
-    width: 64px;
-    height: 64px;
-    margin: 0 auto var(--spacing-24);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    background: color-mix(in srgb, var(--color-blueprint-blue) 10%, var(--color-surface-white));
-    border: 1px solid color-mix(in srgb, var(--color-blueprint-blue) 20%, var(--color-border-light));
-    border-radius: var(--radius-full);
-    color: var(--color-blueprint-blue);
-  }
-
-  .auth-success h1 {
-    font-size: 1.5rem;
-    font-weight: var(--font-weight-medium);
-    margin-bottom: var(--spacing-16);
-  }
-
-  .auth-success p {
-    font-size: 0.9375rem;
-    color: var(--color-text-secondary);
-    line-height: 1.7;
-    margin-bottom: var(--spacing-32);
-  }
-
-  .auth-success strong {
-    color: var(--color-text-primary);
   }
 </style>

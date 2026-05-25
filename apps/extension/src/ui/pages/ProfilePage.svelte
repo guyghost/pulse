@@ -12,17 +12,68 @@
 
   settings.load();
 
-  const profileCompleteness = $derived.by(() => {
-    const checks = [
-      settings.firstName.trim().length > 0,
-      settings.jobTitle.trim().length > 0,
-      settings.profileLocation.trim().length > 0,
-      settings.profileStack.length > 0,
-      settings.tjmMin > 0,
-      settings.tjmMax > 0,
-      settings.searchKeywords.length > 0,
+  const profileCompletionItems = $derived.by(() => {
+    return [
+      {
+        complete: settings.firstName.trim().length > 0,
+        label: 'Prénom',
+        impact: 'personnalise les textes générés',
+      },
+      {
+        complete: settings.jobTitle.trim().length > 0,
+        label: 'Poste cible',
+        impact: 'cadre les recherches connecteurs',
+      },
+      {
+        complete: settings.profileLocation.trim().length > 0,
+        label: 'Localisation',
+        impact: 'pondère les missions proches ou hybrides',
+      },
+      {
+        complete: settings.profileStack.length > 0,
+        label: 'Stack technique',
+        impact: 'alimente le scoring de pertinence',
+      },
+      {
+        complete: settings.tjmMin > 0,
+        label: 'TJM minimum',
+        impact: 'filtre les missions sous votre plancher',
+      },
+      {
+        complete: settings.tjmMax > 0,
+        label: 'TJM maximum',
+        impact: 'calibre les fourchettes réalistes',
+      },
+      {
+        complete: settings.searchKeywords.length > 0,
+        label: 'Mots-clés de recherche',
+        impact: 'enrichit les requêtes envoyées aux plateformes',
+      },
     ];
+  });
+
+  const missingProfileItems = $derived(
+    profileCompletionItems.filter((item) => !item.complete).map((item) => item.label)
+  );
+
+  const profileCompleteness = $derived.by(() => {
+    const checks = profileCompletionItems.map((item) => item.complete);
     return Math.round((checks.filter(Boolean).length / checks.length) * 100);
+  });
+
+  const completionExplanation = $derived.by(() => {
+    if (missingProfileItems.length === 0) {
+      return 'Profil complet : MissionPulse peut utiliser toutes vos préférences pour matcher les missions.';
+    }
+
+    const visibleMissingItems = missingProfileItems.slice(0, 2).join(', ');
+    const remainingCount = missingProfileItems.length - 2;
+    const missingSummary =
+      remainingCount > 0
+        ? `${visibleMissingItems} + ${remainingCount} autre${remainingCount > 1 ? 's' : ''}`
+        : visibleMissingItems;
+
+    return `Il manque ${missingProfileItems.length} élément${missingProfileItems.length > 1 ? 's' : ''} : ${missingSummary}.`;
   });
 
   const targetSummary = $derived(
@@ -69,6 +120,23 @@
       </div>
       <span class="text-xs font-medium text-text-primary">{profileCompleteness}%</span>
     </div>
+
+    <div class="mt-3 flex items-start gap-2 rounded-xl bg-surface-white/55 px-3 py-2">
+      <Icon
+        name={missingProfileItems.length === 0 ? 'check-circle' : 'info'}
+        size={14}
+        class="mt-0.5 shrink-0 text-blueprint-blue"
+      />
+      <div class="min-w-0">
+        <p class="text-[11px] font-medium leading-4 text-text-primary">{completionExplanation}</p>
+        {#if missingProfileItems.length > 0}
+          <p class="mt-0.5 text-[11px] leading-4 text-text-subtle">
+            Complétez ces champs pour améliorer les requêtes, le scoring et les suggestions de
+            candidature.
+          </p>
+        {/if}
+      </div>
+    </div>
   </section>
 
   <div class="mt-4 space-y-4">
@@ -94,22 +162,5 @@
       onAddKeyword={() => settings.addKeyword()}
       onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
     />
-
-    <section class="section-card rounded-xl p-5">
-      <div class="flex items-start gap-3">
-        <div
-          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
-        >
-          <Icon name="radar" size={14} class="text-blueprint-blue" />
-        </div>
-        <div>
-          <h3 class="text-sm font-medium text-text-primary">Impact sur le matching</h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Ces informations pilotent les requêtes connecteurs, le scoring des missions et les
-            textes de candidature générés.
-          </p>
-        </div>
-      </div>
-    </section>
   </div>
 </div>

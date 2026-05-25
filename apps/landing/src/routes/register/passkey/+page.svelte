@@ -1,20 +1,17 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { passkeyErrorMessage, signInWithPasskey } from '$lib/auth/passkey';
-
-  let { data } = $props();
+  import { passkeyErrorMessage, registerCurrentUserPasskey } from '$lib/auth/passkey';
 
   let formError = $state<string | undefined>(undefined);
   let submitting = $state(false);
-  const redirectTo = $derived(data.redirectTo ?? '/dashboard');
 
-  async function handlePasskeyLogin() {
+  async function handlePasskeyRegistration() {
     submitting = true;
     formError = undefined;
 
     try {
-      await signInWithPasskey();
-      await goto(redirectTo);
+      await registerCurrentUserPasskey();
+      await goto('/dashboard');
     } catch (error) {
       formError = passkeyErrorMessage(error);
     } finally {
@@ -24,12 +21,11 @@
 </script>
 
 <svelte:head>
-  <title>Connexion — MissionPulse</title>
-  <meta name="description" content="Connectez-vous à votre compte MissionPulse." />
+  <title>Passkey — MissionPulse</title>
+  <meta name="description" content="Finalisez votre compte MissionPulse avec un passkey." />
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
-<!-- Navigation -->
 <nav class="nav" aria-label="Navigation principale">
   <div class="container nav__container">
     <a href="/" class="nav__brand" aria-label="MissionPulse - Accueil">
@@ -47,10 +43,6 @@
       </div>
       <span class="nav__title">Mission<span>Pulse</span></span>
     </a>
-
-    <div class="nav__actions">
-      <a href="/" class="btn btn--ghost">← Accueil</a>
-    </div>
   </div>
 </nav>
 
@@ -58,13 +50,13 @@
   <div class="container">
     <div class="auth-card glass-card">
       <div class="auth-card__header">
-        <h1>Connexion</h1>
-        <p>Accédez à votre compte MissionPulse</p>
+        <h1>Créer votre passkey</h1>
+        <p>Derniere etape avant votre dashboard MissionPulse</p>
       </div>
 
       <div class="auth-form">
         {#if formError}
-          <div class="form-error" role="alert" data-testid="login-passkey-error">
+          <div class="form-error" role="alert" data-testid="register-passkey-final-error">
             <svg
               width="16"
               height="16"
@@ -87,26 +79,19 @@
           type="button"
           class="btn btn--primary auth-submit"
           disabled={submitting}
-          onclick={handlePasskeyLogin}
-          data-testid="login-passkey-submit"
+          onclick={handlePasskeyRegistration}
+          data-testid="register-passkey-final-submit"
         >
           {#if submitting}
-            Ouverture du passkey...
+            Creation du passkey...
           {:else}
-            Se connecter avec un passkey
+            Finaliser avec un passkey
           {/if}
         </button>
 
         <p class="auth-note">
-          Utilisez le passkey enregistre sur cet appareil ou synchronise dans votre gestionnaire de
-          mots de passe.
-        </p>
-      </div>
-
-      <div class="auth-footer">
-        <p>
-          Pas de compte ?
-          <a href="/register">Créer un compte</a>
+          Votre navigateur va ouvrir Touch ID, Windows Hello, une cle de securite ou votre
+          gestionnaire de mots de passe.
         </p>
       </div>
     </div>
@@ -184,22 +169,5 @@
     font-size: 0.875rem;
     line-height: 1.6;
     text-align: center;
-  }
-
-  .auth-footer {
-    text-align: center;
-    margin-top: var(--spacing-32);
-    padding-top: var(--spacing-24);
-    border-top: 1px solid var(--color-border-light);
-  }
-
-  .auth-footer p {
-    font-size: 0.875rem;
-    color: var(--color-text-secondary);
-  }
-
-  .auth-footer a {
-    color: var(--color-blueprint-blue);
-    font-weight: 500;
   }
 </style>

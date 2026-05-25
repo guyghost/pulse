@@ -19,6 +19,9 @@ importers:
       simple-git-hooks:
         specifier: ^2.13.1
         version: 2.13.1
+      supabase:
+        specifier: ^2.101.0
+        version: 2.101.0
       turbo:
         specifier: ^2.0.0
         version: 2.9.3
