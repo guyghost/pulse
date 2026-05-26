@@ -1,6 +1,9 @@
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
 
-const storage: Record<string, unknown> = {
+const STORAGE_KEY = 'missionpulse.dev.chromeStorage.local';
+const SESSION_STORAGE_KEY = 'missionpulse.dev.chromeStorage.session';
+
+const storageDefaults: Record<string, unknown> = {
   settings: {
     scanIntervalMinutes: 30,
     enabledConnectors: ['free-work'],
@@ -8,6 +11,36 @@ const storage: Record<string, unknown> = {
     autoScan: true,
   },
   tjm_history: generateMockTJMHistory(),
+};
+
+function readPersistentStore(key: string): Record<string, unknown> {
+  try {
+    const raw = globalThis.localStorage?.getItem(key);
+    if (!raw) {
+      return {};
+    }
+    const parsed = JSON.parse(raw);
+    return parsed && typeof parsed === 'object' ? (parsed as Record<string, unknown>) : {};
+  } catch {
+    return {};
+  }
+}
+
+function writePersistentStore(key: string, value: Record<string, unknown>): void {
+  try {
+    globalThis.localStorage?.setItem(key, JSON.stringify(value));
+  } catch {
+    // Ignore persistence failures in dev stubs
+  }
+}
+
+const storage: Record<string, unknown> = {
+  ...storageDefaults,
+  ...readPersistentStore(STORAGE_KEY),
+};
+
+const sessionStorageState: Record<string, unknown> = {
+  ...readPersistentStore(SESSION_STORAGE_KEY),
 };
 
 function createChromeStubs() {
@@ -66,17 +99,21 @@ function createChromeStubs() {
         },
         set: async (items: Record<string, unknown>) => {
           Object.assign(storage, items);
+          writePersistentStore(STORAGE_KEY, storage);
         },
         remove: async (keys: string | string[]) => {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
           for (const k of keyArr) {
             delete storage[k];
           }
+          writePersistentStore(STORAGE_KEY, storage);
         },
         clear: async () => {
           for (const k of Object.keys(storage)) {
             delete storage[k];
           }
+          Object.assign(storage, storageDefaults);
+          writePersistentStore(STORAGE_KEY, storage);
         },
       },
       session: {
@@ -84,20 +121,22 @@ function createChromeStubs() {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
           const result: Record<string, unknown> = {};
           for (const k of keyArr) {
-            if (k in storage) {
-              result[k] = storage[k];
+            if (k in sessionStorageState) {
+              result[k] = sessionStorageState[k];
             }
           }
           return result;
         },
         set: async (items: Record<string, unknown>) => {
-          Object.assign(storage, items);
+          Object.assign(sessionStorageState, items);
+          writePersistentStore(SESSION_STORAGE_KEY, sessionStorageState);
         },
         remove: async (keys: string | string[]) => {
           const keyArr = typeof keys === 'string' ? [keys] : keys;
           for (const k of keyArr) {
-            delete storage[k];
+            delete sessionStorageState[k];
           }
+          writePersistentStore(SESSION_STORAGE_KEY, sessionStorageState);
         },
       },
       onChanged: {

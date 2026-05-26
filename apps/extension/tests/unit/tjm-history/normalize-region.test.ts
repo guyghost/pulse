@@ -71,6 +71,7 @@ describe('normalizeRegion', () => {
   it('maps Grenoble variants', () => {
     expect(normalizeRegion('Grenoble')).toBe('grenoble');
     expect(normalizeRegion('Meylan')).toBe('grenoble');
+    expect(normalizeRegion('Échirolles')).toBe('grenoble');
   });
 
   it('maps Montpellier', () => {

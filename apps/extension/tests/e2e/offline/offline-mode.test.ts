@@ -124,7 +124,7 @@ test.describe('Offline Mode', () => {
     await expect(hideBtn).toBeVisible();
     await hideBtn.click();
 
-    await expect(page.getByRole('button', { name: /Voir les 1 mission masquee/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Voir les 1 mission masquée/ })).toBeVisible();
   });
 
   test('search works with cached missions while offline', async ({ page }) => {
@@ -138,7 +138,8 @@ test.describe('Offline Mode', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    const searchInput = page.getByRole('textbox', { name: 'Rechercher' });
+    await searchInput.fill('React');
     await page.waitForTimeout(500);
 
     const resultsText = await page.locator('text=/\\d+ mission/').first().textContent();
@@ -147,7 +148,7 @@ test.describe('Offline Mode', () => {
     const resultsCount = parseInt(resultsText?.match(/\d+/)?.[0] || '0', 10);
     expect(resultsCount).toBeLessThanOrEqual(initialCount);
 
-    await page.getByPlaceholder('Rechercher...').clear();
+    await searchInput.clear();
     await page.waitForTimeout(300);
     await expect(page.getByText(`${initialCount} missions`, { exact: true }).first()).toBeVisible({
       timeout: 2000,

@@ -10,18 +10,35 @@ export const SIDE_PANEL = '/src/sidepanel/index.html';
 // ============================================================================
 
 export async function waitForDevPanel(page: Page) {
-  await page.locator('button:has-text("Ctrl+Shift+D")').waitFor({ state: 'visible' });
+  await page.waitForLoadState('domcontentloaded');
 }
 
 export async function openDevPanel(page: Page) {
   await waitForDevPanel(page);
   await page.keyboard.press('Control+Shift+D');
-  await expect(page.getByText('DEV PANEL')).toBeVisible();
+  const panel = page.getByText('DEV PANEL');
+  const opened = await panel.isVisible().catch(() => false);
+  if (!opened) {
+    const launcher = page.locator('button:has-text("Ctrl+Shift+D")');
+    if (await launcher.isVisible().catch(() => false)) {
+      await launcher.click();
+    }
+  }
+  await expect(panel).toBeVisible();
 }
 
 export async function closeDevPanel(page: Page) {
-  await page.keyboard.press('Control+Shift+D');
-  await expect(page.getByText('DEV PANEL')).not.toBeVisible();
+  const panel = page.getByText('DEV PANEL');
+  if (await panel.isVisible().catch(() => false)) {
+    await page.keyboard.press('Control+Shift+D');
+    if (await panel.isVisible().catch(() => false)) {
+      const closeButton = page.locator('button').filter({ has: page.locator('svg') }).first();
+      if (await closeButton.isVisible().catch(() => false)) {
+        await closeButton.click();
+      }
+    }
+  }
+  await expect(panel).not.toBeVisible();
 }
 
 export async function setFeedState(page: Page, state: 'empty' | 'loading' | 'loaded' | 'error') {
@@ -47,8 +64,21 @@ export async function injectMissions(page: Page, count: number) {
 export async function clearAndInjectMissions(page: Page, count: number) {
   await setFeedState(page, 'empty');
   await page.waitForTimeout(200);
+  // In dev mode, an initial auto-scan may still resolve shortly after mount.
+  // Let that pending result flush before injecting a deterministic mission set.
+  await page.waitForTimeout(900);
   await injectMissions(page, count);
   await waitForMissions(page, count, 5000);
+}
+
+/**
+ * Reset persisted mission interaction state used by dev chrome stubs.
+ * Keeps tests deterministic across reloads and scenario boundaries.
+ */
+export async function resetStoredMissionState(page: Page) {
+  await page.evaluate(async () => {
+    await chrome.storage.local.remove(['favoriteMissions', 'hiddenMissions']);
+  });
 }
 
 // ============================================================================
@@ -246,7 +276,7 @@ export async function triggerScan(page: Page) {
  * Récupère la première carte mission visible
  */
 export async function getFirstMissionCard(page: Page): Promise<Locator> {
-  return page.locator('[role="button"]').first();
+  return page.locator('[role="button"][tabindex="0"]').first();
 }
 
 /**
@@ -384,10 +414,21 @@ export async function waitForLoadingComplete(page: Page, timeout = 5000) {
 export async function getDisplayedMissionCount(page: Page): Promise<number> {
   const badge = page.locator('[aria-label$="missions visibles"]');
   const label = await badge.getAttribute('aria-label').catch(() => null);
-  if (!label) {
+  if (label) {
+    const match = label.match(/(\d+)/);
+    return match ? parseInt(match[1], 10) : 0;
+  }
+
+  const missionText = await page
+    .locator('text=/^\\d+ missions?$/')
+    .first()
+    .textContent()
+    .catch(() => null);
+  if (!missionText) {
     return 0;
   }
-  const match = label.match(/(\d+)/);
+
+  const match = missionText.match(/(\d+)/);
   return match ? parseInt(match[1], 10) : 0;
 }
 
@@ -396,7 +437,9 @@ export async function getDisplayedMissionCount(page: Page): Promise<number> {
  * Utilise aria-label pour éviter les collisions de texte.
  */
 export async function expectMissionCount(page: Page, count: number, timeout = 5000) {
-  await expect(page.locator(`[aria-label="${count} missions visibles"]`)).toBeVisible({ timeout });
+  await expect
+    .poll(() => getDisplayedMissionCount(page), { timeout })
+    .toBe(count);
 }
 
 /**

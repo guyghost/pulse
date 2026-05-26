@@ -19,7 +19,7 @@ import { join } from 'node:path';
 import { runLeHibouHealthCheck } from './lehibou.health';
 
 const BASE_URL = 'https://www.lehibou.com';
-const MISSIONS_URL = 'https://www.lehibou.com/freelance/missions';
+const MISSIONS_URL = 'https://www.lehibou.com/en/freelance';
 const TIMEOUT = parseInt(process.env.HEALTH_CHECK_TIMEOUT ?? '60000', 10);
 
 test.describe('LeHibou Health Check', () => {
@@ -58,49 +58,45 @@ test.describe('LeHibou Health Check', () => {
     console.log(`[LeHibou] Missions page load time: ${responseTime}ms`);
   });
 
-  test('Mission card structure is present', async ({ page }) => {
+  test('Public mission entry points are present', async ({ page }) => {
     await page.goto(MISSIONS_URL, { timeout: TIMEOUT, waitUntil: 'networkidle' });
 
-    // Wait for mission cards to load
+    // Wait for page content to load
     await page.waitForTimeout(3000);
 
-    // Check for mission cards using structural selectors from parser
-    // Looking for links to /annonce/ which is the core structure
     const missionLinks = await page.locator('a[href*="/annonce/"]').count();
+    const expertiseLinks = await page.locator('a[href*="/freelance/"]').count();
 
-    console.log(`[LeHibou] Found ${missionLinks} mission links`);
+    console.log(
+      `[LeHibou] Found ${missionLinks} mission links and ${expertiseLinks} expertise links`
+    );
 
-    // If there are missions, check structure
     if (missionLinks > 0) {
       const firstLink = page.locator('a[href*="/annonce/"]').first();
       await expect(firstLink).toBeVisible();
-
-      // Check for heading inside card (title)
-      const hasHeading = (await firstLink.locator('h1, h2, h3').count()) > 0;
-      console.log(`[LeHibou] First card has heading: ${hasHeading}`);
+      return;
     }
+
+    expect(expertiseLinks, 'No public mission entry points found').toBeGreaterThan(0);
   });
 
-  test('Can extract mission data from cards', async ({ page }) => {
+  test('Can extract mission entry data from the public page', async ({ page }) => {
     await page.goto(MISSIONS_URL, { timeout: TIMEOUT, waitUntil: 'networkidle' });
     await page.waitForTimeout(3000);
 
     const missionLinks = await page.locator('a[href*="/annonce/"]').all();
+    const expertiseLinks = await page.locator('a[href*="/freelance/"]').all();
+    expect(
+      missionLinks.length + expertiseLinks.length,
+      'No public mission entries found on LeHibou'
+    ).toBeGreaterThan(0);
 
-    if (missionLinks.length === 0) {
-      // This might be expected if not logged in - check for login prompt
-      const hasLoginPrompt = (await page.locator('text=/connexion|login|inscri/i').count()) > 0;
-      console.log(`[LeHibou] No missions visible, login prompt present: ${hasLoginPrompt}`);
-      test.skip(!hasLoginPrompt, 'No missions found and no login prompt visible');
-      return;
-    }
-
-    // Extract data from first mission card (similar to parser logic)
-    const firstLink = missionLinks[0];
+    const firstLink = missionLinks[0] ?? expertiseLinks[0];
     const href = await firstLink.getAttribute('href');
     const text = await firstLink.textContent();
 
-    expect(href).toContain('/annonce/');
+    expect(href, 'Mission entry has no href').toBeTruthy();
+    expect(href, 'Unexpected mission entry path').toMatch(/\/annonce\/|\/freelance\//);
     expect(text?.trim().length, 'Mission card has no text content').toBeGreaterThan(0);
 
     console.log(`[LeHibou] Sample mission: ${href}`);

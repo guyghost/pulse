@@ -5,6 +5,9 @@
  */
 import type { TJMRegion } from '../types/tjm';
 
+const stripDiacritics = (value: string): string =>
+  value.normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
 /** Human-readable label for each region */
 export const REGION_LABELS: Record<TJMRegion, string> = {
   'ile-de-france': 'Île-de-France',
@@ -110,7 +113,7 @@ export const normalizeRegion = (
     return 'other';
   }
 
-  const lower = location.toLowerCase().trim();
+  const lower = stripDiacritics(location).toLowerCase().trim();
 
   if (!lower) {
     return 'other';
@@ -118,7 +121,7 @@ export const normalizeRegion = (
 
   for (const [keywords, region] of REGION_KEYWORDS) {
     for (const keyword of keywords) {
-      if (lower.includes(keyword)) {
+      if (lower.includes(stripDiacritics(keyword).toLowerCase())) {
         return region;
       }
     }

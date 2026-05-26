@@ -38,7 +38,8 @@ test.describe('Onboarding', () => {
     await page.locator('#ob-location').fill('Paris');
     await page.getByRole('button', { name: /C.est parti/ }).click();
 
-    await expect(page.getByRole('heading', { name: 'Radar freelance' })).toBeVisible();
+    await expect(page.getByText(/Bonjour, Guy|Radar freelance/)).toBeVisible();
+    await expect(page.getByRole('region', { name: /Missions tri/i })).toBeVisible();
     await expect(page.locator('#ob-firstname')).not.toBeVisible();
   });
 
@@ -47,7 +48,7 @@ test.describe('Onboarding', () => {
     await page.goto(SIDE_PANEL);
 
     await expect(page.locator('#ob-location')).toBeVisible();
-    await expect(page.getByLabel('Localisation souhaitee')).toBeVisible();
+    await expect(page.getByLabel(/Localisation souhait/i)).toBeVisible();
   });
 
   test('submit button disabled without firstName', async ({ page }) => {
@@ -73,7 +74,7 @@ test.describe('Onboarding', () => {
     // Either the feed is shown directly OR the onboarding form is NOT shown
     // Check for feed content or absence of onboarding form
     const hasMissions = await page
-      .getByText('Missions')
+      .getByRole('region', { name: /Missions tri/i })
       .isVisible()
       .catch(() => false);
     const hasGreeting = await page

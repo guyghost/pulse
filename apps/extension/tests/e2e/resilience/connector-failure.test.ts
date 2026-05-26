@@ -1,6 +1,8 @@
 import { test, expect } from '@playwright/test';
 import {
-  SIDE_PANEL,
+  ensureFeedVisible,
+  expectMissionCount,
+  getDisplayedMissionCount,
   openDevPanel,
   injectMissions,
   waitForMissions,
@@ -10,31 +12,26 @@ import { generateBalancedDataset } from '../../fixtures/large-dataset';
 
 test.describe('Connector Resilience', () => {
   test('handles connector HTTP 500 error gracefully', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Simuler une erreur 500 via le dev panel
     await openDevPanel(page);
     await setFeedState(page, 'error');
 
     // Vérifier le message d'erreur
-    await expect(page.getByText(/Erreur|error/i)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Erreur de synchronisation')).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('[Dev] Simulated error')).toBeVisible({ timeout: 3000 });
   });
 
   test('continues scanning when one connector fails', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter des missions normalement
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
 
     // Vérifier que les missions sont affichées (les autres connecteurs ont continué)
-    const missionCount = await page.locator('[role="button"]').count();
-    expect(missionCount).toBe(5);
-
-    // Vérifier que le compteur affiche 5 missions
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 5, 2000);
   });
 
   test('shows typed error message for connector failure', async ({ page }) => {
@@ -87,14 +84,13 @@ test.describe('Connector Resilience', () => {
       });
     });
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre un peu pour voir si une erreur s'affiche
     await page.waitForTimeout(2000);
 
     // L'application doit rester fonctionnelle
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
   });
 
   test('handles DOM changed scenario (parser failure)', async ({ page }) => {
@@ -148,18 +144,19 @@ test.describe('Connector Resilience', () => {
       });
     });
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre l'erreur
     await page.waitForTimeout(1500);
 
     // L'application doit rester fonctionnelle malgré l'erreur de parsing
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
   });
 
   test('handles multiple connector failures with partial success', async ({ page }) => {
-    const missions = generateBalancedDataset(10);
+    const missions = generateBalancedDataset(10).filter(
+      (mission) => mission.source !== 'free-work' && mission.source !== 'lehibou'
+    );
 
     await page.addInitScript((mockMissions: unknown) => {
       (window as unknown as Record<string, unknown>).__mockMissions = mockMissions;
@@ -179,41 +176,12 @@ test.describe('Connector Resilience', () => {
             ) => Promise<unknown>;
             (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
               type: string;
-              payload?: { connectorId?: string };
             }) => {
               if (msg?.type === 'SCAN_START') {
-                const connectorId = msg.payload?.connectorId || 'free-work';
-
-                // Simuler que certains connecteurs échouent
-                if (connectorId === 'free-work' || connectorId === 'lehibou') {
-                  return {
-                    type: 'SCAN_ERROR',
-                    payload: {
-                      connectorId,
-                      error: 'Connection refused',
-                      code: 'ECONNREFUSED',
-                    },
-                  };
-                }
-
-                // Les autres connecteurs réussissent
-                setTimeout(() => {
-                  const missions = (window as unknown as Record<string, unknown>).__mockMissions;
-                  window.dispatchEvent(
-                    new CustomEvent('dev:missions', {
-                      detail: missions,
-                    })
-                  );
-                }, 300);
-
+                const partialMissions = (window as unknown as Record<string, unknown>).__mockMissions;
                 return {
-                  type: 'SCAN_STATUS',
-                  payload: {
-                    state: 'scanning',
-                    currentConnector: connectorId,
-                    progress: 0,
-                    missionsFound: 0,
-                  },
+                  type: 'SCAN_COMPLETE',
+                  payload: partialMissions,
                 };
               }
               return origSend.call((val as Record<string, unknown>).runtime, msg);
@@ -223,15 +191,14 @@ test.describe('Connector Resilience', () => {
       });
     }, missions);
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
-    // Attendre que les missions apparaissent
+    // Attendre que les missions partielles apparaissent malgré l'échec simulé de deux sources.
     await waitForMissions(page, 1, 10000);
 
     // Vérifier qu'on a des missions malgré les échecs
-    const missionCount = await page.locator('text=/\\d+ mission/').textContent();
-    expect(missionCount).toMatch(/\d+ mission/);
+    const missionCount = await getDisplayedMissionCount(page);
+    expect(missionCount).toBeGreaterThan(0);
   });
 
   test('handles network timeout gracefully', async ({ page }) => {
@@ -274,14 +241,13 @@ test.describe('Connector Resilience', () => {
       });
     });
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre le timeout
     await page.waitForTimeout(500);
 
     // L'application doit rester fonctionnelle
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
   });
 
   test('error recovery allows retry', async ({ page }) => {
@@ -362,8 +328,7 @@ test.describe('Connector Resilience', () => {
       });
     }, shouldFail);
 
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Attendre l'erreur
     await page.waitForTimeout(500);

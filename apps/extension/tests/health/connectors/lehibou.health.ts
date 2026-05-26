@@ -1,7 +1,7 @@
 import { join } from 'node:path';
 import type { HealthCheckResult } from '../types';
 
-const MISSIONS_URL = 'https://www.lehibou.com/freelance/missions';
+const MISSIONS_URL = 'https://www.lehibou.com/en/freelance';
 const TIMEOUT = parseInt(process.env.HEALTH_CHECK_TIMEOUT ?? '60000', 10);
 
 export async function runLeHibouHealthCheck(screenshotDir: string): Promise<HealthCheckResult> {
@@ -61,12 +61,18 @@ export async function runLeHibouHealthCheck(screenshotDir: string): Promise<Heal
     await page.waitForTimeout(3000);
 
     const missionLinks = await page.locator('a[href*="/annonce/"]').count();
+    const expertiseLinks = await page
+      .locator('a[href*="/freelance/"]')
+      .filter({ hasNotText: 'Create my freelance profile' })
+      .count();
     const screenshotPath = join(screenshotDir, 'lehibou-missions.png');
     await page.screenshot({ path: screenshotPath, fullPage: false });
 
     const hasLoginPrompt = (await page.locator('text=/connexion|login|inscri/i').count()) > 0;
+    const hasMissionEntryPoint =
+      (await page.locator('text=/find a mission|trouver une mission/i').count()) > 0;
 
-    if (missionLinks === 0 && !hasLoginPrompt) {
+    if (missionLinks === 0 && expertiseLinks === 0 && !hasLoginPrompt && !hasMissionEntryPoint) {
       return {
         connectorId: 'lehibou',
         connectorName: 'LeHibou',
@@ -74,7 +80,7 @@ export async function runLeHibouHealthCheck(screenshotDir: string): Promise<Heal
         responseTimeMs: responseTime,
         timestamp,
         error:
-          'No mission cards found and no login prompt visible - site structure may have changed',
+          'No public mission entry points found - site structure may have changed',
         missionsFound: 0,
         screenshotPath,
       };
@@ -86,11 +92,13 @@ export async function runLeHibouHealthCheck(screenshotDir: string): Promise<Heal
       status: 'ok',
       responseTimeMs: responseTime,
       timestamp,
-      missionsFound: missionLinks,
+      missionsFound: missionLinks || expertiseLinks,
       screenshotPath,
       metadata: {
         requiresAuth: hasLoginPrompt,
         pageLoadComplete: true,
+        publicMissionCards: missionLinks,
+        publicExpertiseLinks: expertiseLinks,
       },
     };
   } catch (error) {

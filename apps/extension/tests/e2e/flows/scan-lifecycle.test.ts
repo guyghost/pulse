@@ -53,13 +53,14 @@ test.describe('Scan Lifecycle', () => {
     await waitForMissions(page, 10, 5000);
 
     // Search
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    const searchInput = page.getByRole('textbox', { name: 'Rechercher' });
+    await searchInput.fill('React');
     await page.waitForTimeout(500);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toHaveValue('React');
+    await expect(searchInput).toHaveValue('React');
 
     // Clear search restores all
-    await page.getByPlaceholder('Rechercher...').clear();
+    await searchInput.clear();
     await page.waitForTimeout(300);
     await expectMissionCount(page, 10);
   });

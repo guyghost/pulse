@@ -88,6 +88,8 @@ export function createFeedPageState(
   let seenIds = $state<string[]>([]);
   let favorites = $state<Record<string, number>>({});
   let hidden = $state<Record<string, number>>({});
+  let favoritesTouched = $state(false);
+  let hiddenTouched = $state(false);
 
   // Cleanup functions
   let cleanupFns: Array<() => void> = [];
@@ -193,11 +195,13 @@ export function createFeedPageState(
   }
 
   function handleToggleFavorite(id: string): void {
+    favoritesTouched = true;
     favorites = toggleFavorite(favorites, id, Date.now());
     saveFavorites(favorites).catch(() => {});
   }
 
   function handleHide(id: string): void {
+    hiddenTouched = true;
     hidden = toggleHidden(hidden, id, Date.now());
     saveHidden(hidden).catch(() => {});
   }
@@ -206,27 +210,15 @@ export function createFeedPageState(
     // Copy handled in MissionCard, callback for future analytics
   }
 
-  let searchDebounceTimer: ReturnType<typeof setTimeout> | null = null;
-  const SEARCH_DEBOUNCE_MS = 300;
-
   function handleSearch(query: string): void {
-    // Clear immediately when emptying
     if (!query) {
-      if (searchDebounceTimer) {
-        clearTimeout(searchDebounceTimer);
-      }
-      searchDebounceTimer = null;
       feedStore.clearSearch();
       return;
     }
-    // Debounce non-empty queries
-    if (searchDebounceTimer) {
-      clearTimeout(searchDebounceTimer);
-    }
-    searchDebounceTimer = setTimeout(() => {
-      feedStore.search(query);
-      searchDebounceTimer = null;
-    }, SEARCH_DEBOUNCE_MS);
+
+    // SearchInput already debounces user typing.
+    // Keep page state updates immediate to avoid stacked debounce lag.
+    feedStore.search(query);
   }
 
   function toggleFavoritesFilter(): void {
@@ -294,12 +286,16 @@ export function createFeedPageState(
     $effect(() => {
       getFavorites()
         .then((f) => {
-          favorites = f;
+          if (!favoritesTouched) {
+            favorites = f;
+          }
         })
         .catch(() => {});
       getHidden()
         .then((h) => {
-          hidden = h;
+          if (!hiddenTouched) {
+            hidden = h;
+          }
         })
         .catch(() => {});
     });
@@ -442,9 +438,6 @@ export function createFeedPageState(
   }
 
   function dispose(): void {
-    if (searchDebounceTimer) {
-      clearTimeout(searchDebounceTimer);
-    }
     for (const fn of cleanupFns) {
       fn();
     }

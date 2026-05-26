@@ -4,13 +4,13 @@
   import Button from '../atoms/Button.svelte';
 
   let {
-    firstName,
-    jobTitle,
-    profileLocation,
-    tjmMin,
-    tjmMax,
-    profileStack,
-    stackInput,
+    firstName = $bindable(),
+    jobTitle = $bindable(),
+    profileLocation = $bindable(),
+    tjmMin = $bindable(),
+    tjmMax = $bindable(),
+    profileStack = $bindable(),
+    stackInput = $bindable(),
     editing,
     profileSaved,
     profileError,

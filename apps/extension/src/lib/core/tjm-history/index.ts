@@ -494,7 +494,9 @@ const buildRegionInsights = (history: TJMHistory): TJMRegionInsight[] => {
 
   for (const record of history.records) {
     const region = record.region ?? 'other';
-    if (record.average <= 0) continue;
+    if (record.average <= 0) {
+      continue;
+    }
 
     const existing = groups.get(region);
     if (existing) {
@@ -518,7 +520,9 @@ const buildRegionInsights = (history: TJMHistory): TJMRegionInsight[] => {
   for (const group of groups.values()) {
     const { region, entries } = group;
     const totalSamples = entries.reduce((sum, e) => sum + e.sampleCount, 0);
-    if (totalSamples === 0) continue;
+    if (totalSamples === 0) {
+      continue;
+    }
 
     // Weighted average by sample count
     const weightedSum = entries.reduce((sum, e) => sum + e.average * e.sampleCount, 0);

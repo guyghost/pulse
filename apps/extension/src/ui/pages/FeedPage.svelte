@@ -75,7 +75,8 @@
                 class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-white/10 bg-white/6 text-white transition-all duration-200 hover:bg-white/10"
                 onclick={() => controller.startScan()}
                 disabled={controller.isScanning || page.isLoading || page.isOffline}
-                title="Lancer le scan (r)"
+                title="Rafraichir"
+                aria-label="Rafraichir"
               >
                 <Icon name="play" size={12} class="ml-0.5" />
               </button>
@@ -126,11 +127,8 @@
                     : 'border-white/10 bg-white/6 text-white hover:bg-white/10'}"
                 onclick={() => controller.startScan()}
                 disabled={controller.isScanning || page.isLoading || page.isOffline}
-                title={controller.isScanning || page.isLoading
-                  ? 'Scan en cours...'
-                  : page.isOffline
-                    ? 'Scan indisponible hors ligne'
-                    : 'Lancer le scan (r)'}
+                title="Rafraichir"
+                aria-label="Rafraichir"
               >
                 {#if controller.isScanning || page.isLoading}
                   <span class="absolute inset-0 flex items-center justify-center">
@@ -280,7 +278,8 @@
             : 'border-white/8 bg-white/4 text-text-secondary hover:bg-white/8 hover:text-white'}"
           onclick={page.toggleFavoritesFilter}
           aria-pressed={page.showFavoritesOnly}
-          title={page.showFavoritesOnly ? 'Voir toutes (f)' : `Favoris (${page.favoriteCount})`}
+          title={page.showFavoritesOnly ? 'Voir toutes' : 'Voir favoris'}
+          aria-label={page.showFavoritesOnly ? 'Voir toutes' : 'Voir favoris'}
         >
           <Icon name="star" size={14} class={page.showFavoritesOnly ? 'fill-accent-amber' : ''} />
           <span class="hidden @[20rem]:inline text-[11px] font-medium">Favoris</span>
@@ -374,6 +373,7 @@
 
   <div
     class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
+    data-testid="feed-scroll-container"
     use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
   >
     <VirtualMissionFeed

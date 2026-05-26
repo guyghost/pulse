@@ -1,10 +1,15 @@
 import { test, expect } from '@playwright/test';
-import { SIDE_PANEL, openDevPanel, closeDevPanel } from './helpers';
+import {
+  SIDE_PANEL,
+  closeDevPanel,
+  ensureFeedVisible,
+  expectMissionCount,
+  openDevPanel,
+} from './helpers';
 
 test.describe('DevPanel', () => {
   test('opens with Ctrl+Shift+D', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
     await openDevPanel(page);
 
     // Verify panel content is visible
@@ -13,16 +18,14 @@ test.describe('DevPanel', () => {
   });
 
   test('closes with Ctrl+Shift+D again', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
     await openDevPanel(page);
 
     await closeDevPanel(page);
   });
 
   test('shows all control sections', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
     await openDevPanel(page);
 
     await expect(page.getByText('Feed State')).toBeVisible();
@@ -31,8 +34,7 @@ test.describe('DevPanel', () => {
   });
 
   test('inject missions populates feed', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
     await openDevPanel(page);
 
     // Verify slider value before clicking
@@ -45,25 +47,21 @@ test.describe('DevPanel', () => {
     await closeDevPanel(page);
 
     // Verify exact count is displayed
-    await expect(page.getByText(new RegExp(`${injectCount} mission`))).toBeVisible({
-      timeout: 3000,
-    });
+    await expectMissionCount(page, injectCount, 3000);
   });
 
   test('toggle onboarding returns to onboarding screen', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
     await openDevPanel(page);
 
     await page.getByRole('button', { name: 'toggle onboarding' }).click();
 
     // Should show onboarding
-    await expect(page.getByText('Configurez en 30 secondes')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Le cockpit freelance' })).toBeVisible();
   });
 
   test('set state empty shows "Aucune mission"', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
     await openDevPanel(page);
 
     await page.getByRole('button', { name: 'empty' }).click();

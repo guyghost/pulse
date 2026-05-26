@@ -96,8 +96,9 @@ test.describe('TJM page', () => {
 
     await page.getByRole('button', { name: 'TJM' }).click();
     await expect(page.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByText('TJM Intelligence')).toBeVisible();
-    await expect(page.getByText(/Lancez une analyse/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Radar marché' })).toBeVisible();
+    await expect(page.getByText('Aucune donnée TJM')).toBeVisible();
+    await expect(page.getByText(/Lancez un scan depuis l'onglet Feed/i)).toBeVisible();
   });
 
   test('renders dashboard data when TJM history is available', async ({ page }) => {
@@ -109,13 +110,12 @@ test.describe('TJM page', () => {
       .getByRole('button', { name: 'TJM' })
       .click();
 
-    await expect(page.getByText('Radar marche')).toBeVisible();
-    await expect(page.getByText('Analyse TJM')).toBeVisible();
-    await expect(page.getByText('Stacks suivies')).toBeVisible();
-    await expect(page.getByText('react', { exact: true })).toBeVisible();
-    await expect(page.getByText('typescript', { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Radar marché' })).toBeVisible();
+    await expect(page.getByText("Vue d'ensemble")).toBeVisible();
+    await expect(page.getByText('TJM par région')).toBeVisible();
+    await expect(page.getByText('Recommandation')).toBeVisible();
     await expect(page.getByText('2026-04-02')).toBeVisible();
-    await expect(page.getByText(/Le marche est orienté a la hausse/i)).toBeVisible();
+    await expect(page.getByText(/Le marché/i)).toBeVisible();
   });
 
   test('shows cached TJM data while offline', async ({ page }) => {
@@ -131,11 +131,9 @@ test.describe('TJM page', () => {
       .getByRole('button', { name: 'TJM' })
       .click();
 
-    await expect(
-      page.getByText('Mode hors ligne — Affichage des dernieres donnees en cache')
-    ).toBeVisible();
-    await expect(page.getByText('Analyse TJM')).toBeVisible();
-    await expect(page.getByText('react', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mode hors ligne — Données en cache', { exact: true })).toBeVisible();
+    await expect(page.getByText("Vue d'ensemble")).toBeVisible();
+    await expect(page.getByText('Recommandation')).toBeVisible();
 
     await toggleOffline(page, false);
   });

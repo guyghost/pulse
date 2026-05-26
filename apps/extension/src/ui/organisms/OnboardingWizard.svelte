@@ -55,9 +55,7 @@
     onComplete?.();
   }
 
-  const canSubmit = $derived(
-    firstName.trim().length > 0 && jobTitle.trim().length > 0 && stack.length > 0
-  );
+  const canSubmit = $derived(firstName.trim().length > 0 && jobTitle.trim().length > 0);
 
   function handleSubmit() {
     if (isSaving) {
@@ -194,7 +192,7 @@
 
   {#if firstName.trim().length > 0 && jobTitle.trim().length > 0 && stack.length === 0}
     <p class="text-xs text-accent-amber">
-      Ajoutez au moins une technologie pour activer le scoring.
+      Ajoutez des technologies pour affiner le scoring, ou continuez avec un profil minimal.
     </p>
   {/if}
 

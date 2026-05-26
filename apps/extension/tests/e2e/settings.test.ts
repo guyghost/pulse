@@ -54,14 +54,15 @@ test.describe('Settings Flow', () => {
     await page.getByTitle('Modifier').click();
 
     const stackInput = page.locator('#stack-input');
+    const stackSection = page.locator('#stack-input').locator('xpath=ancestor::div[contains(@class,"space-y-2")]').first();
     await expect(stackInput).toBeVisible();
-    await stackInput.fill('TypeScript');
-    await page.keyboard.press('Enter');
-    await expect(page.getByText('TypeScript')).toBeVisible();
+    await stackInput.fill('Elixir');
+    await stackInput.press('Enter');
+    const elixirChip = stackSection.getByRole('button', { name: 'Elixir', exact: true });
+    await expect(elixirChip).toBeVisible();
 
-    const chip = page.locator('button').filter({ hasText: 'TypeScript' });
-    await chip.click();
-    await page.waitForTimeout(300);
+    await elixirChip.click();
+    await expect(elixirChip).not.toBeVisible();
   });
 
   test('adding stack item via Enter key works', async ({ page }) => {
@@ -70,16 +71,17 @@ test.describe('Settings Flow', () => {
     await page.getByTitle('Modifier').click();
 
     const stackInput = page.locator('#stack-input');
-    await stackInput.fill('React');
-    await page.keyboard.press('Enter');
-    await expect(page.getByText('React')).toBeVisible();
+    const stackSection = page.locator('#stack-input').locator('xpath=ancestor::div[contains(@class,"space-y-2")]').first();
+    await stackInput.fill('Zig');
+    await stackInput.press('Enter');
+    await expect(stackSection.getByRole('button', { name: 'Zig', exact: true })).toBeVisible();
   });
 
   test('scan frequency slider is visible and adjustable', async ({ page }) => {
     await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
-    await expect(page.getByText('Frequence de scan')).toBeVisible();
+    await expect(page.getByText('Fréquence de scan')).toBeVisible();
     await expect(page.locator('input[type="range"]').first()).toBeVisible();
     await expect(page.getByText('5 min')).toBeVisible();
     await expect(page.getByText('120 min')).toBeVisible();
