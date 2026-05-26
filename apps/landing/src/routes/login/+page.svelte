@@ -1,12 +1,33 @@
 <script lang="ts">
   import { goto } from '$app/navigation';
-  import { passkeyErrorMessage, signInWithPasskey } from '$lib/auth/passkey';
+  import {
+    passkeyErrorMessage,
+    requestEmailSessionLink,
+    signInWithPasskey,
+  } from '$lib/auth/passkey';
 
   let { data } = $props();
 
   let formError = $state<string | undefined>(undefined);
+  let email = $state('');
+  let linkSent = $state(false);
   let submitting = $state(false);
   const redirectTo = $derived(data.redirectTo ?? '/dashboard');
+
+  async function handleEmailLogin(event: SubmitEvent) {
+    event.preventDefault();
+    submitting = true;
+    formError = undefined;
+
+    try {
+      await requestEmailSessionLink(email, { next: redirectTo, shouldCreateUser: false });
+      linkSent = true;
+    } catch (error) {
+      formError = passkeyErrorMessage(error);
+    } finally {
+      submitting = false;
+    }
+  }
 
   async function handlePasskeyLogin() {
     submitting = true;
@@ -57,51 +78,89 @@
 <main class="auth-page">
   <div class="container">
     <div class="auth-card glass-card">
-      <div class="auth-card__header">
-        <h1>Connexion</h1>
-        <p>Accédez à votre compte MissionPulse</p>
-      </div>
+      {#if linkSent}
+        <div class="auth-card__header">
+          <h1>Vérifiez votre email</h1>
+          <p>Le lien securise ouvrira votre dashboard.</p>
+        </div>
 
-      <div class="auth-form">
-        {#if formError}
-          <div class="form-error" role="alert" data-testid="login-passkey-error">
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <circle cx="12" cy="12" r="10" />
-              <line x1="15" y1="9" x2="9" y2="15" />
-              <line x1="9" y1="9" x2="15" y2="15" />
-            </svg>
-            {formError}
-          </div>
-        {/if}
+        <div class="auth-message" data-testid="login-link-sent">
+          <p>
+            Nous avons envoye un lien a <strong>{email}</strong>. Ouvrez-le dans ce navigateur pour
+            acceder a MissionPulse.
+          </p>
+        </div>
+      {:else}
+        <div class="auth-card__header">
+          <h1>Connexion</h1>
+          <p>Accédez à votre compte MissionPulse</p>
+        </div>
 
-        <button
-          type="button"
-          class="btn btn--primary auth-submit"
-          disabled={submitting}
-          onclick={handlePasskeyLogin}
-          data-testid="login-passkey-submit"
-        >
-          {#if submitting}
-            Ouverture du passkey...
-          {:else}
-            Se connecter avec un passkey
+        <form class="auth-form" onsubmit={handleEmailLogin}>
+          {#if formError}
+            <div class="form-error" role="alert" data-testid="login-passkey-error">
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="2"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              >
+                <circle cx="12" cy="12" r="10" />
+                <line x1="15" y1="9" x2="9" y2="15" />
+                <line x1="9" y1="9" x2="15" y2="15" />
+              </svg>
+              {formError}
+            </div>
           {/if}
-        </button>
 
-        <p class="auth-note">
-          Utilisez le passkey enregistre sur cet appareil ou synchronise dans votre gestionnaire de
-          mots de passe.
-        </p>
-      </div>
+          <div class="form-group">
+            <label for="email" class="form-label">Email</label>
+            <input
+              id="email"
+              name="email"
+              type="email"
+              class="form-input"
+              placeholder="vous@exemple.com"
+              bind:value={email}
+              required
+              autocomplete="email"
+              data-testid="login-email"
+            />
+          </div>
+
+          <button
+            type="submit"
+            class="btn btn--primary auth-submit"
+            disabled={submitting}
+            data-testid="login-email-submit"
+          >
+            {#if submitting}
+              Envoi du lien...
+            {:else}
+              Recevoir mon lien de connexion
+            {/if}
+          </button>
+
+          <button
+            type="button"
+            class="btn btn--ghost auth-submit"
+            disabled={submitting}
+            onclick={handlePasskeyLogin}
+            data-testid="login-passkey-submit"
+          >
+            Se connecter avec un passkey
+          </button>
+
+          <p class="auth-note">
+            Le lien email fonctionne sur tous les environnements configures. Le passkey reste
+            disponible quand Supabase l'autorise pour le projet.
+          </p>
+        </form>
+      {/if}
 
       <div class="auth-footer">
         <p>

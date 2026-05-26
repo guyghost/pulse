@@ -1,18 +1,18 @@
 <script lang="ts">
-  import { passkeyErrorMessage, requestPasskeyAccountSetup } from '$lib/auth/passkey';
+  import { passkeyErrorMessage, requestEmailSessionLink } from '$lib/auth/passkey';
 
   let formError = $state<string | undefined>(undefined);
   let email = $state('');
   let linkSent = $state(false);
   let submitting = $state(false);
 
-  async function handlePasskeyRegistration(event: SubmitEvent) {
+  async function handleEmailRegistration(event: SubmitEvent) {
     event.preventDefault();
     submitting = true;
     formError = undefined;
 
     try {
-      await requestPasskeyAccountSetup(email);
+      await requestEmailSessionLink(email, { next: '/dashboard', shouldCreateUser: true });
       linkSent = true;
     } catch (error) {
       formError = passkeyErrorMessage(error);
@@ -59,22 +59,22 @@
       {#if linkSent}
         <div class="auth-card__header">
           <h1>Vérifiez votre email</h1>
-          <p>Le lien securise ouvrira la derniere etape de creation du passkey.</p>
+          <p>Le lien securise ouvrira votre dashboard.</p>
         </div>
 
         <div class="auth-message" data-testid="register-link-sent">
           <p>
             Nous avons envoye un lien a <strong>{email}</strong>. Ouvrez-le dans ce navigateur pour
-            enregistrer votre passkey et acceder au dashboard.
+            acceder au dashboard MissionPulse.
           </p>
         </div>
       {:else}
         <div class="auth-card__header">
           <h1>Créer un compte</h1>
-          <p>Demarrez sans mot de passe, puis finalisez avec un passkey</p>
+          <p>Demarrez sans mot de passe avec un lien securise</p>
         </div>
 
-        <form class="auth-form" onsubmit={handlePasskeyRegistration}>
+        <form class="auth-form" onsubmit={handleEmailRegistration}>
           {#if formError}
             <div class="form-error" role="alert" data-testid="register-passkey-error">
               <svg
@@ -105,7 +105,7 @@
               placeholder="vous@exemple.com"
               bind:value={email}
               required
-              autocomplete="email webauthn"
+              autocomplete="email"
               data-testid="register-email"
             />
           </div>
@@ -124,8 +124,8 @@
           </button>
 
           <p class="auth-note">
-            Le lien valide votre email, puis MissionPulse demandera le passkey natif de votre
-            appareil avant d'ouvrir le dashboard.
+            Le lien valide votre email et ouvre le dashboard. Les passkeys seront proposes quand
+            Supabase les activera pour ce projet.
           </p>
         </form>
       {/if}

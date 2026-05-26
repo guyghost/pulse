@@ -305,6 +305,36 @@ export async function requestPasskeyAccountSetup(email: string): Promise<void> {
   }
 }
 
+function normalizeNextPath(next: string): string {
+  return next.startsWith('/') && !next.startsWith('//') ? next : '/dashboard';
+}
+
+export async function requestEmailSessionLink(
+  email: string,
+  options: { next?: string; shouldCreateUser?: boolean } = {}
+): Promise<void> {
+  const supabase = createSupabaseBrowserClient();
+  const normalizedEmail = email.trim().toLowerCase();
+
+  if (!normalizedEmail) {
+    throw new Error('Email requis');
+  }
+
+  const next = normalizeNextPath(options.next ?? '/dashboard');
+  const redirectTo = `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(next)}`;
+  const { error } = await supabase.auth.signInWithOtp({
+    email: normalizedEmail,
+    options: {
+      emailRedirectTo: redirectTo,
+      shouldCreateUser: options.shouldCreateUser ?? false,
+    },
+  });
+
+  if (error) {
+    throw error;
+  }
+}
+
 export async function registerCurrentUserPasskey(): Promise<void> {
   if (!browserSupportsPasskeys()) {
     throw new Error('Ce navigateur ne prend pas en charge les passkeys.');
