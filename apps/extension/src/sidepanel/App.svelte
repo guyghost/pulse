@@ -161,11 +161,11 @@
       </div>
     {/if}
 
-    <div class="px-4 pt-4 transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]">
+    <div class="px-4 pt-4 transition-all duration-200 ease-out">
       <nav
         aria-label="Main navigation"
-        class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {feedNavCompact
-          ? 'min-h-9 gap-0.5 p-0.5'
+        class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-200 ease-out {feedNavCompact
+          ? 'min-h-11 gap-0.5 p-0.5'
           : denseNav
             ? 'min-h-11 gap-0.5 p-0.5'
             : 'min-h-12 gap-1 p-1'}"
@@ -173,7 +173,7 @@
         {#each visibleNavItems as item}
           <button
             use:ripple
-            class="flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] active:scale-[0.985]
+            class="flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
           {feedNavCompact
               ? nav.currentPage === item.page
                 ? 'flex-1 gap-1.5 px-3 py-1.5'
@@ -189,13 +189,11 @@
             aria-current={nav.currentPage === item.page ? 'page' : undefined}
             onclick={() => nav.navigate(item.page)}
           >
-            <span
-              class="shrink-0 transition-transform duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-            >
+            <span class="shrink-0 transition-transform duration-200 ease-out">
               <Icon name={item.icon} size={feedNavCompact || denseNav ? 13 : 16} />
             </span>
             <span
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {(feedNavCompact &&
+              class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out {(feedNavCompact &&
                 nav.currentPage !== item.page) ||
               (denseNav && nav.currentPage !== item.page)
                 ? 'max-w-0 opacity-0 -translate-x-1'
@@ -206,9 +204,9 @@
       </nav>
 
       <div
-        class="grid transition-[grid-template-rows,opacity,margin] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {feedNavCompact
-          ? 'mt-0 grid-rows-[0fr] opacity-0'
-          : 'mt-3 grid-rows-[1fr] opacity-100'}"
+        class="grid transition-[opacity,margin] duration-200 ease-out {feedNavCompact
+          ? 'mt-2 opacity-0 pointer-events-none'
+          : 'mt-3 opacity-100'}"
       >
         <div class="min-h-0 overflow-hidden flex justify-end">
           <ConnectionIndicator />

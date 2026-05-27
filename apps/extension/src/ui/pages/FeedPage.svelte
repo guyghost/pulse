@@ -7,6 +7,7 @@
   import { createFeedPageState } from '$lib/state/feed-page.svelte';
   import VirtualMissionFeed from '../organisms/VirtualMissionFeed.svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
+  import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import ConnectorStatusList from '../molecules/ConnectorStatusList.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
@@ -46,7 +47,7 @@
   let showTour = $state(false);
   let tourStepIndex = $state(0);
   let missionScrollTop = $state(0);
-  let hideMissionPulseCard = $state(false);
+  let feedChromeCompact = $state(false);
   let scrollStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const tourSteps: FeedTourStep[] = [
@@ -169,7 +170,7 @@
     missionScrollTop = nextScrollTop;
 
     if (scrollingDown && nextScrollTop > 12) {
-      hideMissionPulseCard = true;
+      feedChromeCompact = true;
       emitFeedScrollState(true, nextScrollTop);
     }
 
@@ -178,7 +179,7 @@
     }
 
     scrollStopTimeout = setTimeout(() => {
-      hideMissionPulseCard = false;
+      feedChromeCompact = false;
       emitFeedScrollState(false, missionScrollTop);
     }, 260);
   }
@@ -186,18 +187,18 @@
 
 <div class="relative flex h-full flex-col">
   <div
-    class="shrink-0 grid transition-[grid-template-rows,opacity,transform,padding] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {hideMissionPulseCard
-      ? 'grid-rows-[0fr] px-4 pt-0 opacity-0 -translate-y-2 pointer-events-none'
-      : 'grid-rows-[1fr] px-4 pt-4 opacity-100 translate-y-0'}"
+    class="shrink-0 px-4 pt-4 transition-[filter] duration-200 ease-out {feedChromeCompact
+      ? 'brightness-[0.99]'
+      : ''}"
   >
-    <div class="min-h-0 overflow-hidden">
+    <div class="min-h-0 overflow-visible">
       <!-- ═══════════════════════════════════════════
            Hero card — greeting + filters unified
            ═══════════════════════════════════════════ -->
       <section
-        class="section-card-strong relative overflow-hidden rounded-2xl transition-all duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {hideMissionPulseCard
-          ? 'scale-[0.985] opacity-0'
-          : 'scale-100 opacity-100'}"
+        class="section-card-strong relative overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {feedChromeCompact
+          ? 'border-blueprint-blue/10 shadow-subtle-3'
+          : ''}"
       >
         <!-- ── Hero header ── -->
         <div class="px-5 {page.heroCompact ? 'pt-3 pb-2' : 'pt-4 pb-0'}">
@@ -522,9 +523,10 @@
           {#if page.showFilters}
             <div
               id="filter-panel"
-              class="mt-3 border-t border-border-light pt-3"
+              class="absolute left-5 right-5 top-[calc(100%-0.5rem)] z-30 max-h-80 overflow-y-auto rounded-2xl border border-border-light bg-surface-white p-2 shadow-subtle-3"
               role="group"
               aria-label="Options de filtrage"
+              transition:slide={{ duration: 160 }}
             >
               <FilterBar
                 availableStacks={page.availableStacks}
@@ -556,9 +558,7 @@
   <!-- ── Mission feed ── -->
   <div
     data-testid="mission-feed"
-    class="flex-1 overflow-y-auto px-4 pb-5 transition-[padding,transform] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)] {hideMissionPulseCard
-      ? 'pt-2'
-      : 'pt-4'}"
+    class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
     use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
     onscroll={handleMissionScroll}
   >
