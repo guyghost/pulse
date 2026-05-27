@@ -132,8 +132,7 @@ export function createFeedPageState(
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
   });
 
-  // Combined single-pass filter pipeline
-  const displayMissions = $derived.by(() => {
+  const sourceCountBaseMissions = $derived.by(() => {
     let result = missions ?? [];
     if (controller.enabledConnectorIds.size > 0) {
       result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
@@ -145,18 +144,9 @@ export function createFeedPageState(
       result = filterHidden(result, hidden);
     }
 
-    // Single-pass: source + remote + stacks + seniority
-    if (
-      selectedSource !== null ||
-      selectedRemote !== null ||
-      selectedStacks.length > 0 ||
-      selectedSeniority !== null
-    ) {
+    if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
       const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
       result = result.filter((m) => {
-        if (selectedSource !== null && m.source !== selectedSource) {
-          return false;
-        }
         if (selectedRemote !== null && m.remote !== selectedRemote) {
           return false;
         }
@@ -171,6 +161,21 @@ export function createFeedPageState(
     }
 
     return result;
+  });
+
+  const sourceMissionCounts = $derived.by(() => {
+    const counts = new Map<string, number>();
+    for (const mission of sourceCountBaseMissions) {
+      counts.set(mission.source, (counts.get(mission.source) ?? 0) + 1);
+    }
+    return counts;
+  });
+
+  const displayMissions = $derived.by(() => {
+    if (selectedSource === null) {
+      return sourceCountBaseMissions;
+    }
+    return sourceCountBaseMissions.filter((m) => m.source === selectedSource);
   });
 
   const comparisonMissions = $derived.by(() => {
@@ -598,6 +603,9 @@ export function createFeedPageState(
     },
     get visibleCount() {
       return visibleCount;
+    },
+    get sourceMissionCounts() {
+      return sourceMissionCounts;
     },
 
     get comparisonMissionIds() {

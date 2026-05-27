@@ -249,7 +249,7 @@
               sources={controller.sourceStatuses as SourceStatus[]}
               isChecking={controller.isCheckingSources}
               compact={true}
-              scanResultCounts={controller.scanResultCounts}
+              scanResultCounts={page.sourceMissionCounts}
               activeSourceFilter={page.selectedSource}
               enabledConnectors={controller.enabledConnectorIds}
               healthSnapshots={controller.healthSnapshots}
@@ -341,7 +341,7 @@
                 sources={controller.sourceStatuses as SourceStatus[]}
                 isChecking={controller.isCheckingSources}
                 compact={true}
-                scanResultCounts={controller.scanResultCounts}
+                scanResultCounts={page.sourceMissionCounts}
                 activeSourceFilter={page.selectedSource}
                 enabledConnectors={controller.enabledConnectorIds}
                 healthSnapshots={controller.healthSnapshots}
