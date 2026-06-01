@@ -5,7 +5,3 @@ export type { ApplicationStatus, MissionTracking, StatusTransition } from './tra
 export type { AppSettings, ThemePreference } from './app-settings';
 export type { PersistedConnectorStatus } from './connector-status';
 export type { TJMRecord, TJMStats, TJMRange, TJMTrend, TJMStackInsight } from './tjm';
-export type { AuthStatus, PremiumStatus, AuthUser, AuthState } from './auth';
-export { isPremiumActive } from './auth';
-export type { CreditPack, CreditPackId, CreditTransactionReason } from './credits';
-export { CREDIT_PACKS, PREMIUM_MONTHLY_CREDITS } from './credits';

@@ -13,11 +13,9 @@ import type { ProfileSyncField, VerifyProfileResult } from '../../core/profile/p
 import type { CanonicalCandidateProfileDraft } from '../../core/profile-extractors/types';
 import type { ConnectorState } from '../../core/types/connector-status';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
-import type { AuthStatus, AuthUser } from '../../core/types/auth';
 import type { AppError } from '../../core/errors/app-error';
 import type { TJMAnalysis, TJMRegion } from '../../core/types/tjm';
 import type { ToastType } from '../../state/toast.svelte';
-import type { ConnectedDashboardSyncStatus } from '../sync/connected-dashboard';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -153,33 +151,6 @@ export type BridgeMessage =
   | { type: 'PROFILE_UPDATED' }
   | { type: 'RESET_LOCAL_DATA' }
   | { type: 'LOCAL_DATA_RESET'; payload: { reset: boolean; reason?: string } }
-  // Auth
-  | { type: 'AUTH_LOGIN'; payload: { email: string; password: string } }
-  | { type: 'AUTH_SIGNUP'; payload: { email: string; password: string } }
-  | { type: 'AUTH_LOGOUT' }
-  | { type: 'AUTH_STATUS' }
-  | { type: 'AUTH_RESULT'; payload: { status: AuthStatus; user: AuthUser | null; error?: string } }
-  // Account sync
-  | { type: 'SYNC_FAVORITE_MISSION'; payload: { missionId: string; favoritedAt: number | null } }
-  | {
-      type: 'FAVORITE_MISSION_SYNCED';
-      payload: { missionId: string; synced: boolean; reason?: string };
-    }
-  | { type: 'GET_CONNECTED_SYNC_STATUS' }
-  | { type: 'CONNECTED_SYNC_STATUS_RESULT'; payload: ConnectedDashboardSyncStatus }
-  | { type: 'SYNC_CONNECTED_DASHBOARD' }
-  | { type: 'RETRY_CONNECTED_SYNC' }
-  | {
-      type: 'CONNECTED_DASHBOARD_SYNCED';
-      payload: {
-        synced: boolean;
-        missions?: number;
-        applications?: number;
-        skippedApplications?: number;
-        connectorHealth?: number;
-        reason?: string;
-      };
-    }
   // Connector health (service worker → side panel)
   | { type: 'GET_CONNECTOR_HEALTH' }
   | { type: 'CONNECTOR_HEALTH_RESULT'; payload: ConnectorHealthSnapshot[] }
@@ -191,7 +162,12 @@ export type BridgeMessage =
   | {
       type: 'CONNECTOR_SKIPPED';
       payload: { connectorId: string; connectorName: string; reason: 'circuit-open' };
-    };
+    }
+  // Premium status
+  | { type: 'GET_PREMIUM_STATUS' }
+  | { type: 'PREMIUM_STATUS_RESULT'; payload: boolean }
+  | { type: 'SET_PREMIUM'; payload: boolean }
+  | { type: 'PREMIUM_SET'; payload: { saved: boolean } };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

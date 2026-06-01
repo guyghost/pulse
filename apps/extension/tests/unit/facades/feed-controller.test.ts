@@ -104,25 +104,23 @@ describe('feed controller facade', () => {
     vi.clearAllMocks();
 
     feedDataMock.getMissions.mockResolvedValue([makeMission()]);
-    feedDataMock.getConnectorStatuses.mockResolvedValue([]);
+    feedDataMock.getConnectorStatuses.mockResolvedValue([
+      {
+        connectorId: 'free-work',
+        connectorName: 'Free-Work',
+        lastState: 'done',
+        missionsCount: 5,
+        error: null,
+        lastSyncAt: new Date('2026-05-22T08:05:00.000Z').getTime(),
+        lastSuccessAt: new Date('2026-05-22T08:05:00.000Z').getTime(),
+      },
+    ]);
     feedDataMock.getConnectorsMeta.mockReturnValue([]);
     feedDataMock.detectAllConnectorSessions.mockResolvedValue([]);
     settingsMock.getSettings.mockResolvedValue(settings);
     settingsMock.setSettings.mockResolvedValue(undefined);
     connectorsMock.getConnectors.mockResolvedValue([]);
     bridgeMock.sendMessage.mockImplementation(async (message: { type: string }) => {
-      if (message.type === 'GET_CONNECTED_SYNC_STATUS') {
-        return {
-          type: 'CONNECTED_SYNC_STATUS_RESULT',
-          payload: {
-            authenticated: true,
-            installId: 'install-1',
-            lastGlobalSync: new Date('2026-05-22T08:05:00.000Z').getTime(),
-            entities: [],
-          },
-        };
-      }
-
       if (message.type === 'GET_CONNECTOR_HEALTH') {
         return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
       }
@@ -136,7 +134,7 @@ describe('feed controller facade', () => {
     vi.unstubAllGlobals();
   });
 
-  it('loads fresh persisted missions using sync status from the service worker bridge', async () => {
+  it('loads fresh persisted missions using connector status timestamps', async () => {
     const { storageGet } = stubChrome();
     const feedStore = {
       load: vi.fn(),
@@ -156,7 +154,7 @@ describe('feed controller facade', () => {
     expect(feedStore.setMissions).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'mission-1' }),
     ]);
-    expect(bridgeMock.sendMessage).toHaveBeenCalledWith({ type: 'GET_CONNECTED_SYNC_STATUS' });
+    // Should NOT start a scan because persistedStatuses show a recent sync (5 min ago)
     expect(messageTypes).not.toContain('SCAN_START');
     expect(storageGet).not.toHaveBeenCalled();
     controller.dispose();

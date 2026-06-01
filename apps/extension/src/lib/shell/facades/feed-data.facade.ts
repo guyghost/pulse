@@ -103,17 +103,3 @@ export async function getProfile(): Promise<UserProfile | null> {
   const response = await sendMessage({ type: 'GET_PROFILE' });
   return response.type === 'PROFILE_RESULT' ? response.payload : null;
 }
-
-export async function syncFavoriteMission(
-  missionId: string,
-  favoritedAt: number | null
-): Promise<void> {
-  try {
-    await sendMessage({
-      type: 'SYNC_FAVORITE_MISSION',
-      payload: { missionId, favoritedAt },
-    });
-  } catch {
-    // Account sync is best-effort. Local favorites remain the source for the extension.
-  }
-}

@@ -12,9 +12,7 @@ import type {
   ConnectorProgress,
 } from '../lib/shell/messaging/bridge';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
-import type { AuthUser } from '../lib/core/types/auth';
 import type { Mission } from '../lib/core/types/mission';
-import type { MissionDuplicateRelation } from '../lib/core/scoring/dedup';
 import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
 import {
@@ -73,23 +71,9 @@ import {
   saveGeneratedAsset,
   getGeneratedAssetsForMission,
 } from '../lib/shell/storage/generated-assets';
-import { getSupabaseClient } from '../lib/shell/auth/supabase-client';
-import { saveAuthUser, loadAuthUser, clearAuthUser } from '../lib/shell/auth/auth-storage';
 import type { GeneratedAsset } from '../lib/core/types/generation';
-import type { MissionTracking } from '../lib/core/types/tracking';
-import type { CanonicalCandidateProfileDraft } from '../lib/core/profile-extractors/types';
-import { generatePremium } from '../lib/shell/auth/premium-api';
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
-import { syncFavoriteMissionChange } from '../lib/shell/sync/favorite-missions';
-import {
-  getConnectedDashboardSyncStatus,
-  syncConnectedDashboardScan,
-  syncConnectedDashboardSnapshot,
-  syncConnectedDashboardProfileExtractorHealth,
-  syncConnectedDashboardProfileImport,
-  syncConnectedDashboardTracking,
-} from '../lib/shell/sync/connected-dashboard';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
 import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
@@ -101,52 +85,6 @@ if (import.meta.env.DEV) {
 }
 
 type LinkedInProfilePreviewMessage = Extract<BridgeMessage, { type: 'LINKEDIN_PROFILE_PREVIEWED' }>;
-type LinkedInProfileImportMessage = Extract<BridgeMessage, { type: 'LINKEDIN_PROFILE_IMPORTED' }>;
-
-const CONNECTED_DASHBOARD_RETRY_SNAPSHOT_KEY = 'connectedDashboardRetrySnapshot';
-
-type StoredMission = Omit<Mission, 'scrapedAt'> & { scrapedAt: string };
-
-type ConnectedDashboardRetrySnapshot = {
-  sourceMissions: StoredMission[];
-  duplicateRelations: MissionDuplicateRelation[];
-};
-
-function serializeMissionForRetry(mission: Mission): StoredMission {
-  return {
-    ...mission,
-    scrapedAt: mission.scrapedAt.toISOString(),
-  };
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
-}
-
-function parseStoredMission(value: unknown): Mission | null {
-  if (
-    !isRecord(value) ||
-    typeof value.id !== 'string' ||
-    typeof value.title !== 'string' ||
-    typeof value.description !== 'string' ||
-    !Array.isArray(value.stack) ||
-    typeof value.url !== 'string' ||
-    typeof value.source !== 'string' ||
-    typeof value.scrapedAt !== 'string'
-  ) {
-    return null;
-  }
-
-  const scrapedAtMs = Date.parse(value.scrapedAt);
-  if (!Number.isFinite(scrapedAtMs)) {
-    return null;
-  }
-
-  return {
-    ...(value as unknown as StoredMission),
-    scrapedAt: new Date(scrapedAtMs),
-  };
-}
 
 function buildTJMAnalysis(
   history: TJMHistory,
@@ -177,118 +115,9 @@ function buildTJMAnalysis(
   });
 }
 
-function parseDuplicateRelation(value: unknown): MissionDuplicateRelation | null {
-  if (
-    !isRecord(value) ||
-    typeof value.canonicalMissionId !== 'string' ||
-    typeof value.duplicateMissionId !== 'string' ||
-    typeof value.confidence !== 'number' ||
-    typeof value.reason !== 'string'
-  ) {
-    return null;
-  }
-
-  return {
-    canonicalMissionId: value.canonicalMissionId,
-    duplicateMissionId: value.duplicateMissionId,
-    confidence: value.confidence,
-    reason: value.reason,
-  };
-}
-
-async function saveConnectedDashboardRetrySnapshot(input: {
-  sourceMissions: Mission[];
-  duplicateRelations: MissionDuplicateRelation[];
-}): Promise<void> {
-  const snapshot: ConnectedDashboardRetrySnapshot = {
-    sourceMissions: input.sourceMissions.map(serializeMissionForRetry),
-    duplicateRelations: [...input.duplicateRelations],
-  };
-  await chrome.storage.local.set({ [CONNECTED_DASHBOARD_RETRY_SNAPSHOT_KEY]: snapshot });
-}
-
-async function loadConnectedDashboardRetrySnapshot(): Promise<{
-  sourceMissions: Mission[];
-  duplicateRelations: MissionDuplicateRelation[];
-}> {
-  const stored = await chrome.storage.local.get(CONNECTED_DASHBOARD_RETRY_SNAPSHOT_KEY);
-  const snapshot = stored[CONNECTED_DASHBOARD_RETRY_SNAPSHOT_KEY];
-  if (!isRecord(snapshot)) {
-    return { sourceMissions: [], duplicateRelations: [] };
-  }
-
-  return {
-    sourceMissions: Array.isArray(snapshot.sourceMissions)
-      ? snapshot.sourceMissions.flatMap((mission) => {
-          const parsed = parseStoredMission(mission);
-          return parsed ? [parsed] : [];
-        })
-      : [],
-    duplicateRelations: Array.isArray(snapshot.duplicateRelations)
-      ? snapshot.duplicateRelations.flatMap((relation) => {
-          const parsed = parseDuplicateRelation(relation);
-          return parsed ? [parsed] : [];
-        })
-      : [],
-  };
-}
-
-function buildAuthUserFromProfile(
-  user: { id: string; email?: string | null },
-  fallbackEmail: string,
-  profile?: {
-    subscription_status?: string | null;
-    subscription_period_end?: string | null;
-    credit_balance?: number | null;
-  } | null
-): AuthUser {
-  const now = Date.now();
-  let premiumStatus: AuthUser['premiumStatus'] = 'free';
-  let premiumExpiresAt: number | null = null;
-
-  if (profile?.subscription_status === 'premium') {
-    const expiresAt = profile.subscription_period_end
-      ? new Date(profile.subscription_period_end).getTime()
-      : null;
-    if (expiresAt && expiresAt > now) {
-      premiumStatus = 'premium';
-      premiumExpiresAt = expiresAt;
-    } else if (expiresAt && expiresAt <= now) {
-      premiumStatus = 'expired';
-      premiumExpiresAt = expiresAt;
-    } else {
-      premiumStatus = 'premium';
-    }
-  }
-
-  return {
-    id: user.id,
-    email: user.email ?? fallbackEmail,
-    premiumStatus,
-    premiumExpiresAt,
-    creditBalance: profile?.credit_balance ?? 0,
-  };
-}
-
 function getBridgeErrorCode(error: import('../lib/core/errors/app-error').AppError): string {
   const code = error.context?.profileExtractorCode;
   return typeof code === 'string' ? code : error.type;
-}
-
-function recordLinkedInExtractorHealth(input: {
-  ok: boolean;
-  errorCode?: string | null;
-  errorMessage?: string | null;
-  occurredAt: Date;
-}): void {
-  syncConnectedDashboardProfileExtractorHealth({
-    source: 'linkedin',
-    ...input,
-  }).catch((error) => {
-    if (import.meta.env.DEV) {
-      console.warn('[MissionPulse] LinkedIn extractor health sync failed:', error);
-    }
-  });
 }
 
 async function previewLinkedInProfile(
@@ -300,12 +129,6 @@ async function previewLinkedInProfile(
 
   if (!result.ok) {
     const errorCode = getBridgeErrorCode(result.error);
-    recordLinkedInExtractorHealth({
-      ok: false,
-      errorCode,
-      errorMessage: result.error.message,
-      occurredAt: new Date(startedAt),
-    });
     return {
       type: 'LINKEDIN_PROFILE_PREVIEWED',
       payload: {
@@ -319,38 +142,6 @@ async function previewLinkedInProfile(
   return {
     type: 'LINKEDIN_PROFILE_PREVIEWED',
     payload: { extracted: true, profile: result.value },
-  };
-}
-
-async function syncLinkedInProfileImport(
-  profile: CanonicalCandidateProfileDraft,
-  startedAt: number
-): Promise<LinkedInProfileImportMessage> {
-  const synced = await syncConnectedDashboardProfileImport(profile);
-  if (!synced.ok) {
-    recordLinkedInExtractorHealth({
-      ok: false,
-      errorCode: 'sync_failed',
-      errorMessage: synced.error.message,
-      occurredAt: new Date(startedAt),
-    });
-    return {
-      type: 'LINKEDIN_PROFILE_IMPORTED',
-      payload: {
-        imported: false,
-        errorCode: 'sync_failed',
-        errorMessage: synced.error.message,
-      },
-    };
-  }
-
-  recordLinkedInExtractorHealth({
-    ok: true,
-    occurredAt: new Date(startedAt),
-  });
-  return {
-    type: 'LINKEDIN_PROFILE_IMPORTED',
-    payload: { imported: true, profile },
   };
 }
 
@@ -452,19 +243,6 @@ async function loadConnectorHealthSnapshots() {
   return [...snapshots.values()];
 }
 
-async function loadGeneratedAssetsByMissionId(
-  trackings: MissionTracking[]
-): Promise<Map<string, GeneratedAsset[]>> {
-  const entries = await Promise.all(
-    trackings.map(async (tracking) => {
-      const assets = await getGeneratedAssetsForMission(tracking.missionId);
-      return [tracking.missionId, assets] as const;
-    })
-  );
-
-  return new Map(entries.filter(([, assets]) => assets.length > 0));
-}
-
 async function recheckConnectorHealth(
   connectorId: string,
   enable = false
@@ -491,24 +269,6 @@ async function recheckConnectorHealth(
   } finally {
     await setSettings({ ...settings, enabledConnectors: persistedEnabled });
   }
-}
-
-async function syncConnectedDashboardFromLocalState() {
-  const [missions, trackings, healthSnapshots] = await Promise.all([
-    getMissions(),
-    getAllTrackings(),
-    loadConnectorHealthSnapshots(),
-  ]);
-  const retrySnapshot = await loadConnectedDashboardRetrySnapshot();
-  const generatedAssetsByMissionId = await loadGeneratedAssetsByMissionId(trackings);
-  return syncConnectedDashboardSnapshot({
-    missions,
-    sourceMissions: retrySnapshot.sourceMissions,
-    duplicateRelations: retrySnapshot.duplicateRelations,
-    trackings,
-    generatedAssetsByMissionId,
-    healthSnapshots,
-  });
 }
 
 async function persistScanResults(
@@ -544,25 +304,6 @@ async function persistScanResults(
     await saveConnectorStatuses(persistedStatuses);
   } catch {
     /* Non-critical: status persistence */
-  }
-
-  try {
-    await saveConnectedDashboardRetrySnapshot({
-      sourceMissions: result.sourceMissions ?? missions,
-      duplicateRelations: result.duplicateRelations ?? [],
-    });
-  } catch {
-    /* Non-critical: retry snapshot */
-  }
-
-  try {
-    const healthSnapshots = await loadConnectorHealthSnapshots();
-    await syncConnectedDashboardScan(missions, healthSnapshots, {
-      sourceMissions: result.sourceMissions,
-      duplicateRelations: result.duplicateRelations,
-    });
-  } catch {
-    /* Non-critical: connected dashboard sync */
   }
 
   if (missions.length === 0) {
@@ -999,12 +740,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           sendResponse(response);
         })
         .catch((error) => {
-          recordLinkedInExtractorHealth({
-            ok: false,
-            errorCode: 'dom_changed',
-            errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
-            occurredAt: new Date(startedAt),
-          });
           sendResponse({
             type: 'LINKEDIN_PROFILE_PREVIEWED',
             payload: {
@@ -1018,28 +753,15 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     }
 
     if (message.type === 'SYNC_LINKEDIN_PROFILE_IMPORT') {
-      const startedAt = Date.now();
-      syncLinkedInProfileImport(message.payload.profile, startedAt)
-        .then((response) => {
-          sendResponse(response);
-        })
-        .catch((error) => {
-          recordLinkedInExtractorHealth({
-            ok: false,
-            errorCode: 'sync_failed',
-            errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
-            occurredAt: new Date(startedAt),
-          });
-          sendResponse({
-            type: 'LINKEDIN_PROFILE_IMPORTED',
-            payload: {
-              imported: false,
-              errorCode: 'sync_failed',
-              errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
-            },
-          });
-        });
-      return true;
+      sendResponse({
+        type: 'LINKEDIN_PROFILE_IMPORTED',
+        payload: {
+          imported: false,
+          errorCode: 'sync_unavailable',
+          errorMessage: 'Sync not available',
+        },
+      });
+      return false;
     }
 
     if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
@@ -1058,16 +780,24 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
-          const response = await syncLinkedInProfileImport(preview.payload.profile, startedAt);
-          sendResponse(response);
+          const response = await previewLinkedInProfile(startedAt, message.payload?.tabId);
+          if (response.payload.extracted) {
+            sendResponse({
+              type: 'LINKEDIN_PROFILE_IMPORTED',
+              payload: { imported: true, profile: response.payload.profile },
+            });
+          } else {
+            sendResponse({
+              type: 'LINKEDIN_PROFILE_IMPORTED',
+              payload: {
+                imported: false,
+                errorCode: response.payload.errorCode,
+                errorMessage: response.payload.errorMessage,
+              },
+            });
+          }
         })
         .catch((error) => {
-          recordLinkedInExtractorHealth({
-            ok: false,
-            errorCode: 'dom_changed',
-            errorMessage: error instanceof Error ? error.message : 'Import LinkedIn impossible.',
-            occurredAt: new Date(startedAt),
-          });
           sendResponse({
             type: 'LINKEDIN_PROFILE_IMPORTED',
             payload: {
@@ -1152,45 +882,9 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           }
 
           await saveTracking(updated);
-          syncConnectedDashboardTracking(missionId).catch(() => {
-            /* Non-critical: connected dashboard sync */
-          });
           sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING error:', err);
-          sendResponse({
-            type: 'TRACKING_UPDATED',
-            payload: {
-              missionId,
-              currentStatus: status,
-              history: [],
-              generatedAssetIds: [],
-              userRating: null,
-              notes: '',
-              nextActionAt: null,
-            },
-          });
-        }
-      })();
-      return true;
-    }
-
-    if (message.type === 'UPDATE_TRACKING_DETAILS') {
-      const { missionId, nextActionAt } = message.payload;
-
-      (async () => {
-        try {
-          const tracking = (await getTracking(missionId)) ?? createTracking(missionId, Date.now());
-          const updated =
-            nextActionAt === undefined ? tracking : setTrackingNextActionAt(tracking, nextActionAt);
-
-          await saveTracking(updated);
-          syncConnectedDashboardTracking(missionId).catch(() => {
-            /* Non-critical: connected dashboard sync */
-          });
-          sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
-        } catch (err) {
-          console.error('[MissionPulse] UPDATE_TRACKING_DETAILS error:', err);
           sendResponse({
             type: 'TRACKING_UPDATED',
             payload: {
@@ -1200,7 +894,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               generatedAssetIds: [],
               userRating: null,
               notes: '',
-              nextActionAt: nextActionAt ?? null,
+              nextActionAt: null,
             },
           });
         }
@@ -1226,91 +920,11 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     // ── Generation handlers ──
 
     if (message.type === 'GENERATE_ASSET') {
-      const { missionId, generationType } = message.payload;
-
-      (async () => {
-        try {
-          const mission = await getMissionById(missionId);
-          if (!mission) {
-            sendResponse({ type: 'GENERATION_RESULT', payload: { asset: null } });
-            return;
-          }
-
-          const profile = await getProfile();
-          if (!profile) {
-            sendResponse({ type: 'GENERATION_RESULT', payload: { asset: null } });
-            return;
-          }
-
-          let asset: GeneratedAsset | null = null;
-          let creditBalance: number | undefined;
-          let creditsConsumed: number | undefined;
-
-          const authUser = await loadAuthUser();
-          if (!authUser) {
-            sendResponse({
-              type: 'GENERATION_RESULT',
-              payload: { asset: null, error: 'INSUFFICIENT_CREDITS', creditBalance: 0 },
-            });
-            return;
-          }
-
-          const premiumResult = await generatePremium(missionId, generationType, mission, profile);
-          if (premiumResult.error === 'INSUFFICIENT_CREDITS') {
-            sendResponse({
-              type: 'GENERATION_RESULT',
-              payload: {
-                asset: null,
-                error: 'INSUFFICIENT_CREDITS',
-                creditBalance: premiumResult.creditBalance ?? 0,
-                creditsConsumed: premiumResult.creditsConsumed ?? 0,
-              },
-            });
-            return;
-          }
-          asset = premiumResult.asset;
-          creditBalance = premiumResult.creditBalance;
-          creditsConsumed = premiumResult.creditsConsumed;
-
-          if (!asset) {
-            sendResponse({
-              type: 'GENERATION_RESULT',
-              payload: { asset: null, error: 'GENERATION_FAILED' },
-            });
-            return;
-          }
-
-          // Persist the generated asset
-          await saveGeneratedAsset(asset);
-
-          // Update tracking to reference the new asset
-          let tracking = await getTracking(missionId);
-          if (!tracking) {
-            tracking = createTracking(missionId, Date.now());
-          }
-          const updatedTracking = addGeneratedAssetAndMarkPrepared(tracking, asset.id, Date.now());
-          await saveTracking(updatedTracking);
-          syncConnectedDashboardTracking(missionId).catch(() => {
-            /* Non-critical: connected dashboard sync */
-          });
-
-          if (typeof creditBalance === 'number' && authUser) {
-            await saveAuthUser({ ...authUser, creditBalance });
-          }
-
-          sendResponse({
-            type: 'GENERATION_RESULT',
-            payload: { asset, creditBalance, creditsConsumed },
-          });
-        } catch (err) {
-          console.error('[MissionPulse] GENERATE_ASSET error:', err);
-          sendResponse({
-            type: 'GENERATION_RESULT',
-            payload: { asset: null, error: 'GENERATION_FAILED' },
-          });
-        }
-      })();
-      return true;
+      sendResponse({
+        type: 'GENERATION_RESULT',
+        payload: { asset: null, error: 'GENERATION_UNAVAILABLE' },
+      });
+      return false;
     }
 
     if (message.type === 'GET_GENERATED_ASSETS') {
@@ -1323,240 +937,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.error('[MissionPulse] GET_GENERATED_ASSETS error:', err);
           sendResponse({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
-        });
-      return true;
-    }
-
-    // ── Auth handlers ──
-
-    if (message.type === 'AUTH_LOGIN') {
-      const { email, password } = message.payload;
-      const supabase = getSupabaseClient();
-
-      (async () => {
-        try {
-          const { data, error } = await supabase.auth.signInWithPassword({ email, password });
-          if (error || !data.user) {
-            sendResponse({
-              type: 'AUTH_RESULT',
-              payload: {
-                status: 'unauthenticated',
-                user: null,
-                error: error?.message ?? 'Login failed',
-              },
-            });
-            return;
-          }
-
-          // Query profiles table for premium and credit status
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('subscription_status, subscription_period_end, credit_balance')
-            .eq('id', data.user.id)
-            .single();
-
-          const authUser = buildAuthUserFromProfile(data.user, email, profile);
-
-          await saveAuthUser(authUser);
-          sendResponse({
-            type: 'AUTH_RESULT',
-            payload: { status: 'authenticated', user: authUser },
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Login failed';
-          sendResponse({
-            type: 'AUTH_RESULT',
-            payload: { status: 'unauthenticated', user: null, error: msg },
-          });
-        }
-      })();
-      return true;
-    }
-
-    if (message.type === 'AUTH_SIGNUP') {
-      const { email, password } = message.payload;
-      const supabase = getSupabaseClient();
-
-      (async () => {
-        try {
-          const { data, error } = await supabase.auth.signUp({ email, password });
-          if (error || !data.user) {
-            sendResponse({
-              type: 'AUTH_RESULT',
-              payload: {
-                status: 'unauthenticated',
-                user: null,
-                error: error?.message ?? 'Signup failed',
-              },
-            });
-            return;
-          }
-
-          // New users start as free — the trigger creates the profile row
-          const authUser: AuthUser = {
-            id: data.user.id,
-            email: data.user.email ?? email,
-            premiumStatus: 'free',
-            premiumExpiresAt: null,
-            creditBalance: 0,
-          };
-
-          await saveAuthUser(authUser);
-          sendResponse({
-            type: 'AUTH_RESULT',
-            payload: { status: 'authenticated', user: authUser },
-          });
-        } catch (err) {
-          const msg = err instanceof Error ? err.message : 'Signup failed';
-          sendResponse({
-            type: 'AUTH_RESULT',
-            payload: { status: 'unauthenticated', user: null, error: msg },
-          });
-        }
-      })();
-      return true;
-    }
-
-    if (message.type === 'AUTH_LOGOUT') {
-      const supabase = getSupabaseClient();
-
-      (async () => {
-        try {
-          await supabase.auth.signOut();
-        } catch {
-          // Session may already be gone — ignore
-        }
-        await clearAuthUser();
-        sendResponse({ type: 'AUTH_RESULT', payload: { status: 'unauthenticated', user: null } });
-      })();
-      return true;
-    }
-
-    if (message.type === 'AUTH_STATUS') {
-      const supabase = getSupabaseClient();
-
-      (async () => {
-        try {
-          const {
-            data: { session },
-          } = await supabase.auth.getSession();
-
-          if (!session?.user) {
-            // No active session — try cached user
-            const cached = await loadAuthUser();
-            if (cached) {
-              sendResponse({
-                type: 'AUTH_RESULT',
-                payload: { status: 'authenticated', user: cached },
-              });
-            } else {
-              sendResponse({
-                type: 'AUTH_RESULT',
-                payload: { status: 'unauthenticated', user: null },
-              });
-            }
-            return;
-          }
-
-          // Active session — refresh premium and credit status from profiles table
-          const { data: profile } = await supabase
-            .from('profiles')
-            .select('subscription_status, subscription_period_end, credit_balance')
-            .eq('id', session.user.id)
-            .single();
-
-          const authUser = buildAuthUserFromProfile(session.user, '', profile);
-
-          await saveAuthUser(authUser);
-          sendResponse({
-            type: 'AUTH_RESULT',
-            payload: { status: 'authenticated', user: authUser },
-          });
-        } catch {
-          // On any error, fall back to cache
-          const cached = await loadAuthUser();
-          sendResponse({
-            type: 'AUTH_RESULT',
-            payload: cached
-              ? { status: 'authenticated', user: cached }
-              : { status: 'unknown', user: null },
-          });
-        }
-      })();
-      return true;
-    }
-
-    // ── Account sync handlers ──
-
-    if (message.type === 'SYNC_FAVORITE_MISSION') {
-      const { missionId, favoritedAt } = message.payload;
-
-      syncFavoriteMissionChange(missionId, favoritedAt)
-        .then((result) => {
-          sendResponse({
-            type: 'FAVORITE_MISSION_SYNCED',
-            payload: {
-              missionId,
-              synced: result.synced,
-              ...(!result.synced ? { reason: result.reason } : {}),
-            },
-          });
-        })
-        .catch((err) => {
-          if (import.meta.env.DEV) {
-            console.warn('[MissionPulse] SYNC_FAVORITE_MISSION error:', err);
-          }
-          sendResponse({
-            type: 'FAVORITE_MISSION_SYNCED',
-            payload: { missionId, synced: false, reason: 'remote-error' },
-          });
-        });
-      return true;
-    }
-
-    if (message.type === 'GET_CONNECTED_SYNC_STATUS') {
-      getConnectedDashboardSyncStatus()
-        .then((status) => {
-          sendResponse({ type: 'CONNECTED_SYNC_STATUS_RESULT', payload: status });
-        })
-        .catch(() => {
-          sendResponse({
-            type: 'CONNECTED_SYNC_STATUS_RESULT',
-            payload: { authenticated: false, installId: null, lastGlobalSync: null, entities: [] },
-          });
-        });
-      return true;
-    }
-
-    if (message.type === 'SYNC_CONNECTED_DASHBOARD' || message.type === 'RETRY_CONNECTED_SYNC') {
-      syncConnectedDashboardFromLocalState()
-        .then((result) => {
-          if (!result.ok) {
-            sendResponse({
-              type: 'CONNECTED_DASHBOARD_SYNCED',
-              payload: { synced: false, reason: result.error.code },
-            });
-            return;
-          }
-          sendResponse({
-            type: 'CONNECTED_DASHBOARD_SYNCED',
-            payload: {
-              synced: true,
-              missions: result.value.missions,
-              applications: result.value.applications,
-              skippedApplications: result.value.skippedApplications,
-              connectorHealth: result.value.connectorHealth,
-            },
-          });
-        })
-        .catch((err) => {
-          if (import.meta.env.DEV) {
-            console.warn(`[MissionPulse] ${message.type} error:`, err);
-          }
-          sendResponse({
-            type: 'CONNECTED_DASHBOARD_SYNCED',
-            payload: { synced: false, reason: 'remote-error' },
-          });
         });
       return true;
     }
@@ -1593,6 +973,35 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               reason: err instanceof Error ? err.message : 'Erreur inconnue',
             },
           });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_PREMIUM_STATUS') {
+      chrome.storage.local
+        .get('premium_enabled')
+        .then((result) => {
+          sendResponse({
+            type: 'PREMIUM_STATUS_RESULT',
+            payload: result.premium_enabled === true,
+          });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_PREMIUM_STATUS error:', err);
+          sendResponse({ type: 'PREMIUM_STATUS_RESULT', payload: false });
+        });
+      return true;
+    }
+
+    if (message.type === 'SET_PREMIUM') {
+      chrome.storage.local
+        .set({ premium_enabled: message.payload })
+        .then(() => {
+          sendResponse({ type: 'PREMIUM_SET', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SET_PREMIUM error:', err);
+          sendResponse({ type: 'PREMIUM_SET', payload: { saved: false } });
         });
       return true;
     }

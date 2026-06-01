@@ -29,10 +29,6 @@ const getGeneratedAssetsForMission = vi.fn();
 const getAllHealthSnapshots = vi.fn();
 const resetHealthSnapshot = vi.fn();
 const loadTJMHistory = vi.fn();
-const syncConnectedDashboardScan = vi.fn();
-const syncConnectedDashboardSnapshot = vi.fn();
-const syncConnectedDashboardProfileExtractorHealth = vi.fn();
-const syncConnectedDashboardTracking = vi.fn();
 const verifyProfilePage = vi.fn();
 const resetLocalData = vi.fn();
 const rescoreStoredMissions = vi.fn();
@@ -235,20 +231,6 @@ vi.mock('../../../src/lib/shell/notifications/notify-missions', () => ({
   setupNotificationClickHandler,
 }));
 
-vi.mock('../../../src/lib/shell/sync/connected-dashboard', () => ({
-  getConnectedDashboardSyncStatus: vi.fn(async () => ({
-    authenticated: true,
-    installId: 'install-1',
-    lastGlobalSync: 1779340800000,
-    entities: [],
-  })),
-  syncConnectedDashboardScan,
-  syncConnectedDashboardSnapshot,
-  syncConnectedDashboardProfileExtractorHealth,
-  syncConnectedDashboardProfileImport: vi.fn(),
-  syncConnectedDashboardTracking,
-}));
-
 vi.mock('../../../src/lib/shell/profile/profile-page-verification', () => ({
   verifyProfilePage,
 }));
@@ -344,22 +326,6 @@ describe('background auto-scan notifications', () => {
     getGeneratedAssetsForMission.mockResolvedValue([]);
     getAllHealthSnapshots.mockResolvedValue(new Map());
     loadTJMHistory.mockResolvedValue({ records: [] });
-    syncConnectedDashboardScan.mockResolvedValue({
-      ok: true,
-      value: { missions: 1, connectorHealth: 0 },
-    });
-    syncConnectedDashboardSnapshot.mockResolvedValue({
-      ok: true,
-      value: { missions: 1, applications: 0, skippedApplications: 0, connectorHealth: 0 },
-    });
-    syncConnectedDashboardProfileExtractorHealth.mockResolvedValue({
-      ok: true,
-      value: { pushedCount: 1 },
-    });
-    syncConnectedDashboardTracking.mockResolvedValue({
-      ok: true,
-      value: { pushedCount: 1, skippedCount: 0 },
-    });
     verifyProfilePage.mockResolvedValue({
       read: { status: 'available', finalUrl: 'https://www.linkedin.com/in/example/' },
       comparisons: [{ fieldId: 'title', label: 'Titre', expected: 'Lead Svelte', status: 'match' }],
@@ -411,89 +377,6 @@ describe('background auto-scan notifications', () => {
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
   });
 
-  it('does not advance connected dashboard last sync when scan sync fails', async () => {
-    syncConnectedDashboardScan.mockResolvedValueOnce({
-      ok: false,
-      error: {
-        code: 'remote-error',
-        message: 'Supabase unavailable',
-        retryable: true,
-      },
-    });
-
-    await alarmListener?.({ name: 'auto-scan' });
-
-    expect(chrome.storage.local.set).not.toHaveBeenCalledWith({
-      lastGlobalSync: expect.any(Number),
-    });
-    expect(chrome.storage.local.set).toHaveBeenCalledWith({
-      connectedDashboardRetrySnapshot: expect.objectContaining({
-        sourceMissions: expect.any(Array),
-        duplicateRelations: expect.any(Array),
-      }),
-    });
-  });
-
-  it('handles explicit connected dashboard retry messages', async () => {
-    expect(messageListener).toBeTypeOf('function');
-    const sendResponse = vi.fn();
-    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
-      connectedDashboardRetrySnapshot: {
-        sourceMissions: [
-          {
-            ...makeMission({ id: 'mission-duplicate', source: 'lehibou' }),
-            scrapedAt: '2026-01-01T00:00:00.000Z',
-          },
-        ],
-        duplicateRelations: [
-          {
-            canonicalMissionId: 'mission-1',
-            duplicateMissionId: 'mission-duplicate',
-            confidence: 0.92,
-            reason: 'same-client-title',
-          },
-        ],
-      },
-    });
-
-    const handled = messageListener?.({ type: 'RETRY_CONNECTED_SYNC' }, {}, sendResponse);
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(handled).toBe(true);
-    expect(getMissions).toHaveBeenCalled();
-    expect(getAllTrackings).toHaveBeenCalled();
-    expect(syncConnectedDashboardSnapshot).toHaveBeenCalledWith({
-      missions: [expect.objectContaining({ id: 'mission-1' })],
-      sourceMissions: [
-        expect.objectContaining({
-          id: 'mission-duplicate',
-          scrapedAt: new Date('2026-01-01T00:00:00.000Z'),
-        }),
-      ],
-      duplicateRelations: [
-        {
-          canonicalMissionId: 'mission-1',
-          duplicateMissionId: 'mission-duplicate',
-          confidence: 0.92,
-          reason: 'same-client-title',
-        },
-      ],
-      trackings: [],
-      generatedAssetsByMissionId: new Map(),
-      healthSnapshots: [],
-    });
-    expect(sendResponse).toHaveBeenCalledWith({
-      type: 'CONNECTED_DASHBOARD_SYNCED',
-      payload: {
-        synced: true,
-        missions: 1,
-        applications: 0,
-        skippedApplications: 0,
-        connectorHealth: 0,
-      },
-    });
-  });
-
   it('saves profiles through the service worker and rescored missions locally', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();
@@ -509,49 +392,6 @@ describe('background auto-scan notifications', () => {
       payload: [expect.objectContaining({ id: 'rescored-1', score: 96 })],
     });
     expect(sendResponse).toHaveBeenCalledWith({ type: 'PROFILE_RESULT', payload: profile });
-  });
-
-  it('updates tracking details and triggers connected dashboard sync', async () => {
-    expect(messageListener).toBeTypeOf('function');
-    const sendResponse = vi.fn();
-    getTracking.mockResolvedValueOnce({
-      missionId: 'mission-1',
-      currentStatus: 'selected',
-      history: [
-        { from: null, to: 'detected', timestamp: 1779340800000, note: null },
-        { from: 'detected', to: 'selected', timestamp: 1779344400000, note: null },
-      ],
-      generatedAssetIds: [],
-      userRating: null,
-      notes: 'A relancer',
-      nextActionAt: null,
-    });
-
-    const handled = messageListener?.(
-      {
-        type: 'UPDATE_TRACKING_DETAILS',
-        payload: { missionId: 'mission-1', nextActionAt: '2026-05-24T09:00:00.000Z' },
-      },
-      {},
-      sendResponse
-    );
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(handled).toBe(true);
-    expect(saveTracking).toHaveBeenCalledWith(
-      expect.objectContaining({
-        missionId: 'mission-1',
-        nextActionAt: '2026-05-24T09:00:00.000Z',
-      })
-    );
-    expect(syncConnectedDashboardTracking).toHaveBeenCalledWith('mission-1');
-    expect(sendResponse).toHaveBeenCalledWith({
-      type: 'TRACKING_UPDATED',
-      payload: expect.objectContaining({
-        missionId: 'mission-1',
-        nextActionAt: '2026-05-24T09:00:00.000Z',
-      }),
-    });
   });
 
   it('routes profile page verification through the service worker shell', async () => {

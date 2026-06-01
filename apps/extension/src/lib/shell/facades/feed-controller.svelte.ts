@@ -39,19 +39,6 @@ const humanizeScanError = (message: string, code: string): string => {
   }
 };
 
-async function readLastGlobalSyncFromServiceWorker(): Promise<number | null> {
-  try {
-    const response = await sendMessage({ type: 'GET_CONNECTED_SYNC_STATUS' });
-    if (response.type !== 'CONNECTED_SYNC_STATUS_RESULT') {
-      return null;
-    }
-
-    return response.payload.lastGlobalSync;
-  } catch {
-    return null;
-  }
-}
-
 // Re-export SourceStatus types for consumers
 export type SourceSessionStatus = 'checking' | 'connected' | 'not-connected' | 'error';
 
@@ -264,10 +251,20 @@ export function createFeedController(feedStore: {
    */
   async function smartLoad(): Promise<void> {
     try {
-      const [stored, settings] = await Promise.all([getMissions(), getSettings()]);
+      const [stored, statuses, settings] = await Promise.all([
+        getMissions(),
+        getConnectorStatuses(),
+        getSettings(),
+      ]);
       if (stored.length > 0) {
         feedStore.setMissions(stored);
-        const lastSync = await readLastGlobalSyncFromServiceWorker();
+        // Use connector statuses to determine freshness
+        const lastSync = statuses.reduce<number | null>((max, s) => {
+          if (s.lastSyncAt && (max === null || s.lastSyncAt > max)) {
+            return s.lastSyncAt;
+          }
+          return max;
+        }, null);
         const intervalMs = settings.scanIntervalMinutes * 60 * 1000;
         if (lastSync && Date.now() - lastSync < intervalMs) {
           return;
@@ -476,14 +473,17 @@ export function createFeedController(feedStore: {
       /* Non-critical */
     }
 
-    // Load last scan timestamp
-    try {
-      const lastSync = await readLastGlobalSyncFromServiceWorker();
-      if (lastSync) {
-        lastScanAt = lastSync;
+    // Load last scan timestamp from persisted connector statuses
+    if (persistedStatuses.length > 0) {
+      const latestSync = persistedStatuses.reduce<number | null>((max, s) => {
+        if (s.lastSyncAt && (max === null || s.lastSyncAt > max)) {
+          return s.lastSyncAt;
+        }
+        return max;
+      }, null);
+      if (latestSync) {
+        lastScanAt = latestSync;
       }
-    } catch {
-      /* Non-critical */
     }
 
     // Setup bridge listener

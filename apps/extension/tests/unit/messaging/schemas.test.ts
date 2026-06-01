@@ -109,10 +109,6 @@ describe('validateMessage — messages sans payload', () => {
     expect(validateMessage({ type: 'GET_PROFILE' }).valid).toBe(true);
   });
 
-  it('accepte AUTH_LOGOUT', () => {
-    expect(validateMessage({ type: 'AUTH_LOGOUT' }).valid).toBe(true);
-  });
-
   it('accepte RESET_LOCAL_DATA', () => {
     expect(validateMessage({ type: 'RESET_LOCAL_DATA' }).valid).toBe(true);
   });
@@ -588,122 +584,6 @@ describe('validateMessage — TRACKING_UPDATED', () => {
       },
     });
 
-    expect(r.valid).toBe(false);
-  });
-});
-
-// ============================================================================
-// AUTH — email/password
-// ============================================================================
-
-describe('validateMessage — AUTH_LOGIN', () => {
-  it('accepte des credentials valides', () => {
-    const r = validateMessage({
-      type: 'AUTH_LOGIN',
-      payload: { email: 'user@example.com', password: 'securepass' },
-    });
-    expect(r.valid).toBe(true);
-  });
-
-  it('rejette un email invalide', () => {
-    const r = validateMessage({
-      type: 'AUTH_LOGIN',
-      payload: { email: 'not-an-email', password: 'securepass' },
-    });
-    expect(r.valid).toBe(false);
-  });
-
-  it('rejette un mot de passe trop court (< 6 chars)', () => {
-    const r = validateMessage({
-      type: 'AUTH_LOGIN',
-      payload: { email: 'user@example.com', password: '123' },
-    });
-    expect(r.valid).toBe(false);
-  });
-});
-
-// ============================================================================
-// SYNC_FAVORITE_MISSION
-// ============================================================================
-
-describe('validateMessage — SYNC_FAVORITE_MISSION', () => {
-  it('accepte un favori à synchroniser', () => {
-    const r = validateMessage({
-      type: 'SYNC_FAVORITE_MISSION',
-      payload: { missionId: 'm1', favoritedAt: 1773230400000 },
-    });
-    expect(r.valid).toBe(true);
-  });
-
-  it('accepte la suppression distante du favori', () => {
-    const r = validateMessage({
-      type: 'SYNC_FAVORITE_MISSION',
-      payload: { missionId: 'm1', favoritedAt: null },
-    });
-    expect(r.valid).toBe(true);
-  });
-
-  it('rejette les timestamps invalides', () => {
-    const r = validateMessage({
-      type: 'SYNC_FAVORITE_MISSION',
-      payload: { missionId: 'm1', favoritedAt: -1 },
-    });
-    expect(r.valid).toBe(false);
-  });
-});
-
-// ============================================================================
-// Connected dashboard sync
-// ============================================================================
-
-describe('validateMessage — connected dashboard sync', () => {
-  it('accepte une demande de statut sync connecté', () => {
-    expect(validateMessage({ type: 'GET_CONNECTED_SYNC_STATUS' }).valid).toBe(true);
-  });
-
-  it('accepte une demande de retry manuel', () => {
-    expect(validateMessage({ type: 'SYNC_CONNECTED_DASHBOARD' }).valid).toBe(true);
-  });
-
-  it('accepte une demande explicite de retry sync connecté', () => {
-    expect(validateMessage({ type: 'RETRY_CONNECTED_SYNC' }).valid).toBe(true);
-  });
-
-  it('accepte un résultat de statut sync connecté', () => {
-    const r = validateMessage({
-      type: 'CONNECTED_SYNC_STATUS_RESULT',
-      payload: {
-        authenticated: true,
-        installId: 'install-1',
-        lastGlobalSync: 1779340800000,
-        entities: [
-          {
-            entity: 'applications',
-            label: 'Candidatures',
-            state: 'error',
-            lastPullAt: '2026-05-22T08:00:00.000Z',
-            lastPushAt: null,
-            pendingUploadCount: 0,
-            pendingDownloadCount: 1,
-            lastErrorCode: 'remote-error',
-            lastErrorMessage: 'Supabase indisponible',
-            retryAfterAt: '2026-05-22T08:05:00.000Z',
-            updatedAt: '2026-05-22T08:00:00.000Z',
-          },
-        ],
-      },
-    });
-    expect(r.valid).toBe(true);
-  });
-
-  it('rejette un résultat de sync connecté avec compteurs négatifs', () => {
-    const r = validateMessage({
-      type: 'CONNECTED_DASHBOARD_SYNCED',
-      payload: {
-        synced: true,
-        missions: -1,
-      },
-    });
     expect(r.valid).toBe(false);
   });
 });

@@ -30,7 +30,6 @@ import {
   toggleHidden,
   filterHidden,
   filterFavoritesOnly,
-  syncFavoriteMission,
 } from '$lib/shell/facades/feed-data.facade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
@@ -205,7 +204,6 @@ export function createFeedPageState(
     const updated = toggleFavorite(favorites, id, Date.now());
     favorites = updated;
     saveFavorites(favorites).catch(() => {});
-    syncFavoriteMission(id, updated[id] ?? null).catch(() => {});
   }
 
   function handleHide(id: string): void {

@@ -18,22 +18,26 @@
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { createAppNavigation, NAV_ITEMS } from '$lib/state/app-navigation.svelte';
-  import { AUTH_STATE_CHANGED_EVENT, createAuthStore } from '$lib/state/auth.svelte';
   import { createThemeStore } from '$lib/state/theme.svelte';
+  import { premium } from '$lib/state/premium.svelte';
 
   const nav = createAppNavigation();
-  const auth = createAuthStore();
   const theme = createThemeStore();
+
+  // Load premium status from storage on mount
+  $effect(() => {
+    premium.load();
+  });
+
+  // Premium pages hidden for non-premium users
+  const PREMIUM_PAGES = new Set(['profile', 'tjm', 'cv', 'applications']);
   const visibleNavItems = $derived(
-    auth.isAuthenticated
-      ? NAV_ITEMS
-      : NAV_ITEMS.filter((item) => item.page === 'feed' || item.page === 'settings')
+    NAV_ITEMS.filter((item) => !PREMIUM_PAGES.has(item.page) || premium.isPremium)
   );
   const denseNav = $derived(visibleNavItems.length > 4);
 
   // Initialize theme on mount
   theme.init();
-  auth.checkStatus();
   const connection = getConnectionStore();
   let showOfflineBanner = $state(false);
   let feedNavCompact = $state(false);
@@ -107,26 +111,6 @@
 
     window.addEventListener('feed:scroll-state', handleFeedScrollState);
     return () => window.removeEventListener('feed:scroll-state', handleFeedScrollState);
-  });
-
-  $effect(() => {
-    function handleAuthStateChanged() {
-      void auth.checkStatus();
-    }
-
-    window.addEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthStateChanged);
-    return () => window.removeEventListener(AUTH_STATE_CHANGED_EVENT, handleAuthStateChanged);
-  });
-
-  $effect(() => {
-    if (
-      !auth.isAuthenticated &&
-      nav.currentPage !== 'feed' &&
-      nav.currentPage !== 'settings' &&
-      nav.currentPage !== 'onboarding'
-    ) {
-      nav.navigate('feed');
-    }
   });
 
   $effect(() => {
@@ -263,7 +247,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'tjm'}
+      {#if nav.currentPage === 'tjm' && premium.isPremium}
         <div
           class="absolute inset-0 overflow-y-auto"
           in:fly={{ x: 30, duration: 200, easing: cubicOut }}
@@ -290,7 +274,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'profile'}
+      {#if nav.currentPage === 'profile' && premium.isPremium}
         <div
           class="absolute inset-0 overflow-y-auto"
           in:fly={{ x: 30, duration: 200, easing: cubicOut }}
@@ -317,7 +301,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'cv'}
+      {#if nav.currentPage === 'cv' && premium.isPremium}
         <div
           class="absolute inset-0 overflow-y-auto"
           in:fly={{ x: 30, duration: 200, easing: cubicOut }}
@@ -344,7 +328,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'applications'}
+      {#if nav.currentPage === 'applications' && premium.isPremium}
         <div
           class="absolute inset-0 overflow-y-auto"
           in:fly={{ x: 30, duration: 200, easing: cubicOut }}

@@ -332,11 +332,6 @@ const MissionTrackingSchema = z
 
 const GenerationTypeSchema = z.enum(['cover-message', 'cv-summary', 'pitch']);
 
-// ── Auth ─────────────────────────────────────────────────────────────────────
-
-const EmailSchema = z.string().email().max(254);
-const PasswordSchema = z.string().min(6).max(256);
-
 // ── Toast ────────────────────────────────────────────────────────────────────
 
 const ToastTypeSchema = z.enum(['info', 'success', 'warning', 'error']);
@@ -678,79 +673,6 @@ export const MessageSchemas = {
     }),
   }),
 
-  // Auth
-  AUTH_LOGIN: z.object({
-    type: z.literal('AUTH_LOGIN'),
-    payload: z.object({ email: EmailSchema, password: PasswordSchema }),
-  }),
-  AUTH_SIGNUP: z.object({
-    type: z.literal('AUTH_SIGNUP'),
-    payload: z.object({ email: EmailSchema, password: PasswordSchema }),
-  }),
-  AUTH_LOGOUT: z.object({ type: z.literal('AUTH_LOGOUT') }),
-  AUTH_STATUS: z.object({ type: z.literal('AUTH_STATUS') }),
-  AUTH_RESULT: z.object({ type: z.literal('AUTH_RESULT'), payload: z.unknown() }),
-
-  // Account sync
-  SYNC_FAVORITE_MISSION: z.object({
-    type: z.literal('SYNC_FAVORITE_MISSION'),
-    payload: z.object({
-      missionId: z.string().max(256),
-      favoritedAt: z.number().int().min(0).nullable(),
-    }),
-  }),
-  FAVORITE_MISSION_SYNCED: z.object({
-    type: z.literal('FAVORITE_MISSION_SYNCED'),
-    payload: z.object({
-      missionId: z.string().max(256),
-      synced: z.boolean(),
-      reason: z.string().max(128).optional(),
-    }),
-  }),
-  GET_CONNECTED_SYNC_STATUS: z.object({ type: z.literal('GET_CONNECTED_SYNC_STATUS') }),
-  CONNECTED_SYNC_STATUS_RESULT: z.object({
-    type: z.literal('CONNECTED_SYNC_STATUS_RESULT'),
-    payload: z.object({
-      authenticated: z.boolean(),
-      installId: z.string().nullable(),
-      lastGlobalSync: z.number().int().min(0).nullable(),
-      entities: z.array(
-        z.object({
-          entity: z.enum([
-            'missions',
-            'applications',
-            'candidate_profile',
-            'connector_health',
-            'alert_preferences',
-          ]),
-          label: z.string().min(1).max(80),
-          state: z.enum(['healthy', 'pending', 'error', 'idle']),
-          lastPullAt: z.string().nullable(),
-          lastPushAt: z.string().nullable(),
-          pendingUploadCount: z.number().int().min(0),
-          pendingDownloadCount: z.number().int().min(0),
-          lastErrorCode: z.string().nullable(),
-          lastErrorMessage: z.string().nullable(),
-          retryAfterAt: z.string().nullable(),
-          updatedAt: z.string(),
-        })
-      ),
-    }),
-  }),
-  SYNC_CONNECTED_DASHBOARD: z.object({ type: z.literal('SYNC_CONNECTED_DASHBOARD') }),
-  RETRY_CONNECTED_SYNC: z.object({ type: z.literal('RETRY_CONNECTED_SYNC') }),
-  CONNECTED_DASHBOARD_SYNCED: z.object({
-    type: z.literal('CONNECTED_DASHBOARD_SYNCED'),
-    payload: z.object({
-      synced: z.boolean(),
-      missions: z.number().int().min(0).optional(),
-      applications: z.number().int().min(0).optional(),
-      skippedApplications: z.number().int().min(0).optional(),
-      connectorHealth: z.number().int().min(0).optional(),
-      reason: z.string().max(256).optional(),
-    }),
-  }),
-
   // Connector health
   GET_CONNECTOR_HEALTH: z.object({ type: z.literal('GET_CONNECTOR_HEALTH') }),
   CONNECTOR_HEALTH_RESULT: z.object({
@@ -778,6 +700,21 @@ export const MessageSchemas = {
       connectorName: z.string(),
       reason: z.literal('circuit-open'),
     }),
+  }),
+
+  // Premium status
+  GET_PREMIUM_STATUS: z.object({ type: z.literal('GET_PREMIUM_STATUS') }),
+  PREMIUM_STATUS_RESULT: z.object({
+    type: z.literal('PREMIUM_STATUS_RESULT'),
+    payload: z.boolean(),
+  }),
+  SET_PREMIUM: z.object({
+    type: z.literal('SET_PREMIUM'),
+    payload: z.boolean(),
+  }),
+  PREMIUM_SET: z.object({
+    type: z.literal('PREMIUM_SET'),
+    payload: z.object({ saved: z.boolean() }),
   }),
 } as const;
 

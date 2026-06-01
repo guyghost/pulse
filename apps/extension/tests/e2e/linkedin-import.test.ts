@@ -71,22 +71,6 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
           }
 
           chromeApi.runtime.sendMessage = async (message) => {
-            if (message.type === 'AUTH_STATUS') {
-              return {
-                type: 'AUTH_RESULT',
-                payload: {
-                  status: 'authenticated',
-                  user: {
-                    id: 'user-e2e',
-                    email: 'e2e@example.com',
-                    premiumStatus: 'premium',
-                    premiumExpiresAt: null,
-                    creditBalance: 10,
-                  },
-                },
-              };
-            }
-
             if (message.type === 'PREVIEW_LINKEDIN_PROFILE') {
               if (bridgeMode !== 'success') {
                 const error = previewErrors[bridgeMode];
