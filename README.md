@@ -143,7 +143,6 @@ pnpm test:coverage          # Coverage (seuil 70% sur core/)
 pnpm test:e2e               # Playwright E2E
 pnpm typecheck              # TypeScript strict
 pnpm lint                   # ESLint
-pnpm health-check           # Vérification connecteurs vs sites live
 ```
 
 Supabase local est configuré dans `apps/landing/supabase/`. Les migrations existantes sont

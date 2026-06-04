@@ -1,6 +1,6 @@
 {
   "name": "@pulse/extension",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "type": "module",
   "scripts": {
@@ -19,9 +19,7 @@
     "typecheck": "tsc --noEmit",
     "verify-manifest": "tsx scripts/verify-manifest.ts",
     "bump-version": "tsx scripts/bump-version.ts",
-    "build:extension": "bash scripts/build-extension.sh",
-    "health-check": "tsx tests/health/run-health-checks.ts",
-    "health-check:json": "tsx tests/health/run-health-checks.ts --json"
+    "build:extension": "bash scripts/build-extension.sh"
   },
   "dependencies": {
     "@pulse/domain": "workspace:*",

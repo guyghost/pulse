@@ -48,7 +48,10 @@ export const buildSearchContext = (
   // Do NOT fallback to jobTitle — it's too restrictive for server-side keyword search
   // (e.g., "Développeur Fullstack Senior" matches almost nothing on Free-Work/Hiway/Collective).
   // Relevance is handled locally by scoreMission() with fuzzy matching.
-  const query = profile.searchKeywords.length > 0 ? profile.searchKeywords.join(' ').trim() : '';
+  const query = profile.searchKeywords
+    .map((keyword) => keyword.trim().replace(/\s+/g, ' '))
+    .filter((keyword) => keyword.length > 0)
+    .join(' ');
 
   return {
     query,

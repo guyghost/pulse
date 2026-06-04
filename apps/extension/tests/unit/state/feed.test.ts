@@ -80,6 +80,43 @@ describe('feed store', () => {
     expect(store.filteredMissions).toHaveLength(1);
   });
 
+  it('searches missions by client, location, and source', () => {
+    const store = createFeedStore();
+    store.load();
+    store.setMissions([
+      makeMission({
+        id: '1',
+        title: 'Frontend platform',
+        client: 'Airbus',
+        location: 'Toulouse',
+        source: 'free-work',
+      }),
+      makeMission({
+        id: '2',
+        title: 'Backend API',
+        client: 'Doctolib',
+        location: 'Paris',
+        source: 'lehibou',
+      }),
+      makeMission({
+        id: '3',
+        title: 'Data pipeline',
+        client: null,
+        location: 'Lyon',
+        source: 'collective',
+      }),
+    ]);
+
+    store.search('airbus');
+    expect(store.filteredMissions.map((m) => m.id)).toEqual(['1']);
+
+    store.search('paris');
+    expect(store.filteredMissions.map((m) => m.id)).toEqual(['2']);
+
+    store.search('collective');
+    expect(store.filteredMissions.map((m) => m.id)).toEqual(['3']);
+  });
+
   it('clears search and restores all missions', () => {
     const store = createFeedStore();
     store.load();

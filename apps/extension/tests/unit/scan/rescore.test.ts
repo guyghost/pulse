@@ -31,6 +31,7 @@ vi.mock('../../../src/lib/shell/ai/semantic-scorer', () => ({
 
 import { getMissions, saveMissions } from '../../../src/lib/shell/storage/db';
 import { getSettings } from '../../../src/lib/shell/storage/chrome-storage';
+import { scoreMissionsSemantic } from '../../../src/lib/shell/ai/semantic-scorer';
 import { rescoreStoredMissions } from '../../../src/lib/shell/scan/rescore';
 
 const profile: UserProfile = {
@@ -99,5 +100,34 @@ describe('rescoreStoredMissions', () => {
 
     expect(result).toEqual([]);
     expect(saveMissions).not.toHaveBeenCalled();
+  });
+
+  it('fuses semantic scores into mission scoreBreakdown and persists the final score', async () => {
+    (getMissions as Mock).mockResolvedValue([mission]);
+    (scoreMissionsSemantic as Mock).mockResolvedValue(
+      new Map([['mission-1', { score: 91, reason: 'Stack TypeScript très alignée' }]])
+    );
+
+    const result = await rescoreStoredMissions(profile);
+
+    expect(result[0].semanticScore).toBe(91);
+    expect(result[0].semanticReason).toBe('Stack TypeScript très alignée');
+    expect(result[0].scoreBreakdown).toEqual(
+      expect.objectContaining({
+        deterministic: 61,
+        semantic: 91,
+        semanticReason: 'Stack TypeScript très alignée',
+        total: 73,
+        grade: 'B',
+      })
+    );
+    expect(result[0].score).toBe(73);
+    expect(saveMissions).toHaveBeenCalledWith([
+      expect.objectContaining({
+        id: 'mission-1',
+        score: 73,
+        semanticScore: 91,
+      }),
+    ]);
   });
 });

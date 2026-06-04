@@ -4,11 +4,10 @@ This directory contains all GitHub Actions workflows for MissionPulse.
 
 ## Workflows Overview
 
-| File                   | Name             | Trigger      | Purpose                  |
-| ---------------------- | ---------------- | ------------ | ------------------------ |
-| `ci.yml`               | CI               | Push, PR     | Continuous integration   |
-| `release.yml`          | Release          | Tags `v*`    | Build & publish releases |
-| `connector-health.yml` | Connector Health | Cron, Manual | Monitor connector status |
+| File          | Name    | Trigger   | Purpose                  |
+| ------------- | ------- | --------- | ------------------------ |
+| `ci.yml`      | CI      | Push, PR  | Continuous integration   |
+| `release.yml` | Release | Tags `v*` | Build & publish releases |
 
 ## Detailed Documentation
 
@@ -33,18 +32,6 @@ git push origin v1.0.0
 
 ```bash
 gh workflow run release.yml -f version=1.0.0 -f dry_run=true
-```
-
-### Run connector health check
-
-```bash
-gh workflow run connector-health.yml
-```
-
-### Run health check for specific connectors
-
-```bash
-gh workflow run connector-health.yml -f connectors=freework,lehibou
 ```
 
 ## Workflow Files
@@ -110,35 +97,12 @@ gh workflow run connector-health.yml -f connectors=freework,lehibou
 
 When secrets are not configured, the workflow succeeds with a warning.
 
----
-
-### connector-health.yml
-
-**Triggers:**
-
-- Schedule: Daily at 8:00 UTC
-- Manual dispatch
-
-**Inputs:**
-
-- `connectors` - Comma-separated connector names (optional)
-- `skip_issue` - Skip GitHub Issue creation (default: false)
-
-**Job:**
-
-1. `health-check` - Run connector tests
-2. `notify-success` - Log success (scheduled only)
-
-**Failure Handling:**
-Creates/updates GitHub Issue with failure details.
-
 ## Permissions
 
-| Workflow             | Permissions                       |
-| -------------------- | --------------------------------- |
-| ci.yml               | `contents: read`                  |
-| release.yml          | `contents: write`                 |
-| connector-health.yml | `contents: read`, `issues: write` |
+| Workflow    | Permissions       |
+| ----------- | ----------------- |
+| ci.yml      | `contents: read`  |
+| release.yml | `contents: write` |
 
 ## Actions Used
 
@@ -153,16 +117,3 @@ Creates/updates GitHub Issue with failure details.
 | `codecov/codecov-action`          | v4      | Coverage upload   |
 | `softprops/action-gh-release`     | v2      | GitHub releases   |
 | `mnao305/chrome-extension-upload` | v5.0.0  | CWS publish       |
-| `JasonEtco/create-an-issue`       | v2      | Issue creation    |
-
-## Issue Templates
-
-### connector-failure.md
-
-Used by `connector-health.yml` to create issues when health checks fail.
-
-Variables:
-
-- `{{ env.DATE }}` - Failure date
-- `{{ env.FAILED_CONNECTORS }}` - List of failed connectors
-- `{{ env.RUN_URL }}` - Link to workflow run
