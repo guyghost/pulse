@@ -51,11 +51,11 @@
 </script>
 
 <svelte:head>
-  <title>MissionPulse — Votre radar freelance</title>
-  <meta name="title" content="MissionPulse — Votre radar freelance" />
+  <title>MissionPulse — Le radar mission des freelances tech</title>
+  <meta name="title" content="MissionPulse — Le radar mission des freelances tech" />
   <meta
     name="description"
-    content="MissionPulse scanne 5 plateformes freelance (Free-Work, LeHibou, Hiway, Collective, Cherry Pick) depuis votre navigateur et synchronise le dashboard connecté sur demande."
+    content="MissionPulse scanne vos plateformes freelance, score les meilleures opportunités et prépare vos candidatures depuis votre navigateur."
   />
   <meta
     name="keywords"
@@ -67,10 +67,10 @@
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://missionpulse.app/" />
-  <meta property="og:title" content="MissionPulse — Votre radar freelance" />
+  <meta property="og:title" content="MissionPulse — Le radar mission des freelances tech" />
   <meta
     property="og:description"
-    content="5 plateformes. Un side panel local. Un dashboard connecté optionnel. MissionPulse scanne Free-Work, LeHibou, Hiway, Collective et Cherry Pick en arrière-plan."
+    content="5 plateformes. 1 feed. Des scores. Zéro tracking publicitaire. MissionPulse scanne, qualifie et prépare vos candidatures depuis votre navigateur."
   />
   <meta property="og:image" content="https://missionpulse.app/og-image.png" />
   <meta property="og:locale" content="fr_FR" />
@@ -79,10 +79,10 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:url" content="https://missionpulse.app/" />
-  <meta name="twitter:title" content="MissionPulse — Votre radar freelance" />
+  <meta name="twitter:title" content="MissionPulse — Le radar mission des freelances tech" />
   <meta
     name="twitter:description"
-    content="5 plateformes. Side panel local. Dashboard connecté optionnel. Extension Chrome gratuite pour freelances tech."
+    content="5 plateformes. 1 feed. Des scores. Zéro tracking publicitaire. Extension Chrome gratuite pour freelances tech."
   />
   <meta name="twitter:image" content="https://missionpulse.app/og-image.png" />
 </svelte:head>
@@ -107,8 +107,10 @@
     </a>
 
     <ul class="nav__menu">
+      <li><a href="#workflow" class="nav__link">Workflow</a></li>
       <li><a href="#for-who" class="nav__link">Pour qui</a></li>
       <li><a href="#features" class="nav__link">Fonctionnalités</a></li>
+      <li><a href="#funnel" class="nav__link">Tunnel</a></li>
       <li><a href="#platforms" class="nav__link">Plateformes</a></li>
     </ul>
 
@@ -177,9 +179,13 @@
     aria-hidden={!mobileMenuOpen}
   >
     <ul>
+      <li><a href="#workflow" onclick={closeMobileMenu}>Workflow</a></li>
       <li><a href="#for-who" onclick={closeMobileMenu}>Pour qui</a></li>
       <li>
         <a href="#features" onclick={closeMobileMenu}>Fonctionnalités</a>
+      </li>
+      <li>
+        <a href="#funnel" onclick={closeMobileMenu}>Tunnel</a>
       </li>
       <li>
         <a href="#platforms" onclick={closeMobileMenu}>Plateformes</a>
@@ -212,17 +218,18 @@
       </div>
 
       <h1 class="hero__title">
-        Missions.<br /><span class="light-text">Sur pilote auto.</span>
+        Le radar mission<br /><span class="light-text">des freelances tech</span>
       </h1>
 
       <div class="hero__bottom-bar">
         <p class="hero__description">
-          Le #1 Mission Agent pour freelances tech : scannez vos plateformes, priorisez par score et
-          ne ratez plus les bonnes opportunités.
+          MissionPulse scanne vos plateformes, score les meilleures opportunités et prépare vos
+          candidatures depuis votre navigateur.
         </p>
 
         <div class="hero__actions">
-          <a href={chromeStoreUrl} class="btn btn--primary btn--lg"> Essayer gratuitement </a>
+          <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer l'extension gratuite</a>
+          <a href="#workflow" class="btn btn--secondary btn--lg">Voir le workflow</a>
         </div>
       </div>
     </div>
@@ -230,7 +237,7 @@
 </section>
 
 <!-- Product showcase -->
-<section class="product-showcase" aria-label="Aperçu de MissionPulse">
+<section class="product-showcase" id="workflow" aria-label="Aperçu de MissionPulse">
   <div class="container">
     <div class="showcase-shell fade-in">
       <div class="showcase-logos" aria-label="Plateformes scannées">
@@ -242,7 +249,7 @@
       </div>
 
       <p class="showcase-caption">
-        Automatisez votre veille mission, du scan multi-plateformes à la shortlist actionnable.
+        Automatisez votre veille mission, du scan multi-plateformes à la candidature prête à envoyer.
       </p>
 
       <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -651,9 +658,9 @@
 <section class="features section" id="features">
   <div class="container">
     <div class="section-header">
-      <h2 class="section-title fade-in">Fonctionnalités</h2>
+      <h2 class="section-title fade-in">Pourquoi ça convertit</h2>
       <p class="section-subtitle fade-in fade-in-delay-1">
-        Tout ce qu'il faut pour ne rater aucune mission
+        MissionPulse transforme la recherche de mission en pipeline commercial actionnable.
       </p>
     </div>
 
@@ -671,10 +678,10 @@
             <path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" />
           </svg>
         </div>
-        <h3 class="feature-card__title">Scan automatique</h3>
+        <h3 class="feature-card__title">Ne ratez plus les bonnes missions</h3>
         <p class="feature-card__desc">
-          5 plateformes scannées en parallèle, en arrière-plan. Les nouvelles missions arrivent
-          toutes seules dans votre side panel.
+          Free-Work, LeHibou, Hiway, Collective et Cherry Pick arrivent dans un seul feed. Vous
+          gardez la couverture marché sans ouvrir cinq onglets chaque matin.
         </p>
       </article>
 
@@ -693,10 +700,10 @@
             />
           </svg>
         </div>
-        <h3 class="feature-card__title">Scoring IA</h3>
+        <h3 class="feature-card__title">Passez de 40 annonces à 5 vraies pistes</h3>
         <p class="feature-card__desc">
-          Chaque mission reçoit un score basé sur votre stack, TJM, localisation et séniorité.
-          Gemini Nano affine le score sémantiquement.
+          Le scoring combine stack, TJM, localisation, remote, séniorité et analyse sémantique.
+          Les doublons sont fusionnés pour ne garder que les opportunités uniques.
         </p>
       </article>
 
@@ -715,10 +722,10 @@
             />
           </svg>
         </div>
-        <h3 class="feature-card__title">Dashboard TJM</h3>
+        <h3 class="feature-card__title">Négociez avec des données</h3>
         <p class="feature-card__desc">
-          Historique des TJM par stack et par source. Visualisez les tendances du marché et
-          positionnez-vous au bon prix.
+          Le radar TJM suit les taux par stack et par source. Vous arrivez en échange avec une
+          fourchette marché, pas une impression.
         </p>
       </article>
 
@@ -736,10 +743,10 @@
             <line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
           </svg>
         </div>
-        <h3 class="feature-card__title">Déduplication</h3>
+        <h3 class="feature-card__title">Transformez la veille en pipeline</h3>
         <p class="feature-card__desc">
-          Les missions postées sur plusieurs plateformes sont fusionnées automatiquement. Plus de
-          doublons dans votre feed.
+          Favoris, missions masquées, statuts de candidature et prochaine action gardent chaque
+          opportunité qualifiée sous contrôle jusqu'à l'entretien ou l'offre.
         </p>
       </article>
 
@@ -758,10 +765,10 @@
             />
           </svg>
         </div>
-        <h3 class="feature-card__title">Alertes intelligentes</h3>
+        <h3 class="feature-card__title">Postulez plus vite</h3>
         <p class="feature-card__desc">
-          Configurez vos critères (stack + TJM + score) et recevez une notification uniquement pour
-          les missions qui comptent.
+          Pitch court, message recruteur et résumé CV sont générés depuis la mission et votre
+          profil. Vous répondez vite sans envoyer un message générique.
         </p>
       </article>
 
@@ -785,6 +792,57 @@
           Les plateformes sont consultées depuis vos sessions navigateur, sans stocker vos
           identifiants. La synchronisation cloud du dashboard est optionnelle et limitée aux
           snapshots normalisés via Supabase; jamais vos mots de passe, cookies ou jetons de session.
+        </p>
+      </article>
+    </div>
+  </div>
+</section>
+
+<!-- Tunnel commercial -->
+<section class="funnel section" id="funnel">
+  <div class="container">
+    <div class="section-header">
+      <h2 class="section-title fade-in">Du premier scan à la signature</h2>
+      <p class="section-subtitle fade-in fade-in-delay-1">
+        Le tunnel MissionPulse commence gratuit, prouve sa valeur en quelques minutes, puis accompagne
+        les freelances qui veulent structurer leur prospection.
+      </p>
+    </div>
+
+    <div class="funnel__grid" aria-label="Tunnel de vente MissionPulse">
+      <article class="funnel-step fade-in fade-in-delay-1">
+        <span class="funnel-step__phase">Acquisition</span>
+        <h3 class="funnel-step__title">5 plateformes, 1 feed, des scores</h3>
+        <p class="funnel-step__desc">
+          La landing et le Chrome Web Store vendent une promesse simple: installer l'extension,
+          scanner ses sources et voir immédiatement les meilleures missions.
+        </p>
+      </article>
+
+      <article class="funnel-step fade-in fade-in-delay-2">
+        <span class="funnel-step__phase">Activation</span>
+        <h3 class="funnel-step__title">Trouvées, uniques, à contacter</h3>
+        <p class="funnel-step__desc">
+          Le premier scan rend la valeur visible avec des métriques concrètes: missions consolidées,
+          opportunités dédupliquées et shortlist priorisée.
+        </p>
+      </article>
+
+      <article class="funnel-step fade-in fade-in-delay-3">
+        <span class="funnel-step__phase">Rétention</span>
+        <h3 class="funnel-step__title">Alertes, nouveautés, TJM et pipeline</h3>
+        <p class="funnel-step__desc">
+          Les alertes intelligentes, le radar TJM, les favoris et le suivi de candidature donnent une
+          raison claire de revenir entre deux missions.
+        </p>
+      </article>
+
+      <article class="funnel-step fade-in fade-in-delay-4">
+        <span class="funnel-step__phase">Monétisation</span>
+        <h3 class="funnel-step__title">Dashboard connecté et crédits IA</h3>
+        <p class="funnel-step__desc">
+          Le compte ajoute historique, pipeline, CV canonique et synchronisation optionnelle. Les
+          crédits débloquent les contenus de candidature générés pour chaque mission.
         </p>
       </article>
     </div>
@@ -835,7 +893,7 @@
           <h3 class="step__title">Ouvrez le side panel</h3>
           <p class="step__desc">
             Cliquez sur l'icône MissionPulse. Les missions arrivent classées par score. Filtrez,
-            comparez, exportez.
+            comparez, préparez vos candidatures.
           </p>
         </div>
       </div>
@@ -980,10 +1038,9 @@
   <div class="container">
     <div class="cta__card fade-in">
       <div class="cta__content">
-        <h2 class="cta__title">Prêt à trouver votre prochaine mission ?</h2>
+        <h2 class="cta__title">Prêt à installer votre radar mission ?</h2>
         <p class="cta__desc">
-          Installation gratuite en 30 secondes. Compte requis seulement pour le dashboard connecté
-          optionnel; l'exécution plateforme reste dans votre navigateur.
+          Extension gratuite, exécution navigateur, zéro tracking publicitaire. Compte requis seulement pour le dashboard connecté optionnel et les crédits de génération; l'exécution plateforme reste dans votre navigateur.
         </p>
         <a
           href={chromeStoreUrl}

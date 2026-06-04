@@ -41,6 +41,7 @@ const storage: Record<string, unknown> = {
   newMissionCount: 0,
   feedSortBy: 'score',
   profile: mockProfile,
+  premium_enabled: true,
   first_scan_done: true,
   profile_banner_dismissed: false,
   onboarding_completed: true,
@@ -69,6 +70,14 @@ function createChromeStubs() {
             console.log('[Chrome Stub] Profile saved:', message.payload);
             storage.profile = message.payload;
             return { type: 'PROFILE_RESULT', payload: message.payload };
+          case 'GET_PREMIUM_STATUS':
+            return {
+              type: 'PREMIUM_STATUS_RESULT',
+              payload: storage.premium_enabled === true,
+            };
+          case 'SET_PREMIUM':
+            storage.premium_enabled = message.payload === true;
+            return { type: 'PREMIUM_SET', payload: { saved: true } };
           case 'VERIFY_PROFILE_PAGE': {
             const p = message.payload as Record<string, unknown> | undefined;
             return {
