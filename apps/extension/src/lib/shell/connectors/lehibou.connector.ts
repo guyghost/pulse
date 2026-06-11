@@ -10,6 +10,7 @@ const MISSIONS_URL = `${API_BASE}/search/mission/list`;
 const COOKIE_DOMAIN = '.lehibou.com';
 const COOKIE_RULE_ID = 10;
 const URL_FILTER = 'api.lehibou.com';
+const ALLOWED_COOKIE_NAMES = ['rt'] as const;
 const ITEMS_PER_PAGE = 50;
 const MAX_PAGES = 5;
 
@@ -89,71 +90,96 @@ export class LeHibouConnector extends BaseConnector {
     context?: ConnectorSearchContext
   ): Promise<Result<Mission[], AppError>> {
     try {
-      await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
+      const injectResult = await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID, {
+        allowedCookieNames: ALLOWED_COOKIE_NAMES,
+      });
+      if (!injectResult.success) {
+        return err(
+          createConnectorError(
+            injectResult.warning ??
+              'LeHibou: aucun cookie de session autorise trouve. Connectez-vous sur lehibou.com puis relancez le scan.',
+            {
+              connectorId: this.id,
+              phase: 'detect',
+              context: {
+                cookieCount: injectResult.cookieCount,
+                injectedCookieCount: injectResult.injectedCookieCount,
+              },
+            },
+            now
+          )
+        );
+      }
       const allMissions: Mission[] = [];
 
-      for (let page = 1; page <= MAX_PAGES; page++) {
-        const url = `${MISSIONS_URL}?limit=${ITEMS_PER_PAGE}&page=${page}`;
+      try {
+        for (let page = 1; page <= MAX_PAGES; page++) {
+          const url = `${MISSIONS_URL}?limit=${ITEMS_PER_PAGE}&page=${page}`;
 
-        // Build search body with context
-        const body: Record<string, unknown> = {};
-        if (context?.query) {
-          body.query = context.query;
-        }
-        if (context?.skills?.length) {
-          body.skills = context.skills;
-        }
+          // Build search body with context
+          const body: Record<string, unknown> = {};
+          if (context?.query) {
+            body.query = context.query;
+          }
+          if (context?.skills?.length) {
+            body.skills = context.skills;
+          }
 
-        const response = await fetch(url, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
+          const response = await fetch(url, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          });
 
-        if (!response.ok) {
-          await removeCookieRule(COOKIE_RULE_ID);
-          return err(
-            createConnectorError(
-              `LeHibou API error: ${response.status}`,
-              { connectorId: this.id, phase: 'fetch', context: { page, status: response.status } },
-              now
-            )
-          );
-        }
+          if (!response.ok) {
+            return err(
+              createConnectorError(
+                `LeHibou API error: ${response.status}`,
+                {
+                  connectorId: this.id,
+                  phase: 'fetch',
+                  context: { page, status: response.status },
+                },
+                now
+              )
+            );
+          }
 
-        const data = (await response.json()) as { total: number; missions: LeHibouMission[] };
-        if (!data.missions || data.missions.length === 0) {
-          break;
-        }
+          const data = (await response.json()) as { total: number; missions: LeHibouMission[] };
+          if (!data.missions || data.missions.length === 0) {
+            break;
+          }
 
-        for (const m of data.missions) {
-          allMissions.push(
-            createMission({
-              id: `lh-${m.id}`,
-              title: m.title,
-              client: null,
-              description: stripHtml(m.description ?? ''),
-              stack: (m.skills ?? []).map((s) => s.title),
-              tjm: m.tjm,
-              location: m.city
-                ? `${m.city.title}${m.city.country ? `, ${m.city.country.title}` : ''}`
-                : null,
-              remote: mapRemote(m.remote),
-              duration: formatDuration(m.duration, m.durationUnit),
-              url: `https://www.lehibou.com/annonce/${m.id}`,
-              source: 'lehibou' as const,
-              scrapedAt: new Date(now),
-            })
-          );
-        }
+          for (const m of data.missions) {
+            allMissions.push(
+              createMission({
+                id: `lh-${m.id}`,
+                title: m.title,
+                client: null,
+                description: stripHtml(m.description ?? ''),
+                stack: (m.skills ?? []).map((s) => s.title),
+                tjm: m.tjm,
+                location: m.city
+                  ? `${m.city.title}${m.city.country ? `, ${m.city.country.title}` : ''}`
+                  : null,
+                remote: mapRemote(m.remote),
+                duration: formatDuration(m.duration, m.durationUnit),
+                url: `https://www.lehibou.com/annonce/${m.id}`,
+                source: 'lehibou' as const,
+                scrapedAt: new Date(now),
+              })
+            );
+          }
 
-        if (allMissions.length >= data.total) {
-          break;
+          if (allMissions.length >= data.total) {
+            break;
+          }
         }
+      } finally {
+        await removeCookieRule(COOKIE_RULE_ID);
       }
 
-      await removeCookieRule(COOKIE_RULE_ID);
       return ok(allMissions);
     } catch (e) {
       await removeCookieRule(COOKIE_RULE_ID);

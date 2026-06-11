@@ -7,10 +7,8 @@ import { mapSkill, extractTjm, mapCollectiveRemote } from '$lib/core/connectors/
 import {
   injectCookieRule,
   removeCookieRule,
-  verifyCookieRule,
   getCookieCount,
   getCookieNames,
-  type CookieRuleResult,
 } from './cookie-rules';
 import { detectBrowser } from '../../core/browser/browser-compat';
 
@@ -19,6 +17,16 @@ const APP_URL = 'https://app.collective.work';
 const COOKIE_DOMAIN = '.collective.work';
 const COOKIE_RULE_ID = 11;
 const URL_FILTER = 'api.collective.work';
+const ALLOWED_COOKIE_NAMES = [
+  '__Secure-next-auth.session-token',
+  'next-auth.session-token',
+  'connect.sid',
+  'session',
+  'sessionid',
+  'auth',
+  'auth_token',
+  'token',
+] as const;
 
 const GET_ME_QUERY = `
   query Collective_GetMe {
@@ -102,7 +110,9 @@ export class CollectiveConnector extends BaseConnector {
         console.debug(
           '[collective] detectSession: no session cookies found, trying fallback detection via cookie injection'
         );
-        const injectResult = await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
+        const injectResult = await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID, {
+          allowedCookieNames: ALLOWED_COOKIE_NAMES,
+        });
         if (injectResult.success) {
           try {
             const resp = await fetch(API_URL, {
@@ -126,6 +136,8 @@ export class CollectiveConnector extends BaseConnector {
             if (import.meta.env.DEV) {
               console.warn('[collective] detectSession: fallback detection failed:', fallbackError);
             }
+          } finally {
+            await removeCookieRule(COOKIE_RULE_ID);
           }
         }
         console.debug(
@@ -134,28 +146,32 @@ export class CollectiveConnector extends BaseConnector {
         return ok(false);
       }
 
-      // Inject cookie rule once — reused by fetchMissions
-      await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
-
       // Discover user slug for mission URLs
+      const injectResult = await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID, {
+        allowedCookieNames: ALLOWED_COOKIE_NAMES,
+      });
       try {
-        const resp = await fetch(API_URL, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: GET_ME_QUERY }),
-        });
-        if (resp.ok) {
-          const data = (await resp.json()) as {
-            data?: { me?: { members?: { collective?: { slug?: string } }[] } };
-          };
-          this.userSlug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
-          if (import.meta.env.DEV) {
-            console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+        if (injectResult.success) {
+          const resp = await fetch(API_URL, {
+            method: 'POST',
+            credentials: 'include',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ query: GET_ME_QUERY }),
+          });
+          if (resp.ok) {
+            const data = (await resp.json()) as {
+              data?: { me?: { members?: { collective?: { slug?: string } }[] } };
+            };
+            this.userSlug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
+            if (import.meta.env.DEV) {
+              console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
+            }
           }
         }
       } catch {
         // Non-blocking — URLs will use fallback
+      } finally {
+        await removeCookieRule(COOKIE_RULE_ID);
       }
 
       return ok(true);
@@ -169,12 +185,10 @@ export class CollectiveConnector extends BaseConnector {
     context?: ConnectorSearchContext
   ): Promise<Result<Mission[], AppError>> {
     try {
-      // Verify cookie rule is active, re-inject if needed
-      const ruleActive = await verifyCookieRule(COOKIE_RULE_ID);
-      if (!ruleActive) {
-        console.log('[collective] fetchMissions: cookie rule not active, re-injecting');
-        await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
-      }
+      await removeCookieRule(COOKIE_RULE_ID);
+      const injectResult = await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID, {
+        allowedCookieNames: ALLOWED_COOKIE_NAMES,
+      });
 
       // Log cookie state for diagnostics
       const cookieCount = await getCookieCount(COOKIE_DOMAIN);
@@ -212,11 +226,19 @@ export class CollectiveConnector extends BaseConnector {
         }
       }
 
-      if (cookieCount === 0) {
+      if (!injectResult.success) {
         return err(
           createConnectorError(
-            'Collective: aucun cookie trouv\u00e9. Connectez-vous sur app.collective.work puis relancez le scan.',
-            { connectorId: this.id, phase: 'detect', context: { cookieCount: 0 } },
+            injectResult.warning ??
+              'Collective: aucun cookie trouve. Connectez-vous sur app.collective.work puis relancez le scan.',
+            {
+              connectorId: this.id,
+              phase: 'detect',
+              context: {
+                cookieCount,
+                injectedCookieCount: injectResult.injectedCookieCount,
+              },
+            },
             now
           )
         );
@@ -255,114 +277,116 @@ export class CollectiveConnector extends BaseConnector {
         },
       });
 
-      const response = await fetch(API_URL, {
-        method: 'POST',
-        credentials: 'include',
-        headers: { 'Content-Type': 'application/json' },
-        body,
-      });
+      try {
+        const response = await fetch(API_URL, {
+          method: 'POST',
+          credentials: 'include',
+          headers: { 'Content-Type': 'application/json' },
+          body,
+        });
 
-      const contentType = response.headers.get('content-type') ?? '';
-      if (import.meta.env.DEV) {
-        console.log(
-          `[collective] fetchMissions: HTTP ${response.status}, content-type: ${contentType}`
-        );
-      }
-
-      // Cloudflare challenge returns HTML with 403
-      if (!response.ok || !contentType.includes('json')) {
-        const preview = await response
-          .text()
-          .then((t) => t.slice(0, 300))
-          .catch(() => '(unreadable)');
+        const contentType = response.headers.get('content-type') ?? '';
         if (import.meta.env.DEV) {
-          console.error(
-            `[collective] fetchMissions: blocked — status=${response.status}, preview: ${preview}`
+          console.log(
+            `[collective] fetchMissions: HTTP ${response.status}, content-type: ${contentType}`
           );
         }
-        await removeCookieRule(COOKIE_RULE_ID);
-        return err(
-          createConnectorError(
-            response.status === 403
-              ? 'Collective: bloqu\u00e9 par Cloudflare. Visitez app.collective.work dans un onglet puis relancez le scan.'
-              : `Collective API error: ${response.status}`,
-            {
-              connectorId: this.id,
-              phase: 'fetch',
-              context: {
-                status: response.status,
-                contentType,
-                cloudflare: response.status === 403,
-                browser: detectBrowser(typeof navigator !== 'undefined' ? navigator.userAgent : '')
-                  .name,
+
+        // Cloudflare challenge returns HTML with 403
+        if (!response.ok || !contentType.includes('json')) {
+          const preview = await response
+            .text()
+            .then((t) => t.slice(0, 300))
+            .catch(() => '(unreadable)');
+          if (import.meta.env.DEV) {
+            console.error(
+              `[collective] fetchMissions: blocked — status=${response.status}, preview: ${preview}`
+            );
+          }
+          return err(
+            createConnectorError(
+              response.status === 403
+                ? 'Collective: bloqu\u00e9 par Cloudflare. Visitez app.collective.work dans un onglet puis relancez le scan.'
+                : `Collective API error: ${response.status}`,
+              {
+                connectorId: this.id,
+                phase: 'fetch',
+                context: {
+                  status: response.status,
+                  contentType,
+                  cloudflare: response.status === 403,
+                  browser: detectBrowser(
+                    typeof navigator !== 'undefined' ? navigator.userAgent : ''
+                  ).name,
+                },
               },
-            },
-            now
-          )
-        );
-      }
-
-      const result = (await response.json()) as {
-        data?: {
-          results?: {
-            projects?: CollectiveProject[];
-            pagination?: { total: number };
-          };
-        };
-        errors?: {
-          message: string;
-          extensions?: Record<string, unknown>;
-          path?: string[];
-          locations?: unknown[];
-        }[];
-      };
-
-      // GraphQL errors (auth, schema, etc.)
-      if (result.errors && result.errors.length > 0) {
-        const fullErrors = JSON.stringify(result.errors).slice(0, 1000);
-        if (import.meta.env.DEV) {
-          console.error(`[collective] fetchMissions: GraphQL errors (full):`, fullErrors);
+              now
+            )
+          );
         }
 
+        const result = (await response.json()) as {
+          data?: {
+            results?: {
+              projects?: CollectiveProject[];
+              pagination?: { total: number };
+            };
+          };
+          errors?: {
+            message: string;
+            extensions?: Record<string, unknown>;
+            path?: string[];
+            locations?: unknown[];
+          }[];
+        };
+
+        // GraphQL errors (auth, schema, etc.)
+        if (result.errors && result.errors.length > 0) {
+          const fullErrors = JSON.stringify(result.errors).slice(0, 1000);
+          if (import.meta.env.DEV) {
+            console.error(`[collective] fetchMissions: GraphQL errors (full):`, fullErrors);
+          }
+
+          return err(
+            createConnectorError(
+              `Collective GraphQL error: ${fullErrors}`,
+              { connectorId: this.id, phase: 'fetch', context: { errors: result.errors } },
+              now
+            )
+          );
+        }
+
+        const projects = result.data?.results?.projects ?? [];
+        const total = result.data?.results?.pagination?.total ?? 0;
+        if (import.meta.env.DEV) {
+          console.log(
+            `[collective] fetchMissions: ${projects.length} projects returned (total: ${total})`
+          );
+        }
+
+        const missions = projects.map((p) =>
+          createMission({
+            id: `col-${p.id}`,
+            title: p.name,
+            client: p.company?.name ?? null,
+            description: stripHtml(p.sumUp ?? p.description ?? ''),
+            stack: p.projectTypes.map(mapSkill),
+            tjm: extractTjm(p.budgetBrief),
+            location: p.location?.fullNameFrench ?? null,
+            remote: mapCollectiveRemote(p.workPreferences),
+            duration: p.duration ? `${p.duration} mois` : null,
+            url: this.userSlug
+              ? `${APP_URL}/collective/${this.userSlug}/jobs?jobId=${p.id}`
+              : `${APP_URL}/job/${p.slug}`,
+            source: 'collective' as const,
+            scrapedAt: new Date(now),
+          })
+        );
+
+        return ok(missions);
+      } finally {
         await removeCookieRule(COOKIE_RULE_ID);
-        return err(
-          createConnectorError(
-            `Collective GraphQL error: ${fullErrors}`,
-            { connectorId: this.id, phase: 'fetch', context: { errors: result.errors } },
-            now
-          )
-        );
       }
-
-      const projects = result.data?.results?.projects ?? [];
-      const total = result.data?.results?.pagination?.total ?? 0;
-      if (import.meta.env.DEV) {
-        console.log(
-          `[collective] fetchMissions: ${projects.length} projects returned (total: ${total})`
-        );
-      }
-
-      const missions = projects.map((p) =>
-        createMission({
-          id: `col-${p.id}`,
-          title: p.name,
-          client: p.company?.name ?? null,
-          description: stripHtml(p.sumUp ?? p.description ?? ''),
-          stack: p.projectTypes.map(mapSkill),
-          tjm: extractTjm(p.budgetBrief),
-          location: p.location?.fullNameFrench ?? null,
-          remote: mapCollectiveRemote(p.workPreferences),
-          duration: p.duration ? `${p.duration} mois` : null,
-          url: this.userSlug
-            ? `${APP_URL}/collective/${this.userSlug}/jobs?jobId=${p.id}`
-            : `${APP_URL}/job/${p.slug}`,
-          source: 'collective' as const,
-          scrapedAt: new Date(now),
-        })
-      );
-
-      await removeCookieRule(COOKIE_RULE_ID);
-      return ok(missions);
     } catch (e) {
       await removeCookieRule(COOKIE_RULE_ID);
       const message = e instanceof Error ? e.message : String(e);

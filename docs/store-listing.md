@@ -56,7 +56,7 @@ Fonctionne sur Chrome, Brave, Edge, Arc et Dia.
 
 ### Vie privée
 
-MissionPulse ne s'appuie sur aucun serveur externe. Le profil, les missions, les favoris, les caches et l'historique TJM restent stockés localement via IndexedDB et chrome.storage. Le scoring IA utilise Gemini Nano qui tourne entièrement sur votre machine, sans clé API externe. Code source ouvert sur GitHub.
+MissionPulse ne s'appuie sur aucun serveur MissionPulse. Le profil, les missions, les favoris, les caches et l'historique TJM restent stockés localement via IndexedDB et chrome.storage. L'extension contacte directement les plateformes supportées et leurs API, dont l'API publique Supabase utilisée par Hiway, pour récupérer les missions. Le scoring IA utilise Gemini Nano qui tourne entièrement sur votre machine, sans clé API externe. Code source ouvert sur GitHub.
 
 ---
 
@@ -81,5 +81,5 @@ MissionPulse ne s'appuie sur aucun serveur externe. Le profil, les missions, les
 | `cookies` | Détection de session sur les plateformes (LeHibou, Collective, Cherry Pick) |
 | `alarms` | Scan automatique programmé en arrière-plan |
 | `notifications` | Alertes pour les missions à haut score |
-| `declarativeNetRequest` | Réécriture headers Origin/Referer pour les API cross-origin |
+| `declarativeNetRequest` | Réécriture headers Origin/Referer et ajout temporaire de cookies de session allowlistés pour les API cross-origin |
 | `host_permissions` | Accès aux 5 plateformes pour le scraping de missions |

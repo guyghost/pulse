@@ -27,8 +27,12 @@ export async function getTJMAnalysis(
 
   const filtered: TJMHistory = {
     records: history.records.filter((r) => {
-      if (normalizedStacks && !normalizedStacks.has(r.stack)) return false;
-      if (hasRegionFilter && r.region !== region) return false;
+      if (normalizedStacks && !normalizedStacks.has(r.stack)) {
+        return false;
+      }
+      if (hasRegionFilter && r.region !== region) {
+        return false;
+      }
       return true;
     }),
   };

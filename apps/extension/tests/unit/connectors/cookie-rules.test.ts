@@ -74,6 +74,8 @@ import {
   getCookieNames,
 } from '../../../src/lib/shell/connectors/cookie-rules';
 
+const allowCookies = (...allowedCookieNames: string[]) => ({ allowedCookieNames });
+
 // =============================================================================
 // Test suites
 // =============================================================================
@@ -96,10 +98,16 @@ describe('injectCookieRule', () => {
       { name: 'token', value: 'xyz789', domain: '.example.com' },
     ];
 
-    const result = await injectCookieRule('.example.com', '*://api.example.com/*', 100);
+    const result = await injectCookieRule(
+      '.example.com',
+      '*://api.example.com/*',
+      100,
+      allowCookies('session', 'token')
+    );
 
     expect(result.success).toBe(true);
     expect(result.cookieCount).toBe(2);
+    expect(result.injectedCookieCount).toBe(2);
     expect(result.warning).toBeUndefined();
     expect(mockCookiesGetAll).toHaveBeenCalledWith({ domain: '.example.com' });
     expect(mockUpdateDynamicRules).toHaveBeenCalled();
@@ -109,10 +117,16 @@ describe('injectCookieRule', () => {
     // Setup: No cookies
     mockCookies = [];
 
-    const result = await injectCookieRule('.example.com', '*://api.example.com/*', 100);
+    const result = await injectCookieRule(
+      '.example.com',
+      '*://api.example.com/*',
+      100,
+      allowCookies('session')
+    );
 
     expect(result.success).toBe(false);
     expect(result.cookieCount).toBe(0);
+    expect(result.injectedCookieCount).toBe(0);
     expect(result.warning).toContain('No cookies found');
     expect(mockUpdateDynamicRules).not.toHaveBeenCalled();
   });
@@ -124,7 +138,12 @@ describe('injectCookieRule', () => {
       { name: 'auth_token', value: 'auth-value', domain: '.example.com' },
     ];
 
-    await injectCookieRule('.example.com', '*://api.example.com/*', 100);
+    await injectCookieRule(
+      '.example.com',
+      '*://api.example.com/*',
+      100,
+      allowCookies('session_id', 'auth_token')
+    );
 
     // Verify the call to updateDynamicRules
     expect(mockUpdateDynamicRules).toHaveBeenCalled();
@@ -147,10 +166,51 @@ describe('injectCookieRule', () => {
     expect(addedRule.condition.urlFilter).toBe('*://api.example.com/*');
   });
 
+  it('does not inject cookies outside the connector allowlist', async () => {
+    mockCookies = [
+      { name: 'session_id', value: 'session-value', domain: '.example.com' },
+      { name: 'analytics_id', value: 'tracking-value', domain: '.example.com' },
+    ];
+
+    const result = await injectCookieRule(
+      '.example.com',
+      '*://api.example.com/*',
+      100,
+      allowCookies('session_id')
+    );
+
+    const callArgs = mockUpdateDynamicRules.mock.calls[0]?.[0];
+    const addedRule = callArgs?.addRules?.[0] as {
+      action: { requestHeaders: Array<{ value: string }> };
+    };
+
+    expect(result.success).toBe(true);
+    expect(result.cookieCount).toBe(2);
+    expect(result.injectedCookieCount).toBe(1);
+    expect(addedRule.action.requestHeaders[0]?.value).toBe('session_id=session-value');
+  });
+
+  it('returns success=false when cookies exist but none are allowlisted', async () => {
+    mockCookies = [{ name: 'analytics_id', value: 'tracking-value', domain: '.example.com' }];
+
+    const result = await injectCookieRule(
+      '.example.com',
+      '*://api.example.com/*',
+      100,
+      allowCookies('session_id')
+    );
+
+    expect(result.success).toBe(false);
+    expect(result.cookieCount).toBe(1);
+    expect(result.injectedCookieCount).toBe(0);
+    expect(result.warning).toContain('No allowed session cookies');
+    expect(mockUpdateDynamicRules).not.toHaveBeenCalled();
+  });
+
   it('creates rule with correct priority and resourceType', async () => {
     mockCookies = [{ name: 'test', value: 'val', domain: '.example.com' }];
 
-    await injectCookieRule('.example.com', 'api.example.com', 200);
+    await injectCookieRule('.example.com', 'api.example.com', 200, allowCookies('test'));
 
     const callArgs = mockUpdateDynamicRules.mock.calls[0]?.[0];
     const addedRule = callArgs?.addRules?.[0] as {
@@ -170,7 +230,12 @@ describe('injectCookieRule', () => {
     // Pre-existing rule
     mockDynamicRules = [{ id: 100, priority: 1 }];
 
-    await injectCookieRule('.example.com', '*://api.example.com/*', 100);
+    await injectCookieRule(
+      '.example.com',
+      '*://api.example.com/*',
+      100,
+      allowCookies('test')
+    );
 
     const callArgs = mockUpdateDynamicRules.mock.calls[0]?.[0];
     expect(callArgs?.removeRuleIds).toEqual([100]);
@@ -362,7 +427,12 @@ describe('edge cases', () => {
   it('injectCookieRule handles cookies with special characters in values', async () => {
     mockCookies = [{ name: 'session', value: 'abc=123&xyz=456', domain: '.example.com' }];
 
-    const result = await injectCookieRule('.example.com', '*://api.example.com/*', 100);
+    const result = await injectCookieRule(
+      '.example.com',
+      '*://api.example.com/*',
+      100,
+      allowCookies('session')
+    );
 
     expect(result.success).toBe(true);
 
@@ -377,7 +447,12 @@ describe('edge cases', () => {
   it('injectCookieRule handles single cookie', async () => {
     mockCookies = [{ name: 'single', value: 'value', domain: '.example.com' }];
 
-    const result = await injectCookieRule('.example.com', '*://api.example.com/*', 100);
+    const result = await injectCookieRule(
+      '.example.com',
+      '*://api.example.com/*',
+      100,
+      allowCookies('single')
+    );
 
     expect(result.success).toBe(true);
     expect(result.cookieCount).toBe(1);

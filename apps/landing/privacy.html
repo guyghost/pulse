@@ -7,7 +7,7 @@
   <!-- Primary Meta Tags -->
   <title>Politique de confidentialité — MissionPulse</title>
   <meta name="title" content="Politique de confidentialité — MissionPulse">
-  <meta name="description" content="Politique de confidentialité de MissionPulse. Toutes vos données restent sur votre machine. Aucun serveur externe, aucun tracking.">
+  <meta name="description" content="Politique de confidentialité de MissionPulse. Toutes vos données restent sur votre machine. Aucun serveur MissionPulse, aucun tracking.">
   <meta name="robots" content="noindex, nofollow">
   
   <!-- Open Graph -->
@@ -73,9 +73,9 @@
         <h2>Principe fondamental</h2>
         
         <p>
-          <strong>Toutes vos données restent sur votre machine.</strong> MissionPulse est une application 100% locale. 
-          Aucune donnée personnelle n'est transmise à nos serveurs, car nous n'en avons pas. 
-          Il n'y a pas de backend, pas de base de données distante, pas de tracking, pas d'analytiques.
+          <strong>Toutes vos données restent sur votre machine.</strong> MissionPulse est une application locale-first.
+          Aucune donnée personnelle n'est transmise à des serveurs MissionPulse.
+          L'extension contacte uniquement les plateformes supportées et leurs API techniques pour récupérer les missions, sans tracking ni analytiques.
         </p>
         
         <h2>Données stockées localement</h2>
@@ -89,6 +89,11 @@
           <li><strong>Cache de scoring sémantique</strong> — Les scores de pertinence calculés par Gemini Nano sont mis en cache localement pour optimiser les performances.</li>
           <li><strong>Préférences de l'extension</strong> — Vos paramètres de notification et de scan automatique.</li>
         </ul>
+
+        <p>
+          Les missions sont purgées automatiquement après 90 jours. Le cache sémantique expire après 7 jours ou lors d'un changement de profil.
+          Les exports et backups créés depuis l'extension sont des fichiers locaux non chiffrés par MissionPulse.
+        </p>
         
         <h2>Utilisation de Gemini Nano</h2>
         
@@ -104,6 +109,11 @@
           MissionPulse accède aux sites Free-Work, LeHibou, Hiway, Collective et Cherry Pick pour scrapper les missions disponibles. 
           Ces accès sont effectués via <strong>votre session navigateur existante</strong> — vous devez être connecté à ces plateformes. 
           Nous ne stockons jamais vos identifiants de connexion.
+        </p>
+
+        <p>
+          Certains connecteurs réutilisent localement des cookies de session autorisés dans les requêtes API de la plateforme concernée, sans créer ni modifier vos cookies.
+          Le connecteur Hiway interroge l'API publique Supabase utilisée par hiway-missions.fr avec une clé anon publique.
         </p>
         
         <p>

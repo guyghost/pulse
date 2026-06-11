@@ -7,10 +7,21 @@
 export interface CookieRuleResult {
   /** Whether the rule was successfully injected */
   success: boolean;
-  /** Number of cookies found for the domain */
+  /** Number of cookies found for the domain before allowlist filtering */
   cookieCount: number;
+  /** Number of cookies attached to the dynamic request rule */
+  injectedCookieCount: number;
   /** Warning message if cookies were empty (possible partitioning issue) */
   warning?: string;
+}
+
+export interface CookieRuleOptions {
+  /**
+   * Exact cookie names that are allowed to be attached to connector API requests.
+   * Keep this list connector-specific so unrelated cookies for the same domain
+   * are not copied into the Cookie header.
+   */
+  allowedCookieNames: readonly string[];
 }
 
 /**
@@ -26,11 +37,15 @@ export interface CookieRuleResult {
 export const injectCookieRule = async (
   cookieDomain: string,
   urlFilter: string,
-  ruleId: number
+  ruleId: number,
+  options: CookieRuleOptions
 ): Promise<CookieRuleResult> => {
   const cookies = await chrome.cookies.getAll({ domain: cookieDomain });
   const cookieCount = cookies.length;
-  const cookieHeader = cookies.map((c) => `${c.name}=${c.value}`).join('; ');
+  const allowedNames = new Set(options.allowedCookieNames);
+  const allowedCookies = cookies.filter((cookie) => allowedNames.has(cookie.name));
+  const injectedCookieCount = allowedCookies.length;
+  const cookieHeader = allowedCookies.map((c) => `${c.name}=${c.value}`).join('; ');
 
   // Warn if no cookies found — possible cookie partitioning issue
   if (cookieCount === 0) {
@@ -38,13 +53,23 @@ export const injectCookieRule = async (
     if (import.meta.env.DEV) {
       console.warn(`[cookie-rules] ${warning}`);
     }
-    return { success: false, cookieCount, warning };
+    return { success: false, cookieCount, injectedCookieCount, warning };
+  }
+
+  if (injectedCookieCount === 0) {
+    const warning = `No allowed session cookies found for ${cookieDomain}`;
+    if (import.meta.env.DEV) {
+      console.warn(`[cookie-rules] ${warning}`);
+    }
+    return { success: false, cookieCount, injectedCookieCount, warning };
   }
 
   // Log found cookies for diagnostics
   if (import.meta.env.DEV) {
-    const cookieNames = cookies.map((c) => c.name).join(', ');
-    console.log(`[cookie-rules] Found ${cookieCount} cookies for ${cookieDomain}: ${cookieNames}`);
+    const cookieNames = allowedCookies.map((c) => c.name).join(', ');
+    console.log(
+      `[cookie-rules] Injecting ${injectedCookieCount}/${cookieCount} allowed cookies for ${cookieDomain}: ${cookieNames}`
+    );
   }
 
   await chrome.declarativeNetRequest.updateDynamicRules({
@@ -71,7 +96,7 @@ export const injectCookieRule = async (
     ],
   });
 
-  return { success: true, cookieCount };
+  return { success: true, cookieCount, injectedCookieCount };
 };
 
 /**
