@@ -23,9 +23,7 @@
     "https://app.cherry-pick.io/*",
     "https://missionpulse.app/*"
   ],
-  "optional_host_permissions": [
-    "https://www.linkedin.com/*"
-  ],
+  "optional_host_permissions": ["https://www.linkedin.com/*"],
   "background": {
     "service_worker": "src/background/index.ts",
     "type": "module"
