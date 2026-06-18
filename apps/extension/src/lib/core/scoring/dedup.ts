@@ -372,7 +372,7 @@ const computeMissionScore = (mission: Mission): number => {
  * Deduplicates missions using optimized two-phase strategy:
  *
  * Phase 1: Token inverted index to narrow candidate comparisons
- * Phase 2: Jaccard similarity on a structured mission signature
+ * Phase 2: pairwise title/client/stack/location compatibility scoring
  *
  * This reduces from O(n²) full comparisons to O(n * avg_candidates_sharing_tokens)
  *

@@ -23,7 +23,7 @@ pulse/
 - **Scoring IA** — Gemini Nano (Chrome built-in AI) analyse la pertinence sémantique
 - **Scoring multi-critères** — Stack, TJM, localisation, remote, séniorité, urgence (startDate)
 - **Dashboard TJM** — Tendances du taux journalier par stack et par source
-- **Déduplication** — Fusionne automatiquement les missions postées sur plusieurs plateformes
+- **Déduplication intelligente** — Fusionne les missions en préférant les sources directes (CherryPick > LeHibou > Hiway/Collective > Free-Work), détecte les proxy clients, URL normalisée avec validation de chemin
 - **Scan parallèle** — 5 connecteurs lancés simultanément (pool de 3)
 - **Smart notifications** — Alertes configurables par stack + TJM + score
 - **Comparaison** — Comparez jusqu'à 3 missions côte à côte
@@ -60,7 +60,7 @@ pulse/
 # Prérequis: Node.js >= 22, pnpm >= 10
 pnpm install
 pnpm dev:local    # Supabase local + variables .env.local + dev servers
-pnpm test         # 717 tests unitaires
+pnpm test         # 1156 tests unitaires
 pnpm build        # Build extension
 ```
 
@@ -74,7 +74,7 @@ pnpm build        # Build extension
 | Language   | TypeScript (strict)                        | ^5.x    |
 | Build      | Vite + @crxjs/vite-plugin                  | ^6.x    |
 | Monorepo   | Turborepo                                  | ^2.x    |
-| Testing    | Vitest (717 tests) + Playwright            | latest  |
+| Testing    | Vitest (1156 tests) + Playwright           | latest  |
 | Runtime    | Chrome Extension Manifest V3               | MV3     |
 | IA         | Gemini Nano (Chrome built-in AI)           | —       |
 | Validation | Zod                                        | ^3.23   |
@@ -87,7 +87,7 @@ pnpm build        # Build extension
 ```
 apps/extension/src/lib/
 ├── core/                  # FONCTIONS PURES — zéro I/O, zéro async
-│   ├── scoring/           # Relevance, bonus (séniorité/startDate), dedup, sort, smart notifications
+│   ├── scoring/           # Relevance, final-score (fusion), dedup (multi-field), notification-filter, sort
 │   ├── connectors/        # Parsers purs (HTML/JSON → Mission[])
 │   ├── types/             # Types + barrel exports (index.ts)
 │   ├── errors/            # Result<T,E> + erreurs typées
@@ -137,7 +137,7 @@ pnpm dev:env                # Écrit apps/landing/.env.local et apps/dashboard/.
 pnpm supabase:status        # Affiche les URLs/keys locales
 pnpm supabase:reset         # Rejoue les migrations + supabase/seed.sql
 pnpm supabase:stop          # Arrête la stack Supabase
-pnpm test                   # 717 tests unitaires
+pnpm test                   # 1156 tests unitaires
 pnpm test:watch             # Watch mode
 pnpm test:coverage          # Coverage (seuil 70% sur core/)
 pnpm test:e2e               # Playwright E2E
