@@ -415,6 +415,7 @@ describe('validateMessage — feed local data bridge', () => {
     expect(validateMessage({ type: 'GET_FEED_FAVORITES' }).valid).toBe(true);
     expect(validateMessage({ type: 'GET_FEED_HIDDEN' }).valid).toBe(true);
     expect(validateMessage({ type: 'GET_FEED_SORT' }).valid).toBe(true);
+    expect(validateMessage({ type: 'GET_FEED_SAVED_VIEWS' }).valid).toBe(true);
     expect(validateMessage({ type: 'GET_SEEN_MISSIONS' }).valid).toBe(true);
     expect(validateMessage({ type: 'GET_PERSISTED_CONNECTOR_STATUSES' }).valid).toBe(true);
   });
@@ -431,6 +432,31 @@ describe('validateMessage — feed local data bridge', () => {
       true
     );
     expect(validateMessage({ type: 'SAVE_FEED_SORT', payload: 'date' }).valid).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SAVE_FEED_SAVED_VIEWS',
+        payload: [
+          {
+            id: 'view-1',
+            name: 'Prioritaires',
+            filters: {
+              searchQuery: '',
+              selectedStacks: ['Svelte'],
+              selectedSource: null,
+              selectedRemote: 'full',
+              selectedSeniority: 'senior',
+              selectedScoreBucket: 'strong',
+              showNewOnly: false,
+              showFavoritesOnly: false,
+              showHidden: false,
+              sortBy: 'score',
+            },
+            createdAt: 1779436800000,
+            updatedAt: 1779436800000,
+          },
+        ],
+      }).valid
+    ).toBe(true);
     expect(validateMessage({ type: 'RESET_NEW_MISSION_COUNT' }).valid).toBe(true);
     expect(validateMessage({ type: 'CLEAR_EXTENSION_BADGE' }).valid).toBe(true);
     expect(
@@ -443,6 +469,29 @@ describe('validateMessage — feed local data bridge', () => {
     expect(
       validateMessage({ type: 'SAVE_FEED_FAVORITES', payload: { 'mission-1': -1 } }).valid
     ).toBe(false);
+  });
+
+  it('rejette trop de vues feed sauvegardées', () => {
+    const views = Array.from({ length: 13 }, (_, index) => ({
+      id: `view-${index}`,
+      name: `Vue ${index}`,
+      filters: {
+        searchQuery: '',
+        selectedStacks: [],
+        selectedSource: null,
+        selectedRemote: null,
+        selectedSeniority: null,
+        selectedScoreBucket: null,
+        showNewOnly: false,
+        showFavoritesOnly: false,
+        showHidden: false,
+        sortBy: 'score',
+      },
+      createdAt: 1779436800000,
+      updatedAt: 1779436800000,
+    }));
+
+    expect(validateMessage({ type: 'SAVE_FEED_SAVED_VIEWS', payload: views }).valid).toBe(false);
   });
 
   it('rejette les URLs externes non HTTPS', () => {

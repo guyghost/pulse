@@ -15,6 +15,7 @@ import type { ConnectorState } from '../../core/types/connector-status';
 import type { ConnectorHealthSnapshot } from '../../core/types/health';
 import type { AppError } from '../../core/errors/app-error';
 import type { TJMAnalysis, TJMRegion } from '../../core/types/tjm';
+import type { SavedFeedView } from '../../core/types/feed-view';
 import type { ToastType } from '../../state/toast.svelte';
 
 /**
@@ -64,6 +65,10 @@ export type BridgeMessage =
   | { type: 'FEED_SORT_RESULT'; payload: 'score' | 'date' | 'tjm' }
   | { type: 'SAVE_FEED_SORT'; payload: 'score' | 'date' | 'tjm' }
   | { type: 'FEED_SORT_SAVED'; payload: { saved: boolean } }
+  | { type: 'GET_FEED_SAVED_VIEWS' }
+  | { type: 'FEED_SAVED_VIEWS_RESULT'; payload: SavedFeedView[] }
+  | { type: 'SAVE_FEED_SAVED_VIEWS'; payload: SavedFeedView[] }
+  | { type: 'FEED_SAVED_VIEWS_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_TJM_ANALYSIS'; payload?: { profileStacks?: string[]; region?: TJMRegion } }
   | { type: 'TJM_ANALYSIS_RESULT'; payload: { analysis: TJMAnalysis | null } }
   | { type: 'GET_SEEN_MISSIONS' }

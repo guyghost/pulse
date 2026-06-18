@@ -9,6 +9,8 @@
   import { createTrackingStore } from '$lib/state/tracking.svelte';
   import { sendMessage } from '$lib/shell/messaging/bridge';
   import { showToast } from '$lib/shell/notifications/toast-service';
+  import { summarizeApplicationPipeline } from '$lib/core/tracking/pipeline-summary';
+  import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
 
   const tracking = createTrackingStore();
 
@@ -18,18 +20,6 @@
   let assets = $state<GeneratedAsset[]>([]);
   let generatingType = $state<GenerationType | null>(null);
   let nextActionInput = $state('');
-
-  const statuses: ApplicationStatus[] = [
-    'detected',
-    'selected',
-    'application_prepared',
-    'applied',
-    'interview',
-    'offer',
-    'accepted',
-    'rejected',
-    'archived',
-  ];
 
   const generationTypes: GenerationType[] = ['pitch', 'cover-message', 'cv-summary'];
 
@@ -58,16 +48,9 @@
     nextActionInput = isoToDateTimeLocal(selectedTracking?.nextActionAt ?? null);
   });
 
-  const statusCounts = $derived.by(() => {
-    const counts = new Map<ApplicationStatus, number>();
-    for (const status of statuses) {
-      counts.set(status, 0);
-    }
-    for (const record of tracking.trackings.values()) {
-      counts.set(record.currentStatus, (counts.get(record.currentStatus) ?? 0) + 1);
-    }
-    return counts;
-  });
+  const pipelineSummary = $derived.by(() =>
+    summarizeApplicationPipeline([...tracking.trackings.values()], Date.now())
+  );
 
   function getLastActivity(record: MissionTracking | null): number {
     if (!record || record.history.length === 0) {
@@ -254,18 +237,7 @@
         <Icon name="mail" size={18} class="text-blueprint-blue" />
       </div>
     </div>
-    <div class="mt-4 grid grid-cols-2 gap-2">
-      {#each statuses.slice(1, 5) as status}
-        <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
-            {STATUS_LABELS[status]}
-          </p>
-          <p class="mt-1 text-sm font-semibold text-text-primary">
-            {statusCounts.get(status) ?? 0}
-          </p>
-        </div>
-      {/each}
-    </div>
+    <ApplicationPipelineSummary summary={pipelineSummary} />
   </section>
 
   {#if isLoading}

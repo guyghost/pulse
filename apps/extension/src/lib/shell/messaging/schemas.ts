@@ -58,6 +58,36 @@ const SeenMissionIdsSchema = z
 
 const FeedSortSchema = z.enum(['score', 'date', 'tjm']);
 
+const FeedSavedViewSchema = z
+  .object({
+    id: z.string().min(1).max(80),
+    name: z.string().min(1).max(48),
+    filters: z
+      .object({
+        searchQuery: z.string().max(120),
+        selectedStacks: z.array(z.string().min(1).max(48)).max(24),
+        selectedSource: z
+          .enum(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'])
+          .nullable(),
+        selectedRemote: z.enum(['full', 'hybrid', 'onsite']).nullable(),
+        selectedSeniority: z.enum(['junior', 'confirmed', 'senior']).nullable(),
+        selectedScoreBucket: z.enum(['strong', 'good', 'weak']).nullable(),
+        showNewOnly: z.boolean(),
+        showFavoritesOnly: z.boolean(),
+        showHidden: z.boolean(),
+        sortBy: FeedSortSchema,
+      })
+      .strict(),
+    createdAt: z.number().int().min(0),
+    updatedAt: z.number().int().min(0),
+  })
+  .strict();
+
+const FeedSavedViewsSchema = z
+  .array(FeedSavedViewSchema)
+  .max(12)
+  .refine(maxBytes(30_000), { message: 'Feed saved views payload exceeds 30KB limit' });
+
 const TJMRegionSchema = z.enum([
   'ile-de-france',
   'lyon',
@@ -404,6 +434,19 @@ export const MessageSchemas = {
   }),
   FEED_SORT_SAVED: z.object({
     type: z.literal('FEED_SORT_SAVED'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  GET_FEED_SAVED_VIEWS: z.object({ type: z.literal('GET_FEED_SAVED_VIEWS') }),
+  FEED_SAVED_VIEWS_RESULT: z.object({
+    type: z.literal('FEED_SAVED_VIEWS_RESULT'),
+    payload: FeedSavedViewsSchema,
+  }),
+  SAVE_FEED_SAVED_VIEWS: z.object({
+    type: z.literal('SAVE_FEED_SAVED_VIEWS'),
+    payload: FeedSavedViewsSchema,
+  }),
+  FEED_SAVED_VIEWS_SAVED: z.object({
+    type: z.literal('FEED_SAVED_VIEWS_SAVED'),
     payload: z.object({ saved: z.boolean() }),
   }),
   GET_TJM_ANALYSIS: z.object({

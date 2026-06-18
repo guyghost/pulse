@@ -10,6 +10,7 @@
  */
 import { z } from 'zod';
 import type { AppSettings } from '../../core/types/app-settings';
+import type { SavedFeedView } from '../../core/types/feed-view';
 
 const SettingsSchema = z.object({
   scanIntervalMinutes: z.number().int().min(1).max(1440),
@@ -96,6 +97,66 @@ export const getFeedSortBy = async (): Promise<FeedSortBy> => {
 export const setFeedSortBy = async (value: FeedSortBy): Promise<void> => {
   try {
     await chrome.storage.local.set({ [FEED_SORT_KEY]: value });
+  } catch {
+    // Outside extension context
+  }
+};
+
+// ============================================================================
+// Feed Saved Views
+// ============================================================================
+
+const FEED_SAVED_VIEWS_KEY = 'feedSavedViews';
+
+const FeedSavedViewSchema = z
+  .object({
+    id: z.string().min(1).max(80),
+    name: z.string().min(1).max(48),
+    filters: z
+      .object({
+        searchQuery: z.string().max(120),
+        selectedStacks: z.array(z.string().min(1).max(48)).max(24),
+        selectedSource: z
+          .enum(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'])
+          .nullable(),
+        selectedRemote: z.enum(['full', 'hybrid', 'onsite']).nullable(),
+        selectedSeniority: z.enum(['junior', 'confirmed', 'senior']).nullable(),
+        selectedScoreBucket: z.enum(['strong', 'good', 'weak']).nullable(),
+        showNewOnly: z.boolean(),
+        showFavoritesOnly: z.boolean(),
+        showHidden: z.boolean(),
+        sortBy: z.enum(VALID_SORT_VALUES),
+      })
+      .strict(),
+    createdAt: z.number().int().min(0),
+    updatedAt: z.number().int().min(0),
+  })
+  .strict();
+
+const FeedSavedViewsSchema = z.array(FeedSavedViewSchema).max(12);
+
+export const getFeedSavedViews = async (): Promise<SavedFeedView[]> => {
+  try {
+    const result = await chrome.storage.local.get(FEED_SAVED_VIEWS_KEY);
+    const parseResult = FeedSavedViewsSchema.safeParse(result[FEED_SAVED_VIEWS_KEY]);
+    if (parseResult.success) {
+      return parseResult.data;
+    }
+  } catch {
+    // Outside extension context
+  }
+  return [];
+};
+
+export const setFeedSavedViews = async (views: SavedFeedView[]): Promise<void> => {
+  const parseResult = FeedSavedViewsSchema.safeParse(views);
+  if (!parseResult.success) {
+    const messages = parseResult.error.issues.map((i) => i.message).join(', ');
+    throw new Error(`Invalid feed saved views: ${messages}`);
+  }
+
+  try {
+    await chrome.storage.local.set({ [FEED_SAVED_VIEWS_KEY]: parseResult.data });
   } catch {
     // Outside extension context
   }

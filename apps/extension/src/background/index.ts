@@ -17,8 +17,10 @@ import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
 import {
   DEFAULT_SETTINGS,
+  getFeedSavedViews,
   getFeedSortBy,
   getSettings,
+  setFeedSavedViews,
   setFeedSortBy,
   setSettings,
 } from '../lib/shell/storage/chrome-storage';
@@ -537,6 +539,30 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] SAVE_FEED_SORT error:', err);
           sendResponse({ type: 'FEED_SORT_SAVED', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_FEED_SAVED_VIEWS') {
+      getFeedSavedViews()
+        .then((views) => {
+          sendResponse({ type: 'FEED_SAVED_VIEWS_RESULT', payload: views });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_FEED_SAVED_VIEWS error:', err);
+          sendResponse({ type: 'FEED_SAVED_VIEWS_RESULT', payload: [] });
+        });
+      return true;
+    }
+
+    if (message.type === 'SAVE_FEED_SAVED_VIEWS') {
+      setFeedSavedViews(message.payload)
+        .then(() => {
+          sendResponse({ type: 'FEED_SAVED_VIEWS_SAVED', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SAVE_FEED_SAVED_VIEWS error:', err);
+          sendResponse({ type: 'FEED_SAVED_VIEWS_SAVED', payload: { saved: false } });
         });
       return true;
     }

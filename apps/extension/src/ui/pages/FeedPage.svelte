@@ -13,6 +13,7 @@
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon } from '@pulse/ui';
   import FilterBar from '../organisms/FilterBar.svelte';
+  import FeedActionDashboard from '../organisms/FeedActionDashboard.svelte';
   import SourceHealthPanel from '../organisms/SourceHealthPanel.svelte';
   import LastScanInfo from '../molecules/LastScanInfo.svelte';
   import KeyboardShortcutsHelp from '../molecules/KeyboardShortcutsHelp.svelte';
@@ -262,6 +263,17 @@
               onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
               onReconnect={handleOpenExternalUrl}
             />
+            <FeedActionDashboard
+              summary={page.dashboardSummary}
+              insightSummary={page.insightSummary}
+              scoreDistribution={page.scoreDistribution}
+              selectedScoreBucket={page.selectedScoreBucket}
+              showNewOnly={page.showNewOnly}
+              brokenConnectorCount={brokenConnectors.length}
+              onToggleNewOnly={page.toggleNewOnly}
+              onToggleFavorites={page.toggleFavoritesFilter}
+              onSetScoreBucket={page.setSelectedScoreBucket}
+            />
           {:else}
             <!-- Full: hero with description, progress, stats -->
             <div class="relative pr-14">
@@ -329,6 +341,7 @@
               connectorName={controller.scanProgress.connectorName}
               current={controller.scanProgress.current}
               total={controller.scanProgress.total}
+              statuses={controller.connectorStatuses}
             />
 
             <ConnectorStatusList
@@ -354,6 +367,19 @@
                 onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
                 onReconnect={handleOpenExternalUrl}
               />
+              {#if page.totalMissions > 0}
+                <FeedActionDashboard
+                  summary={page.dashboardSummary}
+                  insightSummary={page.insightSummary}
+                  scoreDistribution={page.scoreDistribution}
+                  selectedScoreBucket={page.selectedScoreBucket}
+                  showNewOnly={page.showNewOnly}
+                  brokenConnectorCount={brokenConnectors.length}
+                  onToggleNewOnly={page.toggleNewOnly}
+                  onToggleFavorites={page.toggleFavoritesFilter}
+                  onSetScoreBucket={page.setSelectedScoreBucket}
+                />
+              {/if}
             {/if}
 
             {#if !(controller.isScanning || page.isLoading) && controller.lastScanAt}
@@ -534,11 +560,18 @@
                 selectedSource={page.selectedSource}
                 selectedRemote={page.selectedRemote}
                 selectedSeniority={page.selectedSeniority}
+                savedViews={page.savedViews}
+                activeSavedViewId={page.activeSavedViewId}
+                canSaveCurrentView={page.canSaveCurrentView}
+                savedViewLimitReached={page.savedViewLimitReached}
                 onToggleStack={page.toggleStack}
                 onSetSource={page.setSelectedSource}
                 onSetRemote={page.setSelectedRemote}
                 onSetSeniority={page.setSelectedSeniority}
                 onClearAll={page.clearAllFilters}
+                onSaveView={page.saveCurrentView}
+                onApplyView={page.applySavedView}
+                onDeleteView={page.deleteSavedView}
               />
             </div>
           {/if}

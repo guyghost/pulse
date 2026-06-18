@@ -5,6 +5,7 @@ import type { Mission } from '$lib/core/types/mission';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
+const DEV_SAVED_VIEWS_STORAGE_KEY = '__missionpulse_dev_saved_views';
 
 function readDevStorage<T>(key: string, fallback: T): T {
   try {
@@ -38,6 +39,7 @@ const storage: Record<string, unknown> = {
   favoriteMissions: readDevStorage<Record<string, number>>(DEV_FAVORITES_STORAGE_KEY, {}),
   hiddenMissions: {},
   seenMissions: [],
+  feedSavedViews: readDevStorage(DEV_SAVED_VIEWS_STORAGE_KEY, []),
   newMissionCount: 0,
   feedSortBy: 'score',
   profile: mockProfile,
@@ -115,6 +117,12 @@ function createChromeStubs() {
           case 'SAVE_FEED_SORT':
             storage.feedSortBy = message.payload;
             return { type: 'FEED_SORT_SAVED', payload: { saved: true } };
+          case 'GET_FEED_SAVED_VIEWS':
+            return { type: 'FEED_SAVED_VIEWS_RESULT', payload: storage.feedSavedViews };
+          case 'SAVE_FEED_SAVED_VIEWS':
+            storage.feedSavedViews = message.payload;
+            writeDevStorage(DEV_SAVED_VIEWS_STORAGE_KEY, message.payload);
+            return { type: 'FEED_SAVED_VIEWS_SAVED', payload: { saved: true } };
           case 'GET_TJM_ANALYSIS': {
             const history = storage.tjm_history as TJMHistory | undefined;
             const payload = message.payload as
@@ -206,7 +214,80 @@ function createChromeStubs() {
               },
             };
           case 'GET_TRACKINGS':
-            return { type: 'TRACKINGS_RESULT', payload: [] };
+            return {
+              type: 'TRACKINGS_RESULT',
+              payload: [
+                {
+                  missionId: 'mock-0',
+                  currentStatus: 'selected',
+                  history: [
+                    { from: null, to: 'detected', timestamp: Date.now() - 86_400_000, note: null },
+                    {
+                      from: 'detected',
+                      to: 'selected',
+                      timestamp: Date.now() - 43_200_000,
+                      note: null,
+                    },
+                  ],
+                  generatedAssetIds: [],
+                  userRating: null,
+                  notes: '',
+                  nextActionAt: new Date(Date.now() - 3_600_000).toISOString(),
+                },
+                {
+                  missionId: 'mock-1',
+                  currentStatus: 'application_prepared',
+                  history: [
+                    { from: null, to: 'detected', timestamp: Date.now() - 172_800_000, note: null },
+                    {
+                      from: 'detected',
+                      to: 'selected',
+                      timestamp: Date.now() - 120_000_000,
+                      note: null,
+                    },
+                    {
+                      from: 'selected',
+                      to: 'application_prepared',
+                      timestamp: Date.now() - 86_400_000,
+                      note: null,
+                    },
+                  ],
+                  generatedAssetIds: ['asset-dev-1'],
+                  userRating: 4,
+                  notes: 'Relancer demain matin',
+                  nextActionAt: new Date(Date.now() + 86_400_000).toISOString(),
+                },
+                {
+                  missionId: 'mock-2',
+                  currentStatus: 'applied',
+                  history: [
+                    { from: null, to: 'detected', timestamp: Date.now() - 259_200_000, note: null },
+                    {
+                      from: 'detected',
+                      to: 'selected',
+                      timestamp: Date.now() - 220_000_000,
+                      note: null,
+                    },
+                    {
+                      from: 'selected',
+                      to: 'application_prepared',
+                      timestamp: Date.now() - 180_000_000,
+                      note: null,
+                    },
+                    {
+                      from: 'application_prepared',
+                      to: 'applied',
+                      timestamp: Date.now() - 86_400_000,
+                      note: null,
+                    },
+                  ],
+                  generatedAssetIds: [],
+                  userRating: null,
+                  notes: '',
+                  nextActionAt: null,
+                },
+              ],
+            };
           case 'UPDATE_TRACKING': {
             const p = message.payload as Record<string, unknown> | undefined;
             return {

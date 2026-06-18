@@ -8,6 +8,7 @@ import { sendMessage } from '../messaging/bridge';
 import type { UserProfile } from '../../core/types/profile';
 import type { Mission } from '../../core/types/mission';
 import type { PersistedConnectorStatus } from '../../core/types/connector-status';
+import type { SavedFeedView } from '../../core/types/feed-view';
 
 export type FeedSortBy = 'score' | 'date' | 'tjm';
 
@@ -63,6 +64,18 @@ export async function setFeedSortBy(sortBy: FeedSortBy): Promise<void> {
   const response = await sendMessage({ type: 'SAVE_FEED_SORT', payload: sortBy });
   if (response.type !== 'FEED_SORT_SAVED' || !response.payload.saved) {
     throw new Error('Feed sort save failed.');
+  }
+}
+
+export async function getFeedSavedViews(): Promise<SavedFeedView[]> {
+  const response = await sendMessage({ type: 'GET_FEED_SAVED_VIEWS' });
+  return response.type === 'FEED_SAVED_VIEWS_RESULT' ? response.payload : [];
+}
+
+export async function setFeedSavedViews(views: SavedFeedView[]): Promise<void> {
+  const response = await sendMessage({ type: 'SAVE_FEED_SAVED_VIEWS', payload: views });
+  if (response.type !== 'FEED_SAVED_VIEWS_SAVED' || !response.payload.saved) {
+    throw new Error('Feed saved views save failed.');
   }
 }
 

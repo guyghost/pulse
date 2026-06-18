@@ -6,6 +6,8 @@ const getSettings = vi.fn();
 const setSettings = vi.fn();
 const getFeedSortBy = vi.fn();
 const setFeedSortBy = vi.fn();
+const getFeedSavedViews = vi.fn();
+const setFeedSavedViews = vi.fn();
 const runScan = vi.fn();
 const getSeenIds = vi.fn();
 const saveSeenIds = vi.fn();
@@ -169,6 +171,8 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
   setSettings,
   getFeedSortBy,
   setFeedSortBy,
+  getFeedSavedViews,
+  setFeedSavedViews,
 }));
 
 vi.mock('../../../src/lib/shell/storage/db', () => ({
@@ -265,6 +269,8 @@ describe('background auto-scan notifications', () => {
     setSettings.mockResolvedValue(undefined);
     getFeedSortBy.mockResolvedValue('score');
     setFeedSortBy.mockResolvedValue(undefined);
+    getFeedSavedViews.mockResolvedValue([]);
+    setFeedSavedViews.mockResolvedValue(undefined);
     getFirstScanDone.mockResolvedValue(true);
     getProfileBannerDismissed.mockResolvedValue(false);
     setProfileBannerDismissed.mockResolvedValue(undefined);
@@ -310,6 +316,8 @@ describe('background auto-scan notifications', () => {
     saveHidden.mockResolvedValue(undefined);
     getFeedSortBy.mockResolvedValue('score');
     setFeedSortBy.mockResolvedValue(undefined);
+    getFeedSavedViews.mockResolvedValue([]);
+    setFeedSavedViews.mockResolvedValue(undefined);
     getFirstScanDone.mockResolvedValue(true);
     getProfileBannerDismissed.mockResolvedValue(false);
     setProfileBannerDismissed.mockResolvedValue(undefined);
@@ -468,6 +476,7 @@ describe('background auto-scan notifications', () => {
     const favoritesResponse = vi.fn();
     const hiddenResponse = vi.fn();
     const sortResponse = vi.fn();
+    const savedViewsResponse = vi.fn();
     const seenResponse = vi.fn();
     const statusesResponse = vi.fn();
 
@@ -488,6 +497,26 @@ describe('background auto-scan notifications', () => {
     getFavorites.mockResolvedValueOnce(favorites);
     getHidden.mockResolvedValueOnce(hidden);
     getFeedSortBy.mockResolvedValueOnce('date');
+    getFeedSavedViews.mockResolvedValueOnce([
+      {
+        id: 'view-1',
+        name: 'Prioritaires',
+        filters: {
+          searchQuery: '',
+          selectedStacks: [],
+          selectedSource: null,
+          selectedRemote: null,
+          selectedSeniority: null,
+          selectedScoreBucket: 'strong',
+          showNewOnly: false,
+          showFavoritesOnly: false,
+          showHidden: false,
+          sortBy: 'score',
+        },
+        createdAt: 1779436800000,
+        updatedAt: 1779436800000,
+      },
+    ]);
     getSeenIds.mockResolvedValueOnce(['mission-1']);
     getConnectorStatuses.mockResolvedValueOnce(statuses);
 
@@ -495,6 +524,7 @@ describe('background auto-scan notifications', () => {
     expect(messageListener?.({ type: 'GET_FEED_FAVORITES' }, {}, favoritesResponse)).toBe(true);
     expect(messageListener?.({ type: 'GET_FEED_HIDDEN' }, {}, hiddenResponse)).toBe(true);
     expect(messageListener?.({ type: 'GET_FEED_SORT' }, {}, sortResponse)).toBe(true);
+    expect(messageListener?.({ type: 'GET_FEED_SAVED_VIEWS' }, {}, savedViewsResponse)).toBe(true);
     expect(messageListener?.({ type: 'GET_SEEN_MISSIONS' }, {}, seenResponse)).toBe(true);
     expect(
       messageListener?.({ type: 'GET_PERSISTED_CONNECTOR_STATUSES' }, {}, statusesResponse)
@@ -516,6 +546,10 @@ describe('background auto-scan notifications', () => {
     expect(sortResponse).toHaveBeenCalledWith({
       type: 'FEED_SORT_RESULT',
       payload: 'date',
+    });
+    expect(savedViewsResponse).toHaveBeenCalledWith({
+      type: 'FEED_SAVED_VIEWS_RESULT',
+      payload: [expect.objectContaining({ id: 'view-1', name: 'Prioritaires' })],
     });
     expect(seenResponse).toHaveBeenCalledWith({
       type: 'SEEN_MISSIONS_RESULT',
@@ -584,6 +618,7 @@ describe('background auto-scan notifications', () => {
     const favoritesResponse = vi.fn();
     const hiddenResponse = vi.fn();
     const sortResponse = vi.fn();
+    const savedViewsResponse = vi.fn();
     const seenResponse = vi.fn();
     const resetResponse = vi.fn();
     const badgeResponse = vi.fn();
@@ -591,6 +626,26 @@ describe('background auto-scan notifications', () => {
     const favorites = { 'mission-1': 1779436800000 };
     const hidden = { 'mission-2': 1779436900000 };
     const seenIds = ['mission-1', 'mission-2'];
+    const savedViews = [
+      {
+        id: 'view-1',
+        name: 'Remote',
+        filters: {
+          searchQuery: '',
+          selectedStacks: [],
+          selectedSource: null,
+          selectedRemote: 'full' as const,
+          selectedSeniority: null,
+          selectedScoreBucket: null,
+          showNewOnly: false,
+          showFavoritesOnly: false,
+          showHidden: false,
+          sortBy: 'score' as const,
+        },
+        createdAt: 1779436800000,
+        updatedAt: 1779436800000,
+      },
+    ];
 
     expect(
       messageListener?.({ type: 'SAVE_FEED_FAVORITES', payload: favorites }, {}, favoritesResponse)
@@ -601,6 +656,13 @@ describe('background auto-scan notifications', () => {
     expect(messageListener?.({ type: 'SAVE_FEED_SORT', payload: 'tjm' }, {}, sortResponse)).toBe(
       true
     );
+    expect(
+      messageListener?.(
+        { type: 'SAVE_FEED_SAVED_VIEWS', payload: savedViews },
+        {},
+        savedViewsResponse
+      )
+    ).toBe(true);
     expect(
       messageListener?.({ type: 'SAVE_SEEN_MISSIONS', payload: seenIds }, {}, seenResponse)
     ).toBe(true);
@@ -618,6 +680,7 @@ describe('background auto-scan notifications', () => {
     expect(saveFavorites).toHaveBeenCalledWith(favorites);
     expect(saveHidden).toHaveBeenCalledWith(hidden);
     expect(setFeedSortBy).toHaveBeenCalledWith('tjm');
+    expect(setFeedSavedViews).toHaveBeenCalledWith(savedViews);
     expect(saveSeenIds).toHaveBeenCalledWith(seenIds);
     expect(resetNewMissionCount).toHaveBeenCalled();
     expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
@@ -632,6 +695,10 @@ describe('background auto-scan notifications', () => {
     });
     expect(sortResponse).toHaveBeenCalledWith({
       type: 'FEED_SORT_SAVED',
+      payload: { saved: true },
+    });
+    expect(savedViewsResponse).toHaveBeenCalledWith({
+      type: 'FEED_SAVED_VIEWS_SAVED',
       payload: { saved: true },
     });
     expect(seenResponse).toHaveBeenCalledWith({

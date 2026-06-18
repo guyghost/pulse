@@ -25,7 +25,12 @@ vi.stubGlobal('chrome', {
   },
 });
 
-import { getSettings, setSettings } from '../../../src/lib/shell/storage/chrome-storage';
+import {
+  getFeedSavedViews,
+  getSettings,
+  setFeedSavedViews,
+  setSettings,
+} from '../../../src/lib/shell/storage/chrome-storage';
 
 describe('getSettings', () => {
   beforeEach(() => {
@@ -239,5 +244,73 @@ describe('setSettings', () => {
     const { theme: _, ...settingsWithoutTheme } = await getSettings();
     // The persisted payload must include theme; restoration code fills it with the default value.
     await setSettings({ ...settingsWithoutTheme, theme: 'system' });
+  });
+});
+
+describe('feed saved views storage', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(mockStorage)) {
+      delete mockStorage[key];
+    }
+  });
+
+  it('returns an empty list when no saved views exist', async () => {
+    await expect(getFeedSavedViews()).resolves.toEqual([]);
+  });
+
+  it('persists valid saved views and reads them back', async () => {
+    const views = [
+      {
+        id: 'view-1',
+        name: 'Prioritaires',
+        filters: {
+          searchQuery: '',
+          selectedStacks: ['Svelte'],
+          selectedSource: null,
+          selectedRemote: 'full' as const,
+          selectedSeniority: 'senior' as const,
+          selectedScoreBucket: 'strong' as const,
+          showNewOnly: false,
+          showFavoritesOnly: false,
+          showHidden: false,
+          sortBy: 'score' as const,
+        },
+        createdAt: 1779436800000,
+        updatedAt: 1779436800000,
+      },
+    ];
+
+    await setFeedSavedViews(views);
+
+    await expect(getFeedSavedViews()).resolves.toEqual(views);
+  });
+
+  it('falls back to an empty list when stored saved views are invalid', async () => {
+    mockStorage.feedSavedViews = [{ id: 'bad-view', name: '', filters: {} }];
+
+    await expect(getFeedSavedViews()).resolves.toEqual([]);
+  });
+
+  it('rejects more than 12 saved views', async () => {
+    const views = Array.from({ length: 13 }, (_, index) => ({
+      id: `view-${index}`,
+      name: `Vue ${index}`,
+      filters: {
+        searchQuery: '',
+        selectedStacks: [],
+        selectedSource: null,
+        selectedRemote: null,
+        selectedSeniority: null,
+        selectedScoreBucket: null,
+        showNewOnly: false,
+        showFavoritesOnly: false,
+        showHidden: false,
+        sortBy: 'score' as const,
+      },
+      createdAt: 1779436800000,
+      updatedAt: 1779436800000,
+    }));
+
+    await expect(setFeedSavedViews(views)).rejects.toThrow('Invalid feed saved views');
   });
 });

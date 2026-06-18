@@ -114,6 +114,6 @@
 
   <!-- Dashboard -->
   <section class="mt-4">
-    <TJMDashboard {analysis} {isLoading} {error} {userSeniority} />
+    <TJMDashboard {analysis} {isLoading} {error} {userSeniority} {userTjmMin} {userTjmMax} />
   </section>
 </div>

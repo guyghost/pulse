@@ -8,6 +8,12 @@
  */
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
 import type { SeniorityLevel } from '$lib/core/types/profile';
+import type {
+  FeedScoreBucket,
+  FeedSortBy,
+  FeedViewFilters,
+  SavedFeedView,
+} from '$lib/core/types/feed-view';
 import type { FeedState } from './feed.svelte';
 import type { FeedController } from '$lib/shell/facades/feed-controller.svelte';
 import type { AiAvailability } from '$lib/shell/ai/capabilities';
@@ -24,7 +30,9 @@ import {
   resetNewMissionCount,
   clearExtensionBadge,
   getFeedSortBy,
+  getFeedSavedViews,
   setFeedSortBy,
+  setFeedSavedViews,
   markAsSeen,
   toggleFavorite,
   toggleHidden,
@@ -40,7 +48,52 @@ import {
 } from '$lib/shell/utils/keyboard-shortcuts';
 import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 
-export type SortBy = 'score' | 'date' | 'tjm';
+export type SortBy = FeedSortBy;
+export type ScoreBucket = FeedScoreBucket;
+
+export interface ScoreBucketSummary {
+  bucket: ScoreBucket;
+  label: string;
+  count: number;
+  min: number;
+  max: number | null;
+}
+
+export interface FeedDashboardSummary {
+  newCount: number;
+  highScoreCount: number;
+  favoriteCount: number;
+  visibleCount: number;
+}
+
+export interface FeedInsightSummary {
+  strongStackCount: number;
+  weakTjmCount: number;
+  remoteMatchCount: number;
+  semanticAnalyzedCount: number;
+}
+
+function getMissionScore(mission: Mission): number {
+  return mission.scoreBreakdown?.total ?? mission.score ?? 0;
+}
+
+function getScoreBucket(score: number): ScoreBucket {
+  if (score >= 80) {
+    return 'strong';
+  }
+  if (score >= 60) {
+    return 'good';
+  }
+  return 'weak';
+}
+
+const SCORE_BUCKETS: Array<Omit<ScoreBucketSummary, 'count'>> = [
+  { bucket: 'strong', label: 'Prioritaires', min: 80, max: null },
+  { bucket: 'good', label: 'À comparer', min: 60, max: 79 },
+  { bucket: 'weak', label: 'À qualifier', min: 0, max: 59 },
+];
+
+const MAX_SAVED_VIEWS = 12;
 
 /**
  * Feed Page State — factory function returning a reactive state object.
@@ -79,11 +132,15 @@ export function createFeedPageState(
   let selectedSource = $state<MissionSource | null>(null);
   let selectedRemote = $state<RemoteType | null>(null);
   let selectedSeniority = $state<SeniorityLevel | null>(null);
+  let selectedScoreBucket = $state<ScoreBucket | null>(null);
+  let showNewOnly = $state(false);
   let firstName = $state('');
   let panelSide = $state<PanelSide>('right');
   let aiStatus = $state<AiAvailability>('no');
   let showShortcutsHelp = $state(false);
   let comparisonMissionIds = $state<string[]>([]);
+  let savedViews = $state<SavedFeedView[]>([]);
+  let activeSavedViewId = $state<string | null>(null);
   const connection = getConnectionStore();
   let searchInputRef = $state<HTMLInputElement | null>(null);
 
@@ -118,7 +175,9 @@ export function createFeedPageState(
     selectedSource !== null ||
       selectedRemote !== null ||
       selectedStacks.length > 0 ||
-      selectedSeniority !== null
+      selectedSeniority !== null ||
+      selectedScoreBucket !== null ||
+      showNewOnly
   );
 
   const availableStacks = $derived.by(() => {
@@ -158,9 +217,100 @@ export function createFeedPageState(
         return true;
       });
     }
+    if (selectedScoreBucket !== null) {
+      result = result.filter((m) => getScoreBucket(getMissionScore(m)) === selectedScoreBucket);
+    }
+    if (showNewOnly) {
+      result = result.filter((m) => !seenSet.has(m.id));
+    }
 
     return result;
   });
+
+  const dashboardScopeMissions = $derived.by(() => {
+    let result = missions ?? [];
+    if (controller.enabledConnectorIds.size > 0) {
+      result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
+    }
+    if (showFavoritesOnly) {
+      result = filterFavoritesOnly(result, favorites);
+    }
+    if (!showHidden) {
+      result = filterHidden(result, hidden);
+    }
+    if (selectedSource !== null) {
+      result = result.filter((m) => m.source === selectedSource);
+    }
+    if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
+      const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
+      result = result.filter((m) => {
+        if (selectedRemote !== null && m.remote !== selectedRemote) {
+          return false;
+        }
+        if (selectedSeniority !== null && m.seniority !== selectedSeniority) {
+          return false;
+        }
+        if (stacksSet && !m.stack.some((s) => stacksSet.has(s))) {
+          return false;
+        }
+        return true;
+      });
+    }
+    return result;
+  });
+
+  const scoreDistribution = $derived.by(() => {
+    const counts = new Map<ScoreBucket, number>(
+      SCORE_BUCKETS.map((bucket) => [bucket.bucket, 0] as const)
+    );
+    for (const mission of dashboardScopeMissions) {
+      const bucket = getScoreBucket(getMissionScore(mission));
+      counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+    }
+    return SCORE_BUCKETS.map((bucket) => ({
+      ...bucket,
+      count: counts.get(bucket.bucket) ?? 0,
+    }));
+  });
+
+  const dashboardSummary = $derived.by(
+    (): FeedDashboardSummary => ({
+      newCount: dashboardScopeMissions.filter((m) => !seenSet.has(m.id)).length,
+      highScoreCount: dashboardScopeMissions.filter((m) => getMissionScore(m) >= 80).length,
+      favoriteCount,
+      visibleCount,
+    })
+  );
+
+  const insightSummary = $derived.by(
+    (): FeedInsightSummary => ({
+      strongStackCount: dashboardScopeMissions.filter(
+        (m) => (m.scoreBreakdown?.criteria.stack ?? 0) >= 80
+      ).length,
+      weakTjmCount: dashboardScopeMissions.filter((m) => {
+        if (m.tjm === null) {
+          return false;
+        }
+        return (m.scoreBreakdown?.criteria.tjm ?? 100) < 60;
+      }).length,
+      remoteMatchCount: dashboardScopeMissions.filter(
+        (m) => (m.scoreBreakdown?.criteria.remote ?? 0) >= 80
+      ).length,
+      semanticAnalyzedCount: dashboardScopeMissions.filter((m) =>
+        m.scoreBreakdown ? m.scoreBreakdown.semantic !== null : m.semanticScore !== null
+      ).length,
+    })
+  );
+
+  const canSaveCurrentView = $derived(
+    filterActive ||
+      searchQuery.trim().length > 0 ||
+      sortBy !== 'score' ||
+      showFavoritesOnly ||
+      showHidden
+  );
+
+  const savedViewLimitReached = $derived(savedViews.length >= MAX_SAVED_VIEWS);
 
   const sourceMissionCounts = $derived.by(() => {
     const counts = new Map<string, number>();
@@ -219,6 +369,7 @@ export function createFeedPageState(
   const SEARCH_DEBOUNCE_MS = 300;
 
   function handleSearch(query: string): void {
+    activeSavedViewId = null;
     // Clear immediately when emptying
     if (!query) {
       if (searchDebounceTimer) {
@@ -239,14 +390,17 @@ export function createFeedPageState(
   }
 
   function toggleFavoritesFilter(): void {
+    activeSavedViewId = null;
     showFavoritesOnly = !showFavoritesOnly;
   }
 
   function toggleHiddenFilter(): void {
+    activeSavedViewId = null;
     showHidden = !showHidden;
   }
 
   function toggleStack(stack: string): void {
+    activeSavedViewId = null;
     if (selectedStacks.includes(stack)) {
       selectedStacks = selectedStacks.filter((s) => s !== stack);
     } else {
@@ -255,22 +409,130 @@ export function createFeedPageState(
   }
 
   function setSelectedSource(source: MissionSource | null): void {
+    activeSavedViewId = null;
     selectedSource = source;
   }
 
   function setSelectedRemote(remote: RemoteType | null): void {
+    activeSavedViewId = null;
     selectedRemote = remote;
   }
 
   function setSelectedSeniority(seniority: SeniorityLevel | null): void {
+    activeSavedViewId = null;
     selectedSeniority = seniority;
   }
 
+  function setSelectedScoreBucket(bucket: ScoreBucket | null): void {
+    activeSavedViewId = null;
+    selectedScoreBucket = bucket;
+  }
+
+  function toggleNewOnly(): void {
+    activeSavedViewId = null;
+    showNewOnly = !showNewOnly;
+  }
+
   function clearAllFilters(): void {
+    activeSavedViewId = null;
     selectedStacks = [];
     selectedSource = null;
     selectedRemote = null;
     selectedSeniority = null;
+    selectedScoreBucket = null;
+    showNewOnly = false;
+  }
+
+  function currentFilters(): FeedViewFilters {
+    return {
+      searchQuery,
+      selectedStacks: [...selectedStacks],
+      selectedSource,
+      selectedRemote,
+      selectedSeniority,
+      selectedScoreBucket,
+      showNewOnly,
+      showFavoritesOnly,
+      showHidden,
+      sortBy,
+    };
+  }
+
+  function defaultSavedViewName(filters: FeedViewFilters): string {
+    if (filters.selectedScoreBucket === 'strong') {
+      return 'Prioritaires';
+    }
+    if (filters.showNewOnly) {
+      return 'Nouvelles missions';
+    }
+    if (filters.showFavoritesOnly) {
+      return 'Favoris';
+    }
+    if (filters.selectedRemote === 'full') {
+      return 'Full remote';
+    }
+    if (filters.selectedStacks.length > 0) {
+      return filters.selectedStacks.slice(0, 2).join(' + ');
+    }
+    return 'Vue personnalisée';
+  }
+
+  function normalizeSavedViewName(name: string, filters: FeedViewFilters): string {
+    const trimmed = name.trim();
+    return (trimmed || defaultSavedViewName(filters)).slice(0, 48);
+  }
+
+  async function persistSavedViews(nextViews: SavedFeedView[]): Promise<void> {
+    savedViews = nextViews;
+    await setFeedSavedViews(nextViews);
+  }
+
+  async function saveCurrentView(name = ''): Promise<void> {
+    const filters = currentFilters();
+    const now = Date.now();
+    const view: SavedFeedView = {
+      id: `feed-view-${now}`,
+      name: normalizeSavedViewName(name, filters),
+      filters,
+      createdAt: now,
+      updatedAt: now,
+    };
+    const nextViews = [view, ...savedViews].slice(0, MAX_SAVED_VIEWS);
+    await persistSavedViews(nextViews);
+    activeSavedViewId = view.id;
+  }
+
+  function applySavedView(viewId: string): void {
+    const view = savedViews.find((item) => item.id === viewId);
+    if (!view) {
+      return;
+    }
+
+    const filters = view.filters;
+    selectedStacks = [...filters.selectedStacks];
+    selectedSource = filters.selectedSource;
+    selectedRemote = filters.selectedRemote;
+    selectedSeniority = filters.selectedSeniority;
+    selectedScoreBucket = filters.selectedScoreBucket;
+    showNewOnly = filters.showNewOnly;
+    showFavoritesOnly = filters.showFavoritesOnly;
+    showHidden = filters.showHidden;
+    sortBy = filters.sortBy;
+    setFeedSortBy(filters.sortBy).catch(() => {});
+    if (filters.searchQuery.trim()) {
+      feedStore.search(filters.searchQuery);
+    } else {
+      feedStore.clearSearch();
+    }
+    activeSavedViewId = view.id;
+  }
+
+  async function deleteSavedView(viewId: string): Promise<void> {
+    const nextViews = savedViews.filter((item) => item.id !== viewId);
+    await persistSavedViews(nextViews);
+    if (activeSavedViewId === viewId) {
+      activeSavedViewId = null;
+    }
   }
 
   function toggleCompare(missionId: string): void {
@@ -309,6 +571,15 @@ export function createFeedPageState(
       getHidden()
         .then((h) => {
           hidden = h;
+        })
+        .catch(() => {});
+    });
+
+    // Load saved views
+    $effect(() => {
+      getFeedSavedViews()
+        .then((views) => {
+          savedViews = views;
         })
         .catch(() => {});
     });
@@ -497,6 +768,7 @@ export function createFeedPageState(
       return sortBy;
     },
     set sortBy(v: SortBy) {
+      activeSavedViewId = null;
       sortBy = v;
       setFeedSortBy(v);
     },
@@ -521,6 +793,18 @@ export function createFeedPageState(
     },
     get selectedSeniority() {
       return selectedSeniority;
+    },
+    get selectedScoreBucket() {
+      return selectedScoreBucket;
+    },
+    get showNewOnly() {
+      return showNewOnly;
+    },
+    get savedViews() {
+      return savedViews;
+    },
+    get activeSavedViewId() {
+      return activeSavedViewId;
     },
     get firstName() {
       return firstName;
@@ -605,6 +889,21 @@ export function createFeedPageState(
     get sourceMissionCounts() {
       return sourceMissionCounts;
     },
+    get scoreDistribution() {
+      return scoreDistribution;
+    },
+    get dashboardSummary() {
+      return dashboardSummary;
+    },
+    get insightSummary() {
+      return insightSummary;
+    },
+    get canSaveCurrentView() {
+      return canSaveCurrentView;
+    },
+    get savedViewLimitReached() {
+      return savedViewLimitReached;
+    },
 
     get comparisonMissionIds() {
       return comparisonMissionIds;
@@ -630,6 +929,11 @@ export function createFeedPageState(
     setSelectedSource,
     setSelectedRemote,
     setSelectedSeniority,
+    setSelectedScoreBucket,
+    toggleNewOnly,
+    saveCurrentView,
+    applySavedView,
+    deleteSavedView,
     toggleCompare,
     clearComparison,
     clearAllFilters,

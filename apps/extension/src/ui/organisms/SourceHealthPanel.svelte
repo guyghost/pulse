@@ -39,7 +39,10 @@
   const imgFailed = $state<Record<string, boolean>>({});
   let expanded = $state(false);
 
-  function getRelativeTime(timestamp: number): string {
+  function getRelativeTime(timestamp: number | null): string {
+    if (timestamp === null) {
+      return 'jamais';
+    }
     const diff = Date.now() - timestamp;
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) {
@@ -53,6 +56,21 @@
       return `il y a ${hours}h`;
     }
     return `il y a ${Math.floor(hours / 24)}j`;
+  }
+
+  function formatMissionCount(count: number): string {
+    return `${count} mission${count > 1 ? 's' : ''}`;
+  }
+
+  function getHealthLabel(snapshot: ConnectorHealthSnapshot): string {
+    const status = deriveHealthStatus(snapshot);
+    if (status === 'broken') {
+      return 'À corriger';
+    }
+    if (status === 'degraded') {
+      return 'Dégradé';
+    }
+    return 'Sain';
   }
 
   const connectedCount = $derived(sources.filter((s) => s.sessionStatus === 'connected').length);
@@ -224,6 +242,8 @@
           {@const isFiltered = activeSourceFilter === source.connectorId}
           {@const isEnabled = enabledConnectors ? enabledConnectors.has(source.connectorId) : true}
           {@const isActive = source.sessionStatus === 'connected' && isEnabled}
+          {@const snap = healthSnapshots?.get(source.connectorId)}
+          {@const healthStatus = snap ? deriveHealthStatus(snap) : null}
 
           <div
             class="flex items-center gap-3 py-2.5 {i > 0 ? 'border-t border-border-light' : ''}"
@@ -278,16 +298,40 @@
               <span class="block truncate text-[12px] font-medium text-text-primary"
                 >{source.name}</span
               >
-              {#if missionCount > 0}
-                <span class="block text-[10px] text-text-muted">{missionCount} missions</span>
+              <div class="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[10px]">
+                <span class="text-text-muted">{formatMissionCount(missionCount)} dernier scan</span>
+                {#if source.lastSyncAt}
+                  <span class="text-text-muted">Sync {getRelativeTime(source.lastSyncAt)}</span>
+                {/if}
+                {#if snap?.lastSuccessAt}
+                  <span class="text-accent-green">Succès {getRelativeTime(snap.lastSuccessAt)}</span
+                  >
+                {/if}
+                {#if snap?.lastFailureAt}
+                  <span class="text-status-red">Échec {getRelativeTime(snap.lastFailureAt)}</span>
+                {/if}
+              </div>
+              {#if source.error?.message}
+                <span class="mt-0.5 block truncate text-[10px] text-status-red">
+                  {source.error.message}
+                </span>
               {/if}
             </div>
 
             <!-- Status -->
             <div class="flex shrink-0 items-center gap-2">
-              {#if healthSnapshots}
-                {@const snap = healthSnapshots.get(source.connectorId)}
-                {#if snap && snap.circuitState !== 'closed'}
+              {#if snap}
+                <span
+                  class="rounded-md px-1.5 py-0.5 text-[9px] font-medium
+                    {healthStatus === 'broken'
+                    ? 'bg-status-red/10 text-status-red'
+                    : healthStatus === 'degraded'
+                      ? 'bg-status-yellow/20 text-status-orange'
+                      : 'bg-accent-green/10 text-accent-green'}"
+                >
+                  {getHealthLabel(snap)}
+                </span>
+                {#if snap.circuitState !== 'closed'}
                   <CircuitBadge state={snap.circuitState} size="sm" showLabel />
                 {/if}
               {/if}
@@ -315,9 +359,8 @@
                 </span>
               {/if}
 
-              {#if healthSnapshots}
-                {@const snap = healthSnapshots.get(source.connectorId)}
-                {#if snap && deriveHealthStatus(snap) === 'broken' && onRecheckConnector}
+              {#if snap}
+                {#if deriveHealthStatus(snap) === 'broken' && onRecheckConnector}
                   <button
                     class="rounded-md border border-status-red/20 bg-status-red/6 px-2 py-0.5 text-[10px] font-medium text-status-red transition-colors hover:bg-status-red/10"
                     onclick={() => onRecheckConnector(source.connectorId, !isEnabled)}

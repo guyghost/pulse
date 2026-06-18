@@ -10,11 +10,15 @@
     isLoading = false,
     error = null,
     userSeniority = null,
+    userTjmMin = 0,
+    userTjmMax = 0,
   }: {
     analysis?: TJMAnalysis | null;
     isLoading?: boolean;
     error?: string | null;
     userSeniority?: SeniorityLevel | null;
+    userTjmMin?: number;
+    userTjmMax?: number;
   } = $props();
 
   const levels: Array<{
@@ -26,6 +30,24 @@
     { key: 'confirmed', label: 'Confirmé', icon: 'shield' },
     { key: 'senior', label: 'Senior', icon: 'crown' },
   ];
+
+  const selectedMarketRange = $derived(analysis ? analysis[userSeniority ?? 'confirmed'] : null);
+  const userTargetMedian = $derived(
+    userTjmMin > 0 && userTjmMax > 0 ? Math.round((userTjmMin + userTjmMax) / 2) : null
+  );
+  const userTargetDelta = $derived(
+    selectedMarketRange && userTargetMedian !== null
+      ? userTargetMedian - selectedMarketRange.median
+      : null
+  );
+  const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
+
+  function formatDelta(delta: number): string {
+    if (delta === 0) {
+      return 'aligné';
+    }
+    return `${delta > 0 ? '+' : ''}${delta}€`;
+  }
 </script>
 
 <div class="space-y-4">
@@ -66,7 +88,66 @@
       {#if analysis.trendDetail}
         <p class="mt-3 text-xs leading-relaxed text-text-subtle">{analysis.trendDetail}</p>
       {/if}
+      <div class="mt-4">
+        <div class="mb-1.5 flex items-center justify-between gap-3">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Confiance
+          </p>
+          <p class="text-[10px] font-mono tabular-nums text-text-primary">{confidencePct}%</p>
+        </div>
+        <div class="h-1.5 overflow-hidden rounded-full bg-subtle-gray">
+          <div
+            class="h-full rounded-full bg-blueprint-blue transition-all duration-500"
+            style:width="{confidencePct}%"
+          ></div>
+        </div>
+        <p class="mt-1.5 text-[10px] leading-snug text-text-muted">
+          Basée sur {analysis.dataPoints} point{analysis.dataPoints > 1 ? 's' : ''} de marché consolidé{analysis.dataPoints >
+          1
+            ? 's'
+            : ''}.
+        </p>
+      </div>
     </div>
+
+    <!-- User positioning -->
+    {#if selectedMarketRange && userTargetMedian !== null && userTargetDelta !== null}
+      <div class="section-card rounded-xl p-5">
+        <div class="flex items-start justify-between gap-4">
+          <div class="min-w-0">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+              Votre positionnement
+            </p>
+            <p class="mt-1 text-xs leading-relaxed text-text-subtle">
+              Cible {userTjmMin}–{userTjmMax}€ face au marché
+              {userSeniority
+                ? levels.find((level) => level.key === userSeniority)?.label
+                : 'Confirmé'}.
+            </p>
+          </div>
+          <div class="text-right">
+            <p class="text-xl font-semibold tabular-nums text-text-primary">
+              {formatDelta(userTargetDelta)}
+            </p>
+            <p class="text-[9px] text-text-muted">vs médiane</p>
+          </div>
+        </div>
+        <div class="mt-4 grid grid-cols-3 gap-2 text-center">
+          <div class="rounded-lg bg-page-canvas px-2 py-2">
+            <p class="text-[9px] uppercase tracking-[0.12em] text-text-muted">Marché bas</p>
+            <p class="mt-1 text-xs font-mono text-text-primary">{selectedMarketRange.min}€</p>
+          </div>
+          <div class="rounded-lg bg-blueprint-blue/6 px-2 py-2">
+            <p class="text-[9px] uppercase tracking-[0.12em] text-blueprint-blue">Médiane</p>
+            <p class="mt-1 text-xs font-mono text-text-primary">{selectedMarketRange.median}€</p>
+          </div>
+          <div class="rounded-lg bg-page-canvas px-2 py-2">
+            <p class="text-[9px] uppercase tracking-[0.12em] text-text-muted">Marché haut</p>
+            <p class="mt-1 text-xs font-mono text-text-primary">{selectedMarketRange.max}€</p>
+          </div>
+        </div>
+      </div>
+    {/if}
 
     <!-- Level cards -->
     <div class="space-y-3">
@@ -102,6 +183,45 @@
         </div>
       {/each}
     </div>
+
+    <!-- Top stacks -->
+    {#if analysis.topStacks.length > 0}
+      <div class="section-card rounded-xl p-5">
+        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
+          Stacks suivies
+        </p>
+        <div class="space-y-3">
+          {#each analysis.topStacks as stack}
+            {@const maxAverage = Math.max(...analysis.topStacks.map((item) => item.average), 1)}
+            {@const barWidth = Math.max(8, Math.round((stack.average / maxAverage) * 100))}
+            <div>
+              <div class="flex items-center justify-between gap-3">
+                <div class="min-w-0">
+                  <p class="truncate text-xs font-medium capitalize text-text-primary">
+                    {stack.stack}
+                  </p>
+                  <p class="text-[10px] text-text-muted">
+                    {stack.sampleCount} point{stack.sampleCount > 1 ? 's' : ''}
+                  </p>
+                </div>
+                <div class="flex shrink-0 items-center gap-2">
+                  <TrendBadge trend={stack.trend} />
+                  <span class="text-[11px] font-mono tabular-nums text-text-primary"
+                    >{stack.average}€</span
+                  >
+                </div>
+              </div>
+              <div class="mt-1.5 h-1.5 rounded-full bg-subtle-gray">
+                <div
+                  class="h-full rounded-full bg-blueprint-blue/45 transition-all duration-500"
+                  style:width="{barWidth}%"
+                ></div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      </div>
+    {/if}
 
     <!-- Region insights -->
     {#if analysis.regionInsights && analysis.regionInsights.length > 0}
