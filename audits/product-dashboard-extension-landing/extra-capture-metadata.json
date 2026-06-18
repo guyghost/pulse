@@ -1,0 +1,102 @@
+[
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/09-web-dashboard-no-supabase.png",
+    "items": [
+      {
+        "disabled": false,
+        "href": "/",
+        "tag": "a",
+        "text": "MissionPulse"
+      },
+      {
+        "disabled": false,
+        "href": "/",
+        "tag": "a",
+        "text": "← Accueil"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h1",
+        "text": "Connexion"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "input",
+        "text": "vous@exemple.com"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "button",
+        "text": "Recevoir mon lien de connexion"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "button",
+        "text": "Se connecter avec un passkey"
+      },
+      {
+        "disabled": false,
+        "href": "/register",
+        "tag": "a",
+        "text": "Créer un compte"
+      }
+    ],
+    "text": "Connexion Accédez à votre compte MissionPulse Email Recevoir mon lien de connexion Se connecter avec un passkey Le lien email fonctionne sur tous les environnements configures. Le passkey reste disponible quand Supabase l'autorise pour le projet. Pas de compte ? Créer un compte",
+    "title": "Connexion — MissionPulse",
+    "url": "http://localhost:5173/login?redirectTo=%2Fdashboard"
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/10-web-dashboard-no-supabase-full.png",
+    "items": [
+      {
+        "disabled": false,
+        "href": "/",
+        "tag": "a",
+        "text": "MissionPulse"
+      },
+      {
+        "disabled": false,
+        "href": "/",
+        "tag": "a",
+        "text": "← Accueil"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h1",
+        "text": "Connexion"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "input",
+        "text": "vous@exemple.com"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "button",
+        "text": "Recevoir mon lien de connexion"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "button",
+        "text": "Se connecter avec un passkey"
+      },
+      {
+        "disabled": false,
+        "href": "/register",
+        "tag": "a",
+        "text": "Créer un compte"
+      }
+    ],
+    "text": "Connexion Accédez à votre compte MissionPulse Email Recevoir mon lien de connexion Se connecter avec un passkey Le lien email fonctionne sur tous les environnements configures. Le passkey reste disponible quand Supabase l'autorise pour le projet. Pas de compte ? Créer un compte",
+    "title": "Connexion — MissionPulse",
+    "url": "http://localhost:5173/login?redirectTo=%2Fdashboard"
+  }
+]
