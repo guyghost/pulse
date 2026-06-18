@@ -12,8 +12,8 @@
   const showcaseSteps: { id: ShowcaseStep; label: string }[] = [
     { id: 'scanner', label: 'Scanner' },
     { id: 'qualifier', label: 'Qualifier' },
-    { id: 'comparer', label: 'Comparer' },
-    { id: 'postuler', label: 'Postuler' },
+    { id: 'comparer', label: 'Décider' },
+    { id: 'postuler', label: 'Convertir' },
   ];
 
   $effect(() => {
@@ -51,11 +51,11 @@
 </script>
 
 <svelte:head>
-  <title>MissionPulse — Le radar mission des freelances tech</title>
-  <meta name="title" content="MissionPulse — Le radar mission des freelances tech" />
+  <title>MissionPulse — Transformez votre veille mission en pipeline</title>
+  <meta name="title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     name="description"
-    content="MissionPulse scanne vos plateformes freelance, score les meilleures opportunités et prépare vos candidatures depuis votre navigateur."
+    content="MissionPulse scanne vos plateformes freelance, score les meilleures opportunités et transforme votre veille en pipeline de candidatures."
   />
   <meta
     name="keywords"
@@ -67,10 +67,10 @@
   <!-- Open Graph / Facebook -->
   <meta property="og:type" content="website" />
   <meta property="og:url" content="https://missionpulse.app/" />
-  <meta property="og:title" content="MissionPulse — Le radar mission des freelances tech" />
+  <meta property="og:title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     property="og:description"
-    content="5 plateformes. 1 feed. Des scores. Zéro tracking publicitaire. MissionPulse scanne, qualifie et prépare vos candidatures depuis votre navigateur."
+    content="5 plateformes. 1 feed. Des scores. Un plan gratuit pour scanner, un plan Premium pour suivre, négocier et générer vos candidatures."
   />
   <meta property="og:image" content="https://missionpulse.app/og-image.png" />
   <meta property="og:locale" content="fr_FR" />
@@ -79,10 +79,10 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:url" content="https://missionpulse.app/" />
-  <meta name="twitter:title" content="MissionPulse — Le radar mission des freelances tech" />
+  <meta name="twitter:title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     name="twitter:description"
-    content="5 plateformes. 1 feed. Des scores. Zéro tracking publicitaire. Extension Chrome gratuite pour freelances tech."
+    content="5 plateformes. 1 feed. Des scores. Gratuit pour scanner, Premium pour structurer votre prospection freelance."
   />
   <meta name="twitter:image" content="https://missionpulse.app/og-image.png" />
 </svelte:head>
@@ -110,7 +110,7 @@
       <li><a href="#workflow" class="nav__link">Workflow</a></li>
       <li><a href="#for-who" class="nav__link">Pour qui</a></li>
       <li><a href="#features" class="nav__link">Fonctionnalités</a></li>
-      <li><a href="#funnel" class="nav__link">Tunnel</a></li>
+      <li><a href="#plans" class="nav__link">Offres</a></li>
       <li><a href="#platforms" class="nav__link">Plateformes</a></li>
     </ul>
 
@@ -185,7 +185,7 @@
         <a href="#features" onclick={closeMobileMenu}>Fonctionnalités</a>
       </li>
       <li>
-        <a href="#funnel" onclick={closeMobileMenu}>Tunnel</a>
+        <a href="#plans" onclick={closeMobileMenu}>Offres</a>
       </li>
       <li>
         <a href="#platforms" onclick={closeMobileMenu}>Plateformes</a>
@@ -214,22 +214,22 @@
         >
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
-        Extension Chrome · Gratuit · Open source
+        Extension Chrome · Scan gratuit · Premium optionnel
       </div>
 
       <h1 class="hero__title">
-        Le radar mission<br /><span class="light-text">des freelances tech</span>
+        Transformez votre veille mission<br /><span class="light-text">en pipeline</span>
       </h1>
 
       <div class="hero__bottom-bar">
         <p class="hero__description">
-          MissionPulse scanne vos plateformes, score les meilleures opportunités et prépare vos
-          candidatures depuis votre navigateur.
+          MissionPulse scanne vos plateformes freelance, classe les opportunités par pertinence et
+          vous aide à convertir les meilleures pistes en candidatures suivies.
         </p>
 
         <div class="hero__actions">
           <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer l'extension gratuite</a>
-          <a href="#workflow" class="btn btn--secondary btn--lg">Voir le workflow</a>
+          <a href="#plans" class="btn btn--secondary btn--lg">Comparer gratuit et Premium</a>
         </div>
       </div>
     </div>
@@ -249,7 +249,8 @@
       </div>
 
       <p class="showcase-caption">
-        Automatisez votre veille mission, du scan multi-plateformes à la candidature prête à envoyer.
+        Le feed gratuit prouve la valeur dès le scan. Premium ajoute le dashboard connecté, le
+        suivi de candidature, le radar TJM, le profil/CV et les générations par crédits.
       </p>
 
       <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -284,11 +285,11 @@
                 MissionPulse Feed
               {:else if activeShowcaseStep === 'qualifier'}
                 Pourquoi cette mission ?
-              {:else if activeShowcaseStep === 'comparer'}
-                Comparateur de missions
-              {:else}
-                Assistant candidature
-              {/if}
+            {:else if activeShowcaseStep === 'comparer'}
+              Dashboard de décision
+            {:else}
+              Assistant candidature Premium
+            {/if}
             </h2>
           </div>
           <div class="app-preview__actions" aria-hidden="true">
@@ -305,9 +306,9 @@
             {:else if activeShowcaseStep === 'qualifier'}
               Score détaillé
             {:else if activeShowcaseStep === 'comparer'}
-              Shortlist
+              Premium
             {:else}
-              Prêt à postuler
+              Crédits IA
             {/if}
           </span>
           <span class="app-preview__pill">
@@ -316,9 +317,9 @@
             {:else if activeShowcaseStep === 'qualifier'}
               Grade A
             {:else if activeShowcaseStep === 'comparer'}
-              3 finalistes
+              Pipeline
             {:else}
-              Message prêt
+              1 crédit
             {/if}
           </span>
           <span class="app-preview__toggle">Auto</span>
@@ -496,7 +497,7 @@
 
             <div class="decision-panel" aria-label="Aide à la décision">
               <h3>Décision assistée</h3>
-              <p>Comparez le potentiel réel, pas seulement le TJM.</p>
+              <p>Premium relie shortlist, TJM, profil et suivi pour arbitrer les meilleures pistes.</p>
               <div class="decision-row">
                 <span>Meilleur fit profil</span><strong>Lead Svelte</strong>
               </div>
@@ -514,7 +515,7 @@
               <article class="score-card score-card--highlight">
                 <span class="score-card__label">Contact</span>
                 <strong>Prêt</strong>
-                <span>lien source et contexte conservés</span>
+                <span>pitch généré via crédit IA</span>
               </article>
               <article class="score-card">
                 <span class="score-card__label">CV</span>
@@ -524,7 +525,7 @@
               <article class="score-card">
                 <span class="score-card__label">Suivi</span>
                 <strong>J+2</strong>
-                <span>relance planifiée dans la shortlist</span>
+                <span>prochaine action dans le pipeline</span>
               </article>
             </div>
 
@@ -567,8 +568,8 @@
         <div class="stat-item__label">Scoring Gemini Nano</div>
       </div>
       <div class="stat-item fade-in fade-in-delay-3">
-        <div class="stat-item__value">&lt;30s</div>
-        <div class="stat-item__label">Par scan complet</div>
+        <div class="stat-item__value">20</div>
+        <div class="stat-item__label">Crédits Premium / mois</div>
       </div>
     </div>
   </div>
@@ -658,9 +659,10 @@
 <section class="features section" id="features">
   <div class="container">
     <div class="section-header">
-      <h2 class="section-title fade-in">Pourquoi ça convertit</h2>
+      <h2 class="section-title fade-in">Pourquoi les prospects activent</h2>
       <p class="section-subtitle fade-in fade-in-delay-1">
-        MissionPulse transforme la recherche de mission en pipeline commercial actionnable.
+        La promesse gratuite est immédiate; les modules Premium prolongent naturellement le workflow
+        quand une mission mérite d'être travaillée.
       </p>
     </div>
 
@@ -681,7 +683,7 @@
         <h3 class="feature-card__title">Ne ratez plus les bonnes missions</h3>
         <p class="feature-card__desc">
           Free-Work, LeHibou, Hiway, Collective et Cherry Pick arrivent dans un seul feed. Vous
-          gardez la couverture marché sans ouvrir cinq onglets chaque matin.
+          gardez la couverture marché sans ouvrir cinq onglets chaque matin. Inclus dans le gratuit.
         </p>
       </article>
 
@@ -703,7 +705,8 @@
         <h3 class="feature-card__title">Passez de 40 annonces à 5 vraies pistes</h3>
         <p class="feature-card__desc">
           Le scoring combine stack, TJM, localisation, remote, séniorité et analyse sémantique.
-          Les doublons sont fusionnés pour ne garder que les opportunités uniques.
+          Les doublons sont fusionnés pour ne garder que les opportunités uniques. Inclus dans le
+          gratuit quand l'IA locale Chrome est disponible.
         </p>
       </article>
 
@@ -724,8 +727,8 @@
         </div>
         <h3 class="feature-card__title">Négociez avec des données</h3>
         <p class="feature-card__desc">
-          Le radar TJM suit les taux par stack et par source. Vous arrivez en échange avec une
-          fourchette marché, pas une impression.
+          Le radar TJM Premium suit les taux observés par stack et par source. Vous arrivez en
+          échange avec une fourchette marché, pas une impression.
         </p>
       </article>
 
@@ -745,8 +748,8 @@
         </div>
         <h3 class="feature-card__title">Transformez la veille en pipeline</h3>
         <p class="feature-card__desc">
-          Favoris, missions masquées, statuts de candidature et prochaine action gardent chaque
-          opportunité qualifiée sous contrôle jusqu'à l'entretien ou l'offre.
+          Le suivi Premium ajoute statuts de candidature, prochaine action, notes et historique pour
+          garder chaque opportunité qualifiée sous contrôle jusqu'à l'entretien ou l'offre.
         </p>
       </article>
 
@@ -767,8 +770,8 @@
         </div>
         <h3 class="feature-card__title">Postulez plus vite</h3>
         <p class="feature-card__desc">
-          Pitch court, message recruteur et résumé CV sont générés depuis la mission et votre
-          profil. Vous répondez vite sans envoyer un message générique.
+          Pitch court, message recruteur et résumé CV sont générés depuis la mission et votre profil
+          avec les crédits IA du dashboard.
         </p>
       </article>
 
@@ -798,53 +801,67 @@
   </div>
 </section>
 
-<!-- Tunnel commercial -->
-<section class="funnel section" id="funnel">
+<!-- Offres -->
+<section class="plans section" id="plans">
   <div class="container">
     <div class="section-header">
-      <h2 class="section-title fade-in">Du premier scan à la signature</h2>
+      <h2 class="section-title fade-in">Gratuit ou Premium ?</h2>
       <p class="section-subtitle fade-in fade-in-delay-1">
-        Le tunnel MissionPulse commence gratuit, prouve sa valeur en quelques minutes, puis accompagne
-        les freelances qui veulent structurer leur prospection.
+        La landing vend le même parcours que le dashboard: découvrir gratuitement les bonnes
+        missions, puis payer quand vous voulez structurer la conversion.
       </p>
     </div>
 
-    <div class="funnel__grid" aria-label="Tunnel de vente MissionPulse">
-      <article class="funnel-step fade-in fade-in-delay-1">
-        <span class="funnel-step__phase">Acquisition</span>
-        <h3 class="funnel-step__title">5 plateformes, 1 feed, des scores</h3>
-        <p class="funnel-step__desc">
-          La landing et le Chrome Web Store vendent une promesse simple: installer l'extension,
-          scanner ses sources et voir immédiatement les meilleures missions.
-        </p>
+    <div class="plans__grid" aria-label="Comparaison gratuit et Premium">
+      <article class="plan-card fade-in fade-in-delay-1">
+        <div class="plan-card__header">
+          <span class="plan-card__name">Gratuit</span>
+          <strong class="plan-card__price">0€</strong>
+          <p>Pour valider la valeur en quelques minutes depuis l'extension Chrome.</p>
+        </div>
+        <ul class="plan-card__list">
+          <li>Scan des 5 plateformes connectées depuis vos sessions navigateur.</li>
+          <li>Feed centralisé avec recherche, filtres, tri, nouveautés et favoris.</li>
+          <li>Scoring de pertinence, déduplication et comparaison des meilleures missions.</li>
+          <li>Paramètres de profil, alertes, exports et sauvegarde locale.</li>
+          <li>Scoring sémantique local via Gemini Nano quand Chrome le permet.</li>
+        </ul>
+        <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer gratuitement</a>
       </article>
 
-      <article class="funnel-step fade-in fade-in-delay-2">
-        <span class="funnel-step__phase">Activation</span>
-        <h3 class="funnel-step__title">Trouvées, uniques, à contacter</h3>
-        <p class="funnel-step__desc">
-          Le premier scan rend la valeur visible avec des métriques concrètes: missions consolidées,
-          opportunités dédupliquées et shortlist priorisée.
-        </p>
+      <article class="plan-card plan-card--featured fade-in fade-in-delay-2">
+        <div class="plan-card__header">
+          <span class="plan-card__name">Premium</span>
+          <strong class="plan-card__price">10€<small>/an</small></strong>
+          <p>Pour piloter votre prospection comme un pipeline et produire vos candidatures.</p>
+        </div>
+        <ul class="plan-card__list">
+          <li>Le dashboard connecté optionnel synchronise les snapshots normalisés.</li>
+          <li>Pages Premium dans l'extension: profil, CV, suivi de candidatures et radar TJM.</li>
+          <li>Pipeline de candidature avec statuts, notes, prochaine action et historique.</li>
+          <li>Assistant profil/CV pour garder vos informations cohérentes entre plateformes.</li>
+          <li>20 crédits IA par mois pour générer pitch, message recruteur ou résumé CV.</li>
+        </ul>
+        <a
+          href="https://missionpulse.lemonsqueezy.com/checkout"
+          class="btn btn--primary btn--lg"
+          target="_blank"
+          rel="noopener noreferrer"
+        >
+          Passer à Premium
+        </a>
       </article>
+    </div>
 
-      <article class="funnel-step fade-in fade-in-delay-3">
-        <span class="funnel-step__phase">Rétention</span>
-        <h3 class="funnel-step__title">Alertes, nouveautés, TJM et pipeline</h3>
-        <p class="funnel-step__desc">
-          Les alertes intelligentes, le radar TJM, les favoris et le suivi de candidature donnent une
-          raison claire de revenir entre deux missions.
+    <div class="credits-strip fade-in fade-in-delay-3">
+      <div>
+        <span class="credits-strip__label">Crédits IA à la demande</span>
+        <p>
+          Besoin de générer plus de contenus ? Packs disponibles depuis le dashboard:
+          5 crédits à 4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€.
         </p>
-      </article>
-
-      <article class="funnel-step fade-in fade-in-delay-4">
-        <span class="funnel-step__phase">Monétisation</span>
-        <h3 class="funnel-step__title">Dashboard connecté et crédits IA</h3>
-        <p class="funnel-step__desc">
-          Le compte ajoute historique, pipeline, CV canonique et synchronisation optionnelle. Les
-          crédits débloquent les contenus de candidature générés pour chaque mission.
-        </p>
-      </article>
+      </div>
+      <a href="/dashboard" class="btn btn--secondary">Voir mon compte</a>
     </div>
   </div>
 </section>
@@ -1002,8 +1019,8 @@
       <div class="tech-stack__info fade-in">
         <h2 class="tech-stack__title">Open source &amp; moderne</h2>
         <p class="tech-stack__desc">
-          MissionPulse est open source. 700+ tests, architecture FC&IS, TypeScript strict.
-          Contributions bienvenues.
+          MissionPulse garde le scraping dans votre navigateur, respecte une architecture local-first
+          et limite le dashboard connecté aux données normalisées utiles au suivi.
         </p>
         <a
           href="https://github.com/guyghost/pulse"
@@ -1040,7 +1057,9 @@
       <div class="cta__content">
         <h2 class="cta__title">Prêt à installer votre radar mission ?</h2>
         <p class="cta__desc">
-          Extension gratuite, exécution navigateur, zéro tracking publicitaire. Compte requis seulement pour le dashboard connecté optionnel et les crédits de génération; l'exécution plateforme reste dans votre navigateur.
+          Exécution navigateur, scan gratuit et zéro tracking publicitaire. Compte requis seulement pour le dashboard connecté
+          optionnel, le radar TJM, le suivi de candidature, le profil/CV et les crédits de
+          génération; l'exécution plateforme reste dans votre navigateur.
         </p>
         <a
           href={chromeStoreUrl}

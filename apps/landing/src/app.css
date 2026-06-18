@@ -1411,32 +1411,47 @@ p {
   }
 }
 
-/* ===== Funnel Section ===== */
-.funnel {
+/* ===== Plans Section ===== */
+.plans {
   background: var(--color-page-canvas);
 }
 
-.funnel__grid {
+.plans__grid {
   display: grid;
   grid-template-columns: 1fr;
-  gap: var(--spacing-16);
+  gap: var(--spacing-24);
   max-width: 1120px;
   margin: 0 auto;
 }
 
-.funnel-step {
+.plan-card {
   position: relative;
-  padding: var(--spacing-32);
+  display: flex;
+  min-height: 100%;
+  flex-direction: column;
+  justify-content: space-between;
+  gap: var(--spacing-32);
+  padding: var(--spacing-40);
   border: 1px solid var(--color-border-light);
   border-radius: var(--radius-large);
   background: color-mix(in srgb, var(--color-surface-white) 72%, var(--color-page-canvas));
 }
 
-.funnel-step__phase {
+.plan-card--featured {
+  border-color: color-mix(in srgb, var(--color-blueprint-blue) 38%, var(--color-border-light));
+  background: var(--color-surface-white);
+}
+
+.plan-card__header {
+  display: grid;
+  gap: var(--spacing-12);
+}
+
+.plan-card__name {
   display: inline-flex;
   align-items: center;
-  min-height: 28px;
-  margin-bottom: var(--spacing-24);
+  width: fit-content;
+  min-height: 30px;
   padding: 0 var(--spacing-12);
   border: 1px solid color-mix(in srgb, var(--color-blueprint-blue) 32%, var(--color-border-light));
   border-radius: var(--radius-full);
@@ -1445,29 +1460,92 @@ p {
   font-weight: 500;
 }
 
-.funnel-step__title {
-  margin: 0 0 var(--spacing-12);
+.plan-card__price {
   color: var(--color-text-primary);
-  font-size: var(--text-heading-lg);
-  font-weight: var(--font-weight-medium);
+  font-family: var(--font-display);
+  font-size: clamp(3.25rem, 8vw, 5.75rem);
+  font-weight: var(--font-weight-regular);
+  line-height: 0.9;
+  letter-spacing: -0.05em;
 }
 
-.funnel-step__desc {
+.plan-card__price small {
+  font-family: var(--font-geist);
+  font-size: 1rem;
+  font-weight: 500;
+  letter-spacing: 0;
+}
+
+.plan-card__header p {
   margin: 0;
   color: var(--color-text-subtle);
   font-size: 0.9375rem;
   line-height: 1.65;
 }
 
+.plan-card__list {
+  display: grid;
+  gap: var(--spacing-12);
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.plan-card__list li {
+  position: relative;
+  padding-left: var(--spacing-24);
+  color: var(--color-text-secondary);
+  font-size: 0.9375rem;
+  line-height: 1.55;
+}
+
+.plan-card__list li::before {
+  content: '';
+  position: absolute;
+  top: 0.68em;
+  left: 0;
+  width: 8px;
+  height: 8px;
+  border-radius: var(--radius-full);
+  background: var(--color-blueprint-blue);
+}
+
+.credits-strip {
+  display: flex;
+  flex-direction: column;
+  gap: var(--spacing-20);
+  max-width: 1120px;
+  margin: var(--spacing-24) auto 0;
+  padding: var(--spacing-24);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-large);
+  background: color-mix(in srgb, var(--color-surface-white) 64%, var(--color-page-canvas));
+}
+
+.credits-strip__label {
+  display: block;
+  margin-bottom: var(--spacing-8);
+  color: var(--color-text-primary);
+  font-size: 0.875rem;
+  font-weight: 500;
+}
+
+.credits-strip p {
+  margin: 0;
+  color: var(--color-text-subtle);
+  font-size: 0.9375rem;
+  line-height: 1.6;
+}
+
 @media (min-width: 768px) {
-  .funnel__grid {
+  .plans__grid {
     grid-template-columns: repeat(2, minmax(0, 1fr));
-    gap: var(--spacing-24);
   }
 
-  .funnel-step {
-    min-height: 260px;
-    padding: var(--spacing-40);
+  .credits-strip {
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
   }
 }
 
