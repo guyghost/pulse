@@ -17,9 +17,13 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
     location: null,
     remote: null,
     duration: null,
+    startDate: null,
+    publishedAt: null,
     url: 'https://example.com',
     source: 'free-work' as MissionSource,
     scrapedAt: new Date(),
+    seniority: null,
+    scoreBreakdown: null,
     score: null,
     semanticScore: null,
     semanticReason: null,
@@ -196,6 +200,69 @@ describe('deduplicateMissions', () => {
       makeMission({ id: '1', title: 'Developpeur React Senior', client: 'Acme', stack: [] }),
       makeMission({ id: '2', title: 'Developpeur React Senior', client: 'Globex', stack: [] }),
     ];
+    const result = deduplicateMissions(missions);
+    expect(result).toHaveLength(2);
+  });
+
+  it('prefers direct Cherry Pick mission over Free-Work reseller duplicate', () => {
+    const result = deduplicateMissionsDetailed([
+      makeMission({
+        id: 'fw-1',
+        title: 'Product Owner Salesforce',
+        client: 'CherryPick',
+        stack: ['Salesforce', 'Agile'],
+        tjm: 720,
+        location: 'Paris, Ile-de-France',
+        remote: 'hybrid',
+        description:
+          'Mission detaillee publiee par un intermediaire avec contexte projet et contraintes.',
+        url: 'https://www.free-work.com/fr/tech-it/product-owner/job-mission/product-owner-salesforce',
+        source: 'free-work',
+      }),
+      makeMission({
+        id: 'cp-1',
+        title: 'Product Owner Salesforce H/F',
+        client: 'Banque Alpha',
+        stack: ['Salesforce', 'Agile'],
+        tjm: 700,
+        location: 'Paris',
+        remote: 'hybrid',
+        description: 'Mission Salesforce',
+        url: 'https://app.cherry-pick.io/ext/missions/product-owner-salesforce-42',
+        source: 'cherry-pick',
+      }),
+    ]);
+
+    expect(result.missions).toHaveLength(1);
+    expect(result.missions[0]).toMatchObject({
+      id: 'cp-1',
+      source: 'cherry-pick',
+      url: 'https://app.cherry-pick.io/ext/missions/product-owner-salesforce-42',
+    });
+    expect(result.duplicateRelations[0]).toMatchObject({
+      canonicalMissionId: 'cp-1',
+      duplicateMissionId: 'fw-1',
+      reason: 'same_title_stack_proxy_client',
+    });
+    expect(result.duplicateRelations[0].confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('keeps same title and stack when real locations are incompatible', () => {
+    const missions = [
+      makeMission({
+        id: '1',
+        title: 'Developpeur React Senior',
+        stack: ['React', 'TypeScript'],
+        location: 'Paris',
+      }),
+      makeMission({
+        id: '2',
+        title: 'Developpeur React Senior',
+        stack: ['React', 'TypeScript'],
+        location: 'Lyon',
+      }),
+    ];
+
     const result = deduplicateMissions(missions);
     expect(result).toHaveLength(2);
   });

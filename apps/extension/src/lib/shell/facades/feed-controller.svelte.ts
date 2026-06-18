@@ -10,6 +10,7 @@ import type { Mission } from '$lib/core/types/mission';
 import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
 import type { ConnectorStatus, PersistedConnectorStatus } from '$lib/core/types/connector-status';
 import type { AppError } from '$lib/core/errors/app-error';
+import { deduplicateMissions } from '$lib/core/scoring/dedup';
 import { sendMessage, subscribeMessages } from '../messaging/bridge';
 import {
   getMissions,
@@ -38,6 +39,29 @@ const humanizeScanError = (message: string, code: string): string => {
       return message || 'Erreur inattendue lors du scan.';
   }
 };
+
+function deduplicateEnabledSources(missions: Mission[], enabledSources: Set<string>): Mission[] {
+  if (missions.length <= 1) {
+    return missions;
+  }
+
+  if (enabledSources.size === 0) {
+    return deduplicateMissions(missions);
+  }
+
+  const enabledMissions: Mission[] = [];
+  const disabledMissions: Mission[] = [];
+
+  for (const mission of missions) {
+    if (enabledSources.has(mission.source)) {
+      enabledMissions.push(mission);
+    } else {
+      disabledMissions.push(mission);
+    }
+  }
+
+  return [...deduplicateMissions(enabledMissions), ...disabledMissions];
+}
 
 // Re-export SourceStatus types for consumers
 export type SourceSessionStatus = 'checking' | 'connected' | 'not-connected' | 'error';
@@ -216,7 +240,7 @@ export function createFeedController(feedStore: {
     for (const m of missions) {
       unique.set(m.id, m);
     }
-    const finalMissions = [...unique.values()];
+    const finalMissions = deduplicateEnabledSources([...unique.values()], enabledConnectorIds);
 
     if (finalMissions.length > 0) {
       feedStore.setMissions(finalMissions);
@@ -257,7 +281,9 @@ export function createFeedController(feedStore: {
         getSettings(),
       ]);
       if (stored.length > 0) {
-        feedStore.setMissions(stored);
+        feedStore.setMissions(
+          deduplicateEnabledSources(stored, new Set(settings.enabledConnectors))
+        );
         // Use connector statuses to determine freshness
         const lastSync = statuses.reduce<number | null>((max, s) => {
           if (s.lastSyncAt && (max === null || s.lastSyncAt > max)) {
@@ -445,7 +471,7 @@ export function createFeedController(feedStore: {
         }
 
         if (message?.type === 'MISSIONS_UPDATED' && Array.isArray(message.payload)) {
-          feedStore.setMissions(message.payload);
+          feedStore.setMissions(deduplicateEnabledSources(message.payload, enabledConnectorIds));
         }
 
         // Erreur du scan (auto-scan du background)
