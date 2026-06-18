@@ -28,10 +28,11 @@ import {
   getProfile,
   saveProfile,
 } from '$lib/shell/facades/settings.facade';
-import { getMissions } from '$lib/shell/facades/feed-data.facade';
+import { getMissions, openExternalUrl } from '$lib/shell/facades/feed-data.facade';
 import { sendMessage } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
+import { getPremium } from '$lib/shell/facades/premium.facade';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
@@ -93,6 +94,14 @@ export class SettingsPageController {
   autoScan = $state(true);
   theme = $state<'light' | 'dark' | 'system'>('system');
 
+  premiumEnabled = $state(false);
+  connectedAccountEmail = $state<string | null>(null);
+  connectedDeviceLabel = $state('Extension Chrome locale');
+  connectedLastSyncAt = $state<string | null>(null);
+  connectedPendingUploads = $state(0);
+  connectedPendingDownloads = $state(0);
+  connectedSyncError = $state<string | null>(null);
+
   showResetConfirm = $state(false);
 
   isExporting = $state(false);
@@ -106,7 +115,12 @@ export class SettingsPageController {
   constructor(private readonly options: SettingsPageControllerOptions = {}) {}
 
   async load(): Promise<void> {
-    await Promise.all([this.loadProfile(), this.loadAiAvailability(), this.loadSettings()]);
+    await Promise.all([
+      this.loadProfile(),
+      this.loadAiAvailability(),
+      this.loadSettings(),
+      this.loadConnectedAccount(),
+    ]);
   }
 
   async loadProfile(): Promise<void> {
@@ -149,6 +163,55 @@ export class SettingsPageController {
     } catch {
       // Hors contexte extension
     }
+  }
+
+  async loadConnectedAccount(): Promise<void> {
+    try {
+      this.premiumEnabled = await getPremium();
+      if (import.meta.env.DEV && this.premiumEnabled) {
+        this.connectedAccountEmail = 'demo@missionpulse.app';
+        this.connectedLastSyncAt = "à l'instant";
+        this.connectedPendingUploads = 0;
+        this.connectedPendingDownloads = 0;
+      }
+    } catch {
+      this.premiumEnabled = false;
+      this.connectedAccountEmail = null;
+      this.connectedLastSyncAt = null;
+      this.connectedPendingUploads = 0;
+      this.connectedPendingDownloads = 0;
+    }
+  }
+
+  get isConnectedAccount(): boolean {
+    return Boolean(this.connectedAccountEmail);
+  }
+
+  get accountStatusLabel(): string {
+    if (this.connectedSyncError) {
+      return 'Action requise';
+    }
+    return this.isConnectedAccount ? 'Connecté' : 'Local uniquement';
+  }
+
+  get syncStatusText(): string {
+    if (this.connectedSyncError) {
+      return this.connectedSyncError;
+    }
+    if (this.isConnectedAccount) {
+      return this.connectedLastSyncAt
+        ? `Dernière synchro ${this.connectedLastSyncAt}`
+        : 'Compte connecté, première synchronisation en attente.';
+    }
+    return "Vos scans, favoris, CV et candidatures restent dans l'extension tant qu'aucun compte n'est connecté.";
+  }
+
+  async openAccountCenter(): Promise<void> {
+    await openExternalUrl('https://missionpulse.app/dashboard');
+  }
+
+  async openConnectedDashboard(): Promise<void> {
+    await openExternalUrl('https://missionpulse.app/dashboard');
   }
 
   toggleProfileEditing(): void {

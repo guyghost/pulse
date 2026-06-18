@@ -79,7 +79,10 @@
   <!-- Twitter -->
   <meta name="twitter:card" content="summary_large_image" />
   <meta name="twitter:url" content="https://missionpulse.app/" />
-  <meta name="twitter:title" content="MissionPulse — Transformez votre veille mission en pipeline" />
+  <meta
+    name="twitter:title"
+    content="MissionPulse — Transformez votre veille mission en pipeline"
+  />
   <meta
     name="twitter:description"
     content="5 plateformes. 1 feed. Des scores. Gratuit pour scanner, Premium pour structurer votre prospection freelance."
@@ -228,7 +231,9 @@
         </p>
 
         <div class="hero__actions">
-          <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer l'extension gratuite</a>
+          <a href={chromeStoreUrl} class="btn btn--primary btn--lg"
+            >Installer l'extension gratuite</a
+          >
           <a href="#plans" class="btn btn--secondary btn--lg">Comparer gratuit et Premium</a>
         </div>
       </div>
@@ -249,8 +254,8 @@
       </div>
 
       <p class="showcase-caption">
-        Le feed gratuit prouve la valeur dès le scan. Premium ajoute le dashboard connecté, le
-        suivi de candidature, le radar TJM, le profil/CV et les générations par crédits.
+        Le feed gratuit prouve la valeur dès le scan. Premium ajoute le dashboard connecté, le suivi
+        de candidature, le radar TJM, le profil/CV et les générations par crédits.
       </p>
 
       <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -285,11 +290,11 @@
                 MissionPulse Feed
               {:else if activeShowcaseStep === 'qualifier'}
                 Pourquoi cette mission ?
-            {:else if activeShowcaseStep === 'comparer'}
-              Dashboard de décision
-            {:else}
-              Assistant candidature Premium
-            {/if}
+              {:else if activeShowcaseStep === 'comparer'}
+                Dashboard de décision
+              {:else}
+                Assistant candidature Premium
+              {/if}
             </h2>
           </div>
           <div class="app-preview__actions" aria-hidden="true">
@@ -497,7 +502,9 @@
 
             <div class="decision-panel" aria-label="Aide à la décision">
               <h3>Décision assistée</h3>
-              <p>Premium relie shortlist, TJM, profil et suivi pour arbitrer les meilleures pistes.</p>
+              <p>
+                Premium relie shortlist, TJM, profil et suivi pour arbitrer les meilleures pistes.
+              </p>
               <div class="decision-row">
                 <span>Meilleur fit profil</span><strong>Lead Svelte</strong>
               </div>
@@ -547,6 +554,50 @@
           </div>
         {/if}
       </div>
+    </div>
+  </div>
+</section>
+
+<!-- Product map -->
+<section class="product-map section" aria-labelledby="product-map-title">
+  <div class="container">
+    <div class="section-header">
+      <h2 id="product-map-title" class="section-title fade-in">Trois surfaces, un seul flux</h2>
+      <p class="section-subtitle fade-in fade-in-delay-1">
+        MissionPulse sépare clairement le scan local, la gestion du compte et le cockpit connecté.
+      </p>
+    </div>
+
+    <div class="product-map__grid" aria-label="Flux produit MissionPulse">
+      <article class="product-map__item fade-in fade-in-delay-1">
+        <span class="product-map__step">1</span>
+        <p class="product-map__eyebrow">Extension Chrome</p>
+        <h3>Scanner localement</h3>
+        <p>
+          Les plateformes sont consultées depuis vos sessions navigateur. Le feed, les favoris et
+          les premiers scores fonctionnent sans compte.
+        </p>
+      </article>
+
+      <article class="product-map__item fade-in fade-in-delay-2">
+        <span class="product-map__step">2</span>
+        <p class="product-map__eyebrow">Compte MissionPulse</p>
+        <h3>Gérer plan et crédits</h3>
+        <p>
+          Le compte sert à l'abonnement, aux crédits IA, à l'identité et à l'activation de la
+          synchronisation entre appareils.
+        </p>
+      </article>
+
+      <article class="product-map__item fade-in fade-in-delay-3">
+        <span class="product-map__step">3</span>
+        <p class="product-map__eyebrow">Dashboard connecté</p>
+        <h3>Piloter les snapshots</h3>
+        <p>
+          Le cockpit web consolide missions, TJM, CV et candidatures synchronisés. Les cookies et
+          jetons des plateformes restent dans Chrome.
+        </p>
+      </article>
     </div>
   </div>
 </section>
@@ -704,8 +755,8 @@
         </div>
         <h3 class="feature-card__title">Passez de 40 annonces à 5 vraies pistes</h3>
         <p class="feature-card__desc">
-          Le scoring combine stack, TJM, localisation, remote, séniorité et analyse sémantique.
-          Les doublons sont fusionnés pour ne garder que les opportunités uniques. Inclus dans le
+          Le scoring combine stack, TJM, localisation, remote, séniorité et analyse sémantique. Les
+          doublons sont fusionnés pour ne garder que les opportunités uniques. Inclus dans le
           gratuit quand l'IA locale Chrome est disponible.
         </p>
       </article>
@@ -771,7 +822,7 @@
         <h3 class="feature-card__title">Postulez plus vite</h3>
         <p class="feature-card__desc">
           Pitch court, message recruteur et résumé CV sont générés depuis la mission et votre profil
-          avec les crédits IA du dashboard.
+          avec les crédits IA de votre compte MissionPulse.
         </p>
       </article>
 
@@ -793,8 +844,9 @@
         <h3 class="feature-card__title">Local-first &amp; privé</h3>
         <p class="feature-card__desc">
           Les plateformes sont consultées depuis vos sessions navigateur, sans stocker vos
-          identifiants. La synchronisation cloud du dashboard est optionnelle et limitée aux
-          snapshots normalisés via Supabase; jamais vos mots de passe, cookies ou jetons de session.
+          identifiants. La synchronisation cloud du dashboard connecté est optionnelle et limitée
+          aux snapshots normalisés via Supabase; jamais vos mots de passe, cookies ou jetons de
+          session.
         </p>
       </article>
     </div>
@@ -807,8 +859,8 @@
     <div class="section-header">
       <h2 class="section-title fade-in">Gratuit ou Premium ?</h2>
       <p class="section-subtitle fade-in fade-in-delay-1">
-        La landing vend le même parcours que le dashboard: découvrir gratuitement les bonnes
-        missions, puis payer quand vous voulez structurer la conversion.
+        Commencez par scanner localement dans l'extension, puis connectez votre compte quand vous
+        voulez piloter la conversion dans le dashboard connecté.
       </p>
     </div>
 
@@ -857,11 +909,11 @@
       <div>
         <span class="credits-strip__label">Crédits IA à la demande</span>
         <p>
-          Besoin de générer plus de contenus ? Packs disponibles depuis le dashboard:
-          5 crédits à 4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€.
+          Besoin de générer plus de contenus ? Packs disponibles depuis votre compte: 5 crédits à
+          4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€.
         </p>
       </div>
-      <a href="/dashboard" class="btn btn--secondary">Voir mon compte</a>
+      <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>
     </div>
   </div>
 </section>
@@ -1019,8 +1071,8 @@
       <div class="tech-stack__info fade-in">
         <h2 class="tech-stack__title">Open source &amp; moderne</h2>
         <p class="tech-stack__desc">
-          MissionPulse garde le scraping dans votre navigateur, respecte une architecture local-first
-          et limite le dashboard connecté aux données normalisées utiles au suivi.
+          MissionPulse garde le scraping dans votre navigateur, respecte une architecture
+          local-first et limite le dashboard connecté aux données normalisées utiles au suivi.
         </p>
         <a
           href="https://github.com/guyghost/pulse"
@@ -1057,9 +1109,9 @@
       <div class="cta__content">
         <h2 class="cta__title">Prêt à installer votre radar mission ?</h2>
         <p class="cta__desc">
-          Exécution navigateur, scan gratuit et zéro tracking publicitaire. Compte requis seulement pour le dashboard connecté
-          optionnel, le radar TJM, le suivi de candidature, le profil/CV et les crédits de
-          génération; l'exécution plateforme reste dans votre navigateur.
+          Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le compte sert au
+          dashboard connecté optionnel, au radar TJM, au suivi de candidature, au profil/CV et aux
+          crédits de génération; l'exécution plateforme reste dans votre navigateur.
         </p>
         <a
           href={chromeStoreUrl}

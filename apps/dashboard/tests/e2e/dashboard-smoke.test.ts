@@ -1,19 +1,20 @@
 import { expect, test } from '@playwright/test';
 
 test.describe('connected dashboard smoke', () => {
-  test('renders feed, pipeline, CV, and sync surfaces without Supabase config', async ({
+  test('renders feed, pipeline, CV, and sync surfaces without connected backend config', async ({
     page,
   }) => {
     await page.goto('/dashboard/');
 
-    await expect(page.getByText('Configuration Supabase absente')).toBeVisible();
+    await expect(page.getByText('Aucune extension connectée').first()).toBeVisible();
+    await expect(page.getByRole('link', { name: "Installer l'extension" }).first()).toBeVisible();
     await expect(page.getByText('Aucune sync')).toBeVisible();
     await expect(page.getByText('Sans score')).toBeVisible();
     await expect(page.getByText('Aucune relance')).toBeVisible();
     await expect(
       page.getByRole('heading', { name: "Missions détectées par l'extension" })
     ).toBeVisible();
-    await expect(page.getByText('Aucune mission synchronisée')).toBeVisible();
+    await expect(page.getByText("Aucune mission reçue depuis l'extension")).toBeVisible();
 
     await page.getByRole('link', { name: 'Candidatures' }).click();
     await expect(page.getByPlaceholder('Rechercher mission, client ou plateforme')).toBeVisible();
@@ -27,7 +28,7 @@ test.describe('connected dashboard smoke', () => {
     await page.getByRole('link', { name: 'Synchronisation', exact: true }).click();
     await expect(page.getByRole('heading', { name: 'Synchronisation extension' })).toBeVisible();
     await expect(page.getByText('Alertes missions')).toBeVisible();
-    await expect(page.getByText('Aucun appareil extension enregistré')).toBeVisible();
+    await expect(page.getByText('Local ou non connecté')).toBeVisible();
     const syncSection = page.locator('section#sync');
     await expect(syncSection.getByText('Free-Work', { exact: true })).toBeVisible();
     await expect(syncSection.getByText('LinkedIn', { exact: true })).toBeVisible();

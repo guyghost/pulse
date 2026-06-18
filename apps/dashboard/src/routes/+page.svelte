@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { env } from '$env/dynamic/public';
   import { Badge } from '@pulse/ui';
   import {
     buildMissionComparisonSnapshot,
@@ -36,6 +37,7 @@
   let { data, form }: { data: PageData; form?: ActionData } = $props();
 
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
+  const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || 'https://chromewebstore.google.com/';
   const tjmRadar = $derived(data.tjmRadar as TjmRadarSnapshot);
   const applications = $derived(data.applications as MissionApplication[]);
   const applicationTimeline = $derived(data.applicationTimeline as ApplicationTimelineEvent[]);
@@ -462,10 +464,18 @@
               >
                 {enabledFeatureCount}/{featureAccess.length} features
               </span>
+              <span
+                class="rounded-full border px-2 py-1 text-xs font-medium {isConnected
+                  ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                  : 'border-border-light bg-surface-white text-text-subtle'}"
+              >
+                {isConnected ? 'Compte connecté' : 'En attente de compte'}
+              </span>
             </div>
             <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
-              Retrouvez les fonctionnalités de l'extension dans le dashboard, avec activation par
-              feature flag selon la session, les crédits et le statut d'achat.
+              Retrouvez les données normalisées par l'extension dans le dashboard connecté. Les
+              scans et sessions plateforme restent dans Chrome; seuls les snapshots utiles sont
+              synchronisés avec votre compte.
             </p>
           </div>
           <a
@@ -490,26 +500,45 @@
         </div>
       </section>
 
-      {#if configurationMissing}
-        <section
-          class="mb-6 rounded-lg border border-status-orange/30 bg-status-orange/10 p-4 shadow-subtle-2"
-        >
-          <p class="text-sm font-medium text-text-primary">Configuration Supabase absente</p>
-          <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
-            Le dashboard connecté n'affiche que les données synchronisées depuis Supabase. Ajoutez
-            `PUBLIC_SUPABASE_URL` et `PUBLIC_SUPABASE_ANON_KEY`, puis connectez-vous pour charger
-            vos missions, candidatures, CV et statuts de synchronisation.
-          </p>
-        </section>
-      {:else if !isConnected}
+      {#if configurationMissing || !isConnected}
         <section
           class="mb-6 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/8 p-4 shadow-subtle-2"
         >
-          <p class="text-sm font-medium text-text-primary">Connexion requise</p>
-          <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
-            Connectez-vous pour charger les données synchronisées via Supabase. Le dashboard ne lit
-            pas les sessions plateforme et n'utilise pas de données de démonstration.
-          </p>
+          <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
+            <div>
+              <p class="text-sm font-medium text-text-primary">Aucune extension connectée</p>
+              <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
+                Installez MissionPulse, connectez votre compte depuis les réglages de l'extension,
+                puis lancez un scan. Le dashboard se remplira avec les missions, candidatures, CV et
+                statuts synchronisés depuis votre navigateur.
+              </p>
+              <p class="mt-2 text-xs leading-5 text-text-subtle">
+                Les cookies et sessions Free-Work, LeHibou, Hiway, Collective, Cherry Pick ou Malt
+                restent dans Chrome.
+              </p>
+            </div>
+            <div class="flex shrink-0 flex-wrap gap-2">
+              <a
+                class="inline-flex h-9 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                href={chromeStoreUrl}
+              >
+                Installer l'extension
+              </a>
+              <a
+                class="inline-flex h-9 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-surface-white px-3 text-xs font-semibold text-blueprint-blue hover:bg-blueprint-blue/8"
+                href={data.loginUrl || '/login'}
+              >
+                {isConnected ? "Connecter l'extension" : 'Se connecter'}
+              </a>
+            </div>
+          </div>
+          {#if configurationMissing && import.meta.env.DEV}
+            <p
+              class="mt-3 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs leading-5 text-text-subtle"
+            >
+              Diagnostic local: le service connecté n'est pas configuré dans cet environnement.
+            </p>
+          {/if}
         </section>
       {/if}
 
@@ -560,9 +589,15 @@
         <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
           <div>
             <p class="eyebrow text-text-subtle">Feed connecté</p>
-            <h2 id="mission-feed-title" class="mt-1 text-lg font-semibold text-text-primary">
-              Missions détectées par l'extension
-            </h2>
+            <div class="mt-1 flex flex-wrap items-center gap-2">
+              <h2 id="mission-feed-title" class="text-lg font-semibold text-text-primary">
+                Missions détectées par l'extension
+              </h2>
+              <Badge
+                label={missionFeed.length > 0 ? 'Synchronisé' : 'En attente extension'}
+                variant={missionFeed.length > 0 ? 'success' : 'source'}
+              />
+            </div>
           </div>
           <p class="text-sm text-text-subtle">
             {filteredMissionFeed.length}/{missionFeed.length} affichées, {freshMissionCount}
@@ -634,11 +669,36 @@
         <div class="grid gap-3 lg:grid-cols-3">
           {#if missionFeed.length === 0}
             <article
-              class="rounded-xl border border-dashed border-border-light bg-surface-white p-5"
+              class="rounded-xl border border-dashed border-border-light bg-surface-white p-5 lg:col-span-3"
             >
-              <p class="text-sm font-semibold text-text-primary">Aucune mission synchronisée</p>
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="text-sm font-semibold text-text-primary">
+                    Aucune mission reçue depuis l'extension
+                  </p>
+                  <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
+                    Connectez l'extension à votre compte MissionPulse puis lancez un scan. Les
+                    missions retenues, les favoris et les statuts de candidature apparaîtront ici.
+                  </p>
+                </div>
+                <Badge label="En attente" variant="source" />
+              </div>
+              <div class="mt-4 flex flex-wrap gap-2">
+                <a
+                  class="inline-flex h-9 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                  href={chromeStoreUrl}
+                >
+                  Installer l'extension
+                </a>
+                <a
+                  class="inline-flex h-9 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
+                  href={data.loginUrl || '/login'}
+                >
+                  Connecter mon compte
+                </a>
+              </div>
               <p class="mt-2 text-sm leading-6 text-text-subtle">
-                Lancez un scan depuis l'extension connectée pour alimenter le dashboard Supabase.
+                Le dashboard ne lit pas directement vos sessions plateforme.
               </p>
             </article>
           {:else if filteredMissionFeed.length === 0}
@@ -2058,7 +2118,7 @@
                 <div>
                   <p class="text-xs font-medium uppercase text-text-subtle">File de sync</p>
                   <p class="mt-1 text-sm text-text-subtle">
-                    {connectedSyncStatuses.length} entités suivies via Supabase
+                    {connectedSyncStatuses.length} entités suivies par le dashboard connecté
                   </p>
                 </div>
                 <Badge
@@ -2073,11 +2133,40 @@
 
               <div class="mt-3 space-y-2">
                 {#if connectedSyncStatuses.length === 0}
-                  <p
-                    class="rounded-lg border border-dashed border-border-light bg-surface-white p-3 text-xs leading-5 text-text-subtle"
+                  <article
+                    class="rounded-lg border border-dashed border-border-light bg-surface-white p-4"
                   >
-                    Aucun appareil extension enregistré dans Supabase pour le moment.
-                  </p>
+                    <div class="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <p class="text-sm font-semibold text-text-primary">
+                          Aucune extension connectée
+                        </p>
+                        <p class="mt-2 max-w-xl text-xs leading-5 text-text-subtle">
+                          Connectez MissionPulse à ce compte depuis les réglages de l'extension pour
+                          suivre les uploads, téléchargements et arbitrages de conflit.
+                        </p>
+                      </div>
+                      <Badge label="Local ou non connecté" variant="source" />
+                    </div>
+                    <div class="mt-4 flex flex-wrap gap-2">
+                      <a
+                        class="inline-flex h-8 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                        href={chromeStoreUrl}
+                      >
+                        Installer l'extension
+                      </a>
+                      <a
+                        class="inline-flex h-8 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
+                        href={data.loginUrl || '/login'}
+                      >
+                        Connecter mon compte
+                      </a>
+                    </div>
+                    <p class="mt-3 text-xs leading-5 text-text-muted">
+                      Les sessions plateforme restent côté navigateur; la file ne transporte que les
+                      données métier normalisées.
+                    </p>
+                  </article>
                 {/if}
 
                 {#each connectedSyncStatuses as status}
@@ -2325,8 +2414,8 @@
               Données connectées
             </h2>
             <p class="mt-2 text-sm leading-6 text-text-subtle">
-              Exportez les données synchronisées via Supabase ou supprimez les snapshots connectés
-              du dashboard. Les sessions et credentials des plateformes ne sont jamais stockés.
+              Exportez les données du dashboard connecté ou supprimez les snapshots liés à votre
+              compte. Les sessions et credentials des plateformes ne sont jamais stockés.
             </p>
           </div>
           <a

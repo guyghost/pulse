@@ -226,9 +226,19 @@
     <div class="flex items-start justify-between gap-4">
       <div>
         <p class="eyebrow text-blueprint-blue">Pipeline</p>
-        <h2 class="mt-1 text-base font-semibold text-text-primary">Candidatures</h2>
+        <div class="mt-1 flex flex-wrap items-center gap-2">
+          <h2 class="text-base font-semibold text-text-primary">Candidatures</h2>
+          <span
+            class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+          >
+            Local uniquement
+          </span>
+        </div>
         <p class="mt-1 text-xs leading-5 text-text-subtle">
           Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier.
+        </p>
+        <p class="mt-2 text-[11px] leading-5 text-text-muted">
+          Ces statuts restent dans l'extension tant que le compte MissionPulse n'est pas connecté.
         </p>
       </div>
       <div

@@ -110,6 +110,90 @@
       onScanIntervalChange={handleScanIntervalChange}
     />
 
+    <!-- Compte & synchronisation -->
+    <div class="section-card rounded-xl p-5 space-y-4">
+      <div class="flex items-start gap-3">
+        <div
+          class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
+        >
+          <Icon name="database" size={14} class="text-blueprint-blue" />
+        </div>
+        <div class="min-w-0 flex-1">
+          <div class="flex flex-wrap items-center justify-between gap-2">
+            <div>
+              <h3 class="text-sm font-medium text-text-primary">Compte et synchronisation</h3>
+              <p class="mt-1 text-xs leading-5 text-text-subtle">
+                Le scan reste local. Le compte MissionPulse sert à synchroniser les snapshots vers
+                le dashboard connecté.
+              </p>
+            </div>
+            <span
+              class="rounded-md border px-2 py-1 text-[10px] font-medium {settings.isConnectedAccount
+                ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                : 'border-border-light bg-page-canvas text-text-subtle'}"
+            >
+              {settings.accountStatusLabel}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid gap-2 sm:grid-cols-2">
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Compte</p>
+          <p class="mt-1 text-xs font-medium text-text-primary">
+            {settings.connectedAccountEmail ?? 'Non connecté'}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
+          <p class="mt-1 text-xs font-medium text-text-primary">
+            {settings.premiumEnabled ? 'Premium local actif' : 'Gratuit local'}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Appareil</p>
+          <p class="mt-1 text-xs font-medium text-text-primary">{settings.connectedDeviceLabel}</p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
+          <p class="mt-1 text-xs font-medium text-text-primary">
+            {settings.connectedPendingUploads} upload · {settings.connectedPendingDownloads}
+            download
+          </p>
+        </div>
+      </div>
+
+      <p
+        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs leading-5 text-text-subtle"
+      >
+        {settings.syncStatusText}
+      </p>
+
+      <div class="flex flex-wrap gap-2">
+        <button
+          class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+          onclick={() => settings.openAccountCenter()}
+        >
+          <Icon name="user" size={13} />
+          {settings.isConnectedAccount ? 'Gérer mon compte' : 'Connecter mon compte'}
+        </button>
+        <button
+          class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+          onclick={() => settings.openConnectedDashboard()}
+        >
+          <Icon name="external-link" size={13} />
+          Ouvrir le dashboard connecté
+        </button>
+      </div>
+
+      <p class="text-[11px] leading-5 text-text-muted">
+        Les sessions Free-Work, LeHibou, Hiway, Collective et Cherry Pick restent dans Chrome; seuls
+        les résultats normalisés, les candidatures, le CV et les préférences peuvent être
+        synchronisés.
+      </p>
+    </div>
+
     <!-- Apparence -->
     <div class="section-card rounded-xl p-5 space-y-4">
       <div>

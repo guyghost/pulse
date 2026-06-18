@@ -1282,6 +1282,78 @@ p {
   }
 }
 
+/* ===== Product Map ===== */
+.product-map {
+  padding-top: 0;
+  background: var(--color-page-canvas);
+}
+
+.product-map__grid {
+  display: grid;
+  gap: var(--spacing-16);
+}
+
+.product-map__item {
+  position: relative;
+  min-height: 260px;
+  padding: var(--spacing-24);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-large);
+  background: var(--color-surface-white);
+  box-shadow: var(--shadow-subtle-2);
+}
+
+.product-map__step {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  border: 1px solid color-mix(in srgb, var(--color-blueprint-blue) 24%, transparent);
+  border-radius: var(--radius-buttons);
+  background: color-mix(in srgb, var(--color-blueprint-blue) 8%, transparent);
+  color: var(--color-blueprint-blue);
+  font-size: 0.875rem;
+  font-weight: var(--font-weight-medium);
+}
+
+.product-map__eyebrow {
+  margin-top: var(--spacing-24);
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.product-map__item h3 {
+  margin-top: var(--spacing-8);
+  font-size: 1.25rem;
+}
+
+.product-map__item p:last-child {
+  margin-top: var(--spacing-12);
+  color: var(--color-text-subtle);
+  font-size: 0.9375rem;
+  line-height: 1.7;
+}
+
+@media (min-width: 900px) {
+  .product-map__grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .product-map__item:not(:last-child)::after {
+    position: absolute;
+    top: 40px;
+    right: -22px;
+    width: 28px;
+    height: 1px;
+    background: var(--color-disabled-gray);
+    content: '';
+  }
+}
+
 /* ===== Stats Section ===== */
 .stats {
   padding: 0 0 var(--spacing-140);
@@ -1943,6 +2015,28 @@ p {
 }
 .fade-in-delay-5 {
   transition-delay: 0.5s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+
+  *,
+  *::before,
+  *::after {
+    animation-duration: 1ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 1ms !important;
+    transition-delay: 0ms !important;
+  }
+
+  .fade-in,
+  .fade-in.is-visible {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
 }
 
 /* ===== Privacy Page ===== */

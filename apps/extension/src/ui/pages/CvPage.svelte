@@ -330,12 +330,21 @@
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
         <p class="eyebrow text-blueprint-blue">CV synchronisé</p>
-        <h2 class="mt-1 text-base font-semibold text-text-primary">
-          Homogénéiser le profil partout
-        </h2>
+        <div class="mt-1 flex flex-wrap items-center gap-2">
+          <h2 class="text-base font-semibold text-text-primary">Homogénéiser le profil partout</h2>
+          <span
+            class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
+          >
+            En attente de compte
+          </span>
+        </div>
         <p class="mt-1 text-xs leading-5 text-text-subtle">
           MissionPulse prépare une version canonique de votre CV pour LinkedIn et les plateformes de
           mission connectées.
+        </p>
+        <p class="mt-2 text-[11px] leading-5 text-text-muted">
+          La préparation reste locale; la synchronisation dashboard démarre après connexion du
+          compte.
         </p>
       </div>
       <div

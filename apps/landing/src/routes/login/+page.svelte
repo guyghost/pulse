@@ -13,6 +13,43 @@
   let linkSent = $state(false);
   let submitting = $state(false);
   const redirectTo = $derived(data.redirectTo ?? '/dashboard');
+  const loginIntent = $derived(getLoginIntent(redirectTo));
+
+  function getLoginIntent(path: string): {
+    title: string;
+    subtitle: string;
+    sentMessage: string;
+  } {
+    if (path.includes('export')) {
+      return {
+        title: 'Exporter vos données connectées',
+        subtitle: 'Connectez-vous pour télécharger vos snapshots MissionPulse.',
+        sentMessage: 'Le lien sécurisé ouvrira votre export de données connectées.',
+      };
+    }
+
+    if (path.includes('credits') || path.includes('billing')) {
+      return {
+        title: 'Gérer vos crédits',
+        subtitle: 'Connectez-vous pour gérer vos crédits et votre abonnement MissionPulse.',
+        sentMessage: 'Le lien sécurisé ouvrira votre espace crédits.',
+      };
+    }
+
+    if (path === '/dashboard' || path.startsWith('/dashboard?')) {
+      return {
+        title: 'Ouvrir votre compte',
+        subtitle: 'Connectez-vous pour gérer votre abonnement, vos crédits et l’accès Premium.',
+        sentMessage: 'Le lien sécurisé ouvrira votre compte MissionPulse.',
+      };
+    }
+
+    return {
+      title: 'Connexion',
+      subtitle: 'Connectez-vous pour continuer dans MissionPulse.',
+      sentMessage: 'Le lien sécurisé ouvrira MissionPulse.',
+    };
+  }
 
   async function handleEmailLogin(event: SubmitEvent) {
     event.preventDefault();
@@ -81,19 +118,19 @@
       {#if linkSent}
         <div class="auth-card__header">
           <h1>Vérifiez votre email</h1>
-          <p>Le lien securise ouvrira votre dashboard.</p>
+          <p>{loginIntent.sentMessage}</p>
         </div>
 
         <div class="auth-message" data-testid="login-link-sent">
           <p>
             Nous avons envoye un lien a <strong>{email}</strong>. Ouvrez-le dans ce navigateur pour
-            acceder a MissionPulse.
+            acceder a la destination demandee.
           </p>
         </div>
       {:else}
         <div class="auth-card__header">
-          <h1>Connexion</h1>
-          <p>Accédez à votre compte MissionPulse</p>
+          <h1>{loginIntent.title}</h1>
+          <p>{loginIntent.subtitle}</p>
         </div>
 
         <form class="auth-form" onsubmit={handleEmailLogin}>

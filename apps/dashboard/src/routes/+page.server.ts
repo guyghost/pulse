@@ -573,7 +573,7 @@ export const actions: Actions = {
   updateAlertPreferences: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { alertError: 'Configuration Supabase absente.' });
+      return fail(503, { alertError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);
@@ -644,7 +644,7 @@ export const actions: Actions = {
   resolveCvSuggestion: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { cvError: 'Configuration Supabase absente.' });
+      return fail(503, { cvError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);
@@ -795,7 +795,7 @@ export const actions: Actions = {
   resolveSyncConflict: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { syncConflictError: 'Configuration Supabase absente.' });
+      return fail(503, { syncConflictError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);
@@ -989,7 +989,7 @@ export const actions: Actions = {
   deleteConnectedData: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { privacyError: 'Configuration Supabase absente.' });
+      return fail(503, { privacyError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);
@@ -1052,7 +1052,7 @@ export const actions: Actions = {
   updateCvProfile: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { cvError: 'Configuration Supabase absente.' });
+      return fail(503, { cvError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);
@@ -1174,7 +1174,7 @@ export const actions: Actions = {
   updateApplicationDetails: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { detailsError: 'Configuration Supabase absente.' });
+      return fail(503, { detailsError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);
@@ -1256,7 +1256,7 @@ export const actions: Actions = {
   selectMission: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { selectionError: 'Configuration Supabase absente.' });
+      return fail(503, { selectionError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);
@@ -1464,7 +1464,7 @@ export const actions: Actions = {
   archiveMission: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { selectionError: 'Configuration Supabase absente.' });
+      return fail(503, { selectionError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);
@@ -1669,7 +1669,7 @@ export const actions: Actions = {
   transitionApplication: async ({ cookies, request }) => {
     const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
     if (!hasSupabaseConfig) {
-      return fail(503, { transitionError: 'Configuration Supabase absente.' });
+      return fail(503, { transitionError: 'Dashboard connecté indisponible pour le moment.' });
     }
 
     const supabase = createSupabaseServerClient(cookies);

@@ -79,7 +79,14 @@
         </div>
         <div>
           <p class="eyebrow text-blueprint-blue">Marché</p>
-          <h2 class="mt-1 text-base font-semibold text-text-primary">Radar TJM</h2>
+          <div class="mt-1 flex flex-wrap items-center gap-2">
+            <h2 class="text-base font-semibold text-text-primary">Radar TJM</h2>
+            <span
+              class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+            >
+              Local uniquement
+            </span>
+          </div>
         </div>
       </div>
       <button
@@ -101,6 +108,11 @@
     {:else if isLoading}
       <p class="mt-3 text-[11px] text-text-muted">Chargement…</p>
     {/if}
+
+    <p class="mt-2 text-[11px] leading-5 text-text-muted">
+      Tendances calculées depuis les missions stockées dans l'extension; le dashboard connecté les
+      consolide après synchronisation.
+    </p>
 
     {#if isOffline}
       <div
