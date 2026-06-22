@@ -84,6 +84,21 @@ describe('operational UI constraints', () => {
     expect(source).toContain("window.addEventListener('feed-tour:open'");
   });
 
+  it('keeps feed offers reachable with one scroll container', () => {
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
+
+    expect(feedSource).toContain('class="relative h-full overflow-y-auto"');
+    expect(feedSource).toContain('data-testid="feed-scroll-container"');
+    expect(feedSource).toContain('data-testid="mission-feed"');
+    expect(feedSource).toContain('class="px-4 pb-28 pt-4"');
+    expect(feedSource).not.toContain('class="flex-1 overflow-y-auto px-4 pb-5 pt-4"');
+    expect(appSource).toContain('class="absolute inset-0 overflow-hidden"');
+    expect(appSource).not.toContain('class="absolute inset-0 overflow-y-auto"\n        class:hidden={nav.currentPage !==');
+    expect(appSource).toContain("feedNavCompact = nav.currentPage === 'feed' && detail.scrollTop > 12");
+    expect(appSource).not.toContain('detail.isScrolling && detail.scrollTop > 12');
+  });
+
   it('keeps the primary navigation labels localized for the French product surface', () => {
     const source = readFileSync('src/lib/state/app-navigation.svelte.ts', 'utf8');
 

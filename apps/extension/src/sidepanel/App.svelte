@@ -112,7 +112,7 @@
   $effect(() => {
     function handleFeedScrollState(event: Event) {
       const detail = (event as CustomEvent<{ isScrolling: boolean; scrollTop: number }>).detail;
-      feedNavCompact = nav.currentPage === 'feed' && detail.isScrolling && detail.scrollTop > 12;
+      feedNavCompact = nav.currentPage === 'feed' && detail.scrollTop > 12;
     }
 
     window.addEventListener('feed:scroll-state', handleFeedScrollState);
@@ -207,7 +207,7 @@
     </div>
     <main class="relative flex-1 overflow-hidden">
       <div
-        class="absolute inset-0 overflow-y-auto"
+        class="absolute inset-0 overflow-hidden"
         class:hidden={nav.currentPage !== 'feed'}
         aria-hidden={nav.currentPage !== 'feed'}
         inert={nav.currentPage !== 'feed'}

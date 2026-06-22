@@ -390,9 +390,14 @@
   }
 </script>
 
-<div class="relative flex h-full flex-col">
+<div
+  data-testid="feed-scroll-container"
+  class="relative h-full overflow-y-auto"
+  use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
+  onscroll={handleMissionScroll}
+>
   <div
-    class="shrink-0 px-4 pt-4 transition-[filter] duration-200 ease-out {feedChromeCompact
+    class="px-4 pt-4 transition-[filter] duration-200 ease-out {feedChromeCompact
       ? 'brightness-[0.99]'
       : ''}"
   >
@@ -864,9 +869,7 @@
   <!-- ── Mission feed ── -->
   <div
     data-testid="mission-feed"
-    class="flex-1 overflow-y-auto px-4 pb-5 pt-4"
-    use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
-    onscroll={handleMissionScroll}
+    class="px-4 pb-28 pt-4"
   >
     <div
       class="rounded-xl transition-all duration-200 {activeTourStep?.id === 'expand' ||
