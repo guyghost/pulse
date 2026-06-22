@@ -3,8 +3,15 @@
   import ProfileSection from '../organisms/ProfileSection.svelte';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
   import { showToast } from '$lib/shell/notifications/toast-service';
+  import OperationalStoryCard, {
+    type OperationalEvidence,
+  } from '../molecules/OperationalStoryCard.svelte';
+  import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
+  const connection = getConnectionStore();
+  const isOffline = $derived(connection.status === 'offline');
 
   const settings = new SettingsPageController({
     onNavigateToOnboarding: () => onNavigateToOnboarding?.(),
@@ -86,6 +93,58 @@
     ].join(' · ')
   );
 
+  const profileStory = $derived.by(() => {
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Completude',
+        value: `${profileCompleteness}%`,
+        icon: 'gauge',
+        severity:
+          profileCompleteness >= 85
+            ? 'success'
+            : profileCompleteness >= 55
+              ? 'attention'
+              : 'incident',
+      },
+      {
+        label: 'Champs',
+        value: missingProfileItems.length,
+        icon: 'list-checks',
+        severity: missingProfileItems.length === 0 ? 'success' : 'attention',
+      },
+      {
+        label: 'Stack',
+        value: settings.profileStack.length,
+        icon: 'layers',
+        severity: settings.profileStack.length > 0 ? 'success' : 'incident',
+      },
+    ];
+
+    if (missingProfileItems.length === 0) {
+      return {
+        severity: 'success' as const,
+        statusLabel: 'Pret',
+        title: 'Le profil peut alimenter le scoring et les generations',
+        description:
+          'Les criteres essentiels sont renseignes. Gardez cette source canonique a jour avant de comparer les missions prioritaires.',
+        evidence,
+        primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil',
+        primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
+      };
+    }
+
+    return {
+      severity: profileCompleteness < 55 ? ('incident' as const) : ('attention' as const),
+      statusLabel: 'A completer',
+      title: `${missingProfileItems.length} element${missingProfileItems.length > 1 ? 's' : ''} limite${missingProfileItems.length > 1 ? 'nt' : ''} la qualite du radar`,
+      description:
+        'Les champs manquants reduisent la precision des requetes, du scoring et des suggestions de candidature.',
+      evidence,
+      primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil',
+      primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
+    };
+  });
+
   async function handleSave() {
     await settings.saveProfile();
     if (!settings.profileError) {
@@ -137,6 +196,34 @@
         {/if}
       </div>
     </div>
+
+    <div class="mt-4">
+      <OperationalStoryCard
+        eyebrow="Impact scoring"
+        title={profileStory.title}
+        description={profileStory.description}
+        severity={profileStory.severity}
+        statusLabel={profileStory.statusLabel}
+        evidence={profileStory.evidence}
+        primaryActionLabel={profileStory.primaryActionLabel}
+        primaryActionIcon={profileStory.primaryActionIcon}
+        onPrimaryAction={() => {
+          if (settings.editingProfile) {
+            handleSave();
+            return;
+          }
+          settings.toggleProfileEditing();
+        }}
+      />
+    </div>
+    {#if isOffline}
+      <div class="mt-3">
+        <OfflineNotice
+          description="Vous pouvez ajuster le profil localement, mais les effets sur les recherches et synchronisations seront visibles au retour réseau."
+          action="Prochaine action : sauvegarder les critères critiques, puis relancer un scan quand la connexion revient."
+        />
+      </div>
+    {/if}
   </section>
 
   <div class="mt-4 space-y-4">

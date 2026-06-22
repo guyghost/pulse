@@ -19,6 +19,12 @@
   const isHealthy = $derived(snapshot.circuitState === 'closed');
   const isOpen = $derived(snapshot.circuitState === 'open');
 
+  type ConnectorDiagnosis = {
+    statusLabel: string;
+    hint: string;
+    tone: 'success' | 'attention' | 'incident';
+  };
+
   function formatLatency(ms: number | null): string {
     if (ms === null) {
       return '—';
@@ -51,40 +57,85 @@
   const lastSuccessText = $derived(formatRelativeTime(snapshot.lastSuccessAt));
   const p95Text = $derived(formatLatency(metrics.p95LatencyMs));
   const failureRatePct = $derived(Math.round(metrics.failureRate * 100));
+
+  const diagnosis = $derived.by<ConnectorDiagnosis>(() => {
+    if (isOpen) {
+      return {
+        statusLabel: 'Collecte suspendue',
+        hint: 'Source isolée pour éviter des scans répétés en échec.',
+        tone: 'incident',
+      };
+    }
+
+    if (snapshot.circuitState === 'half-open') {
+      return {
+        statusLabel: 'Sonde en cours',
+        hint: 'Pulse teste si la source peut réintégrer le scan.',
+        tone: 'attention',
+      };
+    }
+
+    if (snapshot.consecutiveFailures > 0) {
+      return {
+        statusLabel: 'Instable',
+        hint: `${snapshot.consecutiveFailures} échec${snapshot.consecutiveFailures > 1 ? 's' : ''} consécutif${snapshot.consecutiveFailures > 1 ? 's' : ''}; surveillez le prochain scan.`,
+        tone: 'attention',
+      };
+    }
+
+    if (metrics.totalCalls === 0) {
+      return {
+        statusLabel: 'Pas encore sondée',
+        hint: 'Aucun historique disponible pour qualifier la fiabilité.',
+        tone: 'attention',
+      };
+    }
+
+    if (failureRatePct >= 30) {
+      return {
+        statusLabel: 'Fiabilité dégradée',
+        hint: `${failureRatePct}% d’échecs observés sur l’historique récent.`,
+        tone: 'attention',
+      };
+    }
+
+    return {
+      statusLabel: 'Collecte fiable',
+      hint: `Dernier succès ${lastSuccessText}; latence p95 ${p95Text}.`,
+      tone: 'success',
+    };
+  });
 </script>
 
 <div
   class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[11px]
     {isOpen
-    ? 'border-red-400/20 bg-red-400/[0.06]'
+    ? 'border-status-red/20 bg-status-red/8'
     : isHealthy
       ? 'border-border-light bg-page-canvas'
       : 'border-blueprint-blue/20 bg-blueprint-blue/[0.06]'}"
 >
-  <!-- Left: circuit badge + name -->
   <div class="flex min-w-0 items-center gap-2">
     <CircuitBadge state={snapshot.circuitState} size="md" />
-    <span class="truncate font-medium text-text-primary">{connectorName}</span>
+    <div class="min-w-0">
+      <span class="block truncate font-medium text-text-primary">{connectorName}</span>
+      <span class="mt-0.5 block truncate text-[10px] text-text-subtle">{diagnosis.hint}</span>
+    </div>
   </div>
 
-  <!-- Right: metrics -->
-  <div class="flex shrink-0 items-center gap-3 text-text-muted">
-    {#if snapshot.consecutiveFailures > 0}
-      <span class="font-mono text-red-400" title="Échecs consécutifs"
-        >{snapshot.consecutiveFailures} err</span
-      >
-    {/if}
-
-    {#if metrics.totalCalls > 0}
-      <span title="Latence p95">{p95Text}</span>
-    {/if}
-
-    <span title="Dernier succès">{lastSuccessText}</span>
-
-    {#if isOpen}
-      <span class="text-red-400/80 text-[10px]">suspendu</span>
-    {:else if snapshot.circuitState === 'half-open'}
-      <span class="text-blueprint-blue/80 text-[10px] animate-pulse">sonde...</span>
-    {/if}
+  <div
+    class="flex shrink-0 flex-col items-end gap-0.5 text-[10px]"
+    title={`Dernier succès : ${lastSuccessText}. Latence p95 : ${p95Text}. Échecs : ${failureRatePct}%.`}
+  >
+    <span
+      class={diagnosis.tone === 'incident'
+        ? 'font-medium text-status-red'
+        : diagnosis.tone === 'attention'
+          ? 'font-medium text-status-orange'
+          : 'font-medium text-blueprint-blue'}
+    >
+      {diagnosis.statusLabel}
+    </span>
+    <span class="font-mono tabular-nums text-text-muted">{lastSuccessText}</span>
   </div>
 </div>

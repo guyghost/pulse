@@ -4,6 +4,7 @@
   import { Button } from '@pulse/ui';
   import type { RemoteType } from '$lib/core/types/mission';
   import type { SeniorityLevel } from '$lib/core/types/profile';
+  import Tooltip from '../atoms/Tooltip.svelte';
 
   /* eslint-disable prefer-const */
   let {
@@ -76,13 +77,20 @@
         <p class="mt-0.5 text-xs text-text-subtle">Vos informations de freelance.</p>
       </div>
     </div>
-    <button
-      class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
-      onclick={onToggleEdit}
-      title={editing ? 'Annuler' : 'Modifier'}
+    <Tooltip
+      label={editing ? 'Annuler la modification' : 'Modifier le profil'}
+      description={editing
+        ? 'Quitte le mode edition sans sauvegarder.'
+        : 'Ajuste les criteres qui influencent le scoring.'}
     >
-      <Icon name={editing ? 'x' : 'edit-2'} size={13} />
-    </button>
+      <button
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+        onclick={onToggleEdit}
+        aria-label={editing ? 'Annuler la modification du profil' : 'Modifier le profil'}
+      >
+        <Icon name={editing ? 'x' : 'edit-2'} size={13} />
+      </button>
+    </Tooltip>
   </div>
 
   {#if editing}
@@ -166,13 +174,18 @@
               }
             }}
           />
-          <button
-            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
-            onclick={onAddStack}
-            title="Ajouter"
+          <Tooltip
+            label="Ajouter la stack"
+            description="Ajoute cette competence aux criteres de matching."
           >
-            <Icon name="plus" size={13} />
-          </button>
+            <button
+              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+              onclick={onAddStack}
+              aria-label="Ajouter la stack technique"
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          </Tooltip>
         </div>
         {#if profileStack.length > 0}
           <div class="flex flex-wrap gap-1.5 pt-1">
@@ -200,13 +213,18 @@
               }
             }}
           />
-          <button
-            class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
-            onclick={onAddKeyword}
-            title="Ajouter"
+          <Tooltip
+            label="Ajouter le mot-cle"
+            description="Ajoute ce signal aux recherches et recommandations."
           >
-            <Icon name="plus" size={13} />
-          </button>
+            <button
+              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+              onclick={onAddKeyword}
+              aria-label="Ajouter le mot-clé de recherche"
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          </Tooltip>
         </div>
         {#if searchKeywords.length > 0}
           <div class="flex flex-wrap gap-1.5 pt-1">

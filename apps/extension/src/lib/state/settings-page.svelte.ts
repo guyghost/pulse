@@ -214,6 +214,10 @@ export class SettingsPageController {
     await openExternalUrl('https://missionpulse.app/dashboard');
   }
 
+  async openAiHelp(): Promise<void> {
+    await openExternalUrl('https://developer.chrome.com/docs/ai/prompt-api');
+  }
+
   toggleProfileEditing(): void {
     this.editingProfile = !this.editingProfile;
   }

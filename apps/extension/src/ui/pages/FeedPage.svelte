@@ -19,11 +19,15 @@
   import KeyboardShortcutsHelp from '../molecules/KeyboardShortcutsHelp.svelte';
   import type { MissionSource } from '$lib/core/types/mission';
   import MissionComparison from '../organisms/MissionComparison.svelte';
+  import MissionInvestigationDrawer from '../organisms/MissionInvestigationDrawer.svelte';
   import ProfileRefinementBanner from '../molecules/ProfileRefinementBanner.svelte';
   import ConnectorAlertBar from '../molecules/ConnectorAlertBar.svelte';
   import FeedTourOverlay, { type FeedTourStep } from '../molecules/FeedTourOverlay.svelte';
+  import OperationalStoryCard, {
+    type OperationalEvidence,
+  } from '../molecules/OperationalStoryCard.svelte';
+  import Tooltip from '../atoms/Tooltip.svelte';
   import {
-    getFeedTourSeen,
     getFirstScanDone,
     getProfileBannerDismissed,
     setFeedTourSeen,
@@ -31,6 +35,9 @@
   import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
+  import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
+  import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
+  import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
 
@@ -44,11 +51,14 @@
 
   // Refinement banner: shown only on zero-config first scan (no profile yet)
   let showRefinementBanner = $state(false);
-  let shouldAutoOpenTour = $state(false);
   let showTour = $state(false);
   let tourStepIndex = $state(0);
   let missionScrollTop = $state(0);
   let feedChromeCompact = $state(false);
+  let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
+  let showAlertOnly = $state(false);
+  let showComparison = $state(false);
+  let investigationMission = $state<(typeof page.displayMissions)[number] | null>(null);
   let scrollStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
   const tourSteps: FeedTourStep[] = [
@@ -95,33 +105,227 @@
       }));
   });
 
+  function getMissionScore(mission: {
+    scoreBreakdown?: { total?: number } | null;
+    score?: number | null;
+  }): number {
+    return mission.scoreBreakdown?.total ?? mission.score ?? 0;
+  }
+
+  function missionMatchesAlert(
+    mission: (typeof page.displayMissions)[number],
+    preferences: ConnectedAlertPreferences
+  ): boolean {
+    if (!preferences.enabled) {
+      return false;
+    }
+
+    if (getMissionScore(mission) < preferences.scoreThreshold) {
+      return false;
+    }
+
+    if (preferences.minDailyRate > 0 && (mission.tjm ?? 0) < preferences.minDailyRate) {
+      return false;
+    }
+
+    const stacks = new Set(
+      preferences.requiredStacks.map((stack) => stack.toLowerCase().trim()).filter(Boolean)
+    );
+
+    if (stacks.size > 0 && !mission.stack.some((stack) => stacks.has(stack.toLowerCase()))) {
+      return false;
+    }
+
+    return true;
+  }
+
+  const alertMissions = $derived(
+    page.displayMissions.filter((mission) => missionMatchesAlert(mission, alertPreferences))
+  );
+
+  const visibleFeedMissions = $derived(showAlertOnly ? alertMissions : page.displayMissions);
+
+  const alertMatchCount = $derived.by(() => {
+    if (!alertPreferences.enabled) {
+      return 0;
+    }
+    return alertMissions.length;
+  });
+
+  const feedStory = $derived.by(() => {
+    const brokenCount = brokenConnectors.length;
+    const highScoreCount = alertMatchCount;
+    const newCount = page.dashboardSummary.newCount;
+    const visibleCount = page.dashboardSummary.visibleCount;
+
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Nouvelles',
+        value: newCount,
+        icon: 'sparkles',
+        severity: newCount > 0 ? 'attention' : 'neutral',
+      },
+      {
+        label: `Alerte ${alertPreferences.scoreThreshold}+`,
+        value: highScoreCount,
+        icon: 'target',
+        severity: highScoreCount > 0 ? 'success' : 'neutral',
+      },
+      {
+        label: 'Sources',
+        value: brokenCount,
+        icon: brokenCount > 0 ? 'triangle-alert' : 'shield-check',
+        severity: brokenCount > 0 ? 'critical' : 'success',
+      },
+    ];
+
+    if (page.isOffline) {
+      return {
+        severity: 'incident' as const,
+        statusLabel: 'Hors ligne',
+        title: 'Pulse affiche les donnees en cache',
+        description:
+          'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions deja stockees.',
+        evidence,
+        primaryActionLabel: 'Voir les missions cachees',
+        primaryActionIcon: 'database',
+      };
+    }
+
+    if (brokenCount > 0) {
+      const firstBroken = brokenConnectors[0];
+      return {
+        severity: 'critical' as const,
+        statusLabel: 'Action requise',
+        title: `${brokenCount} source${brokenCount > 1 ? 's' : ''} a corriger avant de faire confiance au radar`,
+        description: `${firstBroken?.connectorName ?? 'Une source'} ne remonte plus correctement. Le feed peut manquer des opportunites.`,
+        evidence,
+        primaryActionLabel: 'Relancer le diagnostic',
+        primaryActionIcon: 'refresh-cw',
+      };
+    }
+
+    if (newCount > 0) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'A traiter',
+        title: `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} depuis le dernier passage`,
+        description:
+          highScoreCount > 0
+            ? `${highScoreCount} opportunite${highScoreCount > 1 ? 's' : ''} depasse le seuil prioritaire. Commencez par celles-ci.`
+            : 'Aucune urgence detectee, mais les nouvelles missions meritent une qualification rapide.',
+        evidence,
+        primaryActionLabel: 'Voir les nouvelles',
+        primaryActionIcon: 'sparkles',
+      };
+    }
+
+    if (alertPreferences.enabled && highScoreCount > 0) {
+      return {
+        severity: 'success' as const,
+        statusLabel: 'Radar sain',
+        title: `${highScoreCount} opportunite${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prete${highScoreCount > 1 ? 's' : ''}`,
+        description: `Le bruit est filtre selon votre alerte ${alertPreferences.scoreThreshold}+. La prochaine action utile est de comparer ces missions et d en mettre une en suivi.`,
+        evidence,
+        primaryActionLabel:
+          alertPreferences.scoreThreshold >= 80 ? 'Filtrer les 80+' : 'Voir les alertes',
+        primaryActionIcon: 'target',
+      };
+    }
+
+    if (visibleCount === 0) {
+      return {
+        severity: 'neutral' as const,
+        statusLabel: 'Aucune donnee',
+        title: 'Le radar attend un premier scan',
+        description:
+          'Connectez ou verifiez les sources, puis lancez un scan pour obtenir les premieres recommandations.',
+        evidence,
+        primaryActionLabel: 'Lancer le scan',
+        primaryActionIcon: 'play',
+      };
+    }
+
+    return {
+      severity: 'success' as const,
+      statusLabel: 'Normal',
+      title: `${visibleCount} mission${visibleCount > 1 ? 's' : ''} disponible${visibleCount > 1 ? 's' : ''}, aucune alerte critique`,
+      description:
+        'Le systeme est stable. Continuez par les favoris ou relancez un scan si la veille doit etre rafraichie.',
+      evidence,
+      primaryActionLabel: 'Rafraichir',
+      primaryActionIcon: 'refresh-cw',
+    };
+  });
+
+  function handleFeedStoryPrimaryAction(): void {
+    if (page.isOffline) {
+      return;
+    }
+
+    if (brokenConnectors.length > 0) {
+      controller.recheckConnector(brokenConnectors[0].connectorId);
+      return;
+    }
+
+    if (page.dashboardSummary.newCount > 0) {
+      if (!page.showNewOnly) {
+        page.toggleNewOnly();
+      }
+      return;
+    }
+
+    if (alertMatchCount > 0) {
+      showAlertOnly = true;
+      return;
+    }
+
+    controller.startScan();
+  }
+
+  function handleClearMissionFilters(): void {
+    showAlertOnly = false;
+    page.clearAllFilters();
+    page.handleSearch('');
+  }
+
+  function openComparison(): void {
+    if (page.comparisonMissions.length >= 2) {
+      showComparison = true;
+    }
+  }
+
+  function closeComparison(): void {
+    showComparison = false;
+  }
+
+  function clearComparison(): void {
+    showComparison = false;
+    page.clearComparison();
+  }
+
+  function handleMissionFeedScanAction(): void {
+    if (page.isOffline || controller.isScanning || page.isLoading) {
+      return;
+    }
+    controller.startScan();
+  }
+
   function handleOpenExternalUrl(url: string): void {
     openExternalUrl(url).catch(() => {});
   }
 
   (async () => {
-    const [firstScanDone, bannerDismissed, profile, feedTourSeen] = await Promise.all([
-      getFirstScanDone(),
-      getProfileBannerDismissed(),
-      getProfile(),
-      getFeedTourSeen(),
-    ]);
+    const [firstScanDone, bannerDismissed, profile, storedAlertPreferences] =
+      await Promise.all([
+        getFirstScanDone(),
+        getProfileBannerDismissed(),
+        getProfile(),
+        getAlertPreferences(),
+      ]);
     showRefinementBanner = firstScanDone && !bannerDismissed && !profile;
-    shouldAutoOpenTour = firstScanDone && !feedTourSeen;
+    alertPreferences = storedAlertPreferences;
   })().catch(() => {});
-
-  $effect(() => {
-    if (
-      shouldAutoOpenTour &&
-      !showTour &&
-      !controller.isScanning &&
-      page.displayMissions.length > 0
-    ) {
-      shouldAutoOpenTour = false;
-      tourStepIndex = 0;
-      showTour = true;
-    }
-  });
 
   $effect(() => {
     function handleOpenTour() {
@@ -237,14 +441,21 @@
                     <Icon name="database" size={12} />
                   </span>
                 {/if}
-                <button
-                  class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-primary transition-all duration-200 hover:bg-subtle-gray"
-                  onclick={() => controller.startScan()}
-                  disabled={controller.isScanning || page.isLoading || page.isOffline}
-                  title="Lancer le scan (r)"
+                <Tooltip
+                  label={page.isOffline ? 'Scan indisponible hors ligne' : 'Lancer le scan'}
+                  description={page.isOffline
+                    ? 'Pulse utilise les donnees en cache jusqu au retour reseau.'
+                    : 'Raccourci clavier: r. Relance les sources connectees.'}
                 >
-                  <Icon name="play" size={12} class="ml-0.5" />
-                </button>
+                  <button
+                    class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-primary transition-all duration-200 hover:bg-subtle-gray"
+                    onclick={() => controller.startScan()}
+                    disabled={controller.isScanning || page.isLoading || page.isOffline}
+                    aria-label="Lancer le scan des missions"
+                  >
+                    <Icon name="play" size={12} class="ml-0.5" />
+                  </button>
+                </Tooltip>
               </div>
             </div>
             <SourceHealthPanel
@@ -263,6 +474,20 @@
               onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
               onReconnect={handleOpenExternalUrl}
             />
+            <div class="mt-3">
+              <OperationalStoryCard
+                eyebrow="Situation"
+                title={feedStory.title}
+                description={feedStory.description}
+                severity={feedStory.severity}
+                statusLabel={feedStory.statusLabel}
+                evidence={feedStory.evidence}
+                compact={true}
+                primaryActionLabel={feedStory.primaryActionLabel}
+                primaryActionIcon={feedStory.primaryActionIcon}
+                onPrimaryAction={handleFeedStoryPrimaryAction}
+              />
+            </div>
             <FeedActionDashboard
               summary={page.dashboardSummary}
               insightSummary={page.insightSummary}
@@ -294,43 +519,61 @@
                 class:flex-row-reverse={page.panelSide === 'left'}
               >
                 {#if controller.isScanning || page.isLoading}
-                  <button
-                    class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-red-500/30 bg-red-500/10 text-red-400 transition-all duration-200 hover:bg-red-500/20 hover:text-red-300"
-                    onclick={() => controller.stopScan()}
-                    title="Stopper le scan"
+                  <Tooltip
+                    label="Stopper le scan"
+                    description="Interrompt le scan en cours et conserve les donnees deja chargees."
                   >
-                    <Icon name="square" size={14} />
-                  </button>
+                    <button
+                      class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
+                      onclick={() => controller.stopScan()}
+                      aria-label="Stopper le scan en cours"
+                    >
+                      <Icon name="square" size={14} />
+                    </button>
+                  </Tooltip>
                 {/if}
-                <button
-                  class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
-                    {controller.isScanning || page.isLoading
-                    ? 'border-blueprint-blue/20 bg-blueprint-blue/8'
-                    : page.isOffline
-                      ? 'border-border-light bg-subtle-gray text-text-muted cursor-not-allowed'
-                      : 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'}"
-                  onclick={() => controller.startScan()}
-                  disabled={controller.isScanning || page.isLoading || page.isOffline}
-                  title={controller.isScanning || page.isLoading
-                    ? 'Scan en cours...'
+                <Tooltip
+                  label={controller.isScanning || page.isLoading
+                    ? 'Scan en cours'
                     : page.isOffline
                       ? 'Scan indisponible hors ligne'
-                      : 'Lancer le scan (r)'}
+                      : 'Lancer le scan'}
+                  description={controller.isScanning || page.isLoading
+                    ? 'Pulse interroge les sources connectees.'
+                    : page.isOffline
+                      ? 'Les donnees en cache restent disponibles.'
+                      : 'Raccourci clavier: r. Relance la detection des missions.'}
                 >
-                  {#if controller.isScanning || page.isLoading}
-                    <span class="absolute inset-0 flex items-center justify-center">
-                      <span
-                        class="radar-ping absolute h-8 w-8 rounded-full border border-blueprint-blue/40"
-                      ></span>
-                      <span
-                        class="radar-ping animation-delay-500 absolute h-5 w-5 rounded-full border border-blueprint-blue/60"
-                      ></span>
-                      <span class="h-2 w-2 rounded-full bg-blueprint-blue"></span>
-                    </span>
-                  {:else}
-                    <Icon name="play" size={14} class="ml-0.5" />
-                  {/if}
-                </button>
+                  <button
+                    class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
+                    {controller.isScanning || page.isLoading
+                      ? 'border-blueprint-blue/20 bg-blueprint-blue/8'
+                      : page.isOffline
+                        ? 'border-border-light bg-subtle-gray text-text-muted cursor-not-allowed'
+                        : 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'}"
+                    onclick={() => controller.startScan()}
+                    disabled={controller.isScanning || page.isLoading || page.isOffline}
+                    aria-label={controller.isScanning || page.isLoading
+                      ? 'Scan en cours'
+                      : page.isOffline
+                        ? 'Scan indisponible hors ligne'
+                        : 'Lancer le scan des missions'}
+                  >
+                    {#if controller.isScanning || page.isLoading}
+                      <span class="absolute inset-0 flex items-center justify-center">
+                        <span
+                          class="radar-ping absolute h-8 w-8 rounded-full border border-blueprint-blue/40"
+                        ></span>
+                        <span
+                          class="radar-ping animation-delay-500 absolute h-5 w-5 rounded-full border border-blueprint-blue/60"
+                        ></span>
+                        <span class="h-2 w-2 rounded-full bg-blueprint-blue"></span>
+                      </span>
+                    {:else}
+                      <Icon name="play" size={14} class="ml-0.5" />
+                    {/if}
+                  </button>
+                </Tooltip>
               </div>
             </div>
 
@@ -343,6 +586,20 @@
               total={controller.scanProgress.total}
               statuses={controller.connectorStatuses}
             />
+
+            <div class="mt-3">
+              <OperationalStoryCard
+                eyebrow="Situation"
+                title={feedStory.title}
+                description={feedStory.description}
+                severity={feedStory.severity}
+                statusLabel={feedStory.statusLabel}
+                evidence={feedStory.evidence}
+                primaryActionLabel={feedStory.primaryActionLabel}
+                primaryActionIcon={feedStory.primaryActionIcon}
+                onPrimaryAction={handleFeedStoryPrimaryAction}
+              />
+            </div>
 
             <ConnectorStatusList
               statuses={controller.connectorStatuses}
@@ -467,46 +724,52 @@
               ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas px-1 py-1'
               : ''}"
           >
-            <button
-              class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
-              {page.showFavoritesOnly
-                ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-              onclick={page.toggleFavoritesFilter}
-              aria-pressed={page.showFavoritesOnly}
-              title={page.showFavoritesOnly ? 'Voir toutes (f)' : `Favoris (${page.favoriteCount})`}
+            <Tooltip
+              label={page.showFavoritesOnly ? 'Voir toutes les missions' : 'Filtrer les favoris'}
+              description={`Raccourci clavier: f. ${page.favoriteCount} mission${page.favoriteCount > 1 ? 's' : ''} en favori.`}
             >
-              <Icon
-                name="star"
-                size={12}
-                class={page.showFavoritesOnly ? 'fill-blueprint-blue' : ''}
-              />
-              <span class="hidden @[20rem]:inline text-[10px] font-medium">Favoris</span>
-              {#if page.favoriteCount > 0}
-                <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium"
-                  >{page.favoriteCount}</span
-                >
-              {/if}
-            </button>
-            <button
-              class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
-              {page.showHidden
-                ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-              onclick={page.toggleHiddenFilter}
-              aria-pressed={page.showHidden}
-              title={page.showHidden
-                ? 'Masquer les ignorées (h)'
-                : `Ignorées (${page.hiddenCount})`}
+              <button
+                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
+                {page.showFavoritesOnly
+                  ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
+                  : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                onclick={page.toggleFavoritesFilter}
+                aria-pressed={page.showFavoritesOnly}
+              >
+                <Icon
+                  name="star"
+                  size={12}
+                  class={page.showFavoritesOnly ? 'fill-blueprint-blue' : ''}
+                />
+                <span class="hidden @[20rem]:inline text-[10px] font-medium">Favoris</span>
+                {#if page.favoriteCount > 0}
+                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium"
+                    >{page.favoriteCount}</span
+                  >
+                {/if}
+              </button>
+            </Tooltip>
+            <Tooltip
+              label={page.showHidden ? 'Masquer les missions ignorees' : 'Voir les ignorees'}
+              description={`Raccourci clavier: h. ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} ignoree${page.hiddenCount > 1 ? 's' : ''}.`}
             >
-              <Icon name={page.showHidden ? 'eye' : 'eye-off'} size={12} />
-              <span class="hidden @[20rem]:inline text-[10px] font-medium">Ignorées</span>
-              {#if page.hiddenCount > 0}
-                <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium"
-                  >{page.hiddenCount}</span
-                >
-              {/if}
-            </button>
+              <button
+                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
+                {page.showHidden
+                  ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
+                  : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                onclick={page.toggleHiddenFilter}
+                aria-pressed={page.showHidden}
+              >
+                <Icon name={page.showHidden ? 'eye' : 'eye-off'} size={12} />
+                <span class="hidden @[20rem]:inline text-[10px] font-medium">Ignorées</span>
+                {#if page.hiddenCount > 0}
+                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium"
+                    >{page.hiddenCount}</span
+                  >
+                {/if}
+              </button>
+            </Tooltip>
 
             <div class="h-4 w-px shrink-0 bg-border-light"></div>
 
@@ -520,30 +783,40 @@
               <option value="date">Date</option>
               <option value="tjm">TJM</option>
             </select>
-            <button
-              class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[10px] font-medium transition-all duration-150
-              {page.showFilters || page.filterActive
-                ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-              onclick={() => page.setShowFilters(!page.showFilters)}
-              aria-expanded={page.showFilters}
-              aria-controls="filter-panel"
-              title={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
+            <Tooltip
+              label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
+              description={page.filterActive
+                ? 'Un filtre est actif sur le feed.'
+                : 'Affinez par stack, source, remote ou seniorite.'}
             >
-              <Icon name="sliders-horizontal" size={12} />
-              <span class="hidden @[20rem]:inline">Filtres</span>
-              {#if page.filterActive}
-                <span class="h-1.5 w-1.5 rounded-full bg-blueprint-blue"></span>
-              {/if}
-            </button>
-            <button
-              class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
-              onclick={() => (page.showShortcutsHelp = true)}
-              title="Raccourcis clavier (?)"
-              aria-label="Afficher l'aide des raccourcis clavier"
+              <button
+                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[10px] font-medium transition-all duration-150
+                {page.showFilters || page.filterActive
+                  ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
+                  : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                onclick={() => page.setShowFilters(!page.showFilters)}
+                aria-expanded={page.showFilters}
+                aria-controls="filter-panel"
+              >
+                <Icon name="sliders-horizontal" size={12} />
+                <span class="hidden @[20rem]:inline">Filtres</span>
+                {#if page.filterActive}
+                  <span class="h-1.5 w-1.5 rounded-full bg-blueprint-blue"></span>
+                {/if}
+              </button>
+            </Tooltip>
+            <Tooltip
+              label="Raccourcis clavier"
+              description="Ouvre la liste des commandes disponibles. Raccourci: ?."
             >
-              <Icon name="help-circle" size={12} />
-            </button>
+              <button
+                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                onclick={() => (page.showShortcutsHelp = true)}
+                aria-label="Afficher l'aide des raccourcis clavier"
+              >
+                <Icon name="help-circle" size={12} />
+              </button>
+            </Tooltip>
           </div>
 
           {#if page.showFilters}
@@ -602,22 +875,36 @@
         : ''}"
     >
       <VirtualMissionFeed
-        missions={page.displayMissions}
+        missions={visibleFeedMissions}
         isLoading={controller.isScanning || page.isLoading}
         error={page.error}
         seenIds={page.seenIds}
         favorites={page.favorites}
         hidden={page.hidden}
+        comparisonMissionIds={page.comparisonMissionIds}
         sortBy={page.sortBy}
-        filterActive={page.filterActive}
+        filterActive={page.filterActive || showAlertOnly}
         onMissionSeen={page.handleMissionSeen}
         onToggleFavorite={page.handleToggleFavorite}
         onHide={page.handleHide}
+        onToggleCompare={page.toggleCompare}
         onCopyLink={page.handleCopyLink}
         onOpenLink={handleOpenExternalUrl}
+        onInvestigateMission={(mission) => (investigationMission = mission)}
+        onRetry={handleMissionFeedScanAction}
+        onStartScan={handleMissionFeedScanAction}
+        onClearFilters={handleClearMissionFilters}
         tourStep={activeTourStep?.id ?? null}
       />
     </div>
+    {#if showAlertOnly}
+      <button
+        class="mt-3 w-full rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/6 py-2.5 text-[11px] font-medium text-blueprint-blue transition-all duration-200 hover:bg-blueprint-blue/10"
+        onclick={() => (showAlertOnly = false)}
+      >
+        Afficher toutes les missions
+      </button>
+    {/if}
     {#if page.hiddenCount > 0 && !page.showFavoritesOnly}
       <button
         class="mt-3 w-full rounded-xl border border-border-light bg-surface-white py-2.5 text-[11px] text-text-secondary transition-all duration-200 hover:border-disabled-gray hover:bg-subtle-gray hover:text-text-primary"
@@ -644,6 +931,14 @@
   />
 {/if}
 
+{#if investigationMission}
+  <MissionInvestigationDrawer
+    mission={investigationMission}
+    onClose={() => (investigationMission = null)}
+    onOpenLink={handleOpenExternalUrl}
+  />
+{/if}
+
 {#if page.comparisonMissionIds.length > 0}
   <div
     class="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl"
@@ -656,22 +951,22 @@
     {#if page.comparisonMissions.length >= 2}
       <button
         class="rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-xs font-medium text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
-        onclick={() => {}}
+        onclick={openComparison}
       >
         Comparer
       </button>
     {/if}
     <button
       class="rounded-lg px-2 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
-      onclick={page.clearComparison}
+      onclick={clearComparison}
     >
       Annuler
     </button>
   </div>
 {/if}
 
-{#if page.comparisonMissions.length >= 2}
+{#if showComparison && page.comparisonMissions.length >= 2}
   {#key page.comparisonMissionIds.join(',')}
-    <MissionComparison missions={page.comparisonMissions} onClose={page.clearComparison} />
+    <MissionComparison missions={page.comparisonMissions} onClose={closeComparison} />
   {/key}
 {/if}

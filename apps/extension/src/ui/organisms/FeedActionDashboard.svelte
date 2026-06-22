@@ -46,6 +46,15 @@
     weak: 'text-text-subtle',
   };
 
+  type FeedInsightItem = {
+    label: string;
+    value: number;
+    icon: string;
+    stateLabel: string;
+    hint: string;
+    severity: 'success' | 'attention' | 'neutral';
+  };
+
   function bucketRange(bucket: ScoreBucketSummary): string {
     if (bucket.max === null) {
       return `${bucket.min}+`;
@@ -57,30 +66,50 @@
     onSetScoreBucket?.(selectedScoreBucket === bucket ? null : bucket);
   }
 
-  const insightItems = $derived([
+  const insightItems = $derived<FeedInsightItem[]>([
     {
       label: 'Stack forte',
       value: insightSummary.strongStackCount,
       icon: 'layers',
-      tone: 'text-blueprint-blue',
+      stateLabel: insightSummary.strongStackCount > 0 ? 'Signal exploitable' : 'À enrichir',
+      hint:
+        insightSummary.strongStackCount > 0
+          ? 'Comparer ces missions en premier.'
+          : 'Compléter la stack du profil.',
+      severity: insightSummary.strongStackCount > 0 ? 'success' : 'neutral',
     },
     {
       label: 'TJM à négocier',
       value: insightSummary.weakTjmCount,
       icon: 'badge-euro',
-      tone: insightSummary.weakTjmCount > 0 ? 'text-status-orange' : 'text-text-subtle',
+      stateLabel: insightSummary.weakTjmCount > 0 ? 'Attention marge' : 'Fourchette saine',
+      hint:
+        insightSummary.weakTjmCount > 0
+          ? 'Filtrer ou négocier avant de postuler.'
+          : 'Pas de mission sous plancher.',
+      severity: insightSummary.weakTjmCount > 0 ? 'attention' : 'success',
     },
     {
       label: 'Remote compatible',
       value: insightSummary.remoteMatchCount,
       icon: 'wifi',
-      tone: 'text-accent-green',
+      stateLabel: insightSummary.remoteMatchCount > 0 ? 'Compatible' : 'Aucun signal',
+      hint:
+        insightSummary.remoteMatchCount > 0
+          ? 'Prioriser si le lieu est clé.'
+          : 'Vérifier les critères remote.',
+      severity: insightSummary.remoteMatchCount > 0 ? 'success' : 'neutral',
     },
     {
       label: 'IA analysée',
       value: insightSummary.semanticAnalyzedCount,
       icon: 'sparkles',
-      tone: 'text-blueprint-blue',
+      stateLabel: insightSummary.semanticAnalyzedCount > 0 ? 'Confiance enrichie' : 'Analyse absente',
+      hint:
+        insightSummary.semanticAnalyzedCount > 0
+          ? 'Lire les raisons de score.'
+          : 'Activer ou attendre Gemini Nano.',
+      severity: insightSummary.semanticAnalyzedCount > 0 ? 'success' : 'neutral',
     },
   ]);
 </script>
@@ -215,16 +244,40 @@
     {/if}
   </div>
 
-  <div class="mt-3 grid grid-cols-2 gap-1.5" aria-label="Facteurs de scoring du périmètre courant">
+  <div
+    class="mt-3 grid grid-cols-2 gap-1.5"
+    aria-label="Insights actionnables du périmètre courant"
+  >
     {#each insightItems as item}
-      <div class="rounded-lg bg-page-canvas px-2 py-1.5">
-        <span class="flex items-center gap-1 text-[10px] text-text-muted">
-          <Icon name={item.icon} size={11} />
-          {item.label}
-        </span>
-        <span class="mt-0.5 block text-[12px] font-mono font-semibold tabular-nums {item.tone}">
-          {item.value}
-        </span>
+      <div
+        class="rounded-lg border bg-page-canvas px-2 py-1.5 {item.severity === 'attention'
+          ? 'border-status-orange/25'
+          : item.severity === 'success'
+            ? 'border-accent-green/20'
+            : 'border-border-light'}"
+      >
+        <div class="flex items-start justify-between gap-2">
+          <span class="min-w-0">
+            <span class="flex items-center gap-1 text-[10px] text-text-muted">
+              <Icon name={item.icon} size={11} />
+              {item.label}
+            </span>
+            <span class="mt-0.5 block truncate text-[10px] font-medium text-text-primary">
+              {item.stateLabel}
+            </span>
+          </span>
+          <span
+            class="shrink-0 text-[12px] font-mono font-semibold tabular-nums {item.severity ===
+            'attention'
+              ? 'text-status-orange'
+              : item.severity === 'success'
+                ? 'text-accent-green'
+                : 'text-text-subtle'}"
+          >
+            {item.value}
+          </span>
+        </div>
+        <p class="mt-1 min-h-7 text-[10px] leading-4 text-text-subtle">{item.hint}</p>
       </div>
     {/each}
   </div>

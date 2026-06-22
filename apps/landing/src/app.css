@@ -1354,45 +1354,87 @@ p {
   }
 }
 
-/* ===== Stats Section ===== */
-.stats {
+/* ===== Operational Proof Section ===== */
+.proof-strip {
   padding: 0 0 var(--spacing-140);
   background: var(--color-page-canvas);
 }
 
-.stats .container {
+.proof-strip .container {
   max-width: 1040px;
 }
 
-.stats__grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: var(--spacing-32);
+.proof-strip__header {
+  max-width: 560px;
   padding-top: var(--spacing-40);
   border-top: 1px solid var(--color-disabled-gray);
 }
 
-.stat-item {
-  text-align: left;
+.proof-strip__eyebrow {
+  margin: 0 0 var(--spacing-8);
+  color: var(--color-text-subtle);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
 }
 
-.stat-item__value {
-  margin-bottom: var(--spacing-8);
+.proof-strip__header h2 {
+  margin: 0;
   color: var(--color-text-primary);
-  font-family: var(--font-display);
-  font-size: clamp(2.5rem, 5vw, 4.5rem);
-  font-weight: 400;
-  line-height: 0.9;
-  letter-spacing: -0.04em;
+  font-size: 1.75rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  line-height: 1.15;
 }
 
-.stat-item__label {
+.proof-strip__grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: var(--spacing-16);
+  margin-top: var(--spacing-32);
+}
+
+.proof-item {
+  display: flex;
+  min-height: 180px;
+  flex-direction: column;
+  gap: var(--spacing-12);
+  justify-content: space-between;
+  padding: var(--spacing-20);
+  background: var(--color-surface-white);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-large);
+}
+
+.proof-item__signal {
+  width: fit-content;
+  padding: var(--spacing-4) var(--spacing-10);
+  border: 1px solid color-mix(in srgb, var(--color-blueprint-blue) 24%, var(--color-border-light));
+  border-radius: var(--radius-md);
+  color: var(--color-blueprint-blue);
+  font-size: 0.75rem;
+  font-weight: var(--font-weight-semibold);
+}
+
+.proof-item h3 {
+  margin: 0;
+  color: var(--color-text-primary);
+  font-size: 1rem;
+  font-weight: var(--font-weight-medium);
+  letter-spacing: 0;
+  line-height: 1.3;
+}
+
+.proof-item p {
+  margin: 0;
   color: var(--color-text-subtle);
   font-size: 0.9375rem;
+  line-height: 1.6;
 }
 
 @media (min-width: 768px) {
-  .stats__grid {
+  .proof-strip__grid {
     grid-template-columns: repeat(4, 1fr);
   }
 }

@@ -5,6 +5,7 @@
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import type { SavedFeedView } from '$lib/core/types/feed-view';
   import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
+  import Tooltip from '../atoms/Tooltip.svelte';
 
   const {
     availableStacks = [],
@@ -92,20 +93,24 @@
   <div>
     <div class="mb-2 flex items-center justify-between gap-2">
       <p class="text-[11px] uppercase tracking-[0.15em] text-text-muted">Vues</p>
-      <button
-        type="button"
-        class="inline-flex h-7 items-center gap-1 rounded-lg border border-border-light bg-surface-white px-2 text-[10px] font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
-        onclick={() => (saveOpen = !saveOpen)}
-        disabled={!canSaveCurrentView || savedViewLimitReached}
-        title={savedViewLimitReached
+      <Tooltip
+        label={savedViewLimitReached
           ? 'Limite de vues atteinte'
           : canSaveCurrentView
             ? 'Enregistrer la vue'
             : 'Aucun filtre à enregistrer'}
+        description="Sauvegarde la combinaison actuelle de filtres."
       >
-        <Icon name="bookmark-plus" size={12} />
-        Enregistrer
-      </button>
+        <button
+          type="button"
+          class="inline-flex h-7 items-center gap-1 rounded-lg border border-border-light bg-surface-white px-2 text-[10px] font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+          onclick={() => (saveOpen = !saveOpen)}
+          disabled={!canSaveCurrentView || savedViewLimitReached}
+        >
+          <Icon name="bookmark-plus" size={12} />
+          Enregistrer
+        </button>
+      </Tooltip>
     </div>
 
     {#if savedViews.length > 0}
@@ -126,15 +131,16 @@
             >
               <span class="block max-w-28 truncate">{view.name}</span>
             </button>
-            <button
-              type="button"
-              class="inline-flex h-6 w-6 items-center justify-center text-text-muted transition-colors hover:text-status-red"
-              onclick={() => onDeleteView?.(view.id)}
-              title="Supprimer {view.name}"
-              aria-label="Supprimer {view.name}"
-            >
-              <Icon name="x" size={11} />
-            </button>
+            <Tooltip label={`Supprimer ${view.name}`} description="Retire cette vue sauvegardee.">
+              <button
+                type="button"
+                class="inline-flex h-6 w-6 items-center justify-center text-text-muted transition-colors hover:text-status-red"
+                onclick={() => onDeleteView?.(view.id)}
+                aria-label={`Supprimer ${view.name}`}
+              >
+                <Icon name="x" size={11} />
+              </button>
+            </Tooltip>
           </span>
         {/each}
       </div>
@@ -150,14 +156,16 @@
           maxlength="48"
           placeholder="Nom de la vue"
         />
-        <button
-          type="submit"
-          class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue text-surface-white transition-opacity disabled:opacity-40"
-          disabled={isSaving}
-          title="Valider"
-        >
-          <Icon name="check" size={13} />
-        </button>
+        <Tooltip label="Valider la vue" description="Enregistre ce filtre dans vos vues rapides.">
+          <button
+            type="submit"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue text-surface-white transition-opacity disabled:opacity-40"
+            disabled={isSaving}
+            aria-label="Valider le nom de la vue"
+          >
+            <Icon name="check" size={13} />
+          </button>
+        </Tooltip>
       </form>
     {/if}
   </div>

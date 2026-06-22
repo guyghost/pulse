@@ -1,4 +1,4 @@
-import { ToastStore, type ToastType } from '$lib/state/toast.svelte';
+import { ToastStore, type ToastAction, type ToastType } from '$lib/state/toast.svelte';
 import { sendMessage } from '../messaging/bridge';
 
 // Singleton global pour la gestion des toasts
@@ -47,6 +47,17 @@ export async function showToast(
     if (import.meta.env.DEV) {
       console.warn('[ToastService] Failed to show toast:', message);
     }
+  }
+}
+
+export function showToastAction(
+  message: string,
+  toastType: ToastType,
+  action: ToastAction,
+  duration = 6000
+): void {
+  if (toastStore) {
+    toastStore.add(message, toastType, duration, action);
   }
 }
 

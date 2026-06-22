@@ -30,8 +30,8 @@
         };
       case 'open':
         return {
-          dotClass: 'bg-red-400 shadow-[0_0_6px_theme(colors.red-400/60%)]',
-          labelClass: 'text-red-400',
+          dotClass: 'bg-status-red shadow-[0_0_6px_theme(colors.status-red/60%)]',
+          labelClass: 'text-status-red',
           label: 'Suspendu',
           title: "Connecteur suspendu — trop d'erreurs",
         };

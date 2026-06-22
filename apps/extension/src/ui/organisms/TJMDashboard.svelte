@@ -4,6 +4,10 @@
   import TrendBadge from '../molecules/TrendBadge.svelte';
   import { Skeleton } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
+  import OperationalStoryCard, {
+    type OperationalEvidence,
+  } from '../molecules/OperationalStoryCard.svelte';
+  import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
 
   const {
     analysis = null,
@@ -12,6 +16,7 @@
     userSeniority = null,
     userTjmMin = 0,
     userTjmMax = 0,
+    onRetry,
   }: {
     analysis?: TJMAnalysis | null;
     isLoading?: boolean;
@@ -19,6 +24,7 @@
     userSeniority?: SeniorityLevel | null;
     userTjmMin?: number;
     userTjmMax?: number;
+    onRetry?: () => void;
   } = $props();
 
   const levels: Array<{
@@ -48,6 +54,94 @@
     }
     return `${delta > 0 ? '+' : ''}${delta}€`;
   }
+
+  const pricingStory = $derived.by(() => {
+    if (!analysis) {
+      return null;
+    }
+
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Confiance',
+        value: `${confidencePct}%`,
+        icon: 'shield',
+        severity: confidencePct >= 70 ? 'success' : confidencePct >= 45 ? 'attention' : 'incident',
+      },
+      {
+        label: 'Points',
+        value: analysis.dataPoints,
+        icon: 'database',
+        severity: analysis.dataPoints >= 20 ? 'success' : 'attention',
+      },
+      {
+        label: 'Ecart',
+        value: userTargetDelta === null ? 'A calibrer' : formatDelta(userTargetDelta),
+        icon: 'badge-euro',
+        severity:
+          userTargetDelta === null
+            ? 'attention'
+            : Math.abs(userTargetDelta) <= 50
+              ? 'success'
+              : userTargetDelta > 0
+                ? 'attention'
+                : 'incident',
+      },
+    ];
+
+    if (userTargetDelta === null || selectedMarketRange === null) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Profil incomplet',
+        title: 'Le positionnement TJM ne peut pas encore etre decide',
+        description:
+          'Ajoutez une fourchette TJM et une seniorite dans le profil pour transformer les tendances en decision tarifaire.',
+        evidence,
+      };
+    }
+
+    if (confidencePct < 45) {
+      return {
+        severity: 'incident' as const,
+        statusLabel: 'Confiance faible',
+        title: 'Le marche observe est encore trop peu fiable pour changer votre TJM',
+        description:
+          'Gardez votre fourchette actuelle et alimentez le radar avec plus de scans avant de negocier sur cette base.',
+        evidence,
+      };
+    }
+
+    if (userTargetDelta > 80) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'A justifier',
+        title: `Votre cible est ${formatDelta(userTargetDelta)} au-dessus de la mediane`,
+        description:
+          'Acceptez ce niveau seulement si la mission coche fortement stack, remote et contexte client. Sinon, preparez une marge de negociation.',
+        evidence,
+      };
+    }
+
+    if (userTargetDelta < -80) {
+      return {
+        severity: 'incident' as const,
+        statusLabel: 'Sous-positionne',
+        title: `Votre cible est ${formatDelta(userTargetDelta)} sous la mediane`,
+        description:
+          'Le radar indique une marge de rehausse. La prochaine action est de relever la fourchette ou de filtrer les missions trop basses.',
+        evidence,
+      };
+    }
+
+    return {
+      severity: 'success' as const,
+      statusLabel: 'Aligne',
+      title: 'Votre TJM est coherent avec le marche observe',
+      description:
+        analysis.recommendation ??
+        'Conservez la fourchette actuelle et utilisez les ecarts par stack ou region pour arbitrer mission par mission.',
+      evidence,
+    };
+  });
 </script>
 
 <div class="space-y-4">
@@ -59,16 +153,30 @@
       <Skeleton width="100%" height="4.5rem" />
     </div>
   {:else if error}
-    <div
-      class="section-card rounded-xl flex flex-col items-center justify-center py-12 text-center"
-    >
-      <div class="mb-4 flex h-10 w-10 items-center justify-center rounded-xl bg-status-red/10">
-        <Icon name="x" size={18} class="text-status-red" />
-      </div>
-      <p class="text-sm font-medium text-text-primary">Erreur de chargement</p>
-      <p class="mt-2 max-w-[250px] text-xs text-text-subtle">{error}</p>
-    </div>
+    <OperationalEmptyState
+      title="Le radar TJM ne peut pas être calculé"
+      description={error}
+      severity="critical"
+      statusLabel="Incident"
+      icon="triangle-alert"
+      proofLabel="Analyse"
+      proofValue="Indisponible"
+      primaryActionLabel="Réessayer"
+      primaryActionIcon="refresh-cw"
+      onPrimaryAction={onRetry}
+    />
   {:else if analysis}
+    {#if pricingStory}
+      <OperationalStoryCard
+        eyebrow="Decision tarifaire"
+        title={pricingStory.title}
+        description={pricingStory.description}
+        severity={pricingStory.severity}
+        statusLabel={pricingStory.statusLabel}
+        evidence={pricingStory.evidence}
+      />
+    {/if}
+
     <!-- Trend overview -->
     <div class="section-card-strong rounded-xl p-5">
       <div class="flex items-center justify-between">
@@ -287,17 +395,17 @@
       </div>
     {/if}
   {:else}
-    <!-- Empty state -->
-    <div
-      class="section-card rounded-xl flex flex-col items-center justify-center py-16 text-center"
-    >
-      <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-subtle-gray">
-        <Icon name="bar-chart-3" size={20} class="text-text-muted" />
-      </div>
-      <p class="text-sm font-medium text-text-primary">Aucune donnée TJM</p>
-      <p class="mt-2 max-w-[220px] text-xs text-text-subtle">
-        Lancez un scan depuis l'onglet Feed pour alimenter les tendances.
-      </p>
-    </div>
+    <OperationalEmptyState
+      title="Aucune tendance TJM exploitable"
+      description="Le marché ne contient pas encore assez de missions stockées pour produire une décision tarifaire. Relancez l’analyse après un scan du feed."
+      severity="attention"
+      statusLabel="Données absentes"
+      icon="bar-chart-3"
+      proofLabel="Points de marché"
+      proofValue="0"
+      primaryActionLabel="Réessayer l’analyse"
+      primaryActionIcon="refresh-cw"
+      onPrimaryAction={onRetry}
+    />
   {/if}
 </div>

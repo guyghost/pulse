@@ -320,6 +320,134 @@ export const iconPaths = {
     ['line', { x1: '8', x2: '16', y1: '21', y2: '21' }],
     ['line', { x1: '12', x2: '12', y1: '17', y2: '21' }],
   ],
+  'arrow-left': [
+    ['path', { d: 'M19 12H5' }],
+    ['path', { d: 'm12 19-7-7 7-7' }],
+  ],
+  save: [
+    ['path', { d: 'M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2Z' }],
+    ['polyline', { points: '17 21 17 13 7 13 7 21' }],
+    ['polyline', { points: '7 3 7 8 15 8' }],
+  ],
+  sparkles: [
+    ['path', { d: 'M9.9 10.8 8 16l-1.9-5.2L1 9l5.1-1.8L8 2l1.9 5.2L15 9l-5.1 1.8Z' }],
+    ['path', { d: 'M19 22l-1.2-3.2L15 18l2.8-.8L19 14l1.2 3.2L23 18l-2.8.8L19 22Z' }],
+  ],
+  target: [
+    ['circle', { cx: '12', cy: '12', r: '10' }],
+    ['circle', { cx: '12', cy: '12', r: '6' }],
+    ['circle', { cx: '12', cy: '12', r: '2' }],
+  ],
+  'triangle-alert': [
+    ['path', { d: 'm21.73 18-8-14a2 2 0 0 0-3.46 0l-8 14A2 2 0 0 0 4 21h16a2 2 0 0 0 1.73-3Z' }],
+    ['path', { d: 'M12 9v4' }],
+    ['path', { d: 'M12 17h.01' }],
+  ],
+  'shield-check': [
+    ['path', { d: 'M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8Z' }],
+    ['path', { d: 'm9 12 2 2 4-5' }],
+  ],
+  shield: [['path', { d: 'M20 13c0 5-3.5 7.5-8 9-4.5-1.5-8-4-8-9V5l8-3 8 3v8Z' }]],
+  'circle-alert': [
+    ['circle', { cx: '12', cy: '12', r: '10' }],
+    ['path', { d: 'M12 8v4' }],
+    ['path', { d: 'M12 16h.01' }],
+  ],
+  gauge: [
+    ['path', { d: 'M12 14l4-4' }],
+    ['path', { d: 'M3.34 19a10 10 0 1 1 17.32 0' }],
+  ],
+  'list-checks': [
+    ['path', { d: 'm3 7 2 2 4-4' }],
+    ['path', { d: 'm3 17 2 2 4-4' }],
+    ['path', { d: 'M13 6h8' }],
+    ['path', { d: 'M13 12h8' }],
+    ['path', { d: 'M13 18h8' }],
+  ],
+  layers: [
+    [
+      'path',
+      {
+        d: 'm12.83 2.18 8.58 4.3a1 1 0 0 1 0 1.79l-8.58 4.3a2 2 0 0 1-1.66 0l-8.58-4.3a1 1 0 0 1 0-1.79l8.58-4.3a2 2 0 0 1 1.66 0Z',
+      },
+    ],
+    ['path', { d: 'm22 12-9.17 4.59a2 2 0 0 1-1.66 0L2 12' }],
+    ['path', { d: 'm22 17-9.17 4.59a2 2 0 0 1-1.66 0L2 17' }],
+  ],
+  pencil: [
+    ['path', { d: 'M17 3a2.85 2.83 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z' }],
+    ['path', { d: 'm15 5 4 4' }],
+  ],
+  'git-compare-arrows': [
+    ['circle', { cx: '5', cy: '6', r: '3' }],
+    ['path', { d: 'M12 6h7' }],
+    ['path', { d: 'm16 3 3 3-3 3' }],
+    ['circle', { cx: '19', cy: '18', r: '3' }],
+    ['path', { d: 'M12 18H5' }],
+    ['path', { d: 'm8 15-3 3 3 3' }],
+  ],
+  'panel-top': [
+    ['rect', { width: '18', height: '18', x: '3', y: '3', rx: '2' }],
+    ['path', { d: 'M3 9h18' }],
+  ],
+  'file-warning': [
+    ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }],
+    ['path', { d: 'M14 2v6h6' }],
+    ['path', { d: 'M12 12v4' }],
+    ['path', { d: 'M12 19h.01' }],
+  ],
+  'file-plus': [
+    ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }],
+    ['path', { d: 'M14 2v6h6' }],
+    ['path', { d: 'M12 12v6' }],
+    ['path', { d: 'M9 15h6' }],
+  ],
+  'calendar-clock': [
+    ['path', { d: 'M21 7.5V6a2 2 0 0 0-2-2H5a2 2 0 0 0-2 2v13a2 2 0 0 0 2 2h6' }],
+    ['path', { d: 'M16 2v4' }],
+    ['path', { d: 'M8 2v4' }],
+    ['path', { d: 'M3 10h18' }],
+    ['circle', { cx: '17', cy: '17', r: '5' }],
+    ['path', { d: 'M17 14v3l2 1' }],
+  ],
+  send: [
+    ['path', { d: 'm22 2-7 20-4-9-9-4Z' }],
+    ['path', { d: 'M22 2 11 13' }],
+  ],
+  activity: [['path', { d: 'M22 12h-4l-3 9L9 3l-3 9H2' }]],
+  'traffic-cone': [
+    ['path', { d: 'M9.3 4h5.4L19 21H5Z' }],
+    ['path', { d: 'M8 13h8' }],
+    ['path', { d: 'M7 17h10' }],
+  ],
+  zap: [['path', { d: 'M13 2 3 14h8l-1 8 10-12h-8l1-8Z' }]],
+  'badge-euro': [
+    ['circle', { cx: '12', cy: '12', r: '10' }],
+    ['path', { d: 'M15 8.5a4 4 0 1 0 0 7' }],
+    ['path', { d: 'M9 11h5' }],
+    ['path', { d: 'M9 13h5' }],
+  ],
+  'scan-line': [
+    ['path', { d: 'M3 7V5a2 2 0 0 1 2-2h2' }],
+    ['path', { d: 'M17 3h2a2 2 0 0 1 2 2v2' }],
+    ['path', { d: 'M21 17v2a2 2 0 0 1-2 2h-2' }],
+    ['path', { d: 'M7 21H5a2 2 0 0 1-2-2v-2' }],
+    ['path', { d: 'M7 12h10' }],
+  ],
+  'file-down': [
+    ['path', { d: 'M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z' }],
+    ['path', { d: 'M14 2v6h6' }],
+    ['path', { d: 'M12 12v6' }],
+    ['path', { d: 'm9 15 3 3 3-3' }],
+  ],
+  'bookmark-plus': [
+    ['path', { d: 'M19 21 12 17 5 21V5a2 2 0 0 1 2-2h10a2 2 0 0 1 2 2Z' }],
+    ['path', { d: 'M12 7v6' }],
+    ['path', { d: 'M9 10h6' }],
+  ],
+  'message-square': [
+    ['path', { d: 'M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2Z' }],
+  ],
 } as const satisfies Record<string, SVGChild[]>;
 
 export type IconName = keyof typeof iconPaths;

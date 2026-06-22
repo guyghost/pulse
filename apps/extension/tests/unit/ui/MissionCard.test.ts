@@ -90,19 +90,19 @@ describe('MissionCard', () => {
     await tick();
 
     const favoriteBtn = target.querySelector(
-      'button[title="Ajouter aux favoris"]'
+      'button[aria-label="Ajouter la mission aux favoris"]'
     ) as HTMLButtonElement;
     expect(favoriteBtn).not.toBeNull();
     favoriteBtn.click();
     expect(onToggleFavorite).toHaveBeenCalledOnce();
   });
 
-  it("affiche l'etat favori (titre change)", async () => {
+  it("affiche l'etat favori (label accessible change)", async () => {
     const target = mountCard({ isFavorite: true });
     await tick();
 
     const starredBtn = target.querySelector(
-      'button[title="Retirer des favoris"]'
+      'button[aria-label="Retirer la mission des favoris"]'
     ) as HTMLButtonElement;
     expect(starredBtn).not.toBeNull();
   });
@@ -112,11 +112,11 @@ describe('MissionCard', () => {
     await tick();
 
     const unstarredBtn = target.querySelector(
-      'button[title="Ajouter aux favoris"]'
+      'button[aria-label="Ajouter la mission aux favoris"]'
     ) as HTMLButtonElement;
     expect(unstarredBtn).not.toBeNull();
     // Pas de bouton "Retirer"
-    expect(target.querySelector('button[title="Retirer des favoris"]')).toBeNull();
+    expect(target.querySelector('button[aria-label="Retirer la mission des favoris"]')).toBeNull();
   });
 
   it('affiche le score avec la bonne couleur pour score >= 80', async () => {

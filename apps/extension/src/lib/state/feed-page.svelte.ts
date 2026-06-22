@@ -41,6 +41,7 @@ import {
 } from '$lib/shell/facades/feed-data.facade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
+import { showToastAction } from '$lib/shell/notifications/toast-service';
 import {
   registerShortcuts,
   FeedShortcuts,
@@ -351,14 +352,32 @@ export function createFeedPageState(
   }
 
   function handleToggleFavorite(id: string): void {
+    const previous = { ...favorites };
+    const wasFavorite = id in favorites;
     const updated = toggleFavorite(favorites, id, Date.now());
     favorites = updated;
     saveFavorites(favorites).catch(() => {});
+    showToastAction(wasFavorite ? 'Favori retire' : 'Mission ajoutee aux favoris', 'success', {
+      label: 'Annuler',
+      onClick: () => {
+        favorites = previous;
+        saveFavorites(previous).catch(() => {});
+      },
+    });
   }
 
   function handleHide(id: string): void {
+    const previous = { ...hidden };
+    const wasHidden = id in hidden;
     hidden = toggleHidden(hidden, id, Date.now());
     saveHidden(hidden).catch(() => {});
+    showToastAction(wasHidden ? 'Mission restauree' : 'Mission masquee', 'info', {
+      label: 'Annuler',
+      onClick: () => {
+        hidden = previous;
+        saveHidden(previous).catch(() => {});
+      },
+    });
   }
 
   function handleCopyLink(_id: string): void {

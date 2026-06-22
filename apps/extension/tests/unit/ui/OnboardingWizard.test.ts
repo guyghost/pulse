@@ -1,0 +1,97 @@
+import { describe, expect, it, beforeEach, vi } from 'vitest';
+import { mount, tick } from 'svelte';
+import OnboardingWizard from '../../../src/ui/organisms/OnboardingWizard.svelte';
+
+function mountWizard(props: Record<string, unknown> = {}) {
+  const target = document.createElement('div');
+  document.body.appendChild(target);
+  mount(OnboardingWizard, { target, props });
+  return target;
+}
+
+function clickButton(target: HTMLElement, label: string | RegExp) {
+  const buttons = [...target.querySelectorAll('button')];
+  const button = buttons.find((candidate) => {
+    const text = candidate.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+    return typeof label === 'string' ? text.includes(label) : label.test(text);
+  }) as HTMLButtonElement | undefined;
+
+  expect(button, `button ${String(label)} should exist`).toBeTruthy();
+  button!.click();
+}
+
+async function flushAsyncStep() {
+  await Promise.resolve();
+  await tick();
+}
+
+describe('OnboardingWizard', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('exposes the five progressive operational onboarding steps', async () => {
+    const target = mountWizard();
+    await tick();
+
+    for (const label of [
+      'Comprendre Pulse',
+      'Connecter une source',
+      'Observer une activite',
+      'Creer une alerte',
+      'Recevoir un insight',
+    ]) {
+      expect(target.querySelector(`button[aria-label="${label}"]`)).not.toBeNull();
+    }
+
+    expect(target.textContent).toContain('Comprendre Pulse');
+    expect(target.textContent).toContain('1/5');
+
+    clickButton(target, 'Configurer le radar');
+    await tick();
+    expect(target.textContent).toContain('Connecter une source');
+    expect(target.textContent).toContain('2/5');
+
+    clickButton(target, /Continuer avec/);
+    await tick();
+    expect(target.textContent).toContain('Observer une activite');
+    expect(target.textContent).toContain('3/5');
+
+    clickButton(target, 'Creer une premiere alerte');
+    await tick();
+    expect(target.textContent).toContain('Creer une alerte');
+    expect(target.textContent).toContain('4/5');
+
+    clickButton(target, 'Voir le premier insight');
+    await flushAsyncStep();
+    expect(target.textContent).toContain('Recevoir un insight');
+    expect(target.textContent).toContain('5/5');
+    expect(target.textContent).toContain('Action recommandee apres le scan');
+  });
+
+  it('saves the first alert before showing the insight step', async () => {
+    const onSaveAlertPreferences = vi.fn();
+    const target = mountWizard({ onSaveAlertPreferences });
+    await tick();
+
+    clickButton(target, 'Configurer le radar');
+    await tick();
+    clickButton(target, /Continuer avec/);
+    await tick();
+    clickButton(target, 'Creer une premiere alerte');
+    await tick();
+    clickButton(target, 'Voir le premier insight');
+    await flushAsyncStep();
+
+    expect(onSaveAlertPreferences).toHaveBeenCalledOnce();
+    expect(onSaveAlertPreferences).toHaveBeenCalledWith(
+      expect.objectContaining({
+        enabled: true,
+        scoreThreshold: 70,
+        minDailyRate: 600,
+        maxResults: 5,
+      })
+    );
+    expect(target.textContent).toContain('Recevoir un insight');
+  });
+});

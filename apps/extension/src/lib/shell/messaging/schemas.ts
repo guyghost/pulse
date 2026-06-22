@@ -88,6 +88,19 @@ const FeedSavedViewsSchema = z
   .max(12)
   .refine(maxBytes(30_000), { message: 'Feed saved views payload exceeds 30KB limit' });
 
+const ConnectedAlertPreferencesSchema = z
+  .object({
+    enabled: z.boolean(),
+    scoreThreshold: z.number().int().min(0).max(100),
+    minDailyRate: z.number().int().min(0).max(5000),
+    requiredStacks: z.array(z.string().min(1).max(40)).max(12),
+    maxResults: z.number().int().min(1).max(20),
+    revision: z.number().int().min(1),
+    updatedAt: z.string().max(40),
+  })
+  .strict()
+  .refine(maxBytes(4_000), { message: 'Alert preferences payload exceeds 4KB limit' });
+
 const TJMRegionSchema = z.enum([
   'ile-de-france',
   'lyon',
@@ -447,6 +460,21 @@ export const MessageSchemas = {
   }),
   FEED_SAVED_VIEWS_SAVED: z.object({
     type: z.literal('FEED_SAVED_VIEWS_SAVED'),
+    payload: z.object({ saved: z.boolean() }),
+  }),
+  GET_CONNECTED_ALERT_PREFERENCES: z.object({
+    type: z.literal('GET_CONNECTED_ALERT_PREFERENCES'),
+  }),
+  CONNECTED_ALERT_PREFERENCES_RESULT: z.object({
+    type: z.literal('CONNECTED_ALERT_PREFERENCES_RESULT'),
+    payload: ConnectedAlertPreferencesSchema.nullable(),
+  }),
+  SAVE_CONNECTED_ALERT_PREFERENCES: z.object({
+    type: z.literal('SAVE_CONNECTED_ALERT_PREFERENCES'),
+    payload: ConnectedAlertPreferencesSchema,
+  }),
+  CONNECTED_ALERT_PREFERENCES_SAVED: z.object({
+    type: z.literal('CONNECTED_ALERT_PREFERENCES_SAVED'),
     payload: z.object({ saved: z.boolean() }),
   }),
   GET_TJM_ANALYSIS: z.object({

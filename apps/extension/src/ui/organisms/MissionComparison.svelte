@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
   import { Icon } from '@pulse/ui';
-  import { Badge } from '@pulse/ui';
 
   const {
     missions,
@@ -15,6 +14,13 @@
     full: 'Full remote',
     hybrid: 'Hybride',
     onsite: 'Sur site',
+  };
+
+  type DecisionEvidence = {
+    label: string;
+    value: string;
+    icon: string;
+    severity: 'success' | 'attention' | 'neutral';
   };
 
   const fields: { label: string; key: string; render: (m: Mission) => string }[] = [
@@ -39,6 +45,89 @@
     { label: 'Source', key: 'source', render: (m) => m.source },
     { label: 'Client', key: 'client', render: (m) => m.client ?? '—' },
   ];
+
+  function getScore(mission: Mission): number {
+    return mission.scoreBreakdown?.total ?? mission.semanticScore ?? mission.score ?? 0;
+  }
+
+  function formatTjm(value: number | null): string {
+    return typeof value === 'number' ? `${value} €/j` : 'Non précisé';
+  }
+
+  const rankedMissions = $derived([...missions].sort((a, b) => getScore(b) - getScore(a)));
+  const recommendedMission = $derived(rankedMissions[0] ?? null);
+  const runnerUpMission = $derived(rankedMissions[1] ?? null);
+  const scoreGap = $derived(
+    recommendedMission && runnerUpMission
+      ? getScore(recommendedMission) - getScore(runnerUpMission)
+      : 0
+  );
+  const bestTjmMission = $derived(
+    [...missions]
+      .filter((mission) => typeof mission.tjm === 'number')
+      .sort((a, b) => (b.tjm ?? 0) - (a.tjm ?? 0))[0] ?? null
+  );
+
+  const recommendationTitle = $derived(
+    recommendedMission ? `Priorité: ${recommendedMission.title}` : 'Comparaison prête'
+  );
+
+  const recommendationDescription = $derived.by(() => {
+    if (!recommendedMission) {
+      return 'Sélectionnez au moins deux missions pour obtenir une recommandation.';
+    }
+
+    if (scoreGap >= 10) {
+      return `${recommendedMission.title} devance la suivante de ${scoreGap} points. La prochaine action est d’ouvrir cette mission ou de la mettre en suivi.`;
+    }
+
+    if (scoreGap > 0) {
+      return `Les scores sont proches: ${scoreGap} point${scoreGap > 1 ? 's' : ''} d’écart. Départagez avec le TJM, le remote et la source avant de postuler.`;
+    }
+
+    return 'Les scores sont à égalité. Utilisez le TJM, le remote et le client pour trancher.';
+  });
+
+  const decisionEvidence = $derived.by<DecisionEvidence[]>(() => {
+    if (!recommendedMission) {
+      return [];
+    }
+
+    return [
+      {
+        label: 'Score',
+        value: `${getScore(recommendedMission)}/100`,
+        icon: 'target',
+        severity: getScore(recommendedMission) >= 80 ? 'success' : 'attention',
+      },
+      {
+        label: 'Écart',
+        value: scoreGap > 0 ? `+${scoreGap} pts` : 'Égalité',
+        icon: 'git-compare-arrows',
+        severity: scoreGap >= 10 ? 'success' : 'attention',
+      },
+      {
+        label: 'Meilleur TJM',
+        value: bestTjmMission ? formatTjm(bestTjmMission.tjm) : 'Absent',
+        icon: 'badge-euro',
+        severity: bestTjmMission ? 'success' : 'neutral',
+      },
+      {
+        label: 'Vigilance',
+        value:
+          recommendedMission.remote === 'onsite'
+            ? 'Présentiel'
+            : recommendedMission.tjm === null
+              ? 'TJM absent'
+              : 'Aucune',
+        icon: 'circle-alert',
+        severity:
+          recommendedMission.remote === 'onsite' || recommendedMission.tjm === null
+            ? 'attention'
+            : 'success',
+      },
+    ];
+  });
 </script>
 
 {#if missions.length >= 2}
@@ -65,6 +154,59 @@
           <Icon name="x" size={16} />
         </button>
       </div>
+
+      {#if recommendedMission}
+        <section class="border-b border-border-light bg-page-canvas px-4 py-3">
+          <div class="rounded-xl border border-blueprint-blue/15 bg-surface-white p-3">
+            <div class="flex items-start gap-3">
+              <span
+                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/8 text-blueprint-blue"
+                aria-hidden="true"
+              >
+                <Icon name="target" size={16} />
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+                  Décision recommandée
+                </p>
+                <h3 class="mt-1 text-sm font-semibold text-text-primary">
+                  {recommendationTitle}
+                </h3>
+                <p class="mt-1 text-xs leading-5 text-text-subtle">
+                  {recommendationDescription}
+                </p>
+              </div>
+            </div>
+
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              {#each decisionEvidence as item}
+                <div
+                  class="rounded-lg border px-2 py-1.5 {item.severity === 'attention'
+                    ? 'border-status-orange/25 bg-status-orange/5'
+                    : item.severity === 'success'
+                      ? 'border-accent-green/20 bg-accent-green/5'
+                      : 'border-border-light bg-page-canvas'}"
+                >
+                  <span class="flex items-center gap-1 text-[10px] text-text-muted">
+                    <Icon name={item.icon} size={11} />
+                    {item.label}
+                  </span>
+                  <span
+                    class="mt-0.5 block text-xs font-semibold tabular-nums {item.severity ===
+                    'attention'
+                      ? 'text-status-orange'
+                      : item.severity === 'success'
+                        ? 'text-text-primary'
+                        : 'text-text-subtle'}"
+                  >
+                    {item.value}
+                  </span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        </section>
+      {/if}
 
       <!-- Titles row -->
       <div

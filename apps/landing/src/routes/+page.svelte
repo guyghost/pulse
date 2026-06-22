@@ -602,26 +602,35 @@
   </div>
 </section>
 
-<!-- Stats -->
-<section class="stats">
+<!-- Operational proof -->
+<section class="proof-strip" aria-labelledby="proof-strip-title">
   <div class="container">
-    <div class="stats__grid">
-      <div class="stat-item fade-in">
-        <div class="stat-item__value">5</div>
-        <div class="stat-item__label">Plateformes scannées</div>
-      </div>
-      <div class="stat-item fade-in fade-in-delay-1">
-        <div class="stat-item__value">Local</div>
-        <div class="stat-item__label">Exécution navigateur</div>
-      </div>
-      <div class="stat-item fade-in fade-in-delay-2">
-        <div class="stat-item__value">IA</div>
-        <div class="stat-item__label">Scoring Gemini Nano</div>
-      </div>
-      <div class="stat-item fade-in fade-in-delay-3">
-        <div class="stat-item__value">20</div>
-        <div class="stat-item__label">Crédits Premium / mois</div>
-      </div>
+    <div class="proof-strip__header fade-in">
+      <p class="proof-strip__eyebrow">Preuves operationnelles</p>
+      <h2 id="proof-strip-title">Chaque signal doit mener a une action</h2>
+    </div>
+
+    <div class="proof-strip__grid">
+      <article class="proof-item fade-in">
+        <span class="proof-item__signal">5 sources</span>
+        <h3>Vous voyez ou chercher en premier</h3>
+        <p>Les plateformes sont consolidees avant decision: prioriser, filtrer ou ignorer.</p>
+      </article>
+      <article class="proof-item fade-in fade-in-delay-1">
+        <span class="proof-item__signal">Local</span>
+        <h3>Les sessions restent dans Chrome</h3>
+        <p>Si une source casse, l'action est de reconnecter ou relancer, pas de transmettre un mot de passe.</p>
+      </article>
+      <article class="proof-item fade-in fade-in-delay-2">
+        <span class="proof-item__signal">Gemini Nano</span>
+        <h3>Le score explique la decision</h3>
+        <p>Les missions fortes remontent avec les raisons de fit avant les details techniques.</p>
+      </article>
+      <article class="proof-item fade-in fade-in-delay-3">
+        <span class="proof-item__signal">20 credits</span>
+        <h3>Les generations restent pilotees</h3>
+        <p>Le compte montre quand recharger avant de bloquer pitch, message ou resume CV.</p>
+      </article>
     </div>
   </div>
 </section>

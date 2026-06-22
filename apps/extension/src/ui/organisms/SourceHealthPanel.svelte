@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon } from '@pulse/ui';
   import CircuitBadge from '../atoms/CircuitBadge.svelte';
+  import Tooltip from '../atoms/Tooltip.svelte';
   import type { AppError } from '$lib/core/errors';
   import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
@@ -39,6 +40,13 @@
   const imgFailed = $state<Record<string, boolean>>({});
   let expanded = $state(false);
 
+  type SourceDiagnosis = {
+    statusLabel: string;
+    impact: string;
+    action: string;
+    severity: 'success' | 'attention' | 'incident' | 'neutral';
+  };
+
   function getRelativeTime(timestamp: number | null): string {
     if (timestamp === null) {
       return 'jamais';
@@ -71,6 +79,76 @@
       return 'Dégradé';
     }
     return 'Sain';
+  }
+
+  function getSourceDiagnosis(
+    source: SourceStatus,
+    snapshot: ConnectorHealthSnapshot | undefined,
+    missionCount: number,
+    isEnabled: boolean
+  ): SourceDiagnosis {
+    if (!isEnabled) {
+      return {
+        statusLabel: 'Source désactivée',
+        impact: 'Le radar ignore volontairement cette plateforme.',
+        action: 'Activez puis sondez si elle doit contribuer au feed.',
+        severity: 'neutral',
+      };
+    }
+
+    if (source.sessionStatus === 'not-connected') {
+      return {
+        statusLabel: 'Session absente',
+        impact: 'Les nouvelles missions de cette source ne peuvent pas remonter.',
+        action: 'Reconnectez la plateforme dans Chrome.',
+        severity: 'attention',
+      };
+    }
+
+    if (source.sessionStatus === 'error') {
+      return {
+        statusLabel: 'Session en erreur',
+        impact: 'Le feed peut sous-estimer les opportunités récentes.',
+        action: 'Reconnectez ou relancez le diagnostic.',
+        severity: 'incident',
+      };
+    }
+
+    if (snapshot) {
+      const healthStatus = deriveHealthStatus(snapshot);
+      if (healthStatus === 'broken') {
+        return {
+          statusLabel: 'Collecte suspendue',
+          impact: 'Le radar ne doit pas être considéré fiable pour cette source.',
+          action: 'Relancez le diagnostic puis reconnectez si l’échec persiste.',
+          severity: 'incident',
+        };
+      }
+      if (healthStatus === 'degraded') {
+        return {
+          statusLabel: 'Signal instable',
+          impact: 'Les résultats peuvent être partiels ou retardés.',
+          action: 'Sondez la source avant de traiter les alertes.',
+          severity: 'attention',
+        };
+      }
+    }
+
+    if (missionCount === 0) {
+      return {
+        statusLabel: 'Aucun signal',
+        impact: 'La source est disponible mais n’a rien produit au dernier scan.',
+        action: 'Élargissez les critères ou vérifiez la plateforme.',
+        severity: 'neutral',
+      };
+    }
+
+    return {
+      statusLabel: 'Signal exploitable',
+      impact: 'Les missions de cette source peuvent alimenter la décision.',
+      action: 'Filtrez cette source si vous voulez investiguer son volume.',
+      severity: 'success',
+    };
   }
 
   const connectedCount = $derived(sources.filter((s) => s.sessionStatus === 'connected').length);
@@ -140,6 +218,12 @@
                 toggleExpand();
               }
             }}
+            aria-label={isFiltered
+              ? `Retirer le filtre ${source.name}`
+              : hasData
+                ? `Filtrer par ${source.name}, ${formatMissionCount(missionCount)}`
+                : `Afficher les détails de ${source.name}`}
+            aria-pressed={isFiltered}
             title="{source.name}{hasData ? ` — ${missionCount} missions` : ' — aucune mission'}"
           >
             <!-- Status dot -->
@@ -181,13 +265,18 @@
             {/if}
           </button>
         {/each}
-        <button
-          class="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-subtle-gray hover:text-text-primary transition-colors"
-          onclick={toggleExpand}
-          title="Afficher le détail des sources"
+        <Tooltip
+          label="Afficher le detail des sources"
+          description="Ouvre les sessions, incidents et filtres par connecteur."
         >
-          <Icon name="chevron-down" size={12} />
-        </button>
+          <button
+            class="ml-auto inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-md text-text-muted hover:bg-subtle-gray hover:text-text-primary transition-colors"
+            onclick={toggleExpand}
+            aria-label="Afficher le détail des sources"
+          >
+            <Icon name="chevron-down" size={12} />
+          </button>
+        </Tooltip>
       </div>
     {:else}
       <!-- ── Expanded mode: full detail rows ── -->
@@ -212,25 +301,32 @@
           </div>
           <div class="flex items-center gap-1">
             {#if onRefresh}
-              <button
-                class="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:opacity-40"
-                onclick={onRefresh}
-                disabled={isChecking}
-                title="Vérifier les connexions"
+              <Tooltip
+                label={isChecking ? 'Verification en cours' : 'Verifier les connexions'}
+                description="Relance le diagnostic des sessions sources."
               >
-                <span class:animate-spin={isChecking}>
-                  <Icon name="refresh-cw" size={11} />
-                </span>
-              </button>
+                <button
+                  class="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:opacity-40"
+                  onclick={onRefresh}
+                  disabled={isChecking}
+                  aria-label="Vérifier les connexions des sources"
+                >
+                  <span class:animate-spin={isChecking}>
+                    <Icon name="refresh-cw" size={11} />
+                  </span>
+                </button>
+              </Tooltip>
             {/if}
             {#if compact}
-              <button
-                class="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
-                onclick={toggleExpand}
-                title="Réduire"
-              >
-                <Icon name="chevron-down" size={11} class="rotate-180" />
-              </button>
+              <Tooltip label="Reduire" description="Revient a la vue compacte des sources.">
+                <button
+                  class="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+                  onclick={toggleExpand}
+                  aria-label="Réduire le détail des sources"
+                >
+                  <Icon name="chevron-down" size={11} class="rotate-180" />
+                </button>
+              </Tooltip>
             {/if}
           </div>
         </div>
@@ -244,6 +340,7 @@
           {@const isActive = source.sessionStatus === 'connected' && isEnabled}
           {@const snap = healthSnapshots?.get(source.connectorId)}
           {@const healthStatus = snap ? deriveHealthStatus(snap) : null}
+          {@const diagnosis = getSourceDiagnosis(source, snap, missionCount, isEnabled)}
 
           <div
             class="flex items-center gap-3 py-2.5 {i > 0 ? 'border-t border-border-light' : ''}"
@@ -259,7 +356,7 @@
                 onclick={() => onToggleConnector(source.connectorId)}
                 role="switch"
                 aria-checked={isEnabled}
-                aria-label="Activer {source.name}"
+                aria-label={isEnabled ? `Désactiver ${source.name}` : `Activer ${source.name}`}
               >
                 <span
                   class="inline-block h-3.5 w-3.5 rounded-full transition-transform duration-200
@@ -316,6 +413,32 @@
                   {source.error.message}
                 </span>
               {/if}
+              <div
+                class="mt-1.5 rounded-lg border px-2 py-1.5 {diagnosis.severity === 'incident'
+                  ? 'border-status-red/20 bg-status-red/6'
+                  : diagnosis.severity === 'attention'
+                    ? 'border-status-orange/20 bg-status-orange/6'
+                    : diagnosis.severity === 'success'
+                      ? 'border-accent-green/20 bg-accent-green/6'
+                      : 'border-border-light bg-surface-white'}"
+              >
+                <div class="flex items-center justify-between gap-2">
+                  <span
+                    class="text-[10px] font-medium {diagnosis.severity === 'incident'
+                      ? 'text-status-red'
+                      : diagnosis.severity === 'attention'
+                        ? 'text-status-orange'
+                        : diagnosis.severity === 'success'
+                          ? 'text-accent-green'
+                          : 'text-text-subtle'}"
+                  >
+                    {diagnosis.statusLabel}
+                  </span>
+                  <span class="text-[10px] text-text-muted">Action</span>
+                </div>
+                <p class="mt-0.5 text-[10px] leading-4 text-text-subtle">{diagnosis.impact}</p>
+                <p class="mt-0.5 text-[10px] leading-4 text-text-primary">{diagnosis.action}</p>
+              </div>
             </div>
 
             <!-- Status -->
@@ -365,23 +488,31 @@
                     class="rounded-md border border-status-red/20 bg-status-red/6 px-2 py-0.5 text-[10px] font-medium text-status-red transition-colors hover:bg-status-red/10"
                     onclick={() => onRecheckConnector(source.connectorId, !isEnabled)}
                   >
-                    {isEnabled ? 'Re-check' : 'Activer'}
+                    {isEnabled ? 'Relancer' : 'Activer'}
                   </button>
                 {/if}
               {/if}
 
               <!-- Filter by source button -->
               {#if missionCount > 0}
-                <button
-                  class="rounded-md px-1.5 py-0.5 text-[10px] font-mono font-medium transition-colors
-                    {isFiltered
-                    ? 'bg-blueprint-blue/10 text-blueprint-blue'
-                    : 'text-text-muted hover:bg-subtle-gray hover:text-text-primary'}"
-                  onclick={() => onFilterBySource?.(isFiltered ? null : source.connectorId)}
-                  title={isFiltered ? 'Retirer le filtre' : `Filtrer par ${source.name}`}
+                <Tooltip
+                  label={isFiltered ? 'Retirer le filtre' : `Filtrer ${source.name}`}
+                  description={`${formatMissionCount(missionCount)} detectee${missionCount > 1 ? 's' : ''} sur cette source.`}
                 >
-                  {missionCount}
-                </button>
+                  <button
+                    class="rounded-md px-1.5 py-0.5 text-[10px] font-mono font-medium transition-colors
+                      {isFiltered
+                      ? 'bg-blueprint-blue/10 text-blueprint-blue'
+                      : 'text-text-muted hover:bg-subtle-gray hover:text-text-primary'}"
+                    onclick={() => onFilterBySource?.(isFiltered ? null : source.connectorId)}
+                    aria-label={isFiltered
+                      ? `Retirer le filtre ${source.name}`
+                      : `Filtrer par ${source.name}, ${formatMissionCount(missionCount)}`}
+                    aria-pressed={isFiltered}
+                  >
+                    {missionCount}
+                  </button>
+                </Tooltip>
               {/if}
             </div>
           </div>

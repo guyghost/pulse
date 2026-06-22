@@ -36,6 +36,10 @@ import { rescoreStoredMissions } from '../lib/shell/scan/rescore';
 import { getConnectorIds, getConnectors } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { getFavorites, saveFavorites, getHidden, saveHidden } from '../lib/shell/storage/favorites';
+import {
+  getConnectedAlertPreferences,
+  saveConnectedAlertPreferences,
+} from '../lib/shell/storage/connected-alert-preferences';
 import { setNewMissionCount, resetNewMissionCount } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
@@ -563,6 +567,30 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] SAVE_FEED_SAVED_VIEWS error:', err);
           sendResponse({ type: 'FEED_SAVED_VIEWS_SAVED', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_CONNECTED_ALERT_PREFERENCES') {
+      getConnectedAlertPreferences()
+        .then((preferences) => {
+          sendResponse({ type: 'CONNECTED_ALERT_PREFERENCES_RESULT', payload: preferences });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_CONNECTED_ALERT_PREFERENCES error:', err);
+          sendResponse({ type: 'CONNECTED_ALERT_PREFERENCES_RESULT', payload: null });
+        });
+      return true;
+    }
+
+    if (message.type === 'SAVE_CONNECTED_ALERT_PREFERENCES') {
+      saveConnectedAlertPreferences(message.payload)
+        .then(() => {
+          sendResponse({ type: 'CONNECTED_ALERT_PREFERENCES_SAVED', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SAVE_CONNECTED_ALERT_PREFERENCES error:', err);
+          sendResponse({ type: 'CONNECTED_ALERT_PREFERENCES_SAVED', payload: { saved: false } });
         });
       return true;
     }

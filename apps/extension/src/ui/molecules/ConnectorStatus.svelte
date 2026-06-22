@@ -84,7 +84,7 @@
       case 'error':
         return {
           icon: 'x-circle',
-          color: 'text-red-400',
+          color: 'text-status-red',
           label: errorMessage ?? 'Erreur',
           spin: false,
         };

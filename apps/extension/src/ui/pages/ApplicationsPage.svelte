@@ -11,6 +11,16 @@
   import { showToast } from '$lib/shell/notifications/toast-service';
   import { summarizeApplicationPipeline } from '$lib/core/tracking/pipeline-summary';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
+  import OperationalStoryCard, {
+    type OperationalEvidence,
+  } from '../molecules/OperationalStoryCard.svelte';
+  import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
+  import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
+
+  const { onNavigateToFeed }: { onNavigateToFeed?: () => void } = $props();
+  const connection = getConnectionStore();
+  const isOffline = $derived(connection.status === 'offline');
 
   const tracking = createTrackingStore();
 
@@ -20,8 +30,14 @@
   let assets = $state<GeneratedAsset[]>([]);
   let generatingType = $state<GenerationType | null>(null);
   let nextActionInput = $state('');
+  let loadError = $state<string | null>(null);
 
   const generationTypes: GenerationType[] = ['pitch', 'cover-message', 'cv-summary'];
+
+  type TrackedMission = {
+    mission: Mission;
+    record: MissionTracking;
+  };
 
   const trackedMissions = $derived.by(() => {
     return missions
@@ -29,7 +45,10 @@
         mission,
         record: tracking.getTrackingForMission(mission.id) ?? null,
       }))
-      .filter(({ record }) => record && record.currentStatus !== 'detected')
+      .filter(
+        (item): item is TrackedMission =>
+          item.record !== null && item.record.currentStatus !== 'detected'
+      )
       .sort((a, b) => getLastActivity(b.record) - getLastActivity(a.record));
   });
 
@@ -52,11 +71,116 @@
     summarizeApplicationPipeline([...tracking.trackings.values()], Date.now())
   );
 
+  const recommendedTrackedMission = $derived.by(() => {
+    const now = Date.now();
+    const dueMission = [...trackedMissions]
+      .filter(({ record }) => isTrackingDue(record, now))
+      .sort((a, b) => getNextActionTimestamp(a.record) - getNextActionTimestamp(b.record))[0];
+
+    if (dueMission) {
+      return dueMission;
+    }
+
+    const preparedMission = trackedMissions.find(
+      ({ record }) => record.currentStatus === 'application_prepared'
+    );
+
+    return preparedMission ?? trackedMissions[0] ?? null;
+  });
+
+  const applicationStory = $derived.by(() => {
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Actives',
+        value: pipelineSummary.activeCount,
+        icon: 'activity',
+        severity: pipelineSummary.activeCount > 0 ? 'success' : 'neutral',
+      },
+      {
+        label: 'Relances',
+        value: pipelineSummary.dueFollowUps,
+        icon: 'calendar-clock',
+        severity: pipelineSummary.dueFollowUps > 0 ? 'attention' : 'neutral',
+      },
+      {
+        label: 'Pretes',
+        value: pipelineSummary.preparedNotApplied,
+        icon: 'send',
+        severity: pipelineSummary.preparedNotApplied > 0 ? 'attention' : 'neutral',
+      },
+    ];
+
+    if (pipelineSummary.dueFollowUps > 0) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Relance due',
+        title: `${pipelineSummary.dueFollowUps} relance${pipelineSummary.dueFollowUps > 1 ? 's' : ''} a traiter maintenant`,
+        description:
+          'La prochaine decision n est pas de parcourir toutes les missions, mais de reprendre les dossiers qui ont une echeance.',
+        evidence,
+        primaryActionLabel: 'Voir la file de suivi',
+        primaryActionIcon: 'calendar-clock',
+      };
+    }
+
+    if (pipelineSummary.preparedNotApplied > 0) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Pret a envoyer',
+        title: `${pipelineSummary.preparedNotApplied} candidature${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} preparee${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} mais pas encore envoyee${pipelineSummary.preparedNotApplied > 1 ? 's' : ''}`,
+        description:
+          'Le contenu existe deja. La prochaine action utile est de finaliser l envoi ou de changer le statut.',
+        evidence,
+        primaryActionLabel: 'Continuer le dossier',
+        primaryActionIcon: 'arrow-right',
+      };
+    }
+
+    if (pipelineSummary.activeCount === 0) {
+      return {
+        severity: 'neutral' as const,
+        statusLabel: 'Aucun suivi',
+        title: 'Aucune candidature active pour le moment',
+        description:
+          'Qualifiez une mission depuis le Feed pour transformer la veille en pipeline actionnable.',
+        evidence,
+        primaryActionLabel: 'Preparer une mission',
+        primaryActionIcon: 'briefcase',
+      };
+    }
+
+    return {
+      severity: 'success' as const,
+      statusLabel: 'Pipeline sain',
+      title: `${pipelineSummary.activeCount} dossier${pipelineSummary.activeCount > 1 ? 's' : ''} actif${pipelineSummary.activeCount > 1 ? 's' : ''}, aucune relance en retard`,
+      description:
+        pipelineSummary.bottleneck !== null
+          ? `Le goulot actuel est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette etape.`
+          : 'Le pipeline est sous controle. Continuez par le dossier selectionne ou preparez une nouvelle candidature.',
+      evidence,
+      primaryActionLabel: 'Ouvrir le dossier',
+      primaryActionIcon: 'arrow-right',
+    };
+  });
+
   function getLastActivity(record: MissionTracking | null): number {
     if (!record || record.history.length === 0) {
       return 0;
     }
     return record.history[record.history.length - 1].timestamp;
+  }
+
+  function getNextActionTimestamp(record: MissionTracking): number {
+    if (!record.nextActionAt) {
+      return Number.POSITIVE_INFINITY;
+    }
+
+    const timestamp = Date.parse(record.nextActionAt);
+    return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
+  }
+
+  function isTrackingDue(record: MissionTracking, now: number): boolean {
+    return getNextActionTimestamp(record) <= now;
   }
 
   function getMissionScore(mission: Mission): number {
@@ -140,6 +264,15 @@
     await loadAssets(missionId);
   }
 
+  function handleApplicationStoryAction(): void {
+    if (recommendedTrackedMission) {
+      void selectMission(recommendedTrackedMission.mission.id);
+      return;
+    }
+
+    onNavigateToFeed?.();
+  }
+
   async function transitionTo(status: ApplicationStatus): Promise<void> {
     if (!selectedMission) {
       return;
@@ -168,7 +301,7 @@
   }
 
   async function generate(type: GenerationType): Promise<void> {
-    if (!selectedMission) {
+    if (!selectedMission || generatingType !== null) {
       return;
     }
 
@@ -206,8 +339,9 @@
     await showToast('Copié', 'success');
   }
 
-  (async () => {
+  async function loadApplications(): Promise<void> {
     isLoading = true;
+    loadError = null;
     await tracking.loadTrackings();
     missions = await getMissions();
     selectedMissionId = missions[0]?.id ?? null;
@@ -215,8 +349,11 @@
       await loadAssets(selectedMissionId);
     }
     isLoading = false;
-  })().catch(async () => {
+  }
+
+  loadApplications().catch(async () => {
     isLoading = false;
+    loadError = 'Impossible de charger les candidatures';
     await showToast('Impossible de charger les candidatures', 'error');
   });
 </script>
@@ -247,14 +384,67 @@
         <Icon name="mail" size={18} class="text-blueprint-blue" />
       </div>
     </div>
+    <div class="mt-4">
+      <OperationalStoryCard
+        eyebrow="Priorite"
+        title={applicationStory.title}
+        description={applicationStory.description}
+        severity={applicationStory.severity}
+        statusLabel={applicationStory.statusLabel}
+        evidence={applicationStory.evidence}
+        primaryActionLabel={applicationStory.primaryActionLabel}
+        primaryActionIcon={applicationStory.primaryActionIcon}
+        onPrimaryAction={handleApplicationStoryAction}
+      />
+    </div>
+    {#if isOffline}
+      <div class="mt-3">
+        <OfflineNotice
+          description="Le pipeline local reste modifiable. Les ouvertures de mission et générations de messages peuvent attendre le retour réseau."
+          action="Prochaine action : mettre à jour les relances dues et préparer les prochaines actions."
+        />
+      </div>
+    {/if}
     <ApplicationPipelineSummary summary={pipelineSummary} />
   </section>
 
   {#if isLoading}
-    <div class="mt-4 section-card rounded-xl p-5 text-sm text-text-subtle">Chargement...</div>
+    <div class="mt-4 section-card rounded-xl p-5 space-y-3">
+      <div class="h-3 w-28 rounded-full bg-subtle-gray"></div>
+      <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
+      <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
+    </div>
+  {:else if loadError}
+    <div class="mt-4">
+      <OperationalEmptyState
+        title="Le pipeline candidatures ne peut pas être chargé"
+        description="Les statuts locaux sont indisponibles pour le moment. Réessayez avant de modifier un dossier ou de générer un kit."
+        severity="critical"
+        statusLabel="Incident"
+        icon="triangle-alert"
+        proofLabel="Pipeline"
+        proofValue="Indisponible"
+        primaryActionLabel="Réessayer"
+        primaryActionIcon="refresh-cw"
+        onPrimaryAction={() => {
+          loadApplications().catch(() => {});
+        }}
+      />
+    </div>
   {:else if missions.length === 0}
-    <div class="mt-4 section-card rounded-xl p-5 text-sm text-text-subtle">
-      Aucune mission disponible. Lancez un scan depuis le feed.
+    <div class="mt-4">
+      <OperationalEmptyState
+        title="Aucune mission ne peut encore devenir candidature"
+        description="Le pipeline démarre quand une mission existe dans le feed. Lancez ou consultez le radar, puis revenez préparer un dossier."
+        severity="attention"
+        statusLabel="Pipeline vide"
+        icon="briefcase"
+        proofLabel="Missions disponibles"
+        proofValue="0"
+        primaryActionLabel="Retourner au feed"
+        primaryActionIcon="arrow-left"
+        onPrimaryAction={() => onNavigateToFeed?.()}
+      />
     </div>
   {:else}
     <div class="mt-4 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
@@ -402,6 +592,24 @@
               {/each}
             </div>
           </div>
+
+          {#if assets.length === 0}
+            <OperationalEmptyState
+              title="Aucun kit n’est prêt pour cette mission"
+              description="La prochaine action utile est de générer un pitch court ou un message recruteur, puis de passer le dossier au statut préparé."
+              severity="attention"
+              statusLabel="À préparer"
+              icon="file-plus"
+              proofLabel="Contenus générés"
+              proofValue="0"
+              primaryActionLabel="Générer un pitch"
+              primaryActionIcon={GENERATION_TYPE_ICONS.pitch}
+              secondaryActionLabel="Générer le message"
+              secondaryActionIcon={GENERATION_TYPE_ICONS['cover-message']}
+              onPrimaryAction={() => generate('pitch')}
+              onSecondaryAction={() => generate('cover-message')}
+            />
+          {/if}
 
           {#each assets as asset}
             <article class="section-card rounded-xl p-5">

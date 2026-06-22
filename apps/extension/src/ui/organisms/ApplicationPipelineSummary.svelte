@@ -12,36 +12,121 @@
   const acceptanceText = $derived(
     summary.acceptanceRate === null ? '—' : `${summary.acceptanceRate}%`
   );
+
+  type PipelineInsightCard = {
+    label: string;
+    value: string | number;
+    icon: string;
+    stateLabel: string;
+    hint: string;
+    severity: 'success' | 'attention' | 'incident' | 'neutral';
+  };
+
+  const insightCards = $derived.by<PipelineInsightCard[]>(() => [
+    {
+      label: 'Actives',
+      value: summary.activeCount,
+      icon: 'activity',
+      stateLabel: summary.activeCount > 0 ? 'En cours' : 'À créer',
+      hint:
+        summary.activeCount > 0
+          ? 'Traiter le dossier recommandé.'
+          : 'Qualifier une mission depuis le feed.',
+      severity: summary.activeCount > 0 ? 'success' : 'neutral',
+    },
+    {
+      label: 'Relances',
+      value: summary.dueFollowUps,
+      icon: 'calendar-clock',
+      stateLabel: summary.dueFollowUps > 0 ? 'À traiter' : 'Normal',
+      hint:
+        summary.dueFollowUps > 0
+          ? 'Ouvrir la relance échue.'
+          : 'Aucune échéance dépassée.',
+      severity: summary.dueFollowUps > 0 ? 'attention' : 'success',
+    },
+    {
+      label: 'Prêtes',
+      value: summary.preparedNotApplied,
+      icon: 'send',
+      stateLabel: summary.preparedNotApplied > 0 ? 'À envoyer' : 'Fluide',
+      hint:
+        summary.preparedNotApplied > 0
+          ? 'Finaliser l’envoi ou changer le statut.'
+          : 'Aucun dossier préparé bloqué.',
+      severity: summary.preparedNotApplied > 0 ? 'attention' : 'success',
+    },
+    {
+      label: 'Conversion',
+      value: acceptanceText,
+      icon: 'target',
+      stateLabel:
+        summary.acceptanceRate === null
+          ? 'Pas encore mesurée'
+          : summary.acceptedCount >= summary.rejectedCount
+            ? 'Signal positif'
+            : 'À surveiller',
+      hint:
+        summary.acceptanceRate === null
+          ? 'Attendre un premier résultat.'
+          : 'Comparer gagnées et refusées.',
+      severity:
+        summary.acceptanceRate === null
+          ? 'neutral'
+          : summary.acceptedCount >= summary.rejectedCount
+            ? 'success'
+            : 'incident',
+    },
+  ]);
 </script>
 
 <div class="mt-4 space-y-3">
-  <div class="grid grid-cols-4 gap-2">
-    <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-      <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Actives</p>
-      <p class="mt-1 text-lg font-semibold tabular-nums text-text-primary">
-        {summary.activeCount}
-      </p>
-    </div>
-    <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-      <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Relances</p>
-      <p
-        class="mt-1 text-lg font-semibold tabular-nums {summary.dueFollowUps > 0
-          ? 'text-status-orange'
-          : 'text-text-primary'}"
+  <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
+    {#each insightCards as card}
+      <div
+        class="rounded-lg border bg-surface-white px-3 py-2.5 {card.severity === 'attention'
+          ? 'border-status-orange/25'
+          : card.severity === 'incident'
+            ? 'border-status-red/25'
+            : card.severity === 'success'
+              ? 'border-accent-green/25'
+              : 'border-border-light'}"
       >
-        {summary.dueFollowUps}
-      </p>
-    </div>
-    <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-      <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Prêtes</p>
-      <p class="mt-1 text-lg font-semibold tabular-nums text-text-primary">
-        {summary.preparedNotApplied}
-      </p>
-    </div>
-    <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-      <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Accept.</p>
-      <p class="mt-1 text-lg font-semibold tabular-nums text-blueprint-blue">{acceptanceText}</p>
-    </div>
+        <div class="flex items-start justify-between gap-2">
+          <div class="min-w-0">
+            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+              {card.label}
+            </p>
+            <p
+              class="mt-1 text-lg font-semibold tabular-nums {card.severity === 'attention'
+                ? 'text-status-orange'
+                : card.severity === 'incident'
+                  ? 'text-status-red'
+                  : card.severity === 'success'
+                    ? 'text-text-primary'
+                    : 'text-text-primary'}"
+            >
+              {card.value}
+            </p>
+          </div>
+          <span
+            class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg {card.severity ===
+            'attention'
+              ? 'bg-status-orange/10 text-status-orange'
+              : card.severity === 'incident'
+                ? 'bg-status-red/10 text-status-red'
+                : card.severity === 'success'
+                  ? 'bg-accent-green/10 text-accent-green'
+                  : 'bg-subtle-gray text-text-muted'}"
+            aria-hidden="true"
+          >
+            <Icon name={card.icon} size={13} />
+          </span>
+        </div>
+        <p class="mt-1 text-[10px] font-medium text-text-primary">{card.stateLabel}</p>
+        <p class="mt-0.5 min-h-7 text-[10px] leading-4 text-text-subtle">{card.hint}</p>
+      </div>
+    {/each}
   </div>
 
   <div class="rounded-xl border border-border-light bg-surface-white p-3">

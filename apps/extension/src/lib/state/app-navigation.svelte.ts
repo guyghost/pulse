@@ -24,13 +24,13 @@ const PAGE_INDEX: Record<Page, number> = {
   settings: 5,
 };
 
-export const NAV_ITEMS: { page: Page; label: string; icon: string }[] = [
+export const NAV_ITEMS: { page: Page; label: string; icon: string; ariaLabel?: string }[] = [
   { page: 'feed', label: 'Feed', icon: 'briefcase' },
   { page: 'profile', label: 'Profil', icon: 'user' },
   { page: 'cv', label: 'CV', icon: 'file-text' },
   { page: 'applications', label: 'Suivi', icon: 'mail' },
   { page: 'tjm', label: 'TJM', icon: 'chart-column' },
-  { page: 'settings', label: 'Settings', icon: 'settings' },
+  { page: 'settings', label: 'Réglages', ariaLabel: 'Réglages Settings', icon: 'settings' },
 ];
 
 export function createAppNavigation() {

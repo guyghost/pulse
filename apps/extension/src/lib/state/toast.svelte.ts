@@ -1,11 +1,17 @@
 export type ToastType = 'info' | 'error' | 'success';
 
+export interface ToastAction {
+  label: string;
+  onClick: () => void;
+}
+
 export interface ToastItem {
   id: number;
   message: string;
   toastType: ToastType;
   createdAt: number;
   duration: number;
+  action: ToastAction | null;
 }
 
 const MAX_TOASTS = 5;
@@ -25,7 +31,12 @@ export class ToastStore {
 
   private timers = new Map<number, ReturnType<typeof setTimeout>>();
 
-  add(message: string, toastType: ToastType = 'info', duration?: number): void {
+  add(
+    message: string,
+    toastType: ToastType = 'info',
+    duration?: number,
+    action: ToastAction | null = null
+  ): void {
     const resolvedDuration = duration ?? DEFAULT_DURATION;
     const newToast: ToastItem = {
       id: this.nextId,
@@ -33,6 +44,7 @@ export class ToastStore {
       toastType,
       createdAt: Date.now(),
       duration: resolvedDuration,
+      action,
     };
 
     this.toasts = addToast(this.toasts, newToast, MAX_TOASTS);

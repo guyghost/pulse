@@ -36,6 +36,19 @@
 
   let { data, form }: { data: PageData; form?: ActionData } = $props();
 
+  type DashboardStoryTone = 'success' | 'attention' | 'incident';
+  type DashboardStoryActionTarget = 'install' | 'sync' | 'applications' | 'mission-feed' | 'cv';
+
+  interface DashboardOperationalStory {
+    tone: DashboardStoryTone;
+    badge: string;
+    title: string;
+    impact: string;
+    action: string;
+    actionTarget: DashboardStoryActionTarget;
+    signals: string[];
+  }
+
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || 'https://chromewebstore.google.com/';
   const tjmRadar = $derived(data.tjmRadar as TjmRadarSnapshot);
@@ -57,6 +70,7 @@
   const freshMissionCount = $derived(
     missionFeed.filter((mission) => mission.freshness === 'fresh').length
   );
+  const topFreshMission = $derived(getTopFreshMission(missionFeed));
   let searchQuery = $state('');
   let selectedSource = $state<'all' | MissionApplication['source']>('all');
   let missionFeedQuery = $state('');
@@ -142,6 +156,24 @@
   const canPrepareCvSync = $derived(readiness.canSync && Boolean(cvSyncAccess?.enabled));
   const hasSyncActionRequired = $derived(
     syncConflicts.length > 0 || connectedSyncStatuses.some((status) => status.state === 'error')
+  );
+  const syncErrorCount = $derived(
+    connectedSyncStatuses.filter((status) => status.state === 'error').length
+  );
+  const operationalStory = $derived(
+    getDashboardOperationalStory({
+      configurationMissing,
+      isConnected,
+      hasSyncActionRequired,
+      syncConflictCount: syncConflicts.length,
+      syncErrorCount,
+      nextFollowUp,
+      topFreshMission,
+      canPrepareCvSync,
+      applicationCount: applications.length,
+      freshMissionCount,
+      creditBalance: entitlements.creditBalance,
+    })
   );
   const syncConflictCountText = $derived(
     `${syncConflicts.length} champ${syncConflicts.length > 1 ? 's' : ''} attend${
@@ -284,6 +316,105 @@
       return 'error';
     }
     return 'warning';
+  }
+
+  function getTopFreshMission(missions: MissionFeedItem[]): MissionFeedItem | null {
+    return missions.reduce<MissionFeedItem | null>((best, mission) => {
+      if (mission.freshness !== 'fresh') {
+        return best;
+      }
+      if (!best || mission.score > best.score) {
+        return mission;
+      }
+      return best;
+    }, null);
+  }
+
+  function getDashboardOperationalStory(input: {
+    configurationMissing: boolean;
+    isConnected: boolean;
+    hasSyncActionRequired: boolean;
+    syncConflictCount: number;
+    syncErrorCount: number;
+    nextFollowUp: MissionApplication | null;
+    topFreshMission: MissionFeedItem | null;
+    canPrepareCvSync: boolean;
+    applicationCount: number;
+    freshMissionCount: number;
+    creditBalance: number;
+  }): DashboardOperationalStory {
+    if (input.configurationMissing || !input.isConnected) {
+      return {
+        tone: 'attention',
+        badge: 'Connexion requise',
+        title: 'Aucune extension connectée au cockpit',
+        impact:
+          'Le dashboard ne peut pas encore confirmer les missions, candidatures, CV et statuts synchronisés.',
+        action: "Prochaine action: installer l'extension, connecter le compte puis lancer un scan.",
+        actionTarget: 'install',
+        signals: ['Extension absente', 'Snapshots indisponibles', 'Sessions gardées dans Chrome'],
+      };
+    }
+
+    if (input.hasSyncActionRequired) {
+      return {
+        tone: 'incident',
+        badge: 'Arbitrage requis',
+        title: 'La synchronisation demande une décision',
+        impact: `${input.syncConflictCount} conflit(s) et ${input.syncErrorCount} erreur(s) peuvent rendre les données connectées incomplètes.`,
+        action: 'Prochaine action: ouvrir la synchronisation et résoudre les champs prioritaires.',
+        actionTarget: 'sync',
+        signals: ['Conflit détecté', 'Fiabilité partielle', 'Action manuelle utile'],
+      };
+    }
+
+    if (input.nextFollowUp) {
+      return {
+        tone: 'attention',
+        badge: 'À traiter',
+        title: `Relance à préparer pour ${input.nextFollowUp.title}`,
+        impact: `Le dossier est au statut ${stageLabels[input.nextFollowUp.stage]} avec une prochaine action datée.`,
+        action: 'Prochaine action: ouvrir la candidature et traiter la relance avant de scanner plus.',
+        actionTarget: 'applications',
+        signals: ['Relance détectée', `${input.applicationCount} candidatures suivies`, 'Pipeline actif'],
+      };
+    }
+
+    if (input.topFreshMission && input.topFreshMission.score >= 85) {
+      return {
+        tone: 'success',
+        badge: 'Opportunité',
+        title: `${input.topFreshMission.title} ressort comme meilleure mission fraîche`,
+        impact: `Score ${input.topFreshMission.score}% sur ${sourceLabels[input.topFreshMission.source]}. Le feed contient ${input.freshMissionCount} mission(s) récente(s).`,
+        action: 'Prochaine action: sélectionner cette mission ou comparer les meilleures options.',
+        actionTarget: 'mission-feed',
+        signals: ['Mission fraîche', 'Score élevé', 'Décision de sélection'],
+      };
+    }
+
+    if (!input.canPrepareCvSync) {
+      return {
+        tone: 'attention',
+        badge: 'Précondition',
+        title: 'Le CV ne peut pas encore être synchronisé',
+        impact:
+          'La préparation CV dépend du profil, des plateformes prêtes et de l’accès compte/Premium.',
+        action: 'Prochaine action: ouvrir le CV et résoudre la première précondition affichée.',
+        actionTarget: 'cv',
+        signals: ['CV à vérifier', 'Synchronisation limitée', `${input.creditBalance} crédits`],
+      };
+    }
+
+    return {
+      tone: 'success',
+      badge: 'Normal',
+      title: 'Le cockpit est prêt pour arbitrer les missions',
+      impact:
+        'Aucun conflit prioritaire détecté. Les données connectées peuvent être utilisées pour sélectionner, relancer ou générer.',
+      action: 'Prochaine action: traiter la meilleure mission ou vérifier la prochaine relance.',
+      actionTarget: 'mission-feed',
+      signals: ['Sync stable', `${input.applicationCount} candidatures`, `${input.freshMissionCount} fraîches`],
+    };
   }
 
   const copyGeneratedAsset = async (asset: GeneratedApplicationAsset) => {
@@ -541,6 +672,74 @@
           {/if}
         </section>
       {/if}
+
+      <section
+        class="mb-6 rounded-xl border p-4 shadow-subtle-2 {operationalStory.tone === 'incident'
+          ? 'border-status-red/25 bg-status-red/8'
+          : operationalStory.tone === 'attention'
+            ? 'border-status-orange/25 bg-status-orange/8'
+            : 'border-blueprint-blue/20 bg-blueprint-blue/8'}"
+        aria-labelledby="operational-story-title"
+      >
+        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+          <div class="min-w-0">
+            <div class="flex flex-wrap items-center gap-2">
+              <p class="eyebrow text-text-subtle">Etat operationnel</p>
+              <Badge
+                label={operationalStory.badge}
+                variant={operationalStory.tone === 'incident'
+                  ? 'error'
+                  : operationalStory.tone === 'attention'
+                    ? 'warning'
+                    : 'success'}
+              />
+            </div>
+            <h2 id="operational-story-title" class="mt-2 text-xl font-semibold text-text-primary">
+              {operationalStory.title}
+            </h2>
+            <div class="mt-4 grid gap-3 md:grid-cols-2">
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
+                  Impact
+                </p>
+                <p class="mt-1 text-sm leading-6 text-text-secondary">{operationalStory.impact}</p>
+              </div>
+              <div>
+                <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
+                  Action recommandée
+                </p>
+                <p class="mt-1 text-sm font-medium leading-6 text-text-primary">
+                  {operationalStory.action}
+                </p>
+              </div>
+            </div>
+            <div class="mt-4 flex flex-wrap gap-2">
+              {#each operationalStory.signals as signal}
+                <span
+                  class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1 text-xs font-medium text-text-subtle"
+                >
+                  {signal}
+                </span>
+              {/each}
+            </div>
+          </div>
+
+          <a
+            class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+            href={operationalStory.actionTarget === 'install'
+              ? chromeStoreUrl
+              : operationalStory.actionTarget === 'sync'
+                ? '#sync'
+                : operationalStory.actionTarget === 'applications'
+                  ? '#applications'
+                  : operationalStory.actionTarget === 'cv'
+                    ? '#cv'
+                    : '#mission-feed-title'}
+          >
+            Aller à l'action
+          </a>
+        </div>
+      </section>
 
       <section
         class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"

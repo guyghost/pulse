@@ -8,17 +8,47 @@
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast } from '$lib/shell/notifications/toast-service';
+  import OperationalStoryCard, {
+    type OperationalEvidence,
+  } from '../molecules/OperationalStoryCard.svelte';
+  import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import AlertBuilderCard from '../molecules/AlertBuilderCard.svelte';
+  import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
+  import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
+  import {
+    getAlertPreferences,
+    saveAlertPreferences,
+  } from '$lib/shell/facades/alert-preferences.facade';
+  import { getFavorites } from '$lib/shell/facades/feed-data.facade';
+  import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 
-  const { onNavigateToOnboarding }: { onBack?: () => void; onNavigateToOnboarding?: () => void } =
-    $props();
+  const {
+    onBack,
+    onNavigateToOnboarding,
+  }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
 
   const settings = new SettingsPageController({
     onNavigateToOnboarding: () => {
       onNavigateToOnboarding?.();
     },
   });
+  const connection = getConnectionStore();
+  const isOffline = $derived(connection.status === 'offline');
 
   settings.load();
+  let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
+  let isSavingAlertPreferences = $state(false);
+  let favoriteExportCount = $state(0);
+  let aiSettingsSection: HTMLElement | null = $state(null);
+
+  (async () => {
+    const [storedAlertPreferences, favorites] = await Promise.all([
+      getAlertPreferences(),
+      getFavorites(),
+    ]);
+    alertPreferences = storedAlertPreferences;
+    favoriteExportCount = Object.keys(favorites).length;
+  })().catch(() => {});
 
   async function handleExportFavorites(format: ExportFormat) {
     const result = await settings.exportFavorites(format);
@@ -57,6 +87,298 @@
     const input = event.target as HTMLInputElement;
     await settings.handleFileSelect(input.files?.[0]);
   }
+
+  async function handleSaveAlertPreferences(nextPreferences: ConnectedAlertPreferences) {
+    isSavingAlertPreferences = true;
+    try {
+      alertPreferences = await saveAlertPreferences(nextPreferences);
+      await showToast('Alerte prioritaire mise à jour', 'success');
+    } catch {
+      await showToast("Impossible d'enregistrer l'alerte", 'error');
+    } finally {
+      isSavingAlertPreferences = false;
+    }
+  }
+
+  function focusAiSettings() {
+    aiSettingsSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    aiSettingsSection?.focus({ preventScroll: true });
+  }
+
+  const profileReadyForBackup = $derived(
+    settings.firstName.trim().length > 0 ||
+      settings.jobTitle.trim().length > 0 ||
+      settings.profileStack.length > 0
+  );
+
+  const exportStory = $derived.by(() => {
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Favoris',
+        value: favoriteExportCount,
+        icon: 'star',
+        severity: favoriteExportCount > 0 ? 'success' : 'attention',
+      },
+      {
+        label: 'Formats',
+        value: 3,
+        icon: 'file-down',
+        severity: 'neutral',
+      },
+      {
+        label: 'Etat',
+        value: settings.isExporting ? 'En cours' : 'Pret',
+        icon: settings.isExporting ? 'loader' : 'check',
+        severity: settings.isExporting ? 'attention' : 'success',
+      },
+    ];
+
+    if (favoriteExportCount === 0) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Rien à exporter',
+        title: 'Aucune mission favorite ne peut être transmise',
+        description:
+          'L’export devient utile après qualification du feed. Retournez marquer les missions à suivre, puis revenez ici.',
+        evidence,
+        primaryActionLabel: 'Retourner au feed',
+        primaryActionIcon: 'arrow-left',
+      };
+    }
+
+    return {
+      severity: 'success' as const,
+      statusLabel: 'Export prêt',
+      title: `${favoriteExportCount} mission${favoriteExportCount > 1 ? 's' : ''} prête${favoriteExportCount > 1 ? 's' : ''} à partager`,
+      description:
+        'Le prochain geste utile est de sortir une version exploitable pour suivi commercial, archive ou comparaison.',
+      evidence,
+      primaryActionLabel: 'Exporter en JSON',
+      primaryActionIcon: 'file-json',
+    };
+  });
+
+  const backupStory = $derived.by(() => {
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Profil',
+        value: profileReadyForBackup ? 'Pret' : 'Manquant',
+        icon: 'user',
+        severity: profileReadyForBackup ? 'success' : 'attention',
+      },
+      {
+        label: 'Favoris',
+        value: favoriteExportCount,
+        icon: 'star',
+        severity: favoriteExportCount > 0 ? 'success' : 'neutral',
+      },
+      {
+        label: 'Restore',
+        value: 'Confirmé',
+        icon: 'shield-check',
+        severity: 'success',
+      },
+    ];
+
+    if (!profileReadyForBackup) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Préparation requise',
+        title: 'La sauvegarde serait trop pauvre pour restaurer un espace utile',
+        description:
+          'Complétez au moins le profil ou la stack avant de créer un point de restauration.',
+        evidence,
+        primaryActionLabel: 'Compléter le profil',
+        primaryActionIcon: 'user',
+      };
+    }
+
+    return {
+      severity: 'success' as const,
+      statusLabel: 'Sauvegardable',
+      title: 'Un point de restauration local peut être créé',
+      description:
+        'La sauvegarde capture profil, réglages, favoris et missions masquées. La restauration reste confirmée avant écriture.',
+      evidence,
+      primaryActionLabel: 'Créer une sauvegarde',
+      primaryActionIcon: 'download',
+    };
+  });
+
+  const aiStory = $derived.by(() => {
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Statut',
+        value:
+          settings.aiAvailability === 'available'
+            ? 'OK'
+            : settings.aiAvailability === 'after-download'
+              ? 'Download'
+              : 'Off',
+        icon: 'cpu',
+        severity:
+          settings.aiAvailability === 'available'
+            ? 'success'
+            : settings.aiAvailability === 'after-download'
+              ? 'attention'
+              : 'incident',
+      },
+      {
+        label: 'Couverture',
+        value: settings.maxSemanticPerScan,
+        icon: 'scan-line',
+        severity: settings.maxSemanticPerScan > 0 ? 'success' : 'attention',
+      },
+      {
+        label: 'Fallback',
+        value: 'Score base',
+        icon: 'shield-check',
+        severity: 'success',
+      },
+    ];
+
+    if (settings.aiAvailability === 'available') {
+      return {
+        severity: 'success' as const,
+        statusLabel: 'Actif',
+        title: 'Le scoring sémantique peut enrichir les décisions',
+        description:
+          'Pulse analysera les premières missions du scan, puis utilisera le cache pour éviter les recalculs inutiles.',
+        evidence,
+        primaryActionLabel: null,
+        primaryActionIcon: 'play',
+      };
+    }
+
+    return {
+      severity:
+        settings.aiAvailability === 'after-download'
+          ? ('attention' as const)
+          : ('incident' as const),
+      statusLabel:
+        settings.aiAvailability === 'after-download' ? 'Téléchargement requis' : 'Indisponible',
+      title: 'Le scoring sémantique est remplacé par le scoring de base',
+      description:
+        'Ce n’est pas bloquant, mais les insights seront moins précis sur le fit métier et les signaux faibles.',
+      evidence,
+      primaryActionLabel: 'Ouvrir l’aide IA Chrome',
+      primaryActionIcon: 'external-link',
+    };
+  });
+
+  async function handleSettingsStoryAction() {
+    if (!settings.isConnectedAccount) {
+      await settings.openAccountCenter();
+      return;
+    }
+
+    if (settings.connectedPendingUploads + settings.connectedPendingDownloads > 0) {
+      await settings.openConnectedDashboard();
+      return;
+    }
+
+    if (settings.aiAvailability !== 'available') {
+      focusAiSettings();
+      return;
+    }
+
+    await settings.openConnectedDashboard();
+  }
+
+  async function handleExportStoryAction() {
+    if (favoriteExportCount === 0) {
+      onBack?.();
+      return;
+    }
+    await handleExportFavorites('json');
+  }
+
+  const settingsStory = $derived.by(() => {
+    const pendingTotal = settings.connectedPendingUploads + settings.connectedPendingDownloads;
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Compte',
+        value: settings.isConnectedAccount ? 'Connecte' : 'Local',
+        icon: 'user',
+        severity: settings.isConnectedAccount ? 'success' : 'attention',
+      },
+      {
+        label: 'Sync',
+        value: pendingTotal,
+        icon: 'refresh-cw',
+        severity: pendingTotal > 0 ? 'attention' : 'success',
+      },
+      {
+        label: 'IA',
+        value:
+          settings.aiAvailability === 'available'
+            ? 'OK'
+            : settings.aiAvailability === 'after-download'
+              ? 'A telecharger'
+              : 'Off',
+        icon: 'cpu',
+        severity:
+          settings.aiAvailability === 'available'
+            ? 'success'
+            : settings.aiAvailability === 'after-download'
+              ? 'attention'
+              : 'incident',
+      },
+    ];
+
+    if (!settings.isConnectedAccount) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Local uniquement',
+        title: 'Pulse fonctionne, mais la synchronisation dashboard est inactive',
+        description:
+          'Les scans restent disponibles dans Chrome. Connectez le compte pour consolider snapshots, candidatures, CV et preferences.',
+        evidence,
+        primaryActionLabel: 'Connecter mon compte',
+        primaryActionIcon: 'user',
+      };
+    }
+
+    if (pendingTotal > 0) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Sync en attente',
+        title: `${pendingTotal} operation${pendingTotal > 1 ? 's' : ''} de synchronisation en file`,
+        description:
+          'Le dashboard connecte peut afficher un etat legerement en retard tant que la file locale n est pas vide.',
+        evidence,
+        primaryActionLabel: 'Ouvrir le dashboard',
+        primaryActionIcon: 'external-link',
+      };
+    }
+
+    if (settings.aiAvailability !== 'available') {
+      return {
+        severity:
+          settings.aiAvailability === 'after-download'
+            ? ('attention' as const)
+            : ('incident' as const),
+      statusLabel: 'IA locale limitee',
+      title: 'Le scoring semantique ne couvre pas toutes les missions',
+      description:
+        'Pulse continue avec le scoring de base. Activez ou telechargez Gemini Nano pour enrichir les insights.',
+      evidence,
+      primaryActionLabel: 'Voir les reglages IA',
+      primaryActionIcon: 'cpu',
+    };
+  }
+
+    return {
+      severity: 'success' as const,
+      statusLabel: 'Systeme sain',
+      title: 'Configuration operationnelle',
+      description:
+        'Compte, synchronisation et IA locale sont prets. Les reglages ci-dessous servent surtout a ajuster le comportement.',
+      evidence,
+      primaryActionLabel: 'Ouvrir le dashboard',
+      primaryActionIcon: 'external-link',
+    };
+  });
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
@@ -73,6 +395,28 @@
         <h2 class="mt-1 text-base font-semibold text-text-primary">Paramètres</h2>
       </div>
     </div>
+
+    <div class="mt-4">
+      <OperationalStoryCard
+        eyebrow="Etat systeme"
+        title={settingsStory.title}
+        description={settingsStory.description}
+        severity={settingsStory.severity}
+        statusLabel={settingsStory.statusLabel}
+        evidence={settingsStory.evidence}
+        primaryActionLabel={settingsStory.primaryActionLabel}
+        primaryActionIcon={settingsStory.primaryActionIcon}
+        onPrimaryAction={handleSettingsStoryAction}
+      />
+    </div>
+    {#if isOffline}
+      <div class="mt-3">
+        <OfflineNotice
+          description="Les réglages locaux restent accessibles. Le centre de compte, les dashboards connectés et certaines restaurations peuvent être indisponibles."
+          action="Prochaine action : ajuster les alertes locales, puis vérifier le compte au retour réseau."
+        />
+      </div>
+    {/if}
   </section>
 
   <div class="mt-4 space-y-4">
@@ -108,6 +452,13 @@
       onToggleAutoScan={() => settings.toggleAutoScan()}
       onToggleNotifications={() => settings.toggleNotifications()}
       onScanIntervalChange={handleScanIntervalChange}
+    />
+
+    <AlertBuilderCard
+      preferences={alertPreferences}
+      availableStacks={settings.profileStack}
+      isSaving={isSavingAlertPreferences}
+      onSave={handleSaveAlertPreferences}
     />
 
     <!-- Compte & synchronisation -->
@@ -224,6 +575,17 @@
           Exporter vos missions favorites dans différents formats.
         </p>
       </div>
+      <OperationalStoryCard
+        eyebrow="Décision"
+        title={exportStory.title}
+        description={exportStory.description}
+        severity={exportStory.severity}
+        statusLabel={exportStory.statusLabel}
+        evidence={exportStory.evidence}
+        primaryActionLabel={exportStory.primaryActionLabel}
+        primaryActionIcon={exportStory.primaryActionIcon}
+        onPrimaryAction={handleExportStoryAction}
+      />
       <div class="flex flex-wrap gap-2">
         <button
           class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
@@ -263,6 +625,16 @@
           Sauvegarder ou restaurer vos données (profil, paramètres, favoris).
         </p>
       </div>
+      <OperationalStoryCard
+        eyebrow="Continuité"
+        title={backupStory.title}
+        description={backupStory.description}
+        severity={backupStory.severity}
+        statusLabel={backupStory.statusLabel}
+        evidence={backupStory.evidence}
+        primaryActionLabel={null}
+        primaryActionIcon={backupStory.primaryActionIcon}
+      />
       <div class="flex flex-wrap gap-2">
         <Button variant="secondary" onclick={handleCreateBackup}>
           {#snippet children()}
@@ -287,7 +659,7 @@
     </div>
 
     <!-- IA locale -->
-    <div class="section-card rounded-xl p-5 space-y-3">
+    <div class="section-card rounded-xl p-5 space-y-3" bind:this={aiSettingsSection} tabindex="-1">
       <div class="flex items-start gap-3">
         <div
           class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
@@ -302,6 +674,17 @@
           </p>
         </div>
       </div>
+      <OperationalStoryCard
+        eyebrow="Scoring"
+        title={aiStory.title}
+        description={aiStory.description}
+        severity={aiStory.severity}
+        statusLabel={aiStory.statusLabel}
+        evidence={aiStory.evidence}
+        primaryActionLabel={aiStory.primaryActionLabel}
+        primaryActionIcon={aiStory.primaryActionIcon}
+        onPrimaryAction={() => settings.openAiHelp()}
+      />
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
           <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>

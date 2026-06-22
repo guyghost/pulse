@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, Skeleton } from '@pulse/ui';
   import type { UserProfile } from '$lib/core/types/profile';
   import type { ProfileFieldComparison } from '$lib/core/profile/profile-sync';
   import { getConnectorsMeta, openExternalUrl } from '$lib/shell/facades/feed-data.facade';
@@ -13,6 +13,20 @@
     type VerifyProfileResult,
   } from '$lib/shell/facades/profile-sync.facade';
   import { showToast } from '$lib/shell/notifications/toast-service';
+  import OperationalStoryCard, {
+    type OperationalEvidence,
+  } from '../molecules/OperationalStoryCard.svelte';
+  import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
+  import OfflineNotice from '../molecules/OfflineNotice.svelte';
+  import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
+
+  const connection = getConnectionStore();
+  const isOffline = $derived(connection.status === 'offline');
+  const {
+    onNavigateToProfile,
+  }: {
+    onNavigateToProfile?: () => void;
+  } = $props();
 
   type ProfilePlatform = {
     id: string;
@@ -132,6 +146,92 @@
 
   const selectedPayload = $derived(buildPlatformPayload(selectedPlatform, selectedFields));
   const selectedVerification = $derived(verificationResults.get(selectedPlatform.id) ?? null);
+  const linkedInPrimaryLabel = $derived(
+    previewingLinkedIn ? 'Extraction...' : profile ? 'Prévisualiser LinkedIn' : 'Importer LinkedIn'
+  );
+  const sourceActionLabel = $derived(profile ? 'Tout préparer' : 'Compléter le profil');
+  const sourceActionIcon = $derived(profile ? 'upload' : 'user');
+
+  const cvStory = $derived.by(() => {
+    const mismatchCount = [...verificationResults.values()].reduce(
+      (total, result) =>
+        total + (result.read.status === 'available' ? result.summary.mismatches : 0),
+      0
+    );
+    const blockedCount = [...verificationResults.values()].filter(
+      (result) => result.read.status !== 'available'
+    ).length;
+    const evidence: OperationalEvidence[] = [
+      {
+        label: 'Completude',
+        value: `${profileCompleteness}%`,
+        icon: 'gauge',
+        severity: profileCompleteness >= 85 ? 'success' : 'attention',
+      },
+      {
+        label: 'Ecarts',
+        value: mismatchCount,
+        icon: 'git-compare-arrows',
+        severity: mismatchCount > 0 ? 'attention' : 'success',
+      },
+      {
+        label: 'Plateformes',
+        value: platforms.length,
+        icon: 'panel-top',
+        severity: blockedCount > 0 ? 'incident' : 'neutral',
+      },
+    ];
+
+    if (!profile) {
+      return {
+        severity: 'incident' as const,
+        statusLabel: 'Source manquante',
+        title: 'Aucun profil canonique disponible pour synchroniser le CV',
+        description:
+          'Creez ou importez un profil avant de pousser des informations vers LinkedIn et les plateformes.',
+        evidence,
+        primaryActionLabel: 'Importer LinkedIn',
+        primaryActionIcon: 'download',
+      };
+    }
+
+    if (mismatchCount > 0) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Ecarts detectes',
+        title: `${mismatchCount} ecart${mismatchCount > 1 ? 's' : ''} entre le CV canonique et les plateformes`,
+        description:
+          'La prochaine action utile est de pousser le bloc canonique sur les plateformes divergentes.',
+        evidence,
+        primaryActionLabel: 'Tout preparer',
+        primaryActionIcon: 'upload',
+      };
+    }
+
+    if (profileCompleteness < 85) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'A completer',
+        title: 'Le CV canonique est exploitable mais incomplet',
+        description:
+          'Completez les champs manquants avant de synchroniser pour eviter de propager une version faible.',
+        evidence,
+        primaryActionLabel: 'Prévisualiser LinkedIn',
+        primaryActionIcon: 'download',
+      };
+    }
+
+    return {
+      severity: 'success' as const,
+      statusLabel: 'Aligne',
+      title: 'Le CV canonique est pret a etre diffuse',
+      description:
+        'Les champs essentiels sont prets. Verifiez une plateforme puis poussez le bloc de mise a jour.',
+      evidence,
+      primaryActionLabel: 'Prévisualiser LinkedIn',
+      primaryActionIcon: 'download',
+    };
+  });
 
   function buildSummary(value: UserProfile | null): string {
     if (!value) {
@@ -237,6 +337,10 @@
     }
   }
 
+  function completeProfileManually(): void {
+    onNavigateToProfile?.();
+  }
+
   async function confirmLinkedInSync(): Promise<void> {
     if (!linkedInPreviewResult?.extracted) {
       await showToast("Prévisualisez LinkedIn avant de synchroniser l'import", 'error');
@@ -315,6 +419,15 @@
     await showToast('Mise à jour préparée pour toutes les plateformes', 'success');
   }
 
+  function handleSourceAction(): void {
+    if (!profile) {
+      completeProfileManually();
+      return;
+    }
+
+    void pushAll();
+  }
+
   (async () => {
     isLoading = true;
     profile = await getProfile();
@@ -371,36 +484,87 @@
         disabled={previewingLinkedIn || syncingLinkedIn}
       >
         <Icon name="download" size={13} />
-        {previewingLinkedIn ? 'Extraction...' : 'Prévisualiser LinkedIn'}
+        {linkedInPrimaryLabel}
       </button>
       <span class="text-xs text-text-subtle">
         Ouvrez votre profil LinkedIn dans l'onglet actif, vérifiez la preview, puis synchronisez.
       </span>
     </div>
+
+    <div class="mt-4">
+      <OperationalStoryCard
+        eyebrow="Cohérence CV"
+        title={cvStory.title}
+        description={cvStory.description}
+        severity={cvStory.severity}
+        statusLabel={cvStory.statusLabel}
+        evidence={cvStory.evidence}
+        primaryActionLabel={cvStory.primaryActionLabel}
+        primaryActionIcon={cvStory.primaryActionIcon}
+        onPrimaryAction={() => {
+          if (cvStory.primaryActionIcon === 'upload') {
+            pushAll();
+            return;
+          }
+          previewLinkedIn();
+        }}
+      />
+    </div>
+    {#if isOffline}
+      <div class="mt-3">
+        <OfflineNotice
+          description="Les données CV locales restent consultables. La prévisualisation LinkedIn et les vérifications de profil peuvent échouer tant que Chrome est hors ligne."
+          action="Prochaine action : préparer les champs locaux, puis synchroniser LinkedIn au retour réseau."
+        />
+      </div>
+    {/if}
   </section>
 
   {#if isLoading}
-    <div class="mt-4 section-card rounded-xl p-5 text-sm text-text-subtle">Chargement...</div>
+    <div class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]" aria-busy="true">
+      <section class="section-card rounded-xl p-5">
+        <div class="flex items-center justify-between gap-3">
+          <div class="min-w-0 flex-1 space-y-2">
+            <Skeleton width="7rem" height="0.7rem" />
+            <Skeleton width="75%" height="1.25rem" />
+            <Skeleton width="52%" height="0.85rem" />
+          </div>
+          <Skeleton variant="circle" width="2.25rem" />
+        </div>
+        <div class="mt-4 space-y-2">
+          <Skeleton width="100%" height="3.75rem" />
+          <Skeleton width="100%" height="3.75rem" />
+          <Skeleton width="68%" height="2rem" />
+        </div>
+      </section>
+      <section class="section-card rounded-xl p-5">
+        <div class="space-y-2">
+          <Skeleton width="8rem" height="0.7rem" />
+          <Skeleton width="85%" height="1.2rem" />
+          <Skeleton width="100%" height="6rem" />
+          <Skeleton width="100%" height="6rem" />
+        </div>
+      </section>
+    </div>
   {:else}
     <div class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
       <section class="space-y-4">
         {#if !profile}
-          <div class="section-card rounded-xl p-5">
-            <div class="flex items-start gap-3">
-              <div
-                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
-              >
-                <Icon name="info" size={14} class="text-blueprint-blue" />
-              </div>
-              <div>
-                <h3 class="text-sm font-medium text-text-primary">Profil source à compléter</h3>
-                <p class="mt-1 text-xs leading-5 text-text-subtle">
-                  Ajoutez votre profil MissionPulse ou récupérez les informations depuis vos
-                  plateformes avant de pousser une version homogène.
-                </p>
-              </div>
-            </div>
-          </div>
+          <OperationalEmptyState
+            title="Le CV canonique n’a pas encore de source fiable"
+            description="Sans profil MissionPulse, les blocs à pousser risquent de propager des champs vides. Commencez par extraire LinkedIn ou complétez le profil avant de synchroniser."
+            severity="incident"
+            statusLabel="Source manquante"
+            icon="file-warning"
+            proofLabel="Profil canonique"
+            proofValue="Absent"
+            primaryActionLabel="Importer LinkedIn"
+            primaryActionIcon="download"
+            secondaryActionLabel="Compléter le profil"
+            secondaryActionIcon="user"
+            onPrimaryAction={previewLinkedIn}
+            onSecondaryAction={completeProfileManually}
+          />
         {/if}
 
         <div class="section-card rounded-xl p-5">
@@ -411,10 +575,10 @@
             </div>
             <button
               class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
-              onclick={pushAll}
+              onclick={handleSourceAction}
             >
-              <Icon name="upload" size={13} />
-              Tout préparer
+              <Icon name={sourceActionIcon} size={13} />
+              {sourceActionLabel}
             </button>
           </div>
 

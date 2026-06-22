@@ -2,10 +2,16 @@ import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
 import { analyzeTJMHistory } from '$lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
 import type { Mission } from '$lib/core/types/mission';
+import {
+  DEFAULT_CONNECTED_ALERT_PREFERENCES,
+  type ConnectedAlertPreferences,
+} from '$lib/core/types/alert-preferences';
+import { createInitialHealthSnapshot, type ConnectorHealthSnapshot } from '$lib/core/types/health';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
 const DEV_SAVED_VIEWS_STORAGE_KEY = '__missionpulse_dev_saved_views';
+const DEV_ALERT_PREFERENCES_STORAGE_KEY = '__missionpulse_dev_alert_preferences';
 
 function readDevStorage<T>(key: string, fallback: T): T {
   try {
@@ -40,6 +46,10 @@ const storage: Record<string, unknown> = {
   hiddenMissions: {},
   seenMissions: [],
   feedSavedViews: readDevStorage(DEV_SAVED_VIEWS_STORAGE_KEY, []),
+  connectedAlertPreferences: readDevStorage<ConnectedAlertPreferences>(
+    DEV_ALERT_PREFERENCES_STORAGE_KEY,
+    DEFAULT_CONNECTED_ALERT_PREFERENCES
+  ),
   newMissionCount: 0,
   feedSortBy: 'score',
   profile: mockProfile,
@@ -50,6 +60,16 @@ const storage: Record<string, unknown> = {
   feed_tour_seen: false,
   tjm_history: generateMockTJMHistory(),
 };
+
+function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
+  const now = Date.now();
+  return ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'].map((connectorId) => ({
+    ...createInitialHealthSnapshot(connectorId, now - 10 * 60_000),
+    totalSuccesses: connectorId === 'free-work' ? 3 : 1,
+    lastSuccessAt: now - (connectorId === 'free-work' ? 2 : 18) * 60_000,
+    recentLatenciesMs: connectorId === 'free-work' ? [420, 510, 460] : [780],
+  }));
+}
 
 function createChromeStubs() {
   return {
@@ -123,6 +143,28 @@ function createChromeStubs() {
             storage.feedSavedViews = message.payload;
             writeDevStorage(DEV_SAVED_VIEWS_STORAGE_KEY, message.payload);
             return { type: 'FEED_SAVED_VIEWS_SAVED', payload: { saved: true } };
+          case 'GET_CONNECTED_ALERT_PREFERENCES':
+            return {
+              type: 'CONNECTED_ALERT_PREFERENCES_RESULT',
+              payload: storage.connectedAlertPreferences,
+            };
+          case 'SAVE_CONNECTED_ALERT_PREFERENCES':
+            storage.connectedAlertPreferences = message.payload;
+            writeDevStorage(DEV_ALERT_PREFERENCES_STORAGE_KEY, message.payload);
+            return {
+              type: 'CONNECTED_ALERT_PREFERENCES_SAVED',
+              payload: { saved: true, preferences: message.payload },
+            };
+          case 'GET_CONNECTOR_HEALTH':
+            return {
+              type: 'CONNECTOR_HEALTH_RESULT',
+              payload: getDevConnectorHealthSnapshots(),
+            };
+          case 'RECHECK_CONNECTOR_HEALTH':
+            return {
+              type: 'CONNECTOR_HEALTH_RESULT',
+              payload: getDevConnectorHealthSnapshots(),
+            };
           case 'GET_TJM_ANALYSIS': {
             const history = storage.tjm_history as TJMHistory | undefined;
             const payload = message.payload as

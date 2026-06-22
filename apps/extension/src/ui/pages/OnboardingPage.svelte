@@ -4,6 +4,15 @@
   import type { UserProfile } from '$lib/core/types/profile';
   import { saveProfile } from '$lib/shell/facades/settings.facade';
   import { createOnboardingStore } from '$lib/state/onboarding.svelte';
+  import {
+    DEFAULT_CONNECTED_ALERT_PREFERENCES,
+    type ConnectedAlertPreferences,
+  } from '$lib/core/types/alert-preferences';
+  import {
+    getAlertPreferences,
+    saveAlertPreferences,
+  } from '$lib/shell/facades/alert-preferences.facade';
+  import { showToast } from '$lib/shell/notifications/toast-service';
 
   const { onComplete, onSkip }: { onComplete?: () => void; onSkip?: () => void } = $props();
 
@@ -12,6 +21,12 @@
   const isSaving = $derived(onboarding.state === 'saving');
   const hasError = $derived(onboarding.state === 'error');
   const errorMessage = $derived(onboarding.error);
+  let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
+  let isSavingAlertPreferences = $state(false);
+
+  (async () => {
+    alertPreferences = await getAlertPreferences();
+  })().catch(() => {});
 
   function handleUpdateProfile(updates: Partial<UserProfile>) {
     onboarding.updateProfile(updates);
@@ -37,6 +52,18 @@
   function handleRetry() {
     handleComplete();
   }
+
+  async function handleSaveAlertPreferences(preferences: ConnectedAlertPreferences) {
+    isSavingAlertPreferences = true;
+    try {
+      alertPreferences = await saveAlertPreferences(preferences);
+      await showToast('Première alerte créée', 'success');
+    } catch {
+      await showToast("Impossible d'enregistrer l'alerte", 'error');
+    } finally {
+      isSavingAlertPreferences = false;
+    }
+  }
 </script>
 
 {#snippet wizardContent()}
@@ -48,6 +75,9 @@
     {isSaving}
     {hasError}
     {errorMessage}
+    {alertPreferences}
+    {isSavingAlertPreferences}
+    onSaveAlertPreferences={handleSaveAlertPreferences}
   />
 {/snippet}
 

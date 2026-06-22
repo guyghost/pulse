@@ -17,6 +17,7 @@ import type { AppError } from '../../core/errors/app-error';
 import type { TJMAnalysis, TJMRegion } from '../../core/types/tjm';
 import type { SavedFeedView } from '../../core/types/feed-view';
 import type { ToastType } from '../../state/toast.svelte';
+import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -69,6 +70,10 @@ export type BridgeMessage =
   | { type: 'FEED_SAVED_VIEWS_RESULT'; payload: SavedFeedView[] }
   | { type: 'SAVE_FEED_SAVED_VIEWS'; payload: SavedFeedView[] }
   | { type: 'FEED_SAVED_VIEWS_SAVED'; payload: { saved: boolean } }
+  | { type: 'GET_CONNECTED_ALERT_PREFERENCES' }
+  | { type: 'CONNECTED_ALERT_PREFERENCES_RESULT'; payload: ConnectedAlertPreferences | null }
+  | { type: 'SAVE_CONNECTED_ALERT_PREFERENCES'; payload: ConnectedAlertPreferences }
+  | { type: 'CONNECTED_ALERT_PREFERENCES_SAVED'; payload: { saved: boolean } }
   | { type: 'GET_TJM_ANALYSIS'; payload?: { profileStacks?: string[]; region?: TJMRegion } }
   | { type: 'TJM_ANALYSIS_RESULT'; payload: { analysis: TJMAnalysis | null } }
   | { type: 'GET_SEEN_MISSIONS' }

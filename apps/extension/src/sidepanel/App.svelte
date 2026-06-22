@@ -9,6 +9,7 @@
   import { Icon } from '@pulse/ui';
   import ConnectionIndicator from '../ui/atoms/ConnectionIndicator.svelte';
   import ToastContainer from '../ui/organisms/ToastContainer.svelte';
+  import OperationalEmptyState from '../ui/molecules/OperationalEmptyState.svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { ripple } from '../ui/actions/ripple';
@@ -51,11 +52,16 @@
   }
 
   let DevPanel: typeof import('../dev/DevPanel.svelte').default | null = $state(null);
+  let MetricsPanel: typeof import('../ui/organisms/MetricsPanel.svelte').default | null =
+    $state(null);
   let bridgeLogs: LogEntry[] = $state([]);
 
   if (import.meta.env.DEV) {
     import('../dev/DevPanel.svelte').then((m) => {
       DevPanel = m.default;
+    });
+    import('../ui/organisms/MetricsPanel.svelte').then((m) => {
+      MetricsPanel = m.default;
     });
   }
 
@@ -171,6 +177,8 @@
               ? 'bg-surface-white text-text-primary shadow-subtle-2'
               : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
             aria-current={nav.currentPage === item.page ? 'page' : undefined}
+            aria-label={item.ariaLabel ?? item.label}
+            title={item.label}
             onclick={() => nav.navigate(item.page)}
           >
             <span class="shrink-0 transition-transform duration-200 ease-out">
@@ -198,7 +206,12 @@
       </div>
     </div>
     <main class="relative flex-1 overflow-hidden">
-      <div class="absolute inset-0 overflow-y-auto" class:hidden={nav.currentPage !== 'feed'}>
+      <div
+        class="absolute inset-0 overflow-y-auto"
+        class:hidden={nav.currentPage !== 'feed'}
+        aria-hidden={nav.currentPage !== 'feed'}
+        inert={nav.currentPage !== 'feed'}
+      >
         <svelte:boundary
           onerror={(e) => {
             if (import.meta.env.DEV) console.error('[FeedPage crash]', e);
@@ -206,15 +219,19 @@
         >
           <FeedPage onNavigateToOnboarding={nav.resetToOnboarding} />
           {#snippet failed(error, reset)}
-            <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-              <div class="text-4xl">⚠️</div>
-              <p class="text-sm text-text-secondary">Le feed a rencontré une erreur.</p>
-              <button
-                onclick={reset}
-                class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
-              >
-                Réessayer
-              </button>
+            <div class="p-4">
+              <OperationalEmptyState
+                title="Le feed a rencontré une erreur"
+                description="La vue principale est indisponible, mais l’extension reste ouverte. Réessayez le rendu avant de relancer le scan."
+                severity="incident"
+                statusLabel="Vue interrompue"
+                icon="triangle-alert"
+                proofLabel="Ecran"
+                proofValue="Feed"
+                primaryActionLabel="Réessayer"
+                primaryActionIcon="refresh-cw"
+                onPrimaryAction={reset}
+              />
             </div>
           {/snippet}
         </svelte:boundary>
@@ -233,15 +250,19 @@
           >
             <OnboardingPage onComplete={nav.completeOnboarding} onSkip={nav.completeOnboarding} />
             {#snippet failed(error, reset)}
-              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                <div class="text-4xl">🚀</div>
-                <p class="text-sm text-text-secondary">L'onboarding a rencontré une erreur.</p>
-                <button
-                  onclick={reset}
-                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
-                >
-                  Réessayer
-                </button>
+              <div class="p-4">
+                <OperationalEmptyState
+                  title="L’onboarding a été interrompu"
+                  description="La configuration initiale n’a pas pu s’afficher. Réessayez avant de passer en mode manuel."
+                  severity="incident"
+                  statusLabel="Configuration bloquée"
+                  icon="triangle-alert"
+                  proofLabel="Ecran"
+                  proofValue="Onboarding"
+                  primaryActionLabel="Réessayer"
+                  primaryActionIcon="refresh-cw"
+                  onPrimaryAction={reset}
+                />
               </div>
             {/snippet}
           </svelte:boundary>
@@ -260,15 +281,19 @@
           >
             <TJMPage />
             {#snippet failed(error, reset)}
-              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                <div class="text-4xl">📈</div>
-                <p class="text-sm text-text-secondary">La vue TJM a rencontré une erreur.</p>
-                <button
-                  onclick={reset}
-                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
-                >
-                  Réessayer
-                </button>
+              <div class="p-4">
+                <OperationalEmptyState
+                  title="La vue TJM ne peut pas être calculée"
+                  description="L’analyse tarifaire est indisponible. Le feed reste utilisable pour qualifier les missions."
+                  severity="incident"
+                  statusLabel="Analyse interrompue"
+                  icon="triangle-alert"
+                  proofLabel="Ecran"
+                  proofValue="TJM"
+                  primaryActionLabel="Réessayer"
+                  primaryActionIcon="refresh-cw"
+                  onPrimaryAction={reset}
+                />
               </div>
             {/snippet}
           </svelte:boundary>
@@ -287,15 +312,19 @@
           >
             <ProfilePage onNavigateToOnboarding={nav.resetToOnboarding} />
             {#snippet failed(error, reset)}
-              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                <div class="text-4xl">Profil</div>
-                <p class="text-sm text-text-secondary">Le profil a rencontré une erreur.</p>
-                <button
-                  onclick={reset}
-                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
-                >
-                  Réessayer
-                </button>
+              <div class="p-4">
+                <OperationalEmptyState
+                  title="Le profil ne peut pas être affiché"
+                  description="Le scoring peut continuer avec les derniers réglages connus. Réessayez avant de modifier votre calibration."
+                  severity="incident"
+                  statusLabel="Profil indisponible"
+                  icon="triangle-alert"
+                  proofLabel="Ecran"
+                  proofValue="Profil"
+                  primaryActionLabel="Réessayer"
+                  primaryActionIcon="refresh-cw"
+                  onPrimaryAction={reset}
+                />
               </div>
             {/snippet}
           </svelte:boundary>
@@ -312,17 +341,21 @@
               if (import.meta.env.DEV) console.error('[CvPage crash]', e);
             }}
           >
-            <CvPage />
+            <CvPage onNavigateToProfile={() => nav.navigate('profile')} />
             {#snippet failed(error, reset)}
-              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                <div class="text-4xl">CV</div>
-                <p class="text-sm text-text-secondary">La vue CV a rencontré une erreur.</p>
-                <button
-                  onclick={reset}
-                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
-                >
-                  Réessayer
-                </button>
+              <div class="p-4">
+                <OperationalEmptyState
+                  title="Le CV ne peut pas être préparé"
+                  description="La génération de contenu est interrompue. Les missions et candidatures restent disponibles."
+                  severity="incident"
+                  statusLabel="Vue interrompue"
+                  icon="triangle-alert"
+                  proofLabel="Ecran"
+                  proofValue="CV"
+                  primaryActionLabel="Réessayer"
+                  primaryActionIcon="refresh-cw"
+                  onPrimaryAction={reset}
+                />
               </div>
             {/snippet}
           </svelte:boundary>
@@ -339,19 +372,21 @@
               if (import.meta.env.DEV) console.error('[ApplicationsPage crash]', e);
             }}
           >
-            <ApplicationsPage />
+            <ApplicationsPage onNavigateToFeed={() => nav.navigate('feed')} />
             {#snippet failed(error, reset)}
-              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                <div class="text-4xl">Candidatures</div>
-                <p class="text-sm text-text-secondary">
-                  Les candidatures ont rencontré une erreur.
-                </p>
-                <button
-                  onclick={reset}
-                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
-                >
-                  Réessayer
-                </button>
+              <div class="p-4">
+                <OperationalEmptyState
+                  title="Le pipeline candidatures est indisponible"
+                  description="Le suivi ne peut pas être rendu maintenant. Réessayez avant de modifier vos statuts de candidature."
+                  severity="incident"
+                  statusLabel="Pipeline interrompu"
+                  icon="triangle-alert"
+                  proofLabel="Ecran"
+                  proofValue="Candidatures"
+                  primaryActionLabel="Réessayer"
+                  primaryActionIcon="refresh-cw"
+                  onPrimaryAction={reset}
+                />
               </div>
             {/snippet}
           </svelte:boundary>
@@ -373,15 +408,19 @@
               onNavigateToOnboarding={nav.resetToOnboarding}
             />
             {#snippet failed(error, reset)}
-              <div class="flex flex-col items-center justify-center gap-4 p-8 text-center">
-                <div class="text-4xl">⚙️</div>
-                <p class="text-sm text-text-secondary">Les paramètres ont rencontré une erreur.</p>
-                <button
-                  onclick={reset}
-                  class="rounded-lg bg-blueprint-blue/10 px-4 py-2 text-xs text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
-                >
-                  Réessayer
-                </button>
+              <div class="p-4">
+                <OperationalEmptyState
+                  title="Les paramètres ne peuvent pas être affichés"
+                  description="La configuration reste conservée. Réessayez avant de restaurer ou modifier les préférences."
+                  severity="incident"
+                  statusLabel="Réglages indisponibles"
+                  icon="triangle-alert"
+                  proofLabel="Ecran"
+                  proofValue="Paramètres"
+                  primaryActionLabel="Réessayer"
+                  primaryActionIcon="refresh-cw"
+                  onPrimaryAction={reset}
+                />
               </div>
             {/snippet}
           </svelte:boundary>
@@ -400,5 +439,9 @@
       onClearCache={devClearCache}
       logs={bridgeLogs}
     />
+  {/if}
+
+  {#if import.meta.env.DEV && MetricsPanel}
+    <MetricsPanel />
   {/if}
 </div>

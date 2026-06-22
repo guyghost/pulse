@@ -3,6 +3,7 @@
   import MissionCard from '../molecules/MissionCard.svelte';
   import { Skeleton } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
+  import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
 
   const BATCH_SIZE = 20;
 
@@ -13,14 +14,20 @@
     seenIds = [],
     favorites = {},
     hidden = {},
+    comparisonMissionIds = [],
     sortBy = 'score',
     filterActive = false,
     tourStep = null,
     onMissionSeen,
     onToggleFavorite,
     onHide,
+    onToggleCompare,
     onCopyLink,
     onOpenLink,
+    onInvestigateMission,
+    onRetry,
+    onStartScan,
+    onClearFilters,
   }: {
     missions?: Mission[];
     isLoading?: boolean;
@@ -28,19 +35,29 @@
     seenIds?: string[];
     favorites?: Record<string, number>;
     hidden?: Record<string, number>;
+    comparisonMissionIds?: string[];
     sortBy?: 'score' | 'date' | 'tjm';
     filterActive?: boolean;
     tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onMissionSeen?: (id: string) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
+    onToggleCompare?: (id: string) => void;
     onCopyLink?: (id: string) => void;
     onOpenLink?: (url: string) => void;
+    onInvestigateMission?: (mission: Mission) => void;
+    onRetry?: () => void;
+    onStartScan?: () => void;
+    onClearFilters?: () => void;
   } = $props();
 
   // Unwrap Svelte 5 $state proxy — proxied arrays aren't iterable in template context
   const seenArr = $derived(Array.isArray(seenIds) ? Array.from(seenIds) : []);
   const seenSet = $derived(new Set(seenArr));
+  const comparedIds = $derived(
+    new Set(Array.isArray(comparisonMissionIds) ? Array.from(comparisonMissionIds) : [])
+  );
+  const comparisonLimitReached = $derived(comparedIds.size >= 3);
 
   // Sort missions
   const sortedMissions = $derived.by(() => {
@@ -126,35 +143,52 @@
       </div>
     {/each}
   {:else if error && sortedMissions.length === 0}
-    <div
-      class="section-card rounded-2xl flex flex-col items-center justify-center py-12 text-center"
-    >
-      <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-status-red/10">
-        <Icon name="x" size={20} class="text-status-red" />
-      </div>
-      <p class="text-sm font-semibold text-text-primary">Erreur de synchronisation</p>
-      <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">{error}</p>
-    </div>
+    <OperationalEmptyState
+      title="Le feed ne peut pas être synchronisé"
+      description={error}
+      severity="critical"
+      statusLabel="Incident"
+      icon="triangle-alert"
+      proofLabel="Résultat affiché"
+      proofValue="0 mission"
+      primaryActionLabel="Réessayer"
+      primaryActionIcon="refresh-cw"
+      secondaryActionLabel={filterActive ? 'Réinitialiser les filtres' : null}
+      secondaryActionIcon="filter-x"
+      onPrimaryAction={onRetry}
+      onSecondaryAction={onClearFilters}
+    />
   {:else if sortedMissions.length === 0}
-    <div
-      class="section-card rounded-2xl flex flex-col items-center justify-center py-12 text-center"
-    >
-      {#if filterActive}
-        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-subtle-gray">
-          <Icon name="filter-x" size={20} class="text-text-muted" />
-        </div>
-        <p class="text-sm font-semibold text-text-primary">Aucun résultat</p>
-        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">
-          Essayez d'élargir vos filtres ou de modifier vos critères de recherche.
-        </p>
-      {:else}
-        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-subtle-gray">
-          <Icon name="briefcase" size={20} class="text-text-muted" />
-        </div>
-        <p class="text-sm font-semibold text-text-primary">Aucune mission pour l'instant</p>
-        <p class="mt-2 text-xs text-text-secondary">Lancez un scan pour alimenter le radar.</p>
-      {/if}
-    </div>
+    {#if filterActive}
+      <OperationalEmptyState
+        title="Aucune mission ne correspond à cette décision"
+        description="Le système n’a pas trouvé d’opportunité dans le périmètre courant. La prochaine action utile est d’élargir les critères avant de rescanner."
+        severity="attention"
+        statusLabel="Filtre trop strict"
+        icon="filter-x"
+        proofLabel="Résultat filtré"
+        proofValue="0 mission"
+        primaryActionLabel="Réinitialiser les filtres"
+        primaryActionIcon="filter-x"
+        secondaryActionLabel="Relancer le scan"
+        secondaryActionIcon="refresh-cw"
+        onPrimaryAction={onClearFilters}
+        onSecondaryAction={onStartScan}
+      />
+    {:else}
+      <OperationalEmptyState
+        title="Le radar attend un premier signal"
+        description="Aucune mission exploitable n’est stockée. Lancez un scan pour transformer les sources connectées en file de décisions."
+        severity="neutral"
+        statusLabel="Aucune donnée"
+        icon="radar"
+        proofLabel="Feed actuel"
+        proofValue="0 mission"
+        primaryActionLabel="Lancer le scan"
+        primaryActionIcon="play"
+        onPrimaryAction={onStartScan}
+      />
+    {/if}
   {:else}
     {#if error}
       <div class="section-card rounded-xl flex items-center gap-3 px-4 py-3">
@@ -173,11 +207,15 @@
           isSeen={seenSet.has(mission.id)}
           isFavorite={mission.id in (favorites ?? {})}
           isHidden={mission.id in (hidden ?? {})}
+          isCompared={comparedIds.has(mission.id)}
+          compareDisabled={comparisonLimitReached && !comparedIds.has(mission.id)}
           tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
           onVisible={() => onMissionSeen?.(mission.id)}
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}
+          onToggleCompare={() => onToggleCompare?.(mission.id)}
           onCopyLink={() => onCopyLink?.(mission.id)}
+          onInvestigate={() => onInvestigateMission?.(mission)}
           {onOpenLink}
         />
       {/each}

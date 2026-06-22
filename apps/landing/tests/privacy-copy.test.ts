@@ -26,7 +26,7 @@ describe('connected privacy copy', () => {
   });
 
   it('describes local execution and optional dashboard cloud sync explicitly', () => {
-    expect(homePage).toContain('Exécution navigateur');
+    expect(homePage).toContain('Les sessions restent dans Chrome');
     expect(homePage).toContain('dashboard connecté optionnel');
     expect(homePage).toMatch(/Le compte sert au\s+dashboard connecté optionnel/);
     expect(homePage).toContain("l'exécution plateforme reste dans votre navigateur");
