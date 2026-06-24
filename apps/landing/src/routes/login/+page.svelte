@@ -123,8 +123,8 @@
 
         <div class="auth-message" data-testid="login-link-sent">
           <p>
-            Nous avons envoye un lien a <strong>{email}</strong>. Ouvrez-le dans ce navigateur pour
-            acceder a la destination demandee.
+            Nous avons envoyé un lien à <strong>{email}</strong>. Ouvrez-le dans ce navigateur pour
+            accéder à la destination demandée.
           </p>
         </div>
       {:else}
@@ -193,7 +193,7 @@
           </button>
 
           <p class="auth-note">
-            Le lien email fonctionne sur tous les environnements configures. Le passkey reste
+            Le lien email fonctionne sur tous les environnements configurés. Le passkey reste
             disponible selon votre navigateur et votre compte.
           </p>
         </form>
