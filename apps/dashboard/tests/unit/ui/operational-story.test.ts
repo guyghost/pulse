@@ -54,4 +54,16 @@ describe('connected dashboard operational story', () => {
     expect(normalizedSource).not.toContain('> Profil CV </a');
     expect(normalizedSource).not.toContain('> Synchronisations</a');
   });
+
+  it('guides sync conflict resolution before showing action buttons', () => {
+    expect(source).toContain('interface SyncConflictResolutionStep');
+    expect(source).toContain('Guide de résolution guidée');
+    expect(source).toContain('1. Identifier la source fiable');
+    expect(source).toContain('2. Choisir l’arbitrage');
+    expect(source).toContain('3. Ignorer seulement le bruit');
+    expect(source).toContain('Garder dashboard conserve la donnée web');
+    expect(source.indexOf('Guide de résolution guidée')).toBeLessThan(
+      source.indexOf('value="keep_remote"')
+    );
+  });
 });

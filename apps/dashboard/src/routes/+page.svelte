@@ -64,6 +64,11 @@
     signal: string;
   }
 
+  interface SyncConflictResolutionStep {
+    title: string;
+    detail: string;
+  }
+
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || 'https://chromewebstore.google.com/';
   const tjmRadar = $derived(data.tjmRadar as TjmRadarSnapshot);
@@ -127,6 +132,23 @@
         ? "Installez l'extension puis reliez ce compte pour recevoir les snapshots."
         : "Connectez le compte MissionPulse avant de relier l'extension Chrome."
   );
+  const syncConflictResolutionSteps: SyncConflictResolutionStep[] = [
+    {
+      title: '1. Identifier la source fiable',
+      detail:
+        'Comparez la date, l’appareil et le contexte métier avant de choisir une valeur à conserver.',
+    },
+    {
+      title: '2. Choisir l’arbitrage',
+      detail:
+        'Garder dashboard conserve la donnée web; appliquer extension renvoie la valeur Chrome à la prochaine récupération.',
+    },
+    {
+      title: '3. Ignorer seulement le bruit',
+      detail:
+        'Ignorer ferme le conflit sans écriture métier quand les deux valeurs ne changent pas la décision.',
+    },
+  ];
   const freshMissionCount = $derived(
     missionFeed.filter((mission) => mission.freshness === 'fresh').length
   );
@@ -2759,6 +2781,18 @@
                     {form.syncConflictSuccess}
                   </p>
                 {/if}
+
+                <div class="mt-3 rounded-lg border border-border-light bg-surface-white px-3 py-3">
+                  <p class="text-xs font-semibold text-text-primary">Guide de résolution guidée</p>
+                  <div class="mt-3 grid gap-2 md:grid-cols-3">
+                    {#each syncConflictResolutionSteps as step}
+                      <div class="rounded-md bg-page-canvas px-2.5 py-2">
+                        <p class="text-[11px] font-semibold text-text-primary">{step.title}</p>
+                        <p class="mt-1 text-[11px] leading-4 text-text-subtle">{step.detail}</p>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
 
                 <div class="mt-3 space-y-2">
                   {#each syncConflicts as conflict}
