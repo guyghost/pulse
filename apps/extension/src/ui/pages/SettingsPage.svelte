@@ -959,6 +959,7 @@
           settings.showResetConfirm = false;
         }}
         onConfirmReset={() => settings.resetAll()}
+        onCreateBackup={handleCreateBackup}
       />
     </section>
   </div>

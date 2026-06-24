@@ -514,17 +514,21 @@ describe('operational UI constraints', () => {
 
   it('keeps destructive settings actions gated by operational impact confirmation', () => {
     const source = readFileSync('src/ui/organisms/DangerZone.svelte', 'utf8');
+    const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
 
     expect(source).toContain("confirmationText === 'SUPPRIMER'");
     expect(source).toContain('function handleConfirmReset()');
     expect(source).toContain('scrollIntoView');
     expect(source).toContain('disabled={!canConfirmReset}');
+    expect(source).toContain('onCreateBackup');
+    expect(source).toContain('Créer une sauvegarde avant suppression');
     expect(source).toContain('Suppression irréversible');
     expect(source).toContain(
       'Impact : profil, missions, favoris, masquées, vues et caches IA supprimés'
     );
     expect(source).toContain('Après suppression : relancer l’onboarding');
     expect(source).toContain('Tapez SUPPRIMER pour confirmer');
+    expect(settingsSource).toContain('onCreateBackup={handleCreateBackup}');
     expect(source).not.toContain('Confirmer la suppression');
   });
 

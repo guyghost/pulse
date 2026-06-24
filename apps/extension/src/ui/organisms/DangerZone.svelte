@@ -6,11 +6,13 @@
     onShowConfirm,
     onCancelConfirm,
     onConfirmReset,
+    onCreateBackup,
   }: {
     showResetConfirm: boolean;
     onShowConfirm: () => void;
     onCancelConfirm: () => void;
     onConfirmReset: () => void;
+    onCreateBackup?: () => void | Promise<void>;
   } = $props();
 
   let confirmationText = $state('');
@@ -64,7 +66,10 @@
           Après suppression : relancer l’onboarding, reconnecter les sources, puis refaire un scan.
         </p>
 
-        <label for="danger-reset-confirm" class="mt-1.5 block text-xs font-medium text-text-primary">
+        <label
+          for="danger-reset-confirm"
+          class="mt-1.5 block text-xs font-medium text-text-primary"
+        >
           Tapez SUPPRIMER pour confirmer
         </label>
         <input
@@ -74,6 +79,17 @@
           bind:value={confirmationText}
           autocomplete="off"
         />
+
+        {#if onCreateBackup}
+          <button
+            type="button"
+            class="mt-2 inline-flex items-center rounded-lg border border-border-light bg-surface-white px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+            onclick={onCreateBackup}
+          >
+            <Icon name="download" size={12} class="mr-1" />
+            Créer une sauvegarde avant suppression
+          </button>
+        {/if}
 
         <div bind:this={confirmActions} class="mt-1.5 flex scroll-mb-4 flex-wrap gap-2">
           <button
