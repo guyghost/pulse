@@ -6,7 +6,11 @@
   } from '$lib/shell/facades/feed-controller.svelte';
   import { createFeedPageState } from '$lib/state/feed-page.svelte';
   import { createTrackingStore } from '$lib/state/tracking.svelte';
-  import type { ApplicationStatus } from '$lib/core/types/tracking';
+  import {
+    STATUS_LABELS,
+    type ApplicationStatus,
+    type MissionTracking,
+  } from '$lib/core/types/tracking';
   import VirtualMissionFeed from '../organisms/VirtualMissionFeed.svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
   import { tick } from 'svelte';
@@ -41,6 +45,7 @@
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
+  import { showToastAction } from '$lib/shell/notifications/toast-service';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
 
@@ -511,8 +516,30 @@
     openExternalUrl(url).catch(() => {});
   }
 
-  function handleTrackingTransition(missionId: string, status: ApplicationStatus): void {
-    void tracking.transitionStatus(missionId, status);
+  function cloneTrackingSnapshot(record: MissionTracking | undefined): MissionTracking | null {
+    if (!record) {
+      return null;
+    }
+
+    return {
+      ...record,
+      history: record.history.map((transition) => ({ ...transition })),
+      generatedAssetIds: [...record.generatedAssetIds],
+    };
+  }
+
+  async function handleTrackingTransition(
+    missionId: string,
+    status: ApplicationStatus
+  ): Promise<void> {
+    const previousTracking = cloneTrackingSnapshot(tracking.getTrackingForMission(missionId));
+    await tracking.transitionStatus(missionId, status);
+    showToastAction(`Statut: ${STATUS_LABELS[status]}`, 'success', {
+      label: 'Annuler',
+      onClick: () => {
+        void tracking.restoreTracking(missionId, previousTracking);
+      },
+    });
   }
 
   function handleInvestigationToggleCompare(): void {
@@ -533,7 +560,7 @@
     if (!investigationMission) {
       return;
     }
-    handleTrackingTransition(investigationMission.id, 'selected');
+    void handleTrackingTransition(investigationMission.id, 'selected');
   }
 
   function feedActionToneClass(tone: FeedActionQueueTone): string {

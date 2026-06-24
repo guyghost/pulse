@@ -401,6 +401,16 @@ describe('operational UI constraints', () => {
     expect(virtualFeedSource).toContain('onStatusTransition');
   });
 
+  it('keeps feed status transitions undoable', () => {
+    const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+
+    expect(source).toContain('function cloneTrackingSnapshot');
+    expect(source).toContain('const previousTracking = cloneTrackingSnapshot');
+    expect(source).toContain('showToastAction(`Statut: ${STATUS_LABELS[status]}`');
+    expect(source).toContain("label: 'Annuler'");
+    expect(source).toContain('tracking.restoreTracking(missionId, previousTracking)');
+  });
+
   it('keeps the feed comparison flow explicit and actionable', () => {
     const cardSource = readFileSync('src/ui/molecules/MissionCard.svelte', 'utf8');
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
