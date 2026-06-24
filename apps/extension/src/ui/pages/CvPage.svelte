@@ -442,7 +442,7 @@
   <section class="section-card-strong rounded-2xl px-5 py-4">
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
-        <p class="eyebrow text-blueprint-blue">CV synchronisé</p>
+        <p class="eyebrow text-blueprint-blue">CV canonique</p>
         <div class="mt-1 flex flex-wrap items-center gap-2">
           <h2 class="text-base font-semibold text-text-primary">Homogénéiser le profil partout</h2>
           <span
