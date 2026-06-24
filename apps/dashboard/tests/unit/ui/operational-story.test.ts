@@ -18,4 +18,20 @@ describe('connected dashboard operational story', () => {
       source.indexOf('aria-label="Indicateurs candidatures"')
     );
   });
+
+  it('does not mark the dashboard ready before an extension is linked', () => {
+    expect(source).toContain('const hasConnectedExtension = $derived');
+    expect(source).toContain(
+      'const dashboardReady = $derived(isConnected && !configurationMissing && hasConnectedExtension)'
+    );
+    expect(source).toContain('hasConnectedExtension,');
+    expect(source).toContain('const sidebarConnectionTitle = $derived');
+    expect(source).toContain("  ? 'Extension Chrome'");
+    expect(source).toContain(
+      '{completedDashboardSetupStepCount}/{dashboardSetupSteps.length} setup'
+    );
+    expect(source).not.toContain(
+      'const dashboardReady = $derived(isConnected && !configurationMissing);'
+    );
+  });
 });

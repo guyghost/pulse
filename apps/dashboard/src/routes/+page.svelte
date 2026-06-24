@@ -75,8 +75,9 @@
   const counts = $derived(countApplicationsByStage(applications));
   const readiness = $derived(getCvSyncReadiness(cv, syncStatuses));
   const isConnected = $derived(Boolean(data.session));
+  const hasConnectedExtension = $derived(connectedSyncStatuses.length > 0);
   const enabledFeatureCount = $derived(featureAccess.filter((feature) => feature.enabled).length);
-  const dashboardReady = $derived(isConnected && !configurationMissing);
+  const dashboardReady = $derived(isConnected && !configurationMissing && hasConnectedExtension);
   const setupRequired = $derived(!dashboardReady);
   const hasDashboardSnapshots = $derived(
     missionFeed.length > 0 || applications.length > 0 || connectedSyncStatuses.length > 0
@@ -85,6 +86,7 @@
     getDashboardSetupSteps({
       isConnected,
       configurationMissing,
+      hasConnectedExtension,
       hasDashboardSnapshots,
       loginUrl: data.loginUrl || '/login',
       chromeStoreUrl,
@@ -103,13 +105,17 @@
     }
   );
   const sidebarConnectionTitle = $derived(
-    dashboardReady ? 'Extension Chrome' : isConnected ? 'Extension à relier' : 'Compte requis'
+    hasConnectedExtension
+      ? 'Extension Chrome'
+      : isConnected
+        ? 'Extension à relier'
+        : 'Compte requis'
   );
   const sidebarConnectionLabel = $derived(
-    dashboardReady ? 'Connectée' : isConnected ? 'À relier' : 'Hors ligne'
+    hasConnectedExtension ? 'Connectée' : isConnected ? 'À relier' : 'Hors ligne'
   );
   const sidebarConnectionDescription = $derived(
-    dashboardReady
+    hasConnectedExtension
       ? 'Les mises à jour CV seront exécutées depuis les sessions navigateur existantes.'
       : isConnected
         ? "Installez l'extension puis reliez ce compte pour recevoir les snapshots."
@@ -371,19 +377,20 @@
   function getDashboardSetupSteps(input: {
     isConnected: boolean;
     configurationMissing: boolean;
+    hasConnectedExtension: boolean;
     hasDashboardSnapshots: boolean;
     loginUrl: string;
     chromeStoreUrl: string;
   }): DashboardSetupStep[] {
     const accountState: DashboardSetupStepState = input.isConnected ? 'complete' : 'current';
-    const extensionState: DashboardSetupStepState = !input.isConnected
-      ? 'pending'
-      : input.configurationMissing
+    const extensionState: DashboardSetupStepState = input.hasConnectedExtension
+      ? 'complete'
+      : input.isConnected
         ? 'current'
-        : 'complete';
+        : 'pending';
     const scanState: DashboardSetupStepState = input.hasDashboardSnapshots
       ? 'complete'
-      : !input.isConnected || input.configurationMissing
+      : !input.isConnected || input.configurationMissing || !input.hasConnectedExtension
         ? 'pending'
         : 'current';
 
@@ -718,7 +725,11 @@
               <span
                 class="rounded-full bg-subtle-gray px-2 py-1 text-xs font-medium text-text-subtle"
               >
-                {enabledFeatureCount}/{featureAccess.length} features
+                {#if setupRequired}
+                  {completedDashboardSetupStepCount}/{dashboardSetupSteps.length} setup
+                {:else}
+                  {enabledFeatureCount}/{featureAccess.length} features
+                {/if}
               </span>
               <span
                 class="rounded-full border px-2 py-1 text-xs font-medium {isConnected
