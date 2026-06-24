@@ -94,8 +94,12 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('class="px-4 pb-28 pt-4 focus:outline-none"');
     expect(feedSource).not.toContain('class="flex-1 overflow-y-auto px-4 pb-5 pt-4"');
     expect(appSource).toContain('class="absolute inset-0 overflow-hidden"');
-    expect(appSource).not.toContain('class="absolute inset-0 overflow-y-auto"\n        class:hidden={nav.currentPage !==');
-    expect(appSource).toContain("feedNavCompact = nav.currentPage === 'feed' && detail.scrollTop > 12");
+    expect(appSource).not.toContain(
+      'class="absolute inset-0 overflow-y-auto"\n        class:hidden={nav.currentPage !=='
+    );
+    expect(appSource).toContain(
+      "feedNavCompact = nav.currentPage === 'feed' && detail.scrollTop > 12"
+    );
     expect(appSource).not.toContain('detail.isScrolling && detail.scrollTop > 12');
   });
 
@@ -105,7 +109,9 @@ describe('operational UI constraints', () => {
     expect(source).toContain('data-testid="mission-scroll-cue"');
     expect(source).toContain('data-testid="mission-feed-anchor"');
     expect(source).toContain('function scrollToMissionFeed()');
-    expect(source).toContain("missionFeedSection.scrollIntoView({ behavior: 'smooth', block: 'start' })");
+    expect(source).toContain(
+      "missionFeedSection.scrollIntoView({ behavior: 'smooth', block: 'start' })"
+    );
     expect(source).toContain('Missions proposées plus bas');
     expect(source).toContain('Missions proposées');
     expect(source).toContain('Voir les ${formatMissionCount(newCount)}');
@@ -118,6 +124,17 @@ describe('operational UI constraints', () => {
 
     expect(source).toContain("label: 'Réglages'");
     expect(source).not.toContain("label: 'Settings'");
+  });
+
+  it('keeps premium destinations visible with an explanatory locked state', () => {
+    const source = readFileSync('src/sidepanel/App.svelte', 'utf8');
+
+    expect(source).toContain('const PREMIUM_LOCKS');
+    expect(source).toContain('Premium verrouillé');
+    expect(source).toContain('aria-label={itemLocked');
+    expect(source).toContain('primaryActionLabel="Voir les réglages"');
+    expect(source).not.toContain('NAV_ITEMS.filter');
+    expect(source).not.toContain('Premium pages hidden');
   });
 
   it('keeps Settings system actions aligned with the stated operational issue', () => {
@@ -156,7 +173,9 @@ describe('operational UI constraints', () => {
     expect(cvSource).toContain(
       "previewingLinkedIn ? 'Extraction...' : profile ? 'Prévisualiser LinkedIn' : 'Importer LinkedIn'"
     );
-    expect(cvSource).toContain("const sourceActionLabel = $derived(profile ? 'Tout préparer' : 'Compléter le profil')");
+    expect(cvSource).toContain(
+      "const sourceActionLabel = $derived(profile ? 'Tout préparer' : 'Compléter le profil')"
+    );
     expect(cvSource).toContain('function handleSourceAction()');
     expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
   });
@@ -201,9 +220,13 @@ describe('operational UI constraints', () => {
     expect(source).toContain('type DecisionEvidence');
     expect(source).toContain('Décision recommandée');
     expect(source).toContain('recommendationDescription');
-    expect(source).toContain('La prochaine action est d’ouvrir cette mission ou de la mettre en suivi.');
+    expect(source).toContain(
+      'La prochaine action est d’ouvrir cette mission ou de la mettre en suivi.'
+    );
     expect(source).toContain('Départagez avec le TJM, le remote et la source avant de postuler.');
-    expect(source.indexOf('Décision recommandée')).toBeLessThan(source.indexOf('<!-- Titles row -->'));
+    expect(source.indexOf('Décision recommandée')).toBeLessThan(
+      source.indexOf('<!-- Titles row -->')
+    );
   });
 
   it('keeps the feed comparison flow explicit and actionable', () => {
@@ -299,7 +322,9 @@ describe('operational UI constraints', () => {
     expect(source).toContain('scrollIntoView');
     expect(source).toContain('disabled={!canConfirmReset}');
     expect(source).toContain('Suppression irréversible');
-    expect(source).toContain('Impact : profil, missions, favoris, masquées, vues et caches IA supprimés');
+    expect(source).toContain(
+      'Impact : profil, missions, favoris, masquées, vues et caches IA supprimés'
+    );
     expect(source).toContain('Après suppression : relancer l’onboarding');
     expect(source).toContain('Tapez SUPPRIMER pour confirmer');
     expect(source).not.toContain('Confirmer la suppression');
