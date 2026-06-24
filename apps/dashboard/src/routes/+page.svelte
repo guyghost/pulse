@@ -128,8 +128,10 @@
   let selectedApplicationId = $state<string | null>(null);
   let syncPrepared = $state(false);
   let copiedAssetId = $state<string | null>(null);
+  let privacyConfirmation = $state('');
   const averageScore = $derived(getAverageApplicationScore(applications));
   const nextFollowUp = $derived(getNextFollowUp(applications));
+  const canDeleteConnectedData = $derived(isConnected && privacyConfirmation === 'SUPPRIMER');
   const applicationCountBadgeLabel = $derived(
     applications.length > 0
       ? `${applications.length} suivie${applications.length > 1 ? 's' : ''}`
@@ -2835,20 +2837,44 @@
           action="?/deleteConnectedData"
           class="mt-5 border-t border-border-light pt-4"
         >
-          <label class="block text-xs font-medium text-text-subtle" for="privacy-confirmation">
-            Confirmation suppression
-            <input
-              id="privacy-confirmation"
-              name="confirmation"
-              placeholder="SUPPRIMER"
-              class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-status-red/40"
-              autocomplete="off"
-            />
+          <div class="rounded-xl border border-status-red/20 bg-status-red/8 px-3 py-3">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-status-red">
+              Suppression irréversible
+            </p>
+            <p class="mt-1.5 text-xs leading-5 text-text-primary">
+              Impact : missions synchronisées, candidatures, CV, préférences d'alertes, conflits et
+              statuts de sync seront supprimés du dashboard connecté.
+            </p>
+            <p class="mt-1 text-xs leading-5 text-text-subtle">
+              Après suppression : relier à nouveau l'extension, lancer un scan, puis reconstruire le
+              CV et le suivi depuis les snapshots Chrome.
+            </p>
+            <a
+              class="mt-2 inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas aria-disabled:pointer-events-none aria-disabled:opacity-40"
+              href={isConnected ? '/export.json' : data.loginUrl || '/login'}
+              download={isConnected ? 'missionpulse-connected-data.json' : undefined}
+              aria-disabled={!isConnected}
+            >
+              Exporter avant suppression
+            </a>
+          </div>
+
+          <label class="mt-3 block text-xs font-medium text-text-subtle" for="privacy-confirmation">
+            Tapez SUPPRIMER pour confirmer
           </label>
+          <input
+            id="privacy-confirmation"
+            name="confirmation"
+            placeholder="SUPPRIMER"
+            class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-status-red/40"
+            autocomplete="off"
+            bind:value={privacyConfirmation}
+          />
           <button
             type="submit"
             class="mt-3 inline-flex h-8 items-center rounded-lg border border-status-red/25 bg-status-red/8 px-3 text-xs font-semibold text-status-red hover:border-status-red/40 hover:bg-status-red/12 disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={!isConnected}
+            disabled={!canDeleteConnectedData}
+            aria-disabled={!canDeleteConnectedData}
           >
             Supprimer les données connectées
           </button>

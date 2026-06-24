@@ -6,8 +6,8 @@ test.describe('connected dashboard smoke', () => {
   }) => {
     await page.goto('/dashboard/');
 
-    await expect(page.getByText('Aucune extension connectée').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: "Installer l'extension" }).first()).toBeVisible();
+    await expect(page.getByText('Checklist de setup', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Se connecter' }).first()).toBeVisible();
     await expect(page.getByText('Aucune sync')).toBeVisible();
     await expect(page.getByText('Sans score')).toBeVisible();
     await expect(page.getByText('Aucune relance')).toBeVisible();
@@ -50,8 +50,13 @@ test.describe('connected dashboard smoke', () => {
     await expect(exportLink).toHaveAttribute('aria-disabled', 'true');
     await expect(exportLink).toHaveAttribute('href', /\/login/);
 
-    await expect(page.getByLabel('Confirmation suppression')).toBeVisible();
+    await expect(page.getByText('Suppression irréversible')).toBeVisible();
+    await expect(page.getByText('Impact : missions synchronisées')).toBeVisible();
+    await expect(page.getByLabel('Tapez SUPPRIMER pour confirmer')).toBeVisible();
     await expect(page.getByPlaceholder('SUPPRIMER')).toBeVisible();
+    const exportBeforeDeleteLink = page.getByRole('link', { name: 'Exporter avant suppression' });
+    await expect(exportBeforeDeleteLink).toBeVisible();
+    await expect(exportBeforeDeleteLink).toHaveAttribute('aria-disabled', 'true');
     await expect(
       page.getByRole('button', { name: 'Supprimer les données connectées' })
     ).toBeDisabled();
