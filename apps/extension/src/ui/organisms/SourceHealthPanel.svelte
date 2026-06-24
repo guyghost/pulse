@@ -8,6 +8,7 @@
   import ConnectorHealthCard from '../molecules/ConnectorHealthCard.svelte';
 
   import type { SourceStatus } from '$lib/shell/facades/feed-controller.svelte';
+  import { getConnectorErrorCopy } from '../copy/connector-error-copy';
 
   const {
     sources,
@@ -341,6 +342,11 @@
           {@const snap = healthSnapshots?.get(source.connectorId)}
           {@const healthStatus = snap ? deriveHealthStatus(snap) : null}
           {@const diagnosis = getSourceDiagnosis(source, snap, missionCount, isEnabled)}
+          {@const sourceErrorCopy = getConnectorErrorCopy({
+            connectorId: source.connectorId,
+            connectorName: source.name,
+            error: source.error,
+          })}
 
           <div
             class="flex items-center gap-3 py-2.5 {i > 0 ? 'border-t border-border-light' : ''}"
@@ -408,9 +414,9 @@
                   <span class="text-status-red">Échec {getRelativeTime(snap.lastFailureAt)}</span>
                 {/if}
               </div>
-              {#if source.error?.message}
+              {#if source.error}
                 <span class="mt-0.5 block truncate text-[10px] text-status-red">
-                  {source.error.message}
+                  {sourceErrorCopy.label}
                 </span>
               {/if}
               <div
@@ -478,7 +484,7 @@
               {:else if source.sessionStatus === 'error'}
                 <span class="flex items-center gap-1 text-[10px] text-status-red">
                   <Icon name="x-circle" size={11} />
-                  <span class="max-w-28 truncate">{source.error?.message ?? 'Erreur'}</span>
+                  <span class="max-w-28 truncate">{sourceErrorCopy.label}</span>
                 </span>
               {/if}
 

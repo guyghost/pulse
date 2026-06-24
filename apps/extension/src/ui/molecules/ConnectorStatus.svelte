@@ -2,6 +2,7 @@
   import type { ConnectorStatus as ConnectorStatusType } from '$lib/core/types/connector-status';
   import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
   import { Icon } from '@pulse/ui';
+  import { getConnectorErrorCopy } from '../copy/connector-error-copy';
 
   const {
     name,
@@ -28,17 +29,16 @@
 
   const retryCount = $derived(status?.retryCount ?? 0);
 
-  const errorMessage = $derived.by(() => {
-    if (status?.error?.message) {
-      return status.error.message;
-    }
-    if (persisted?.error && typeof persisted.error === 'object' && 'message' in persisted.error) {
-      return String(persisted.error.message);
-    }
-    return undefined;
+  const connectorErrorCopy = $derived.by(() => {
+    const error = status?.error ?? persisted?.error ?? null;
+    return getConnectorErrorCopy({
+      connectorId: status?.connectorId ?? persisted?.connectorId,
+      connectorName: name,
+      error,
+    });
   });
 
-  const isSessionError = $derived(errorMessage ? /session|expir/i.test(errorMessage) : false);
+  const isSessionError = $derived(connectorErrorCopy.reconnectRecommended);
 
   const relativeTime = $derived.by(() => {
     if (!persisted?.lastSyncAt) {
@@ -85,7 +85,7 @@
         return {
           icon: 'x-circle',
           color: 'text-status-red',
-          label: errorMessage ?? 'Erreur',
+          label: connectorErrorCopy.label,
           spin: false,
         };
       default:
