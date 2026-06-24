@@ -169,6 +169,16 @@ describe('operational UI constraints', () => {
     expect(alertSource).toContain('formatAlertHistoryCriteria');
   });
 
+  it('keeps alert preference edits undoable', () => {
+    const source = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+
+    expect(source).toContain('showToastAction');
+    expect(source).toContain('previousPreferences');
+    expect(source).toContain('Alerte prioritaire mise à jour');
+    expect(source).toContain("label: 'Annuler'");
+    expect(source).toContain('Alerte prioritaire restaurée');
+  });
+
   it('presents Markdown export as a shareable shortlist report', () => {
     const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
     const exportSource = readFileSync('src/lib/core/export/mission-export.ts', 'utf8');

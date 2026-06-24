@@ -9,7 +9,7 @@
   import type { Mission } from '$lib/core/types/mission';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
   import type { ExportFormat } from '$lib/core/export/mission-export';
-  import { showToast } from '$lib/shell/notifications/toast-service';
+  import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import OperationalStoryCard, {
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
@@ -144,10 +144,23 @@
   }
 
   async function handleSaveAlertPreferences(nextPreferences: ConnectedAlertPreferences) {
+    const previousPreferences = alertPreferences;
     isSavingAlertPreferences = true;
     try {
       alertPreferences = await saveAlertPreferences(nextPreferences);
-      await showToast('Alerte prioritaire mise à jour', 'success');
+      showToastAction('Alerte prioritaire mise à jour', 'success', {
+        label: 'Annuler',
+        onClick: () => {
+          void (async () => {
+            try {
+              alertPreferences = await saveAlertPreferences(previousPreferences);
+              await showToast('Alerte prioritaire restaurée', 'success');
+            } catch {
+              await showToast("Impossible de restaurer l'alerte", 'error');
+            }
+          })();
+        },
+      });
     } catch {
       await showToast("Impossible d'enregistrer l'alerte", 'error');
     } finally {
