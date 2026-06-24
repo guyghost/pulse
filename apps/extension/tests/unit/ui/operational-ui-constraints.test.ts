@@ -373,6 +373,18 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('selectMission(trackedMissions[0].mission.id)');
   });
 
+  it('keeps application decision history visible in the selected dossier', () => {
+    const source = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
+
+    expect(source).toContain('StatusTransition');
+    expect(source).toContain('const selectedDecisionHistory = $derived.by');
+    expect(source).toContain('selectedTracking.history.slice().reverse().slice(0, 4)');
+    expect(source).toContain('function formatDecisionTransition');
+    expect(source).toContain('Historique des décisions');
+    expect(source).toContain('aria-label="Historique des décisions"');
+    expect(source).toContain('formatDecisionNote(transition.note)');
+  });
+
   it('keeps the application pipeline summary decision-oriented', () => {
     const source = readFileSync('src/ui/organisms/ApplicationPipelineSummary.svelte', 'utf8');
 

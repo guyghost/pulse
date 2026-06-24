@@ -3,7 +3,11 @@
   import type { Mission } from '$lib/core/types/mission';
   import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
   import { GENERATION_TYPE_ICONS, GENERATION_TYPE_LABELS } from '$lib/core/types/generation';
-  import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
+  import type {
+    ApplicationStatus,
+    MissionTracking,
+    StatusTransition,
+  } from '$lib/core/types/tracking';
   import { STATUS_LABELS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { getMissions } from '$lib/shell/facades/feed-data.facade';
   import { createTrackingStore } from '$lib/state/tracking.svelte';
@@ -86,6 +90,9 @@
 
   const selectedStatus = $derived<ApplicationStatus>(selectedTracking?.currentStatus ?? 'detected');
   const nextStatuses = $derived<ApplicationStatus[]>(VALID_TRANSITIONS[selectedStatus] ?? []);
+  const selectedDecisionHistory = $derived.by(() =>
+    selectedTracking ? selectedTracking.history.slice().reverse().slice(0, 4) : []
+  );
 
   $effect(() => {
     nextActionInput = isoToDateTimeLocal(selectedTracking?.nextActionAt ?? null);
@@ -337,6 +344,19 @@
         void tracking.restoreTracking(missionId, previousTracking);
       },
     });
+  }
+
+  function formatDecisionTransition(transition: StatusTransition): string {
+    if (transition.from === null) {
+      return `Entrée dans le pipeline: ${STATUS_LABELS[transition.to]}`;
+    }
+
+    return `${STATUS_LABELS[transition.from]} vers ${STATUS_LABELS[transition.to]}`;
+  }
+
+  function formatDecisionNote(note: string | null): string | null {
+    const trimmed = note?.trim();
+    return trimmed ? trimmed : null;
   }
 
   async function saveNextAction(): Promise<void> {
@@ -713,6 +733,50 @@
                 {/if}
               </div>
             </div>
+
+            {#if selectedDecisionHistory.length > 0}
+              <div
+                class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3"
+                aria-label="Historique des décisions"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted">
+                    Historique des décisions
+                  </p>
+                  <span class="text-[10px] text-text-muted">
+                    {selectedTracking?.history.length ?? 0} événement{(selectedTracking?.history
+                      .length ?? 0) > 1
+                      ? 's'
+                      : ''}
+                  </span>
+                </div>
+                <ol class="mt-3 space-y-2">
+                  {#each selectedDecisionHistory as transition}
+                    <li
+                      class="flex gap-3 rounded-lg border border-border-light bg-surface-white p-2.5"
+                    >
+                      <span
+                        class="mt-1 h-2 w-2 shrink-0 rounded-full bg-blueprint-blue"
+                        aria-hidden="true"
+                      ></span>
+                      <div class="min-w-0">
+                        <p class="text-xs font-medium text-text-primary">
+                          {formatDecisionTransition(transition)}
+                        </p>
+                        <p class="mt-0.5 text-[11px] text-text-muted">
+                          {formatDate(transition.timestamp)}
+                        </p>
+                        {#if formatDecisionNote(transition.note)}
+                          <p class="mt-1 text-[11px] leading-4 text-text-subtle">
+                            Note : {formatDecisionNote(transition.note)}
+                          </p>
+                        {/if}
+                      </div>
+                    </li>
+                  {/each}
+                </ol>
+              </div>
+            {/if}
           </div>
 
           <div class="section-card rounded-xl p-5">
