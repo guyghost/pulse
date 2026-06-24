@@ -24,6 +24,9 @@ describe('auth copy', () => {
     expect(normalizedLoginSource).toContain('accéder à la destination demandée');
     expect(normalizedLoginSource).toContain('environnements configurés');
     expect(normalizedLoginSource).toContain('disponible selon votre navigateur et votre compte');
+    expect(normalizedLoginSource).toContain(
+      'Le compte synchronise uniquement snapshots, CV, préférences et candidatures. Vos sessions plateforme restent dans Chrome.'
+    );
     expect(loginSource).not.toContain('Supabase l');
   });
 

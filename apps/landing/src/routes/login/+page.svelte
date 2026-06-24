@@ -194,7 +194,8 @@
 
           <p class="auth-note">
             Le lien email fonctionne sur tous les environnements configurés. Le passkey reste
-            disponible selon votre navigateur et votre compte.
+            disponible selon votre navigateur et votre compte. Le compte synchronise uniquement
+            snapshots, CV, préférences et candidatures. Vos sessions plateforme restent dans Chrome.
           </p>
         </form>
       {/if}
