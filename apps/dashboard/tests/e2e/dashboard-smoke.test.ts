@@ -8,17 +8,26 @@ test.describe('connected dashboard smoke', () => {
 
     await expect(page.getByText('Checklist de setup', { exact: true })).toBeVisible();
     await expect(page.getByRole('link', { name: 'Se connecter' }).first()).toBeVisible();
-    await expect(page.getByText('Aucune sync')).toBeVisible();
-    await expect(page.getByText('Sans score')).toBeVisible();
-    await expect(page.getByText('Aucune relance')).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Surfaces activées après setup' })
+    ).toBeVisible();
+    await expect(page.getByText('Le dashboard évite ainsi les métriques vides')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Feed connecté' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Radar TJM' })).toBeVisible();
+    await expect(page.getByText('Aucune sync')).not.toBeVisible();
+    await expect(page.getByText('Sans score')).not.toBeVisible();
+    await expect(page.getByText('Aucune relance')).not.toBeVisible();
     await expect(
       page.getByRole('heading', { name: "Missions détectées par l'extension" })
-    ).toBeVisible();
-    await expect(page.getByText("Aucune mission reçue depuis l'extension")).toBeVisible();
+    ).not.toBeVisible();
+    await expect(page.getByText("Aucune mission reçue depuis l'extension")).not.toBeVisible();
 
     await page.getByRole('link', { name: 'Candidatures' }).click();
-    await expect(page.getByPlaceholder('Rechercher mission, client ou plateforme')).toBeVisible();
-    await expect(page.getByText('Aucune mission trouvée')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Pipeline activé après setup' })).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Rechercher mission, client ou plateforme')
+    ).not.toBeVisible();
+    await expect(page.getByText('Aucune mission trouvée')).not.toBeVisible();
 
     await page.getByRole('link', { name: 'Profil CV' }).click();
     await expect(page.getByRole('heading', { name: 'CV principal' })).toBeVisible();

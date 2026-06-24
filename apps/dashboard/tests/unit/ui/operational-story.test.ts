@@ -34,4 +34,14 @@ describe('connected dashboard operational story', () => {
       'const dashboardReady = $derived(isConnected && !configurationMissing);'
     );
   });
+
+  it('collapses empty dashboard surfaces into one setup preview', () => {
+    expect(source).toContain('interface DashboardSetupPreviewItem');
+    expect(source).toContain('const dashboardSetupPreviewItems = $derived');
+    expect(source).toContain('Surfaces activées après setup');
+    expect(source).toContain('Le dashboard évite ainsi les métriques vides ou les N/A');
+    expect(source).toContain('Pipeline activé après setup');
+    expect(source).toContain('{#if !setupRequired}');
+    expect(source).toContain('aria-label="Indicateurs candidatures"');
+  });
 });
