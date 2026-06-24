@@ -556,11 +556,26 @@ export function createFeedPageState(
   }
 
   async function deleteSavedView(viewId: string): Promise<void> {
+    const deletedView = savedViews.find((item) => item.id === viewId);
+    if (!deletedView) {
+      return;
+    }
+
+    const previousViews = [...savedViews];
+    const previousActiveSavedViewId = activeSavedViewId;
     const nextViews = savedViews.filter((item) => item.id !== viewId);
     await persistSavedViews(nextViews);
     if (activeSavedViewId === viewId) {
       activeSavedViewId = null;
     }
+    showToastAction(`Vue "${deletedView.name}" supprimée`, 'info', {
+      label: 'Annuler',
+      onClick: () => {
+        savedViews = previousViews;
+        activeSavedViewId = previousActiveSavedViewId;
+        setFeedSavedViews(previousViews).catch(() => {});
+      },
+    });
   }
 
   function toggleCompare(missionId: string): void {

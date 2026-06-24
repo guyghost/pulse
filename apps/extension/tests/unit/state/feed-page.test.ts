@@ -25,6 +25,9 @@ const feedDataMock = vi.hoisted(() => ({
   setFeedSavedViews: vi.fn(),
   syncFavoriteMission: vi.fn(),
 }));
+const toastMock = vi.hoisted(() => ({
+  showToastAction: vi.fn(),
+}));
 
 vi.mock('../../../src/lib/shell/facades/feed-data.facade', async () => {
   const favorites = await vi.importActual<
@@ -63,6 +66,8 @@ vi.mock('../../../src/lib/shell/utils/keyboard-shortcuts', () => ({
   },
   registerShortcuts: vi.fn(() => vi.fn()),
 }));
+
+vi.mock('../../../src/lib/shell/notifications/toast-service', () => toastMock);
 
 vi.mock('../../../src/lib/state/connection-singleton.svelte', () => ({
   getConnectionStore: vi.fn(() => ({ status: 'online' })),
@@ -273,6 +278,22 @@ describe('feed page state', () => {
 
     expect(page.savedViews).toEqual([]);
     expect(page.activeSavedViewId).toBeNull();
+
+    expect(toastMock.showToastAction).toHaveBeenCalledWith(
+      'Vue "Remote prioritaire" supprimée',
+      'info',
+      expect.objectContaining({ label: 'Annuler' })
+    );
+    const undoAction = toastMock.showToastAction.mock.calls.at(-1)?.[2].onClick;
+    expect(undoAction).toBeDefined();
+    undoAction?.();
+
+    expect(page.savedViews).toHaveLength(1);
+    expect(page.savedViews[0].id).toBe(savedId);
+    expect(page.activeSavedViewId).toBe(savedId);
+    expect(feedDataMock.setFeedSavedViews).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: savedId, name: 'Remote prioritaire' }),
+    ]);
   });
 
   it('summarizes score explanations for the current dashboard scope', () => {
