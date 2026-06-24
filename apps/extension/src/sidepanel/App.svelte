@@ -355,7 +355,10 @@
               if (import.meta.env.DEV) console.error('[TJMPage crash]', e);
             }}
           >
-            <TJMPage />
+            <TJMPage
+              onNavigateToProfile={() => nav.navigate('profile')}
+              onNavigateToFeed={() => nav.navigate('feed')}
+            />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState

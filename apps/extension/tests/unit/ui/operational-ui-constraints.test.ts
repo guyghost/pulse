@@ -234,6 +234,23 @@ describe('operational UI constraints', () => {
     expect(source).toContain('function inspectLocalSignals()');
   });
 
+  it('keeps TJM actions tied to pricing decisions instead of refresh only', () => {
+    const pageSource = readFileSync('src/ui/pages/TJMPage.svelte', 'utf8');
+    const dashboardSource = readFileSync('src/ui/organisms/TJMDashboard.svelte', 'utf8');
+    const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
+
+    expect(pageSource).toContain("primaryActionLabel: 'Ajuster mon TJM cible'");
+    expect(pageSource).toContain("primaryActionLabel: 'Scanner le feed'");
+    expect(pageSource).toContain('onNavigateToProfile');
+    expect(pageSource).toContain('onNavigateToFeed');
+    expect(dashboardSource).toContain('type TjmSetupStep');
+    expect(dashboardSource).toContain('3 étapes pour alimenter le radar TJM');
+    expect(dashboardSource).toContain('Alimenter le radar TJM');
+    expect(dashboardSource).toContain('Ajuster mon TJM cible');
+    expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
+    expect(appSource).toContain("onNavigateToFeed={() => nav.navigate('feed')}");
+  });
+
   it('routes missing CV source states to import or profile completion', () => {
     const cvSource = readFileSync('src/ui/pages/CvPage.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
