@@ -801,7 +801,7 @@
         <div>
           <h3 class="text-sm font-medium text-text-primary">Export</h3>
           <p class="mt-1 text-xs text-text-subtle">
-            Exporter vos missions favorites dans différents formats.
+            Préparer une shortlist partageable ou sortir les données brutes.
           </p>
         </div>
         <OperationalStoryCard
@@ -815,6 +815,34 @@
           primaryActionIcon={exportStory.primaryActionIcon}
           onPrimaryAction={handleExportStoryAction}
         />
+        <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
+          <div class="flex items-start gap-2">
+            <Icon name="file-text" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+            <div class="min-w-0">
+              <p class="text-xs font-medium text-text-primary">Rapport shortlist</p>
+              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+                Le Markdown inclut synthèse, critères visibles, signaux de score, liens sources et
+                rappel de confidentialité locale.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+            <div class="rounded-md bg-surface-white px-2 py-2">
+              <p class="font-mono text-sm font-semibold tabular-nums text-text-primary">
+                {favoriteExportCount}
+              </p>
+              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Favoris</p>
+            </div>
+            <div class="rounded-md bg-surface-white px-2 py-2">
+              <p class="text-sm font-semibold text-text-primary">MD</p>
+              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Rapport</p>
+            </div>
+            <div class="rounded-md bg-surface-white px-2 py-2">
+              <p class="text-sm font-semibold text-text-primary">Local</p>
+              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Sessions</p>
+            </div>
+          </div>
+        </div>
         <div class="flex flex-wrap gap-2">
           <button
             class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"

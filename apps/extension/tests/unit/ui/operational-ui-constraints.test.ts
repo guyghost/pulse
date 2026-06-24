@@ -169,6 +169,18 @@ describe('operational UI constraints', () => {
     expect(alertSource).toContain('formatAlertHistoryCriteria');
   });
 
+  it('presents Markdown export as a shareable shortlist report', () => {
+    const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+    const exportSource = readFileSync('src/lib/core/export/mission-export.ts', 'utf8');
+
+    expect(settingsSource).toContain('Rapport shortlist');
+    expect(settingsSource).toContain('rappel de confidentialité locale');
+    expect(settingsSource).toContain('Markdown');
+    expect(exportSource).toContain('## Synthèse shortlist');
+    expect(exportSource).toContain('## Missions retenues');
+    expect(exportSource).toContain('**Confidentialité:** rapport local généré depuis vos favoris');
+  });
+
   it('keeps Profile story CTAs aligned with edit/save state', () => {
     const source = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
 
