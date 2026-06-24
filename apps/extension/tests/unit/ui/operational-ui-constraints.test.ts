@@ -527,6 +527,28 @@ describe('operational UI constraints', () => {
     );
   });
 
+  it('keeps extension operational error copy accented', () => {
+    const profileSource = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
+    const emptyStateSource = readFileSync('src/ui/molecules/OperationalEmptyState.svelte', 'utf8');
+    const drawerSource = readFileSync('src/ui/organisms/MissionInvestigationDrawer.svelte', 'utf8');
+    const sourceHealthSource = readFileSync('src/ui/organisms/SourceHealthPanel.svelte', 'utf8');
+    const controllerSource = readFileSync(
+      'src/lib/shell/facades/feed-controller.svelte.ts',
+      'utf8'
+    );
+    const tjmSource = readFileSync('src/ui/organisms/TJMDashboard.svelte', 'utf8');
+
+    expect(profileSource).toContain('À compléter');
+    expect(profileSource).toContain('réduisent la précision des requêtes');
+    expect(emptyStateSource).toContain('Décision');
+    expect(drawerSource).toContain('eyebrow="Décision"');
+    expect(sourceHealthSource).toContain('Vérification en cours');
+    expect(sourceHealthSource).toContain('Vérifier les connexions');
+    expect(controllerSource).toContain('Vérifiez votre réseau et réessayez.');
+    expect(controllerSource).toContain('Erreur réseau lors du scan. Réessayez');
+    expect(tjmSource).toContain('eyebrow="Décision tarifaire"');
+  });
+
   it('keeps the feed comparison flow explicit and actionable', () => {
     const cardSource = readFileSync('src/ui/molecules/MissionCard.svelte', 'utf8');
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');

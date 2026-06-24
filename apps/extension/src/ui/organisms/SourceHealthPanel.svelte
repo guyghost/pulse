@@ -302,7 +302,7 @@
           <div class="flex items-center gap-1">
             {#if onRefresh}
               <Tooltip
-                label={isChecking ? 'Verification en cours' : 'Verifier les connexions'}
+                label={isChecking ? 'Vérification en cours' : 'Vérifier les connexions'}
                 description="Relance le diagnostic des sessions sources."
               >
                 <button

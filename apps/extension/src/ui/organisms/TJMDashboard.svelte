@@ -207,7 +207,7 @@
   {:else if analysis}
     {#if pricingStory}
       <OperationalStoryCard
-        eyebrow="Decision tarifaire"
+        eyebrow="Décision tarifaire"
         title={pricingStory.title}
         description={pricingStory.description}
         severity={pricingStory.severity}

@@ -28,13 +28,13 @@ import { getConnectors } from '../connectors/index';
 const humanizeScanError = (message: string, code: string): string => {
   switch (code) {
     case 'OFFLINE':
-      return 'Aucune connexion internet. Verifiez votre reseau et reessayez.';
+      return 'Aucune connexion internet. Vérifiez votre réseau et réessayez.';
     case 'MUTEX':
-      return 'Un scan est deja en cours. Veuillez patienter.';
+      return 'Un scan est déjà en cours. Veuillez patienter.';
     case 'CANCELLED':
-      return 'Scan annule.';
+      return 'Scan annulé.';
     case 'NETWORK_ERROR':
-      return 'Erreur reseau lors du scan. Reessayez dans quelques instants.';
+      return 'Erreur réseau lors du scan. Réessayez dans quelques instants.';
     default:
       return message || 'Erreur inattendue lors du scan.';
   }
@@ -428,7 +428,7 @@ export function createFeedController(feedStore: {
       }
     } catch (err) {
       feedStore.setError(
-        err instanceof Error ? err.message : 'Impossible de re-verifier le connecteur'
+        err instanceof Error ? err.message : 'Impossible de revérifier le connecteur'
       );
     }
   }

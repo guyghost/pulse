@@ -164,7 +164,7 @@
 
     <div class="flex-1 space-y-4 overflow-y-auto p-4">
       <OperationalStoryCard
-        eyebrow="Decision"
+        eyebrow="Décision"
         title={story.title}
         description={story.description}
         severity={story.severity}

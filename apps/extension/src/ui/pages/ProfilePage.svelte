@@ -112,10 +112,10 @@
 
     return {
       severity: profileCompleteness < 55 ? ('incident' as const) : ('attention' as const),
-      statusLabel: 'A completer',
-      title: `${missingProfileItems.length} element${missingProfileItems.length > 1 ? 's' : ''} limite${missingProfileItems.length > 1 ? 'nt' : ''} la qualite du radar`,
+      statusLabel: 'À compléter',
+      title: `${missingProfileItems.length} élément${missingProfileItems.length > 1 ? 's' : ''} limite${missingProfileItems.length > 1 ? 'nt' : ''} la qualité du radar`,
       description:
-        'Les champs manquants reduisent la precision des requetes, du scoring et des suggestions de candidature.',
+        'Les champs manquants réduisent la précision des requêtes, du scoring et des suggestions de candidature.',
       evidence,
       primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil',
       primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
