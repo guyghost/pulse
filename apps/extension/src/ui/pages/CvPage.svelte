@@ -54,6 +54,12 @@
     state: 'ready' | 'attention' | 'locked';
   };
 
+  type LoadingProgressStep = {
+    label: string;
+    detail: string;
+    icon: 'database' | 'panel-top' | 'git-compare-arrows';
+  };
+
   let profile = $state<UserProfile | null>(null);
   let isLoading = $state(true);
   let selectedPlatformId = $state('linkedin');
@@ -157,6 +163,23 @@
   const selectedVerification = $derived(verificationResults.get(selectedPlatform.id) ?? null);
   const sourceActionLabel = $derived(profile ? 'Tout préparer' : 'Compléter le profil');
   const sourceActionIcon = $derived(profile ? 'upload' : 'user');
+  const loadingProgressSteps: LoadingProgressStep[] = [
+    {
+      label: 'Profil canonique',
+      detail: 'Lecture du profil local utilisé comme source fiable.',
+      icon: 'database',
+    },
+    {
+      label: 'Plateformes',
+      detail: 'Préparation des destinations LinkedIn et connecteurs mission.',
+      icon: 'panel-top',
+    },
+    {
+      label: 'Écarts',
+      detail: 'Reprise des dernières vérifications et champs à comparer.',
+      icon: 'git-compare-arrows',
+    },
+  ];
 
   const cvStory = $derived.by(() => {
     const mismatchCount = [...verificationResults.values()].reduce(
@@ -596,7 +619,12 @@
   </section>
 
   {#if isLoading}
-    <div class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]" aria-busy="true">
+    <div
+      class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]"
+      aria-busy="true"
+      role="status"
+      aria-live="polite"
+    >
       <section class="section-card rounded-xl p-5">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0 flex-1 space-y-2">
@@ -613,7 +641,34 @@
         </div>
       </section>
       <section class="section-card rounded-xl p-5">
-        <div class="space-y-2">
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Chargement CV
+          </p>
+          <h3 class="mt-1 text-sm font-semibold text-text-primary">Préparation du workflow CV</h3>
+          <p class="mt-1 text-xs leading-5 text-text-subtle">
+            Pulse récupère la source canonique, les plateformes disponibles et les dernières
+            vérifications avant d’afficher les actions.
+          </p>
+        </div>
+        <div class="mt-4 grid gap-2" aria-label="Progression du chargement CV">
+          {#each loadingProgressSteps as step}
+            <div
+              class="flex items-start gap-3 rounded-lg border border-border-light bg-page-canvas p-3"
+            >
+              <div
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blueprint-blue/8 text-blueprint-blue"
+              >
+                <Icon name={step.icon} size={13} />
+              </div>
+              <div class="min-w-0">
+                <p class="text-xs font-medium text-text-primary">{step.label}</p>
+                <p class="mt-0.5 text-[11px] leading-5 text-text-subtle">{step.detail}</p>
+              </div>
+            </div>
+          {/each}
+        </div>
+        <div class="mt-4 space-y-2">
           <Skeleton width="8rem" height="0.7rem" />
           <Skeleton width="85%" height="1.2rem" />
           <Skeleton width="100%" height="6rem" />

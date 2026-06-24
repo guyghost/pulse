@@ -39,6 +39,30 @@
     record: MissionTracking;
   };
 
+  type LoadingProgressStep = {
+    label: string;
+    detail: string;
+    icon: 'database' | 'activity' | 'sparkles';
+  };
+
+  const loadingProgressSteps: LoadingProgressStep[] = [
+    {
+      label: 'Missions locales',
+      detail: 'Lecture du feed stocké pour retrouver les dossiers qualifiables.',
+      icon: 'database',
+    },
+    {
+      label: 'Statuts de suivi',
+      detail: 'Reprise des relances, étapes et notes enregistrées dans le pipeline.',
+      icon: 'activity',
+    },
+    {
+      label: 'Kits générés',
+      detail: 'Préparation des pitchs, messages et résumés liés aux candidatures.',
+      icon: 'sparkles',
+    },
+  ];
+
   const trackedMissions = $derived.by(() => {
     return missions
       .map((mission) => ({
@@ -493,10 +517,45 @@
   </section>
 
   {#if isLoading}
-    <div class="mt-4 section-card rounded-xl p-5 space-y-3">
-      <div class="h-3 w-28 rounded-full bg-subtle-gray"></div>
-      <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
-      <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
+    <div class="mt-4 section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Chargement candidatures
+          </p>
+          <h3 class="mt-1 text-sm font-semibold text-text-primary">
+            Reconstruction du pipeline local
+          </h3>
+          <p class="mt-1 text-xs leading-5 text-text-subtle">
+            Pulse relie les missions, statuts et contenus générés avant de recommander le prochain
+            dossier.
+          </p>
+        </div>
+        <Icon name="loader" size={16} class="mt-1 shrink-0 animate-spin text-blueprint-blue" />
+      </div>
+
+      <div
+        class="mt-4 grid gap-2 md:grid-cols-3"
+        aria-label="Progression du chargement candidatures"
+      >
+        {#each loadingProgressSteps as step}
+          <div class="rounded-lg border border-border-light bg-page-canvas p-3">
+            <div
+              class="flex h-7 w-7 items-center justify-center rounded-md bg-blueprint-blue/8 text-blueprint-blue"
+            >
+              <Icon name={step.icon} size={13} />
+            </div>
+            <p class="mt-2 text-xs font-medium text-text-primary">{step.label}</p>
+            <p class="mt-1 text-[11px] leading-5 text-text-subtle">{step.detail}</p>
+          </div>
+        {/each}
+      </div>
+
+      <div class="mt-4 space-y-3">
+        <div class="h-3 w-28 rounded-full bg-subtle-gray"></div>
+        <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
+        <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
+      </div>
     </div>
   {:else if loadError}
     <div class="mt-4">

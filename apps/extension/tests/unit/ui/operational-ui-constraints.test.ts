@@ -76,6 +76,26 @@ describe('operational UI constraints', () => {
     expect(violations).toEqual([]);
   });
 
+  it('keeps loading states tied to source and progression context', () => {
+    const cvSource = readFileSync('src/ui/pages/CvPage.svelte', 'utf8');
+    const applicationsSource = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
+
+    expect(cvSource).toContain('type LoadingProgressStep');
+    expect(cvSource).toContain('Chargement CV');
+    expect(cvSource).toContain('Progression du chargement CV');
+    expect(cvSource).toContain('Profil canonique');
+    expect(cvSource).toContain('Plateformes');
+    expect(cvSource).toContain('Écarts');
+    expect(cvSource).toContain('role="status"');
+    expect(applicationsSource).toContain('type LoadingProgressStep');
+    expect(applicationsSource).toContain('Chargement candidatures');
+    expect(applicationsSource).toContain('Progression du chargement candidatures');
+    expect(applicationsSource).toContain('Missions locales');
+    expect(applicationsSource).toContain('Statuts de suivi');
+    expect(applicationsSource).toContain('Kits générés');
+    expect(applicationsSource).toContain('role="status"');
+  });
+
   it('does not auto-open the feed tour over actionable operational state', () => {
     const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
 
