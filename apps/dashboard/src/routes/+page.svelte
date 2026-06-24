@@ -38,6 +38,7 @@
 
   type DashboardStoryTone = 'success' | 'attention' | 'incident';
   type DashboardStoryActionTarget = 'install' | 'sync' | 'applications' | 'mission-feed' | 'cv';
+  type DashboardSetupStepState = 'complete' | 'current' | 'pending';
 
   interface DashboardOperationalStory {
     tone: DashboardStoryTone;
@@ -47,6 +48,14 @@
     action: string;
     actionTarget: DashboardStoryActionTarget;
     signals: string[];
+  }
+
+  interface DashboardSetupStep {
+    title: string;
+    detail: string;
+    state: DashboardSetupStepState;
+    actionLabel?: string;
+    href?: string;
   }
 
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
@@ -67,6 +76,45 @@
   const readiness = $derived(getCvSyncReadiness(cv, syncStatuses));
   const isConnected = $derived(Boolean(data.session));
   const enabledFeatureCount = $derived(featureAccess.filter((feature) => feature.enabled).length);
+  const dashboardReady = $derived(isConnected && !configurationMissing);
+  const setupRequired = $derived(!dashboardReady);
+  const hasDashboardSnapshots = $derived(
+    missionFeed.length > 0 || applications.length > 0 || connectedSyncStatuses.length > 0
+  );
+  const dashboardSetupSteps = $derived(
+    getDashboardSetupSteps({
+      isConnected,
+      configurationMissing,
+      hasDashboardSnapshots,
+      loginUrl: data.loginUrl || '/login',
+      chromeStoreUrl,
+    })
+  );
+  const completedDashboardSetupStepCount = $derived(
+    dashboardSetupSteps.filter((step) => step.state === 'complete').length
+  );
+  const currentDashboardSetupStep = $derived(
+    dashboardSetupSteps.find((step) => step.state === 'current') ?? {
+      title: 'Ouvrir le compte MissionPulse',
+      detail: 'Le dashboard doit reconnaître votre compte avant de relier une extension.',
+      state: 'current',
+      actionLabel: 'Se connecter',
+      href: data.loginUrl || '/login',
+    }
+  );
+  const sidebarConnectionTitle = $derived(
+    dashboardReady ? 'Extension Chrome' : isConnected ? 'Extension à relier' : 'Compte requis'
+  );
+  const sidebarConnectionLabel = $derived(
+    dashboardReady ? 'Connectée' : isConnected ? 'À relier' : 'Hors ligne'
+  );
+  const sidebarConnectionDescription = $derived(
+    dashboardReady
+      ? 'Les mises à jour CV seront exécutées depuis les sessions navigateur existantes.'
+      : isConnected
+        ? "Installez l'extension puis reliez ce compte pour recevoir les snapshots."
+        : "Connectez le compte MissionPulse avant de relier l'extension Chrome."
+  );
   const freshMissionCount = $derived(
     missionFeed.filter((mission) => mission.freshness === 'fresh').length
   );
@@ -318,6 +366,57 @@
     return 'warning';
   }
 
+  function getDashboardSetupSteps(input: {
+    isConnected: boolean;
+    configurationMissing: boolean;
+    hasDashboardSnapshots: boolean;
+    loginUrl: string;
+    chromeStoreUrl: string;
+  }): DashboardSetupStep[] {
+    const accountState: DashboardSetupStepState = input.isConnected ? 'complete' : 'current';
+    const extensionState: DashboardSetupStepState = !input.isConnected
+      ? 'pending'
+      : input.configurationMissing
+        ? 'current'
+        : 'complete';
+    const scanState: DashboardSetupStepState = input.hasDashboardSnapshots
+      ? 'complete'
+      : !input.isConnected || input.configurationMissing
+        ? 'pending'
+        : 'current';
+
+    return [
+      {
+        title: 'Ouvrir le compte MissionPulse',
+        detail: input.isConnected
+          ? 'Compte actif, prêt à recevoir les snapshots synchronisés.'
+          : 'Le dashboard doit reconnaître votre compte avant de relier une extension.',
+        state: accountState,
+        actionLabel: accountState === 'current' ? 'Se connecter' : undefined,
+        href: accountState === 'current' ? input.loginUrl : undefined,
+      },
+      {
+        title: "Relier l'extension Chrome",
+        detail:
+          extensionState === 'complete'
+            ? 'Extension prête à transmettre missions, candidatures, CV et statuts.'
+            : input.isConnected
+              ? "Installez l'extension, ouvrez ses réglages puis reliez ce compte."
+              : 'Disponible dès que le compte est ouvert.',
+        state: extensionState,
+        actionLabel: extensionState === 'current' ? "Installer l'extension" : undefined,
+        href: extensionState === 'current' ? input.chromeStoreUrl : undefined,
+      },
+      {
+        title: 'Lancer le premier scan',
+        detail: input.hasDashboardSnapshots
+          ? 'Des snapshots sont disponibles dans le dashboard.'
+          : 'Un scan remplit ensuite les missions, candidatures, CV et statuts.',
+        state: scanState,
+      },
+    ];
+  }
+
   function getTopFreshMission(missions: MissionFeedItem[]): MissionFeedItem | null {
     return missions.reduce<MissionFeedItem | null>((best, mission) => {
       if (mission.freshness !== 'fresh') {
@@ -374,9 +473,14 @@
         badge: 'À traiter',
         title: `Relance à préparer pour ${input.nextFollowUp.title}`,
         impact: `Le dossier est au statut ${stageLabels[input.nextFollowUp.stage]} avec une prochaine action datée.`,
-        action: 'Prochaine action: ouvrir la candidature et traiter la relance avant de scanner plus.',
+        action:
+          'Prochaine action: ouvrir la candidature et traiter la relance avant de scanner plus.',
         actionTarget: 'applications',
-        signals: ['Relance détectée', `${input.applicationCount} candidatures suivies`, 'Pipeline actif'],
+        signals: [
+          'Relance détectée',
+          `${input.applicationCount} candidatures suivies`,
+          'Pipeline actif',
+        ],
       };
     }
 
@@ -413,7 +517,11 @@
         'Aucun conflit prioritaire détecté. Les données connectées peuvent être utilisées pour sélectionner, relancer ou générer.',
       action: 'Prochaine action: traiter la meilleure mission ou vérifier la prochaine relance.',
       actionTarget: 'mission-feed',
-      signals: ['Sync stable', `${input.applicationCount} candidatures`, `${input.freshMissionCount} fraîches`],
+      signals: [
+        'Sync stable',
+        `${input.applicationCount} candidatures`,
+        `${input.freshMissionCount} fraîches`,
+      ],
     };
   }
 
@@ -501,17 +609,32 @@
 
     <div class="absolute inset-x-4 bottom-4">
       <div class="rounded-lg border border-border-light bg-page-canvas p-3">
-        <div class="flex items-center justify-between">
-          <p class="text-xs font-medium text-text-primary">Extension Chrome</p>
-          <span class="h-2 w-2 rounded-full bg-accent-green"></span>
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs font-medium text-text-primary">{sidebarConnectionTitle}</p>
+          <span
+            class="inline-flex items-center gap-1.5 rounded-full border bg-surface-white px-2 py-0.5 text-[10px] font-medium {dashboardReady
+              ? 'border-accent-green/25 text-accent-green'
+              : 'border-status-orange/25 text-status-orange'}"
+          >
+            <span
+              class="h-1.5 w-1.5 rounded-full {dashboardReady
+                ? 'bg-accent-green'
+                : 'bg-status-orange'}"
+            ></span>
+            {sidebarConnectionLabel}
+          </span>
         </div>
-        <p class="mt-2 text-xs leading-5 text-text-subtle">
-          Les mises à jour CV seront exécutées depuis les sessions navigateur existantes.
-        </p>
+        <p class="mt-2 text-xs leading-5 text-text-subtle">{sidebarConnectionDescription}</p>
         <div class="mt-3 flex items-center justify-between border-t border-border-light pt-3">
-          <span class="text-xs text-text-subtle">Features actives</span>
+          <span class="text-xs text-text-subtle">
+            {dashboardReady ? 'Features actives' : 'Setup'}
+          </span>
           <span class="text-xs font-semibold text-text-primary">
-            {enabledFeatureCount}/{featureAccess.length}
+            {#if dashboardReady}
+              {enabledFeatureCount}/{featureAccess.length}
+            {:else}
+              {completedDashboardSetupStepCount}/{dashboardSetupSteps.length}
+            {/if}
           </span>
         </div>
       </div>
@@ -609,12 +732,14 @@
               synchronisés avec votre compte.
             </p>
           </div>
-          <a
-            class="inline-flex h-8 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue shadow-subtle-2 hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12"
-            href="#cv"
-          >
-            Vérifier le CV
-          </a>
+          {#if !setupRequired}
+            <a
+              class="inline-flex h-8 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue shadow-subtle-2 hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12"
+              href="#cv"
+            >
+              Vérifier le CV
+            </a>
+          {/if}
         </div>
 
         <div class="mt-6 flex border-b border-border-light">
@@ -631,38 +756,79 @@
         </div>
       </section>
 
-      {#if configurationMissing || !isConnected}
+      {#if setupRequired}
         <section
           class="mb-6 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/8 p-4 shadow-subtle-2"
+          aria-labelledby="dashboard-setup-title"
         >
           <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <p class="text-sm font-medium text-text-primary">Aucune extension connectée</p>
+              <p id="dashboard-setup-title" class="text-sm font-medium text-text-primary">
+                Checklist de setup
+              </p>
               <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
-                Installez MissionPulse, connectez votre compte depuis les réglages de l'extension,
-                puis lancez un scan. Le dashboard se remplira avec les missions, candidatures, CV et
-                statuts synchronisés depuis votre navigateur.
+                Le dashboard devient utile après trois validations: compte reconnu, extension
+                reliée, premier scan lancé depuis Chrome.
               </p>
               <p class="mt-2 text-xs leading-5 text-text-subtle">
                 Les cookies et sessions Free-Work, LeHibou, Hiway, Collective, Cherry Pick ou Malt
                 restent dans Chrome.
               </p>
             </div>
-            <div class="flex shrink-0 flex-wrap gap-2">
+            {#if currentDashboardSetupStep.href && currentDashboardSetupStep.actionLabel}
               <a
-                class="inline-flex h-9 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-                href={chromeStoreUrl}
+                class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                href={currentDashboardSetupStep.href}
               >
-                Installer l'extension
+                {currentDashboardSetupStep.actionLabel}
               </a>
-              <a
-                class="inline-flex h-9 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-surface-white px-3 text-xs font-semibold text-blueprint-blue hover:bg-blueprint-blue/8"
-                href={data.loginUrl || '/login'}
-              >
-                {isConnected ? "Connecter l'extension" : 'Se connecter'}
-              </a>
-            </div>
+            {/if}
           </div>
+
+          <ol class="mt-4 grid gap-2 md:grid-cols-3" aria-label="Progression setup dashboard">
+            {#each dashboardSetupSteps as step, index}
+              <li
+                class="rounded-lg border bg-surface-white p-3 {step.state === 'complete'
+                  ? 'border-accent-green/20'
+                  : step.state === 'current'
+                    ? 'border-blueprint-blue/25 shadow-subtle-2'
+                    : 'border-border-light'}"
+              >
+                <div class="flex items-start gap-3">
+                  <span
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold {step.state ===
+                    'complete'
+                      ? 'border-accent-green/25 bg-accent-green/10 text-accent-green'
+                      : step.state === 'current'
+                        ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                        : 'border-border-light bg-page-canvas text-text-muted'}"
+                    aria-hidden="true"
+                  >
+                    {#if step.state === 'complete'}
+                      <svg
+                        viewBox="0 0 24 24"
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="m5 12 4 4L19 6" />
+                      </svg>
+                    {:else}
+                      {index + 1}
+                    {/if}
+                  </span>
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-text-primary">{step.title}</p>
+                    <p class="mt-1 text-xs leading-5 text-text-subtle">{step.detail}</p>
+                  </div>
+                </div>
+              </li>
+            {/each}
+          </ol>
+
           {#if configurationMissing && import.meta.env.DEV}
             <p
               class="mt-3 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs leading-5 text-text-subtle"
@@ -673,73 +839,77 @@
         </section>
       {/if}
 
-      <section
-        class="mb-6 rounded-xl border p-4 shadow-subtle-2 {operationalStory.tone === 'incident'
-          ? 'border-status-red/25 bg-status-red/8'
-          : operationalStory.tone === 'attention'
-            ? 'border-status-orange/25 bg-status-orange/8'
-            : 'border-blueprint-blue/20 bg-blueprint-blue/8'}"
-        aria-labelledby="operational-story-title"
-      >
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <p class="eyebrow text-text-subtle">Etat operationnel</p>
-              <Badge
-                label={operationalStory.badge}
-                variant={operationalStory.tone === 'incident'
-                  ? 'error'
-                  : operationalStory.tone === 'attention'
-                    ? 'warning'
-                    : 'success'}
-              />
-            </div>
-            <h2 id="operational-story-title" class="mt-2 text-xl font-semibold text-text-primary">
-              {operationalStory.title}
-            </h2>
-            <div class="mt-4 grid gap-3 md:grid-cols-2">
-              <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
-                  Impact
-                </p>
-                <p class="mt-1 text-sm leading-6 text-text-secondary">{operationalStory.impact}</p>
+      {#if !setupRequired}
+        <section
+          class="mb-6 rounded-xl border p-4 shadow-subtle-2 {operationalStory.tone === 'incident'
+            ? 'border-status-red/25 bg-status-red/8'
+            : operationalStory.tone === 'attention'
+              ? 'border-status-orange/25 bg-status-orange/8'
+              : 'border-blueprint-blue/20 bg-blueprint-blue/8'}"
+          aria-labelledby="operational-story-title"
+        >
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="eyebrow text-text-subtle">Etat operationnel</p>
+                <Badge
+                  label={operationalStory.badge}
+                  variant={operationalStory.tone === 'incident'
+                    ? 'error'
+                    : operationalStory.tone === 'attention'
+                      ? 'warning'
+                      : 'success'}
+                />
               </div>
-              <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
-                  Action recommandée
-                </p>
-                <p class="mt-1 text-sm font-medium leading-6 text-text-primary">
-                  {operationalStory.action}
-                </p>
+              <h2 id="operational-story-title" class="mt-2 text-xl font-semibold text-text-primary">
+                {operationalStory.title}
+              </h2>
+              <div class="mt-4 grid gap-3 md:grid-cols-2">
+                <div>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
+                    Impact
+                  </p>
+                  <p class="mt-1 text-sm leading-6 text-text-secondary">
+                    {operationalStory.impact}
+                  </p>
+                </div>
+                <div>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
+                    Action recommandée
+                  </p>
+                  <p class="mt-1 text-sm font-medium leading-6 text-text-primary">
+                    {operationalStory.action}
+                  </p>
+                </div>
+              </div>
+              <div class="mt-4 flex flex-wrap gap-2">
+                {#each operationalStory.signals as signal}
+                  <span
+                    class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1 text-xs font-medium text-text-subtle"
+                  >
+                    {signal}
+                  </span>
+                {/each}
               </div>
             </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-              {#each operationalStory.signals as signal}
-                <span
-                  class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1 text-xs font-medium text-text-subtle"
-                >
-                  {signal}
-                </span>
-              {/each}
-            </div>
-          </div>
 
-          <a
-            class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-            href={operationalStory.actionTarget === 'install'
-              ? chromeStoreUrl
-              : operationalStory.actionTarget === 'sync'
-                ? '#sync'
-                : operationalStory.actionTarget === 'applications'
-                  ? '#applications'
-                  : operationalStory.actionTarget === 'cv'
-                    ? '#cv'
-                    : '#mission-feed-title'}
-          >
-            Aller à l'action
-          </a>
-        </div>
-      </section>
+            <a
+              class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+              href={operationalStory.actionTarget === 'install'
+                ? chromeStoreUrl
+                : operationalStory.actionTarget === 'sync'
+                  ? '#sync'
+                  : operationalStory.actionTarget === 'applications'
+                    ? '#applications'
+                    : operationalStory.actionTarget === 'cv'
+                      ? '#cv'
+                      : '#mission-feed-title'}
+            >
+              Aller à l'action
+            </a>
+          </div>
+        </section>
+      {/if}
 
       <section
         class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
@@ -882,20 +1052,28 @@
                 </div>
                 <Badge label="En attente" variant="source" />
               </div>
-              <div class="mt-4 flex flex-wrap gap-2">
-                <a
-                  class="inline-flex h-9 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-                  href={chromeStoreUrl}
+              {#if setupRequired}
+                <p
+                  class="mt-4 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs leading-5 text-text-subtle"
                 >
-                  Installer l'extension
-                </a>
-                <a
-                  class="inline-flex h-9 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
-                  href={data.loginUrl || '/login'}
-                >
-                  Connecter mon compte
-                </a>
-              </div>
+                  Terminez la checklist de setup ci-dessus pour activer le feed connecté.
+                </p>
+              {:else}
+                <div class="mt-4 flex flex-wrap gap-2">
+                  <a
+                    class="inline-flex h-9 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                    href={chromeStoreUrl}
+                  >
+                    Installer l'extension
+                  </a>
+                  <a
+                    class="inline-flex h-9 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
+                    href={data.loginUrl || '/login'}
+                  >
+                    Connecter mon compte
+                  </a>
+                </div>
+              {/if}
               <p class="mt-2 text-sm leading-6 text-text-subtle">
                 Le dashboard ne lit pas directement vos sessions plateforme.
               </p>
@@ -2347,20 +2525,29 @@
                       </div>
                       <Badge label="Local ou non connecté" variant="source" />
                     </div>
-                    <div class="mt-4 flex flex-wrap gap-2">
-                      <a
-                        class="inline-flex h-8 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-                        href={chromeStoreUrl}
+                    {#if setupRequired}
+                      <p
+                        class="mt-4 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs leading-5 text-text-subtle"
                       >
-                        Installer l'extension
-                      </a>
-                      <a
-                        class="inline-flex h-8 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
-                        href={data.loginUrl || '/login'}
-                      >
-                        Connecter mon compte
-                      </a>
-                    </div>
+                        La checklist de setup reste l'action prioritaire avant d'ouvrir la file de
+                        synchronisation.
+                      </p>
+                    {:else}
+                      <div class="mt-4 flex flex-wrap gap-2">
+                        <a
+                          class="inline-flex h-8 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                          href={chromeStoreUrl}
+                        >
+                          Installer l'extension
+                        </a>
+                        <a
+                          class="inline-flex h-8 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
+                          href={data.loginUrl || '/login'}
+                        >
+                          Connecter mon compte
+                        </a>
+                      </div>
+                    {/if}
                     <p class="mt-3 text-xs leading-5 text-text-muted">
                       Les sessions plateforme restent côté navigateur; la file ne transporte que les
                       données métier normalisées.
