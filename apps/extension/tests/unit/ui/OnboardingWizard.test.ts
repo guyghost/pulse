@@ -90,6 +90,7 @@ describe('OnboardingWizard', () => {
         scoreThreshold: 70,
         minDailyRate: 600,
         maxResults: 5,
+        mutedUntil: null,
       })
     );
     expect(target.textContent).toContain('Recevoir un insight');

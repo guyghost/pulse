@@ -26,6 +26,15 @@ function buildAlertHistoryId(triggeredAt: number, missions: Mission[]): string {
   return `alert-${triggeredAt}-${missionKey || 'empty'}`;
 }
 
+function isMutedUntilActive(mutedUntil: string | null, now: number): boolean {
+  if (!mutedUntil) {
+    return false;
+  }
+
+  const mutedUntilMs = Date.parse(mutedUntil);
+  return Number.isFinite(mutedUntilMs) && mutedUntilMs > now;
+}
+
 /**
  * Persist the last notification timestamp to chrome.storage.session.
  * Uses session storage so it resets when the browser session ends.
@@ -112,6 +121,10 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
   const connectedAlertPreferences = await getConnectedAlertPreferences();
 
   if (connectedAlertPreferences && !connectedAlertPreferences.enabled) {
+    return { shown: false, notifiedMissionIds: [] };
+  }
+
+  if (connectedAlertPreferences && isMutedUntilActive(connectedAlertPreferences.mutedUntil, now)) {
     return { shown: false, notifiedMissionIds: [] };
   }
 

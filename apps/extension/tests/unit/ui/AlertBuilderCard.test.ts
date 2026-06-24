@@ -36,6 +36,7 @@ function makePreferences(
     minDailyRate: 650,
     requiredStacks: ['Svelte'],
     maxResults: 1,
+    mutedUntil: null,
     revision: 1,
     updatedAt: '2026-06-24T10:00:00.000Z',
     ...overrides,
@@ -80,5 +81,19 @@ describe('AlertBuilderCard', () => {
     expect(text).toContain('Éligibles');
     expect(text).toContain('Notifiées');
     expect(text).toContain('1 mission déjà vue exclue du volume');
+  });
+
+  it('shows temporary mute state without losing alert criteria', async () => {
+    const target = mountCard({
+      preferences: makePreferences({ mutedUntil: '2099-06-24T10:00:00.000Z' }),
+    });
+    await tick();
+    const text = target.textContent?.replace(/\s+/g, ' ').trim() ?? '';
+
+    expect(text).toContain('Pause temporaire');
+    expect(text).toContain('Pause active');
+    expect(text).toContain('Aucune notification ne partira avant');
+    expect(text).toContain('Les critères restent prêts pour la reprise');
+    expect(text).toContain('Reprendre');
   });
 });

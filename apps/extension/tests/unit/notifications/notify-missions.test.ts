@@ -195,6 +195,7 @@ describe('notifyHighScoreMissions', () => {
       minDailyRate: 650,
       requiredStacks: ['Svelte'],
       maxResults: 1,
+      mutedUntil: null,
       revision: 2,
       updatedAt: '2026-05-22T08:00:00.000Z',
     });
@@ -231,6 +232,7 @@ describe('notifyHighScoreMissions', () => {
       minDailyRate: 0,
       requiredStacks: [],
       maxResults: 5,
+      mutedUntil: null,
       revision: 2,
       updatedAt: '2026-05-22T08:00:00.000Z',
     });
@@ -241,6 +243,27 @@ describe('notifyHighScoreMissions', () => {
 
     expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
     expect(notificationsCreate).not.toHaveBeenCalled();
+  });
+
+  it('does not notify while connected alert preferences are temporarily muted', async () => {
+    getConnectedAlertPreferences.mockResolvedValueOnce({
+      enabled: true,
+      scoreThreshold: 70,
+      minDailyRate: 0,
+      requiredStacks: [],
+      maxResults: 5,
+      mutedUntil: '2099-05-22T08:00:00.000Z',
+      revision: 2,
+      updatedAt: '2026-05-22T08:00:00.000Z',
+    });
+
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
+    const result = await notifyHighScoreMissions([makeMission({ score: 99 })]);
+
+    expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
+    expect(notificationsCreate).not.toHaveBeenCalled();
+    expect(recordAlertHistoryEntry).not.toHaveBeenCalled();
   });
 
   it('returns false when cooldown is still active from session storage', async () => {

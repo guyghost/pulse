@@ -179,6 +179,14 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Alerte prioritaire restaurée');
   });
 
+  it('keeps alert notifications temporarily pausable', () => {
+    const source = readFileSync('src/ui/molecules/AlertBuilderCard.svelte', 'utf8');
+
+    expect(source).toContain('Pause temporaire');
+    expect(source).toContain('pauseAlerts(24)');
+    expect(source).toContain('mutedUntil: isMuteActive ? mutedUntil : null');
+  });
+
   it('presents Markdown export as a shareable shortlist report', () => {
     const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
     const exportSource = readFileSync('src/lib/core/export/mission-export.ts', 'utf8');

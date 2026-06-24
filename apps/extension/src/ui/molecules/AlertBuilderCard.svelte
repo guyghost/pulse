@@ -29,6 +29,7 @@
   let minDailyRate = $state(0);
   let maxResults = $state(5);
   let requiredStacks = $state<string[]>([]);
+  let mutedUntil = $state<string | null>(null);
   let stackInput = $state('');
   let lastRevision = $state(-1);
 
@@ -42,13 +43,24 @@
     minDailyRate = preferences.minDailyRate;
     maxResults = preferences.maxResults;
     requiredStacks = [...preferences.requiredStacks];
+    mutedUntil = preferences.mutedUntil;
     lastRevision = preferences.revision;
   });
 
+  const muteDateFormatter = new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+  const muteUntilTime = $derived(mutedUntil ? Date.parse(mutedUntil) : Number.NaN);
+  const isMuteActive = $derived(Number.isFinite(muteUntilTime) && muteUntilTime > Date.now());
   const alertSummary = $derived(
-    enabled
-      ? `${scoreThreshold}+${minDailyRate > 0 ? ` · ${minDailyRate}€/j min` : ''}`
-      : 'Desactivee'
+    !enabled
+      ? 'Desactivee'
+      : isMuteActive
+        ? 'En pause'
+        : `${scoreThreshold}+${minDailyRate > 0 ? ` · ${minDailyRate}€/j min` : ''}`
   );
 
   const suggestedStacks = $derived(
@@ -69,6 +81,10 @@
   const alertPreviewText = $derived.by(() => {
     if (!enabled) {
       return 'Aucune notification ne partira tant que l’alerte reste désactivée.';
+    }
+
+    if (isMuteActive) {
+      return `Aucune notification ne partira avant ${formatMuteUntil(mutedUntil)}. Les critères restent prêts pour la reprise.`;
     }
 
     if (alertPreview.totalMissions === 0) {
@@ -109,6 +125,27 @@
     hour: '2-digit',
     minute: '2-digit',
   });
+
+  function formatMuteUntil(value: string | null): string {
+    if (!value) {
+      return 'la reprise';
+    }
+
+    const timestamp = Date.parse(value);
+    if (!Number.isFinite(timestamp)) {
+      return 'la reprise';
+    }
+
+    return muteDateFormatter.format(new Date(timestamp));
+  }
+
+  function pauseAlerts(hours: number): void {
+    mutedUntil = new Date(Date.now() + hours * 60 * 60 * 1000).toISOString();
+  }
+
+  function resumeAlerts(): void {
+    mutedUntil = null;
+  }
 
   function formatAlertHistoryTime(triggeredAt: number): string {
     if (!Number.isFinite(triggeredAt) || triggeredAt <= 0) {
@@ -169,6 +206,7 @@
       minDailyRate,
       requiredStacks,
       maxResults,
+      mutedUntil: isMuteActive ? mutedUntil : null,
       revision: preferences.revision,
       updatedAt: preferences.updatedAt,
     });
@@ -201,6 +239,53 @@
       </span>
       <input type="checkbox" bind:checked={enabled} class="h-4 w-4 accent-blueprint-blue" />
     </label>
+
+    <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+      <div class="flex items-center justify-between gap-3">
+        <div>
+          <p class="text-xs font-medium text-text-primary">Pause temporaire</p>
+          <p class="mt-0.5 text-[11px] leading-5 text-text-subtle">
+            Suspendre les notifications sans perdre les critères de l’alerte.
+          </p>
+        </div>
+        <OperationalStatusBadge
+          label={isMuteActive ? 'Pause active' : 'Active'}
+          severity={isMuteActive ? 'attention' : 'success'}
+        />
+      </div>
+      {#if isMuteActive}
+        <p class="mt-2 rounded-md bg-surface-white px-2 py-1.5 text-[11px] text-text-subtle">
+          Reprise automatique le {formatMuteUntil(mutedUntil)}.
+        </p>
+      {/if}
+      <div class="mt-3 flex flex-wrap gap-2">
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-[11px] font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+          onclick={() => pauseAlerts(1)}
+        >
+          <Icon name="clock" size={12} />
+          1h
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-[11px] font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+          onclick={() => pauseAlerts(24)}
+        >
+          <Icon name="clock" size={12} />
+          24h
+        </button>
+        <button
+          type="button"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-[11px] font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-45"
+          onclick={resumeAlerts}
+          disabled={!isMuteActive}
+        >
+          <Icon name="play" size={12} />
+          Reprendre
+        </button>
+      </div>
+    </div>
 
     <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
       <div class="flex items-center justify-between gap-3">

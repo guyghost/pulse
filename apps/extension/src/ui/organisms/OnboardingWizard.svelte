@@ -150,6 +150,7 @@
       minDailyRate: tjm,
       requiredStacks: stack,
       maxResults: 5,
+      mutedUntil: null,
     });
     goNext();
   }

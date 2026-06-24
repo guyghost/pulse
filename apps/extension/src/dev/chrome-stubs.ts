@@ -4,6 +4,7 @@ import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
 import type { Mission } from '$lib/core/types/mission';
 import {
   DEFAULT_CONNECTED_ALERT_PREFERENCES,
+  normalizeConnectedAlertPreferences,
   type ConnectedAlertPreferences,
 } from '$lib/core/types/alert-preferences';
 import { createInitialHealthSnapshot, type ConnectorHealthSnapshot } from '$lib/core/types/health';
@@ -146,14 +147,18 @@ function createChromeStubs() {
           case 'GET_CONNECTED_ALERT_PREFERENCES':
             return {
               type: 'CONNECTED_ALERT_PREFERENCES_RESULT',
-              payload: storage.connectedAlertPreferences,
+              payload: normalizeConnectedAlertPreferences(
+                storage.connectedAlertPreferences as ConnectedAlertPreferences
+              ),
             };
           case 'SAVE_CONNECTED_ALERT_PREFERENCES':
-            storage.connectedAlertPreferences = message.payload;
-            writeDevStorage(DEV_ALERT_PREFERENCES_STORAGE_KEY, message.payload);
+            storage.connectedAlertPreferences = normalizeConnectedAlertPreferences(
+              message.payload as ConnectedAlertPreferences
+            );
+            writeDevStorage(DEV_ALERT_PREFERENCES_STORAGE_KEY, storage.connectedAlertPreferences);
             return {
               type: 'CONNECTED_ALERT_PREFERENCES_SAVED',
-              payload: { saved: true, preferences: message.payload },
+              payload: { saved: true, preferences: storage.connectedAlertPreferences },
             };
           case 'GET_CONNECTOR_HEALTH':
             return {
