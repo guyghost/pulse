@@ -145,7 +145,10 @@
     const fidIncident = Boolean(webVitals.fid && webVitals.fid > 300);
     const hasIncident = fcpIncident || lcpIncident || clsIncident || fidIncident;
     const hasAttention =
-      webVitals.fcp > 1800 || webVitals.lcp > 2500 || webVitals.cls > 0.1 || Boolean(webVitals.fid && webVitals.fid > 100);
+      webVitals.fcp > 1800 ||
+      webVitals.lcp > 2500 ||
+      webVitals.cls > 0.1 ||
+      Boolean(webVitals.fid && webVitals.fid > 100);
 
     if (hasIncident) {
       return {
@@ -234,7 +237,8 @@
         statusLabel: 'Incident',
         title: `${errors} incident${errors > 1 ? 's' : ''} détecté${errors > 1 ? 's' : ''} dans la session`,
         description: `Dernier signal : ${latest?.tags?.connectorId ?? 'source inconnue'} / ${latest?.tags?.errorType ?? 'erreur non classée'}.`,
-        action: 'Action recommandée : ouvrir l’onglet Scans, identifier la source, puis relancer le scan.',
+        action:
+          'Action recommandée : ouvrir l’onglet Scans, identifier la source, puis relancer le scan.',
         tone: 'incident',
       };
     }
@@ -273,7 +277,8 @@
       statusLabel: 'Normal',
       title: 'Pulse ne montre pas d’anomalie instrumentée',
       description: `${scan.scanCount} scan${scan.scanCount > 1 ? 's' : ''} observé${scan.scanCount > 1 ? 's' : ''}, aucun incident récent.`,
-      action: 'Action recommandée : continuer la session ou exporter les métriques si vous préparez une investigation.',
+      action:
+        'Action recommandée : continuer la session ou exporter les métriques si vous préparez une investigation.',
       tone: 'success',
     };
   });
@@ -368,7 +373,9 @@
     <div class="sticky top-0 z-10 border-b border-border-light bg-surface-white px-4 py-3">
       <div class="mx-auto flex max-w-6xl items-center justify-between gap-3">
         <div class="flex min-w-0 items-center gap-3">
-          <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/8 text-blueprint-blue">
+          <div
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/8 text-blueprint-blue"
+          >
             <Icon name="activity" size={15} />
           </div>
           <div class="min-w-0">
@@ -430,12 +437,16 @@
                   </span>
                   <Icon name={signal.icon} size={12} class="shrink-0" />
                 </div>
-                <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-text-primary">{signal.value}</p>
-                <p class="text-[10px] font-medium {signal.tone === 'incident'
-                  ? 'text-status-red'
-                  : signal.tone === 'attention'
-                    ? 'text-status-orange'
-                    : 'text-blueprint-blue'}">
+                <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-text-primary">
+                  {signal.value}
+                </p>
+                <p
+                  class="text-[10px] font-medium {signal.tone === 'incident'
+                    ? 'text-status-red'
+                    : signal.tone === 'attention'
+                      ? 'text-status-orange'
+                      : 'text-blueprint-blue'}"
+                >
                   {signal.state}
                 </p>
               </div>
@@ -444,10 +455,13 @@
         </div>
       </section>
 
-      <nav class="flex gap-1 overflow-x-auto rounded-xl border border-border-light bg-surface-white p-1">
+      <nav
+        class="flex gap-1 overflow-x-auto rounded-xl border border-border-light bg-surface-white p-1"
+      >
         {#each tabs as tab}
           <button
-            class="shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-colors {activeTab === tab.id
+            class="shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-colors {activeTab ===
+            tab.id
               ? 'bg-blueprint-blue text-surface-white'
               : 'text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
             onclick={() => (activeTab = tab.id)}
@@ -471,7 +485,9 @@
                       <p class="text-sm font-semibold text-text-primary">{signal.state}</p>
                       <p class="mt-1 text-xs leading-5 text-text-subtle">{signal.hint}</p>
                     </div>
-                    <span class="font-mono text-sm font-semibold tabular-nums text-text-primary">{signal.value}</span>
+                    <span class="font-mono text-sm font-semibold tabular-nums text-text-primary"
+                      >{signal.value}</span
+                    >
                   </div>
                 </article>
               {/each}
@@ -484,7 +500,9 @@
             </p>
             {#if missionsByConnector.size === 0}
               <div class="mt-3 rounded-xl border border-status-orange/20 bg-status-orange/8 p-3">
-                <p class="text-sm font-medium text-text-primary">Aucune source n’a encore produit de signal.</p>
+                <p class="text-sm font-medium text-text-primary">
+                  Aucune source n’a encore produit de signal.
+                </p>
                 <p class="mt-1 text-xs leading-5 text-text-subtle">
                   Lancez un scan pour savoir si le problème vient d’un connecteur ou d’un feed vide.
                 </p>
@@ -497,7 +515,9 @@
                       <div class="min-w-0">
                         <p class="truncate text-sm font-medium text-text-primary">{connectorId}</p>
                         <p class="text-xs text-text-subtle">
-                          {count > 0 ? 'Source contributrice au dernier scan.' : 'Source muette à investiguer.'}
+                          {count > 0
+                            ? 'Source contributrice au dernier scan.'
+                            : 'Source muette à investiguer.'}
                         </p>
                       </div>
                       <span class="font-mono text-sm font-semibold tabular-nums text-text-primary">
@@ -536,9 +556,13 @@
               <article class="rounded-xl border border-border-light bg-surface-white px-3 py-2.5">
                 <div class="flex items-center justify-between gap-3">
                   <div>
-                    <p class="text-xs font-medium text-text-primary">{formatTimestamp(metric.timestamp)}</p>
+                    <p class="text-xs font-medium text-text-primary">
+                      {formatTimestamp(metric.timestamp)}
+                    </p>
                     <p class="text-[11px] text-text-subtle">
-                      {missions?.value ? `${missions.value} mission(s) détectée(s)` : 'Volume non renseigné'}
+                      {missions?.value
+                        ? `${missions.value} mission(s) détectée(s)`
+                        : 'Volume non renseigné'}
                     </p>
                   </div>
                   <span class="font-mono text-xs font-semibold tabular-nums text-blueprint-blue">
@@ -547,7 +571,9 @@
                 </div>
               </article>
             {:else}
-              <p class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle">
+              <p
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+              >
                 Aucune entrée de timeline disponible.
               </p>
             {/each}
@@ -573,11 +599,15 @@
                       Action : relancer la source ou inspecter la session navigateur.
                     </p>
                   </div>
-                  <span class="font-mono text-[11px] text-text-muted">{formatTimestamp(error.timestamp)}</span>
+                  <span class="font-mono text-[11px] text-text-muted"
+                    >{formatTimestamp(error.timestamp)}</span
+                  >
                 </div>
               </article>
             {:else}
-              <p class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle">
+              <p
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+              >
                 Aucun incident récent. Le scan peut être considéré normal sur cette session.
               </p>
             {/each}
@@ -588,9 +618,11 @@
           <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
             Diagnostic cache
           </p>
-          <div class="mt-3 rounded-xl border p-3 {cacheStats.lastHitRate >= 70
-            ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
-            : 'border-status-orange/20 bg-status-orange/8'}">
+          <div
+            class="mt-3 rounded-xl border p-3 {cacheStats.lastHitRate >= 70
+              ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
+              : 'border-status-orange/20 bg-status-orange/8'}"
+          >
             <p class="text-sm font-semibold text-text-primary">
               {cacheStats.lastHitRate >= 70
                 ? 'Le cache accélère les parcours répétés'
@@ -615,7 +647,9 @@
               <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                 <div class="flex items-center justify-between gap-3">
                   <div>
-                    <p class="text-xs font-medium text-text-primary">{formatTimestamp(metric.timestamp)}</p>
+                    <p class="text-xs font-medium text-text-primary">
+                      {formatTimestamp(metric.timestamp)}
+                    </p>
                     <p class="text-[11px] text-text-subtle">
                       {hits?.value ?? 0} hit(s), {misses?.value ?? 0} miss(es)
                     </p>
@@ -626,7 +660,9 @@
                 </div>
               </article>
             {:else}
-              <p class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle">
+              <p
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+              >
                 Aucun historique cache disponible.
               </p>
             {/each}
@@ -644,7 +680,9 @@
                   <div class="min-w-0">
                     <p class="truncate text-sm font-semibold text-text-primary">{operation}</p>
                     <p class="mt-1 text-xs text-text-subtle">
-                      {stats.count} appel{stats.count > 1 ? 's' : ''}, plage {formatDuration(stats.min)}
+                      {stats.count} appel{stats.count > 1 ? 's' : ''}, plage {formatDuration(
+                        stats.min
+                      )}
                       → {formatDuration(stats.max)}.
                     </p>
                     <p class="mt-1 text-xs font-medium text-text-primary">
@@ -653,15 +691,19 @@
                         : 'État : pas de blocage opérationnel immédiat.'}
                     </p>
                   </div>
-                  <span class="font-mono text-sm font-semibold tabular-nums {stats.avg > 1000
-                    ? 'text-status-orange'
-                    : 'text-blueprint-blue'}">
+                  <span
+                    class="font-mono text-sm font-semibold tabular-nums {stats.avg > 1000
+                      ? 'text-status-orange'
+                      : 'text-blueprint-blue'}"
+                  >
                     {formatDuration(stats.avg)}
                   </span>
                 </div>
               </article>
             {:else}
-              <p class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle">
+              <p
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+              >
                 Aucune latence instrumentée. Ajoutez un timing autour du parcours à investiguer.
               </p>
             {/each}
@@ -673,12 +715,7 @@
             Expérience perçue
           </p>
           <div class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-            {#each [
-              { label: 'FCP', value: webVitals.fcp, limit: 1800, incident: 3000, help: 'Premier contenu visible' },
-              { label: 'LCP', value: webVitals.lcp, limit: 2500, incident: 4000, help: 'Contenu principal visible' },
-              { label: 'CLS', value: webVitals.cls, limit: 0.1, incident: 0.25, help: 'Stabilité visuelle' },
-              { label: 'FID', value: webVitals.fid ?? 0, limit: 100, incident: 300, help: 'Réactivité interaction' },
-            ] as vital}
+            {#each [{ label: 'FCP', value: webVitals.fcp, limit: 1800, incident: 3000, help: 'Premier contenu visible' }, { label: 'LCP', value: webVitals.lcp, limit: 2500, incident: 4000, help: 'Contenu principal visible' }, { label: 'CLS', value: webVitals.cls, limit: 0.1, incident: 0.25, help: 'Stabilité visuelle' }, { label: 'FID', value: webVitals.fid ?? 0, limit: 100, incident: 300, help: 'Réactivité interaction' }] as vital}
               {@const measured = vital.value > 0}
               {@const tone = !measured
                 ? 'attention'
@@ -717,7 +754,9 @@
                 </div>
               </article>
             {:else}
-              <p class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle">
+              <p
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+              >
                 Aucune mesure historique. Rafraîchissez après avoir navigué dans l’interface.
               </p>
             {/each}
@@ -739,7 +778,10 @@
           Vider la session
         </button>
         <span class="ml-auto text-[10px] text-text-muted">
-          {allMetrics.length} signal{allMetrics.length > 1 ? 'aux' : ''} collecté{allMetrics.length > 1 ? 's' : ''}
+          {allMetrics.length} signal{allMetrics.length > 1 ? 'aux' : ''} collecté{allMetrics.length >
+          1
+            ? 's'
+            : ''}
         </span>
       </footer>
     </div>

@@ -49,11 +49,14 @@
   });
 
   const devScenario = $derived.by<DevScenario>(() => {
-    if (logs.some((log) => log.type.includes('ERROR') || log.summary.toLowerCase().includes('error'))) {
+    if (
+      logs.some((log) => log.type.includes('ERROR') || log.summary.toLowerCase().includes('error'))
+    ) {
       return {
         statusLabel: 'Incident simulé',
         title: 'Le bridge a produit un signal à investiguer',
-        description: 'Utilisez le journal pour vérifier le message, puis ouvrez le diagnostic complet si la cause est métrique.',
+        description:
+          'Utilisez le journal pour vérifier le message, puis ouvrez le diagnostic complet si la cause est métrique.',
         action: 'Prochaine action : filtrer le log récent et reproduire le scénario.',
         severity: 'incident',
       };
@@ -63,7 +66,8 @@
       return {
         statusLabel: 'Charge élevée',
         title: `${missionCount} missions vont tester la lisibilité du feed`,
-        description: 'Ce volume sert surtout à valider virtualisation, filtres, comparaison et absence de chevauchement.',
+        description:
+          'Ce volume sert surtout à valider virtualisation, filtres, comparaison et absence de chevauchement.',
         action: 'Prochaine action : injecter puis vérifier scroll, filtres et temps de rendu.',
         severity: 'attention',
       };
@@ -73,7 +77,8 @@
       return {
         statusLabel: 'Session instrumentée',
         title: `${scanMetrics.total} signal${scanMetrics.total > 1 ? 'aux' : ''} collecté${scanMetrics.total > 1 ? 's' : ''}`,
-        description: 'La session contient assez de matière pour ouvrir le diagnostic opérationnel complet.',
+        description:
+          'La session contient assez de matière pour ouvrir le diagnostic opérationnel complet.',
         action: 'Prochaine action : ouvrir Ctrl+Shift+M pour prioriser les anomalies.',
         severity: 'success',
       };
@@ -82,7 +87,8 @@
     return {
       statusLabel: 'Prêt',
       title: 'Choisissez le scénario à simuler',
-      description: 'Le panneau sert à provoquer un état précis du produit, pas à explorer des réglages au hasard.',
+      description:
+        'Le panneau sert à provoquer un état précis du produit, pas à explorer des réglages au hasard.',
       action: 'Prochaine action : choisir un état feed ou injecter un volume de missions.',
       severity: 'attention',
     };
@@ -112,7 +118,9 @@
   <div
     class="fixed bottom-0 left-0 right-0 z-[60] max-h-[62vh] overflow-y-auto border-t border-blueprint-blue/30 bg-page-canvas shadow-lg"
   >
-    <div class="sticky top-0 z-10 flex items-center justify-between border-b border-border-light bg-surface-white px-3 py-2">
+    <div
+      class="sticky top-0 z-10 flex items-center justify-between border-b border-border-light bg-surface-white px-3 py-2"
+    >
       <div>
         <span class="text-xs font-bold text-blueprint-blue font-mono">DEV PANEL</span>
         <p class="mt-0.5 text-[10px] text-text-subtle">Centre de contrôle des scénarios locaux</p>
@@ -151,7 +159,9 @@
 
     <div class="p-3 space-y-4">
       <section class="rounded-xl border p-3 {severityClasses(devScenario.severity)}">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.16em]">{devScenario.statusLabel}</p>
+        <p class="text-[10px] font-semibold uppercase tracking-[0.16em]">
+          {devScenario.statusLabel}
+        </p>
         <p class="mt-1 text-sm font-semibold text-text-primary">{devScenario.title}</p>
         <p class="mt-1 text-xs leading-5 text-text-secondary">{devScenario.description}</p>
         <p class="mt-1 text-xs font-medium text-text-primary">{devScenario.action}</p>
@@ -165,12 +175,7 @@
           <span class="text-[10px] text-text-muted">Simuler une situation visible</span>
         </div>
         <div class="grid grid-cols-2 gap-1 mt-1 sm:flex">
-          {#each [
-            { id: 'empty', label: 'empty', hint: 'Valider état vide' },
-            { id: 'loading', label: 'loading', hint: 'Valider skeleton' },
-            { id: 'loaded', label: 'loaded', hint: 'Valider feed actif' },
-            { id: 'error', label: 'error', hint: 'Valider incident' },
-          ] as state}
+          {#each [{ id: 'empty', label: 'empty', hint: 'Valider état vide' }, { id: 'loading', label: 'loading', hint: 'Valider skeleton' }, { id: 'loaded', label: 'loaded', hint: 'Valider feed actif' }, { id: 'error', label: 'error', hint: 'Valider incident' }] as state}
             <button
               class="rounded-lg border border-border-light bg-surface-white px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-subtle-gray"
               onclick={() => onSetState?.(state.id as 'empty' | 'loading' | 'loaded' | 'error')}
@@ -251,7 +256,9 @@
             class="mt-1 max-h-32 overflow-y-auto rounded-xl border border-border-light bg-surface-white p-2 font-mono text-[10px] space-y-0.5"
           >
             {#if logs.length === 0}
-              <p class="text-text-muted">Aucun message runtime. Lancez un scan ou changez d’état.</p>
+              <p class="text-text-muted">
+                Aucun message runtime. Lancez un scan ou changez d’état.
+              </p>
             {:else}
               {#each logs as log}
                 <div class="flex gap-2">
@@ -332,7 +339,9 @@
             </div>
           </div>
 
-          <p class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 p-2 text-[10px] text-text-secondary">
+          <p
+            class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 p-2 text-[10px] text-text-secondary"
+          >
             Diagnostic complet : <span class="font-mono text-blueprint-blue">Ctrl+Shift+M</span>
             pour voir cause probable, impact et action recommandée.
           </p>

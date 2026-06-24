@@ -161,7 +161,9 @@
       </div>
 
       <div class="mb-4 rounded-2xl border border-status-orange/25 bg-status-orange/8 p-4">
-        <p class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-status-orange">
+        <p
+          class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-status-orange"
+        >
           <Icon name="alert-triangle" size={13} class="shrink-0" />
           Décision requise
         </p>
@@ -189,7 +191,11 @@
         <Button variant="ghost" onclick={onCancel}>
           {#snippet children()}Annuler{/snippet}
         </Button>
-        <Button variant="primary" onclick={handleConfirm} disabled={isRestoring || !canConfirmRestore}>
+        <Button
+          variant="primary"
+          onclick={handleConfirm}
+          disabled={isRestoring || !canConfirmRestore}
+        >
           {#snippet children()}
             {#if isRestoring}
               <Icon name="loader-2" size={16} class="animate-spin mr-1" />

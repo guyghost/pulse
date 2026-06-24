@@ -104,7 +104,8 @@
       label: 'IA analysée',
       value: insightSummary.semanticAnalyzedCount,
       icon: 'sparkles',
-      stateLabel: insightSummary.semanticAnalyzedCount > 0 ? 'Confiance enrichie' : 'Analyse absente',
+      stateLabel:
+        insightSummary.semanticAnalyzedCount > 0 ? 'Confiance enrichie' : 'Analyse absente',
       hint:
         insightSummary.semanticAnalyzedCount > 0
           ? 'Lire les raisons de score.'

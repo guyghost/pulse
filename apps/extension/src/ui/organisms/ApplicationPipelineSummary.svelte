@@ -39,10 +39,7 @@
       value: summary.dueFollowUps,
       icon: 'calendar-clock',
       stateLabel: summary.dueFollowUps > 0 ? 'À traiter' : 'Normal',
-      hint:
-        summary.dueFollowUps > 0
-          ? 'Ouvrir la relance échue.'
-          : 'Aucune échéance dépassée.',
+      hint: summary.dueFollowUps > 0 ? 'Ouvrir la relance échue.' : 'Aucune échéance dépassée.',
       severity: summary.dueFollowUps > 0 ? 'attention' : 'success',
     },
     {

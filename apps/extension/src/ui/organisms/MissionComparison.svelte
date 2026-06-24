@@ -166,7 +166,9 @@
                 <Icon name="target" size={16} />
               </span>
               <div class="min-w-0 flex-1">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+                <p
+                  class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue"
+                >
                   Décision recommandée
                 </p>
                 <h3 class="mt-1 text-sm font-semibold text-text-primary">
