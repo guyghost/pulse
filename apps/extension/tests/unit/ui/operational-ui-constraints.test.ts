@@ -200,6 +200,21 @@ describe('operational UI constraints', () => {
     expect(source).toContain('function scrollToSettingsSection');
   });
 
+  it('exposes scan frequency, latest trigger, and recent history in Settings', () => {
+    const settingsSource = readFileSync('src/lib/state/settings-page.svelte.ts', 'utf8');
+    const scanSource = readFileSync('src/ui/organisms/ScanSettings.svelte', 'utf8');
+    const pageSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+
+    expect(settingsSource).toContain('async loadScanHistory()');
+    expect(settingsSource).toContain('getConnectorStatuses()');
+    expect(settingsSource).toContain('Dernier déclenchement');
+    expect(settingsSource).toContain('Prochain scan dès que Chrome déclenche l’alarme');
+    expect(scanSource).toContain('aria-label="Historique et cadence des scans"');
+    expect(scanSource).toContain('Historique récent');
+    expect(scanSource).toContain('Prochain déclenchement');
+    expect(pageSource).toContain('lastScanLabel={settings.lastScanLabel}');
+  });
+
   it('keeps alert history visible next to notification volume controls', () => {
     const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
     const alertSource = readFileSync('src/ui/molecules/AlertBuilderCard.svelte', 'utf8');

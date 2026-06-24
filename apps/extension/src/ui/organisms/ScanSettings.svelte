@@ -5,6 +5,10 @@
     autoScan,
     scanInterval,
     notifications,
+    lastScanLabel,
+    scanHistoryLabel,
+    nextScanLabel,
+    scanHistoryTone = 'neutral',
     onToggleAutoScan,
     onToggleNotifications,
     onScanIntervalChange,
@@ -12,6 +16,10 @@
     autoScan: boolean;
     scanInterval: number;
     notifications: boolean;
+    lastScanLabel: string;
+    scanHistoryLabel: string;
+    nextScanLabel: string;
+    scanHistoryTone?: 'success' | 'attention' | 'neutral';
     onToggleAutoScan: () => void;
     onToggleNotifications: () => void;
     onScanIntervalChange: (event: Event) => void;
@@ -80,6 +88,32 @@
     <span class="text-[10px] text-text-muted">2h</span>
   </div>
   <p class="text-center text-sm font-semibold tabular-nums text-text-primary">{scanInterval} min</p>
+  <div class="grid gap-2 sm:grid-cols-3" aria-label="Historique et cadence des scans">
+    <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
+      <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+        Dernier déclenchement
+      </p>
+      <p class="mt-1 text-[11px] leading-4 text-text-secondary">{lastScanLabel}</p>
+    </div>
+    <div
+      class="rounded-lg border px-3 py-2 {scanHistoryTone === 'attention'
+        ? 'border-status-orange/25 bg-status-orange/8'
+        : scanHistoryTone === 'success'
+          ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
+          : 'border-border-light bg-surface-white'}"
+    >
+      <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+        Historique récent
+      </p>
+      <p class="mt-1 text-[11px] leading-4 text-text-secondary">{scanHistoryLabel}</p>
+    </div>
+    <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
+      <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+        Prochain déclenchement
+      </p>
+      <p class="mt-1 text-[11px] leading-4 text-text-secondary">{nextScanLabel}</p>
+    </div>
+  </div>
 </div>
 
 <!-- Notifications -->

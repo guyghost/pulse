@@ -601,6 +601,10 @@
         autoScan={settings.autoScan}
         scanInterval={settings.scanInterval}
         notifications={settings.notifications}
+        lastScanLabel={settings.lastScanLabel}
+        scanHistoryLabel={settings.scanHistoryLabel}
+        nextScanLabel={settings.nextScanLabel}
+        scanHistoryTone={settings.scanHistoryTone}
         onToggleAutoScan={() => settings.toggleAutoScan()}
         onToggleNotifications={() => settings.toggleNotifications()}
         onScanIntervalChange={handleScanIntervalChange}
