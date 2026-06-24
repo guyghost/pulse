@@ -246,6 +246,13 @@ describe('operational UI constraints', () => {
     expect(source).toContain('isTrackingDue(record, now)');
     expect(source).toContain("record.currentStatus === 'application_prepared'");
     expect(source).toContain('onPrimaryAction={handleApplicationStoryAction}');
+    expect(source).toContain('function openRecommendedDossier()');
+    expect(source).toContain('function getRecommendedDossierReason');
+    expect(source).toContain('aria-label="Dossier recommandé"');
+    expect(source).toContain('Dossier recommandé');
+    expect(source.indexOf('Dossier recommandé')).toBeLessThan(
+      source.indexOf('<ApplicationPipelineSummary')
+    );
     expect(source).not.toContain('selectMission(trackedMissions[0].mission.id)');
   });
 

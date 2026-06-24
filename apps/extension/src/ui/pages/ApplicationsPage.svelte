@@ -273,6 +273,27 @@
     onNavigateToFeed?.();
   }
 
+  function openRecommendedDossier(): void {
+    if (!recommendedTrackedMission) {
+      onNavigateToFeed?.();
+      return;
+    }
+
+    void selectMission(recommendedTrackedMission.mission.id);
+  }
+
+  function getRecommendedDossierReason(item: TrackedMission): string {
+    if (isTrackingDue(item.record, Date.now())) {
+      return 'Relance échue: reprenez ce dossier avant de parcourir le reste du pipeline.';
+    }
+
+    if (item.record.currentStatus === 'application_prepared') {
+      return 'Kit prêt: finalisez l’envoi ou changez le statut pour garder le pipeline propre.';
+    }
+
+    return 'Dossier actif: continuez par la dernière mission suivie avant de créer un nouveau dossier.';
+  }
+
   async function transitionTo(status: ApplicationStatus): Promise<void> {
     if (!selectedMission) {
       return;
@@ -417,6 +438,56 @@
           action="Prochaine action : mettre à jour les relances dues et préparer les prochaines actions."
         />
       </div>
+    {/if}
+
+    {#if !isLoading}
+      <section
+        class="mt-3 rounded-xl border border-blueprint-blue/15 bg-surface-white p-3"
+        aria-label="Dossier recommandé"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+              Dossier recommandé
+            </p>
+            {#if recommendedTrackedMission}
+              <h3 class="mt-1 truncate text-sm font-semibold text-text-primary">
+                {recommendedTrackedMission.mission.title}
+              </h3>
+              <p class="mt-1 text-xs leading-5 text-text-subtle">
+                {getRecommendedDossierReason(recommendedTrackedMission)}
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                  class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-[10px] font-medium text-blueprint-blue"
+                >
+                  {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
+                </span>
+                {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
+                  <span class="text-[10px] text-text-muted">
+                    Action {formatNextAction(recommendedTrackedMission.record.nextActionAt)}
+                  </span>
+                {/if}
+              </div>
+            {:else}
+              <h3 class="mt-1 text-sm font-semibold text-text-primary">
+                Aucun dossier suivi pour l’instant
+              </h3>
+              <p class="mt-1 text-xs leading-5 text-text-subtle">
+                Qualifiez une mission depuis le Feed pour transformer la veille en candidature.
+              </p>
+            {/if}
+          </div>
+          <button
+            type="button"
+            class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+            onclick={openRecommendedDossier}
+          >
+            <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
+            {recommendedTrackedMission ? 'Ouvrir' : 'Aller au feed'}
+          </button>
+        </div>
+      </section>
     {/if}
     <ApplicationPipelineSummary summary={pipelineSummary} />
   </section>
