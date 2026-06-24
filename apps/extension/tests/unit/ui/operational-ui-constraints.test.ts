@@ -374,6 +374,7 @@ describe('operational UI constraints', () => {
 
   it('keeps mission investigation actionable before technical details', () => {
     const drawerSource = readFileSync('src/ui/organisms/MissionInvestigationDrawer.svelte', 'utf8');
+    const cardSource = readFileSync('src/ui/molecules/MissionCard.svelte', 'utf8');
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const virtualFeedSource = readFileSync('src/ui/organisms/VirtualMissionFeed.svelte', 'utf8');
 
@@ -382,6 +383,13 @@ describe('operational UI constraints', () => {
     expect(drawerSource).toContain('Comparer');
     expect(drawerSource).toContain('Masquer');
     expect(drawerSource).toContain('Pourquoi ce score ?');
+    expect(cardSource).toContain('Pourquoi ce score ?');
+    expect(cardSource).toContain('function handleScoreDetailsToggle');
+    expect(cardSource).toContain('aria-expanded={scoreDetailsOpen}');
+    expect(cardSource).toContain('aria-controls={scoreDetailsId}');
+    expect(cardSource.indexOf('Pourquoi ce score ?')).toBeLessThan(
+      cardSource.indexOf('<!-- Detail grid -->')
+    );
     expect(drawerSource.indexOf('Transformer la décision')).toBeLessThan(
       drawerSource.indexOf('Détails techniques')
     );

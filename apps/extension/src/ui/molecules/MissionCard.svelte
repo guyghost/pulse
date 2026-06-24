@@ -49,6 +49,7 @@
   } = $props();
 
   let expanded = $state(false);
+  let scoreDetailsOpen = $state(false);
 
   const seniorityLabels: Record<string, string> = {
     junior: 'Junior (0-2 ans)',
@@ -65,6 +66,20 @@
   );
 
   const scoreValue = $derived(mission.scoreBreakdown?.total ?? mission.score ?? 0);
+  const scoreDisplayValue = $derived(
+    mission.scoreBreakdown?.total ?? mission.score ?? mission.semanticScore
+  );
+  const semanticDisplayValue = $derived(mission.scoreBreakdown?.semantic ?? mission.semanticScore);
+  const semanticReason = $derived(mission.scoreBreakdown?.semanticReason ?? mission.semanticReason);
+  const hasScoreDetails = $derived(
+    mission.scoreBreakdown !== null ||
+      mission.score !== null ||
+      mission.semanticScore !== null ||
+      Boolean(semanticReason)
+  );
+  const scoreDetailsId = $derived(
+    `mission-score-details-${mission.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+  );
 
   const decisionInsight = $derived.by(() => {
     if (scoreValue >= 80) {
@@ -120,6 +135,11 @@
 
   function toggleExpand() {
     expanded = !expanded;
+  }
+
+  function handleScoreDetailsToggle(e: MouseEvent) {
+    e.stopPropagation();
+    scoreDetailsOpen = !scoreDetailsOpen;
   }
 
   let copied = $state(false);
@@ -252,11 +272,11 @@
     {#if mission.stack.length > 3}
       <Badge label="+{mission.stack.length - 3}" variant="source" />
     {/if}
-    {#if mission.scoreBreakdown?.semanticReason ?? mission.semanticReason}
+    {#if semanticReason}
       <span
         class="inline-flex items-center gap-1 rounded-full border border-blueprint-blue/15 bg-blueprint-blue/5 px-2 py-0.5 text-[10px] text-blueprint-blue"
       >
-        {mission.scoreBreakdown?.semanticReason ?? mission.semanticReason}
+        {semanticReason}
       </span>
     {/if}
   </div>
@@ -271,6 +291,114 @@
     <p class="text-[9px] font-semibold uppercase tracking-[0.13em]">{decisionInsight.label}</p>
     <p class="mt-1 text-[11px] leading-4 text-text-secondary">{decisionInsight.text}</p>
   </div>
+
+  {#if hasScoreDetails}
+    <button
+      type="button"
+      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-text-subtle transition-colors hover:bg-page-canvas hover:text-blueprint-blue"
+      onclick={handleScoreDetailsToggle}
+      onkeydown={(e) => e.stopPropagation()}
+      aria-expanded={scoreDetailsOpen}
+      aria-controls={scoreDetailsId}
+    >
+      <Icon name="help-circle" size={13} />
+      <span>Pourquoi ce score ?</span>
+      <Icon
+        name="chevron-down"
+        size={12}
+        class="transition-transform duration-150 {scoreDetailsOpen ? 'rotate-180' : ''}"
+      />
+    </button>
+  {/if}
+
+  <!-- Score breakdown — explicit disclosure for quick scan state -->
+  {#if scoreDetailsOpen && hasScoreDetails}
+    <div
+      id={scoreDetailsId}
+      class="mt-3 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 p-3"
+    >
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+            Score expliqué
+          </p>
+          <p class="mt-1 text-[11px] leading-4 text-text-secondary">
+            {#if scoreDisplayValue !== null}
+              Score final {scoreDisplayValue}/100, calculé depuis le profil, l'annonce et les
+              critères disponibles.
+            {:else}
+              L'explication disponible vient du signal sémantique conservé localement.
+            {/if}
+          </p>
+        </div>
+        {#if mission.scoreBreakdown}
+          <span
+            class="shrink-0 rounded-md bg-surface-white px-2 py-1 font-mono text-[10px] font-semibold text-text-primary"
+          >
+            Base {mission.scoreBreakdown.deterministic}
+          </span>
+        {/if}
+      </div>
+      <p class="mt-2 text-[10px] leading-4 text-text-subtle">
+        Les critères sont des faits calculés. L'IA sémantique, quand elle existe, ajoute une
+        hypothèse locale et reste non bloquante.
+      </p>
+
+      {#if mission.scoreBreakdown}
+        {@const lines = [
+          { label: 'Compétences', value: mission.scoreBreakdown.criteria.stack },
+          { label: 'TJM', value: mission.scoreBreakdown.criteria.tjm },
+          { label: 'Localisation', value: mission.scoreBreakdown.criteria.location },
+          { label: 'Mode de travail', value: mission.scoreBreakdown.criteria.remote },
+        ]}
+        <div class="mt-3 space-y-1.5">
+          {#each lines as line}
+            {@const grade = scoreToGrade(line.value)}
+            {@const color =
+              grade === 'A'
+                ? 'bg-accent-green text-surface-white'
+                : grade === 'B'
+                  ? 'bg-accent-amber text-surface-white'
+                  : grade === 'C'
+                    ? 'bg-status-orange text-surface-white'
+                    : 'bg-disabled-gray text-text-secondary'}
+            <div class="flex items-center gap-2.5 py-0.5">
+              <span class="text-[11px] text-text-subtle flex-1">{line.label}</span>
+              <span
+                class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold font-mono {color}"
+              >
+                {grade}
+              </span>
+            </div>
+          {/each}
+          {#if semanticDisplayValue !== null}
+            {@const sg = scoreToGrade(semanticDisplayValue)}
+            <div class="flex items-center gap-2.5 py-0.5">
+              <span class="text-[11px] text-blueprint-blue flex-1">IA sémantique</span>
+              <span
+                class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blueprint-blue text-surface-white text-[10px] font-bold font-mono"
+              >
+                {sg}
+              </span>
+            </div>
+          {/if}
+        </div>
+      {:else}
+        <p
+          class="mt-3 rounded-md bg-surface-white px-3 py-2 text-[10px] leading-4 text-text-subtle"
+        >
+          Score historique conservé sans détail par critère. Relancez un scan pour reconstruire les
+          critères stack, TJM, localisation et remote.
+        </p>
+      {/if}
+
+      {#if semanticReason}
+        <p class="pt-2 text-[10px] leading-snug text-blueprint-blue">
+          {semanticReason}
+        </p>
+      {/if}
+    </div>
+  {/if}
 
   <!-- Detail grid -->
   {#if expanded}
@@ -315,75 +443,6 @@
           <p class="mt-1 truncate text-text-primary">{mission.source}</p>
         </div>
       </div>
-    </div>
-  {/if}
-
-  <!-- Score breakdown — subway line style -->
-  {#if expanded && mission.scoreBreakdown}
-    {@const lines = [
-      { label: 'Compétences', value: mission.scoreBreakdown.criteria.stack },
-      { label: 'TJM', value: mission.scoreBreakdown.criteria.tjm },
-      { label: 'Localisation', value: mission.scoreBreakdown.criteria.location },
-      { label: 'Mode de travail', value: mission.scoreBreakdown.criteria.remote },
-    ]}
-    <div class="mt-4 border-t border-border-light pt-3 space-y-1.5">
-      <div class="mb-3 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2">
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-              Pourquoi ce score ?
-            </p>
-            <p class="mt-1 text-[11px] leading-4 text-text-secondary">
-              Score final {mission.scoreBreakdown.total}/100, calculé depuis le profil, l'annonce et
-              les critères ci-dessous.
-            </p>
-          </div>
-          <span
-            class="shrink-0 rounded-md bg-surface-white px-2 py-1 font-mono text-[10px] font-semibold text-text-primary"
-          >
-            Base {mission.scoreBreakdown.deterministic}
-          </span>
-        </div>
-        <p class="mt-2 text-[10px] leading-4 text-text-subtle">
-          Les critères sont des faits calculés. L'IA sémantique, quand elle existe, ajoute une
-          hypothèse locale et reste non bloquante.
-        </p>
-      </div>
-      {#each lines as line}
-        {@const grade = scoreToGrade(line.value)}
-        {@const color =
-          grade === 'A'
-            ? 'bg-accent-green text-surface-white'
-            : grade === 'B'
-              ? 'bg-accent-amber text-surface-white'
-              : grade === 'C'
-                ? 'bg-status-orange text-surface-white'
-                : 'bg-disabled-gray text-text-secondary'}
-        <div class="flex items-center gap-2.5 py-0.5">
-          <span class="text-[11px] text-text-subtle flex-1">{line.label}</span>
-          <span
-            class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold font-mono {color}"
-          >
-            {grade}
-          </span>
-        </div>
-      {/each}
-      {#if mission.scoreBreakdown.semantic !== null}
-        {@const sg = scoreToGrade(mission.scoreBreakdown.semantic)}
-        <div class="flex items-center gap-2.5 py-0.5">
-          <span class="text-[11px] text-blueprint-blue flex-1">IA sémantique</span>
-          <span
-            class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blueprint-blue text-surface-white text-[10px] font-bold font-mono"
-          >
-            {sg}
-          </span>
-        </div>
-      {/if}
-      {#if mission.scoreBreakdown.semanticReason}
-        <p class="pt-1 text-[10px] leading-snug text-blueprint-blue">
-          {mission.scoreBreakdown.semanticReason}
-        </p>
-      {/if}
     </div>
   {/if}
 
