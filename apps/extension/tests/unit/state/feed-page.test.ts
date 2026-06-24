@@ -236,6 +236,53 @@ describe('feed page state', () => {
     expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-1', 'new-2']);
   });
 
+  it('applies decision presets for business-oriented feed filtering', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([
+      makeMission({ id: 'priority-remote', score: 92, remote: 'full' }),
+      makeMission({ id: 'priority-onsite', score: 88, remote: 'onsite' }),
+      makeMission({ id: 'remote-good', score: 72, remote: 'hybrid' }),
+      makeMission({ id: 'weak-onsite', score: 41, remote: 'onsite' }),
+    ]);
+
+    expect(page.decisionPresets.map((preset) => [preset.id, preset.count])).toEqual([
+      ['priority', 2],
+      ['remote-compatible', 2],
+      ['tjm-negotiation', 0],
+      ['new', 4],
+    ]);
+
+    page.applyDecisionPreset('priority');
+
+    expect(page.decisionPreset).toBe('priority');
+    expect(page.visibleCount).toBe(2);
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+      'priority-remote',
+      'priority-onsite',
+    ]);
+
+    page.applyDecisionPreset('remote-compatible');
+
+    expect(page.decisionPreset).toBe('remote-compatible');
+    expect(page.visibleCount).toBe(2);
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+      'priority-remote',
+      'remote-good',
+    ]);
+
+    page.handleMissionSeen('priority-remote');
+    page.applyDecisionPreset('new');
+
+    expect(page.decisionPreset).toBe('new');
+    expect(page.visibleCount).toBe(3);
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+      'priority-onsite',
+      'remote-good',
+      'weak-onsite',
+    ]);
+  });
+
   it('saves, applies and deletes feed views', async () => {
     const feed = createFeedStore();
     const page = createFeedPageState(feed, makeController());
@@ -255,6 +302,7 @@ describe('feed page state', () => {
         filters: expect.objectContaining({
           selectedRemote: 'full',
           selectedScoreBucket: 'strong',
+          decisionPreset: null,
           sortBy: 'date',
         }),
       }),

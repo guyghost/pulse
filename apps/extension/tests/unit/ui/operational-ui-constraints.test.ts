@@ -297,6 +297,20 @@ describe('operational UI constraints', () => {
     );
   });
 
+  it('keeps feed filters decision-oriented with business presets', () => {
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const stateSource = readFileSync('src/lib/state/feed-page.svelte.ts', 'utf8');
+
+    expect(stateSource).toContain('type DecisionPresetId');
+    expect(stateSource).toContain('const decisionPresets = $derived.by');
+    expect(stateSource).toContain('function applyDecisionPreset');
+    expect(stateSource).toContain('Remote compatible');
+    expect(stateSource).toContain('TJM à négocier');
+    expect(feedSource).toContain('Presets métier');
+    expect(feedSource).toContain('page.decisionPresets');
+    expect(feedSource).toContain('page.applyDecisionPreset(preset.id)');
+  });
+
   it('keeps mission comparison decision-first before technical details', () => {
     const source = readFileSync('src/ui/organisms/MissionComparison.svelte', 'utf8');
 

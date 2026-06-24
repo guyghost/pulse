@@ -1159,6 +1159,42 @@
             </Tooltip>
           </div>
 
+          <div class="mt-2" aria-label="Presets métier du feed">
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                Presets métier
+              </p>
+              {#if page.decisionPreset}
+                <button
+                  type="button"
+                  class="text-[10px] font-medium text-blueprint-blue hover:text-blueprint-blue/80"
+                  onclick={page.clearAllFilters}
+                >
+                  Réinitialiser
+                </button>
+              {/if}
+            </div>
+            <div class="flex gap-1.5 overflow-x-auto pb-1">
+              {#each page.decisionPresets as preset}
+                <button
+                  type="button"
+                  class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
+                    ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                    : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                  onclick={() => page.applyDecisionPreset(preset.id)}
+                  aria-pressed={preset.active}
+                  disabled={preset.count === 0 && !preset.active}
+                  title={preset.description}
+                >
+                  <span>{preset.label}</span>
+                  <span class="rounded-md bg-page-canvas px-1 py-0.5 text-[9px]">
+                    {preset.count}
+                  </span>
+                </button>
+              {/each}
+            </div>
+          </div>
+
           {#if page.showFilters}
             <div
               id="filter-panel"

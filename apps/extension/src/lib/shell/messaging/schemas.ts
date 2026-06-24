@@ -72,6 +72,10 @@ const FeedSavedViewSchema = z
         selectedRemote: z.enum(['full', 'hybrid', 'onsite']).nullable(),
         selectedSeniority: z.enum(['junior', 'confirmed', 'senior']).nullable(),
         selectedScoreBucket: z.enum(['strong', 'good', 'weak']).nullable(),
+        decisionPreset: z
+          .enum(['priority', 'remote-compatible', 'tjm-negotiation', 'new'])
+          .nullable()
+          .default(null),
         showNewOnly: z.boolean(),
         showFavoritesOnly: z.boolean(),
         showHidden: z.boolean(),
