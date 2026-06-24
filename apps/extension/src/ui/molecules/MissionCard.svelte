@@ -327,6 +327,28 @@
       { label: 'Mode de travail', value: mission.scoreBreakdown.criteria.remote },
     ]}
     <div class="mt-4 border-t border-border-light pt-3 space-y-1.5">
+      <div class="mb-3 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+              Pourquoi ce score ?
+            </p>
+            <p class="mt-1 text-[11px] leading-4 text-text-secondary">
+              Score final {mission.scoreBreakdown.total}/100, calculé depuis le profil, l'annonce et
+              les critères ci-dessous.
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-md bg-surface-white px-2 py-1 font-mono text-[10px] font-semibold text-text-primary"
+          >
+            Base {mission.scoreBreakdown.deterministic}
+          </span>
+        </div>
+        <p class="mt-2 text-[10px] leading-4 text-text-subtle">
+          Les critères sont des faits calculés. L'IA sémantique, quand elle existe, ajoute une
+          hypothèse locale et reste non bloquante.
+        </p>
+      </div>
       {#each lines as line}
         {@const grade = scoreToGrade(line.value)}
         {@const color =
