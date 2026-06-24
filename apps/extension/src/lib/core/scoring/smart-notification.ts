@@ -15,6 +15,14 @@ export interface SmartNotificationCriteria {
   maxResults: number;
 }
 
+export interface SmartNotificationPreview {
+  totalMissions: number;
+  seenCount: number;
+  matchingCount: number;
+  notifyCount: number;
+  limitedCount: number;
+}
+
 export const DEFAULT_SMART_CRITERIA: SmartNotificationCriteria = {
   scoreThreshold: 70,
   requiredStacks: [],
@@ -77,4 +85,25 @@ export const filterSmartNotifications = (
     })
     .sort((a, b) => (bestScore(b) ?? 0) - (bestScore(a) ?? 0))
     .slice(0, criteria.maxResults);
+};
+
+export const summarizeSmartNotificationPreview = (
+  missions: Mission[],
+  seenIds: string[],
+  criteria: SmartNotificationCriteria
+): SmartNotificationPreview => {
+  const allMatches = filterSmartNotifications(missions, seenIds, {
+    ...criteria,
+    maxResults: Number.MAX_SAFE_INTEGER,
+  });
+  const seenSet = new Set(seenIds);
+  const notifyCount = Math.min(allMatches.length, Math.max(0, criteria.maxResults));
+
+  return {
+    totalMissions: missions.length,
+    seenCount: missions.filter((mission) => seenSet.has(mission.id)).length,
+    matchingCount: allMatches.length,
+    notifyCount,
+    limitedCount: Math.max(0, allMatches.length - notifyCount),
+  };
 };

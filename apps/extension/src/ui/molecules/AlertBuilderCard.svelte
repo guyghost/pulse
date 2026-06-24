@@ -1,16 +1,22 @@
 <script lang="ts">
   import { Icon } from '@pulse/ui';
+  import type { Mission } from '$lib/core/types/mission';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
+  import { summarizeSmartNotificationPreview } from '$lib/core/scoring/smart-notification';
   import OperationalStatusBadge from '../atoms/OperationalStatusBadge.svelte';
 
   const {
     preferences,
     availableStacks = [],
+    previewMissions = [],
+    seenMissionIds = [],
     isSaving = false,
     onSave,
   }: {
     preferences: ConnectedAlertPreferences;
     availableStacks?: string[];
+    previewMissions?: Mission[];
+    seenMissionIds?: string[];
     isSaving?: boolean;
     onSave?: (preferences: ConnectedAlertPreferences) => void;
   } = $props();
@@ -47,6 +53,45 @@
       (stack) => !requiredStacks.some((selected) => selected.toLowerCase() === stack.toLowerCase())
     )
   );
+
+  const alertPreview = $derived.by(() =>
+    summarizeSmartNotificationPreview(previewMissions, seenMissionIds, {
+      scoreThreshold,
+      requiredStacks,
+      minTJM: minDailyRate,
+      maxResults,
+    })
+  );
+
+  const alertPreviewText = $derived.by(() => {
+    if (!enabled) {
+      return 'Aucune notification ne partira tant que l’alerte reste désactivée.';
+    }
+
+    if (alertPreview.totalMissions === 0) {
+      return 'Aucun scan local disponible pour estimer le volume. Lancez un scan pour calibrer cette alerte.';
+    }
+
+    if (alertPreview.notifyCount === 0) {
+      return 'Avec vos données actuelles, aucune mission non vue ne franchirait ces critères.';
+    }
+
+    const missionLabel = `${alertPreview.notifyCount} mission${alertPreview.notifyCount > 1 ? 's' : ''}`;
+    const limitLabel =
+      alertPreview.limitedCount > 0
+        ? ` ${alertPreview.limitedCount} autre${alertPreview.limitedCount > 1 ? 's' : ''} resterait${alertPreview.limitedCount > 1 ? 'ent' : ''} hors notification à cause de la limite.`
+        : '';
+
+    return `Avec vos données actuelles, cette alerte notifierait ${missionLabel}.${limitLabel}`;
+  });
+
+  const alertPreviewSeenText = $derived.by(() => {
+    const missionLabel = `${alertPreview.seenCount} mission${alertPreview.seenCount > 1 ? 's' : ''}`;
+    const seenLabel = `déjà vue${alertPreview.seenCount > 1 ? 's' : ''}`;
+    const excludedLabel = `exclue${alertPreview.seenCount > 1 ? 's' : ''}`;
+
+    return `${missionLabel} ${seenLabel} ${excludedLabel} du volume.`;
+  });
 
   function addStack(value = stackInput): void {
     const clean = value.trim();
@@ -204,6 +249,42 @@
         </div>
       {/if}
     </div>
+  </div>
+
+  <div
+    class="mt-4 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3"
+    aria-live="polite"
+  >
+    <div class="flex items-start gap-2">
+      <Icon name="activity" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+      <div class="min-w-0">
+        <p class="text-xs font-medium text-text-primary">Aperçu avec vos données actuelles</p>
+        <p class="mt-1 text-[11px] leading-5 text-text-subtle">{alertPreviewText}</p>
+      </div>
+    </div>
+    <div class="mt-3 grid grid-cols-3 gap-2 text-center">
+      <div class="rounded-md bg-surface-white px-2 py-2">
+        <p class="font-mono text-sm font-semibold tabular-nums text-text-primary">
+          {alertPreview.totalMissions}
+        </p>
+        <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Locales</p>
+      </div>
+      <div class="rounded-md bg-surface-white px-2 py-2">
+        <p class="font-mono text-sm font-semibold tabular-nums text-text-primary">
+          {alertPreview.matchingCount}
+        </p>
+        <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Éligibles</p>
+      </div>
+      <div class="rounded-md bg-surface-white px-2 py-2">
+        <p class="font-mono text-sm font-semibold tabular-nums text-text-primary">
+          {alertPreview.notifyCount}
+        </p>
+        <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Notifiées</p>
+      </div>
+    </div>
+    {#if alertPreview.seenCount > 0}
+      <p class="mt-2 text-[10px] leading-4 text-text-muted">{alertPreviewSeenText}</p>
+    {/if}
   </div>
 
   <button

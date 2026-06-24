@@ -5,6 +5,7 @@
   import ProfileSection from '../organisms/ProfileSection.svelte';
   import ScanSettings from '../organisms/ScanSettings.svelte';
   import DangerZone from '../organisms/DangerZone.svelte';
+  import type { Mission } from '$lib/core/types/mission';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast } from '$lib/shell/notifications/toast-service';
@@ -19,7 +20,7 @@
     getAlertPreferences,
     saveAlertPreferences,
   } from '$lib/shell/facades/alert-preferences.facade';
-  import { getFavorites } from '$lib/shell/facades/feed-data.facade';
+  import { getFavorites, getMissions, getSeenIds } from '$lib/shell/facades/feed-data.facade';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 
   const {
@@ -39,15 +40,21 @@
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let isSavingAlertPreferences = $state(false);
   let favoriteExportCount = $state(0);
+  let alertPreviewMissions = $state<Mission[]>([]);
+  let alertPreviewSeenIds = $state<string[]>([]);
   let aiSettingsSection: HTMLElement | null = $state(null);
 
   (async () => {
-    const [storedAlertPreferences, favorites] = await Promise.all([
+    const [storedAlertPreferences, favorites, missions, seenIds] = await Promise.all([
       getAlertPreferences(),
       getFavorites(),
+      getMissions(),
+      getSeenIds(),
     ]);
     alertPreferences = storedAlertPreferences;
     favoriteExportCount = Object.keys(favorites).length;
+    alertPreviewMissions = missions;
+    alertPreviewSeenIds = seenIds;
   })().catch(() => {});
 
   async function handleExportFavorites(format: ExportFormat) {
@@ -358,15 +365,15 @@
           settings.aiAvailability === 'after-download'
             ? ('attention' as const)
             : ('incident' as const),
-      statusLabel: 'IA locale limitee',
-      title: 'Le scoring semantique ne couvre pas toutes les missions',
-      description:
-        'Pulse continue avec le scoring de base. Activez ou telechargez Gemini Nano pour enrichir les insights.',
-      evidence,
-      primaryActionLabel: 'Voir les reglages IA',
-      primaryActionIcon: 'cpu',
-    };
-  }
+        statusLabel: 'IA locale limitee',
+        title: 'Le scoring semantique ne couvre pas toutes les missions',
+        description:
+          'Pulse continue avec le scoring de base. Activez ou telechargez Gemini Nano pour enrichir les insights.',
+        evidence,
+        primaryActionLabel: 'Voir les reglages IA',
+        primaryActionIcon: 'cpu',
+      };
+    }
 
     return {
       severity: 'success' as const,
@@ -457,6 +464,8 @@
     <AlertBuilderCard
       preferences={alertPreferences}
       availableStacks={settings.profileStack}
+      previewMissions={alertPreviewMissions}
+      seenMissionIds={alertPreviewSeenIds}
       isSaving={isSavingAlertPreferences}
       onSave={handleSaveAlertPreferences}
     />
