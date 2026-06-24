@@ -5,6 +5,7 @@ describe('auth copy', () => {
   const registerSource = readFileSync('src/routes/register/+page.svelte', 'utf8');
   const loginSource = readFileSync('src/routes/login/+page.svelte', 'utf8');
   const registerPasskeySource = readFileSync('src/routes/register/passkey/+page.svelte', 'utf8');
+  const passkeySource = readFileSync('src/lib/auth/passkey.ts', 'utf8');
   const normalizedRegisterSource = registerSource.replace(/\s+/g, ' ');
   const normalizedLoginSource = loginSource.replace(/\s+/g, ' ');
   const normalizedRegisterPasskeySource = registerPasskeySource.replace(/\s+/g, ' ');
@@ -34,5 +35,21 @@ describe('auth copy', () => {
     expect(normalizedRegisterPasskeySource).toContain('clé de sécurité');
     expect(registerPasskeySource).not.toContain('Creation du passkey');
     expect(registerPasskeySource).not.toContain('cle de securite');
+  });
+
+  it('keeps passkey error messages accented and user-facing', () => {
+    expect(passkeySource).toContain('La création ou la validation du passkey a été annulée.');
+    expect(passkeySource).toContain(
+      "Le passkey doit être utilisé depuis l'origine locale autorisée."
+    );
+    expect(passkeySource).toContain("L'opération passkey a échoué.");
+    expect(passkeySource).toContain('Réponse passkey invalide');
+    expect(passkeySource).toContain('Le navigateur n’a pas retourné de passkey valide.');
+    expect(passkeySource).toContain('La requête passkey a échoué.');
+    expect(passkeySource).toContain('Session introuvable. Relancez la création de compte.');
+    expect(passkeySource).toContain("La session passkey n'a pas pu être créée.");
+    expect(passkeySource).not.toContain('creation');
+    expect(passkeySource).not.toContain('Reponse passkey invalide');
+    expect(passkeySource).not.toContain('requete passkey');
   });
 });
