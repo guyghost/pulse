@@ -12,7 +12,7 @@
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import ConnectorStatusList from '../molecules/ConnectorStatusList.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import FilterBar from '../organisms/FilterBar.svelte';
   import FeedActionDashboard from '../organisms/FeedActionDashboard.svelte';
   import SourceHealthPanel from '../organisms/SourceHealthPanel.svelte';
@@ -41,6 +41,19 @@
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
+
+  type FeedActionQueueTone = 'critical' | 'attention' | 'success' | 'neutral';
+
+  type FeedActionQueueItem = {
+    id: string;
+    title: string;
+    description: string;
+    icon: IconName;
+    endIcon: IconName;
+    tone: FeedActionQueueTone;
+    action: () => void;
+    disabled?: boolean;
+  };
 
   // ============================================================
   // Initialization
@@ -163,6 +176,99 @@
       return 0;
     }
     return alertMissions.length;
+  });
+
+  const feedActionQueue = $derived.by((): FeedActionQueueItem[] => {
+    const actions: FeedActionQueueItem[] = [];
+    const firstBroken = brokenConnectors[0];
+    const newCount = page.dashboardSummary.newCount;
+    const highScoreCount = page.dashboardSummary.highScoreCount;
+    const visibleCount = page.dashboardSummary.visibleCount;
+
+    if (firstBroken) {
+      actions.push({
+        id: 'source-diagnostic',
+        title: `Corriger ${firstBroken.connectorName}`,
+        description: 'Relance le diagnostic avant de faire confiance au radar.',
+        icon: 'circle-alert',
+        endIcon: 'refresh-cw',
+        tone: 'critical',
+        action: recheckFirstBrokenConnector,
+      });
+    }
+
+    if (alertMatchCount > 0) {
+      actions.push({
+        id: 'alert-priority',
+        title: `Traiter ${formatMissionCount(alertMatchCount)} en alerte`,
+        description: `Seuil ${alertPreferences.scoreThreshold}+ franchi selon vos critères.`,
+        icon: 'target',
+        endIcon: 'chevron-down',
+        tone: 'success',
+        action: showPriorityMissions,
+      });
+    } else if (highScoreCount > 0) {
+      actions.push({
+        id: 'high-score',
+        title: `Isoler ${formatMissionCount(highScoreCount)} 80+`,
+        description: 'Filtre les missions les plus fortes avant les insights secondaires.',
+        icon: 'target',
+        endIcon: 'chevron-down',
+        tone: 'success',
+        action: showPriorityMissions,
+      });
+    }
+
+    if (newCount > 0) {
+      actions.push({
+        id: 'new-missions',
+        title: `Qualifier ${formatMissionCount(newCount)}`,
+        description: 'Affiche uniquement les missions non vues à traiter maintenant.',
+        icon: 'sparkles',
+        endIcon: 'chevron-down',
+        tone: 'attention',
+        action: showNewMissions,
+      });
+    }
+
+    if (page.comparisonMissions.length >= 2) {
+      actions.push({
+        id: 'compare',
+        title: 'Comparer la sélection',
+        description: 'Départage les missions retenues avant de postuler.',
+        icon: 'git-compare-arrows',
+        endIcon: 'git-compare-arrows',
+        tone: 'neutral',
+        action: openComparison,
+      });
+    }
+
+    if (actions.length < 3) {
+      if (visibleCount > 0) {
+        actions.push({
+          id: 'mission-list',
+          title: 'Passer à la liste',
+          description: `${formatMissionCount(visibleCount)} visibles selon les filtres courants.`,
+          icon: 'chevron-down',
+          endIcon: 'chevron-down',
+          tone: 'neutral',
+          action: scrollToMissionFeedAction,
+        });
+      } else {
+        actions.push({
+          id: 'scan',
+          title: 'Lancer le scan',
+          description: 'Alimente le radar avec les sources connectées.',
+          icon: 'scan-line',
+          endIcon: 'play',
+          tone: 'neutral',
+          action: startFeedScanFromQueue,
+          disabled: page.isOffline || controller.isScanning || page.isLoading,
+        });
+      }
+    }
+
+    return actions.slice(0, 3);
   });
 
   const feedStory = $derived.by(() => {
@@ -335,6 +441,41 @@
     controller.startScan();
   }
 
+  function recheckFirstBrokenConnector(): void {
+    const firstBroken = brokenConnectors[0];
+    if (!firstBroken) {
+      return;
+    }
+    controller.recheckConnector(firstBroken.connectorId);
+  }
+
+  function showPriorityMissions(): void {
+    if (alertMatchCount > 0) {
+      showAlertOnly = true;
+    } else if (page.selectedScoreBucket !== 'strong') {
+      page.setSelectedScoreBucket('strong');
+    }
+    void scrollToMissionFeed();
+  }
+
+  function showNewMissions(): void {
+    if (!page.showNewOnly) {
+      page.toggleNewOnly();
+    }
+    void scrollToMissionFeed();
+  }
+
+  function scrollToMissionFeedAction(): void {
+    void scrollToMissionFeed();
+  }
+
+  function startFeedScanFromQueue(): void {
+    if (page.isOffline || controller.isScanning || page.isLoading) {
+      return;
+    }
+    controller.startScan();
+  }
+
   function handleClearMissionFilters(): void {
     showAlertOnly = false;
     page.clearAllFilters();
@@ -365,6 +506,19 @@
 
   function handleOpenExternalUrl(url: string): void {
     openExternalUrl(url).catch(() => {});
+  }
+
+  function feedActionToneClass(tone: FeedActionQueueTone): string {
+    if (tone === 'critical') {
+      return 'border-status-red/25 bg-status-red/6 text-status-red hover:bg-status-red/10';
+    }
+    if (tone === 'attention') {
+      return 'border-status-orange/25 bg-status-orange/6 text-status-orange hover:bg-status-orange/10';
+    }
+    if (tone === 'success') {
+      return 'border-blueprint-blue/20 bg-blueprint-blue/6 text-blueprint-blue hover:bg-blueprint-blue/10';
+    }
+    return 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray';
   }
 
   (async () => {
@@ -455,6 +609,58 @@
     });
   });
 </script>
+
+{#snippet feedActionQueueBlock(compact: boolean)}
+  <div
+    class={compact
+      ? 'mt-2 border-t border-border-light pt-2'
+      : 'mt-3 border-t border-border-light pt-3'}
+  >
+    <div class="mb-2 flex items-center justify-between gap-3">
+      <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+        File d’actions
+      </p>
+      <p class="text-[10px] text-text-muted">
+        {feedActionQueue.length} priorité{feedActionQueue.length > 1 ? 's' : ''}
+      </p>
+    </div>
+    <div
+      class="grid gap-2"
+      data-testid="feed-action-queue"
+      aria-label="Actions prioritaires du feed"
+    >
+      {#each feedActionQueue as item (item.id)}
+        <button
+          type="button"
+          class="group flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-left transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-55 {feedActionToneClass(
+            item.tone
+          )}"
+          onclick={item.action}
+          disabled={item.disabled}
+          aria-label={`Action prioritaire: ${item.title}. ${item.description}`}
+        >
+          <span
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-white/80"
+            aria-hidden="true"
+          >
+            <Icon name={item.icon} size={14} />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-xs font-semibold text-text-primary">{item.title}</span>
+            <span class="mt-0.5 block text-[10px] leading-4 text-text-subtle">
+              {item.description}
+            </span>
+          </span>
+          <Icon
+            name={item.endIcon}
+            size={13}
+            class="shrink-0 opacity-55 transition-opacity group-hover:opacity-100"
+          />
+        </button>
+      {/each}
+    </div>
+  </div>
+{/snippet}
 
 <div
   bind:this={feedScrollContainer}
@@ -591,6 +797,7 @@
                 onPrimaryAction={handleFeedStoryPrimaryAction}
               />
             </div>
+            {@render feedActionQueueBlock(true)}
             <FeedActionDashboard
               summary={page.dashboardSummary}
               insightSummary={page.insightSummary}
@@ -703,6 +910,7 @@
                 onPrimaryAction={handleFeedStoryPrimaryAction}
               />
             </div>
+            {@render feedActionQueueBlock(false)}
 
             <ConnectorStatusList
               statuses={controller.connectorStatuses}

@@ -267,6 +267,23 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('Facteurs de scoring du périmètre courant');
   });
 
+  it('keeps the feed story followed by a compact action queue', () => {
+    const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+
+    expect(source).toContain('type FeedActionQueueItem');
+    expect(source).toContain('const feedActionQueue = $derived.by');
+    expect(source).toContain('data-testid="feed-action-queue"');
+    expect(source).toContain('File d’actions');
+    expect(source).toContain('Corriger ${firstBroken.connectorName}');
+    expect(source).toContain('Traiter ${formatMissionCount(alertMatchCount)} en alerte');
+    expect(source).toContain('Qualifier ${formatMissionCount(newCount)}');
+    expect(source).toContain('{@render feedActionQueueBlock(true)}');
+    expect(source).toContain('{@render feedActionQueueBlock(false)}');
+    expect(source.indexOf('{@render feedActionQueueBlock(false)}')).toBeLessThan(
+      source.indexOf('<ConnectorStatusList')
+    );
+  });
+
   it('keeps mission comparison decision-first before technical details', () => {
     const source = readFileSync('src/ui/organisms/MissionComparison.svelte', 'utf8');
 
