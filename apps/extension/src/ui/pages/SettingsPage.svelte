@@ -3,7 +3,6 @@
   import { Icon } from '@pulse/ui';
   import type { IconName } from '@pulse/ui';
   import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
-  import ProfileSection from '../organisms/ProfileSection.svelte';
   import ScanSettings from '../organisms/ScanSettings.svelte';
   import DangerZone from '../organisms/DangerZone.svelte';
   import type { Mission } from '$lib/core/types/mission';
@@ -60,7 +59,7 @@
       id: 'sources',
       label: 'Sources',
       title: 'Radar et cadence',
-      description: 'Profil, plateformes locales et fréquence de scan.',
+      description: 'Plateformes locales et fréquence de scan.',
       icon: 'radar',
     },
     {
@@ -566,36 +565,14 @@
         <div>
           <p class="eyebrow text-text-muted">Sources</p>
           <h3 id="settings-sources-title" class="mt-1 text-sm font-semibold text-text-primary">
-            Calibrer le radar local
+            Piloter le radar local
           </h3>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Profil, critères et cadence de scan alimentent les résultats visibles dans le feed.
+            Cadence, notifications et historique source alimentent les résultats visibles dans le
+            feed.
           </p>
         </div>
       </div>
-
-      <ProfileSection
-        bind:firstName={settings.firstName}
-        bind:jobTitle={settings.jobTitle}
-        bind:profileLocation={settings.profileLocation}
-        bind:profileRemote={settings.profileRemote}
-        bind:seniority={settings.seniority}
-        bind:tjmMin={settings.tjmMin}
-        bind:tjmMax={settings.tjmMax}
-        bind:profileStack={settings.profileStack}
-        bind:stackInput={settings.stackInput}
-        bind:searchKeywords={settings.searchKeywords}
-        bind:keywordInput={settings.keywordInput}
-        editing={settings.editingProfile}
-        profileSaved={settings.profileSaved}
-        profileError={settings.profileError}
-        onToggleEdit={() => settings.toggleProfileEditing()}
-        onSave={() => settings.saveProfile()}
-        onAddStack={() => settings.addStack()}
-        onRemoveStack={(tech) => settings.removeStack(tech)}
-        onAddKeyword={() => settings.addKeyword()}
-        onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
-      />
 
       <ScanSettings
         autoScan={settings.autoScan}

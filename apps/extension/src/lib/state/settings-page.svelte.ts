@@ -71,6 +71,23 @@ const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({
   searchKeywords: profile.searchKeywords ?? [],
 });
 
+const normalizeTextInput = (value: string): string => value.trim().replace(/\s+/g, ' ');
+
+const normalizeDailyRate = (value: number): number => {
+  const numeric = Number(value);
+  if (!Number.isFinite(numeric) || numeric < 0) {
+    return 0;
+  }
+  return Math.round(numeric);
+};
+
+function appendUniqueNormalized(items: string[], pendingItem: string): string[] {
+  const normalizedItems = items.map(normalizeTextInput).filter(Boolean);
+  const normalizedPending = normalizeTextInput(pendingItem);
+  const nextItems = normalizedPending ? [...normalizedItems, normalizedPending] : normalizedItems;
+  return Array.from(new Set(nextItems));
+}
+
 const formatBackupDateKey = (timestamp: number): string =>
   new Date(timestamp).toISOString().split('T')[0] ?? 'backup';
 
@@ -309,7 +326,7 @@ export class SettingsPageController {
   }
 
   addStack(): void {
-    const trimmed = this.stackInput.trim();
+    const trimmed = normalizeTextInput(this.stackInput);
     if (!trimmed || this.profileStack.includes(trimmed)) {
       return;
     }
@@ -323,7 +340,7 @@ export class SettingsPageController {
   }
 
   addKeyword(): void {
-    const trimmed = this.keywordInput.trim();
+    const trimmed = normalizeTextInput(this.keywordInput);
     if (!trimmed || this.searchKeywords.includes(trimmed)) {
       return;
     }
@@ -338,23 +355,43 @@ export class SettingsPageController {
 
   async saveProfile(): Promise<void> {
     this.profileError = null;
+    this.profileSaved = false;
 
     try {
       const current = await getProfile();
+      const nextStack = appendUniqueNormalized(this.profileStack, this.stackInput);
+      const nextSearchKeywords = appendUniqueNormalized(this.searchKeywords, this.keywordInput);
+      const nextTjmMin = normalizeDailyRate(this.tjmMin);
+      const nextTjmMax = normalizeDailyRate(this.tjmMax);
+
+      if (nextTjmMax > 0 && nextTjmMin > nextTjmMax) {
+        this.profileError = 'Le TJM maximum doit être supérieur ou égal au TJM minimum';
+        return;
+      }
+
       const nextProfile = withProfileDefaults({
-        firstName: this.firstName,
-        jobTitle: this.jobTitle,
-        location: this.profileLocation,
-        tjmMin: this.tjmMin,
-        tjmMax: this.tjmMax,
-        stack: [...this.profileStack],
+        firstName: normalizeTextInput(this.firstName),
+        jobTitle: normalizeTextInput(this.jobTitle),
+        location: normalizeTextInput(this.profileLocation),
+        tjmMin: nextTjmMin,
+        tjmMax: nextTjmMax,
+        stack: nextStack,
         remote: this.profileRemote,
         seniority: this.seniority,
         scoringWeights: current?.scoringWeights,
-        searchKeywords: [...this.searchKeywords],
+        searchKeywords: nextSearchKeywords,
       });
 
       await saveProfile(nextProfile);
+      this.firstName = nextProfile.firstName;
+      this.jobTitle = nextProfile.jobTitle;
+      this.profileLocation = nextProfile.location;
+      this.tjmMin = nextProfile.tjmMin;
+      this.tjmMax = nextProfile.tjmMax;
+      this.profileStack = nextProfile.stack;
+      this.stackInput = '';
+      this.searchKeywords = nextProfile.searchKeywords;
+      this.keywordInput = '';
       this.editingProfile = false;
       this.profileSaved = true;
       window.dispatchEvent(new CustomEvent('profile-updated'));

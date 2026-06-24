@@ -146,6 +146,21 @@ const rawTjmScore = (missionTjm: number | null, min: number, max: number): numbe
   if (missionTjm === null) {
     return 48;
   }
+  if (min <= 0 && max <= 0) {
+    return 100;
+  }
+  if (min > 0 && max <= 0) {
+    if (missionTjm >= min) {
+      return 100;
+    }
+    return Math.round(Math.max(0, missionTjm / min) * 100);
+  }
+  if (min <= 0 && max > 0) {
+    if (missionTjm <= max) {
+      return 100;
+    }
+    return Math.round(Math.max(0, 1 - (missionTjm - max) / max) * 100);
+  }
   if (missionTjm >= min && missionTjm <= max) {
     return 100;
   }

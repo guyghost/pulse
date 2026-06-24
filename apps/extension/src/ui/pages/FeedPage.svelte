@@ -35,12 +35,10 @@
   } from '../molecules/OperationalStoryCard.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
   import {
-    getFirstScanDone,
     getProfileBannerDismissed,
     setFeedTourSeen,
   } from '$lib/shell/facades/app-flags.facade';
   import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
-  import { getProfile } from '$lib/shell/facades/settings.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
   import { getLastTransitionTime } from '$lib/core/tracking';
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
@@ -48,7 +46,10 @@
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
   import { showToastAction } from '$lib/shell/notifications/toast-service';
 
-  const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
+  const {
+    onNavigateToOnboarding,
+    onNavigateToProfile,
+  }: { onNavigateToOnboarding?: () => void; onNavigateToProfile?: () => void } = $props();
 
   type FeedActionQueueTone = 'critical' | 'attention' | 'success' | 'neutral';
 
@@ -583,13 +584,11 @@
   }
 
   (async () => {
-    const [firstScanDone, bannerDismissed, profile, storedAlertPreferences] = await Promise.all([
-      getFirstScanDone(),
+    const [bannerDismissed, storedAlertPreferences] = await Promise.all([
       getProfileBannerDismissed(),
-      getProfile(),
       getAlertPreferences(),
     ]);
-    showRefinementBanner = firstScanDone && !bannerDismissed && !profile;
+    showRefinementBanner = !bannerDismissed;
     alertPreferences = storedAlertPreferences;
     await tracking.loadTrackings();
   })().catch(() => {});
@@ -1063,10 +1062,16 @@
             {#if controller.isScanning || page.isLoading}Chargement des missions en cours{/if}
           </div>
 
-          {#if showRefinementBanner && !controller.isScanning}
+          {#if showRefinementBanner && !controller.isScanning && page.profileLoaded && page.profileNeedsCompletion}
             <ProfileRefinementBanner
+              completion={page.profileCompletion}
+              missingItems={page.missingProfileItems}
               onSetupProfile={() => {
                 showRefinementBanner = false;
+                if (onNavigateToProfile) {
+                  onNavigateToProfile();
+                  return;
+                }
                 onNavigateToOnboarding?.();
               }}
             />

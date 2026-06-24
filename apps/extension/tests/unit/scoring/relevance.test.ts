@@ -92,6 +92,23 @@ describe('scoreMission', () => {
     expect(score(missionWithTjm, profile)).toBeGreaterThan(score(missionWithoutTjm, profile));
   });
 
+  it('keeps TJM neutral when the profile has no TJM preference yet', () => {
+    const result = scoreWithBreakdown(makeMission({ tjm: 320 }), {
+      ...profile,
+      tjmMin: 0,
+      tjmMax: 0,
+    });
+
+    expect(result.breakdown.tjm).toBe(100);
+  });
+
+  it('supports a minimum-only TJM preference for partial profiles', () => {
+    const partialProfile: UserProfile = { ...profile, tjmMin: 600, tjmMax: 0 };
+
+    expect(scoreWithBreakdown(makeMission({ tjm: 650 }), partialProfile).breakdown.tjm).toBe(100);
+    expect(scoreWithBreakdown(makeMission({ tjm: 300 }), partialProfile).breakdown.tjm).toBe(50);
+  });
+
   it('handles case-insensitive stack matching', () => {
     const mission = makeMission({ stack: ['react', 'typescript'] });
     expect(score(mission, profile)).toBeGreaterThanOrEqual(30);

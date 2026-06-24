@@ -117,7 +117,6 @@ export const UserProfileSchema = z
   .object({
     firstName: z
       .string()
-      .min(1, 'Le prénom est requis')
       .max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
     stack: z
       .array(z.string().min(1, 'Chaque compétence doit être non vide'))
@@ -138,7 +137,7 @@ export const UserProfileSchema = z
     /** User-defined search keywords sent to connector APIs for server-side filtering */
     searchKeywords: z.array(z.string()).default([]),
   })
-  .refine((p) => p.tjmMax >= p.tjmMin, {
+  .refine((p) => p.tjmMax === 0 || p.tjmMax >= p.tjmMin, {
     message: 'Le TJM maximum doit être supérieur ou égal au TJM minimum',
     path: ['tjmMax'],
   });

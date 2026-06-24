@@ -44,6 +44,11 @@ import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
 import { showToastAction } from '$lib/shell/notifications/toast-service';
 import {
+  buildProfileImpactItems,
+  buildProfileImpactSimulation,
+  type ProfileImpactInput,
+} from '$lib/core/profile/profile-impact';
+import {
   registerShortcuts,
   FeedShortcuts,
   type ShortcutConfig,
@@ -105,6 +110,19 @@ const SCORE_BUCKETS: Array<Omit<ScoreBucketSummary, 'count'>> = [
 ];
 
 const MAX_SAVED_VIEWS = 12;
+
+function toProfileImpactInput(profile: UserProfile | null): ProfileImpactInput {
+  return {
+    firstName: typeof profile?.firstName === 'string' ? profile.firstName : '',
+    jobTitle: typeof profile?.jobTitle === 'string' ? profile.jobTitle : '',
+    location: typeof profile?.location === 'string' ? profile.location : '',
+    remote: profile?.remote ?? 'any',
+    tjmMin: typeof profile?.tjmMin === 'number' ? profile.tjmMin : 0,
+    tjmMax: typeof profile?.tjmMax === 'number' ? profile.tjmMax : 0,
+    stack: Array.isArray(profile?.stack) ? profile.stack : [],
+    searchKeywords: Array.isArray(profile?.searchKeywords) ? profile.searchKeywords : [],
+  };
+}
 
 export function needsTjmNegotiation(mission: Pick<Mission, 'tjm'>, profileTjmMin: number | null) {
   return (
@@ -178,6 +196,8 @@ export function createFeedPageState(
   let decisionPreset = $state<DecisionPresetId | null>(null);
   let showNewOnly = $state(false);
   let firstName = $state('');
+  let profile = $state<UserProfile | null>(null);
+  let profileLoaded = $state(false);
   let profileTjmMin = $state<number | null>(null);
   let panelSide = $state<PanelSide>('right');
   let aiStatus = $state<AiAvailability>('no');
@@ -214,6 +234,12 @@ export function createFeedPageState(
   const hiddenCount = $derived(Object.keys(hidden).length);
   const isOffline = $derived(connection.status === 'offline');
   const heroCompact = $derived(totalMissions > 0 && !isLoading);
+  const profileImpactItems = $derived(buildProfileImpactItems(toProfileImpactInput(profile)));
+  const profileImpactSimulation = $derived(buildProfileImpactSimulation(profileImpactItems));
+  const missingProfileItems = $derived(
+    profileImpactItems.filter((item) => !item.complete).map((item) => item.label)
+  );
+  const profileNeedsCompletion = $derived(missingProfileItems.length > 0);
 
   const filterActive = $derived(
     selectedSource !== null ||
@@ -725,9 +751,12 @@ export function createFeedPageState(
         .catch(() => {});
     });
 
-    function applyProfile(profile: UserProfile | null): void {
-      firstName = profile?.firstName ?? '';
-      profileTjmMin = profile && profile.tjmMin > 0 ? profile.tjmMin : null;
+    function applyProfile(nextProfile: UserProfile | null): void {
+      const impactInput = toProfileImpactInput(nextProfile);
+      firstName = impactInput.firstName;
+      profileTjmMin = impactInput.tjmMin > 0 ? impactInput.tjmMin : null;
+      profile = nextProfile;
+      profileLoaded = true;
     }
 
     // Load profile-derived UI hints
@@ -736,7 +765,9 @@ export function createFeedPageState(
         .then((p) => {
           applyProfile(p);
         })
-        .catch(() => {});
+        .catch(() => {
+          applyProfile(null);
+        });
     });
 
     // Load panel side
@@ -957,6 +988,18 @@ export function createFeedPageState(
     },
     get firstName() {
       return firstName;
+    },
+    get profileLoaded() {
+      return profileLoaded;
+    },
+    get profileCompletion() {
+      return profileImpactSimulation.currentCompletion;
+    },
+    get missingProfileItems() {
+      return missingProfileItems;
+    },
+    get profileNeedsCompletion() {
+      return profileNeedsCompletion;
     },
     get panelSide() {
       return panelSide;

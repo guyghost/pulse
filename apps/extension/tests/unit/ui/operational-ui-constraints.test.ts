@@ -164,6 +164,9 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Premium verrouillé');
     expect(source).toContain('aria-label={itemLocked');
     expect(source).toContain('primaryActionLabel="Voir les réglages"');
+    expect(source).toContain("nav.currentPage === 'profile'");
+    expect(source).not.toContain('Profil premium verrouillé');
+    expect(source).not.toContain("nav.currentPage === 'profile' && premium.isPremium");
     expect(source).not.toContain('NAV_ITEMS.filter');
     expect(source).not.toContain('Premium pages hidden');
   });

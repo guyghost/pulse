@@ -38,13 +38,6 @@
   };
 
   const PREMIUM_LOCKS: Partial<Record<Page, PremiumLockContent>> = {
-    profile: {
-      title: 'Profil premium verrouillé',
-      description:
-        'Le feed reste utilisable avec le radar local. Le profil premium débloque la calibration fine du scoring et des alertes.',
-      proofLabel: 'Surface',
-      proofValue: 'Profil',
-    },
     cv: {
       title: 'CV canonique premium verrouillé',
       description:
@@ -273,7 +266,10 @@
             if (import.meta.env.DEV) console.error('[FeedPage crash]', e);
           }}
         >
-          <FeedPage onNavigateToOnboarding={nav.resetToOnboarding} />
+          <FeedPage
+            onNavigateToOnboarding={nav.resetToOnboarding}
+            onNavigateToProfile={() => nav.navigate('profile')}
+          />
           {#snippet failed(error, reset)}
             <div class="p-4">
               <OperationalEmptyState
@@ -380,7 +376,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'profile' && premium.isPremium}
+      {#if nav.currentPage === 'profile'}
         <div
           class="absolute inset-0 overflow-y-auto"
           in:fly={{ x: 30, duration: 200, easing: cubicOut }}

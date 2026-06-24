@@ -1,8 +1,14 @@
-import { describe, it, expect } from 'vitest';
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   parseFreeWorkAPI,
   type FreeWorkApiResponse,
+  type FreeWorkJobPosting,
 } from '../../../src/lib/core/connectors/freework-parser';
+import {
+  buildFreeWorkApiUrl,
+  FREEWORK_ITEMS_PER_PAGE,
+  FreeWorkConnector,
+} from '../../../src/lib/shell/connectors/freework.connector';
 
 const NOW = new Date('2026-03-11T12:00:00Z');
 
@@ -192,102 +198,157 @@ describe('parseFreeWorkAPI', () => {
   });
 });
 
-/**
- * Tests for FreeWork URL building with search context.
- * These verify that the connector correctly translates ConnectorSearchContext
- * into FreeWork API URL parameters.
- *
- * Since the URL building is embedded in the connector (Shell, I/O),
- * we test the URL construction logic in isolation by extracting it.
- *
- * Note: lastSync/createdAt[after] filtering was intentionally removed to fix
- * the split-brain bug where lastSync (chrome.storage.local) becomes stale
- * when IndexedDB is cleared, causing 0 results permanently. All connectors
- * now always fetch latest pages and rely on local dedup.
- */
 describe('FreeWork URL building with search context', () => {
-  const API_BASE = 'https://www.free-work.com/api/job_postings';
-  const ITEMS_PER_PAGE = 50;
-
-  /**
-   * Replicates the URL building logic from FreeWorkConnector.fetchMissions()
-   * so we can test it as a pure function without I/O.
-   */
-  function buildFreeWorkUrl(page: number, context?: { query?: string; skills?: string[] }): string {
-    const url = new URL(API_BASE);
-    url.searchParams.set('page', String(page));
-    url.searchParams.set('itemsPerPage', String(ITEMS_PER_PAGE));
-    url.searchParams.set('contracts', 'contractor');
-    // Note: order[publishedAt]=desc is listed in hydra:search but returns 400.
-    // The API already returns newest first by default.
-
-    if (context?.query) {
-      url.searchParams.set('q', context.query);
-    }
-
-    if (context?.skills?.length) {
-      for (const skill of context.skills) {
-        url.searchParams.append('properties[]', skill);
-      }
-    }
-
-    return url.toString();
-  }
-
   it('builds base URL with pagination (no context)', () => {
-    const url = buildFreeWorkUrl(1);
+    const url = buildFreeWorkApiUrl(1);
     expect(url).toContain('page=1');
-    expect(url).toContain('itemsPerPage=50');
+    expect(url).toContain(`itemsPerPage=${FREEWORK_ITEMS_PER_PAGE}`);
     expect(url).toContain('contracts=contractor');
-    // order[publishedAt] is NOT sent (API returns 400)
     expect(url).not.toContain('order');
     expect(url).not.toContain('q=');
     expect(url).not.toContain('properties');
     expect(url).not.toContain('createdAt');
   });
 
-  it('adds q parameter when query is provided', () => {
-    const url = buildFreeWorkUrl(1, { query: 'React Developer' });
-    expect(url).toContain('q=React+Developer');
-  });
-
-  it('encodes special characters in query', () => {
-    const url = buildFreeWorkUrl(1, { query: 'Développeur Frontend' });
-    expect(url).toContain('q=');
-    expect(url).toContain('D%C3%A9veloppeur+Frontend');
-  });
-
-  it('adds properties[] for each skill', () => {
-    const url = buildFreeWorkUrl(1, { skills: ['React', 'TypeScript', 'Node.js'] });
-    expect(url).toContain('properties%5B%5D=React');
-    expect(url).toContain('properties%5B%5D=TypeScript');
-    expect(url).toContain('properties%5B%5D=Node.js');
-  });
-
-  it('never includes createdAt[after] — lastSync filtering removed (split-brain fix)', () => {
-    const url = buildFreeWorkUrl(1);
-    expect(url).not.toContain('createdAt');
-  });
-
-  it('combines query and skills together', () => {
-    const url = buildFreeWorkUrl(2, {
+  it('adds minDailySalary when tjmMin is provided', () => {
+    const url = buildFreeWorkApiUrl(2, {
       query: 'React',
       skills: ['React', 'TypeScript'],
+      location: 'Paris',
+      remote: 'hybrid',
+      tjmMin: 650,
+      tjmMax: null,
+      lastSync: null,
     });
+
     expect(url).toContain('page=2');
-    expect(url).toContain('q=React');
-    expect(url).toContain('properties%5B%5D=React');
-    expect(url).toContain('properties%5B%5D=TypeScript');
-    expect(url).not.toContain('createdAt');
+    expect(url).toContain('minDailySalary=650');
   });
 
-  it('ignores empty query string', () => {
-    const url = buildFreeWorkUrl(1, { query: '' });
+  it('does not send ignored filters', () => {
+    const url = buildFreeWorkApiUrl(1, {
+      query: 'Développeur Frontend',
+      skills: ['React', 'TypeScript'],
+      location: 'Paris',
+      remote: 'full',
+      tjmMin: null,
+      tjmMax: null,
+      lastSync: new Date('2026-03-01T00:00:00Z'),
+    });
+
     expect(url).not.toContain('q=');
+    expect(url).not.toContain('properties');
+    expect(url).not.toContain('createdAt');
+    expect(url).not.toContain('remote');
+  });
+});
+
+describe('FreeWorkConnector.fetchMissions', () => {
+  let fetchMock: ReturnType<typeof vi.fn>;
+
+  function makePosting(id: number, publishedAt: string): FreeWorkJobPosting {
+    return {
+      '@id': `/job_postings/mission-${id}`,
+      id,
+      title: `Mission ${id}`,
+      slug: `mission-${id}`,
+      description: `Description ${id}`,
+      candidateProfile: null,
+      companyDescription: null,
+      minDailySalary: 500,
+      maxDailySalary: 650,
+      minAnnualSalary: null,
+      maxAnnualSalary: null,
+      dailySalary: '500-650 €',
+      annualSalary: null,
+      currency: 'EUR',
+      duration: 6,
+      durationValue: 6,
+      durationPeriod: 'month',
+      renewable: false,
+      remoteMode: 'partial',
+      contracts: ['contractor'],
+      location: {
+        locality: 'Paris',
+        adminLevel1: 'Île-de-France',
+        label: 'Paris, Île-de-France',
+        shortLabel: 'Paris',
+      },
+      company: { name: 'Client', slug: 'client' },
+      job: { name: 'Developpeur', slug: 'developpeur' },
+      skills: [{ name: 'TypeScript', slug: 'typescript' }],
+      publishedAt,
+      startsAt: null,
+      experienceLevel: 'senior',
+    };
+  }
+
+  beforeEach(() => {
+    const responses = new Map<number, FreeWorkApiResponse>([
+      [
+        1,
+        {
+          'hydra:totalItems': 250,
+          'hydra:member': [makePosting(1, '2026-03-11T10:00:00+01:00')],
+        },
+      ],
+      [
+        2,
+        {
+          'hydra:totalItems': 250,
+          'hydra:member': [makePosting(2, '2026-03-10T10:00:00+01:00')],
+        },
+      ],
+      [
+        3,
+        {
+          'hydra:totalItems': 250,
+          'hydra:member': [makePosting(3, '2026-01-01T10:00:00+01:00')],
+        },
+      ],
+    ]);
+
+    fetchMock = vi.fn(async (input: RequestInfo | URL) => {
+      const url = new URL(input.toString());
+      const page = Number(url.searchParams.get('page') ?? '1');
+      const response = responses.get(page) ?? { 'hydra:totalItems': 250, 'hydra:member': [] };
+
+      return new Response(JSON.stringify(response), {
+        status: 200,
+        headers: { 'Content-Type': 'application/ld+json' },
+      });
+    });
+
+    vi.stubGlobal('fetch', fetchMock);
+    vi.stubGlobal('chrome', {
+      declarativeNetRequest: {
+        updateDynamicRules: vi.fn().mockResolvedValue(undefined),
+      },
+    });
   });
 
-  it('ignores empty skills array', () => {
-    const url = buildFreeWorkUrl(1, { skills: [] });
-    expect(url).not.toContain('properties');
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('fetches computed pages and stops when the freshness cutoff is reached', async () => {
+    const connector = new FreeWorkConnector();
+    const result = await connector.fetchMissions(NOW.getTime());
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) {
+      return;
+    }
+
+    expect(result.value.map((mission) => mission.id)).toEqual(['fw-1', 'fw-2']);
+    expect(fetchMock).toHaveBeenCalledTimes(3);
+
+    const fetchedPages = fetchMock.mock.calls.map(([input]) =>
+      new URL(input.toString()).searchParams.get('page')
+    );
+    expect(fetchedPages).toEqual(['1', '2', '3']);
+
+    const firstUrl = new URL(fetchMock.mock.calls[0][0].toString());
+    expect(firstUrl.searchParams.get('itemsPerPage')).toBe(String(FREEWORK_ITEMS_PER_PAGE));
   });
 });

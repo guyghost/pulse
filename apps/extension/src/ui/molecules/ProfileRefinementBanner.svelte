@@ -2,9 +2,24 @@
   import { Icon } from '@pulse/ui';
   import { setProfileBannerDismissed } from '$lib/shell/facades/app-flags.facade';
 
-  const { onSetupProfile }: { onSetupProfile: () => void } = $props();
+  const {
+    completion = 0,
+    missingItems = [],
+    onSetupProfile,
+  }: { completion?: number; missingItems?: string[]; onSetupProfile: () => void } = $props();
 
   let dismissed = $state(false);
+  const missingSummary = $derived.by(() => {
+    if (missingItems.length === 0) {
+      return 'Vos critères principaux sont prêts pour le scoring.';
+    }
+
+    const visibleItems = missingItems.slice(0, 2).join(', ');
+    const remainingCount = missingItems.length - 2;
+    return remainingCount > 0
+      ? `${visibleItems} + ${remainingCount} autre${remainingCount > 1 ? 's' : ''}`
+      : visibleItems;
+  });
 
   async function handleDismiss() {
     dismissed = true;
@@ -27,9 +42,11 @@
     </div>
 
     <div class="min-w-0 flex-1">
-      <p class="text-[12px] font-semibold text-text-primary">Affinez vos résultats</p>
-      <p class="text-[11px] text-text-secondary">
-        Complétez votre profil pour un scoring personnalisé
+      <p class="text-[12px] font-semibold text-text-primary">
+        Profil à {completion}% · affinez vos résultats
+      </p>
+      <p class="text-[11px] leading-4 text-text-secondary">
+        À compléter : {missingSummary}
       </p>
     </div>
 
@@ -39,7 +56,7 @@
                text-[11px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/25"
         onclick={handleSetupProfile}
       >
-        Configurer
+        Compléter
       </button>
       <button
         class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted
