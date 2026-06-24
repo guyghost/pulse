@@ -131,9 +131,9 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Profil incomplet',
-        title: 'Le positionnement TJM ne peut pas encore etre decide',
+        title: 'Le positionnement TJM ne peut pas encore être décidé',
         description:
-          'Ajoutez une fourchette TJM et une seniorite dans le profil pour transformer les tendances en decision tarifaire.',
+          'Ajoutez une fourchette TJM et une séniorité dans le profil pour transformer les tendances en décision tarifaire.',
         evidence,
       };
     }
@@ -142,9 +142,9 @@
       return {
         severity: 'incident' as const,
         statusLabel: 'Confiance faible',
-        title: 'Le marche observe est encore trop peu fiable pour changer votre TJM',
+        title: 'Le marché observé est encore trop peu fiable pour changer votre TJM',
         description:
-          'Gardez votre fourchette actuelle et alimentez le radar avec plus de scans avant de negocier sur cette base.',
+          'Gardez votre fourchette actuelle et alimentez le radar avec plus de scans avant de négocier sur cette base.',
         evidence,
       };
     }
@@ -173,11 +173,11 @@
 
     return {
       severity: 'success' as const,
-      statusLabel: 'Aligne',
-      title: 'Votre TJM est coherent avec le marche observe',
+      statusLabel: 'Aligné',
+      title: 'Votre TJM est cohérent avec le marché observé',
       description:
         analysis.recommendation ??
-        'Conservez la fourchette actuelle et utilisez les ecarts par stack ou region pour arbitrer mission par mission.',
+        'Conservez la fourchette actuelle et utilisez les écarts par stack ou région pour arbitrer mission par mission.',
       evidence,
     };
   });

@@ -127,7 +127,7 @@
         severity: pipelineSummary.dueFollowUps > 0 ? 'attention' : 'neutral',
       },
       {
-        label: 'Pretes',
+        label: 'Prêtes',
         value: pipelineSummary.preparedNotApplied,
         icon: 'send',
         severity: pipelineSummary.preparedNotApplied > 0 ? 'attention' : 'neutral',
@@ -138,9 +138,9 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Relance due',
-        title: `${pipelineSummary.dueFollowUps} relance${pipelineSummary.dueFollowUps > 1 ? 's' : ''} a traiter maintenant`,
+        title: `${pipelineSummary.dueFollowUps} relance${pipelineSummary.dueFollowUps > 1 ? 's' : ''} à traiter maintenant`,
         description:
-          'La prochaine decision n est pas de parcourir toutes les missions, mais de reprendre les dossiers qui ont une echeance.',
+          'La prochaine décision n’est pas de parcourir toutes les missions, mais de reprendre les dossiers qui ont une échéance.',
         evidence,
         primaryActionLabel: 'Voir la file de suivi',
         primaryActionIcon: 'calendar-clock',
@@ -150,10 +150,10 @@
     if (pipelineSummary.preparedNotApplied > 0) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'Pret a envoyer',
-        title: `${pipelineSummary.preparedNotApplied} candidature${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} preparee${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} mais pas encore envoyee${pipelineSummary.preparedNotApplied > 1 ? 's' : ''}`,
+        statusLabel: 'Prêt à envoyer',
+        title: `${pipelineSummary.preparedNotApplied} candidature${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} préparée${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} mais pas encore envoyée${pipelineSummary.preparedNotApplied > 1 ? 's' : ''}`,
         description:
-          'Le contenu existe deja. La prochaine action utile est de finaliser l envoi ou de changer le statut.',
+          'Le contenu existe déjà. La prochaine action utile est de finaliser l’envoi ou de changer le statut.',
         evidence,
         primaryActionLabel: 'Continuer le dossier',
         primaryActionIcon: 'arrow-right',
@@ -168,7 +168,7 @@
         description:
           'Qualifiez une mission depuis le Feed pour transformer la veille en pipeline actionnable.',
         evidence,
-        primaryActionLabel: 'Preparer une mission',
+        primaryActionLabel: 'Préparer une mission',
         primaryActionIcon: 'briefcase',
       };
     }
@@ -179,8 +179,8 @@
       title: `${pipelineSummary.activeCount} dossier${pipelineSummary.activeCount > 1 ? 's' : ''} actif${pipelineSummary.activeCount > 1 ? 's' : ''}, aucune relance en retard`,
       description:
         pipelineSummary.bottleneck !== null
-          ? `Le goulot actuel est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette etape.`
-          : 'Le pipeline est sous controle. Continuez par le dossier selectionne ou preparez une nouvelle candidature.',
+          ? `Le goulot actuel est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette étape.`
+          : 'Le pipeline est sous contrôle. Continuez par le dossier sélectionné ou préparez une nouvelle candidature.',
       evidence,
       primaryActionLabel: 'Ouvrir le dossier',
       primaryActionIcon: 'arrow-right',

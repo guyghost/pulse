@@ -8,7 +8,7 @@ describe('connected dashboard operational story', () => {
   it('prioritizes a narrative operational state before metrics', () => {
     expect(source).toContain('interface DashboardOperationalStory');
     expect(source).toContain('function getDashboardOperationalStory');
-    expect(source).toContain('Etat operationnel');
+    expect(source).toContain('État opérationnel');
     expect(source).toContain('Impact');
     expect(source).toContain('Action recommandée');
     expect(source).toContain("Prochaine action: installer l'extension");

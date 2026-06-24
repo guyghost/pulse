@@ -968,7 +968,7 @@
           <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
             <div class="min-w-0">
               <div class="flex flex-wrap items-center gap-2">
-                <p class="eyebrow text-text-subtle">Etat operationnel</p>
+                <p class="eyebrow text-text-subtle">État opérationnel</p>
                 <Badge
                   label={operationalStory.badge}
                   variant={operationalStory.tone === 'incident'

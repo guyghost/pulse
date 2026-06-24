@@ -497,7 +497,7 @@
               {#if missionCount > 0}
                 <Tooltip
                   label={isFiltered ? 'Retirer le filtre' : `Filtrer ${source.name}`}
-                  description={`${formatMissionCount(missionCount)} detectee${missionCount > 1 ? 's' : ''} sur cette source.`}
+                  description={`${formatMissionCount(missionCount)} détectée${missionCount > 1 ? 's' : ''} sur cette source.`}
                 >
                   <button
                     class="rounded-md px-1.5 py-0.5 text-[10px] font-mono font-medium transition-colors

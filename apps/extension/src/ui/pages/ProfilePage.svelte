@@ -100,10 +100,10 @@
     if (missingProfileItems.length === 0) {
       return {
         severity: 'success' as const,
-        statusLabel: 'Pret',
-        title: 'Le profil peut alimenter le scoring et les generations',
+        statusLabel: 'Prêt',
+        title: 'Le profil peut alimenter le scoring et les générations',
         description:
-          'Les criteres essentiels sont renseignes. Gardez cette source canonique a jour avant de comparer les missions prioritaires.',
+          'Les critères essentiels sont renseignés. Gardez cette source canonique à jour avant de comparer les missions prioritaires.',
         evidence,
         primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil',
         primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',

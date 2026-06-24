@@ -80,8 +80,8 @@
     <Tooltip
       label={editing ? 'Annuler la modification' : 'Modifier le profil'}
       description={editing
-        ? 'Quitte le mode edition sans sauvegarder.'
-        : 'Ajuste les criteres qui influencent le scoring.'}
+        ? 'Quitte le mode édition sans sauvegarder.'
+        : 'Ajuste les critères qui influencent le scoring.'}
     >
       <button
         class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
@@ -176,7 +176,7 @@
           />
           <Tooltip
             label="Ajouter la stack"
-            description="Ajoute cette competence aux criteres de matching."
+            description="Ajoute cette compétence aux critères de matching."
           >
             <button
               class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"

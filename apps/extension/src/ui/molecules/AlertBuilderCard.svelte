@@ -57,7 +57,7 @@
   const isMuteActive = $derived(Number.isFinite(muteUntilTime) && muteUntilTime > Date.now());
   const alertSummary = $derived(
     !enabled
-      ? 'Desactivee'
+      ? 'Désactivée'
       : isMuteActive
         ? 'En pause'
         : `${scoreThreshold}+${minDailyRate > 0 ? ` · ${minDailyRate}€/j min` : ''}`

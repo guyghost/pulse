@@ -171,7 +171,7 @@ describe('operational UI constraints', () => {
   it('keeps Settings system actions aligned with the stated operational issue', () => {
     const source = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
 
-    expect(source).toContain("primaryActionLabel: 'Voir les reglages IA'");
+    expect(source).toContain("primaryActionLabel: 'Voir les réglages IA'");
     expect(source).toContain("primaryActionLabel: 'Ouvrir l’aide IA Chrome'");
     expect(source).not.toContain("primaryActionLabel: 'Rejouer le tour'");
     expect(source).not.toContain("primaryActionLabel: 'Rejouer l’onboarding'");

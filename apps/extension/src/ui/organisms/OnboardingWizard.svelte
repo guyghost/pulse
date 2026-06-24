@@ -65,12 +65,12 @@
     },
     {
       id: 'activity',
-      label: 'Observer une activite',
-      description: 'Le premier scan devient un feed priorise.',
+      label: 'Observer une activité',
+      description: 'Le premier scan devient un feed priorisé.',
     },
     {
       id: 'alert',
-      label: 'Creer une alerte',
+      label: 'Créer une alerte',
       description: 'Les scores forts remontent avant le bruit.',
     },
     {
@@ -246,10 +246,10 @@
   {:else if currentStep === 'source'}
     <section class="rounded-xl border border-border-light bg-surface-white p-4">
       <p class="text-sm font-semibold text-text-primary">
-        Choisissez la premiere source a verifier
+        Choisissez la première source à vérifier
       </p>
       <p class="mt-1 text-xs leading-5 text-text-subtle">
-        Pulse utilisera vos sessions navigateur existantes. Aucune credential n est stocke.
+        Pulse utilisera vos sessions navigateur existantes. Aucun identifiant n’est stocké.
       </p>
       <div class="mt-3 grid grid-cols-2 gap-2">
         {#each ['Free-Work', 'LeHibou', 'Hiway', 'Collective'] as source}
@@ -277,17 +277,17 @@
   {:else if currentStep === 'activity'}
     <section class="rounded-xl border border-border-light bg-surface-white p-4">
       <p class="text-sm font-semibold text-text-primary">
-        Le premier scan deviendra un feed d'activite
+        Le premier scan deviendra un feed d’activité
       </p>
       <div class="mt-3 space-y-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
-          <p class="text-xs font-medium text-text-primary">Mission prioritaire detectee</p>
+          <p class="text-xs font-medium text-text-primary">Mission prioritaire détectée</p>
           <p class="mt-0.5 text-[11px] text-text-subtle">Score 86, stack forte, TJM compatible.</p>
         </div>
         <div class="rounded-lg border border-status-orange/20 bg-status-orange/8 px-3 py-2">
-          <p class="text-xs font-medium text-status-orange">Source a verifier</p>
+          <p class="text-xs font-medium text-status-orange">Source à vérifier</p>
           <p class="mt-0.5 text-[11px] text-text-subtle">
-            Si une source casse, Pulse affiche l impact avant les resultats.
+            Si une source casse, Pulse affiche l’impact avant les résultats.
           </p>
         </div>
       </div>
@@ -296,7 +296,7 @@
         type="button"
         onclick={goNext}
       >
-        Creer une premiere alerte
+        Créer une première alerte
         <Icon name="arrow-right" size={13} />
       </button>
     </section>
@@ -306,7 +306,7 @@
         Alerte prioritaire
       </label>
       <p class="mt-1 text-xs leading-5 text-text-subtle">
-        Les missions au-dessus de ce score doivent apparaitre comme action a traiter.
+        Les missions au-dessus de ce score doivent apparaître comme action à traiter.
       </p>
       <div class="mt-3 flex items-center gap-3">
         <input
@@ -343,10 +343,10 @@
           <Icon name="lightbulb" size={16} />
         </div>
         <div>
-          <p class="text-sm font-semibold text-text-primary">Action recommandee apres le scan</p>
+          <p class="text-sm font-semibold text-text-primary">Action recommandée après le scan</p>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Commencer par les missions {alertThreshold}+ issues de {selectedSource}, puis verifier
-            les sources qui n ont rien remonte.
+            Commencer par les missions {alertThreshold}+ issues de {selectedSource}, puis vérifier
+            les sources qui n’ont rien remonté.
           </p>
         </div>
       </div>

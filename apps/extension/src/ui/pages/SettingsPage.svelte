@@ -229,8 +229,8 @@
         severity: 'neutral',
       },
       {
-        label: 'Etat',
-        value: settings.isExporting ? 'En cours' : 'Pret',
+        label: 'État',
+        value: settings.isExporting ? 'En cours' : 'Prêt',
         icon: settings.isExporting ? 'loader' : 'check',
         severity: settings.isExporting ? 'attention' : 'success',
       },
@@ -265,7 +265,7 @@
     const evidence: OperationalEvidence[] = [
       {
         label: 'Profil',
-        value: profileReadyForBackup ? 'Pret' : 'Manquant',
+        value: profileReadyForBackup ? 'Prêt' : 'Manquant',
         icon: 'user',
         severity: profileReadyForBackup ? 'success' : 'attention',
       },
@@ -401,7 +401,7 @@
     const evidence: OperationalEvidence[] = [
       {
         label: 'Compte',
-        value: settings.isConnectedAccount ? 'Connecte' : 'Local',
+        value: settings.isConnectedAccount ? 'Connecté' : 'Local',
         icon: 'user',
         severity: settings.isConnectedAccount ? 'success' : 'attention',
       },
@@ -417,7 +417,7 @@
           settings.aiAvailability === 'available'
             ? 'OK'
             : settings.aiAvailability === 'after-download'
-              ? 'A telecharger'
+              ? 'À télécharger'
               : 'Off',
         icon: 'cpu',
         severity:
@@ -435,7 +435,7 @@
         statusLabel: 'Local uniquement',
         title: 'Pulse fonctionne, mais la synchronisation dashboard est inactive',
         description:
-          'Les scans restent disponibles dans Chrome. Connectez le compte pour consolider snapshots, candidatures, CV et preferences.',
+          'Les scans restent disponibles dans Chrome. Connectez le compte pour consolider snapshots, candidatures, CV et préférences.',
         evidence,
         primaryActionLabel: 'Connecter mon compte',
         primaryActionIcon: 'user',
@@ -446,9 +446,9 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Sync en attente',
-        title: `${pendingTotal} operation${pendingTotal > 1 ? 's' : ''} de synchronisation en file`,
+        title: `${pendingTotal} opération${pendingTotal > 1 ? 's' : ''} de synchronisation en file`,
         description:
-          'Le dashboard connecte peut afficher un etat legerement en retard tant que la file locale n est pas vide.',
+          'Le dashboard connecté peut afficher un état légèrement en retard tant que la file locale n’est pas vide.',
         evidence,
         primaryActionLabel: 'Ouvrir le dashboard',
         primaryActionIcon: 'external-link',
@@ -461,22 +461,22 @@
           settings.aiAvailability === 'after-download'
             ? ('attention' as const)
             : ('incident' as const),
-        statusLabel: 'IA locale limitee',
-        title: 'Le scoring semantique ne couvre pas toutes les missions',
+        statusLabel: 'IA locale limitée',
+        title: 'Le scoring sémantique ne couvre pas toutes les missions',
         description:
-          'Pulse continue avec le scoring de base. Activez ou telechargez Gemini Nano pour enrichir les insights.',
+          'Pulse continue avec le scoring de base. Activez ou téléchargez Gemini Nano pour enrichir les insights.',
         evidence,
-        primaryActionLabel: 'Voir les reglages IA',
+        primaryActionLabel: 'Voir les réglages IA',
         primaryActionIcon: 'cpu',
       };
     }
 
     return {
       severity: 'success' as const,
-      statusLabel: 'Systeme sain',
-      title: 'Configuration operationnelle',
+      statusLabel: 'Système sain',
+      title: 'Configuration opérationnelle',
       description:
-        'Compte, synchronisation et IA locale sont prets. Les reglages ci-dessous servent surtout a ajuster le comportement.',
+        'Compte, synchronisation et IA locale sont prêts. Les réglages ci-dessous servent surtout à ajuster le comportement.',
       evidence,
       primaryActionLabel: 'Ouvrir le dashboard',
       primaryActionIcon: 'external-link',
@@ -501,7 +501,7 @@
 
     <div class="mt-4">
       <OperationalStoryCard
-        eyebrow="Etat systeme"
+        eyebrow="État système"
         title={settingsStory.title}
         description={settingsStory.description}
         severity={settingsStory.severity}

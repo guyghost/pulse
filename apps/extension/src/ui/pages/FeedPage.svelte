@@ -311,9 +311,9 @@
       return {
         severity: 'incident' as const,
         statusLabel: 'Hors ligne',
-        title: 'Pulse affiche les donnees en cache',
+        title: 'Pulse affiche les données en cache',
         description:
-          'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions deja stockees.',
+          'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions déjà stockées.',
         evidence,
         primaryActionLabel:
           visibleCount > 0 ? `Voir les ${formatMissionCount(visibleCount)} en cache` : 'Hors ligne',
@@ -326,8 +326,8 @@
       return {
         severity: 'critical' as const,
         statusLabel: 'Action requise',
-        title: `${brokenCount} source${brokenCount > 1 ? 's' : ''} a corriger avant de faire confiance au radar`,
-        description: `${firstBroken?.connectorName ?? 'Une source'} ne remonte plus correctement. Le feed peut manquer des opportunites.`,
+        title: `${brokenCount} source${brokenCount > 1 ? 's' : ''} à corriger avant de faire confiance au radar`,
+        description: `${firstBroken?.connectorName ?? 'Une source'} ne remonte plus correctement. Le feed peut manquer des opportunités.`,
         evidence,
         primaryActionLabel: 'Relancer le diagnostic',
         primaryActionIcon: 'refresh-cw',
@@ -337,12 +337,12 @@
     if (newCount > 0) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'A traiter',
+        statusLabel: 'À traiter',
         title: `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} depuis le dernier passage`,
         description:
           highScoreCount > 0
-            ? `${highScoreCount} opportunite${highScoreCount > 1 ? 's' : ''} depasse le seuil prioritaire. Commencez par celles-ci.`
-            : 'Aucune urgence detectee, mais les nouvelles missions meritent une qualification rapide.',
+            ? `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} dépasse le seuil prioritaire. Commencez par celles-ci.`
+            : 'Aucune urgence détectée, mais les nouvelles missions méritent une qualification rapide.',
         evidence,
         primaryActionLabel: `Voir les ${formatMissionCount(newCount)} proposée${newCount > 1 ? 's' : ''}`,
         primaryActionIcon: 'chevron-down',
@@ -353,8 +353,8 @@
       return {
         severity: 'success' as const,
         statusLabel: 'Radar sain',
-        title: `${highScoreCount} opportunite${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prete${highScoreCount > 1 ? 's' : ''}`,
-        description: `Le bruit est filtre selon votre alerte ${alertPreferences.scoreThreshold}+. La prochaine action utile est de comparer ces missions et d en mettre une en suivi.`,
+        title: `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prête${highScoreCount > 1 ? 's' : ''}`,
+        description: `Le bruit est filtré selon votre alerte ${alertPreferences.scoreThreshold}+. La prochaine action utile est de comparer ces missions et d’en mettre une en suivi.`,
         evidence,
         primaryActionLabel:
           alertPreferences.scoreThreshold >= 80
@@ -367,10 +367,10 @@
     if (visibleCount === 0) {
       return {
         severity: 'neutral' as const,
-        statusLabel: 'Aucune donnee',
+        statusLabel: 'Aucune donnée',
         title: 'Le radar attend un premier scan',
         description:
-          'Connectez ou verifiez les sources, puis lancez un scan pour obtenir les premieres recommandations.',
+          'Connectez ou vérifiez les sources, puis lancez un scan pour obtenir les premières recommandations.',
         evidence,
         primaryActionLabel: 'Lancer le scan',
         primaryActionIcon: 'play',
@@ -382,7 +382,7 @@
       statusLabel: 'Normal',
       title: `${visibleCount} mission${visibleCount > 1 ? 's' : ''} disponible${visibleCount > 1 ? 's' : ''}, aucune alerte critique`,
       description:
-        'Le systeme est stable. Continuez par les favoris ou relancez un scan si la veille doit etre rafraichie.',
+        'Le système est stable. Continuez par les favoris ou relancez un scan si la veille doit être rafraîchie.',
       evidence,
       primaryActionLabel: `Voir les ${formatMissionCount(visibleCount)} proposée${visibleCount > 1 ? 's' : ''}`,
       primaryActionIcon: 'chevron-down',
@@ -815,8 +815,8 @@
                 <Tooltip
                   label={page.isOffline ? 'Scan indisponible hors ligne' : 'Lancer le scan'}
                   description={page.isOffline
-                    ? 'Pulse utilise les donnees en cache jusqu au retour reseau.'
-                    : 'Raccourci clavier: r. Relance les sources connectees.'}
+                    ? 'Pulse utilise les données en cache jusqu’au retour réseau.'
+                    : 'Raccourci clavier: r. Relance les sources connectées.'}
                 >
                   <button
                     class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-primary transition-all duration-200 hover:bg-subtle-gray"
@@ -893,7 +893,7 @@
                 {#if controller.isScanning || page.isLoading}
                   <Tooltip
                     label="Stopper le scan"
-                    description="Interrompt le scan en cours et conserve les donnees deja chargees."
+                    description="Interrompt le scan en cours et conserve les données déjà chargées."
                   >
                     <button
                       class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
@@ -911,10 +911,10 @@
                       ? 'Scan indisponible hors ligne'
                       : 'Lancer le scan'}
                   description={controller.isScanning || page.isLoading
-                    ? 'Pulse interroge les sources connectees.'
+                    ? 'Pulse interroge les sources connectées.'
                     : page.isOffline
-                      ? 'Les donnees en cache restent disponibles.'
-                      : 'Raccourci clavier: r. Relance la detection des missions.'}
+                      ? 'Les données en cache restent disponibles.'
+                      : 'Raccourci clavier: r. Relance la détection des missions.'}
                 >
                   <button
                     class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200

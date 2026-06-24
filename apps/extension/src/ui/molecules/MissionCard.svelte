@@ -87,11 +87,11 @@
   const decisionInsight = $derived.by(() => {
     if (scoreValue >= 80) {
       return {
-        label: 'Action recommandee',
+        label: 'Action recommandée',
         text:
           mission.tjm !== null
-            ? `Qualifier en priorite: score fort et TJM ${mission.tjm}€/j.`
-            : 'Qualifier en priorite: score fort, TJM a verifier dans l annonce.',
+            ? `Qualifier en priorité: score fort et TJM ${mission.tjm}€/j.`
+            : 'Qualifier en priorité: score fort, TJM à vérifier dans l’annonce.',
         tone: 'border-accent-green/20 bg-accent-green/8 text-accent-green',
       };
     }
@@ -106,15 +106,15 @@
 
     if (scoreValue >= 60) {
       return {
-        label: 'A comparer',
+        label: 'À comparer',
         text: 'Potentiel correct: comparez avec les missions 80+ avant de postuler.',
         tone: 'border-status-yellow/30 bg-status-yellow/12 text-status-orange',
       };
     }
 
     return {
-      label: 'A qualifier',
-      text: 'Priorite faible: ouvrez seulement si la source ou le client est strategique.',
+      label: 'À qualifier',
+      text: 'Priorité faible: ouvrez seulement si la source ou le client est stratégique.',
       tone: 'border-border-light bg-page-canvas text-text-subtle',
     };
   });
@@ -347,10 +347,10 @@
           </p>
           <p class="mt-1 text-[11px] leading-4 text-text-secondary">
             {#if scoreDisplayValue !== null}
-              Score final {scoreDisplayValue}/100, calculé depuis le profil, l'annonce et les
+              Score final {scoreDisplayValue}/100, calculé depuis le profil, l’annonce et les
               critères disponibles.
             {:else}
-              L'explication disponible vient du signal sémantique conservé localement.
+              L’explication disponible vient du signal sémantique conservé localement.
             {/if}
           </p>
         </div>
@@ -475,8 +475,8 @@
       <Tooltip
         label={isFavorite ? 'Retirer des favoris' : 'Ajouter aux favoris'}
         description={isFavorite
-          ? 'La mission ne sera plus priorisee dans vos vues.'
-          : 'Gardez cette mission dans les opportunites a suivre.'}
+          ? 'La mission ne sera plus priorisée dans vos vues.'
+          : 'Gardez cette mission dans les opportunités à suivre.'}
       >
         <button
           class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
@@ -495,7 +495,7 @@
         label={isHidden ? 'Restaurer la mission' : 'Masquer la mission'}
         description={isHidden
           ? 'La mission reviendra dans le feed actif.'
-          : 'Retirez cette opportunite du flux decisionnel.'}
+          : 'Retirez cette opportunité du flux décisionnel.'}
       >
         <button
           class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
@@ -526,7 +526,7 @@
         </button>
       </Tooltip>
       <Tooltip
-        label={copied ? 'Lien copie' : 'Copier le lien'}
+        label={copied ? 'Lien copié' : 'Copier le lien'}
         description="Partagez ou archivez la mission sans ouvrir la plateforme."
       >
         <button
@@ -543,7 +543,7 @@
       </Tooltip>
       <Tooltip
         label="Ouvrir la mission"
-        description="Passez a la plateforme source pour verifier ou postuler."
+        description="Passez à la plateforme source pour vérifier ou postuler."
       >
         <button
           class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"

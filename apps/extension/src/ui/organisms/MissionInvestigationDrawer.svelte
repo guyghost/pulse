@@ -45,7 +45,7 @@
     },
     {
       label: 'TJM',
-      value: mission.tjm !== null ? `${mission.tjm}€/j` : 'A verifier',
+      value: mission.tjm !== null ? `${mission.tjm}€/j` : 'À vérifier',
       icon: 'badge-euro',
       severity: mission.tjm !== null ? 'success' : 'attention',
     },
@@ -62,28 +62,28 @@
       return {
         severity: 'success' as const,
         statusLabel: 'Prioritaire',
-        title: 'Cette mission merite une qualification rapide',
+        title: 'Cette mission mérite une qualification rapide',
         description:
-          'Le score global indique un bon alignement. Verifiez les points faibles ci-dessous avant de postuler.',
+          'Le score global indique un bon alignement. Vérifiez les points faibles ci-dessous avant de postuler.',
       };
     }
 
     if ((criteria?.tjm ?? 100) < 60) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'A negocier',
+        statusLabel: 'À négocier',
         title: 'Le principal risque est le TJM',
         description:
-          'Gardez cette mission si le client ou le contexte compense, sinon priorisez une opportunite mieux alignee.',
+          'Gardez cette mission si le client ou le contexte compense, sinon priorisez une opportunité mieux alignée.',
       };
     }
 
     return {
       severity: score >= 60 ? ('attention' as const) : ('neutral' as const),
-      statusLabel: score >= 60 ? 'A comparer' : 'Faible priorite',
-      title: score >= 60 ? 'Mission a comparer avant action' : 'Mission a garder en observation',
+      statusLabel: score >= 60 ? 'À comparer' : 'Faible priorité',
+      title: score >= 60 ? 'Mission à comparer avant action' : 'Mission à garder en observation',
       description:
-        'Utilisez le detail des criteres pour comprendre pourquoi elle ne remonte pas plus haut.',
+        'Utilisez le détail des critères pour comprendre pourquoi elle ne remonte pas plus haut.',
     };
   });
 
@@ -276,11 +276,11 @@
             </summary>
             <p class="mt-2 text-xs leading-5 text-text-secondary">
               Score final {mission.scoreBreakdown?.total ?? score}/100, calculé depuis le profil,
-              l'annonce et les critères ci-dessous.
+              l’annonce et les critères ci-dessous.
             </p>
             {#if mission.scoreBreakdown}
               <p class="mt-2 text-[11px] leading-5 text-text-subtle">
-                Base déterministe {mission.scoreBreakdown.deterministic}/100. L'IA sémantique, quand
+                Base déterministe {mission.scoreBreakdown.deterministic}/100. L’IA sémantique, quand
                 elle existe, ajoute une hypothèse locale et non bloquante.
               </p>
               {#if mission.scoreBreakdown.semanticReason}

@@ -37,8 +37,8 @@ describe('OnboardingWizard', () => {
     for (const label of [
       'Comprendre Pulse',
       'Connecter une source',
-      'Observer une activite',
-      'Creer une alerte',
+      'Observer une activité',
+      'Créer une alerte',
       'Recevoir un insight',
     ]) {
       expect(target.querySelector(`button[aria-label="${label}"]`)).not.toBeNull();
@@ -57,19 +57,19 @@ describe('OnboardingWizard', () => {
 
     clickButton(target, /Continuer avec/);
     await tick();
-    expect(target.textContent).toContain('Observer une activite');
+    expect(target.textContent).toContain('Observer une activité');
     expect(target.textContent).toContain('3/5');
 
-    clickButton(target, 'Creer une premiere alerte');
+    clickButton(target, 'Créer une première alerte');
     await tick();
-    expect(target.textContent).toContain('Creer une alerte');
+    expect(target.textContent).toContain('Créer une alerte');
     expect(target.textContent).toContain('4/5');
 
     clickButton(target, 'Voir le premier insight');
     await flushAsyncStep();
     expect(target.textContent).toContain('Recevoir un insight');
     expect(target.textContent).toContain('5/5');
-    expect(target.textContent).toContain('Action recommandee apres le scan');
+    expect(target.textContent).toContain('Action recommandée après le scan');
   });
 
   it('saves the first alert before showing the insight step', async () => {
@@ -81,7 +81,7 @@ describe('OnboardingWizard', () => {
     await tick();
     clickButton(target, /Continuer avec/);
     await tick();
-    clickButton(target, 'Creer une premiere alerte');
+    clickButton(target, 'Créer une première alerte');
     await tick();
     clickButton(target, 'Voir le premier insight');
     await flushAsyncStep();
