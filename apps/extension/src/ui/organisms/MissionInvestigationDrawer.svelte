@@ -1,6 +1,8 @@
 <script lang="ts">
   import { Icon } from '@pulse/ui';
   import type { Mission } from '$lib/core/types/mission';
+  import type { ApplicationStatus } from '$lib/core/types/tracking';
+  import { STATUS_LABELS } from '$lib/core/types/tracking';
   import { scoreToGrade } from '$lib/core/types/score';
   import OperationalStoryCard, {
     type OperationalEvidence,
@@ -8,12 +10,26 @@
 
   const {
     mission,
+    isCompared = false,
+    compareDisabled = false,
+    isHidden = false,
+    trackingStatus = null,
     onClose,
     onOpenLink,
+    onToggleCompare,
+    onHide,
+    onSelectForTracking,
   }: {
     mission: Mission;
+    isCompared?: boolean;
+    compareDisabled?: boolean;
+    isHidden?: boolean;
+    trackingStatus?: ApplicationStatus | null;
     onClose?: () => void;
     onOpenLink?: (url: string) => void;
+    onToggleCompare?: () => void;
+    onHide?: () => void;
+    onSelectForTracking?: () => void;
   } = $props();
 
   const score = $derived(mission.scoreBreakdown?.total ?? mission.score ?? 0);
@@ -79,6 +95,31 @@
         ]
       : []
   );
+
+  const canSelectForTracking = $derived(trackingStatus === null || trackingStatus === 'detected');
+  const trackingActionLabel = $derived(
+    canSelectForTracking
+      ? 'Mettre en suivi'
+      : `Suivi: ${STATUS_LABELS[trackingStatus ?? 'detected']}`
+  );
+
+  function handleSelectForTracking(): void {
+    if (!canSelectForTracking) {
+      return;
+    }
+    onSelectForTracking?.();
+  }
+
+  function handleToggleCompare(): void {
+    if (compareDisabled && !isCompared) {
+      return;
+    }
+    onToggleCompare?.();
+  }
+
+  function handleOpenForTracking(): void {
+    onOpenLink?.(mission.url);
+  }
 </script>
 
 <div class="fixed inset-0 z-50 bg-text-primary/20 backdrop-blur-sm" role="presentation">
@@ -118,6 +159,64 @@
         onPrimaryAction={() => onOpenLink?.(mission.url)}
       />
 
+      <section class="section-card rounded-xl p-4" aria-label="Actions rapides mission">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <h3 class="text-sm font-semibold text-text-primary">Transformer la décision</h3>
+            <p class="mt-1 text-xs leading-5 text-text-subtle">
+              Gardez le contrôle avant de sortir vers la plateforme source.
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-lg border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+          >
+            {trackingStatus ? STATUS_LABELS[trackingStatus] : 'Non suivie'}
+          </span>
+        </div>
+
+        <div class="mt-3 grid grid-cols-2 gap-2">
+          <button
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
+            onclick={handleSelectForTracking}
+            disabled={!canSelectForTracking}
+            aria-label={trackingActionLabel}
+          >
+            <Icon name="list-checks" size={13} />
+            {trackingActionLabel}
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-xs font-semibold text-text-primary transition-colors hover:bg-subtle-gray"
+            onclick={handleOpenForTracking}
+          >
+            <Icon name="external-link" size={13} />
+            Ouvrir pour postuler
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-xs font-semibold text-text-primary transition-colors hover:bg-subtle-gray disabled:cursor-not-allowed disabled:opacity-45 {isCompared
+              ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+              : ''}"
+            onclick={handleToggleCompare}
+            disabled={compareDisabled && !isCompared}
+            aria-pressed={isCompared}
+          >
+            <Icon name="git-compare-arrows" size={13} />
+            {isCompared ? 'Retirer comparaison' : 'Comparer'}
+          </button>
+          <button
+            type="button"
+            class="inline-flex h-9 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-xs font-semibold text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red"
+            onclick={() => onHide?.()}
+            aria-pressed={isHidden}
+          >
+            <Icon name={isHidden ? 'eye' : 'x-circle'} size={13} />
+            {isHidden ? 'Restaurer' : 'Masquer'}
+          </button>
+        </div>
+      </section>
+
       <section class="section-card rounded-xl p-4">
         <h3 class="text-sm font-semibold text-text-primary">Preuves principales</h3>
         <div class="mt-3 grid grid-cols-2 gap-2">
@@ -150,7 +249,27 @@
 
       {#if scoreLines.length > 0}
         <section class="section-card rounded-xl p-4">
-          <h3 class="text-sm font-semibold text-text-primary">Score par critère</h3>
+          <details class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2">
+            <summary class="cursor-pointer text-xs font-semibold text-blueprint-blue">
+              Pourquoi ce score ?
+            </summary>
+            <p class="mt-2 text-xs leading-5 text-text-secondary">
+              Score final {mission.scoreBreakdown?.total ?? score}/100, calculé depuis le profil,
+              l'annonce et les critères ci-dessous.
+            </p>
+            {#if mission.scoreBreakdown}
+              <p class="mt-2 text-[11px] leading-5 text-text-subtle">
+                Base déterministe {mission.scoreBreakdown.deterministic}/100. L'IA sémantique, quand
+                elle existe, ajoute une hypothèse locale et non bloquante.
+              </p>
+              {#if mission.scoreBreakdown.semanticReason}
+                <p class="mt-2 text-[11px] leading-5 text-blueprint-blue">
+                  {mission.scoreBreakdown.semanticReason}
+                </p>
+              {/if}
+            {/if}
+          </details>
+          <h3 class="mt-4 text-sm font-semibold text-text-primary">Score par critère</h3>
           <div class="mt-3 space-y-2">
             {#each scoreLines as line}
               {@const grade = scoreToGrade(line.value)}

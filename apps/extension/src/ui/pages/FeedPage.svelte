@@ -5,6 +5,8 @@
     type SourceStatus,
   } from '$lib/shell/facades/feed-controller.svelte';
   import { createFeedPageState } from '$lib/state/feed-page.svelte';
+  import { createTrackingStore } from '$lib/state/tracking.svelte';
+  import type { ApplicationStatus } from '$lib/core/types/tracking';
   import VirtualMissionFeed from '../organisms/VirtualMissionFeed.svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
   import { tick } from 'svelte';
@@ -61,6 +63,7 @@
   const feed = createFeedStore();
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
+  const tracking = createTrackingStore();
   page.setup();
 
   // Refinement banner: shown only on zero-config first scan (no profile yet)
@@ -508,6 +511,31 @@
     openExternalUrl(url).catch(() => {});
   }
 
+  function handleTrackingTransition(missionId: string, status: ApplicationStatus): void {
+    void tracking.transitionStatus(missionId, status);
+  }
+
+  function handleInvestigationToggleCompare(): void {
+    if (!investigationMission) {
+      return;
+    }
+    page.toggleCompare(investigationMission.id);
+  }
+
+  function handleInvestigationHide(): void {
+    if (!investigationMission) {
+      return;
+    }
+    page.handleHide(investigationMission.id);
+  }
+
+  function handleInvestigationSelectForTracking(): void {
+    if (!investigationMission) {
+      return;
+    }
+    handleTrackingTransition(investigationMission.id, 'selected');
+  }
+
   function feedActionToneClass(tone: FeedActionQueueTone): string {
     if (tone === 'critical') {
       return 'border-status-red/25 bg-status-red/6 text-status-red hover:bg-status-red/10';
@@ -530,6 +558,7 @@
     ]);
     showRefinementBanner = firstScanDone && !bannerDismissed && !profile;
     alertPreferences = storedAlertPreferences;
+    await tracking.loadTrackings();
   })().catch(() => {});
 
   $effect(() => {
@@ -1221,12 +1250,14 @@
         favorites={page.favorites}
         hidden={page.hidden}
         comparisonMissionIds={page.comparisonMissionIds}
+        trackingByMissionId={tracking.trackings}
         sortBy={page.sortBy}
         filterActive={page.filterActive || showAlertOnly}
         onMissionSeen={page.handleMissionSeen}
         onToggleFavorite={page.handleToggleFavorite}
         onHide={page.handleHide}
         onToggleCompare={page.toggleCompare}
+        onStatusTransition={handleTrackingTransition}
         onCopyLink={page.handleCopyLink}
         onOpenLink={handleOpenExternalUrl}
         onInvestigateMission={(mission) => (investigationMission = mission)}
@@ -1273,8 +1304,16 @@
 {#if investigationMission}
   <MissionInvestigationDrawer
     mission={investigationMission}
+    isCompared={page.comparisonMissionIds.includes(investigationMission.id)}
+    compareDisabled={page.comparisonMissionIds.length >= 3 &&
+      !page.comparisonMissionIds.includes(investigationMission.id)}
+    isHidden={investigationMission.id in page.hidden}
+    trackingStatus={tracking.getTrackingForMission(investigationMission.id)?.currentStatus ?? null}
     onClose={() => (investigationMission = null)}
     onOpenLink={handleOpenExternalUrl}
+    onToggleCompare={handleInvestigationToggleCompare}
+    onHide={handleInvestigationHide}
+    onSelectForTracking={handleInvestigationSelectForTracking}
   />
 {/if}
 

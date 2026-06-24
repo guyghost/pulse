@@ -299,6 +299,27 @@ describe('operational UI constraints', () => {
     );
   });
 
+  it('keeps mission investigation actionable before technical details', () => {
+    const drawerSource = readFileSync('src/ui/organisms/MissionInvestigationDrawer.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const virtualFeedSource = readFileSync('src/ui/organisms/VirtualMissionFeed.svelte', 'utf8');
+
+    expect(drawerSource).toContain('Transformer la décision');
+    expect(drawerSource).toContain('Mettre en suivi');
+    expect(drawerSource).toContain('Comparer');
+    expect(drawerSource).toContain('Masquer');
+    expect(drawerSource).toContain('Pourquoi ce score ?');
+    expect(drawerSource.indexOf('Transformer la décision')).toBeLessThan(
+      drawerSource.indexOf('Détails techniques')
+    );
+    expect(feedSource).toContain('const tracking = createTrackingStore()');
+    expect(feedSource).toContain('onSelectForTracking');
+    expect(feedSource).toContain('function handleInvestigationSelectForTracking()');
+    expect(feedSource).toContain("handleTrackingTransition(investigationMission.id, 'selected')");
+    expect(virtualFeedSource).toContain('trackingByMissionId');
+    expect(virtualFeedSource).toContain('onStatusTransition');
+  });
+
   it('keeps the feed comparison flow explicit and actionable', () => {
     const cardSource = readFileSync('src/ui/molecules/MissionCard.svelte', 'utf8');
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
