@@ -42,6 +42,12 @@ export interface ScanProgressPayload {
   connectorProgress: ConnectorProgress[];
 }
 
+export interface ScanPartialResultPayload {
+  connectorId: string;
+  connectorName: string;
+  missions: Mission[];
+}
+
 /**
  * Payload du message CONNECTOR_HEALTH_UPDATED
  */
@@ -137,6 +143,7 @@ export type BridgeMessage =
   // Scan orchestration (panel ↔ service worker)
   | { type: 'SCAN_START' }
   | { type: 'SCAN_PROGRESS'; payload: ScanProgressPayload }
+  | { type: 'SCAN_PARTIAL_RESULT'; payload: ScanPartialResultPayload }
   | { type: 'SCAN_COMPLETE'; payload: Mission[] }
   | { type: 'SCAN_ERROR'; payload: { message: string; code: string } }
   | { type: 'SCAN_CANCEL' }
@@ -166,7 +173,7 @@ export type BridgeMessage =
   | { type: 'SHOW_TOAST'; payload: { message: string; toastType: ToastType; duration?: number } }
   | { type: 'TOAST_SHOWN' }
   // Profile
-  | { type: 'PROFILE_UPDATED' }
+  | { type: 'PROFILE_UPDATED'; payload: UserProfile }
   | { type: 'RESET_LOCAL_DATA' }
   | { type: 'LOCAL_DATA_RESET'; payload: { reset: boolean; reason?: string } }
   // Connector health (service worker → side panel)

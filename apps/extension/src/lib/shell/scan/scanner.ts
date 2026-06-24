@@ -98,11 +98,19 @@ export type DetailedProgressCallback = (info: {
   connectorStates: ConnectorScanState[];
 }) => void;
 
+export type ConnectorResultCallback = (info: {
+  connectorId: string;
+  connectorName: string;
+  missions: Mission[];
+}) => void;
+
 export interface ScanOptions {
   /** Délai entre les pages d'un même connecteur en ms (défaut: 500) */
   pageDelayMs?: number;
   /** Callback de progression détaillé (pour bridge SCAN_PROGRESS) */
   onDetailedProgress?: DetailedProgressCallback;
+  /** Callback appelé quand un connecteur réussit, avant le résultat final global */
+  onConnectorResult?: ConnectorResultCallback;
   /** Override explicite du profil utilisé pour le scan */
   profileOverride?: UserProfile;
 }
@@ -244,11 +252,26 @@ async function _runScanInternal(
     }
   }
   profile ??= createDefaultProfile();
-  const usingDefaultProfile = isDefaultProfile(profile);
+  const scanProfile = profile;
+  const usingDefaultProfile = isDefaultProfile(scanProfile);
+
+  function buildDeterministicMissions(rawMissions: Mission[], now: Date): Mission[] {
+    const freelanceOnly = filterSalariedMissions(rawMissions);
+    const freshOnly = filterStaleMissions(freelanceOnly, now);
+
+    return freshOnly.map((mission) => {
+      const score = scoreMission(mission, scanProfile, now);
+      return {
+        ...mission,
+        scoreBreakdown: buildScoreBreakdown(score.total, score.breakdown),
+        score: score.total,
+      };
+    });
+  }
 
   // Build base search context from profile (lastSync is always null — see comment below)
   // Keep connector fetching broad for the default profile.
-  const baseSearchContext = usingDefaultProfile ? null : buildSearchContext(profile, null);
+  const baseSearchContext = usingDefaultProfile ? null : buildSearchContext(scanProfile, null);
 
   // Note: No connector uses server-side lastSync filtering anymore. This avoids the
   // split-brain bug where lastSync (chrome.storage.local) becomes stale when IndexedDB
@@ -369,6 +392,15 @@ async function _runScanInternal(
     } else {
       trackParserHealth(connector.id, result.value.length, now).catch(() => {});
       connectorResults.push({ connectorId: connector.id, missions: result.value });
+      try {
+        options?.onConnectorResult?.({
+          connectorId: connector.id,
+          connectorName: connector.name,
+          missions: buildDeterministicMissions(result.value, new Date(now)),
+        });
+      } catch {
+        // Partial UI updates are best-effort; the final scan result remains canonical.
+      }
       // Toast de récupération si le circuit revient à closed depuis open/half-open
       if (
         circuitRun.snapshot.circuitState === 'closed' &&
@@ -457,7 +489,8 @@ async function _runScanInternal(
   // Score against profile (already loaded above for connector filtering)
   // Now returns structured breakdown
   const scored = freshOnly.map((m) => {
-    const result = scoreMission(m, profile, new Date());
+    const now = new Date();
+    const result = scoreMission(m, scanProfile, now);
     return {
       ...m,
       scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),
@@ -470,7 +503,7 @@ async function _runScanInternal(
     try {
       const semanticResults = await scoreMissionsSemantic(
         scored,
-        profile,
+        scanProfile,
         settings.maxSemanticPerScan
       );
       for (const mission of scored) {

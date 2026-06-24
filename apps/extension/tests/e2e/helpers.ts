@@ -19,19 +19,41 @@ export function navButton(page: Page, name: string): Locator {
 }
 
 export function missionCards(page: Page): Locator {
-  return page.locator('[role="button"][tabindex="0"]');
+  return page.locator('[data-testid="mission-feed"] [role="button"][tabindex="0"]');
 }
 
 export function favoritesToggle(page: Page): Locator {
-  return page.getByTitle(/Favoris/);
+  return page.getByRole('button', { name: 'Filtrer les favoris' });
 }
 
 export function allMissionsToggle(page: Page): Locator {
-  return page.getByTitle(/Voir toutes/);
+  return page.getByRole('button', { name: 'Voir toutes les missions' });
 }
 
 export function scanButton(page: Page): Locator {
-  return page.getByTitle(/Lancer le scan|Rafraichir|Rafraîchir|Scan en cours/);
+  return page.getByRole('button', {
+    name: /Lancer le scan des missions|Scan en cours|Scan indisponible hors ligne/,
+  });
+}
+
+export function favoriteButton(card: Locator): Locator {
+  return card.getByRole('button', { name: 'Ajouter la mission aux favoris' });
+}
+
+export function unfavoriteButton(card: Locator): Locator {
+  return card.getByRole('button', { name: 'Retirer la mission des favoris' });
+}
+
+export function hideButton(card: Locator): Locator {
+  return card.getByRole('button', { name: 'Masquer la mission' });
+}
+
+export function copyLinkButton(card: Locator): Locator {
+  return card.getByRole('button', { name: 'Copier le lien de la mission' });
+}
+
+export function openMissionButton(card: Locator): Locator {
+  return card.getByRole('button', { name: 'Ouvrir la mission sur la plateforme source' });
 }
 
 export async function clearFeedSearch(page: Page) {
@@ -85,7 +107,12 @@ export async function openDevPanel(page: Page) {
 }
 
 export async function closeDevPanel(page: Page) {
-  await page.keyboard.press('Control+Shift+D');
+  const closeButton = page.getByRole('button', { name: 'Fermer le centre de contrôle dev' });
+  if (await closeButton.isVisible().catch(() => false)) {
+    await closeButton.click();
+  } else {
+    await page.keyboard.press('Control+Shift+D');
+  }
   await expect(page.getByText('DEV PANEL')).not.toBeVisible();
 }
 
@@ -281,21 +308,9 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
           }) => {
             if (msg?.type === 'SCAN_START') {
               const mockMissions = (window as unknown as Record<string, unknown>).__mockMissions;
-              setTimeout(() => {
-                window.dispatchEvent(
-                  new CustomEvent('dev:missions', {
-                    detail: mockMissions,
-                  })
-                );
-              }, 300);
               return {
-                type: 'SCAN_STATUS',
-                payload: {
-                  state: 'scanning',
-                  currentConnector: 'free-work',
-                  progress: 0,
-                  missionsFound: 0,
-                },
+                type: 'SCAN_COMPLETE',
+                payload: mockMissions,
               };
             }
             return origSend.call((val as Record<string, unknown>).runtime, msg);
@@ -344,12 +359,19 @@ export async function getFirstMissionCard(page: Page): Promise<Locator> {
  * Marque une mission comme favorite
  */
 export async function favoriteMission(card: Locator) {
-  const previousFavoritesCount = await card.page().getByTitle('Retirer des favoris').count();
-  const starBtn = card.getByTitle('Ajouter aux favoris');
+  const previousFavoritesCount = await card
+    .page()
+    .getByRole('button', { name: 'Retirer la mission des favoris' })
+    .count();
+  const starBtn = favoriteButton(card);
   await expect(starBtn).toBeVisible();
   await starBtn.click();
   await expect
-    .poll(async () => card.page().getByTitle('Retirer des favoris').count(), { timeout: 1000 })
+    .poll(
+      async () =>
+        card.page().getByRole('button', { name: 'Retirer la mission des favoris' }).count(),
+      { timeout: 1000 }
+    )
     .toBeGreaterThan(previousFavoritesCount);
 }
 
@@ -357,17 +379,17 @@ export async function favoriteMission(card: Locator) {
  * Retire une mission des favoris
  */
 export async function unfavoriteMission(card: Locator) {
-  const starBtn = card.getByTitle('Retirer des favoris');
+  const starBtn = unfavoriteButton(card);
   await expect(starBtn).toBeVisible();
   await starBtn.click();
-  await expect(card.getByTitle('Ajouter aux favoris')).toBeVisible({ timeout: 1000 });
+  await expect(favoriteButton(card)).toBeVisible({ timeout: 1000 });
 }
 
 /**
  * Masque une mission
  */
 export async function hideMission(card: Locator) {
-  const hideBtn = card.getByTitle('Masquer');
+  const hideBtn = hideButton(card);
   await expect(hideBtn).toBeVisible();
   await hideBtn.click();
 }
@@ -387,7 +409,7 @@ export async function toggleFavoritesFilter(page: Page, showOnlyFavorites: boole
  * Affiche les missions masquées
  */
 export async function showHiddenMissions(page: Page) {
-  const showHiddenBtn = page.getByRole('button', { name: /Voir les \d+ mission/ });
+  const showHiddenBtn = page.getByRole('button', { name: /Voir les \d+ mission.*masqu/i });
   await expect(showHiddenBtn).toBeVisible({ timeout: 5000 });
   await dismissFeedTour(page);
   await showHiddenBtn.click();

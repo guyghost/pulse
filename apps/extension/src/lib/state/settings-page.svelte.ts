@@ -37,6 +37,15 @@ import { sendMessage } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
 import { getPremium } from '$lib/shell/facades/premium.facade';
+import {
+  appendUniqueNormalized,
+  normalizeDailyRate,
+  normalizeProfileDraft,
+  normalizeTextInput,
+  withProfileDefaults,
+} from '$lib/core/profile/normalize-profile';
+import { profileMachine, type ProfileStatus } from '$lib/shell/machines/profile.machine';
+import { createSvelteActor } from '$lib/shell/state/xstate.svelte';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
@@ -58,36 +67,6 @@ const DEFAULT_SETTINGS: AppSettings = {
   theme: 'system',
 };
 
-const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({
-  firstName: profile.firstName ?? '',
-  stack: profile.stack ?? [],
-  tjmMin: profile.tjmMin ?? 0,
-  tjmMax: profile.tjmMax ?? 0,
-  location: profile.location ?? '',
-  remote: profile.remote ?? 'any',
-  seniority: profile.seniority ?? 'senior',
-  jobTitle: profile.jobTitle ?? '',
-  scoringWeights: profile.scoringWeights,
-  searchKeywords: profile.searchKeywords ?? [],
-});
-
-const normalizeTextInput = (value: string): string => value.trim().replace(/\s+/g, ' ');
-
-const normalizeDailyRate = (value: number): number => {
-  const numeric = Number(value);
-  if (!Number.isFinite(numeric) || numeric < 0) {
-    return 0;
-  }
-  return Math.round(numeric);
-};
-
-function appendUniqueNormalized(items: string[], pendingItem: string): string[] {
-  const normalizedItems = items.map(normalizeTextInput).filter(Boolean);
-  const normalizedPending = normalizeTextInput(pendingItem);
-  const nextItems = normalizedPending ? [...normalizedItems, normalizedPending] : normalizedItems;
-  return Array.from(new Set(nextItems));
-}
-
 const formatBackupDateKey = (timestamp: number): string =>
   new Date(timestamp).toISOString().split('T')[0] ?? 'backup';
 
@@ -105,6 +84,18 @@ const exportFormatLabels: Record<ExportFormat, string> = {
 };
 
 export class SettingsPageController {
+  private readonly profileActor = createSvelteActor(profileMachine, {
+    input: {
+      deps: {
+        loadProfile: getProfile,
+        saveProfile: async (profile) => {
+          await saveProfile(profile);
+          return profile;
+        },
+      },
+    },
+  });
+
   firstName = $state('');
   jobTitle = $state('');
   profileLocation = $state('');
@@ -153,6 +144,22 @@ export class SettingsPageController {
 
   constructor(private readonly options: SettingsPageControllerOptions = {}) {}
 
+  get profileStatus(): ProfileStatus {
+    return String(this.profileActor.snapshot.value) as ProfileStatus;
+  }
+
+  get currentProfile(): UserProfile | null {
+    return this.profileActor.snapshot.context.current;
+  }
+
+  get draftProfile(): UserProfile | null {
+    return this.profileActor.snapshot.context.draft;
+  }
+
+  get isSavingProfile(): boolean {
+    return this.profileActor.snapshot.matches('saving');
+  }
+
   async load(): Promise<void> {
     await Promise.all([
       this.loadProfile(),
@@ -179,6 +186,7 @@ export class SettingsPageController {
       this.tjmMax = profile.tjmMax ?? 0;
       this.profileStack = profile.stack ?? [];
       this.searchKeywords = profile.searchKeywords ?? [];
+      this.profileActor.send({ type: 'PROFILE_UPDATED', profile });
     } catch {
       // Hors contexte extension
     }
@@ -369,7 +377,7 @@ export class SettingsPageController {
         return;
       }
 
-      const nextProfile = withProfileDefaults({
+      const normalized = normalizeProfileDraft({
         firstName: normalizeTextInput(this.firstName),
         jobTitle: normalizeTextInput(this.jobTitle),
         location: normalizeTextInput(this.profileLocation),
@@ -382,7 +390,14 @@ export class SettingsPageController {
         searchKeywords: nextSearchKeywords,
       });
 
-      await saveProfile(nextProfile);
+      if (!normalized.ok || !normalized.profile) {
+        this.profileError = normalized.error ?? 'Profil invalide';
+        return;
+      }
+
+      const nextProfile = normalized.profile;
+
+      await this.submitProfile(nextProfile);
       this.firstName = nextProfile.firstName;
       this.jobTitle = nextProfile.jobTitle;
       this.profileLocation = nextProfile.location;
@@ -394,13 +409,36 @@ export class SettingsPageController {
       this.keywordInput = '';
       this.editingProfile = false;
       this.profileSaved = true;
-      window.dispatchEvent(new CustomEvent('profile-updated'));
       setTimeout(() => {
         this.profileSaved = false;
       }, 2000);
     } catch (err) {
       this.profileError = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
     }
+  }
+
+  private submitProfile(profile: UserProfile): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const unsubscribe = this.profileActor.subscribe((snapshot) => {
+        if (settled) {
+          return;
+        }
+        if (snapshot.matches('ready') && snapshot.context.current) {
+          settled = true;
+          unsubscribe();
+          resolve();
+        }
+        if (snapshot.matches('error')) {
+          settled = true;
+          const message = snapshot.context.error ?? 'Erreur lors de la sauvegarde';
+          unsubscribe();
+          reject(new Error(message));
+        }
+      });
+
+      this.profileActor.send({ type: 'SUBMIT_PROFILE', profile });
+    });
   }
 
   async updateScanInterval(value: number): Promise<void> {
@@ -605,7 +643,6 @@ export class SettingsPageController {
       this.showBackupModal = false;
       this.pendingBackup = null;
       this.backupError = null;
-      window.dispatchEvent(new CustomEvent('profile-updated'));
 
       return { ok: true, value: undefined };
     } catch {

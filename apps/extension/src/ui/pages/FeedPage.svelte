@@ -34,10 +34,7 @@
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
-  import {
-    getProfileBannerDismissed,
-    setFeedTourSeen,
-  } from '$lib/shell/facades/app-flags.facade';
+  import { getProfileBannerDismissed, setFeedTourSeen } from '$lib/shell/facades/app-flags.facade';
   import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
   import { getLastTransitionTime } from '$lib/core/tracking';
@@ -45,6 +42,7 @@
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
   import { showToastAction } from '$lib/shell/notifications/toast-service';
+  import { subscribeMessages } from '$lib/shell/messaging/bridge';
 
   const {
     onNavigateToOnboarding,
@@ -173,12 +171,11 @@
   const visibleFeedMissions = $derived(showAlertOnly ? alertMissions : page.displayMissions);
   const visibleFeedMissionCount = $derived(visibleFeedMissions.length);
   const hasVisibleFeedMissions = $derived(visibleFeedMissionCount > 0);
+  const feedIsColdLoading = $derived(page.isLoading && !hasVisibleFeedMissions);
+  const feedChromeBusy = $derived(controller.isScanning || feedIsColdLoading);
   const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
   const showMissionScrollCue = $derived(
-    feedChromeCompact &&
-      hasVisibleFeedMissions &&
-      !missionFeedReached &&
-      !(controller.isScanning || page.isLoading)
+    feedChromeCompact && hasVisibleFeedMissions && !missionFeedReached && !feedIsColdLoading
   );
 
   const alertMatchCount = $derived.by(() => {
@@ -599,15 +596,16 @@
       showTour = true;
     }
 
-    function handleProfileUpdated() {
-      showRefinementBanner = false;
-    }
+    const unsubscribe = subscribeMessages((message) => {
+      if (message.type === 'PROFILE_UPDATED') {
+        showRefinementBanner = false;
+      }
+    });
 
     window.addEventListener('feed-tour:open', handleOpenTour);
-    window.addEventListener('profile-updated', handleProfileUpdated);
     return () => {
+      unsubscribe();
       window.removeEventListener('feed-tour:open', handleOpenTour);
-      window.removeEventListener('profile-updated', handleProfileUpdated);
     };
   });
 
@@ -820,7 +818,7 @@
                   <button
                     class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-primary transition-all duration-200 hover:bg-subtle-gray"
                     onclick={() => controller.startScan()}
-                    disabled={controller.isScanning || page.isLoading || page.isOffline}
+                    disabled={controller.isScanning || feedIsColdLoading || page.isOffline}
                     aria-label="Lancer le scan des missions"
                   >
                     <Icon name="play" size={12} class="ml-0.5" />
@@ -889,7 +887,7 @@
                 class="absolute right-0 top-0 flex items-center gap-2"
                 class:flex-row-reverse={page.panelSide === 'left'}
               >
-                {#if controller.isScanning || page.isLoading}
+                {#if feedChromeBusy}
                   <Tooltip
                     label="Stopper le scan"
                     description="Interrompt le scan en cours et conserve les données déjà chargées."
@@ -904,12 +902,12 @@
                   </Tooltip>
                 {/if}
                 <Tooltip
-                  label={controller.isScanning || page.isLoading
+                  label={feedChromeBusy
                     ? 'Scan en cours'
                     : page.isOffline
                       ? 'Scan indisponible hors ligne'
                       : 'Lancer le scan'}
-                  description={controller.isScanning || page.isLoading
+                  description={feedChromeBusy
                     ? 'Pulse interroge les sources connectées.'
                     : page.isOffline
                       ? 'Les données en cache restent disponibles.'
@@ -917,20 +915,20 @@
                 >
                   <button
                     class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
-                    {controller.isScanning || page.isLoading
+                    {feedChromeBusy
                       ? 'border-blueprint-blue/20 bg-blueprint-blue/8'
                       : page.isOffline
                         ? 'border-border-light bg-subtle-gray text-text-muted cursor-not-allowed'
                         : 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'}"
                     onclick={() => controller.startScan()}
-                    disabled={controller.isScanning || page.isLoading || page.isOffline}
-                    aria-label={controller.isScanning || page.isLoading
+                    disabled={controller.isScanning || feedIsColdLoading || page.isOffline}
+                    aria-label={feedChromeBusy
                       ? 'Scan en cours'
                       : page.isOffline
                         ? 'Scan indisponible hors ligne'
                         : 'Lancer le scan des missions'}
                   >
-                    {#if controller.isScanning || page.isLoading}
+                    {#if feedChromeBusy}
                       <span class="absolute inset-0 flex items-center justify-center">
                         <span
                           class="radar-ping absolute h-8 w-8 rounded-full border border-blueprint-blue/40"
@@ -949,7 +947,7 @@
             </div>
 
             <ScanProgress
-              isScanning={controller.isScanning || page.isLoading}
+              isScanning={feedChromeBusy}
               progress={controller.scanProgress.percent}
               missionsFound={page.totalMissions}
               connectorName={controller.scanProgress.connectorName}
@@ -976,10 +974,10 @@
             <ConnectorStatusList
               statuses={controller.connectorStatuses}
               persistedStatuses={controller.persistedStatuses}
-              isScanning={controller.isScanning || page.isLoading}
+              isScanning={feedChromeBusy}
             />
 
-            {#if !(controller.isScanning || page.isLoading)}
+            {#if !feedIsColdLoading}
               <SourceHealthPanel
                 sources={controller.sourceStatuses as SourceStatus[]}
                 isChecking={controller.isCheckingSources}
@@ -1011,7 +1009,7 @@
               {/if}
             {/if}
 
-            {#if !(controller.isScanning || page.isLoading) && controller.lastScanAt}
+            {#if !feedIsColdLoading && controller.lastScanAt}
               <div class="mt-2">
                 <LastScanInfo
                   lastScanAt={controller.lastScanAt}
@@ -1059,7 +1057,7 @@
         <!-- ── Search + Filter toolbar ── -->
         <div class="border-t border-border-light px-5 py-3">
           <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
-            {#if controller.isScanning || page.isLoading}Chargement des missions en cours{/if}
+            {#if feedChromeBusy}Chargement des missions en cours{/if}
           </div>
 
           {#if showRefinementBanner && !controller.isScanning && page.profileLoaded && page.profileNeedsCompletion}
@@ -1078,7 +1076,7 @@
           {/if}
 
           <!-- Row 1: title + search -->
-          {#if controller.isScanning || page.isLoading}
+          {#if feedChromeBusy}
             <div class="flex items-center gap-2 text-xs text-text-muted">
               <span
                 class="h-3 w-3 animate-spin rounded-full border-2 border-blueprint-blue/20 border-t-blueprint-blue"
@@ -1087,7 +1085,7 @@
             </div>
           {/if}
 
-          <div class={controller.isScanning || page.isLoading ? 'mt-2' : ''}>
+          <div class={feedChromeBusy ? 'mt-2' : ''}>
             <SearchInput
               value={page.searchQuery}
               onSearch={page.handleSearch}
@@ -1113,6 +1111,9 @@
                   : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
                 onclick={page.toggleFavoritesFilter}
                 aria-pressed={page.showFavoritesOnly}
+                aria-label={page.showFavoritesOnly
+                  ? 'Voir toutes les missions'
+                  : 'Filtrer les favoris'}
               >
                 <Icon
                   name="star"
@@ -1138,6 +1139,7 @@
                   : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
                 onclick={page.toggleHiddenFilter}
                 aria-pressed={page.showHidden}
+                aria-label={page.showHidden ? 'Masquer les missions ignorées' : 'Voir les ignorées'}
               >
                 <Icon name={page.showHidden ? 'eye' : 'eye-off'} size={12} />
                 <span class="hidden @[20rem]:inline text-[10px] font-medium">Ignorées</span>
@@ -1175,6 +1177,7 @@
                 onclick={() => page.setShowFilters(!page.showFilters)}
                 aria-expanded={page.showFilters}
                 aria-controls="filter-panel"
+                aria-label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
               >
                 <Icon name="sliders-horizontal" size={12} />
                 <span class="hidden @[20rem]:inline">Filtres</span>
@@ -1318,7 +1321,7 @@
     >
       <VirtualMissionFeed
         missions={visibleFeedMissions}
-        isLoading={controller.isScanning || page.isLoading}
+        isLoading={feedIsColdLoading}
         error={page.error}
         seenIds={page.seenIds}
         favorites={page.favorites}

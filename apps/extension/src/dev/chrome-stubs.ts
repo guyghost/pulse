@@ -1,7 +1,7 @@
 import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
 import { analyzeTJMHistory } from '$lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
-import type { Mission } from '$lib/core/types/mission';
+import type { Mission, MissionSource } from '$lib/core/types/mission';
 import {
   DEFAULT_CONNECTED_ALERT_PREFERENCES,
   normalizeConnectedAlertPreferences,
@@ -13,6 +13,14 @@ const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
 const DEV_SAVED_VIEWS_STORAGE_KEY = '__missionpulse_dev_saved_views';
 const DEV_ALERT_PREFERENCES_STORAGE_KEY = '__missionpulse_dev_alert_preferences';
+
+type RuntimeMessage = { type: string; payload?: unknown };
+type RuntimeMessageListener = (
+  message: RuntimeMessage,
+  sender: chrome.runtime.MessageSender,
+  sendResponse: (response?: unknown) => void
+) => boolean | void;
+type SerializedMission = Omit<Mission, 'scrapedAt'> & { scrapedAt: string };
 
 function readDevStorage<T>(key: string, fallback: T): T {
   try {
@@ -29,6 +37,39 @@ function writeDevStorage(key: string, value: unknown): void {
   } catch {
     // Dev-only persistence should never break the app shell.
   }
+}
+
+function serializeMissionForBridge(mission: Mission): SerializedMission {
+  return {
+    ...mission,
+    scrapedAt:
+      mission.scrapedAt instanceof Date
+        ? mission.scrapedAt.toISOString()
+        : String(mission.scrapedAt),
+  };
+}
+
+function connectorDisplayName(connectorId: MissionSource): string {
+  const names: Record<MissionSource, string> = {
+    'free-work': 'Free-Work',
+    lehibou: 'LeHibou',
+    hiway: 'Hiway',
+    collective: 'Collective',
+    'cherry-pick': 'Cherry Pick',
+  };
+  return names[connectorId];
+}
+
+function groupMissionsBySource(
+  missions: SerializedMission[]
+): Map<MissionSource, SerializedMission[]> {
+  const grouped = new Map<MissionSource, SerializedMission[]>();
+
+  for (const mission of missions) {
+    grouped.set(mission.source, [...(grouped.get(mission.source) ?? []), mission]);
+  }
+
+  return grouped;
 }
 
 const storage: Record<string, unknown> = {
@@ -73,6 +114,20 @@ function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
 }
 
 function createChromeStubs() {
+  const runtimeMessageListeners = new Set<RuntimeMessageListener>();
+
+  function emitRuntimeMessage(message: RuntimeMessage): void {
+    const sender = { id: 'dev-mode' } as chrome.runtime.MessageSender;
+
+    for (const listener of runtimeMessageListeners) {
+      try {
+        listener(message, sender, () => {});
+      } catch (error) {
+        console.warn('[Chrome Stub] runtime listener failed:', error);
+      }
+    }
+  }
+
   return {
     runtime: {
       id: 'dev-mode',
@@ -92,6 +147,7 @@ function createChromeStubs() {
           case 'SAVE_PROFILE':
             console.log('[Chrome Stub] Profile saved:', message.payload);
             storage.profile = message.payload;
+            emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: message.payload });
             return { type: 'PROFILE_RESULT', payload: message.payload };
           case 'GET_PREMIUM_STATUS':
             return {
@@ -243,23 +299,45 @@ function createChromeStubs() {
             storage.feed_tour_seen = false;
             return { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } };
           case 'SCAN_START':
-            setTimeout(() => {
-              const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions);
-              window.dispatchEvent(
-                new CustomEvent('dev:missions', {
-                  detail: missions.map((m) => ({ ...m, scrapedAt: new Date() })),
-                })
+            return new Promise((resolve) => {
+              const runtimeMissions = readDevStorage<Mission[]>(
+                DEV_MISSIONS_STORAGE_KEY,
+                mockMissions
+              ).map((m) => ({ ...m, scrapedAt: new Date() }));
+              const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
+              const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
+
+              groupedBySource.forEach(([connectorId, connectorMissions], index) => {
+                setTimeout(
+                  () => {
+                    emitRuntimeMessage({
+                      type: 'SCAN_PARTIAL_RESULT',
+                      payload: {
+                        connectorId,
+                        connectorName: connectorDisplayName(connectorId),
+                        missions: connectorMissions,
+                      },
+                    });
+                  },
+                  250 + index * 250
+                );
+              });
+
+              setTimeout(
+                () => {
+                  resolve({
+                    type: 'SCAN_COMPLETE',
+                    payload: bridgeMissions,
+                  });
+                  window.dispatchEvent(
+                    new CustomEvent('dev:missions', {
+                      detail: runtimeMissions,
+                    })
+                  );
+                },
+                Math.max(800, 500 + groupedBySource.length * 250)
               );
-            }, 800);
-            return {
-              type: 'SCAN_STATUS',
-              payload: {
-                state: 'scanning',
-                currentConnector: 'free-work',
-                progress: 0,
-                missionsFound: 0,
-              },
-            };
+            });
           case 'GET_TRACKINGS':
             return {
               type: 'TRACKINGS_RESULT',
@@ -375,7 +453,8 @@ function createChromeStubs() {
             console.log('[Chrome Stub] Toast:', message.payload);
             return { type: 'TOAST_SHOWN' };
           case 'PROFILE_UPDATED':
-            console.log('[Chrome Stub] Profile updated notification');
+            console.log('[Chrome Stub] Profile updated notification', message.payload);
+            emitRuntimeMessage(message);
             return null;
           case 'RESET_LOCAL_DATA':
             for (const key of Object.keys(storage)) {
@@ -388,8 +467,12 @@ function createChromeStubs() {
         }
       },
       onMessage: {
-        addListener: () => {},
-        removeListener: () => {},
+        addListener: (listener: RuntimeMessageListener) => {
+          runtimeMessageListeners.add(listener);
+        },
+        removeListener: (listener: RuntimeMessageListener) => {
+          runtimeMessageListeners.delete(listener);
+        },
       },
     },
     storage: {

@@ -134,6 +134,33 @@ describe('validateMessage — messages sans payload', () => {
   });
 });
 
+describe('validateMessage — scan progressif', () => {
+  it('accepte SCAN_PARTIAL_RESULT avec missions par connecteur', () => {
+    expect(
+      validateMessage({
+        type: 'SCAN_PARTIAL_RESULT',
+        payload: {
+          connectorId: 'free-work',
+          connectorName: 'Free-Work',
+          missions: [{ id: 'mission-1', title: 'Lead Svelte', source: 'free-work' }],
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette SCAN_PARTIAL_RESULT sans connectorId', () => {
+    expect(
+      validateMessage({
+        type: 'SCAN_PARTIAL_RESULT',
+        payload: {
+          connectorName: 'Free-Work',
+          missions: [{ id: 'mission-1', title: 'Lead Svelte', source: 'free-work' }],
+        },
+      }).valid
+    ).toBe(false);
+  });
+});
+
 // ============================================================================
 // SAVE_PROFILE — limite 10 Ko
 // ============================================================================

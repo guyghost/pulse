@@ -3,7 +3,14 @@ import { expectFeedReady, feedSearchInput, SIDE_PANEL } from './helpers';
 
 async function withNoProfile(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
+    const savedProfileKey = '__missionpulse_e2e_saved_profile';
     let _chrome: unknown = undefined;
+    let savedProfile: unknown = null;
+    try {
+      savedProfile = JSON.parse(window.sessionStorage.getItem(savedProfileKey) ?? 'null');
+    } catch {
+      savedProfile = null;
+    }
     Object.defineProperty(window, 'chrome', {
       configurable: true,
       enumerable: true,
@@ -17,9 +24,14 @@ async function withNoProfile(page: import('@playwright/test').Page) {
         };
         if (chromeApi.runtime?.sendMessage) {
           const origSend = chromeApi.runtime.sendMessage;
-          chromeApi.runtime.sendMessage = async (msg: { type: string }) => {
+          chromeApi.runtime.sendMessage = async (msg: { type: string; payload?: unknown }) => {
             if (msg?.type === 'GET_PROFILE') {
-              return { type: 'PROFILE_RESULT', payload: null };
+              return { type: 'PROFILE_RESULT', payload: savedProfile };
+            }
+            if (msg?.type === 'SAVE_PROFILE') {
+              savedProfile = msg.payload;
+              window.sessionStorage.setItem(savedProfileKey, JSON.stringify(savedProfile));
+              return { type: 'PROFILE_RESULT', payload: savedProfile };
             }
             if (msg?.type === 'GET_FIRST_SCAN_DONE') {
               return { type: 'FIRST_SCAN_DONE_RESULT', payload: false };
@@ -45,10 +57,19 @@ test.describe('Onboarding', () => {
     await page.locator('#ob-firstname').fill('Guy');
     await page.locator('#ob-jobtitle').fill('Dev React Senior');
     await page.locator('#ob-stack').fill('React');
-    await page.locator('#ob-stack + button').click();
+    await page.getByRole('button', { name: 'Ajouter la stack technique' }).click();
+    await expect(page.getByRole('button', { name: 'React' })).toBeVisible();
     await page.locator('#ob-location').fill('Paris');
+    await expect(page.getByRole('button', { name: 'Sauvegarder mon profil' })).toBeEnabled();
     await page.getByRole('button', { name: 'Sauvegarder mon profil' }).click();
+    await page.waitForFunction(() =>
+      window.sessionStorage.getItem('__missionpulse_e2e_saved_profile')
+    );
 
+    await expectFeedReady(page);
+    await expect(page.locator('#ob-firstname')).not.toBeVisible();
+
+    await page.reload();
     await expectFeedReady(page);
     await expect(page.locator('#ob-firstname')).not.toBeVisible();
   });

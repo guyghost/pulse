@@ -4,6 +4,7 @@
   import { Icon } from '@pulse/ui';
   import { ripple } from '../actions/ripple';
   import OperationalStatusBadge from '../atoms/OperationalStatusBadge.svelte';
+  import { normalizeProfileDraft } from '$lib/core/profile/normalize-profile';
   import {
     DEFAULT_CONNECTED_ALERT_PREFERENCES,
     type ConnectedAlertPreferences,
@@ -29,7 +30,7 @@
     isSavingAlertPreferences = false,
     onSaveAlertPreferences,
   }: {
-    onComplete?: () => void;
+    onComplete?: (profile: UserProfile) => void;
     onSkip?: () => void;
     onUpdateProfile?: (profile: Partial<UserProfile>) => void;
     onRetry?: () => void;
@@ -98,7 +99,7 @@
   }
 
   function handleComplete() {
-    onUpdateProfile?.({
+    const result = normalizeProfileDraft({
       firstName,
       jobTitle,
       location,
@@ -107,8 +108,13 @@
       tjmMax: tjm + 150,
       remote: 'any',
       seniority: 'senior',
+      searchKeywords: [],
     });
-    onComplete?.();
+
+    if (result.ok && result.profile) {
+      onUpdateProfile?.(result.profile);
+      onComplete?.(result.profile);
+    }
   }
 
   const canSubmit = $derived(

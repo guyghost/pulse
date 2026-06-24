@@ -98,4 +98,36 @@ describe('OnboardingWizard', () => {
     );
     expect(target.textContent).toContain('Recevoir un insight');
   });
+
+  it('submits a complete normalized profile from current fields', async () => {
+    const onComplete = vi.fn();
+    const target = mountWizard({ onComplete });
+    await tick();
+
+    (target.querySelector('#ob-firstname') as HTMLInputElement).value = ' Guy ';
+    target.querySelector('#ob-firstname')?.dispatchEvent(new Event('input', { bubbles: true }));
+    (target.querySelector('#ob-jobtitle') as HTMLInputElement).value = ' Dev React Senior ';
+    target.querySelector('#ob-jobtitle')?.dispatchEvent(new Event('input', { bubbles: true }));
+    (target.querySelector('#ob-stack') as HTMLInputElement).value = 'React';
+    target.querySelector('#ob-stack')?.dispatchEvent(new Event('input', { bubbles: true }));
+    (target.querySelector('button[aria-label="Ajouter la stack technique"]') as HTMLButtonElement)
+      .click();
+    (target.querySelector('#ob-location') as HTMLInputElement).value = ' Paris ';
+    target.querySelector('#ob-location')?.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+
+    clickButton(target, 'Sauvegarder mon profil');
+    await tick();
+
+    expect(onComplete).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firstName: 'Guy',
+        jobTitle: 'Dev React Senior',
+        location: 'Paris',
+        stack: ['React'],
+        tjmMin: 600,
+        tjmMax: 750,
+      })
+    );
+  });
 });

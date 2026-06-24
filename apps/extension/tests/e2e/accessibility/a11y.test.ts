@@ -6,9 +6,15 @@ import {
   ensureFeedVisible,
   expectFeedReady,
   expectMissionCount,
+  copyLinkButton,
+  favoriteButton,
   favoritesToggle,
+  hideButton,
   allMissionsToggle,
   injectMissions,
+  missionCards,
+  navButton,
+  openMissionButton,
   waitForMissions,
   openDevPanel,
   closeDevPanel,
@@ -54,10 +60,11 @@ test.describe('Accessibility', () => {
     // 2. Navigation sur le feed
     await expectFeedReady(page);
 
-    // Tab à travers les éléments du header
-    await page.keyboard.press('Tab'); // Filtre favoris
-    await page.keyboard.press('Tab'); // Rafraîchir
-    await page.keyboard.press('Tab'); // Recherche
+    // Partir d'un contrôle connu évite de dépendre du focus initial du navigateur.
+    const feedTab = navButton(page, 'Feed');
+    await feedTab.focus();
+    await expect(feedTab).toBeFocused();
+    await page.keyboard.press('Tab');
 
     // Les éléments interactifs doivent être focusables
     const activeElement = await page.evaluate(() => document.activeElement?.tagName);
@@ -72,7 +79,7 @@ test.describe('Accessibility', () => {
     await waitForMissions(page, 5, 5000);
 
     // Vérifier que les cartes sont présentes
-    const cards = page.locator('[role="button"][tabindex="0"]');
+    const cards = missionCards(page);
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThanOrEqual(5);
 
@@ -106,26 +113,26 @@ test.describe('Accessibility', () => {
     await waitForMissions(page, 3, 5000);
 
     // Vérifier les aria-labels sur les boutons d'action
-    const favoriteBtn = page.getByTitle('Ajouter aux favoris').first();
+    const firstCard = missionCards(page).first();
+    const favoriteBtn = favoriteButton(firstCard);
     await expect(favoriteBtn).toBeVisible();
 
-    const hideBtn = page.getByTitle('Masquer').first();
+    const hideBtn = hideButton(firstCard);
     await expect(hideBtn).toBeVisible();
 
-    const copyBtn = page.getByTitle('Copier le lien').first();
+    const copyBtn = copyLinkButton(firstCard);
     await expect(copyBtn).toBeVisible();
 
-    const openBtn = page.getByTitle('Ouvrir').first();
+    const openBtn = openMissionButton(firstCard);
     await expect(openBtn).toBeVisible();
 
-    // Vérifier qu'ils ont des attributs accessibles
-    const buttons = [favoriteBtn, hideBtn, copyBtn, openBtn];
-    for (const btn of buttons) {
-      const hasAccessibleName = await btn.evaluate(
-        (el) => el.getAttribute('aria-label') !== null || el.getAttribute('title') !== null
-      );
-      expect(hasAccessibleName).toBe(true);
-    }
+    await expect(favoriteBtn).toHaveAttribute('aria-label', 'Ajouter la mission aux favoris');
+    await expect(hideBtn).toHaveAttribute('aria-label', 'Masquer la mission');
+    await expect(copyBtn).toHaveAttribute('aria-label', 'Copier le lien de la mission');
+    await expect(openBtn).toHaveAttribute(
+      'aria-label',
+      'Ouvrir la mission sur la plateforme source'
+    );
   });
 
   test('aria-pressed on toggle buttons', async ({ page }) => {
@@ -144,12 +151,15 @@ test.describe('Accessibility', () => {
   test('aria-expanded on collapsible sections', async ({ page }) => {
     await ensureFeedVisible(page);
 
-    const filterToggle = page.getByTitle('Afficher les filtres');
+    const filterToggle = page.getByRole('button', { name: 'Afficher les filtres' });
     await expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
     await expect(filterToggle).toHaveAttribute('aria-controls');
 
     await filterToggle.click();
-    await expect(page.getByTitle('Masquer les filtres')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('button', { name: 'Masquer les filtres' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
 
     // Le panneau doit être visible
     const filterPanel = page.getByRole('group', { name: 'Options de filtrage' });
@@ -160,17 +170,17 @@ test.describe('Accessibility', () => {
     await ensureFeedVisible(page);
 
     // Vérifier l'état actif sur Feed
-    const feedTab = page.getByRole('button', { name: 'Feed' });
+    const feedTab = navButton(page, 'Feed');
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
 
     // Naviguer vers TJM
-    const tjmTab = page.getByRole('button', { name: 'TJM' });
+    const tjmTab = navButton(page, 'TJM');
     await tjmTab.click();
     await expect(tjmTab).toHaveAttribute('aria-current', 'page');
     await expect(feedTab).not.toHaveAttribute('aria-current', 'page');
 
     // Naviguer vers Settings
-    const settingsTab = page.getByRole('button', { name: 'Settings' });
+    const settingsTab = navButton(page, 'Settings');
     await settingsTab.click();
     await expect(settingsTab).toHaveAttribute('aria-current', 'page');
     await expect(tjmTab).not.toHaveAttribute('aria-current', 'page');

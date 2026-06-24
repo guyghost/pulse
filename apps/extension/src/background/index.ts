@@ -199,6 +199,16 @@ function sendScanProgress(payload: ScanProgressPayload): void {
   });
 }
 
+function sendScanPartialResult(payload: {
+  connectorId: string;
+  connectorName: string;
+  missions: Mission[];
+}): void {
+  chrome.runtime.sendMessage({ type: 'SCAN_PARTIAL_RESULT', payload }).catch(() => {
+    // Side panel not open, ignore
+  });
+}
+
 /**
  * Gère un SCAN_START initié par le side panel.
  * Lance runScan() avec un callback de progression qui envoie SCAN_PROGRESS au panel.
@@ -225,6 +235,9 @@ async function handleScanStartFromPanel(): Promise<import('../lib/core/types/mis
           total: info.total,
           connectorProgress: toConnectorProgress(info.connectorStates),
         });
+      },
+      onConnectorResult: (info) => {
+        sendScanPartialResult(info);
       },
     }
   );
@@ -391,6 +404,11 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           }
 
           sendResponse({ type: 'PROFILE_RESULT', payload: message.payload });
+          chrome.runtime
+            .sendMessage({ type: 'PROFILE_UPDATED', payload: message.payload })
+            .catch(() => {
+              // Side panel not open, ignore
+            });
         } catch (err) {
           const message = err instanceof Error ? err.message : String(err);
           console.warn('[MissionPulse] SAVE_PROFILE via bridge (legacy):', message);

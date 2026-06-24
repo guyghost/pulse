@@ -3,7 +3,11 @@ import {
   showHiddenMissions,
   allMissionsToggle,
   ensureFeedVisible,
+  favoriteButton,
   favoritesToggle,
+  hideButton,
+  missionCards,
+  unfavoriteButton,
   waitForMissions,
   expectMissionCount,
 } from './helpers';
@@ -24,11 +28,11 @@ test.describe('Hidden Missions Flow', () => {
     await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
-    const initialCount = await page.locator('[role="button"][tabindex="0"]').count();
+    const initialCount = await missionCards(page).count();
 
-    const card = page.locator('[role="button"][tabindex="0"]').first();
-    await expect(card.getByTitle('Masquer')).toBeVisible({ timeout: 3000 });
-    await card.getByTitle('Masquer').click();
+    const card = missionCards(page).first();
+    await expect(hideButton(card)).toBeVisible({ timeout: 3000 });
+    await hideButton(card).click();
 
     await expectMissionCount(page, initialCount - 1);
     await expect(page.getByRole('button', { name: /Voir les 1 mission/ })).toBeVisible({
@@ -40,10 +44,10 @@ test.describe('Hidden Missions Flow', () => {
     await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
-    const initialCount = await page.locator('[role="button"][tabindex="0"]').count();
+    const initialCount = await missionCards(page).count();
 
-    const card = page.locator('[role="button"][tabindex="0"]').first();
-    await card.getByTitle('Masquer').click();
+    const card = missionCards(page).first();
+    await hideButton(card).click();
     await expectMissionCount(page, initialCount - 1);
 
     await showHiddenMissions(page);
@@ -54,23 +58,25 @@ test.describe('Hidden Missions Flow', () => {
     await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
-    await expect(page.getByRole('button', { name: /Voir les \d+ mission/ })).not.toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Voir les \d+ mission.*masqu/i })
+    ).not.toBeVisible();
   });
 
   test('combining hide and favorite filters works', async ({ page }) => {
     await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
-    const initialCount = await page.locator('[role="button"][tabindex="0"]').count();
+    const initialCount = await missionCards(page).count();
 
     // Favorite the first card
-    const firstCard = page.locator('[role="button"][tabindex="0"]').first();
-    await firstCard.getByTitle('Ajouter aux favoris').click();
-    await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 3000 });
+    const firstCard = missionCards(page).first();
+    await favoriteButton(firstCard).click();
+    await expect(unfavoriteButton(firstCard)).toBeVisible({ timeout: 3000 });
 
     // Hide a different card
-    const cards = page.locator('[role="button"][tabindex="0"]');
-    await cards.nth(1).getByTitle('Masquer').click();
+    const cards = missionCards(page);
+    await hideButton(cards.nth(1)).click();
     await expectMissionCount(page, initialCount - 1);
 
     // Show only favorites

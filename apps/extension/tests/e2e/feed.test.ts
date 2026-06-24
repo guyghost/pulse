@@ -1,12 +1,19 @@
 import { test, expect, type Page } from '@playwright/test';
 import {
   SIDE_PANEL,
+  copyLinkButton,
   expectMissionCount,
   feedSearchInput,
+  favoriteButton,
+  favoritesToggle,
+  hideButton,
   injectMissions,
   missionCards,
+  openMissionButton,
   scanButton,
   setFeedState,
+  allMissionsToggle,
+  unfavoriteButton,
 } from './helpers';
 
 /**
@@ -61,6 +68,138 @@ async function mockUserWithProfile(page: Page) {
             },
           };
         }
+      },
+    });
+  });
+}
+
+async function mockUserWithProfileAndSlowPartialScan(page: Page) {
+  await page.addInitScript(() => {
+    let _chrome: unknown = undefined;
+    const runtimeListeners: Array<
+      (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void
+    > = [];
+    const now = new Date().toISOString();
+    const partialMission = {
+      id: 'partial-scan-action-test',
+      title: 'Partial Scan Action Test',
+      client: 'Test Client',
+      description: 'Mission partielle disponible avant la fin du scan complet.',
+      stack: ['Svelte', 'TypeScript'],
+      tjm: 720,
+      location: 'Paris',
+      remote: 'hybrid',
+      duration: '6 mois',
+      startDate: null,
+      publishedAt: now,
+      url: 'https://www.free-work.com/fr/tech-it/jobs/partial-scan-action-test',
+      source: 'free-work',
+      scrapedAt: now,
+      seniority: 'senior',
+      scoreBreakdown: null,
+      score: 86,
+      semanticScore: null,
+      semanticReason: null,
+    };
+
+    function emitRuntimeMessage(message: unknown): void {
+      for (const listener of runtimeListeners) {
+        listener(message, { id: 'dev-mode' }, () => {});
+      }
+    }
+
+    Object.defineProperty(window, 'chrome', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return _chrome;
+      },
+      set(val) {
+        _chrome = val;
+        const chromeStub = val as {
+          runtime?: {
+            sendMessage?: (msg: unknown) => Promise<unknown>;
+            onMessage?: {
+              addListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+              removeListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+            };
+          };
+        };
+        if (!chromeStub.runtime?.sendMessage) {
+          return;
+        }
+
+        const originalSendMessage = chromeStub.runtime.sendMessage.bind(chromeStub.runtime);
+        const originalAddListener = chromeStub.runtime.onMessage?.addListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+        const originalRemoveListener = chromeStub.runtime.onMessage?.removeListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+
+        if (chromeStub.runtime.onMessage) {
+          chromeStub.runtime.onMessage.addListener = (listener) => {
+            runtimeListeners.push(listener);
+            originalAddListener?.(listener);
+          };
+          chromeStub.runtime.onMessage.removeListener = (listener) => {
+            const index = runtimeListeners.indexOf(listener);
+            if (index >= 0) {
+              runtimeListeners.splice(index, 1);
+            }
+            originalRemoveListener?.(listener);
+          };
+        }
+
+        chromeStub.runtime.sendMessage = async (msg: unknown) => {
+          const message = msg as { type?: string };
+
+          if (message?.type === 'GET_PROFILE') {
+            return {
+              type: 'PROFILE_RESULT',
+              payload: {
+                firstName: 'Test',
+                jobTitle: 'Developer',
+                location: 'Paris',
+                stacks: ['Svelte', 'TypeScript'],
+                tjm: 650,
+              },
+            };
+          }
+
+          if (message?.type === 'SCAN_START') {
+            window.setTimeout(() => {
+              emitRuntimeMessage({
+                type: 'SCAN_PARTIAL_RESULT',
+                payload: {
+                  connectorId: 'free-work',
+                  connectorName: 'Free-Work',
+                  missions: [partialMission],
+                },
+              });
+            }, 150);
+
+            return new Promise((resolve) => {
+              window.setTimeout(() => {
+                resolve({ type: 'SCAN_COMPLETE', payload: [partialMission] });
+              }, 2500);
+            });
+          }
+
+          return originalSendMessage(msg);
+        };
       },
     });
   });
@@ -172,10 +311,10 @@ test.describe('Feed', () => {
     await expect(firstCard).toBeVisible();
 
     // Verify all action buttons exist and are enabled (interactive)
-    const starBtn = firstCard.getByTitle('Ajouter aux favoris');
-    const hideBtn = firstCard.getByTitle('Masquer');
-    const copyBtn = firstCard.getByTitle('Copier le lien');
-    const openBtn = firstCard.getByTitle('Ouvrir');
+    const starBtn = favoriteButton(firstCard);
+    const hideBtn = hideButton(firstCard);
+    const copyBtn = copyLinkButton(firstCard);
+    const openBtn = openMissionButton(firstCard);
 
     await expect(starBtn).toBeVisible();
     await expect(hideBtn).toBeVisible();
@@ -200,17 +339,16 @@ test.describe('Feed', () => {
     await expectMissionCount(page, 5);
 
     const firstCard = missionCards(page).first();
-    const starBtn = firstCard.getByTitle('Ajouter aux favoris');
+    const starBtn = favoriteButton(firstCard);
     await expect(starBtn).toBeVisible();
 
     // Click to favorite
     await starBtn.click();
-    // After clicking, title should change to 'Retirer des favoris'
-    await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 1000 });
+    await expect(unfavoriteButton(firstCard)).toBeVisible({ timeout: 1000 });
 
     // Click again to unfavorite
-    await firstCard.getByTitle('Retirer des favoris').click();
-    await expect(firstCard.getByTitle('Ajouter aux favoris')).toBeVisible({ timeout: 1000 });
+    await unfavoriteButton(firstCard).click();
+    await expect(favoriteButton(firstCard)).toBeVisible({ timeout: 1000 });
   });
 
   test('clicking hide removes mission and shows toggle link', async ({ page }) => {
@@ -225,7 +363,7 @@ test.describe('Feed', () => {
 
     // Hide the first mission
     const firstCard = missionCards(page).first();
-    const hideBtn = firstCard.getByTitle('Masquer');
+    const hideBtn = hideButton(firstCard);
     await hideBtn.click();
 
     // Mission count should decrease
@@ -247,19 +385,40 @@ test.describe('Feed', () => {
 
     // Favorite the first mission
     const firstCard = missionCards(page).first();
-    await firstCard.getByTitle('Ajouter aux favoris').click();
-    await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 1000 });
+    await favoriteButton(firstCard).click();
+    await expect(unfavoriteButton(firstCard)).toBeVisible({ timeout: 1000 });
 
-    // Click favorites filter in header — button shows "Favoris" text
-    await page.getByTitle(/Favoris/).click();
+    await favoritesToggle(page).click();
     await page.waitForTimeout(300);
 
     // Should show only 1 mission (the favorited one)
     await expectMissionCount(page, 1, 2000);
 
-    // Toggle back to all — button now shows "Voir toutes (f)"
-    await page.getByTitle(/Voir toutes/).click();
+    await allMissionsToggle(page).click();
     await expectMissionCount(page, 5, 2000);
+  });
+
+  test('partial scan missions stay interactive before scan completes', async ({ page }) => {
+    await mockUserWithProfileAndSlowPartialScan(page);
+    await page.goto(SIDE_PANEL);
+
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
+    await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
+
+    await scanButton(page).click();
+
+    await expect(page.getByText('Partial Scan Action Test')).toBeVisible({ timeout: 1000 });
+    await expect(page.getByText('Scraping...')).toBeVisible();
+
+    const partialCard = missionCards(page).filter({ hasText: 'Partial Scan Action Test' });
+    await expect(partialCard).toBeVisible();
+
+    const investigateButton = partialCard.getByRole('button', { name: 'Investiguer →' });
+    await expect(investigateButton).toBeEnabled();
+    await investigateButton.click();
+
+    await expect(page.getByRole('dialog', { name: 'Investigation mission' })).toBeVisible();
+    await expect(page.getByText('Scraping...')).toBeVisible();
   });
 
   test('header star button and refresh button are visible', async ({ page }) => {
@@ -284,22 +443,24 @@ test.describe('Feed', () => {
     await expect(feedSearchInput(page)).toBeVisible();
 
     // Test aria-pressed on favorites toggle — button shows "Favoris" text when not active
-    const favoritesToggle = page.getByTitle(/Favoris/);
-    await expect(favoritesToggle).toHaveAttribute('aria-pressed', 'false');
+    const favoritesFilter = favoritesToggle(page);
+    await expect(favoritesFilter).toHaveAttribute('aria-pressed', 'false');
 
-    await favoritesToggle.click();
-    await expect(page.getByTitle(/Voir toutes/)).toHaveAttribute('aria-pressed', 'true');
-    // When active, button shows "Voir toutes (f)"
-    await page.getByTitle(/Voir toutes/).click();
-    await expect(page.getByTitle(/Favoris/)).toHaveAttribute('aria-pressed', 'false');
+    await favoritesFilter.click();
+    await expect(allMissionsToggle(page)).toHaveAttribute('aria-pressed', 'true');
+    await allMissionsToggle(page).click();
+    await expect(favoritesToggle(page)).toHaveAttribute('aria-pressed', 'false');
 
     // Test aria-expanded on filter toggle
-    const filterToggle = page.getByTitle('Afficher les filtres');
+    const filterToggle = page.getByRole('button', { name: 'Afficher les filtres' });
     await expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
     await expect(filterToggle).toHaveAttribute('aria-controls', 'filter-panel');
 
     await filterToggle.click();
-    await expect(page.getByTitle('Masquer les filtres')).toHaveAttribute('aria-expanded', 'true');
+    await expect(page.getByRole('button', { name: 'Masquer les filtres' })).toHaveAttribute(
+      'aria-expanded',
+      'true'
+    );
     // Filter panel uses role="group" with aria-label "Options de filtrage"
     const filterPanel = page.getByRole('group', { name: /Options de filtrage/ });
     await expect(filterPanel).toBeVisible();

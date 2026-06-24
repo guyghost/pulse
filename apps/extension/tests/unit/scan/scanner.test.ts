@@ -247,6 +247,59 @@ describe('scanner — runScan', () => {
     expect(result.missions[0].scoreBreakdown).not.toBeNull();
   });
 
+  it('calls onConnectorResult with deterministic filtered and scored missions', async () => {
+    const freshMission = makeMission({
+      id: 'fresh-freelance',
+      title: 'Mission freelance Svelte',
+      description: 'Renfort freelance sur produit B2B',
+      publishedAt: null,
+    });
+    const salariedMission = makeMission({
+      id: 'salaried-cdi',
+      title: 'Développeur Svelte CDI',
+      description: 'Poste en CDI',
+      publishedAt: null,
+    });
+    const staleMission = makeMission({
+      id: 'stale-freelance',
+      title: 'Mission freelance ancienne',
+      description: 'Renfort freelance',
+      publishedAt: '2020-01-01T00:00:00.000Z',
+    });
+    const connector = makeConnector('free-work', 'Free-Work', [
+      freshMission,
+      salariedMission,
+      staleMission,
+    ]);
+    const onConnectorResult = vi.fn();
+
+    (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work']));
+    (getConnector as Mock).mockResolvedValue(connector);
+    (getConnectors as Mock).mockResolvedValue([connector]);
+
+    await runScan(undefined, undefined, {
+      pageDelayMs: 0,
+      onConnectorResult,
+    });
+
+    expect(onConnectorResult).toHaveBeenCalledTimes(1);
+    const partial = onConnectorResult.mock.calls[0][0] as {
+      connectorId: string;
+      connectorName: string;
+      missions: Mission[];
+    };
+    expect(partial.connectorId).toBe('free-work');
+    expect(partial.connectorName).toBe('Free-Work');
+    expect(partial.missions).toHaveLength(1);
+    expect(partial.missions[0]).toEqual(
+      expect.objectContaining({
+        id: 'fresh-freelance',
+        score: 50,
+        scoreBreakdown: expect.objectContaining({ total: 50 }),
+      })
+    );
+  });
+
   // 2. Empty connectors
   it('returns empty when no connectors enabled', async () => {
     (getSettings as Mock).mockResolvedValue(defaultSettings([]));

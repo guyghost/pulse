@@ -3,13 +3,16 @@ import {
   allMissionsToggle,
   ensureFeedVisible,
   expectMissionCount,
+  favoriteButton,
   favoritesToggle,
   feedSearchInput,
+  hideButton,
   clearFeedSearch,
   injectMissions,
   missionCards,
   navButton,
   scanButton,
+  unfavoriteButton,
   waitForMissions,
   toggleOffline,
   triggerScan,
@@ -106,11 +109,11 @@ test.describe('Offline Mode', () => {
     await page.waitForTimeout(300);
 
     const firstCard = missionCards(page).first();
-    const starBtn = firstCard.getByTitle('Ajouter aux favoris');
+    const starBtn = favoriteButton(firstCard);
     await expect(starBtn).toBeVisible();
     await starBtn.click();
 
-    await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 1000 });
+    await expect(unfavoriteButton(firstCard)).toBeVisible({ timeout: 1000 });
     await favoritesToggle(page).click();
     await expect(allMissionsToggle(page)).toBeVisible({ timeout: 2000 });
   });
@@ -125,7 +128,7 @@ test.describe('Offline Mode', () => {
     await page.waitForTimeout(300);
 
     const firstCard = missionCards(page).first();
-    const hideBtn = firstCard.getByTitle('Masquer');
+    const hideBtn = hideButton(firstCard);
     await expect(hideBtn).toBeVisible();
     await hideBtn.click();
 

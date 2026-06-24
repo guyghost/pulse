@@ -11,6 +11,9 @@ import {
   getOnboardingCompleted,
   setOnboardingCompleted,
 } from '$lib/shell/facades/app-flags.facade';
+import { appLifecycleMachine, type AppBootStatus } from '$lib/shell/machines/app-lifecycle.machine';
+import { subscribeMessages } from '$lib/shell/messaging/bridge';
+import { createSvelteActor } from '$lib/shell/state/xstate.svelte';
 
 export type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'onboarding';
 
@@ -34,67 +37,53 @@ export const NAV_ITEMS: { page: Page; label: string; icon: string; ariaLabel?: s
 ];
 
 export function createAppNavigation() {
-  let currentPage = $state<Page>('feed');
-  let hasCompletedOnboarding = $state(false);
-  let previousPageIndex = $state(PAGE_INDEX['feed']);
-  let transitionDirection = $state(1);
+  const actor = createSvelteActor(appLifecycleMachine, {
+    input: {
+      deps: {
+        loadProfile: getProfile,
+        getFirstScanDone,
+        getOnboardingCompleted,
+        setOnboardingCompleted,
+        clearOnboardingCompleted,
+      },
+      pageIndex: PAGE_INDEX,
+    },
+  });
+
+  try {
+    subscribeMessages((message) => {
+      if (message.type === 'PROFILE_UPDATED') {
+        actor.send({ type: 'PROFILE_UPDATED', profile: message.payload });
+      }
+    });
+  } catch {
+    // Outside extension context
+  }
 
   function navigate(page: Page) {
-    const newIndex = PAGE_INDEX[page];
-    transitionDirection = newIndex > previousPageIndex ? 1 : -1;
-    previousPageIndex = newIndex;
-    currentPage = page;
+    actor.send({ type: 'NAVIGATE', page });
   }
 
   function completeOnboarding() {
-    hasCompletedOnboarding = true;
-    transitionDirection = 1;
-    previousPageIndex = PAGE_INDEX['feed'];
-    currentPage = 'feed';
-    void setOnboardingCompleted();
+    actor.send({ type: 'COMPLETE_ONBOARDING' });
   }
 
   function resetToOnboarding() {
-    hasCompletedOnboarding = false;
-    transitionDirection = -1;
-    previousPageIndex = PAGE_INDEX['onboarding'];
-    currentPage = 'onboarding';
-    void clearOnboardingCompleted();
+    actor.send({ type: 'RESET_ONBOARDING' });
   }
-
-  // Fresh installs can land directly on the feed after the zero-config scan,
-  // while still keeping onboarding available as a non-blocking flow.
-  getProfile()
-    .then(async (profile) => {
-      if (profile) {
-        hasCompletedOnboarding = true;
-        previousPageIndex = PAGE_INDEX['feed'];
-        currentPage = 'feed';
-        return;
-      }
-
-      const [firstScanDone, onboardingCompleted] = await Promise.all([
-        getFirstScanDone(),
-        getOnboardingCompleted(),
-      ]);
-
-      hasCompletedOnboarding = onboardingCompleted;
-      previousPageIndex = PAGE_INDEX['feed'];
-      currentPage = firstScanDone ? 'feed' : onboardingCompleted ? 'feed' : 'onboarding';
-    })
-    .catch(() => {
-      // Outside extension context — keep default feed/onboarding behaviour
-    });
 
   return {
     get currentPage() {
-      return currentPage;
+      return actor.snapshot.context.currentPage;
     },
     get hasCompletedOnboarding() {
-      return hasCompletedOnboarding;
+      return actor.snapshot.context.hasCompletedOnboarding;
     },
     get transitionDirection() {
-      return transitionDirection;
+      return actor.snapshot.context.transitionDirection;
+    },
+    get bootStatus(): AppBootStatus {
+      return actor.snapshot.context.bootStatus;
     },
 
     navigate,

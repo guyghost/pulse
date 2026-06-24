@@ -2,8 +2,9 @@
   import OnboardingLayout from '../templates/OnboardingLayout.svelte';
   import OnboardingWizard from '../organisms/OnboardingWizard.svelte';
   import type { UserProfile } from '$lib/core/types/profile';
-  import { saveProfile } from '$lib/shell/facades/settings.facade';
-  import { createOnboardingStore } from '$lib/state/onboarding.svelte';
+  import { getProfile, saveProfile as persistProfile } from '$lib/shell/facades/settings.facade';
+  import { profileMachine } from '$lib/shell/machines/profile.machine';
+  import { createSvelteActor } from '$lib/shell/state/xstate.svelte';
   import {
     DEFAULT_CONNECTED_ALERT_PREFERENCES,
     type ConnectedAlertPreferences,
@@ -16,11 +17,21 @@
 
   const { onComplete, onSkip }: { onComplete?: () => void; onSkip?: () => void } = $props();
 
-  const onboarding = createOnboardingStore();
+  const profileActor = createSvelteActor(profileMachine, {
+    input: {
+      deps: {
+        loadProfile: getProfile,
+        saveProfile: async (profile) => {
+          await persistProfile(profile);
+          return profile;
+        },
+      },
+    },
+  });
 
-  const isSaving = $derived(onboarding.state === 'saving');
-  const hasError = $derived(onboarding.state === 'error');
-  const errorMessage = $derived(onboarding.error);
+  const isSaving = $derived(profileActor.snapshot.matches('saving'));
+  const hasError = $derived(profileActor.snapshot.matches('error'));
+  const errorMessage = $derived(profileActor.snapshot.context.error);
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let isSavingAlertPreferences = $state(false);
 
@@ -28,29 +39,17 @@
     alertPreferences = await getAlertPreferences();
   })().catch(() => {});
 
-  function handleUpdateProfile(updates: Partial<UserProfile>) {
-    onboarding.updateProfile(updates);
-  }
-
-  async function handleComplete() {
-    onboarding.save();
-
-    // Unwrap $state proxy to plain object for IndexedDB storage
-    const profile = JSON.parse(JSON.stringify(onboarding.profile)) as UserProfile;
-
+  async function handleComplete(profile: UserProfile) {
     try {
-      await saveProfile(profile);
-      window.dispatchEvent(new CustomEvent('profile-updated'));
-      onboarding.saveSuccess();
+      await submitProfile(profile);
       onComplete?.();
-    } catch (err) {
-      const message = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
-      onboarding.saveError(message);
+    } catch {
+      // The machine exposes the error state to the wizard.
     }
   }
 
   function handleRetry() {
-    handleComplete();
+    profileActor.send({ type: 'RETRY' });
   }
 
   async function handleSaveAlertPreferences(preferences: ConnectedAlertPreferences) {
@@ -64,13 +63,36 @@
       isSavingAlertPreferences = false;
     }
   }
+
+  function submitProfile(profile: UserProfile): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const unsubscribe = profileActor.subscribe((snapshot) => {
+        if (settled) {
+          return;
+        }
+        if (snapshot.matches('ready') && snapshot.context.current) {
+          settled = true;
+          unsubscribe();
+          resolve();
+        }
+        if (snapshot.matches('error')) {
+          settled = true;
+          const message = snapshot.context.error ?? 'Erreur lors de la sauvegarde';
+          unsubscribe();
+          reject(new Error(message));
+        }
+      });
+
+      profileActor.send({ type: 'SUBMIT_PROFILE', profile });
+    });
+  }
 </script>
 
 {#snippet wizardContent()}
   <OnboardingWizard
     onComplete={handleComplete}
     {onSkip}
-    onUpdateProfile={handleUpdateProfile}
     onRetry={handleRetry}
     {isSaving}
     {hasError}

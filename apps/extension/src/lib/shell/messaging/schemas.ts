@@ -696,6 +696,14 @@ export const MessageSchemas = {
       connectorProgress: z.array(ConnectorProgressSchema),
     }),
   }),
+  SCAN_PARTIAL_RESULT: z.object({
+    type: z.literal('SCAN_PARTIAL_RESULT'),
+    payload: z.object({
+      connectorId: SafeString,
+      connectorName: SafeString,
+      missions: MissionsPayloadSchema,
+    }),
+  }),
   SCAN_COMPLETE: z.object({ type: z.literal('SCAN_COMPLETE'), payload: MissionsPayloadSchema }),
   SCAN_ERROR: z.object({
     type: z.literal('SCAN_ERROR'),
@@ -776,7 +784,7 @@ export const MessageSchemas = {
   TOAST_SHOWN: z.object({ type: z.literal('TOAST_SHOWN') }),
 
   // Profile events
-  PROFILE_UPDATED: z.object({ type: z.literal('PROFILE_UPDATED') }),
+  PROFILE_UPDATED: z.object({ type: z.literal('PROFILE_UPDATED'), payload: ProfilePayloadSchema }),
   RESET_LOCAL_DATA: z.object({ type: z.literal('RESET_LOCAL_DATA') }),
   LOCAL_DATA_RESET: z.object({
     type: z.literal('LOCAL_DATA_RESET'),

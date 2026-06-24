@@ -152,16 +152,12 @@
     const unsubscribe = subscribeMessages((message) => {
       if (message.type === 'SCAN_COMPLETE') {
         loadAnalysis();
+      } else if (message.type === 'PROFILE_UPDATED') {
+        loadProfileAndAnalysis();
       }
     });
 
     return unsubscribe;
-  });
-
-  $effect(() => {
-    const handler = () => loadProfileAndAnalysis();
-    window.addEventListener('profile-updated', handler);
-    return () => window.removeEventListener('profile-updated', handler);
   });
 
   function inspectLocalSignals(): void {

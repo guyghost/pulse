@@ -54,6 +54,7 @@ import {
   type ShortcutConfig,
 } from '$lib/shell/utils/keyboard-shortcuts';
 import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
+import { subscribeMessages } from '$lib/shell/messaging/bridge';
 
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
@@ -233,7 +234,7 @@ export function createFeedPageState(
   const favoriteCount = $derived(Object.keys(favorites).length);
   const hiddenCount = $derived(Object.keys(hidden).length);
   const isOffline = $derived(connection.status === 'offline');
-  const heroCompact = $derived(totalMissions > 0 && !isLoading);
+  const heroCompact = $derived(totalMissions > 0);
   const profileImpactItems = $derived(buildProfileImpactItems(toProfileImpactInput(profile)));
   const profileImpactSimulation = $derived(buildProfileImpactSimulation(profileImpactItems));
   const missingProfileItems = $derived(
@@ -845,36 +846,13 @@ export function createFeedPageState(
     });
 
     $effect(() => {
-      async function handleProfileUpdated() {
-        try {
-          const profile = await getProfile();
-          applyProfile(profile);
-        } catch {
-          // Ignore refresh failures
+      const unsubscribe = subscribeMessages((message) => {
+        if (message.type === 'PROFILE_UPDATED') {
+          applyProfile(message.payload);
         }
-      }
+      });
 
-      async function handleMissionsRescored(e: Event) {
-        const missions = (e as CustomEvent).detail;
-        if (Array.isArray(missions)) {
-          feedStore.setMissions(missions as Mission[]);
-          return;
-        }
-
-        try {
-          const stored = await getMissions();
-          feedStore.setMissions(stored);
-        } catch {
-          // Ignore refresh failures
-        }
-      }
-
-      window.addEventListener('profile-updated', handleProfileUpdated);
-      window.addEventListener('missions-rescored', handleMissionsRescored);
-      return () => {
-        window.removeEventListener('profile-updated', handleProfileUpdated);
-        window.removeEventListener('missions-rescored', handleMissionsRescored);
-      };
+      return unsubscribe;
     });
 
     // Dev event handlers

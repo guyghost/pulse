@@ -11,6 +11,7 @@ import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
 import type { ConnectorStatus, PersistedConnectorStatus } from '$lib/core/types/connector-status';
 import type { AppError } from '$lib/core/errors/app-error';
 import { deduplicateMissions } from '$lib/core/scoring/dedup';
+import { parseMission } from '$lib/core/types/type-guards';
 import { sendMessage, subscribeMessages } from '../messaging/bridge';
 import {
   getMissions,
@@ -61,6 +62,50 @@ function deduplicateEnabledSources(missions: Mission[], enabledSources: Set<stri
   }
 
   return [...deduplicateMissions(enabledMissions), ...disabledMissions];
+}
+
+function deserializeBridgeDate(value: string): Date | null {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+}
+
+function normalizeBridgeMissions(payload: unknown[]): Mission[] {
+  const missions: Mission[] = [];
+
+  for (const rawMission of payload) {
+    const mission = parseMission(rawMission, deserializeBridgeDate);
+    if (mission) {
+      missions.push(mission);
+    }
+  }
+
+  return missions;
+}
+
+function isScanCompleteResponse(
+  response: unknown
+): response is { type: 'SCAN_COMPLETE'; payload: unknown[] } {
+  return (
+    typeof response === 'object' &&
+    response !== null &&
+    (response as { type?: unknown }).type === 'SCAN_COMPLETE' &&
+    Array.isArray((response as { payload?: unknown }).payload)
+  );
+}
+
+function isScanErrorResponse(
+  response: unknown
+): response is { type: 'SCAN_ERROR'; payload: { message: string; code: string } } {
+  if (
+    typeof response !== 'object' ||
+    response === null ||
+    (response as { type?: unknown }).type !== 'SCAN_ERROR'
+  ) {
+    return false;
+  }
+
+  const payload = (response as { payload?: unknown }).payload;
+  return typeof payload === 'object' && payload !== null;
 }
 
 // Re-export SourceStatus types for consumers
@@ -124,6 +169,7 @@ export interface FeedController {
  * @returns FeedController API with reactive state and methods
  */
 export function createFeedController(feedStore: {
+  readonly missions?: Mission[];
   load(): void;
   setMissions(missions: Mission[]): void;
   setError(msg: string): void;
@@ -142,6 +188,9 @@ export function createFeedController(feedStore: {
   let isCheckingSources = $state(false);
   let enabledConnectorIds = $state<Set<string>>(new Set());
   let healthSnapshots = $state<Map<string, ConnectorHealthSnapshot>>(new Map());
+  let partialScanBaseMissions: Mission[] = [];
+  let partialScanConnectorMissions = new Map<string, Mission[]>();
+  let partialScanCompletedSources = new Set<string>();
 
   // Bridge message listener cleanup
   let bridgeListenerCleanup: (() => void) | null = null;
@@ -178,17 +227,24 @@ export function createFeedController(feedStore: {
     scanCompleted = false;
     isScanning = true;
     connectorStatuses = new Map();
+    beginPartialScan();
     feedStore.load();
 
     try {
       // Envoyer SCAN_START au service worker — il gère toute l'orchestration
-      const response = await sendMessage({ type: 'SCAN_START' });
+      const response = (await sendMessage({ type: 'SCAN_START' })) as unknown;
       // Le SW renvoie SCAN_COMPLETE avec les missions traitées
-      if (response.type === 'SCAN_COMPLETE' && Array.isArray(response.payload)) {
-        await handleScanComplete(response.payload);
-      } else if (response.type === 'SCAN_ERROR' && response.payload) {
-        const { message, code } = response.payload as { message: string; code: string };
+      if (isScanCompleteResponse(response)) {
+        await handleScanComplete(normalizeBridgeMissions(response.payload));
+      } else if (isScanErrorResponse(response)) {
+        const message =
+          typeof response.payload.message === 'string'
+            ? response.payload.message
+            : 'Erreur inattendue lors du scan.';
+        const code = typeof response.payload.code === 'string' ? response.payload.code : 'UNKNOWN';
         feedStore.setError(humanizeScanError(message, code));
+      } else {
+        await recoverFromUnsettledScanResponse(response);
       }
     } catch (err) {
       if (import.meta.env.DEV) {
@@ -196,8 +252,7 @@ export function createFeedController(feedStore: {
       }
       feedStore.setError(err instanceof Error ? err.message : 'Erreur inattendue lors du scan');
     } finally {
-      isScanning = false;
-      connectorStatuses = new Map();
+      finishScanLifecycle();
     }
   }
 
@@ -207,6 +262,60 @@ export function createFeedController(feedStore: {
     });
     isScanning = false;
     connectorStatuses = new Map();
+    resetPartialScan();
+  }
+
+  function finishScanLifecycle(): void {
+    isScanning = false;
+    connectorStatuses = new Map();
+    resetPartialScan();
+  }
+
+  function readFeedMissionsSnapshot(): Mission[] {
+    return Array.isArray(feedStore.missions) ? [...feedStore.missions] : [];
+  }
+
+  function beginPartialScan(): void {
+    partialScanBaseMissions = readFeedMissionsSnapshot();
+    partialScanConnectorMissions = new Map();
+    partialScanCompletedSources = new Set();
+  }
+
+  function resetPartialScan(): void {
+    partialScanBaseMissions = [];
+    partialScanConnectorMissions = new Map();
+    partialScanCompletedSources = new Set();
+  }
+
+  function handleScanPartialResult(connectorId: string, missions: Mission[]): void {
+    if (!isScanning) {
+      return;
+    }
+
+    partialScanConnectorMissions = new Map(partialScanConnectorMissions).set(connectorId, missions);
+    partialScanCompletedSources = new Set(partialScanCompletedSources).add(connectorId);
+
+    const retainedBaseMissions = partialScanBaseMissions.filter(
+      (mission) => !partialScanCompletedSources.has(mission.source)
+    );
+    const partialMissions = [...partialScanConnectorMissions.values()].flat();
+
+    feedStore.setMissions(
+      deduplicateEnabledSources([...retainedBaseMissions, ...partialMissions], enabledConnectorIds)
+    );
+  }
+
+  async function recoverFromUnsettledScanResponse(response: unknown): Promise<void> {
+    if (import.meta.env.DEV) {
+      console.warn('[FeedController] Unexpected scan response:', response);
+    }
+
+    try {
+      const stored = await getMissions();
+      feedStore.setMissions(deduplicateEnabledSources(stored, enabledConnectorIds));
+    } catch {
+      feedStore.setError('Scan terminé sans réponse exploitable.');
+    }
   }
 
   /**
@@ -222,41 +331,20 @@ export function createFeedController(feedStore: {
       );
     }
 
-    // Merge avec cache pour résilience — les missions du scan frais ont priorité
-    let cached: Mission[] = [];
-    try {
-      cached = await getMissions();
-    } catch {
-      /* Non-critical */
-    }
+    const finalMissions = deduplicateEnabledSources(missions, enabledConnectorIds);
 
-    // Dedup: scan frais prioritaire sur le cache (scores à jour si profil changé)
-    const unique = new Map<string, Mission>();
-    // Cache d'abord (sera écrasé par le scan frais)
-    for (const m of cached) {
-      unique.set(m.id, m);
-    }
-    // Scan frais écrase le cache (scores recalculés)
+    feedStore.setMissions(finalMissions);
+    scanCompleted = true;
+    resetPartialScan();
+
+    // Compter par source pour l'affichage
+    const counts = new Map<string, number>();
     for (const m of missions) {
-      unique.set(m.id, m);
+      counts.set(m.source, (counts.get(m.source) ?? 0) + 1);
     }
-    const finalMissions = deduplicateEnabledSources([...unique.values()], enabledConnectorIds);
-
-    if (finalMissions.length > 0) {
-      feedStore.setMissions(finalMissions);
-      scanCompleted = true;
-
-      // Compter par source pour l'affichage
-      const counts = new Map<string, number>();
-      for (const m of missions) {
-        counts.set(m.source, (counts.get(m.source) ?? 0) + 1);
-      }
-      scanResultCounts = counts;
-      lastScanAt = Date.now();
-      lastScanMissionCount = missions.length;
-    } else {
-      feedStore.setError('Aucune mission trouvee');
-    }
+    scanResultCounts = counts;
+    lastScanAt = Date.now();
+    lastScanMissionCount = missions.length;
 
     // Recharger les statuts persistés pour le panneau SourceHealthPanel
     try {
@@ -465,19 +553,36 @@ export function createFeedController(feedStore: {
           healthSnapshots = new Map(healthSnapshots).set(snap.connectorId, snap);
         }
 
+        if (message?.type === 'SCAN_PARTIAL_RESULT' && message.payload) {
+          const payload = message.payload;
+          handleScanPartialResult(
+            payload.connectorId,
+            normalizeBridgeMissions(payload.missions ?? [])
+          );
+        }
+
         // Résultat final du scan (auto-scan du background)
         if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
-          handleScanComplete(message.payload).catch(() => {});
+          handleScanComplete(normalizeBridgeMissions(message.payload))
+            .catch((err) => {
+              feedStore.setError(
+                err instanceof Error ? err.message : 'Impossible de finaliser le scan'
+              );
+            })
+            .finally(finishScanLifecycle);
         }
 
         if (message?.type === 'MISSIONS_UPDATED' && Array.isArray(message.payload)) {
-          feedStore.setMissions(deduplicateEnabledSources(message.payload, enabledConnectorIds));
+          feedStore.setMissions(
+            deduplicateEnabledSources(normalizeBridgeMissions(message.payload), enabledConnectorIds)
+          );
         }
 
         // Erreur du scan (auto-scan du background)
         if (message?.type === 'SCAN_ERROR' && message.payload) {
           const { message: errorMsg, code } = message.payload as { message: string; code: string };
           feedStore.setError(humanizeScanError(errorMsg, code));
+          finishScanLifecycle();
         }
       });
     } catch {
