@@ -146,6 +146,18 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain("primaryActionLabel: 'Rejouer l’onboarding'");
   });
 
+  it('groups Settings controls by operational outcome', () => {
+    const source = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+
+    expect(source).toContain('const settingsSections');
+    expect(source).toContain('aria-label="Sections de réglages"');
+    expect(source).toContain('id="settings-sources"');
+    expect(source).toContain('id="settings-alerts"');
+    expect(source).toContain('id="settings-account"');
+    expect(source).toContain('id="settings-data"');
+    expect(source).toContain('function scrollToSettingsSection');
+  });
+
   it('keeps Profile story CTAs aligned with edit/save state', () => {
     const source = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
 
