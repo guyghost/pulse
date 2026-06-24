@@ -49,6 +49,12 @@
     icon: IconName;
   };
 
+  type AiTransparencyItem = {
+    label: string;
+    value: string;
+    icon: IconName;
+  };
+
   const settingsSections: SettingsSectionLink[] = [
     {
       id: 'sources',
@@ -77,6 +83,29 @@
       title: 'Exports et sécurité',
       description: 'Sauvegardes, apparence et suppression locale.',
       icon: 'database',
+    },
+  ];
+
+  const aiTransparencyItems: AiTransparencyItem[] = [
+    {
+      label: 'Mission',
+      value: 'Titre, description, stack, TJM, localisation et remote',
+      icon: 'file-text',
+    },
+    {
+      label: 'Profil',
+      value: 'Stack cible, TJM cible, remote, localisation et mots-clés',
+      icon: 'user',
+    },
+    {
+      label: 'Cache',
+      value: 'Scores conservés 7 jours, vidés quand le profil change',
+      icon: 'database',
+    },
+    {
+      label: 'Exclus',
+      value: 'Sessions, cookies, identifiants et pages privées ne sont pas envoyés',
+      icon: 'shield-check',
     },
   ];
 
@@ -766,6 +795,31 @@
               Missions / scan
             </p>
             <p class="mt-1 text-xs font-medium text-text-primary">{settings.maxSemanticPerScan}</p>
+          </div>
+        </div>
+        <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
+          <div class="flex items-start gap-2">
+            <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+            <div class="min-w-0">
+              <p class="text-xs font-medium text-text-primary">Données utilisées par l'IA locale</p>
+              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+                Gemini Nano reçoit uniquement le contexte utile au score sémantique. Le résultat
+                reste local avec le score et une raison courte.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3 grid gap-2 sm:grid-cols-2">
+            {#each aiTransparencyItems as item}
+              <div class="rounded-md bg-surface-white px-2.5 py-2">
+                <div class="flex items-center gap-1.5">
+                  <Icon name={item.icon} size={12} class="text-blueprint-blue" />
+                  <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+                    {item.label}
+                  </p>
+                </div>
+                <p class="mt-1 text-[11px] leading-4 text-text-secondary">{item.value}</p>
+              </div>
+            {/each}
           </div>
         </div>
       </div>

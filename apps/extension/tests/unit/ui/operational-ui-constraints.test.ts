@@ -198,6 +198,21 @@ describe('operational UI constraints', () => {
     expect(source).toContain('mutedUntil: isMuteActive ? mutedUntil : null');
   });
 
+  it('keeps local AI scoring transparent about data usage', () => {
+    const source = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+
+    expect(source).toContain('type AiTransparencyItem');
+    expect(source).toContain("label: 'Mission'");
+    expect(source).toContain('Titre, description, stack, TJM, localisation et remote');
+    expect(source).toContain("label: 'Profil'");
+    expect(source).toContain('Stack cible, TJM cible, remote, localisation et mots-clés');
+    expect(source).toContain('Scores conservés 7 jours, vidés quand le profil change');
+    expect(source).toContain(
+      'Sessions, cookies, identifiants et pages privées ne sont pas envoyés'
+    );
+    expect(source).toContain("Données utilisées par l'IA locale");
+  });
+
   it('presents Markdown export as a shareable shortlist report', () => {
     const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
     const exportSource = readFileSync('src/lib/core/export/mission-export.ts', 'utf8');
