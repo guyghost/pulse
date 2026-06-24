@@ -184,7 +184,7 @@
 
           <button
             type="button"
-            class="btn btn--ghost auth-submit"
+            class="btn btn--secondary auth-submit"
             disabled={submitting}
             onclick={handlePasskeyLogin}
             data-testid="login-passkey-submit"
@@ -194,7 +194,7 @@
 
           <p class="auth-note">
             Le lien email fonctionne sur tous les environnements configures. Le passkey reste
-            disponible quand Supabase l'autorise pour le projet.
+            disponible selon votre navigateur et votre compte.
           </p>
         </form>
       {/if}
@@ -250,6 +250,42 @@
     display: flex;
     flex-direction: column;
     gap: var(--spacing-24);
+  }
+
+  .form-group {
+    display: flex;
+    flex-direction: column;
+    gap: var(--spacing-4);
+  }
+
+  .form-label {
+    font-size: 0.875rem;
+    font-weight: 500;
+    color: var(--color-text-secondary);
+  }
+
+  .form-input {
+    width: 100%;
+    padding: var(--spacing-16);
+    background: var(--color-surface-white);
+    border: 1px solid var(--color-border-light);
+    border-radius: var(--radius-large);
+    color: var(--color-text-primary);
+    font-family: var(--font-sans);
+    font-size: 0.9375rem;
+    transition:
+      border-color var(--transition-fast),
+      box-shadow var(--transition-fast);
+  }
+
+  .form-input::placeholder {
+    color: var(--color-text-muted);
+  }
+
+  .form-input:focus {
+    outline: none;
+    border-color: var(--color-blueprint-blue);
+    box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-blueprint-blue) 15%, transparent);
   }
 
   .form-error {
