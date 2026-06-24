@@ -40,6 +40,7 @@ import {
   getConnectedAlertPreferences,
   saveConnectedAlertPreferences,
 } from '../lib/shell/storage/connected-alert-preferences';
+import { getAlertHistory } from '../lib/shell/storage/alert-history';
 import { setNewMissionCount, resetNewMissionCount } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
@@ -592,6 +593,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] SAVE_CONNECTED_ALERT_PREFERENCES error:', err);
           sendResponse({ type: 'CONNECTED_ALERT_PREFERENCES_SAVED', payload: { saved: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_ALERT_HISTORY') {
+      getAlertHistory()
+        .then((history) => {
+          sendResponse({ type: 'ALERT_HISTORY_RESULT', payload: history });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_ALERT_HISTORY error:', err);
+          sendResponse({ type: 'ALERT_HISTORY_RESULT', payload: [] });
         });
       return true;
     }

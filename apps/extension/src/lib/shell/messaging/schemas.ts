@@ -101,6 +101,25 @@ const ConnectedAlertPreferencesSchema = z
   .strict()
   .refine(maxBytes(4_000), { message: 'Alert preferences payload exceeds 4KB limit' });
 
+const AlertHistoryEntrySchema = z
+  .object({
+    id: z.string().min(1).max(180),
+    triggeredAt: z.number().int().min(0),
+    missionCount: z.number().int().min(0).max(500),
+    missionIds: z.array(z.string().min(1).max(256)).max(20),
+    missionTitles: z.array(z.string().min(1).max(180)).max(5),
+    scoreThreshold: z.number().int().min(0).max(100),
+    minDailyRate: z.number().int().min(0).max(5000),
+    requiredStacks: z.array(z.string().min(1).max(40)).max(12),
+    maxResults: z.number().int().min(1).max(20),
+  })
+  .strict();
+
+const AlertHistorySchema = z
+  .array(AlertHistoryEntrySchema)
+  .max(20)
+  .refine(maxBytes(30_000), { message: 'Alert history payload exceeds 30KB limit' });
+
 const TJMRegionSchema = z.enum([
   'ile-de-france',
   'lyon',
@@ -476,6 +495,13 @@ export const MessageSchemas = {
   CONNECTED_ALERT_PREFERENCES_SAVED: z.object({
     type: z.literal('CONNECTED_ALERT_PREFERENCES_SAVED'),
     payload: z.object({ saved: z.boolean() }),
+  }),
+  GET_ALERT_HISTORY: z.object({
+    type: z.literal('GET_ALERT_HISTORY'),
+  }),
+  ALERT_HISTORY_RESULT: z.object({
+    type: z.literal('ALERT_HISTORY_RESULT'),
+    payload: AlertHistorySchema,
   }),
   GET_TJM_ANALYSIS: z.object({
     type: z.literal('GET_TJM_ANALYSIS'),

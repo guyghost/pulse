@@ -4,6 +4,7 @@ import type { Mission } from '$lib/core/types/mission';
 const getSettings = vi.fn();
 const getSeenIds = vi.fn();
 const getConnectedAlertPreferences = vi.fn();
+const recordAlertHistoryEntry = vi.fn();
 
 const notificationsCreate = vi.fn();
 const sessionGet = vi.fn();
@@ -19,6 +20,10 @@ vi.mock('../../../src/lib/shell/storage/seen-missions', () => ({
 
 vi.mock('../../../src/lib/shell/storage/connected-alert-preferences', () => ({
   getConnectedAlertPreferences,
+}));
+
+vi.mock('../../../src/lib/shell/storage/alert-history', () => ({
+  recordAlertHistoryEntry,
 }));
 
 const makeMission = (overrides: Partial<Mission> = {}): Mission => ({
@@ -59,6 +64,7 @@ describe('notifyHighScoreMissions', () => {
 
     getSeenIds.mockResolvedValue([]);
     getConnectedAlertPreferences.mockResolvedValue(null);
+    recordAlertHistoryEntry.mockResolvedValue(undefined);
     sessionGet.mockResolvedValue({});
     sessionSet.mockResolvedValue(undefined);
     notificationsCreate.mockResolvedValue(undefined);
@@ -132,6 +138,17 @@ describe('notifyHighScoreMissions', () => {
       })
     );
     expect(sessionSet).toHaveBeenCalledWith({ last_notification_time: 1_700_000_000_000 });
+    expect(recordAlertHistoryEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        triggeredAt: 1_700_000_000_000,
+        missionCount: 1,
+        missionIds: ['low-basic'],
+        missionTitles: ['Mission IA'],
+        scoreThreshold: 70,
+        minDailyRate: 0,
+        requiredStacks: [],
+      })
+    );
   });
 
   it('filters out seen missions before notifying', async () => {
@@ -194,6 +211,16 @@ describe('notifyHighScoreMissions', () => {
     expect(notificationsCreate).toHaveBeenCalledWith(
       'high-score-missions',
       expect.objectContaining({ message: 'Svelte' })
+    );
+    expect(recordAlertHistoryEntry).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionCount: 1,
+        missionIds: ['svelte'],
+        scoreThreshold: 80,
+        minDailyRate: 650,
+        requiredStacks: ['Svelte'],
+        maxResults: 1,
+      })
     );
   });
 

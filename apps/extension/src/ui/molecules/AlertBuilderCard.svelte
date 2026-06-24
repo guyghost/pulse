@@ -2,6 +2,7 @@
   import { Icon } from '@pulse/ui';
   import type { Mission } from '$lib/core/types/mission';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
+  import type { AlertHistoryEntry } from '$lib/core/types/alert-history';
   import { summarizeSmartNotificationPreview } from '$lib/core/scoring/smart-notification';
   import OperationalStatusBadge from '../atoms/OperationalStatusBadge.svelte';
 
@@ -10,6 +11,7 @@
     availableStacks = [],
     previewMissions = [],
     seenMissionIds = [],
+    history = [],
     isSaving = false,
     onSave,
   }: {
@@ -17,6 +19,7 @@
     availableStacks?: string[];
     previewMissions?: Mission[];
     seenMissionIds?: string[];
+    history?: AlertHistoryEntry[];
     isSaving?: boolean;
     onSave?: (preferences: ConnectedAlertPreferences) => void;
   } = $props();
@@ -92,6 +95,54 @@
 
     return `${missionLabel} ${seenLabel} ${excludedLabel} du volume.`;
   });
+
+  const recentAlertHistory = $derived(history.slice(0, 3));
+  const alertHistorySummary = $derived(
+    history.length > 0
+      ? `${history.length} déclenchement${history.length > 1 ? 's' : ''}`
+      : 'Aucun historique'
+  );
+
+  const alertHistoryDateFormatter = new Intl.DateTimeFormat('fr-FR', {
+    day: '2-digit',
+    month: 'short',
+    hour: '2-digit',
+    minute: '2-digit',
+  });
+
+  function formatAlertHistoryTime(triggeredAt: number): string {
+    if (!Number.isFinite(triggeredAt) || triggeredAt <= 0) {
+      return 'Date inconnue';
+    }
+
+    return alertHistoryDateFormatter.format(new Date(triggeredAt));
+  }
+
+  function formatAlertHistoryCriteria(entry: AlertHistoryEntry): string {
+    const criteria = [`Score ${entry.scoreThreshold}+`];
+
+    if (entry.minDailyRate > 0) {
+      criteria.push(`${entry.minDailyRate}€/j min`);
+    }
+
+    if (entry.requiredStacks.length > 0) {
+      criteria.push(entry.requiredStacks.join(', '));
+    }
+
+    return criteria.join(' · ');
+  }
+
+  function formatAlertHistoryTitles(entry: AlertHistoryEntry): string {
+    if (entry.missionTitles.length === 0) {
+      return `${entry.missionCount} mission${entry.missionCount > 1 ? 's' : ''}`;
+    }
+
+    const visibleTitles = entry.missionTitles.slice(0, 2).join(', ');
+    const remainingCount = Math.max(0, entry.missionCount - entry.missionTitles.slice(0, 2).length);
+    const suffix = remainingCount > 0 ? ` +${remainingCount}` : '';
+
+    return `${visibleTitles}${suffix}`;
+  }
 
   function addStack(value = stackInput): void {
     const clean = value.trim();
@@ -284,6 +335,51 @@
     </div>
     {#if alertPreview.seenCount > 0}
       <p class="mt-2 text-[10px] leading-4 text-text-muted">{alertPreviewSeenText}</p>
+    {/if}
+  </div>
+
+  <div class="mt-3 rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+    <div class="flex items-start justify-between gap-3">
+      <div class="flex min-w-0 items-start gap-2">
+        <Icon name="clock" size={14} class="mt-0.5 shrink-0 text-text-subtle" />
+        <div class="min-w-0">
+          <p class="text-xs font-medium text-text-primary">Historique récent</p>
+          <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+            Derniers lots réellement envoyés par Chrome.
+          </p>
+        </div>
+      </div>
+      <OperationalStatusBadge
+        label={alertHistorySummary}
+        severity={history.length > 0 ? 'success' : 'neutral'}
+      />
+    </div>
+
+    {#if recentAlertHistory.length > 0}
+      <div class="mt-3 space-y-2">
+        {#each recentAlertHistory as entry}
+          <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
+            <div class="flex items-center justify-between gap-2">
+              <span class="text-[10px] font-medium text-text-subtle">
+                {formatAlertHistoryTime(entry.triggeredAt)}
+              </span>
+              <span class="font-mono text-[10px] font-semibold text-text-primary">
+                {entry.missionCount} mission{entry.missionCount > 1 ? 's' : ''}
+              </span>
+            </div>
+            <p class="mt-1 truncate text-xs font-medium text-text-primary">
+              {formatAlertHistoryTitles(entry)}
+            </p>
+            <p class="mt-1 truncate text-[10px] text-text-muted">
+              {formatAlertHistoryCriteria(entry)}
+            </p>
+          </div>
+        {/each}
+      </div>
+    {:else}
+      <p class="mt-3 rounded-lg bg-surface-white px-3 py-2 text-[11px] leading-5 text-text-subtle">
+        Les déclenchements apparaîtront ici après un scan qui franchit vos critères.
+      </p>
     {/if}
   </div>
 

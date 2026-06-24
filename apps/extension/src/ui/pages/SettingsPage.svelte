@@ -18,9 +18,11 @@
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import {
+    getAlertHistory,
     getAlertPreferences,
     saveAlertPreferences,
   } from '$lib/shell/facades/alert-preferences.facade';
+  import type { AlertHistoryEntry } from '$lib/core/types/alert-history';
   import { getFavorites, getMissions, getSeenIds } from '$lib/shell/facades/feed-data.facade';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 
@@ -84,19 +86,23 @@
   let favoriteExportCount = $state(0);
   let alertPreviewMissions = $state<Mission[]>([]);
   let alertPreviewSeenIds = $state<string[]>([]);
+  let alertHistory = $state<AlertHistoryEntry[]>([]);
   let aiSettingsSection: HTMLElement | null = $state(null);
 
   (async () => {
-    const [storedAlertPreferences, favorites, missions, seenIds] = await Promise.all([
-      getAlertPreferences(),
-      getFavorites(),
-      getMissions(),
-      getSeenIds(),
-    ]);
+    const [storedAlertPreferences, favorites, missions, seenIds, storedAlertHistory] =
+      await Promise.all([
+        getAlertPreferences(),
+        getFavorites(),
+        getMissions(),
+        getSeenIds(),
+        getAlertHistory(),
+      ]);
     alertPreferences = storedAlertPreferences;
     favoriteExportCount = Object.keys(favorites).length;
     alertPreviewMissions = missions;
     alertPreviewSeenIds = seenIds;
+    alertHistory = storedAlertHistory;
   })().catch(() => {});
 
   async function handleExportFavorites(format: ExportFormat) {
@@ -586,6 +592,7 @@
         availableStacks={settings.profileStack}
         previewMissions={alertPreviewMissions}
         seenMissionIds={alertPreviewSeenIds}
+        history={alertHistory}
         isSaving={isSavingAlertPreferences}
         onSave={handleSaveAlertPreferences}
       />

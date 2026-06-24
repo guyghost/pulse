@@ -113,6 +113,10 @@ describe('validateMessage — messages sans payload', () => {
     expect(validateMessage({ type: 'RESET_LOCAL_DATA' }).valid).toBe(true);
   });
 
+  it('accepte GET_ALERT_HISTORY', () => {
+    expect(validateMessage({ type: 'GET_ALERT_HISTORY' }).valid).toBe(true);
+  });
+
   it('accepte les messages de flags side panel sans payload', () => {
     for (const type of [
       'GET_FIRST_SCAN_DONE',
@@ -689,6 +693,52 @@ describe('validateMessage — RESTORE_TRACKING', () => {
           nextActionAt: null,
         },
       },
+    });
+
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
+// ALERT_HISTORY_RESULT — historique d'alertes
+// ============================================================================
+
+describe('validateMessage — ALERT_HISTORY_RESULT', () => {
+  it('accepte un historique borne', () => {
+    const r = validateMessage({
+      type: 'ALERT_HISTORY_RESULT',
+      payload: [
+        {
+          id: 'alert-1',
+          triggeredAt: 1779436800000,
+          missionCount: 2,
+          missionIds: ['m1', 'm2'],
+          missionTitles: ['Mission Svelte', 'Mission React'],
+          scoreThreshold: 80,
+          minDailyRate: 650,
+          requiredStacks: ['Svelte'],
+          maxResults: 5,
+        },
+      ],
+    });
+
+    expect(r.valid).toBe(true);
+  });
+
+  it('rejette un historique trop volumineux', () => {
+    const r = validateMessage({
+      type: 'ALERT_HISTORY_RESULT',
+      payload: Array.from({ length: 21 }, (_, index) => ({
+        id: `alert-${index}`,
+        triggeredAt: 1779436800000 + index,
+        missionCount: 1,
+        missionIds: [`m${index}`],
+        missionTitles: [`Mission ${index}`],
+        scoreThreshold: 80,
+        minDailyRate: 0,
+        requiredStacks: [],
+        maxResults: 5,
+      })),
     });
 
     expect(r.valid).toBe(false);

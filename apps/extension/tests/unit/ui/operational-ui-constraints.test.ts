@@ -158,6 +158,17 @@ describe('operational UI constraints', () => {
     expect(source).toContain('function scrollToSettingsSection');
   });
 
+  it('keeps alert history visible next to notification volume controls', () => {
+    const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+    const alertSource = readFileSync('src/ui/molecules/AlertBuilderCard.svelte', 'utf8');
+
+    expect(settingsSource).toContain('getAlertHistory');
+    expect(settingsSource).toContain('history={alertHistory}');
+    expect(alertSource).toContain('Historique récent');
+    expect(alertSource).toContain('Derniers lots réellement envoyés par Chrome.');
+    expect(alertSource).toContain('formatAlertHistoryCriteria');
+  });
+
   it('keeps Profile story CTAs aligned with edit/save state', () => {
     const source = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
 
