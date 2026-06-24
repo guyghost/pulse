@@ -4,8 +4,10 @@ import { describe, expect, it } from 'vitest';
 describe('auth copy', () => {
   const registerSource = readFileSync('src/routes/register/+page.svelte', 'utf8');
   const loginSource = readFileSync('src/routes/login/+page.svelte', 'utf8');
+  const registerPasskeySource = readFileSync('src/routes/register/passkey/+page.svelte', 'utf8');
   const normalizedRegisterSource = registerSource.replace(/\s+/g, ' ');
   const normalizedLoginSource = loginSource.replace(/\s+/g, ' ');
+  const normalizedRegisterPasskeySource = registerPasskeySource.replace(/\s+/g, ' ');
 
   it('explains account sync without exposing auth provider details', () => {
     expect(normalizedRegisterSource).toContain(
@@ -22,5 +24,15 @@ describe('auth copy', () => {
     expect(normalizedLoginSource).toContain('environnements configurés');
     expect(normalizedLoginSource).toContain('disponible selon votre navigateur et votre compte');
     expect(loginSource).not.toContain('Supabase l');
+  });
+
+  it('keeps passkey registration copy accented and browser-oriented', () => {
+    expect(normalizedRegisterPasskeySource).toContain(
+      'Dernière étape avant votre dashboard MissionPulse'
+    );
+    expect(normalizedRegisterPasskeySource).toContain('Création du passkey');
+    expect(normalizedRegisterPasskeySource).toContain('clé de sécurité');
+    expect(registerPasskeySource).not.toContain('Creation du passkey');
+    expect(registerPasskeySource).not.toContain('cle de securite');
   });
 });

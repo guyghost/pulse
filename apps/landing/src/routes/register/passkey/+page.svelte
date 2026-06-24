@@ -51,7 +51,7 @@
     <div class="auth-card glass-card">
       <div class="auth-card__header">
         <h1>Créer votre passkey</h1>
-        <p>Derniere etape avant votre dashboard MissionPulse</p>
+        <p>Dernière étape avant votre dashboard MissionPulse</p>
       </div>
 
       <div class="auth-form">
@@ -83,14 +83,14 @@
           data-testid="register-passkey-final-submit"
         >
           {#if submitting}
-            Creation du passkey...
+            Création du passkey...
           {:else}
             Finaliser avec un passkey
           {/if}
         </button>
 
         <p class="auth-note">
-          Votre navigateur va ouvrir Touch ID, Windows Hello, une cle de securite ou votre
+          Votre navigateur va ouvrir Touch ID, Windows Hello, une clé de sécurité ou votre
           gestionnaire de mots de passe.
         </p>
       </div>
