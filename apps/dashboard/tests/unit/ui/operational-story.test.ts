@@ -66,4 +66,16 @@ describe('connected dashboard operational story', () => {
       source.indexOf('value="keep_remote"')
     );
   });
+
+  it('surfaces success milestones before raw dashboard metrics', () => {
+    expect(source).toContain('buildDashboardSuccessMilestones');
+    expect(source).toContain('Résultats débloqués');
+    expect(source).toContain('Jalons de confiance');
+    expect(normalizedSource).toContain(
+      'mission qualifiée, relance traitée, CV prêt et export disponible'
+    );
+    expect(source.indexOf('success-milestones-title')).toBeLessThan(
+      source.indexOf('aria-label="Indicateurs candidatures"')
+    );
+  });
 });

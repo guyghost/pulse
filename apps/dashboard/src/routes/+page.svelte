@@ -3,6 +3,7 @@
   import { Badge } from '@pulse/ui';
   import {
     buildMissionComparisonSnapshot,
+    buildDashboardSuccessMilestones,
     countApplicationsByStage,
     filterApplications,
     filterMissionFeedItems,
@@ -232,6 +233,15 @@
   );
   const missionComparison = $derived(
     buildMissionComparisonSnapshot(applications, 3) as MissionComparisonSnapshot
+  );
+  const successMilestones = $derived(
+    buildDashboardSuccessMilestones({
+      missionFeed,
+      applications,
+      applicationTimeline,
+      cv,
+      exportAvailable: isConnected && hasDashboardSnapshots,
+    })
   );
   const dashboardSetupPreviewItems = $derived([
     {
@@ -1014,6 +1024,59 @@
             >
               Aller à l'action
             </a>
+          </div>
+        </section>
+      {/if}
+
+      {#if !setupRequired}
+        <section
+          class="mb-6 rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          aria-labelledby="success-milestones-title"
+        >
+          <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p class="eyebrow text-text-subtle">Résultats débloqués</p>
+              <h2
+                id="success-milestones-title"
+                class="mt-1 text-lg font-semibold text-text-primary"
+              >
+                Jalons de confiance
+              </h2>
+              <p class="mt-2 max-w-3xl text-sm leading-6 text-text-subtle">
+                Les premiers gains concrets restent visibles: mission qualifiée, relance traitée, CV
+                prêt et export disponible.
+              </p>
+            </div>
+          </div>
+
+          <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {#each successMilestones as milestone}
+              <article
+                class="rounded-lg border p-3 {milestone.state === 'complete'
+                  ? 'border-accent-green/20 bg-accent-green/8'
+                  : milestone.state === 'ready'
+                    ? 'border-blueprint-blue/20 bg-blueprint-blue/8'
+                    : 'border-border-light bg-page-canvas'}"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-xs font-semibold text-text-primary">{milestone.title}</p>
+                    <p class="mt-1 text-sm font-semibold text-text-primary">
+                      {milestone.result}
+                    </p>
+                  </div>
+                  <Badge
+                    label={milestone.signal}
+                    variant={milestone.state === 'complete'
+                      ? 'success'
+                      : milestone.state === 'ready'
+                        ? 'status'
+                        : 'source'}
+                  />
+                </div>
+                <p class="mt-2 text-xs leading-5 text-text-subtle">{milestone.detail}</p>
+              </article>
+            {/each}
           </div>
         </section>
       {/if}
