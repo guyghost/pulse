@@ -631,7 +631,7 @@
         class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
         href="#cv"
       >
-        Profil CV
+        CV
       </a>
       <a
         class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
@@ -791,10 +791,10 @@
             class="-mb-px border-b-2 border-text-primary px-3 py-2 text-sm font-medium text-text-primary"
             href="#applications"
           >
-            Explore
+            Candidatures
           </a>
           <a class="px-3 py-2 text-sm text-text-subtle hover:text-text-primary" href="#sync"
-            >Synchronisations</a
+            >Synchronisation</a
           >
           <a class="px-3 py-2 text-sm text-text-subtle hover:text-text-primary" href="#cv">CV</a>
         </div>

@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 
 describe('connected dashboard operational story', () => {
   const source = readFileSync('src/routes/+page.svelte', 'utf8');
+  const normalizedSource = source.replace(/\s+/g, ' ');
 
   it('prioritizes a narrative operational state before metrics', () => {
     expect(source).toContain('interface DashboardOperationalStory');
@@ -43,5 +44,14 @@ describe('connected dashboard operational story', () => {
     expect(source).toContain('Pipeline activé après setup');
     expect(source).toContain('{#if !setupRequired}');
     expect(source).toContain('aria-label="Indicateurs candidatures"');
+  });
+
+  it('keeps dashboard navigation vocabulary stable', () => {
+    expect(source).toContain('Candidatures');
+    expect(source).toContain('>Synchronisation</a');
+    expect(source).toContain('href="#cv">CV</a');
+    expect(normalizedSource).not.toContain('> Explore </a');
+    expect(normalizedSource).not.toContain('> Profil CV </a');
+    expect(normalizedSource).not.toContain('> Synchronisations</a');
   });
 });

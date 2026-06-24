@@ -22,19 +22,25 @@ test.describe('connected dashboard smoke', () => {
     ).not.toBeVisible();
     await expect(page.getByText("Aucune mission reçue depuis l'extension")).not.toBeVisible();
 
-    await page.getByRole('link', { name: 'Candidatures' }).click();
+    await page
+      .getByLabel('Navigation dashboard')
+      .getByRole('link', { name: 'Candidatures' })
+      .click();
     await expect(page.getByRole('heading', { name: 'Pipeline activé après setup' })).toBeVisible();
     await expect(
       page.getByPlaceholder('Rechercher mission, client ou plateforme')
     ).not.toBeVisible();
     await expect(page.getByText('Aucune mission trouvée')).not.toBeVisible();
 
-    await page.getByRole('link', { name: 'Profil CV' }).click();
+    await page.getByLabel('Navigation dashboard').getByRole('link', { name: 'CV' }).click();
     await expect(page.getByRole('heading', { name: 'CV principal' })).toBeVisible();
     await expect(page.getByText('Aucun CV canonique synchronisé')).toBeVisible();
     await expect(page.getByLabel('Titre du profil')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Synchronisation', exact: true }).click();
+    await page
+      .getByLabel('Navigation dashboard')
+      .getByRole('link', { name: 'Synchronisation' })
+      .click();
     await expect(page.getByRole('heading', { name: 'Synchronisation extension' })).toBeVisible();
     await expect(page.getByText('Alertes missions')).toBeVisible();
     await expect(page.getByText('Local ou non connecté')).toBeVisible();
