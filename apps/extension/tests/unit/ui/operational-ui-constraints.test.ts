@@ -137,6 +137,17 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('Premium pages hidden');
   });
 
+  it('keeps onboarding focused with duration and minimal shell navigation', () => {
+    const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
+    const wizardSource = readFileSync('src/ui/organisms/OnboardingWizard.svelte', 'utf8');
+
+    expect(appSource).toContain("nav.currentPage !== 'onboarding'");
+    expect(wizardSource).toContain('2 minutes');
+    expect(wizardSource).toContain('Modifiable ensuite');
+    expect(wizardSource).toContain('aria-label="Passer l’onboarding"');
+    expect(wizardSource).toContain('onclick={onSkip}');
+  });
+
   it('keeps Settings system actions aligned with the stated operational issue', () => {
     const source = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
 

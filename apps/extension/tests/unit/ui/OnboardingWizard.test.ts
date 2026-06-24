@@ -46,6 +46,9 @@ describe('OnboardingWizard', () => {
 
     expect(target.textContent).toContain('Comprendre Pulse');
     expect(target.textContent).toContain('1/5');
+    expect(target.textContent).toContain('2 minutes');
+    expect(target.textContent).toContain('Modifiable ensuite');
+    expect(target.querySelector('button[aria-label="Passer l’onboarding"]')).not.toBeNull();
 
     clickButton(target, 'Configurer le radar');
     await tick();

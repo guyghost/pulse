@@ -169,11 +169,36 @@
         <p class="mt-1 text-xs leading-5 text-text-subtle">
           {currentStepDefinition.description}
         </p>
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
+          <span
+            class="inline-flex items-center gap-1 rounded-md border border-border-light bg-page-canvas px-2 py-1"
+          >
+            <Icon name="clock" size={11} />
+            2 minutes
+          </span>
+          <span
+            class="inline-flex items-center gap-1 rounded-md border border-border-light bg-page-canvas px-2 py-1"
+          >
+            <Icon name="pencil" size={11} />
+            Modifiable ensuite
+          </span>
+        </div>
       </div>
-      <OperationalStatusBadge
-        label={`${currentStepIndex + 1}/${onboardingSteps.length}`}
-        severity="attention"
-      />
+      <div class="flex shrink-0 flex-col items-end gap-2">
+        <OperationalStatusBadge
+          label={`${currentStepIndex + 1}/${onboardingSteps.length}`}
+          severity="attention"
+        />
+        <button
+          type="button"
+          class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2 py-1 text-[11px] font-medium text-text-subtle transition-colors hover:bg-surface-white hover:text-text-primary"
+          onclick={onSkip}
+          aria-label="Passer l’onboarding"
+        >
+          Plus tard
+          <Icon name="x" size={11} />
+        </button>
+      </div>
     </div>
 
     <div class="mt-4 grid grid-cols-5 gap-1" aria-label="Progression onboarding">

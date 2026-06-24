@@ -192,73 +192,75 @@
       </div>
     {/if}
 
-    <div class="px-4 pt-4 transition-all duration-200 ease-out">
-      <nav
-        aria-label="Main navigation"
-        class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-200 ease-out {feedNavCompact
-          ? 'min-h-11 gap-0.5 p-0.5'
-          : denseNav
+    {#if nav.currentPage !== 'onboarding'}
+      <div class="px-4 pt-4 transition-all duration-200 ease-out">
+        <nav
+          aria-label="Main navigation"
+          class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-200 ease-out {feedNavCompact
             ? 'min-h-11 gap-0.5 p-0.5'
-            : 'min-h-12 gap-1 p-1'}"
-      >
-        {#each visibleNavItems as item}
-          {@const itemLocked = isPremiumLocked(item.page)}
-          <button
-            use:ripple
-            class="relative flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
+            : denseNav
+              ? 'min-h-11 gap-0.5 p-0.5'
+              : 'min-h-12 gap-1 p-1'}"
+        >
+          {#each visibleNavItems as item}
+            {@const itemLocked = isPremiumLocked(item.page)}
+            <button
+              use:ripple
+              class="relative flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
           {feedNavCompact
-              ? nav.currentPage === item.page
-                ? 'flex-1 gap-1.5 px-3 py-1.5'
-                : 'basis-9 flex-none gap-0 px-0 py-1.5'
-              : denseNav
                 ? nav.currentPage === item.page
-                  ? 'flex-1 gap-1.5 px-3 py-2'
-                  : 'basis-10 flex-none gap-0 px-0 py-2'
-                : 'flex-1 basis-0 gap-2 px-3 py-3'}
+                  ? 'flex-1 gap-1.5 px-3 py-1.5'
+                  : 'basis-9 flex-none gap-0 px-0 py-1.5'
+                : denseNav
+                  ? nav.currentPage === item.page
+                    ? 'flex-1 gap-1.5 px-3 py-2'
+                    : 'basis-10 flex-none gap-0 px-0 py-2'
+                  : 'flex-1 basis-0 gap-2 px-3 py-3'}
           {nav.currentPage === item.page
-              ? 'bg-surface-white text-text-primary shadow-subtle-2'
-              : itemLocked
-                ? 'text-text-muted hover:bg-surface-white hover:text-text-primary'
-                : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
-            aria-current={nav.currentPage === item.page ? 'page' : undefined}
-            aria-label={itemLocked
-              ? `${item.label} premium verrouillé`
-              : (item.ariaLabel ?? item.label)}
-            title={itemLocked ? `${item.label} premium verrouillé` : item.label}
-            onclick={() => nav.navigate(item.page)}
-          >
-            <span class="shrink-0 transition-transform duration-200 ease-out">
-              <Icon name={item.icon} size={feedNavCompact || denseNav ? 13 : 16} />
-            </span>
-            <span
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out {(feedNavCompact &&
-                nav.currentPage !== item.page) ||
-              (denseNav && nav.currentPage !== item.page)
-                ? 'max-w-0 opacity-0 -translate-x-1'
-                : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
+                ? 'bg-surface-white text-text-primary shadow-subtle-2'
+                : itemLocked
+                  ? 'text-text-muted hover:bg-surface-white hover:text-text-primary'
+                  : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
+              aria-current={nav.currentPage === item.page ? 'page' : undefined}
+              aria-label={itemLocked
+                ? `${item.label} premium verrouillé`
+                : (item.ariaLabel ?? item.label)}
+              title={itemLocked ? `${item.label} premium verrouillé` : item.label}
+              onclick={() => nav.navigate(item.page)}
             >
-            {#if itemLocked}
-              <span
-                class="absolute right-1 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-surface-white text-text-muted ring-1 ring-border-light"
-                aria-hidden="true"
-              >
-                <Icon name="lock" size={8} />
+              <span class="shrink-0 transition-transform duration-200 ease-out">
+                <Icon name={item.icon} size={feedNavCompact || denseNav ? 13 : 16} />
               </span>
-            {/if}
-          </button>
-        {/each}
-      </nav>
+              <span
+                class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out {(feedNavCompact &&
+                  nav.currentPage !== item.page) ||
+                (denseNav && nav.currentPage !== item.page)
+                  ? 'max-w-0 opacity-0 -translate-x-1'
+                  : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
+              >
+              {#if itemLocked}
+                <span
+                  class="absolute right-1 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-surface-white text-text-muted ring-1 ring-border-light"
+                  aria-hidden="true"
+                >
+                  <Icon name="lock" size={8} />
+                </span>
+              {/if}
+            </button>
+          {/each}
+        </nav>
 
-      <div
-        class="grid transition-[opacity,margin] duration-200 ease-out {feedNavCompact
-          ? 'mt-2 opacity-0 pointer-events-none'
-          : 'mt-3 opacity-100'}"
-      >
-        <div class="min-h-0 overflow-hidden flex justify-end">
-          <ConnectionIndicator />
+        <div
+          class="grid transition-[opacity,margin] duration-200 ease-out {feedNavCompact
+            ? 'mt-2 opacity-0 pointer-events-none'
+            : 'mt-3 opacity-100'}"
+        >
+          <div class="min-h-0 overflow-hidden flex justify-end">
+            <ConnectionIndicator />
+          </div>
         </div>
       </div>
-    </div>
+    {/if}
     <main class="relative flex-1 overflow-hidden">
       <div
         class="absolute inset-0 overflow-hidden"
