@@ -8,7 +8,7 @@
   import { getMissions } from '$lib/shell/facades/feed-data.facade';
   import { createTrackingStore } from '$lib/state/tracking.svelte';
   import { sendMessage } from '$lib/shell/messaging/bridge';
-  import { showToast } from '$lib/shell/notifications/toast-service';
+  import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import { summarizeApplicationPipeline } from '$lib/core/tracking/pipeline-summary';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
   import OperationalStoryCard, {
@@ -277,8 +277,21 @@
     if (!selectedMission) {
       return;
     }
-    await tracking.transitionStatus(selectedMission.id, status);
-    await showToast(`Statut: ${STATUS_LABELS[status]}`, 'success');
+    const missionId = selectedMission.id;
+    const previousTracking = selectedTracking
+      ? {
+          ...selectedTracking,
+          history: [...selectedTracking.history],
+          generatedAssetIds: [...selectedTracking.generatedAssetIds],
+        }
+      : null;
+    await tracking.transitionStatus(missionId, status);
+    showToastAction(`Statut: ${STATUS_LABELS[status]}`, 'success', {
+      label: 'Annuler',
+      onClick: () => {
+        void tracking.restoreTracking(missionId, previousTracking);
+      },
+    });
   }
 
   async function saveNextAction(): Promise<void> {

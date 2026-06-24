@@ -146,7 +146,12 @@ export type BridgeMessage =
       type: 'UPDATE_TRACKING_DETAILS';
       payload: { missionId: string; nextActionAt?: string | null };
     }
+  | {
+      type: 'RESTORE_TRACKING';
+      payload: { missionId: string; tracking: MissionTracking | null };
+    }
   | { type: 'TRACKING_UPDATED'; payload: MissionTracking }
+  | { type: 'TRACKING_RESTORED'; payload: MissionTracking | null }
   | { type: 'GET_TRACKINGS'; payload?: { status?: ApplicationStatus } }
   | { type: 'TRACKINGS_RESULT'; payload: MissionTracking[] }
   // Generation

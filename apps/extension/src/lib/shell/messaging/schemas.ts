@@ -694,9 +694,20 @@ export const MessageSchemas = {
       nextActionAt: IsoDateTimeOrNullSchema.optional(),
     }),
   }),
+  RESTORE_TRACKING: z.object({
+    type: z.literal('RESTORE_TRACKING'),
+    payload: z.object({
+      missionId: z.string().max(256),
+      tracking: MissionTrackingSchema.nullable(),
+    }),
+  }),
   TRACKING_UPDATED: z.object({
     type: z.literal('TRACKING_UPDATED'),
     payload: MissionTrackingSchema,
+  }),
+  TRACKING_RESTORED: z.object({
+    type: z.literal('TRACKING_RESTORED'),
+    payload: MissionTrackingSchema.nullable(),
   }),
   GET_TRACKINGS: z.object({
     type: z.literal('GET_TRACKINGS'),

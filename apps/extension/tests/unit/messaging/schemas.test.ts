@@ -638,6 +638,64 @@ describe('validateMessage — TRACKING_UPDATED', () => {
 });
 
 // ============================================================================
+// RESTORE_TRACKING — undo de suivi
+// ============================================================================
+
+describe('validateMessage — RESTORE_TRACKING', () => {
+  it('accepte un snapshot précédent', () => {
+    const r = validateMessage({
+      type: 'RESTORE_TRACKING',
+      payload: {
+        missionId: 'm1',
+        tracking: {
+          missionId: 'm1',
+          currentStatus: 'selected',
+          history: [
+            { from: null, to: 'detected', timestamp: 1779436800000, note: null },
+            { from: 'detected', to: 'selected', timestamp: 1779436900000, note: null },
+          ],
+          generatedAssetIds: [],
+          userRating: null,
+          notes: '',
+          nextActionAt: null,
+        },
+      },
+    });
+
+    expect(r.valid).toBe(true);
+  });
+
+  it('accepte une restauration vers mission non suivie', () => {
+    const r = validateMessage({
+      type: 'RESTORE_TRACKING',
+      payload: { missionId: 'm1', tracking: null },
+    });
+
+    expect(r.valid).toBe(true);
+  });
+
+  it('rejette un snapshot sans historique canonique', () => {
+    const r = validateMessage({
+      type: 'RESTORE_TRACKING',
+      payload: {
+        missionId: 'm1',
+        tracking: {
+          missionId: 'm1',
+          currentStatus: 'selected',
+          history: [],
+          generatedAssetIds: [],
+          userRating: null,
+          notes: '',
+          nextActionAt: null,
+        },
+      },
+    });
+
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
 // TJM analysis
 // ============================================================================
 

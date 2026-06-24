@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
+import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 const getSettings = vi.fn();
@@ -26,6 +27,7 @@ const getHidden = vi.fn();
 const saveHidden = vi.fn();
 const getTracking = vi.fn();
 const saveTracking = vi.fn();
+const deleteTracking = vi.fn();
 const getAllTrackings = vi.fn();
 const getGeneratedAssetsForMission = vi.fn();
 const getAllHealthSnapshots = vi.fn();
@@ -87,6 +89,20 @@ const profile: UserProfile = {
   jobTitle: 'Lead Frontend',
   searchKeywords: ['mission svelte'],
 };
+
+const makeTracking = (overrides: Partial<MissionTracking> = {}): MissionTracking => ({
+  missionId: 'mission-1',
+  currentStatus: 'selected',
+  history: [
+    { from: null, to: 'detected', timestamp: 1779436800000, note: null },
+    { from: 'detected', to: 'selected', timestamp: 1779436900000, note: null },
+  ],
+  generatedAssetIds: [],
+  userRating: null,
+  notes: '',
+  nextActionAt: null,
+  ...overrides,
+});
 
 vi.stubGlobal('chrome', {
   sidePanel: {
@@ -212,6 +228,7 @@ vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
 vi.mock('../../../src/lib/shell/storage/tracking', () => ({
   getTracking,
   saveTracking,
+  deleteTracking,
   getAllTrackings,
   getTrackingsByStatus: vi.fn(async () => []),
 }));
@@ -330,6 +347,7 @@ describe('background auto-scan notifications', () => {
     saveProfile.mockResolvedValue(undefined);
     getTracking.mockResolvedValue(null);
     saveTracking.mockResolvedValue(undefined);
+    deleteTracking.mockResolvedValue(undefined);
     getAllTrackings.mockResolvedValue([]);
     getGeneratedAssetsForMission.mockResolvedValue([]);
     getAllHealthSnapshots.mockResolvedValue(new Map());
@@ -610,6 +628,46 @@ describe('background auto-scan notifications', () => {
           topStacks: [expect.objectContaining({ stack: 'svelte' })],
         }),
       },
+    });
+  });
+
+  it('restores tracking snapshots through the service worker shell', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const restoreResponse = vi.fn();
+    const clearResponse = vi.fn();
+    const previousTracking = makeTracking();
+
+    expect(
+      messageListener?.(
+        {
+          type: 'RESTORE_TRACKING',
+          payload: { missionId: 'mission-1', tracking: previousTracking },
+        },
+        {},
+        restoreResponse
+      )
+    ).toBe(true);
+    expect(
+      messageListener?.(
+        {
+          type: 'RESTORE_TRACKING',
+          payload: { missionId: 'mission-2', tracking: null },
+        },
+        {},
+        clearResponse
+      )
+    ).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(saveTracking).toHaveBeenCalledWith(previousTracking);
+    expect(deleteTracking).toHaveBeenCalledWith('mission-2');
+    expect(restoreResponse).toHaveBeenCalledWith({
+      type: 'TRACKING_RESTORED',
+      payload: previousTracking,
+    });
+    expect(clearResponse).toHaveBeenCalledWith({
+      type: 'TRACKING_RESTORED',
+      payload: null,
     });
   });
 
