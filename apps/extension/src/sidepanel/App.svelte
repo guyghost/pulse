@@ -18,7 +18,7 @@
   import type { ToastType } from '$lib/state/toast.svelte.ts';
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
-  import { createAppNavigation, NAV_ITEMS } from '$lib/state/app-navigation.svelte';
+  import { createAppNavigation, NAV_ITEMS, type Page } from '$lib/state/app-navigation.svelte';
   import { createThemeStore } from '$lib/state/theme.svelte';
   import { premium } from '$lib/state/premium.svelte';
 
@@ -30,12 +30,53 @@
     premium.load();
   });
 
-  // Premium pages hidden for non-premium users
-  const PREMIUM_PAGES = new Set(['profile', 'tjm', 'cv', 'applications']);
-  const visibleNavItems = $derived(
-    NAV_ITEMS.filter((item) => !PREMIUM_PAGES.has(item.page) || premium.isPremium)
-  );
+  type PremiumLockContent = {
+    title: string;
+    description: string;
+    proofLabel: string;
+    proofValue: string;
+  };
+
+  const PREMIUM_LOCKS: Partial<Record<Page, PremiumLockContent>> = {
+    profile: {
+      title: 'Profil premium verrouillé',
+      description:
+        'Le feed reste utilisable avec le radar local. Le profil premium débloque la calibration fine du scoring et des alertes.',
+      proofLabel: 'Surface',
+      proofValue: 'Profil',
+    },
+    cv: {
+      title: 'CV canonique premium verrouillé',
+      description:
+        'Cette vue prépare un profil candidat cohérent pour LinkedIn, dashboard et plateformes. Vos sessions restent dans Chrome.',
+      proofLabel: 'Surface',
+      proofValue: 'CV',
+    },
+    applications: {
+      title: 'Suivi candidatures premium verrouillé',
+      description:
+        'Le pipeline transforme les missions retenues en relances, statuts et prochaines actions. Le feed reste disponible pour qualifier les missions.',
+      proofLabel: 'Surface',
+      proofValue: 'Suivi',
+    },
+    tjm: {
+      title: 'Radar TJM premium verrouillé',
+      description:
+        'Le radar tarifaire consolide les missions scannées pour estimer une fourchette de négociation exploitable.',
+      proofLabel: 'Surface',
+      proofValue: 'TJM',
+    },
+  };
+
+  const visibleNavItems = NAV_ITEMS;
   const denseNav = $derived(visibleNavItems.length > 4);
+  const lockedPremiumPage = $derived(
+    premium.isPremium ? null : (PREMIUM_LOCKS[nav.currentPage] ?? null)
+  );
+
+  function isPremiumLocked(page: Page): boolean {
+    return !premium.isPremium && page in PREMIUM_LOCKS;
+  }
 
   // Initialize theme on mount
   theme.init();
@@ -151,60 +192,75 @@
       </div>
     {/if}
 
-    <div class="px-4 pt-4 transition-all duration-200 ease-out">
-      <nav
-        aria-label="Main navigation"
-        class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-200 ease-out {feedNavCompact
-          ? 'min-h-11 gap-0.5 p-0.5'
-          : denseNav
+    {#if nav.currentPage !== 'onboarding'}
+      <div class="px-4 pt-4 transition-all duration-200 ease-out">
+        <nav
+          aria-label="Main navigation"
+          class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-200 ease-out {feedNavCompact
             ? 'min-h-11 gap-0.5 p-0.5'
-            : 'min-h-12 gap-1 p-1'}"
-      >
-        {#each visibleNavItems as item}
-          <button
-            use:ripple
-            class="flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
+            : denseNav
+              ? 'min-h-11 gap-0.5 p-0.5'
+              : 'min-h-12 gap-1 p-1'}"
+        >
+          {#each visibleNavItems as item}
+            {@const itemLocked = isPremiumLocked(item.page)}
+            <button
+              use:ripple
+              class="relative flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
           {feedNavCompact
-              ? nav.currentPage === item.page
-                ? 'flex-1 gap-1.5 px-3 py-1.5'
-                : 'basis-9 flex-none gap-0 px-0 py-1.5'
-              : denseNav
                 ? nav.currentPage === item.page
-                  ? 'flex-1 gap-1.5 px-3 py-2'
-                  : 'basis-10 flex-none gap-0 px-0 py-2'
-                : 'flex-1 basis-0 gap-2 px-3 py-3'}
+                  ? 'flex-1 gap-1.5 px-3 py-1.5'
+                  : 'basis-9 flex-none gap-0 px-0 py-1.5'
+                : denseNav
+                  ? nav.currentPage === item.page
+                    ? 'flex-1 gap-1.5 px-3 py-2'
+                    : 'basis-10 flex-none gap-0 px-0 py-2'
+                  : 'flex-1 basis-0 gap-2 px-3 py-3'}
           {nav.currentPage === item.page
-              ? 'bg-surface-white text-text-primary shadow-subtle-2'
-              : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
-            aria-current={nav.currentPage === item.page ? 'page' : undefined}
-            aria-label={item.ariaLabel ?? item.label}
-            title={item.label}
-            onclick={() => nav.navigate(item.page)}
-          >
-            <span class="shrink-0 transition-transform duration-200 ease-out">
-              <Icon name={item.icon} size={feedNavCompact || denseNav ? 13 : 16} />
-            </span>
-            <span
-              class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out {(feedNavCompact &&
-                nav.currentPage !== item.page) ||
-              (denseNav && nav.currentPage !== item.page)
-                ? 'max-w-0 opacity-0 -translate-x-1'
-                : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
+                ? 'bg-surface-white text-text-primary shadow-subtle-2'
+                : itemLocked
+                  ? 'text-text-muted hover:bg-surface-white hover:text-text-primary'
+                  : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
+              aria-current={nav.currentPage === item.page ? 'page' : undefined}
+              aria-label={itemLocked
+                ? `${item.label} premium verrouillé`
+                : (item.ariaLabel ?? item.label)}
+              title={itemLocked ? `${item.label} premium verrouillé` : item.label}
+              onclick={() => nav.navigate(item.page)}
             >
-          </button>
-        {/each}
-      </nav>
+              <span class="shrink-0 transition-transform duration-200 ease-out">
+                <Icon name={item.icon} size={feedNavCompact || denseNav ? 13 : 16} />
+              </span>
+              <span
+                class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out {(feedNavCompact &&
+                  nav.currentPage !== item.page) ||
+                (denseNav && nav.currentPage !== item.page)
+                  ? 'max-w-0 opacity-0 -translate-x-1'
+                  : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
+              >
+              {#if itemLocked}
+                <span
+                  class="absolute right-1 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-surface-white text-text-muted ring-1 ring-border-light"
+                  aria-hidden="true"
+                >
+                  <Icon name="lock" size={8} />
+                </span>
+              {/if}
+            </button>
+          {/each}
+        </nav>
 
-      <div
-        class="grid transition-[opacity,margin] duration-200 ease-out {feedNavCompact
-          ? 'mt-2 opacity-0 pointer-events-none'
-          : 'mt-3 opacity-100'}"
-      >
-        <div class="min-h-0 overflow-hidden flex justify-end">
-          <ConnectionIndicator />
+        <div
+          class="grid transition-[opacity,margin] duration-200 ease-out {feedNavCompact
+            ? 'mt-2 opacity-0 pointer-events-none'
+            : 'mt-3 opacity-100'}"
+        >
+          <div class="min-h-0 overflow-hidden flex justify-end">
+            <ConnectionIndicator />
+          </div>
         </div>
       </div>
-    </div>
+    {/if}
     <main class="relative flex-1 overflow-hidden">
       <div
         class="absolute inset-0 overflow-hidden"
@@ -268,6 +324,28 @@
           </svelte:boundary>
         </div>
       {/if}
+      {#if lockedPremiumPage}
+        <div
+          class="absolute inset-0 overflow-y-auto"
+          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
+          out:fade={{ duration: 100 }}
+        >
+          <div class="p-4">
+            <OperationalEmptyState
+              title={lockedPremiumPage.title}
+              description={lockedPremiumPage.description}
+              severity="attention"
+              statusLabel="Premium verrouillé"
+              icon="lock"
+              proofLabel={lockedPremiumPage.proofLabel}
+              proofValue={lockedPremiumPage.proofValue}
+              primaryActionLabel="Voir les réglages"
+              primaryActionIcon="settings"
+              onPrimaryAction={() => nav.navigate('settings')}
+            />
+          </div>
+        </div>
+      {/if}
       {#if nav.currentPage === 'tjm' && premium.isPremium}
         <div
           class="absolute inset-0 overflow-y-auto"
@@ -279,7 +357,10 @@
               if (import.meta.env.DEV) console.error('[TJMPage crash]', e);
             }}
           >
-            <TJMPage />
+            <TJMPage
+              onNavigateToProfile={() => nav.navigate('profile')}
+              onNavigateToFeed={() => nav.navigate('feed')}
+            />
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState

@@ -98,6 +98,47 @@ describe('tracking store', () => {
     expect(trackingStorageMock.saveTracking).not.toHaveBeenCalled();
   });
 
+  it('restores a previous tracking snapshot through the service worker bridge', async () => {
+    const previous = makeTracking({ currentStatus: 'selected' });
+    bridgeMock.sendMessage.mockResolvedValue({
+      type: 'TRACKING_RESTORED',
+      payload: previous,
+    });
+    const store = createTrackingStore();
+
+    await store.restoreTracking('mission-1', previous);
+
+    expect(bridgeMock.sendMessage).toHaveBeenCalledWith({
+      type: 'RESTORE_TRACKING',
+      payload: { missionId: 'mission-1', tracking: previous },
+    });
+    expect(store.getTrackingForMission('mission-1')).toEqual(previous);
+    expect(trackingStorageMock.saveTracking).not.toHaveBeenCalled();
+  });
+
+  it('removes local tracking state when undo restores an untracked mission', async () => {
+    bridgeMock.sendMessage
+      .mockResolvedValueOnce({
+        type: 'TRACKINGS_RESULT',
+        payload: [makeTracking()],
+      })
+      .mockResolvedValueOnce({
+        type: 'TRACKING_RESTORED',
+        payload: null,
+      });
+    const store = createTrackingStore();
+
+    await store.loadTrackings();
+    await store.restoreTracking('mission-1', null);
+
+    expect(bridgeMock.sendMessage).toHaveBeenLastCalledWith({
+      type: 'RESTORE_TRACKING',
+      payload: { missionId: 'mission-1', tracking: null },
+    });
+    expect(store.getTrackingForMission('mission-1')).toBeUndefined();
+    expect(trackingStorageMock.saveTracking).not.toHaveBeenCalled();
+  });
+
   it('surfaces bridge failures without falling back to IndexedDB', async () => {
     bridgeMock.sendMessage.mockRejectedValue(new Error('bridge unavailable'));
     const store = createTrackingStore();

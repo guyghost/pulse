@@ -9,6 +9,7 @@
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
 import type { SeniorityLevel, UserProfile } from '$lib/core/types/profile';
 import type {
+  FeedDecisionPresetId,
   FeedScoreBucket,
   FeedSortBy,
   FeedViewFilters,
@@ -51,6 +52,7 @@ import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
+export type DecisionPresetId = FeedDecisionPresetId;
 
 export interface ScoreBucketSummary {
   bucket: ScoreBucket;
@@ -72,6 +74,14 @@ export interface FeedInsightSummary {
   weakTjmCount: number;
   remoteMatchCount: number;
   semanticAnalyzedCount: number;
+}
+
+export interface FeedDecisionPreset {
+  id: DecisionPresetId;
+  label: string;
+  description: string;
+  count: number;
+  active: boolean;
 }
 
 function getMissionScore(mission: Mission): number {
@@ -107,6 +117,24 @@ export function needsTjmNegotiation(mission: Pick<Mission, 'tjm'>, profileTjmMin
 
 export function isRemoteCompatibleInsight(mission: Pick<Mission, 'remote'>): boolean {
   return mission.remote === 'full' || mission.remote === 'hybrid';
+}
+
+function matchesDecisionPreset(
+  mission: Mission,
+  preset: DecisionPresetId,
+  seenSet: Set<string>,
+  profileTjmMin: number | null
+): boolean {
+  if (preset === 'priority') {
+    return getMissionScore(mission) >= 80;
+  }
+  if (preset === 'remote-compatible') {
+    return isRemoteCompatibleInsight(mission);
+  }
+  if (preset === 'tjm-negotiation') {
+    return needsTjmNegotiation(mission, profileTjmMin);
+  }
+  return !seenSet.has(mission.id);
 }
 
 /**
@@ -147,6 +175,7 @@ export function createFeedPageState(
   let selectedRemote = $state<RemoteType | null>(null);
   let selectedSeniority = $state<SeniorityLevel | null>(null);
   let selectedScoreBucket = $state<ScoreBucket | null>(null);
+  let decisionPreset = $state<DecisionPresetId | null>(null);
   let showNewOnly = $state(false);
   let firstName = $state('');
   let profileTjmMin = $state<number | null>(null);
@@ -192,6 +221,7 @@ export function createFeedPageState(
       selectedStacks.length > 0 ||
       selectedSeniority !== null ||
       selectedScoreBucket !== null ||
+      decisionPreset !== null ||
       showNewOnly
   );
 
@@ -237,6 +267,10 @@ export function createFeedPageState(
     }
     if (showNewOnly) {
       result = result.filter((m) => !seenSet.has(m.id));
+    }
+    if (decisionPreset !== null) {
+      const activePreset = decisionPreset;
+      result = result.filter((m) => matchesDecisionPreset(m, activePreset, seenSet, profileTjmMin));
     }
 
     return result;
@@ -287,6 +321,37 @@ export function createFeedPageState(
       count: counts.get(bucket.bucket) ?? 0,
     }));
   });
+
+  const decisionPresets = $derived.by<FeedDecisionPreset[]>(() => [
+    {
+      id: 'priority',
+      label: 'Prioritaires',
+      description: 'Score 80+',
+      count: dashboardScopeMissions.filter((m) => getMissionScore(m) >= 80).length,
+      active: decisionPreset === 'priority',
+    },
+    {
+      id: 'remote-compatible',
+      label: 'Remote compatible',
+      description: 'Full remote ou hybride',
+      count: dashboardScopeMissions.filter(isRemoteCompatibleInsight).length,
+      active: decisionPreset === 'remote-compatible',
+    },
+    {
+      id: 'tjm-negotiation',
+      label: 'TJM à négocier',
+      description: 'Sous le TJM cible',
+      count: dashboardScopeMissions.filter((m) => needsTjmNegotiation(m, profileTjmMin)).length,
+      active: decisionPreset === 'tjm-negotiation',
+    },
+    {
+      id: 'new',
+      label: 'Nouvelles seulement',
+      description: 'Jamais vues',
+      count: dashboardScopeMissions.filter((m) => !seenSet.has(m.id)).length,
+      active: decisionPreset === 'new',
+    },
+  ]);
 
   const dashboardSummary = $derived.by(
     (): FeedDashboardSummary => ({
@@ -366,7 +431,7 @@ export function createFeedPageState(
     const updated = toggleFavorite(favorites, id, Date.now());
     favorites = updated;
     saveFavorites(favorites).catch(() => {});
-    showToastAction(wasFavorite ? 'Favori retire' : 'Mission ajoutee aux favoris', 'success', {
+    showToastAction(wasFavorite ? 'Favori retiré' : 'Mission ajoutée aux favoris', 'success', {
       label: 'Annuler',
       onClick: () => {
         favorites = previous;
@@ -380,7 +445,7 @@ export function createFeedPageState(
     const wasHidden = id in hidden;
     hidden = toggleHidden(hidden, id, Date.now());
     saveHidden(hidden).catch(() => {});
-    showToastAction(wasHidden ? 'Mission restauree' : 'Mission masquee', 'info', {
+    showToastAction(wasHidden ? 'Mission restaurée' : 'Mission masquée', 'info', {
       label: 'Annuler',
       onClick: () => {
         hidden = previous;
@@ -456,9 +521,27 @@ export function createFeedPageState(
     selectedScoreBucket = bucket;
   }
 
+  function applyDecisionPreset(preset: DecisionPresetId): void {
+    activeSavedViewId = null;
+    decisionPreset = decisionPreset === preset ? null : preset;
+
+    if (preset === 'priority') {
+      selectedScoreBucket = null;
+    }
+    if (preset === 'remote-compatible') {
+      selectedRemote = null;
+    }
+    if (preset === 'new') {
+      showNewOnly = false;
+    }
+  }
+
   function toggleNewOnly(): void {
     activeSavedViewId = null;
     showNewOnly = !showNewOnly;
+    if (showNewOnly && decisionPreset === 'new') {
+      decisionPreset = null;
+    }
   }
 
   function clearAllFilters(): void {
@@ -468,6 +551,7 @@ export function createFeedPageState(
     selectedRemote = null;
     selectedSeniority = null;
     selectedScoreBucket = null;
+    decisionPreset = null;
     showNewOnly = false;
   }
 
@@ -479,6 +563,7 @@ export function createFeedPageState(
       selectedRemote,
       selectedSeniority,
       selectedScoreBucket,
+      decisionPreset,
       showNewOnly,
       showFavoritesOnly,
       showHidden,
@@ -489,6 +574,18 @@ export function createFeedPageState(
   function defaultSavedViewName(filters: FeedViewFilters): string {
     if (filters.selectedScoreBucket === 'strong') {
       return 'Prioritaires';
+    }
+    if (filters.decisionPreset === 'priority') {
+      return 'Prioritaires';
+    }
+    if (filters.decisionPreset === 'remote-compatible') {
+      return 'Remote compatible';
+    }
+    if (filters.decisionPreset === 'tjm-negotiation') {
+      return 'TJM à négocier';
+    }
+    if (filters.decisionPreset === 'new') {
+      return 'Nouvelles missions';
     }
     if (filters.showNewOnly) {
       return 'Nouvelles missions';
@@ -542,6 +639,7 @@ export function createFeedPageState(
     selectedRemote = filters.selectedRemote;
     selectedSeniority = filters.selectedSeniority;
     selectedScoreBucket = filters.selectedScoreBucket;
+    decisionPreset = filters.decisionPreset ?? null;
     showNewOnly = filters.showNewOnly;
     showFavoritesOnly = filters.showFavoritesOnly;
     showHidden = filters.showHidden;
@@ -556,11 +654,26 @@ export function createFeedPageState(
   }
 
   async function deleteSavedView(viewId: string): Promise<void> {
+    const deletedView = savedViews.find((item) => item.id === viewId);
+    if (!deletedView) {
+      return;
+    }
+
+    const previousViews = [...savedViews];
+    const previousActiveSavedViewId = activeSavedViewId;
     const nextViews = savedViews.filter((item) => item.id !== viewId);
     await persistSavedViews(nextViews);
     if (activeSavedViewId === viewId) {
       activeSavedViewId = null;
     }
+    showToastAction(`Vue "${deletedView.name}" supprimée`, 'info', {
+      label: 'Annuler',
+      onClick: () => {
+        savedViews = previousViews;
+        activeSavedViewId = previousActiveSavedViewId;
+        setFeedSavedViews(previousViews).catch(() => {});
+      },
+    });
   }
 
   function toggleCompare(missionId: string): void {
@@ -830,6 +943,9 @@ export function createFeedPageState(
     get selectedScoreBucket() {
       return selectedScoreBucket;
     },
+    get decisionPreset() {
+      return decisionPreset;
+    },
     get showNewOnly() {
       return showNewOnly;
     },
@@ -925,6 +1041,9 @@ export function createFeedPageState(
     get scoreDistribution() {
       return scoreDistribution;
     },
+    get decisionPresets() {
+      return decisionPresets;
+    },
     get dashboardSummary() {
       return dashboardSummary;
     },
@@ -963,6 +1082,7 @@ export function createFeedPageState(
     setSelectedRemote,
     setSelectedSeniority,
     setSelectedScoreBucket,
+    applyDecisionPreset,
     toggleNewOnly,
     saveCurrentView,
     applySavedView,

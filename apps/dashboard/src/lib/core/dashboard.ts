@@ -102,6 +102,31 @@ export interface MissionComparisonSnapshot {
   averageDailyRate: number | null;
 }
 
+export type DashboardSuccessMilestoneId =
+  | 'qualified_mission'
+  | 'follow_up_handled'
+  | 'cv_ready'
+  | 'export_ready';
+
+export type DashboardSuccessMilestoneState = 'complete' | 'ready' | 'pending';
+
+export interface DashboardSuccessMilestone {
+  id: DashboardSuccessMilestoneId;
+  title: string;
+  result: string;
+  detail: string;
+  signal: string;
+  state: DashboardSuccessMilestoneState;
+}
+
+export interface DashboardSuccessMilestoneInput {
+  missionFeed: MissionFeedItem[];
+  applications: MissionApplication[];
+  applicationTimeline: ApplicationTimelineEvent[];
+  cv: CvSnapshot;
+  exportAvailable: boolean;
+}
+
 export interface DashboardAlertPreferencesRow {
   enabled: boolean;
   score_threshold: number;
@@ -2233,6 +2258,149 @@ const COMPARISON_STAGE_PRIORITY: Record<ApplicationStage, number> = {
   rejected: 0,
   archived: 0,
 };
+
+const QUALIFIED_MISSION_SCORE = 85;
+const FOLLOW_UP_HANDLED_STAGES = new Set<ApplicationStage>([
+  'applied',
+  'interview',
+  'offer',
+  'accepted',
+]);
+
+export function buildDashboardSuccessMilestones(
+  input: DashboardSuccessMilestoneInput
+): DashboardSuccessMilestone[] {
+  const qualifiedMission = getBestQualifiedMission(input.missionFeed, input.applications);
+  const handledFollowUp = getLatestHandledFollowUp(input.applicationTimeline, input.applications);
+  const cvReady = input.cv.id !== 'empty-cv' && input.cv.completeness >= 80;
+  const exportReady =
+    input.exportAvailable &&
+    (input.missionFeed.length > 0 || input.applications.length > 0 || input.cv.id !== 'empty-cv');
+
+  return [
+    qualifiedMission
+      ? {
+          id: 'qualified_mission',
+          title: 'Mission qualifiée',
+          result: 'Match validé',
+          detail: `${qualifiedMission.title} atteint ${qualifiedMission.score}%.`,
+          signal: `${qualifiedMission.score}%`,
+          state: 'complete',
+        }
+      : {
+          id: 'qualified_mission',
+          title: 'Mission qualifiée',
+          result: 'À qualifier',
+          detail: 'Une mission à 85% ou plus fera apparaître le premier signal fort.',
+          signal: 'Score >=85',
+          state: 'pending',
+        },
+    handledFollowUp
+      ? {
+          id: 'follow_up_handled',
+          title: 'Relance traitée',
+          result: 'Pipeline avancé',
+          detail: handledFollowUp.detail,
+          signal: handledFollowUp.signal,
+          state: 'complete',
+        }
+      : {
+          id: 'follow_up_handled',
+          title: 'Relance traitée',
+          result: 'À traiter',
+          detail: 'Traiter une relance ou avancer une candidature débloque ce jalon.',
+          signal: 'Pipeline',
+          state: 'pending',
+        },
+    cvReady
+      ? {
+          id: 'cv_ready',
+          title: 'CV prêt',
+          result: 'Profil exploitable',
+          detail: `${input.cv.title || 'CV canonique'} est complet à ${input.cv.completeness}%.`,
+          signal: `${input.cv.completeness}%`,
+          state: 'complete',
+        }
+      : {
+          id: 'cv_ready',
+          title: 'CV prêt',
+          result: 'À compléter',
+          detail: 'Atteindre 80% de complétude débloque un CV prêt à synchroniser.',
+          signal: `${input.cv.completeness}%`,
+          state: 'pending',
+        },
+    exportReady
+      ? {
+          id: 'export_ready',
+          title: 'Export prêt',
+          result: 'Partage possible',
+          detail: 'Un export local peut être téléchargé avant partage ou suppression.',
+          signal: 'Disponible',
+          state: 'ready',
+        }
+      : {
+          id: 'export_ready',
+          title: 'Export prêt',
+          result: 'En attente',
+          detail: 'Connecter le compte et synchroniser des données rendra l’export utile.',
+          signal: 'À débloquer',
+          state: 'pending',
+        },
+  ];
+}
+
+function getBestQualifiedMission(
+  missionFeed: MissionFeedItem[],
+  applications: MissionApplication[]
+): { title: string; score: number } | null {
+  const feedCandidates = missionFeed
+    .filter((mission) => mission.score >= QUALIFIED_MISSION_SCORE)
+    .map((mission) => ({ title: mission.title, score: mission.score }));
+  const applicationCandidates = applications
+    .filter((application) => application.score >= QUALIFIED_MISSION_SCORE)
+    .map((application) => ({ title: application.title, score: application.score }));
+  const candidates = [...feedCandidates, ...applicationCandidates].sort(
+    (left, right) => right.score - left.score || left.title.localeCompare(right.title)
+  );
+
+  return candidates[0] ?? null;
+}
+
+function getLatestHandledFollowUp(
+  timeline: ApplicationTimelineEvent[],
+  applications: MissionApplication[]
+): { detail: string; signal: string } | null {
+  const applicationsById = new Map(
+    applications.map((application) => [application.id, application])
+  );
+  const latestHandledEvent = [...timeline]
+    .filter((event) => FOLLOW_UP_HANDLED_STAGES.has(event.toStage))
+    .sort((left, right) => right.occurredAt.localeCompare(left.occurredAt))[0];
+
+  if (latestHandledEvent) {
+    const application = applicationsById.get(latestHandledEvent.applicationId);
+
+    return {
+      detail: `${latestHandledEvent.toLabel} enregistré pour ${
+        application?.title ?? 'une candidature'
+      }.`,
+      signal: latestHandledEvent.createdByLabel,
+    };
+  }
+
+  const advancedApplication = [...applications]
+    .filter((application) => FOLLOW_UP_HANDLED_STAGES.has(application.stage))
+    .sort((left, right) => right.score - left.score || left.title.localeCompare(right.title))[0];
+
+  if (!advancedApplication) {
+    return null;
+  }
+
+  return {
+    detail: `${advancedApplication.title} a dépassé l’étape sélection.`,
+    signal: APPLICATION_STAGE_LABELS[advancedApplication.stage],
+  };
+}
 
 export function buildMissionComparisonSnapshot(
   applications: MissionApplication[],

@@ -67,7 +67,7 @@
     <div class="min-w-0 flex-1">
       <div class="flex flex-wrap items-center gap-2">
         <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
-          Decision
+          Décision
         </p>
         {#if statusLabel}
           <OperationalStatusBadge label={statusLabel} {severity} />

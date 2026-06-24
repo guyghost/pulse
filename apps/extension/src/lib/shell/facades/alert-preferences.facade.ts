@@ -3,6 +3,7 @@ import {
   normalizeConnectedAlertPreferences,
   type ConnectedAlertPreferences,
 } from '$lib/core/types/alert-preferences';
+import type { AlertHistoryEntry } from '$lib/core/types/alert-history';
 import { sendMessage } from '$lib/shell/messaging/bridge';
 
 export async function getAlertPreferences(): Promise<ConnectedAlertPreferences> {
@@ -33,4 +34,13 @@ export async function saveAlertPreferences(
   }
 
   return normalized;
+}
+
+export async function getAlertHistory(): Promise<AlertHistoryEntry[]> {
+  const response = await sendMessage({ type: 'GET_ALERT_HISTORY' });
+  if (response.type !== 'ALERT_HISTORY_RESULT') {
+    return [];
+  }
+
+  return response.payload;
 }

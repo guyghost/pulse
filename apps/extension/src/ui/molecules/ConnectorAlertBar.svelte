@@ -79,7 +79,7 @@
                     <p>
                       <span class="font-medium text-text-secondary">Action:</span>
                       {connector.isEnabled
-                        ? 'relancer un diagnostic puis reconnecter la plateforme si l erreur persiste.'
+                        ? "relancer un diagnostic puis reconnecter la plateforme si l'erreur persiste."
                         : 'réactiver seulement si cette source est utile à votre recherche actuelle.'}
                     </p>
                   </div>

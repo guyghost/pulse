@@ -25,6 +25,9 @@ const feedDataMock = vi.hoisted(() => ({
   setFeedSavedViews: vi.fn(),
   syncFavoriteMission: vi.fn(),
 }));
+const toastMock = vi.hoisted(() => ({
+  showToastAction: vi.fn(),
+}));
 
 vi.mock('../../../src/lib/shell/facades/feed-data.facade', async () => {
   const favorites = await vi.importActual<
@@ -63,6 +66,8 @@ vi.mock('../../../src/lib/shell/utils/keyboard-shortcuts', () => ({
   },
   registerShortcuts: vi.fn(() => vi.fn()),
 }));
+
+vi.mock('../../../src/lib/shell/notifications/toast-service', () => toastMock);
 
 vi.mock('../../../src/lib/state/connection-singleton.svelte', () => ({
   getConnectionStore: vi.fn(() => ({ status: 'online' })),
@@ -231,6 +236,53 @@ describe('feed page state', () => {
     expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-1', 'new-2']);
   });
 
+  it('applies decision presets for business-oriented feed filtering', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([
+      makeMission({ id: 'priority-remote', score: 92, remote: 'full' }),
+      makeMission({ id: 'priority-onsite', score: 88, remote: 'onsite' }),
+      makeMission({ id: 'remote-good', score: 72, remote: 'hybrid' }),
+      makeMission({ id: 'weak-onsite', score: 41, remote: 'onsite' }),
+    ]);
+
+    expect(page.decisionPresets.map((preset) => [preset.id, preset.count])).toEqual([
+      ['priority', 2],
+      ['remote-compatible', 2],
+      ['tjm-negotiation', 0],
+      ['new', 4],
+    ]);
+
+    page.applyDecisionPreset('priority');
+
+    expect(page.decisionPreset).toBe('priority');
+    expect(page.visibleCount).toBe(2);
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+      'priority-remote',
+      'priority-onsite',
+    ]);
+
+    page.applyDecisionPreset('remote-compatible');
+
+    expect(page.decisionPreset).toBe('remote-compatible');
+    expect(page.visibleCount).toBe(2);
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+      'priority-remote',
+      'remote-good',
+    ]);
+
+    page.handleMissionSeen('priority-remote');
+    page.applyDecisionPreset('new');
+
+    expect(page.decisionPreset).toBe('new');
+    expect(page.visibleCount).toBe(3);
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+      'priority-onsite',
+      'remote-good',
+      'weak-onsite',
+    ]);
+  });
+
   it('saves, applies and deletes feed views', async () => {
     const feed = createFeedStore();
     const page = createFeedPageState(feed, makeController());
@@ -250,6 +302,7 @@ describe('feed page state', () => {
         filters: expect.objectContaining({
           selectedRemote: 'full',
           selectedScoreBucket: 'strong',
+          decisionPreset: null,
           sortBy: 'date',
         }),
       }),
@@ -273,6 +326,22 @@ describe('feed page state', () => {
 
     expect(page.savedViews).toEqual([]);
     expect(page.activeSavedViewId).toBeNull();
+
+    expect(toastMock.showToastAction).toHaveBeenCalledWith(
+      'Vue "Remote prioritaire" supprimée',
+      'info',
+      expect.objectContaining({ label: 'Annuler' })
+    );
+    const undoAction = toastMock.showToastAction.mock.calls.at(-1)?.[2].onClick;
+    expect(undoAction).toBeDefined();
+    undoAction?.();
+
+    expect(page.savedViews).toHaveLength(1);
+    expect(page.savedViews[0].id).toBe(savedId);
+    expect(page.activeSavedViewId).toBe(savedId);
+    expect(feedDataMock.setFeedSavedViews).toHaveBeenLastCalledWith([
+      expect.objectContaining({ id: savedId, name: 'Remote prioritaire' }),
+    ]);
   });
 
   it('summarizes score explanations for the current dashboard scope', () => {

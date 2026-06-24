@@ -35,11 +35,11 @@ export function browserSupportsPasskeys(): boolean {
 export function passkeyErrorMessage(error: unknown): string {
   if (error instanceof DOMException) {
     if (error.name === 'NotAllowedError') {
-      return 'La creation ou validation du passkey a ete annulee.';
+      return 'La création ou la validation du passkey a été annulée.';
     }
 
     if (error.name === 'SecurityError') {
-      return "Le passkey doit etre utilise depuis l'origine locale autorisee.";
+      return "Le passkey doit être utilisé depuis l'origine locale autorisée.";
     }
   }
 
@@ -47,12 +47,12 @@ export function passkeyErrorMessage(error: unknown): string {
     return error.message;
   }
 
-  return "L'operation passkey a echoue.";
+  return "L'opération passkey a échoué.";
 }
 
 function asObject(value: unknown, label: string): JsonObject {
   if (!value || typeof value !== 'object' || Array.isArray(value)) {
-    throw new Error(`Reponse passkey invalide: ${label}`);
+    throw new Error(`Réponse passkey invalide: ${label}`);
   }
 
   return value as JsonObject;
@@ -62,7 +62,7 @@ function stringField(source: JsonObject, field: string): string {
   const value = source[field];
 
   if (typeof value !== 'string') {
-    throw new Error(`Reponse passkey invalide: ${field}`);
+    throw new Error(`Réponse passkey invalide: ${field}`);
   }
 
   return value;
@@ -76,7 +76,7 @@ function optionalStringField(source: JsonObject, field: string): string | undefi
   }
 
   if (typeof value !== 'string') {
-    throw new Error(`Reponse passkey invalide: ${field}`);
+    throw new Error(`Réponse passkey invalide: ${field}`);
   }
 
   return value;
@@ -86,7 +86,7 @@ function arrayField<T>(source: JsonObject, field: string): T[] {
   const value = source[field];
 
   if (!Array.isArray(value)) {
-    throw new Error(`Reponse passkey invalide: ${field}`);
+    throw new Error(`Réponse passkey invalide: ${field}`);
   }
 
   return value as T[];
@@ -100,7 +100,7 @@ function optionalArrayField<T>(source: JsonObject, field: string): T[] | undefin
   }
 
   if (!Array.isArray(value)) {
-    throw new Error(`Reponse passkey invalide: ${field}`);
+    throw new Error(`Réponse passkey invalide: ${field}`);
   }
 
   return value as T[];
@@ -191,7 +191,7 @@ function parseRequestOptions(options: unknown): PublicKeyCredentialRequestOption
 
 function assertPublicKeyCredential(credential: Credential | null): CredentialWithToJson {
   if (!credential || !(credential instanceof PublicKeyCredential)) {
-    throw new Error('Le navigateur n’a pas retourne de passkey valide.');
+    throw new Error('Le navigateur n’a pas retourné de passkey valide.');
   }
 
   return credential as CredentialWithToJson;
@@ -271,7 +271,7 @@ async function supabaseAuthRequest<T>(
       optionalStringField(errorPayload, 'msg') ??
       optionalStringField(errorPayload, 'message') ??
       optionalStringField(errorPayload, 'error_description') ??
-      'La requete passkey a echoue.';
+      'La requête passkey a échoué.';
 
     throw new Error(message);
   }
@@ -353,7 +353,7 @@ export async function registerCurrentUserPasskey(): Promise<void> {
   }
 
   if (!userData.user || !sessionData.session) {
-    throw new Error('Session introuvable. Relancez la creation de compte.');
+    throw new Error('Session introuvable. Relancez la création de compte.');
   }
 
   const options = await supabaseAuthRequest<PasskeyOptionsResponse>(
@@ -396,7 +396,7 @@ export async function signInWithPasskey(): Promise<void> {
   const refreshToken = session.refresh_token ?? session.session?.refresh_token;
 
   if (!accessToken || !refreshToken) {
-    throw new Error("La session passkey n'a pas pu etre creee.");
+    throw new Error("La session passkey n'a pas pu être créée.");
   }
 
   const { error } = await supabase.auth.setSession({

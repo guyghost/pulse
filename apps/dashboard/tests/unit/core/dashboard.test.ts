@@ -6,6 +6,7 @@ import {
 import type { Mission } from '../../../../extension/src/lib/core/types/mission';
 import {
   buildDashboardAlertPreferencesPatch,
+  buildDashboardSuccessMilestones,
   buildMissionComparisonSnapshot,
   countApplicationsByStage,
   canonicalRowsToApplications,
@@ -45,7 +46,9 @@ import {
   type ApplicationSource,
   type CvSnapshot,
   type DashboardAccountEntitlements,
+  type ApplicationTimelineEvent,
   type MissionApplication,
+  type MissionFeedItem,
   type PlatformSyncStatus,
 } from '../../../src/lib/core/dashboard';
 
@@ -265,6 +268,72 @@ describe('dashboard core', () => {
       strengths: ['Score fort', 'Rating utilisateur élevé', 'Pipeline avancé'],
       risks: ['TJM absent', 'Relance non planifiée'],
     });
+  });
+
+  it('surfaces success milestones only when dashboard data proves user value', () => {
+    const missionFeed = [
+      {
+        id: 'mission-1',
+        title: 'Staff Svelte',
+        client: 'ScaleOps',
+        source: 'free-work',
+        stack: ['Svelte'],
+        score: 91,
+        deterministicScore: 88,
+        semanticScore: 94,
+        grade: 'A',
+        scoreCriteria,
+        semanticReason: 'Très fort match.',
+        dailyRate: 720,
+        location: 'Remote',
+        scrapedAt: '2026-05-22T08:00:00.000Z',
+        url: 'https://example.com/mission-1',
+        duplicateCount: 0,
+        applicationStage: null,
+        freshness: 'fresh',
+      },
+    ] satisfies MissionFeedItem[];
+    const timeline = [
+      {
+        id: 'event-1',
+        applicationId: 'app-001',
+        fromStage: 'applied',
+        fromLabel: 'Postulé',
+        toStage: 'interview',
+        toLabel: 'Entretien',
+        note: null,
+        occurredAt: '2026-05-22T09:00:00.000Z',
+        createdBy: 'dashboard',
+        createdByLabel: 'Dashboard',
+      },
+    ] satisfies ApplicationTimelineEvent[];
+
+    expect(
+      buildDashboardSuccessMilestones({
+        missionFeed,
+        applications,
+        applicationTimeline: timeline,
+        cv,
+        exportAvailable: true,
+      }).map((milestone) => [milestone.id, milestone.state, milestone.signal])
+    ).toEqual([
+      ['qualified_mission', 'complete', '92%'],
+      ['follow_up_handled', 'complete', 'Dashboard'],
+      ['cv_ready', 'complete', '84%'],
+      ['export_ready', 'ready', 'Disponible'],
+    ]);
+  });
+
+  it('keeps success milestones pending before qualification, follow-up, CV readiness and export', () => {
+    expect(
+      buildDashboardSuccessMilestones({
+        missionFeed: [],
+        applications: [],
+        applicationTimeline: [],
+        cv: { ...cv, id: 'empty-cv', completeness: 0, title: '' },
+        exportAvailable: false,
+      }).map((milestone) => milestone.state)
+    ).toEqual(['pending', 'pending', 'pending', 'pending']);
   });
 
   it('maps and validates connected dashboard alert preferences', () => {

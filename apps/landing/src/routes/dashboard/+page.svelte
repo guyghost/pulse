@@ -69,7 +69,7 @@
 
   function buyRecommendedPack() {
     if (!recommendedPack) {
-      checkoutError = 'Aucun pack de credits disponible pour le moment.';
+      checkoutError = 'Aucun pack de crédits disponible pour le moment.';
       return;
     }
     startCreditCheckout(recommendedPack.id);
@@ -80,14 +80,14 @@
       return {
         tone: 'attention',
         badge: 'Action utile',
-        title: "Le compte est actif, Premium n'est pas encore active",
+        title: "Le compte est actif, Premium n'est pas encore activé",
         impact:
-          "Le scan reste disponible gratuitement. Le suivi pipeline, le radar TJM et les generations restent limites.",
+          'Le scan reste disponible gratuitement. Le suivi pipeline, le radar TJM et les générations restent limités.',
         action:
-          "Prochaine action: installer l'extension, puis passer a Premium si vous voulez piloter les candidatures ici.",
-        evidence: ['Plan gratuit', `${credits} credits disponibles`, 'Extension a connecter'],
+          "Prochaine action: installer l'extension, puis passer à Premium si vous voulez piloter les candidatures ici.",
+        evidence: ['Plan gratuit', `${credits} crédits disponibles`, 'Extension à connecter'],
         primaryAction: 'premium',
-        primaryLabel: 'Passer a Premium',
+        primaryLabel: 'Passer à Premium',
       };
     }
 
@@ -95,11 +95,11 @@
       return {
         tone: 'incident',
         badge: 'Blocage',
-        title: 'Aucun credit disponible pour generer les prochaines actions',
+        title: 'Aucun crédit disponible pour générer les prochaines actions',
         impact:
-          'Les pitchs, messages recruteur et resumes CV seront bloques jusqu a la prochaine recharge.',
-        action: `Prochaine action: acheter le pack ${CREDIT_PACKS.pro.label} pour reprendre les generations.`,
-        evidence: ['Premium actif', '0 credit disponible', 'Generation bloquee'],
+          "Les pitchs, messages recruteur et résumés CV seront bloqués jusqu'à la prochaine recharge.",
+        action: `Prochaine action: acheter le pack ${CREDIT_PACKS.pro.label} pour reprendre les générations.`,
+        evidence: ['Premium actif', '0 crédit disponible', 'Génération bloquée'],
         primaryAction: 'credits',
         primaryLabel: 'Recharger maintenant',
       };
@@ -109,11 +109,11 @@
       return {
         tone: 'attention',
         badge: 'Risque proche',
-        title: 'Credits bas avant les prochaines candidatures',
+        title: 'Crédits bas avant les prochaines candidatures',
         impact:
-          'Votre solde peut suffire pour une action, mais pas pour traiter une serie de missions qualifiees.',
+          'Votre solde peut suffire pour une action, mais pas pour traiter une série de missions qualifiées.',
         action: `Prochaine action: ajouter le pack ${CREDIT_PACKS.pro.label} avant un scan complet.`,
-        evidence: ['Premium actif', `${credits} credits disponibles`, 'Risque de friction'],
+        evidence: ['Premium actif', `${credits} crédits disponibles`, 'Risque de friction'],
         primaryAction: 'credits',
         primaryLabel: 'Recharger',
       };
@@ -122,11 +122,11 @@
     return {
       tone: 'success',
       badge: 'Normal',
-      title: 'Compte pret pour les actions Premium',
+      title: 'Compte prêt pour les actions Premium',
       impact:
-        "Les credits et l'abonnement sont disponibles. Le travail utile se passe maintenant dans l'extension.",
-      action: 'Prochaine action: ouvrir l extension, scanner, qualifier puis synchroniser.',
-      evidence: ['Premium actif', `${credits} credits disponibles`, 'Pipeline exploitable'],
+        "Les crédits et l'abonnement sont disponibles. Le travail utile se passe maintenant dans l'extension.",
+      action: "Prochaine action: ouvrir l'extension, scanner, qualifier puis synchroniser.",
+      evidence: ['Premium actif', `${credits} crédits disponibles`, 'Pipeline exploitable'],
       primaryAction: 'extension',
       primaryLabel: "Ouvrir l'extension",
     };
@@ -187,7 +187,7 @@
         >
           <div class="ops-card__header">
             <div>
-              <p class="ops-card__eyebrow">Etat operationnel</p>
+              <p class="ops-card__eyebrow">État opérationnel</p>
               <h2>{accountDecision.title}</h2>
             </div>
             <span
@@ -204,11 +204,11 @@
             <p class="ops-card__description">{accountDecision.impact}</p>
           </div>
           <div class="ops-card__story">
-            <p class="ops-card__label">Action recommandee</p>
+            <p class="ops-card__label">Action recommandée</p>
             <p class="ops-card__next">{accountDecision.action}</p>
           </div>
 
-          <div class="ops-metrics" aria-label="Signaux operationnels du compte">
+          <div class="ops-metrics" aria-label="Signaux opérationnels du compte">
             {#each accountDecision.evidence as signal, index}
               <div>
                 <span>Signal {index + 1}</span>
@@ -235,7 +235,7 @@
                 onclick={buyRecommendedPack}
               >
                 {checkoutLoadingPack === recommendedPack.id
-                  ? 'Preparation...'
+                  ? 'Préparation...'
                   : accountDecision.primaryLabel}
               </button>
             {/if}
@@ -258,9 +258,9 @@
         <div class="section-heading">
           <div>
             <p class="section-heading__eyebrow">Investigation</p>
-            <h2>Credits et abonnement</h2>
+            <h2>Crédits et abonnement</h2>
           </div>
-          <span class="section-heading__hint">Details a ouvrir si vous devez acheter</span>
+          <span class="section-heading__hint">Détails à ouvrir si vous devez acheter</span>
         </div>
 
         <div class="subscription-card">
@@ -275,7 +275,7 @@
               </span>
               <div class="credit-balance">
                 <span>{creditBalance}</span>
-                <p>credits disponibles</p>
+                <p>crédits disponibles</p>
               </div>
             </div>
 
@@ -293,7 +293,7 @@
                   rel="noopener noreferrer"
                   class="btn btn--secondary btn--sm"
                 >
-                  Gerer via Lemon Squeezy
+                  Gérer via Lemon Squeezy
                 </a>
               </div>
             {:else}
@@ -327,23 +327,26 @@
 
         <details class="credit-drawer" open={!isPremium || creditBalance < 3}>
           <summary>
-            <span>Choisir un pack de credits</span>
+            <span>Choisir un pack de crédits</span>
             <small>Recommandation: {recommendedPack.label}</small>
           </summary>
 
-          <div class="credit-packs" aria-label="Packs de credits">
+          <div class="credit-packs" aria-label="Packs de crédits">
             {#each data.creditPacks as pack}
-              <article class="credit-pack" class:credit-pack--recommended={pack.id === recommendedPackId}>
+              <article
+                class="credit-pack"
+                class:credit-pack--recommended={pack.id === recommendedPackId}
+              >
                 <div>
                   <div class="credit-pack__topline">
                     <p class="credit-pack__label">{pack.label}</p>
                     {#if pack.id === recommendedPackId}
-                      <span>Recommande</span>
+                      <span>Recommandé</span>
                     {/if}
                   </div>
-                  <h3>{pack.credits} credits</h3>
+                  <h3>{pack.credits} crédits</h3>
                   <p class="credit-pack__unit">
-                    {formatPrice(Math.round(pack.priceCents / pack.credits))} / generation
+                    {formatPrice(Math.round(pack.priceCents / pack.credits))} / génération
                   </p>
                 </div>
                 <div class="credit-pack__footer">
@@ -352,10 +355,10 @@
                     type="button"
                     class="btn btn--primary btn--sm"
                     disabled={checkoutLoadingPack === pack.id}
-                    title={`Acheter ${pack.credits} credits ${pack.label}`}
+                    title={`Acheter ${pack.credits} crédits ${pack.label}`}
                     onclick={() => startCreditCheckout(pack.id)}
                   >
-                    {checkoutLoadingPack === pack.id ? 'Preparation...' : 'Acheter'}
+                    {checkoutLoadingPack === pack.id ? 'Préparation...' : 'Acheter'}
                   </button>
                 </div>
               </article>

@@ -131,7 +131,7 @@
             >
               <span class="block max-w-28 truncate">{view.name}</span>
             </button>
-            <Tooltip label={`Supprimer ${view.name}`} description="Retire cette vue sauvegardee.">
+            <Tooltip label={`Supprimer ${view.name}`} description="Retire cette vue sauvegardée.">
               <button
                 type="button"
                 class="inline-flex h-6 w-6 items-center justify-center text-text-muted transition-colors hover:text-status-red"

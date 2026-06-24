@@ -100,6 +100,58 @@ function escapeCSV(value: string | null | undefined): string {
   return str;
 }
 
+function formatMissionCount(count: number): string {
+  return `${count} mission${count > 1 ? 's' : ''}`;
+}
+
+function getMissionScore(mission: Mission): number | null {
+  return mission.scoreBreakdown?.total ?? mission.score;
+}
+
+function getMissionSignal(mission: Mission): string | null {
+  return mission.scoreBreakdown?.semanticReason ?? mission.semanticReason;
+}
+
+function formatTJMRange(missions: Mission[]): string {
+  const rates = missions
+    .map((mission) => mission.tjm)
+    .filter((rate): rate is number => typeof rate === 'number' && Number.isFinite(rate));
+
+  if (rates.length === 0) {
+    return 'Non renseigné';
+  }
+
+  const min = Math.min(...rates);
+  const max = Math.max(...rates);
+
+  return min === max ? `${min} EUR/jour` : `${min}-${max} EUR/jour`;
+}
+
+function summarizeStacks(missions: Mission[]): string {
+  const counts = new Map<string, number>();
+
+  for (const mission of missions) {
+    for (const stack of mission.stack) {
+      const clean = stack.trim();
+      if (clean) {
+        counts.set(clean, (counts.get(clean) ?? 0) + 1);
+      }
+    }
+  }
+
+  const stacks = [...counts.entries()]
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]))
+    .slice(0, 5)
+    .map(([stack]) => stack);
+
+  return stacks.length > 0 ? stacks.join(', ') : 'Non renseigné';
+}
+
+function summarizeSources(missions: Mission[]): string {
+  const sources = [...new Set(missions.map((mission) => mission.source))].sort();
+  return sources.length > 0 ? sources.join(', ') : 'Non renseigné';
+}
+
 /**
  * Exporte les missions en CSV
  * Pure function
@@ -162,13 +214,29 @@ export function exportMissionsToMarkdown(
 ): string {
   const includeDescription = options?.includeDescription ?? true;
   const dateFormat = options?.dateFormat ?? 'locale';
+  const title = options?.filterLabel ? options.filterLabel : 'Shortlist MissionPulse';
+  const scores = missions
+    .map((mission) => getMissionScore(mission))
+    .filter((score): score is number => typeof score === 'number' && Number.isFinite(score));
+  const bestScore = scores.length > 0 ? Math.max(...scores) : null;
 
-  const lines: string[] = [
-    `# ${options?.filterLabel ? options.filterLabel : 'Missions favorites'}\n`,
-  ];
+  const lines: string[] = [`# ${title}\n`];
 
-  for (const mission of missions) {
-    lines.push(`## ${mission.title}\n`);
+  lines.push('## Synthèse shortlist\n');
+  lines.push(
+    `- **Volume:** ${formatMissionCount(missions.length)} retenue${missions.length > 1 ? 's' : ''}`
+  );
+  lines.push(`- **TJM observé:** ${formatTJMRange(missions)}`);
+  lines.push(`- **Stacks dominantes:** ${summarizeStacks(missions)}`);
+  lines.push(`- **Sources:** ${summarizeSources(missions)}`);
+  lines.push(`- **Meilleur score:** ${bestScore !== null ? `${bestScore}/100` : 'Non scoré'}`);
+  lines.push(
+    '- **Confidentialité:** rapport local généré depuis vos favoris; aucune session plateforme ni credential inclus.\n'
+  );
+  lines.push('## Missions retenues\n');
+
+  for (const [index, mission] of missions.entries()) {
+    lines.push(`### ${index + 1}. ${mission.title}\n`);
 
     if (mission.client) {
       lines.push(`**Client:** ${mission.client}\n`);
@@ -202,8 +270,14 @@ export function exportMissionsToMarkdown(
     lines.push(`**Source:** ${mission.source}\n`);
     lines.push(`**Date:** ${formatDate(mission.scrapedAt, dateFormat, now)}\n`);
 
-    if (mission.score !== null) {
-      lines.push(`**Score:** ${mission.score}/100\n`);
+    const score = getMissionScore(mission);
+    if (score !== null) {
+      lines.push(`**Score:** ${score}/100\n`);
+    }
+
+    const signal = getMissionSignal(mission);
+    if (signal) {
+      lines.push(`**Signal score:** ${signal}\n`);
     }
 
     if (includeDescription && mission.description) {

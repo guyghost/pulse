@@ -3,11 +3,19 @@
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import TrendBadge from '../molecules/TrendBadge.svelte';
   import { Skeleton } from '@pulse/ui';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import OperationalStoryCard, {
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
+
+  type TjmSetupStep = {
+    title: string;
+    description: string;
+    icon: IconName;
+    actionLabel: string;
+    action?: () => void;
+  };
 
   const {
     analysis = null,
@@ -17,6 +25,8 @@
     userTjmMin = 0,
     userTjmMax = 0,
     onRetry,
+    onOpenProfile,
+    onOpenFeed,
   }: {
     analysis?: TJMAnalysis | null;
     isLoading?: boolean;
@@ -25,6 +35,8 @@
     userTjmMin?: number;
     userTjmMax?: number;
     onRetry?: () => void;
+    onOpenProfile?: () => void;
+    onOpenFeed?: () => void;
   } = $props();
 
   const levels: Array<{
@@ -47,6 +59,33 @@
       : null
   );
   const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
+  const hasTjmTarget = $derived(userTjmMin > 0 && userTjmMax > 0);
+  const tjmSetupSteps = $derived.by<TjmSetupStep[]>(() => [
+    {
+      title: 'Scanner le feed',
+      description: 'Collecter des missions avec TJM pour créer les premiers points de marché.',
+      icon: 'briefcase',
+      actionLabel: 'Ouvrir le feed',
+      action: onOpenFeed,
+    },
+    {
+      title: 'Ajuster mon TJM cible',
+      description: hasTjmTarget
+        ? 'Votre fourchette existe déjà; vérifiez qu’elle correspond à votre prochaine négociation.'
+        : 'Définir une fourchette min/max pour comparer votre cible au marché observé.',
+      icon: 'badge-euro',
+      actionLabel: 'Ouvrir le profil',
+      action: onOpenProfile,
+    },
+    {
+      title: 'Relancer l’analyse',
+      description:
+        'Transformer les missions stockées et la fourchette cible en décision tarifaire.',
+      icon: 'refresh-cw',
+      actionLabel: 'Réessayer',
+      action: onRetry,
+    },
+  ]);
 
   function formatDelta(delta: number): string {
     if (delta === 0) {
@@ -92,9 +131,9 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Profil incomplet',
-        title: 'Le positionnement TJM ne peut pas encore etre decide',
+        title: 'Le positionnement TJM ne peut pas encore être décidé',
         description:
-          'Ajoutez une fourchette TJM et une seniorite dans le profil pour transformer les tendances en decision tarifaire.',
+          'Ajoutez une fourchette TJM et une séniorité dans le profil pour transformer les tendances en décision tarifaire.',
         evidence,
       };
     }
@@ -103,9 +142,9 @@
       return {
         severity: 'incident' as const,
         statusLabel: 'Confiance faible',
-        title: 'Le marche observe est encore trop peu fiable pour changer votre TJM',
+        title: 'Le marché observé est encore trop peu fiable pour changer votre TJM',
         description:
-          'Gardez votre fourchette actuelle et alimentez le radar avec plus de scans avant de negocier sur cette base.',
+          'Gardez votre fourchette actuelle et alimentez le radar avec plus de scans avant de négocier sur cette base.',
         evidence,
       };
     }
@@ -134,11 +173,11 @@
 
     return {
       severity: 'success' as const,
-      statusLabel: 'Aligne',
-      title: 'Votre TJM est coherent avec le marche observe',
+      statusLabel: 'Aligné',
+      title: 'Votre TJM est cohérent avec le marché observé',
       description:
         analysis.recommendation ??
-        'Conservez la fourchette actuelle et utilisez les ecarts par stack ou region pour arbitrer mission par mission.',
+        'Conservez la fourchette actuelle et utilisez les écarts par stack ou région pour arbitrer mission par mission.',
       evidence,
     };
   });
@@ -168,7 +207,7 @@
   {:else if analysis}
     {#if pricingStory}
       <OperationalStoryCard
-        eyebrow="Decision tarifaire"
+        eyebrow="Décision tarifaire"
         title={pricingStory.title}
         description={pricingStory.description}
         severity={pricingStory.severity}
@@ -395,17 +434,70 @@
       </div>
     {/if}
   {:else}
-    <OperationalEmptyState
-      title="Aucune tendance TJM exploitable"
-      description="Le marché ne contient pas encore assez de missions stockées pour produire une décision tarifaire. Relancez l’analyse après un scan du feed."
-      severity="attention"
-      statusLabel="Données absentes"
-      icon="bar-chart-3"
-      proofLabel="Points de marché"
-      proofValue="0"
-      primaryActionLabel="Réessayer l’analyse"
-      primaryActionIcon="refresh-cw"
-      onPrimaryAction={onRetry}
-    />
+    <div class="space-y-3">
+      <OperationalEmptyState
+        title="Aucune tendance TJM exploitable"
+        description="Le marché ne contient pas encore assez de missions stockées pour produire une décision tarifaire. Suivez les étapes ci-dessous avant de relancer l’analyse."
+        severity="attention"
+        statusLabel="Données absentes"
+        icon="bar-chart-3"
+        proofLabel="Points de marché"
+        proofValue="0"
+        primaryActionLabel="Réessayer l’analyse"
+        primaryActionIcon="refresh-cw"
+        onPrimaryAction={onRetry}
+      />
+
+      <section
+        class="section-card rounded-xl p-5"
+        aria-label="3 étapes pour alimenter le radar TJM"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="eyebrow text-blueprint-blue">3 étapes</p>
+            <h3 class="mt-1 text-sm font-semibold text-text-primary">Alimenter le radar TJM</h3>
+            <p class="mt-1 text-xs leading-5 text-text-subtle">
+              Le radar devient utile quand les missions scannées et votre fourchette cible se
+              répondent.
+            </p>
+          </div>
+          <Icon name="badge-euro" size={16} class="mt-1 shrink-0 text-blueprint-blue" />
+        </div>
+
+        <div class="mt-4 space-y-2">
+          {#each tjmSetupSteps as step, index}
+            <button
+              type="button"
+              class="group flex w-full items-start gap-3 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/20 hover:bg-surface-white disabled:cursor-not-allowed disabled:opacity-60"
+              onclick={step.action}
+              disabled={!step.action}
+            >
+              <span
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-white text-blueprint-blue"
+              >
+                <Icon name={step.icon} size={14} />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="flex items-center gap-2">
+                  <span class="font-mono text-[10px] text-text-muted">{index + 1}</span>
+                  <span class="text-xs font-semibold text-text-primary">{step.title}</span>
+                </span>
+                <span class="mt-0.5 block text-[11px] leading-4 text-text-subtle">
+                  {step.description}
+                </span>
+              </span>
+              <span class="mt-1.5 flex shrink-0 items-center gap-1 text-[10px] text-text-muted">
+                {step.actionLabel}
+                <Icon
+                  name="chevron-right"
+                  size={12}
+                  class="transition-colors group-hover:text-blueprint-blue"
+                />
+              </span>
+            </button>
+          {/each}
+        </div>
+      </section>
+    </div>
   {/if}
 </div>

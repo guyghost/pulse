@@ -11,6 +11,14 @@
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
 
+  const {
+    onNavigateToProfile,
+    onNavigateToFeed,
+  }: {
+    onNavigateToProfile?: () => void;
+    onNavigateToFeed?: () => void;
+  } = $props();
+
   let analysis = $state<TJMAnalysis | null>(null);
   let isLoading = $state(true);
   let error = $state<string | null>(null);
@@ -106,8 +114,8 @@
         description:
           'Le prochain geste utile est d’alimenter le radar avec des missions, puis de relancer cette analyse.',
         evidence,
-        primaryActionLabel: 'Relancer l’analyse',
-        primaryActionIcon: 'refresh-cw',
+        primaryActionLabel: 'Scanner le feed',
+        primaryActionIcon: 'briefcase',
       };
     }
 
@@ -131,8 +139,8 @@
       description:
         'Comparez votre fourchette aux médianes par seniorité, stack et région avant de qualifier une mission.',
       evidence,
-      primaryActionLabel: 'Rafraîchir',
-      primaryActionIcon: 'refresh-cw',
+      primaryActionLabel: 'Ajuster mon TJM cible',
+      primaryActionIcon: 'badge-euro',
     };
   });
 
@@ -162,12 +170,31 @@
   }
 
   function handleTjmStoryAction(): void {
+    if (error) {
+      loadAnalysis();
+      return;
+    }
+
     if (isOffline && analysis) {
       inspectLocalSignals();
       return;
     }
 
-    loadAnalysis();
+    if (!analysis) {
+      if (onNavigateToFeed) {
+        onNavigateToFeed();
+        return;
+      }
+      loadAnalysis();
+      return;
+    }
+
+    if (onNavigateToProfile) {
+      onNavigateToProfile();
+      return;
+    }
+
+    inspectLocalSignals();
   }
 </script>
 
@@ -253,6 +280,8 @@
       {userTjmMin}
       {userTjmMax}
       onRetry={() => loadAnalysis()}
+      onOpenProfile={onNavigateToProfile}
+      onOpenFeed={onNavigateToFeed}
     />
   </section>
 </div>

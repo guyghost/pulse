@@ -9,7 +9,7 @@ describe('landing account dashboard operational UI', () => {
     expect(source).toContain('type AccountTone');
     expect(source).toContain('interface AccountDecision');
     expect(source).toContain('function getAccountDecision');
-    expect(source).toContain('Etat operationnel');
+    expect(source).toContain('État opérationnel');
     expect(source).toContain('Prochaine action:');
     expect(source).toContain('Impact');
     expect(source).toContain('accountDecision.primaryAction');
@@ -17,7 +17,7 @@ describe('landing account dashboard operational UI', () => {
 
   it('keeps credit purchase details behind progressive disclosure', () => {
     expect(source).toContain('<details class="credit-drawer"');
-    expect(source).toContain('Choisir un pack de credits');
+    expect(source).toContain('Choisir un pack de crédits');
     expect(source).toContain('Recommandation: {recommendedPack.label}');
     expect(source).toContain('credit-pack--recommended');
     expect(source).not.toContain('<table');

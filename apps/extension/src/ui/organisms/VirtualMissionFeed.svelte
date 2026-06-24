@@ -1,5 +1,7 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
+  import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
+  import { getLastTransitionTime } from '$lib/core/tracking';
   import MissionCard from '../molecules/MissionCard.svelte';
   import { Skeleton } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
@@ -15,6 +17,7 @@
     favorites = {},
     hidden = {},
     comparisonMissionIds = [],
+    trackingByMissionId = new Map<string, MissionTracking>(),
     sortBy = 'score',
     filterActive = false,
     tourStep = null,
@@ -22,6 +25,7 @@
     onToggleFavorite,
     onHide,
     onToggleCompare,
+    onStatusTransition,
     onCopyLink,
     onOpenLink,
     onInvestigateMission,
@@ -36,6 +40,7 @@
     favorites?: Record<string, number>;
     hidden?: Record<string, number>;
     comparisonMissionIds?: string[];
+    trackingByMissionId?: Map<string, MissionTracking>;
     sortBy?: 'score' | 'date' | 'tjm';
     filterActive?: boolean;
     tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
@@ -43,6 +48,7 @@
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
     onToggleCompare?: (id: string) => void;
+    onStatusTransition?: (id: string, status: ApplicationStatus) => void;
     onCopyLink?: (id: string) => void;
     onOpenLink?: (url: string) => void;
     onInvestigateMission?: (mission: Mission) => void;
@@ -202,6 +208,7 @@
     <!-- Lazy-loaded list: renders only visibleCount missions, loads more on scroll -->
     <div class="flex flex-col gap-3">
       {#each visibleMissions as mission (mission.id)}
+        {@const missionTracking = trackingByMissionId.get(mission.id)}
         <MissionCard
           {mission}
           isSeen={seenSet.has(mission.id)}
@@ -209,11 +216,14 @@
           isHidden={mission.id in (hidden ?? {})}
           isCompared={comparedIds.has(mission.id)}
           compareDisabled={comparisonLimitReached && !comparedIds.has(mission.id)}
+          trackingStatus={missionTracking?.currentStatus ?? null}
+          trackingUpdatedAt={missionTracking ? getLastTransitionTime(missionTracking) : null}
           tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
           onVisible={() => onMissionSeen?.(mission.id)}
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}
           onToggleCompare={() => onToggleCompare?.(mission.id)}
+          onStatusTransition={(status) => onStatusTransition?.(mission.id, status)}
           onCopyLink={() => onCopyLink?.(mission.id)}
           onInvestigate={() => onInvestigateMission?.(mission)}
           {onOpenLink}

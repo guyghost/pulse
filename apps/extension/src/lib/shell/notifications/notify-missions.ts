@@ -6,6 +6,7 @@ import { canNotify } from '../../core/scoring/notification-rate-limit';
 import { getSettings } from '../storage/chrome-storage';
 import { getConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { getSeenIds } from '../storage/seen-missions';
+import { recordAlertHistoryEntry } from '../storage/alert-history';
 
 // ---------------------------------------------------------------------------
 // Rate limit state (in-memory, reset on service worker restart)
@@ -14,6 +15,25 @@ import { getSeenIds } from '../storage/seen-missions';
 let lastNotificationTime: number | null = null;
 
 const LAST_NOTIFICATION_KEY = 'last_notification_time';
+
+function buildAlertHistoryId(triggeredAt: number, missions: Mission[]): string {
+  const missionKey = missions
+    .slice(0, 4)
+    .map((mission) => mission.id)
+    .join('-')
+    .slice(0, 90);
+
+  return `alert-${triggeredAt}-${missionKey || 'empty'}`;
+}
+
+function isMutedUntilActive(mutedUntil: string | null, now: number): boolean {
+  if (!mutedUntil) {
+    return false;
+  }
+
+  const mutedUntilMs = Date.parse(mutedUntil);
+  return Number.isFinite(mutedUntilMs) && mutedUntilMs > now;
+}
 
 /**
  * Persist the last notification timestamp to chrome.storage.session.
@@ -104,6 +124,10 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
     return { shown: false, notifiedMissionIds: [] };
   }
 
+  if (connectedAlertPreferences && isMutedUntilActive(connectedAlertPreferences.mutedUntil, now)) {
+    return { shown: false, notifiedMissionIds: [] };
+  }
+
   const notifiableMissions = connectedAlertPreferences
     ? filterSmartNotifications(missions, seenIds, {
         scoreThreshold: connectedAlertPreferences.scoreThreshold,
@@ -150,6 +174,20 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
 
     // Update rate limit timestamp
     await persistLastNotificationTime(now);
+
+    await recordAlertHistoryEntry({
+      id: buildAlertHistoryId(now, notifiableMissions),
+      triggeredAt: now,
+      missionCount,
+      missionIds: notifiableMissions.map((mission) => mission.id),
+      missionTitles: notifiableMissions.map((mission) => mission.title),
+      scoreThreshold:
+        connectedAlertPreferences?.scoreThreshold ?? settings.notificationScoreThreshold,
+      minDailyRate: connectedAlertPreferences?.minDailyRate ?? 0,
+      requiredStacks: connectedAlertPreferences?.requiredStacks ?? [],
+      maxResults: connectedAlertPreferences?.maxResults ?? Math.min(Math.max(missionCount, 1), 20),
+    }).catch(() => {});
+
     return {
       shown: true,
       notifiedMissionIds: notifiableMissions.map((mission) => mission.id),

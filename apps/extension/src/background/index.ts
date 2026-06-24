@@ -40,6 +40,7 @@ import {
   getConnectedAlertPreferences,
   saveConnectedAlertPreferences,
 } from '../lib/shell/storage/connected-alert-preferences';
+import { getAlertHistory } from '../lib/shell/storage/alert-history';
 import { setNewMissionCount, resetNewMissionCount } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
@@ -64,6 +65,7 @@ import { createDefaultProfile } from '../lib/core/profile/defaults';
 import {
   getTracking,
   saveTracking,
+  deleteTracking,
   getAllTrackings,
   getTrackingsByStatus,
 } from '../lib/shell/storage/tracking';
@@ -595,6 +597,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    if (message.type === 'GET_ALERT_HISTORY') {
+      getAlertHistory()
+        .then((history) => {
+          sendResponse({ type: 'ALERT_HISTORY_RESULT', payload: history });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_ALERT_HISTORY error:', err);
+          sendResponse({ type: 'ALERT_HISTORY_RESULT', payload: [] });
+        });
+      return true;
+    }
+
     if (message.type === 'GET_SEEN_MISSIONS') {
       getSeenIds()
         .then((seenIds) => {
@@ -951,6 +965,28 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               nextActionAt: null,
             },
           });
+        }
+      })();
+      return true;
+    }
+
+    if (message.type === 'RESTORE_TRACKING') {
+      const { missionId, tracking } = message.payload;
+
+      (async () => {
+        try {
+          if (tracking) {
+            await saveTracking(tracking);
+            sendResponse({ type: 'TRACKING_RESTORED', payload: tracking });
+            return;
+          }
+
+          await deleteTracking(missionId);
+          sendResponse({ type: 'TRACKING_RESTORED', payload: null });
+        } catch (err) {
+          console.error('[MissionPulse] RESTORE_TRACKING error:', err);
+          const current = await getTracking(missionId).catch(() => null);
+          sendResponse({ type: 'TRACKING_RESTORED', payload: current });
         }
       })();
       return true;

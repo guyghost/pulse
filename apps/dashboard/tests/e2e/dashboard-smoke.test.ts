@@ -6,26 +6,41 @@ test.describe('connected dashboard smoke', () => {
   }) => {
     await page.goto('/dashboard/');
 
-    await expect(page.getByText('Aucune extension connectée').first()).toBeVisible();
-    await expect(page.getByRole('link', { name: "Installer l'extension" }).first()).toBeVisible();
-    await expect(page.getByText('Aucune sync')).toBeVisible();
-    await expect(page.getByText('Sans score')).toBeVisible();
-    await expect(page.getByText('Aucune relance')).toBeVisible();
+    await expect(page.getByText('Checklist de setup', { exact: true })).toBeVisible();
+    await expect(page.getByRole('link', { name: 'Se connecter' }).first()).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Surfaces activées après setup' })
+    ).toBeVisible();
+    await expect(page.getByText('Le dashboard évite ainsi les métriques vides')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Feed connecté' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Radar TJM' })).toBeVisible();
+    await expect(page.getByText('Aucune sync')).not.toBeVisible();
+    await expect(page.getByText('Sans score')).not.toBeVisible();
+    await expect(page.getByText('Aucune relance')).not.toBeVisible();
     await expect(
       page.getByRole('heading', { name: "Missions détectées par l'extension" })
-    ).toBeVisible();
-    await expect(page.getByText("Aucune mission reçue depuis l'extension")).toBeVisible();
+    ).not.toBeVisible();
+    await expect(page.getByText("Aucune mission reçue depuis l'extension")).not.toBeVisible();
 
-    await page.getByRole('link', { name: 'Candidatures' }).click();
-    await expect(page.getByPlaceholder('Rechercher mission, client ou plateforme')).toBeVisible();
-    await expect(page.getByText('Aucune mission trouvée')).toBeVisible();
+    await page
+      .getByLabel('Navigation dashboard')
+      .getByRole('link', { name: 'Candidatures' })
+      .click();
+    await expect(page.getByRole('heading', { name: 'Pipeline activé après setup' })).toBeVisible();
+    await expect(
+      page.getByPlaceholder('Rechercher mission, client ou plateforme')
+    ).not.toBeVisible();
+    await expect(page.getByText('Aucune mission trouvée')).not.toBeVisible();
 
-    await page.getByRole('link', { name: 'Profil CV' }).click();
+    await page.getByLabel('Navigation dashboard').getByRole('link', { name: 'CV' }).click();
     await expect(page.getByRole('heading', { name: 'CV principal' })).toBeVisible();
     await expect(page.getByText('Aucun CV canonique synchronisé')).toBeVisible();
     await expect(page.getByLabel('Titre du profil')).toBeVisible();
 
-    await page.getByRole('link', { name: 'Synchronisation', exact: true }).click();
+    await page
+      .getByLabel('Navigation dashboard')
+      .getByRole('link', { name: 'Synchronisation' })
+      .click();
     await expect(page.getByRole('heading', { name: 'Synchronisation extension' })).toBeVisible();
     await expect(page.getByText('Alertes missions')).toBeVisible();
     await expect(page.getByText('Local ou non connecté')).toBeVisible();
@@ -50,8 +65,13 @@ test.describe('connected dashboard smoke', () => {
     await expect(exportLink).toHaveAttribute('aria-disabled', 'true');
     await expect(exportLink).toHaveAttribute('href', /\/login/);
 
-    await expect(page.getByLabel('Confirmation suppression')).toBeVisible();
+    await expect(page.getByText('Suppression irréversible')).toBeVisible();
+    await expect(page.getByText('Impact : missions synchronisées')).toBeVisible();
+    await expect(page.getByLabel('Tapez SUPPRIMER pour confirmer')).toBeVisible();
     await expect(page.getByPlaceholder('SUPPRIMER')).toBeVisible();
+    const exportBeforeDeleteLink = page.getByRole('link', { name: 'Exporter avant suppression' });
+    await expect(exportBeforeDeleteLink).toBeVisible();
+    await expect(exportBeforeDeleteLink).toHaveAttribute('aria-disabled', 'true');
     await expect(
       page.getByRole('button', { name: 'Supprimer les données connectées' })
     ).toBeDisabled();

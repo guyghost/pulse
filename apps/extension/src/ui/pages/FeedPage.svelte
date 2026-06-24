@@ -5,6 +5,12 @@
     type SourceStatus,
   } from '$lib/shell/facades/feed-controller.svelte';
   import { createFeedPageState } from '$lib/state/feed-page.svelte';
+  import { createTrackingStore } from '$lib/state/tracking.svelte';
+  import {
+    STATUS_LABELS,
+    type ApplicationStatus,
+    type MissionTracking,
+  } from '$lib/core/types/tracking';
   import VirtualMissionFeed from '../organisms/VirtualMissionFeed.svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
   import { tick } from 'svelte';
@@ -12,7 +18,7 @@
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import ConnectorStatusList from '../molecules/ConnectorStatusList.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import FilterBar from '../organisms/FilterBar.svelte';
   import FeedActionDashboard from '../organisms/FeedActionDashboard.svelte';
   import SourceHealthPanel from '../organisms/SourceHealthPanel.svelte';
@@ -36,11 +42,26 @@
   import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
+  import { getLastTransitionTime } from '$lib/core/tracking';
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
+  import { showToastAction } from '$lib/shell/notifications/toast-service';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
+
+  type FeedActionQueueTone = 'critical' | 'attention' | 'success' | 'neutral';
+
+  type FeedActionQueueItem = {
+    id: string;
+    title: string;
+    description: string;
+    icon: IconName;
+    endIcon: IconName;
+    tone: FeedActionQueueTone;
+    action: () => void;
+    disabled?: boolean;
+  };
 
   // ============================================================
   // Initialization
@@ -48,6 +69,7 @@
   const feed = createFeedStore();
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
+  const tracking = createTrackingStore();
   page.setup();
 
   // Refinement banner: shown only on zero-config first scan (no profile yet)
@@ -152,7 +174,10 @@
   const hasVisibleFeedMissions = $derived(visibleFeedMissionCount > 0);
   const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
   const showMissionScrollCue = $derived(
-    hasVisibleFeedMissions && !missionFeedReached && !(controller.isScanning || page.isLoading)
+    feedChromeCompact &&
+      hasVisibleFeedMissions &&
+      !missionFeedReached &&
+      !(controller.isScanning || page.isLoading)
   );
 
   const alertMatchCount = $derived.by(() => {
@@ -160,6 +185,99 @@
       return 0;
     }
     return alertMissions.length;
+  });
+
+  const feedActionQueue = $derived.by((): FeedActionQueueItem[] => {
+    const actions: FeedActionQueueItem[] = [];
+    const firstBroken = brokenConnectors[0];
+    const newCount = page.dashboardSummary.newCount;
+    const highScoreCount = page.dashboardSummary.highScoreCount;
+    const visibleCount = page.dashboardSummary.visibleCount;
+
+    if (firstBroken) {
+      actions.push({
+        id: 'source-diagnostic',
+        title: `Corriger ${firstBroken.connectorName}`,
+        description: 'Relance le diagnostic avant de faire confiance au radar.',
+        icon: 'circle-alert',
+        endIcon: 'refresh-cw',
+        tone: 'critical',
+        action: recheckFirstBrokenConnector,
+      });
+    }
+
+    if (alertMatchCount > 0) {
+      actions.push({
+        id: 'alert-priority',
+        title: `Traiter ${formatMissionCount(alertMatchCount)} en alerte`,
+        description: `Seuil ${alertPreferences.scoreThreshold}+ franchi selon vos critères.`,
+        icon: 'target',
+        endIcon: 'chevron-down',
+        tone: 'success',
+        action: showPriorityMissions,
+      });
+    } else if (highScoreCount > 0) {
+      actions.push({
+        id: 'high-score',
+        title: `Isoler ${formatMissionCount(highScoreCount)} 80+`,
+        description: 'Filtre les missions les plus fortes avant les insights secondaires.',
+        icon: 'target',
+        endIcon: 'chevron-down',
+        tone: 'success',
+        action: showPriorityMissions,
+      });
+    }
+
+    if (newCount > 0) {
+      actions.push({
+        id: 'new-missions',
+        title: `Qualifier ${formatMissionCount(newCount)}`,
+        description: 'Affiche uniquement les missions non vues à traiter maintenant.',
+        icon: 'sparkles',
+        endIcon: 'chevron-down',
+        tone: 'attention',
+        action: showNewMissions,
+      });
+    }
+
+    if (page.comparisonMissions.length >= 2) {
+      actions.push({
+        id: 'compare',
+        title: 'Comparer la sélection',
+        description: 'Départage les missions retenues avant de postuler.',
+        icon: 'git-compare-arrows',
+        endIcon: 'git-compare-arrows',
+        tone: 'neutral',
+        action: openComparison,
+      });
+    }
+
+    if (actions.length < 3) {
+      if (visibleCount > 0) {
+        actions.push({
+          id: 'mission-list',
+          title: 'Passer à la liste',
+          description: `${formatMissionCount(visibleCount)} visibles selon les filtres courants.`,
+          icon: 'chevron-down',
+          endIcon: 'chevron-down',
+          tone: 'neutral',
+          action: scrollToMissionFeedAction,
+        });
+      } else {
+        actions.push({
+          id: 'scan',
+          title: 'Lancer le scan',
+          description: 'Alimente le radar avec les sources connectées.',
+          icon: 'scan-line',
+          endIcon: 'play',
+          tone: 'neutral',
+          action: startFeedScanFromQueue,
+          disabled: page.isOffline || controller.isScanning || page.isLoading,
+        });
+      }
+    }
+
+    return actions.slice(0, 3);
   });
 
   const feedStory = $derived.by(() => {
@@ -193,9 +311,9 @@
       return {
         severity: 'incident' as const,
         statusLabel: 'Hors ligne',
-        title: 'Pulse affiche les donnees en cache',
+        title: 'Pulse affiche les données en cache',
         description:
-          'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions deja stockees.',
+          'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions déjà stockées.',
         evidence,
         primaryActionLabel:
           visibleCount > 0 ? `Voir les ${formatMissionCount(visibleCount)} en cache` : 'Hors ligne',
@@ -208,8 +326,8 @@
       return {
         severity: 'critical' as const,
         statusLabel: 'Action requise',
-        title: `${brokenCount} source${brokenCount > 1 ? 's' : ''} a corriger avant de faire confiance au radar`,
-        description: `${firstBroken?.connectorName ?? 'Une source'} ne remonte plus correctement. Le feed peut manquer des opportunites.`,
+        title: `${brokenCount} source${brokenCount > 1 ? 's' : ''} à corriger avant de faire confiance au radar`,
+        description: `${firstBroken?.connectorName ?? 'Une source'} ne remonte plus correctement. Le feed peut manquer des opportunités.`,
         evidence,
         primaryActionLabel: 'Relancer le diagnostic',
         primaryActionIcon: 'refresh-cw',
@@ -219,12 +337,12 @@
     if (newCount > 0) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'A traiter',
+        statusLabel: 'À traiter',
         title: `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} depuis le dernier passage`,
         description:
           highScoreCount > 0
-            ? `${highScoreCount} opportunite${highScoreCount > 1 ? 's' : ''} depasse le seuil prioritaire. Commencez par celles-ci.`
-            : 'Aucune urgence detectee, mais les nouvelles missions meritent une qualification rapide.',
+            ? `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} dépasse le seuil prioritaire. Commencez par celles-ci.`
+            : 'Aucune urgence détectée, mais les nouvelles missions méritent une qualification rapide.',
         evidence,
         primaryActionLabel: `Voir les ${formatMissionCount(newCount)} proposée${newCount > 1 ? 's' : ''}`,
         primaryActionIcon: 'chevron-down',
@@ -235,8 +353,8 @@
       return {
         severity: 'success' as const,
         statusLabel: 'Radar sain',
-        title: `${highScoreCount} opportunite${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prete${highScoreCount > 1 ? 's' : ''}`,
-        description: `Le bruit est filtre selon votre alerte ${alertPreferences.scoreThreshold}+. La prochaine action utile est de comparer ces missions et d en mettre une en suivi.`,
+        title: `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prête${highScoreCount > 1 ? 's' : ''}`,
+        description: `Le bruit est filtré selon votre alerte ${alertPreferences.scoreThreshold}+. La prochaine action utile est de comparer ces missions et d’en mettre une en suivi.`,
         evidence,
         primaryActionLabel:
           alertPreferences.scoreThreshold >= 80
@@ -249,10 +367,10 @@
     if (visibleCount === 0) {
       return {
         severity: 'neutral' as const,
-        statusLabel: 'Aucune donnee',
+        statusLabel: 'Aucune donnée',
         title: 'Le radar attend un premier scan',
         description:
-          'Connectez ou verifiez les sources, puis lancez un scan pour obtenir les premieres recommandations.',
+          'Connectez ou vérifiez les sources, puis lancez un scan pour obtenir les premières recommandations.',
         evidence,
         primaryActionLabel: 'Lancer le scan',
         primaryActionIcon: 'play',
@@ -264,7 +382,7 @@
       statusLabel: 'Normal',
       title: `${visibleCount} mission${visibleCount > 1 ? 's' : ''} disponible${visibleCount > 1 ? 's' : ''}, aucune alerte critique`,
       description:
-        'Le systeme est stable. Continuez par les favoris ou relancez un scan si la veille doit etre rafraichie.',
+        'Le système est stable. Continuez par les favoris ou relancez un scan si la veille doit être rafraîchie.',
       evidence,
       primaryActionLabel: `Voir les ${formatMissionCount(visibleCount)} proposée${visibleCount > 1 ? 's' : ''}`,
       primaryActionIcon: 'chevron-down',
@@ -332,6 +450,41 @@
     controller.startScan();
   }
 
+  function recheckFirstBrokenConnector(): void {
+    const firstBroken = brokenConnectors[0];
+    if (!firstBroken) {
+      return;
+    }
+    controller.recheckConnector(firstBroken.connectorId);
+  }
+
+  function showPriorityMissions(): void {
+    if (alertMatchCount > 0) {
+      showAlertOnly = true;
+    } else if (page.selectedScoreBucket !== 'strong') {
+      page.setSelectedScoreBucket('strong');
+    }
+    void scrollToMissionFeed();
+  }
+
+  function showNewMissions(): void {
+    if (!page.showNewOnly) {
+      page.toggleNewOnly();
+    }
+    void scrollToMissionFeed();
+  }
+
+  function scrollToMissionFeedAction(): void {
+    void scrollToMissionFeed();
+  }
+
+  function startFeedScanFromQueue(): void {
+    if (page.isOffline || controller.isScanning || page.isLoading) {
+      return;
+    }
+    controller.startScan();
+  }
+
   function handleClearMissionFilters(): void {
     showAlertOnly = false;
     page.clearAllFilters();
@@ -364,16 +517,81 @@
     openExternalUrl(url).catch(() => {});
   }
 
+  function cloneTrackingSnapshot(record: MissionTracking | undefined): MissionTracking | null {
+    if (!record) {
+      return null;
+    }
+
+    return {
+      ...record,
+      history: record.history.map((transition) => ({ ...transition })),
+      generatedAssetIds: [...record.generatedAssetIds],
+    };
+  }
+
+  function getTrackingUpdatedAt(missionId: string): number | null {
+    const record = tracking.getTrackingForMission(missionId);
+    return record ? getLastTransitionTime(record) : null;
+  }
+
+  async function handleTrackingTransition(
+    missionId: string,
+    status: ApplicationStatus
+  ): Promise<void> {
+    const previousTracking = cloneTrackingSnapshot(tracking.getTrackingForMission(missionId));
+    await tracking.transitionStatus(missionId, status);
+    showToastAction(`Statut: ${STATUS_LABELS[status]}`, 'success', {
+      label: 'Annuler',
+      onClick: () => {
+        void tracking.restoreTracking(missionId, previousTracking);
+      },
+    });
+  }
+
+  function handleInvestigationToggleCompare(): void {
+    if (!investigationMission) {
+      return;
+    }
+    page.toggleCompare(investigationMission.id);
+  }
+
+  function handleInvestigationHide(): void {
+    if (!investigationMission) {
+      return;
+    }
+    page.handleHide(investigationMission.id);
+  }
+
+  function handleInvestigationSelectForTracking(): void {
+    if (!investigationMission) {
+      return;
+    }
+    void handleTrackingTransition(investigationMission.id, 'selected');
+  }
+
+  function feedActionToneClass(tone: FeedActionQueueTone): string {
+    if (tone === 'critical') {
+      return 'border-status-red/25 bg-status-red/6 text-status-red hover:bg-status-red/10';
+    }
+    if (tone === 'attention') {
+      return 'border-status-orange/25 bg-status-orange/6 text-status-orange hover:bg-status-orange/10';
+    }
+    if (tone === 'success') {
+      return 'border-blueprint-blue/20 bg-blueprint-blue/6 text-blueprint-blue hover:bg-blueprint-blue/10';
+    }
+    return 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray';
+  }
+
   (async () => {
-    const [firstScanDone, bannerDismissed, profile, storedAlertPreferences] =
-      await Promise.all([
-        getFirstScanDone(),
-        getProfileBannerDismissed(),
-        getProfile(),
-        getAlertPreferences(),
-      ]);
+    const [firstScanDone, bannerDismissed, profile, storedAlertPreferences] = await Promise.all([
+      getFirstScanDone(),
+      getProfileBannerDismissed(),
+      getProfile(),
+      getAlertPreferences(),
+    ]);
     showRefinementBanner = firstScanDone && !bannerDismissed && !profile;
     alertPreferences = storedAlertPreferences;
+    await tracking.loadTrackings();
   })().catch(() => {});
 
   $effect(() => {
@@ -453,6 +671,58 @@
     });
   });
 </script>
+
+{#snippet feedActionQueueBlock(compact: boolean)}
+  <div
+    class={compact
+      ? 'mt-2 border-t border-border-light pt-2'
+      : 'mt-3 border-t border-border-light pt-3'}
+  >
+    <div class="mb-2 flex items-center justify-between gap-3">
+      <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+        File d’actions
+      </p>
+      <p class="text-[10px] text-text-muted">
+        {feedActionQueue.length} priorité{feedActionQueue.length > 1 ? 's' : ''}
+      </p>
+    </div>
+    <div
+      class="grid gap-2"
+      data-testid="feed-action-queue"
+      aria-label="Actions prioritaires du feed"
+    >
+      {#each feedActionQueue as item (item.id)}
+        <button
+          type="button"
+          class="group flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-left transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-55 {feedActionToneClass(
+            item.tone
+          )}"
+          onclick={item.action}
+          disabled={item.disabled}
+          aria-label={`Action prioritaire: ${item.title}. ${item.description}`}
+        >
+          <span
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-white/80"
+            aria-hidden="true"
+          >
+            <Icon name={item.icon} size={14} />
+          </span>
+          <span class="min-w-0 flex-1">
+            <span class="block truncate text-xs font-semibold text-text-primary">{item.title}</span>
+            <span class="mt-0.5 block text-[10px] leading-4 text-text-subtle">
+              {item.description}
+            </span>
+          </span>
+          <Icon
+            name={item.endIcon}
+            size={13}
+            class="shrink-0 opacity-55 transition-opacity group-hover:opacity-100"
+          />
+        </button>
+      {/each}
+    </div>
+  </div>
+{/snippet}
 
 <div
   bind:this={feedScrollContainer}
@@ -545,8 +815,8 @@
                 <Tooltip
                   label={page.isOffline ? 'Scan indisponible hors ligne' : 'Lancer le scan'}
                   description={page.isOffline
-                    ? 'Pulse utilise les donnees en cache jusqu au retour reseau.'
-                    : 'Raccourci clavier: r. Relance les sources connectees.'}
+                    ? 'Pulse utilise les données en cache jusqu’au retour réseau.'
+                    : 'Raccourci clavier: r. Relance les sources connectées.'}
                 >
                   <button
                     class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-primary transition-all duration-200 hover:bg-subtle-gray"
@@ -589,6 +859,7 @@
                 onPrimaryAction={handleFeedStoryPrimaryAction}
               />
             </div>
+            {@render feedActionQueueBlock(true)}
             <FeedActionDashboard
               summary={page.dashboardSummary}
               insightSummary={page.insightSummary}
@@ -622,7 +893,7 @@
                 {#if controller.isScanning || page.isLoading}
                   <Tooltip
                     label="Stopper le scan"
-                    description="Interrompt le scan en cours et conserve les donnees deja chargees."
+                    description="Interrompt le scan en cours et conserve les données déjà chargées."
                   >
                     <button
                       class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
@@ -640,10 +911,10 @@
                       ? 'Scan indisponible hors ligne'
                       : 'Lancer le scan'}
                   description={controller.isScanning || page.isLoading
-                    ? 'Pulse interroge les sources connectees.'
+                    ? 'Pulse interroge les sources connectées.'
                     : page.isOffline
-                      ? 'Les donnees en cache restent disponibles.'
-                      : 'Raccourci clavier: r. Relance la detection des missions.'}
+                      ? 'Les données en cache restent disponibles.'
+                      : 'Raccourci clavier: r. Relance la détection des missions.'}
                 >
                   <button
                     class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
@@ -701,6 +972,7 @@
                 onPrimaryAction={handleFeedStoryPrimaryAction}
               />
             </div>
+            {@render feedActionQueueBlock(false)}
 
             <ConnectorStatusList
               statuses={controller.connectorStatuses}
@@ -851,8 +1123,8 @@
               </button>
             </Tooltip>
             <Tooltip
-              label={page.showHidden ? 'Masquer les missions ignorees' : 'Voir les ignorees'}
-              description={`Raccourci clavier: h. ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} ignoree${page.hiddenCount > 1 ? 's' : ''}.`}
+              label={page.showHidden ? 'Masquer les missions ignorées' : 'Voir les ignorées'}
+              description={`Raccourci clavier : h. ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} ignorée${page.hiddenCount > 1 ? 's' : ''}.`}
             >
               <button
                 class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
@@ -920,6 +1192,42 @@
             </Tooltip>
           </div>
 
+          <div class="mt-2" aria-label="Presets métier du feed">
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                Presets métier
+              </p>
+              {#if page.decisionPreset}
+                <button
+                  type="button"
+                  class="text-[10px] font-medium text-blueprint-blue hover:text-blueprint-blue/80"
+                  onclick={page.clearAllFilters}
+                >
+                  Réinitialiser
+                </button>
+              {/if}
+            </div>
+            <div class="flex gap-1.5 overflow-x-auto pb-1">
+              {#each page.decisionPresets as preset}
+                <button
+                  type="button"
+                  class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
+                    ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                    : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                  onclick={() => page.applyDecisionPreset(preset.id)}
+                  aria-pressed={preset.active}
+                  disabled={preset.count === 0 && !preset.active}
+                  title={preset.description}
+                >
+                  <span>{preset.label}</span>
+                  <span class="rounded-md bg-page-canvas px-1 py-0.5 text-[9px]">
+                    {preset.count}
+                  </span>
+                </button>
+              {/each}
+            </div>
+          </div>
+
           {#if page.showFilters}
             <div
               id="filter-panel"
@@ -983,8 +1291,8 @@
             Missions proposées
           </h2>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            {visibleFeedMissionLabel} visible{visibleFeedMissionCount > 1 ? 's' : ''} selon vos
-            filtres actuels.
+            {visibleFeedMissionLabel} visible{visibleFeedMissionCount > 1 ? 's' : ''} selon vos filtres
+            actuels.
           </p>
         </div>
         <span
@@ -1011,12 +1319,14 @@
         favorites={page.favorites}
         hidden={page.hidden}
         comparisonMissionIds={page.comparisonMissionIds}
+        trackingByMissionId={tracking.trackings}
         sortBy={page.sortBy}
         filterActive={page.filterActive || showAlertOnly}
         onMissionSeen={page.handleMissionSeen}
         onToggleFavorite={page.handleToggleFavorite}
         onHide={page.handleHide}
         onToggleCompare={page.toggleCompare}
+        onStatusTransition={handleTrackingTransition}
         onCopyLink={page.handleCopyLink}
         onOpenLink={handleOpenExternalUrl}
         onInvestigateMission={(mission) => (investigationMission = mission)}
@@ -1063,8 +1373,17 @@
 {#if investigationMission}
   <MissionInvestigationDrawer
     mission={investigationMission}
+    isCompared={page.comparisonMissionIds.includes(investigationMission.id)}
+    compareDisabled={page.comparisonMissionIds.length >= 3 &&
+      !page.comparisonMissionIds.includes(investigationMission.id)}
+    isHidden={investigationMission.id in page.hidden}
+    trackingStatus={tracking.getTrackingForMission(investigationMission.id)?.currentStatus ?? null}
+    trackingUpdatedAt={getTrackingUpdatedAt(investigationMission.id)}
     onClose={() => (investigationMission = null)}
     onOpenLink={handleOpenExternalUrl}
+    onToggleCompare={handleInvestigationToggleCompare}
+    onHide={handleInvestigationHide}
+    onSelectForTracking={handleInvestigationSelectForTracking}
   />
 {/if}
 

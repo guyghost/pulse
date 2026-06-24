@@ -3,12 +3,16 @@
   import type { Mission } from '$lib/core/types/mission';
   import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
   import { GENERATION_TYPE_ICONS, GENERATION_TYPE_LABELS } from '$lib/core/types/generation';
-  import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
+  import type {
+    ApplicationStatus,
+    MissionTracking,
+    StatusTransition,
+  } from '$lib/core/types/tracking';
   import { STATUS_LABELS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { getMissions } from '$lib/shell/facades/feed-data.facade';
   import { createTrackingStore } from '$lib/state/tracking.svelte';
   import { sendMessage } from '$lib/shell/messaging/bridge';
-  import { showToast } from '$lib/shell/notifications/toast-service';
+  import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import { summarizeApplicationPipeline } from '$lib/core/tracking/pipeline-summary';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
   import OperationalStoryCard, {
@@ -39,6 +43,30 @@
     record: MissionTracking;
   };
 
+  type LoadingProgressStep = {
+    label: string;
+    detail: string;
+    icon: 'database' | 'activity' | 'sparkles';
+  };
+
+  const loadingProgressSteps: LoadingProgressStep[] = [
+    {
+      label: 'Missions locales',
+      detail: 'Lecture du feed stocké pour retrouver les dossiers qualifiables.',
+      icon: 'database',
+    },
+    {
+      label: 'Statuts de suivi',
+      detail: 'Reprise des relances, étapes et notes enregistrées dans le pipeline.',
+      icon: 'activity',
+    },
+    {
+      label: 'Kits générés',
+      detail: 'Préparation des pitchs, messages et résumés liés aux candidatures.',
+      icon: 'sparkles',
+    },
+  ];
+
   const trackedMissions = $derived.by(() => {
     return missions
       .map((mission) => ({
@@ -62,6 +90,9 @@
 
   const selectedStatus = $derived<ApplicationStatus>(selectedTracking?.currentStatus ?? 'detected');
   const nextStatuses = $derived<ApplicationStatus[]>(VALID_TRANSITIONS[selectedStatus] ?? []);
+  const selectedDecisionHistory = $derived.by(() =>
+    selectedTracking ? selectedTracking.history.slice().reverse().slice(0, 4) : []
+  );
 
   $effect(() => {
     nextActionInput = isoToDateTimeLocal(selectedTracking?.nextActionAt ?? null);
@@ -103,7 +134,7 @@
         severity: pipelineSummary.dueFollowUps > 0 ? 'attention' : 'neutral',
       },
       {
-        label: 'Pretes',
+        label: 'Prêtes',
         value: pipelineSummary.preparedNotApplied,
         icon: 'send',
         severity: pipelineSummary.preparedNotApplied > 0 ? 'attention' : 'neutral',
@@ -114,9 +145,9 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Relance due',
-        title: `${pipelineSummary.dueFollowUps} relance${pipelineSummary.dueFollowUps > 1 ? 's' : ''} a traiter maintenant`,
+        title: `${pipelineSummary.dueFollowUps} relance${pipelineSummary.dueFollowUps > 1 ? 's' : ''} à traiter maintenant`,
         description:
-          'La prochaine decision n est pas de parcourir toutes les missions, mais de reprendre les dossiers qui ont une echeance.',
+          'La prochaine décision n’est pas de parcourir toutes les missions, mais de reprendre les dossiers qui ont une échéance.',
         evidence,
         primaryActionLabel: 'Voir la file de suivi',
         primaryActionIcon: 'calendar-clock',
@@ -126,10 +157,10 @@
     if (pipelineSummary.preparedNotApplied > 0) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'Pret a envoyer',
-        title: `${pipelineSummary.preparedNotApplied} candidature${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} preparee${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} mais pas encore envoyee${pipelineSummary.preparedNotApplied > 1 ? 's' : ''}`,
+        statusLabel: 'Prêt à envoyer',
+        title: `${pipelineSummary.preparedNotApplied} candidature${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} préparée${pipelineSummary.preparedNotApplied > 1 ? 's' : ''} mais pas encore envoyée${pipelineSummary.preparedNotApplied > 1 ? 's' : ''}`,
         description:
-          'Le contenu existe deja. La prochaine action utile est de finaliser l envoi ou de changer le statut.',
+          'Le contenu existe déjà. La prochaine action utile est de finaliser l’envoi ou de changer le statut.',
         evidence,
         primaryActionLabel: 'Continuer le dossier',
         primaryActionIcon: 'arrow-right',
@@ -144,7 +175,7 @@
         description:
           'Qualifiez une mission depuis le Feed pour transformer la veille en pipeline actionnable.',
         evidence,
-        primaryActionLabel: 'Preparer une mission',
+        primaryActionLabel: 'Préparer une mission',
         primaryActionIcon: 'briefcase',
       };
     }
@@ -155,8 +186,8 @@
       title: `${pipelineSummary.activeCount} dossier${pipelineSummary.activeCount > 1 ? 's' : ''} actif${pipelineSummary.activeCount > 1 ? 's' : ''}, aucune relance en retard`,
       description:
         pipelineSummary.bottleneck !== null
-          ? `Le goulot actuel est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette etape.`
-          : 'Le pipeline est sous controle. Continuez par le dossier selectionne ou preparez une nouvelle candidature.',
+          ? `Le goulot actuel est ${pipelineSummary.bottleneck.label}. Concentrez les prochaines actions sur cette étape.`
+          : 'Le pipeline est sous contrôle. Continuez par le dossier sélectionné ou préparez une nouvelle candidature.',
       evidence,
       primaryActionLabel: 'Ouvrir le dossier',
       primaryActionIcon: 'arrow-right',
@@ -273,12 +304,59 @@
     onNavigateToFeed?.();
   }
 
+  function openRecommendedDossier(): void {
+    if (!recommendedTrackedMission) {
+      onNavigateToFeed?.();
+      return;
+    }
+
+    void selectMission(recommendedTrackedMission.mission.id);
+  }
+
+  function getRecommendedDossierReason(item: TrackedMission): string {
+    if (isTrackingDue(item.record, Date.now())) {
+      return 'Relance échue: reprenez ce dossier avant de parcourir le reste du pipeline.';
+    }
+
+    if (item.record.currentStatus === 'application_prepared') {
+      return 'Kit prêt: finalisez l’envoi ou changez le statut pour garder le pipeline propre.';
+    }
+
+    return 'Dossier actif: continuez par la dernière mission suivie avant de créer un nouveau dossier.';
+  }
+
   async function transitionTo(status: ApplicationStatus): Promise<void> {
     if (!selectedMission) {
       return;
     }
-    await tracking.transitionStatus(selectedMission.id, status);
-    await showToast(`Statut: ${STATUS_LABELS[status]}`, 'success');
+    const missionId = selectedMission.id;
+    const previousTracking = selectedTracking
+      ? {
+          ...selectedTracking,
+          history: [...selectedTracking.history],
+          generatedAssetIds: [...selectedTracking.generatedAssetIds],
+        }
+      : null;
+    await tracking.transitionStatus(missionId, status);
+    showToastAction(`Statut: ${STATUS_LABELS[status]}`, 'success', {
+      label: 'Annuler',
+      onClick: () => {
+        void tracking.restoreTracking(missionId, previousTracking);
+      },
+    });
+  }
+
+  function formatDecisionTransition(transition: StatusTransition): string {
+    if (transition.from === null) {
+      return `Entrée dans le pipeline: ${STATUS_LABELS[transition.to]}`;
+    }
+
+    return `${STATUS_LABELS[transition.from]} vers ${STATUS_LABELS[transition.to]}`;
+  }
+
+  function formatDecisionNote(note: string | null): string | null {
+    const trimmed = note?.trim();
+    return trimmed ? trimmed : null;
   }
 
   async function saveNextAction(): Promise<void> {
@@ -405,14 +483,99 @@
         />
       </div>
     {/if}
+
+    {#if !isLoading}
+      <section
+        class="mt-3 rounded-xl border border-blueprint-blue/15 bg-surface-white p-3"
+        aria-label="Dossier recommandé"
+      >
+        <div class="flex items-start justify-between gap-3">
+          <div class="min-w-0">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+              Dossier recommandé
+            </p>
+            {#if recommendedTrackedMission}
+              <h3 class="mt-1 truncate text-sm font-semibold text-text-primary">
+                {recommendedTrackedMission.mission.title}
+              </h3>
+              <p class="mt-1 text-xs leading-5 text-text-subtle">
+                {getRecommendedDossierReason(recommendedTrackedMission)}
+              </p>
+              <div class="mt-2 flex flex-wrap items-center gap-2">
+                <span
+                  class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-[10px] font-medium text-blueprint-blue"
+                >
+                  {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
+                </span>
+                {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
+                  <span class="text-[10px] text-text-muted">
+                    Action {formatNextAction(recommendedTrackedMission.record.nextActionAt)}
+                  </span>
+                {/if}
+              </div>
+            {:else}
+              <h3 class="mt-1 text-sm font-semibold text-text-primary">
+                Aucun dossier suivi pour l’instant
+              </h3>
+              <p class="mt-1 text-xs leading-5 text-text-subtle">
+                Qualifiez une mission depuis le Feed pour transformer la veille en candidature.
+              </p>
+            {/if}
+          </div>
+          <button
+            type="button"
+            class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+            onclick={openRecommendedDossier}
+          >
+            <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
+            {recommendedTrackedMission ? 'Ouvrir' : 'Aller au feed'}
+          </button>
+        </div>
+      </section>
+    {/if}
     <ApplicationPipelineSummary summary={pipelineSummary} />
   </section>
 
   {#if isLoading}
-    <div class="mt-4 section-card rounded-xl p-5 space-y-3">
-      <div class="h-3 w-28 rounded-full bg-subtle-gray"></div>
-      <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
-      <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
+    <div class="mt-4 section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
+      <div class="flex items-start justify-between gap-3">
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Chargement candidatures
+          </p>
+          <h3 class="mt-1 text-sm font-semibold text-text-primary">
+            Reconstruction du pipeline local
+          </h3>
+          <p class="mt-1 text-xs leading-5 text-text-subtle">
+            Pulse relie les missions, statuts et contenus générés avant de recommander le prochain
+            dossier.
+          </p>
+        </div>
+        <Icon name="loader" size={16} class="mt-1 shrink-0 animate-spin text-blueprint-blue" />
+      </div>
+
+      <div
+        class="mt-4 grid gap-2 md:grid-cols-3"
+        aria-label="Progression du chargement candidatures"
+      >
+        {#each loadingProgressSteps as step}
+          <div class="rounded-lg border border-border-light bg-page-canvas p-3">
+            <div
+              class="flex h-7 w-7 items-center justify-center rounded-md bg-blueprint-blue/8 text-blueprint-blue"
+            >
+              <Icon name={step.icon} size={13} />
+            </div>
+            <p class="mt-2 text-xs font-medium text-text-primary">{step.label}</p>
+            <p class="mt-1 text-[11px] leading-5 text-text-subtle">{step.detail}</p>
+          </div>
+        {/each}
+      </div>
+
+      <div class="mt-4 space-y-3">
+        <div class="h-3 w-28 rounded-full bg-subtle-gray"></div>
+        <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
+        <div class="h-20 rounded-xl bg-subtle-gray/70"></div>
+      </div>
     </div>
   {:else if loadError}
     <div class="mt-4">
@@ -570,6 +733,50 @@
                 {/if}
               </div>
             </div>
+
+            {#if selectedDecisionHistory.length > 0}
+              <div
+                class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3"
+                aria-label="Historique des décisions"
+              >
+                <div class="flex items-center justify-between gap-3">
+                  <p class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted">
+                    Historique des décisions
+                  </p>
+                  <span class="text-[10px] text-text-muted">
+                    {selectedTracking?.history.length ?? 0} événement{(selectedTracking?.history
+                      .length ?? 0) > 1
+                      ? 's'
+                      : ''}
+                  </span>
+                </div>
+                <ol class="mt-3 space-y-2">
+                  {#each selectedDecisionHistory as transition}
+                    <li
+                      class="flex gap-3 rounded-lg border border-border-light bg-surface-white p-2.5"
+                    >
+                      <span
+                        class="mt-1 h-2 w-2 shrink-0 rounded-full bg-blueprint-blue"
+                        aria-hidden="true"
+                      ></span>
+                      <div class="min-w-0">
+                        <p class="text-xs font-medium text-text-primary">
+                          {formatDecisionTransition(transition)}
+                        </p>
+                        <p class="mt-0.5 text-[11px] text-text-muted">
+                          {formatDate(transition.timestamp)}
+                        </p>
+                        {#if formatDecisionNote(transition.note)}
+                          <p class="mt-1 text-[11px] leading-4 text-text-subtle">
+                            Note : {formatDecisionNote(transition.note)}
+                          </p>
+                        {/if}
+                      </div>
+                    </li>
+                  {/each}
+                </ol>
+              </div>
+            {/if}
           </div>
 
           <div class="section-card rounded-xl p-5">

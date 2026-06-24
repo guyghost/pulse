@@ -3,6 +3,7 @@
   import { Badge } from '@pulse/ui';
   import {
     buildMissionComparisonSnapshot,
+    buildDashboardSuccessMilestones,
     countApplicationsByStage,
     filterApplications,
     filterMissionFeedItems,
@@ -38,6 +39,7 @@
 
   type DashboardStoryTone = 'success' | 'attention' | 'incident';
   type DashboardStoryActionTarget = 'install' | 'sync' | 'applications' | 'mission-feed' | 'cv';
+  type DashboardSetupStepState = 'complete' | 'current' | 'pending';
 
   interface DashboardOperationalStory {
     tone: DashboardStoryTone;
@@ -47,6 +49,25 @@
     action: string;
     actionTarget: DashboardStoryActionTarget;
     signals: string[];
+  }
+
+  interface DashboardSetupStep {
+    title: string;
+    detail: string;
+    state: DashboardSetupStepState;
+    actionLabel?: string;
+    href?: string;
+  }
+
+  interface DashboardSetupPreviewItem {
+    title: string;
+    detail: string;
+    signal: string;
+  }
+
+  interface SyncConflictResolutionStep {
+    title: string;
+    detail: string;
   }
 
   const missionFeed = $derived(data.missionFeed as MissionFeedItem[]);
@@ -66,7 +87,69 @@
   const counts = $derived(countApplicationsByStage(applications));
   const readiness = $derived(getCvSyncReadiness(cv, syncStatuses));
   const isConnected = $derived(Boolean(data.session));
+  const hasConnectedExtension = $derived(connectedSyncStatuses.length > 0);
   const enabledFeatureCount = $derived(featureAccess.filter((feature) => feature.enabled).length);
+  const dashboardReady = $derived(isConnected && !configurationMissing && hasConnectedExtension);
+  const setupRequired = $derived(!dashboardReady);
+  const hasDashboardSnapshots = $derived(
+    missionFeed.length > 0 || applications.length > 0 || connectedSyncStatuses.length > 0
+  );
+  const dashboardSetupSteps = $derived(
+    getDashboardSetupSteps({
+      isConnected,
+      configurationMissing,
+      hasConnectedExtension,
+      hasDashboardSnapshots,
+      loginUrl: data.loginUrl || '/login',
+      chromeStoreUrl,
+    })
+  );
+  const completedDashboardSetupStepCount = $derived(
+    dashboardSetupSteps.filter((step) => step.state === 'complete').length
+  );
+  const currentDashboardSetupStep = $derived(
+    dashboardSetupSteps.find((step) => step.state === 'current') ?? {
+      title: 'Ouvrir le compte MissionPulse',
+      detail: 'Le dashboard doit reconnaître votre compte avant de relier une extension.',
+      state: 'current',
+      actionLabel: 'Se connecter',
+      href: data.loginUrl || '/login',
+    }
+  );
+  const sidebarConnectionTitle = $derived(
+    hasConnectedExtension
+      ? 'Extension Chrome'
+      : isConnected
+        ? 'Extension à relier'
+        : 'Compte requis'
+  );
+  const sidebarConnectionLabel = $derived(
+    hasConnectedExtension ? 'Connectée' : isConnected ? 'À relier' : 'Hors ligne'
+  );
+  const sidebarConnectionDescription = $derived(
+    hasConnectedExtension
+      ? 'Les mises à jour CV seront exécutées depuis les sessions navigateur existantes.'
+      : isConnected
+        ? "Installez l'extension puis reliez ce compte pour recevoir les snapshots."
+        : "Connectez le compte MissionPulse avant de relier l'extension Chrome."
+  );
+  const syncConflictResolutionSteps: SyncConflictResolutionStep[] = [
+    {
+      title: '1. Identifier la source fiable',
+      detail:
+        'Comparez la date, l’appareil et le contexte métier avant de choisir une valeur à conserver.',
+    },
+    {
+      title: '2. Choisir l’arbitrage',
+      detail:
+        'Garder dashboard conserve la donnée web; appliquer extension renvoie la valeur Chrome à la prochaine récupération.',
+    },
+    {
+      title: '3. Ignorer seulement le bruit',
+      detail:
+        'Ignorer ferme le conflit sans écriture métier quand les deux valeurs ne changent pas la décision.',
+    },
+  ];
   const freshMissionCount = $derived(
     missionFeed.filter((mission) => mission.freshness === 'fresh').length
   );
@@ -80,8 +163,10 @@
   let selectedApplicationId = $state<string | null>(null);
   let syncPrepared = $state(false);
   let copiedAssetId = $state<string | null>(null);
+  let privacyConfirmation = $state('');
   const averageScore = $derived(getAverageApplicationScore(applications));
   const nextFollowUp = $derived(getNextFollowUp(applications));
+  const canDeleteConnectedData = $derived(isConnected && privacyConfirmation === 'SUPPRIMER');
   const applicationCountBadgeLabel = $derived(
     applications.length > 0
       ? `${applications.length} suivie${applications.length > 1 ? 's' : ''}`
@@ -149,6 +234,40 @@
   const missionComparison = $derived(
     buildMissionComparisonSnapshot(applications, 3) as MissionComparisonSnapshot
   );
+  const successMilestones = $derived(
+    buildDashboardSuccessMilestones({
+      missionFeed,
+      applications,
+      applicationTimeline,
+      cv,
+      exportAvailable: isConnected && hasDashboardSnapshots,
+    })
+  );
+  const dashboardSetupPreviewItems = $derived([
+    {
+      title: 'Feed connecté',
+      detail: 'Les missions, scores et raisons IA apparaissent après le premier scan extension.',
+      signal: missionFeed.length > 0 ? `${missionFeed.length} missions` : 'Après scan',
+    },
+    {
+      title: 'Candidatures',
+      detail: 'Les sélections, relances et assets générés se remplissent depuis le pipeline local.',
+      signal: applications.length > 0 ? `${applications.length} suivies` : 'Après sélection',
+    },
+    {
+      title: 'Radar TJM',
+      detail: 'Les fourchettes et stacks dominantes se calculent quand des TJM sont synchronisés.',
+      signal: tjmRadar.missionCount > 0 ? `${tjmRadar.missionCount} TJM` : 'Après données',
+    },
+    {
+      title: 'Shortlist',
+      detail: 'La comparaison s’active quand des missions sont sélectionnées ou avancées.',
+      signal:
+        missionComparison.items.length > 0
+          ? `${missionComparison.items.length} missions`
+          : 'Après shortlist',
+    },
+  ] satisfies DashboardSetupPreviewItem[]);
   const recentGeneratedAssets = $derived(generatedAssets.slice(0, 5));
   const syncBlockers = $derived(getSyncBlockers(cv, syncStatuses));
   const readyPlatforms = $derived(getReadyCvSyncPlatforms(syncStatuses));
@@ -318,6 +437,58 @@
     return 'warning';
   }
 
+  function getDashboardSetupSteps(input: {
+    isConnected: boolean;
+    configurationMissing: boolean;
+    hasConnectedExtension: boolean;
+    hasDashboardSnapshots: boolean;
+    loginUrl: string;
+    chromeStoreUrl: string;
+  }): DashboardSetupStep[] {
+    const accountState: DashboardSetupStepState = input.isConnected ? 'complete' : 'current';
+    const extensionState: DashboardSetupStepState = input.hasConnectedExtension
+      ? 'complete'
+      : input.isConnected
+        ? 'current'
+        : 'pending';
+    const scanState: DashboardSetupStepState = input.hasDashboardSnapshots
+      ? 'complete'
+      : !input.isConnected || input.configurationMissing || !input.hasConnectedExtension
+        ? 'pending'
+        : 'current';
+
+    return [
+      {
+        title: 'Ouvrir le compte MissionPulse',
+        detail: input.isConnected
+          ? 'Compte actif, prêt à recevoir les snapshots synchronisés.'
+          : 'Le dashboard doit reconnaître votre compte avant de relier une extension.',
+        state: accountState,
+        actionLabel: accountState === 'current' ? 'Se connecter' : undefined,
+        href: accountState === 'current' ? input.loginUrl : undefined,
+      },
+      {
+        title: "Relier l'extension Chrome",
+        detail:
+          extensionState === 'complete'
+            ? 'Extension prête à transmettre missions, candidatures, CV et statuts.'
+            : input.isConnected
+              ? "Installez l'extension, ouvrez ses réglages puis reliez ce compte."
+              : 'Disponible dès que le compte est ouvert.',
+        state: extensionState,
+        actionLabel: extensionState === 'current' ? "Installer l'extension" : undefined,
+        href: extensionState === 'current' ? input.chromeStoreUrl : undefined,
+      },
+      {
+        title: 'Lancer le premier scan',
+        detail: input.hasDashboardSnapshots
+          ? 'Des snapshots sont disponibles dans le dashboard.'
+          : 'Un scan remplit ensuite les missions, candidatures, CV et statuts.',
+        state: scanState,
+      },
+    ];
+  }
+
   function getTopFreshMission(missions: MissionFeedItem[]): MissionFeedItem | null {
     return missions.reduce<MissionFeedItem | null>((best, mission) => {
       if (mission.freshness !== 'fresh') {
@@ -374,9 +545,14 @@
         badge: 'À traiter',
         title: `Relance à préparer pour ${input.nextFollowUp.title}`,
         impact: `Le dossier est au statut ${stageLabels[input.nextFollowUp.stage]} avec une prochaine action datée.`,
-        action: 'Prochaine action: ouvrir la candidature et traiter la relance avant de scanner plus.',
+        action:
+          'Prochaine action: ouvrir la candidature et traiter la relance avant de scanner plus.',
         actionTarget: 'applications',
-        signals: ['Relance détectée', `${input.applicationCount} candidatures suivies`, 'Pipeline actif'],
+        signals: [
+          'Relance détectée',
+          `${input.applicationCount} candidatures suivies`,
+          'Pipeline actif',
+        ],
       };
     }
 
@@ -413,7 +589,11 @@
         'Aucun conflit prioritaire détecté. Les données connectées peuvent être utilisées pour sélectionner, relancer ou générer.',
       action: 'Prochaine action: traiter la meilleure mission ou vérifier la prochaine relance.',
       actionTarget: 'mission-feed',
-      signals: ['Sync stable', `${input.applicationCount} candidatures`, `${input.freshMissionCount} fraîches`],
+      signals: [
+        'Sync stable',
+        `${input.applicationCount} candidatures`,
+        `${input.freshMissionCount} fraîches`,
+      ],
     };
   }
 
@@ -483,7 +663,7 @@
         class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
         href="#cv"
       >
-        Profil CV
+        CV
       </a>
       <a
         class="flex h-9 items-center rounded-lg px-3 text-sm text-text-subtle hover:bg-page-canvas hover:text-text-primary"
@@ -501,17 +681,32 @@
 
     <div class="absolute inset-x-4 bottom-4">
       <div class="rounded-lg border border-border-light bg-page-canvas p-3">
-        <div class="flex items-center justify-between">
-          <p class="text-xs font-medium text-text-primary">Extension Chrome</p>
-          <span class="h-2 w-2 rounded-full bg-accent-green"></span>
+        <div class="flex items-center justify-between gap-2">
+          <p class="text-xs font-medium text-text-primary">{sidebarConnectionTitle}</p>
+          <span
+            class="inline-flex items-center gap-1.5 rounded-full border bg-surface-white px-2 py-0.5 text-[10px] font-medium {dashboardReady
+              ? 'border-accent-green/25 text-accent-green'
+              : 'border-status-orange/25 text-status-orange'}"
+          >
+            <span
+              class="h-1.5 w-1.5 rounded-full {dashboardReady
+                ? 'bg-accent-green'
+                : 'bg-status-orange'}"
+            ></span>
+            {sidebarConnectionLabel}
+          </span>
         </div>
-        <p class="mt-2 text-xs leading-5 text-text-subtle">
-          Les mises à jour CV seront exécutées depuis les sessions navigateur existantes.
-        </p>
+        <p class="mt-2 text-xs leading-5 text-text-subtle">{sidebarConnectionDescription}</p>
         <div class="mt-3 flex items-center justify-between border-t border-border-light pt-3">
-          <span class="text-xs text-text-subtle">Features actives</span>
+          <span class="text-xs text-text-subtle">
+            {dashboardReady ? 'Features actives' : 'Setup'}
+          </span>
           <span class="text-xs font-semibold text-text-primary">
-            {enabledFeatureCount}/{featureAccess.length}
+            {#if dashboardReady}
+              {enabledFeatureCount}/{featureAccess.length}
+            {:else}
+              {completedDashboardSetupStepCount}/{dashboardSetupSteps.length}
+            {/if}
           </span>
         </div>
       </div>
@@ -593,7 +788,11 @@
               <span
                 class="rounded-full bg-subtle-gray px-2 py-1 text-xs font-medium text-text-subtle"
               >
-                {enabledFeatureCount}/{featureAccess.length} features
+                {#if setupRequired}
+                  {completedDashboardSetupStepCount}/{dashboardSetupSteps.length} setup
+                {:else}
+                  {enabledFeatureCount}/{featureAccess.length} features
+                {/if}
               </span>
               <span
                 class="rounded-full border px-2 py-1 text-xs font-medium {isConnected
@@ -609,12 +808,14 @@
               synchronisés avec votre compte.
             </p>
           </div>
-          <a
-            class="inline-flex h-8 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue shadow-subtle-2 hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12"
-            href="#cv"
-          >
-            Vérifier le CV
-          </a>
+          {#if !setupRequired}
+            <a
+              class="inline-flex h-8 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue shadow-subtle-2 hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12"
+              href="#cv"
+            >
+              Vérifier le CV
+            </a>
+          {/if}
         </div>
 
         <div class="mt-6 flex border-b border-border-light">
@@ -622,47 +823,88 @@
             class="-mb-px border-b-2 border-text-primary px-3 py-2 text-sm font-medium text-text-primary"
             href="#applications"
           >
-            Explore
+            Candidatures
           </a>
           <a class="px-3 py-2 text-sm text-text-subtle hover:text-text-primary" href="#sync"
-            >Synchronisations</a
+            >Synchronisation</a
           >
           <a class="px-3 py-2 text-sm text-text-subtle hover:text-text-primary" href="#cv">CV</a>
         </div>
       </section>
 
-      {#if configurationMissing || !isConnected}
+      {#if setupRequired}
         <section
           class="mb-6 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/8 p-4 shadow-subtle-2"
+          aria-labelledby="dashboard-setup-title"
         >
           <div class="flex flex-col gap-4 md:flex-row md:items-start md:justify-between">
             <div>
-              <p class="text-sm font-medium text-text-primary">Aucune extension connectée</p>
+              <p id="dashboard-setup-title" class="text-sm font-medium text-text-primary">
+                Checklist de setup
+              </p>
               <p class="mt-1 max-w-3xl text-sm leading-6 text-text-subtle">
-                Installez MissionPulse, connectez votre compte depuis les réglages de l'extension,
-                puis lancez un scan. Le dashboard se remplira avec les missions, candidatures, CV et
-                statuts synchronisés depuis votre navigateur.
+                Le dashboard devient utile après trois validations: compte reconnu, extension
+                reliée, premier scan lancé depuis Chrome.
               </p>
               <p class="mt-2 text-xs leading-5 text-text-subtle">
                 Les cookies et sessions Free-Work, LeHibou, Hiway, Collective, Cherry Pick ou Malt
                 restent dans Chrome.
               </p>
             </div>
-            <div class="flex shrink-0 flex-wrap gap-2">
+            {#if currentDashboardSetupStep.href && currentDashboardSetupStep.actionLabel}
               <a
-                class="inline-flex h-9 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-                href={chromeStoreUrl}
+                class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                href={currentDashboardSetupStep.href}
               >
-                Installer l'extension
+                {currentDashboardSetupStep.actionLabel}
               </a>
-              <a
-                class="inline-flex h-9 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-surface-white px-3 text-xs font-semibold text-blueprint-blue hover:bg-blueprint-blue/8"
-                href={data.loginUrl || '/login'}
-              >
-                {isConnected ? "Connecter l'extension" : 'Se connecter'}
-              </a>
-            </div>
+            {/if}
           </div>
+
+          <ol class="mt-4 grid gap-2 md:grid-cols-3" aria-label="Progression setup dashboard">
+            {#each dashboardSetupSteps as step, index}
+              <li
+                class="rounded-lg border bg-surface-white p-3 {step.state === 'complete'
+                  ? 'border-accent-green/20'
+                  : step.state === 'current'
+                    ? 'border-blueprint-blue/25 shadow-subtle-2'
+                    : 'border-border-light'}"
+              >
+                <div class="flex items-start gap-3">
+                  <span
+                    class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border text-xs font-semibold {step.state ===
+                    'complete'
+                      ? 'border-accent-green/25 bg-accent-green/10 text-accent-green'
+                      : step.state === 'current'
+                        ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                        : 'border-border-light bg-page-canvas text-text-muted'}"
+                    aria-hidden="true"
+                  >
+                    {#if step.state === 'complete'}
+                      <svg
+                        viewBox="0 0 24 24"
+                        class="h-3.5 w-3.5"
+                        fill="none"
+                        stroke="currentColor"
+                        stroke-width="2.5"
+                        stroke-linecap="round"
+                        stroke-linejoin="round"
+                      >
+                        <path d="m5 12 4 4L19 6" />
+                      </svg>
+                    {:else}
+                      {index + 1}
+                    {/if}
+                  </span>
+                  <div class="min-w-0">
+                    <p class="text-sm font-semibold text-text-primary">{step.title}</p>
+                    <p class="mt-1 text-xs leading-5 text-text-subtle">{step.detail}</p>
+                  </div>
+                </div>
+              </li>
+            {/each}
+          </ol>
+
           {#if configurationMissing && import.meta.env.DEV}
             <p
               class="mt-3 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs leading-5 text-text-subtle"
@@ -673,769 +915,909 @@
         </section>
       {/if}
 
-      <section
-        class="mb-6 rounded-xl border p-4 shadow-subtle-2 {operationalStory.tone === 'incident'
-          ? 'border-status-red/25 bg-status-red/8'
-          : operationalStory.tone === 'attention'
-            ? 'border-status-orange/25 bg-status-orange/8'
-            : 'border-blueprint-blue/20 bg-blueprint-blue/8'}"
-        aria-labelledby="operational-story-title"
-      >
-        <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div class="min-w-0">
-            <div class="flex flex-wrap items-center gap-2">
-              <p class="eyebrow text-text-subtle">Etat operationnel</p>
-              <Badge
-                label={operationalStory.badge}
-                variant={operationalStory.tone === 'incident'
-                  ? 'error'
-                  : operationalStory.tone === 'attention'
-                    ? 'warning'
-                    : 'success'}
-              />
-            </div>
-            <h2 id="operational-story-title" class="mt-2 text-xl font-semibold text-text-primary">
-              {operationalStory.title}
-            </h2>
-            <div class="mt-4 grid gap-3 md:grid-cols-2">
-              <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
-                  Impact
-                </p>
-                <p class="mt-1 text-sm leading-6 text-text-secondary">{operationalStory.impact}</p>
-              </div>
-              <div>
-                <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
-                  Action recommandée
-                </p>
-                <p class="mt-1 text-sm font-medium leading-6 text-text-primary">
-                  {operationalStory.action}
-                </p>
-              </div>
-            </div>
-            <div class="mt-4 flex flex-wrap gap-2">
-              {#each operationalStory.signals as signal}
-                <span
-                  class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1 text-xs font-medium text-text-subtle"
-                >
-                  {signal}
-                </span>
-              {/each}
-            </div>
-          </div>
-
-          <a
-            class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-            href={operationalStory.actionTarget === 'install'
-              ? chromeStoreUrl
-              : operationalStory.actionTarget === 'sync'
-                ? '#sync'
-                : operationalStory.actionTarget === 'applications'
-                  ? '#applications'
-                  : operationalStory.actionTarget === 'cv'
-                    ? '#cv'
-                    : '#mission-feed-title'}
-          >
-            Aller à l'action
-          </a>
-        </div>
-      </section>
-
-      <section
-        class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-        aria-label="Indicateurs candidatures"
-      >
-        <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
-          <p class="text-xs font-medium uppercase text-text-subtle">Candidatures</p>
-          <div class="mt-3 flex items-end justify-between">
-            <p class="text-3xl font-semibold">{applications.length}</p>
-            <Badge
-              label={applicationCountBadgeLabel}
-              variant={applications.length > 0 ? 'success' : 'source'}
-            />
-          </div>
-        </div>
-        <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
-          <p class="text-xs font-medium uppercase text-text-subtle">Taux moyen</p>
-          <div class="mt-3 flex items-end justify-between">
-            <p class="text-3xl font-semibold">{averageScore}%</p>
-            <Badge
-              label={averageScoreBadgeLabel}
-              variant={averageScore > 0 ? 'status' : 'source'}
-            />
-          </div>
-        </div>
-        <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
-          <p class="text-xs font-medium uppercase text-text-subtle">Entretiens</p>
-          <div class="mt-3 flex items-end justify-between">
-            <p class="text-3xl font-semibold">{counts.interview}</p>
-            <Badge
-              label={interviewBadgeLabel}
-              variant={counts.interview > 0 ? 'warning' : 'source'}
-            />
-          </div>
-        </div>
-        <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
-          <p class="text-xs font-medium uppercase text-text-subtle">Prochaine relance</p>
-          <div class="mt-3 flex items-end justify-between">
-            <p class="text-3xl font-semibold">{formatDate(nextFollowUp?.nextActionAt ?? null)}</p>
-            <Badge label={nextFollowUpBadgeLabel} variant={nextFollowUp ? 'warning' : 'source'} />
-          </div>
-        </div>
-      </section>
-
-      <section class="mt-6" aria-labelledby="mission-feed-title">
-        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p class="eyebrow text-text-subtle">Feed connecté</p>
-            <div class="mt-1 flex flex-wrap items-center gap-2">
-              <h2 id="mission-feed-title" class="text-lg font-semibold text-text-primary">
-                Missions détectées par l'extension
-              </h2>
-              <Badge
-                label={missionFeed.length > 0 ? 'Synchronisé' : 'En attente extension'}
-                variant={missionFeed.length > 0 ? 'success' : 'source'}
-              />
-            </div>
-          </div>
-          <p class="text-sm text-text-subtle">
-            {filteredMissionFeed.length}/{missionFeed.length} affichées, {freshMissionCount}
-            fraîches
-          </p>
-        </div>
-
-        {#if form?.selectionError}
-          <p
-            class="mb-3 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
-          >
-            {form.selectionError}
-          </p>
-        {/if}
-
-        {#if form?.selectionSuccess}
-          <p
-            class="mb-3 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
-          >
-            {form.selectionSuccess}
-          </p>
-        {/if}
-
-        <div
-          class="mb-3 grid gap-3 rounded-xl border border-border-light bg-surface-white p-3 md:grid-cols-[minmax(0,1fr)_160px_150px_140px]"
+      {#if setupRequired}
+        <section
+          class="mb-6 rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          aria-labelledby="dashboard-setup-preview-title"
         >
-          <label class="min-w-0 text-xs font-medium text-text-subtle">
-            Recherche
-            <input
-              class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
-              placeholder="Mission, client, stack"
-              bind:value={missionFeedQuery}
-            />
-          </label>
-          <label class="text-xs font-medium text-text-subtle">
-            Source
-            <select
-              class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
-              bind:value={missionFeedSource}
-            >
-              {#each sourceFilters as source}
-                <option value={source.value}>{source.label}</option>
-              {/each}
-            </select>
-          </label>
-          <label class="text-xs font-medium text-text-subtle">
-            Score min.
-            <input
-              class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
-              type="number"
-              min="0"
-              max="100"
-              bind:value={missionFeedMinScore}
-            />
-          </label>
-          <label class="text-xs font-medium text-text-subtle">
-            Fraîcheur
-            <select
-              class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
-              bind:value={missionFeedFreshness}
-            >
-              <option value="all">Toutes</option>
-              <option value="fresh">Récentes</option>
-              <option value="stale">À revoir</option>
-            </select>
-          </label>
-        </div>
-
-        <div class="grid gap-3 lg:grid-cols-3">
-          {#if missionFeed.length === 0}
-            <article
-              class="rounded-xl border border-dashed border-border-light bg-surface-white p-5 lg:col-span-3"
-            >
-              <div class="flex flex-wrap items-start justify-between gap-3">
-                <div>
-                  <p class="text-sm font-semibold text-text-primary">
-                    Aucune mission reçue depuis l'extension
-                  </p>
-                  <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
-                    Connectez l'extension à votre compte MissionPulse puis lancez un scan. Les
-                    missions retenues, les favoris et les statuts de candidature apparaîtront ici.
-                  </p>
-                </div>
-                <Badge label="En attente" variant="source" />
-              </div>
-              <div class="mt-4 flex flex-wrap gap-2">
-                <a
-                  class="inline-flex h-9 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-                  href={chromeStoreUrl}
-                >
-                  Installer l'extension
-                </a>
-                <a
-                  class="inline-flex h-9 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
-                  href={data.loginUrl || '/login'}
-                >
-                  Connecter mon compte
-                </a>
-              </div>
-              <p class="mt-2 text-sm leading-6 text-text-subtle">
-                Le dashboard ne lit pas directement vos sessions plateforme.
+          <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p class="eyebrow text-text-subtle">Après setup</p>
+              <h2
+                id="dashboard-setup-preview-title"
+                class="mt-1 text-lg font-semibold text-text-primary"
+              >
+                Surfaces activées après setup
+              </h2>
+              <p class="mt-2 max-w-3xl text-sm leading-6 text-text-subtle">
+                Les vues de décision restent résumées tant que le compte, l'extension et le premier
+                scan ne sont pas validés. Le dashboard évite ainsi les métriques vides ou les N/A
+                hors contexte.
               </p>
-            </article>
-          {:else if filteredMissionFeed.length === 0}
-            <article
-              class="rounded-xl border border-dashed border-border-light bg-surface-white p-5"
+            </div>
+            <span
+              class="inline-flex h-8 shrink-0 items-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-subtle"
             >
-              <p class="text-sm font-semibold text-text-primary">Aucune mission ne correspond</p>
-              <p class="mt-2 text-sm leading-6 text-text-subtle">
-                Ajustez la recherche, la source, le score ou la fraîcheur.
-              </p>
-            </article>
-          {/if}
+              {completedDashboardSetupStepCount}/{dashboardSetupSteps.length} validées
+            </span>
+          </div>
 
-          {#each filteredMissionFeed.slice(0, 6) as mission}
-            <article
-              class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div class="flex flex-wrap gap-1.5">
-                  <Badge label={sourceLabels[mission.source]} variant="source" />
-                  {#if mission.sourceHealthStatus}
-                    <Badge
-                      label={`Santé: ${statusLabels[mission.sourceHealthStatus]}`}
-                      variant={getPlatformStatusBadgeVariant(mission.sourceHealthStatus)}
-                    />
-                  {/if}
+          <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {#each dashboardSetupPreviewItems as item}
+              <article class="rounded-lg border border-border-light bg-page-canvas p-3">
+                <div class="flex items-start justify-between gap-3">
+                  <h3 class="text-sm font-semibold text-text-primary">{item.title}</h3>
+                  <Badge label={item.signal} variant="source" />
                 </div>
+                <p class="mt-2 text-xs leading-5 text-text-subtle">{item.detail}</p>
+              </article>
+            {/each}
+          </div>
+        </section>
+      {/if}
+
+      {#if !setupRequired}
+        <section
+          class="mb-6 rounded-xl border p-4 shadow-subtle-2 {operationalStory.tone === 'incident'
+            ? 'border-status-red/25 bg-status-red/8'
+            : operationalStory.tone === 'attention'
+              ? 'border-status-orange/25 bg-status-orange/8'
+              : 'border-blueprint-blue/20 bg-blueprint-blue/8'}"
+          aria-labelledby="operational-story-title"
+        >
+          <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="min-w-0">
+              <div class="flex flex-wrap items-center gap-2">
+                <p class="eyebrow text-text-subtle">État opérationnel</p>
                 <Badge
-                  label={`${mission.score}%${mission.grade ? ` · ${mission.grade}` : ''}`}
-                  variant={mission.score >= 85 ? 'success' : 'warning'}
+                  label={operationalStory.badge}
+                  variant={operationalStory.tone === 'incident'
+                    ? 'error'
+                    : operationalStory.tone === 'attention'
+                      ? 'warning'
+                      : 'success'}
                 />
               </div>
-              <h3 class="mt-3 text-sm font-semibold leading-tight text-text-primary">
-                {mission.title}
-              </h3>
-              <p class="mt-1 text-xs text-text-subtle">
-                {mission.client ?? 'Client non renseigné'} ·
-                {mission.location ?? 'Localisation non renseignée'}
-              </p>
-
-              <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
-                <div class="rounded-lg bg-page-canvas px-2 py-2">
-                  <p class="text-text-muted">TJM</p>
-                  <p class="mt-1 font-medium text-text-primary">
-                    {mission.dailyRate ? `${mission.dailyRate}€` : 'N/A'}
+              <h2 id="operational-story-title" class="mt-2 text-xl font-semibold text-text-primary">
+                {operationalStory.title}
+              </h2>
+              <div class="mt-4 grid gap-3 md:grid-cols-2">
+                <div>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
+                    Impact
+                  </p>
+                  <p class="mt-1 text-sm leading-6 text-text-secondary">
+                    {operationalStory.impact}
                   </p>
                 </div>
-                <div class="rounded-lg bg-page-canvas px-2 py-2">
-                  <p class="text-text-muted">Fraîcheur</p>
-                  <p class="mt-1 font-medium text-text-primary">
-                    {mission.freshness === 'fresh' ? 'Récente' : 'À revoir'}
+                <div>
+                  <p class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle">
+                    Action recommandée
+                  </p>
+                  <p class="mt-1 text-sm font-medium leading-6 text-text-primary">
+                    {operationalStory.action}
                   </p>
                 </div>
-                <div class="rounded-lg bg-page-canvas px-2 py-2">
-                  <p class="text-text-muted">Doublons</p>
-                  <p class="mt-1 font-medium text-text-primary">{mission.duplicateCount}</p>
-                </div>
               </div>
-
-              {#if mission.semanticReason}
-                <p class="mt-3 line-clamp-2 text-xs leading-5 text-text-subtle">
-                  {mission.semanticReason}
-                </p>
-              {/if}
-              {#if mission.sourceHealthErrorMessage}
-                <p
-                  class="mt-3 rounded-md border border-status-orange/20 bg-status-orange/8 px-2 py-1.5 text-xs leading-5 text-status-orange"
-                >
-                  {mission.sourceHealthErrorCode ?? 'connector_health'}:
-                  {mission.sourceHealthErrorMessage}
-                </p>
-              {/if}
-
-              <div class="mt-3 grid grid-cols-3 gap-1.5 text-[10px]">
-                {#each scoreCriteriaLabels as criterion}
-                  <div class="rounded-md border border-border-light bg-surface-white px-2 py-1.5">
-                    <p class="text-text-muted">{criterion.label}</p>
-                    <p class="mt-0.5 font-medium text-text-primary">
-                      {formatScoreCriterion(mission.scoreCriteria[criterion.key])}
-                    </p>
-                  </div>
-                {/each}
-              </div>
-
-              <div class="mt-3 flex flex-wrap gap-1.5">
-                {#each mission.stack.slice(0, 4) as skill}
+              <div class="mt-4 flex flex-wrap gap-2">
+                {#each operationalStory.signals as signal}
                   <span
-                    class="rounded-md bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
+                    class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1 text-xs font-medium text-text-subtle"
                   >
-                    {skill}
+                    {signal}
                   </span>
                 {/each}
               </div>
-
-              <div class="mt-4 flex items-center justify-between border-t border-border-light pt-3">
-                <span class="text-xs text-text-subtle">{formatDate(mission.scrapedAt)}</span>
-                {#if mission.applicationStage}
-                  <Badge label={stageLabels[mission.applicationStage]} variant="status" />
-                {:else if isConnected}
-                  <div class="flex items-center gap-2">
-                    <form method="POST" action="?/archiveMission">
-                      <input type="hidden" name="missionId" value={mission.id} />
-                      <button
-                        type="submit"
-                        class="text-xs font-medium text-text-subtle hover:text-text-primary"
-                      >
-                        Archiver
-                      </button>
-                    </form>
-                    <form method="POST" action="?/selectMission">
-                      <input type="hidden" name="missionId" value={mission.id} />
-                      <button
-                        type="submit"
-                        class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
-                      >
-                        Sélectionner
-                      </button>
-                    </form>
-                  </div>
-                {:else}
-                  <a
-                    class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
-                    href={mission.url}
-                    target="_blank"
-                    rel="noreferrer"
-                  >
-                    Ouvrir
-                  </a>
-                {/if}
-              </div>
-            </article>
-          {/each}
-        </div>
-      </section>
-
-      <section id="tjm" class="mt-6" aria-labelledby="tjm-radar-title">
-        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p class="eyebrow text-text-subtle">Radar TJM</p>
-            <h2 id="tjm-radar-title" class="mt-1 text-lg font-semibold text-text-primary">
-              Tendances marché synchronisées
-            </h2>
-          </div>
-          <p class="text-sm text-text-subtle">
-            {tjmRadar.missionCount} missions avec TJM exploitable
-          </p>
-        </div>
-
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          <article
-            class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
-          >
-            <p class="text-xs font-medium uppercase text-text-subtle">TJM moyen</p>
-            <div class="mt-3 flex items-end justify-between gap-3">
-              <p class="text-3xl font-semibold text-text-primary">
-                {formatDailyRate(tjmRadar.averageDailyRate)}
-              </p>
-              <Badge label={`${tjmRadar.missionCount} offres`} variant="source" />
             </div>
-          </article>
-          <article
-            class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
-          >
-            <p class="text-xs font-medium uppercase text-text-subtle">Fourchette</p>
-            <p class="mt-3 text-2xl font-semibold text-text-primary">
-              {formatDailyRate(tjmRadar.minDailyRate)} - {formatDailyRate(tjmRadar.maxDailyRate)}
-            </p>
-            <p class="mt-2 text-xs text-text-subtle">Min / max des missions synchronisées</p>
-          </article>
-          <article
-            class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
-          >
-            <p class="text-xs font-medium uppercase text-text-subtle">Stack dominante</p>
-            <p class="mt-3 text-2xl font-semibold text-text-primary">
-              {tjmRadar.topStack ?? 'N/A'}
-            </p>
-            <p class="mt-2 text-xs text-text-subtle">Par volume de missions qualifiées</p>
-          </article>
-          <article
-            class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
-          >
-            <p class="text-xs font-medium uppercase text-text-subtle">Tendance</p>
-            <div class="mt-3 flex items-end justify-between gap-3">
-              <p class="text-lg font-semibold text-text-primary">
-                {tjmTrendLabels[tjmRadar.trend]}
+
+            <a
+              class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+              href={operationalStory.actionTarget === 'install'
+                ? chromeStoreUrl
+                : operationalStory.actionTarget === 'sync'
+                  ? '#sync'
+                  : operationalStory.actionTarget === 'applications'
+                    ? '#applications'
+                    : operationalStory.actionTarget === 'cv'
+                      ? '#cv'
+                      : '#mission-feed-title'}
+            >
+              Aller à l'action
+            </a>
+          </div>
+        </section>
+      {/if}
+
+      {#if !setupRequired}
+        <section
+          class="mb-6 rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+          aria-labelledby="success-milestones-title"
+        >
+          <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p class="eyebrow text-text-subtle">Résultats débloqués</p>
+              <h2
+                id="success-milestones-title"
+                class="mt-1 text-lg font-semibold text-text-primary"
+              >
+                Jalons de confiance
+              </h2>
+              <p class="mt-2 max-w-3xl text-sm leading-6 text-text-subtle">
+                Les premiers gains concrets restent visibles: mission qualifiée, relance traitée, CV
+                prêt et export disponible.
               </p>
+            </div>
+          </div>
+
+          <div class="mt-4 grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {#each successMilestones as milestone}
+              <article
+                class="rounded-lg border p-3 {milestone.state === 'complete'
+                  ? 'border-accent-green/20 bg-accent-green/8'
+                  : milestone.state === 'ready'
+                    ? 'border-blueprint-blue/20 bg-blueprint-blue/8'
+                    : 'border-border-light bg-page-canvas'}"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div class="min-w-0">
+                    <p class="text-xs font-semibold text-text-primary">{milestone.title}</p>
+                    <p class="mt-1 text-sm font-semibold text-text-primary">
+                      {milestone.result}
+                    </p>
+                  </div>
+                  <Badge
+                    label={milestone.signal}
+                    variant={milestone.state === 'complete'
+                      ? 'success'
+                      : milestone.state === 'ready'
+                        ? 'status'
+                        : 'source'}
+                  />
+                </div>
+                <p class="mt-2 text-xs leading-5 text-text-subtle">{milestone.detail}</p>
+              </article>
+            {/each}
+          </div>
+        </section>
+      {/if}
+
+      {#if !setupRequired}
+        <section
+          class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+          aria-label="Indicateurs candidatures"
+        >
+          <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
+            <p class="text-xs font-medium uppercase text-text-subtle">Candidatures</p>
+            <div class="mt-3 flex items-end justify-between">
+              <p class="text-3xl font-semibold">{applications.length}</p>
               <Badge
-                label={tjmRadar.trendDelta === null
-                  ? 'N/A'
-                  : `${tjmRadar.trendDelta > 0 ? '+' : ''}${tjmRadar.trendDelta}€`}
-                variant={tjmRadar.trend === 'up'
-                  ? 'success'
-                  : tjmRadar.trend === 'down'
-                    ? 'warning'
-                    : 'status'}
+                label={applicationCountBadgeLabel}
+                variant={applications.length > 0 ? 'success' : 'source'}
               />
             </div>
-          </article>
-        </div>
-
-        <div class="mt-3 grid gap-3 lg:grid-cols-2">
-          <article
-            class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="text-sm font-semibold text-text-primary">Par source</h3>
-              <Badge label={tjmRadar.topSource ?? 'N/A'} variant="source" />
-            </div>
-            <div class="mt-3 space-y-2">
-              {#if tjmRadar.sourceSegments.length === 0}
-                <p
-                  class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
-                >
-                  Aucun TJM synchronisé par source.
-                </p>
-              {/if}
-              {#each tjmRadar.sourceSegments.slice(0, 4) as segment}
-                <div class="rounded-lg bg-page-canvas px-3 py-2 text-xs">
-                  <div class="flex items-center justify-between gap-3">
-                    <span class="font-medium text-text-primary">{segment.label}</span>
-                    <span class="text-text-subtle">{segment.missionCount} missions</span>
-                  </div>
-                  <div class="mt-2 flex items-center justify-between gap-3">
-                    <span class="text-text-muted">
-                      {formatDailyRate(segment.minDailyRate)} - {formatDailyRate(
-                        segment.maxDailyRate
-                      )}
-                    </span>
-                    <span class="font-semibold text-text-primary">
-                      {formatDailyRate(segment.averageDailyRate)}
-                    </span>
-                  </div>
-                </div>
-              {/each}
-            </div>
-          </article>
-
-          <article
-            class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
-          >
-            <div class="flex items-center justify-between gap-3">
-              <h3 class="text-sm font-semibold text-text-primary">Par stack</h3>
-              <Badge label={tjmRadar.stackSegments.length.toString()} variant="tech" />
-            </div>
-            <div class="mt-3 space-y-2">
-              {#if tjmRadar.stackSegments.length === 0}
-                <p
-                  class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
-                >
-                  Aucun TJM synchronisé par stack.
-                </p>
-              {/if}
-              {#each tjmRadar.stackSegments.slice(0, 5) as segment}
-                <div class="rounded-lg bg-page-canvas px-3 py-2 text-xs">
-                  <div class="flex items-center justify-between gap-3">
-                    <span class="font-medium text-text-primary">{segment.label}</span>
-                    <span class="font-semibold text-text-primary">
-                      {formatDailyRate(segment.averageDailyRate)}
-                    </span>
-                  </div>
-                  <p class="mt-1 text-text-subtle">
-                    {segment.missionCount} missions · {formatDailyRate(segment.minDailyRate)} -
-                    {formatDailyRate(segment.maxDailyRate)}
-                  </p>
-                </div>
-              {/each}
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section class="mt-6" aria-labelledby="feature-flags-title">
-        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p class="eyebrow text-text-subtle">Feature flipping</p>
-            <h2 id="feature-flags-title" class="mt-1 text-lg font-semibold text-text-primary">
-              Fonctionnalités disponibles sur le dashboard
-            </h2>
           </div>
-          <p class="text-sm text-text-subtle">
-            {enabledFeatureCount} actives, {featureAccess.length - enabledFeatureCount} verrouillées
-          </p>
-        </div>
+          <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
+            <p class="text-xs font-medium uppercase text-text-subtle">Taux moyen</p>
+            <div class="mt-3 flex items-end justify-between">
+              <p class="text-3xl font-semibold">{averageScore}%</p>
+              <Badge
+                label={averageScoreBadgeLabel}
+                variant={averageScore > 0 ? 'status' : 'source'}
+              />
+            </div>
+          </div>
+          <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
+            <p class="text-xs font-medium uppercase text-text-subtle">Entretiens</p>
+            <div class="mt-3 flex items-end justify-between">
+              <p class="text-3xl font-semibold">{counts.interview}</p>
+              <Badge
+                label={interviewBadgeLabel}
+                variant={counts.interview > 0 ? 'warning' : 'source'}
+              />
+            </div>
+          </div>
+          <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
+            <p class="text-xs font-medium uppercase text-text-subtle">Prochaine relance</p>
+            <div class="mt-3 flex items-end justify-between">
+              <p class="text-3xl font-semibold">{formatDate(nextFollowUp?.nextActionAt ?? null)}</p>
+              <Badge label={nextFollowUpBadgeLabel} variant={nextFollowUp ? 'warning' : 'source'} />
+            </div>
+          </div>
+        </section>
 
-        <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-          {#each featureAccess as feature}
-            <article
-              class="rounded-lg border bg-surface-white p-4 shadow-subtle-2 {feature.enabled
-                ? 'border-border-light'
-                : 'border-dashed border-disabled-gray opacity-80'}"
-            >
-              <div class="flex items-start justify-between gap-3">
-                <div>
-                  <p class="text-[11px] font-medium uppercase text-text-muted">
-                    {featureAreaLabels[feature.area]}
-                  </p>
-                  <h3 class="mt-1 text-sm font-semibold text-text-primary">{feature.label}</h3>
-                </div>
+        <section class="mt-6" aria-labelledby="mission-feed-title">
+          <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p class="eyebrow text-text-subtle">Feed connecté</p>
+              <div class="mt-1 flex flex-wrap items-center gap-2">
+                <h2 id="mission-feed-title" class="text-lg font-semibold text-text-primary">
+                  Missions détectées par l'extension
+                </h2>
                 <Badge
-                  label={feature.enabled
-                    ? requirementLabels[feature.requirement]
-                    : (feature.lockedReason ?? 'Verrouillé')}
-                  variant={feature.enabled ? 'success' : 'warning'}
+                  label={missionFeed.length > 0 ? 'Synchronisé' : 'En attente extension'}
+                  variant={missionFeed.length > 0 ? 'success' : 'source'}
                 />
               </div>
-              <p class="mt-3 text-xs leading-5 text-text-subtle">{feature.description}</p>
-            </article>
-          {/each}
-        </div>
-      </section>
-
-      <section id="comparison" class="mt-6" aria-labelledby="mission-comparison-title">
-        <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
-          <div>
-            <p class="eyebrow text-text-subtle">Shortlist</p>
-            <h2 id="mission-comparison-title" class="mt-1 text-lg font-semibold text-text-primary">
-              Comparaison des missions prioritaires
-            </h2>
-          </div>
-          <p class="text-sm text-text-subtle">
-            {missionComparison.items.length} missions comparées · score moyen
-            {missionComparison.averageScore}%
-          </p>
-        </div>
-
-        {#if missionComparison.items.length === 0}
-          <article class="rounded-xl border border-dashed border-border-light bg-surface-white p-5">
-            <p class="text-sm font-semibold text-text-primary">Aucune shortlist à comparer</p>
-            <p class="mt-2 text-sm leading-6 text-text-subtle">
-              Sélectionnez une mission depuis le feed ou avancez une candidature pour alimenter la
-              comparaison dashboard.
+            </div>
+            <p class="text-sm text-text-subtle">
+              {filteredMissionFeed.length}/{missionFeed.length} affichées, {freshMissionCount}
+              fraîches
             </p>
-          </article>
-        {:else}
+          </div>
+
+          {#if form?.selectionError}
+            <p
+              class="mb-3 rounded-lg border border-status-red/20 bg-status-red/8 px-3 py-2 text-xs leading-5 text-status-red"
+            >
+              {form.selectionError}
+            </p>
+          {/if}
+
+          {#if form?.selectionSuccess}
+            <p
+              class="mb-3 rounded-lg border border-accent-green/15 bg-accent-green/8 px-3 py-2 text-xs leading-5 text-accent-green"
+            >
+              {form.selectionSuccess}
+            </p>
+          {/if}
+
+          <div
+            class="mb-3 grid gap-3 rounded-xl border border-border-light bg-surface-white p-3 md:grid-cols-[minmax(0,1fr)_160px_150px_140px]"
+          >
+            <label class="min-w-0 text-xs font-medium text-text-subtle">
+              Recherche
+              <input
+                class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
+                placeholder="Mission, client, stack"
+                bind:value={missionFeedQuery}
+              />
+            </label>
+            <label class="text-xs font-medium text-text-subtle">
+              Source
+              <select
+                class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
+                bind:value={missionFeedSource}
+              >
+                {#each sourceFilters as source}
+                  <option value={source.value}>{source.label}</option>
+                {/each}
+              </select>
+            </label>
+            <label class="text-xs font-medium text-text-subtle">
+              Score min.
+              <input
+                class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
+                type="number"
+                min="0"
+                max="100"
+                bind:value={missionFeedMinScore}
+              />
+            </label>
+            <label class="text-xs font-medium text-text-subtle">
+              Fraîcheur
+              <select
+                class="mt-1 h-10 w-full rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-primary outline-none focus:border-blueprint-blue"
+                bind:value={missionFeedFreshness}
+              >
+                <option value="all">Toutes</option>
+                <option value="fresh">Récentes</option>
+                <option value="stale">À revoir</option>
+              </select>
+            </label>
+          </div>
+
           <div class="grid gap-3 lg:grid-cols-3">
-            {#each missionComparison.items as item}
+            {#if missionFeed.length === 0}
+              <article
+                class="rounded-xl border border-dashed border-border-light bg-surface-white p-5 lg:col-span-3"
+              >
+                <div class="flex flex-wrap items-start justify-between gap-3">
+                  <div>
+                    <p class="text-sm font-semibold text-text-primary">
+                      Aucune mission reçue depuis l'extension
+                    </p>
+                    <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
+                      Connectez l'extension à votre compte MissionPulse puis lancez un scan. Les
+                      missions retenues, les favoris et les statuts de candidature apparaîtront ici.
+                    </p>
+                  </div>
+                  <Badge label="En attente" variant="source" />
+                </div>
+                {#if setupRequired}
+                  <p
+                    class="mt-4 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs leading-5 text-text-subtle"
+                  >
+                    Terminez la checklist de setup ci-dessus pour activer le feed connecté.
+                  </p>
+                {:else}
+                  <div class="mt-4 flex flex-wrap gap-2">
+                    <a
+                      class="inline-flex h-9 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                      href={chromeStoreUrl}
+                    >
+                      Installer l'extension
+                    </a>
+                    <a
+                      class="inline-flex h-9 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
+                      href={data.loginUrl || '/login'}
+                    >
+                      Connecter mon compte
+                    </a>
+                  </div>
+                {/if}
+                <p class="mt-2 text-sm leading-6 text-text-subtle">
+                  Le dashboard ne lit pas directement vos sessions plateforme.
+                </p>
+              </article>
+            {:else if filteredMissionFeed.length === 0}
+              <article
+                class="rounded-xl border border-dashed border-border-light bg-surface-white p-5"
+              >
+                <p class="text-sm font-semibold text-text-primary">Aucune mission ne correspond</p>
+                <p class="mt-2 text-sm leading-6 text-text-subtle">
+                  Ajustez la recherche, la source, le score ou la fraîcheur.
+                </p>
+              </article>
+            {/if}
+
+            {#each filteredMissionFeed.slice(0, 6) as mission}
               <article
                 class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
               >
                 <div class="flex items-start justify-between gap-3">
-                  <div class="min-w-0">
-                    <Badge label={sourceLabels[item.source]} variant="source" />
-                    <h3 class="mt-3 text-base font-semibold leading-tight text-text-primary">
-                      {item.title}
-                    </h3>
-                    <p class="mt-1 text-xs text-text-subtle">{item.company} · {item.location}</p>
+                  <div class="flex flex-wrap gap-1.5">
+                    <Badge label={sourceLabels[mission.source]} variant="source" />
+                    {#if mission.sourceHealthStatus}
+                      <Badge
+                        label={`Santé: ${statusLabels[mission.sourceHealthStatus]}`}
+                        variant={getPlatformStatusBadgeVariant(mission.sourceHealthStatus)}
+                      />
+                    {/if}
                   </div>
                   <Badge
-                    label={`#${item.scoreRank} score`}
-                    variant={item.id === missionComparison.bestScoreId ? 'success' : 'status'}
+                    label={`${mission.score}%${mission.grade ? ` · ${mission.grade}` : ''}`}
+                    variant={mission.score >= 85 ? 'success' : 'warning'}
                   />
                 </div>
+                <h3 class="mt-3 text-sm font-semibold leading-tight text-text-primary">
+                  {mission.title}
+                </h3>
+                <p class="mt-1 text-xs text-text-subtle">
+                  {mission.client ?? 'Client non renseigné'} ·
+                  {mission.location ?? 'Localisation non renseignée'}
+                </p>
 
-                <dl class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                <div class="mt-3 grid grid-cols-3 gap-2 text-xs">
                   <div class="rounded-lg bg-page-canvas px-2 py-2">
-                    <dt class="text-text-muted">Score</dt>
-                    <dd class="mt-1 font-semibold text-text-primary">{item.score}%</dd>
+                    <p class="text-text-muted">TJM</p>
+                    <p class="mt-1 font-medium text-text-primary">
+                      {mission.dailyRate ? `${mission.dailyRate}€` : 'N/A'}
+                    </p>
                   </div>
                   <div class="rounded-lg bg-page-canvas px-2 py-2">
-                    <dt class="text-text-muted">TJM</dt>
-                    <dd class="mt-1 font-semibold text-text-primary">
-                      {formatDailyRate(item.dailyRate)}
-                    </dd>
+                    <p class="text-text-muted">Fraîcheur</p>
+                    <p class="mt-1 font-medium text-text-primary">
+                      {mission.freshness === 'fresh' ? 'Récente' : 'À revoir'}
+                    </p>
                   </div>
                   <div class="rounded-lg bg-page-canvas px-2 py-2">
-                    <dt class="text-text-muted">Relance</dt>
-                    <dd class="mt-1 font-semibold text-text-primary">
-                      {formatDate(item.nextActionAt)}
-                    </dd>
+                    <p class="text-text-muted">Doublons</p>
+                    <p class="mt-1 font-medium text-text-primary">{mission.duplicateCount}</p>
                   </div>
-                </dl>
-
-                <div class="mt-4 flex flex-wrap gap-1.5">
-                  <Badge label={stageLabels[item.stage]} variant="status" />
-                  {#if item.id === missionComparison.bestRateId}
-                    <Badge label="Meilleur TJM" variant="success" />
-                  {/if}
-                  {#if item.id === missionComparison.earliestFollowUpId}
-                    <Badge label="Relance proche" variant="warning" />
-                  {/if}
-                  {#if item.userRating}
-                    <Badge label={`${item.userRating}/5`} variant="source" />
-                  {/if}
                 </div>
 
-                <div class="mt-4 grid gap-2 text-xs">
-                  <div class="rounded-lg bg-page-canvas px-3 py-2">
-                    <p class="font-medium text-text-primary">Forces</p>
-                    <p class="mt-1 leading-5 text-text-subtle">{item.strengths.join(' · ')}</p>
-                  </div>
-                  {#if item.risks.length > 0}
-                    <div class="rounded-lg bg-status-orange/8 px-3 py-2">
-                      <p class="font-medium text-status-orange">Points à vérifier</p>
-                      <p class="mt-1 leading-5 text-text-subtle">{item.risks.join(' · ')}</p>
+                {#if mission.semanticReason}
+                  <p class="mt-3 line-clamp-2 text-xs leading-5 text-text-subtle">
+                    {mission.semanticReason}
+                  </p>
+                {/if}
+                {#if mission.sourceHealthErrorMessage}
+                  <p
+                    class="mt-3 rounded-md border border-status-orange/20 bg-status-orange/8 px-2 py-1.5 text-xs leading-5 text-status-orange"
+                  >
+                    {mission.sourceHealthErrorCode ?? 'connector_health'}:
+                    {mission.sourceHealthErrorMessage}
+                  </p>
+                {/if}
+
+                <div class="mt-3 grid grid-cols-3 gap-1.5 text-[10px]">
+                  {#each scoreCriteriaLabels as criterion}
+                    <div class="rounded-md border border-border-light bg-surface-white px-2 py-1.5">
+                      <p class="text-text-muted">{criterion.label}</p>
+                      <p class="mt-0.5 font-medium text-text-primary">
+                        {formatScoreCriterion(mission.scoreCriteria[criterion.key])}
+                      </p>
                     </div>
+                  {/each}
+                </div>
+
+                <div class="mt-3 flex flex-wrap gap-1.5">
+                  {#each mission.stack.slice(0, 4) as skill}
+                    <span
+                      class="rounded-md bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
+                    >
+                      {skill}
+                    </span>
+                  {/each}
+                </div>
+
+                <div
+                  class="mt-4 flex items-center justify-between border-t border-border-light pt-3"
+                >
+                  <span class="text-xs text-text-subtle">{formatDate(mission.scrapedAt)}</span>
+                  {#if mission.applicationStage}
+                    <Badge label={stageLabels[mission.applicationStage]} variant="status" />
+                  {:else if isConnected}
+                    <div class="flex items-center gap-2">
+                      <form method="POST" action="?/archiveMission">
+                        <input type="hidden" name="missionId" value={mission.id} />
+                        <button
+                          type="submit"
+                          class="text-xs font-medium text-text-subtle hover:text-text-primary"
+                        >
+                          Archiver
+                        </button>
+                      </form>
+                      <form method="POST" action="?/selectMission">
+                        <input type="hidden" name="missionId" value={mission.id} />
+                        <button
+                          type="submit"
+                          class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
+                        >
+                          Sélectionner
+                        </button>
+                      </form>
+                    </div>
+                  {:else}
+                    <a
+                      class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
+                      href={mission.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      Ouvrir
+                    </a>
                   {/if}
                 </div>
               </article>
             {/each}
           </div>
-        {/if}
-      </section>
+        </section>
+
+        <section id="tjm" class="mt-6" aria-labelledby="tjm-radar-title">
+          <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p class="eyebrow text-text-subtle">Radar TJM</p>
+              <h2 id="tjm-radar-title" class="mt-1 text-lg font-semibold text-text-primary">
+                Tendances marché synchronisées
+              </h2>
+            </div>
+            <p class="text-sm text-text-subtle">
+              {tjmRadar.missionCount} missions avec TJM exploitable
+            </p>
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            <article
+              class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+            >
+              <p class="text-xs font-medium uppercase text-text-subtle">TJM moyen</p>
+              <div class="mt-3 flex items-end justify-between gap-3">
+                <p class="text-3xl font-semibold text-text-primary">
+                  {formatDailyRate(tjmRadar.averageDailyRate)}
+                </p>
+                <Badge label={`${tjmRadar.missionCount} offres`} variant="source" />
+              </div>
+            </article>
+            <article
+              class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+            >
+              <p class="text-xs font-medium uppercase text-text-subtle">Fourchette</p>
+              <p class="mt-3 text-2xl font-semibold text-text-primary">
+                {formatDailyRate(tjmRadar.minDailyRate)} - {formatDailyRate(tjmRadar.maxDailyRate)}
+              </p>
+              <p class="mt-2 text-xs text-text-subtle">Min / max des missions synchronisées</p>
+            </article>
+            <article
+              class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+            >
+              <p class="text-xs font-medium uppercase text-text-subtle">Stack dominante</p>
+              <p class="mt-3 text-2xl font-semibold text-text-primary">
+                {tjmRadar.topStack ?? 'N/A'}
+              </p>
+              <p class="mt-2 text-xs text-text-subtle">Par volume de missions qualifiées</p>
+            </article>
+            <article
+              class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+            >
+              <p class="text-xs font-medium uppercase text-text-subtle">Tendance</p>
+              <div class="mt-3 flex items-end justify-between gap-3">
+                <p class="text-lg font-semibold text-text-primary">
+                  {tjmTrendLabels[tjmRadar.trend]}
+                </p>
+                <Badge
+                  label={tjmRadar.trendDelta === null
+                    ? 'N/A'
+                    : `${tjmRadar.trendDelta > 0 ? '+' : ''}${tjmRadar.trendDelta}€`}
+                  variant={tjmRadar.trend === 'up'
+                    ? 'success'
+                    : tjmRadar.trend === 'down'
+                      ? 'warning'
+                      : 'status'}
+                />
+              </div>
+            </article>
+          </div>
+
+          <div class="mt-3 grid gap-3 lg:grid-cols-2">
+            <article
+              class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-text-primary">Par source</h3>
+                <Badge label={tjmRadar.topSource ?? 'N/A'} variant="source" />
+              </div>
+              <div class="mt-3 space-y-2">
+                {#if tjmRadar.sourceSegments.length === 0}
+                  <p
+                    class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
+                  >
+                    Aucun TJM synchronisé par source.
+                  </p>
+                {/if}
+                {#each tjmRadar.sourceSegments.slice(0, 4) as segment}
+                  <div class="rounded-lg bg-page-canvas px-3 py-2 text-xs">
+                    <div class="flex items-center justify-between gap-3">
+                      <span class="font-medium text-text-primary">{segment.label}</span>
+                      <span class="text-text-subtle">{segment.missionCount} missions</span>
+                    </div>
+                    <div class="mt-2 flex items-center justify-between gap-3">
+                      <span class="text-text-muted">
+                        {formatDailyRate(segment.minDailyRate)} - {formatDailyRate(
+                          segment.maxDailyRate
+                        )}
+                      </span>
+                      <span class="font-semibold text-text-primary">
+                        {formatDailyRate(segment.averageDailyRate)}
+                      </span>
+                    </div>
+                  </div>
+                {/each}
+              </div>
+            </article>
+
+            <article
+              class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+            >
+              <div class="flex items-center justify-between gap-3">
+                <h3 class="text-sm font-semibold text-text-primary">Par stack</h3>
+                <Badge label={tjmRadar.stackSegments.length.toString()} variant="tech" />
+              </div>
+              <div class="mt-3 space-y-2">
+                {#if tjmRadar.stackSegments.length === 0}
+                  <p
+                    class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
+                  >
+                    Aucun TJM synchronisé par stack.
+                  </p>
+                {/if}
+                {#each tjmRadar.stackSegments.slice(0, 5) as segment}
+                  <div class="rounded-lg bg-page-canvas px-3 py-2 text-xs">
+                    <div class="flex items-center justify-between gap-3">
+                      <span class="font-medium text-text-primary">{segment.label}</span>
+                      <span class="font-semibold text-text-primary">
+                        {formatDailyRate(segment.averageDailyRate)}
+                      </span>
+                    </div>
+                    <p class="mt-1 text-text-subtle">
+                      {segment.missionCount} missions · {formatDailyRate(segment.minDailyRate)} -
+                      {formatDailyRate(segment.maxDailyRate)}
+                    </p>
+                  </div>
+                {/each}
+              </div>
+            </article>
+          </div>
+        </section>
+
+        <section class="mt-6" aria-labelledby="feature-flags-title">
+          <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p class="eyebrow text-text-subtle">Feature flipping</p>
+              <h2 id="feature-flags-title" class="mt-1 text-lg font-semibold text-text-primary">
+                Fonctionnalités disponibles sur le dashboard
+              </h2>
+            </div>
+            <p class="text-sm text-text-subtle">
+              {enabledFeatureCount} actives, {featureAccess.length - enabledFeatureCount} verrouillées
+            </p>
+          </div>
+
+          <div class="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
+            {#each featureAccess as feature}
+              <article
+                class="rounded-lg border bg-surface-white p-4 shadow-subtle-2 {feature.enabled
+                  ? 'border-border-light'
+                  : 'border-dashed border-disabled-gray opacity-80'}"
+              >
+                <div class="flex items-start justify-between gap-3">
+                  <div>
+                    <p class="text-[11px] font-medium uppercase text-text-muted">
+                      {featureAreaLabels[feature.area]}
+                    </p>
+                    <h3 class="mt-1 text-sm font-semibold text-text-primary">{feature.label}</h3>
+                  </div>
+                  <Badge
+                    label={feature.enabled
+                      ? requirementLabels[feature.requirement]
+                      : (feature.lockedReason ?? 'Verrouillé')}
+                    variant={feature.enabled ? 'success' : 'warning'}
+                  />
+                </div>
+                <p class="mt-3 text-xs leading-5 text-text-subtle">{feature.description}</p>
+              </article>
+            {/each}
+          </div>
+        </section>
+
+        <section id="comparison" class="mt-6" aria-labelledby="mission-comparison-title">
+          <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
+            <div>
+              <p class="eyebrow text-text-subtle">Shortlist</p>
+              <h2
+                id="mission-comparison-title"
+                class="mt-1 text-lg font-semibold text-text-primary"
+              >
+                Comparaison des missions prioritaires
+              </h2>
+            </div>
+            <p class="text-sm text-text-subtle">
+              {missionComparison.items.length} missions comparées · score moyen
+              {missionComparison.averageScore}%
+            </p>
+          </div>
+
+          {#if missionComparison.items.length === 0}
+            <article
+              class="rounded-xl border border-dashed border-border-light bg-surface-white p-5"
+            >
+              <p class="text-sm font-semibold text-text-primary">Aucune shortlist à comparer</p>
+              <p class="mt-2 text-sm leading-6 text-text-subtle">
+                Sélectionnez une mission depuis le feed ou avancez une candidature pour alimenter la
+                comparaison dashboard.
+              </p>
+            </article>
+          {:else}
+            <div class="grid gap-3 lg:grid-cols-3">
+              {#each missionComparison.items as item}
+                <article
+                  class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+                >
+                  <div class="flex items-start justify-between gap-3">
+                    <div class="min-w-0">
+                      <Badge label={sourceLabels[item.source]} variant="source" />
+                      <h3 class="mt-3 text-base font-semibold leading-tight text-text-primary">
+                        {item.title}
+                      </h3>
+                      <p class="mt-1 text-xs text-text-subtle">{item.company} · {item.location}</p>
+                    </div>
+                    <Badge
+                      label={`#${item.scoreRank} score`}
+                      variant={item.id === missionComparison.bestScoreId ? 'success' : 'status'}
+                    />
+                  </div>
+
+                  <dl class="mt-4 grid grid-cols-3 gap-2 text-xs">
+                    <div class="rounded-lg bg-page-canvas px-2 py-2">
+                      <dt class="text-text-muted">Score</dt>
+                      <dd class="mt-1 font-semibold text-text-primary">{item.score}%</dd>
+                    </div>
+                    <div class="rounded-lg bg-page-canvas px-2 py-2">
+                      <dt class="text-text-muted">TJM</dt>
+                      <dd class="mt-1 font-semibold text-text-primary">
+                        {formatDailyRate(item.dailyRate)}
+                      </dd>
+                    </div>
+                    <div class="rounded-lg bg-page-canvas px-2 py-2">
+                      <dt class="text-text-muted">Relance</dt>
+                      <dd class="mt-1 font-semibold text-text-primary">
+                        {formatDate(item.nextActionAt)}
+                      </dd>
+                    </div>
+                  </dl>
+
+                  <div class="mt-4 flex flex-wrap gap-1.5">
+                    <Badge label={stageLabels[item.stage]} variant="status" />
+                    {#if item.id === missionComparison.bestRateId}
+                      <Badge label="Meilleur TJM" variant="success" />
+                    {/if}
+                    {#if item.id === missionComparison.earliestFollowUpId}
+                      <Badge label="Relance proche" variant="warning" />
+                    {/if}
+                    {#if item.userRating}
+                      <Badge label={`${item.userRating}/5`} variant="source" />
+                    {/if}
+                  </div>
+
+                  <div class="mt-4 grid gap-2 text-xs">
+                    <div class="rounded-lg bg-page-canvas px-3 py-2">
+                      <p class="font-medium text-text-primary">Forces</p>
+                      <p class="mt-1 leading-5 text-text-subtle">{item.strengths.join(' · ')}</p>
+                    </div>
+                    {#if item.risks.length > 0}
+                      <div class="rounded-lg bg-status-orange/8 px-3 py-2">
+                        <p class="font-medium text-status-orange">Points à vérifier</p>
+                        <p class="mt-1 leading-5 text-text-subtle">{item.risks.join(' · ')}</p>
+                      </div>
+                    {/if}
+                  </div>
+                </article>
+              {/each}
+            </div>
+          {/if}
+        </section>
+      {/if}
 
       <div class="mt-6 grid gap-6 xl:grid-cols-[minmax(0,1fr)_360px]">
         <section id="applications">
-          <div class="rounded-xl border border-border-light bg-surface-white p-3 shadow-sm">
-            <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-              <label
-                class="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-subtle"
-              >
-                <svg
-                  viewBox="0 0 24 24"
-                  class="h-4 w-4"
-                  fill="none"
-                  stroke="currentColor"
-                  stroke-width="2"
-                  aria-hidden="true"
-                >
-                  <circle cx="11" cy="11" r="7" />
-                  <path d="m20 20-3.5-3.5" />
-                </svg>
-                <input
-                  class="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
-                  placeholder="Rechercher mission, client ou plateforme"
-                  type="search"
-                  value={searchQuery}
-                  oninput={(event) => {
-                    searchQuery = event.currentTarget.value;
-                  }}
-                />
-              </label>
-              <p class="shrink-0 text-xs font-medium text-text-subtle">
-                {filteredApplications.length}/{applications.length} missions
-              </p>
-            </div>
-
-            <div class="mt-3 flex flex-wrap gap-2" role="toolbar" aria-label="Filtrer par source">
-              {#each sourceFilters as filter}
-                <label
-                  class="inline-flex h-7 cursor-pointer items-center rounded-full border px-2 text-[10px] font-medium transition-colors {selectedSource ===
-                  filter.value
-                    ? 'border-blueprint-blue/30 bg-blueprint-blue/10 text-blueprint-blue'
-                    : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                >
-                  <input
-                    class="mr-1.5 h-3 w-3 accent-blueprint-blue"
-                    type="radio"
-                    name="source-filter"
-                    value={filter.value}
-                    checked={selectedSource === filter.value}
-                    oninput={() => {
-                      selectedSource = filter.value;
-                    }}
-                  />
-                  {filter.label}
-                </label>
-              {/each}
-            </div>
-          </div>
-
-          <div class="mt-4 grid auto-rows-[104px] gap-4 md:grid-cols-2">
-            {#if filteredApplications.length === 0}
-              <article
-                class="row-span-2 rounded-xl border border-dashed border-border-light bg-surface-white p-5"
-              >
-                <p class="text-sm font-semibold text-text-primary">Aucune mission trouvée</p>
-                <p class="mt-2 text-sm leading-6 text-text-subtle">
-                  Ajustez la recherche ou revenez à toutes les sources.
-                </p>
-                <button
-                  type="button"
-                  class="mt-5 inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas"
-                  onclick={() => {
-                    searchQuery = '';
-                    selectedSource = 'all';
-                  }}
-                >
-                  Réinitialiser
-                </button>
-              </article>
-            {/if}
-
-            {#each filteredApplications as application}
-              <article
-                class="group flex min-h-0 flex-col justify-between rounded-xl border bg-surface-white p-4 shadow-subtle-2 transition duration-200 hover:-translate-y-0.5 hover:shadow-sm {selectedApplication?.id ===
-                application.id
-                  ? 'border-blueprint-blue/40 ring-2 ring-blueprint-blue/10'
-                  : 'border-border-light'} {application.stage === 'interview'
-                  ? 'row-span-3'
-                  : 'row-span-2'}"
-              >
+          {#if setupRequired}
+            <article class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm">
+              <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                 <div>
-                  <div class="flex items-start justify-between gap-3">
-                    <Badge label={sourceLabels[application.source]} variant="source" />
-                    <Badge
-                      label={`${application.score}%`}
-                      variant={application.score >= 85 ? 'success' : 'warning'}
-                    />
-                  </div>
-                  <h2 class="mt-4 text-lg font-semibold leading-tight text-text-primary">
-                    {application.title}
+                  <p class="eyebrow text-text-subtle">Candidatures</p>
+                  <h2 class="mt-2 text-lg font-semibold text-text-primary">
+                    Pipeline activé après setup
                   </h2>
-                  <p class="mt-2 text-sm text-text-subtle">
-                    {application.company} · {application.location}
+                  <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
+                    Les dossiers, relances et contenus générés apparaîtront ici après connexion de
+                    l'extension et sélection d'une première mission. Pour l'instant, la checklist de
+                    setup reste la seule action prioritaire.
                   </p>
                 </div>
+                <Badge label={currentDashboardSetupStep.title} variant="warning" size="md" />
+              </div>
+              <a
+                class="mt-4 inline-flex h-9 items-center justify-center rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-xs font-semibold text-blueprint-blue hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12"
+                href={currentDashboardSetupStep.href ?? '#dashboard-setup-title'}
+              >
+                {currentDashboardSetupStep.actionLabel ?? 'Voir la checklist'}
+              </a>
+            </article>
+          {:else}
+            <div class="rounded-xl border border-border-light bg-surface-white p-3 shadow-sm">
+              <div class="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                <label
+                  class="flex h-11 min-w-0 flex-1 items-center gap-3 rounded-lg border border-border-light bg-page-canvas px-3 text-sm text-text-subtle"
+                >
+                  <svg
+                    viewBox="0 0 24 24"
+                    class="h-4 w-4"
+                    fill="none"
+                    stroke="currentColor"
+                    stroke-width="2"
+                    aria-hidden="true"
+                  >
+                    <circle cx="11" cy="11" r="7" />
+                    <path d="m20 20-3.5-3.5" />
+                  </svg>
+                  <input
+                    class="min-w-0 flex-1 bg-transparent text-sm text-text-primary outline-none placeholder:text-text-muted"
+                    placeholder="Rechercher mission, client ou plateforme"
+                    type="search"
+                    value={searchQuery}
+                    oninput={(event) => {
+                      searchQuery = event.currentTarget.value;
+                    }}
+                  />
+                </label>
+                <p class="shrink-0 text-xs font-medium text-text-subtle">
+                  {filteredApplications.length}/{applications.length} missions
+                </p>
+              </div>
 
-                <div>
-                  <div class="mb-4 grid grid-cols-2 gap-2 text-xs text-text-subtle">
-                    <div class="rounded-lg bg-page-canvas px-3 py-2">
-                      <p class="text-text-muted">TJM</p>
-                      <p class="mt-1 font-medium text-text-primary">
-                        {application.dailyRate ? `${application.dailyRate}€` : 'N/A'}
-                      </p>
-                    </div>
-                    <div class="rounded-lg bg-page-canvas px-3 py-2">
-                      <p class="text-text-muted">Relance</p>
-                      <p class="mt-1 font-medium text-text-primary">
-                        {formatDate(application.nextActionAt)}
-                      </p>
-                    </div>
-                  </div>
-                  <div class="flex min-w-0 items-center gap-3 border-t border-border-light pt-3">
-                    <Badge label={stageLabels[application.stage]} variant="status" size="md" />
-                    <button
-                      type="button"
-                      class="ml-auto inline-flex h-7 shrink-0 items-center justify-center rounded-md px-2 text-xs font-medium text-text-primary hover:bg-page-canvas hover:text-blueprint-blue"
-                      onclick={() => {
-                        selectedApplicationId = application.id;
+              <div class="mt-3 flex flex-wrap gap-2" role="toolbar" aria-label="Filtrer par source">
+                {#each sourceFilters as filter}
+                  <label
+                    class="inline-flex h-7 cursor-pointer items-center rounded-full border px-2 text-[10px] font-medium transition-colors {selectedSource ===
+                    filter.value
+                      ? 'border-blueprint-blue/30 bg-blueprint-blue/10 text-blueprint-blue'
+                      : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                  >
+                    <input
+                      class="mr-1.5 h-3 w-3 accent-blueprint-blue"
+                      type="radio"
+                      name="source-filter"
+                      value={filter.value}
+                      checked={selectedSource === filter.value}
+                      oninput={() => {
+                        selectedSource = filter.value;
                       }}
-                    >
-                      {selectedApplication?.id === application.id ? 'Sélectionnée' : 'Ouvrir'}
-                    </button>
+                    />
+                    {filter.label}
+                  </label>
+                {/each}
+              </div>
+            </div>
+
+            <div class="mt-4 grid auto-rows-[104px] gap-4 md:grid-cols-2">
+              {#if filteredApplications.length === 0}
+                <article
+                  class="row-span-2 rounded-xl border border-dashed border-border-light bg-surface-white p-5"
+                >
+                  <p class="text-sm font-semibold text-text-primary">Aucune mission trouvée</p>
+                  <p class="mt-2 text-sm leading-6 text-text-subtle">
+                    Ajustez la recherche ou revenez à toutes les sources.
+                  </p>
+                  <button
+                    type="button"
+                    class="mt-5 inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas"
+                    onclick={() => {
+                      searchQuery = '';
+                      selectedSource = 'all';
+                    }}
+                  >
+                    Réinitialiser
+                  </button>
+                </article>
+              {/if}
+
+              {#each filteredApplications as application}
+                <article
+                  class="group flex min-h-0 flex-col justify-between rounded-xl border bg-surface-white p-4 shadow-subtle-2 transition duration-200 hover:-translate-y-0.5 hover:shadow-sm {selectedApplication?.id ===
+                  application.id
+                    ? 'border-blueprint-blue/40 ring-2 ring-blueprint-blue/10'
+                    : 'border-border-light'} {application.stage === 'interview'
+                    ? 'row-span-3'
+                    : 'row-span-2'}"
+                >
+                  <div>
+                    <div class="flex items-start justify-between gap-3">
+                      <Badge label={sourceLabels[application.source]} variant="source" />
+                      <Badge
+                        label={`${application.score}%`}
+                        variant={application.score >= 85 ? 'success' : 'warning'}
+                      />
+                    </div>
+                    <h2 class="mt-4 text-lg font-semibold leading-tight text-text-primary">
+                      {application.title}
+                    </h2>
+                    <p class="mt-2 text-sm text-text-subtle">
+                      {application.company} · {application.location}
+                    </p>
                   </div>
-                </div>
-              </article>
-            {/each}
-          </div>
+
+                  <div>
+                    <div class="mb-4 grid grid-cols-2 gap-2 text-xs text-text-subtle">
+                      <div class="rounded-lg bg-page-canvas px-3 py-2">
+                        <p class="text-text-muted">TJM</p>
+                        <p class="mt-1 font-medium text-text-primary">
+                          {application.dailyRate ? `${application.dailyRate}€` : 'N/A'}
+                        </p>
+                      </div>
+                      <div class="rounded-lg bg-page-canvas px-3 py-2">
+                        <p class="text-text-muted">Relance</p>
+                        <p class="mt-1 font-medium text-text-primary">
+                          {formatDate(application.nextActionAt)}
+                        </p>
+                      </div>
+                    </div>
+                    <div class="flex min-w-0 items-center gap-3 border-t border-border-light pt-3">
+                      <Badge label={stageLabels[application.stage]} variant="status" size="md" />
+                      <button
+                        type="button"
+                        class="ml-auto inline-flex h-7 shrink-0 items-center justify-center rounded-md px-2 text-xs font-medium text-text-primary hover:bg-page-canvas hover:text-blueprint-blue"
+                        onclick={() => {
+                          selectedApplicationId = application.id;
+                        }}
+                      >
+                        {selectedApplication?.id === application.id ? 'Sélectionnée' : 'Ouvrir'}
+                      </button>
+                    </div>
+                  </div>
+                </article>
+              {/each}
+            </div>
+          {/if}
         </section>
 
         <div class="space-y-4">
@@ -1733,44 +2115,46 @@
             </section>
           {/if}
 
-          <section class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm">
-            <div class="flex items-start justify-between gap-4">
-              <div>
-                <p class="eyebrow text-text-subtle">Historique IA</p>
-                <h2 class="mt-2 text-lg font-semibold">Assets générés</h2>
+          {#if !setupRequired}
+            <section class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm">
+              <div class="flex items-start justify-between gap-4">
+                <div>
+                  <p class="eyebrow text-text-subtle">Historique IA</p>
+                  <h2 class="mt-2 text-lg font-semibold">Assets générés</h2>
+                </div>
+                <Badge label={`${generatedAssets.length}`} variant="source" size="md" />
               </div>
-              <Badge label={`${generatedAssets.length}`} variant="source" size="md" />
-            </div>
 
-            <div class="mt-4 space-y-3">
-              {#if recentGeneratedAssets.length === 0}
-                <p
-                  class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
-                >
-                  Aucun contenu généré synchronisé pour le moment.
-                </p>
-              {/if}
-
-              {#each recentGeneratedAssets as asset}
-                <article class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
-                  <div class="flex items-start justify-between gap-3">
-                    <div class="min-w-0">
-                      <p class="text-sm font-medium text-text-primary">{asset.label}</p>
-                      <p class="mt-1 truncate text-xs text-text-subtle">
-                        {asset.applicationTitle} · {asset.company}
-                      </p>
-                    </div>
-                    <span class="shrink-0 text-[10px] text-text-muted">
-                      {formatDate(asset.createdAt)}
-                    </span>
-                  </div>
-                  <p class="mt-2 line-clamp-2 text-xs leading-5 text-text-subtle">
-                    {asset.preview}
+              <div class="mt-4 space-y-3">
+                {#if recentGeneratedAssets.length === 0}
+                  <p
+                    class="rounded-lg border border-dashed border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-subtle"
+                  >
+                    Aucun contenu généré synchronisé pour le moment.
                   </p>
-                </article>
-              {/each}
-            </div>
-          </section>
+                {/if}
+
+                {#each recentGeneratedAssets as asset}
+                  <article class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+                    <div class="flex items-start justify-between gap-3">
+                      <div class="min-w-0">
+                        <p class="text-sm font-medium text-text-primary">{asset.label}</p>
+                        <p class="mt-1 truncate text-xs text-text-subtle">
+                          {asset.applicationTitle} · {asset.company}
+                        </p>
+                      </div>
+                      <span class="shrink-0 text-[10px] text-text-muted">
+                        {formatDate(asset.createdAt)}
+                      </span>
+                    </div>
+                    <p class="mt-2 line-clamp-2 text-xs leading-5 text-text-subtle">
+                      {asset.preview}
+                    </p>
+                  </article>
+                {/each}
+              </div>
+            </section>
+          {/if}
 
           <section
             id="cv"
@@ -2347,20 +2731,29 @@
                       </div>
                       <Badge label="Local ou non connecté" variant="source" />
                     </div>
-                    <div class="mt-4 flex flex-wrap gap-2">
-                      <a
-                        class="inline-flex h-8 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-                        href={chromeStoreUrl}
+                    {#if setupRequired}
+                      <p
+                        class="mt-4 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs leading-5 text-text-subtle"
                       >
-                        Installer l'extension
-                      </a>
-                      <a
-                        class="inline-flex h-8 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
-                        href={data.loginUrl || '/login'}
-                      >
-                        Connecter mon compte
-                      </a>
-                    </div>
+                        La checklist de setup reste l'action prioritaire avant d'ouvrir la file de
+                        synchronisation.
+                      </p>
+                    {:else}
+                      <div class="mt-4 flex flex-wrap gap-2">
+                        <a
+                          class="inline-flex h-8 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+                          href={chromeStoreUrl}
+                        >
+                          Installer l'extension
+                        </a>
+                        <a
+                          class="inline-flex h-8 items-center justify-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-semibold text-text-primary hover:bg-subtle-gray"
+                          href={data.loginUrl || '/login'}
+                        >
+                          Connecter mon compte
+                        </a>
+                      </div>
+                    {/if}
                     <p class="mt-3 text-xs leading-5 text-text-muted">
                       Les sessions plateforme restent côté navigateur; la file ne transporte que les
                       données métier normalisées.
@@ -2451,6 +2844,18 @@
                     {form.syncConflictSuccess}
                   </p>
                 {/if}
+
+                <div class="mt-3 rounded-lg border border-border-light bg-surface-white px-3 py-3">
+                  <p class="text-xs font-semibold text-text-primary">Guide de résolution guidée</p>
+                  <div class="mt-3 grid gap-2 md:grid-cols-3">
+                    {#each syncConflictResolutionSteps as step}
+                      <div class="rounded-md bg-page-canvas px-2.5 py-2">
+                        <p class="text-[11px] font-semibold text-text-primary">{step.title}</p>
+                        <p class="mt-1 text-[11px] leading-4 text-text-subtle">{step.detail}</p>
+                      </div>
+                    {/each}
+                  </div>
+                </div>
 
                 <div class="mt-3 space-y-2">
                   {#each syncConflicts as conflict}
@@ -2648,20 +3053,44 @@
           action="?/deleteConnectedData"
           class="mt-5 border-t border-border-light pt-4"
         >
-          <label class="block text-xs font-medium text-text-subtle" for="privacy-confirmation">
-            Confirmation suppression
-            <input
-              id="privacy-confirmation"
-              name="confirmation"
-              placeholder="SUPPRIMER"
-              class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-status-red/40"
-              autocomplete="off"
-            />
+          <div class="rounded-xl border border-status-red/20 bg-status-red/8 px-3 py-3">
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-status-red">
+              Suppression irréversible
+            </p>
+            <p class="mt-1.5 text-xs leading-5 text-text-primary">
+              Impact : missions synchronisées, candidatures, CV, préférences d'alertes, conflits et
+              statuts de sync seront supprimés du dashboard connecté.
+            </p>
+            <p class="mt-1 text-xs leading-5 text-text-subtle">
+              Après suppression : relier à nouveau l'extension, lancer un scan, puis reconstruire le
+              CV et le suivi depuis les snapshots Chrome.
+            </p>
+            <a
+              class="mt-2 inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas aria-disabled:pointer-events-none aria-disabled:opacity-40"
+              href={isConnected ? '/export.json' : data.loginUrl || '/login'}
+              download={isConnected ? 'missionpulse-connected-data.json' : undefined}
+              aria-disabled={!isConnected}
+            >
+              Exporter avant suppression
+            </a>
+          </div>
+
+          <label class="mt-3 block text-xs font-medium text-text-subtle" for="privacy-confirmation">
+            Tapez SUPPRIMER pour confirmer
           </label>
+          <input
+            id="privacy-confirmation"
+            name="confirmation"
+            placeholder="SUPPRIMER"
+            class="mt-1 h-9 w-full rounded-lg border border-border-light bg-page-canvas px-2 text-sm text-text-primary outline-none placeholder:text-text-muted focus:border-status-red/40"
+            autocomplete="off"
+            bind:value={privacyConfirmation}
+          />
           <button
             type="submit"
             class="mt-3 inline-flex h-8 items-center rounded-lg border border-status-red/25 bg-status-red/8 px-3 text-xs font-semibold text-status-red hover:border-status-red/40 hover:bg-status-red/12 disabled:cursor-not-allowed disabled:opacity-40"
-            disabled={!isConnected}
+            disabled={!canDeleteConnectedData}
+            aria-disabled={!canDeleteConnectedData}
           >
             Supprimer les données connectées
           </button>

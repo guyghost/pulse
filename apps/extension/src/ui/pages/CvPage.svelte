@@ -45,6 +45,21 @@
     quality: 'ready' | 'missing';
   };
 
+  type CvWorkflowStep = {
+    label: string;
+    title: string;
+    detail: string;
+    statusLabel: string;
+    icon: 'file-text' | 'panel-top' | 'upload';
+    state: 'ready' | 'attention' | 'locked';
+  };
+
+  type LoadingProgressStep = {
+    label: string;
+    detail: string;
+    icon: 'database' | 'panel-top' | 'git-compare-arrows';
+  };
+
   let profile = $state<UserProfile | null>(null);
   let isLoading = $state(true);
   let selectedPlatformId = $state('linkedin');
@@ -146,11 +161,25 @@
 
   const selectedPayload = $derived(buildPlatformPayload(selectedPlatform, selectedFields));
   const selectedVerification = $derived(verificationResults.get(selectedPlatform.id) ?? null);
-  const linkedInPrimaryLabel = $derived(
-    previewingLinkedIn ? 'Extraction...' : profile ? 'Prévisualiser LinkedIn' : 'Importer LinkedIn'
-  );
   const sourceActionLabel = $derived(profile ? 'Tout préparer' : 'Compléter le profil');
   const sourceActionIcon = $derived(profile ? 'upload' : 'user');
+  const loadingProgressSteps: LoadingProgressStep[] = [
+    {
+      label: 'Profil canonique',
+      detail: 'Lecture du profil local utilisé comme source fiable.',
+      icon: 'database',
+    },
+    {
+      label: 'Plateformes',
+      detail: 'Préparation des destinations LinkedIn et connecteurs mission.',
+      icon: 'panel-top',
+    },
+    {
+      label: 'Écarts',
+      detail: 'Reprise des dernières vérifications et champs à comparer.',
+      icon: 'git-compare-arrows',
+    },
+  ];
 
   const cvStory = $derived.by(() => {
     const mismatchCount = [...verificationResults.values()].reduce(
@@ -163,13 +192,13 @@
     ).length;
     const evidence: OperationalEvidence[] = [
       {
-        label: 'Completude',
+        label: 'Complétude',
         value: `${profileCompleteness}%`,
         icon: 'gauge',
         severity: profileCompleteness >= 85 ? 'success' : 'attention',
       },
       {
-        label: 'Ecarts',
+        label: 'Écarts',
         value: mismatchCount,
         icon: 'git-compare-arrows',
         severity: mismatchCount > 0 ? 'attention' : 'success',
@@ -186,9 +215,9 @@
       return {
         severity: 'incident' as const,
         statusLabel: 'Source manquante',
-        title: 'Aucun profil canonique disponible pour synchroniser le CV',
+        title: 'Aucun profil canonique disponible pour préparer le CV',
         description:
-          'Creez ou importez un profil avant de pousser des informations vers LinkedIn et les plateformes.',
+          'Créez ou importez un profil avant de pousser des informations vers LinkedIn et les plateformes.',
         evidence,
         primaryActionLabel: 'Importer LinkedIn',
         primaryActionIcon: 'download',
@@ -198,12 +227,12 @@
     if (mismatchCount > 0) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'Ecarts detectes',
-        title: `${mismatchCount} ecart${mismatchCount > 1 ? 's' : ''} entre le CV canonique et les plateformes`,
+        statusLabel: 'Écarts détectés',
+        title: `${mismatchCount} écart${mismatchCount > 1 ? 's' : ''} entre le CV canonique et les plateformes`,
         description:
           'La prochaine action utile est de pousser le bloc canonique sur les plateformes divergentes.',
         evidence,
-        primaryActionLabel: 'Tout preparer',
+        primaryActionLabel: 'Tout préparer',
         primaryActionIcon: 'upload',
       };
     }
@@ -211,10 +240,10 @@
     if (profileCompleteness < 85) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'A completer',
+        statusLabel: 'À compléter',
         title: 'Le CV canonique est exploitable mais incomplet',
         description:
-          'Completez les champs manquants avant de synchroniser pour eviter de propager une version faible.',
+          'Complétez les champs manquants avant de diffuser pour éviter de propager une version faible.',
         evidence,
         primaryActionLabel: 'Prévisualiser LinkedIn',
         primaryActionIcon: 'download',
@@ -223,15 +252,47 @@
 
     return {
       severity: 'success' as const,
-      statusLabel: 'Aligne',
-      title: 'Le CV canonique est pret a etre diffuse',
+      statusLabel: 'Aligné',
+      title: 'Le CV canonique est prêt à être diffusé',
       description:
-        'Les champs essentiels sont prets. Verifiez une plateforme puis poussez le bloc de mise a jour.',
+        'Les champs essentiels sont prêts. Vérifiez une plateforme puis poussez le bloc de mise à jour.',
       evidence,
       primaryActionLabel: 'Prévisualiser LinkedIn',
       primaryActionIcon: 'download',
     };
   });
+
+  const cvWorkflowSteps = $derived.by<CvWorkflowStep[]>(() => [
+    {
+      label: '1',
+      title: 'Source canonique',
+      detail: profile
+        ? `${readyFields.length}/${syncFields.length} champs prêts pour composer le CV de référence.`
+        : 'Importez LinkedIn ou complétez le profil MissionPulse avant toute diffusion.',
+      statusLabel: profile ? `${profileCompleteness}% prêt` : 'À créer',
+      icon: 'file-text',
+      state: profile ? (profileCompleteness >= 85 ? 'ready' : 'attention') : 'locked',
+    },
+    {
+      label: '2',
+      title: 'Plateformes à mettre à jour',
+      detail: profile
+        ? `${selectedFields.length} champs sélectionnés à copier, vérifier et pousser manuellement.`
+        : 'Les plateformes restent verrouillées tant que la source canonique est vide.',
+      statusLabel: `${platforms.length} cibles`,
+      icon: 'panel-top',
+      state: profile ? 'ready' : 'locked',
+    },
+    {
+      label: '3',
+      title: 'Dashboard connecté',
+      detail:
+        'La préparation reste locale; le compte active ensuite l’historique, les conflits et la synchronisation.',
+      statusLabel: 'Compte requis',
+      icon: 'upload',
+      state: 'locked',
+    },
+  ]);
 
   function buildSummary(value: UserProfile | null): string {
     if (!value) {
@@ -331,7 +392,7 @@
         return;
       }
 
-      await showToast('Preview LinkedIn prête à synchroniser', 'success');
+      await showToast('Preview LinkedIn prête à enregistrer', 'success');
     } finally {
       previewingLinkedIn = false;
     }
@@ -343,7 +404,7 @@
 
   async function confirmLinkedInSync(): Promise<void> {
     if (!linkedInPreviewResult?.extracted) {
-      await showToast("Prévisualisez LinkedIn avant de synchroniser l'import", 'error');
+      await showToast("Prévisualisez LinkedIn avant de l'enregistrer comme source", 'error');
       return;
     }
 
@@ -356,7 +417,7 @@
         return;
       }
 
-      await showToast('Profil LinkedIn synchronisé vers le dashboard', 'success');
+      await showToast('Profil LinkedIn enregistré comme CV canonique', 'success');
     } finally {
       syncingLinkedIn = false;
     }
@@ -399,7 +460,7 @@
       case 'rate_limited_or_blocked':
         return 'Attendez la fin du blocage LinkedIn ou vérifiez le profil dans un nouvel onglet.';
       case 'sync_failed':
-        return 'Gardez la preview ouverte et relancez la synchronisation vers le dashboard.';
+        return "Gardez la preview ouverte et relancez l'enregistrement comme source canonique.";
       default:
         return "Relancez l'action ou gardez le CV canonique prêt pour une mise à jour manuelle.";
     }
@@ -428,6 +489,26 @@
     void pushAll();
   }
 
+  function workflowStepClass(state: CvWorkflowStep['state']): string {
+    if (state === 'ready') {
+      return 'border-blueprint-blue/25 bg-blueprint-blue/6';
+    }
+    if (state === 'attention') {
+      return 'border-status-orange/25 bg-status-orange/8';
+    }
+    return 'border-border-light bg-surface-white';
+  }
+
+  function workflowIconClass(state: CvWorkflowStep['state']): string {
+    if (state === 'ready') {
+      return 'bg-blueprint-blue/8 text-blueprint-blue';
+    }
+    if (state === 'attention') {
+      return 'bg-status-orange/10 text-status-orange';
+    }
+    return 'bg-page-canvas text-text-muted';
+  }
+
   (async () => {
     isLoading = true;
     profile = await getProfile();
@@ -442,7 +523,7 @@
   <section class="section-card-strong rounded-2xl px-5 py-4">
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
-        <p class="eyebrow text-blueprint-blue">CV synchronisé</p>
+        <p class="eyebrow text-blueprint-blue">CV canonique</p>
         <div class="mt-1 flex flex-wrap items-center gap-2">
           <h2 class="text-base font-semibold text-text-primary">Homogénéiser le profil partout</h2>
           <span
@@ -456,7 +537,7 @@
           mission connectées.
         </p>
         <p class="mt-2 text-[11px] leading-5 text-text-muted">
-          La préparation reste locale; la synchronisation dashboard démarre après connexion du
+          La préparation reste locale; le dashboard connecté prend le relais après connexion du
           compte.
         </p>
       </div>
@@ -475,20 +556,6 @@
         ></div>
       </div>
       <span class="text-xs font-medium text-text-primary">{profileCompleteness}%</span>
-    </div>
-
-    <div class="mt-4 flex flex-wrap items-center gap-2">
-      <button
-        class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90 disabled:opacity-50"
-        onclick={previewLinkedIn}
-        disabled={previewingLinkedIn || syncingLinkedIn}
-      >
-        <Icon name="download" size={13} />
-        {linkedInPrimaryLabel}
-      </button>
-      <span class="text-xs text-text-subtle">
-        Ouvrez votre profil LinkedIn dans l'onglet actif, vérifiez la preview, puis synchronisez.
-      </span>
     </div>
 
     <div class="mt-4">
@@ -510,18 +577,54 @@
         }}
       />
     </div>
+
+    <div class="mt-4 grid gap-2" aria-label="Workflow CV">
+      {#each cvWorkflowSteps as step}
+        <div class="rounded-xl border p-3 transition-colors {workflowStepClass(step.state)}">
+          <div class="flex items-start gap-3">
+            <div
+              class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {workflowIconClass(
+                step.state
+              )}"
+            >
+              <Icon name={step.icon} size={14} />
+            </div>
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <p class="text-[10px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  Étape {step.label}
+                </p>
+                <span
+                  class="shrink-0 rounded-md bg-surface-white px-2 py-0.5 text-[10px] font-medium text-text-subtle"
+                >
+                  {step.statusLabel}
+                </span>
+              </div>
+              <h3 class="mt-1 text-sm font-semibold text-text-primary">{step.title}</h3>
+              <p class="mt-1 text-xs leading-5 text-text-subtle">{step.detail}</p>
+            </div>
+          </div>
+        </div>
+      {/each}
+    </div>
+
     {#if isOffline}
       <div class="mt-3">
         <OfflineNotice
           description="Les données CV locales restent consultables. La prévisualisation LinkedIn et les vérifications de profil peuvent échouer tant que Chrome est hors ligne."
-          action="Prochaine action : préparer les champs locaux, puis synchroniser LinkedIn au retour réseau."
+          action="Prochaine action : préparer les champs locaux, puis enregistrer LinkedIn au retour réseau."
         />
       </div>
     {/if}
   </section>
 
   {#if isLoading}
-    <div class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]" aria-busy="true">
+    <div
+      class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]"
+      aria-busy="true"
+      role="status"
+      aria-live="polite"
+    >
       <section class="section-card rounded-xl p-5">
         <div class="flex items-center justify-between gap-3">
           <div class="min-w-0 flex-1 space-y-2">
@@ -538,7 +641,34 @@
         </div>
       </section>
       <section class="section-card rounded-xl p-5">
-        <div class="space-y-2">
+        <div>
+          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Chargement CV
+          </p>
+          <h3 class="mt-1 text-sm font-semibold text-text-primary">Préparation du workflow CV</h3>
+          <p class="mt-1 text-xs leading-5 text-text-subtle">
+            Pulse récupère la source canonique, les plateformes disponibles et les dernières
+            vérifications avant d’afficher les actions.
+          </p>
+        </div>
+        <div class="mt-4 grid gap-2" aria-label="Progression du chargement CV">
+          {#each loadingProgressSteps as step}
+            <div
+              class="flex items-start gap-3 rounded-lg border border-border-light bg-page-canvas p-3"
+            >
+              <div
+                class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-blueprint-blue/8 text-blueprint-blue"
+              >
+                <Icon name={step.icon} size={13} />
+              </div>
+              <div class="min-w-0">
+                <p class="text-xs font-medium text-text-primary">{step.label}</p>
+                <p class="mt-0.5 text-[11px] leading-5 text-text-subtle">{step.detail}</p>
+              </div>
+            </div>
+          {/each}
+        </div>
+        <div class="mt-4 space-y-2">
           <Skeleton width="8rem" height="0.7rem" />
           <Skeleton width="85%" height="1.2rem" />
           <Skeleton width="100%" height="6rem" />
@@ -552,7 +682,7 @@
         {#if !profile}
           <OperationalEmptyState
             title="Le CV canonique n’a pas encore de source fiable"
-            description="Sans profil MissionPulse, les blocs à pousser risquent de propager des champs vides. Commencez par extraire LinkedIn ou complétez le profil avant de synchroniser."
+            description="Sans profil MissionPulse, les blocs à pousser risquent de propager des champs vides. Commencez par extraire LinkedIn ou complétez le profil avant de préparer la diffusion."
             severity="incident"
             statusLabel="Source manquante"
             icon="file-warning"
@@ -670,7 +800,7 @@
                       disabled={syncingLinkedIn || previewingLinkedIn}
                     >
                       <Icon name="upload" size={13} />
-                      {syncingLinkedIn ? 'Synchronisation...' : 'Synchroniser le CV'}
+                      {syncingLinkedIn ? 'Enregistrement...' : 'Enregistrer comme source'}
                     </button>
                     <button
                       class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
@@ -712,8 +842,8 @@
                 <h3 class="text-sm font-medium text-text-primary">Import LinkedIn</h3>
                 {#if linkedInImportResult.imported}
                   <p class="mt-1 text-xs leading-5 text-text-subtle">
-                    Profil CV synchronisé dans Supabase. Le dashboard affichera l'import, les
-                    suggestions de champs et l'historique LinkedIn.
+                    Profil LinkedIn enregistré comme source canonique. Le dashboard connecté
+                    affichera l'import, les suggestions de champs et l'historique LinkedIn.
                   </p>
                 {:else}
                   <p class="mt-1 text-xs leading-5 text-text-subtle">

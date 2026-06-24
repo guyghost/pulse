@@ -94,6 +94,32 @@ export function createTrackingStore() {
     }
   }
 
+  async function restoreTracking(
+    missionId: string,
+    previousTracking: MissionTracking | null
+  ): Promise<void> {
+    try {
+      const response = await sendMessage({
+        type: 'RESTORE_TRACKING',
+        payload: { missionId, tracking: previousTracking },
+      });
+
+      if (response.type === 'TRACKING_RESTORED') {
+        const newMap = new Map(trackings);
+        if (response.payload) {
+          newMap.set(response.payload.missionId, response.payload);
+        } else {
+          newMap.delete(missionId);
+        }
+        trackings = newMap;
+      } else {
+        error = 'Failed to restore tracking';
+      }
+    } catch (err) {
+      error = err instanceof Error ? err.message : 'Failed to restore tracking';
+    }
+  }
+
   /**
    * Get tracking for a specific mission.
    */
@@ -125,6 +151,7 @@ export function createTrackingStore() {
     loadTrackings,
     transitionStatus,
     updateNextActionAt,
+    restoreTracking,
     getTrackingForMission,
     getStatusLabel,
   };

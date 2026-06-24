@@ -113,6 +113,10 @@ describe('validateMessage — messages sans payload', () => {
     expect(validateMessage({ type: 'RESET_LOCAL_DATA' }).valid).toBe(true);
   });
 
+  it('accepte GET_ALERT_HISTORY', () => {
+    expect(validateMessage({ type: 'GET_ALERT_HISTORY' }).valid).toBe(true);
+  });
+
   it('accepte les messages de flags side panel sans payload', () => {
     for (const type of [
       'GET_FIRST_SCAN_DONE',
@@ -446,6 +450,7 @@ describe('validateMessage — feed local data bridge', () => {
               selectedRemote: 'full',
               selectedSeniority: 'senior',
               selectedScoreBucket: 'strong',
+              decisionPreset: null,
               showNewOnly: false,
               showFavoritesOnly: false,
               showHidden: false,
@@ -482,6 +487,7 @@ describe('validateMessage — feed local data bridge', () => {
         selectedRemote: null,
         selectedSeniority: null,
         selectedScoreBucket: null,
+        decisionPreset: null,
         showNewOnly: false,
         showFavoritesOnly: false,
         showHidden: false,
@@ -631,6 +637,110 @@ describe('validateMessage — TRACKING_UPDATED', () => {
         notes: '',
         nextActionAt: null,
       },
+    });
+
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
+// RESTORE_TRACKING — undo de suivi
+// ============================================================================
+
+describe('validateMessage — RESTORE_TRACKING', () => {
+  it('accepte un snapshot précédent', () => {
+    const r = validateMessage({
+      type: 'RESTORE_TRACKING',
+      payload: {
+        missionId: 'm1',
+        tracking: {
+          missionId: 'm1',
+          currentStatus: 'selected',
+          history: [
+            { from: null, to: 'detected', timestamp: 1779436800000, note: null },
+            { from: 'detected', to: 'selected', timestamp: 1779436900000, note: null },
+          ],
+          generatedAssetIds: [],
+          userRating: null,
+          notes: '',
+          nextActionAt: null,
+        },
+      },
+    });
+
+    expect(r.valid).toBe(true);
+  });
+
+  it('accepte une restauration vers mission non suivie', () => {
+    const r = validateMessage({
+      type: 'RESTORE_TRACKING',
+      payload: { missionId: 'm1', tracking: null },
+    });
+
+    expect(r.valid).toBe(true);
+  });
+
+  it('rejette un snapshot sans historique canonique', () => {
+    const r = validateMessage({
+      type: 'RESTORE_TRACKING',
+      payload: {
+        missionId: 'm1',
+        tracking: {
+          missionId: 'm1',
+          currentStatus: 'selected',
+          history: [],
+          generatedAssetIds: [],
+          userRating: null,
+          notes: '',
+          nextActionAt: null,
+        },
+      },
+    });
+
+    expect(r.valid).toBe(false);
+  });
+});
+
+// ============================================================================
+// ALERT_HISTORY_RESULT — historique d'alertes
+// ============================================================================
+
+describe('validateMessage — ALERT_HISTORY_RESULT', () => {
+  it('accepte un historique borne', () => {
+    const r = validateMessage({
+      type: 'ALERT_HISTORY_RESULT',
+      payload: [
+        {
+          id: 'alert-1',
+          triggeredAt: 1779436800000,
+          missionCount: 2,
+          missionIds: ['m1', 'm2'],
+          missionTitles: ['Mission Svelte', 'Mission React'],
+          scoreThreshold: 80,
+          minDailyRate: 650,
+          requiredStacks: ['Svelte'],
+          maxResults: 5,
+        },
+      ],
+    });
+
+    expect(r.valid).toBe(true);
+  });
+
+  it('rejette un historique trop volumineux', () => {
+    const r = validateMessage({
+      type: 'ALERT_HISTORY_RESULT',
+      payload: Array.from({ length: 21 }, (_, index) => ({
+        id: `alert-${index}`,
+        triggeredAt: 1779436800000 + index,
+        missionCount: 1,
+        missionIds: [`m${index}`],
+        missionTitles: [`Mission ${index}`],
+        scoreThreshold: 80,
+        minDailyRate: 0,
+        requiredStacks: [],
+        maxResults: 5,
+      })),
     });
 
     expect(r.valid).toBe(false);

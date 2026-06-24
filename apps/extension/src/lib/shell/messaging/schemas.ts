@@ -72,6 +72,10 @@ const FeedSavedViewSchema = z
         selectedRemote: z.enum(['full', 'hybrid', 'onsite']).nullable(),
         selectedSeniority: z.enum(['junior', 'confirmed', 'senior']).nullable(),
         selectedScoreBucket: z.enum(['strong', 'good', 'weak']).nullable(),
+        decisionPreset: z
+          .enum(['priority', 'remote-compatible', 'tjm-negotiation', 'new'])
+          .nullable()
+          .default(null),
         showNewOnly: z.boolean(),
         showFavoritesOnly: z.boolean(),
         showHidden: z.boolean(),
@@ -95,11 +99,31 @@ const ConnectedAlertPreferencesSchema = z
     minDailyRate: z.number().int().min(0).max(5000),
     requiredStacks: z.array(z.string().min(1).max(40)).max(12),
     maxResults: z.number().int().min(1).max(20),
+    mutedUntil: z.string().max(40).nullable(),
     revision: z.number().int().min(1),
     updatedAt: z.string().max(40),
   })
   .strict()
   .refine(maxBytes(4_000), { message: 'Alert preferences payload exceeds 4KB limit' });
+
+const AlertHistoryEntrySchema = z
+  .object({
+    id: z.string().min(1).max(180),
+    triggeredAt: z.number().int().min(0),
+    missionCount: z.number().int().min(0).max(500),
+    missionIds: z.array(z.string().min(1).max(256)).max(20),
+    missionTitles: z.array(z.string().min(1).max(180)).max(5),
+    scoreThreshold: z.number().int().min(0).max(100),
+    minDailyRate: z.number().int().min(0).max(5000),
+    requiredStacks: z.array(z.string().min(1).max(40)).max(12),
+    maxResults: z.number().int().min(1).max(20),
+  })
+  .strict();
+
+const AlertHistorySchema = z
+  .array(AlertHistoryEntrySchema)
+  .max(20)
+  .refine(maxBytes(30_000), { message: 'Alert history payload exceeds 30KB limit' });
 
 const TJMRegionSchema = z.enum([
   'ile-de-france',
@@ -477,6 +501,13 @@ export const MessageSchemas = {
     type: z.literal('CONNECTED_ALERT_PREFERENCES_SAVED'),
     payload: z.object({ saved: z.boolean() }),
   }),
+  GET_ALERT_HISTORY: z.object({
+    type: z.literal('GET_ALERT_HISTORY'),
+  }),
+  ALERT_HISTORY_RESULT: z.object({
+    type: z.literal('ALERT_HISTORY_RESULT'),
+    payload: AlertHistorySchema,
+  }),
   GET_TJM_ANALYSIS: z.object({
     type: z.literal('GET_TJM_ANALYSIS'),
     payload: TJMAnalysisRequestSchema.optional(),
@@ -694,9 +725,20 @@ export const MessageSchemas = {
       nextActionAt: IsoDateTimeOrNullSchema.optional(),
     }),
   }),
+  RESTORE_TRACKING: z.object({
+    type: z.literal('RESTORE_TRACKING'),
+    payload: z.object({
+      missionId: z.string().max(256),
+      tracking: MissionTrackingSchema.nullable(),
+    }),
+  }),
   TRACKING_UPDATED: z.object({
     type: z.literal('TRACKING_UPDATED'),
     payload: MissionTrackingSchema,
+  }),
+  TRACKING_RESTORED: z.object({
+    type: z.literal('TRACKING_RESTORED'),
+    payload: MissionTrackingSchema.nullable(),
   }),
   GET_TRACKINGS: z.object({
     type: z.literal('GET_TRACKINGS'),

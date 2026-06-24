@@ -28,7 +28,11 @@ import {
   getProfile,
   saveProfile,
 } from '$lib/shell/facades/settings.facade';
-import { getMissions, openExternalUrl } from '$lib/shell/facades/feed-data.facade';
+import {
+  getConnectorStatuses,
+  getMissions,
+  openExternalUrl,
+} from '$lib/shell/facades/feed-data.facade';
 import { sendMessage } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
@@ -70,6 +74,19 @@ const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({
 const formatBackupDateKey = (timestamp: number): string =>
   new Date(timestamp).toISOString().split('T')[0] ?? 'backup';
 
+const scanDateFormatter = new Intl.DateTimeFormat('fr-FR', {
+  day: '2-digit',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
+const exportFormatLabels: Record<ExportFormat, string> = {
+  json: 'JSON',
+  csv: 'CSV',
+  markdown: 'Rapport Markdown',
+};
+
 export class SettingsPageController {
   firstName = $state('');
   jobTitle = $state('');
@@ -93,6 +110,10 @@ export class SettingsPageController {
   notifications = $state(true);
   autoScan = $state(true);
   theme = $state<'light' | 'dark' | 'system'>('system');
+  lastScanAt = $state<number | null>(null);
+  scanHistorySourceCount = $state(0);
+  scanHistoryMissionCount = $state(0);
+  scanHistoryErrorCount = $state(0);
 
   premiumEnabled = $state(false);
   connectedAccountEmail = $state<string | null>(null);
@@ -106,6 +127,7 @@ export class SettingsPageController {
 
   isExporting = $state(false);
   exportSuccess = $state(false);
+  lastExportSummary = $state<string | null>(null);
 
   showBackupModal = $state(false);
   pendingBackup: BackupData | null = $state(null);
@@ -120,6 +142,7 @@ export class SettingsPageController {
       this.loadAiAvailability(),
       this.loadSettings(),
       this.loadConnectedAccount(),
+      this.loadScanHistory(),
     ]);
   }
 
@@ -183,6 +206,29 @@ export class SettingsPageController {
     }
   }
 
+  async loadScanHistory(): Promise<void> {
+    try {
+      const statuses = await getConnectorStatuses();
+      this.scanHistorySourceCount = statuses.length;
+      this.scanHistoryMissionCount = statuses.reduce(
+        (total, status) => total + status.missionsCount,
+        0
+      );
+      this.scanHistoryErrorCount = statuses.filter((status) => status.lastState === 'error').length;
+      this.lastScanAt = statuses.reduce<number | null>((latest, status) => {
+        if (status.lastSyncAt && (latest === null || status.lastSyncAt > latest)) {
+          return status.lastSyncAt;
+        }
+        return latest;
+      }, null);
+    } catch {
+      this.scanHistorySourceCount = 0;
+      this.scanHistoryMissionCount = 0;
+      this.scanHistoryErrorCount = 0;
+      this.lastScanAt = null;
+    }
+  }
+
   get isConnectedAccount(): boolean {
     return Boolean(this.connectedAccountEmail);
   }
@@ -204,6 +250,46 @@ export class SettingsPageController {
         : 'Compte connecté, première synchronisation en attente.';
     }
     return "Vos scans, favoris, CV et candidatures restent dans l'extension tant qu'aucun compte n'est connecté.";
+  }
+
+  get lastScanLabel(): string {
+    if (!this.lastScanAt) {
+      return 'Aucun scan enregistré';
+    }
+    return `Dernier déclenchement ${scanDateFormatter.format(new Date(this.lastScanAt))}`;
+  }
+
+  get scanHistoryLabel(): string {
+    if (this.scanHistorySourceCount === 0) {
+      return 'Aucun historique par source';
+    }
+    const errorSuffix =
+      this.scanHistoryErrorCount > 0
+        ? ` · ${this.scanHistoryErrorCount} source${this.scanHistoryErrorCount > 1 ? 's' : ''} à corriger`
+        : '';
+    return `${this.scanHistorySourceCount} source${this.scanHistorySourceCount > 1 ? 's' : ''} · ${this.scanHistoryMissionCount} mission${this.scanHistoryMissionCount > 1 ? 's' : ''}${errorSuffix}`;
+  }
+
+  get nextScanLabel(): string {
+    if (!this.autoScan) {
+      return 'Scan automatique désactivé';
+    }
+    if (!this.lastScanAt) {
+      return `Premier scan automatique toutes les ${this.scanInterval} min`;
+    }
+
+    const nextScanAt = this.lastScanAt + this.scanInterval * 60_000;
+    if (nextScanAt <= Date.now()) {
+      return 'Prochain scan dès que Chrome déclenche l’alarme';
+    }
+    return `Prochain déclenchement vers ${scanDateFormatter.format(new Date(nextScanAt))}`;
+  }
+
+  get scanHistoryTone(): 'success' | 'attention' | 'neutral' {
+    if (this.scanHistorySourceCount === 0) {
+      return 'neutral';
+    }
+    return this.scanHistoryErrorCount > 0 ? 'attention' : 'success';
   }
 
   async openAccountCenter(): Promise<void> {
@@ -362,6 +448,7 @@ export class SettingsPageController {
       const favoriteMissions = allMissions.filter((m) => favoriteIds.includes(m.id));
       const now = new Date();
       const filename = generateFilename('favoris', format, now);
+      const exportedCount = favoriteMissions.length;
 
       switch (format) {
         case 'json':
@@ -384,6 +471,7 @@ export class SettingsPageController {
           break;
       }
 
+      this.lastExportSummary = `${exportFormatLabels[format]} généré · ${exportedCount} mission${exportedCount > 1 ? 's' : ''} favorite${exportedCount > 1 ? 's' : ''} · sessions plateforme conservées localement`;
       this.exportSuccess = true;
       setTimeout(() => {
         this.exportSuccess = false;
