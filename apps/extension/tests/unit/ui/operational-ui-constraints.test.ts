@@ -510,6 +510,23 @@ describe('operational UI constraints', () => {
     expect(source).toContain('tracking.restoreTracking(missionId, previousTracking)');
   });
 
+  it('keeps feed undo and hidden-filter microcopy accented', () => {
+    const feedStateSource = readFileSync('src/lib/state/feed-page.svelte.ts', 'utf8');
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const filterSource = readFileSync('src/ui/organisms/FilterBar.svelte', 'utf8');
+
+    expect(feedStateSource).toContain('Favori retiré');
+    expect(feedStateSource).toContain('Mission ajoutée aux favoris');
+    expect(feedStateSource).toContain('Mission restaurée');
+    expect(feedStateSource).toContain('Mission masquée');
+    expect(feedSource).toContain('Voir les ignorées');
+    expect(feedSource).toContain('Raccourci clavier : h.');
+    expect(filterSource).toContain('Retire cette vue sauvegardée.');
+    expect(`${feedStateSource}\n${feedSource}\n${filterSource}`).not.toMatch(
+      /retire|ajoutee|restauree|masquee|ignoree|sauvegardee/
+    );
+  });
+
   it('keeps the feed comparison flow explicit and actionable', () => {
     const cardSource = readFileSync('src/ui/molecules/MissionCard.svelte', 'utf8');
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');

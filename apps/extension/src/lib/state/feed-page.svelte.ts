@@ -431,7 +431,7 @@ export function createFeedPageState(
     const updated = toggleFavorite(favorites, id, Date.now());
     favorites = updated;
     saveFavorites(favorites).catch(() => {});
-    showToastAction(wasFavorite ? 'Favori retire' : 'Mission ajoutee aux favoris', 'success', {
+    showToastAction(wasFavorite ? 'Favori retiré' : 'Mission ajoutée aux favoris', 'success', {
       label: 'Annuler',
       onClick: () => {
         favorites = previous;
@@ -445,7 +445,7 @@ export function createFeedPageState(
     const wasHidden = id in hidden;
     hidden = toggleHidden(hidden, id, Date.now());
     saveHidden(hidden).catch(() => {});
-    showToastAction(wasHidden ? 'Mission restauree' : 'Mission masquee', 'info', {
+    showToastAction(wasHidden ? 'Mission restaurée' : 'Mission masquée', 'info', {
       label: 'Annuler',
       onClick: () => {
         hidden = previous;

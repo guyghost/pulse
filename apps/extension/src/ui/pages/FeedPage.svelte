@@ -1123,8 +1123,8 @@
               </button>
             </Tooltip>
             <Tooltip
-              label={page.showHidden ? 'Masquer les missions ignorees' : 'Voir les ignorees'}
-              description={`Raccourci clavier: h. ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} ignoree${page.hiddenCount > 1 ? 's' : ''}.`}
+              label={page.showHidden ? 'Masquer les missions ignorées' : 'Voir les ignorées'}
+              description={`Raccourci clavier : h. ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} ignorée${page.hiddenCount > 1 ? 's' : ''}.`}
             >
               <button
                 class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
