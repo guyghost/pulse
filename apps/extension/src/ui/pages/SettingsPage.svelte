@@ -254,10 +254,10 @@
       statusLabel: 'Export prêt',
       title: `${favoriteExportCount} mission${favoriteExportCount > 1 ? 's' : ''} prête${favoriteExportCount > 1 ? 's' : ''} à partager`,
       description:
-        'Le prochain geste utile est de sortir une version exploitable pour suivi commercial, archive ou comparaison.',
+        'Le prochain geste utile est de produire un rapport Markdown lisible avant les formats techniques.',
       evidence,
-      primaryActionLabel: 'Exporter en JSON',
-      primaryActionIcon: 'file-json',
+      primaryActionLabel: 'Exporter le rapport',
+      primaryActionIcon: 'file-text',
     };
   });
 
@@ -393,7 +393,7 @@
       onBack?.();
       return;
     }
-    await handleExportFavorites('json');
+    await handleExportFavorites('markdown');
   }
 
   const settingsStory = $derived.by(() => {
@@ -910,31 +910,36 @@
             </div>
           </div>
         </div>
-        <div class="flex flex-wrap gap-2">
-          <button
-            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
-            onclick={() => handleExportFavorites('json')}
-            disabled={settings.isExporting}
-          >
-            <Icon name="file-json" size={14} class="text-blueprint-blue" />
-            JSON
-          </button>
-          <button
-            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
-            onclick={() => handleExportFavorites('csv')}
-            disabled={settings.isExporting}
-          >
-            <Icon name="file-spreadsheet" size={14} class="text-blueprint-blue" />
-            CSV
-          </button>
-          <button
-            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
-            onclick={() => handleExportFavorites('markdown')}
-            disabled={settings.isExporting}
-          >
-            <Icon name="file-text" size={14} class="text-blueprint-blue" />
-            Markdown
-          </button>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            Formats secondaires
+          </p>
+          <div class="mt-2 flex flex-wrap gap-2">
+            <button
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              onclick={() => handleExportFavorites('json')}
+              disabled={settings.isExporting}
+            >
+              <Icon name="file-json" size={14} class="text-blueprint-blue" />
+              JSON
+            </button>
+            <button
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              onclick={() => handleExportFavorites('csv')}
+              disabled={settings.isExporting}
+            >
+              <Icon name="file-spreadsheet" size={14} class="text-blueprint-blue" />
+              CSV
+            </button>
+            <button
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              onclick={() => handleExportFavorites('markdown')}
+              disabled={settings.isExporting}
+            >
+              <Icon name="file-text" size={14} class="text-blueprint-blue" />
+              Markdown
+            </button>
+          </div>
         </div>
         {#if settings.exportSuccess}
           <p class="text-xs text-blueprint-blue">Export réussi !</p>

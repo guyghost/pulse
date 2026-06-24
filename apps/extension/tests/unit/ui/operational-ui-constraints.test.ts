@@ -239,7 +239,12 @@ describe('operational UI constraints', () => {
 
     expect(settingsSource).toContain('Rapport shortlist');
     expect(settingsSource).toContain('rappel de confidentialité locale');
+    expect(settingsSource).toContain("primaryActionLabel: 'Exporter le rapport'");
+    expect(settingsSource).toContain("primaryActionIcon: 'file-text'");
+    expect(settingsSource).toContain("await handleExportFavorites('markdown')");
+    expect(settingsSource).toContain('Formats secondaires');
     expect(settingsSource).toContain('Markdown');
+    expect(settingsSource).not.toContain("primaryActionLabel: 'Exporter en JSON'");
     expect(exportSource).toContain('## Synthèse shortlist');
     expect(exportSource).toContain('## Missions retenues');
     expect(exportSource).toContain('**Confidentialité:** rapport local généré depuis vos favoris');
