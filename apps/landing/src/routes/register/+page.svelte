@@ -59,19 +59,19 @@
       {#if linkSent}
         <div class="auth-card__header">
           <h1>Vérifiez votre email</h1>
-          <p>Le lien securise ouvrira votre dashboard.</p>
+          <p>Le lien sécurisé ouvrira votre dashboard.</p>
         </div>
 
         <div class="auth-message" data-testid="register-link-sent">
           <p>
-            Nous avons envoye un lien a <strong>{email}</strong>. Ouvrez-le dans ce navigateur pour
-            acceder au dashboard MissionPulse.
+            Nous avons envoyé un lien à <strong>{email}</strong>. Ouvrez-le dans ce navigateur pour
+            accéder au dashboard MissionPulse.
           </p>
         </div>
       {:else}
         <div class="auth-card__header">
           <h1>Créer un compte</h1>
-          <p>Demarrez sans mot de passe avec un lien securise</p>
+          <p>Démarrez sans mot de passe avec un lien sécurisé</p>
         </div>
 
         <form class="auth-form" onsubmit={handleEmailRegistration}>
@@ -119,13 +119,13 @@
             {#if submitting}
               Envoi du lien...
             {:else}
-              Recevoir mon lien de creation
+              Recevoir mon lien de création
             {/if}
           </button>
 
           <p class="auth-note">
-            Le lien valide votre email et ouvre le dashboard. Les passkeys seront proposes quand
-            Supabase les activera pour ce projet.
+            Le compte synchronise uniquement snapshots, CV, préférences et candidatures. Vos
+            sessions plateforme restent dans Chrome.
           </p>
         </form>
       {/if}
