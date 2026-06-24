@@ -123,6 +123,17 @@ describe('operational UI constraints', () => {
     expect(appSource).not.toContain('detail.isScrolling && detail.scrollTop > 12');
   });
 
+  it('keeps extension keyboard focus visible and respects reduced motion', () => {
+    const source = readFileSync('src/ui/design-tokens.css', 'utf8');
+
+    expect(source).toContain('a:focus-visible');
+    expect(source).toContain('button:focus-visible');
+    expect(source).toContain('input:focus-visible');
+    expect(source).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(source).toContain('transition-duration: 0.01ms !important');
+    expect(source).toContain('animation-iteration-count: 1 !important');
+  });
+
   it('guides users from the feed summary to missions below the fold', () => {
     const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
 
