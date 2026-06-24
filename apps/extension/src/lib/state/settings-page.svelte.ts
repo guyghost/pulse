@@ -81,6 +81,12 @@ const scanDateFormatter = new Intl.DateTimeFormat('fr-FR', {
   minute: '2-digit',
 });
 
+const exportFormatLabels: Record<ExportFormat, string> = {
+  json: 'JSON',
+  csv: 'CSV',
+  markdown: 'Rapport Markdown',
+};
+
 export class SettingsPageController {
   firstName = $state('');
   jobTitle = $state('');
@@ -121,6 +127,7 @@ export class SettingsPageController {
 
   isExporting = $state(false);
   exportSuccess = $state(false);
+  lastExportSummary = $state<string | null>(null);
 
   showBackupModal = $state(false);
   pendingBackup: BackupData | null = $state(null);
@@ -441,6 +448,7 @@ export class SettingsPageController {
       const favoriteMissions = allMissions.filter((m) => favoriteIds.includes(m.id));
       const now = new Date();
       const filename = generateFilename('favoris', format, now);
+      const exportedCount = favoriteMissions.length;
 
       switch (format) {
         case 'json':
@@ -463,6 +471,7 @@ export class SettingsPageController {
           break;
       }
 
+      this.lastExportSummary = `${exportFormatLabels[format]} généré · ${exportedCount} mission${exportedCount > 1 ? 's' : ''} favorite${exportedCount > 1 ? 's' : ''} · sessions plateforme conservées localement`;
       this.exportSuccess = true;
       setTimeout(() => {
         this.exportSuccess = false;

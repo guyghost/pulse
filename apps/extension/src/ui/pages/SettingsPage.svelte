@@ -945,8 +945,22 @@
             </button>
           </div>
         </div>
-        {#if settings.exportSuccess}
-          <p class="text-xs text-blueprint-blue">Export réussi !</p>
+        {#if settings.exportSuccess && settings.lastExportSummary}
+          <div
+            class="rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/6 px-3 py-2"
+            role="status"
+            aria-live="polite"
+          >
+            <div class="flex items-start gap-2">
+              <Icon name="check-circle-2" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+              <div class="min-w-0">
+                <p class="text-xs font-medium text-text-primary">Export prêt à partager</p>
+                <p class="mt-0.5 text-[11px] leading-4 text-text-subtle">
+                  {settings.lastExportSummary}
+                </p>
+              </div>
+            </div>
+          </div>
         {/if}
       </div>
 
