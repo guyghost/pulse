@@ -152,7 +152,10 @@
   const hasVisibleFeedMissions = $derived(visibleFeedMissionCount > 0);
   const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
   const showMissionScrollCue = $derived(
-    hasVisibleFeedMissions && !missionFeedReached && !(controller.isScanning || page.isLoading)
+    feedChromeCompact &&
+      hasVisibleFeedMissions &&
+      !missionFeedReached &&
+      !(controller.isScanning || page.isLoading)
   );
 
   const alertMatchCount = $derived.by(() => {
@@ -365,13 +368,12 @@
   }
 
   (async () => {
-    const [firstScanDone, bannerDismissed, profile, storedAlertPreferences] =
-      await Promise.all([
-        getFirstScanDone(),
-        getProfileBannerDismissed(),
-        getProfile(),
-        getAlertPreferences(),
-      ]);
+    const [firstScanDone, bannerDismissed, profile, storedAlertPreferences] = await Promise.all([
+      getFirstScanDone(),
+      getProfileBannerDismissed(),
+      getProfile(),
+      getAlertPreferences(),
+    ]);
     showRefinementBanner = firstScanDone && !bannerDismissed && !profile;
     alertPreferences = storedAlertPreferences;
   })().catch(() => {});
@@ -983,8 +985,8 @@
             Missions proposées
           </h2>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            {visibleFeedMissionLabel} visible{visibleFeedMissionCount > 1 ? 's' : ''} selon vos
-            filtres actuels.
+            {visibleFeedMissionLabel} visible{visibleFeedMissionCount > 1 ? 's' : ''} selon vos filtres
+            actuels.
           </p>
         </div>
         <span
