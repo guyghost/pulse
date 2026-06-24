@@ -42,6 +42,7 @@
   import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
+  import { getLastTransitionTime } from '$lib/core/tracking';
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
@@ -526,6 +527,11 @@
       history: record.history.map((transition) => ({ ...transition })),
       generatedAssetIds: [...record.generatedAssetIds],
     };
+  }
+
+  function getTrackingUpdatedAt(missionId: string): number | null {
+    const record = tracking.getTrackingForMission(missionId);
+    return record ? getLastTransitionTime(record) : null;
   }
 
   async function handleTrackingTransition(
@@ -1372,6 +1378,7 @@
       !page.comparisonMissionIds.includes(investigationMission.id)}
     isHidden={investigationMission.id in page.hidden}
     trackingStatus={tracking.getTrackingForMission(investigationMission.id)?.currentStatus ?? null}
+    trackingUpdatedAt={getTrackingUpdatedAt(investigationMission.id)}
     onClose={() => (investigationMission = null)}
     onOpenLink={handleOpenExternalUrl}
     onToggleCompare={handleInvestigationToggleCompare}

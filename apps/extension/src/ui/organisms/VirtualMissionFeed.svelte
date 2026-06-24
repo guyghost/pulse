@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
   import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
+  import { getLastTransitionTime } from '$lib/core/tracking';
   import MissionCard from '../molecules/MissionCard.svelte';
   import { Skeleton } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
@@ -207,6 +208,7 @@
     <!-- Lazy-loaded list: renders only visibleCount missions, loads more on scroll -->
     <div class="flex flex-col gap-3">
       {#each visibleMissions as mission (mission.id)}
+        {@const missionTracking = trackingByMissionId.get(mission.id)}
         <MissionCard
           {mission}
           isSeen={seenSet.has(mission.id)}
@@ -214,7 +216,8 @@
           isHidden={mission.id in (hidden ?? {})}
           isCompared={comparedIds.has(mission.id)}
           compareDisabled={comparisonLimitReached && !comparedIds.has(mission.id)}
-          trackingStatus={trackingByMissionId.get(mission.id)?.currentStatus ?? null}
+          trackingStatus={missionTracking?.currentStatus ?? null}
+          trackingUpdatedAt={missionTracking ? getLastTransitionTime(missionTracking) : null}
           tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
           onVisible={() => onMissionSeen?.(mission.id)}
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}

@@ -87,6 +87,17 @@ describe('MissionCard', () => {
     expect(target.textContent).not.toContain('Nouveau');
   });
 
+  it('affiche le timestamp du dernier changement de statut', async () => {
+    const target = mountCard({
+      trackingStatus: 'selected',
+      trackingUpdatedAt: Date.UTC(2026, 5, 24, 10, 30),
+    });
+    await tick();
+
+    expect(target.textContent).toContain('Sélectionnée');
+    expect(target.textContent).toContain('Modifié');
+  });
+
   it('appelle onToggleFavorite au clic sur le bouton favoris', async () => {
     const onToggleFavorite = vi.fn();
     const target = mountCard({ onToggleFavorite });

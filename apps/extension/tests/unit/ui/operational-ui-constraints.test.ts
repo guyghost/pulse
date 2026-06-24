@@ -401,6 +401,22 @@ describe('operational UI constraints', () => {
     expect(virtualFeedSource).toContain('onStatusTransition');
   });
 
+  it('keeps feed tracking timestamps visible after status changes', () => {
+    const cardSource = readFileSync('src/ui/molecules/MissionCard.svelte', 'utf8');
+    const drawerSource = readFileSync('src/ui/organisms/MissionInvestigationDrawer.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const virtualFeedSource = readFileSync('src/ui/organisms/VirtualMissionFeed.svelte', 'utf8');
+
+    expect(cardSource).toContain('trackingUpdatedAt');
+    expect(cardSource).toContain('Modifié {trackingUpdatedLabel}');
+    expect(drawerSource).toContain('trackingUpdatedAt');
+    expect(drawerSource).toContain('Modifié {trackingUpdatedLabel}');
+    expect(feedSource).toContain(
+      'trackingUpdatedAt={getTrackingUpdatedAt(investigationMission.id)}'
+    );
+    expect(virtualFeedSource).toContain('getLastTransitionTime(missionTracking)');
+  });
+
   it('keeps feed status transitions undoable', () => {
     const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
 

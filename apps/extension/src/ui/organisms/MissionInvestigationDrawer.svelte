@@ -14,6 +14,7 @@
     compareDisabled = false,
     isHidden = false,
     trackingStatus = null,
+    trackingUpdatedAt = null,
     onClose,
     onOpenLink,
     onToggleCompare,
@@ -25,6 +26,7 @@
     compareDisabled?: boolean;
     isHidden?: boolean;
     trackingStatus?: ApplicationStatus | null;
+    trackingUpdatedAt?: number | null;
     onClose?: () => void;
     onOpenLink?: (url: string) => void;
     onToggleCompare?: () => void;
@@ -102,6 +104,20 @@
       ? 'Mettre en suivi'
       : `Suivi: ${STATUS_LABELS[trackingStatus ?? 'detected']}`
   );
+  const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
+
+  function formatTrackingTimestamp(timestamp: number | null | undefined): string | null {
+    if (typeof timestamp !== 'number' || !Number.isFinite(timestamp) || timestamp <= 0) {
+      return null;
+    }
+
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(timestamp));
+  }
 
   function handleSelectForTracking(): void {
     if (!canSelectForTracking) {
@@ -167,11 +183,16 @@
               Gardez le contrôle avant de sortir vers la plateforme source.
             </p>
           </div>
-          <span
-            class="shrink-0 rounded-lg border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
-          >
-            {trackingStatus ? STATUS_LABELS[trackingStatus] : 'Non suivie'}
-          </span>
+          <div class="shrink-0 text-right">
+            <span
+              class="inline-flex rounded-lg border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+            >
+              {trackingStatus ? STATUS_LABELS[trackingStatus] : 'Non suivie'}
+            </span>
+            {#if trackingUpdatedLabel}
+              <p class="mt-1 text-[10px] text-text-muted">Modifié {trackingUpdatedLabel}</p>
+            {/if}
+          </div>
         </div>
 
         <div class="mt-3 grid grid-cols-2 gap-2">

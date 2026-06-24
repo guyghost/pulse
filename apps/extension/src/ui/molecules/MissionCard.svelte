@@ -27,6 +27,7 @@
     onOpenLink,
     onInvestigate,
     trackingStatus = null as ApplicationStatus | null,
+    trackingUpdatedAt = null as number | null,
     onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
   }: {
     mission: Mission;
@@ -45,6 +46,7 @@
     onOpenLink?: (url: string) => void;
     onInvestigate?: () => void;
     trackingStatus?: ApplicationStatus | null;
+    trackingUpdatedAt?: number | null;
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
   } = $props();
 
@@ -64,6 +66,7 @@
   const availableTransitions = $derived(
     trackingStatus ? (VALID_TRANSITIONS[trackingStatus] ?? []) : []
   );
+  const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
 
   const scoreValue = $derived(mission.scoreBreakdown?.total ?? mission.score ?? 0);
   const scoreDisplayValue = $derived(
@@ -131,6 +134,19 @@
       : grade === 'B'
         ? 'bg-accent-amber'
         : 'bg-status-red';
+  }
+
+  function formatTrackingTimestamp(timestamp: number | null | undefined): string | null {
+    if (typeof timestamp !== 'number' || !Number.isFinite(timestamp) || timestamp <= 0) {
+      return null;
+    }
+
+    return new Intl.DateTimeFormat('fr-FR', {
+      day: '2-digit',
+      month: 'short',
+      hour: '2-digit',
+      minute: '2-digit',
+    }).format(new Date(timestamp));
   }
 
   function toggleExpand() {
@@ -209,6 +225,13 @@
         <Badge label={mission.source} variant="source" />
         {#if trackingStatus}
           <Badge label={STATUS_LABELS[trackingStatus]} variant={STATUS_VARIANTS[trackingStatus]} />
+          {#if trackingUpdatedLabel}
+            <span
+              class="inline-flex items-center rounded-full bg-page-canvas px-2 py-0.5 text-[10px] font-medium text-text-muted"
+            >
+              Modifié {trackingUpdatedLabel}
+            </span>
+          {/if}
         {/if}
         {#if !isSeen}
           <span
