@@ -91,12 +91,26 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('class="relative h-full overflow-y-auto"');
     expect(feedSource).toContain('data-testid="feed-scroll-container"');
     expect(feedSource).toContain('data-testid="mission-feed"');
-    expect(feedSource).toContain('class="px-4 pb-28 pt-4"');
+    expect(feedSource).toContain('class="px-4 pb-28 pt-4 focus:outline-none"');
     expect(feedSource).not.toContain('class="flex-1 overflow-y-auto px-4 pb-5 pt-4"');
     expect(appSource).toContain('class="absolute inset-0 overflow-hidden"');
     expect(appSource).not.toContain('class="absolute inset-0 overflow-y-auto"\n        class:hidden={nav.currentPage !==');
     expect(appSource).toContain("feedNavCompact = nav.currentPage === 'feed' && detail.scrollTop > 12");
     expect(appSource).not.toContain('detail.isScrolling && detail.scrollTop > 12');
+  });
+
+  it('guides users from the feed summary to missions below the fold', () => {
+    const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+
+    expect(source).toContain('data-testid="mission-scroll-cue"');
+    expect(source).toContain('data-testid="mission-feed-anchor"');
+    expect(source).toContain('function scrollToMissionFeed()');
+    expect(source).toContain("missionFeedSection.scrollIntoView({ behavior: 'smooth', block: 'start' })");
+    expect(source).toContain('Missions proposées plus bas');
+    expect(source).toContain('Missions proposées');
+    expect(source).toContain('Voir les ${formatMissionCount(newCount)}');
+    expect(source).toContain('visibleFeedMissionLabel');
+    expect(source).toContain('missionFeedReached = sectionRect.top <= containerRect.bottom - 48');
   });
 
   it('keeps the primary navigation labels localized for the French product surface', () => {

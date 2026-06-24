@@ -7,6 +7,7 @@
   import { createFeedPageState } from '$lib/state/feed-page.svelte';
   import VirtualMissionFeed from '../organisms/VirtualMissionFeed.svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
+  import { tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import ConnectorStatusList from '../molecules/ConnectorStatusList.svelte';
@@ -55,6 +56,9 @@
   let tourStepIndex = $state(0);
   let missionScrollTop = $state(0);
   let feedChromeCompact = $state(false);
+  let feedScrollContainer = $state<HTMLDivElement | null>(null);
+  let missionFeedSection = $state<HTMLDivElement | null>(null);
+  let missionFeedReached = $state(false);
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let showAlertOnly = $state(false);
   let showComparison = $state(false);
@@ -144,6 +148,12 @@
   );
 
   const visibleFeedMissions = $derived(showAlertOnly ? alertMissions : page.displayMissions);
+  const visibleFeedMissionCount = $derived(visibleFeedMissions.length);
+  const hasVisibleFeedMissions = $derived(visibleFeedMissionCount > 0);
+  const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
+  const showMissionScrollCue = $derived(
+    hasVisibleFeedMissions && !missionFeedReached && !(controller.isScanning || page.isLoading)
+  );
 
   const alertMatchCount = $derived.by(() => {
     if (!alertPreferences.enabled) {
@@ -187,8 +197,9 @@
         description:
           'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions deja stockees.',
         evidence,
-        primaryActionLabel: 'Voir les missions cachees',
-        primaryActionIcon: 'database',
+        primaryActionLabel:
+          visibleCount > 0 ? `Voir les ${formatMissionCount(visibleCount)} en cache` : 'Hors ligne',
+        primaryActionIcon: visibleCount > 0 ? 'chevron-down' : 'database',
       };
     }
 
@@ -215,8 +226,8 @@
             ? `${highScoreCount} opportunite${highScoreCount > 1 ? 's' : ''} depasse le seuil prioritaire. Commencez par celles-ci.`
             : 'Aucune urgence detectee, mais les nouvelles missions meritent une qualification rapide.',
         evidence,
-        primaryActionLabel: 'Voir les nouvelles',
-        primaryActionIcon: 'sparkles',
+        primaryActionLabel: `Voir les ${formatMissionCount(newCount)} proposée${newCount > 1 ? 's' : ''}`,
+        primaryActionIcon: 'chevron-down',
       };
     }
 
@@ -228,8 +239,10 @@
         description: `Le bruit est filtre selon votre alerte ${alertPreferences.scoreThreshold}+. La prochaine action utile est de comparer ces missions et d en mettre une en suivi.`,
         evidence,
         primaryActionLabel:
-          alertPreferences.scoreThreshold >= 80 ? 'Filtrer les 80+' : 'Voir les alertes',
-        primaryActionIcon: 'target',
+          alertPreferences.scoreThreshold >= 80
+            ? `Voir les ${formatMissionCount(highScoreCount)} prioritaire${highScoreCount > 1 ? 's' : ''}`
+            : `Voir les ${formatMissionCount(highScoreCount)} en alerte`,
+        primaryActionIcon: 'chevron-down',
       };
     }
 
@@ -253,13 +266,42 @@
       description:
         'Le systeme est stable. Continuez par les favoris ou relancez un scan si la veille doit etre rafraichie.',
       evidence,
-      primaryActionLabel: 'Rafraichir',
-      primaryActionIcon: 'refresh-cw',
+      primaryActionLabel: `Voir les ${formatMissionCount(visibleCount)} proposée${visibleCount > 1 ? 's' : ''}`,
+      primaryActionIcon: 'chevron-down',
     };
   });
 
+  function formatMissionCount(count: number): string {
+    return `${count} mission${count > 1 ? 's' : ''}`;
+  }
+
+  function updateMissionFeedReached(container: HTMLElement): void {
+    if (!missionFeedSection) {
+      missionFeedReached = false;
+      return;
+    }
+
+    const containerRect = container.getBoundingClientRect();
+    const sectionRect = missionFeedSection.getBoundingClientRect();
+    missionFeedReached = sectionRect.top <= containerRect.bottom - 48;
+  }
+
+  async function scrollToMissionFeed(): Promise<void> {
+    await tick();
+
+    if (!missionFeedSection) {
+      return;
+    }
+
+    missionFeedSection.focus({ preventScroll: true });
+    missionFeedSection.scrollIntoView({ behavior: 'smooth', block: 'start' });
+  }
+
   function handleFeedStoryPrimaryAction(): void {
     if (page.isOffline) {
+      if (hasVisibleFeedMissions) {
+        void scrollToMissionFeed();
+      }
       return;
     }
 
@@ -272,11 +314,18 @@
       if (!page.showNewOnly) {
         page.toggleNewOnly();
       }
+      void scrollToMissionFeed();
       return;
     }
 
     if (alertMatchCount > 0) {
       showAlertOnly = true;
+      void scrollToMissionFeed();
+      return;
+    }
+
+    if (hasVisibleFeedMissions) {
+      void scrollToMissionFeed();
       return;
     }
 
@@ -373,6 +422,7 @@
     const scrollingDown = nextScrollTop > missionScrollTop;
 
     missionScrollTop = nextScrollTop;
+    updateMissionFeedReached(target);
 
     if (scrollingDown && nextScrollTop > 12) {
       feedChromeCompact = true;
@@ -388,14 +438,60 @@
       emitFeedScrollState(false, missionScrollTop);
     }, 260);
   }
+
+  $effect(() => {
+    const container = feedScrollContainer;
+    missionFeedSection;
+    visibleFeedMissionCount;
+    page.showFilters;
+    showAlertOnly;
+
+    void tick().then(() => {
+      if (container) {
+        updateMissionFeedReached(container);
+      }
+    });
+  });
 </script>
 
 <div
+  bind:this={feedScrollContainer}
   data-testid="feed-scroll-container"
   class="relative h-full overflow-y-auto"
   use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
   onscroll={handleMissionScroll}
 >
+  {#if showMissionScrollCue}
+    <div
+      class="pointer-events-none sticky top-[calc(100%-5.5rem)] z-40 px-4"
+      data-testid="mission-scroll-cue-layer"
+    >
+      <button
+        data-testid="mission-scroll-cue"
+        class="pointer-events-auto flex w-full items-center justify-between gap-3 rounded-xl border border-blueprint-blue/20 bg-surface-white/95 px-4 py-3 text-left text-blueprint-blue shadow-subtle-3 backdrop-blur-sm transition-all duration-200 hover:border-blueprint-blue/30 hover:bg-blueprint-blue/5 focus:outline-none focus:ring-2 focus:ring-blueprint-blue/25"
+        type="button"
+        onclick={scrollToMissionFeed}
+        aria-label={`Faire défiler vers ${visibleFeedMissionLabel} proposée${visibleFeedMissionCount > 1 ? 's' : ''}`}
+        transition:slide={{ duration: 160 }}
+      >
+        <span class="min-w-0">
+          <span class="block text-[11px] font-semibold text-text-primary"
+            >Missions proposées plus bas</span
+          >
+          <span class="mt-0.5 block text-[10px] leading-4 text-text-subtle"
+            >{visibleFeedMissionLabel} selon vos filtres. Continuez pour les comparer.</span
+          >
+        </span>
+        <span
+          class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-blueprint-blue/8 text-blueprint-blue"
+          aria-hidden="true"
+        >
+          <Icon name="chevron-down" size={14} />
+        </span>
+      </button>
+    </div>
+  {/if}
+
   <div
     class="px-4 pt-4 transition-[filter] duration-200 ease-out {feedChromeCompact
       ? 'brightness-[0.99]'
@@ -868,9 +964,39 @@
 
   <!-- ── Mission feed ── -->
   <div
+    bind:this={missionFeedSection}
     data-testid="mission-feed"
-    class="px-4 pb-28 pt-4"
+    class="px-4 pb-28 pt-4 focus:outline-none"
+    tabindex="-1"
+    aria-labelledby="mission-feed-title"
   >
+    {#if hasVisibleFeedMissions}
+      <div
+        data-testid="mission-feed-anchor"
+        class="mb-3 flex items-end justify-between gap-3 border-t border-border-light pt-4"
+      >
+        <div class="min-w-0">
+          <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+            Investigation
+          </p>
+          <h2 id="mission-feed-title" class="mt-1 text-sm font-semibold text-text-primary">
+            Missions proposées
+          </h2>
+          <p class="mt-1 text-xs leading-5 text-text-subtle">
+            {visibleFeedMissionLabel} visible{visibleFeedMissionCount > 1 ? 's' : ''} selon vos
+            filtres actuels.
+          </p>
+        </div>
+        <span
+          class="shrink-0 rounded-lg border border-border-light bg-surface-white px-2 py-1 font-mono text-xs font-semibold tabular-nums text-text-primary"
+          aria-label={`${visibleFeedMissionCount} missions dans la liste`}
+        >
+          {visibleFeedMissionCount}
+        </span>
+      </div>
+    {:else}
+      <h2 id="mission-feed-title" class="sr-only">Missions proposées</h2>
+    {/if}
     <div
       class="rounded-xl transition-all duration-200 {activeTourStep?.id === 'expand' ||
       activeTourStep?.id === 'seen'

@@ -1,6 +1,10 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { createFeedStore } from '../../../src/lib/state/feed.svelte';
-import { createFeedPageState } from '../../../src/lib/state/feed-page.svelte';
+import {
+  createFeedPageState,
+  isRemoteCompatibleInsight,
+  needsTjmNegotiation,
+} from '../../../src/lib/state/feed-page.svelte';
 import type { Mission, MissionSource } from '../../../src/lib/core/types/mission';
 import type { FeedController } from '../../../src/lib/shell/facades/feed-controller.svelte';
 
@@ -291,6 +295,7 @@ describe('feed page state', () => {
       }),
       makeMission({
         id: 'weak-remote',
+        remote: 'onsite',
         scoreBreakdown: makeScoreBreakdown({
           criteria: {
             stack: 40,
@@ -307,9 +312,24 @@ describe('feed page state', () => {
 
     expect(page.insightSummary).toEqual({
       strongStackCount: 1,
-      weakTjmCount: 1,
+      weakTjmCount: 0,
       remoteMatchCount: 1,
       semanticAnalyzedCount: 1,
     });
+  });
+
+  it('flags only missions below the profile TJM floor as needing negotiation', () => {
+    expect(needsTjmNegotiation(makeMission({ tjm: 590 }), 600)).toBe(true);
+    expect(needsTjmNegotiation(makeMission({ tjm: 600 }), 600)).toBe(false);
+    expect(needsTjmNegotiation(makeMission({ tjm: 900 }), 600)).toBe(false);
+    expect(needsTjmNegotiation(makeMission({ tjm: null }), 600)).toBe(false);
+    expect(needsTjmNegotiation(makeMission({ tjm: 590 }), null)).toBe(false);
+  });
+
+  it('counts only explicit full or hybrid remote as remote-compatible insight', () => {
+    expect(isRemoteCompatibleInsight(makeMission({ remote: 'full' }))).toBe(true);
+    expect(isRemoteCompatibleInsight(makeMission({ remote: 'hybrid' }))).toBe(true);
+    expect(isRemoteCompatibleInsight(makeMission({ remote: 'onsite' }))).toBe(false);
+    expect(isRemoteCompatibleInsight(makeMission({ remote: null }))).toBe(false);
   });
 });

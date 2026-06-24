@@ -7,7 +7,7 @@
  * Uses Svelte 5 runes for reactive state.
  */
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
-import type { SeniorityLevel } from '$lib/core/types/profile';
+import type { SeniorityLevel, UserProfile } from '$lib/core/types/profile';
 import type {
   FeedScoreBucket,
   FeedSortBy,
@@ -96,6 +96,19 @@ const SCORE_BUCKETS: Array<Omit<ScoreBucketSummary, 'count'>> = [
 
 const MAX_SAVED_VIEWS = 12;
 
+export function needsTjmNegotiation(mission: Pick<Mission, 'tjm'>, profileTjmMin: number | null) {
+  return (
+    profileTjmMin !== null &&
+    profileTjmMin > 0 &&
+    mission.tjm !== null &&
+    mission.tjm < profileTjmMin
+  );
+}
+
+export function isRemoteCompatibleInsight(mission: Pick<Mission, 'remote'>): boolean {
+  return mission.remote === 'full' || mission.remote === 'hybrid';
+}
+
 /**
  * Feed Page State — factory function returning a reactive state object.
  *
@@ -136,6 +149,7 @@ export function createFeedPageState(
   let selectedScoreBucket = $state<ScoreBucket | null>(null);
   let showNewOnly = $state(false);
   let firstName = $state('');
+  let profileTjmMin = $state<number | null>(null);
   let panelSide = $state<PanelSide>('right');
   let aiStatus = $state<AiAvailability>('no');
   let showShortcutsHelp = $state(false);
@@ -289,14 +303,9 @@ export function createFeedPageState(
         (m) => (m.scoreBreakdown?.criteria.stack ?? 0) >= 80
       ).length,
       weakTjmCount: dashboardScopeMissions.filter((m) => {
-        if (m.tjm === null) {
-          return false;
-        }
-        return (m.scoreBreakdown?.criteria.tjm ?? 100) < 60;
+        return needsTjmNegotiation(m, profileTjmMin);
       }).length,
-      remoteMatchCount: dashboardScopeMissions.filter(
-        (m) => (m.scoreBreakdown?.criteria.remote ?? 0) >= 80
-      ).length,
+      remoteMatchCount: dashboardScopeMissions.filter(isRemoteCompatibleInsight).length,
       semanticAnalyzedCount: dashboardScopeMissions.filter((m) =>
         m.scoreBreakdown ? m.scoreBreakdown.semantic !== null : m.semanticScore !== null
       ).length,
@@ -603,11 +612,16 @@ export function createFeedPageState(
         .catch(() => {});
     });
 
-    // Load profile for first name
+    function applyProfile(profile: UserProfile | null): void {
+      firstName = profile?.firstName ?? '';
+      profileTjmMin = profile && profile.tjmMin > 0 ? profile.tjmMin : null;
+    }
+
+    // Load profile-derived UI hints
     $effect(() => {
       getProfile()
         .then((p) => {
-          firstName = p?.firstName ?? '';
+          applyProfile(p);
         })
         .catch(() => {});
     });
@@ -690,7 +704,7 @@ export function createFeedPageState(
       async function handleProfileUpdated() {
         try {
           const profile = await getProfile();
-          firstName = profile?.firstName ?? '';
+          applyProfile(profile);
         } catch {
           // Ignore refresh failures
         }
