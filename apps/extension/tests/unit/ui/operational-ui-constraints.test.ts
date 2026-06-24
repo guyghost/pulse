@@ -223,12 +223,18 @@ describe('operational UI constraints', () => {
     expect(cvSource).toContain("primaryActionLabel: 'Importer LinkedIn'");
     expect(cvSource).toContain('secondaryActionLabel="Compléter le profil"');
     expect(cvSource).toContain('onSecondaryAction={completeProfileManually}');
-    expect(cvSource).toContain(
-      "previewingLinkedIn ? 'Extraction...' : profile ? 'Prévisualiser LinkedIn' : 'Importer LinkedIn'"
-    );
+    expect(cvSource).toContain("primaryActionLabel: 'Prévisualiser LinkedIn'");
+    expect(cvSource).not.toContain('const linkedInPrimaryLabel');
     expect(cvSource).toContain(
       "const sourceActionLabel = $derived(profile ? 'Tout préparer' : 'Compléter le profil')"
     );
+    expect(cvSource).toContain('type CvWorkflowStep');
+    expect(cvSource).toContain('const cvWorkflowSteps = $derived.by');
+    expect(cvSource).toContain('Source canonique');
+    expect(cvSource).toContain('Plateformes à mettre à jour');
+    expect(cvSource).toContain('Dashboard connecté');
+    expect(cvSource).toContain('Enregistrer comme source');
+    expect(cvSource).not.toContain('Profil CV synchronisé dans Supabase');
     expect(cvSource).toContain('function handleSourceAction()');
     expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
   });

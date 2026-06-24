@@ -116,9 +116,7 @@ async function openCvPage(page: Page) {
 }
 
 test.describe('LinkedIn profile import flow', () => {
-  test('previews a LinkedIn profile before syncing it to the connected dashboard', async ({
-    page,
-  }) => {
+  test('previews a LinkedIn profile before saving it as the canonical source', async ({ page }) => {
     await mockAuthenticatedLinkedInBridge(page, 'success');
     await openCvPage(page);
 
@@ -127,15 +125,17 @@ test.describe('LinkedIn profile import flow', () => {
     await expect(page.getByRole('heading', { name: 'Preview LinkedIn' })).toBeVisible();
     await expect(page.getByText('Consultant Svelte senior')).toBeVisible();
     await expect(page.getByText('Architecture Svelte, TypeScript')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Synchroniser le CV' })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enregistrer comme source' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Synchroniser le CV' }).click();
+    await page.getByRole('button', { name: 'Enregistrer comme source' }).click();
 
     await expect(page.getByRole('heading', { name: 'Import LinkedIn' })).toBeVisible();
-    await expect(page.getByText('Profil CV synchronisé dans Supabase.')).toBeVisible();
+    await expect(
+      page.getByText('Profil LinkedIn enregistré comme source canonique.')
+    ).toBeVisible();
   });
 
-  test('shows typed LinkedIn preview errors without syncing', async ({ page }) => {
+  test('shows typed LinkedIn preview errors without saving the source', async ({ page }) => {
     await mockAuthenticatedLinkedInBridge(page, 'session-required');
     await openCvPage(page);
 
@@ -143,7 +143,7 @@ test.describe('LinkedIn profile import flow', () => {
 
     await expect(page.getByRole('heading', { name: 'Preview LinkedIn' })).toBeVisible();
     await expect(page.getByText('session_required: Session LinkedIn requise.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Synchroniser le CV' })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enregistrer comme source' })).not.toBeVisible();
   });
 
   test('shows recovery guidance for missing LinkedIn permissions', async ({ page }) => {
@@ -159,6 +159,6 @@ test.describe('LinkedIn profile import flow', () => {
     await expect(
       page.getByText("Autorisez l'accès LinkedIn dans Chrome, puis relancez la preview.")
     ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Synchroniser le CV' })).not.toBeVisible();
+    await expect(page.getByRole('button', { name: 'Enregistrer comme source' })).not.toBeVisible();
   });
 });
