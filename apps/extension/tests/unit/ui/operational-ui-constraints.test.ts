@@ -208,6 +208,24 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain("primaryActionLabel: 'Enregistrer le profil'");
   });
 
+  it('keeps Profile completion prioritized by scoring impact', () => {
+    const profileSource = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
+    const impactSource = readFileSync('src/lib/core/profile/profile-impact.ts', 'utf8');
+
+    expect(impactSource).toContain("id: 'stack'");
+    expect(impactSource).toContain("id: 'tjm-min'");
+    expect(impactSource).toContain("id: 'remote'");
+    expect(impactSource).toContain("id: 'location'");
+    expect(impactSource).toContain("id: 'search-keywords'");
+    expect(impactSource.indexOf("id: 'stack'")).toBeLessThan(impactSource.indexOf("id: 'remote'"));
+    expect(profileSource).toContain('buildProfileImpactItems');
+    expect(profileSource).toContain('buildProfileImpactSimulation');
+    expect(profileSource).toContain('Priorités d’impact');
+    expect(profileSource).toContain('topProfilePriorities');
+    expect(profileSource).toContain('profileImpactSimulation.delta');
+    expect(profileSource).toContain('onclick={openProfileEditing}');
+  });
+
   it('routes the offline TJM story toward cached signal investigation', () => {
     const source = readFileSync('src/ui/pages/TJMPage.svelte', 'utf8');
 

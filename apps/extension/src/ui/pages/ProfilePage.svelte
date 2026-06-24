@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import ProfileSection from '../organisms/ProfileSection.svelte';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
   import { showToast } from '$lib/shell/notifications/toast-service';
@@ -8,6 +8,11 @@
   } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
+  import {
+    buildProfileImpactItems,
+    buildProfileImpactSimulation,
+    type ProfileImpactItem,
+  } from '$lib/core/profile/profile-impact';
 
   const { onNavigateToOnboarding }: { onNavigateToOnboarding?: () => void } = $props();
   const connection = getConnectionStore();
@@ -20,53 +25,25 @@
   settings.load();
 
   const profileCompletionItems = $derived.by(() => {
-    return [
-      {
-        complete: settings.firstName.trim().length > 0,
-        label: 'Prénom',
-        impact: 'personnalise les textes générés',
-      },
-      {
-        complete: settings.jobTitle.trim().length > 0,
-        label: 'Poste cible',
-        impact: 'cadre les recherches connecteurs',
-      },
-      {
-        complete: settings.profileLocation.trim().length > 0,
-        label: 'Localisation',
-        impact: 'pondère les missions proches ou hybrides',
-      },
-      {
-        complete: settings.profileStack.length > 0,
-        label: 'Stack technique',
-        impact: 'alimente le scoring de pertinence',
-      },
-      {
-        complete: settings.tjmMin > 0,
-        label: 'TJM minimum',
-        impact: 'filtre les missions sous votre plancher',
-      },
-      {
-        complete: settings.tjmMax > 0,
-        label: 'TJM maximum',
-        impact: 'calibre les fourchettes réalistes',
-      },
-      {
-        complete: settings.searchKeywords.length > 0,
-        label: 'Mots-clés de recherche',
-        impact: 'enrichit les requêtes envoyées aux plateformes',
-      },
-    ];
+    return buildProfileImpactItems({
+      firstName: settings.firstName,
+      jobTitle: settings.jobTitle,
+      location: settings.profileLocation,
+      remote: settings.profileRemote,
+      tjmMin: settings.tjmMin,
+      tjmMax: settings.tjmMax,
+      stack: settings.profileStack,
+      searchKeywords: settings.searchKeywords,
+    });
   });
 
   const missingProfileItems = $derived(
     profileCompletionItems.filter((item) => !item.complete).map((item) => item.label)
   );
 
-  const profileCompleteness = $derived.by(() => {
-    const checks = profileCompletionItems.map((item) => item.complete);
-    return Math.round((checks.filter(Boolean).length / checks.length) * 100);
-  });
+  const profileImpactSimulation = $derived(buildProfileImpactSimulation(profileCompletionItems));
+  const profileCompleteness = $derived(profileImpactSimulation.currentCompletion);
+  const topProfilePriorities = $derived(profileImpactSimulation.prioritizedItems);
 
   const completionExplanation = $derived.by(() => {
     if (missingProfileItems.length === 0) {
@@ -107,8 +84,8 @@
               : 'incident',
       },
       {
-        label: 'Champs',
-        value: missingProfileItems.length,
+        label: 'A gagner',
+        value: profileImpactSimulation.delta > 0 ? `+${profileImpactSimulation.delta}` : '0',
         icon: 'list-checks',
         severity: missingProfileItems.length === 0 ? 'success' : 'attention',
       },
@@ -149,6 +126,34 @@
     await settings.saveProfile();
     if (!settings.profileError) {
       await showToast('Profil mis à jour', 'success');
+    }
+  }
+
+  function profileImpactIcon(item: ProfileImpactItem): IconName {
+    if (item.id === 'stack') {
+      return 'layers';
+    }
+    if (item.id === 'tjm-min' || item.id === 'tjm-max') {
+      return 'badge-euro';
+    }
+    if (item.id === 'remote') {
+      return 'wifi';
+    }
+    if (item.id === 'location') {
+      return 'target';
+    }
+    if (item.id === 'search-keywords') {
+      return 'search';
+    }
+    if (item.id === 'job-title') {
+      return 'briefcase';
+    }
+    return 'user';
+  }
+
+  function openProfileEditing(): void {
+    if (!settings.editingProfile) {
+      settings.toggleProfileEditing();
     }
   }
 </script>
@@ -215,6 +220,68 @@
           settings.toggleProfileEditing();
         }}
       />
+    </div>
+
+    <div class="mt-4 border-t border-border-light pt-4" aria-label="Priorités d’impact profil">
+      <div class="flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <p class="eyebrow text-text-muted">Priorités d’impact</p>
+          <h3 class="mt-1 text-sm font-semibold leading-5 text-text-primary">
+            {profileImpactSimulation.title}
+          </h3>
+          <p class="mt-1 text-xs leading-5 text-text-subtle">
+            {profileImpactSimulation.description}
+          </p>
+        </div>
+        <div
+          class="shrink-0 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2.5 py-1.5 text-right"
+        >
+          <p class="text-[9px] uppercase tracking-[0.13em] text-text-muted">Gain</p>
+          <p class="font-mono text-sm font-semibold text-blueprint-blue">
+            {profileImpactSimulation.delta > 0 ? `+${profileImpactSimulation.delta}` : '0'}
+          </p>
+        </div>
+      </div>
+
+      {#if topProfilePriorities.length > 0}
+        <div class="mt-3 space-y-2">
+          {#each topProfilePriorities as item}
+            <button
+              type="button"
+              class="group flex w-full items-start gap-3 rounded-lg border border-border-light bg-surface-white/65 px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/20 hover:bg-surface-white"
+              onclick={openProfileEditing}
+            >
+              <span
+                class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
+              >
+                <Icon name={profileImpactIcon(item)} size={14} />
+              </span>
+              <span class="min-w-0 flex-1">
+                <span class="flex items-center justify-between gap-2">
+                  <span class="text-xs font-semibold text-text-primary">{item.label}</span>
+                  <span class="font-mono text-[11px] text-text-muted">{item.weight}%</span>
+                </span>
+                <span class="mt-0.5 block text-[11px] leading-4 text-text-subtle">
+                  {item.action}
+                </span>
+                <span class="mt-1 block text-[10px] leading-4 text-text-muted">
+                  Impact : {item.impact}
+                </span>
+              </span>
+              <Icon
+                name="chevron-right"
+                size={13}
+                class="mt-2 shrink-0 text-text-muted transition-colors group-hover:text-blueprint-blue"
+              />
+            </button>
+          {/each}
+        </div>
+      {:else}
+        <div class="mt-3 flex items-center gap-2 text-xs text-text-subtle">
+          <Icon name="check-circle" size={14} class="text-blueprint-blue" />
+          <span>Stack, TJM, remote, localisation et mots-clés sont prêts pour le scoring.</span>
+        </div>
+      {/if}
     </div>
     {#if isOffline}
       <div class="mt-3">
