@@ -32,4 +32,15 @@ describe('landing account dashboard operational UI', () => {
     expect(homeSource).not.toContain('stat-item__value');
     expect(homeSource).not.toContain('Crédits Premium / mois');
   });
+
+  it('implements the freelance acquisition wedge on the public landing', () => {
+    expect(homeSource).toContain('Les bonnes missions freelance');
+    expect(homeSource).toContain('Développeurs 3+ ans');
+    expect(homeSource).toContain('TJM 450-900€');
+    expect(homeSource).toContain('Shortlist quotidienne');
+    expect(homeSource).toContain('missions Java, Spring Boot et frontend senior');
+    expect(homeSource).toContain('Tester Premium');
+    expect(homeSource).toContain('prix 9-15€/mois');
+    expect(homeSource).toContain('12€<small>/mois</small>');
+  });
 });

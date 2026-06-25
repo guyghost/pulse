@@ -14,18 +14,21 @@
 
 ## Résumé court (132 caractères max)
 
-> Radar freelance : 5 plateformes, scoring IA, dashboard connecté optionnel. Exécution navigateur, zéro tracking.
+> Radar freelance tech : 5 plateformes, 1 feed scoré, dashboard connecté optionnel. Exécution navigateur.
 
 ---
 
 ## Description détaillée
 
-**MissionPulse** est une extension Chrome gratuite pour les freelances tech. Elle centralise les missions de 5 plateformes dans un panneau latéral unique avec scoring de pertinence par IA, puis peut synchroniser un dashboard connecté optionnel.
+**MissionPulse** est une extension Chrome gratuite pour les freelances tech français. Elle centralise les missions de Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans un panneau latéral unique, score les meilleures opportunités et aide à transformer la veille en pipeline de candidatures.
+
+Pensé pour les développeurs freelances 3+ ans, TJM 450-900€, qui surveillent des requêtes comme `missions freelance Java`, `mission freelance Spring Boot`, `TJM développeur freelance` ou `Free-Work LeHibou alternative`.
 
 ### Fonctionnalités
 
 - **Feed centralisé** — Regroupe les missions de Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans une seule interface.
 - **Scoring IA** — Chaque mission reçoit un score basé sur vos compétences, TJM, localisation, séniorité et préférences remote. Gemini Nano (IA locale Chrome) affine le score sémantiquement.
+- **Shortlist actionnable** — Les missions 80+ compatibles avec votre stack, votre TJM et votre remote remontent avant le bruit.
 - **Bonus urgence** — Les missions avec une date de début proche sont mises en avant automatiquement.
 - **Dashboard TJM** — Historique et tendances du taux journalier par stack et par source. Négociez avec des données.
 - **Déduplication intelligente** — Détecte et fusionne les missions publiées sur plusieurs plateformes simultanément.

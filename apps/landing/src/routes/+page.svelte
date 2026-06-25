@@ -55,11 +55,11 @@
   <meta name="title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     name="description"
-    content="MissionPulse scanne vos plateformes freelance, score les meilleures opportunités et transforme votre veille en pipeline de candidatures."
+    content="MissionPulse est le radar quotidien des freelances tech français: 5 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant."
   />
   <meta
     name="keywords"
-    content="freelance, missions, scanning, Free-Work, LeHibou, Hiway, Collective, Cherry Pick, extension Chrome, tech, développeur, TJM"
+    content="missions freelance java, mission freelance spring boot, TJM développeur freelance, Free-Work LeHibou alternative, extension Chrome freelance, radar missions tech"
   />
   <meta name="author" content="MissionPulse" />
   <meta name="robots" content="index, follow" />
@@ -70,7 +70,7 @@
   <meta property="og:title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     property="og:description"
-    content="5 plateformes. 1 feed. Des scores. Un plan gratuit pour scanner, un plan Premium pour suivre, négocier et générer vos candidatures."
+    content="5 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. Gratuit pour scanner, Premium pour suivre, négocier et candidater."
   />
   <meta property="og:image" content="https://missionpulse.app/og-image.png" />
   <meta property="og:locale" content="fr_FR" />
@@ -85,7 +85,7 @@
   />
   <meta
     name="twitter:description"
-    content="5 plateformes. 1 feed. Des scores. Gratuit pour scanner, Premium pour structurer votre prospection freelance."
+    content="Le radar quotidien des freelances tech français: Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans un feed scoré."
   />
   <meta name="twitter:image" content="https://missionpulse.app/og-image.png" />
 </svelte:head>
@@ -113,8 +113,8 @@
       <li><a href="#workflow" class="nav__link">Workflow</a></li>
       <li><a href="#for-who" class="nav__link">Pour qui</a></li>
       <li><a href="#features" class="nav__link">Fonctionnalités</a></li>
+      <li><a href="#shortlist" class="nav__link">Shortlist</a></li>
       <li><a href="#plans" class="nav__link">Offres</a></li>
-      <li><a href="#platforms" class="nav__link">Plateformes</a></li>
     </ul>
 
     <div class="nav__actions">
@@ -217,25 +217,31 @@
         >
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
-        Extension Chrome · Scan gratuit · Premium optionnel
+        Radar quotidien · Freelances tech France · Scan gratuit
       </div>
 
       <h1 class="hero__title">
-        Transformez votre veille mission<br /><span class="light-text">en pipeline</span>
+        Les bonnes missions freelance<br /><span class="light-text">à traiter maintenant</span>
       </h1>
 
       <div class="hero__bottom-bar">
         <p class="hero__description">
-          MissionPulse scanne vos plateformes freelance, classe les opportunités par pertinence et
-          vous aide à convertir les meilleures pistes en candidatures suivies.
+          MissionPulse scanne Free-Work, LeHibou, Hiway, Collective et Cherry Pick, puis remonte les
+          opportunités 80+ compatibles avec votre stack, votre TJM et votre remote.
         </p>
 
         <div class="hero__actions">
           <a href={chromeStoreUrl} class="btn btn--primary btn--lg"
             >Installer l'extension gratuite</a
           >
-          <a href="#plans" class="btn btn--secondary btn--lg">Comparer gratuit et Premium</a>
+          <a href="#shortlist" class="btn btn--secondary btn--lg">Voir la shortlist quotidienne</a>
         </div>
+      </div>
+
+      <div class="hero__meta" aria-label="Positionnement MissionPulse">
+        <span class="hero__meta-item">Développeurs 3+ ans</span>
+        <span class="hero__meta-item">TJM 450-900€</span>
+        <span class="hero__meta-item">France &amp; remote</span>
       </div>
     </div>
   </div>
@@ -254,8 +260,9 @@
       </div>
 
       <p class="showcase-caption">
-        Le feed gratuit prouve la valeur dès le scan. Premium ajoute le dashboard connecté, le suivi
-        de candidature, le radar TJM, le profil/CV et les générations par crédits.
+        Le feed gratuit prouve la valeur dès le premier scan: une mission 80+, un TJM compatible,
+        une action immédiate. Premium ajoute le suivi, le radar TJM, le profil/CV et les générations
+        par crédits.
       </p>
 
       <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -558,6 +565,67 @@
   </div>
 </section>
 
+<!-- Daily radar -->
+<section class="daily-radar section" id="shortlist" aria-labelledby="daily-radar-title">
+  <div class="container">
+    <div class="daily-radar__layout">
+      <div class="daily-radar__content fade-in">
+        <p class="daily-radar__eyebrow">Shortlist quotidienne</p>
+        <h2 id="daily-radar-title" class="daily-radar__title">
+          Commencez par les missions Java, Spring Boot et frontend senior qui valent un message
+          aujourd'hui.
+        </h2>
+        <p class="daily-radar__desc">
+          Chaque matin, MissionPulse sert le même réflexe produit: scanner les plateformes, isoler
+          les annonces au bon TJM, puis décider quoi ouvrir, sauvegarder ou relancer.
+        </p>
+        <div class="daily-radar__actions">
+          <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Scanner mes plateformes</a>
+          <a
+            href="mailto:contact@missionpulse.app?subject=Shortlist%20quotidienne%20Java%20Spring%20Boot"
+            class="btn btn--secondary btn--lg">Recevoir la shortlist</a
+          >
+        </div>
+      </div>
+
+      <div class="radar-board fade-in fade-in-delay-2" aria-label="Exemple de shortlist">
+        <div class="radar-board__header">
+          <span>Shortlist Java / Spring Boot</span>
+          <strong>Ce matin</strong>
+        </div>
+        <article class="radar-row radar-row--hot">
+          <div>
+            <strong>Tech Lead Java / Spring Boot</strong>
+            <span>Client final · Remote hybride · 12 mois</span>
+          </div>
+          <mark>92</mark>
+          <span>780€</span>
+        </article>
+        <article class="radar-row">
+          <div>
+            <strong>Backend Kotlin / Kafka</strong>
+            <span>ESN sélective · Paris · Démarrage rapide</span>
+          </div>
+          <mark>87</mark>
+          <span>720€</span>
+        </article>
+        <article class="radar-row">
+          <div>
+            <strong>Fullstack TypeScript / Java</strong>
+            <span>Scale-up · Full remote · Produit B2B</span>
+          </div>
+          <mark>84</mark>
+          <span>690€</span>
+        </article>
+        <div class="radar-board__footer">
+          <span>Action suivante</span>
+          <strong>Ouvrir #1 et générer le pitch</strong>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
 <!-- Product map -->
 <section class="product-map section" aria-labelledby="product-map-title">
   <div class="container">
@@ -619,7 +687,10 @@
       <article class="proof-item fade-in fade-in-delay-1">
         <span class="proof-item__signal">Local</span>
         <h3>Les sessions restent dans Chrome</h3>
-        <p>Si une source casse, l'action est de reconnecter ou relancer, pas de transmettre un mot de passe.</p>
+        <p>
+          Si une source casse, l'action est de reconnecter ou relancer, pas de transmettre un mot de
+          passe.
+        </p>
       </article>
       <article class="proof-item fade-in fade-in-delay-2">
         <span class="proof-item__signal">Gemini Nano</span>
@@ -641,8 +712,8 @@
     <div class="section-header">
       <h2 class="section-title fade-in">Pour qui ?</h2>
       <p class="section-subtitle fade-in fade-in-delay-1">
-        MissionPulse est conçu pour les freelances tech en France qui cherchent leur prochaine
-        mission
+        MissionPulse est conçu pour les développeurs freelances 3+ ans, TJM 450-900€, qui veulent
+        rester visibles sans passer leur matinée dans cinq onglets.
       </p>
     </div>
 
@@ -663,8 +734,8 @@
         </div>
         <h3 class="feature-card__title">Freelance en recherche</h3>
         <p class="feature-card__desc">
-          Vous passez 30 min/jour à checker Free-Work, LeHibou et Hiway ? MissionPulse le fait en 30
-          secondes pendant que vous codez.
+          Vous êtes disponible maintenant ou sous 30 jours. MissionPulse transforme votre veille
+          quotidienne en shortlist claire: ouvrir, sauvegarder, postuler ou ignorer.
         </p>
       </article>
 
@@ -683,10 +754,10 @@
             />
           </svg>
         </div>
-        <h3 class="feature-card__title">Dev qui veille</h3>
+        <h3 class="feature-card__title">Dev déjà en mission</h3>
         <p class="feature-card__desc">
-          Vous êtes en mission mais gardez un œil sur le marché ? Le scan automatique vous alerte
-          quand une opportunité pertinente apparaît.
+          Vous gardez un œil sur le marché sans chercher activement. Les alertes remontent seulement
+          les missions à haut score, avec TJM et remote compatibles.
         </p>
       </article>
 
@@ -705,10 +776,10 @@
             />
           </svg>
         </div>
-        <h3 class="feature-card__title">Négociateur de TJM</h3>
+        <h3 class="feature-card__title">Consultant qui négocie</h3>
         <p class="feature-card__desc">
-          L'analyse TJM historique vous donne la fourchette marché pour votre stack. Négociez avec
-          des données, pas au feeling.
+          Vous ciblez 450-900€ de TJM et voulez savoir quand pousser, refuser ou relancer. Le radar
+          TJM transforme les annonces scannées en repères de négociation.
         </p>
       </article>
     </div>
@@ -893,7 +964,7 @@
       <article class="plan-card plan-card--featured fade-in fade-in-delay-2">
         <div class="plan-card__header">
           <span class="plan-card__name">Premium</span>
-          <strong class="plan-card__price">10€<small>/an</small></strong>
+          <strong class="plan-card__price">12€<small>/mois</small></strong>
           <p>Pour piloter votre prospection comme un pipeline et produire vos candidatures.</p>
         </div>
         <ul class="plan-card__list">
@@ -923,6 +994,52 @@
         </p>
       </div>
       <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>
+    </div>
+  </div>
+</section>
+
+<!-- Go-to-market loop -->
+<section class="experiment-loop section" aria-labelledby="experiment-loop-title">
+  <div class="container">
+    <div class="section-header">
+      <h2 id="experiment-loop-title" class="section-title fade-in">Bêta pilotée par le terrain</h2>
+      <p class="section-subtitle fade-in fade-in-delay-1">
+        Les prochaines itérations suivent un objectif simple: plus d'installs qualifiées, plus de
+        premiers scans, plus de missions sauvegardées.
+      </p>
+    </div>
+
+    <div class="experiment-loop__grid" aria-label="Plan d'expérimentation MissionPulse">
+      <article class="experiment-card fade-in fade-in-delay-1">
+        <span class="experiment-card__week">Semaine 1</span>
+        <h3>Mesurer l'activation</h3>
+        <p>
+          Visite landing, installation, premier scan, mission ouverte, favori ou pipeline, retour
+          J+1.
+        </p>
+      </article>
+      <article class="experiment-card fade-in fade-in-delay-2">
+        <span class="experiment-card__week">Semaine 2</span>
+        <h3>Prouver le canal</h3>
+        <p>
+          Publier la shortlist quotidienne et tester LinkedIn, communautés freelances et
+          newsletters.
+        </p>
+      </article>
+      <article class="experiment-card fade-in fade-in-delay-3">
+        <span class="experiment-card__week">Semaine 3</span>
+        <h3>Tester Premium</h3>
+        <p>
+          Valider le prix 9-15€/mois avec le pipeline, le radar TJM, les alertes et les générations.
+        </p>
+      </article>
+      <article class="experiment-card fade-in fade-in-delay-4">
+        <span class="experiment-card__week">Semaine 4</span>
+        <h3>Corriger les blocages</h3>
+        <p>
+          10 entretiens utilisateurs sur connecteurs, onboarding profil, score et première action.
+        </p>
+      </article>
     </div>
   </div>
 </section>
