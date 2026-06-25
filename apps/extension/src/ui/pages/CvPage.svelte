@@ -518,15 +518,13 @@
   });
 </script>
 
-<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
-  <section class="section-card-strong rounded-2xl px-5 py-4">
+<div class="flex h-full min-w-0 flex-col overflow-x-hidden overflow-y-auto px-4 pb-5 pt-4">
+  <section class="section-card-strong min-w-0 shrink-0 overflow-visible rounded-2xl px-5 py-4">
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
         <p class="eyebrow text-blueprint-blue">Source canonique</p>
         <div class="mt-1 flex flex-wrap items-center gap-2">
-          <h2 class="text-base font-semibold text-text-primary">
-            Préparer le même profil partout
-          </h2>
+          <h2 class="text-base font-semibold text-text-primary">Préparer le même profil partout</h2>
           <span
             class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
           >
@@ -579,9 +577,11 @@
       />
     </div>
 
-    <div class="mt-4 grid gap-2" aria-label="Workflow CV">
+    <div class="mt-4 grid min-w-0 gap-2" aria-label="Workflow CV">
       {#each cvWorkflowSteps as step}
-        <div class="rounded-xl border p-3 transition-colors {workflowStepClass(step.state)}">
+        <div
+          class="min-w-0 rounded-xl border p-3 transition-colors {workflowStepClass(step.state)}"
+        >
           <div class="flex items-start gap-3">
             <div
               class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {workflowIconClass(
@@ -602,7 +602,7 @@
                 </span>
               </div>
               <h3 class="mt-1 text-sm font-semibold text-text-primary">{step.title}</h3>
-              <p class="mt-1 text-xs leading-5 text-text-subtle">{step.detail}</p>
+              <p class="mt-1 break-words text-xs leading-5 text-text-subtle">{step.detail}</p>
             </div>
           </div>
         </div>
@@ -621,7 +621,7 @@
 
   {#if isLoading}
     <div
-      class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]"
+      class="mt-4 grid shrink-0 gap-4 lg:grid-cols-[0.9fr_1.1fr]"
       aria-busy="true"
       role="status"
       aria-live="polite"
@@ -678,8 +678,8 @@
       </section>
     </div>
   {:else}
-    <div class="mt-4 grid gap-4 lg:grid-cols-[0.9fr_1.1fr]">
-      <section class="space-y-4">
+    <div class="mt-4 grid min-w-0 shrink-0 gap-4 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+      <section class="min-w-0 space-y-4">
         {#if !profile}
           <OperationalEmptyState
             title="Le profil de référence n’a pas encore de source fiable"
@@ -698,14 +698,14 @@
           />
         {/if}
 
-        <div class="section-card rounded-xl p-5">
-          <div class="flex items-center justify-between gap-3">
-            <div>
+        <div class="section-card min-w-0 overflow-hidden rounded-xl p-5">
+          <div class="flex min-w-0 items-center justify-between gap-3">
+            <div class="min-w-0">
               <h3 class="text-sm font-medium text-text-primary">Profil source</h3>
               <p class="mt-1 text-xs text-text-subtle">Champs utilisés pour l'homogénéisation.</p>
             </div>
             <button
-              class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+              class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
               onclick={handleSourceAction}
             >
               <Icon name={sourceActionIcon} size={13} />
@@ -713,19 +713,21 @@
             </button>
           </div>
 
-          <div class="mt-4 space-y-2">
+          <div class="mt-4 min-w-0 space-y-2">
             {#each syncFields as field}
               <button
-                class="flex w-full items-center justify-between gap-3 rounded-lg border px-3 py-2.5 text-left transition-colors {selectedFieldIds.has(
+                class="flex w-full min-w-0 items-center justify-between gap-3 overflow-hidden rounded-lg border px-3 py-2.5 text-left transition-colors {selectedFieldIds.has(
                   field.id
                 )
                   ? 'border-blueprint-blue/25 bg-blueprint-blue/6'
                   : 'border-border-light bg-page-canvas hover:bg-subtle-gray'}"
                 onclick={() => toggleField(field.id)}
               >
-                <span class="min-w-0">
+                <span class="min-w-0 flex-1">
                   <span class="block text-xs font-medium text-text-primary">{field.label}</span>
-                  <span class="mt-0.5 block truncate text-xs text-text-subtle">
+                  <span
+                    class="mt-0.5 block whitespace-normal break-words text-xs leading-5 text-text-subtle"
+                  >
                     {field.value || 'A compléter'}
                   </span>
                 </span>
@@ -742,10 +744,10 @@
           </div>
         </div>
 
-        <div class="section-card rounded-xl p-5">
+        <div class="section-card min-w-0 overflow-hidden rounded-xl p-5">
           <h3 class="text-sm font-medium text-text-primary">Bloc à copier</h3>
           <pre
-            class="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-secondary">{selectedPayload}</pre>
+            class="mt-3 max-h-56 max-w-full overflow-auto whitespace-pre-wrap break-words rounded-lg border border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-secondary [overflow-wrap:anywhere]">{selectedPayload}</pre>
           <button
             class="mt-3 inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
             onclick={copyPayload}
@@ -801,7 +803,7 @@
                       disabled={syncingLinkedIn || previewingLinkedIn}
                     >
                       <Icon name="upload" size={13} />
-                       {syncingLinkedIn ? 'Enregistrement...' : 'Enregistrer comme source'}
+                      {syncingLinkedIn ? 'Enregistrement...' : 'Enregistrer comme source'}
                     </button>
                     <button
                       class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
@@ -911,7 +913,7 @@
         {/if}
       </section>
 
-      <section class="section-card rounded-xl p-3">
+      <section class="section-card min-w-0 overflow-hidden rounded-xl p-3">
         <div class="flex items-center justify-between px-2 pb-2">
           <h3 class="text-sm font-medium text-text-primary">Plateformes</h3>
           <span class="text-xs text-text-muted">{platforms.length}</span>
@@ -920,12 +922,13 @@
         <div class="space-y-2">
           {#each platforms as platform}
             <article
-              class="rounded-lg border p-3 transition-colors {selectedPlatformId === platform.id
+              class="min-w-0 rounded-lg border p-3 transition-colors {selectedPlatformId ===
+              platform.id
                 ? 'border-blueprint-blue/30 bg-blueprint-blue/6'
                 : 'border-border-light bg-page-canvas'}"
             >
               <button
-                class="flex w-full items-start gap-3 text-left"
+                class="flex w-full min-w-0 items-start gap-3 text-left"
                 onclick={() => {
                   selectedPlatformId = platform.id;
                 }}
@@ -954,9 +957,9 @@
                 </span>
               </button>
 
-              <div class="mt-3 grid grid-cols-[1fr_1fr_auto] gap-2">
+              <div class="mt-3 grid min-w-0 grid-cols-1 gap-2 sm:grid-cols-[1fr_1fr_auto]">
                 <button
-                  class="inline-flex items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+                  class="inline-flex min-w-0 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
                   onclick={() => verifyPlatform(platform)}
                   disabled={verifyingPlatformId !== null}
                 >
@@ -964,7 +967,7 @@
                   {verifyingPlatformId === platform.id ? '...' : 'Vérifier'}
                 </button>
                 <button
-                  class="inline-flex items-center justify-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+                  class="inline-flex min-w-0 items-center justify-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
                   onclick={() => pushPlatform(platform)}
                 >
                   <Icon name="upload" size={13} />
