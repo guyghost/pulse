@@ -76,9 +76,14 @@
 
   // Lazy loading: show only visibleCount missions, expand on scroll or click
   let visibleCount = $state(BATCH_SIZE);
-  let lastResetKey = $state(resetKey);
+  let lastResetKey = $state<string | null>(null);
 
   $effect(() => {
+    if (lastResetKey === null) {
+      lastResetKey = resetKey;
+      return;
+    }
+
     if (resetKey === lastResetKey) {
       return;
     }

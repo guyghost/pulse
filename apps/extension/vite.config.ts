@@ -32,6 +32,7 @@ export default defineConfig({
   },
   build: {
     modulePreload: { polyfill: false },
+    chunkSizeWarningLimit: 600,
     outDir: 'dist',
     rollupOptions: {
       input: {
