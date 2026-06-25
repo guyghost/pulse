@@ -398,7 +398,9 @@ test.describe('Feed', () => {
     await expectMissionCount(page, 5, 2000);
   });
 
-  test('partial scan missions stay interactive before scan completes', async ({ page }) => {
+  test('partial scan missions stay buffered and become interactive after applying them', async ({
+    page,
+  }) => {
     await mockUserWithProfileAndSlowPartialScan(page);
     await page.goto(SIDE_PANEL);
 
@@ -407,8 +409,12 @@ test.describe('Feed', () => {
 
     await scanButton(page).click();
 
-    await expect(page.getByText('Partial Scan Action Test')).toBeVisible({ timeout: 1000 });
-    await expect(page.getByText('Scraping...')).toBeVisible();
+    const pendingBanner = page.getByTestId('pending-missions-banner');
+    await expect(pendingBanner).toBeVisible({ timeout: 1000 });
+    await expect(page.getByText('Partial Scan Action Test')).not.toBeVisible();
+    await expect(page.getByText('Collecte...')).toBeVisible();
+
+    await pendingBanner.getByRole('button', { name: /Afficher 1 mission/ }).click();
 
     const partialCard = missionCards(page).filter({ hasText: 'Partial Scan Action Test' });
     await expect(partialCard).toBeVisible();
@@ -418,7 +424,7 @@ test.describe('Feed', () => {
     await investigateButton.click();
 
     await expect(page.getByRole('dialog', { name: 'Investigation mission' })).toBeVisible();
-    await expect(page.getByText('Scraping...')).toBeVisible();
+    await expect(page.getByText('Collecte...')).toBeVisible();
   });
 
   test('header star button and refresh button are visible', async ({ page }) => {

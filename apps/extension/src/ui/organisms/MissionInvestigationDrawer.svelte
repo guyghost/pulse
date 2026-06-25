@@ -280,8 +280,8 @@
             </p>
             {#if mission.scoreBreakdown}
               <p class="mt-2 text-[11px] leading-5 text-text-subtle">
-                Base déterministe {mission.scoreBreakdown.deterministic}/100. L’IA sémantique, quand
-                elle existe, ajoute une hypothèse locale et non bloquante.
+                Base de score {mission.scoreBreakdown.deterministic}/100. L’analyse locale, quand
+                elle existe, ajoute une hypothèse non bloquante.
               </p>
               {#if mission.scoreBreakdown.semanticReason}
                 <p class="mt-2 text-[11px] leading-5 text-blueprint-blue">

@@ -58,14 +58,14 @@
     {
       id: 'sources',
       label: 'Sources',
-      title: 'Radar et cadence',
+      title: 'Sources et fréquence',
       description: 'Plateformes locales et fréquence de scan.',
       icon: 'radar',
     },
     {
       id: 'alerts',
       label: 'Alertes',
-      title: 'Signal prioritaire',
+      title: 'Alertes prioritaires',
       description: 'Seuil, stack et volume de notifications prévu.',
       icon: 'bell',
     },
@@ -73,7 +73,7 @@
       id: 'account',
       label: 'Compte & IA',
       title: 'Synchronisation',
-      description: 'Dashboard connecté et scoring sémantique local.',
+      description: 'Dashboard connecté et analyse locale.',
       icon: 'cpu',
     },
     {
@@ -315,8 +315,8 @@
           settings.aiAvailability === 'available'
             ? 'OK'
             : settings.aiAvailability === 'after-download'
-              ? 'Download'
-              : 'Off',
+              ? 'À télécharger'
+              : 'Inactive',
         icon: 'cpu',
         severity:
           settings.aiAvailability === 'available'
@@ -343,7 +343,7 @@
       return {
         severity: 'success' as const,
         statusLabel: 'Actif',
-        title: 'Le scoring sémantique peut enrichir les décisions',
+        title: 'L’analyse locale peut préciser le classement',
         description:
           'Pulse analysera les premières missions du scan, puis utilisera le cache pour éviter les recalculs inutiles.',
         evidence,
@@ -359,9 +359,9 @@
           : ('incident' as const),
       statusLabel:
         settings.aiAvailability === 'after-download' ? 'Téléchargement requis' : 'Indisponible',
-      title: 'Le scoring sémantique est remplacé par le scoring de base',
+      title: 'Pulse utilise le score de base pour l’instant',
       description:
-        'Ce n’est pas bloquant, mais les insights seront moins précis sur le fit métier et les signaux faibles.',
+        'Les missions restent classées. Activez l’analyse locale pour enrichir les explications.',
       evidence,
       primaryActionLabel: 'Ouvrir l’aide IA Chrome',
       primaryActionIcon: 'external-link',
@@ -417,7 +417,7 @@
             ? 'OK'
             : settings.aiAvailability === 'after-download'
               ? 'À télécharger'
-              : 'Off',
+              : 'Inactive',
         icon: 'cpu',
         severity:
           settings.aiAvailability === 'available'
@@ -460,10 +460,10 @@
           settings.aiAvailability === 'after-download'
             ? ('attention' as const)
             : ('incident' as const),
-        statusLabel: 'IA locale limitée',
-        title: 'Le scoring sémantique ne couvre pas toutes les missions',
+        statusLabel: 'Analyse locale inactive',
+        title: 'Pulse utilise le score de base pour l’instant',
         description:
-          'Pulse continue avec le scoring de base. Activez ou téléchargez Gemini Nano pour enrichir les insights.',
+          'Les missions restent classées. Configurez l’analyse locale pour enrichir les explications.',
         evidence,
         primaryActionLabel: 'Voir les réglages IA',
         primaryActionIcon: 'cpu',
@@ -500,7 +500,7 @@
 
     <div class="mt-4">
       <OperationalStoryCard
-        eyebrow="État système"
+        eyebrow="À vérifier"
         title={settingsStory.title}
         description={settingsStory.description}
         severity={settingsStory.severity}
@@ -565,11 +565,10 @@
         <div>
           <p class="eyebrow text-text-muted">Sources</p>
           <h3 id="settings-sources-title" class="mt-1 text-sm font-semibold text-text-primary">
-            Piloter le radar local
+            Choisir les sources à scanner
           </h3>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Cadence, notifications et historique source alimentent les résultats visibles dans le
-            feed.
+            Cadence, notifications et historique source alimentent les missions visibles.
           </p>
         </div>
       </div>
@@ -602,7 +601,7 @@
         <div>
           <p class="eyebrow text-text-muted">Alertes</p>
           <h3 id="settings-alerts-title" class="mt-1 text-sm font-semibold text-text-primary">
-            Piloter le bruit utile
+            Choisir les missions qui méritent une alerte
           </h3>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
             Ajustez les conditions avant d’autoriser une notification prioritaire.
@@ -638,7 +637,7 @@
             Synchroniser et enrichir
           </h3>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Le dashboard connecté et Gemini Nano restent optionnels, mais clarifient le pilotage.
+            Le dashboard connecté et l’analyse locale restent optionnels, mais clarifient le pilotage.
           </p>
         </div>
       </div>
@@ -694,8 +693,8 @@
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
             <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
             <p class="mt-1 text-xs font-medium text-text-primary">
-              {settings.connectedPendingUploads} upload · {settings.connectedPendingDownloads}
-              download
+              {settings.connectedPendingUploads} envoi · {settings.connectedPendingDownloads}
+              réception
             </p>
           </div>
         </div>
@@ -744,13 +743,13 @@
           <div>
             <h3 class="text-sm font-medium text-text-primary">IA locale</h3>
             <p class="mt-1 text-xs text-text-subtle">
-              Le scoring sémantique utilise Gemini Nano via la Prompt API de Chrome, sans clé API
+              L’analyse locale utilise Gemini Nano via la Prompt API de Chrome, sans clé API
               externe.
             </p>
           </div>
         </div>
         <OperationalStoryCard
-          eyebrow="Scoring"
+          eyebrow="Analyse locale"
           title={aiStory.title}
           description={aiStory.description}
           severity={aiStory.severity}
@@ -784,7 +783,7 @@
             <div class="min-w-0">
               <p class="text-xs font-medium text-text-primary">Données utilisées par l'IA locale</p>
               <p class="mt-1 text-[11px] leading-5 text-text-subtle">
-                Gemini Nano reçoit uniquement le contexte utile au score sémantique. Le résultat
+                Gemini Nano reçoit uniquement le contexte utile au score de mission. Le résultat
                 reste local avec le score et une raison courte.
               </p>
             </div>

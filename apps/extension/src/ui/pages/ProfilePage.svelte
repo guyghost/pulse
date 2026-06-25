@@ -73,7 +73,7 @@
   const profileStory = $derived.by(() => {
     const evidence: OperationalEvidence[] = [
       {
-        label: 'Completude',
+        label: 'Complétude',
         value: `${profileCompleteness}%`,
         icon: 'gauge',
         severity:
@@ -84,7 +84,7 @@
               : 'incident',
       },
       {
-        label: 'A gagner',
+        label: 'Gain estimé',
         value: profileImpactSimulation.delta > 0 ? `+${profileImpactSimulation.delta}` : '0',
         icon: 'list-checks',
         severity: missingProfileItems.length === 0 ? 'success' : 'attention',
@@ -101,9 +101,9 @@
       return {
         severity: 'success' as const,
         statusLabel: 'Prêt',
-        title: 'Le profil peut alimenter le scoring et les générations',
+        title: 'Le profil peut mieux classer vos missions',
         description:
-          'Les critères essentiels sont renseignés. Gardez cette source canonique à jour avant de comparer les missions prioritaires.',
+          'Les critères essentiels sont renseignés. Gardez ce profil de référence à jour avant de comparer les missions prioritaires.',
         evidence,
         primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil',
         primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
@@ -113,9 +113,9 @@
     return {
       severity: profileCompleteness < 55 ? ('incident' as const) : ('attention' as const),
       statusLabel: 'À compléter',
-      title: `${missingProfileItems.length} élément${missingProfileItems.length > 1 ? 's' : ''} limite${missingProfileItems.length > 1 ? 'nt' : ''} la qualité du radar`,
+      title: `${missingProfileItems.length} champ${missingProfileItems.length > 1 ? 's' : ''} manque${missingProfileItems.length > 1 ? 'nt' : ''} pour mieux classer vos missions`,
       description:
-        'Les champs manquants réduisent la précision des requêtes, du scoring et des suggestions de candidature.',
+        'Les champs manquants réduisent la précision des requêtes et des suggestions de candidature.',
       evidence,
       primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil',
       primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
@@ -204,7 +204,7 @@
 
     <div class="mt-4">
       <OperationalStoryCard
-        eyebrow="Impact scoring"
+        eyebrow="Impact du profil"
         title={profileStory.title}
         description={profileStory.description}
         severity={profileStory.severity}

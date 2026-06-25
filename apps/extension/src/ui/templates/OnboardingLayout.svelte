@@ -20,11 +20,11 @@
       <div class="mb-6">
         <p class="eyebrow text-blueprint-blue/80">MissionPulse</p>
         <h1 class="mt-3 text-xl font-semibold leading-tight text-text-primary">
-          Affinez votre radar
+          Configurez votre premier scan
         </h1>
         <p class="mt-3 text-sm leading-relaxed text-text-secondary">
-          Vos premières missions peuvent déjà être visibles. Ajoutez maintenant votre profil pour
-          personnaliser le scoring, ou revenez plus tard.
+          Pulse utilise vos sessions Chrome pour récupérer les missions et afficher celles à traiter
+          en premier.
         </p>
       </div>
 

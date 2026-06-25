@@ -215,9 +215,9 @@
       return {
         severity: 'incident' as const,
         statusLabel: 'Source manquante',
-        title: 'Aucun profil canonique disponible pour préparer le CV',
+        title: 'Aucun profil de référence disponible pour préparer le CV',
         description:
-          'Créez ou importez un profil avant de pousser des informations vers LinkedIn et les plateformes.',
+          'Créez ou importez un profil avant de copier des informations vers LinkedIn et les plateformes.',
         evidence,
         primaryActionLabel: 'Importer LinkedIn',
         primaryActionIcon: 'download',
@@ -228,11 +228,11 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Écarts détectés',
-        title: `${mismatchCount} écart${mismatchCount > 1 ? 's' : ''} entre le CV canonique et les plateformes`,
+        title: `${mismatchCount} écart${mismatchCount > 1 ? 's' : ''} entre votre profil et les plateformes`,
         description:
-          'La prochaine action utile est de pousser le bloc canonique sur les plateformes divergentes.',
+          'La prochaine action utile est de préparer un bloc à copier sur les plateformes divergentes.',
         evidence,
-        primaryActionLabel: 'Tout préparer',
+        primaryActionLabel: 'Préparer le bloc à copier',
         primaryActionIcon: 'upload',
       };
     }
@@ -241,9 +241,8 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'À compléter',
-        title: 'Le CV canonique est exploitable mais incomplet',
-        description:
-          'Complétez les champs manquants avant de diffuser pour éviter de propager une version faible.',
+        title: 'Votre profil de référence est exploitable mais incomplet',
+        description: 'Complétez les champs manquants avant de le copier sur vos plateformes.',
         evidence,
         primaryActionLabel: 'Prévisualiser LinkedIn',
         primaryActionIcon: 'download',
@@ -253,9 +252,9 @@
     return {
       severity: 'success' as const,
       statusLabel: 'Aligné',
-      title: 'Le CV canonique est prêt à être diffusé',
+      title: 'Votre profil de référence est prêt à copier',
       description:
-        'Les champs essentiels sont prêts. Vérifiez une plateforme puis poussez le bloc de mise à jour.',
+        'Les champs essentiels sont prêts. Vérifiez une plateforme puis copiez le bloc de mise à jour.',
       evidence,
       primaryActionLabel: 'Prévisualiser LinkedIn',
       primaryActionIcon: 'download',
@@ -277,8 +276,8 @@
       label: '2',
       title: 'Plateformes à mettre à jour',
       detail: profile
-        ? `${selectedFields.length} champs sélectionnés à copier, vérifier et pousser manuellement.`
-        : 'Les plateformes restent verrouillées tant que la source canonique est vide.',
+        ? `${selectedFields.length} champs sélectionnés à copier et vérifier manuellement.`
+        : 'Les plateformes restent verrouillées tant que le profil de référence est vide.',
       statusLabel: `${platforms.length} cibles`,
       icon: 'panel-top',
       state: profile ? 'ready' : 'locked',
@@ -417,7 +416,7 @@
         return;
       }
 
-      await showToast('Profil LinkedIn enregistré comme CV canonique', 'success');
+      await showToast('Profil LinkedIn enregistré comme profil de référence', 'success');
     } finally {
       syncingLinkedIn = false;
     }
@@ -450,19 +449,19 @@
   function getLinkedInRecoveryHint(errorCode: string): string {
     switch (errorCode) {
       case 'permission_required':
-        return "Autorisez l'accès LinkedIn dans Chrome, puis relancez la preview.";
+        return "Autorisez l'accès LinkedIn dans Chrome, puis relancez l’aperçu.";
       case 'session_required':
-        return 'Connectez-vous à LinkedIn dans le navigateur avant de relancer la preview.';
+        return 'Connectez-vous à LinkedIn dans le navigateur avant de relancer l’aperçu.';
       case 'profile_not_found':
         return 'Ouvrez un onglet de profil LinkedIn public ou connecté avant de relancer.';
       case 'dom_changed':
-        return "Le profil LinkedIn ne correspond plus au parser attendu; l'import manuel reste disponible.";
+        return "Le profil LinkedIn ne correspond plus au format attendu; l'import manuel reste disponible.";
       case 'rate_limited_or_blocked':
         return 'Attendez la fin du blocage LinkedIn ou vérifiez le profil dans un nouvel onglet.';
       case 'sync_failed':
-        return "Gardez la preview ouverte et relancez l'enregistrement comme source canonique.";
+        return "Gardez l'aperçu ouvert et relancez l'enregistrement comme profil de référence.";
       default:
-        return "Relancez l'action ou gardez le CV canonique prêt pour une mise à jour manuelle.";
+        return "Relancez l'action ou gardez le profil de référence prêt pour une mise à jour manuelle.";
     }
   }
 
@@ -523,18 +522,20 @@
   <section class="section-card-strong rounded-2xl px-5 py-4">
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
-        <p class="eyebrow text-blueprint-blue">CV canonique</p>
+        <p class="eyebrow text-blueprint-blue">Source canonique</p>
         <div class="mt-1 flex flex-wrap items-center gap-2">
-          <h2 class="text-base font-semibold text-text-primary">Homogénéiser le profil partout</h2>
+          <h2 class="text-base font-semibold text-text-primary">
+            Préparer le même profil partout
+          </h2>
           <span
             class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
           >
-            En attente de compte
+            Local prêt
           </span>
         </div>
         <p class="mt-1 text-xs leading-5 text-text-subtle">
-          MissionPulse prépare une version canonique de votre CV pour LinkedIn et les plateformes de
-          mission connectées.
+          MissionPulse prépare une version claire de votre profil pour LinkedIn et les plateformes
+          de mission connectées.
         </p>
         <p class="mt-2 text-[11px] leading-5 text-text-muted">
           La préparation reste locale; le dashboard connecté prend le relais après connexion du
@@ -647,7 +648,7 @@
           </p>
           <h3 class="mt-1 text-sm font-semibold text-text-primary">Préparation du workflow CV</h3>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Pulse récupère la source canonique, les plateformes disponibles et les dernières
+            Pulse récupère le profil de référence, les plateformes disponibles et les dernières
             vérifications avant d’afficher les actions.
           </p>
         </div>
@@ -681,12 +682,12 @@
       <section class="space-y-4">
         {#if !profile}
           <OperationalEmptyState
-            title="Le CV canonique n’a pas encore de source fiable"
-            description="Sans profil MissionPulse, les blocs à pousser risquent de propager des champs vides. Commencez par extraire LinkedIn ou complétez le profil avant de préparer la diffusion."
+            title="Le profil de référence n’a pas encore de source fiable"
+            description="Sans profil MissionPulse, le bloc à copier risque de contenir des champs vides. Commencez par extraire LinkedIn ou complétez le profil."
             severity="incident"
             statusLabel="Source manquante"
             icon="file-warning"
-            proofLabel="Profil canonique"
+            proofLabel="Source canonique"
             proofValue="Absent"
             primaryActionLabel="Importer LinkedIn"
             primaryActionIcon="download"
@@ -742,7 +743,7 @@
         </div>
 
         <div class="section-card rounded-xl p-5">
-          <h3 class="text-sm font-medium text-text-primary">Aperçu à pousser</h3>
+          <h3 class="text-sm font-medium text-text-primary">Bloc à copier</h3>
           <pre
             class="mt-3 max-h-56 overflow-auto whitespace-pre-wrap rounded-lg border border-border-light bg-page-canvas p-3 text-xs leading-5 text-text-secondary">{selectedPayload}</pre>
           <button
@@ -800,7 +801,7 @@
                       disabled={syncingLinkedIn || previewingLinkedIn}
                     >
                       <Icon name="upload" size={13} />
-                      {syncingLinkedIn ? 'Enregistrement...' : 'Enregistrer comme source'}
+                       {syncingLinkedIn ? 'Enregistrement...' : 'Enregistrer comme source'}
                     </button>
                     <button
                       class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
@@ -808,7 +809,7 @@
                       disabled={syncingLinkedIn || previewingLinkedIn}
                     >
                       <Icon name="refresh-cw" size={13} />
-                      Réextraire
+                      Relire LinkedIn
                     </button>
                   </div>
                 {:else}
@@ -842,7 +843,7 @@
                 <h3 class="text-sm font-medium text-text-primary">Import LinkedIn</h3>
                 {#if linkedInImportResult.imported}
                   <p class="mt-1 text-xs leading-5 text-text-subtle">
-                    Profil LinkedIn enregistré comme source canonique. Le dashboard connecté
+                    Profil LinkedIn enregistré comme profil de référence. Le dashboard connecté
                     affichera l'import, les suggestions de champs et l'historique LinkedIn.
                   </p>
                 {:else}
@@ -967,7 +968,7 @@
                   onclick={() => pushPlatform(platform)}
                 >
                   <Icon name="upload" size={13} />
-                  Pousser
+                  Copier et ouvrir
                 </button>
                 <a
                   href={platform.profileUrl}

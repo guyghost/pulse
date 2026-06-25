@@ -144,12 +144,12 @@
     if (pipelineSummary.dueFollowUps > 0) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'Relance due',
+        statusLabel: 'Relance à faire',
         title: `${pipelineSummary.dueFollowUps} relance${pipelineSummary.dueFollowUps > 1 ? 's' : ''} à traiter maintenant`,
         description:
           'La prochaine décision n’est pas de parcourir toutes les missions, mais de reprendre les dossiers qui ont une échéance.',
         evidence,
-        primaryActionLabel: 'Voir la file de suivi',
+        primaryActionLabel: 'Voir la relance',
         primaryActionIcon: 'calendar-clock',
       };
     }
@@ -464,7 +464,7 @@
     </div>
     <div class="mt-4">
       <OperationalStoryCard
-        eyebrow="Priorite"
+        eyebrow="Priorité"
         title={applicationStory.title}
         description={applicationStory.description}
         severity={applicationStory.severity}
@@ -528,7 +528,7 @@
             onclick={openRecommendedDossier}
           >
             <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
-            {recommendedTrackedMission ? 'Ouvrir' : 'Aller au feed'}
+            {recommendedTrackedMission ? 'Ouvrir le dossier' : 'Aller au feed'}
           </button>
         </div>
       </section>

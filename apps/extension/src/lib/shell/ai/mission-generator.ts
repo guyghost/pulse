@@ -15,7 +15,7 @@ import {
   cleanGenerationOutput,
   isValidGeneration,
 } from '../../core/generation/parse-generation-result';
-import { isPromptApiAvailable } from './capabilities';
+import { createPromptSession, isPromptApiAvailable } from './capabilities';
 import type { AILanguageModelSession } from './chrome-ai';
 
 const TIMEOUT_MS = 8000;
@@ -57,7 +57,7 @@ export const generateAsset = async (
   let session: AILanguageModelSession | null = null;
 
   try {
-    session = await self.ai.languageModel.create();
+    session = await createPromptSession();
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
       try {

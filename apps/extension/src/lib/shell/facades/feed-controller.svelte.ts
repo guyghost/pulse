@@ -132,6 +132,10 @@ export interface FeedController {
   // Scan state (reactive getters)
   get isScanning(): boolean;
   get scanCompleted(): boolean;
+  get hasPendingMissions(): boolean;
+  get pendingMissionCount(): number;
+  get pendingConnectorCount(): number;
+  get isApplyingPendingMissions(): boolean;
   get connectorStatuses(): Map<string, ConnectorStatus>;
   get scanResultCounts(): Map<string, number>;
   get persistedStatuses(): PersistedConnectorStatus[];
@@ -152,6 +156,7 @@ export interface FeedController {
   startScan(): Promise<void>;
   stopScan(): void;
   handleScanComplete(missions: Mission[]): Promise<void>;
+  applyPendingMissions(): Promise<void>;
   smartLoad(): Promise<void>;
   checkSourceSessions(): Promise<void>;
   handleToggleConnector(id: string): Promise<void>;
@@ -179,6 +184,10 @@ export function createFeedController(feedStore: {
   // ============================================================
   let isScanning = $state(false);
   let scanCompleted = $state(false);
+  let hasPendingMissions = $state(false);
+  let pendingMissionCount = $state(0);
+  let pendingConnectorCount = $state(0);
+  let isApplyingPendingMissions = $state(false);
   let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
   let scanResultCounts = $state<Map<string, number>>(new Map());
   let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
@@ -191,6 +200,8 @@ export function createFeedController(feedStore: {
   let partialScanBaseMissions: Mission[] = [];
   let partialScanConnectorMissions = new Map<string, Mission[]>();
   let partialScanCompletedSources = new Set<string>();
+  let pendingScanMissions: Mission[] | null = null;
+  let pendingScanKind: 'partial' | 'final' | null = null;
 
   // Bridge message listener cleanup
   let bridgeListenerCleanup: (() => void) | null = null;
@@ -263,6 +274,7 @@ export function createFeedController(feedStore: {
     isScanning = false;
     connectorStatuses = new Map();
     resetPartialScan();
+    clearPendingScanUpdate();
   }
 
   function finishScanLifecycle(): void {
@@ -279,12 +291,53 @@ export function createFeedController(feedStore: {
     partialScanBaseMissions = readFeedMissionsSnapshot();
     partialScanConnectorMissions = new Map();
     partialScanCompletedSources = new Set();
+    clearPendingScanUpdate();
   }
 
   function resetPartialScan(): void {
     partialScanBaseMissions = [];
     partialScanConnectorMissions = new Map();
     partialScanCompletedSources = new Set();
+  }
+
+  function clearPendingScanUpdate(): void {
+    pendingScanMissions = null;
+    pendingScanKind = null;
+    hasPendingMissions = false;
+    pendingMissionCount = 0;
+    pendingConnectorCount = 0;
+    isApplyingPendingMissions = false;
+  }
+
+  function markPendingPartialScanUpdate(): void {
+    pendingScanKind = 'partial';
+    pendingScanMissions = null;
+    hasPendingMissions = true;
+    pendingConnectorCount = partialScanCompletedSources.size;
+    pendingMissionCount = [...partialScanConnectorMissions.values()].reduce(
+      (total, missions) => total + missions.length,
+      0
+    );
+  }
+
+  function setPendingFinalScanUpdate(missions: Mission[]): void {
+    pendingScanKind = 'final';
+    pendingScanMissions = missions;
+    hasPendingMissions = missions.length > 0;
+    pendingMissionCount = missions.length;
+    pendingConnectorCount = 0;
+  }
+
+  function buildPendingPartialMissions(): Mission[] {
+    const retainedBaseMissions = partialScanBaseMissions.filter(
+      (mission) => !partialScanCompletedSources.has(mission.source)
+    );
+    const partialMissions = [...partialScanConnectorMissions.values()].flat();
+
+    return deduplicateEnabledSources(
+      [...retainedBaseMissions, ...partialMissions],
+      enabledConnectorIds
+    );
   }
 
   function handleScanPartialResult(connectorId: string, missions: Mission[]): void {
@@ -294,15 +347,7 @@ export function createFeedController(feedStore: {
 
     partialScanConnectorMissions = new Map(partialScanConnectorMissions).set(connectorId, missions);
     partialScanCompletedSources = new Set(partialScanCompletedSources).add(connectorId);
-
-    const retainedBaseMissions = partialScanBaseMissions.filter(
-      (mission) => !partialScanCompletedSources.has(mission.source)
-    );
-    const partialMissions = [...partialScanConnectorMissions.values()].flat();
-
-    feedStore.setMissions(
-      deduplicateEnabledSources([...retainedBaseMissions, ...partialMissions], enabledConnectorIds)
-    );
+    markPendingPartialScanUpdate();
   }
 
   async function recoverFromUnsettledScanResponse(response: unknown): Promise<void> {
@@ -331,9 +376,13 @@ export function createFeedController(feedStore: {
       );
     }
 
-    const finalMissions = deduplicateEnabledSources(missions, enabledConnectorIds);
-
-    feedStore.setMissions(finalMissions);
+    const shouldApplyImmediately = !isScanning || readFeedMissionsSnapshot().length === 0;
+    if (shouldApplyImmediately) {
+      feedStore.setMissions(missions);
+      clearPendingScanUpdate();
+    } else {
+      setPendingFinalScanUpdate(missions);
+    }
     scanCompleted = true;
     resetPartialScan();
 
@@ -351,6 +400,23 @@ export function createFeedController(feedStore: {
       persistedStatuses = await getConnectorStatuses();
     } catch {
       /* Non-critical */
+    }
+  }
+
+  async function applyPendingMissions(): Promise<void> {
+    if (!hasPendingMissions || isApplyingPendingMissions) {
+      return;
+    }
+
+    isApplyingPendingMissions = true;
+    try {
+      const missions =
+        pendingScanKind === 'partial' ? buildPendingPartialMissions() : (pendingScanMissions ?? []);
+
+      feedStore.setMissions(missions);
+      clearPendingScanUpdate();
+    } finally {
+      isApplyingPendingMissions = false;
     }
   }
 
@@ -581,6 +647,7 @@ export function createFeedController(feedStore: {
         // Erreur du scan (auto-scan du background)
         if (message?.type === 'SCAN_ERROR' && message.payload) {
           const { message: errorMsg, code } = message.payload as { message: string; code: string };
+          clearPendingScanUpdate();
           feedStore.setError(humanizeScanError(errorMsg, code));
           finishScanLifecycle();
         }
@@ -660,6 +727,18 @@ export function createFeedController(feedStore: {
     get scanCompleted() {
       return scanCompleted;
     },
+    get hasPendingMissions() {
+      return hasPendingMissions;
+    },
+    get pendingMissionCount() {
+      return pendingMissionCount;
+    },
+    get pendingConnectorCount() {
+      return pendingConnectorCount;
+    },
+    get isApplyingPendingMissions() {
+      return isApplyingPendingMissions;
+    },
     get connectorStatuses() {
       return connectorStatuses;
     },
@@ -699,6 +778,7 @@ export function createFeedController(feedStore: {
     startScan,
     stopScan,
     handleScanComplete,
+    applyPendingMissions,
     smartLoad,
     checkSourceSessions,
     handleToggleConnector,

@@ -15,6 +15,22 @@ interface SemanticCacheEntry {
  * Semantic scores are less volatile than TJM data.
  */
 const CACHE_TTL_MS = 7 * 24 * 60 * 60 * 1000;
+const CACHE_KEY_PREFIX = 'semantic-';
+const CACHE_INDEX_KEY = 'semantic-cache-index';
+const CACHE_REMOVE_BATCH_SIZE = 100;
+
+/**
+ * Expected upper bound for semantic cache entries.
+ *
+ * Chrome storage.local is limited to 10 MB by default. At this cap, even
+ * 2 KB entries stay under roughly 20% of that quota, leaving room for
+ * settings, seen IDs, alerts and other local extension state.
+ */
+export const MAX_SEMANTIC_CACHE_ENTRIES = 1000;
+
+type StorageAreaWithGetKeys = chrome.storage.StorageArea & {
+  getKeys?: () => Promise<string[]>;
+};
 
 /**
  * Normalize free text to a stable cache key fragment.
@@ -44,7 +60,51 @@ const buildProfileFingerprint = (profile: UserProfile): string =>
  * Build the storage key for a mission's semantic score.
  */
 const buildCacheKey = (missionId: string, profile: UserProfile): string =>
-  `semantic-${buildProfileFingerprint(profile)}-${missionId}`;
+  `${CACHE_KEY_PREFIX}${buildProfileFingerprint(profile)}-${missionId}`;
+
+const isSemanticCacheKey = (key: string): boolean =>
+  key.startsWith(CACHE_KEY_PREFIX) && key !== CACHE_INDEX_KEY;
+
+const readCacheIndex = async (): Promise<string[]> => {
+  const stored = await chrome.storage.local.get(CACHE_INDEX_KEY);
+  const rawIndex = stored[CACHE_INDEX_KEY];
+
+  if (!Array.isArray(rawIndex)) {
+    return [];
+  }
+
+  return rawIndex.filter((key): key is string => typeof key === 'string' && isSemanticCacheKey(key));
+};
+
+const writeCacheIndex = async (keys: string[]): Promise<void> => {
+  await chrome.storage.local.set({ [CACHE_INDEX_KEY]: keys });
+};
+
+const listSemanticCacheKeys = async (): Promise<string[]> => {
+  const storage = chrome.storage.local as StorageAreaWithGetKeys;
+  if (typeof storage.getKeys === 'function') {
+    const keys = await storage.getKeys();
+    return keys.filter(isSemanticCacheKey);
+  }
+
+  return readCacheIndex();
+};
+
+const removeKeysInBatches = async (keys: string[]): Promise<void> => {
+  for (let offset = 0; offset < keys.length; offset += CACHE_REMOVE_BATCH_SIZE) {
+    await chrome.storage.local.remove(keys.slice(offset, offset + CACHE_REMOVE_BATCH_SIZE));
+  }
+};
+
+const removeKeysFromIndex = async (keysToRemove: string[]): Promise<void> => {
+  if (keysToRemove.length === 0) {
+    return;
+  }
+
+  const removeSet = new Set(keysToRemove);
+  const indexedKeys = await readCacheIndex();
+  await writeCacheIndex(indexedKeys.filter((key) => !removeSet.has(key)));
+};
 
 /**
  * Check if a cache entry is still valid based on TTL.
@@ -106,10 +166,12 @@ export const cacheSemanticScores = async (
   }
 
   const toStore: Record<string, SemanticCacheEntry> = {};
+  const cacheKeys: string[] = [];
   const now = Date.now();
 
   for (const [missionId, result] of results) {
     const key = buildCacheKey(missionId, profile);
+    cacheKeys.push(key);
     toStore[key] = {
       score: result.score,
       reason: result.reason,
@@ -118,13 +180,24 @@ export const cacheSemanticScores = async (
   }
 
   await chrome.storage.local.set(toStore);
+
+  const indexedKeys = await readCacheIndex();
+  const nextKeys = [...indexedKeys.filter((key) => !cacheKeys.includes(key)), ...cacheKeys];
+  const overflowCount = Math.max(0, nextKeys.length - MAX_SEMANTIC_CACHE_ENTRIES);
+  const overflowKeys = nextKeys.slice(0, overflowCount);
+  const retainedKeys = nextKeys.slice(overflowCount);
+
+  if (overflowKeys.length > 0) {
+    await removeKeysInBatches(overflowKeys);
+  }
+  await writeCacheIndex(retainedKeys);
 };
 
 /**
  * Remove expired entries from the semantic cache.
  * Should be called on extension startup.
  *
- * Scans all keys starting with "semantic-" and removes expired entries.
+ * Scans indexed semantic cache keys and removes expired entries by batch.
  */
 /**
  * Clear ALL semantic cache entries.
@@ -132,30 +205,28 @@ export const cacheSemanticScores = async (
  * against the new profile on the next scan.
  */
 export const clearSemanticCache = async (): Promise<void> => {
-  const all = await chrome.storage.local.get(null);
-  const keysToRemove = Object.keys(all).filter((key) => key.startsWith('semantic-'));
+  const keysToRemove = await listSemanticCacheKeys();
 
   if (keysToRemove.length > 0) {
-    await chrome.storage.local.remove(keysToRemove);
+    await removeKeysInBatches(keysToRemove);
   }
+  await writeCacheIndex([]);
 };
 
 export const clearExpiredSemanticCache = async (): Promise<void> => {
-  const all = await chrome.storage.local.get(null);
+  const keys = await listSemanticCacheKeys();
+  const stored = keys.length > 0 ? await chrome.storage.local.get(keys) : {};
   const keysToRemove: string[] = [];
 
-  for (const [key, value] of Object.entries(all)) {
-    if (!key.startsWith('semantic-')) {
-      continue;
-    }
-
+  for (const [key, value] of Object.entries(stored)) {
     const entry = value as SemanticCacheEntry;
-    if (!isSemanticCacheValid(entry.cachedAt)) {
+    if (!entry || !isSemanticCacheValid(entry.cachedAt)) {
       keysToRemove.push(key);
     }
   }
 
   if (keysToRemove.length > 0) {
-    await chrome.storage.local.remove(keysToRemove);
+    await removeKeysInBatches(keysToRemove);
+    await removeKeysFromIndex(keysToRemove);
   }
 };

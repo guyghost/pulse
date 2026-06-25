@@ -488,6 +488,20 @@ describe('background auto-scan notifications', () => {
     });
   });
 
+  it('loads on Chrome 114-129 when action user settings events are unavailable', async () => {
+    vi.resetModules();
+    vi.stubGlobal('chrome', {
+      ...globalThis.chrome,
+      action: {
+        setBadgeText,
+        setBadgeBackgroundColor,
+        setBadgeTextColor,
+      },
+    });
+
+    await expect(import('../../../src/background/index.ts?chrome-114')).resolves.toBeDefined();
+  });
+
   it('routes feed local data through the service worker shell', async () => {
     expect(messageListener).toBeTypeOf('function');
     const missionsResponse = vi.fn();

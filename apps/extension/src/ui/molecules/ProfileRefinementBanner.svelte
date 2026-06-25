@@ -11,7 +11,7 @@
   let dismissed = $state(false);
   const missingSummary = $derived.by(() => {
     if (missingItems.length === 0) {
-      return 'Vos critères principaux sont prêts pour le scoring.';
+      return 'Vos critères principaux sont prêts pour classer les missions.';
     }
 
     const visibleItems = missingItems.slice(0, 2).join(', ');

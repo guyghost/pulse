@@ -57,22 +57,22 @@
     {
       id: 'understand',
       label: 'Comprendre Pulse',
-      description: 'Pulse transforme la veille en file de decisions.',
+      description: 'Commencez par la plateforme à scanner en premier.',
     },
     {
       id: 'source',
       label: 'Connecter une source',
-      description: 'Les sessions Chrome alimentent le radar local.',
+      description: 'Pulse utilise vos sessions Chrome, sans stocker d’identifiants.',
     },
     {
       id: 'activity',
       label: 'Observer une activité',
-      description: 'Le premier scan devient un feed priorisé.',
+      description: 'Les missions récupérées sont classées par priorité.',
     },
     {
       id: 'alert',
       label: 'Créer une alerte',
-      description: 'Les scores forts remontent avant le bruit.',
+      description: 'Les missions fortes remontent avant le reste du feed.',
     },
     {
       id: 'insight',
@@ -201,7 +201,7 @@
           onclick={onSkip}
           aria-label="Passer l’onboarding"
         >
-          Plus tard
+          Voir le feed
           <Icon name="x" size={11} />
         </button>
       </div>
@@ -232,11 +232,11 @@
         </div>
         <div>
           <p class="text-sm font-semibold text-text-primary">
-            Le but n est pas d afficher plus de missions.
+            Choisissez la première plateforme à scanner.
           </p>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Pulse doit repondre a quatre questions : que se passe-t-il, est-ce normal, dois-je agir,
-            quelle est la prochaine action.
+            Pulse récupère les missions depuis vos sessions Chrome, puis affiche celles à traiter en
+            premier.
           </p>
           <button
             class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white"
@@ -283,7 +283,7 @@
   {:else if currentStep === 'activity'}
     <section class="rounded-xl border border-border-light bg-surface-white p-4">
       <p class="text-sm font-semibold text-text-primary">
-        Le premier scan deviendra un feed d’activité
+        Le premier scan classera vos missions
       </p>
       <div class="mt-3 space-y-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
@@ -363,15 +363,15 @@
     <div>
       <p class="text-sm font-semibold text-text-primary">Personnalisez vos résultats</p>
       <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-        Le premier scan peut tourner avec un profil vide. Complétez ces champs pour affiner le
-        scoring ensuite.
+        Cette étape est facultative. Ajoutez au moins votre poste et votre stack pour mieux classer
+        les missions.
       </p>
     </div>
   </div>
 
   <div>
     <label for="ob-firstname" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
-      >Prenom</label
+      >Prénom</label
     >
     <input
       id="ob-firstname"
@@ -390,7 +390,7 @@
       id="ob-jobtitle"
       type="text"
       class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
-      placeholder="ex: Developpeur React Senior"
+      placeholder="ex: Développeur React Senior"
       bind:value={jobTitle}
     />
   </div>
@@ -519,7 +519,7 @@
       onclick={onSkip}
       type="button"
     >
-      Plus tard
+      Passer et voir le feed
     </button>
   </div>
 </div>

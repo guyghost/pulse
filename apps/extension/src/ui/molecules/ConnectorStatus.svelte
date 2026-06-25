@@ -64,14 +64,14 @@
       case 'pending':
         return { icon: 'loader', color: 'text-text-muted', label: 'En attente', spin: false };
       case 'detecting':
-        return { icon: 'loader', color: 'text-blueprint-blue', label: 'Detection...', spin: true };
+        return { icon: 'loader', color: 'text-blueprint-blue', label: 'Détection...', spin: true };
       case 'fetching':
-        return { icon: 'loader', color: 'text-blueprint-blue', label: 'Scraping...', spin: true };
+        return { icon: 'loader', color: 'text-blueprint-blue', label: 'Collecte...', spin: true };
       case 'retrying':
         return {
           icon: 'loader',
           color: 'text-blueprint-blue',
-          label: `Retry ${retryCount}/3...`,
+          label: `Nouvel essai ${retryCount}/3...`,
           spin: true,
         };
       case 'done':

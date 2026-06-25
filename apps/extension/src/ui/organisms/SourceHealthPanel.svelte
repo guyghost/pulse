@@ -91,8 +91,8 @@
     if (!isEnabled) {
       return {
         statusLabel: 'Source désactivée',
-        impact: 'Le radar ignore volontairement cette plateforme.',
-        action: 'Activez puis sondez si elle doit contribuer au feed.',
+        impact: 'Pulse ignore volontairement cette plateforme.',
+        action: 'Activez puis vérifiez si elle doit contribuer aux missions visibles.',
         severity: 'neutral',
       };
     }
@@ -267,7 +267,7 @@
           </button>
         {/each}
         <Tooltip
-          label="Afficher le detail des sources"
+          label="Afficher le détail des sources"
           description="Ouvre les sessions, incidents et filtres par connecteur."
         >
           <button
@@ -319,7 +319,7 @@
               </Tooltip>
             {/if}
             {#if compact}
-              <Tooltip label="Reduire" description="Revient a la vue compacte des sources.">
+              <Tooltip label="Réduire" description="Revient à la vue compacte des sources.">
                 <button
                   class="inline-flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
                   onclick={toggleExpand}

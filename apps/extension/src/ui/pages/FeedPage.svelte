@@ -174,6 +174,15 @@
   const feedIsColdLoading = $derived(page.isLoading && !hasVisibleFeedMissions);
   const feedChromeBusy = $derived(controller.isScanning || feedIsColdLoading);
   const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
+  const pendingMissionLabel = $derived(formatMissionCount(controller.pendingMissionCount));
+  const pendingConnectorLabel = $derived(
+    controller.pendingConnectorCount > 0
+      ? `${controller.pendingConnectorCount} source${controller.pendingConnectorCount > 1 ? 's' : ''}`
+      : 'scan terminé'
+  );
+  const missionFeedResetKey = $derived(
+    `${page.missionListResetKey}::alert:${showAlertOnly ? 'alert' : 'all'}`
+  );
   const showMissionScrollCue = $derived(
     feedChromeCompact && hasVisibleFeedMissions && !missionFeedReached && !feedIsColdLoading
   );
@@ -196,7 +205,7 @@
       actions.push({
         id: 'source-diagnostic',
         title: `Corriger ${firstBroken.connectorName}`,
-        description: 'Relance le diagnostic avant de faire confiance au radar.',
+        description: 'Relance le diagnostic avant de traiter les missions.',
         icon: 'circle-alert',
         endIcon: 'refresh-cw',
         tone: 'critical',
@@ -217,8 +226,8 @@
     } else if (highScoreCount > 0) {
       actions.push({
         id: 'high-score',
-        title: `Isoler ${formatMissionCount(highScoreCount)} 80+`,
-        description: 'Filtre les missions les plus fortes avant les insights secondaires.',
+        title: `Voir les ${formatMissionCount(highScoreCount)} prioritaires`,
+        description: 'Affiche les missions les plus fortes en premier.',
         icon: 'target',
         endIcon: 'chevron-down',
         tone: 'success',
@@ -230,7 +239,7 @@
       actions.push({
         id: 'new-missions',
         title: `Qualifier ${formatMissionCount(newCount)}`,
-        description: 'Affiche uniquement les missions non vues à traiter maintenant.',
+        description: 'Affiche uniquement les missions non vues.',
         icon: 'sparkles',
         endIcon: 'chevron-down',
         tone: 'attention',
@@ -254,7 +263,7 @@
       if (visibleCount > 0) {
         actions.push({
           id: 'mission-list',
-          title: 'Passer à la liste',
+          title: 'Aller aux missions',
           description: `${formatMissionCount(visibleCount)} visibles selon les filtres courants.`,
           icon: 'chevron-down',
           endIcon: 'chevron-down',
@@ -265,7 +274,7 @@
         actions.push({
           id: 'scan',
           title: 'Lancer le scan',
-          description: 'Alimente le radar avec les sources connectées.',
+          description: 'Récupère les missions depuis les sources connectées.',
           icon: 'scan-line',
           endIcon: 'play',
           tone: 'neutral',
@@ -292,18 +301,31 @@
         severity: newCount > 0 ? 'attention' : 'neutral',
       },
       {
-        label: `Alerte ${alertPreferences.scoreThreshold}+`,
+        label: `Prioritaires ${alertPreferences.scoreThreshold}+`,
         value: highScoreCount,
         icon: 'target',
         severity: highScoreCount > 0 ? 'success' : 'neutral',
       },
       {
-        label: 'Sources',
+        label: 'Sources en erreur',
         value: brokenCount,
         icon: brokenCount > 0 ? 'triangle-alert' : 'shield-check',
         severity: brokenCount > 0 ? 'critical' : 'success',
       },
     ];
+
+    if (page.error) {
+      return {
+        severity: 'critical' as const,
+        statusLabel: 'Incident',
+        title: 'Impossible de récupérer les missions',
+        description:
+          'Les dernières données restent disponibles. Réessayez le scan ou vérifiez vos sources.',
+        evidence,
+        primaryActionLabel: 'Réessayer le scan',
+        primaryActionIcon: 'refresh-cw',
+      };
+    }
 
     if (page.isOffline) {
       return {
@@ -324,7 +346,7 @@
       return {
         severity: 'critical' as const,
         statusLabel: 'Action requise',
-        title: `${brokenCount} source${brokenCount > 1 ? 's' : ''} à corriger avant de faire confiance au radar`,
+        title: `${brokenCount} source${brokenCount > 1 ? 's' : ''} à corriger avant de traiter les missions`,
         description: `${firstBroken?.connectorName ?? 'Une source'} ne remonte plus correctement. Le feed peut manquer des opportunités.`,
         evidence,
         primaryActionLabel: 'Relancer le diagnostic',
@@ -336,13 +358,19 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'À traiter',
-        title: `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} depuis le dernier passage`,
+        title:
+          highScoreCount > 0
+            ? `${highScoreCount} mission${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} à examiner`
+            : `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} à examiner`,
         description:
           highScoreCount > 0
-            ? `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} dépasse le seuil prioritaire. Commencez par celles-ci.`
+            ? `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} au total. Commencez par celles qui dépassent le seuil ${alertPreferences.scoreThreshold}+.`
             : 'Aucune urgence détectée, mais les nouvelles missions méritent une qualification rapide.',
         evidence,
-        primaryActionLabel: `Voir les ${formatMissionCount(newCount)} proposée${newCount > 1 ? 's' : ''}`,
+        primaryActionLabel:
+          highScoreCount > 0
+            ? `Voir les ${formatMissionCount(highScoreCount)} prioritaires`
+            : `Voir les ${formatMissionCount(newCount)} nouvelles`,
         primaryActionIcon: 'chevron-down',
       };
     }
@@ -350,14 +378,14 @@
     if (alertPreferences.enabled && highScoreCount > 0) {
       return {
         severity: 'success' as const,
-        statusLabel: 'Radar sain',
+        statusLabel: 'Priorités prêtes',
         title: `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prête${highScoreCount > 1 ? 's' : ''}`,
-        description: `Le bruit est filtré selon votre alerte ${alertPreferences.scoreThreshold}+. La prochaine action utile est de comparer ces missions et d’en mettre une en suivi.`,
+        description: `Elles dépassent votre seuil ${alertPreferences.scoreThreshold}+. Comparez-les avant de mettre une mission en suivi.`,
         evidence,
         primaryActionLabel:
           alertPreferences.scoreThreshold >= 80
             ? `Voir les ${formatMissionCount(highScoreCount)} prioritaire${highScoreCount > 1 ? 's' : ''}`
-            : `Voir les ${formatMissionCount(highScoreCount)} en alerte`,
+            : `Voir les ${formatMissionCount(highScoreCount)} prioritaires`,
         primaryActionIcon: 'chevron-down',
       };
     }
@@ -366,7 +394,7 @@
       return {
         severity: 'neutral' as const,
         statusLabel: 'Aucune donnée',
-        title: 'Le radar attend un premier scan',
+        title: 'Lancez un premier scan pour voir vos missions',
         description:
           'Connectez ou vérifiez les sources, puis lancez un scan pour obtenir les premières recommandations.',
         evidence,
@@ -378,11 +406,11 @@
     return {
       severity: 'success' as const,
       statusLabel: 'Normal',
-      title: `${visibleCount} mission${visibleCount > 1 ? 's' : ''} disponible${visibleCount > 1 ? 's' : ''}, aucune alerte critique`,
+      title: `${visibleCount} mission${visibleCount > 1 ? 's' : ''} disponible${visibleCount > 1 ? 's' : ''}, aucune priorité critique`,
       description:
         'Le système est stable. Continuez par les favoris ou relancez un scan si la veille doit être rafraîchie.',
       evidence,
-      primaryActionLabel: `Voir les ${formatMissionCount(visibleCount)} proposée${visibleCount > 1 ? 's' : ''}`,
+      primaryActionLabel: `Voir les ${formatMissionCount(visibleCount)}`,
       primaryActionIcon: 'chevron-down',
     };
   });
@@ -414,6 +442,11 @@
   }
 
   function handleFeedStoryPrimaryAction(): void {
+    if (page.error) {
+      controller.startScan();
+      return;
+    }
+
     if (page.isOffline) {
       if (hasVisibleFeedMissions) {
         void scrollToMissionFeed();
@@ -509,6 +542,14 @@
       return;
     }
     controller.startScan();
+  }
+
+  function handleApplyPendingMissions(): void {
+    controller.applyPendingMissions().catch((err) => {
+      if (import.meta.env.DEV) {
+        console.warn('[FeedPage] apply pending missions failed:', err);
+      }
+    });
   }
 
   function handleOpenExternalUrl(url: string): void {
@@ -738,7 +779,7 @@
         class="pointer-events-auto flex w-full items-center justify-between gap-3 rounded-xl border border-blueprint-blue/20 bg-surface-white/95 px-4 py-3 text-left text-blueprint-blue shadow-subtle-3 backdrop-blur-sm transition-all duration-200 hover:border-blueprint-blue/30 hover:bg-blueprint-blue/5 focus:outline-none focus:ring-2 focus:ring-blueprint-blue/25"
         type="button"
         onclick={scrollToMissionFeed}
-        aria-label={`Faire défiler vers ${visibleFeedMissionLabel} proposée${visibleFeedMissionCount > 1 ? 's' : ''}`}
+        aria-label={`Faire défiler vers ${visibleFeedMissionLabel}`}
         transition:slide={{ duration: 160 }}
       >
         <span class="min-w-0">
@@ -844,7 +885,7 @@
             />
             <div class="mt-3">
               <OperationalStoryCard
-                eyebrow="Situation"
+                eyebrow="À faire maintenant"
                 title={feedStory.title}
                 description={feedStory.description}
                 severity={feedStory.severity}
@@ -958,7 +999,7 @@
 
             <div class="mt-3">
               <OperationalStoryCard
-                eyebrow="Situation"
+                eyebrow="À faire maintenant"
                 title={feedStory.title}
                 description={feedStory.description}
                 severity={feedStory.severity}
@@ -1081,7 +1122,7 @@
               <span
                 class="h-3 w-3 animate-spin rounded-full border-2 border-blueprint-blue/20 border-t-blueprint-blue"
               ></span>
-              Scraping...
+              Collecte...
             </div>
           {/if}
 
@@ -1275,6 +1316,41 @@
           onEnableAndScan={(connectorId) => controller.recheckConnector(connectorId, true)}
         />
       {/if}
+
+      {#if controller.hasPendingMissions}
+        <section
+          class="mt-4 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/6 px-4 py-3"
+          data-testid="pending-missions-banner"
+          aria-live="polite"
+        >
+          <div class="flex items-center gap-3">
+            <span
+              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-white text-blueprint-blue"
+              aria-hidden="true"
+            >
+              <Icon name="download" size={15} />
+            </span>
+            <div class="min-w-0 flex-1">
+              <p class="text-xs font-semibold text-text-primary">
+                {pendingMissionLabel} prête{controller.pendingMissionCount > 1 ? 's' : ''} à afficher
+              </p>
+              <p class="mt-0.5 text-[10px] leading-4 text-text-subtle">
+                Le feed reste stable pendant la collecte. Appliquez les résultats quand vous êtes
+                prêt. Source: {pendingConnectorLabel}.
+              </p>
+            </div>
+            <button
+              type="button"
+              class="shrink-0 rounded-lg border border-blueprint-blue/20 bg-surface-white px-3 py-2 text-[11px] font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/8 disabled:cursor-wait disabled:opacity-60"
+              onclick={handleApplyPendingMissions}
+              disabled={controller.isApplyingPendingMissions}
+              aria-label={`Afficher ${pendingMissionLabel} dans le feed`}
+            >
+              {controller.isApplyingPendingMissions ? 'Application...' : 'Afficher'}
+            </button>
+          </div>
+        </section>
+      {/if}
     </div>
   </div>
 
@@ -1293,10 +1369,10 @@
       >
         <div class="min-w-0">
           <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
-            Investigation
+            Missions
           </p>
           <h2 id="mission-feed-title" class="mt-1 text-sm font-semibold text-text-primary">
-            Missions proposées
+            Missions à examiner
           </h2>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
             {visibleFeedMissionLabel} visible{visibleFeedMissionCount > 1 ? 's' : ''} selon vos filtres
@@ -1329,6 +1405,7 @@
         comparisonMissionIds={page.comparisonMissionIds}
         trackingByMissionId={tracking.trackings}
         sortBy={page.sortBy}
+        resetKey={missionFeedResetKey}
         filterActive={page.filterActive || showAlertOnly}
         onMissionSeen={page.handleMissionSeen}
         onToggleFavorite={page.handleToggleFavorite}

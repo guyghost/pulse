@@ -71,7 +71,7 @@
       label: 'Stack forte',
       value: insightSummary.strongStackCount,
       icon: 'layers',
-      stateLabel: insightSummary.strongStackCount > 0 ? 'Signal exploitable' : 'À enrichir',
+      stateLabel: insightSummary.strongStackCount > 0 ? 'Compétences alignées' : 'Profil à compléter',
       hint:
         insightSummary.strongStackCount > 0
           ? 'Comparer ces missions en premier.'
@@ -93,7 +93,7 @@
       label: 'Remote compatible',
       value: insightSummary.remoteMatchCount,
       icon: 'wifi',
-      stateLabel: insightSummary.remoteMatchCount > 0 ? 'Compatible' : 'Aucun signal',
+      stateLabel: insightSummary.remoteMatchCount > 0 ? 'Compatible' : 'Aucune mission',
       hint:
         insightSummary.remoteMatchCount > 0
           ? 'Prioriser si le lieu est clé.'
@@ -101,22 +101,22 @@
       severity: insightSummary.remoteMatchCount > 0 ? 'success' : 'neutral',
     },
     {
-      label: 'IA analysée',
+      label: 'Analyse locale',
       value: insightSummary.semanticAnalyzedCount,
       icon: 'sparkles',
       stateLabel:
-        insightSummary.semanticAnalyzedCount > 0 ? 'Confiance enrichie' : 'Analyse absente',
+        insightSummary.semanticAnalyzedCount > 0 ? 'Score enrichi' : 'Inactive',
       hint:
         insightSummary.semanticAnalyzedCount > 0
           ? 'Lire les raisons de score.'
-          : 'Activer ou attendre Gemini Nano.',
+          : 'Pulse utilise le score de base.',
       severity: insightSummary.semanticAnalyzedCount > 0 ? 'success' : 'neutral',
     },
   ]);
 </script>
 
 <div class="mt-3 border-t border-border-light pt-3">
-  <div class="grid grid-cols-4 gap-2" aria-label="Synthèse des missions à traiter">
+  <div class="grid grid-cols-4 gap-2" aria-label="Insights actionnables du périmètre courant">
     <button
       type="button"
       class="min-w-0 rounded-lg px-2 py-2 text-left transition-colors {showNewOnly
@@ -187,7 +187,7 @@
   <div class="mt-3" aria-label="Distribution des missions par score">
     <div class="mb-1.5 flex items-center justify-between gap-3">
       <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
-        Score des opportunités
+        Score des missions
       </p>
       <p class="text-[10px] text-text-muted">{summary.visibleCount} visibles</p>
     </div>
@@ -240,14 +240,14 @@
       <div
         class="rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs text-text-muted"
       >
-        Aucun score disponible pour le périmètre courant.
+        Aucun score disponible avec les filtres actuels.
       </div>
     {/if}
   </div>
 
   <div
     class="mt-3 grid grid-cols-2 gap-1.5"
-    aria-label="Insights actionnables du périmètre courant"
+    aria-label="Détails du tri avec les filtres actuels"
   >
     {#each insightItems as item}
       <div

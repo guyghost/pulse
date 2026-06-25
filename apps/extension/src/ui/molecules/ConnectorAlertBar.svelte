@@ -41,7 +41,7 @@
             Impact opérationnel
           </p>
           <p class="mt-1 text-[11px] leading-4 text-text-secondary">
-            Le radar peut sous-estimer les nouvelles missions tant que
+            Pulse peut sous-estimer les nouvelles missions tant que
             {brokenConnectors.length === 1
               ? ` ${brokenConnectors[0]?.connectorName}`
               : ' ces sources'} ne remonte{brokenConnectors.length === 1 ? '' : 'nt'} plus de résultats

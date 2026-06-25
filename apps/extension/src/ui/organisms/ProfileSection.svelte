@@ -78,15 +78,15 @@
       </div>
     </div>
     <Tooltip
-      label={editing ? 'Annuler la modification' : 'Modifier le profil'}
+      label={editing ? 'Annuler la modification' : 'Modifier mes critères'}
       description={editing
         ? 'Quitte le mode édition sans sauvegarder.'
-        : 'Ajuste les critères qui influencent le scoring.'}
+        : 'Ajuste les critères qui influencent le classement.'}
     >
       <button
         class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
         onclick={onToggleEdit}
-        aria-label={editing ? 'Annuler la modification du profil' : 'Modifier le profil'}
+        aria-label={editing ? 'Annuler la modification du profil' : 'Modifier mes critères'}
       >
         <Icon name={editing ? 'x' : 'edit-2'} size={13} />
       </button>

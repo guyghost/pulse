@@ -255,7 +255,7 @@ describe('feed controller facade', () => {
     controller.dispose();
   });
 
-  it('merges SCAN_PARTIAL_RESULT with the scan snapshot without ending the scan', async () => {
+  it('buffers SCAN_PARTIAL_RESULT until pending missions are explicitly applied', async () => {
     stubChrome();
     let bridgeListener: ((message: unknown) => void) | null = null;
     let resolveScan: ((response: { type: 'SCAN_COMPLETE'; payload: Mission[] }) => void) | null =
@@ -330,8 +330,18 @@ describe('feed controller facade', () => {
     await flushPromises();
 
     expect(controller.isScanning).toBe(true);
+    expect(controller.hasPendingMissions).toBe(true);
+    expect(controller.pendingMissionCount).toBe(1);
+    expect(controller.pendingConnectorCount).toBe(1);
+    expect(feedStore.setMissions).not.toHaveBeenCalled();
+    expect(currentMissions.map((mission) => mission.id)).toEqual(['old-free-work', 'old-lehibou']);
+
+    await controller.applyPendingMissions();
+    await flushPromises();
+
     expect(currentMissions.map((mission) => mission.id)).toEqual(['old-lehibou', 'new-free-work']);
     expect(currentMissions[1].scrapedAt).toEqual(new Date('2026-05-22T08:08:00.000Z'));
+    expect(controller.hasPendingMissions).toBe(false);
 
     bridgeListener?.({
       type: 'SCAN_COMPLETE',
@@ -347,10 +357,79 @@ describe('feed controller facade', () => {
     await flushPromises();
 
     expect(controller.isScanning).toBe(false);
+    expect(controller.hasPendingMissions).toBe(true);
+    expect(currentMissions.map((mission) => mission.id)).toEqual(['old-lehibou', 'new-free-work']);
+
+    await controller.applyPendingMissions();
+    await flushPromises();
+
     expect(currentMissions.map((mission) => mission.id)).toEqual(['final-free-work']);
 
     resolveScan?.({ type: 'SCAN_COMPLETE', payload: currentMissions });
     await startPromise;
+    controller.dispose();
+  });
+
+  it('buffers final scan results over an existing feed without local deduplication', async () => {
+    stubChrome();
+    const duplicateA = makeSerializedMission({
+      id: 'final-duplicate-a',
+      title: 'Final Duplicate',
+      source: 'free-work',
+      url: 'https://example.com/final-duplicate-a',
+    });
+    const duplicateB = makeSerializedMission({
+      id: 'final-duplicate-b',
+      title: 'Final Duplicate',
+      source: 'free-work',
+      url: 'https://example.com/final-duplicate-b',
+    });
+    let currentMissions = [makeMission({ id: 'existing-feed' })];
+    const feedStore = {
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(),
+      setMissions: vi.fn((missions: Mission[]) => {
+        currentMissions = missions;
+      }),
+      setError: vi.fn(),
+    };
+    feedDataMock.getMissions.mockImplementation(async () => currentMissions);
+
+    bridgeMock.sendMessage.mockImplementation(async (message: { type: string }) => {
+      if (message.type === 'GET_CONNECTOR_HEALTH') {
+        return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+      }
+      if (message.type === 'SCAN_START') {
+        return {
+          type: 'SCAN_COMPLETE',
+          payload: [duplicateA, duplicateB],
+        };
+      }
+      return { type: 'SCAN_COMPLETE', payload: [] };
+    });
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    await controller.startScan();
+
+    expect(currentMissions.map((mission) => mission.id)).toEqual(['existing-feed']);
+    expect(controller.hasPendingMissions).toBe(true);
+    expect(controller.pendingMissionCount).toBe(2);
+
+    await controller.applyPendingMissions();
+
+    expect(currentMissions.map((mission) => mission.id)).toEqual([
+      'final-duplicate-a',
+      'final-duplicate-b',
+    ]);
+    expect(feedStore.setMissions).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'final-duplicate-a' }),
+      expect.objectContaining({ id: 'final-duplicate-b' }),
+    ]);
     controller.dispose();
   });
 

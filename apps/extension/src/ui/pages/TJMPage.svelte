@@ -67,7 +67,7 @@
         severity: analysis ? 'success' : error ? 'critical' : 'attention',
       },
       {
-        label: 'Points',
+        label: 'Missions analysées',
         value: analysis?.dataPoints ?? 0,
         icon: 'database',
         severity: analysis && analysis.dataPoints >= 20 ? 'success' : 'attention',
@@ -112,7 +112,7 @@
         statusLabel: 'Données absentes',
         title: 'Aucun signal marché ne permet de décider un TJM',
         description:
-          'Le prochain geste utile est d’alimenter le radar avec des missions, puis de relancer cette analyse.',
+          'Le prochain geste utile est de scanner des missions avec TJM, puis de relancer cette analyse.',
         evidence,
         primaryActionLabel: 'Scanner le feed',
         primaryActionIcon: 'briefcase',
@@ -135,7 +135,7 @@
     return {
       severity: 'success' as const,
       statusLabel: 'Analyse prête',
-      title: 'Le radar TJM peut guider la prochaine négociation',
+      title: 'Votre fourchette TJM est prête à comparer',
       description:
         'Comparez votre fourchette aux médianes par seniorité, stack et région avant de qualifier une mission.',
       evidence,
@@ -207,7 +207,7 @@
         <div>
           <p class="eyebrow text-blueprint-blue">Marché</p>
           <div class="mt-1 flex flex-wrap items-center gap-2">
-            <h2 class="text-base font-semibold text-text-primary">Radar TJM</h2>
+            <h2 class="text-base font-semibold text-text-primary">Analyse TJM</h2>
             <span
               class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
             >
@@ -253,7 +253,7 @@
 
     <div class="mt-4">
       <OperationalStoryCard
-        eyebrow="Décision tarifaire"
+        eyebrow="À faire avec votre TJM"
         title={tjmStory.title}
         description={tjmStory.description}
         severity={tjmStory.severity}

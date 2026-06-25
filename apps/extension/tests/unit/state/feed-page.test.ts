@@ -125,6 +125,18 @@ function makeController(enabledConnectorIds = new Set<string>()): FeedController
     get scanCompleted() {
       return false;
     },
+    get hasPendingMissions() {
+      return false;
+    },
+    get pendingMissionCount() {
+      return 0;
+    },
+    get pendingConnectorCount() {
+      return 0;
+    },
+    get isApplyingPendingMissions() {
+      return false;
+    },
     get connectorStatuses() {
       return new Map();
     },
@@ -158,6 +170,7 @@ function makeController(enabledConnectorIds = new Set<string>()): FeedController
     startScan: vi.fn(async () => {}),
     stopScan: vi.fn(),
     handleScanComplete: vi.fn(async () => {}),
+    applyPendingMissions: vi.fn(async () => {}),
     smartLoad: vi.fn(async () => {}),
     checkSourceSessions: vi.fn(async () => {}),
     handleToggleConnector: vi.fn(async () => {}),
@@ -218,69 +231,81 @@ describe('feed page state', () => {
   });
 
   it('filters the feed to unseen missions from the dashboard toggle', () => {
-    const feed = createFeedStore();
-    const page = createFeedPageState(feed, makeController());
-    feed.setMissions([
-      makeMission({ id: 'seen-1', score: 88 }),
-      makeMission({ id: 'new-1', score: 72 }),
-      makeMission({ id: 'new-2', score: 40 }),
-    ]);
+    vi.useFakeTimers();
+    try {
+      const feed = createFeedStore();
+      const page = createFeedPageState(feed, makeController());
+      feed.setMissions([
+        makeMission({ id: 'seen-1', score: 88 }),
+        makeMission({ id: 'new-1', score: 72 }),
+        makeMission({ id: 'new-2', score: 40 }),
+      ]);
 
-    page.handleMissionSeen('seen-1');
+      page.handleMissionSeen('seen-1');
+      vi.advanceTimersByTime(120);
 
-    expect(page.dashboardSummary.newCount).toBe(2);
+      expect(page.dashboardSummary.newCount).toBe(2);
 
-    page.toggleNewOnly();
+      page.toggleNewOnly();
 
-    expect(page.visibleCount).toBe(2);
-    expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-1', 'new-2']);
+      expect(page.visibleCount).toBe(2);
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-1', 'new-2']);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('applies decision presets for business-oriented feed filtering', () => {
-    const feed = createFeedStore();
-    const page = createFeedPageState(feed, makeController());
-    feed.setMissions([
-      makeMission({ id: 'priority-remote', score: 92, remote: 'full' }),
-      makeMission({ id: 'priority-onsite', score: 88, remote: 'onsite' }),
-      makeMission({ id: 'remote-good', score: 72, remote: 'hybrid' }),
-      makeMission({ id: 'weak-onsite', score: 41, remote: 'onsite' }),
-    ]);
+    vi.useFakeTimers();
+    try {
+      const feed = createFeedStore();
+      const page = createFeedPageState(feed, makeController());
+      feed.setMissions([
+        makeMission({ id: 'priority-remote', score: 92, remote: 'full' }),
+        makeMission({ id: 'priority-onsite', score: 88, remote: 'onsite' }),
+        makeMission({ id: 'remote-good', score: 72, remote: 'hybrid' }),
+        makeMission({ id: 'weak-onsite', score: 41, remote: 'onsite' }),
+      ]);
 
-    expect(page.decisionPresets.map((preset) => [preset.id, preset.count])).toEqual([
-      ['priority', 2],
-      ['remote-compatible', 2],
-      ['tjm-negotiation', 0],
-      ['new', 4],
-    ]);
+      expect(page.decisionPresets.map((preset) => [preset.id, preset.count])).toEqual([
+        ['priority', 2],
+        ['remote-compatible', 2],
+        ['tjm-negotiation', 0],
+        ['new', 4],
+      ]);
 
-    page.applyDecisionPreset('priority');
+      page.applyDecisionPreset('priority');
 
-    expect(page.decisionPreset).toBe('priority');
-    expect(page.visibleCount).toBe(2);
-    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
-      'priority-remote',
-      'priority-onsite',
-    ]);
+      expect(page.decisionPreset).toBe('priority');
+      expect(page.visibleCount).toBe(2);
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+        'priority-remote',
+        'priority-onsite',
+      ]);
 
-    page.applyDecisionPreset('remote-compatible');
+      page.applyDecisionPreset('remote-compatible');
 
-    expect(page.decisionPreset).toBe('remote-compatible');
-    expect(page.visibleCount).toBe(2);
-    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
-      'priority-remote',
-      'remote-good',
-    ]);
+      expect(page.decisionPreset).toBe('remote-compatible');
+      expect(page.visibleCount).toBe(2);
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+        'priority-remote',
+        'remote-good',
+      ]);
 
-    page.handleMissionSeen('priority-remote');
-    page.applyDecisionPreset('new');
+      page.handleMissionSeen('priority-remote');
+      vi.advanceTimersByTime(120);
+      page.applyDecisionPreset('new');
 
-    expect(page.decisionPreset).toBe('new');
-    expect(page.visibleCount).toBe(3);
-    expect(page.displayMissions.map((mission) => mission.id)).toEqual([
-      'priority-onsite',
-      'remote-good',
-      'weak-onsite',
-    ]);
+      expect(page.decisionPreset).toBe('new');
+      expect(page.visibleCount).toBe(3);
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual([
+        'priority-onsite',
+        'remote-good',
+        'weak-onsite',
+      ]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('saves, applies and deletes feed views', async () => {
@@ -385,6 +410,38 @@ describe('feed page state', () => {
       remoteMatchCount: 1,
       semanticAnalyzedCount: 1,
     });
+  });
+
+  it('batches visible mission seen writes into a single save', () => {
+    vi.useFakeTimers();
+    try {
+      const feed = createFeedStore();
+      const page = createFeedPageState(feed, makeController());
+      const missions = Array.from({ length: 20 }, (_, index) =>
+        makeMission({
+          id: `mission-${index}`,
+          url: `https://example.com/mission-${index}`,
+        })
+      );
+      feed.setMissions(missions);
+
+      for (const mission of missions) {
+        page.handleMissionSeen(mission.id);
+      }
+
+      expect(feedDataMock.saveSeenIds).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(119);
+      expect(feedDataMock.saveSeenIds).not.toHaveBeenCalled();
+
+      vi.advanceTimersByTime(1);
+
+      expect(page.seenIds).toHaveLength(20);
+      expect(feedDataMock.saveSeenIds).toHaveBeenCalledTimes(1);
+      expect(feedDataMock.saveSeenIds).toHaveBeenCalledWith(missions.map((mission) => mission.id));
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('flags only missions below the profile TJM floor as needing negotiation', () => {

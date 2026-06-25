@@ -122,8 +122,8 @@
       />
     {:else}
       <OperationalEmptyState
-        title="Le radar attend un premier signal"
-        description="Aucune mission exploitable n’est stockée. Lancez un scan pour transformer les sources connectées en file de décisions."
+        title="Lancez un premier scan pour voir vos missions"
+        description="Aucune mission exploitable n’est stockée. Lancez un scan pour transformer les sources connectées en missions à examiner."
         severity="neutral"
         statusLabel="Aucune donnée"
         icon="radar"

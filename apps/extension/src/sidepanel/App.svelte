@@ -39,23 +39,23 @@
 
   const PREMIUM_LOCKS: Partial<Record<Page, PremiumLockContent>> = {
     cv: {
-      title: 'CV canonique premium verrouillé',
+      title: 'Profil de référence inclus dans Premium',
       description:
         'Cette vue prépare un profil candidat cohérent pour LinkedIn, dashboard et plateformes. Vos sessions restent dans Chrome.',
       proofLabel: 'Surface',
       proofValue: 'CV',
     },
     applications: {
-      title: 'Suivi candidatures premium verrouillé',
+      title: 'Suivi des candidatures inclus dans Premium',
       description:
         'Le pipeline transforme les missions retenues en relances, statuts et prochaines actions. Le feed reste disponible pour qualifier les missions.',
       proofLabel: 'Surface',
       proofValue: 'Suivi',
     },
     tjm: {
-      title: 'Radar TJM premium verrouillé',
+      title: 'Analyse TJM incluse dans Premium',
       description:
-        'Le radar tarifaire consolide les missions scannées pour estimer une fourchette de négociation exploitable.',
+        'L’analyse tarifaire consolide les missions scannées pour estimer une fourchette de négociation exploitable.',
       proofLabel: 'Surface',
       proofValue: 'TJM',
     },
@@ -216,9 +216,9 @@
                   : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
               aria-current={nav.currentPage === item.page ? 'page' : undefined}
               aria-label={itemLocked
-                ? `${item.label} premium verrouillé`
+                ? `${item.label} inclus dans Premium`
                 : (item.ariaLabel ?? item.label)}
-              title={itemLocked ? `${item.label} premium verrouillé` : item.label}
+              title={itemLocked ? `${item.label} inclus dans Premium` : item.label}
               onclick={() => nav.navigate(item.page)}
             >
               <span class="shrink-0 transition-transform duration-200 ease-out">

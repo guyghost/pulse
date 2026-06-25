@@ -80,7 +80,7 @@
     {
       title: 'Relancer l’analyse',
       description:
-        'Transformer les missions stockées et la fourchette cible en décision tarifaire.',
+        'Transformer les missions stockées et votre fourchette en recommandation TJM.',
       icon: 'refresh-cw',
       actionLabel: 'Réessayer',
       action: onRetry,
@@ -107,7 +107,7 @@
         severity: confidencePct >= 70 ? 'success' : confidencePct >= 45 ? 'attention' : 'incident',
       },
       {
-        label: 'Points',
+        label: 'Missions analysées',
         value: analysis.dataPoints,
         icon: 'database',
         severity: analysis.dataPoints >= 20 ? 'success' : 'attention',
@@ -133,7 +133,7 @@
         statusLabel: 'Profil incomplet',
         title: 'Le positionnement TJM ne peut pas encore être décidé',
         description:
-          'Ajoutez une fourchette TJM et une séniorité dans le profil pour transformer les tendances en décision tarifaire.',
+          'Ajoutez une fourchette TJM et une séniorité dans le profil pour comparer votre position au marché.',
         evidence,
       };
     }
@@ -144,7 +144,7 @@
         statusLabel: 'Confiance faible',
         title: 'Le marché observé est encore trop peu fiable pour changer votre TJM',
         description:
-          'Gardez votre fourchette actuelle et alimentez le radar avec plus de scans avant de négocier sur cette base.',
+          'Gardez votre fourchette actuelle et scannez plus de missions avant de négocier sur cette base.',
         evidence,
       };
     }
@@ -152,10 +152,10 @@
     if (userTargetDelta > 80) {
       return {
         severity: 'attention' as const,
-        statusLabel: 'A justifier',
-        title: `Votre cible est ${formatDelta(userTargetDelta)} au-dessus de la mediane`,
+        statusLabel: 'À justifier',
+        title: `Votre cible est ${formatDelta(userTargetDelta)} au-dessus de la médiane`,
         description:
-          'Acceptez ce niveau seulement si la mission coche fortement stack, remote et contexte client. Sinon, preparez une marge de negociation.',
+          'Acceptez ce niveau seulement si la mission coche fortement stack, remote et contexte client. Sinon, préparez une marge de négociation.',
         evidence,
       };
     }
@@ -163,10 +163,10 @@
     if (userTargetDelta < -80) {
       return {
         severity: 'incident' as const,
-        statusLabel: 'Sous-positionne',
-        title: `Votre cible est ${formatDelta(userTargetDelta)} sous la mediane`,
+        statusLabel: 'Sous-positionné',
+        title: `Votre cible est ${formatDelta(userTargetDelta)} sous la médiane`,
         description:
-          'Le radar indique une marge de rehausse. La prochaine action est de relever la fourchette ou de filtrer les missions trop basses.',
+          'L’analyse indique une marge de rehausse. La prochaine action est de relever la fourchette ou de filtrer les missions trop basses.',
         evidence,
       };
     }
@@ -193,7 +193,7 @@
     </div>
   {:else if error}
     <OperationalEmptyState
-      title="Le radar TJM ne peut pas être calculé"
+      title="L’analyse TJM ne peut pas être calculée"
       description={error}
       severity="critical"
       statusLabel="Incident"
@@ -226,7 +226,7 @@
           <div>
             <p class="text-sm font-medium text-text-primary">Vue d'ensemble</p>
             <p class="text-[10px] text-text-muted">
-              {analysis.dataPoints} points · {analysis.topStacks.length} stacks
+              {analysis.dataPoints} missions · {analysis.topStacks.length} stacks
             </p>
           </div>
         </div>
@@ -249,7 +249,7 @@
           ></div>
         </div>
         <p class="mt-1.5 text-[10px] leading-snug text-text-muted">
-          Basée sur {analysis.dataPoints} point{analysis.dataPoints > 1 ? 's' : ''} de marché consolidé{analysis.dataPoints >
+          Basée sur {analysis.dataPoints} mission{analysis.dataPoints > 1 ? 's' : ''} analysée{analysis.dataPoints >
           1
             ? 's'
             : ''}.
@@ -441,7 +441,7 @@
         severity="attention"
         statusLabel="Données absentes"
         icon="bar-chart-3"
-        proofLabel="Points de marché"
+        proofLabel="Missions analysées"
         proofValue="0"
         primaryActionLabel="Réessayer l’analyse"
         primaryActionIcon="refresh-cw"
@@ -457,7 +457,7 @@
             <p class="eyebrow text-blueprint-blue">3 étapes</p>
             <h3 class="mt-1 text-sm font-semibold text-text-primary">Alimenter le radar TJM</h3>
             <p class="mt-1 text-xs leading-5 text-text-subtle">
-              Le radar devient utile quand les missions scannées et votre fourchette cible se
+              L’analyse devient utile quand les missions scannées et votre fourchette cible se
               répondent.
             </p>
           </div>

@@ -1,4 +1,4 @@
-import { test, expect } from '@playwright/test';
+import { test, expect, type Page } from '@playwright/test';
 import {
   captureMemoryMetrics,
   ensureFeedVisible,
@@ -10,7 +10,151 @@ import {
   getDisplayedMissionCount,
   injectMissions,
   missionCards,
+  scanButton,
 } from '../helpers';
+
+async function mockMultiBatchPartialScan(page: Page) {
+  await page.addInitScript(() => {
+    let _chrome: unknown = undefined;
+    const runtimeListeners: Array<
+      (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void
+    > = [];
+
+    function makeMission(index: number, source: string) {
+      const now = new Date().toISOString();
+      return {
+        id: `${source}-partial-${index}`,
+        title: `React Partial Batch ${index}`,
+        client: 'Batch Client',
+        description: `Mission React arrivée dans le lot ${index}.`,
+        stack: ['React', 'TypeScript'],
+        tjm: 650 + index,
+        location: 'Paris',
+        remote: 'hybrid',
+        duration: '6 mois',
+        startDate: null,
+        publishedAt: now,
+        url: `https://example.com/${source}/partial-${index}`,
+        source,
+        scrapedAt: now,
+        seniority: 'senior',
+        scoreBreakdown: null,
+        score: 80,
+        semanticScore: null,
+        semanticReason: null,
+      };
+    }
+
+    function emitRuntimeMessage(message: unknown): void {
+      for (const listener of runtimeListeners) {
+        listener(message, { id: 'dev-mode' }, () => {});
+      }
+    }
+
+    Object.defineProperty(window, 'chrome', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return _chrome;
+      },
+      set(val) {
+        _chrome = val;
+        const chromeStub = val as {
+          runtime?: {
+            sendMessage?: (msg: unknown) => Promise<unknown>;
+            onMessage?: {
+              addListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+              removeListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+            };
+          };
+        };
+
+        if (!chromeStub.runtime?.sendMessage) {
+          return;
+        }
+
+        const originalSendMessage = chromeStub.runtime.sendMessage.bind(chromeStub.runtime);
+        const originalAddListener = chromeStub.runtime.onMessage?.addListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+        const originalRemoveListener = chromeStub.runtime.onMessage?.removeListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+
+        if (chromeStub.runtime.onMessage) {
+          chromeStub.runtime.onMessage.addListener = (listener) => {
+            runtimeListeners.push(listener);
+            originalAddListener?.(listener);
+          };
+          chromeStub.runtime.onMessage.removeListener = (listener) => {
+            const index = runtimeListeners.indexOf(listener);
+            if (index >= 0) {
+              runtimeListeners.splice(index, 1);
+            }
+            originalRemoveListener?.(listener);
+          };
+        }
+
+        chromeStub.runtime.sendMessage = async (msg: unknown) => {
+          const message = msg as { type?: string };
+
+          if (message?.type !== 'SCAN_START') {
+            return originalSendMessage(msg);
+          }
+
+          const batches = [
+            { connectorId: 'free-work', connectorName: 'Free-Work', offset: 0 },
+            { connectorId: 'lehibou', connectorName: 'LeHibou', offset: 20 },
+            { connectorId: 'hiway', connectorName: 'Hiway', offset: 40 },
+          ];
+
+          batches.forEach((batch, batchIndex) => {
+            window.setTimeout(
+              () => {
+                emitRuntimeMessage({
+                  type: 'SCAN_PARTIAL_RESULT',
+                  payload: {
+                    connectorId: batch.connectorId,
+                    connectorName: batch.connectorName,
+                    missions: Array.from({ length: 20 }, (_, index) =>
+                      makeMission(batch.offset + index, batch.connectorId)
+                    ),
+                  },
+                });
+              },
+              100 + batchIndex * 120
+            );
+          });
+
+          return new Promise((resolve) => {
+            window.setTimeout(() => {
+              resolve({
+                type: 'SCAN_COMPLETE',
+                payload: batches.flatMap((batch) =>
+                  Array.from({ length: 20 }, (_, index) =>
+                    makeMission(batch.offset + index, batch.connectorId)
+                  )
+                ),
+              });
+            }, 900);
+          });
+        };
+      },
+    });
+  });
+}
 
 test.describe('Performance - Virtual List', () => {
   test('renders large dataset efficiently', async ({ page }) => {
@@ -239,6 +383,24 @@ test.describe('Performance - Virtual List', () => {
 
     // Vérifier qu'on a des favoris affichés
     expect(await getDisplayedMissionCount(page)).toBeGreaterThan(0);
+  });
+
+  test('keeps feed stable while multiple partial scan batches arrive', async ({ page }) => {
+    await mockMultiBatchPartialScan(page);
+    await ensureFeedVisible(page);
+    await injectMissions(page, 120);
+    await expectMissionCount(page, 120, 5000);
+
+    await scanButton(page).click();
+
+    const pendingBanner = page.getByTestId('pending-missions-banner');
+    await expect(pendingBanner).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 120, 1000);
+
+    const searchInput = feedSearchInput(page);
+    await searchInput.fill('React');
+    await expect(searchInput).toHaveValue('React');
+    await expect(pendingBanner.getByRole('button', { name: /Afficher/ })).toBeEnabled();
   });
 
   test('maintains scroll position when filtering', async ({ page }) => {

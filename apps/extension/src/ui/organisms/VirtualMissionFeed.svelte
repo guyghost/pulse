@@ -19,6 +19,7 @@
     comparisonMissionIds = [],
     trackingByMissionId = new Map<string, MissionTracking>(),
     sortBy = 'score',
+    resetKey = '',
     filterActive = false,
     tourStep = null,
     onMissionSeen,
@@ -42,6 +43,7 @@
     comparisonMissionIds?: string[];
     trackingByMissionId?: Map<string, MissionTracking>;
     sortBy?: 'score' | 'date' | 'tjm';
+    resetKey?: string;
     filterActive?: boolean;
     tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onMissionSeen?: (id: string) => void;
@@ -65,29 +67,22 @@
   );
   const comparisonLimitReached = $derived(comparedIds.size >= 3);
 
-  // Sort missions
   const sortedMissions = $derived.by(() => {
     if (!missions || !Array.isArray(missions) || missions.length === 0) {
       return [];
     }
-    return [...missions].sort((a, b) => {
-      if (sortBy === 'date') {
-        return new Date(b.scrapedAt).getTime() - new Date(a.scrapedAt).getTime();
-      }
-      if (sortBy === 'tjm') {
-        return (b.tjm ?? 0) - (a.tjm ?? 0);
-      }
-      return (b.score ?? 0) - (a.score ?? 0);
-    });
+    return missions;
   });
 
   // Lazy loading: show only visibleCount missions, expand on scroll or click
   let visibleCount = $state(BATCH_SIZE);
+  let lastResetKey = $state(resetKey);
 
-  // Reset visible count when missions change (new scan, new filter)
   $effect(() => {
-    // Track missions array reference to detect changes
-    const _len = sortedMissions.length;
+    if (resetKey === lastResetKey) {
+      return;
+    }
+    lastResetKey = resetKey;
     visibleCount = BATCH_SIZE;
   });
 
@@ -150,14 +145,14 @@
     {/each}
   {:else if error && sortedMissions.length === 0}
     <OperationalEmptyState
-      title="Le feed ne peut pas être synchronisé"
+      title="Impossible de récupérer les missions"
       description={error}
       severity="critical"
       statusLabel="Incident"
       icon="triangle-alert"
       proofLabel="Résultat affiché"
       proofValue="0 mission"
-      primaryActionLabel="Réessayer"
+      primaryActionLabel="Réessayer le scan"
       primaryActionIcon="refresh-cw"
       secondaryActionLabel={filterActive ? 'Réinitialiser les filtres' : null}
       secondaryActionIcon="filter-x"
@@ -168,7 +163,7 @@
     {#if filterActive}
       <OperationalEmptyState
         title="Aucune mission ne correspond à cette décision"
-        description="Le système n’a pas trouvé d’opportunité dans le périmètre courant. La prochaine action utile est d’élargir les critères avant de rescanner."
+        description="Aucune mission ne correspond aux filtres actuels. Élargissez les critères avant de relancer un scan."
         severity="attention"
         statusLabel="Filtre trop strict"
         icon="filter-x"
@@ -183,8 +178,8 @@
       />
     {:else}
       <OperationalEmptyState
-        title="Le radar attend un premier signal"
-        description="Aucune mission exploitable n’est stockée. Lancez un scan pour transformer les sources connectées en file de décisions."
+        title="Lancez un premier scan pour voir vos missions"
+        description="Aucune mission n’est encore stockée. Lancez un scan pour récupérer les missions depuis vos sources connectées."
         severity="neutral"
         statusLabel="Aucune donnée"
         icon="radar"

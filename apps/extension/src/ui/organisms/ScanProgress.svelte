@@ -38,9 +38,9 @@
       case 'detecting':
         return 'Session';
       case 'fetching':
-        return 'Scrape';
+        return 'Collecte';
       case 'retrying':
-        return 'Retry';
+        return 'Nouvel essai';
       case 'done':
         return 'OK';
       case 'error':
@@ -76,7 +76,7 @@
     <div class="flex items-center justify-between gap-3 text-[11px] text-text-secondary">
       <p class="transition-opacity duration-300">
         {#if connectorName}
-          Scraping {connectorName}... ({current}/{total})
+          Collecte {connectorName}... ({current}/{total})
         {:else if missionsFound > 0}
           {missionsFound} mission{missionsFound > 1 ? 's' : ''} reperee{missionsFound > 1
             ? 's'

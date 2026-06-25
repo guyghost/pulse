@@ -117,6 +117,23 @@ export function initPerformanceMonitoring(): void {
     } catch {
       // FID non supporté
     }
+
+    // Long tasks — useful for feed freezes during large mission updates.
+    try {
+      const longTaskObserver = new PerformanceObserver((list) => {
+        for (const entry of list.getEntries()) {
+          metricsCollector.record({
+            name: 'main_thread.long_task',
+            value: Math.round(entry.duration),
+            unit: 'ms',
+            timestamp: Date.now(),
+          });
+        }
+      });
+      longTaskObserver.observe({ entryTypes: ['longtask'] });
+    } catch {
+      // Long Task API non supportée
+    }
   }
 
   // Navigation Timing

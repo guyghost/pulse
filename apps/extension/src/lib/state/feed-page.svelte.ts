@@ -55,6 +55,7 @@ import {
 } from '$lib/shell/utils/keyboard-shortcuts';
 import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 import { subscribeMessages } from '$lib/shell/messaging/bridge';
+import { sortMissions } from '$lib/core/scoring/sort-missions';
 
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
@@ -90,6 +91,14 @@ export interface FeedDecisionPreset {
   active: boolean;
 }
 
+interface FeedAggregates {
+  scoreDistribution: ScoreBucketSummary[];
+  decisionPresets: FeedDecisionPreset[];
+  dashboardSummary: FeedDashboardSummary;
+  insightSummary: FeedInsightSummary;
+  sourceMissionCounts: Map<string, number>;
+}
+
 function getMissionScore(mission: Mission): number {
   return mission.scoreBreakdown?.total ?? mission.score ?? 0;
 }
@@ -111,6 +120,7 @@ const SCORE_BUCKETS: Array<Omit<ScoreBucketSummary, 'count'>> = [
 ];
 
 const MAX_SAVED_VIEWS = 12;
+const SEEN_FLUSH_MS = 120;
 
 function toProfileImpactInput(profile: UserProfile | null): ProfileImpactInput {
   return {
@@ -213,6 +223,8 @@ export function createFeedPageState(
   let seenIds = $state<string[]>([]);
   let favorites = $state<Record<string, number>>({});
   let hidden = $state<Record<string, number>>({});
+  let pendingSeenIds = new Set<string>();
+  let seenFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
   // Cleanup functions
   let cleanupFns: Array<() => void> = [];
@@ -335,74 +347,114 @@ export function createFeedPageState(
     return result;
   });
 
-  const scoreDistribution = $derived.by(() => {
+  const feedAggregates = $derived.by<FeedAggregates>(() => {
     const counts = new Map<ScoreBucket, number>(
       SCORE_BUCKETS.map((bucket) => [bucket.bucket, 0] as const)
     );
-    for (const mission of dashboardScopeMissions) {
-      const bucket = getScoreBucket(getMissionScore(mission));
-      counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+    const sourceMissionCounts = new Map<string, number>();
+    let highScoreCount = 0;
+    let newCount = 0;
+    let priorityPresetCount = 0;
+    let remoteCompatiblePresetCount = 0;
+    let tjmNegotiationPresetCount = 0;
+    let newPresetCount = 0;
+    let strongStackCount = 0;
+    let weakTjmCount = 0;
+    let remoteMatchCount = 0;
+    let semanticAnalyzedCount = 0;
+
+    for (const mission of sourceCountBaseMissions) {
+      sourceMissionCounts.set(mission.source, (sourceMissionCounts.get(mission.source) ?? 0) + 1);
     }
-    return SCORE_BUCKETS.map((bucket) => ({
-      ...bucket,
-      count: counts.get(bucket.bucket) ?? 0,
-    }));
+
+    for (const mission of dashboardScopeMissions) {
+      const score = getMissionScore(mission);
+      const bucket = getScoreBucket(score);
+      counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
+
+      if (score >= 80) {
+        highScoreCount += 1;
+        priorityPresetCount += 1;
+      }
+      if (!seenSet.has(mission.id)) {
+        newCount += 1;
+        newPresetCount += 1;
+      }
+      if (isRemoteCompatibleInsight(mission)) {
+        remoteCompatiblePresetCount += 1;
+        remoteMatchCount += 1;
+      }
+      if (needsTjmNegotiation(mission, profileTjmMin)) {
+        tjmNegotiationPresetCount += 1;
+        weakTjmCount += 1;
+      }
+      if ((mission.scoreBreakdown?.criteria.stack ?? 0) >= 80) {
+        strongStackCount += 1;
+      }
+      if (
+        mission.scoreBreakdown
+          ? mission.scoreBreakdown.semantic !== null
+          : mission.semanticScore !== null
+      ) {
+        semanticAnalyzedCount += 1;
+      }
+    }
+
+    return {
+      scoreDistribution: SCORE_BUCKETS.map((bucket) => ({
+        ...bucket,
+        count: counts.get(bucket.bucket) ?? 0,
+      })),
+      decisionPresets: [
+        {
+          id: 'priority',
+          label: 'Prioritaires',
+          description: 'Score 80+',
+          count: priorityPresetCount,
+          active: decisionPreset === 'priority',
+        },
+        {
+          id: 'remote-compatible',
+          label: 'Remote compatible',
+          description: 'Full remote ou hybride',
+          count: remoteCompatiblePresetCount,
+          active: decisionPreset === 'remote-compatible',
+        },
+        {
+          id: 'tjm-negotiation',
+          label: 'TJM à négocier',
+          description: 'Sous le TJM cible',
+          count: tjmNegotiationPresetCount,
+          active: decisionPreset === 'tjm-negotiation',
+        },
+        {
+          id: 'new',
+          label: 'Nouvelles seulement',
+          description: 'Jamais vues',
+          count: newPresetCount,
+          active: decisionPreset === 'new',
+        },
+      ],
+      dashboardSummary: {
+        newCount,
+        highScoreCount,
+        favoriteCount,
+        visibleCount,
+      },
+      insightSummary: {
+        strongStackCount,
+        weakTjmCount,
+        remoteMatchCount,
+        semanticAnalyzedCount,
+      },
+      sourceMissionCounts,
+    };
   });
 
-  const decisionPresets = $derived.by<FeedDecisionPreset[]>(() => [
-    {
-      id: 'priority',
-      label: 'Prioritaires',
-      description: 'Score 80+',
-      count: dashboardScopeMissions.filter((m) => getMissionScore(m) >= 80).length,
-      active: decisionPreset === 'priority',
-    },
-    {
-      id: 'remote-compatible',
-      label: 'Remote compatible',
-      description: 'Full remote ou hybride',
-      count: dashboardScopeMissions.filter(isRemoteCompatibleInsight).length,
-      active: decisionPreset === 'remote-compatible',
-    },
-    {
-      id: 'tjm-negotiation',
-      label: 'TJM à négocier',
-      description: 'Sous le TJM cible',
-      count: dashboardScopeMissions.filter((m) => needsTjmNegotiation(m, profileTjmMin)).length,
-      active: decisionPreset === 'tjm-negotiation',
-    },
-    {
-      id: 'new',
-      label: 'Nouvelles seulement',
-      description: 'Jamais vues',
-      count: dashboardScopeMissions.filter((m) => !seenSet.has(m.id)).length,
-      active: decisionPreset === 'new',
-    },
-  ]);
-
-  const dashboardSummary = $derived.by(
-    (): FeedDashboardSummary => ({
-      newCount: dashboardScopeMissions.filter((m) => !seenSet.has(m.id)).length,
-      highScoreCount: dashboardScopeMissions.filter((m) => getMissionScore(m) >= 80).length,
-      favoriteCount,
-      visibleCount,
-    })
-  );
-
-  const insightSummary = $derived.by(
-    (): FeedInsightSummary => ({
-      strongStackCount: dashboardScopeMissions.filter(
-        (m) => (m.scoreBreakdown?.criteria.stack ?? 0) >= 80
-      ).length,
-      weakTjmCount: dashboardScopeMissions.filter((m) => {
-        return needsTjmNegotiation(m, profileTjmMin);
-      }).length,
-      remoteMatchCount: dashboardScopeMissions.filter(isRemoteCompatibleInsight).length,
-      semanticAnalyzedCount: dashboardScopeMissions.filter((m) =>
-        m.scoreBreakdown ? m.scoreBreakdown.semantic !== null : m.semanticScore !== null
-      ).length,
-    })
-  );
+  const scoreDistribution = $derived(feedAggregates.scoreDistribution);
+  const decisionPresets = $derived.by(() => feedAggregates.decisionPresets);
+  const dashboardSummary = $derived(feedAggregates.dashboardSummary);
+  const insightSummary = $derived(feedAggregates.insightSummary);
 
   const canSaveCurrentView = $derived(
     filterActive ||
@@ -414,19 +466,15 @@ export function createFeedPageState(
 
   const savedViewLimitReached = $derived(savedViews.length >= MAX_SAVED_VIEWS);
 
-  const sourceMissionCounts = $derived.by(() => {
-    const counts = new Map<string, number>();
-    for (const mission of sourceCountBaseMissions) {
-      counts.set(mission.source, (counts.get(mission.source) ?? 0) + 1);
-    }
-    return counts;
-  });
+  const sourceMissionCounts = $derived(feedAggregates.sourceMissionCounts);
 
   const displayMissions = $derived.by(() => {
-    if (selectedSource === null) {
-      return sourceCountBaseMissions;
-    }
-    return sourceCountBaseMissions.filter((m) => m.source === selectedSource);
+    const scopedMissions =
+      selectedSource === null
+        ? sourceCountBaseMissions
+        : sourceCountBaseMissions.filter((m) => m.source === selectedSource);
+
+    return sortMissions(scopedMissions, sortBy);
   });
 
   const comparisonMissions = $derived.by(() => {
@@ -438,18 +486,55 @@ export function createFeedPageState(
   });
 
   const visibleCount = $derived(displayMissions.length);
+  const missionListResetKey = $derived(
+    [
+      searchQuery.trim(),
+      sortBy,
+      selectedSource ?? '',
+      selectedRemote ?? '',
+      selectedSeniority ?? '',
+      selectedScoreBucket ?? '',
+      decisionPreset ?? '',
+      showNewOnly ? 'new' : 'all',
+      showFavoritesOnly ? 'favorites' : 'all-missions',
+      showHidden ? 'hidden' : 'visible',
+      selectedStacks.join('|'),
+    ].join('::')
+  );
 
   // ============================================================
   // Event handlers
   // ============================================================
 
-  function handleMissionSeen(missionId: string): void {
-    const ids = Array.from(seenIds);
-    if (ids.includes(missionId)) {
+  function flushSeenIds(): void {
+    if (pendingSeenIds.size === 0) {
       return;
     }
-    seenIds = markAsSeen(ids, [missionId]);
-    saveSeenIds(Array.from(seenIds)).catch(() => {});
+
+    const nextSeenIds = markAsSeen(Array.from(seenIds), [...pendingSeenIds]);
+    pendingSeenIds = new Set();
+    seenIds = nextSeenIds;
+    saveSeenIds(nextSeenIds).catch(() => {});
+  }
+
+  function scheduleSeenFlush(): void {
+    if (seenFlushTimer) {
+      return;
+    }
+
+    seenFlushTimer = setTimeout(() => {
+      seenFlushTimer = null;
+      flushSeenIds();
+    }, SEEN_FLUSH_MS);
+  }
+
+  function handleMissionSeen(missionId: string): void {
+    if (seenSet.has(missionId) || pendingSeenIds.has(missionId)) {
+      return;
+    }
+
+    pendingSeenIds = new Set(pendingSeenIds).add(missionId);
+    scheduleSeenFlush();
   }
 
   function handleToggleFavorite(id: string): void {
@@ -907,6 +992,11 @@ export function createFeedPageState(
     if (searchDebounceTimer) {
       clearTimeout(searchDebounceTimer);
     }
+    if (seenFlushTimer) {
+      clearTimeout(seenFlushTimer);
+      seenFlushTimer = null;
+    }
+    flushSeenIds();
     for (const fn of cleanupFns) {
       fn();
     }
@@ -1055,6 +1145,9 @@ export function createFeedPageState(
     },
     get visibleCount() {
       return visibleCount;
+    },
+    get missionListResetKey() {
+      return missionListResetKey;
     },
     get sourceMissionCounts() {
       return sourceMissionCounts;

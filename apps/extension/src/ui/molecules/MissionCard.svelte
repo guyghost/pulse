@@ -90,8 +90,8 @@
         label: 'Action recommandée',
         text:
           mission.tjm !== null
-            ? `Qualifier en priorité: score fort et TJM ${mission.tjm}€/j.`
-            : 'Qualifier en priorité: score fort, TJM à vérifier dans l’annonce.',
+            ? `À examiner en premier : score fort et TJM ${mission.tjm}€/j.`
+            : 'À examiner en premier : score fort, TJM à vérifier dans l’annonce.',
         tone: 'border-accent-green/20 bg-accent-green/8 text-accent-green',
       };
     }
@@ -99,7 +99,7 @@
     if ((mission.scoreBreakdown?.criteria.tjm ?? 100) < 60) {
       return {
         label: 'Point de vigilance',
-        text: 'TJM sous votre cible: gardez cette mission seulement si le contexte compense.',
+        text: 'TJM sous votre cible : gardez cette mission seulement si le contexte compense.',
         tone: 'border-status-orange/20 bg-status-orange/8 text-status-orange',
       };
     }
@@ -107,14 +107,14 @@
     if (scoreValue >= 60) {
       return {
         label: 'À comparer',
-        text: 'Potentiel correct: comparez avec les missions 80+ avant de postuler.',
+        text: 'Potentiel correct : comparez avec les missions 80+ avant de postuler.',
         tone: 'border-status-yellow/30 bg-status-yellow/12 text-status-orange',
       };
     }
 
     return {
       label: 'À qualifier',
-      text: 'Priorité faible: ouvrez seulement si la source ou le client est stratégique.',
+      text: 'Priorité faible : ouvrez seulement si la source ou le client est stratégique.',
       tone: 'border-border-light bg-page-canvas text-text-subtle',
     };
   });
@@ -350,7 +350,7 @@
               Score final {scoreDisplayValue}/100, calculé depuis le profil, l’annonce et les
               critères disponibles.
             {:else}
-              L’explication disponible vient du signal sémantique conservé localement.
+              L’explication disponible vient de l’analyse locale conservée sur l’appareil.
             {/if}
           </p>
         </div>
@@ -363,8 +363,8 @@
         {/if}
       </div>
       <p class="mt-2 text-[10px] leading-4 text-text-subtle">
-        Les critères sont des faits calculés. L'IA sémantique, quand elle existe, ajoute une
-        hypothèse locale et reste non bloquante.
+        Les critères sont calculés depuis l’annonce et votre profil. L’analyse locale, quand elle
+        existe, ajoute une hypothèse courte et reste facultative.
       </p>
 
       {#if mission.scoreBreakdown}

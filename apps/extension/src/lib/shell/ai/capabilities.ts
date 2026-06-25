@@ -1,6 +1,36 @@
 /// <reference types="./chrome-ai.d.ts" />
 
+import type { AILanguageModel, AILanguageModelSession, PromptLanguageModel } from './chrome-ai';
+
 export type AiAvailability = 'available' | 'after-download' | 'no';
+
+type PromptRuntime =
+  | {
+      kind: 'current';
+      model: PromptLanguageModel;
+    }
+  | {
+      kind: 'legacy';
+      model: AILanguageModel;
+    };
+
+const getPromptRuntime = (): PromptRuntime | null => {
+  const current = (globalThis as typeof globalThis & { LanguageModel?: PromptLanguageModel })
+    .LanguageModel;
+  if (typeof current?.availability === 'function' && typeof current.create === 'function') {
+    return { kind: 'current', model: current };
+  }
+
+  const legacyScope = globalThis as typeof globalThis & {
+    ai?: { languageModel?: AILanguageModel };
+  };
+  const legacy = legacyScope.ai?.languageModel;
+  if (typeof legacy?.capabilities === 'function' && typeof legacy.create === 'function') {
+    return { kind: 'legacy', model: legacy };
+  }
+
+  return null;
+};
 
 /**
  * Check if the Chrome built-in AI Prompt API is available.
@@ -12,13 +42,27 @@ export type AiAvailability = 'available' | 'after-download' | 'no';
  */
 export const isPromptApiAvailable = async (): Promise<AiAvailability> => {
   try {
-    const ai = self.ai;
-    if (!ai?.languageModel?.capabilities) {
+    const runtime = getPromptRuntime();
+    if (!runtime) {
       return 'no';
     }
 
-    const caps = await ai.languageModel.capabilities();
+    if (runtime.kind === 'current') {
+      const availability = await runtime.model.availability({
+        expectedInputs: [{ type: 'text', languages: ['fr'] }],
+        expectedOutputs: [{ type: 'text', languages: ['fr'] }],
+      });
 
+      if (availability === 'available') {
+        return 'available';
+      }
+      if (availability === 'downloadable' || availability === 'downloading') {
+        return 'after-download';
+      }
+      return 'no';
+    }
+
+    const caps = await runtime.model.capabilities();
     if (caps.available === 'readily') {
       return 'available';
     }
@@ -29,4 +73,13 @@ export const isPromptApiAvailable = async (): Promise<AiAvailability> => {
   } catch {
     return 'no';
   }
+};
+
+export const createPromptSession = async (): Promise<AILanguageModelSession> => {
+  const runtime = getPromptRuntime();
+  if (!runtime) {
+    throw new Error('Prompt API unavailable');
+  }
+
+  return runtime.model.create();
 };

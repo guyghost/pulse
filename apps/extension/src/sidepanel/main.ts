@@ -5,6 +5,8 @@ import { mount } from 'svelte';
 async function init() {
   if (import.meta.env.DEV) {
     const { bootstrapDevMode } = await import('../dev/index');
+    const { initPerformanceMonitoring } = await import('../lib/shell/metrics');
+    initPerformanceMonitoring();
     await bootstrapDevMode();
   }
 
