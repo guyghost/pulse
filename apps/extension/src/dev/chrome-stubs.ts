@@ -9,6 +9,8 @@ import {
   type ConnectedAlertPreferences,
 } from '$lib/core/types/alert-preferences';
 import { createInitialHealthSnapshot, type ConnectorHealthSnapshot } from '$lib/core/types/health';
+import { scoreMission } from '$lib/core/scoring/relevance';
+import { buildScoreBreakdown } from '$lib/core/scoring/final-score';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
@@ -150,6 +152,35 @@ function createChromeStubs() {
             console.log('[Chrome Stub] Profile saved:', message.payload);
             storage.profile = message.payload;
             writeDevStorage(DEV_PROFILE_STORAGE_KEY, message.payload);
+
+            // Mirror the production service worker (background/index.ts SAVE_PROFILE):
+            // rescore stored missions against the new profile and broadcast the
+            // updated scores so the feed reflects the change in dev mode.
+            try {
+              const profile = message.payload as UserProfile;
+              const missions = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions);
+              const now = new Date();
+              const rescored: Mission[] = missions.map((mission): Mission => {
+                const result = scoreMission(mission, profile, now);
+                return {
+                  ...mission,
+                  scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),
+                  score: result.total,
+                  semanticScore: null,
+                  semanticReason: null,
+                };
+              });
+              writeDevStorage(DEV_MISSIONS_STORAGE_KEY, rescored);
+              emitRuntimeMessage({
+                type: 'MISSIONS_UPDATED',
+                payload: rescored.map(serializeMissionForBridge),
+              });
+            } catch (err) {
+              if (import.meta.env.DEV) {
+                console.warn('[Chrome Stub] Profile rescore failed:', err);
+              }
+            }
+
             emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: message.payload });
             return { type: 'PROFILE_RESULT', payload: message.payload };
           case 'GET_PREMIUM_STATUS':

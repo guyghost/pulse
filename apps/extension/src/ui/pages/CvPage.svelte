@@ -4,6 +4,7 @@
   import type { ProfileFieldComparison } from '$lib/core/profile/profile-sync';
   import { getConnectorsMeta, openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { getProfile } from '$lib/shell/facades/settings.facade';
+  import { subscribeMessages } from '$lib/shell/messaging/bridge';
   import {
     previewLinkedInProfile,
     syncLinkedInProfileImport,
@@ -515,6 +516,18 @@
   })().catch(async () => {
     isLoading = false;
     await showToast('Impossible de charger le profil CV', 'error');
+  });
+
+  $effect(() => {
+    const unsubscribe = subscribeMessages((message) => {
+      if (message.type === 'PROFILE_UPDATED') {
+        void (async () => {
+          profile = await getProfile();
+        })();
+      }
+    });
+
+    return unsubscribe;
   });
 </script>
 
