@@ -75,11 +75,6 @@
     new Set(['title', 'summary', 'stack', 'location', 'remote', 'tjm'])
   );
 
-  const profileUrls: Record<string, string> = {
-    'cherry-pick': 'https://app.cherry-pick.io/candidates/41085',
-    collective: 'https://app.collective.work/collective/guy-mandina-nzeza/profile?tab=1',
-  };
-
   const platforms: ProfilePlatform[] = [
     {
       id: 'linkedin',
@@ -94,8 +89,8 @@
       id: connector.id,
       name: connector.name,
       icon: connector.icon,
-      profileUrl: profileUrls[connector.id] ?? connector.url,
-      verificationUrl: profileUrls[connector.id] ?? connector.url,
+      profileUrl: connector.url,
+      verificationUrl: connector.url,
       kind: 'connector' as const,
       writeMode: 'manual' as const,
     })),

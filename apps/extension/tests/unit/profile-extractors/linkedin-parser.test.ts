@@ -8,7 +8,7 @@ describe('linkedin profile parser', () => {
   it('normalizes a sanitized LinkedIn profile payload into a canonical CV draft', () => {
     const result = parseLinkedInProfilePayload({
       source: 'linkedin',
-      profileUrl: 'https://www.linkedin.com/in/guy-mandina/',
+      profileUrl: 'https://www.linkedin.com/in/example-profile/',
       capturedAt,
       sections: {
         headline: 'Lead Frontend Svelte / TypeScript',
@@ -47,7 +47,7 @@ describe('linkedin profile parser', () => {
       summary: 'Consultant frontend senior.\nDesign systems et extensions Chrome.',
       source: 'linkedin',
       capturedAt: '2026-05-22T08:00:00.000Z',
-      profileUrl: 'https://www.linkedin.com/in/guy-mandina/',
+      profileUrl: 'https://www.linkedin.com/in/example-profile/',
       confidence: 1,
     });
     expect(result.value.experiences).toEqual([

@@ -1,0 +1,56 @@
+name: Bug report
+description: Report a reproducible MissionPulse bug
+title: 'bug: '
+labels: ['bug', 'needs-triage']
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include cookies, session tokens, personal profile URLs, or private mission data.
+  - type: textarea
+    id: summary
+    attributes:
+      label: Summary
+      description: What happened?
+    validations:
+      required: true
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to reproduce
+      description: List the smallest reliable reproduction.
+      placeholder: |
+        1. Open...
+        2. Click...
+        3. See...
+    validations:
+      required: true
+  - type: textarea
+    id: expected
+    attributes:
+      label: Expected behavior
+    validations:
+      required: true
+  - type: dropdown
+    id: area
+    attributes:
+      label: Area
+      options:
+        - Extension
+        - Landing
+        - Dashboard
+        - Connector
+        - Documentation
+        - CI/CD
+    validations:
+      required: true
+  - type: input
+    id: browser
+    attributes:
+      label: Browser
+      placeholder: 'Chrome 126, Brave, Edge...'
+  - type: textarea
+    id: logs
+    attributes:
+      label: Logs or screenshots
+      description: Redact private data before attaching logs or screenshots.

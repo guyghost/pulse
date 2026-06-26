@@ -10,9 +10,13 @@
 pulse/
 ├── apps/
 │   ├── extension/     # Extension Chrome (Svelte 5 + Vite + MV3)
-│   └── landing/       # Landing page statique (missionpulse.app)
+│   ├── landing/       # Landing page statique (missionpulse.app)
+│   └── dashboard/     # Dashboard connecte optionnel
 ├── packages/
-│   └── tsconfig/      # Shared TypeScript config
+│   ├── design/        # Tokens et reference design system
+│   ├── domain/        # Types et logique metier partagee
+│   ├── tsconfig/      # Shared TypeScript config
+│   └── ui/            # Composants UI partages
 ├── turbo.json         # Turborepo pipeline
 └── pnpm-workspace.yaml
 ```
@@ -60,7 +64,7 @@ pulse/
 # Prérequis: Node.js >= 22, pnpm >= 10
 pnpm install
 pnpm dev:local    # Supabase local + variables .env.local + dev servers
-pnpm test         # 1156 tests unitaires
+pnpm test         # Tests unitaires
 pnpm build        # Build extension
 ```
 
@@ -74,7 +78,7 @@ pnpm build        # Build extension
 | Language   | TypeScript (strict)                        | ^5.x    |
 | Build      | Vite + @crxjs/vite-plugin                  | ^6.x    |
 | Monorepo   | Turborepo                                  | ^2.x    |
-| Testing    | Vitest (1156 tests) + Playwright           | latest  |
+| Testing    | Vitest + Playwright                        | latest  |
 | Runtime    | Chrome Extension Manifest V3               | MV3     |
 | IA         | Gemini Nano (Chrome built-in AI)           | —       |
 | Validation | Zod                                        | ^3.23   |
@@ -137,7 +141,7 @@ pnpm dev:env                # Écrit apps/landing/.env.local et apps/dashboard/.
 pnpm supabase:status        # Affiche les URLs/keys locales
 pnpm supabase:reset         # Rejoue les migrations + supabase/seed.sql
 pnpm supabase:stop          # Arrête la stack Supabase
-pnpm test                   # 1156 tests unitaires
+pnpm test                   # Tests unitaires
 pnpm test:watch             # Watch mode
 pnpm test:coverage          # Coverage (seuil 70% sur core/)
 pnpm test:e2e               # Playwright E2E
@@ -156,6 +160,14 @@ injecte pas encore toutes depuis `apps/landing/supabase/config.toml`.
 ### Dev Panel
 
 **Ctrl+Shift+D** ouvre le panneau de dev : injection de missions mock, toggle états, logs bridge.
+
+## Documentation
+
+- [Index documentation](./docs/README.md)
+- [Architecture Decisions](./docs/adr/README.md)
+- [CI/CD](./docs/CI-CD.md)
+- [Privacy Policy](./docs/privacy-policy.md)
+- [Open Source Readiness](./docs/open-source-readiness.md)
 
 ## Chrome Web Store
 
@@ -185,6 +197,7 @@ apps/extension/store-assets/
 - **Svelte 5 only** : runes, pas de stores, pas de Svelte 4
 - **TypeScript strict** : pas de `any`
 - **Tests** : toute feature core a ses tests purs (sans mocks)
+- **Guide contributeur** : [`.github/CONTRIBUTING.md`](./.github/CONTRIBUTING.md)
 
 ## License
 
