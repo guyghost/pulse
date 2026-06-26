@@ -115,9 +115,7 @@ export const MissionSerializedSchema = z.object({
 
 export const UserProfileSchema = z
   .object({
-    firstName: z
-      .string()
-      .max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
+    firstName: z.string().max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
     stack: z
       .array(z.string().min(1, 'Chaque compétence doit être non vide'))
       .max(20, 'Maximum 20 compétences'),

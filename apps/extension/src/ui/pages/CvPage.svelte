@@ -522,7 +522,11 @@
     const unsubscribe = subscribeMessages((message) => {
       if (message.type === 'PROFILE_UPDATED') {
         void (async () => {
-          profile = await getProfile();
+          try {
+            profile = await getProfile();
+          } catch {
+            await showToast('Impossible de charger le profil CV', 'error');
+          }
         })();
       }
     });

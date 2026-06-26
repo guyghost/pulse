@@ -61,19 +61,21 @@ export const appLifecycleMachine = setup({
     input: {} as AppLifecycleInput,
   },
   actors: {
-    bootstrap: fromPromise(async ({ input }: { input: AppLifecycleDeps }): Promise<BootstrapResult> => {
-      const profile = await input.loadProfile();
-      if (profile) {
-        return { profile, firstScanDone: false, onboardingCompleted: true };
+    bootstrap: fromPromise(
+      async ({ input }: { input: AppLifecycleDeps }): Promise<BootstrapResult> => {
+        const profile = await input.loadProfile();
+        if (profile) {
+          return { profile, firstScanDone: false, onboardingCompleted: true };
+        }
+
+        const [firstScanDone, onboardingCompleted] = await Promise.all([
+          input.getFirstScanDone(),
+          input.getOnboardingCompleted(),
+        ]);
+
+        return { profile: null, firstScanDone, onboardingCompleted };
       }
-
-      const [firstScanDone, onboardingCompleted] = await Promise.all([
-        input.getFirstScanDone(),
-        input.getOnboardingCompleted(),
-      ]);
-
-      return { profile: null, firstScanDone, onboardingCompleted };
-    }),
+    ),
   },
   actions: {
     setBootstrapping: assign({

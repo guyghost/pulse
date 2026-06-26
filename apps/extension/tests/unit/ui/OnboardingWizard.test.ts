@@ -110,8 +110,9 @@ describe('OnboardingWizard', () => {
     target.querySelector('#ob-jobtitle')?.dispatchEvent(new Event('input', { bubbles: true }));
     (target.querySelector('#ob-stack') as HTMLInputElement).value = 'React';
     target.querySelector('#ob-stack')?.dispatchEvent(new Event('input', { bubbles: true }));
-    (target.querySelector('button[aria-label="Ajouter la stack technique"]') as HTMLButtonElement)
-      .click();
+    (
+      target.querySelector('button[aria-label="Ajouter la stack technique"]') as HTMLButtonElement
+    ).click();
     (target.querySelector('#ob-location') as HTMLInputElement).value = ' Paris ';
     target.querySelector('#ob-location')?.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();

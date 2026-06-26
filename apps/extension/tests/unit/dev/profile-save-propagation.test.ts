@@ -17,9 +17,7 @@ import type { UserProfile } from '../../../src/lib/core/types/profile';
  * `PROFILE_UPDATED` message AND a `MISSIONS_UPDATED` message — otherwise the
  * feed keeps stale relevance scores.
  *
- * The rescore/MISSIONS_UPDATED emission is implemented by the sibling branch
- * `fix/profile-dev-rescore` (which owns `src/dev/chrome-stubs.ts`). Until that
- * branch is merged, this test is expected to be RED (TDD).
+ * The rescore/MISSIONS_UPDATED emission is implemented in `src/dev/chrome-stubs.ts`.
  */
 describe('dev chrome stub — SAVE_PROFILE propagation', () => {
   // Distinctive stack so a profile-influenced rescore is observable.

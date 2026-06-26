@@ -637,7 +637,8 @@
             Synchroniser et enrichir
           </h3>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Le dashboard connecté et l’analyse locale restent optionnels, mais clarifient le pilotage.
+            Le dashboard connecté et l’analyse locale restent optionnels, mais clarifient le
+            pilotage.
           </p>
         </div>
       </div>

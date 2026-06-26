@@ -79,8 +79,7 @@
     },
     {
       title: 'Relancer l’analyse',
-      description:
-        'Transformer les missions stockées et votre fourchette en recommandation TJM.',
+      description: 'Transformer les missions stockées et votre fourchette en recommandation TJM.',
       icon: 'refresh-cw',
       actionLabel: 'Réessayer',
       action: onRetry,
