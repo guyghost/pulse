@@ -73,7 +73,9 @@ const readCacheIndex = async (): Promise<string[]> => {
     return [];
   }
 
-  return rawIndex.filter((key): key is string => typeof key === 'string' && isSemanticCacheKey(key));
+  return rawIndex.filter(
+    (key): key is string => typeof key === 'string' && isSemanticCacheKey(key)
+  );
 };
 
 const writeCacheIndex = async (keys: string[]): Promise<void> => {

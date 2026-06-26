@@ -282,9 +282,7 @@
     </section>
   {:else if currentStep === 'activity'}
     <section class="rounded-xl border border-border-light bg-surface-white p-4">
-      <p class="text-sm font-semibold text-text-primary">
-        Le premier scan classera vos missions
-      </p>
+      <p class="text-sm font-semibold text-text-primary">Le premier scan classera vos missions</p>
       <div class="mt-3 space-y-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
           <p class="text-xs font-medium text-text-primary">Mission prioritaire détectée</p>

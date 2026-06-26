@@ -50,7 +50,8 @@ export const profileMachine = setup({
     ),
   },
   guards: {
-    hasLoadedProfile: ({ event }) => event.type === 'xstate.done.actor.loadProfile' && !!event.output,
+    hasLoadedProfile: ({ event }) =>
+      event.type === 'xstate.done.actor.loadProfile' && !!event.output,
     hasDraft: ({ context }) => !!context.draft,
   },
   actions: {
@@ -87,7 +88,8 @@ export const profileMachine = setup({
     }),
     setError: assign({
       error: ({ event }) =>
-        event.type === 'xstate.error.actor.loadProfile' || event.type === 'xstate.error.actor.saveProfile'
+        event.type === 'xstate.error.actor.loadProfile' ||
+        event.type === 'xstate.error.actor.saveProfile'
           ? errorMessage(event.error)
           : 'Erreur profil',
     }),
