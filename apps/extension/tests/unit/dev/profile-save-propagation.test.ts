@@ -46,7 +46,12 @@ describe('dev chrome stub — SAVE_PROFILE propagation', () => {
     delete globalRecord.chrome;
     // Dev missions/profile are persisted to localStorage by the stub; reset so
     // the default mock missions are used as the rescore source.
-    window.localStorage.clear();
+    try {
+      window.localStorage?.clear();
+    } catch {
+      // Some Node/jsdom combinations expose no usable localStorage. The dev
+      // stub already falls back to mock data in that case.
+    }
 
     installChromeStubs();
 

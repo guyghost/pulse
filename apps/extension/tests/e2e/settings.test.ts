@@ -61,9 +61,17 @@ test.describe('Settings Flow', () => {
     await profileSection.locator('#stack-input').fill('Svelte Save');
     await profileSection.getByRole('button', { name: 'Enregistrer le profil' }).click();
 
+    await navButton(page, 'Feed').click();
+    await navButton(page, 'Profil').click();
+
+    const returnedProfileSection = page
+      .locator('.section-card')
+      .filter({ hasText: 'Vos informations' });
     await expect(profileSection.locator('input[placeholder="Prénom"]')).not.toBeVisible();
-    await expect(profileSection.getByText('Non renseigné — Architecte Svelte')).toBeVisible();
-    await expect(profileSection.getByText('Svelte Save')).toBeVisible();
+    await expect(
+      returnedProfileSection.getByText('Non renseigné — Architecte Svelte')
+    ).toBeVisible();
+    await expect(returnedProfileSection.getByText('Svelte Save')).toBeVisible();
 
     await page.reload();
     await expectFeedReady(page);

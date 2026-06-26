@@ -1,6 +1,7 @@
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+
+import { listFiles } from '../helpers/files';
 
 const privateServerEnvNames = [
   'SUPABASE_SERVICE_ROLE_KEY',
@@ -31,18 +32,14 @@ describe('secret exposure guards', () => {
   });
 
   it('does not reference private server variables from extension source', () => {
-    const matches = execSync(
-      `rg --fixed-strings --line-number ${privateServerEnvNames
-        .map((name) => `-e ${name}`)
-        .join(' ')} src || true`,
-      {
-        cwd: process.cwd(),
-        encoding: 'utf8',
-      }
-    )
-      .trim()
-      .split('\n')
-      .filter(Boolean);
+    const matches = listFiles(['src']).flatMap((file) => {
+      const lines = readFileSync(file, 'utf8').split('\n');
+
+      return lines.flatMap((line, index) => {
+        const envName = privateServerEnvNames.find((name) => line.includes(name));
+        return envName ? [`${file}:${index + 1}:${envName}`] : [];
+      });
+    });
 
     expect(matches).toEqual([]);
   });

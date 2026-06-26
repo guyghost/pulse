@@ -1,15 +1,10 @@
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
 
+import { listFiles } from '../helpers/files';
+
 function listSvelteUiFiles(): string[] {
-  return execSync("rg --files src/ui src/sidepanel -g '*.svelte'", {
-    cwd: process.cwd(),
-    encoding: 'utf8',
-  })
-    .trim()
-    .split('\n')
-    .filter(Boolean);
+  return listFiles(['src/ui', 'src/sidepanel'], { extensions: ['.svelte'] });
 }
 
 function lineForOffset(source: string, offset: number): number {
@@ -287,9 +282,11 @@ describe('operational UI constraints', () => {
   it('keeps Profile story CTAs aligned with edit/save state', () => {
     const source = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
 
-    expect(source).toContain(
-      "primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil'"
-    );
+    expect(source).toContain('primaryActionLabel: settings.isSavingProfile');
+    expect(source).toContain("? 'Sauvegarde...'");
+    expect(source).toContain("? 'Enregistrer'");
+    expect(source).toContain(": 'Modifier le profil'");
+    expect(source).toContain('if (settings.isSavingProfile)');
     expect(source).not.toContain("primaryActionLabel: 'Enregistrer le profil'");
   });
 

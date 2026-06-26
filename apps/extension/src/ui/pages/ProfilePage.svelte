@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import ProfileSection from '../organisms/ProfileSection.svelte';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
@@ -23,6 +24,7 @@
   });
 
   settings.load();
+  onDestroy(() => settings.destroy());
 
   const profileCompletionItems = $derived.by(() => {
     return buildProfileImpactItems({
@@ -105,7 +107,11 @@
         description:
           'Les critères essentiels sont renseignés. Gardez ce profil de référence à jour avant de comparer les missions prioritaires.',
         evidence,
-        primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil',
+        primaryActionLabel: settings.isSavingProfile
+          ? 'Sauvegarde...'
+          : settings.editingProfile
+            ? 'Enregistrer'
+            : 'Modifier le profil',
         primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
       };
     }
@@ -117,12 +123,19 @@
       description:
         'Les champs manquants réduisent la précision des requêtes et des suggestions de candidature.',
       evidence,
-      primaryActionLabel: settings.editingProfile ? 'Enregistrer' : 'Modifier le profil',
+      primaryActionLabel: settings.isSavingProfile
+        ? 'Sauvegarde...'
+        : settings.editingProfile
+          ? 'Enregistrer'
+          : 'Modifier le profil',
       primaryActionIcon: settings.editingProfile ? 'save' : 'pencil',
     };
   });
 
   async function handleSave() {
+    if (settings.isSavingProfile) {
+      return;
+    }
     await settings.saveProfile();
     if (!settings.profileError) {
       await showToast('Profil mis à jour', 'success');
@@ -213,6 +226,9 @@
         primaryActionLabel={profileStory.primaryActionLabel}
         primaryActionIcon={profileStory.primaryActionIcon}
         onPrimaryAction={() => {
+          if (settings.isSavingProfile) {
+            return;
+          }
           if (settings.editingProfile) {
             handleSave();
             return;
@@ -307,6 +323,7 @@
       bind:searchKeywords={settings.searchKeywords}
       bind:keywordInput={settings.keywordInput}
       editing={settings.editingProfile}
+      isSaving={settings.isSavingProfile}
       profileSaved={settings.profileSaved}
       profileError={settings.profileError}
       onToggleEdit={() => settings.toggleProfileEditing()}

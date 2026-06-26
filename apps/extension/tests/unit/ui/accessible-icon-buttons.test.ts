@@ -1,6 +1,7 @@
-import { execSync } from 'node:child_process';
 import { readFileSync } from 'node:fs';
 import { describe, expect, it } from 'vitest';
+
+import { listFiles } from '../helpers/files';
 
 function stripScriptAndStyle(source: string): string {
   return source.replace(/<script[\s\S]*?<\/script>/g, '').replace(/<style[\s\S]*?<\/style>/g, '');
@@ -23,13 +24,7 @@ function hasAccessibleName(buttonMarkup: string): boolean {
 
 describe('icon button accessibility', () => {
   it('gives every icon-only button an accessible name', () => {
-    const files = execSync("rg --files src/ui src/sidepanel -g '*.svelte'", {
-      cwd: process.cwd(),
-      encoding: 'utf8',
-    })
-      .trim()
-      .split('\n')
-      .filter(Boolean);
+    const files = listFiles(['src/ui', 'src/sidepanel'], { extensions: ['.svelte'] });
 
     const violations: string[] = [];
 

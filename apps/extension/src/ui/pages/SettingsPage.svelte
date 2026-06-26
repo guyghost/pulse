@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { onDestroy } from 'svelte';
   import { Button } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import type { IconName } from '@pulse/ui';
@@ -109,6 +110,7 @@
   ];
 
   settings.load();
+  onDestroy(() => settings.destroy());
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let isSavingAlertPreferences = $state(false);
   let favoriteExportCount = $state(0);

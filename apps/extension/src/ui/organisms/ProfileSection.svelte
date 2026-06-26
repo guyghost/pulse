@@ -20,6 +20,7 @@
     searchKeywords = $bindable([]),
     keywordInput = $bindable(''),
     editing,
+    isSaving = false,
     profileSaved,
     profileError,
     onToggleEdit,
@@ -41,10 +42,11 @@
     searchKeywords: string[];
     keywordInput: string;
     editing: boolean;
+    isSaving?: boolean;
     profileSaved: boolean;
     profileError: string | null;
     onToggleEdit: () => void;
-    onSave: () => void;
+    onSave: () => void | Promise<void>;
     onAddStack: () => void;
     onRemoveStack: (tech: string) => void;
     onAddKeyword: () => void;
@@ -87,6 +89,7 @@
         class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
         onclick={onToggleEdit}
         aria-label={editing ? 'Annuler la modification du profil' : 'Modifier mes critères'}
+        disabled={isSaving}
       >
         <Icon name={editing ? 'x' : 'edit-2'} size={13} />
       </button>
@@ -236,8 +239,10 @@
       </div>
 
       <div class="pt-1">
-        <Button variant="secondary" onclick={onSave}>
-          {#snippet children()}{profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}{/snippet}
+        <Button variant="secondary" onclick={onSave} loading={isSaving}>
+          {#snippet children()}
+            {isSaving ? 'Sauvegarde...' : profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}
+          {/snippet}
         </Button>
       </div>
       {#if profileError}

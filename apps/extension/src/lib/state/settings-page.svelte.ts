@@ -33,7 +33,7 @@ import {
   getMissions,
   openExternalUrl,
 } from '$lib/shell/facades/feed-data.facade';
-import { sendMessage } from '$lib/shell/messaging/bridge';
+import { sendMessage, subscribeMessages } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
 import { getPremium } from '$lib/shell/facades/premium.facade';
@@ -84,6 +84,8 @@ const exportFormatLabels: Record<ExportFormat, string> = {
 };
 
 export class SettingsPageController {
+  private readonly unsubscribeProfileMessages = this.subscribeProfileMessages();
+
   private readonly profileActor = createSvelteActor(profileMachine, {
     input: {
       deps: {
@@ -144,6 +146,22 @@ export class SettingsPageController {
 
   constructor(private readonly options: SettingsPageControllerOptions = {}) {}
 
+  private subscribeProfileMessages(): () => void {
+    try {
+      return subscribeMessages((message) => {
+        if (message.type === 'PROFILE_UPDATED') {
+          this.applyProfile(message.payload);
+        }
+      });
+    } catch {
+      return () => {};
+    }
+  }
+
+  destroy(): void {
+    this.unsubscribeProfileMessages();
+  }
+
   get profileStatus(): ProfileStatus {
     return String(this.profileActor.snapshot.value) as ProfileStatus;
   }
@@ -177,19 +195,23 @@ export class SettingsPageController {
         return;
       }
 
-      this.firstName = profile.firstName ?? '';
-      this.jobTitle = profile.jobTitle ?? '';
-      this.profileLocation = profile.location ?? '';
-      this.profileRemote = profile.remote ?? 'any';
-      this.seniority = profile.seniority ?? 'senior';
-      this.tjmMin = profile.tjmMin ?? 0;
-      this.tjmMax = profile.tjmMax ?? 0;
-      this.profileStack = profile.stack ?? [];
-      this.searchKeywords = profile.searchKeywords ?? [];
-      this.profileActor.send({ type: 'PROFILE_UPDATED', profile });
+      this.applyProfile(profile);
     } catch {
       // Hors contexte extension
     }
+  }
+
+  private applyProfile(profile: UserProfile): void {
+    this.firstName = profile.firstName ?? '';
+    this.jobTitle = profile.jobTitle ?? '';
+    this.profileLocation = profile.location ?? '';
+    this.profileRemote = profile.remote ?? 'any';
+    this.seniority = profile.seniority ?? 'senior';
+    this.tjmMin = profile.tjmMin ?? 0;
+    this.tjmMax = profile.tjmMax ?? 0;
+    this.profileStack = profile.stack ?? [];
+    this.searchKeywords = profile.searchKeywords ?? [];
+    this.profileActor.send({ type: 'PROFILE_UPDATED', profile });
   }
 
   async loadAiAvailability(): Promise<void> {
@@ -420,11 +442,15 @@ export class SettingsPageController {
   private submitProfile(profile: UserProfile): Promise<void> {
     return new Promise((resolve, reject) => {
       let settled = false;
+      let sawSaving = this.profileActor.snapshot.matches('saving');
       const unsubscribe = this.profileActor.subscribe((snapshot) => {
         if (settled) {
           return;
         }
-        if (snapshot.matches('ready') && snapshot.context.current) {
+        if (snapshot.matches('saving')) {
+          sawSaving = true;
+        }
+        if (sawSaving && snapshot.matches('ready') && snapshot.context.current) {
           settled = true;
           unsubscribe();
           resolve();

@@ -73,9 +73,24 @@ export function withStore<T>(
     return new Promise<T>((resolve, reject) => {
       const tx = db.transaction(storeName, mode);
       const store = tx.objectStore(storeName);
+      let result: T | undefined;
       const request = fn(store);
-      request.onsuccess = () => resolve(request.result as T);
+      request.onsuccess = () => {
+        result = request.result as T;
+      };
       request.onerror = () => reject(request.error);
+      tx.oncomplete = () => {
+        db.close();
+        resolve(result as T);
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+      tx.onabort = () => {
+        db.close();
+        reject(tx.error);
+      };
     });
   });
 }
