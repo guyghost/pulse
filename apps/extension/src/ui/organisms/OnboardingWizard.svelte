@@ -375,7 +375,7 @@
       id="ob-firstname"
       type="text"
       class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
-      placeholder="ex: Guy"
+      placeholder="ex: Camille"
       bind:value={firstName}
     />
   </div>

@@ -1,6 +1,15 @@
+/.DS_Store
 node_modules/
 dist/
 .vite/
+playwright-report/
+blob-report/
+*.zip
+*.crx
+*.pem
+*.key
+*.p12
+*.mobileprovision
 *.local
 output/
 .superset/
@@ -17,6 +26,8 @@ coverage/
 .conductor/
 .svelte-kit/
 .env
+.env.*
+!.env.example
 
 # DAO governance state
 .dao/

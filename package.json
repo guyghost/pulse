@@ -1,8 +1,22 @@
 {
   "name": "pulse",
   "version": "0.2.2",
+  "description": "MissionPulse monorepo: Chrome extension, landing page, dashboard, and shared packages.",
   "private": true,
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/guyghost/pulse.git"
+  },
+  "bugs": {
+    "url": "https://github.com/guyghost/pulse/issues"
+  },
+  "homepage": "https://github.com/guyghost/pulse#readme",
   "packageManager": "pnpm@10.32.1",
+  "engines": {
+    "node": ">=22",
+    "pnpm": ">=10"
+  },
   "scripts": {
     "dev": "turbo dev",
     "dev:local": "pnpm supabase:start && pnpm dev:env && pnpm dev",
@@ -42,6 +56,6 @@
     "lint-staged": "^16.4.0",
     "simple-git-hooks": "^2.13.1",
     "supabase": "^2.101.0",
-    "turbo": "^2.0.0"
+    "turbo": "^2.10.0"
   }
 }
