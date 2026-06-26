@@ -2,6 +2,7 @@ import { mockProfile, mockMissions, generateMockTJMHistory } from './mocks';
 import { analyzeTJMHistory } from '$lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
 import type { Mission, MissionSource } from '$lib/core/types/mission';
+import type { UserProfile } from '$lib/core/types/profile';
 import {
   DEFAULT_CONNECTED_ALERT_PREFERENCES,
   normalizeConnectedAlertPreferences,
@@ -13,6 +14,7 @@ const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
 const DEV_SAVED_VIEWS_STORAGE_KEY = '__missionpulse_dev_saved_views';
 const DEV_ALERT_PREFERENCES_STORAGE_KEY = '__missionpulse_dev_alert_preferences';
+const DEV_PROFILE_STORAGE_KEY = '__missionpulse_dev_profile';
 
 type RuntimeMessage = { type: string; payload?: unknown };
 type RuntimeMessageListener = (
@@ -94,7 +96,7 @@ const storage: Record<string, unknown> = {
   ),
   newMissionCount: 0,
   feedSortBy: 'score',
-  profile: mockProfile,
+  profile: readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile),
   premium_enabled: true,
   first_scan_done: true,
   profile_banner_dismissed: false,
@@ -147,6 +149,7 @@ function createChromeStubs() {
           case 'SAVE_PROFILE':
             console.log('[Chrome Stub] Profile saved:', message.payload);
             storage.profile = message.payload;
+            writeDevStorage(DEV_PROFILE_STORAGE_KEY, message.payload);
             emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: message.payload });
             return { type: 'PROFILE_RESULT', payload: message.payload };
           case 'GET_PREMIUM_STATUS':

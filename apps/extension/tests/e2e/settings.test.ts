@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ensureFeedVisible, navButton } from './helpers';
+import { ensureFeedVisible, expectFeedReady, navButton } from './helpers';
 
 test.describe('Settings Flow', () => {
   test('navigates to settings without the profile editor section', async ({ page }) => {
@@ -64,6 +64,18 @@ test.describe('Settings Flow', () => {
     await expect(profileSection.locator('input[placeholder="Prénom"]')).not.toBeVisible();
     await expect(profileSection.getByText('Non renseigné — Architecte Svelte')).toBeVisible();
     await expect(profileSection.getByText('Svelte Save')).toBeVisible();
+
+    await page.reload();
+    await expectFeedReady(page);
+    await navButton(page, 'Profil').click();
+
+    const reloadedProfileSection = page
+      .locator('.section-card')
+      .filter({ hasText: 'Vos informations' });
+    await expect(
+      reloadedProfileSection.getByText('Non renseigné — Architecte Svelte')
+    ).toBeVisible();
+    await expect(reloadedProfileSection.getByText('Svelte Save')).toBeVisible();
   });
 
   test('profile stack editor adds and removes technologies', async ({ page }) => {
