@@ -1,5 +1,4 @@
-import type { Metric, MetricUnit, ScanMetrics, CacheMetrics } from '../../core/metrics/types';
-import { calculateHitRate } from '../../core/metrics/types';
+import type { Metric, ScanMetrics, CacheMetrics } from '../../core/metrics/types';
 
 /**
  * Collecteur de métriques

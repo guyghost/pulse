@@ -28,7 +28,7 @@
     {@render feed()}
   </div>
   {#if sidebar}
-    <div class="shrink-0 border-t border-white/5 px-4 py-3">
+    <div class="shrink-0 border-t border-border-light px-4 py-3">
       {@render sidebar()}
     </div>
   {/if}

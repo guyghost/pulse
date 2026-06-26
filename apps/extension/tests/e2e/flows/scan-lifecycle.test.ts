@@ -2,9 +2,12 @@ import { test, expect } from '@playwright/test';
 import {
   ensureFeedVisible,
   expectMissionCount,
+  feedSearchInput,
   injectMissions,
+  missionCards,
+  scanButton,
+  clearFeedSearch,
   waitForMissions,
-  triggerScan,
 } from '../helpers';
 
 test.describe('Scan Lifecycle', () => {
@@ -18,7 +21,7 @@ test.describe('Scan Lifecycle', () => {
   test('refresh button is visible and clickable', async ({ page }) => {
     await ensureFeedVisible(page);
 
-    const refreshBtn = page.getByTitle('Rafraichir');
+    const refreshBtn = scanButton(page);
     await expect(refreshBtn).toBeVisible();
     await expect(refreshBtn).toBeEnabled();
   });
@@ -53,13 +56,13 @@ test.describe('Scan Lifecycle', () => {
     await waitForMissions(page, 10, 5000);
 
     // Search
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    await feedSearchInput(page).fill('React');
     await page.waitForTimeout(500);
 
-    await expect(page.getByPlaceholder('Rechercher...')).toHaveValue('React');
+    await expect(feedSearchInput(page)).toHaveValue('React');
 
     // Clear search restores all
-    await page.getByPlaceholder('Rechercher...').clear();
+    await clearFeedSearch(page);
     await page.waitForTimeout(300);
     await expectMissionCount(page, 10);
   });
@@ -70,14 +73,14 @@ test.describe('Scan Lifecycle', () => {
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
 
-    const filterToggle = page.getByTitle('Afficher les filtres');
+    const filterToggle = page.getByRole('button', { name: 'Afficher les filtres' });
     await expect(filterToggle).toBeVisible();
     await filterToggle.click();
 
     const filterPanel = page.getByRole('group', { name: 'Options de filtrage' });
     await expect(filterPanel).toBeVisible();
 
-    await page.getByTitle('Masquer les filtres').click();
+    await page.getByRole('button', { name: 'Masquer les filtres' }).click();
     await expect(filterPanel).not.toBeVisible();
   });
 
@@ -101,7 +104,7 @@ test.describe('Scan Lifecycle', () => {
 
     await expectMissionCount(page, 10);
 
-    const cards = page.locator('[role="button"][tabindex="0"]');
+    const cards = missionCards(page);
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThanOrEqual(10);
   });

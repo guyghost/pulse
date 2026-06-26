@@ -1,7 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { deduplicateMissions } from '../../../src/lib/core/scoring/dedup';
+import {
+  deduplicateMissions,
+  deduplicateMissionsDetailed,
+} from '../../../src/lib/core/scoring/dedup';
 import type { Mission } from '../../../src/lib/core/types/mission';
-import type { MissionSource, RemoteType } from '../../../src/lib/core/types/mission';
+import type { MissionSource } from '../../../src/lib/core/types/mission';
 
 function makeMission(overrides: Partial<Mission> = {}): Mission {
   return {
@@ -14,9 +17,13 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
     location: null,
     remote: null,
     duration: null,
+    startDate: null,
+    publishedAt: null,
     url: 'https://example.com',
     source: 'free-work' as MissionSource,
     scrapedAt: new Date(),
+    seniority: null,
+    scoreBreakdown: null,
     score: null,
     semanticScore: null,
     semanticReason: null,
@@ -67,6 +74,35 @@ describe('deduplicateMissions', () => {
     expect(result).toHaveLength(1);
     expect(result[0].id).toBe('2');
     expect(result[0].tjm).toBe(600);
+  });
+
+  it('reports duplicate relations against the retained canonical mission', () => {
+    const result = deduplicateMissionsDetailed([
+      makeMission({
+        id: 'source-1',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        tjm: 500,
+        description: 'Short',
+      }),
+      makeMission({
+        id: 'source-2',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        tjm: 650,
+        description: 'Longer description',
+      }),
+    ]);
+
+    expect(result.missions.map((mission) => mission.id)).toEqual(['source-2']);
+    expect(result.duplicateRelations).toEqual([
+      {
+        canonicalMissionId: 'source-2',
+        duplicateMissionId: 'source-1',
+        confidence: 1,
+        reason: 'same_structured_signature',
+      },
+    ]);
   });
 
   it('deduplicates near-duplicate titles', () => {
@@ -164,6 +200,69 @@ describe('deduplicateMissions', () => {
       makeMission({ id: '1', title: 'Developpeur React Senior', client: 'Acme', stack: [] }),
       makeMission({ id: '2', title: 'Developpeur React Senior', client: 'Globex', stack: [] }),
     ];
+    const result = deduplicateMissions(missions);
+    expect(result).toHaveLength(2);
+  });
+
+  it('prefers direct Cherry Pick mission over Free-Work reseller duplicate', () => {
+    const result = deduplicateMissionsDetailed([
+      makeMission({
+        id: 'fw-1',
+        title: 'Product Owner Salesforce',
+        client: 'CherryPick',
+        stack: ['Salesforce', 'Agile'],
+        tjm: 720,
+        location: 'Paris, Ile-de-France',
+        remote: 'hybrid',
+        description:
+          'Mission detaillee publiee par un intermediaire avec contexte projet et contraintes.',
+        url: 'https://www.free-work.com/fr/tech-it/product-owner/job-mission/product-owner-salesforce',
+        source: 'free-work',
+      }),
+      makeMission({
+        id: 'cp-1',
+        title: 'Product Owner Salesforce H/F',
+        client: 'Banque Alpha',
+        stack: ['Salesforce', 'Agile'],
+        tjm: 700,
+        location: 'Paris',
+        remote: 'hybrid',
+        description: 'Mission Salesforce',
+        url: 'https://app.cherry-pick.io/ext/missions/product-owner-salesforce-42',
+        source: 'cherry-pick',
+      }),
+    ]);
+
+    expect(result.missions).toHaveLength(1);
+    expect(result.missions[0]).toMatchObject({
+      id: 'cp-1',
+      source: 'cherry-pick',
+      url: 'https://app.cherry-pick.io/ext/missions/product-owner-salesforce-42',
+    });
+    expect(result.duplicateRelations[0]).toMatchObject({
+      canonicalMissionId: 'cp-1',
+      duplicateMissionId: 'fw-1',
+      reason: 'same_title_stack_proxy_client',
+    });
+    expect(result.duplicateRelations[0].confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
+  it('keeps same title and stack when real locations are incompatible', () => {
+    const missions = [
+      makeMission({
+        id: '1',
+        title: 'Developpeur React Senior',
+        stack: ['React', 'TypeScript'],
+        location: 'Paris',
+      }),
+      makeMission({
+        id: '2',
+        title: 'Developpeur React Senior',
+        stack: ['React', 'TypeScript'],
+        location: 'Lyon',
+      }),
+    ];
+
     const result = deduplicateMissions(missions);
     expect(result).toHaveLength(2);
   });

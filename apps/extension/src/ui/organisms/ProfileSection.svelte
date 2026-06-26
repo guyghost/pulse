@@ -1,106 +1,175 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
-  import Chip from '../atoms/Chip.svelte';
-  import Button from '../atoms/Button.svelte';
+  import { Icon } from '@pulse/ui';
+  import { Chip } from '@pulse/ui';
+  import { Button } from '@pulse/ui';
+  import type { RemoteType } from '$lib/core/types/mission';
+  import type { SeniorityLevel } from '$lib/core/types/profile';
+  import Tooltip from '../atoms/Tooltip.svelte';
 
+  /* eslint-disable prefer-const */
   let {
-    firstName,
-    jobTitle,
-    profileLocation,
-    tjmMin,
-    tjmMax,
-    profileStack,
-    stackInput,
+    firstName = $bindable(''),
+    jobTitle = $bindable(''),
+    profileLocation = $bindable(''),
+    profileRemote = $bindable('any'),
+    seniority = $bindable('senior'),
+    tjmMin = $bindable(0),
+    tjmMax = $bindable(0),
+    profileStack = $bindable([]),
+    stackInput = $bindable(''),
+    searchKeywords = $bindable([]),
+    keywordInput = $bindable(''),
     editing,
+    isSaving = false,
     profileSaved,
     profileError,
     onToggleEdit,
     onSave,
     onAddStack,
     onRemoveStack,
+    onAddKeyword,
+    onRemoveKeyword,
   }: {
     firstName: string;
     jobTitle: string;
     profileLocation: string;
+    profileRemote: RemoteType | 'any';
+    seniority: SeniorityLevel;
     tjmMin: number;
     tjmMax: number;
     profileStack: string[];
     stackInput: string;
+    searchKeywords: string[];
+    keywordInput: string;
     editing: boolean;
+    isSaving?: boolean;
     profileSaved: boolean;
     profileError: string | null;
     onToggleEdit: () => void;
-    onSave: () => void;
+    onSave: () => void | Promise<void>;
     onAddStack: () => void;
     onRemoveStack: (tech: string) => void;
+    onAddKeyword: () => void;
+    onRemoveKeyword: (keyword: string) => void;
   } = $props();
+  /* eslint-enable prefer-const */
+
+  const remoteOptions: Array<{ value: RemoteType | 'any'; label: string }> = [
+    { value: 'any', label: 'Indifférent' },
+    { value: 'full', label: 'Remote' },
+    { value: 'hybrid', label: 'Hybride' },
+    { value: 'onsite', label: 'Présentiel' },
+  ];
+
+  const seniorityOptions: Array<{ value: SeniorityLevel; label: string }> = [
+    { value: 'junior', label: 'Junior' },
+    { value: 'confirmed', label: 'Confirmé' },
+    { value: 'senior', label: 'Senior' },
+  ];
 </script>
 
-<div class="section-card-strong rounded-[1.5rem] p-4 space-y-3">
+<div class="section-card rounded-xl p-5">
   <div class="flex items-center justify-between">
-    <div class="flex items-center gap-2">
-      <Icon name="edit-2" size={12} class="text-accent-blue/60" />
+    <div class="flex items-center gap-3">
+      <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6">
+        <Icon name="edit-2" size={14} class="text-blueprint-blue" />
+      </div>
       <div>
-        <h3 class="text-sm font-semibold text-text-primary">Profil</h3>
-        <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-          Vos informations de freelance.
-        </p>
+        <h3 class="text-sm font-medium text-text-primary">Profil</h3>
+        <p class="mt-0.5 text-xs text-text-subtle">Vos informations de freelance.</p>
       </div>
     </div>
-    <button
-      class="inline-flex h-10 w-10 items-center justify-center rounded-full border border-white/8 bg-white/4 text-text-secondary transition-colors hover:bg-white/8 hover:text-text-primary"
-      onclick={onToggleEdit}
-      title={editing ? 'Annuler' : 'Modifier'}
+    <Tooltip
+      label={editing ? 'Annuler la modification' : 'Modifier mes critères'}
+      description={editing
+        ? 'Quitte le mode édition sans sauvegarder.'
+        : 'Ajuste les critères qui influencent le classement.'}
     >
-      <Icon name={editing ? 'x' : 'edit-2'} size={14} />
-    </button>
+      <button
+        class="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+        onclick={onToggleEdit}
+        aria-label={editing ? 'Annuler la modification du profil' : 'Modifier mes critères'}
+        disabled={isSaving}
+      >
+        <Icon name={editing ? 'x' : 'edit-2'} size={13} />
+      </button>
+    </Tooltip>
   </div>
 
   {#if editing}
-    <div class="space-y-2">
+    <div class="mt-4 space-y-2.5">
       <input
         type="text"
-        placeholder="Prenom"
-        class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+        placeholder="Prénom"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={firstName}
       />
       <input
         type="text"
-        placeholder="Poste (ex: Developpeur React Senior)"
-        class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+        placeholder="Poste (ex: Développeur React Senior)"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={jobTitle}
       />
       <input
         type="text"
         placeholder="Localisation"
-        class="soft-ring w-full rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={profileLocation}
       />
+      <div class="grid grid-cols-2 gap-2">
+        <label class="space-y-1">
+          <span class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
+            Remote
+          </span>
+          <select
+            class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+            bind:value={profileRemote}
+          >
+            {#each remoteOptions as option}
+              <option value={option.value}>{option.label}</option>
+            {/each}
+          </select>
+        </label>
+        <label class="space-y-1">
+          <span class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
+            Séniorité
+          </span>
+          <select
+            class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+            bind:value={seniority}
+          >
+            {#each seniorityOptions as option}
+              <option value={option.value}>{option.label}</option>
+            {/each}
+          </select>
+        </label>
+      </div>
       <div class="flex gap-2">
         <input
           type="number"
           placeholder="TJM min"
-          class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
           bind:value={tjmMin}
         />
         <input
           type="number"
           placeholder="TJM max"
-          class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
           bind:value={tjmMax}
         />
       </div>
 
       <div class="space-y-2">
-        <label for="stack-input" class="text-xs uppercase tracking-[0.18em] text-text-muted"
-          >Stack technique</label
-        >
+        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
+          Stack technique
+        </p>
         <div class="flex gap-2">
           <input
-            id="stack-input"
             type="text"
+            aria-label="Stack technique"
+            id="stack-input"
             placeholder="ex: React, Node.js..."
-            class="soft-ring flex-1 rounded-[1.1rem] border border-white/10 bg-white/5 px-4 py-3 text-sm text-text-primary focus:outline-none focus:border-accent-blue/30 focus:ring-2 focus:ring-accent-blue/15"
+            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={stackInput}
             onkeydown={(e) => {
               if (e.key === 'Enter') {
@@ -108,16 +177,21 @@
               }
             }}
           />
-          <button
-            class="inline-flex min-h-12 items-center justify-center rounded-[1.1rem] border border-white/10 bg-white/6 px-4 text-text-secondary transition-all duration-200 hover:bg-white/10 hover:text-text-primary"
-            onclick={onAddStack}
-            title="Ajouter"
+          <Tooltip
+            label="Ajouter la stack"
+            description="Ajoute cette compétence aux critères de matching."
           >
-            <Icon name="plus" size={14} />
-          </button>
+            <button
+              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+              onclick={onAddStack}
+              aria-label="Ajouter la stack technique"
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          </Tooltip>
         </div>
         {#if profileStack.length > 0}
-          <div class="flex flex-wrap gap-2 pt-1">
+          <div class="flex flex-wrap gap-1.5 pt-1">
             {#each profileStack as tech}
               <Chip label={tech} selected={true} onclick={() => onRemoveStack(tech)} />
             {/each}
@@ -125,34 +199,103 @@
         {/if}
       </div>
 
-      <Button variant="secondary" onclick={onSave}>
-        {#snippet children()}{profileSaved ? 'Sauvegarde !' : 'Enregistrer le profil'}{/snippet}
-      </Button>
+      <div class="space-y-2">
+        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
+          Mots-clés de recherche
+        </p>
+        <div class="flex gap-2">
+          <input
+            type="text"
+            aria-label="Mot-clé de recherche"
+            placeholder="ex: SaaS, marketplace, data..."
+            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+            bind:value={keywordInput}
+            onkeydown={(e) => {
+              if (e.key === 'Enter') {
+                onAddKeyword();
+              }
+            }}
+          />
+          <Tooltip
+            label="Ajouter le mot-cle"
+            description="Ajoute ce signal aux recherches et recommandations."
+          >
+            <button
+              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+              onclick={onAddKeyword}
+              aria-label="Ajouter le mot-clé de recherche"
+            >
+              <Icon name="plus" size={13} />
+            </button>
+          </Tooltip>
+        </div>
+        {#if searchKeywords.length > 0}
+          <div class="flex flex-wrap gap-1.5 pt-1">
+            {#each searchKeywords as keyword}
+              <Chip label={keyword} selected={true} onclick={() => onRemoveKeyword(keyword)} />
+            {/each}
+          </div>
+        {/if}
+      </div>
+
+      <div class="pt-1">
+        <Button variant="secondary" onclick={onSave} loading={isSaving}>
+          {#snippet children()}
+            {isSaving ? 'Sauvegarde...' : profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}
+          {/snippet}
+        </Button>
+      </div>
       {#if profileError}
-        <p class="text-xs text-red-400">{profileError}</p>
+        <p class="text-xs text-status-red">{profileError}</p>
       {/if}
     </div>
   {:else}
-    <div class="space-y-2 text-sm">
+    <div class="mt-4 space-y-2 text-sm">
       <p class="text-text-primary">
         {firstName || 'Non renseigné'}
-        {jobTitle ? `— ${jobTitle}` : ''}
+        {jobTitle ? ` — ${jobTitle}` : ''}
       </p>
-      <p class="text-text-secondary">{profileLocation || 'Localisation non renseignée'}</p>
+      <p class="text-text-subtle">{profileLocation || 'Localisation non renseignée'}</p>
+      <div class="grid grid-cols-2 gap-2">
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Remote</p>
+          <p class="mt-1 text-xs font-medium text-text-primary">
+            {remoteOptions.find((option) => option.value === profileRemote)?.label ?? 'Indifférent'}
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
+          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            Séniorité
+          </p>
+          <p class="mt-1 text-xs font-medium text-text-primary">
+            {seniorityOptions.find((option) => option.value === seniority)?.label ?? 'Senior'}
+          </p>
+        </div>
+      </div>
       {#if tjmMin > 0 || tjmMax > 0}
-        <p class="text-text-secondary">TJM : {tjmMin} – {tjmMax} €/jour</p>
+        <p class="text-text-subtle">TJM : {tjmMin} – {tjmMax} €/jour</p>
       {/if}
       {#if profileStack.length > 0}
         <div class="flex flex-wrap gap-1.5 pt-1">
           {#each profileStack as tech}
             <span
-              class="inline-flex items-center rounded-full bg-accent-blue/10 px-2 py-0.5 text-xs text-accent-blue"
+              class="inline-flex items-center rounded-md bg-blueprint-blue/6 px-2 py-0.5 text-[11px] text-blueprint-blue"
               >{tech}</span
             >
           {/each}
         </div>
       {:else}
-        <p class="text-text-muted text-xs">Aucune technologie renseignée</p>
+        <p class="text-xs text-text-muted">Aucune technologie renseignée</p>
+      {/if}
+      {#if searchKeywords.length > 0}
+        <div class="flex flex-wrap gap-1.5 pt-1">
+          {#each searchKeywords as keyword}
+            <span
+              class="inline-flex items-center rounded-md bg-subtle-gray px-2 py-0.5 text-[11px] text-text-subtle"
+              >{keyword}</span
+            >
+          {/each}
+        </div>
       {/if}
     </div>
   {/if}

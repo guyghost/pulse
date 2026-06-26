@@ -1,46 +1,105 @@
+import type { ScoreBreakdown } from '../types/score';
+import { scoreToGrade } from '../types/score';
+import type { DeterministicBreakdown } from '../types/score';
+
 /**
- * Fuse deterministic score and semantic score into a final score.
+ * Build a complete ScoreBreakdown from deterministic scoring results.
+ *
+ * Used when semantic scoring is not available (Gemini Nano absent or timed out).
+ *
+ * @param deterministicTotal - Score from rule-based matching (0-100)
+ * @param breakdown - Per-criterion breakdown
+ * @returns Complete ScoreBreakdown with null semantic scores
+ */
+export const buildScoreBreakdown = (
+  deterministicTotal: number,
+  breakdown: DeterministicBreakdown
+): ScoreBreakdown => {
+  const total = clampScore(deterministicTotal);
+  return {
+    criteria: breakdown,
+    deterministic: total,
+    semantic: null,
+    semanticReason: null,
+    total,
+    grade: scoreToGrade(total),
+  };
+};
+
+/**
+ * Fuse deterministic and semantic scores into a final ScoreBreakdown.
  *
  * Strategy:
  * - If only deterministic: use it (100% weight)
  * - If only semantic: use it (100% weight)
  * - If both: weighted average (default: 60% deterministic, 40% semantic)
- * - If neither: null
  *
- * The weights are configurable via the `semanticWeight` parameter (0-1).
- * semanticWeight=0.4 means 40% semantic, 60% deterministic.
- *
- * @param deterministicScore - Score from rule-based matching (0-100 or null)
+ * @param deterministicTotal - Score from rule-based matching (0-100)
+ * @param breakdown - Per-criterion breakdown
  * @param semanticScore - Score from LLM semantic analysis (0-100 or null)
+ * @param semanticReason - LLM explanation (or null)
  * @param semanticWeight - Weight for semantic score (0-1), default 0.4
- * @returns Combined final score (0-100) or null if both inputs are null
+ * @returns Complete ScoreBreakdown with fused score and grade
+ */
+export const computeFinalBreakdown = (
+  deterministicTotal: number,
+  breakdown: DeterministicBreakdown,
+  semanticScore: number | null,
+  semanticReason: string | null,
+  semanticWeight = 0.4
+): ScoreBreakdown => {
+  const det = clampScore(deterministicTotal);
+
+  // No semantic score available — deterministic only
+  if (semanticScore === null) {
+    return {
+      criteria: breakdown,
+      deterministic: det,
+      semantic: null,
+      semanticReason: null,
+      total: det,
+      grade: scoreToGrade(det),
+    };
+  }
+
+  const sem = clampScore(semanticScore);
+
+  // Weighted fusion
+  const deterministicWeight = 1 - semanticWeight;
+  const fused = Math.round(clampScore(det * deterministicWeight + sem * semanticWeight));
+
+  return {
+    criteria: breakdown,
+    deterministic: det,
+    semantic: sem,
+    semanticReason,
+    total: fused,
+    grade: scoreToGrade(fused),
+  };
+};
+
+/**
+ * Legacy helper: compute a single numeric final score.
+ * Used for backward compatibility during migration.
+ *
+ * @deprecated Use computeFinalBreakdown() instead.
  */
 export const computeFinalScore = (
   deterministicScore: number | null,
   semanticScore: number | null,
   semanticWeight = 0.4
 ): number | null => {
-  // If neither score exists, return null
   if (deterministicScore === null && semanticScore === null) {
     return null;
   }
-
-  // If only deterministic exists, use it
   if (semanticScore === null) {
-    // At this point, deterministicScore is guaranteed non-null
-    // (otherwise we would have returned in the first check)
     return clampScore(deterministicScore as number);
   }
-
-  // If only semantic exists, use it
   if (deterministicScore === null) {
     return clampScore(semanticScore);
   }
-
-  // Both exist: weighted average
   const deterministicWeight = 1 - semanticWeight;
   const rawScore = deterministicScore * deterministicWeight + semanticScore * semanticWeight;
-
   return Math.round(clampScore(rawScore));
 };
 

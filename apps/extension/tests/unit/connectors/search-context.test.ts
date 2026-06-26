@@ -105,13 +105,19 @@ describe('buildSearchContext', () => {
       });
       const context = buildSearchContext(profile, null);
 
-      // Query is trimmed at edges, but internal whitespace from join is preserved
-      // '  React  ' + ' ' + '  TypeScript  ' = '  React    TypeScript  ' → trim → 'React    TypeScript'
-      // (2 trailing + 1 join + 2 leading = 5 spaces between words)
-      expect(context.query).toBe('React     TypeScript');
+      expect(context.query).toBe('React TypeScript');
       // No leading/trailing whitespace
       expect(context.query.startsWith(' ')).toBe(false);
       expect(context.query.endsWith(' ')).toBe(false);
+    });
+
+    it('ignores blank searchKeywords when building query', () => {
+      const profile = makeProfile({
+        searchKeywords: ['React', ' ', '', '\t', 'TypeScript'],
+      });
+      const context = buildSearchContext(profile, null);
+
+      expect(context.query).toBe('React TypeScript');
     });
   });
 
@@ -328,9 +334,7 @@ describe('buildSearchContext', () => {
       });
       const context = buildSearchContext(profile, null);
 
-      // trim() removes leading/trailing whitespace from the final joined string
-      // Internal whitespace from join is preserved: '  React  ' + ' ' + '  TypeScript  ' = '  React    TypeScript  '
-      expect(context.query).toBe('React     TypeScript');
+      expect(context.query).toBe('React TypeScript');
       expect(context.query.startsWith(' ')).toBe(false);
       expect(context.query.endsWith(' ')).toBe(false);
     });

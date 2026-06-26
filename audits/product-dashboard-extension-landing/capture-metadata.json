@@ -1,0 +1,74 @@
+[
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/01-landing-home.png",
+    "error": "Error: TypeError: Right-hand side of 'instanceof' is not an object\n    at <anonymous>:2623:16\n    at Array.map (<anonymous>)\n    at pick (<anonymous>:2620:103)\n    at __playwrightEvaluate (<anonymous>:2629:17)\n    at <anonymous>:2634:14\n    at runUserScript (<anonymous>:2635:10)\n    at <anonymous>:2639:10\n    at <anonymous>:2640:3",
+    "title": null,
+    "url": null,
+    "headings": [],
+    "actions": [],
+    "visibleTextSample": ""
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/02-landing-home-full.png",
+    "error": "Error: TypeError: Right-hand side of 'instanceof' is not an object\n    at <anonymous>:2623:16\n    at Array.map (<anonymous>)\n    at pick (<anonymous>:2620:103)\n    at __playwrightEvaluate (<anonymous>:2629:17)\n    at <anonymous>:2634:14\n    at runUserScript (<anonymous>:2635:10)\n    at <anonymous>:2639:10\n    at <anonymous>:2640:3",
+    "title": null,
+    "url": null,
+    "headings": [],
+    "actions": [],
+    "visibleTextSample": ""
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/03-landing-login.png",
+    "error": "Error: TypeError: Right-hand side of 'instanceof' is not an object\n    at <anonymous>:2623:16\n    at Array.map (<anonymous>)\n    at pick (<anonymous>:2620:103)\n    at __playwrightEvaluate (<anonymous>:2629:17)\n    at <anonymous>:2634:14\n    at runUserScript (<anonymous>:2635:10)\n    at <anonymous>:2639:10\n    at <anonymous>:2640:3",
+    "title": null,
+    "url": null,
+    "headings": [],
+    "actions": [],
+    "visibleTextSample": ""
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/04-landing-dashboard-route.png",
+    "error": "Error: TypeError: Right-hand side of 'instanceof' is not an object\n    at <anonymous>:2623:16\n    at Array.map (<anonymous>)\n    at pick (<anonymous>:2620:103)\n    at __playwrightEvaluate (<anonymous>:2629:17)\n    at <anonymous>:2634:14\n    at runUserScript (<anonymous>:2635:10)\n    at <anonymous>:2639:10\n    at <anonymous>:2640:3",
+    "title": null,
+    "url": null,
+    "headings": [],
+    "actions": [],
+    "visibleTextSample": ""
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/05-web-dashboard-anonymous.png",
+    "error": "Error: TypeError: Right-hand side of 'instanceof' is not an object\n    at <anonymous>:2623:16\n    at Array.map (<anonymous>)\n    at pick (<anonymous>:2620:103)\n    at __playwrightEvaluate (<anonymous>:2629:17)\n    at <anonymous>:2634:14\n    at runUserScript (<anonymous>:2635:10)\n    at <anonymous>:2639:10\n    at <anonymous>:2640:3",
+    "title": null,
+    "url": null,
+    "headings": [],
+    "actions": [],
+    "visibleTextSample": ""
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/06-web-dashboard-full.png",
+    "error": "Error: TypeError: Right-hand side of 'instanceof' is not an object\n    at <anonymous>:2623:16\n    at Array.map (<anonymous>)\n    at pick (<anonymous>:2620:103)\n    at __playwrightEvaluate (<anonymous>:2629:17)\n    at <anonymous>:2634:14\n    at runUserScript (<anonymous>:2635:10)\n    at <anonymous>:2639:10\n    at <anonymous>:2640:3",
+    "title": null,
+    "url": null,
+    "headings": [],
+    "actions": [],
+    "visibleTextSample": ""
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/07-extension-sidepanel.png",
+    "error": "Error: TypeError: Right-hand side of 'instanceof' is not an object\n    at <anonymous>:2623:16\n    at Array.map (<anonymous>)\n    at pick (<anonymous>:2620:103)\n    at __playwrightEvaluate (<anonymous>:2629:17)\n    at <anonymous>:2634:14\n    at runUserScript (<anonymous>:2635:10)\n    at <anonymous>:2639:10\n    at <anonymous>:2640:3",
+    "title": null,
+    "url": null,
+    "headings": [],
+    "actions": [],
+    "visibleTextSample": ""
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/08-extension-sidepanel-full.png",
+    "error": "Error: TypeError: Right-hand side of 'instanceof' is not an object\n    at <anonymous>:2623:16\n    at Array.map (<anonymous>)\n    at pick (<anonymous>:2620:103)\n    at __playwrightEvaluate (<anonymous>:2629:17)\n    at <anonymous>:2634:14\n    at runUserScript (<anonymous>:2635:10)\n    at <anonymous>:2639:10\n    at <anonymous>:2640:3",
+    "title": null,
+    "url": null,
+    "headings": [],
+    "actions": [],
+    "visibleTextSample": ""
+  }
+]

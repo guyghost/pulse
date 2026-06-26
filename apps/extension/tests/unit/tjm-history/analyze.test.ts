@@ -75,6 +75,26 @@ describe('analyzeTJMHistory', () => {
     expect(analysis!.senior.min).toBeGreaterThan(0);
   });
 
+  it('treats legacy records without seniority as unknown seniority', () => {
+    const legacyRecord = (overrides: Partial<TJMRecord>): TJMRecord =>
+      ({
+        ...makeRecord(overrides),
+        seniority: undefined,
+      }) as unknown as TJMRecord;
+
+    const history = makeHistory([
+      legacyRecord({ stack: 'react', average: 520 }),
+      legacyRecord({ stack: 'typescript', average: 600 }),
+      legacyRecord({ stack: 'node', average: 680 }),
+    ]);
+
+    const analysis = analyzeTJMHistory(history);
+
+    expect(analysis).not.toBeNull();
+    expect(analysis!.junior.median).toBeLessThanOrEqual(analysis!.confirmed.median);
+    expect(analysis!.confirmed.median).toBeLessThanOrEqual(analysis!.senior.median);
+  });
+
   it('computes region insights from records with region data', () => {
     const history = makeHistory([
       makeRecord({ stack: 'react', average: 600, sampleCount: 5, region: 'ile-de-france' }),

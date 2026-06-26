@@ -1,28 +1,37 @@
 import { test, expect } from '@playwright/test';
-import { ensureFeedVisible, waitForMissions, expectMissionCount } from './helpers';
+import {
+  allMissionsToggle,
+  ensureFeedVisible,
+  favoriteButton,
+  favoritesToggle,
+  missionCards,
+  unfavoriteButton,
+  waitForMissions,
+  expectMissionCount,
+} from './helpers';
 
 test.describe('Favorites Flow', () => {
   test('marks a mission as favorite and star becomes filled', async ({ page }) => {
     await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
-    const card = page.locator('[role="button"][tabindex="0"]').first();
-    await expect(card.getByTitle('Ajouter aux favoris')).toBeVisible({ timeout: 3000 });
-    await card.getByTitle('Ajouter aux favoris').click();
+    const card = missionCards(page).first();
+    await expect(favoriteButton(card)).toBeVisible({ timeout: 3000 });
+    await favoriteButton(card).click();
 
-    await expect(card.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 3000 });
+    await expect(unfavoriteButton(card)).toBeVisible({ timeout: 3000 });
   });
 
   test('unfavorites a mission and star reverts', async ({ page }) => {
     await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
-    const card = page.locator('[role="button"][tabindex="0"]').first();
-    await card.getByTitle('Ajouter aux favoris').click();
-    await expect(card.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 3000 });
+    const card = missionCards(page).first();
+    await favoriteButton(card).click();
+    await expect(unfavoriteButton(card)).toBeVisible({ timeout: 3000 });
 
-    await card.getByTitle('Retirer des favoris').click();
-    await expect(card.getByTitle('Ajouter aux favoris')).toBeVisible({ timeout: 3000 });
+    await unfavoriteButton(card).click();
+    await expect(favoriteButton(card)).toBeVisible({ timeout: 3000 });
   });
 
   test('favorites filter shows only favorited missions', async ({ page }) => {
@@ -30,21 +39,21 @@ test.describe('Favorites Flow', () => {
     await waitForMissions(page, 5, 10000);
 
     // Record initial count
-    const initialCount = await page.locator('[role="button"][tabindex="0"]').count();
+    const initialCount = await missionCards(page).count();
 
     // Favorite the first card
-    const card = page.locator('[role="button"][tabindex="0"]').first();
-    await card.getByTitle('Ajouter aux favoris').click();
-    await expect(card.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 3000 });
+    const card = missionCards(page).first();
+    await favoriteButton(card).click();
+    await expect(unfavoriteButton(card)).toBeVisible({ timeout: 3000 });
 
     // Toggle favorites filter
-    await page.getByTitle('Voir favoris').click();
+    await favoritesToggle(page).click();
     await page.waitForTimeout(500);
 
     await expectMissionCount(page, 1);
 
     // Toggle back
-    await page.getByTitle('Voir toutes').click();
+    await allMissionsToggle(page).click();
     await expectMissionCount(page, initialCount);
   });
 
@@ -52,7 +61,7 @@ test.describe('Favorites Flow', () => {
     await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
-    await page.getByTitle('Voir favoris').click();
+    await favoritesToggle(page).click();
     await page.waitForTimeout(500);
 
     await expectMissionCount(page, 0);

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ConnectorStatus } from '$lib/core/types/connector-status';
   import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
-  import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
+  import { getConnectorsMeta, openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import ConnectorStatusItem from './ConnectorStatus.svelte';
 
   const {
@@ -18,6 +18,10 @@
 
   function getMeta(id: string) {
     return metas.find((m) => m.id === id);
+  }
+
+  function handleReconnect(url: string): void {
+    openExternalUrl(url).catch(() => {});
   }
 
   const scanEntries = $derived(statuses ? [...statuses.entries()] : []);
@@ -37,6 +41,7 @@
           icon={m?.icon ?? ''}
           url={m?.url ?? ''}
           {status}
+          onReconnect={handleReconnect}
         />
       {/each}
     {:else}
@@ -47,6 +52,7 @@
           icon={m?.icon ?? ''}
           url={m?.url ?? ''}
           {persisted}
+          onReconnect={handleReconnect}
         />
       {/each}
     {/if}

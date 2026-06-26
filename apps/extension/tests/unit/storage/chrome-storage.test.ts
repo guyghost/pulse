@@ -25,7 +25,12 @@ vi.stubGlobal('chrome', {
   },
 });
 
-import { getSettings } from '../../../src/lib/shell/storage/chrome-storage';
+import {
+  getFeedSavedViews,
+  getSettings,
+  setFeedSavedViews,
+  setSettings,
+} from '../../../src/lib/shell/storage/chrome-storage';
 
 describe('getSettings', () => {
   beforeEach(() => {
@@ -51,6 +56,7 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
+      theme: 'system',
     });
   });
 
@@ -68,6 +74,7 @@ describe('getSettings', () => {
       notificationScoreThreshold: 85,
       respectRateLimits: false,
       customDelayMs: 2000,
+      theme: 'system',
     };
 
     const settings = await getSettings();
@@ -80,6 +87,7 @@ describe('getSettings', () => {
     expect(settings.notificationScoreThreshold).toBe(85);
     expect(settings.respectRateLimits).toBe(false);
     expect(settings.customDelayMs).toBe(2000);
+    expect(settings.theme).toBe('system');
   });
 
   it('falls back to defaults when stored settings are partial (missing fields)', async () => {
@@ -87,6 +95,7 @@ describe('getSettings', () => {
     mockStorage.settings = {
       scanIntervalMinutes: 60,
       notifications: false,
+      theme: 'dark',
     };
 
     const settings = await getSettings();
@@ -95,6 +104,7 @@ describe('getSettings', () => {
     expect(settings.scanIntervalMinutes).toBe(30); // default, not 60
     expect(settings.notifications).toBe(true); // default, not false
     expect(settings.autoScan).toBe(true);
+    expect(settings.theme).toBe('system');
   });
 
   it('strips unknown fields and keeps valid settings', async () => {
@@ -109,6 +119,7 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
+      theme: 'system',
     };
 
     const settings = await getSettings();
@@ -128,6 +139,7 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
+      theme: 'system',
     };
 
     const settings = await getSettings();
@@ -146,6 +158,7 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
+      theme: 'system',
     };
 
     const settings = await getSettings();
@@ -163,6 +176,7 @@ describe('getSettings', () => {
       notificationScoreThreshold: 150, // Above max of 100
       respectRateLimits: true,
       customDelayMs: 0,
+      theme: 'system',
     };
 
     const settings = await getSettings();
@@ -180,6 +194,7 @@ describe('getSettings', () => {
       notificationScoreThreshold: 70,
       respectRateLimits: true,
       customDelayMs: 0,
+      theme: 'system',
     };
 
     const settings = await getSettings();
@@ -191,5 +206,113 @@ describe('getSettings', () => {
       'collective',
       'cherry-pick',
     ]); // default
+  });
+});
+
+describe('setSettings', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(mockStorage)) {
+      delete mockStorage[key];
+    }
+  });
+
+  it('persists theme=dark and reads it back', async () => {
+    const current = await getSettings();
+    await setSettings({ ...current, theme: 'dark' });
+
+    const settings = await getSettings();
+    expect(settings.theme).toBe('dark');
+  });
+
+  it('persists theme=light and reads it back', async () => {
+    const current = await getSettings();
+    await setSettings({ ...current, theme: 'light' });
+
+    const settings = await getSettings();
+    expect(settings.theme).toBe('light');
+  });
+
+  it('rejects an invalid theme value', async () => {
+    const current = await getSettings();
+    await expect(setSettings({ ...current, theme: 'neon' as unknown as 'light' })).rejects.toThrow(
+      'Invalid settings'
+    );
+  });
+
+  it('accepts restored settings when theme is explicitly provided', async () => {
+    // Simulate old code that dropped theme, then restore it explicitly before saving
+    const { theme: _, ...settingsWithoutTheme } = await getSettings();
+    // The persisted payload must include theme; restoration code fills it with the default value.
+    await setSettings({ ...settingsWithoutTheme, theme: 'system' });
+  });
+});
+
+describe('feed saved views storage', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(mockStorage)) {
+      delete mockStorage[key];
+    }
+  });
+
+  it('returns an empty list when no saved views exist', async () => {
+    await expect(getFeedSavedViews()).resolves.toEqual([]);
+  });
+
+  it('persists valid saved views and reads them back', async () => {
+    const views = [
+      {
+        id: 'view-1',
+        name: 'Prioritaires',
+        filters: {
+          searchQuery: '',
+          selectedStacks: ['Svelte'],
+          selectedSource: null,
+          selectedRemote: 'full' as const,
+          selectedSeniority: 'senior' as const,
+          selectedScoreBucket: 'strong' as const,
+          decisionPreset: null,
+          showNewOnly: false,
+          showFavoritesOnly: false,
+          showHidden: false,
+          sortBy: 'score' as const,
+        },
+        createdAt: 1779436800000,
+        updatedAt: 1779436800000,
+      },
+    ];
+
+    await setFeedSavedViews(views);
+
+    await expect(getFeedSavedViews()).resolves.toEqual(views);
+  });
+
+  it('falls back to an empty list when stored saved views are invalid', async () => {
+    mockStorage.feedSavedViews = [{ id: 'bad-view', name: '', filters: {} }];
+
+    await expect(getFeedSavedViews()).resolves.toEqual([]);
+  });
+
+  it('rejects more than 12 saved views', async () => {
+    const views = Array.from({ length: 13 }, (_, index) => ({
+      id: `view-${index}`,
+      name: `Vue ${index}`,
+      filters: {
+        searchQuery: '',
+        selectedStacks: [],
+        selectedSource: null,
+        selectedRemote: null,
+        selectedSeniority: null,
+        selectedScoreBucket: null,
+        decisionPreset: null,
+        showNewOnly: false,
+        showFavoritesOnly: false,
+        showHidden: false,
+        sortBy: 'score' as const,
+      },
+      createdAt: 1779436800000,
+      updatedAt: 1779436800000,
+    }));
+
+    await expect(setFeedSavedViews(views)).rejects.toThrow('Invalid feed saved views');
   });
 });

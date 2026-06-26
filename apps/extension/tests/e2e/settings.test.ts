@@ -1,8 +1,8 @@
 import { test, expect } from '@playwright/test';
-import { ensureFeedVisible } from './helpers';
+import { ensureFeedVisible, expectFeedReady, navButton } from './helpers';
 
 test.describe('Settings Flow', () => {
-  test('navigates to settings and displays profile section', async ({ page }) => {
+  test('navigates to settings without the profile editor section', async ({ page }) => {
     await ensureFeedVisible(page);
 
     await page.getByRole('button', { name: 'Settings' }).click();
@@ -10,79 +10,118 @@ test.describe('Settings Flow', () => {
       'aria-current',
       'page'
     );
+    await expect(page.getByRole('heading', { name: 'Paramètres' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Profil' })).not.toBeVisible();
+    await expect(page.getByText('Fréquence', { exact: true })).toBeVisible();
+  });
+
+  test('profile tab is available and displays current profile information', async ({ page }) => {
+    await ensureFeedVisible(page);
+    await navButton(page, 'Profil').click();
+
+    await expect(navButton(page, 'Profil')).toHaveAttribute('aria-current', 'page');
+    await expect(
+      page.getByRole('heading', { name: /Votre profil MissionPulse|Bonjour/ })
+    ).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Profil' })).toBeVisible();
   });
 
-  test('displays current profile information in read-only mode', async ({ page }) => {
+  test('profile tab edit mode shows form fields', async ({ page }) => {
     await ensureFeedVisible(page);
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await navButton(page, 'Profil').click();
 
-    const hasProfileSection = await page
-      .getByRole('heading', { name: 'Profil' })
-      .isVisible()
-      .catch(() => false);
-    expect(hasProfileSection).toBe(true);
-  });
-
-  test('profile edit mode shows form fields', async ({ page }) => {
-    await ensureFeedVisible(page);
-    await page.getByRole('button', { name: 'Settings' }).click();
-
-    const editBtn = page.getByTitle('Modifier');
+    const editBtn = page.getByRole('button', { name: 'Modifier le profil' }).first();
     await expect(editBtn).toBeVisible({ timeout: 3000 });
     await editBtn.click();
 
-    await expect(page.locator('input[placeholder="Prenom"]')).toBeVisible();
+    await expect(page.locator('input[placeholder="Prénom"]')).toBeVisible();
     await expect(page.locator('input[placeholder*="Poste"]')).toBeVisible();
     await expect(page.locator('input[placeholder="Localisation"]')).toBeVisible();
   });
 
   test('canceling profile edit returns to read-only mode', async ({ page }) => {
     await ensureFeedVisible(page);
-    await page.getByRole('button', { name: 'Settings' }).click();
+    await navButton(page, 'Profil').click();
 
-    await page.getByTitle('Modifier').click();
-    await expect(page.locator('input[placeholder="Prenom"]')).toBeVisible();
+    await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
+    await expect(page.locator('input[placeholder="Prénom"]')).toBeVisible();
 
-    await page.getByTitle('Annuler').click();
-    await expect(page.locator('input[placeholder="Prenom"]')).not.toBeVisible();
+    await page.getByRole('button', { name: 'Annuler la modification du profil' }).click();
+    await expect(page.locator('input[placeholder="Prénom"]')).not.toBeVisible();
   });
 
-  test('stack editor adds and removes technologies', async ({ page }) => {
+  test('profile tab saves partial profile edits', async ({ page }) => {
     await ensureFeedVisible(page);
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByTitle('Modifier').click();
+    await navButton(page, 'Profil').click();
+    await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
 
+    const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
+    await profileSection.locator('input[placeholder="Prénom"]').fill('');
+    await profileSection.locator('input[placeholder^="Poste"]').fill('Architecte Svelte');
+    await profileSection.locator('#stack-input').fill('Svelte Save');
+    await profileSection.getByRole('button', { name: 'Enregistrer le profil' }).click();
+
+    await navButton(page, 'Feed').click();
+    await navButton(page, 'Profil').click();
+
+    const returnedProfileSection = page
+      .locator('.section-card')
+      .filter({ hasText: 'Vos informations' });
+    await expect(profileSection.locator('input[placeholder="Prénom"]')).not.toBeVisible();
+    await expect(
+      returnedProfileSection.getByText('Non renseigné — Architecte Svelte')
+    ).toBeVisible();
+    await expect(returnedProfileSection.getByText('Svelte Save')).toBeVisible();
+
+    await page.reload();
+    await expectFeedReady(page);
+    await navButton(page, 'Profil').click();
+
+    const reloadedProfileSection = page
+      .locator('.section-card')
+      .filter({ hasText: 'Vos informations' });
+    await expect(
+      reloadedProfileSection.getByText('Non renseigné — Architecte Svelte')
+    ).toBeVisible();
+    await expect(reloadedProfileSection.getByText('Svelte Save')).toBeVisible();
+  });
+
+  test('profile stack editor adds and removes technologies', async ({ page }) => {
+    await ensureFeedVisible(page);
+    await navButton(page, 'Profil').click();
+    await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
+
+    const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
     const stackInput = page.locator('#stack-input');
     await expect(stackInput).toBeVisible();
-    await stackInput.fill('TypeScript');
+    await stackInput.fill('TypeScript E2E');
     await page.keyboard.press('Enter');
-    await expect(page.getByText('TypeScript')).toBeVisible();
+    await expect(profileSection.getByRole('button', { name: 'TypeScript E2E' })).toBeVisible();
 
-    const chip = page.locator('button').filter({ hasText: 'TypeScript' });
-    await chip.click();
-    await page.waitForTimeout(300);
+    await profileSection.getByRole('button', { name: 'TypeScript E2E' }).click();
+    await expect(profileSection.getByRole('button', { name: 'TypeScript E2E' })).not.toBeVisible();
   });
 
   test('adding stack item via Enter key works', async ({ page }) => {
     await ensureFeedVisible(page);
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await page.getByTitle('Modifier').click();
+    await navButton(page, 'Profil').click();
+    await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
 
+    const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
     const stackInput = page.locator('#stack-input');
-    await stackInput.fill('React');
+    await stackInput.fill('Svelte E2E');
     await page.keyboard.press('Enter');
-    await expect(page.getByText('React')).toBeVisible();
+    await expect(profileSection.getByRole('button', { name: 'Svelte E2E' })).toBeVisible();
   });
 
   test('scan frequency slider is visible and adjustable', async ({ page }) => {
     await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
-    await expect(page.getByText('Frequence de scan')).toBeVisible();
-    await expect(page.locator('input[type="range"]').first()).toBeVisible();
+    await expect(page.getByText('Fréquence', { exact: true })).toBeVisible();
+    await expect(page.getByRole('slider', { name: 'Fréquence de scan' })).toBeVisible();
     await expect(page.getByText('5 min')).toBeVisible();
-    await expect(page.getByText('120 min')).toBeVisible();
+    await expect(page.getByText('2h')).toBeVisible();
   });
 
   test('notifications toggle switches state', async ({ page }) => {
@@ -129,8 +168,12 @@ test.describe('Settings Flow', () => {
     await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
-    await expect(page.getByText('IA locale')).toBeVisible();
-    await expect(page.getByText(/Gemini Nano/)).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'IA locale' })).toBeVisible();
+    await expect(
+      page.getByText(
+        'Le scoring sémantique utilise Gemini Nano via la Prompt API de Chrome, sans clé API externe.'
+      )
+    ).toBeVisible();
     await expect(page.getByText('Missions / scan')).toBeVisible();
   });
 
@@ -139,34 +182,37 @@ test.describe('Settings Flow', () => {
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByText('Zone dangereuse')).toBeVisible();
-    await expect(page.getByText('Reinitialiser tout')).toBeVisible();
+    await expect(page.getByText('Réinitialiser tout')).toBeVisible();
   });
 
   test('clicking reset shows confirmation dialog', async ({ page }) => {
     await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
-    await page.getByText('Reinitialiser tout').click();
-    await expect(page.getByText('Confirmer la suppression')).toBeVisible();
+    await page.getByText('Réinitialiser tout').click();
+    await expect(page.getByText('Suppression irréversible')).toBeVisible();
     await expect(page.getByText('Annuler')).toBeVisible();
     await page.getByText('Annuler').click();
-    await expect(page.getByText('Confirmer la suppression')).not.toBeVisible();
+    await expect(page.getByText('Suppression irréversible')).not.toBeVisible();
   });
 
   test('settings page remains accessible after navigation', async ({ page }) => {
     await ensureFeedVisible(page);
 
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('heading', { name: 'Profil' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Paramètres' })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Feed' }).click();
-    await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute(
+    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    await nav.getByRole('button', { name: 'Feed', exact: true }).click();
+    await expect(nav.getByRole('button', { name: 'Feed', exact: true })).toHaveAttribute(
       'aria-current',
       'page'
     );
 
     await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('heading', { name: 'Profil' })).toBeVisible({ timeout: 2000 });
+    await expect(page.getByRole('heading', { name: 'Paramètres' })).toBeVisible({
+      timeout: 2000,
+    });
   });
 
   test('settings page shows export section', async ({ page }) => {
@@ -185,6 +231,6 @@ test.describe('Settings Flow', () => {
 
     await expect(page.getByText('Sauvegarde').first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('Créer une sauvegarde')).toBeVisible();
-    await expect(page.getByText('Restaurer depuis une sauvegarde')).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Restaurer' })).toBeVisible();
   });
 });

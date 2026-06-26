@@ -199,6 +199,7 @@ export function parseHiwayMissionRow(
     url,
     source: 'hiway',
     scrapedAt: now,
+    publishedAt: row.created_at ?? row.posted_date ?? null,
   });
 }
 

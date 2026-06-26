@@ -1,6 +1,6 @@
 import type { Mission } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
-import type { TJMHistory, TJMRecord } from '$lib/core/types/tjm';
+import type { TJMHistory, TJMRecord, TJMRegion } from '$lib/core/types/tjm';
 
 export const mockProfile: UserProfile = {
   firstName: 'Alice',
@@ -76,40 +76,56 @@ export function generateMockMissions(count: number): Mission[] {
     source: 'free-work' as const,
     scrapedAt: now,
     seniority: seniorities[i % seniorities.length],
+    scoreBreakdown: null,
     score: Math.floor(Math.random() * 100),
     semanticScore: null,
     semanticReason: null,
+    publishedAt: new Date(
+      now.getTime() - Math.floor(Math.random() * 30) * 24 * 60 * 60 * 1000
+    ).toISOString(),
   }));
 }
 
 export const mockMissions: Mission[] = generateMockMissions(10);
 
 export function generateMockTJMHistory(): TJMHistory {
-  const stacks = ['react', 'typescript', 'node.js', 'python', 'vue.js', 'java'];
-  const dates = ['2026-03-15', '2026-03-22', '2026-03-29', '2026-04-01'];
-  const seniorityLevels: Array<'junior' | 'confirmed' | 'senior' | null> = [
-    'junior',
-    'confirmed',
-    'senior',
-    null,
+  const stackConfigs = [
+    { stack: 'react', base: 520, trend: 18 },
+    { stack: 'typescript', base: 540, trend: 14 },
+    { stack: 'node.js', base: 500, trend: 10 },
+    { stack: 'svelte', base: 560, trend: 20 },
+    { stack: 'python', base: 510, trend: -6 },
+    { stack: 'vue.js', base: 495, trend: 4 },
+    { stack: 'java', base: 530, trend: 8 },
   ];
+  const dates = ['2026-03-15', '2026-03-22', '2026-03-29', '2026-04-01'];
+  const seniorityLevels: Array<{
+    seniority: 'junior' | 'confirmed' | 'senior';
+    offset: number;
+  }> = [
+    { seniority: 'junior', offset: -120 },
+    { seniority: 'confirmed', offset: 0 },
+    { seniority: 'senior', offset: 135 },
+  ];
+  const regions: TJMRegion[] = ['ile-de-france', 'lyon', 'remote', 'bordeaux', 'nantes', 'other'];
   const records: TJMRecord[] = [];
 
-  for (const stack of stacks) {
-    const base = 400 + Math.floor(Math.random() * 300);
-    for (let i = 0; i < dates.length; i++) {
-      const drift = Math.floor((i - 1) * 15 * (Math.random() - 0.3));
-      const avg = base + drift;
-      records.push({
-        stack,
-        date: dates[i],
-        min: avg - 80 - Math.floor(Math.random() * 40),
-        max: avg + 80 + Math.floor(Math.random() * 40),
-        average: avg,
-        sampleCount: 3 + Math.floor(Math.random() * 8),
-        seniority: seniorityLevels[Math.floor(Math.random() * seniorityLevels.length)],
-        region: (['ile-de-france', 'lyon', 'remote', 'bordeaux', 'nantes', 'other'] as const)[Math.floor(Math.random() * 6)],
-      });
+  for (const [stackIndex, config] of stackConfigs.entries()) {
+    for (const [dateIndex, date] of dates.entries()) {
+      for (const [levelIndex, level] of seniorityLevels.entries()) {
+        const marketDrift = (dateIndex - 1) * config.trend;
+        const average = config.base + level.offset + marketDrift + stackIndex * 4;
+        records.push({
+          stack: config.stack,
+          date,
+          min: average - 55 - levelIndex * 8,
+          max: average + 65 + levelIndex * 10,
+          average,
+          sampleCount: 4 + dateIndex + levelIndex,
+          seniority: level.seniority,
+          region: regions[(stackIndex + dateIndex + levelIndex) % regions.length] ?? 'other',
+        });
+      }
     }
   }
 

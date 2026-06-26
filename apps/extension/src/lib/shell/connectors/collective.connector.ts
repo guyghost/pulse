@@ -5,12 +5,10 @@ import { type Result, type AppError, ok, err, createConnectorError } from '$lib/
 import { createMission, stripHtml } from '$lib/core/connectors/parser-utils';
 import { mapSkill, extractTjm, mapCollectiveRemote } from '$lib/core/connectors/collective-parser';
 import {
+  type RequestHeaderRuleHeader,
   injectCookieRule,
   removeCookieRule,
-  verifyCookieRule,
-  getCookieCount,
   getCookieNames,
-  type CookieRuleResult,
 } from './cookie-rules';
 import { detectBrowser } from '../../core/browser/browser-compat';
 
@@ -18,7 +16,12 @@ const API_URL = 'https://api.collective.work/graphql';
 const APP_URL = 'https://app.collective.work';
 const COOKIE_DOMAIN = '.collective.work';
 const COOKIE_RULE_ID = 11;
-const URL_FILTER = 'api.collective.work';
+const REQUEST_DOMAIN = 'api.collective.work';
+const URL_FILTER = '|https://api.collective.work/graphql';
+const COLLECTIVE_HEADERS: RequestHeaderRuleHeader[] = [
+  { header: 'Origin', value: APP_URL },
+  { header: 'Referer', value: `${APP_URL}/` },
+];
 
 const GET_ME_QUERY = `
   query Collective_GetMe {
@@ -82,6 +85,60 @@ export class CollectiveConnector extends BaseConnector {
     return APP_URL;
   }
 
+  private async injectScopedCookieRule(): Promise<boolean> {
+    const injectResult = await injectCookieRule(
+      COOKIE_DOMAIN,
+      URL_FILTER,
+      COOKIE_RULE_ID,
+      [REQUEST_DOMAIN],
+      COLLECTIVE_HEADERS
+    );
+    return injectResult.success && injectResult.cookieCount > 0;
+  }
+
+  private async discoverUserSlug(): Promise<boolean> {
+    const ruleInjected = await this.injectScopedCookieRule();
+    if (!ruleInjected) {
+      return false;
+    }
+
+    try {
+      return await this.fetchUserSlugWithActiveRule();
+    } finally {
+      await removeCookieRule(COOKIE_RULE_ID);
+    }
+  }
+
+  private async fetchUserSlugWithActiveRule(): Promise<boolean> {
+    try {
+      const resp = await fetch(API_URL, {
+        method: 'POST',
+        credentials: 'include',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ query: GET_ME_QUERY }),
+      });
+      if (!resp.ok) {
+        return false;
+      }
+
+      const data = (await resp.json()) as {
+        data?: { me?: { members?: { collective?: { slug?: string } }[] } };
+      };
+      const slug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
+      if (!slug) {
+        return false;
+      }
+
+      this.userSlug = slug;
+      if (import.meta.env.DEV) {
+        console.debug(`[collective] GET_ME: userSlug=${this.userSlug}`);
+      }
+      return true;
+    } catch {
+      return false;
+    }
+  }
+
   async detectSession(_now: number): Promise<Result<boolean, AppError>> {
     try {
       const cookies = await chrome.cookies.getAll({ domain: COOKIE_DOMAIN });
@@ -102,30 +159,14 @@ export class CollectiveConnector extends BaseConnector {
         console.debug(
           '[collective] detectSession: no session cookies found, trying fallback detection via cookie injection'
         );
-        const injectResult = await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
-        if (injectResult.success) {
-          try {
-            const resp = await fetch(API_URL, {
-              method: 'POST',
-              credentials: 'include',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({ query: GET_ME_QUERY }),
-            });
-            if (resp.ok) {
-              const data = (await resp.json()) as {
-                data?: { me?: { members?: { collective?: { slug?: string } }[] } };
-              };
-              const slug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
-              if (slug) {
-                console.debug('[collective] detectSession: fallback succeeded, slug:', slug);
-                this.userSlug = slug;
-                return ok(true);
-              }
-            }
-          } catch (fallbackError) {
-            if (import.meta.env.DEV) {
-              console.warn('[collective] detectSession: fallback detection failed:', fallbackError);
-            }
+        try {
+          if (await this.discoverUserSlug()) {
+            console.debug('[collective] detectSession: fallback succeeded, slug:', this.userSlug);
+            return ok(true);
+          }
+        } catch (fallbackError) {
+          if (import.meta.env.DEV) {
+            console.warn('[collective] detectSession: fallback detection failed:', fallbackError);
           }
         }
         console.debug(
@@ -134,26 +175,9 @@ export class CollectiveConnector extends BaseConnector {
         return ok(false);
       }
 
-      // Inject cookie rule once — reused by fetchMissions
-      await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
-
-      // Discover user slug for mission URLs
+      // Discover user slug for mission URLs. The DNR rule is scoped to this request window.
       try {
-        const resp = await fetch(API_URL, {
-          method: 'POST',
-          credentials: 'include',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ query: GET_ME_QUERY }),
-        });
-        if (resp.ok) {
-          const data = (await resp.json()) as {
-            data?: { me?: { members?: { collective?: { slug?: string } }[] } };
-          };
-          this.userSlug = data.data?.me?.members?.[0]?.collective?.slug ?? null;
-          if (import.meta.env.DEV) {
-            console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
-          }
-        }
+        await this.discoverUserSlug();
       } catch {
         // Non-blocking — URLs will use fallback
       }
@@ -169,57 +193,39 @@ export class CollectiveConnector extends BaseConnector {
     context?: ConnectorSearchContext
   ): Promise<Result<Mission[], AppError>> {
     try {
-      // Verify cookie rule is active, re-inject if needed
-      const ruleActive = await verifyCookieRule(COOKIE_RULE_ID);
-      if (!ruleActive) {
-        console.log('[collective] fetchMissions: cookie rule not active, re-injecting');
-        await injectCookieRule(COOKIE_DOMAIN, URL_FILTER, COOKIE_RULE_ID);
-      }
+      const injectResult = await injectCookieRule(
+        COOKIE_DOMAIN,
+        URL_FILTER,
+        COOKIE_RULE_ID,
+        [REQUEST_DOMAIN],
+        COLLECTIVE_HEADERS
+      );
 
       // Log cookie state for diagnostics
-      const cookieCount = await getCookieCount(COOKIE_DOMAIN);
       const cookieNames = await getCookieNames(COOKIE_DOMAIN);
       if (import.meta.env.DEV) {
-        console.log(
-          `[collective] fetchMissions: ${cookieCount} cookies for ${COOKIE_DOMAIN}: [${cookieNames.join(', ')}]`
+        console.debug(
+          `[collective] fetchMissions: ${injectResult.cookieCount} cookies for ${COOKIE_DOMAIN}: [${cookieNames.join(', ')}]`
         );
       }
 
-      // Discover user slug for mission URLs (if not already known)
-      if (!this.userSlug) {
-        try {
-          const meResp = await fetch(API_URL, {
-            method: 'POST',
-            credentials: 'include',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ query: GET_ME_QUERY }),
-          });
-          if (meResp.ok) {
-            const meData = (await meResp.json()) as {
-              data?: { me?: { members?: { collective?: { slug?: string } }[] } };
-            };
-            this.userSlug = meData.data?.me?.members?.[0]?.collective?.slug ?? null;
-            if (import.meta.env.DEV) {
-              console.log(`[collective] GET_ME: userSlug=${this.userSlug}`);
-            }
-          } else {
-            if (import.meta.env.DEV) {
-              console.warn(`[collective] GET_ME failed: HTTP ${meResp.status}`);
-            }
-          }
-        } catch {
-          // Non-blocking — URLs will use fallback
-        }
-      }
-
-      if (cookieCount === 0) {
+      if (!injectResult.success || injectResult.cookieCount === 0) {
         return err(
           createConnectorError(
             'Collective: aucun cookie trouv\u00e9. Connectez-vous sur app.collective.work puis relancez le scan.',
-            { connectorId: this.id, phase: 'detect', context: { cookieCount: 0 } },
+            {
+              connectorId: this.id,
+              phase: 'detect',
+              context: { cookieCount: injectResult.cookieCount },
+            },
             now
           )
         );
+      }
+
+      // Discover user slug for mission URLs (if not already known) while the scoped rule is active.
+      if (!this.userSlug) {
+        await this.fetchUserSlugWithActiveRule();
       }
 
       const body = JSON.stringify({
@@ -227,7 +233,10 @@ export class CollectiveConnector extends BaseConnector {
         variables: {
           data: {
             query: context?.query ?? '',
-            dailyRates: { from: 0, to: null },
+            dailyRates: {
+              from: context?.tjmMin && context.tjmMin > 0 ? context.tjmMin : 0,
+              to: null,
+            },
             locations: context?.location ? [context.location] : [],
             skills: context?.skills ?? [],
             workPreferences:
@@ -264,7 +273,7 @@ export class CollectiveConnector extends BaseConnector {
 
       const contentType = response.headers.get('content-type') ?? '';
       if (import.meta.env.DEV) {
-        console.log(
+        console.debug(
           `[collective] fetchMissions: HTTP ${response.status}, content-type: ${contentType}`
         );
       }
@@ -280,7 +289,6 @@ export class CollectiveConnector extends BaseConnector {
             `[collective] fetchMissions: blocked — status=${response.status}, preview: ${preview}`
           );
         }
-        await removeCookieRule(COOKIE_RULE_ID);
         return err(
           createConnectorError(
             response.status === 403
@@ -324,7 +332,6 @@ export class CollectiveConnector extends BaseConnector {
           console.error(`[collective] fetchMissions: GraphQL errors (full):`, fullErrors);
         }
 
-        await removeCookieRule(COOKIE_RULE_ID);
         return err(
           createConnectorError(
             `Collective GraphQL error: ${fullErrors}`,
@@ -337,7 +344,7 @@ export class CollectiveConnector extends BaseConnector {
       const projects = result.data?.results?.projects ?? [];
       const total = result.data?.results?.pagination?.total ?? 0;
       if (import.meta.env.DEV) {
-        console.log(
+        console.debug(
           `[collective] fetchMissions: ${projects.length} projects returned (total: ${total})`
         );
       }
@@ -358,13 +365,12 @@ export class CollectiveConnector extends BaseConnector {
             : `${APP_URL}/job/${p.slug}`,
           source: 'collective' as const,
           scrapedAt: new Date(now),
+          publishedAt: p.publishedAt ?? null,
         })
       );
 
-      await removeCookieRule(COOKIE_RULE_ID);
       return ok(missions);
     } catch (e) {
-      await removeCookieRule(COOKIE_RULE_ID);
       const message = e instanceof Error ? e.message : String(e);
       console.error('[collective] fetchMissions: unexpected error:', message);
       return err(
@@ -374,6 +380,8 @@ export class CollectiveConnector extends BaseConnector {
           now
         )
       );
+    } finally {
+      await removeCookieRule(COOKIE_RULE_ID);
     }
   }
 }

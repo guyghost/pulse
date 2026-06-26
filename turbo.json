@@ -3,7 +3,13 @@
   "tasks": {
     "build": {
       "dependsOn": ["^build"],
-      "outputs": ["dist/**"]
+      "env": [
+        "PUBLIC_CHROME_STORE_URL",
+        "PUBLIC_LANDING_URL",
+        "PUBLIC_SUPABASE_ANON_KEY",
+        "PUBLIC_SUPABASE_URL"
+      ],
+      "outputs": ["dist/**", ".svelte-kit/**", ".vercel/**"]
     },
     "dev": {
       "cache": false,

@@ -15,6 +15,10 @@ export interface ConnectorSearchContext {
   location: string | null;
   /** Remote preference */
   remote: RemoteType | 'any' | null;
+  /** Minimum desired daily rate (TJM) */
+  tjmMin: number | null;
+  /** Maximum desired daily rate (TJM) */
+  tjmMax: number | null;
   /** Last sync timestamp for incremental scanning (only fetch missions newer than this) */
   lastSync: Date | null;
 }
@@ -44,13 +48,18 @@ export const buildSearchContext = (
   // Do NOT fallback to jobTitle — it's too restrictive for server-side keyword search
   // (e.g., "Développeur Fullstack Senior" matches almost nothing on Free-Work/Hiway/Collective).
   // Relevance is handled locally by scoreMission() with fuzzy matching.
-  const query = profile.searchKeywords.length > 0 ? profile.searchKeywords.join(' ').trim() : '';
+  const query = profile.searchKeywords
+    .map((keyword) => keyword.trim().replace(/\s+/g, ' '))
+    .filter((keyword) => keyword.length > 0)
+    .join(' ');
 
   return {
     query,
     skills: [], // Skills handled by local scoring, not server-side filtering
     location: profile.location || null,
     remote: profile.remote || null,
+    tjmMin: profile.tjmMin > 0 ? profile.tjmMin : null,
+    tjmMax: profile.tjmMax > 0 ? profile.tjmMax : null,
     lastSync,
   };
 };

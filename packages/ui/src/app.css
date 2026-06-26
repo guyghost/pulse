@@ -1,0 +1,109 @@
+@import 'tailwindcss';
+@import '../../design/theme.css';
+
+@source './';
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ================================================
+   * MissionPulse — Analytical Blueprint Design System
+   * Source of truth: packages/design/theme.css
+   * This package only exposes app-level aliases and runtime helpers.
+   * ================================================ */
+
+  /* Dark mode overrides */
+  --color-page-canvas-dark: #0c0a09;
+  --color-surface-white-dark: #1c1917;
+  --color-blueprint-blue-dark: #3b82f6;
+  --color-text-primary-dark: #f5f5f4;
+  --color-text-secondary-dark: #e7e5e4;
+  --color-text-muted-dark: #78716c;
+  --color-text-subtle-dark: #a8a29e;
+  --color-subtle-gray-dark: #292524;
+  --color-border-light-dark: #292524;
+  --color-disabled-gray-dark: #57534d;
+
+  /* Typography aliases used by apps and components */
+  --font-display: var(--font-fh-total-display-regular);
+  --font-system: var(--font-system-ui);
+  --font-sans: var(--font-geist);
+  --font-mono: 'JetBrains Mono', ui-monospace, monospace;
+
+  --radius-lg: 8px;
+
+  /* Dark shadows */
+  --shadow-sm-dark: rgba(0, 0, 0, 0.2) 0px 2px 4px 0px;
+  --shadow-subtle-dark: rgba(0, 0, 0, 0.25) 0px 1px 2px 0px;
+  --shadow-subtle-2-dark: rgba(0, 0, 0, 0.15) 0px 1px 2px 0px;
+  --shadow-subtle-3-dark: rgba(0, 0, 0, 0.3) 0px 2px 3px 0px;
+  --shadow-xl-dark: rgba(0, 0, 0, 0.5) 0px 14px 32px 0px;
+}
+
+/* ================================================
+ * Base Styles
+ * ================================================ */
+
+:root {
+  color-scheme: light;
+}
+
+.dark {
+  color-scheme: dark;
+
+  --color-page-canvas: var(--color-page-canvas-dark);
+  --color-surface-white: var(--color-surface-white-dark);
+  --color-blueprint-blue: var(--color-blueprint-blue-dark);
+  --color-text-primary: var(--color-text-primary-dark);
+  --color-text-secondary: var(--color-text-secondary-dark);
+  --color-text-muted: var(--color-text-muted-dark);
+  --color-text-subtle: var(--color-text-subtle-dark);
+  --color-subtle-gray: var(--color-subtle-gray-dark);
+  --color-border-light: var(--color-border-light-dark);
+  --color-disabled-gray: var(--color-disabled-gray-dark);
+
+  --shadow-sm: var(--shadow-sm-dark);
+  --shadow-subtle: var(--shadow-subtle-dark);
+  --shadow-subtle-2: var(--shadow-subtle-2-dark);
+  --shadow-subtle-3: var(--shadow-subtle-3-dark);
+  --shadow-xl: var(--shadow-xl-dark);
+}
+
+::selection {
+  background: rgba(11, 100, 233, 0.2);
+  color: var(--color-text-primary);
+}
+
+/* ================================================
+ * Utility Classes
+ * ================================================ */
+
+@layer components {
+  .soft-ring {
+    box-shadow: var(--shadow-subtle-2);
+  }
+
+  .eyebrow {
+    font-family: var(--font-system);
+    font-size: var(--text-caption);
+    line-height: var(--leading-caption);
+    letter-spacing: 0.16em;
+    text-transform: uppercase;
+  }
+}
+
+/* ================================================
+ * Radar animation
+ * ================================================ */
+
+@keyframes radar-ping {
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(1.8);
+  }
+}
+
+.radar-ping {
+  animation: radar-ping 1.8s cubic-bezier(0, 0, 0.2, 1) infinite;
+}

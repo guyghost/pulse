@@ -14,18 +14,21 @@
 
 ## Résumé court (132 caractères max)
 
-> Radar freelance : 5 plateformes, scoring IA, analyse TJM. 100% local, zéro tracking. Gratuit et open source.
+> Radar freelance tech : 5 plateformes, 1 feed scoré, dashboard connecté optionnel. Exécution navigateur.
 
 ---
 
 ## Description détaillée
 
-**MissionPulse** est une extension Chrome gratuite pour les freelances tech. Elle centralise les missions de 5 plateformes dans un panneau latéral unique avec scoring de pertinence par IA.
+**MissionPulse** est une extension Chrome gratuite pour les freelances tech français. Elle centralise les missions de Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans un panneau latéral unique, score les meilleures opportunités et aide à transformer la veille en pipeline de candidatures.
+
+Pensé pour les développeurs freelances 3+ ans, TJM 450-900€, qui surveillent des requêtes comme `missions freelance Java`, `mission freelance Spring Boot`, `TJM développeur freelance` ou `Free-Work LeHibou alternative`.
 
 ### Fonctionnalités
 
 - **Feed centralisé** — Regroupe les missions de Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans une seule interface.
 - **Scoring IA** — Chaque mission reçoit un score basé sur vos compétences, TJM, localisation, séniorité et préférences remote. Gemini Nano (IA locale Chrome) affine le score sémantiquement.
+- **Shortlist actionnable** — Les missions 80+ compatibles avec votre stack, votre TJM et votre remote remontent avant le bruit.
 - **Bonus urgence** — Les missions avec une date de début proche sont mises en avant automatiquement.
 - **Dashboard TJM** — Historique et tendances du taux journalier par stack et par source. Négociez avec des données.
 - **Déduplication intelligente** — Détecte et fusionne les missions publiées sur plusieurs plateformes simultanément.
@@ -33,7 +36,7 @@
 - **Comparaison** — Sélectionnez jusqu'à 3 missions et comparez-les côte à côte (TJM, stack, remote, durée).
 - **Scan parallèle** — 5 connecteurs lancés simultanément pour un scan complet en moins de 30 secondes.
 - **Export** — Exportez vos missions en JSON, CSV ou Markdown, avec filtres appliqués.
-- **100% local** — Aucun serveur, aucun tracking, aucune collecte de données. Tout reste sur votre machine.
+- **Dashboard connecté optionnel** — L'exécution plateforme reste dans votre navigateur; les snapshots normalisés peuvent être synchronisés via Supabase pour retrouver missions, candidatures et CV canonique dans le dashboard.
 
 ### Plateformes connectées
 
@@ -49,6 +52,7 @@
 2. **Configurez** votre profil : compétences, TJM cible, localisation, séniorité et préférences.
 3. **Connectez-vous** aux plateformes supportées dans votre navigateur (sessions existantes).
 4. **Ouvrez le panneau latéral** — MissionPulse scanne les plateformes et affiche les missions triées par pertinence.
+5. **Connectez le dashboard si besoin** — Un compte MissionPulse permet de synchroniser missions, pipeline de candidature, assets générés et CV canonique.
 
 ### Compatibilité
 
@@ -56,30 +60,30 @@ Fonctionne sur Chrome, Brave, Edge, Arc et Dia.
 
 ### Vie privée
 
-MissionPulse ne s'appuie sur aucun serveur externe. Le profil, les missions, les favoris, les caches et l'historique TJM restent stockés localement via IndexedDB et chrome.storage. Le scoring IA utilise Gemini Nano qui tourne entièrement sur votre machine, sans clé API externe. Code source ouvert sur GitHub.
+L'exécution plateforme reste locale dans votre navigateur et MissionPulse ne stocke jamais vos identifiants de plateformes. Le mode dashboard connecté synchronise uniquement des snapshots normalisés via Supabase: missions, scores, pipeline de candidature, assets générés et CV canonique. Nous ne synchronisons pas les mots de passe, cookies, jetons de session, ni le HTML brut LinkedIn. Le scoring IA utilise Gemini Nano sur votre machine quand il est disponible. Code source ouvert sur GitHub.
 
 ---
 
 ## Assets Chrome Web Store
 
-| Asset | Fichier | Taille |
-|---|---|---|
-| Screenshot 1 — Feed | `store-assets/screenshot-1-feed.png` | 1280×800 |
-| Screenshot 2 — TJM | `store-assets/screenshot-2-tjm.png` | 1280×800 |
+| Asset                  | Fichier                                 | Taille   |
+| ---------------------- | --------------------------------------- | -------- |
+| Screenshot 1 — Feed    | `store-assets/screenshot-1-feed.png`    | 1280×800 |
+| Screenshot 2 — TJM     | `store-assets/screenshot-2-tjm.png`     | 1280×800 |
 | Screenshot 3 — Privacy | `store-assets/screenshot-3-privacy.png` | 1280×800 |
-| Promo tile | `store-assets/promo-tile-440x280.png` | 440×280 |
-| Icône 128px | `static/icons/icon-128.png` | 128×128 |
+| Promo tile             | `store-assets/promo-tile-440x280.png`   | 440×280  |
+| Icône 128px            | `static/icons/icon-128.png`             | 128×128  |
 
 ---
 
 ## Permissions justifiées
 
-| Permission | Justification |
-|---|---|
-| `sidePanel` | Interface utilisateur dans le panneau latéral Chrome |
-| `storage` | Stockage local du profil, paramètres et cache |
-| `cookies` | Détection de session sur les plateformes (LeHibou, Collective, Cherry Pick) |
-| `alarms` | Scan automatique programmé en arrière-plan |
-| `notifications` | Alertes pour les missions à haut score |
-| `declarativeNetRequest` | Réécriture headers Origin/Referer pour les API cross-origin |
-| `host_permissions` | Accès aux 5 plateformes pour le scraping de missions |
+| Permission              | Justification                                                               |
+| ----------------------- | --------------------------------------------------------------------------- |
+| `sidePanel`             | Interface utilisateur dans le panneau latéral Chrome                        |
+| `storage`               | Stockage local du profil, paramètres et cache                               |
+| `cookies`               | Détection de session sur les plateformes (LeHibou, Collective, Cherry Pick) |
+| `alarms`                | Scan automatique programmé en arrière-plan                                  |
+| `notifications`         | Alertes pour les missions à haut score                                      |
+| `declarativeNetRequest` | Réécriture headers Origin/Referer pour les API cross-origin                 |
+| `host_permissions`      | Accès aux 5 plateformes pour le scraping de missions                        |

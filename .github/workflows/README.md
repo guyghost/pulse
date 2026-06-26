@@ -4,11 +4,10 @@ This directory contains all GitHub Actions workflows for MissionPulse.
 
 ## Workflows Overview
 
-| File | Name | Trigger | Purpose |
-|------|------|---------|---------|
-| `ci.yml` | CI | Push, PR | Continuous integration |
+| File          | Name    | Trigger   | Purpose                  |
+| ------------- | ------- | --------- | ------------------------ |
+| `ci.yml`      | CI      | Push, PR  | Continuous integration   |
 | `release.yml` | Release | Tags `v*` | Build & publish releases |
-| `connector-health.yml` | Connector Health | Cron, Manual | Monitor connector status |
 
 ## Detailed Documentation
 
@@ -29,16 +28,10 @@ git tag v1.0.0
 git push origin v1.0.0
 ```
 
-### Run connector health check
+### Create a dry-run release (manual dispatch)
 
 ```bash
-gh workflow run connector-health.yml
-```
-
-### Run health check for specific connectors
-
-```bash
-gh workflow run connector-health.yml -f connectors=freework,lehibou
+gh workflow run release.yml -f version=1.0.0 -f dry_run=true
 ```
 
 ## Workflow Files
@@ -46,17 +39,19 @@ gh workflow run connector-health.yml -f connectors=freework,lehibou
 ### ci.yml
 
 **Triggers:**
-- Push to `main` branch
-- Pull requests
+
+- Push to `develop` and `main`
+- Pull requests targeting `develop` and `main`
 - Manual dispatch
 
 **Jobs:**
+
 1. `setup` - Compute cache paths
 2. `lint` - ESLint
 3. `format` - Prettier check
 4. `typecheck` - TypeScript
 5. `test` - Vitest with coverage
-6. `build` - Vite build
+6. `build` - Vite build, built manifest verification, ZIP artifact
 7. `test-e2e` - Playwright (PRs only)
 
 **Concurrency:** Previous runs on same branch are cancelled.
@@ -66,69 +61,59 @@ gh workflow run connector-health.yml -f connectors=freework,lehibou
 ### release.yml
 
 **Triggers:**
-- Tags matching `v*` (e.g., `v1.0.0`, `v2.1.0-beta.1`)
+
+- Tags matching `v*.*.*` (e.g., `v1.0.0`, `v2.1.0-beta.1`)
+- Manual dispatch with `version` and `dry_run` inputs
+
+**Inputs (manual dispatch):**
+
+- `version` - Version to release (required)
+- `dry_run` - Build and verify but skip GitHub Release and CWS publish (default: false)
 
 **Jobs:**
-1. `build-and-release` - Build, ZIP, GitHub Release
-2. `publish-to-chrome-store` - CWS publish (stable only)
+
+1. `build-and-release` - Typecheck, test, bump version, build, verify manifest version match, reproducible ZIP, GitHub Release
+2. `publish-to-chrome-store` - CWS publish (stable, non-dry-run, secrets configured only)
+3. `publish-skip-notice` - Explains why CWS publish was skipped
+
+**Version Validation Gates:**
+
+- Tag version format validated (`X.Y.Z` or `X.Y.Z-prerelease`)
+- Root `package.json` `version` must match the release version after bump (hard error)
+- Built manifest `version` must match tag version (hard error)
+- Source manifest `version` must match tag version after bump (hard error)
+- Root `package.json`, extension `package.json`, and `manifest.json` are bumped in lockstep
 
 **Pre-releases:** Tags with `-` (e.g., `v1.0.0-beta.1`) skip CWS publish.
 
-**Required Secrets:**
+**Dry Run:** Manual dispatch with `dry_run: true` builds and verifies but skips release/publish.
+
+**Required Secrets (for CWS publish):**
+
+- `CHROME_EXTENSION_ID`
 - `CHROME_CLIENT_ID`
 - `CHROME_CLIENT_SECRET`
 - `CHROME_REFRESH_TOKEN`
-- `CHROME_EXTENSION_ID`
 
----
-
-### connector-health.yml
-
-**Triggers:**
-- Schedule: Daily at 8:00 UTC
-- Manual dispatch
-
-**Inputs:**
-- `connectors` - Comma-separated connector names (optional)
-- `skip_issue` - Skip GitHub Issue creation (default: false)
-
-**Job:**
-1. `health-check` - Run connector tests
-2. `notify-success` - Log success (scheduled only)
-
-**Failure Handling:**
-Creates/updates GitHub Issue with failure details.
+When secrets are not configured, the workflow succeeds with a warning.
 
 ## Permissions
 
-| Workflow | Permissions |
-|----------|-------------|
-| ci.yml | `contents: read` |
+| Workflow    | Permissions       |
+| ----------- | ----------------- |
+| ci.yml      | `contents: read`  |
 | release.yml | `contents: write` |
-| connector-health.yml | `contents: read`, `issues: write` |
 
 ## Actions Used
 
-| Action | Version | Purpose |
-|--------|---------|---------|
-| `actions/checkout` | v4 | Git checkout |
-| `actions/setup-node` | v4 | Node.js setup |
-| `pnpm/action-setup` | v4 | pnpm setup |
-| `actions/cache` | v4 | Dependency cache |
-| `actions/upload-artifact` | v4 | Artifact upload |
-| `actions/download-artifact` | v4 | Artifact download |
-| `codecov/codecov-action` | v4 | Coverage upload |
-| `softprops/action-gh-release` | v2 | GitHub releases |
-| `mnao305/chrome-extension-upload` | v5.0.0 | CWS publish |
-| `JasonEtco/create-an-issue` | v2 | Issue creation |
-
-## Issue Templates
-
-### connector-failure.md
-
-Used by `connector-health.yml` to create issues when health checks fail.
-
-Variables:
-- `{{ env.DATE }}` - Failure date
-- `{{ env.FAILED_CONNECTORS }}` - List of failed connectors
-- `{{ env.RUN_URL }}` - Link to workflow run
+| Action                            | Version | Purpose           |
+| --------------------------------- | ------- | ----------------- |
+| `actions/checkout`                | v4      | Git checkout      |
+| `actions/setup-node`              | v4      | Node.js setup     |
+| `pnpm/action-setup`               | v4      | pnpm setup        |
+| `actions/cache`                   | v4      | Dependency cache  |
+| `actions/upload-artifact`         | v4      | Artifact upload   |
+| `actions/download-artifact`       | v4      | Artifact download |
+| `codecov/codecov-action`          | v4      | Coverage upload   |
+| `softprops/action-gh-release`     | v2      | GitHub releases   |
+| `mnao305/chrome-extension-upload` | v5.0.0  | CWS publish       |

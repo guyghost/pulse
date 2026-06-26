@@ -4,8 +4,8 @@
  *
  * Usage: tsx scripts/bump-version.ts <version>
  *
- * This script updates the version field in both package.json and
- * src/manifest.json to ensure consistency across the project.
+ * This script updates the version field in root package.json, extension
+ * package.json, and src/manifest.json to ensure consistency across the project.
  *
  * The version is injected as a pure string - no validation or
  * transformation is performed beyond basic format checking.
@@ -18,13 +18,16 @@ import { fileURLToPath } from 'url';
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
 
+// Resolve monorepo root (two levels up from scripts/)
+const MONOREPO_ROOT = resolve(__dirname, '../../..');
+
 // Pure functions - no I/O
 
 /**
  * Validates a semantic version string.
  * Accepts: X.Y.Z or X.Y.Z-prerelease
  */
-const isValidSemver = (version: string): boolean => {
+export const isValidSemver = (version: string): boolean => {
   const semverRegex = /^\d+\.\d+\.\d+(-[a-zA-Z0-9.]+)?$/;
   return semverRegex.test(version);
 };
@@ -32,7 +35,7 @@ const isValidSemver = (version: string): boolean => {
 /**
  * Updates version in package.json content.
  */
-const updatePackageJsonVersion = (content: string, version: string): string => {
+export const updatePackageJsonVersion = (content: string, version: string): string => {
   const parsed = JSON.parse(content);
   parsed.version = version;
   return JSON.stringify(parsed, null, 2) + '\n';
@@ -41,7 +44,7 @@ const updatePackageJsonVersion = (content: string, version: string): string => {
 /**
  * Updates version in manifest.json content.
  */
-const updateManifestVersion = (content: string, version: string): string => {
+export const updateManifestVersion = (content: string, version: string): string => {
   const parsed = JSON.parse(content);
   parsed.version = version;
   return JSON.stringify(parsed, null, 2) + '\n';
@@ -49,7 +52,7 @@ const updateManifestVersion = (content: string, version: string): string => {
 
 // Main function
 
-const main = (): void => {
+export const main = (): void => {
   const args = process.argv.slice(2);
 
   if (args.length !== 1) {
@@ -67,27 +70,42 @@ const main = (): void => {
   }
 
   const projectRoot = resolve(__dirname, '..');
-  const packageJsonPath = resolve(projectRoot, 'package.json');
+  const rootPackageJsonPath = resolve(MONOREPO_ROOT, 'package.json');
+  const extPackageJsonPath = resolve(projectRoot, 'package.json');
   const manifestJsonPath = resolve(projectRoot, 'src/manifest.json');
 
   // Read current content
-  const packageJsonContent = readFileSync(packageJsonPath, 'utf-8');
-  const manifestJsonContent = readFileSync(manifestJsonPath, 'utf-8');
+  const rootPackageContent = readFileSync(rootPackageJsonPath, 'utf-8');
+  const extPackageContent = readFileSync(extPackageJsonPath, 'utf-8');
+  const manifestContent = readFileSync(manifestJsonPath, 'utf-8');
 
-  // Parse and update
-  const currentPackageVersion = JSON.parse(packageJsonContent).version;
-  const currentManifestVersion = JSON.parse(manifestJsonContent).version;
+  // Parse for display
+  const currentRootVersion = JSON.parse(rootPackageContent).version;
+  const currentExtVersion = JSON.parse(extPackageContent).version;
+  const currentManifestVersion = JSON.parse(manifestContent).version;
 
   console.log(`Bumping version:`);
-  console.log(`  package.json: ${currentPackageVersion} → ${version}`);
-  console.log(`  manifest.json: ${currentManifestVersion} → ${version}`);
+  console.log(`  root package.json:   ${currentRootVersion} → ${version}`);
+  console.log(`  ext package.json:    ${currentExtVersion} → ${version}`);
+  console.log(`  ext manifest.json:   ${currentManifestVersion} → ${version}`);
 
   // Write updated content
-  writeFileSync(packageJsonPath, updatePackageJsonVersion(packageJsonContent, version), 'utf-8');
-
-  writeFileSync(manifestJsonPath, updateManifestVersion(manifestJsonContent, version), 'utf-8');
+  writeFileSync(
+    rootPackageJsonPath,
+    updatePackageJsonVersion(rootPackageContent, version),
+    'utf-8'
+  );
+  writeFileSync(extPackageJsonPath, updatePackageJsonVersion(extPackageContent, version), 'utf-8');
+  writeFileSync(manifestJsonPath, updateManifestVersion(manifestContent, version), 'utf-8');
 
   console.log(`\n✅ Version bumped to ${version}`);
 };
 
-main();
+const isExecutedDirectly = (): boolean => {
+  const entryPoint = process.argv[1];
+  return entryPoint ? resolve(entryPoint) === __filename : false;
+};
+
+if (isExecutedDirectly()) {
+  main();
+}

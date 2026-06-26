@@ -6,11 +6,18 @@ import {
   waitForMissions,
   getFirstMissionCard,
   favoriteMission,
+  feedSearchInput,
   hideMission,
+  ensureFeedVisible,
+  expectFeedReady,
+  expectMissionCount,
+  missionCards,
+  navButton,
   toggleFavoritesFilter,
   showHiddenMissions,
   injectMissions,
-  triggerScan,
+  getDisplayedMissionCount,
+  clearFeedSearch,
 } from '../helpers';
 
 test.describe('Full User Journey', () => {
@@ -24,7 +31,9 @@ test.describe('Full User Journey', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByText('Configurez en 30 secondes')).toBeVisible({ timeout: 5000 });
+    await expect(page.getByRole('heading', { name: 'Affinez votre radar' })).toBeVisible({
+      timeout: 5000,
+    });
 
     // 2. Remplir le profil
     await completeOnboarding(page, {
@@ -34,16 +43,14 @@ test.describe('Full User Journey', () => {
 
     // 3. Arriver sur le feed
     await expect(page.getByText('Bonjour, Jean')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expectFeedReady(page);
 
     // 4. Lancer un scan (le scan auto démarre)
     // Attendre que le scan charge des missions
     await waitForMissions(page, 1, 10000);
 
     // 5. Voir des missions apparaître
-    const initialText = await page.locator('text=/\\d+ mission/').textContent();
-    expect(initialText).toMatch(/\d+ mission/);
-    const initialCount = parseInt(initialText?.match(/\d+/)?.[0] || '0', 10);
+    const initialCount = await getDisplayedMissionCount(page);
     expect(initialCount).toBeGreaterThanOrEqual(1);
 
     // Injecter des missions supplémentaires pour les tests suivants
@@ -56,11 +63,11 @@ test.describe('Full User Journey', () => {
 
     // 7. Vérifier le compteur de favoris
     await toggleFavoritesFilter(page, true);
-    await expect(page.getByText('1 mission')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 1, 2000);
 
     // Retourner à toutes les missions
     await toggleFavoritesFilter(page, false);
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 5, 2000);
 
     // 8. Masquer une mission
     const cardToHide = await getFirstMissionCard(page);
@@ -68,28 +75,27 @@ test.describe('Full User Journey', () => {
 
     // 9. Vérifier le filtre "masquées"
     // Le compteur doit avoir diminué
-    await expect(page.getByText('4 missions')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 4, 2000);
 
     // Le lien "Voir les masquées" doit apparaître
-    await expect(page.getByText(/Voir les? \d+ masquee/)).toBeVisible();
+    await expect(page.getByRole('button', { name: /Voir les? \d+ mission.*masqu/i })).toBeVisible();
 
     // Afficher les missions masquées
     await showHiddenMissions(page);
 
     // On devrait revoir 5 missions
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 5, 2000);
 
     // 10. Recharger la page → données persistées
     await page.reload();
 
     // Le profil doit être conservé (pas d'onboarding)
     await expect(page.getByText('Bonjour, Jean')).toBeVisible({ timeout: 3000 });
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expectFeedReady(page);
   });
 
   test('user can favorite multiple missions and filter persists', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter 10 missions
     await injectMissions(page, 10);
@@ -97,54 +103,51 @@ test.describe('Full User Journey', () => {
 
     // Favoriser 3 missions
     for (let i = 0; i < 3; i++) {
-      const card = page.locator('[role="button"]').nth(i);
+      const card = missionCards(page).nth(i);
       await favoriteMission(card);
     }
 
     // Filtrer les favoris
     await toggleFavoritesFilter(page, true);
-    await expect(page.getByText('3 missions')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 3, 2000);
 
     // Recharger et vérifier que les favoris sont conservés
     await page.reload();
 
     // Attendre le chargement
-    await expect(page.getByText('Missions')).toBeVisible();
+    await expectFeedReady(page);
 
-    // Vérifier que le filtre favoris est toujours actif
-    await expect(page.getByText('3 missions')).toBeVisible({ timeout: 5000 });
+    // Le filtre revient à "toutes", mais les favoris sauvegardés restent disponibles.
+    await expectMissionCount(page, 10, 5000);
+    await toggleFavoritesFilter(page, true);
+    await expectMissionCount(page, 3, 5000);
   });
 
   test('user can navigate through different views and back', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter des missions
     await injectMissions(page, 3);
     await waitForMissions(page, 3, 5000);
 
     // Naviguer vers TJM
-    await page.getByRole('button', { name: 'TJM' }).click();
-    await expect(page.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
+    await navButton(page, 'TJM').click();
+    await expect(navButton(page, 'TJM')).toHaveAttribute('aria-current', 'page');
 
     // Naviguer vers Settings
-    await page.getByRole('button', { name: 'Settings' }).click();
-    await expect(page.getByRole('button', { name: 'Settings' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    await navButton(page, 'Settings').click();
+    await expect(navButton(page, 'Settings')).toHaveAttribute('aria-current', 'page');
 
     // Revenir au Feed
-    await page.getByRole('button', { name: 'Feed' }).click();
-    await expect(page.getByText('Missions')).toBeVisible();
+    await navButton(page, 'Feed').click();
+    await expectFeedReady(page);
 
     // Les missions doivent toujours être là
-    await expect(page.getByText('3 missions')).toBeVisible({ timeout: 3000 });
+    await expectMissionCount(page, 3, 3000);
   });
 
   test('user can search and favorite from search results', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter des missions
     await injectMissions(page, 10);
@@ -154,37 +157,34 @@ test.describe('Full User Journey', () => {
     const initialCount = 10;
 
     // Rechercher
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    await feedSearchInput(page).fill('React');
     await page.waitForTimeout(500);
 
     // Vérifier qu'on a des résultats filtrés
-    const missionText = await page.locator('text=/\\d+ mission/').textContent();
-    expect(missionText).toMatch(/\d+ mission/);
-    const filteredCount = parseInt(missionText?.match(/\d+/)?.[0] || '0', 10);
+    const filteredCount = await getDisplayedMissionCount(page);
     expect(filteredCount).toBeLessThanOrEqual(initialCount);
 
     // Vérifier que la recherche a bien filtré
-    await expect(page.getByPlaceholder('Rechercher...')).toHaveValue('React');
+    await expect(feedSearchInput(page)).toHaveValue('React');
 
     // Favoriser la première mission des résultats de recherche
     const firstResult = await getFirstMissionCard(page);
     await favoriteMission(firstResult);
 
     // Effacer la recherche
-    await page.getByPlaceholder('Rechercher...').clear();
+    await clearFeedSearch(page);
     await page.waitForTimeout(300);
 
     // Vérifier qu'on retrouve toutes les missions
-    await expect(page.getByText(`${initialCount} missions`)).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, initialCount, 2000);
 
     // Vérifier que le favori est toujours là
     await toggleFavoritesFilter(page, true);
-    await expect(page.getByText('1 mission')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 1, 2000);
   });
 
   test('hidden missions count shows correct number', async ({ page }) => {
-    await page.goto(SIDE_PANEL);
-    await expect(page.getByText('Missions')).toBeVisible();
+    await ensureFeedVisible(page);
 
     // Injecter 8 missions
     await injectMissions(page, 8);
@@ -192,16 +192,16 @@ test.describe('Full User Journey', () => {
 
     // Masquer 3 missions
     for (let i = 0; i < 3; i++) {
-      const card = page.locator('[role="button"]').first();
+      const card = missionCards(page).first();
       await hideMission(card);
     }
 
     // Vérifier le compteur de masquées
-    await expect(page.getByText('5 missions')).toBeVisible({ timeout: 2000 });
-    await expect(page.getByText(/Voir les 3 masqu/)).toBeVisible();
+    await expectMissionCount(page, 5, 2000);
+    await expect(page.getByRole('button', { name: /Voir les 3 mission.*masqu/i })).toBeVisible();
 
     // Cliquer pour voir les masquées
     await showHiddenMissions(page);
-    await expect(page.getByText('8 missions')).toBeVisible({ timeout: 2000 });
+    await expectMissionCount(page, 8, 2000);
   });
 });

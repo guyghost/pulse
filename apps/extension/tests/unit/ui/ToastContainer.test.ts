@@ -1,5 +1,5 @@
 import { describe, it, expect, beforeEach } from 'vitest';
-import { mount, tick, flushSync } from 'svelte';
+import { mount, flushSync } from 'svelte';
 import { ToastStore } from '../../../src/lib/state/toast.svelte.ts';
 import ToastContainer from '../../../src/ui/organisms/ToastContainer.svelte';
 

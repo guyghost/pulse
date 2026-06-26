@@ -3,7 +3,18 @@ name: Release
 on:
   push:
     tags:
-      - 'v*'
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., 1.2.3). Must match the tag if triggered by tag push.'
+        required: true
+        type: string
+      dry_run:
+        description: 'Dry run: build and verify but skip GitHub Release and CWS publish'
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -16,7 +27,7 @@ jobs:
   build-and-release:
     name: Build & Release Extension
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 20
     outputs:
       version: ${{ steps.version.outputs.version }}
 
@@ -25,6 +36,9 @@ jobs:
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
+
+      - name: Enable Corepack
+        run: corepack enable
 
       - name: Setup pnpm
         uses: pnpm/action-setup@v4
@@ -40,49 +54,107 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Extract version from tag
+      - name: Extract version from tag or input
         id: version
         run: |
-          # Remove 'v' prefix from tag (e.g., v1.0.0 -> 1.0.0)
-          VERSION="${GITHUB_REF#refs/tags/v}"
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+          else
+            VERSION="${GITHUB_REF#refs/tags/v}"
+          fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "Building version: $VERSION"
 
-      - name: Verify manifest.json
-        run: pnpm --filter @pulse/extension verify-manifest
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^[0-9]+\.[0-9]+\.[0-9]+(-[a-zA-Z0-9.]+)?$ ]]; then
+            echo "::error::Invalid version format: $VERSION (expected X.Y.Z or X.Y.Z-prerelease)"
+            exit 1
+          fi
 
-      - name: Bump version in files
+      - name: Run TypeScript checks
+        run: pnpm turbo typecheck
+
+      - name: Run tests
+        run: pnpm turbo test
+
+      - name: Bump version in all package.json and manifest.json
         run: pnpm --filter @pulse/extension bump-version ${{ steps.version.outputs.version }}
+
+      - name: Verify root package version matches release version
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFileSync } from 'node:fs';
+
+          const expectedVersion = '${{ steps.version.outputs.version }}';
+          const rootPackage = JSON.parse(readFileSync('package.json', 'utf8'));
+
+          if (rootPackage.version !== expectedVersion) {
+            console.error(
+              `❌ Version mismatch: root package.json has ${rootPackage.version}, expected ${expectedVersion}`
+            );
+            process.exit(1);
+          }
+
+          console.log(`✅ Root package version matches expected: ${expectedVersion}`);
+          EOF
+
+      - name: Verify extension package version matches release version
+        run: |
+          node --input-type=module <<'EOF'
+          import { readFileSync } from 'node:fs';
+
+          const expectedVersion = '${{ steps.version.outputs.version }}';
+          const extPackage = JSON.parse(readFileSync('apps/extension/package.json', 'utf8'));
+
+          if (extPackage.version !== expectedVersion) {
+            console.error(
+              `❌ Version mismatch: apps/extension/package.json has ${extPackage.version}, expected ${expectedVersion}`
+            );
+            process.exit(1);
+          }
+
+          console.log(`✅ Extension package version matches expected: ${expectedVersion}`);
+          EOF
 
       - name: Build extension
         run: pnpm turbo build
 
-      - name: Create extension ZIP
+      - name: Verify built manifest version matches release version
+        run: |
+          pnpm --filter @pulse/extension verify-manifest dist/manifest.json --expected-version ${{ steps.version.outputs.version }}
+
+      - name: Verify source manifest version matches release version
+        run: |
+          pnpm --filter @pulse/extension verify-manifest --expected-version ${{ steps.version.outputs.version }}
+
+      - name: Create extension ZIP (reproducible)
         run: |
           cd apps/extension/dist
-          zip -r ../missionpulse-${{ steps.version.outputs.version }}.zip .
-          cd ..
+          find . -type f | sort | zip -X -@ ../missionpulse-${{ steps.version.outputs.version }}.zip
 
       - name: Generate changelog
         id: changelog
         run: |
-          # Get previous tag
           PREV_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          CURRENT_TAG="${{ steps.version.outputs.version }}"
 
           if [ -n "$PREV_TAG" ]; then
-            echo "Generating changelog from $PREV_TAG to ${{ github.ref_name }}"
-            CHANGELOG=$(git log --pretty=format:"- %s (%h)" $PREV_TAG..HEAD 2>/dev/null || echo "- Release ${{ steps.version.outputs.version }}")
+            echo "Generating changelog from $PREV_TAG to v$CURRENT_TAG"
+            CHANGELOG=$(git log --pretty=format:"- %s (%h)" "$PREV_TAG"..HEAD 2>/dev/null || echo "- Release $CURRENT_TAG")
           else
             echo "First release, generating initial changelog"
             CHANGELOG=$(git log --pretty=format:"- %s (%h)" -10 || echo "- Initial release")
           fi
 
-          # Write changelog using EOF syntax for multiline output
+          echo "prev_tag=$PREV_TAG" >> $GITHUB_OUTPUT
           echo "changelog<<EOF" >> $GITHUB_OUTPUT
           echo "$CHANGELOG" >> $GITHUB_OUTPUT
           echo "EOF" >> $GITHUB_OUTPUT
 
       - name: Create GitHub Release
+        if: ${{ !inputs.dry_run }}
         uses: softprops/action-gh-release@v2
         with:
           name: MissionPulse v${{ steps.version.outputs.version }}
@@ -97,20 +169,20 @@ jobs:
 
             ---
 
-            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ github.ref_name }}...HEAD
+            **Full Changelog**: https://github.com/${{ github.repository }}/compare/${{ steps.changelog.outputs.prev_tag || 'HEAD~10' }}...${{ github.ref_name }}
           files: |
-            missionpulse-${{ steps.version.outputs.version }}.zip
+            apps/extension/missionpulse-${{ steps.version.outputs.version }}.zip
           draft: false
           prerelease: ${{ contains(steps.version.outputs.version, '-') }}
           generate_release_notes: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload build artifact
+      - name: Upload extension ZIP artifact
         uses: actions/upload-artifact@v4
         with:
-          name: missionpulse-${{ steps.version.outputs.version }}
-          path: apps/extension/dist/
+          name: missionpulse-zip-${{ steps.version.outputs.version }}
+          path: apps/extension/missionpulse-${{ steps.version.outputs.version }}.zip
           retention-days: 30
 
   publish-to-chrome-store:
@@ -118,48 +190,51 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 10
     needs: build-and-release
-    if: ${{ !contains(github.ref_name, '-') }} # Only publish stable releases (no pre-release tags)
+    if: >-
+      ${{
+        !contains(needs.build-and-release.outputs.version, '-') &&
+        !inputs.dry_run &&
+        secrets.CHROME_EXTENSION_ID != ''
+      }}
 
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Download extension artifact
+      - name: Download extension ZIP artifact
         uses: actions/download-artifact@v4
         with:
-          name: missionpulse-${{ needs.build-and-release.outputs.version }}
-          path: apps/extension/dist/
-
-      - name: Create ZIP for Chrome Store
-        run: |
-          cd dist
-          zip -r ../extension.zip .
+          name: missionpulse-zip-${{ needs.build-and-release.outputs.version }}
+          path: ./
 
       - name: Publish to Chrome Web Store
-        if: ${{ env.CHROME_EXTENSION_ID != '' }}
         uses: mnao305/chrome-extension-upload@v5.0.0
         with:
-          file-path: extension.zip
+          file-path: missionpulse-${{ needs.build-and-release.outputs.version }}.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}
           client-id: ${{ secrets.CHROME_CLIENT_ID }}
           client-secret: ${{ secrets.CHROME_CLIENT_SECRET }}
           refresh-token: ${{ secrets.CHROME_REFRESH_TOKEN }}
-        env:
-          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
 
-      - name: Publish notification
-        if: ${{ env.CHROME_EXTENSION_ID == '' }}
+      - name: Publish success
         run: |
-          echo "::warning::Chrome Web Store credentials not configured. Skipping CWS publish."
-          echo "To enable Chrome Web Store publishing, configure the following secrets:"
-          echo "  - CHROME_EXTENSION_ID"
-          echo "  - CHROME_CLIENT_ID"
-          echo "  - CHROME_CLIENT_SECRET"
-          echo "  - CHROME_REFRESH_TOKEN"
-        env:
-          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+          echo "✅ Published v${{ needs.build-and-release.outputs.version }} to Chrome Web Store"
+
+  publish-skip-notice:
+    name: CWS Publish Status
+    runs-on: ubuntu-latest
+    needs: [build-and-release, publish-to-chrome-store]
+    if: always() && needs.publish-to-chrome-store.result == 'skipped'
+
+    steps:
+      - name: Log CWS skip reason
+        run: |
+          if [[ "${{ inputs.dry_run }}" == "true" ]]; then
+            echo "::notice::Dry run mode — Chrome Web Store publish skipped."
+          elif [[ "${{ contains(needs.build-and-release.outputs.version, '-') }}" == "true" ]]; then
+            echo "::notice::Pre-release version — Chrome Web Store publish skipped."
+          else
+            echo "::warning::Chrome Web Store credentials not configured (CHROME_EXTENSION_ID secret missing). Skipping CWS publish."
+            echo "To enable Chrome Web Store publishing, configure the following secrets:"
+            echo "  - CHROME_EXTENSION_ID"
+            echo "  - CHROME_CLIENT_ID"
+            echo "  - CHROME_CLIENT_SECRET"
+            echo "  - CHROME_REFRESH_TOKEN"
+          fi

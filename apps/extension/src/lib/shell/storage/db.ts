@@ -26,10 +26,16 @@ export interface PaginatedQueryOptions {
   filterSource?: MissionSource;
 }
 
-const DB_NAME = 'missionpulse';
-const DB_VERSION = 2;
+export const MISSIONPULSE_DB_NAME = 'missionpulse';
+const DB_NAME = MISSIONPULSE_DB_NAME;
+const DB_VERSION = 3;
 
-function openDB(): Promise<IDBDatabase> {
+const deserializeStoredDate = (value: string): Date | null => {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? null : date;
+};
+
+export function openDB(): Promise<IDBDatabase> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.open(DB_NAME, DB_VERSION);
 
@@ -46,6 +52,10 @@ function openDB(): Promise<IDBDatabase> {
       if (oldVersion < 2) {
         db.createObjectStore('connector_status', { keyPath: 'connectorId' });
       }
+      if (oldVersion < 3) {
+        const genStore = db.createObjectStore('generated_assets', { keyPath: 'id' });
+        genStore.createIndex('missionId', 'missionId', { unique: false });
+      }
     };
 
     request.onsuccess = () => resolve(request.result);
@@ -54,7 +64,7 @@ function openDB(): Promise<IDBDatabase> {
 }
 
 // Generic helper for store operations
-function withStore<T>(
+export function withStore<T>(
   storeName: string,
   mode: IDBTransactionMode,
   fn: (store: IDBObjectStore) => IDBRequest
@@ -63,9 +73,24 @@ function withStore<T>(
     return new Promise<T>((resolve, reject) => {
       const tx = db.transaction(storeName, mode);
       const store = tx.objectStore(storeName);
+      let result: T | undefined;
       const request = fn(store);
-      request.onsuccess = () => resolve(request.result as T);
+      request.onsuccess = () => {
+        result = request.result as T;
+      };
       request.onerror = () => reject(request.error);
+      tx.oncomplete = () => {
+        db.close();
+        resolve(result as T);
+      };
+      tx.onerror = () => {
+        db.close();
+        reject(tx.error);
+      };
+      tx.onabort = () => {
+        db.close();
+        reject(tx.error);
+      };
     });
   });
 }
@@ -102,7 +127,7 @@ export async function saveMissions(missions: Mission[]): Promise<void> {
       if (import.meta.env.DEV && uniqueMissions.length > 0) {
         const dedupedCount = missions.length - uniqueMissions.length;
         if (dedupedCount > 0) {
-          console.log(
+          console.debug(
             `[DB] Saved ${uniqueMissions.length} missions (${dedupedCount} duplicates deduped)`
           );
         }
@@ -152,7 +177,7 @@ export async function getMissionsBySource(source: MissionSource): Promise<Missio
       const validMissions: Mission[] = [];
 
       for (const raw of rawMissions) {
-        const mission = parseMission(raw);
+        const mission = parseMission(raw, deserializeStoredDate);
         if (mission) {
           validMissions.push(mission);
         }
@@ -185,7 +210,7 @@ export async function getRecentMissions(maxAgeDays: number): Promise<Mission[]> 
       const validMissions: Mission[] = [];
 
       for (const raw of rawMissions) {
-        const mission = parseMission(raw);
+        const mission = parseMission(raw, deserializeStoredDate);
         if (mission) {
           validMissions.push(mission);
         }
@@ -252,7 +277,7 @@ export async function getMissionsPaginated(
   // Parse and validate missions
   const validMissions: Mission[] = [];
   for (const raw of rawMissions) {
-    const mission = parseMission(raw);
+    const mission = parseMission(raw, deserializeStoredDate);
     if (mission) {
       validMissions.push(mission);
     }
@@ -306,7 +331,7 @@ export async function upsertMissions(newMissions: Mission[]): Promise<number> {
 
     tx.oncomplete = () => {
       if (import.meta.env.DEV && writtenCount > 0) {
-        console.log(
+        console.debug(
           `[DB] Upserted ${writtenCount} missions (${newMissions.length - uniqueMissions.length} duplicates deduped)`
         );
       }
@@ -315,6 +340,18 @@ export async function upsertMissions(newMissions: Mission[]): Promise<number> {
 
     tx.onerror = () => reject(tx.error);
   });
+}
+
+/**
+ * Get a single mission by ID.
+ * Returns null if not found or if the stored data is invalid.
+ */
+export async function getMissionById(id: string): Promise<Mission | null> {
+  const raw = await withStore<unknown>('missions', 'readonly', (store) => store.get(id));
+  if (!raw) {
+    return null;
+  }
+  return parseMission(raw, deserializeStoredDate) ?? null;
 }
 
 export function clearMissions(): Promise<void> {
@@ -340,6 +377,18 @@ export async function saveProfile(profile: UserProfile): Promise<void> {
     // Le cache est non-critique, on ne bloque pas la sauvegarde du profil
     if (import.meta.env.DEV) {
       console.warn('[DB] Impossible de vider le cache sémantique après sauvegarde du profil');
+    }
+  }
+}
+
+export async function clearProfile(): Promise<void> {
+  await withStore<void>('profile', 'readwrite', (store) => store.delete('current'));
+
+  try {
+    await clearSemanticCache();
+  } catch {
+    if (import.meta.env.DEV) {
+      console.warn('[DB] Impossible de vider le cache sémantique après suppression du profil');
     }
   }
 }
@@ -431,7 +480,7 @@ export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
 
     tx.oncomplete = () => {
       if (purged > 0 && import.meta.env.DEV) {
-        console.log(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
+        console.debug(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
       }
     };
 

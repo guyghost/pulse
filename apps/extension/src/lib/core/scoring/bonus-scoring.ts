@@ -1,5 +1,5 @@
-import type { Mission } from '../types/mission';
 import type { SeniorityLevel } from '../types/profile';
+import { parseIsoDateToEpochMs } from '../utils/iso-time';
 
 /**
  * Compute bonus points for seniority match (0-5).
@@ -50,12 +50,12 @@ export const scoreStartDateBonus = (missionStartDate: string | null, now: Date):
     return 0;
   }
 
-  const startDate = new Date(missionStartDate);
-  if (isNaN(startDate.getTime())) {
+  const startTimestamp = parseIsoDateToEpochMs(missionStartDate);
+  if (startTimestamp === null) {
     return 0;
   }
 
-  const diffMs = startDate.getTime() - now.getTime();
+  const diffMs = startTimestamp - now.getTime();
   if (diffMs < 0) {
     return 0;
   } // Past date

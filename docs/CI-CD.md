@@ -6,7 +6,7 @@ This document describes the CI/CD pipeline for the MissionPulse monorepo.
 
 ```
 pulse/
-├── apps/extension/   # Chrome extension (tests, build, health checks)
+├── apps/extension/   # Chrome extension (tests, build)
 ├── apps/landing/     # Static landing page (no CI needed)
 └── packages/tsconfig # Shared TypeScript config
 ```
@@ -15,13 +15,12 @@ All CI jobs run in the `apps/extension/` workspace via Turborepo.
 
 ## Overview
 
-MissionPulse uses GitHub Actions for continuous integration and deployment. The pipeline consists of three main workflows:
+MissionPulse uses GitHub Actions for continuous integration and deployment. The pipeline consists of two main workflows:
 
-| Workflow | Trigger | Purpose |
-|----------|---------|---------|
-| `ci.yml` | Push to main, PRs | Lint, test, build, coverage |
-| `release.yml` | Git tags (`v*`) | Build, package, publish extension |
-| `connector-health.yml` | Daily cron (8h UTC) | Monitor connector health |
+| Workflow      | Trigger           | Purpose                           |
+| ------------- | ----------------- | --------------------------------- |
+| `ci.yml`      | Push to main, PRs | Lint, test, build, coverage       |
+| `release.yml` | Git tags (`v*`)   | Build, package, publish extension |
 
 ## Workflows
 
@@ -45,17 +44,18 @@ Runs on every push to `main` and on all pull requests.
 └─────────────────────────────────────────────────────────────┘
 ```
 
-| Job | Description |
-|-----|-------------|
-| `setup` | Compute pnpm cache path |
-| `lint` | Run ESLint on all files |
-| `format` | Check Prettier formatting |
+| Job         | Description                  |
+| ----------- | ---------------------------- |
+| `setup`     | Compute pnpm cache path      |
+| `lint`      | Run ESLint on all files      |
+| `format`    | Check Prettier formatting    |
 | `typecheck` | TypeScript strict mode check |
-| `test` | Run unit tests with coverage |
-| `build` | Build extension artifact |
-| `test-e2e` | Run E2E tests (PRs only) |
+| `test`      | Run unit tests with coverage |
+| `build`     | Build extension artifact     |
+| `test-e2e`  | Run E2E tests (PRs only)     |
 
 **Features:**
+
 - pnpm cache for faster installs
 - Coverage upload to Codecov
 - Concurrency groups to cancel old runs
@@ -85,40 +85,9 @@ Triggered by pushing a semantic version tag (e.g., `v1.0.0`).
 ```
 
 **Version Format:**
+
 - Stable: `v1.0.0` → Published to CWS
 - Pre-release: `v1.0.0-beta.1` → GitHub Release only (skips CWS)
-
-### 3. Connector Health Workflow (`connector-health.yml`)
-
-Runs daily at 8:00 AM UTC to verify all connectors are still working.
-
-**Process:**
-
-```
-┌─────────────────────────────────────────────────────────────┐
-│              Connector Health Pipeline                        │
-├─────────────────────────────────────────────────────────────┤
-│                                                              │
-│  1. Run health check tests for all connectors                │
-│  2. Parse test results                                       │
-│  3. If any connector failed:                                 │
-│     - Create/update GitHub Issue                             │
-│     - Fail workflow                                          │
-│  4. If all passed:                                           │
-│     - Log success                                            │
-│                                                              │
-└─────────────────────────────────────────────────────────────┘
-```
-
-**Manual Trigger:**
-```bash
-gh workflow run connector-health.yml
-```
-
-**Specific Connectors:**
-```bash
-gh workflow run connector-health.yml -f connectors=freework,lehibou
-```
 
 ## Credentials Setup
 
@@ -126,13 +95,13 @@ gh workflow run connector-health.yml -f connectors=freework,lehibou
 
 Configure these secrets in your GitHub repository settings:
 
-| Secret | Required For | How to Obtain |
-|--------|--------------|---------------|
-| `CODECOV_TOKEN` | Coverage upload | [codecov.io](https://codecov.io) |
-| `CHROME_CLIENT_ID` | CWS publish | Chrome Web Store API |
-| `CHROME_CLIENT_SECRET` | CWS publish | Chrome Web Store API |
-| `CHROME_REFRESH_TOKEN` | CWS publish | Chrome Web Store API |
-| `CHROME_EXTENSION_ID` | CWS publish | Your extension ID |
+| Secret                 | Required For    | How to Obtain                    |
+| ---------------------- | --------------- | -------------------------------- |
+| `CODECOV_TOKEN`        | Coverage upload | [codecov.io](https://codecov.io) |
+| `CHROME_CLIENT_ID`     | CWS publish     | Chrome Web Store API             |
+| `CHROME_CLIENT_SECRET` | CWS publish     | Chrome Web Store API             |
+| `CHROME_REFRESH_TOKEN` | CWS publish     | Chrome Web Store API             |
+| `CHROME_EXTENSION_ID`  | CWS publish     | Your extension ID                |
 
 ### Setting Up Chrome Web Store Publishing
 
@@ -196,15 +165,6 @@ gh run watch
 ```bash
 # Trigger CI manually
 gh workflow run ci.yml
-
-# Trigger connector health check
-gh workflow run connector-health.yml
-
-# Trigger connector health for specific connectors
-gh workflow run connector-health.yml -f connectors=freework
-
-# Skip issue creation (only log results)
-gh workflow run connector-health.yml -f skip_issue=true
 ```
 
 ## Code Quality Tools
@@ -222,6 +182,7 @@ pnpm lint:fix
 ```
 
 **Key Rules:**
+
 - No `any` types
 - Functional Core isolation (no shell imports from core)
 - Svelte 5 runes enforcement
@@ -272,12 +233,6 @@ Coverage is automatically uploaded to Codecov on every CI run.
 - Verify all CWS secrets are set correctly
 - Check refresh token hasn't expired
 - Ensure extension ID is correct
-
-### Connector Health Check Fails
-
-- Check the GitHub Issue for details
-- Review the workflow run logs
-- Run health checks locally: `pnpm vitest run tests/health`
 
 ## Security
 

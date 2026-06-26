@@ -1,0 +1,1086 @@
+[
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/09-web-dashboard-no-supabase.png",
+    "items": [
+      {
+        "disabled": false,
+        "href": "/",
+        "tag": "a",
+        "text": "MissionPulse"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Workspace"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Freelance cockpit"
+      },
+      {
+        "disabled": false,
+        "href": "/",
+        "tag": "a",
+        "text": "Vue d'ensemble"
+      },
+      {
+        "disabled": false,
+        "href": "#applications",
+        "tag": "a",
+        "text": "Candidatures"
+      },
+      {
+        "disabled": false,
+        "href": "#comparison",
+        "tag": "a",
+        "text": "Comparaison"
+      },
+      {
+        "disabled": false,
+        "href": "#cv",
+        "tag": "a",
+        "text": "Profil CV"
+      },
+      {
+        "disabled": false,
+        "href": "#tjm",
+        "tag": "a",
+        "text": "Radar TJM"
+      },
+      {
+        "disabled": false,
+        "href": "#sync",
+        "tag": "a",
+        "text": "Synchronisation"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Extension Chrome"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Les mises à jour CV seront exécutées depuis les sessions navigateur existantes."
+      },
+      {
+        "disabled": false,
+        "href": "/login?redirectTo=%2Fdashboard",
+        "tag": "a",
+        "text": "Se connecter"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "button",
+        "text": "Ouvrir les fichiers"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "button",
+        "text": "Compte"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h1",
+        "text": "Pilotage missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Retrouvez les fonctionnalités de l'extension dans le dashboard, avec activation par feature flag selon la session, les crédits et le statut d'achat."
+      },
+      {
+        "disabled": false,
+        "href": "#cv",
+        "tag": "a",
+        "text": "Vérifier le CV"
+      },
+      {
+        "disabled": false,
+        "href": "#applications",
+        "tag": "a",
+        "text": "Explore"
+      },
+      {
+        "disabled": false,
+        "href": "#sync",
+        "tag": "a",
+        "text": "Synchronisations"
+      },
+      {
+        "disabled": false,
+        "href": "#cv",
+        "tag": "a",
+        "text": "CV"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Configuration Supabase absente"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Le dashboard connecté n'affiche que les données synchronisées depuis Supabase. Ajoutez `PUBLIC_SUPABASE_URL` et `PUBLIC_SUPABASE_ANON_KEY`, puis connectez-vous pour charger vos mis"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Candidatures"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Taux moyen"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0%"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Entretiens"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Prochaine relance"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Aucune"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Feed connecté"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h2",
+        "text": "Missions détectées par l'extension"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0/0 affichées, 0 fraîches"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "input",
+        "text": "Mission, client, stack"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "select",
+        "text": "ToutesLinkedInFree-WorkLeHibouHiwayCollectiveCherry PickMaltAutre"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "select",
+        "text": "ToutesRécentesÀ revoir"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Aucune mission synchronisée"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Lancez un scan depuis l'extension connectée pour alimenter le dashboard Supabase."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Radar TJM"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h2",
+        "text": "Tendances marché synchronisées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0 missions avec TJM exploitable"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "TJM moyen"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "N/A"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Fourchette"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "N/A - N/A"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Min / max des missions synchronisées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Stack dominante"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "N/A"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Par volume de missions qualifiées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Tendance"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Tendance inconnue"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Par source"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Aucun TJM synchronisé par source."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Par stack"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Aucun TJM synchronisé par stack."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Feature flipping"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h2",
+        "text": "Fonctionnalités disponibles sur le dashboard"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "9 actives, 4 verrouillées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Feed de missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Recherche, tri, filtres et lecture centralisée des missions détectées."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Scan multi-plateformes"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Pilotage des scans Free-Work, LeHibou, Hiway, Collective et Cherry Pick."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Scoring de pertinence"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Score stack, TJM, localisation, séniorité et analyse sémantique disponible."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Comparaison de missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Shortlist et comparaison des opportunités prioritaires."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Favoris et missions masquées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Conservation des missions suivies, ignorées ou à traiter plus tard."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Candidatures"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Suivi de candidatures"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Pipeline brouillon, postulé, entretien, offre et relance."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Candidatures"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Génération IA"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Pitch, message recruteur et résumé CV consommant les crédits achetés."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Radar TJM"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Analyse des tendances de TJM à partir des missions consolidées."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Profil"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Profil MissionPulse"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Stack, TJM cible, localisation, séniorité et préférences de scan."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Automatisation"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Synchronisation CV"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Préparation du plan de mise à jour CV exécuté par l’extension."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Profil"
+      }
+    ],
+    "text": "MissionPulse Workspace Freelance cockpit Vue d'ensemble Candidatures Comparaison Profil CV Radar TJM Synchronisation Extension Chrome Les mises à jour CV seront exécutées depuis les sessions navigateur existantes. Features actives 9/13 Dashboard / Candidatures Se connecter Pilotage missions 9/13 features Retrouvez les fonctionnalités de l'extension dans le dashboard, avec activation par feature flag selon la session, les crédits et le statut d'achat. Vérifier le CV Explore Synchronisations CV Configuration Supabase absente Le dashboard connecté n'affiche que les données synchronisées depuis Supabase. Ajoutez `PUBLIC_SUPABASE_URL` et `PUBLIC_SUPABASE_ANON_KEY`, puis connectez-vous pour charger vos missions, candidatures, CV et statuts de synchronisation. Candidatures 0 Aucune sync Taux moyen 0% Sans score Entretiens 0 Aucun Prochaine relance Aucune Aucune relance Feed connecté Missions détectées par l'extension 0/0 affichées, 0 fraîches Recherche Source ToutesLinkedInFree-WorkLeHibouHiwayCollectiveCherry PickMaltAutre Score min. Fraîcheur ToutesRécentesÀ revoir Aucune mission synchronisée Lancez un scan depuis l'extension connectée pour alimenter le dashboard Supabase. Radar TJM Tendances marché synchronisées 0 missions avec TJM exploitable TJM moyen N/A 0 offres Fourchette N/A - N/A Min / max des missions synchronisées Stack dominante N/A Par volume de missions qualifiées Tendance Tendance inconnue N/A Par source N/A Aucun TJM synchronisé par source. Par stack 0 Aucun TJM synchronisé par stack. Feature flipping Fonctionnalités disponibles sur le dashboard 9 actives, 4 verrouillées Missions Feed de missions Inclus Recherche, tri, filtres et lecture centralisée des missions détectées.Missions Scan multi-plateformes Inclus Pilotage des scans Free-Work, LeHibou, Hiway, Coll",
+    "title": "Dashboard — MissionPulse",
+    "url": "http://127.0.0.1:5174/dashboard/"
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/10-web-dashboard-no-supabase-full.png",
+    "items": [
+      {
+        "disabled": false,
+        "href": "/",
+        "tag": "a",
+        "text": "MissionPulse"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Workspace"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Freelance cockpit"
+      },
+      {
+        "disabled": false,
+        "href": "/",
+        "tag": "a",
+        "text": "Vue d'ensemble"
+      },
+      {
+        "disabled": false,
+        "href": "#applications",
+        "tag": "a",
+        "text": "Candidatures"
+      },
+      {
+        "disabled": false,
+        "href": "#comparison",
+        "tag": "a",
+        "text": "Comparaison"
+      },
+      {
+        "disabled": false,
+        "href": "#cv",
+        "tag": "a",
+        "text": "Profil CV"
+      },
+      {
+        "disabled": false,
+        "href": "#tjm",
+        "tag": "a",
+        "text": "Radar TJM"
+      },
+      {
+        "disabled": false,
+        "href": "#sync",
+        "tag": "a",
+        "text": "Synchronisation"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Extension Chrome"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Les mises à jour CV seront exécutées depuis les sessions navigateur existantes."
+      },
+      {
+        "disabled": false,
+        "href": "/login?redirectTo=%2Fdashboard",
+        "tag": "a",
+        "text": "Se connecter"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "button",
+        "text": "Ouvrir les fichiers"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "button",
+        "text": "Compte"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h1",
+        "text": "Pilotage missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Retrouvez les fonctionnalités de l'extension dans le dashboard, avec activation par feature flag selon la session, les crédits et le statut d'achat."
+      },
+      {
+        "disabled": false,
+        "href": "#cv",
+        "tag": "a",
+        "text": "Vérifier le CV"
+      },
+      {
+        "disabled": false,
+        "href": "#applications",
+        "tag": "a",
+        "text": "Explore"
+      },
+      {
+        "disabled": false,
+        "href": "#sync",
+        "tag": "a",
+        "text": "Synchronisations"
+      },
+      {
+        "disabled": false,
+        "href": "#cv",
+        "tag": "a",
+        "text": "CV"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Configuration Supabase absente"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Le dashboard connecté n'affiche que les données synchronisées depuis Supabase. Ajoutez `PUBLIC_SUPABASE_URL` et `PUBLIC_SUPABASE_ANON_KEY`, puis connectez-vous pour charger vos mis"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Candidatures"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Taux moyen"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0%"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Entretiens"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Prochaine relance"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Aucune"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Feed connecté"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h2",
+        "text": "Missions détectées par l'extension"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0/0 affichées, 0 fraîches"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "input",
+        "text": "Mission, client, stack"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "select",
+        "text": "ToutesLinkedInFree-WorkLeHibouHiwayCollectiveCherry PickMaltAutre"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "select",
+        "text": "ToutesRécentesÀ revoir"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Aucune mission synchronisée"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Lancez un scan depuis l'extension connectée pour alimenter le dashboard Supabase."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Radar TJM"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h2",
+        "text": "Tendances marché synchronisées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "0 missions avec TJM exploitable"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "TJM moyen"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "N/A"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Fourchette"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "N/A - N/A"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Min / max des missions synchronisées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Stack dominante"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "N/A"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Par volume de missions qualifiées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Tendance"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Tendance inconnue"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Par source"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Aucun TJM synchronisé par source."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Par stack"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Aucun TJM synchronisé par stack."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Feature flipping"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h2",
+        "text": "Fonctionnalités disponibles sur le dashboard"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "9 actives, 4 verrouillées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Feed de missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Recherche, tri, filtres et lecture centralisée des missions détectées."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Scan multi-plateformes"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Pilotage des scans Free-Work, LeHibou, Hiway, Collective et Cherry Pick."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Scoring de pertinence"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Score stack, TJM, localisation, séniorité et analyse sémantique disponible."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Comparaison de missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Shortlist et comparaison des opportunités prioritaires."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Favoris et missions masquées"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Conservation des missions suivies, ignorées ou à traiter plus tard."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Candidatures"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Suivi de candidatures"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Pipeline brouillon, postulé, entretien, offre et relance."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Candidatures"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Génération IA"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Pitch, message recruteur et résumé CV consommant les crédits achetés."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Missions"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Radar TJM"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Analyse des tendances de TJM à partir des missions consolidées."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Profil"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Profil MissionPulse"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Stack, TJM cible, localisation, séniorité et préférences de scan."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Automatisation"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "h3",
+        "text": "Synchronisation CV"
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Préparation du plan de mise à jour CV exécuté par l’extension."
+      },
+      {
+        "disabled": false,
+        "href": null,
+        "tag": "p",
+        "text": "Profil"
+      }
+    ],
+    "text": "MissionPulse Workspace Freelance cockpit Vue d'ensemble Candidatures Comparaison Profil CV Radar TJM Synchronisation Extension Chrome Les mises à jour CV seront exécutées depuis les sessions navigateur existantes. Features actives 9/13 Dashboard / Candidatures Se connecter Pilotage missions 9/13 features Retrouvez les fonctionnalités de l'extension dans le dashboard, avec activation par feature flag selon la session, les crédits et le statut d'achat. Vérifier le CV Explore Synchronisations CV Configuration Supabase absente Le dashboard connecté n'affiche que les données synchronisées depuis Supabase. Ajoutez `PUBLIC_SUPABASE_URL` et `PUBLIC_SUPABASE_ANON_KEY`, puis connectez-vous pour charger vos missions, candidatures, CV et statuts de synchronisation. Candidatures 0 Aucune sync Taux moyen 0% Sans score Entretiens 0 Aucun Prochaine relance Aucune Aucune relance Feed connecté Missions détectées par l'extension 0/0 affichées, 0 fraîches Recherche Source ToutesLinkedInFree-WorkLeHibouHiwayCollectiveCherry PickMaltAutre Score min. Fraîcheur ToutesRécentesÀ revoir Aucune mission synchronisée Lancez un scan depuis l'extension connectée pour alimenter le dashboard Supabase. Radar TJM Tendances marché synchronisées 0 missions avec TJM exploitable TJM moyen N/A 0 offres Fourchette N/A - N/A Min / max des missions synchronisées Stack dominante N/A Par volume de missions qualifiées Tendance Tendance inconnue N/A Par source N/A Aucun TJM synchronisé par source. Par stack 0 Aucun TJM synchronisé par stack. Feature flipping Fonctionnalités disponibles sur le dashboard 9 actives, 4 verrouillées Missions Feed de missions Inclus Recherche, tri, filtres et lecture centralisée des missions détectées.Missions Scan multi-plateformes Inclus Pilotage des scans Free-Work, LeHibou, Hiway, Coll",
+    "title": "Dashboard — MissionPulse",
+    "url": "http://127.0.0.1:5174/dashboard/"
+  }
+]

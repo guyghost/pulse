@@ -1,10 +1,12 @@
 {
   "name": "pulse",
-  "version": "0.1.0",
+  "version": "0.2.2",
   "private": true,
   "packageManager": "pnpm@10.32.1",
   "scripts": {
     "dev": "turbo dev",
+    "dev:local": "pnpm supabase:start && pnpm dev:env && pnpm dev",
+    "dev:env": "node scripts/write-local-supabase-env.mjs",
     "build": "turbo build",
     "test": "turbo test",
     "test:watch": "turbo test:watch",
@@ -12,19 +14,34 @@
     "typecheck": "turbo typecheck",
     "format": "turbo format",
     "format:check": "turbo format:check",
-    "clean": "turbo clean && rm -rf node_modules .turbo"
+    "supabase:start": "supabase start --workdir apps/landing && node scripts/patch-local-supabase-passkey-auth.mjs",
+    "supabase:stop": "supabase stop --workdir apps/landing",
+    "supabase:status": "supabase status --workdir apps/landing",
+    "supabase:reset": "supabase db reset --workdir apps/landing",
+    "ci:check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "clean": "turbo clean && rm -rf node_modules .turbo",
+    "prepare": "simple-git-hooks"
+  },
+  "simple-git-hooks": {
+    "pre-commit": "pnpm lint-staged",
+    "pre-push": "pnpm ci:check"
+  },
+  "lint-staged": {
+    "apps/extension/**/*.{ts,svelte}": [
+      "pnpm --filter @pulse/extension exec eslint --fix",
+      "prettier --write"
+    ],
+    "{apps/dashboard,apps/landing,packages}/**/*.{ts,svelte}": [
+      "prettier --write"
+    ],
+    "*.{css,json,md}": [
+      "prettier --write"
+    ]
   },
   "devDependencies": {
+    "lint-staged": "^16.4.0",
+    "simple-git-hooks": "^2.13.1",
+    "supabase": "^2.101.0",
     "turbo": "^2.0.0"
-  },
-  "pnpm": {
-    "overrides": {
-      "devalue": ">=5.6.4",
-      "picomatch": ">=4.0.4",
-      "rollup": ">=4.0.0"
-    },
-    "onlyBuiltDependencies": [
-      "esbuild"
-    ]
   }
 }

@@ -9,8 +9,14 @@ coverage/
 .claude/worktrees/
 .worktrees/
 .turbo/
+.vercel/
 .ralph/
 .idea/
 .vscode/
 .worktrees/
 .conductor/
+.svelte-kit/
+.env
+
+# DAO governance state
+.dao/

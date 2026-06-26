@@ -20,6 +20,8 @@ export const RemoteTypeSchema = z.enum(['full', 'hybrid', 'onsite']);
 
 export const SeniorityLevelSchema = z.enum(['junior', 'confirmed', 'senior']);
 
+export const GradeSchema = z.enum(['A', 'B', 'C', 'D', 'F']);
+
 // ============================================
 // Types complexes
 // ============================================
@@ -40,6 +42,28 @@ export const ScoringWeightsSchema = z
   );
 
 // ============================================
+// Score Breakdown
+// ============================================
+
+export const DeterministicBreakdownSchema = z.object({
+  stack: z.number().min(0).max(100),
+  location: z.number().min(0).max(100),
+  tjm: z.number().min(0).max(100),
+  remote: z.number().min(0).max(100),
+  seniorityBonus: z.number().min(0).max(5),
+  startDateBonus: z.number().min(0).max(5),
+});
+
+export const ScoreBreakdownSchema = z.object({
+  criteria: DeterministicBreakdownSchema,
+  deterministic: z.number().min(0).max(100),
+  semantic: z.number().min(0).max(100).nullable(),
+  semanticReason: z.string().nullable(),
+  total: z.number().min(0).max(100),
+  grade: GradeSchema,
+});
+
+// ============================================
 // Mission
 // ============================================
 
@@ -54,10 +78,12 @@ export const MissionSchema = z.object({
   remote: RemoteTypeSchema.nullable(),
   duration: z.string().nullable(),
   startDate: z.string().nullable(),
+  publishedAt: z.string().nullable(),
   url: z.string(),
   source: MissionSourceSchema,
   scrapedAt: z.date(),
   seniority: SeniorityLevelSchema.nullable(),
+  scoreBreakdown: ScoreBreakdownSchema.nullable(),
   score: z.number().nullable(),
   semanticScore: z.number().nullable(),
   semanticReason: z.string().nullable(),
@@ -77,25 +103,19 @@ export const MissionSerializedSchema = z.object({
   startDate: z.string().nullable(),
   url: z.string(),
   source: MissionSourceSchema,
-  scrapedAt: z
-    .union([z.date(), z.string()])
-    .transform((val) => (typeof val === 'string' ? new Date(val) : val)),
+  scrapedAt: z.union([z.date(), z.string()]),
   seniority: SeniorityLevelSchema.nullable(),
+  scoreBreakdown: ScoreBreakdownSchema.nullable(),
   score: z.number().nullable(),
   semanticScore: z.number().nullable(),
   semanticReason: z.string().nullable(),
+  publishedAt: z.string().nullable(),
 });
-
-// ============================================
-// Profile
 // ============================================
 
 export const UserProfileSchema = z
   .object({
-    firstName: z
-      .string()
-      .min(1, 'Le prénom est requis')
-      .max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
+    firstName: z.string().max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
     stack: z
       .array(z.string().min(1, 'Chaque compétence doit être non vide'))
       .max(20, 'Maximum 20 compétences'),
@@ -115,7 +135,7 @@ export const UserProfileSchema = z
     /** User-defined search keywords sent to connector APIs for server-side filtering */
     searchKeywords: z.array(z.string()).default([]),
   })
-  .refine((p) => p.tjmMax >= p.tjmMin, {
+  .refine((p) => p.tjmMax === 0 || p.tjmMax >= p.tjmMin, {
     message: 'Le TJM maximum doit être supérieur ou égal au TJM minimum',
     path: ['tjmMax'],
   });
@@ -158,10 +178,7 @@ export const AppSettingsSchema = z.object({
 // Schéma pour les settings sérialisés (dates en string)
 export const AppSettingsSerializedSchema = z.object({
   schemaVersion: z.number().default(1),
-  lastSyncAt: z
-    .union([z.date(), z.string()])
-    .optional()
-    .transform((val) => (typeof val === 'string' ? new Date(val) : val)),
+  lastSyncAt: z.union([z.date(), z.string()]).optional(),
   theme: z.enum(['light', 'dark', 'system']).default('system'),
   notificationsEnabled: z.boolean().default(true),
 });

@@ -6,9 +6,15 @@ import { buildSearchContext } from '../../core/connectors/search-context';
 import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
 import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
-import { deduplicateMissions } from '../../core/scoring/dedup';
+import {
+  deduplicateMissionsDetailed,
+  type MissionDuplicateRelation,
+} from '../../core/scoring/dedup';
 import { filterSalariedMissions } from '../../core/scoring/contract-filter';
+import { filterStaleMissions } from '../../core/scoring/mission-freshness';
 import { scoreMission } from '../../core/scoring/relevance';
+import { computeFinalBreakdown, buildScoreBreakdown } from '../../core/scoring/final-score';
+import { createDefaultProfile, isDefaultProfile } from '../../core/profile/defaults';
 import { setScanState } from '../storage/session-storage';
 import { scoreMissionsSemantic } from '../ai/semantic-scorer';
 import { metricsCollector } from '../metrics/collector';
@@ -16,8 +22,9 @@ import { calculateDedupRatio } from '../../core/metrics/types';
 import type { ScanMetrics } from '../../core/metrics/types';
 import { recordTJMFromMissions } from '../storage/tjm-history';
 import { isOnline } from '../utils/connection-monitor';
-import { withResultRetry } from '../utils/retry-strategy';
 import { trackParserHealth } from './parser-health';
+import { runWithCircuitBreaker } from '../health/circuit-breaker-runner';
+import { syncProbeAlarm } from '../health/probe-scheduler';
 
 /** Mutex pour empêcher les scans concurrents */
 let scanInProgress = false;
@@ -57,6 +64,8 @@ export class ScanError extends Error {
 
 export interface ScanResult {
   missions: Mission[];
+  sourceMissions: Mission[];
+  duplicateRelations: MissionDuplicateRelation[];
   errors: { connectorId: string; message: string }[];
 }
 
@@ -89,11 +98,21 @@ export type DetailedProgressCallback = (info: {
   connectorStates: ConnectorScanState[];
 }) => void;
 
+export type ConnectorResultCallback = (info: {
+  connectorId: string;
+  connectorName: string;
+  missions: Mission[];
+}) => void;
+
 export interface ScanOptions {
   /** Délai entre les pages d'un même connecteur en ms (défaut: 500) */
   pageDelayMs?: number;
   /** Callback de progression détaillé (pour bridge SCAN_PROGRESS) */
   onDetailedProgress?: DetailedProgressCallback;
+  /** Callback appelé quand un connecteur réussit, avant le résultat final global */
+  onConnectorResult?: ConnectorResultCallback;
+  /** Override explicite du profil utilisé pour le scan */
+  profileOverride?: UserProfile;
 }
 
 export async function runScan(
@@ -162,7 +181,12 @@ async function _runScanInternal(
     } catch {
       /* Non-critical: scan state is UI-only */
     }
-    return { missions: [], errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }] };
+    return {
+      missions: [],
+      sourceMissions: [],
+      duplicateRelations: [],
+      errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }],
+    };
   }
 
   // Validate connector IDs and report unknown ones as errors
@@ -182,7 +206,7 @@ async function _runScanInternal(
     } catch {
       /* Non-critical: scan state is UI-only */
     }
-    return { missions: [], errors };
+    return { missions: [], sourceMissions: [], duplicateRelations: [], errors };
   }
 
   // Load all connectors in parallel (they're lazy-loaded, so this loads only enabled ones)
@@ -215,19 +239,39 @@ async function _runScanInternal(
     } catch {
       /* Non-critical: scan state is UI-only */
     }
-    return { missions: [], errors };
+    return { missions: [], sourceMissions: [], duplicateRelations: [], errors };
   }
 
   // Load profile early for connector search filtering + scoring
-  let profile: UserProfile | null = null;
-  try {
-    profile = await getProfile();
-  } catch {
-    // No profile available — connectors will fetch without filters
+  let profile = options?.profileOverride ?? null;
+  if (!profile) {
+    try {
+      profile = await getProfile();
+    } catch {
+      // No saved profile available
+    }
+  }
+  profile ??= createDefaultProfile();
+  const scanProfile = profile;
+  const usingDefaultProfile = isDefaultProfile(scanProfile);
+
+  function buildDeterministicMissions(rawMissions: Mission[], now: Date): Mission[] {
+    const freelanceOnly = filterSalariedMissions(rawMissions);
+    const freshOnly = filterStaleMissions(freelanceOnly, now);
+
+    return freshOnly.map((mission) => {
+      const score = scoreMission(mission, scanProfile, now);
+      return {
+        ...mission,
+        scoreBreakdown: buildScoreBreakdown(score.total, score.breakdown),
+        score: score.total,
+      };
+    });
   }
 
   // Build base search context from profile (lastSync is always null — see comment below)
-  const baseSearchContext = profile ? buildSearchContext(profile, null) : null;
+  // Keep connector fetching broad for the default profile.
+  const baseSearchContext = usingDefaultProfile ? null : buildSearchContext(scanProfile, null);
 
   // Note: No connector uses server-side lastSync filtering anymore. This avoids the
   // split-brain bug where lastSync (chrome.storage.local) becomes stale when IndexedDB
@@ -259,7 +303,6 @@ async function _runScanInternal(
     }
     emitDetailed('scanning', index, connectors.length);
 
-    const connectorStartTime = performance.now();
     const now = Date.now();
 
     const connectorContext: ConnectorSearchContext | undefined = baseSearchContext
@@ -272,17 +315,63 @@ async function _runScanInternal(
     }
     emitDetailed('scanning', index, connectors.length);
 
-    // Retry automatique pour les erreurs réseau avec backoff (Result-aware)
-    const result = await withResultRetry(
-      () => connector.fetchMissions(now, connectorContext, signal),
-      {
-        maxAttempts: 3,
-        baseDelayMs: 1000,
-        maxDelayMs: 10000,
-      }
-    );
+    // --- Circuit Breaker ---
+    // runWithCircuitBreaker gère : open → skip, half-open → probe, closed → execute
+    const circuitRun = await runWithCircuitBreaker(connector, now, connectorContext, signal);
 
-    const connectorDuration = Math.round(performance.now() - connectorStartTime);
+    // Sync alarme de sonde (schedule si open, cancel si closed/half-open)
+    syncProbeAlarm(circuitRun.snapshot).catch(() => {});
+
+    // Émissions bridge health (best-effort — panel peut être fermé)
+    chrome.runtime
+      .sendMessage({
+        type: 'CONNECTOR_HEALTH_UPDATED',
+        payload: {
+          snapshot: circuitRun.snapshot,
+          stateChanged:
+            circuitRun.snapshot.circuitState !== 'closed' ||
+            circuitRun.snapshot.consecutiveFailures === 0,
+        },
+      })
+      .catch(() => {});
+
+    if (circuitRun.status === 'skipped') {
+      // Circuit ouvert — skip ce connecteur pour ce cycle
+      errors.push({
+        connectorId: connector.id,
+        message: `Circuit ouvert — connecteur ${connector.name} temporairement désactivé`,
+      });
+      chrome.runtime
+        .sendMessage({
+          type: 'CONNECTOR_SKIPPED',
+          payload: {
+            connectorId: connector.id,
+            connectorName: connector.name,
+            reason: 'circuit-open',
+          },
+        })
+        .catch(() => {});
+      // Toast — circuit ouvert
+      chrome.runtime
+        .sendMessage({
+          type: 'SHOW_TOAST',
+          payload: {
+            message: `⚠️ ${connector.name} suspendu — trop d'erreurs répétées`,
+            toastType: 'warning',
+            duration: 5000,
+          },
+        })
+        .catch(() => {});
+      if (stateIdx >= 0) {
+        connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'error', error: null };
+      }
+      emitDetailed('scanning', index + 1, connectors.length);
+      return;
+    }
+
+    // circuitRun.status === 'executed'
+    const result = circuitRun.result;
+    const connectorDuration = circuitRun.snapshot.recentLatenciesMs.at(-1) ?? 0;
 
     // Enregistrer le timing du connecteur
     metricsCollector.recordTiming('connector.fetch', connectorDuration, {
@@ -303,6 +392,32 @@ async function _runScanInternal(
     } else {
       trackParserHealth(connector.id, result.value.length, now).catch(() => {});
       connectorResults.push({ connectorId: connector.id, missions: result.value });
+      try {
+        options?.onConnectorResult?.({
+          connectorId: connector.id,
+          connectorName: connector.name,
+          missions: buildDeterministicMissions(result.value, new Date(now)),
+        });
+      } catch {
+        // Partial UI updates are best-effort; the final scan result remains canonical.
+      }
+      // Toast de récupération si le circuit revient à closed depuis open/half-open
+      if (
+        circuitRun.snapshot.circuitState === 'closed' &&
+        circuitRun.snapshot.consecutiveFailures === 0 &&
+        circuitRun.snapshot.totalFailures > 0
+      ) {
+        chrome.runtime
+          .sendMessage({
+            type: 'SHOW_TOAST',
+            payload: {
+              message: `✅ ${connector.name} récupéré et opérationnel`,
+              toastType: 'success',
+              duration: 4000,
+            },
+          })
+          .catch(() => {});
+      }
       if (stateIdx >= 0) {
         connectorStates[stateIdx] = {
           ...connectorStates[stateIdx],
@@ -356,31 +471,55 @@ async function _runScanInternal(
 
   // Deduplicate
   const missionsBeforeDedup = allMissions.length;
-  const deduped = deduplicateMissions(allMissions);
+  const dedupedResult = deduplicateMissionsDetailed(allMissions);
+  const deduped = dedupedResult.missions;
   const dedupRatio = calculateDedupRatio(missionsBeforeDedup, deduped.length);
 
   // Filter out salaried positions (CDD/CDI) — safety net after connector filters
   const freelanceOnly = filterSalariedMissions(deduped);
+
+  // Filter out stale missions (too old — likely filled or cancelled)
+  const freshOnly = filterStaleMissions(freelanceOnly, new Date());
+  const eligibleSourceMissions = filterStaleMissions(
+    filterSalariedMissions(allMissions),
+    new Date()
+  );
   emitDetailed('post-processing', 1, 3);
 
   // Score against profile (already loaded above for connector filtering)
-  const scored = profile
-    ? freelanceOnly.map((m) => ({ ...m, score: scoreMission(m, profile, new Date()) }))
-    : freelanceOnly;
+  // Now returns structured breakdown
+  const scored = freshOnly.map((m) => {
+    const now = new Date();
+    const result = scoreMission(m, scanProfile, now);
+    return {
+      ...m,
+      scoreBreakdown: buildScoreBreakdown(result.total, result.breakdown),
+      score: result.total,
+    };
+  });
 
   // Semantic scoring (async enrichment, non-blocking)
-  if (profile && !signal?.aborted) {
+  if (!usingDefaultProfile && !signal?.aborted) {
     try {
       const semanticResults = await scoreMissionsSemantic(
         scored,
-        profile,
+        scanProfile,
         settings.maxSemanticPerScan
       );
       for (const mission of scored) {
         const semantic = semanticResults.get(mission.id);
-        if (semantic) {
+        if (semantic && mission.scoreBreakdown) {
+          // Rebuild breakdown with semantic fusion
+          mission.scoreBreakdown = computeFinalBreakdown(
+            mission.scoreBreakdown.deterministic,
+            mission.scoreBreakdown.criteria,
+            semantic.score,
+            semantic.reason
+          );
           mission.semanticScore = semantic.score;
           mission.semanticReason = semantic.reason;
+          // Keep legacy score in sync
+          mission.score = mission.scoreBreakdown.total;
         }
       }
     } catch {
@@ -406,11 +545,28 @@ async function _runScanInternal(
     }
   }
 
+  const scoredIds = new Set(scored.map((mission) => mission.id));
+  const eligibleSourceMissionsById = new Map(
+    eligibleSourceMissions.map((mission) => [mission.id, mission])
+  );
+  const duplicateRelations = dedupedResult.duplicateRelations.filter(
+    (relation) =>
+      scoredIds.has(relation.canonicalMissionId) &&
+      eligibleSourceMissionsById.has(relation.duplicateMissionId)
+  );
+  const sourceMissions = [
+    ...scored,
+    ...duplicateRelations.flatMap((relation) => {
+      const mission = eligibleSourceMissionsById.get(relation.duplicateMissionId);
+      return mission ? [mission] : [];
+    }),
+  ];
+
   // Purge old missions (older than 90 days) - non-blocking, silent failure
   try {
     const purged = await purgeOldMissions(90);
     if (purged > 0 && import.meta.env.DEV) {
-      console.log(`[Scanner] Purged ${purged} old missions`);
+      console.debug(`[Scanner] Purged ${purged} old missions`);
     }
   } catch {
     // Purge failure is non-critical
@@ -448,7 +604,7 @@ async function _runScanInternal(
   });
 
   if (import.meta.env.DEV) {
-    console.log(
+    console.debug(
       `[Scanner] Completed in ${scanDuration}ms, ${scored.length} missions, ${errors.length} errors`
     );
   }
@@ -459,5 +615,5 @@ async function _runScanInternal(
     /* Non-critical: scan state is UI-only */
   }
   emitDetailed('done', connectors.length, connectors.length);
-  return { missions: scored, errors };
+  return { missions: scored, sourceMissions, duplicateRelations, errors };
 }

@@ -6,6 +6,7 @@ import {
   serializeBackup,
   validateBackup,
 } from '$lib/core/backup/backup';
+import type { AppSettings } from '$lib/core/types/app-settings';
 import {
   exportMissionsToCSV,
   exportMissionsToJSON,
@@ -27,34 +28,87 @@ import {
   getProfile,
   saveProfile,
 } from '$lib/shell/facades/settings.facade';
-import { getMissions } from '$lib/shell/facades/feed-data.facade';
+import {
+  getConnectorStatuses,
+  getMissions,
+  openExternalUrl,
+} from '$lib/shell/facades/feed-data.facade';
+import { sendMessage, subscribeMessages } from '$lib/shell/messaging/bridge';
 import type { UserProfile } from '$lib/core/types/profile';
+import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
+import { getPremium } from '$lib/shell/facades/premium.facade';
+import {
+  appendUniqueNormalized,
+  normalizeDailyRate,
+  normalizeProfileDraft,
+  normalizeTextInput,
+  withProfileDefaults,
+} from '$lib/core/profile/normalize-profile';
+import { profileMachine, type ProfileStatus } from '$lib/shell/machines/profile.machine';
+import { createSvelteActor } from '$lib/shell/state/xstate.svelte';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
 }
 
-const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({
-  firstName: profile.firstName ?? '',
-  stack: profile.stack ?? [],
-  tjmMin: profile.tjmMin ?? 0,
-  tjmMax: profile.tjmMax ?? 0,
-  location: profile.location ?? '',
-  remote: profile.remote ?? 'any',
-  seniority: profile.seniority ?? 'senior',
-  jobTitle: profile.jobTitle ?? '',
-  scoringWeights: profile.scoringWeights,
-  searchKeywords: profile.searchKeywords ?? [],
+/**
+ * Default settings used to fill missing fields when restoring old backups
+ * that predate the `theme` field addition.
+ */
+const DEFAULT_SETTINGS: AppSettings = {
+  scanIntervalMinutes: 30,
+  enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'],
+  notifications: true,
+  autoScan: true,
+  maxSemanticPerScan: 10,
+  notificationScoreThreshold: 70,
+  respectRateLimits: true,
+  customDelayMs: 0,
+  theme: 'system',
+};
+
+const formatBackupDateKey = (timestamp: number): string =>
+  new Date(timestamp).toISOString().split('T')[0] ?? 'backup';
+
+const scanDateFormatter = new Intl.DateTimeFormat('fr-FR', {
+  day: '2-digit',
+  month: 'short',
+  hour: '2-digit',
+  minute: '2-digit',
 });
 
+const exportFormatLabels: Record<ExportFormat, string> = {
+  json: 'JSON',
+  csv: 'CSV',
+  markdown: 'Rapport Markdown',
+};
+
 export class SettingsPageController {
+  private readonly unsubscribeProfileMessages = this.subscribeProfileMessages();
+
+  private readonly profileActor = createSvelteActor(profileMachine, {
+    input: {
+      deps: {
+        loadProfile: getProfile,
+        saveProfile: async (profile) => {
+          await saveProfile(profile);
+          return profile;
+        },
+      },
+    },
+  });
+
   firstName = $state('');
   jobTitle = $state('');
   profileLocation = $state('');
+  profileRemote = $state<UserProfile['remote']>('any');
+  seniority = $state<UserProfile['seniority']>('senior');
   tjmMin = $state(0);
   tjmMax = $state(0);
   profileStack = $state<string[]>([]);
   stackInput = $state('');
+  searchKeywords = $state<string[]>([]);
+  keywordInput = $state('');
   editingProfile = $state(false);
   profileSaved = $state(false);
   profileError = $state<string | null>(null);
@@ -65,11 +119,25 @@ export class SettingsPageController {
   scanInterval = $state(30);
   notifications = $state(true);
   autoScan = $state(true);
+  theme = $state<'light' | 'dark' | 'system'>('system');
+  lastScanAt = $state<number | null>(null);
+  scanHistorySourceCount = $state(0);
+  scanHistoryMissionCount = $state(0);
+  scanHistoryErrorCount = $state(0);
+
+  premiumEnabled = $state(false);
+  connectedAccountEmail = $state<string | null>(null);
+  connectedDeviceLabel = $state('Extension Chrome locale');
+  connectedLastSyncAt = $state<string | null>(null);
+  connectedPendingUploads = $state(0);
+  connectedPendingDownloads = $state(0);
+  connectedSyncError = $state<string | null>(null);
 
   showResetConfirm = $state(false);
 
   isExporting = $state(false);
   exportSuccess = $state(false);
+  lastExportSummary = $state<string | null>(null);
 
   showBackupModal = $state(false);
   pendingBackup: BackupData | null = $state(null);
@@ -78,8 +146,46 @@ export class SettingsPageController {
 
   constructor(private readonly options: SettingsPageControllerOptions = {}) {}
 
+  private subscribeProfileMessages(): () => void {
+    try {
+      return subscribeMessages((message) => {
+        if (message.type === 'PROFILE_UPDATED') {
+          this.applyProfile(message.payload);
+        }
+      });
+    } catch {
+      return () => {};
+    }
+  }
+
+  destroy(): void {
+    this.unsubscribeProfileMessages();
+  }
+
+  get profileStatus(): ProfileStatus {
+    return String(this.profileActor.snapshot.value) as ProfileStatus;
+  }
+
+  get currentProfile(): UserProfile | null {
+    return this.profileActor.snapshot.context.current;
+  }
+
+  get draftProfile(): UserProfile | null {
+    return this.profileActor.snapshot.context.draft;
+  }
+
+  get isSavingProfile(): boolean {
+    return this.profileActor.snapshot.matches('saving');
+  }
+
   async load(): Promise<void> {
-    await Promise.all([this.loadProfile(), this.loadAiAvailability(), this.loadSettings()]);
+    await Promise.all([
+      this.loadProfile(),
+      this.loadAiAvailability(),
+      this.loadSettings(),
+      this.loadConnectedAccount(),
+      this.loadScanHistory(),
+    ]);
   }
 
   async loadProfile(): Promise<void> {
@@ -89,15 +195,23 @@ export class SettingsPageController {
         return;
       }
 
-      this.firstName = profile.firstName ?? '';
-      this.jobTitle = profile.jobTitle ?? '';
-      this.profileLocation = profile.location ?? '';
-      this.tjmMin = profile.tjmMin ?? 0;
-      this.tjmMax = profile.tjmMax ?? 0;
-      this.profileStack = profile.stack ?? [];
+      this.applyProfile(profile);
     } catch {
       // Hors contexte extension
     }
+  }
+
+  private applyProfile(profile: UserProfile): void {
+    this.firstName = profile.firstName ?? '';
+    this.jobTitle = profile.jobTitle ?? '';
+    this.profileLocation = profile.location ?? '';
+    this.profileRemote = profile.remote ?? 'any';
+    this.seniority = profile.seniority ?? 'senior';
+    this.tjmMin = profile.tjmMin ?? 0;
+    this.tjmMax = profile.tjmMax ?? 0;
+    this.profileStack = profile.stack ?? [];
+    this.searchKeywords = profile.searchKeywords ?? [];
+    this.profileActor.send({ type: 'PROFILE_UPDATED', profile });
   }
 
   async loadAiAvailability(): Promise<void> {
@@ -115,9 +229,126 @@ export class SettingsPageController {
       this.notifications = settings.notifications;
       this.autoScan = settings.autoScan;
       this.maxSemanticPerScan = settings.maxSemanticPerScan;
+      this.theme = settings.theme;
     } catch {
       // Hors contexte extension
     }
+  }
+
+  async loadConnectedAccount(): Promise<void> {
+    try {
+      this.premiumEnabled = await getPremium();
+      if (import.meta.env.DEV && this.premiumEnabled) {
+        this.connectedAccountEmail = 'demo@missionpulse.app';
+        this.connectedLastSyncAt = "à l'instant";
+        this.connectedPendingUploads = 0;
+        this.connectedPendingDownloads = 0;
+      }
+    } catch {
+      this.premiumEnabled = false;
+      this.connectedAccountEmail = null;
+      this.connectedLastSyncAt = null;
+      this.connectedPendingUploads = 0;
+      this.connectedPendingDownloads = 0;
+    }
+  }
+
+  async loadScanHistory(): Promise<void> {
+    try {
+      const statuses = await getConnectorStatuses();
+      this.scanHistorySourceCount = statuses.length;
+      this.scanHistoryMissionCount = statuses.reduce(
+        (total, status) => total + status.missionsCount,
+        0
+      );
+      this.scanHistoryErrorCount = statuses.filter((status) => status.lastState === 'error').length;
+      this.lastScanAt = statuses.reduce<number | null>((latest, status) => {
+        if (status.lastSyncAt && (latest === null || status.lastSyncAt > latest)) {
+          return status.lastSyncAt;
+        }
+        return latest;
+      }, null);
+    } catch {
+      this.scanHistorySourceCount = 0;
+      this.scanHistoryMissionCount = 0;
+      this.scanHistoryErrorCount = 0;
+      this.lastScanAt = null;
+    }
+  }
+
+  get isConnectedAccount(): boolean {
+    return Boolean(this.connectedAccountEmail);
+  }
+
+  get accountStatusLabel(): string {
+    if (this.connectedSyncError) {
+      return 'Action requise';
+    }
+    return this.isConnectedAccount ? 'Connecté' : 'Local uniquement';
+  }
+
+  get syncStatusText(): string {
+    if (this.connectedSyncError) {
+      return this.connectedSyncError;
+    }
+    if (this.isConnectedAccount) {
+      return this.connectedLastSyncAt
+        ? `Dernière synchro ${this.connectedLastSyncAt}`
+        : 'Compte connecté, première synchronisation en attente.';
+    }
+    return "Vos scans, favoris, CV et candidatures restent dans l'extension tant qu'aucun compte n'est connecté.";
+  }
+
+  get lastScanLabel(): string {
+    if (!this.lastScanAt) {
+      return 'Aucun scan enregistré';
+    }
+    return `Dernier déclenchement ${scanDateFormatter.format(new Date(this.lastScanAt))}`;
+  }
+
+  get scanHistoryLabel(): string {
+    if (this.scanHistorySourceCount === 0) {
+      return 'Aucun historique par source';
+    }
+    const errorSuffix =
+      this.scanHistoryErrorCount > 0
+        ? ` · ${this.scanHistoryErrorCount} source${this.scanHistoryErrorCount > 1 ? 's' : ''} à corriger`
+        : '';
+    return `${this.scanHistorySourceCount} source${this.scanHistorySourceCount > 1 ? 's' : ''} · ${this.scanHistoryMissionCount} mission${this.scanHistoryMissionCount > 1 ? 's' : ''}${errorSuffix}`;
+  }
+
+  get nextScanLabel(): string {
+    if (!this.autoScan) {
+      return 'Scan automatique désactivé';
+    }
+    if (!this.lastScanAt) {
+      return `Premier scan automatique toutes les ${this.scanInterval} min`;
+    }
+
+    const nextScanAt = this.lastScanAt + this.scanInterval * 60_000;
+    if (nextScanAt <= Date.now()) {
+      return 'Prochain scan dès que Chrome déclenche l’alarme';
+    }
+    return `Prochain déclenchement vers ${scanDateFormatter.format(new Date(nextScanAt))}`;
+  }
+
+  get scanHistoryTone(): 'success' | 'attention' | 'neutral' {
+    if (this.scanHistorySourceCount === 0) {
+      return 'neutral';
+    }
+    return this.scanHistoryErrorCount > 0 ? 'attention' : 'success';
+  }
+
+  async openAccountCenter(): Promise<void> {
+    await openExternalUrl('https://missionpulse.app/dashboard');
+  }
+
+  async openConnectedDashboard(): Promise<void> {
+    await openExternalUrl('https://missionpulse.app/dashboard');
+  }
+
+  async openAiHelp(): Promise<void> {
+    await openExternalUrl('https://developer.chrome.com/docs/ai/prompt-api');
   }
 
   toggleProfileEditing(): void {
@@ -125,7 +356,7 @@ export class SettingsPageController {
   }
 
   addStack(): void {
-    const trimmed = this.stackInput.trim();
+    const trimmed = normalizeTextInput(this.stackInput);
     if (!trimmed || this.profileStack.includes(trimmed)) {
       return;
     }
@@ -138,35 +369,102 @@ export class SettingsPageController {
     this.profileStack = this.profileStack.filter((s) => s !== item);
   }
 
+  addKeyword(): void {
+    const trimmed = normalizeTextInput(this.keywordInput);
+    if (!trimmed || this.searchKeywords.includes(trimmed)) {
+      return;
+    }
+
+    this.searchKeywords = [...this.searchKeywords, trimmed];
+    this.keywordInput = '';
+  }
+
+  removeKeyword(item: string): void {
+    this.searchKeywords = this.searchKeywords.filter((keyword) => keyword !== item);
+  }
+
   async saveProfile(): Promise<void> {
     this.profileError = null;
+    this.profileSaved = false;
 
     try {
       const current = await getProfile();
-      await saveProfile(
-        withProfileDefaults({
-          firstName: this.firstName,
-          jobTitle: this.jobTitle,
-          location: this.profileLocation,
-          tjmMin: this.tjmMin,
-          tjmMax: this.tjmMax,
-          stack: [...this.profileStack],
-          remote: current?.remote ?? 'any',
-          seniority: current?.seniority ?? 'senior',
-          scoringWeights: current?.scoringWeights,
-          searchKeywords: current?.searchKeywords ?? [],
-        })
-      );
+      const nextStack = appendUniqueNormalized(this.profileStack, this.stackInput);
+      const nextSearchKeywords = appendUniqueNormalized(this.searchKeywords, this.keywordInput);
+      const nextTjmMin = normalizeDailyRate(this.tjmMin);
+      const nextTjmMax = normalizeDailyRate(this.tjmMax);
 
+      if (nextTjmMax > 0 && nextTjmMin > nextTjmMax) {
+        this.profileError = 'Le TJM maximum doit être supérieur ou égal au TJM minimum';
+        return;
+      }
+
+      const normalized = normalizeProfileDraft({
+        firstName: normalizeTextInput(this.firstName),
+        jobTitle: normalizeTextInput(this.jobTitle),
+        location: normalizeTextInput(this.profileLocation),
+        tjmMin: nextTjmMin,
+        tjmMax: nextTjmMax,
+        stack: nextStack,
+        remote: this.profileRemote,
+        seniority: this.seniority,
+        scoringWeights: current?.scoringWeights,
+        searchKeywords: nextSearchKeywords,
+      });
+
+      if (!normalized.ok || !normalized.profile) {
+        this.profileError = normalized.error ?? 'Profil invalide';
+        return;
+      }
+
+      const nextProfile = normalized.profile;
+
+      await this.submitProfile(nextProfile);
+      this.firstName = nextProfile.firstName;
+      this.jobTitle = nextProfile.jobTitle;
+      this.profileLocation = nextProfile.location;
+      this.tjmMin = nextProfile.tjmMin;
+      this.tjmMax = nextProfile.tjmMax;
+      this.profileStack = nextProfile.stack;
+      this.stackInput = '';
+      this.searchKeywords = nextProfile.searchKeywords;
+      this.keywordInput = '';
       this.editingProfile = false;
       this.profileSaved = true;
-      window.dispatchEvent(new CustomEvent('profile-updated'));
       setTimeout(() => {
         this.profileSaved = false;
       }, 2000);
     } catch (err) {
       this.profileError = err instanceof Error ? err.message : 'Erreur lors de la sauvegarde';
     }
+  }
+
+  private submitProfile(profile: UserProfile): Promise<void> {
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      let sawSaving = this.profileActor.snapshot.matches('saving');
+      const unsubscribe = this.profileActor.subscribe((snapshot) => {
+        if (settled) {
+          return;
+        }
+        if (snapshot.matches('saving')) {
+          sawSaving = true;
+        }
+        if (sawSaving && snapshot.matches('ready') && snapshot.context.current) {
+          settled = true;
+          unsubscribe();
+          resolve();
+        }
+        if (snapshot.matches('error')) {
+          settled = true;
+          const message = snapshot.context.error ?? 'Erreur lors de la sauvegarde';
+          unsubscribe();
+          reject(new Error(message));
+        }
+      });
+
+      this.profileActor.send({ type: 'SUBMIT_PROFILE', profile });
+    });
   }
 
   async updateScanInterval(value: number): Promise<void> {
@@ -199,16 +497,36 @@ export class SettingsPageController {
     }
   }
 
+  async updateTheme(value: 'light' | 'dark' | 'system'): Promise<void> {
+    this.theme = value;
+    window.dispatchEvent(new CustomEvent('mp:theme-changed', { detail: value }));
+    try {
+      const settings = await getSettings();
+      await setSettings({ ...settings, theme: value });
+    } catch {
+      // Hors contexte extension
+    }
+  }
+
+  async replayFeedTour(): Promise<void> {
+    await clearFeedTourSeen();
+    window.dispatchEvent(new CustomEvent('feed-tour:open'));
+  }
+
+  async restartOnboarding(): Promise<void> {
+    await clearOnboardingCompleted();
+    this.options.onNavigateToOnboarding?.();
+  }
+
   async resetAll(): Promise<void> {
     try {
-      // Use chrome.storage.local.clear() — this is Shell code, acceptable here
-      // since SettingsPageController is in shell/state layer
-      await chrome.storage.local.clear();
-      const databases = await indexedDB.databases();
-      for (const db of databases) {
-        if (db.name) {
-          indexedDB.deleteDatabase(db.name);
-        }
+      const response = await sendMessage({ type: 'RESET_LOCAL_DATA' });
+      if (response.type !== 'LOCAL_DATA_RESET' || !response.payload.reset) {
+        throw new Error(
+          response.type === 'LOCAL_DATA_RESET'
+            ? (response.payload.reason ?? 'Reset local impossible')
+            : 'Réponse reset local invalide'
+        );
       }
       this.showResetConfirm = false;
       this.options.onNavigateToOnboarding?.();
@@ -231,6 +549,7 @@ export class SettingsPageController {
       const favoriteMissions = allMissions.filter((m) => favoriteIds.includes(m.id));
       const now = new Date();
       const filename = generateFilename('favoris', format, now);
+      const exportedCount = favoriteMissions.length;
 
       switch (format) {
         case 'json':
@@ -253,6 +572,7 @@ export class SettingsPageController {
           break;
       }
 
+      this.lastExportSummary = `${exportFormatLabels[format]} généré · ${exportedCount} mission${exportedCount > 1 ? 's' : ''} favorite${exportedCount > 1 ? 's' : ''} · sessions plateforme conservées localement`;
       this.exportSuccess = true;
       setTimeout(() => {
         this.exportSuccess = false;
@@ -281,7 +601,7 @@ export class SettingsPageController {
 
       const backup = createBackup(profile, settings, favorites, hidden, Date.now());
       const json = serializeBackup(backup);
-      const filename = generateBackupFilename(backup.timestamp);
+      const filename = generateBackupFilename(backup.timestamp, formatBackupDateKey);
       downloadJSON(json, filename);
 
       return { ok: true, value: undefined };
@@ -336,9 +656,12 @@ export class SettingsPageController {
     try {
       const { profile, settings, favorites, hidden } = this.pendingBackup;
 
+      // Merge with defaults to fill fields missing from old backups (e.g. theme)
+      const restoredSettings: AppSettings = { ...DEFAULT_SETTINGS, ...settings };
+
       await Promise.all([
         saveProfile(withProfileDefaults(profile)),
-        setSettings(settings),
+        setSettings(restoredSettings),
         saveFavorites(favorites),
         saveHidden(hidden),
       ]);
@@ -346,7 +669,6 @@ export class SettingsPageController {
       this.showBackupModal = false;
       this.pendingBackup = null;
       this.backupError = null;
-      window.dispatchEvent(new CustomEvent('profile-updated'));
 
       return { ok: true, value: undefined };
     } catch {

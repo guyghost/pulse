@@ -6,7 +6,6 @@ import type { Mission, MissionSource, RemoteType } from './mission';
 import type { UserProfile, SeniorityLevel } from './profile';
 import {
   MissionSchema,
-  MissionSerializedSchema,
   UserProfileSchema,
   SemanticResultSchema,
   MissionSourceSchema,
@@ -22,16 +21,35 @@ export interface SemanticResult {
   reason: string;
 }
 
+export type DateDeserializer = (value: string) => Date | null;
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return value !== null && typeof value === 'object';
+}
+
+function normalizeMissionInput(data: unknown, deserializeDate?: DateDeserializer): unknown {
+  if (!deserializeDate || !isRecord(data) || typeof data.scrapedAt !== 'string') {
+    return data;
+  }
+
+  const scrapedAt = deserializeDate(data.scrapedAt);
+  if (scrapedAt === null) {
+    return data;
+  }
+
+  return { ...data, scrapedAt };
+}
+
 /**
  * Valide qu'un objet inconnu est une Mission valide.
- * Accepte les dates sous forme de Date ou de string ISO.
+ * Accepte uniquement les Date déjà désérialisées.
  */
 export function isMission(obj: unknown): obj is Mission {
   if (obj === null || typeof obj !== 'object') {
     return false;
   }
 
-  const result = MissionSerializedSchema.safeParse(obj);
+  const result = MissionSchema.safeParse(obj);
   return result.success;
 }
 
@@ -85,8 +103,8 @@ export function isSeniorityLevel(value: unknown): value is SeniorityLevel {
  * Parse et valide une Mission depuis des données brutes (IndexedDB, API, etc.)
  * Retourne la mission validée ou null si invalide.
  */
-export function parseMission(data: unknown): Mission | null {
-  const result = MissionSerializedSchema.safeParse(data);
+export function parseMission(data: unknown, deserializeDate?: DateDeserializer): Mission | null {
+  const result = MissionSchema.safeParse(normalizeMissionInput(data, deserializeDate));
   return result.success ? result.data : null;
 }
 

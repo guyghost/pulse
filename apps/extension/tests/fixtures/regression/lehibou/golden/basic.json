@@ -1,0 +1,34 @@
+[
+  {
+    "id": "lh-aaa-bbb-ccc",
+    "title": "Expert Splunk H/F",
+    "client": null,
+    "stack": ["Splunk", "Qualys"],
+    "tjm": 550,
+    "location": "Paris",
+    "remote": null,
+    "duration": "24 mois",
+    "url": "https://www.lehibou.com/annonce/aaa-bbb-ccc",
+    "source": "lehibou",
+    "scrapedAt": "2026-03-13T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  },
+  {
+    "id": "lh-ddd-eee-fff",
+    "title": "Dev Java Backend",
+    "client": null,
+    "stack": ["Java", "Spring Boot"],
+    "tjm": 650,
+    "location": "Lyon",
+    "remote": null,
+    "duration": "6 mois",
+    "url": "https://www.lehibou.com/annonce/ddd-eee-fff",
+    "source": "lehibou",
+    "scrapedAt": "2026-03-13T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  }
+]

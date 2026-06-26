@@ -1,7 +1,8 @@
 <script lang="ts">
   import type { ConnectorStatus as ConnectorStatusType } from '$lib/core/types/connector-status';
   import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
+  import { getConnectorErrorCopy } from '../copy/connector-error-copy';
 
   const {
     name,
@@ -9,12 +10,14 @@
     url = '',
     status = null,
     persisted = null,
+    onReconnect,
   }: {
     name: string;
     icon?: string;
     url?: string;
     status?: ConnectorStatusType | null;
     persisted?: PersistedConnectorStatus | null;
+    onReconnect?: (url: string) => void;
   } = $props();
 
   let imgFailed = $state(false);
@@ -26,17 +29,16 @@
 
   const retryCount = $derived(status?.retryCount ?? 0);
 
-  const errorMessage = $derived.by(() => {
-    if (status?.error?.message) {
-      return status.error.message;
-    }
-    if (persisted?.error && typeof persisted.error === 'object' && 'message' in persisted.error) {
-      return String(persisted.error.message);
-    }
-    return undefined;
+  const connectorErrorCopy = $derived.by(() => {
+    const error = status?.error ?? persisted?.error ?? null;
+    return getConnectorErrorCopy({
+      connectorId: status?.connectorId ?? persisted?.connectorId,
+      connectorName: name,
+      error,
+    });
   });
 
-  const isSessionError = $derived(errorMessage ? /session|expir/i.test(errorMessage) : false);
+  const isSessionError = $derived(connectorErrorCopy.reconnectRecommended);
 
   const relativeTime = $derived.by(() => {
     if (!persisted?.lastSyncAt) {
@@ -62,28 +64,28 @@
       case 'pending':
         return { icon: 'loader', color: 'text-text-muted', label: 'En attente', spin: false };
       case 'detecting':
-        return { icon: 'loader', color: 'text-accent-blue', label: 'Detection...', spin: true };
+        return { icon: 'loader', color: 'text-blueprint-blue', label: 'Détection...', spin: true };
       case 'fetching':
-        return { icon: 'loader', color: 'text-accent-blue', label: 'Scraping...', spin: true };
+        return { icon: 'loader', color: 'text-blueprint-blue', label: 'Collecte...', spin: true };
       case 'retrying':
         return {
           icon: 'loader',
-          color: 'text-accent-amber',
-          label: `Retry ${retryCount}/3...`,
+          color: 'text-blueprint-blue',
+          label: `Nouvel essai ${retryCount}/3...`,
           spin: true,
         };
       case 'done':
         return {
           icon: 'check',
-          color: 'text-accent-emerald',
+          color: 'text-blueprint-blue',
           label: `${missionsCount} missions`,
           spin: false,
         };
       case 'error':
         return {
           icon: 'x-circle',
-          color: 'text-red-400',
-          label: errorMessage ?? 'Erreur',
+          color: 'text-status-red',
+          label: connectorErrorCopy.label,
           spin: false,
         };
       default:
@@ -95,17 +97,13 @@
     if (!url) {
       return;
     }
-    try {
-      chrome.tabs.create({ url });
-    } catch {
-      window.open(url, '_blank');
-    }
+    onReconnect?.(url);
   }
 </script>
 
 <div class="flex items-center gap-2.5 py-1.5">
   <div
-    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-white/8 bg-white/[0.04]"
+    class="flex h-6 w-6 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white"
   >
     {#if icon.startsWith('http') && !imgFailed}
       <img
@@ -125,7 +123,7 @@
   <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">{name}</span>
   <div class="flex items-center gap-1.5">
     {#if connectorState === 'error' && isSessionError && url}
-      <button class="text-[10px] text-accent-blue hover:underline" onclick={handleReconnect}>
+      <button class="text-[10px] text-blueprint-blue hover:underline" onclick={handleReconnect}>
         Reconnecter
       </button>
     {/if}

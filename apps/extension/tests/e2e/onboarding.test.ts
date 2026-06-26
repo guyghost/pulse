@@ -1,9 +1,16 @@
 import { test, expect } from '@playwright/test';
-import { SIDE_PANEL } from './helpers';
+import { expectFeedReady, feedSearchInput, SIDE_PANEL } from './helpers';
 
 async function withNoProfile(page: import('@playwright/test').Page) {
   await page.addInitScript(() => {
-    let _chrome: any = undefined;
+    const savedProfileKey = '__missionpulse_e2e_saved_profile';
+    let _chrome: unknown = undefined;
+    let savedProfile: unknown = null;
+    try {
+      savedProfile = JSON.parse(window.sessionStorage.getItem(savedProfileKey) ?? 'null');
+    } catch {
+      savedProfile = null;
+    }
     Object.defineProperty(window, 'chrome', {
       configurable: true,
       enumerable: true,
@@ -12,13 +19,27 @@ async function withNoProfile(page: import('@playwright/test').Page) {
       },
       set(val) {
         _chrome = val;
-        if (val?.runtime?.sendMessage) {
-          const origSend = val.runtime.sendMessage;
-          val.runtime.sendMessage = async (msg: any) => {
+        const chromeApi = val as {
+          runtime?: { sendMessage?: (msg: { type: string }) => Promise<unknown> };
+        };
+        if (chromeApi.runtime?.sendMessage) {
+          const origSend = chromeApi.runtime.sendMessage;
+          chromeApi.runtime.sendMessage = async (msg: { type: string; payload?: unknown }) => {
             if (msg?.type === 'GET_PROFILE') {
-              return { type: 'PROFILE_RESULT', payload: null };
+              return { type: 'PROFILE_RESULT', payload: savedProfile };
             }
-            return origSend.call(val.runtime, msg);
+            if (msg?.type === 'SAVE_PROFILE') {
+              savedProfile = msg.payload;
+              window.sessionStorage.setItem(savedProfileKey, JSON.stringify(savedProfile));
+              return { type: 'PROFILE_RESULT', payload: savedProfile };
+            }
+            if (msg?.type === 'GET_FIRST_SCAN_DONE') {
+              return { type: 'FIRST_SCAN_DONE_RESULT', payload: false };
+            }
+            if (msg?.type === 'GET_ONBOARDING_COMPLETED') {
+              return { type: 'ONBOARDING_COMPLETED_RESULT', payload: false };
+            }
+            return origSend.call(chromeApi.runtime, msg);
           };
         }
       },
@@ -31,14 +52,25 @@ test.describe('Onboarding', () => {
     await withNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByRole('heading', { name: 'Le cockpit freelance' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Affinez votre radar' })).toBeVisible();
     await expect(page.locator('#ob-firstname')).toBeVisible();
     await page.locator('#ob-firstname').fill('Guy');
     await page.locator('#ob-jobtitle').fill('Dev React Senior');
+    await page.locator('#ob-stack').fill('React');
+    await page.getByRole('button', { name: 'Ajouter la stack technique' }).click();
+    await expect(page.getByRole('button', { name: 'React' })).toBeVisible();
     await page.locator('#ob-location').fill('Paris');
-    await page.getByRole('button', { name: /C.est parti/ }).click();
+    await expect(page.getByRole('button', { name: 'Sauvegarder mon profil' })).toBeEnabled();
+    await page.getByRole('button', { name: 'Sauvegarder mon profil' }).click();
+    await page.waitForFunction(() =>
+      window.sessionStorage.getItem('__missionpulse_e2e_saved_profile')
+    );
 
-    await expect(page.getByRole('heading', { name: 'Radar freelance' })).toBeVisible();
+    await expectFeedReady(page);
+    await expect(page.locator('#ob-firstname')).not.toBeVisible();
+
+    await page.reload();
+    await expectFeedReady(page);
     await expect(page.locator('#ob-firstname')).not.toBeVisible();
   });
 
@@ -47,7 +79,7 @@ test.describe('Onboarding', () => {
     await page.goto(SIDE_PANEL);
 
     await expect(page.locator('#ob-location')).toBeVisible();
-    await expect(page.getByLabel('Localisation souhaitee')).toBeVisible();
+    await expect(page.getByLabel('Localisation souhaitée')).toBeVisible();
   });
 
   test('submit button disabled without firstName', async ({ page }) => {
@@ -55,7 +87,7 @@ test.describe('Onboarding', () => {
     await page.goto(SIDE_PANEL);
 
     await page.locator('#ob-jobtitle').fill('Dev React');
-    await expect(page.getByRole('button', { name: /C.est parti/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Sauvegarder mon profil' })).toBeDisabled();
   });
 
   test('submit button disabled without jobTitle', async ({ page }) => {
@@ -63,7 +95,7 @@ test.describe('Onboarding', () => {
     await page.goto(SIDE_PANEL);
 
     await page.locator('#ob-firstname').fill('Guy');
-    await expect(page.getByRole('button', { name: /C.est parti/ })).toBeDisabled();
+    await expect(page.getByRole('button', { name: 'Sauvegarder mon profil' })).toBeDisabled();
   });
 
   test('auto-skips onboarding when profile exists (default stubs)', async ({ page }) => {
@@ -72,8 +104,7 @@ test.describe('Onboarding', () => {
     // With default stubs (profile exists), onboarding should be skipped
     // Either the feed is shown directly OR the onboarding form is NOT shown
     // Check for feed content or absence of onboarding form
-    const hasMissions = await page
-      .getByText('Missions')
+    const hasFeed = await feedSearchInput(page)
       .isVisible()
       .catch(() => false);
     const hasGreeting = await page
@@ -86,6 +117,6 @@ test.describe('Onboarding', () => {
       .catch(() => false);
 
     // Should have either missions header or greeting (feed visible) and NO onboarding heading
-    expect(hasMissions || hasGreeting || !hasOnboardingHeading).toBe(true);
+    expect(hasFeed || hasGreeting || !hasOnboardingHeading).toBe(true);
   });
 });

@@ -27,10 +27,10 @@
 
   const statusColor = $derived(
     status === 'within'
-      ? 'bg-accent-emerald'
+      ? 'bg-blueprint-blue'
       : status === 'below'
-        ? 'bg-accent-amber'
-        : 'bg-accent-blue'
+        ? 'bg-blueprint-blue'
+        : 'bg-blueprint-blue'
   );
 
   const statusText = $derived(
@@ -48,16 +48,16 @@
     <span class="text-text-secondary">{statusText}</span>
     <span>{range.max}\u20ac</span>
   </div>
-  <div class="relative h-2 bg-navy-700 rounded-full overflow-hidden">
+  <div class="relative h-2 bg-subtle-gray rounded-full overflow-hidden">
     <!-- Market range band -->
     <div
-      class="absolute h-full bg-navy-600 rounded-full"
+      class="absolute h-full bg-disabled-gray rounded-full"
       style:left="{rangeStart}%"
       style:width="{rangeEnd - rangeStart}%"
     ></div>
     <!-- Mission TJM marker -->
     <div
-      class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full {statusColor} border-2 border-navy-900 shadow-sm"
+      class="absolute top-1/2 -translate-y-1/2 w-3 h-3 rounded-full {statusColor} border-2 border-surface-white shadow-sm"
       style:left="calc({position}% - 6px)"
     ></div>
   </div>

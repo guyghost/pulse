@@ -1,7 +1,6 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
-  import Icon from '../atoms/Icon.svelte';
-  import Badge from '../atoms/Badge.svelte';
+  import { Icon } from '@pulse/ui';
 
   const {
     missions,
@@ -15,6 +14,13 @@
     full: 'Full remote',
     hybrid: 'Hybride',
     onsite: 'Sur site',
+  };
+
+  type DecisionEvidence = {
+    label: string;
+    value: string;
+    icon: string;
+    severity: 'success' | 'attention' | 'neutral';
   };
 
   const fields: { label: string; key: string; render: (m: Mission) => string }[] = [
@@ -39,6 +45,89 @@
     { label: 'Source', key: 'source', render: (m) => m.source },
     { label: 'Client', key: 'client', render: (m) => m.client ?? '—' },
   ];
+
+  function getScore(mission: Mission): number {
+    return mission.scoreBreakdown?.total ?? mission.semanticScore ?? mission.score ?? 0;
+  }
+
+  function formatTjm(value: number | null): string {
+    return typeof value === 'number' ? `${value} €/j` : 'Non précisé';
+  }
+
+  const rankedMissions = $derived([...missions].sort((a, b) => getScore(b) - getScore(a)));
+  const recommendedMission = $derived(rankedMissions[0] ?? null);
+  const runnerUpMission = $derived(rankedMissions[1] ?? null);
+  const scoreGap = $derived(
+    recommendedMission && runnerUpMission
+      ? getScore(recommendedMission) - getScore(runnerUpMission)
+      : 0
+  );
+  const bestTjmMission = $derived(
+    [...missions]
+      .filter((mission) => typeof mission.tjm === 'number')
+      .sort((a, b) => (b.tjm ?? 0) - (a.tjm ?? 0))[0] ?? null
+  );
+
+  const recommendationTitle = $derived(
+    recommendedMission ? `Priorité: ${recommendedMission.title}` : 'Comparaison prête'
+  );
+
+  const recommendationDescription = $derived.by(() => {
+    if (!recommendedMission) {
+      return 'Sélectionnez au moins deux missions pour obtenir une recommandation.';
+    }
+
+    if (scoreGap >= 10) {
+      return `${recommendedMission.title} devance la suivante de ${scoreGap} points. La prochaine action est d’ouvrir cette mission ou de la mettre en suivi.`;
+    }
+
+    if (scoreGap > 0) {
+      return `Les scores sont proches: ${scoreGap} point${scoreGap > 1 ? 's' : ''} d’écart. Départagez avec le TJM, le remote et la source avant de postuler.`;
+    }
+
+    return 'Les scores sont à égalité. Utilisez le TJM, le remote et le client pour trancher.';
+  });
+
+  const decisionEvidence = $derived.by<DecisionEvidence[]>(() => {
+    if (!recommendedMission) {
+      return [];
+    }
+
+    return [
+      {
+        label: 'Score',
+        value: `${getScore(recommendedMission)}/100`,
+        icon: 'target',
+        severity: getScore(recommendedMission) >= 80 ? 'success' : 'attention',
+      },
+      {
+        label: 'Écart',
+        value: scoreGap > 0 ? `+${scoreGap} pts` : 'Égalité',
+        icon: 'git-compare-arrows',
+        severity: scoreGap >= 10 ? 'success' : 'attention',
+      },
+      {
+        label: 'Meilleur TJM',
+        value: bestTjmMission ? formatTjm(bestTjmMission.tjm) : 'Absent',
+        icon: 'badge-euro',
+        severity: bestTjmMission ? 'success' : 'neutral',
+      },
+      {
+        label: 'Vigilance',
+        value:
+          recommendedMission.remote === 'onsite'
+            ? 'Présentiel'
+            : recommendedMission.tjm === null
+              ? 'TJM absent'
+              : 'Aucune',
+        icon: 'circle-alert',
+        severity:
+          recommendedMission.remote === 'onsite' || recommendedMission.tjm === null
+            ? 'attention'
+            : 'success',
+      },
+    ];
+  });
 </script>
 
 {#if missions.length >= 2}
@@ -48,17 +137,17 @@
     aria-modal="true"
   >
     <div
-      class="w-full max-w-lg animate-slide-up rounded-t-3xl bg-navy-800 border border-white/10 max-h-[85vh] overflow-y-auto"
+      class="w-full max-w-lg animate-slide-up rounded-t-3xl bg-surface-white border border-border-light max-h-[85vh] overflow-y-auto"
     >
       <!-- Header -->
       <div
-        class="sticky top-0 z-10 flex items-center justify-between border-b border-white/8 bg-navy-800/95 backdrop-blur-sm px-4 py-3"
+        class="sticky top-0 z-10 flex items-center justify-between border-b border-border-light bg-surface-white/95 backdrop-blur-sm px-4 py-3"
       >
         <h2 class="text-sm font-semibold text-text-primary">
           Comparaison ({missions.length} missions)
         </h2>
         <button
-          class="inline-flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:bg-white/10 hover:text-text-primary transition-colors"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:bg-subtle-gray hover:text-text-primary transition-colors"
           onclick={onClose}
           aria-label="Fermer"
         >
@@ -66,9 +155,64 @@
         </button>
       </div>
 
+      {#if recommendedMission}
+        <section class="border-b border-border-light bg-page-canvas px-4 py-3">
+          <div class="rounded-xl border border-blueprint-blue/15 bg-surface-white p-3">
+            <div class="flex items-start gap-3">
+              <span
+                class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/8 text-blueprint-blue"
+                aria-hidden="true"
+              >
+                <Icon name="target" size={16} />
+              </span>
+              <div class="min-w-0 flex-1">
+                <p
+                  class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue"
+                >
+                  Décision recommandée
+                </p>
+                <h3 class="mt-1 text-sm font-semibold text-text-primary">
+                  {recommendationTitle}
+                </h3>
+                <p class="mt-1 text-xs leading-5 text-text-subtle">
+                  {recommendationDescription}
+                </p>
+              </div>
+            </div>
+
+            <div class="mt-3 grid grid-cols-2 gap-2">
+              {#each decisionEvidence as item}
+                <div
+                  class="rounded-lg border px-2 py-1.5 {item.severity === 'attention'
+                    ? 'border-status-orange/25 bg-status-orange/5'
+                    : item.severity === 'success'
+                      ? 'border-accent-green/20 bg-accent-green/5'
+                      : 'border-border-light bg-page-canvas'}"
+                >
+                  <span class="flex items-center gap-1 text-[10px] text-text-muted">
+                    <Icon name={item.icon} size={11} />
+                    {item.label}
+                  </span>
+                  <span
+                    class="mt-0.5 block text-xs font-semibold tabular-nums {item.severity ===
+                    'attention'
+                      ? 'text-status-orange'
+                      : item.severity === 'success'
+                        ? 'text-text-primary'
+                        : 'text-text-subtle'}"
+                  >
+                    {item.value}
+                  </span>
+                </div>
+              {/each}
+            </div>
+          </div>
+        </section>
+      {/if}
+
       <!-- Titles row -->
       <div
-        class="grid border-b border-white/6 px-4 py-3"
+        class="grid border-b border-border-light px-4 py-3"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted self-end">Mission</div>
@@ -78,7 +222,7 @@
               href={mission.url}
               target="_blank"
               rel="noopener"
-              class="text-xs font-semibold text-accent-blue hover:underline line-clamp-2"
+              class="text-xs font-semibold text-blueprint-blue hover:underline line-clamp-2"
             >
               {mission.title}
             </a>
@@ -88,7 +232,7 @@
 
       <!-- Stack row -->
       <div
-        class="grid border-b border-white/6 px-4 py-3"
+        class="grid border-b border-border-light px-4 py-3"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">Stack</div>
@@ -96,7 +240,7 @@
           <div class="flex flex-wrap gap-1 px-2">
             {#each mission.stack.slice(0, 5) as tech}
               <span
-                class="inline-flex rounded-full bg-accent-blue/10 px-1.5 py-0.5 text-[10px] text-accent-blue"
+                class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-[10px] text-blueprint-blue"
                 >{tech}</span
               >
             {/each}
@@ -110,7 +254,7 @@
       <!-- Data rows -->
       {#each fields as field, i}
         <div
-          class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-white/[0.02]' : ''}"
+          class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
           style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
         >
           <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">{field.label}</div>
@@ -122,7 +266,7 @@
 
       <!-- Actions -->
       <div
-        class="grid px-4 py-3 border-t border-white/6"
+        class="grid px-4 py-3 border-t border-border-light"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div></div>
@@ -132,7 +276,7 @@
               href={mission.url}
               target="_blank"
               rel="noopener"
-              class="inline-flex items-center gap-1 rounded-lg bg-accent-blue/10 px-3 py-1.5 text-xs text-accent-blue hover:bg-accent-blue/20 transition-colors"
+              class="inline-flex items-center gap-1 rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-xs text-blueprint-blue hover:bg-blueprint-blue/20 transition-colors"
             >
               <Icon name="external-link" size={12} />
               Voir

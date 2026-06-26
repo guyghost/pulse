@@ -8,12 +8,14 @@ const recomputeFilteredMissions = (missions: Mission[], searchQuery: string): Mi
   }
 
   const query = searchQuery.toLowerCase().trim();
-  return missions.filter(
-    (m) =>
-      (m.title ?? '').toLowerCase().includes(query) ||
-      m.stack.some((s) => s && s.toLowerCase().includes(query)) ||
-      (m.description ?? '').toLowerCase().includes(query)
-  );
+  return missions.filter((m) => {
+    const searchableText = [m.title, m.client, m.description, m.location, m.source, ...m.stack]
+      .filter((value): value is string => typeof value === 'string' && value.length > 0)
+      .join(' ')
+      .toLowerCase();
+
+    return searchableText.includes(query);
+  });
 };
 
 export function createFeedStore() {

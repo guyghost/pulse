@@ -1,4 +1,4 @@
-import type { Mission, MissionSource, RemoteType } from '../types/mission';
+import type { Mission, RemoteType } from '../types/mission';
 import type { SeniorityLevel } from '../types/profile';
 
 /**
@@ -61,10 +61,17 @@ export function stripHtml(html: string): string {
  */
 export type MissionFields = Omit<
   Mission,
-  'score' | 'semanticScore' | 'semanticReason' | 'startDate' | 'seniority'
+  | 'scoreBreakdown'
+  | 'score'
+  | 'semanticScore'
+  | 'semanticReason'
+  | 'startDate'
+  | 'seniority'
+  | 'publishedAt'
 > & {
   startDate?: string | null;
   seniority?: SeniorityLevel | null;
+  publishedAt?: string | null;
 };
 
 export function createMission(fields: MissionFields): Mission {
@@ -75,6 +82,8 @@ export function createMission(fields: MissionFields): Mission {
     stack: fields.stack.filter((s): s is string => typeof s === 'string' && s.length > 0),
     startDate: fields.startDate ?? null,
     seniority: fields.seniority ?? null,
+    publishedAt: fields.publishedAt ?? null,
+    scoreBreakdown: null,
     score: null,
     semanticScore: null,
     semanticReason: null,

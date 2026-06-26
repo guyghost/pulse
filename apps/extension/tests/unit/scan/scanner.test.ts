@@ -25,10 +25,24 @@ vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
 
 vi.mock('../../../src/lib/core/scoring/dedup', () => ({
   deduplicateMissions: vi.fn((missions: Mission[]) => missions),
+  deduplicateMissionsDetailed: vi.fn((missions: Mission[]) => ({
+    missions,
+    duplicateRelations: [],
+  })),
 }));
 
 vi.mock('../../../src/lib/core/scoring/relevance', () => ({
-  scoreMission: vi.fn(() => 50),
+  scoreMission: vi.fn(() => ({
+    total: 50,
+    breakdown: {
+      stack: 20,
+      location: 10,
+      tjm: 12,
+      remote: 8,
+      seniorityBonus: 0,
+      startDateBonus: 0,
+    },
+  })),
 }));
 
 vi.mock('../../../src/lib/shell/utils/connection-monitor', () => ({
@@ -52,13 +66,60 @@ vi.mock('../../../src/lib/shell/utils/retry-strategy', () => ({
   withResultRetry: vi.fn(async (fn: () => Promise<unknown>) => fn()),
 }));
 
+// Mock CircuitBreakerRunner — simule un circuit fermé qui passe directement au connecteur
+vi.mock('../../../src/lib/shell/health/circuit-breaker-runner', () => ({
+  runWithCircuitBreaker: vi.fn(
+    async (
+      connector: { fetchMissions: (n: number, c: unknown, s: unknown) => Promise<unknown> },
+      now: number,
+      context: unknown,
+      signal: unknown
+    ) => {
+      const result = await connector.fetchMissions(now, context, signal);
+      return {
+        status: 'executed',
+        result,
+        snapshot: {
+          connectorId: connector.id ?? 'test',
+          circuitState: 'closed',
+          consecutiveFailures: 0,
+          totalFailures: 0,
+          totalSuccesses: 1,
+          lastSuccessAt: now,
+          lastFailureAt: null,
+          lastStateChangeAt: now,
+          recentLatenciesMs: [100],
+        },
+      };
+    }
+  ),
+}));
+
+// Mock ProbeScheduler — no-op dans les tests
+vi.mock('../../../src/lib/shell/health/probe-scheduler', () => ({
+  syncProbeAlarm: vi.fn().mockResolvedValue(undefined),
+}));
+
+// Mock chrome.runtime.sendMessage (bridge health notifications, best-effort)
+if (typeof chrome === 'undefined') {
+  vi.stubGlobal('chrome', {
+    runtime: { sendMessage: vi.fn().mockResolvedValue(undefined) },
+    storage: {
+      local: {
+        get: vi.fn().mockResolvedValue({}),
+        set: vi.fn().mockResolvedValue(undefined),
+      },
+    },
+  });
+}
+
 // ── Imports (after mocks) ────────────────────────────────────────────────
 
 import { runScan, ScanError } from '../../../src/lib/shell/scan/scanner';
 import { getConnectors, getConnector } from '../../../src/lib/shell/connectors/index';
 import { getSettings } from '../../../src/lib/shell/storage/chrome-storage';
 import { getProfile, saveMissions } from '../../../src/lib/shell/storage/db';
-import { deduplicateMissions } from '../../../src/lib/core/scoring/dedup';
+import { deduplicateMissionsDetailed } from '../../../src/lib/core/scoring/dedup';
 import { isOnline } from '../../../src/lib/shell/utils/connection-monitor';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
@@ -144,7 +205,10 @@ beforeEach(() => {
   (saveMissions as Mock).mockResolvedValue(undefined);
 
   // Default: dedup passes through
-  (deduplicateMissions as Mock).mockImplementation((m: Mission[]) => m);
+  (deduplicateMissionsDetailed as Mock).mockImplementation((missions: Mission[]) => ({
+    missions,
+    duplicateRelations: [],
+  }));
 });
 
 // ── Tests ────────────────────────────────────────────────────────────────
@@ -165,6 +229,75 @@ describe('scanner — runScan', () => {
     expect(result.errors).toHaveLength(0);
     expect(result.missions[0].id).toBe('mission-1');
     expect(result.missions[1].id).toBe('mission-2');
+  });
+
+  it('scores missions with the default profile when no saved profile exists', async () => {
+    const missions = [makeMission()];
+    const connector = makeConnector('free-work', 'Free-Work', missions);
+
+    (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work']));
+    (getConnector as Mock).mockResolvedValue(connector);
+    (getConnectors as Mock).mockResolvedValue([connector]);
+    (getProfile as Mock).mockResolvedValue(null);
+
+    const result = await runScan();
+
+    expect(result.missions).toHaveLength(1);
+    expect(result.missions[0].score).toBe(50);
+    expect(result.missions[0].scoreBreakdown).not.toBeNull();
+  });
+
+  it('calls onConnectorResult with deterministic filtered and scored missions', async () => {
+    const freshMission = makeMission({
+      id: 'fresh-freelance',
+      title: 'Mission freelance Svelte',
+      description: 'Renfort freelance sur produit B2B',
+      publishedAt: null,
+    });
+    const salariedMission = makeMission({
+      id: 'salaried-cdi',
+      title: 'Développeur Svelte CDI',
+      description: 'Poste en CDI',
+      publishedAt: null,
+    });
+    const staleMission = makeMission({
+      id: 'stale-freelance',
+      title: 'Mission freelance ancienne',
+      description: 'Renfort freelance',
+      publishedAt: '2020-01-01T00:00:00.000Z',
+    });
+    const connector = makeConnector('free-work', 'Free-Work', [
+      freshMission,
+      salariedMission,
+      staleMission,
+    ]);
+    const onConnectorResult = vi.fn();
+
+    (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work']));
+    (getConnector as Mock).mockResolvedValue(connector);
+    (getConnectors as Mock).mockResolvedValue([connector]);
+
+    await runScan(undefined, undefined, {
+      pageDelayMs: 0,
+      onConnectorResult,
+    });
+
+    expect(onConnectorResult).toHaveBeenCalledTimes(1);
+    const partial = onConnectorResult.mock.calls[0][0] as {
+      connectorId: string;
+      connectorName: string;
+      missions: Mission[];
+    };
+    expect(partial.connectorId).toBe('free-work');
+    expect(partial.connectorName).toBe('Free-Work');
+    expect(partial.missions).toHaveLength(1);
+    expect(partial.missions[0]).toEqual(
+      expect.objectContaining({
+        id: 'fresh-freelance',
+        score: 50,
+        scoreBreakdown: expect.objectContaining({ total: 50 }),
+      })
+    );
   });
 
   // 2. Empty connectors
@@ -329,25 +462,46 @@ describe('scanner — runScan', () => {
     (getConnectors as Mock).mockResolvedValue([c1, c2]);
 
     // Mock dedup to actually remove duplicates (by title)
-    (deduplicateMissions as Mock).mockImplementation((missions: Mission[]) => {
+    (deduplicateMissionsDetailed as Mock).mockImplementation((missions: Mission[]) => {
       const seen = new Map<string, Mission>();
+      const duplicateRelations: {
+        canonicalMissionId: string;
+        duplicateMissionId: string;
+        confidence: number;
+        reason: string;
+      }[] = [];
       for (const m of missions) {
         if (!seen.has(m.title)) {
           seen.set(m.title, m);
+        } else {
+          duplicateRelations.push({
+            canonicalMissionId: seen.get(m.title)?.id ?? m.id,
+            duplicateMissionId: m.id,
+            confidence: 1,
+            reason: 'test_duplicate_title',
+          });
         }
       }
-      return [...seen.values()];
+      return { missions: [...seen.values()], duplicateRelations };
     });
 
     const result = await runScan(undefined, undefined, { pageDelayMs: 0 });
 
-    // deduplicateMissions was called with all 3 missions
-    expect(deduplicateMissions).toHaveBeenCalledTimes(1);
-    const dedupArg = (deduplicateMissions as Mock).mock.calls[0][0] as Mission[];
+    // deduplicateMissionsDetailed was called with all 3 missions
+    expect(deduplicateMissionsDetailed).toHaveBeenCalledTimes(1);
+    const dedupArg = (deduplicateMissionsDetailed as Mock).mock.calls[0][0] as Mission[];
     expect(dedupArg).toHaveLength(3);
 
     // Result should have 2 unique missions (after dedup by title)
     expect(result.missions).toHaveLength(2);
+    expect(result.duplicateRelations).toEqual([
+      {
+        canonicalMissionId: 'dup-1',
+        duplicateMissionId: 'dup-2',
+        confidence: 1,
+        reason: 'test_duplicate_title',
+      },
+    ]);
   });
 
   // 9. Offline check

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "lh-xxx-yyy-zzz",
+    "title": "Mission Sans Prix",
+    "client": null,
+    "stack": [],
+    "tjm": null,
+    "location": "Paris",
+    "remote": null,
+    "duration": "3 mois",
+    "url": "https://www.lehibou.com/annonce/xxx-yyy-zzz",
+    "source": "lehibou",
+    "scrapedAt": "2026-03-13T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  }
+]

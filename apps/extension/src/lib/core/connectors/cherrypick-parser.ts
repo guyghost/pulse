@@ -16,6 +16,8 @@ export interface CherryPickMission {
   company: { name: string } | null;
   skills: ({ name: string } | string)[];
   description: string | null;
+  status: string | null;
+  created_at: string | null;
 }
 
 // Known API values: remote, partially_remote_3, no_remote
@@ -166,6 +168,7 @@ export function parseCherryPickMissions(missions: CherryPickMission[], now: Date
       url: `${BASE_URL}/ext/missions/${m.slug}`,
       source: SOURCE,
       scrapedAt: now,
+      publishedAt: m.created_at ?? null,
     });
   });
 }

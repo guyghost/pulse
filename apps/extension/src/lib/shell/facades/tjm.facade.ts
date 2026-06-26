@@ -1,6 +1,5 @@
-import { analyzeTJMHistory } from '$lib/core/tjm-history/index';
-import type { TJMAnalysis, TJMHistory, TJMRegion } from '$lib/core/types/tjm';
-import { loadTJMHistory } from '$lib/shell/storage/tjm-history';
+import type { TJMAnalysis, TJMRegion } from '$lib/core/types/tjm';
+import { sendMessage } from '$lib/shell/messaging/bridge';
 
 /**
  * Get TJM analysis, optionally filtered by stacks and/or region.
@@ -12,26 +11,19 @@ export async function getTJMAnalysis(
   profileStacks?: string[],
   region?: TJMRegion
 ): Promise<TJMAnalysis | null> {
-  const history = await loadTJMHistory();
+  const payload = {
+    ...(profileStacks && profileStacks.length > 0 ? { profileStacks } : {}),
+    ...(region ? { region } : {}),
+  };
+  const response = await sendMessage(
+    Object.keys(payload).length > 0
+      ? { type: 'GET_TJM_ANALYSIS', payload }
+      : { type: 'GET_TJM_ANALYSIS' }
+  );
 
-  const hasStackFilter = profileStacks && profileStacks.length > 0;
-  const hasRegionFilter = !!region;
-
-  if (!hasStackFilter && !hasRegionFilter) {
-    return analyzeTJMHistory(history);
+  if (response.type !== 'TJM_ANALYSIS_RESULT') {
+    throw new Error('TJM analysis load failed.');
   }
 
-  const normalizedStacks = hasStackFilter
-    ? new Set(profileStacks.map((s) => s.toLowerCase().trim()))
-    : null;
-
-  const filtered: TJMHistory = {
-    records: history.records.filter((r) => {
-      if (normalizedStacks && !normalizedStacks.has(r.stack)) return false;
-      if (hasRegionFilter && r.region !== region) return false;
-      return true;
-    }),
-  };
-
-  return analyzeTJMHistory(filtered);
+  return response.payload.analysis;
 }

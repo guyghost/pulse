@@ -1,6 +1,6 @@
 <script lang="ts">
   import { createConnectionStore } from '$lib/state/connection.svelte';
-  import Icon from './Icon.svelte';
+  import { Icon } from '@pulse/ui';
 
   const connection = createConnectionStore();
 
@@ -22,36 +22,36 @@
     switch (status) {
       case 'online':
         return {
-          color: 'bg-accent-emerald',
-          bgColor: 'bg-accent-emerald/10',
-          borderColor: 'border-accent-emerald/30',
-          textColor: 'text-accent-emerald',
+          color: 'bg-blueprint-blue',
+          bgColor: 'bg-blueprint-blue/10',
+          borderColor: 'border-blueprint-blue/25',
+          textColor: 'text-blueprint-blue',
           icon: 'wifi',
           label: 'En ligne',
         };
       case 'slow':
         return {
-          color: 'bg-accent-amber',
-          bgColor: 'bg-accent-amber/10',
-          borderColor: 'border-accent-amber/30',
-          textColor: 'text-accent-amber',
+          color: 'bg-blueprint-blue',
+          bgColor: 'bg-blueprint-blue/10',
+          borderColor: 'border-blueprint-blue/30',
+          textColor: 'text-blueprint-blue',
           icon: 'wifi-slow',
           label: 'Connexion lente',
         };
       case 'offline':
         return {
-          color: 'bg-accent-red',
-          bgColor: 'bg-accent-red/10',
-          borderColor: 'border-accent-red/30',
-          textColor: 'text-accent-red',
+          color: 'bg-status-red',
+          bgColor: 'bg-status-red/8',
+          borderColor: 'border-status-red/20',
+          textColor: 'text-status-red',
           icon: 'wifi-off',
           label: 'Hors ligne',
         };
       default:
         return {
           color: 'bg-text-muted',
-          bgColor: 'bg-white/5',
-          borderColor: 'border-white/10',
+          bgColor: 'bg-page-canvas',
+          borderColor: 'border-border-light',
           textColor: 'text-text-secondary',
           icon: 'wifi',
           label: 'Inconnu',
@@ -110,13 +110,13 @@
 
     {#if showDetails}
       <div
-        class="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-white/10 bg-surface p-3 shadow-xl"
+        class="absolute right-0 top-full z-50 mt-2 w-56 rounded-xl border border-border-light bg-surface p-3 shadow-xl"
         role="dialog"
         aria-label="Détails de la connexion"
       >
-        <div class="flex items-center gap-2 border-b border-white/10 pb-2 mb-2">
+        <div class="flex items-center gap-2 border-b border-border-light pb-2 mb-2">
           <span class="h-2 w-2 rounded-full {statusConfig.color}"></span>
-          <span class="text-xs font-medium text-white">{statusConfig.label}</span>
+          <span class="text-xs font-medium text-text-primary">{statusConfig.label}</span>
         </div>
 
         <div class="space-y-1.5 text-xs">

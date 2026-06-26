@@ -1,24 +1,5 @@
 import { test, expect, type Page } from '@playwright/test';
-import { SIDE_PANEL, injectMissions, toggleOffline } from './helpers';
-
-async function ensureFeedIsVisible(page: Page) {
-  await page.goto(SIDE_PANEL);
-
-  if (
-    await page
-      .getByText('Votre profil cible')
-      .isVisible()
-      .catch(() => false)
-  ) {
-    await page.locator('#ob-firstname').fill('Jean');
-    await page.locator('#ob-jobtitle').fill('Développeur React Senior');
-    await page.locator('#ob-location').fill('Paris');
-    await page.getByRole('button', { name: /C'est parti/ }).click();
-  }
-
-  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Feed' })).toBeVisible();
-}
+import { ensureFeedVisible, injectMissions, toggleOffline } from './helpers';
 
 async function seedTJMHistory(page: Page) {
   await page.evaluate(async () => {
@@ -81,14 +62,14 @@ async function seedTJMHistory(page: Page) {
 
 test.describe('TJM page', () => {
   test('shows TJM tab in main navigation', async ({ page }) => {
-    await ensureFeedIsVisible(page);
+    await ensureFeedVisible(page);
     await expect(
       page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })
     ).toBeVisible();
   });
 
   test('shows an empty state when no TJM history exists', async ({ page }) => {
-    await ensureFeedIsVisible(page);
+    await ensureFeedVisible(page);
 
     await page.evaluate(async () => {
       await chrome.storage.local.remove('tjm_history');
@@ -96,12 +77,13 @@ test.describe('TJM page', () => {
 
     await page.getByRole('button', { name: 'TJM' }).click();
     await expect(page.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByText('TJM Intelligence')).toBeVisible();
-    await expect(page.getByText(/Lancez une analyse/)).toBeVisible();
+    await expect(page.getByText('Radar TJM')).toBeVisible();
+    await expect(page.getByText('Aucune donnée TJM')).toBeVisible();
+    await expect(page.getByText(/Lancez un scan/)).toBeVisible();
   });
 
   test('renders dashboard data when TJM history is available', async ({ page }) => {
-    await ensureFeedIsVisible(page);
+    await ensureFeedVisible(page);
     await seedTJMHistory(page);
 
     await page
@@ -109,17 +91,15 @@ test.describe('TJM page', () => {
       .getByRole('button', { name: 'TJM' })
       .click();
 
-    await expect(page.getByText('Radar marche')).toBeVisible();
-    await expect(page.getByText('Analyse TJM')).toBeVisible();
-    await expect(page.getByText('Stacks suivies')).toBeVisible();
-    await expect(page.getByText('react', { exact: true })).toBeVisible();
-    await expect(page.getByText('typescript', { exact: true })).toBeVisible();
-    await expect(page.getByText('2026-04-02')).toBeVisible();
-    await expect(page.getByText(/Le marche est orienté a la hausse/i)).toBeVisible();
+    await expect(page.getByText('Radar TJM')).toBeVisible();
+    await expect(page.getByText("Vue d'ensemble")).toBeVisible();
+    await expect(page.getByText('Junior', { exact: true })).toBeVisible();
+    await expect(page.getByText('Confirmé', { exact: true })).toBeVisible();
+    await expect(page.getByText('Senior', { exact: true })).toBeVisible();
   });
 
   test('shows cached TJM data while offline', async ({ page }) => {
-    await ensureFeedIsVisible(page);
+    await ensureFeedVisible(page);
     await injectMissions(page, 3);
     await seedTJMHistory(page);
 
@@ -131,11 +111,8 @@ test.describe('TJM page', () => {
       .getByRole('button', { name: 'TJM' })
       .click();
 
-    await expect(
-      page.getByText('Mode hors ligne — Affichage des dernieres donnees en cache')
-    ).toBeVisible();
-    await expect(page.getByText('Analyse TJM')).toBeVisible();
-    await expect(page.getByText('react', { exact: true })).toBeVisible();
+    await expect(page.getByText('Mode hors ligne', { exact: true })).toBeVisible();
+    await expect(page.getByText("Vue d'ensemble")).toBeVisible();
 
     await toggleOffline(page, false);
   });

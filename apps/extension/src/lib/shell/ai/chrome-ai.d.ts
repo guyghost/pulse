@@ -1,25 +1,27 @@
 /**
  * Chrome Built-in AI API (Prompt API) type declarations.
  *
- * @see https://developer.chrome.com/docs/ai/built-in
+ * @see https://developer.chrome.com/docs/ai/prompt-api
  *
- * This API is available in Chrome 127+ with the "Prompt API for Gemini Nano"
- * origin trial flag enabled, or in Chrome 130+ by default.
+ * Chrome exposes the current Prompt API as globalThis.LanguageModel.
+ * Older builds exposed the extension trial API as self.ai.languageModel.
  */
 
 /**
- * Language model availability status.
- * - 'readily': The model is available and ready to use.
- * - 'after-download': The model needs to be downloaded first.
- * - 'no': The model is not available on this device.
+ * Current Prompt API availability status.
  */
-export type AIAvailability = 'readily' | 'after-download' | 'no';
+export type PromptApiAvailability = 'unavailable' | 'downloadable' | 'downloading' | 'available';
 
 /**
- * Capabilities returned by ai.languageModel.capabilities()
+ * Legacy Prompt API availability status.
+ */
+export type LegacyAIAvailability = 'readily' | 'after-download' | 'no';
+
+/**
+ * Capabilities returned by the legacy language model capability check.
  */
 export interface AILanguageModelCapabilities {
-  available: AIAvailability;
+  available: LegacyAIAvailability;
 }
 
 /**
@@ -55,6 +57,24 @@ export interface AILanguageModelSession {
    * Should be called when done with the session.
    */
   destroy(): void;
+}
+
+/**
+ * Current global Prompt API interface.
+ */
+export interface PromptLanguageModel {
+  /**
+   * Check whether a session can be created.
+   */
+  availability(options?: {
+    expectedInputs?: Array<{ type: 'text'; languages?: string[] }>;
+    expectedOutputs?: Array<{ type: 'text'; languages?: string[] }>;
+  }): Promise<PromptApiAvailability>;
+
+  /**
+   * Create a new language model session.
+   */
+  create(options?: AISessionOptions): Promise<AILanguageModelSession>;
 }
 
 /**
@@ -101,5 +121,13 @@ declare global {
   // Also extend Window for document contexts
   interface Window {
     ai: ChromeAI;
+    LanguageModel: PromptLanguageModel;
+  }
+
+  // `globalThis` is the stable access point used by the current Prompt API.
+  var LanguageModel: PromptLanguageModel | undefined;
+
+  interface WorkerGlobalScope {
+    LanguageModel: PromptLanguageModel;
   }
 }

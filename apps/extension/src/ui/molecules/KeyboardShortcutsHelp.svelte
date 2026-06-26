@@ -1,5 +1,5 @@
 <script lang="ts">
-  import Icon from '../atoms/Icon.svelte';
+  import { Icon } from '@pulse/ui';
   import {
     getRegisteredShortcuts,
     formatShortcut,
@@ -67,10 +67,10 @@
     tabindex="-1"
   >
     <!-- Header -->
-    <div class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-white/10">
+    <div class="shrink-0 flex items-center justify-between px-4 py-3 border-b border-border-light">
       <div class="flex items-center gap-2.5">
-        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-accent-blue/15">
-          <Icon name="keyboard" size={16} class="text-accent-blue" />
+        <div class="flex h-8 w-8 items-center justify-center rounded-lg bg-blueprint-blue/15">
+          <Icon name="keyboard" size={16} class="text-blueprint-blue" />
         </div>
         <div>
           <h2 id="shortcuts-title" class="text-sm font-semibold text-text-primary">
@@ -80,7 +80,7 @@
         </div>
       </div>
       <button
-        class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-white/5 hover:text-text-primary"
+        class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-page-canvas hover:text-text-primary"
         onclick={closeModal}
         aria-label="Fermer"
       >
@@ -97,12 +97,12 @@
           </h3>
           <div class="space-y-1">
             {#each shortcuts as shortcut}
-              <div class="flex items-center justify-between rounded-lg bg-white/[0.03] px-3 py-2">
+              <div class="flex items-center justify-between rounded-lg bg-page-canvas px-3 py-2">
                 <span class="text-[13px] text-text-secondary">
                   {shortcut.description}
                 </span>
                 <kbd
-                  class="inline-flex shrink-0 min-w-[1.75rem] items-center justify-center rounded-md border border-white/10 bg-white/[0.06] px-2 py-0.5 text-[11px] font-mono font-medium text-text-primary ml-3"
+                  class="inline-flex shrink-0 min-w-[1.75rem] items-center justify-center rounded-md border border-border-light bg-subtle-gray px-2 py-0.5 text-[11px] font-mono font-medium text-text-primary ml-3"
                 >
                   {formatShortcut(shortcut)}
                 </kbd>
@@ -114,10 +114,10 @@
     </div>
 
     <!-- Footer -->
-    <div class="shrink-0 flex items-center justify-between border-t border-white/10 px-4 py-3">
+    <div class="shrink-0 flex items-center justify-between border-t border-border-light px-4 py-3">
       <p class="text-[11px] text-text-muted">Désactivés pendant la saisie</p>
       <button
-        class="rounded-lg bg-accent-blue/15 px-3.5 py-1.5 text-[13px] font-medium text-accent-blue transition-colors hover:bg-accent-blue/25"
+        class="rounded-lg bg-blueprint-blue/15 px-3.5 py-1.5 text-[13px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/25"
         onclick={closeModal}
       >
         J'ai compris

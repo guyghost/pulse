@@ -23,7 +23,7 @@ pulse/
 - **Scoring IA** — Gemini Nano (Chrome built-in AI) analyse la pertinence sémantique
 - **Scoring multi-critères** — Stack, TJM, localisation, remote, séniorité, urgence (startDate)
 - **Dashboard TJM** — Tendances du taux journalier par stack et par source
-- **Déduplication** — Fusionne automatiquement les missions postées sur plusieurs plateformes
+- **Déduplication intelligente** — Fusionne les missions en préférant les sources directes (CherryPick > LeHibou > Hiway/Collective > Free-Work), détecte les proxy clients, URL normalisée avec validation de chemin
 - **Scan parallèle** — 5 connecteurs lancés simultanément (pool de 3)
 - **Smart notifications** — Alertes configurables par stack + TJM + score
 - **Comparaison** — Comparez jusqu'à 3 missions côte à côte
@@ -36,49 +36,49 @@ pulse/
 
 ### Plateformes supportées
 
-| Plateforme | Status | Notes |
-|---|---|---|
-| [Free-Work](https://www.free-work.com) | ✅ Opérationnel | API publique, header `Accept-Language: fr` requis |
-| [LeHibou](https://www.lehibou.com) | ✅ Opérationnel | Session cookie requise |
-| [Hiway](https://hiway-missions.fr) | ✅ Opérationnel | API Supabase publique |
-| [Collective](https://app.collective.work) | ✅ Opérationnel | GraphQL API, session requise, Cloudflare |
-| [Cherry Pick](https://app.cherry-pick.io) | ✅ Opérationnel | Session cookie requise |
+| Plateforme                                | Status          | Notes                                             |
+| ----------------------------------------- | --------------- | ------------------------------------------------- |
+| [Free-Work](https://www.free-work.com)    | ✅ Opérationnel | API publique, header `Accept-Language: fr` requis |
+| [LeHibou](https://www.lehibou.com)        | ✅ Opérationnel | Session cookie requise                            |
+| [Hiway](https://hiway-missions.fr)        | ✅ Opérationnel | API Supabase publique                             |
+| [Collective](https://app.collective.work) | ✅ Opérationnel | GraphQL API, session requise, Cloudflare          |
+| [Cherry Pick](https://app.cherry-pick.io) | ✅ Opérationnel | Session cookie requise                            |
 
 ### Compatibilité navigateurs
 
-| Navigateur | Status |
-|---|---|
-| Chrome | ✅ Testé |
-| Brave | ✅ Compatible |
-| Edge | ✅ Compatible |
-| Arc | ✅ Compatible |
-| Dia | ✅ Compatible (fix Accept-Language) |
+| Navigateur | Status                              |
+| ---------- | ----------------------------------- |
+| Chrome     | ✅ Testé                            |
+| Brave      | ✅ Compatible                       |
+| Edge       | ✅ Compatible                       |
+| Arc        | ✅ Compatible                       |
+| Dia        | ✅ Compatible (fix Accept-Language) |
 
 ## Quick Start
 
 ```bash
 # Prérequis: Node.js >= 22, pnpm >= 10
 pnpm install
-pnpm dev          # Dev server (UI sans Chrome)
-pnpm test         # 717 tests unitaires
+pnpm dev:local    # Supabase local + variables .env.local + dev servers
+pnpm test         # 1156 tests unitaires
 pnpm build        # Build extension
 ```
 
 ## Tech Stack
 
-| Couche | Technologie | Version |
-|---|---|---|
-| UI | Svelte 5 (runes) | ^5.x |
-| Styling | TailwindCSS 4 (CSS-first) | ^4.x |
-| State | Svelte 5 runes ($state, $derived, $effect) | ^5.x |
-| Language | TypeScript (strict) | ^5.x |
-| Build | Vite + @crxjs/vite-plugin | ^6.x |
-| Monorepo | Turborepo | ^2.x |
-| Testing | Vitest (717 tests) + Playwright | latest |
-| Runtime | Chrome Extension Manifest V3 | MV3 |
-| IA | Gemini Nano (Chrome built-in AI) | — |
-| Validation | Zod | ^3.23 |
-| Icons | Lucide Svelte | ^0.460 |
+| Couche     | Technologie                                | Version |
+| ---------- | ------------------------------------------ | ------- |
+| UI         | Svelte 5 (runes)                           | ^5.x    |
+| Styling    | TailwindCSS 4 (CSS-first)                  | ^4.x    |
+| State      | Svelte 5 runes ($state, $derived, $effect) | ^5.x    |
+| Language   | TypeScript (strict)                        | ^5.x    |
+| Build      | Vite + @crxjs/vite-plugin                  | ^6.x    |
+| Monorepo   | Turborepo                                  | ^2.x    |
+| Testing    | Vitest (1156 tests) + Playwright           | latest  |
+| Runtime    | Chrome Extension Manifest V3               | MV3     |
+| IA         | Gemini Nano (Chrome built-in AI)           | —       |
+| Validation | Zod                                        | ^3.23   |
+| Icons      | Lucide Svelte                              | ^0.460  |
 
 ## Architecture
 
@@ -87,7 +87,7 @@ pnpm build        # Build extension
 ```
 apps/extension/src/lib/
 ├── core/                  # FONCTIONS PURES — zéro I/O, zéro async
-│   ├── scoring/           # Relevance, bonus (séniorité/startDate), dedup, sort, smart notifications
+│   ├── scoring/           # Relevance, final-score (fusion), dedup (multi-field), notification-filter, sort
 │   ├── connectors/        # Parsers purs (HTML/JSON → Mission[])
 │   ├── types/             # Types + barrel exports (index.ts)
 │   ├── errors/            # Result<T,E> + erreurs typées
@@ -118,27 +118,40 @@ apps/extension/src/ui/
 
 ### State (Svelte 5 runes)
 
-| Module | Fichier | Rôle |
-|---|---|---|
-| App Navigation | `app-navigation.svelte.ts` | Routing, transitions, onboarding |
-| Feed | `feed.svelte.ts` | Missions, recherche, filtrage |
-| Feed Page | `feed-page.svelte.ts` | État complet du FeedPage (seen, favoris, filtres, comparaison) |
-| Settings | `settings-page.svelte.ts` | Profil, export, backup, reset |
-| Connection | `connection.svelte.ts` | Détection réseau |
-| Toast | `toast.svelte.ts` | Notifications UI |
+| Module         | Fichier                    | Rôle                                                           |
+| -------------- | -------------------------- | -------------------------------------------------------------- |
+| App Navigation | `app-navigation.svelte.ts` | Routing, transitions, onboarding                               |
+| Feed           | `feed.svelte.ts`           | Missions, recherche, filtrage                                  |
+| Feed Page      | `feed-page.svelte.ts`      | État complet du FeedPage (seen, favoris, filtres, comparaison) |
+| Settings       | `settings-page.svelte.ts`  | Profil, export, backup, reset                                  |
+| Connection     | `connection.svelte.ts`     | Détection réseau                                               |
+| Toast          | `toast.svelte.ts`          | Notifications UI                                               |
 
 ## Development
 
 ```bash
-pnpm dev                    # Dev server avec mocks Chrome
-pnpm test                   # 717 tests unitaires
+pnpm dev:local              # Supabase local + dev server avec mocks Chrome
+pnpm dev                    # Dev server seul, sans démarrer Supabase
+pnpm supabase:start         # Démarre Supabase local (Docker) + active les passkeys locales
+pnpm dev:env                # Écrit apps/landing/.env.local et apps/dashboard/.env.local
+pnpm supabase:status        # Affiche les URLs/keys locales
+pnpm supabase:reset         # Rejoue les migrations + supabase/seed.sql
+pnpm supabase:stop          # Arrête la stack Supabase
+pnpm test                   # 1156 tests unitaires
 pnpm test:watch             # Watch mode
 pnpm test:coverage          # Coverage (seuil 70% sur core/)
 pnpm test:e2e               # Playwright E2E
 pnpm typecheck              # TypeScript strict
 pnpm lint                   # ESLint
-pnpm health-check           # Vérification connecteurs vs sites live
 ```
+
+Supabase local est configuré dans `apps/landing/supabase/`. Les migrations existantes sont
+appliquées par le CLI, puis `pnpm dev:env` récupère les clés locales via `supabase status` et écrit
+les `.env.local` ignorés par Git pour `apps/landing` et `apps/dashboard`.
+
+Les passkeys locales utilisent `localhost` comme relying party ID. Le script `pnpm supabase:start`
+relance le conteneur Auth local avec les variables WebAuthn nécessaires, car le CLI Supabase ne les
+injecte pas encore toutes depuis `apps/landing/supabase/config.toml`.
 
 ### Dev Panel
 

@@ -1,5 +1,5 @@
 import { test, expect } from '@playwright/test';
-import { ensureFeedVisible, injectMissions, waitForMissions } from './helpers';
+import { ensureFeedVisible } from './helpers';
 
 test.describe('Export Flow', () => {
   test('export section is accessible from settings', async ({ page }) => {

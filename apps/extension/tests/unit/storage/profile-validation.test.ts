@@ -34,14 +34,10 @@ describe('UserProfileSchema — validation Zod', () => {
     expect(result.success).toBe(true);
   });
 
-  it('rejette un firstName vide', () => {
+  it('accepte un firstName vide pour permettre un profil partiel', () => {
     const profile = { ...validProfile(), firstName: '' };
     const result = UserProfileSchema.safeParse(profile);
-    expect(result.success).toBe(false);
-    if (!result.success) {
-      const messages = result.error.issues.map((i) => i.message).join(', ');
-      expect(messages).toContain('prénom');
-    }
+    expect(result.success).toBe(true);
   });
 
   it('rejette un firstName trop long (> 50 caractères)', () => {
@@ -74,6 +70,12 @@ describe('UserProfileSchema — validation Zod', () => {
       const messages = result.error.issues.map((i) => i.message).join(', ');
       expect(messages).toContain('supérieur ou égal');
     }
+  });
+
+  it('accepte un TJM minimum sans TJM maximum', () => {
+    const profile = { ...validProfile(), tjmMin: 800, tjmMax: 0 };
+    const result = UserProfileSchema.safeParse(profile);
+    expect(result.success).toBe(true);
   });
 
   it('rejette tjmMin > 5000', () => {

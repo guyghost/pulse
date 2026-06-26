@@ -1,7 +1,18 @@
 import { test, expect } from '@playwright/test';
 import {
+  allMissionsToggle,
   ensureFeedVisible,
+  expectMissionCount,
+  favoriteButton,
+  favoritesToggle,
+  feedSearchInput,
+  hideButton,
+  clearFeedSearch,
   injectMissions,
+  missionCards,
+  navButton,
+  scanButton,
+  unfavoriteButton,
   waitForMissions,
   toggleOffline,
   triggerScan,
@@ -23,7 +34,7 @@ test.describe('Offline Mode', () => {
 
     await expect(page.getByText('Mode hors ligne — Données en cache uniquement')).toBeVisible();
 
-    const cardCount = await page.locator('[role="button"]').count();
+    const cardCount = await missionCards(page).count();
     expect(cardCount).toBeGreaterThanOrEqual(5);
   });
 
@@ -33,7 +44,7 @@ test.describe('Offline Mode', () => {
     await injectMissions(page, 8);
     await page.waitForTimeout(700);
 
-    const firstCard = page.locator('[role="button"]').first();
+    const firstCard = missionCards(page).first();
     const missionTitle = await firstCard
       .locator('h3, .mission-title')
       .textContent()
@@ -42,7 +53,7 @@ test.describe('Offline Mode', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(500);
 
-    const cardCount = await page.locator('[role="button"][tabindex="0"]').count();
+    const cardCount = await missionCards(page).count();
     expect(cardCount).toBeGreaterThanOrEqual(8);
 
     if (missionTitle) {
@@ -56,7 +67,7 @@ test.describe('Offline Mode', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    const refreshButton = page.getByTitle('Rafraichir');
+    const refreshButton = scanButton(page);
     await expect(refreshButton).toBeVisible();
 
     const isDisabled = await refreshButton.isDisabled().catch(() => false);
@@ -80,15 +91,12 @@ test.describe('Offline Mode', () => {
 
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
-    await expect(page.getByText('5 missions', { exact: true }).first()).toBeVisible();
+    await expectMissionCount(page, 5);
 
     await triggerScan(page);
     await page.waitForTimeout(1000);
 
-    await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute(
-      'aria-current',
-      'page'
-    );
+    await expect(navButton(page, 'Feed')).toHaveAttribute('aria-current', 'page');
   });
 
   test('favorite actions work while offline', async ({ page }) => {
@@ -100,14 +108,14 @@ test.describe('Offline Mode', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    const firstCard = page.locator('[role="button"]').first();
-    const starBtn = firstCard.getByTitle('Ajouter aux favoris');
+    const firstCard = missionCards(page).first();
+    const starBtn = favoriteButton(firstCard);
     await expect(starBtn).toBeVisible();
     await starBtn.click();
 
-    await expect(firstCard.getByTitle('Retirer des favoris')).toBeVisible({ timeout: 1000 });
-    await page.getByTitle('Voir favoris').click();
-    await expect(page.getByTitle('Voir toutes')).toBeVisible({ timeout: 2000 });
+    await expect(unfavoriteButton(firstCard)).toBeVisible({ timeout: 1000 });
+    await favoritesToggle(page).click();
+    await expect(allMissionsToggle(page)).toBeVisible({ timeout: 2000 });
   });
 
   test('hide action works while offline', async ({ page }) => {
@@ -119,12 +127,12 @@ test.describe('Offline Mode', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    const firstCard = page.locator('[role="button"]').first();
-    const hideBtn = firstCard.getByTitle('Masquer');
+    const firstCard = missionCards(page).first();
+    const hideBtn = hideButton(firstCard);
     await expect(hideBtn).toBeVisible();
     await hideBtn.click();
 
-    await expect(page.getByRole('button', { name: /Voir les 1 mission masquee/ })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Voir les 1 mission masqu/i })).toBeVisible();
   });
 
   test('search works with cached missions while offline', async ({ page }) => {
@@ -138,7 +146,7 @@ test.describe('Offline Mode', () => {
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
-    await page.getByPlaceholder('Rechercher...').fill('React');
+    await feedSearchInput(page).fill('React');
     await page.waitForTimeout(500);
 
     const resultsText = await page.locator('text=/\\d+ mission/').first().textContent();
@@ -147,11 +155,9 @@ test.describe('Offline Mode', () => {
     const resultsCount = parseInt(resultsText?.match(/\d+/)?.[0] || '0', 10);
     expect(resultsCount).toBeLessThanOrEqual(initialCount);
 
-    await page.getByPlaceholder('Rechercher...').clear();
+    await clearFeedSearch(page);
     await page.waitForTimeout(300);
-    await expect(page.getByText(`${initialCount} missions`, { exact: true }).first()).toBeVisible({
-      timeout: 2000,
-    });
+    await expectMissionCount(page, initialCount, 2000);
   });
 
   test('navigation between tabs works offline', async ({ page }) => {
@@ -201,7 +207,7 @@ test.describe('Offline Mode', () => {
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
 
-    const missionCountBefore = await page.locator('[role="button"]').count();
+    const missionCountBefore = await missionCards(page).count();
     expect(missionCountBefore).toBe(5);
 
     await toggleOffline(page, true);

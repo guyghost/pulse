@@ -7,7 +7,7 @@ import {
   parseSemanticResult,
   type SemanticResult,
 } from '../../core/scoring/semantic-scoring';
-import { isPromptApiAvailable } from './capabilities';
+import { createPromptSession, isPromptApiAvailable } from './capabilities';
 import { getCachedSemanticScores, cacheSemanticScores } from '../storage/semantic-cache';
 import type { AILanguageModelSession } from './chrome-ai';
 
@@ -131,7 +131,7 @@ export const scoreMissionsSemantic = async (
   let session: AILanguageModelSession | null = null;
 
   try {
-    session = await self.ai.languageModel.create();
+    session = await createPromptSession();
 
     for (const mission of batch) {
       const result = await scoreSingleMission(mission, profile, session);

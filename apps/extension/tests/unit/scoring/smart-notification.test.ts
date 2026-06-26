@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   filterSmartNotifications,
   DEFAULT_SMART_CRITERIA,
+  summarizeSmartNotificationPreview,
   type SmartNotificationCriteria,
 } from '../../../src/lib/core/scoring/smart-notification';
 import type { Mission } from '../../../src/lib/core/types/mission';
@@ -105,5 +106,22 @@ describe('filterSmartNotifications', () => {
       scoreThreshold: 95,
     });
     expect(result).toEqual([]);
+  });
+
+  it('summarizes current alert volume before applying the max results limit', () => {
+    const preview = summarizeSmartNotificationPreview(missions, ['d'], {
+      scoreThreshold: 60,
+      requiredStacks: [],
+      minTJM: 0,
+      maxResults: 2,
+    });
+
+    expect(preview).toEqual({
+      totalMissions: 4,
+      seenCount: 1,
+      matchingCount: 3,
+      notifyCount: 2,
+      limitedCount: 1,
+    });
   });
 });

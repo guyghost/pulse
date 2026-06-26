@@ -3,6 +3,8 @@
  * Pure domain type: no I/O, no runtime validation.
  */
 
+export type ThemePreference = 'light' | 'dark' | 'system';
+
 export interface AppSettings {
   scanIntervalMinutes: number;
   enabledConnectors: string[];
@@ -12,4 +14,5 @@ export interface AppSettings {
   notificationScoreThreshold: number;
   respectRateLimits: boolean;
   customDelayMs: number;
+  theme: ThemePreference;
 }

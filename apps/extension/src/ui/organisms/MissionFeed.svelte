@@ -1,10 +1,11 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
   import MissionCard from '../molecules/MissionCard.svelte';
-  import Skeleton from '../atoms/Skeleton.svelte';
-  import Icon from '../atoms/Icon.svelte';
+  import { Skeleton } from '@pulse/ui';
+  import { Icon } from '@pulse/ui';
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
+  import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
 
   const {
     missions = [],
@@ -19,6 +20,10 @@
     onToggleFavorite,
     onHide,
     onCopyLink,
+    onOpenLink,
+    onRetry,
+    onStartScan,
+    onClearFilters,
   }: {
     missions?: Mission[];
     isLoading?: boolean;
@@ -32,6 +37,10 @@
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
     onCopyLink?: (id: string) => void;
+    onOpenLink?: (url: string) => void;
+    onRetry?: () => void;
+    onStartScan?: () => void;
+    onClearFilters?: () => void;
   } = $props();
 
   // Use $derived.by for explicit reactivity with defensive checks
@@ -54,7 +63,7 @@
 
   if (import.meta.env.DEV) {
     $effect(() => {
-      console.log(
+      console.debug(
         '[MissionFeed] missions prop:',
         missions?.length ?? 0,
         'sortedMissions:',
@@ -67,7 +76,7 @@
 <div class="flex flex-col gap-3 overflow-y-auto">
   {#if isLoading && sortedMissions.length === 0}
     {#each Array(3) as _}
-      <div class="section-card rounded-[1.5rem] p-4 space-y-3">
+      <div class="section-card rounded-xl p-4 space-y-3">
         <Skeleton width="58%" height="1.15rem" />
         <Skeleton width="34%" height="0.8rem" />
         <div class="flex gap-2">
@@ -79,40 +88,57 @@
       </div>
     {/each}
   {:else if error && sortedMissions.length === 0}
-    <div
-      class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center"
-    >
-      <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-accent-red/12">
-        <Icon name="x" size={20} class="text-accent-red" />
-      </div>
-      <p class="text-sm font-semibold text-text-primary">Erreur de synchronisation</p>
-      <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">{error}</p>
-    </div>
+    <OperationalEmptyState
+      title="Le feed ne peut pas être synchronisé"
+      description={error}
+      severity="critical"
+      statusLabel="Incident"
+      icon="triangle-alert"
+      proofLabel="Résultat affiché"
+      proofValue="0 mission"
+      primaryActionLabel="Réessayer"
+      primaryActionIcon="refresh-cw"
+      secondaryActionLabel={filterActive ? 'Réinitialiser les filtres' : null}
+      secondaryActionIcon="filter-x"
+      onPrimaryAction={onRetry}
+      onSecondaryAction={onClearFilters}
+    />
   {:else if sortedMissions.length === 0}
-    <div
-      class="section-card rounded-[1.75rem] flex flex-col items-center justify-center py-12 text-center"
-    >
-      {#if filterActive}
-        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
-          <Icon name="filter-x" size={20} class="text-text-muted" />
-        </div>
-        <p class="text-sm font-semibold text-text-primary">Aucun résultat</p>
-        <p class="mt-2 max-w-[250px] text-xs leading-relaxed text-text-secondary">
-          Essayez d'élargir vos filtres ou de modifier vos critères de recherche.
-        </p>
-      {:else}
-        <div class="mb-4 flex h-12 w-12 items-center justify-center rounded-2xl bg-white/[0.05]">
-          <Icon name="briefcase" size={20} class="text-text-muted" />
-        </div>
-        <p class="text-sm font-semibold text-text-primary">Aucune mission pour l'instant</p>
-        <p class="mt-2 text-xs text-text-secondary">Lancez un scan pour alimenter le radar.</p>
-      {/if}
-    </div>
+    {#if filterActive}
+      <OperationalEmptyState
+        title="Aucune mission ne correspond à cette décision"
+        description="Le système n’a pas trouvé d’opportunité dans le périmètre courant. La prochaine action utile est d’élargir les critères avant de rescanner."
+        severity="attention"
+        statusLabel="Filtre trop strict"
+        icon="filter-x"
+        proofLabel="Résultat filtré"
+        proofValue="0 mission"
+        primaryActionLabel="Réinitialiser les filtres"
+        primaryActionIcon="filter-x"
+        secondaryActionLabel="Relancer le scan"
+        secondaryActionIcon="refresh-cw"
+        onPrimaryAction={onClearFilters}
+        onSecondaryAction={onStartScan}
+      />
+    {:else}
+      <OperationalEmptyState
+        title="Lancez un premier scan pour voir vos missions"
+        description="Aucune mission exploitable n’est stockée. Lancez un scan pour transformer les sources connectées en missions à examiner."
+        severity="neutral"
+        statusLabel="Aucune donnée"
+        icon="radar"
+        proofLabel="Feed actuel"
+        proofValue="0 mission"
+        primaryActionLabel="Lancer le scan"
+        primaryActionIcon="play"
+        onPrimaryAction={onStartScan}
+      />
+    {/if}
   {:else}
     {#if error}
-      <div class="section-card rounded-[1.25rem] flex items-center gap-3 px-4 py-3">
-        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-accent-red/12">
-          <Icon name="x" size={14} class="text-accent-red" />
+      <div class="section-card rounded-lg flex items-center gap-3 px-4 py-3">
+        <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-status-red/12">
+          <Icon name="x" size={14} class="text-status-red" />
         </div>
         <p class="text-xs leading-relaxed text-text-secondary">{error}</p>
       </div>
@@ -128,6 +154,7 @@
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}
           onCopyLink={() => onCopyLink?.(mission.id)}
+          {onOpenLink}
         />
       </div>
     {/each}

@@ -7,6 +7,16 @@ import { resolve } from 'path';
 
 export default defineConfig({
   plugins: [svelte(), tailwindcss(), crx({ manifest })],
+  server: {
+    host: '0.0.0.0',
+    port: 5176,
+    strictPort: true,
+    hmr: {
+      host: 'localhost',
+      port: 5176,
+      protocol: 'ws',
+    },
+  },
   test: {
     coverage: {
       provider: 'v8',
@@ -22,6 +32,7 @@ export default defineConfig({
   },
   build: {
     modulePreload: { polyfill: false },
+    chunkSizeWarningLimit: 600,
     outDir: 'dist',
     rollupOptions: {
       input: {

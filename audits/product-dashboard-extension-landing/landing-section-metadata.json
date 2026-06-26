@@ -1,0 +1,23 @@
+[
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/11-landing-workflow.png",
+    "selector": "#workflow",
+    "found": true,
+    "text": "Le feed gratuit prouve la valeur dès le scan. Premium ajoute le dashboard connecté, le suivi de candidature, le radar TJM, le profil/CV et les générations par crédits. ScannerQualifierDéciderConvertir Side panel MissionPulse Feed Top missions Scan terminé Auto Trouvées 42 missions consolidées Dédupliquées 31 opportunités uniques À contacter 8 scores supérieurs à 85 Mission Score TJM Lead Svelte / TypeScript Free-Work · Remote hybride A 720€ Architecte Frontend LeHibou · Paris A 780€ Fullstack Platform Hiway · Remote A 690€ Consultant Design System Collective · Lyon B 650€",
+    "top": 1129.2265625
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/12-landing-plans.png",
+    "selector": "#plans",
+    "found": true,
+    "text": "Gratuit ou Premium ? La landing vend le même parcours que le dashboard: découvrir gratuitement les bonnes missions, puis payer quand vous voulez structurer la conversion. Gratuit 0€ Pour valider la valeur en quelques minutes depuis l'extension Chrome. Scan des 5 plateformes connectées depuis vos sessions navigateur. Feed centralisé avec recherche, filtres, tri, nouveautés et favoris. Scoring de pertinence, déduplication et comparaison des meilleures missions. Paramètres de profil, alertes, exports et sauvegarde locale. Scoring sémantique local via Gemini Nano quand Chrome le permet. Installer gratuitement Premium 10€/an Pour piloter votre prospection comme un pipeline et produire vos candidatures. Le dashboard connecté optionnel synchronise les snapshots normalisés. Pages Premium dans l'extension: profil, CV, suivi de candidatures et radar TJM. Pipeline de candidature avec statuts, notes, prochaine action et historique. Assistant profil/CV pour garder vos informations cohérentes entre plateformes. 20 crédits IA par mois pour générer pitch, message recruteur ou résumé CV. Passer à Premium Crédits IA à la demande Besoin de générer plus de contenus ? Packs disponibles depuis le dashboard: 5 crédits à 4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€. Voir mon compte",
+    "top": 3438.4765625
+  },
+  {
+    "filePath": "/Users/guy/Developer/dev/pulse/audits/product-dashboard-extension-landing/13-landing-platforms-final-cta.png",
+    "selector": "#platforms",
+    "found": true,
+    "text": "5 plateformes connectées Les principales sources de missions freelance tech en France Free-Work 8 000+ missions freelance Opérationnel LeHibou Missions IT grands comptes Opérationnel Hiway Portage salarial + missions Opérationnel Collective Collectif de freelances Opérationnel Cherry Pick Missions tech sélectionnées Opérationnel",
+    "top": 2480.78125
+  }
+]
