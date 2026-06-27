@@ -12,6 +12,7 @@ import type {
 } from '../lib/shell/messaging/bridge';
 import type { PersistedConnectorStatus } from '../lib/core/types/connector-status';
 import type { Mission } from '../lib/core/types/mission';
+import type { MissionTracking } from '../lib/core/types/tracking';
 import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
 import {
@@ -964,6 +965,40 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           sendResponse({
             type: 'TRACKING_UPDATED',
             payload: {
+              missionId,
+              currentStatus: 'detected',
+              history: [],
+              generatedAssetIds: [],
+              userRating: null,
+              notes: '',
+              nextActionAt: null,
+            },
+          });
+        }
+      })();
+      return true;
+    }
+
+    if (message.type === 'UPDATE_TRACKING_DETAILS') {
+      const { missionId, nextActionAt } = message.payload;
+      const now = Date.now();
+
+      (async () => {
+        try {
+          let tracking = await getTracking(missionId);
+          if (!tracking) {
+            tracking = createTracking(missionId, now);
+          }
+
+          const updated: MissionTracking = { ...tracking, nextActionAt: nextActionAt ?? null };
+          await saveTracking(updated);
+          sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+        } catch (err) {
+          console.error('[MissionPulse] UPDATE_TRACKING_DETAILS error:', err);
+          const current = await getTracking(missionId).catch(() => null);
+          sendResponse({
+            type: 'TRACKING_UPDATED',
+            payload: current ?? {
               missionId,
               currentStatus: 'detected',
               history: [],

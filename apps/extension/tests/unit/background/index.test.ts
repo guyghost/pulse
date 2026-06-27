@@ -883,4 +883,150 @@ describe('background auto-scan notifications', () => {
       payload: { reset: true },
     });
   });
+
+  describe('UPDATE_TRACKING_DETAILS handler', () => {
+    it('updates nextActionAt on an existing tracking and persists it', async () => {
+      expect(messageListener).toBeTypeOf('function');
+      const sendResponse = vi.fn();
+      const existing = makeTracking({ missionId: 'mission-1', nextActionAt: null });
+      getTracking.mockResolvedValueOnce(existing);
+
+      const handled = messageListener?.(
+        {
+          type: 'UPDATE_TRACKING_DETAILS',
+          payload: { missionId: 'mission-1', nextActionAt: '2026-07-15T10:00:00.000Z' },
+        },
+        {},
+        sendResponse
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(handled).toBe(true);
+      expect(saveTracking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          missionId: 'mission-1',
+          currentStatus: 'selected',
+          nextActionAt: '2026-07-15T10:00:00.000Z',
+        })
+      );
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'TRACKING_UPDATED',
+        payload: expect.objectContaining({
+          missionId: 'mission-1',
+          nextActionAt: '2026-07-15T10:00:00.000Z',
+        }),
+      });
+    });
+
+    it('creates a fresh tracking when none exists before applying nextActionAt', async () => {
+      expect(messageListener).toBeTypeOf('function');
+      const sendResponse = vi.fn();
+      getTracking.mockResolvedValueOnce(null);
+
+      const handled = messageListener?.(
+        {
+          type: 'UPDATE_TRACKING_DETAILS',
+          payload: { missionId: 'mission-new', nextActionAt: '2026-08-01T00:00:00.000Z' },
+        },
+        {},
+        sendResponse
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(handled).toBe(true);
+      expect(saveTracking).toHaveBeenCalledWith(
+        expect.objectContaining({
+          missionId: 'mission-new',
+          currentStatus: 'detected',
+          nextActionAt: '2026-08-01T00:00:00.000Z',
+          history: expect.any(Array),
+        })
+      );
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'TRACKING_UPDATED',
+        payload: expect.objectContaining({
+          missionId: 'mission-new',
+          nextActionAt: '2026-08-01T00:00:00.000Z',
+        }),
+      });
+    });
+
+    it('clears nextActionAt when the payload explicitly sends null', async () => {
+      expect(messageListener).toBeTypeOf('function');
+      const sendResponse = vi.fn();
+      getTracking.mockResolvedValueOnce(
+        makeTracking({ missionId: 'mission-1', nextActionAt: '2026-07-15T10:00:00.000Z' })
+      );
+
+      messageListener?.(
+        {
+          type: 'UPDATE_TRACKING_DETAILS',
+          payload: { missionId: 'mission-1', nextActionAt: null },
+        },
+        {},
+        sendResponse
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(saveTracking).toHaveBeenCalledWith(
+        expect.objectContaining({ missionId: 'mission-1', nextActionAt: null })
+      );
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'TRACKING_UPDATED',
+        payload: expect.objectContaining({ missionId: 'mission-1', nextActionAt: null }),
+      });
+    });
+
+    it('treats an omitted nextActionAt as null (schema marks it optional)', async () => {
+      expect(messageListener).toBeTypeOf('function');
+      const sendResponse = vi.fn();
+      getTracking.mockResolvedValueOnce(
+        makeTracking({ missionId: 'mission-1', nextActionAt: '2026-07-15T10:00:00.000Z' })
+      );
+
+      messageListener?.(
+        { type: 'UPDATE_TRACKING_DETAILS', payload: { missionId: 'mission-1' } },
+        {},
+        sendResponse
+      );
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      expect(saveTracking).toHaveBeenCalledWith(
+        expect.objectContaining({ missionId: 'mission-1', nextActionAt: null })
+      );
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'TRACKING_UPDATED',
+        payload: expect.objectContaining({ missionId: 'mission-1', nextActionAt: null }),
+      });
+    });
+
+    it('responds with the current tracking instead of throwing when persistence fails', async () => {
+      expect(messageListener).toBeTypeOf('function');
+      const sendResponse = vi.fn();
+      const existing = makeTracking({ missionId: 'mission-1', nextActionAt: null });
+      // getTracking resolves to `existing` both for the initial read and the catch fallback.
+      getTracking.mockResolvedValue(existing);
+      saveTracking.mockRejectedValueOnce(new Error('storage down'));
+
+      await expect(
+        (async () => {
+          messageListener?.(
+            {
+              type: 'UPDATE_TRACKING_DETAILS',
+              payload: { missionId: 'mission-1', nextActionAt: '2026-07-15T10:00:00.000Z' },
+            },
+            {},
+            sendResponse
+          );
+          await new Promise((resolve) => setTimeout(resolve, 0));
+        })()
+      ).resolves.toBeUndefined();
+
+      expect(saveTracking).toHaveBeenCalled();
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'TRACKING_UPDATED',
+        payload: existing,
+      });
+    });
+  });
 });
