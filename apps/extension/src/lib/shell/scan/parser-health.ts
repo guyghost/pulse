@@ -1,18 +1,24 @@
 /**
  * Parser health tracking for detecting anomalies in connector outputs.
  *
+ * Shell layer: owns chrome.storage.local persistence and dev-only side effects
+ * (console.warn). All decision logic is delegated to the pure Core function
+ * `evaluateParserHealth` (see `core/connectors/parser-health-logic.ts`).
+ *
  * Tracks previous results per connector to detect suspicious patterns:
  * - A connector returning 0 missions after previously returning >0
- *
- * This helps identify when a parser may have broken due to DOM changes.
+ * - Too many consecutive zero-results (possibly a broken parser)
  */
 
-interface ConnectorHealthRecord {
-  connectorId: string;
-  lastMissionCount: number;
-  lastSuccessAt: number | null;
-  consecutiveZeros: number;
-}
+import {
+  evaluateParserHealth,
+  BROKEN_PARSER_THRESHOLD,
+  type ConnectorHealthRecord,
+  type ParserHealthStatus,
+} from '../../core/connectors/parser-health-logic';
+
+// Re-export the status type so existing importers keep compiling.
+export type { ParserHealthStatus } from '../../core/connectors/parser-health-logic';
 
 const HEALTH_STORAGE_KEY = 'parser_health';
 
@@ -33,15 +39,6 @@ const saveHealthRecords = async (records: Map<string, ConnectorHealthRecord>): P
   await chrome.storage.local.set({ [HEALTH_STORAGE_KEY]: obj });
 };
 
-export interface ParserHealthStatus {
-  connectorId: string;
-  missionCount: number;
-  previousCount: number;
-  isSuspicious: boolean;
-  /** Non-null message when a suspicious pattern is detected */
-  warning?: string;
-}
-
 /**
  * Record and check parser health for a connector result.
  *
@@ -58,44 +55,24 @@ export const trackParserHealth = async (
   now: number
 ): Promise<ParserHealthStatus> => {
   const records = await loadHealthRecords();
-  const existing = records.get(connectorId);
+  const existing = records.get(connectorId) ?? null;
 
-  const previousCount = existing?.lastMissionCount ?? 0;
-  const consecutiveZeros = missionCount === 0 ? (existing?.consecutiveZeros ?? 0) + 1 : 0;
+  // Delegate decision to the pure Core function
+  const { record, status } = evaluateParserHealth(connectorId, existing, missionCount, now);
 
-  // Detect suspicious pattern: went from >0 to 0
-  const isSuspicious = previousCount > 0 && missionCount === 0;
-
-  // Update record
-  const record: ConnectorHealthRecord = {
-    connectorId,
-    lastMissionCount: missionCount,
-    lastSuccessAt: missionCount > 0 ? now : (existing?.lastSuccessAt ?? null),
-    consecutiveZeros,
-  };
   records.set(connectorId, record);
 
   // Persist (non-blocking, ignore errors)
   saveHealthRecords(records).catch(() => {});
 
-  const status: ParserHealthStatus = {
-    connectorId,
-    missionCount,
-    previousCount,
-    isSuspicious,
-  };
-
-  if (isSuspicious) {
-    status.warning = `Parser anomaly: ${connectorId} returned 0 missions after previously returning ${previousCount}`;
-    if (import.meta.env.DEV) {
-      console.warn(`[ParserHealth] ${status.warning}`);
-    }
+  // Dev-only side effects (kept in the Shell — I/O / logging)
+  if (status.warning !== undefined && import.meta.env.DEV) {
+    console.warn(`[ParserHealth] ${status.warning}`);
   }
 
-  // Also warn on too many consecutive zeros (might indicate a broken parser)
-  if (consecutiveZeros >= 5 && import.meta.env.DEV) {
+  if (record.consecutiveZeros >= BROKEN_PARSER_THRESHOLD && import.meta.env.DEV) {
     console.warn(
-      `[ParserHealth] ${connectorId} has returned 0 missions for ${consecutiveZeros} consecutive scans`
+      `[ParserHealth] ${connectorId} has returned 0 missions for ${record.consecutiveZeros} consecutive scans`
     );
   }
 
