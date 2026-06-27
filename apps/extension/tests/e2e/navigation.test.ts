@@ -43,7 +43,8 @@ test.describe('Navigation', () => {
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
 
     await nav.getByRole('button', { name: 'TJM' }).click();
-    await expect(page.getByText('Radar TJM')).toBeVisible();
+    // The TJM hero heading is now "Analyse TJM" (previously "Radar TJM").
+    await expect(page.getByRole('heading', { name: 'Analyse TJM' })).toBeVisible();
     await expect(nav.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
 
     await nav.getByRole('button', { name: 'Feed' }).click();

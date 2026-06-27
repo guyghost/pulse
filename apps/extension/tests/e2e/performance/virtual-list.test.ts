@@ -187,12 +187,12 @@ test.describe('Performance - Virtual List', () => {
     // Attendre que le rendu soit stabilisé
     await page.waitForTimeout(500);
 
-    // Compter les éléments réellement dans le DOM
-    // Avec une virtual list, on ne devrait avoir que ~10-20 éléments, pas 500
+    // The feed uses incremental batch rendering (not JS virtual scroll): it renders the first
+    // BATCH_SIZE items and grows via a "Voir X missions de plus" button + IntersectionObserver.
+    // So the rendered card count must stay far below the total even for a large dataset.
     const cardElements = missionCards(page);
     const count = await cardElements.count();
 
-    // La virtual list ne devrait rendre que les éléments visibles (~20 max)
     expect(count).toBeLessThan(50);
 
     // Mais le texte doit indiquer 500 missions
@@ -207,10 +207,9 @@ test.describe('Performance - Virtual List', () => {
 
     await expectMissionCount(page, 300, 5000);
 
-    // Scroller rapidement vers le bas
-    const container = page
-      .locator('[role="region"], .missions-container, [data-testid="mission-feed"]')
-      .first();
+    // Scroller rapidement vers le bas. The scrollable element is the feed root
+    // ([data-testid="feed-scroll-container"]), not the mission-feed list itself.
+    const container = page.locator('[data-testid="feed-scroll-container"]').first();
 
     // Effectuer plusieurs scrolls rapides
     for (let i = 0; i < 5; i++) {
@@ -411,10 +410,9 @@ test.describe('Performance - Virtual List', () => {
 
     await expectMissionCount(page, 200, 5000);
 
-    // Scroller vers le milieu
-    const container = page
-      .locator('[role="region"], .missions-container, [data-testid="mission-feed"]')
-      .first();
+    // Scroller vers le milieu. The scrollable element is the feed root
+    // ([data-testid="feed-scroll-container"]), not the mission-feed list itself.
+    const container = page.locator('[data-testid="feed-scroll-container"]').first();
     await container.evaluate((el) => {
       el.scrollTop = el.scrollHeight / 3;
     });

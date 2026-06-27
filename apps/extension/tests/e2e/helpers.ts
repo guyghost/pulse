@@ -133,6 +133,19 @@ export async function injectMissions(page: Page, count: number) {
   await expect(missionCountInput).toHaveValue(String(count));
   await page.getByRole('button', { name: 'inject' }).click();
   await closeDevPanel(page);
+
+  // Two dev-mode timing hazards can mask the injected set:
+  //  1. The feed wires its `dev:missions` listener in a Svelte $effect that may not be attached
+  //     yet when the DevPanel click dispatches the event.
+  //  2. `smartLoad()` auto-scans on mount; its delayed SCAN_COMPLETE (~800ms) re-reads the
+  //     pre-injection localStorage snapshot and overwrites the feed with the default 10 missions.
+  // Waiting for the scan to settle, then re-dispatching synchronously, makes the injection stick.
+  await page.waitForTimeout(1200);
+  await page.evaluate(() => {
+    const detail = JSON.parse(window.localStorage.getItem('__missionpulse_dev_missions') ?? '[]');
+    window.dispatchEvent(new CustomEvent('dev:missions', { detail }));
+  });
+  await expect.poll(async () => getMissionTotalCount(page), { timeout: 5000 }).toBe(count);
 }
 
 /**
@@ -143,7 +156,9 @@ export async function clearAndInjectMissions(page: Page, count: number) {
   await setFeedState(page, 'empty');
   await page.waitForTimeout(200);
   await injectMissions(page, count);
-  await waitForMissions(page, count, 5000);
+  // The feed renders missions in batches (BATCH_SIZE=20), so missionCards().count() reflects only
+  // the rendered slice. Assert on the feed's reported total instead.
+  await expectMissionCount(page, count, 5000);
 }
 
 // ============================================================================

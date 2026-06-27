@@ -25,8 +25,10 @@ test.describe('Accessibility', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    // 1. Navigation sur l'onboarding
-    await expect(page.getByRole('heading', { name: 'Affinez votre radar' })).toBeVisible();
+    // 1. Navigation sur l'onboarding. The hero heading drifted to "Configurez votre premier scan".
+    await expect(
+      page.getByRole('heading', { name: 'Configurez votre premier scan' })
+    ).toBeVisible();
 
     // Démarrer explicitement dans le formulaire puis vérifier le flux clavier.
     await page.locator('#ob-firstname').focus();
@@ -210,7 +212,9 @@ test.describe('Accessibility', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByRole('heading', { name: 'Affinez votre radar' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Configurez votre premier scan' })
+    ).toBeVisible();
 
     // Vérifier que les champs ont des labels
     const firstnameInput = page.locator('#ob-firstname');
@@ -250,21 +254,31 @@ test.describe('Accessibility', () => {
     const devPanel = page.getByText('DEV PANEL');
     await expect(devPanel).toBeVisible();
 
-    // Tab à travers les éléments du panel
-    const tabbableElements: string[] = [];
+    // Tab à travers les éléments du panel. We track a distinguishing label per focused element
+    // (aria-label / title / trimmed text) instead of tagName+id, because the panel exposes many
+    // buttons that share the same tag and carry no id — deduping on those would collapse them.
+    const tabbableLabels: string[] = [];
     for (let i = 0; i < 10; i++) {
       await page.keyboard.press('Tab');
-      const activeElement = await page.evaluate(() => {
+      const activeLabel = await page.evaluate(() => {
         const el = document.activeElement;
-        return el ? `${el.tagName}${el.id ? '#' + el.id : ''}` : 'none';
+        if (!el) {
+          return '';
+        }
+        return (
+          el.getAttribute('aria-label') ||
+          el.getAttribute('title') ||
+          (el.textContent ?? '').trim().slice(0, 24) ||
+          el.tagName
+        );
       });
-      if (!tabbableElements.includes(activeElement)) {
-        tabbableElements.push(activeElement);
+      if (activeLabel && !tabbableLabels.includes(activeLabel)) {
+        tabbableLabels.push(activeLabel);
       }
     }
 
-    // Il devrait y avoir plusieurs éléments focusables
-    expect(tabbableElements.length).toBeGreaterThanOrEqual(2);
+    // Il devrait y avoir plusieurs éléments focusables distincts dans le panel.
+    expect(tabbableLabels.length).toBeGreaterThanOrEqual(2);
 
     await closeDevPanel(page);
   });
@@ -346,7 +360,9 @@ test.describe('Accessibility', () => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByRole('heading', { name: 'Affinez votre radar' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Configurez votre premier scan' })
+    ).toBeVisible();
 
     // Le bouton doit être désactivé tant que les champs sont vides
     const submitBtn = page.getByRole('button', { name: 'Sauvegarder mon profil' });

@@ -52,7 +52,9 @@ test.describe('Onboarding', () => {
     await withNoProfile(page);
     await page.goto(SIDE_PANEL);
 
-    await expect(page.getByRole('heading', { name: 'Affinez votre radar' })).toBeVisible();
+    await expect(
+      page.getByRole('heading', { name: 'Configurez votre premier scan' })
+    ).toBeVisible();
     await expect(page.locator('#ob-firstname')).toBeVisible();
     await page.locator('#ob-firstname').fill('Guy');
     await page.locator('#ob-jobtitle').fill('Dev React Senior');

@@ -132,7 +132,11 @@ test.describe('applications pipeline', () => {
     await nav.getByRole('button', { name: 'Suivi' }).click();
 
     await expect(page.getByRole('heading', { name: 'Candidatures' })).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Mission Svelte dashboard' })).toBeVisible();
+    // The mission title appears in both the "Dossier recommandé" section and the selected dossier
+    // detail. Use .first() to disambiguate (they show the same mission here).
+    await expect(
+      page.getByRole('heading', { name: 'Mission Svelte dashboard' }).first()
+    ).toBeVisible();
     await expect(page.getByText('Sélectionnée').first()).toBeVisible();
 
     await page.getByRole('button', { name: 'Pitch candidature' }).click();

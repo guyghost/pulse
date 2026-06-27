@@ -75,11 +75,13 @@ test.describe('TJM page', () => {
       await chrome.storage.local.remove('tjm_history');
     });
 
-    await page.getByRole('button', { name: 'TJM' }).click();
-    await expect(page.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
-    await expect(page.getByText('Radar TJM')).toBeVisible();
-    await expect(page.getByText('Aucune donnée TJM')).toBeVisible();
-    await expect(page.getByText(/Lancez un scan/)).toBeVisible();
+    // Scope to the main nav: the bare name 'TJM' also matches feed filter chips.
+    const nav = page.getByRole('navigation', { name: 'Main navigation' });
+    await nav.getByRole('button', { name: 'TJM' }).click();
+    await expect(nav.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
+    // Empty state renders an OperationalEmptyState + a "Alimenter le radar TJM" setup section.
+    await expect(page.getByText('Aucune tendance TJM exploitable')).toBeVisible();
+    await expect(page.getByText('Alimenter le radar TJM')).toBeVisible();
   });
 
   test('renders dashboard data when TJM history is available', async ({ page }) => {
@@ -91,7 +93,7 @@ test.describe('TJM page', () => {
       .getByRole('button', { name: 'TJM' })
       .click();
 
-    await expect(page.getByText('Radar TJM')).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Analyse TJM' })).toBeVisible();
     await expect(page.getByText("Vue d'ensemble")).toBeVisible();
     await expect(page.getByText('Junior', { exact: true })).toBeVisible();
     await expect(page.getByText('Confirmé', { exact: true })).toBeVisible();

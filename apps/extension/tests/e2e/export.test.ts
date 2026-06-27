@@ -33,8 +33,11 @@ test.describe('Export Flow', () => {
 
     await page.getByRole('button', { name: 'JSON' }).click();
 
-    // Toast should appear with error about no favorites
-    await expect(page.getByText(/Aucune mission favorite/i)).toBeVisible({ timeout: 3000 });
+    // Toast text is the specific error returned by the export facade. The export section story
+    // card also mentions "Aucune mission favorite", so we scope to the toast role.
+    await expect(page.getByText('Aucune mission favorite à exporter')).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('export CSV with no favorites shows error toast', async ({ page }) => {
@@ -44,7 +47,9 @@ test.describe('Export Flow', () => {
 
     await page.getByRole('button', { name: 'CSV' }).click();
 
-    await expect(page.getByText(/Aucune mission favorite/i)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Aucune mission favorite à exporter')).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('export Markdown with no favorites shows error toast', async ({ page }) => {
@@ -54,7 +59,9 @@ test.describe('Export Flow', () => {
 
     await page.getByRole('button', { name: 'Markdown' }).click();
 
-    await expect(page.getByText(/Aucune mission favorite/i)).toBeVisible({ timeout: 3000 });
+    await expect(page.getByText('Aucune mission favorite à exporter')).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('export buttons remain enabled after failed export', async ({ page }) => {

@@ -112,7 +112,10 @@ async function openCvPage(page: Page) {
   await expect(nav).toBeVisible();
   await expect(nav.getByRole('button', { name: 'CV' })).toBeVisible();
   await nav.getByRole('button', { name: 'CV' }).click();
-  await expect(page.getByRole('heading', { name: 'Homogénéiser le profil partout' })).toBeVisible();
+  // The CV hero heading drifted to "Préparer le même profil partout".
+  await expect(
+    page.getByRole('heading', { name: 'Préparer le même profil partout' })
+  ).toBeVisible();
 }
 
 test.describe('LinkedIn profile import flow', () => {
@@ -131,7 +134,7 @@ test.describe('LinkedIn profile import flow', () => {
 
     await expect(page.getByRole('heading', { name: 'Import LinkedIn' })).toBeVisible();
     await expect(
-      page.getByText('Profil LinkedIn enregistré comme source canonique.')
+      page.getByText('Profil LinkedIn enregistré comme profil de référence.')
     ).toBeVisible();
   });
 
@@ -157,7 +160,8 @@ test.describe('LinkedIn profile import flow', () => {
       page.getByText('permission_required: Autorisation LinkedIn refusée.')
     ).toBeVisible();
     await expect(
-      page.getByText("Autorisez l'accès LinkedIn dans Chrome, puis relancez la preview.")
+      // The hint uses a typographic apostrophe (l'aperçu); match the unique apostrophe-free portion.
+      page.getByText(/Autorisez l.+accès LinkedIn dans Chrome, puis relancez/)
     ).toBeVisible();
     await expect(page.getByRole('button', { name: 'Enregistrer comme source' })).not.toBeVisible();
   });

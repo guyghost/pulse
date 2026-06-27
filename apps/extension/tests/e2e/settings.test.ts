@@ -171,7 +171,7 @@ test.describe('Settings Flow', () => {
     await expect(page.getByRole('heading', { name: 'IA locale' })).toBeVisible();
     await expect(
       page.getByText(
-        'Le scoring sémantique utilise Gemini Nano via la Prompt API de Chrome, sans clé API externe.'
+        'L’analyse locale utilise Gemini Nano via la Prompt API de Chrome, sans clé API externe.'
       )
     ).toBeVisible();
     await expect(page.getByText('Missions / scan')).toBeVisible();
