@@ -108,4 +108,42 @@ describe('app lifecycle machine', () => {
     expect(actor.getSnapshot().context.hasCompletedOnboarding).toBe(true);
     expect(deps.setOnboardingCompleted).toHaveBeenCalledOnce();
   });
+
+  // ONB-02: skipping onboarding must seed a minimal/default profile so the feed
+  // can degrade gracefully instead of scoring against a null profile. Both the
+  // skip path and the normal completion path funnel through COMPLETE_ONBOARDING,
+  // so the machine must persist a non-null profile here (null only when a real
+  // profile already exists, which is preserved).
+  it('seeds a default profile when onboarding completes without one (skip path)', async () => {
+    const deps = createDeps();
+    const actor = createActor(appLifecycleMachine, {
+      input: { deps, pageIndex },
+    }).start();
+
+    const bootstrapped = await waitForSnapshot(actor, (s) => s.matches('ready'));
+    expect(bootstrapped.context.currentPage).toBe('onboarding');
+    expect(bootstrapped.context.profile).toBeNull();
+
+    actor.send({ type: 'COMPLETE_ONBOARDING' });
+    const snapshot = actor.getSnapshot();
+
+    expect(snapshot.context.hasCompletedOnboarding).toBe(true);
+    expect(snapshot.context.currentPage).toBe('feed');
+    expect(snapshot.context.profile, 'skip must seed a non-null profile').not.toBeNull();
+    expect(snapshot.context.profile?.stack).toEqual([]);
+    expect(snapshot.context.profile?.tjmMin).toBe(0);
+  });
+
+  it('preserves an existing profile when onboarding completes', async () => {
+    const deps = createDeps({ loadProfile: vi.fn().mockResolvedValue(profile) });
+    const actor = createActor(appLifecycleMachine, {
+      input: { deps, pageIndex },
+    }).start();
+
+    await waitForSnapshot(actor, (s) => s.matches('ready'));
+    expect(actor.getSnapshot().context.profile).toEqual(profile);
+
+    actor.send({ type: 'COMPLETE_ONBOARDING' });
+    expect(actor.getSnapshot().context.profile).toEqual(profile);
+  });
 });

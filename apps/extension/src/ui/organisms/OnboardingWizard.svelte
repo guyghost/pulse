@@ -39,7 +39,11 @@
     errorMessage?: string | null;
     alertPreferences?: ConnectedAlertPreferences;
     isSavingAlertPreferences?: boolean;
-    onSaveAlertPreferences?: (preferences: ConnectedAlertPreferences) => Promise<void> | void;
+    // Resolves to `false` (or throws) when persistence failed so the wizard can
+    // stay on the alert step and let the user retry. `void`/`true` = success.
+    onSaveAlertPreferences?:
+      | ((preferences: ConnectedAlertPreferences) => Promise<boolean | void> | boolean | void)
+      | undefined;
   } = $props();
 
   let firstName = $state('');
@@ -149,15 +153,25 @@
   });
 
   async function saveAlertAndContinue() {
-    await onSaveAlertPreferences?.({
-      ...alertPreferences,
-      enabled: true,
-      scoreThreshold: alertThreshold,
-      minDailyRate: tjm,
-      requiredStacks: stack,
-      maxResults: 5,
-      mutedUntil: null,
-    });
+    // Only advance once the alert has actually been persisted. The parent
+    // signals failure by resolving to `false` (after showing an error toast) or
+    // by throwing — in both cases we stay on the alert step so the user can retry.
+    try {
+      const result = await onSaveAlertPreferences?.({
+        ...alertPreferences,
+        enabled: true,
+        scoreThreshold: alertThreshold,
+        minDailyRate: tjm,
+        requiredStacks: stack,
+        maxResults: 5,
+        mutedUntil: null,
+      });
+      if (result === false) {
+        return;
+      }
+    } catch {
+      return;
+    }
     goNext();
   }
 </script>
