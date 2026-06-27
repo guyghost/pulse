@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest';
 import {
   parseFreeWorkAPI,
+  mapExperienceLevel,
   type FreeWorkApiResponse,
   type FreeWorkJobPosting,
 } from '../../../src/lib/core/connectors/freework-parser';
@@ -195,6 +196,265 @@ describe('parseFreeWorkAPI', () => {
 
   it('returns empty array for malformed response', () => {
     expect(parseFreeWorkAPI({} as any, NOW)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mapExperienceLevel — exported pure mapping (covers null/junior/unknown branches).
+// ---------------------------------------------------------------------------
+describe('mapExperienceLevel', () => {
+  it('maps null to null', () => {
+    expect(mapExperienceLevel(null)).toBeNull();
+  });
+
+  it('maps "junior" to "junior"', () => {
+    expect(mapExperienceLevel('junior')).toBe('junior');
+  });
+
+  it('maps "intermediate" to "confirmed"', () => {
+    expect(mapExperienceLevel('intermediate')).toBe('confirmed');
+  });
+
+  it('maps "senior" to "senior"', () => {
+    expect(mapExperienceLevel('senior')).toBe('senior');
+  });
+
+  it('maps unknown level to null', () => {
+    expect(mapExperienceLevel('expert')).toBeNull();
+    expect(mapExperienceLevel('lead')).toBeNull();
+  });
+
+  it('maps empty string to null (falsy guard)', () => {
+    expect(mapExperienceLevel('')).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// parseFreeWorkAPI — field extraction edge cases (covers private helpers:
+// mapRemoteMode, formatDuration, buildJobUrl, isFreelanceContract).
+// ---------------------------------------------------------------------------
+/**
+ * Minimal valid freelance posting. Overrides applied per-case to hit
+ * specific branches in the private helpers.
+ */
+function makePosting(overrides: Partial<FreeWorkJobPosting> = {}): FreeWorkJobPosting {
+  return {
+    '@id': '/job_postings/test',
+    id: 1,
+    title: 'Dev Test',
+    slug: 'dev-test',
+    description: 'Description test',
+    candidateProfile: null,
+    companyDescription: null,
+    minDailySalary: 500,
+    maxDailySalary: 600,
+    minAnnualSalary: null,
+    maxAnnualSalary: null,
+    dailySalary: '500-600 €',
+    annualSalary: null,
+    currency: 'EUR',
+    duration: 6,
+    durationValue: 6,
+    durationPeriod: 'month',
+    renewable: false,
+    remoteMode: 'full',
+    contracts: ['contractor'],
+    location: {
+      locality: 'Paris',
+      adminLevel1: 'Île-de-France',
+      label: 'Paris',
+      shortLabel: 'Paris (75)',
+    },
+    company: { name: 'Client', slug: 'client' },
+    job: { name: 'Dev', slug: 'developpeur' },
+    skills: [{ name: 'React', slug: 'react' }],
+    publishedAt: '2026-03-11T10:00:00+01:00',
+    startsAt: null,
+    experienceLevel: 'senior',
+    ...overrides,
+  };
+}
+
+function wrap(postings: FreeWorkJobPosting[]): FreeWorkApiResponse {
+  return { 'hydra:totalItems': postings.length, 'hydra:member': postings };
+}
+
+describe('parseFreeWorkAPI (field extraction edge cases)', () => {
+  // --- remoteMode mapping ---
+  it('maps remoteMode "none" to onsite', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ remoteMode: 'none' })]), NOW);
+    expect(m[0].remote).toBe('onsite');
+  });
+
+  it('maps null remoteMode to null', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ remoteMode: null })]), NOW);
+    expect(m[0].remote).toBeNull();
+  });
+
+  it('maps unknown remoteMode to null', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ remoteMode: 'telework' })]), NOW);
+    expect(m[0].remote).toBeNull();
+  });
+
+  // --- duration formatting ---
+  it('formats duration with "year" period as "X an"', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ durationValue: 1, durationPeriod: 'year' })]),
+      NOW
+    );
+    expect(m[0].duration).toBe('1 an');
+  });
+
+  it('passes through unknown duration period unchanged', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ durationValue: 2, durationPeriod: 'week' })]),
+      NOW
+    );
+    expect(m[0].duration).toBe('2 week');
+  });
+
+  it('returns null duration when durationValue is null', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ durationValue: null, durationPeriod: 'month' })]),
+      NOW
+    );
+    expect(m[0].duration).toBeNull();
+  });
+
+  it('returns null duration when durationPeriod is null', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ durationValue: 6, durationPeriod: null })]),
+      NOW
+    );
+    expect(m[0].duration).toBeNull();
+  });
+
+  // --- URL building fallback ---
+  it('falls back to "autre" job slug when job is null', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ job: null })]), NOW);
+    expect(m[0].url).toBe('https://www.free-work.com/fr/tech-it/autre/job-mission/dev-test');
+  });
+
+  it('falls back to "autre" job slug when job.slug is empty (regression: no double slash)', () => {
+    // Regression: buildJobUrl previously used `??`, so an empty-string slug
+    // produced a malformed URL with a double slash ("/fr/tech-it//job-mission/").
+    const m = parseFreeWorkAPI(wrap([makePosting({ job: { name: 'Dev', slug: '' } })]), NOW);
+    expect(m[0].url).toBe('https://www.free-work.com/fr/tech-it/autre/job-mission/dev-test');
+    expect(m[0].url).not.toContain('//job-mission');
+  });
+
+  // --- freelance contract filtering ---
+  it('keeps postings with empty contracts (no info → treated as freelance)', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ contracts: [] })]), NOW);
+    expect(m).toHaveLength(1);
+  });
+
+  it('keeps postings when contracts contains mixed-case freelance variants', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ contracts: ['Freelance'] })]), NOW);
+    expect(m).toHaveLength(1);
+  });
+
+  it('keeps postings with "portage" contract', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ contracts: ['portage'] })]), NOW);
+    expect(m).toHaveLength(1);
+  });
+
+  it('filters out postings whose contracts are only non-freelance', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ contracts: ['permanent', 'internship'] })]),
+      NOW
+    );
+    expect(m).toHaveLength(0);
+  });
+
+  it('treats missing contracts array as freelance (defensive ?? [])', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ contracts: undefined as unknown as string[] })]),
+      NOW
+    );
+    expect(m).toHaveLength(1);
+  });
+
+  // --- TJM fallback chain ---
+  it('falls back to maxDailySalary when minDailySalary is null', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ minDailySalary: null, maxDailySalary: 700 })]),
+      NOW
+    );
+    expect(m[0].tjm).toBe(700);
+  });
+
+  it('returns null tjm when both min and max daily salary are null', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ minDailySalary: null, maxDailySalary: null })]),
+      NOW
+    );
+    expect(m[0].tjm).toBeNull();
+  });
+
+  // --- location fallback chain ---
+  it('falls back to shortLabel when location.label is null', () => {
+    const m = parseFreeWorkAPI(
+      wrap([
+        makePosting({
+          location: { locality: 'Lyon', adminLevel1: 'ARA', label: null, shortLabel: 'Lyon (69)' },
+        }),
+      ]),
+      NOW
+    );
+    expect(m[0].location).toBe('Lyon (69)');
+  });
+
+  it('returns null location when the location object is null', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ location: null })]), NOW);
+    expect(m[0].location).toBeNull();
+  });
+
+  // --- nullable fields ---
+  it('falls back to empty description when description is null', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ description: null })]), NOW);
+    expect(m[0].description).toBe('');
+  });
+
+  it('returns empty stack when skills is null/missing', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ skills: undefined as unknown as FreeWorkJobPosting['skills'] })]),
+      NOW
+    );
+    expect(m[0].stack).toEqual([]);
+  });
+
+  it('returns null publishedAt when publishedAt is null', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ publishedAt: null })]), NOW);
+    expect(m[0].publishedAt).toBeNull();
+  });
+
+  it('maps experienceLevel "junior" to "junior" through the parser', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ experienceLevel: 'junior' })]), NOW);
+    expect(m[0].seniority).toBe('junior');
+  });
+
+  it('maps unknown experienceLevel to null through the parser', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ experienceLevel: 'expert' })]), NOW);
+    expect(m[0].seniority).toBeNull();
+  });
+
+  it('maps null experienceLevel to null through the parser', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ experienceLevel: null })]), NOW);
+    expect(m[0].seniority).toBeNull();
+  });
+
+  it('falls back to null client when company is null', () => {
+    const m = parseFreeWorkAPI(wrap([makePosting({ company: null })]), NOW);
+    expect(m[0].client).toBeNull();
+  });
+
+  it('returns null duration when both durationValue and durationPeriod are null', () => {
+    const m = parseFreeWorkAPI(
+      wrap([makePosting({ durationValue: null, durationPeriod: null })]),
+      NOW
+    );
+    expect(m[0].duration).toBeNull();
   });
 });
 

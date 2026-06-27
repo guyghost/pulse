@@ -77,7 +77,9 @@ function formatDuration(value: number | null, period: string | null): string | n
 }
 
 function buildJobUrl(slug: string, jobSlug: string | null): string {
-  const category = jobSlug ?? 'autre';
+  // `||` (not `??`): an empty-string slug is treated as missing so we never
+  // emit a malformed URL with a double slash (e.g. "/fr/tech-it//job-mission/").
+  const category = jobSlug || 'autre';
   return `${BASE_URL}/fr/tech-it/${category}/job-mission/${slug}`;
 }
 

@@ -309,4 +309,232 @@ describe('parseDescriptionMeta', () => {
     expect(meta.tjm).toBeNull();
     expect(meta.cleanDescription).toBe('Mission React pour projet e-commerce');
   });
+
+  it('extrait la duree (avec accent) depuis la description', () => {
+    const meta = parseDescriptionMeta('Durée de la mission : 6 mois');
+    expect(meta.duration).toBe('6 mois');
+  });
+
+  it('extrait la duree (sans accent) depuis la description', () => {
+    const meta = parseDescriptionMeta('Duree de la mission : 9 mois');
+    expect(meta.duration).toBe('9 mois');
+  });
+
+  it('parse un TJM en range avec slash', () => {
+    const meta = parseDescriptionMeta('TJM : 500/600');
+    expect(meta.tjm).toBe(550);
+  });
+
+  it('nettoie une description contenant uniquement des metadonnees', () => {
+    const meta = parseDescriptionMeta('TJM : 650 Localisation de la mission : Paris');
+    expect(meta.cleanDescription).toBe('');
+  });
+
+  it('ignore les valeurs vides apres une cle', () => {
+    const meta = parseDescriptionMeta('TJM :  Nom du client : Acme');
+    expect(meta.tjm).toBeNull();
+    expect(meta.client).toBe('Acme');
+  });
+});
+
+// ---------------------------------------------------------------------------
+// mapRemote / pickTJM / normalizeDuration — exercised through parseCherryPickMissions
+// (these helpers are module-private) plus edge-case missions.
+// ---------------------------------------------------------------------------
+describe('parseCherryPickMissions (remote & rate edge cases)', () => {
+  it('mappe un displacement inconnu (non partially_remote) vers null', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], displacement: 'unknown_value' }],
+      NOW
+    );
+    expect(missions[0].remote).toBeNull();
+  });
+
+  it('mappe un displacement partially_remote sans suffixe vers hybrid', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], displacement: 'partially_remote' }],
+      NOW
+    );
+    expect(missions[0].remote).toBe('hybrid');
+  });
+
+  it('mappe partially_remote_5 vers hybrid (startsWith)', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], displacement: 'partially_remote_5' }],
+      NOW
+    );
+    expect(missions[0].remote).toBe('hybrid');
+  });
+
+  it('utilise seulement le min rate quand max est null', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], minimum_rate: 550, maximum_rate: null }],
+      NOW
+    );
+    expect(missions[0].tjm).toBe(550);
+  });
+
+  it('traite un rate NaN comme absent (retourne lautre borne)', () => {
+    const missions = parseCherryPickMissions(
+      [
+        {
+          ...FIXTURE_MISSIONS[0],
+          minimum_rate: NaN,
+          maximum_rate: 700,
+        },
+      ],
+      NOW
+    );
+    expect(missions[0].tjm).toBe(700);
+  });
+
+  it('retourne tjm null quand min et max sont NaN', () => {
+    const missions = parseCherryPickMissions(
+      [
+        {
+          ...FIXTURE_MISSIONS[0],
+          minimum_rate: NaN,
+          maximum_rate: NaN,
+          description: null,
+        },
+      ],
+      NOW
+    );
+    expect(missions[0].tjm).toBeNull();
+  });
+
+  it('retourne tjm null quand les rates sont absents et la description na pas de TJM', () => {
+    const missions = parseCherryPickMissions(
+      [
+        {
+          ...FIXTURE_MISSIONS[0],
+          minimum_rate: null,
+          maximum_rate: null,
+          description: 'Mission sans info budget',
+        },
+      ],
+      NOW
+    );
+    expect(missions[0].tjm).toBeNull();
+  });
+});
+
+describe('parseCherryPickMissions (duration fallback chain)', () => {
+  it('retourne null pour une duration null sans meta.duration', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], duration: null, description: null }],
+      NOW
+    );
+    expect(missions[0].duration).toBeNull();
+  });
+
+  it('utilise meta.duration quand le champ API duration est null', () => {
+    const missions = parseCherryPickMissions(
+      [
+        {
+          ...FIXTURE_MISSIONS[0],
+          duration: null,
+          description: 'Durée de la mission : 12 mois',
+        },
+      ],
+      NOW
+    );
+    expect(missions[0].duration).toBe('12 mois');
+  });
+
+  it('normalise une duration API numerique en lui ajoutant "mois"', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], duration: 9 as unknown as string }],
+      NOW
+    );
+    expect(missions[0].duration).toBe('9 mois');
+  });
+
+  it('retourne null pour une duration vide', () => {
+    const missions = parseCherryPickMissions([{ ...FIXTURE_MISSIONS[0], duration: '' }], NOW);
+    expect(missions[0].duration).toBeNull();
+  });
+
+  it('garde une duration null quand API et meta sont tous deux null/absents', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], duration: null, description: null }],
+      NOW
+    );
+    expect(missions[0].duration).toBeNull();
+  });
+});
+
+describe('parseCherryPickMissions (location & client fallback chains)', () => {
+  it('utilise meta.location quand city est null', () => {
+    const missions = parseCherryPickMissions(
+      [
+        {
+          ...FIXTURE_MISSIONS[0],
+          city: null,
+          description: 'Localisation de la mission : Toulouse',
+        },
+      ],
+      NOW
+    );
+    expect(missions[0].location).toBe('Toulouse');
+  });
+
+  it('prefere city au meta.location quand les deux sont presents', () => {
+    const missions = parseCherryPickMissions(
+      [
+        {
+          ...FIXTURE_MISSIONS[0],
+          city: 'Bordeaux',
+          description: 'Localisation de la mission : Toulouse',
+        },
+      ],
+      NOW
+    );
+    expect(missions[0].location).toBe('Bordeaux');
+  });
+
+  it('retourne location null quand city et meta.location sont absents', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], city: null, description: null }],
+      NOW
+    );
+    expect(missions[0].location).toBeNull();
+  });
+
+  it('utilise meta.client quand company est null', () => {
+    const missions = parseCherryPickMissions(
+      [
+        {
+          ...FIXTURE_MISSIONS[0],
+          company: null,
+          description: 'Nom du client : BigBank',
+        },
+      ],
+      NOW
+    );
+    expect(missions[0].client).toBe('BigBank');
+  });
+});
+
+describe('parseCherryPickMissions (publishedAt & encoding)', () => {
+  it('extrait publishedAt depuis created_at', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], created_at: '2026-03-10T08:00:00Z' }],
+      NOW
+    );
+    expect(missions[0].publishedAt).toBe('2026-03-10T08:00:00Z');
+  });
+
+  it('retourne publishedAt null quand created_at est null', () => {
+    const missions = parseCherryPickMissions([{ ...FIXTURE_MISSIONS[0], created_at: null }], NOW);
+    expect(missions[0].publishedAt).toBeNull();
+  });
+
+  it('preserve les accents dans le nom de mission', () => {
+    const missions = parseCherryPickMissions(
+      [{ ...FIXTURE_MISSIONS[0], name: 'Développeur Confirmé Écosystème' }],
+      NOW
+    );
+    expect(missions[0].title).toBe('Développeur Confirmé Écosystème');
+  });
 });

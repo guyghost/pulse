@@ -2,6 +2,9 @@ import { describe, it, expect } from 'vitest';
 import {
   parseCollectiveProjects,
   extractCollectiveProjects,
+  mapSkill,
+  extractTjm,
+  mapCollectiveRemote,
   type CollectiveProject,
 } from '../../../src/lib/core/connectors/collective-parser';
 
@@ -314,3 +317,149 @@ describe('extractCollectiveProjects', () => {
     expect(extractCollectiveProjects(html)).toEqual([]);
   });
 });
+
+// ---------------------------------------------------------------------------
+// Exported pure helpers — direct coverage & documentation.
+// ---------------------------------------------------------------------------
+describe('mapSkill', () => {
+  it('maps known enum keys to their display labels', () => {
+    expect(mapSkill('DOT_NET')).toBe('.NET');
+    expect(mapSkill('C_SHARP')).toBe('C#');
+    expect(mapSkill('A_B_TESTING')).toBe('A/B Testing');
+  });
+
+  it('replaces underscores with spaces for unmapped keys', () => {
+    expect(mapSkill('SPRING_BOOT')).toBe('SPRING BOOT');
+    expect(mapSkill('MACHINE_LEARNING')).toBe('MACHINE LEARNING');
+  });
+
+  it('passes through a plain string with no underscores unchanged', () => {
+    expect(mapSkill('DOCKER')).toBe('DOCKER');
+  });
+
+  it('returns empty string for empty input', () => {
+    expect(mapSkill('')).toBe('');
+  });
+});
+
+describe('extractTjm', () => {
+  it('returns null for null input', () => {
+    expect(extractTjm(null)).toBeNull();
+  });
+
+  it('returns null for empty string', () => {
+    expect(extractTjm('')).toBeNull();
+  });
+
+  it('returns null when no digits are present', () => {
+    expect(extractTjm('selon profil')).toBeNull();
+  });
+
+  it('extracts the lower bound of a range', () => {
+    expect(extractTjm('400-450€ (Journalier)')).toBe(400);
+  });
+
+  it('extracts from a slash range', () => {
+    expect(extractTjm('600/700')).toBe(600);
+  });
+
+  it('extracts a single plain number', () => {
+    expect(extractTjm('550')).toBe(550);
+  });
+
+  it('extracts the first number from a sentence', () => {
+    expect(extractTjm('TJM HT max 636 €')).toBe(636);
+  });
+});
+
+describe('mapCollectiveRemote', () => {
+  it('maps REMOTE to full', () => {
+    expect(mapCollectiveRemote(['REMOTE'])).toBe('full');
+  });
+
+  it('maps HYBRID to hybrid', () => {
+    expect(mapCollectiveRemote(['HYBRID'])).toBe('hybrid');
+  });
+
+  it('maps ON_SITE to onsite', () => {
+    expect(mapCollectiveRemote(['ON_SITE'])).toBe('onsite');
+  });
+
+  it('prioritizes REMOTE over HYBRID when both present', () => {
+    expect(mapCollectiveRemote(['HYBRID', 'REMOTE'])).toBe('full');
+  });
+
+  it('prioritizes HYBRID over ON_SITE when both present', () => {
+    expect(mapCollectiveRemote(['ON_SITE', 'HYBRID'])).toBe('hybrid');
+  });
+
+  it('returns null when no recognized preference is present', () => {
+    expect(mapCollectiveRemote([])).toBeNull();
+    expect(mapCollectiveRemote(['UNKNOWN'])).toBeNull();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// extractCollectiveProjects — additional defensive navigation paths.
+// ---------------------------------------------------------------------------
+describe('extractCollectiveProjects (defensive navigation)', () => {
+  it('returns [] when data.results is not an object (string)', () => {
+    const html = `
+      <html><body>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"dehydratedState":{"queries":[{"state":{"data":{"results":"not-an-object"}}}]}}}}
+        </script>
+      </body></html>`;
+    expect(extractCollectiveProjects(html)).toEqual([]);
+  });
+
+  it('returns [] when state.data is not an object', () => {
+    const html = `
+      <html><body>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"dehydratedState":{"queries":[{"state":{"data":"x"}}}]}}}}
+        </script>
+      </body></html>`;
+    expect(extractCollectiveProjects(html)).toEqual([]);
+  });
+
+  it('returns [] when projects is present but not an array', () => {
+    const html = `
+      <html><body>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"dehydratedState":{"queries":[{"state":{"data":{"results":{"projects":{"a":1}}}}}]}}}}
+        </script>
+      </body></html>`;
+    expect(extractCollectiveProjects(html)).toEqual([]);
+  });
+
+  it('filters projects with non-string name but keeps valid ones', () => {
+    const projects = [
+      { id: 'ok-1', slug: 's', name: 'Valid' },
+      { id: 'ok-2', slug: 's', name: 123 }, // name not a string → filtered
+      { id: 'ok-3', slug: 's', name: 'Also Valid' },
+    ];
+    const html = `
+      <html><body>
+        <script id="__NEXT_DATA__" type="application/json">
+          {"props":{"pageProps":{"dehydratedState":{"queries":[{"state":{"data":{"results":{"projects":${JSON.stringify(
+            projects
+          )}}}}}]}}}}
+        </script>
+      </body></html>`;
+    const result = extractCollectiveProjects(html);
+    expect(result).toHaveLength(2);
+    expect(result.map((p) => p.id)).toEqual(['ok-1', 'ok-3']);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// NOTE on the unreachable catch block (collective-parser.ts lines 104-106):
+// The `try/catch` around the __NEXT_DATA__ navigation is a purely defensive
+// guard. Every access uses optional chaining (`?.`) and the only array check
+// is `Array.isArray(projects)`, neither of which can throw for objects
+// produced by `JSON.parse` (which never synthesizes throwing getters).
+// Covering that catch branch would require monkey-patching / Proxy mocks,
+// which violates the pure no-mocks Core testing constraint. It is therefore
+// intentionally left as a defensive branch.
+// ---------------------------------------------------------------------------

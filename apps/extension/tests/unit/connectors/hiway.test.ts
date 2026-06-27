@@ -135,6 +135,38 @@ describe('normalizeDuration', () => {
   it('returns null for empty string', () => {
     expect(normalizeDuration('')).toBeNull();
   });
+
+  it('returns null for a whitespace-only string', () => {
+    expect(normalizeDuration('   ')).toBeNull();
+  });
+
+  it('passes through a non-numeric, non-range string unchanged', () => {
+    expect(normalizeDuration('CDI')).toBe('CDI');
+  });
+
+  it('passes through a textual duration unchanged ("long terme")', () => {
+    expect(normalizeDuration('long terme')).toBe('long terme');
+  });
+
+  it('normalizes a single-digit duration', () => {
+    expect(normalizeDuration('3')).toBe('3 mois');
+  });
+
+  it('keeps a duration already expressed in "an"', () => {
+    expect(normalizeDuration('1 an')).toBe('1 an');
+  });
+
+  it('keeps a duration already expressed in "jour"', () => {
+    expect(normalizeDuration('20 jours')).toBe('20 jours');
+  });
+
+  it('keeps a duration already expressed in "semaine"', () => {
+    expect(normalizeDuration('6 semaines')).toBe('6 semaines');
+  });
+
+  it('returns null for undefined', () => {
+    expect(normalizeDuration(undefined)).toBeNull();
+  });
 });
 
 // ============================================================================
@@ -221,6 +253,62 @@ describe('parseHiwayMissionRow', () => {
     const row = makeRow({ location: 'Présentiel' });
     const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
     expect(mission?.remote).toBe('onsite');
+  });
+
+  it('detects onsite from unaccented "presentiel"', () => {
+    const row = makeRow({ location: 'Presentiel' });
+    const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+    expect(mission?.remote).toBe('onsite');
+  });
+
+  it('detects onsite from "sur site"', () => {
+    const row = makeRow({ location: 'Travail sur site' });
+    const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+    expect(mission?.remote).toBe('onsite');
+  });
+
+  it('detects onsite from "on-site" / "onsite"', () => {
+    const rowOnsite = makeRow({ location: 'onsite' });
+    expect(parseHiwayMissionRow(rowOnsite, NOW, BASE_URL)?.remote).toBe('onsite');
+    const rowOnSite = makeRow({ location: 'on-site' });
+    expect(parseHiwayMissionRow(rowOnSite, NOW, BASE_URL)?.remote).toBe('onsite');
+  });
+
+  it('detects full remote from "full remote" (English)', () => {
+    const row = makeRow({ location: 'full remote' });
+    const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+    expect(mission?.remote).toBe('full');
+  });
+
+  it('detects full remote from "teletravail complet" (unaccented)', () => {
+    const row = makeRow({ location: 'teletravail complet' });
+    const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+    expect(mission?.remote).toBe('full');
+  });
+
+  it('detects hybrid from "hybride" (specific branch)', () => {
+    const row = makeRow({ location: 'Poste hybride' });
+    const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+    expect(mission?.remote).toBe('hybrid');
+  });
+
+  it('detects hybrid from English "hybrid"', () => {
+    const row = makeRow({ location: 'hybrid role' });
+    const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+    expect(mission?.remote).toBe('hybrid');
+  });
+
+  it('falls back to generic detector and returns null for unrecognized text', () => {
+    // No specific keyword → falls through to detectRemote() which returns null.
+    const row = makeRow({ location: 'Distanciel possible' });
+    const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+    expect(mission?.remote).toBeNull();
+  });
+
+  it('returns null remote for empty location string', () => {
+    const row = makeRow({ location: '' });
+    const mission = parseHiwayMissionRow(row, NOW, BASE_URL);
+    expect(mission?.remote).toBeNull();
   });
 
   it('normalizes duration "12+" to "12+ mois"', () => {
@@ -333,6 +421,36 @@ describe('parseHiwayJSON', () => {
 
   it('returns empty array for empty input', () => {
     expect(parseHiwayJSON([], NOW, BASE_URL)).toEqual([]);
+  });
+
+  it('uses created_at as publishedAt when present', () => {
+    const rows = [makeRow({ id: 'id-1', created_at: '2026-03-15T10:00:00Z', posted_date: null })];
+    const missions = parseHiwayJSON(rows, NOW, BASE_URL);
+    expect(missions[0].publishedAt).toBe('2026-03-15T10:00:00Z');
+  });
+
+  it('falls back to posted_date when created_at is null', () => {
+    const rows = [makeRow({ id: 'id-1', created_at: null, posted_date: '2026-03-14T08:00:00Z' })];
+    const missions = parseHiwayJSON(rows, NOW, BASE_URL);
+    expect(missions[0].publishedAt).toBe('2026-03-14T08:00:00Z');
+  });
+
+  it('returns null publishedAt when both created_at and posted_date are null', () => {
+    const rows = [makeRow({ id: 'id-1', created_at: null, posted_date: null })];
+    const missions = parseHiwayJSON(rows, NOW, BASE_URL);
+    expect(missions[0].publishedAt).toBeNull();
+  });
+
+  it('mixes valid and invalid rows, preserving publishedAt per row', () => {
+    const rows = [
+      makeRow({ id: 'id-1', created_at: '2026-03-15T10:00:00Z' }),
+      makeRow({ id: '', title: 'No ID' }), // invalid → filtered
+      makeRow({ id: 'id-2', created_at: null, posted_date: '2026-03-10T00:00:00Z' }),
+    ];
+    const missions = parseHiwayJSON(rows, NOW, BASE_URL);
+    expect(missions).toHaveLength(2);
+    expect(missions[0].publishedAt).toBe('2026-03-15T10:00:00Z');
+    expect(missions[1].publishedAt).toBe('2026-03-10T00:00:00Z');
   });
 });
 
