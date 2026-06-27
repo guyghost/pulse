@@ -3,7 +3,6 @@ import {
   saveProfile,
   saveConnectorStatuses,
   getConnectorStatuses,
-  getMissionById,
   getMissions,
 } from '../lib/shell/storage/db';
 import type {
@@ -69,17 +68,8 @@ import {
   getAllTrackings,
   getTrackingsByStatus,
 } from '../lib/shell/storage/tracking';
-import {
-  createTracking,
-  transitionStatus,
-  setTrackingNextActionAt,
-  addGeneratedAssetAndMarkPrepared,
-} from '../lib/core/tracking/transitions';
-import {
-  saveGeneratedAsset,
-  getGeneratedAssetsForMission,
-} from '../lib/shell/storage/generated-assets';
-import type { GeneratedAsset } from '../lib/core/types/generation';
+import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
+import { getGeneratedAssetsForMission } from '../lib/shell/storage/generated-assets';
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';

@@ -150,9 +150,16 @@ export const parseArgs = (
 
   const args = [...rawArgs];
   while (args.length > 0) {
-    const arg = args.shift()!;
-    if (arg === '--expected-version' && args.length > 0) {
-      expectedVersion = args.shift()!;
+    const arg = args.shift();
+    if (arg === undefined) {
+      break;
+    }
+
+    if (arg === '--expected-version') {
+      const value = args.shift();
+      if (value !== undefined) {
+        expectedVersion = value;
+      }
     } else if (!arg.startsWith('--')) {
       manifestPath = arg;
     }

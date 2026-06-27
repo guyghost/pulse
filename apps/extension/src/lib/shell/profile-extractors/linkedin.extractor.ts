@@ -147,7 +147,6 @@ function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   const about = sectionByHeading(['about', 'infos', 'à propos']);
   const experience = sectionByHeading(['experience', 'expérience']);
   const education = sectionByHeading(['education', 'formation']);
-  const skills = sectionByHeading(['skills', 'compétences']);
   const blockedReason = blockedReasonFromText(clean(document.body?.innerText));
   const headline =
     text('.pv-text-details__left-panel .text-body-medium') ||

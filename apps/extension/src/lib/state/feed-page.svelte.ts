@@ -26,7 +26,6 @@ import {
   saveFavorites,
   getHidden,
   saveHidden,
-  getMissions,
   getProfile,
   resetNewMissionCount,
   clearExtensionBadge,
