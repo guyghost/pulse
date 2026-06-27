@@ -62,7 +62,7 @@
         {/each}
       </div>
       <button
-        class="inline-flex items-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/88 px-4 py-2 text-xs font-semibold text-text-900 transition-all duration-200 hover:brightness-105"
+        class="inline-flex items-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/88 px-4 py-2 text-xs font-semibold text-surface-white transition-all duration-200 hover:brightness-105"
         onclick={onNext}
       >
         {stepIndex + 1 === totalSteps ? 'Terminer' : 'Suivant'}

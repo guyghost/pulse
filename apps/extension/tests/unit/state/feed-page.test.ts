@@ -458,4 +458,35 @@ describe('feed page state', () => {
     expect(isRemoteCompatibleInsight(makeMission({ remote: 'onsite' }))).toBe(false);
     expect(isRemoteCompatibleInsight(makeMission({ remote: null }))).toBe(false);
   });
+
+  it('scopes dashboard new/high-score counts to the visible set when a preset is active', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    // 5 unseen missions: 2 high-score (>=80), 3 weak (<60).
+    feed.setMissions([
+      makeMission({ id: 'new-strong-1', score: 92 }),
+      makeMission({ id: 'new-strong-2', score: 85 }),
+      makeMission({ id: 'new-weak-1', score: 41 }),
+      makeMission({ id: 'new-weak-2', score: 30 }),
+      makeMission({ id: 'new-weak-3', score: 10 }),
+    ]);
+
+    // No filter active: counts match the full scope.
+    expect(page.dashboardSummary.newCount).toBe(5);
+    expect(page.dashboardSummary.highScoreCount).toBe(2);
+    expect(page.dashboardSummary.visibleCount).toBe(5);
+
+    // Activate the "Prioritaires" preset → only the 2 high-score missions remain visible.
+    page.applyDecisionPreset('priority');
+    expect(page.dashboardSummary.visibleCount).toBe(2);
+
+    // FEED-01: the action queue must never advertise more than is visible.
+    expect(page.dashboardSummary.newCount).toBeLessThanOrEqual(page.dashboardSummary.visibleCount);
+    expect(page.dashboardSummary.highScoreCount).toBeLessThanOrEqual(
+      page.dashboardSummary.visibleCount
+    );
+    // Visible set is exactly the 2 high-score, still-unseen missions.
+    expect(page.dashboardSummary.newCount).toBe(2);
+    expect(page.dashboardSummary.highScoreCount).toBe(2);
+  });
 });

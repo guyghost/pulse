@@ -366,17 +366,18 @@ export function createFeedPageState(
       sourceMissionCounts.set(mission.source, (sourceMissionCounts.get(mission.source) ?? 0) + 1);
     }
 
+    // Facets (score distribution, preset chip counts, insights) are computed
+    // over the broad dashboard scope so users always see how many missions
+    // sit in each bucket/preset regardless of the active filter.
     for (const mission of dashboardScopeMissions) {
       const score = getMissionScore(mission);
       const bucket = getScoreBucket(score);
       counts.set(bucket, (counts.get(bucket) ?? 0) + 1);
 
       if (score >= 80) {
-        highScoreCount += 1;
         priorityPresetCount += 1;
       }
       if (!seenSet.has(mission.id)) {
-        newCount += 1;
         newPresetCount += 1;
       }
       if (isRemoteCompatibleInsight(mission)) {
@@ -396,6 +397,19 @@ export function createFeedPageState(
           : mission.semanticScore !== null
       ) {
         semanticAnalyzedCount += 1;
+      }
+    }
+
+    // Action-queue counts are scoped to the FILTERED/visible set so the
+    // dashboard never advertises more new/high-score missions than are
+    // actually visible (respects score bucket, decision preset, new-only and
+    // source filters). displayMissions is the same set visibleCount derives from.
+    for (const mission of displayMissions) {
+      if (getMissionScore(mission) >= 80) {
+        highScoreCount += 1;
+      }
+      if (!seenSet.has(mission.id)) {
+        newCount += 1;
       }
     }
 
