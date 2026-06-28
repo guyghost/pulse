@@ -3,6 +3,7 @@ import { analyzeTJMHistory } from '$lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
 import type { Mission, MissionSource } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
+import type { MissionTracking } from '$lib/core/types/tracking';
 import {
   DEFAULT_CONNECTED_ALERT_PREFERENCES,
   normalizeConnectedAlertPreferences,
@@ -17,6 +18,12 @@ const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
 const DEV_SAVED_VIEWS_STORAGE_KEY = '__missionpulse_dev_saved_views';
 const DEV_ALERT_PREFERENCES_STORAGE_KEY = '__missionpulse_dev_alert_preferences';
 const DEV_PROFILE_STORAGE_KEY = '__missionpulse_dev_profile';
+// DEV-only extensions: persist hidden/seen/trackings/health so the QA seed
+// (src/dev/qa-seed.ts) and the DevPanel can exercise every state deterministically.
+const DEV_HIDDEN_STORAGE_KEY = '__missionpulse_dev_hidden';
+const DEV_SEEN_STORAGE_KEY = '__missionpulse_dev_seen';
+const DEV_TRACKINGS_STORAGE_KEY = '__missionpulse_dev_trackings';
+const DEV_HEALTH_STORAGE_KEY = '__missionpulse_dev_health';
 
 type RuntimeMessage = { type: string; payload?: unknown };
 type RuntimeMessageListener = (
@@ -89,8 +96,8 @@ const storage: Record<string, unknown> = {
     theme: 'system',
   },
   favoriteMissions: readDevStorage<Record<string, number>>(DEV_FAVORITES_STORAGE_KEY, {}),
-  hiddenMissions: {},
-  seenMissions: [],
+  hiddenMissions: readDevStorage<Record<string, number>>(DEV_HIDDEN_STORAGE_KEY, {}),
+  seenMissions: readDevStorage<string[]>(DEV_SEEN_STORAGE_KEY, []),
   feedSavedViews: readDevStorage(DEV_SAVED_VIEWS_STORAGE_KEY, []),
   connectedAlertPreferences: readDevStorage<ConnectedAlertPreferences>(
     DEV_ALERT_PREFERENCES_STORAGE_KEY,
@@ -108,6 +115,13 @@ const storage: Record<string, unknown> = {
 };
 
 function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
+  const storedHealth = readDevStorage<ConnectorHealthSnapshot[] | null>(
+    DEV_HEALTH_STORAGE_KEY,
+    null
+  );
+  if (import.meta.env.DEV && Array.isArray(storedHealth) && storedHealth.length > 0) {
+    return storedHealth;
+  }
   const now = Date.now();
   return ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'].map((connectorId) => ({
     ...createInitialHealthSnapshot(connectorId, now - 10 * 60_000),
@@ -372,7 +386,18 @@ function createChromeStubs() {
                 Math.max(800, 500 + groupedBySource.length * 250)
               );
             });
-          case 'GET_TRACKINGS':
+          case 'GET_TRACKINGS': {
+            const storedTrackings = readDevStorage<MissionTracking[] | null>(
+              DEV_TRACKINGS_STORAGE_KEY,
+              null
+            );
+            if (
+              import.meta.env.DEV &&
+              Array.isArray(storedTrackings) &&
+              storedTrackings.length > 0
+            ) {
+              return { type: 'TRACKINGS_RESULT', payload: storedTrackings };
+            }
             return {
               type: 'TRACKINGS_RESULT',
               payload: [
@@ -447,6 +472,7 @@ function createChromeStubs() {
                 },
               ],
             };
+          }
           case 'UPDATE_TRACKING': {
             const p = message.payload as Record<string, unknown> | undefined;
             return {
