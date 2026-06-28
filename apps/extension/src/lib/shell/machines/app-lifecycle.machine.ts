@@ -5,6 +5,7 @@ import { withProfileDefaults } from '$lib/core/profile/normalize-profile';
 
 export interface AppLifecycleDeps {
   loadProfile(): Promise<UserProfile | null>;
+  saveProfile(profile: UserProfile): Promise<void>;
   getFirstScanDone(): Promise<boolean>;
   getOnboardingCompleted(): Promise<boolean>;
   setOnboardingCompleted(): Promise<void>;
@@ -134,11 +135,18 @@ export const appLifecycleMachine = setup({
     }),
     completeOnboarding: assign(({ context }) => {
       context.deps.setOnboardingCompleted().catch(() => {});
+      // ONB-02: seed a minimal valid profile when none exists (e.g. the user
+      // skipped onboarding) so the feed degrades gracefully instead of
+      // scoring against a null profile. A real profile is preserved as-is.
+      // When seeding (no existing profile), persist the default so the skip
+      // survives a reload — loadProfile() returns it on next boot instead of
+      // null. A pre-existing profile is never overwritten.
+      const seededProfile = context.profile ?? withProfileDefaults({});
+      if (context.profile === null) {
+        context.deps.saveProfile(seededProfile).catch(() => {});
+      }
       return {
-        // ONB-02: seed a minimal valid profile when none exists (e.g. the user
-        // skipped onboarding) so the feed degrades gracefully instead of
-        // scoring against a null profile. A real profile is preserved as-is.
-        profile: context.profile ?? withProfileDefaults({}),
+        profile: seededProfile,
         hasCompletedOnboarding: true,
         transitionDirection: 1 as const,
         previousPageIndex: context.previousPageIndexFor('feed'),

@@ -4,7 +4,7 @@
  * Manages page routing, transition direction, and onboarding status.
  * Pure Svelte 5 runes, no chrome.* access.
  */
-import { getProfile } from '$lib/shell/facades/settings.facade';
+import { getProfile, saveProfile } from '$lib/shell/facades/settings.facade';
 import {
   clearOnboardingCompleted,
   getFirstScanDone,
@@ -41,6 +41,7 @@ export function createAppNavigation() {
     input: {
       deps: {
         loadProfile: getProfile,
+        saveProfile,
         getFirstScanDone,
         getOnboardingCompleted,
         setOnboardingCompleted,
