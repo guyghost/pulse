@@ -3,7 +3,6 @@ import { analyzeTJMHistory } from '$lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '$lib/core/types/tjm';
 import type { Mission, MissionSource } from '$lib/core/types/mission';
 import type { UserProfile } from '$lib/core/types/profile';
-import type { MissionTracking } from '$lib/core/types/tracking';
 import {
   DEFAULT_CONNECTED_ALERT_PREFERENCES,
   normalizeConnectedAlertPreferences,
