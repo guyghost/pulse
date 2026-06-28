@@ -320,7 +320,7 @@ test.describe('Accessibility', () => {
     // Injecter des missions pour avoir du contenu à tester
     await page.keyboard.press('Control+Shift+D');
     await expect(page.getByText('DEV PANEL')).toBeVisible();
-    await page.getByRole('button', { name: 'inject' }).click();
+    await page.getByRole('button', { name: 'inject', exact: true }).click();
     await page.keyboard.press('Control+Shift+D');
 
     // Attendre les missions

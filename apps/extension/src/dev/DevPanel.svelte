@@ -2,6 +2,7 @@
   import { Icon } from '@pulse/ui';
   import type { LogEntry } from './bridge-logger';
   import { metricsCollector } from '../lib/shell/metrics';
+  import { applyQaSeedToLocalStorage } from './qa-seed';
 
   const {
     onInjectMissions,
@@ -109,6 +110,11 @@
       return 'border-status-orange/25 bg-status-orange/8 text-status-orange';
     }
     return 'border-blueprint-blue/20 bg-blueprint-blue/6 text-blueprint-blue';
+  }
+
+  function handleInjectQaSeed() {
+    applyQaSeedToLocalStorage();
+    window.location.reload();
   }
 </script>
 
@@ -241,6 +247,24 @@
             vider le cache
           </button>
         </div>
+      </div>
+
+      <div>
+        <span class="text-[10px] uppercase font-bold text-text-secondary tracking-wider"
+          >QA Seed</span
+        >
+        <div class="mt-1">
+          <button
+            class="w-full rounded-lg border border-status-violet/25 bg-status-violet/8 px-2 py-1.5 text-[11px] font-semibold text-status-violet transition-colors hover:bg-status-violet/12"
+            onclick={handleInjectQaSeed}
+            title="Injecter un dataset QA déterministe (~500 missions, tous connecteurs, edges) puis recharger"
+          >
+            Inject QA seed (500)
+          </button>
+        </div>
+        <p class="mt-1 text-[10px] text-text-subtle">
+          Écrit missions, profil, favoris, vues, alertes, suivi candidatures et santé connecteurs.
+        </p>
       </div>
 
       {#if activeTab === 'main'}

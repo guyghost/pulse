@@ -70,10 +70,12 @@ import {
   getTrackingsByStatus,
 } from '../lib/shell/storage/tracking';
 import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
+import { isTerminalStatus } from '../lib/core/tracking/pipeline-summary';
 import { getGeneratedAssetsForMission } from '../lib/shell/storage/generated-assets';
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
+import { mergeCandidateProfileIntoUserProfile } from '../lib/core/profile-extractors/merge-candidate-profile';
 import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
 import { loadTJMHistory } from '../lib/shell/storage/tjm-history';
@@ -830,21 +832,38 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     }
 
     if (message.type === 'SYNC_LINKEDIN_PROFILE_IMPORT') {
-      sendResponse({
-        type: 'LINKEDIN_PROFILE_IMPORTED',
-        payload: {
-          imported: false,
-          errorCode: 'sync_unavailable',
-          errorMessage: 'Sync not available',
-        },
-      });
-      return false;
+      (async () => {
+        try {
+          const draft = message.payload.profile;
+          const current = await getProfile();
+          const merged = mergeCandidateProfileIntoUserProfile(current, draft);
+          await saveProfile(merged);
+          chrome.runtime.sendMessage({ type: 'PROFILE_UPDATED', payload: merged }).catch(() => {
+            // Side panel not open, ignore
+          });
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_IMPORTED',
+            payload: { imported: true, profile: draft },
+          });
+        } catch (error) {
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_IMPORTED',
+            payload: {
+              imported: false,
+              errorCode: 'sync_failed',
+              errorMessage:
+                error instanceof Error ? error.message : 'La synchronisation LinkedIn a échoué.',
+            },
+          });
+        }
+      })();
+      return true;
     }
 
     if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
       const startedAt = Date.now();
       previewLinkedInProfile(startedAt, message.payload?.tabId)
-        .then(async (preview) => {
+        .then((preview) => {
           if (!preview.payload.extracted) {
             sendResponse({
               type: 'LINKEDIN_PROFILE_IMPORTED',
@@ -857,22 +876,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
-          const response = await previewLinkedInProfile(startedAt, message.payload?.tabId);
-          if (response.payload.extracted) {
-            sendResponse({
-              type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: { imported: true, profile: response.payload.profile },
-            });
-          } else {
-            sendResponse({
-              type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: {
-                imported: false,
-                errorCode: response.payload.errorCode,
-                errorMessage: response.payload.errorMessage,
-              },
-            });
-          }
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_IMPORTED',
+            payload: { imported: true, profile: preview.payload.profile },
+          });
         })
         .catch((error) => {
           sendResponse({
@@ -958,8 +965,13 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
-          await saveTracking(updated);
-          sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+          // APP-01: a terminal status (accepted/rejected/archived) ends the
+          // follow-up cycle. Clear any stale nextActionAt so a past date can
+          // never resurrect as an overdue relance later.
+          const persisted = isTerminalStatus(status) ? { ...updated, nextActionAt: null } : updated;
+
+          await saveTracking(persisted);
+          sendResponse({ type: 'TRACKING_UPDATED', payload: persisted });
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING error:', err);
           sendResponse({
@@ -1053,11 +1065,59 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     // ── Generation handlers ──
 
     if (message.type === 'GENERATE_ASSET') {
-      sendResponse({
-        type: 'GENERATION_RESULT',
-        payload: { asset: null, error: 'GENERATION_UNAVAILABLE' },
-      });
-      return false;
+      const { missionId, generationType } = message.payload;
+
+      // Kit generation is a premium-gated feature. The on-device Gemini Nano
+      // generator (shell/ai/mission-generator) is loaded lazily so the service
+      // worker does not pay the AI module cost until a generation is requested.
+      (async () => {
+        try {
+          const { premium_enabled } = await chrome.storage.local.get('premium_enabled');
+          if (premium_enabled !== true) {
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: { asset: null, error: 'PREMIUM_REQUIRED' },
+            });
+            return;
+          }
+
+          const { generateAsset } = await import('../lib/shell/ai/mission-generator');
+          const { saveGeneratedAsset } = await import('../lib/shell/storage/generated-assets');
+
+          // Reuse the worker's existing mission/profile read paths (same
+          // accessors as GET_FEED_MISSIONS / GET_PROFILE). Only a getAll
+          // mission accessor is available, so filter by id.
+          const [missions, profile] = await Promise.all([getMissions(), getProfile()]);
+          const mission = missions.find((m) => m.id === missionId) ?? null;
+
+          if (!mission || !profile) {
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: { asset: null, error: 'GENERATION_FAILED' },
+            });
+            return;
+          }
+
+          const asset = await generateAsset(missionId, generationType, mission, profile);
+          if (!asset) {
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: { asset: null, error: 'GENERATION_FAILED' },
+            });
+            return;
+          }
+
+          await saveGeneratedAsset(asset);
+          sendResponse({ type: 'GENERATION_RESULT', payload: { asset } });
+        } catch (err) {
+          console.warn('[MissionPulse] GENERATE_ASSET error:', err);
+          sendResponse({
+            type: 'GENERATION_RESULT',
+            payload: { asset: null, error: 'GENERATION_FAILED' },
+          });
+        }
+      })();
+      return true;
     }
 
     if (message.type === 'GET_GENERATED_ASSETS') {

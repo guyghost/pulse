@@ -2,7 +2,6 @@ packages:
   - 'apps/*'
   - 'packages/*'
 overrides:
-  brace-expansion: '5.0.6'
   devalue: '>=5.6.4'
   js-yaml: '4.2.0'
   picomatch: '>=4.0.4'

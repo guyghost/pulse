@@ -50,8 +50,14 @@
   ];
 
   const selectedMarketRange = $derived(analysis ? analysis[userSeniority ?? 'confirmed'] : null);
+  // An inverted target (min > max, both defined) is incoherent: do not derive a
+  // median/delta from it, otherwise the dashboard would display a misleading
+  // positioning and écart. Surfaced as an explicit validation state instead.
+  const isTargetInverted = $derived(userTjmMin > 0 && userTjmMax > 0 && userTjmMin > userTjmMax);
   const userTargetMedian = $derived(
-    userTjmMin > 0 && userTjmMax > 0 ? Math.round((userTjmMin + userTjmMax) / 2) : null
+    userTjmMin > 0 && userTjmMax > 0 && !isTargetInverted
+      ? Math.round((userTjmMin + userTjmMax) / 2)
+      : null
   );
   const userTargetDelta = $derived(
     selectedMarketRange && userTargetMedian !== null
@@ -59,7 +65,7 @@
       : null
   );
   const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
-  const hasTjmTarget = $derived(userTjmMin > 0 && userTjmMax > 0);
+  const hasTjmTarget = $derived(userTjmMin > 0 && userTjmMax > 0 && !isTargetInverted);
   const tjmSetupSteps = $derived.by<TjmSetupStep[]>(() => [
     {
       title: 'Scanner le feed',
@@ -113,10 +119,15 @@
       },
       {
         label: 'Ecart',
-        value: userTargetDelta === null ? 'A calibrer' : formatDelta(userTargetDelta),
+        value: isTargetInverted
+          ? 'Invalide'
+          : userTargetDelta === null
+            ? 'A calibrer'
+            : formatDelta(userTargetDelta),
         icon: 'badge-euro',
-        severity:
-          userTargetDelta === null
+        severity: isTargetInverted
+          ? 'incident'
+          : userTargetDelta === null
             ? 'attention'
             : Math.abs(userTargetDelta) <= 50
               ? 'success'
@@ -125,6 +136,16 @@
                 : 'incident',
       },
     ];
+
+    if (isTargetInverted) {
+      return {
+        severity: 'incident' as const,
+        statusLabel: 'Fourchette invalide',
+        title: 'Votre fourchette TJM est inversée',
+        description: `Le minimum (${userTjmMin}€) est supérieur au maximum (${userTjmMax}€). Corrigez votre fourchette dans le profil pour obtenir un positionnement fiable.`,
+        evidence,
+      };
+    }
 
     if (userTargetDelta === null || selectedMarketRange === null) {
       return {

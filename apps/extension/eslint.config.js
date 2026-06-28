@@ -25,6 +25,10 @@ export default tseslint.config(
       'landing/',
       // Svelte files that use svelte:boundary (not supported by eslint-plugin-svelte yet)
       'src/sidepanel/App.svelte',
+      // Playwright/Node QA harness scripts (.mjs) use browser + Node globals
+      // (window, document, console, process) that the base recommended config
+      // flags as no-undef. They are not part of the strict FC&IS app surface.
+      'tests/e2e/**/*.mjs',
       '.claude/',
       '.worktrees/',
     ],

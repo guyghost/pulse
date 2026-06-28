@@ -30,6 +30,8 @@ const saveTracking = vi.fn();
 const deleteTracking = vi.fn();
 const getAllTrackings = vi.fn();
 const getGeneratedAssetsForMission = vi.fn();
+const saveGeneratedAsset = vi.fn();
+const generateAsset = vi.fn();
 const getAllHealthSnapshots = vi.fn();
 const resetHealthSnapshot = vi.fn();
 const loadTJMHistory = vi.fn();
@@ -234,8 +236,12 @@ vi.mock('../../../src/lib/shell/storage/tracking', () => ({
 }));
 
 vi.mock('../../../src/lib/shell/storage/generated-assets', () => ({
-  saveGeneratedAsset: vi.fn(async () => undefined),
+  saveGeneratedAsset,
   getGeneratedAssetsForMission,
+}));
+
+vi.mock('../../../src/lib/shell/ai/mission-generator', () => ({
+  generateAsset,
 }));
 
 vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
@@ -350,6 +356,8 @@ describe('background auto-scan notifications', () => {
     deleteTracking.mockResolvedValue(undefined);
     getAllTrackings.mockResolvedValue([]);
     getGeneratedAssetsForMission.mockResolvedValue([]);
+    saveGeneratedAsset.mockResolvedValue(undefined);
+    generateAsset.mockResolvedValue(null);
     getAllHealthSnapshots.mockResolvedValue(new Map());
     loadTJMHistory.mockResolvedValue({ records: [] });
     verifyProfilePage.mockResolvedValue({
@@ -453,6 +461,147 @@ describe('background auto-scan notifications', () => {
     });
   });
 
+  it('merges and persists the LinkedIn profile on SYNC_LINKEDIN_PROFILE_IMPORT', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+    getProfile.mockResolvedValueOnce(profile);
+
+    const draft = {
+      title: 'Lead Frontend Svelte',
+      summary: 'Test summary',
+      experiences: [],
+      skills: [{ skill: 'React', source: 'linkedin' as const, confidence: 0.9 }],
+      education: [],
+      links: [],
+      source: 'linkedin' as const,
+      confidence: 0.9,
+      capturedAt: '2026-06-27T00:00:00.000Z',
+      profileUrl: 'https://www.linkedin.com/in/test',
+    };
+
+    const handled = messageListener?.(
+      { type: 'SYNC_LINKEDIN_PROFILE_IMPORT', payload: { profile: draft } },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(getProfile).toHaveBeenCalled();
+    expect(saveProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobTitle: 'Lead Frontend Svelte',
+        stack: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
+      })
+    );
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'PROFILE_UPDATED',
+      payload: expect.objectContaining({ jobTitle: 'Lead Frontend Svelte' }),
+    });
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'LINKEDIN_PROFILE_IMPORTED',
+      payload: { imported: true, profile: draft },
+    });
+  });
+
+  it('responds with sync_failed when persisting the merged profile throws', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+    saveProfile.mockRejectedValueOnce(new Error('IndexedDB indisponible'));
+
+    const draft = {
+      title: 'Lead Frontend Svelte',
+      summary: '',
+      experiences: [],
+      skills: [],
+      education: [],
+      links: [],
+      source: 'linkedin' as const,
+      confidence: 0.9,
+      capturedAt: '2026-06-27T00:00:00.000Z',
+      profileUrl: 'https://www.linkedin.com/in/test',
+    };
+
+    messageListener?.(
+      { type: 'SYNC_LINKEDIN_PROFILE_IMPORT', payload: { profile: draft } },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'LINKEDIN_PROFILE_IMPORTED',
+      payload: {
+        imported: false,
+        errorCode: 'sync_failed',
+        errorMessage: 'IndexedDB indisponible',
+      },
+    });
+  });
+
+  it('returns PREMIUM_REQUIRED for GENERATE_ASSET when premium is not enabled', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ premium_enabled: false });
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.(
+      {
+        type: 'GENERATE_ASSET',
+        payload: { missionId: 'mission-1', generationType: 'pitch' },
+      },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(generateAsset).not.toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'GENERATION_RESULT',
+      payload: { asset: null, error: 'PREMIUM_REQUIRED' },
+    });
+  });
+
+  it('generates and persists an asset for GENERATE_ASSET when premium is enabled', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ premium_enabled: true });
+    getMissions.mockResolvedValueOnce([makeMission({ id: 'mission-1' })]);
+    getProfile.mockResolvedValueOnce(profile);
+    const fakeAsset = {
+      id: 'gen-pitch-mission-1-1000',
+      missionId: 'mission-1',
+      type: 'pitch' as const,
+      content: 'Generated pitch content.',
+      createdAt: 1000,
+      modelUsed: 'gemini-nano',
+    };
+    generateAsset.mockResolvedValueOnce(fakeAsset);
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.(
+      {
+        type: 'GENERATE_ASSET',
+        payload: { missionId: 'mission-1', generationType: 'pitch' },
+      },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(generateAsset).toHaveBeenCalledWith(
+      'mission-1',
+      'pitch',
+      expect.objectContaining({ id: 'mission-1' }),
+      profile
+    );
+    expect(saveGeneratedAsset).toHaveBeenCalledWith(fakeAsset);
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'GENERATION_RESULT',
+      payload: { asset: fakeAsset },
+    });
+  });
+
   it('routes settings through the service worker shell', async () => {
     expect(messageListener).toBeTypeOf('function');
     const settings = {
@@ -486,6 +635,72 @@ describe('background auto-scan notifications', () => {
       type: 'SETTINGS_SAVED',
       payload: { saved: true, settings },
     });
+  });
+
+  it('clears nextActionAt when transitioning to a terminal status (APP-01)', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    getTracking.mockResolvedValueOnce(
+      makeTracking({
+        missionId: 'mission-1',
+        currentStatus: 'offer',
+        nextActionAt: '2026-06-18T09:00:00.000Z',
+      })
+    );
+
+    const handled = messageListener?.(
+      { type: 'UPDATE_TRACKING', payload: { missionId: 'mission-1', status: 'accepted' } },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    // The persisted record reaches the terminal status with the stale follow-up cleared.
+    expect(saveTracking).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'mission-1',
+        currentStatus: 'accepted',
+        nextActionAt: null,
+      })
+    );
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'TRACKING_UPDATED',
+      payload: expect.objectContaining({
+        missionId: 'mission-1',
+        currentStatus: 'accepted',
+        nextActionAt: null,
+      }),
+    });
+  });
+
+  it('keeps nextActionAt when transitioning to a non-terminal status (APP-01)', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    getTracking.mockResolvedValueOnce(
+      makeTracking({
+        missionId: 'mission-1',
+        currentStatus: 'application_prepared',
+        nextActionAt: '2026-06-18T09:00:00.000Z',
+      })
+    );
+
+    messageListener?.(
+      { type: 'UPDATE_TRACKING', payload: { missionId: 'mission-1', status: 'applied' } },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(saveTracking).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'mission-1',
+        currentStatus: 'applied',
+        nextActionAt: '2026-06-18T09:00:00.000Z',
+      })
+    );
   });
 
   it('loads on Chrome 114-129 when action user settings events are unavailable', async () => {

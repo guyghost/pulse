@@ -1,7 +1,7 @@
 <script lang="ts">
   import TJMDashboard from '../organisms/TJMDashboard.svelte';
   import { Icon } from '@pulse/ui';
-  import type { TJMAnalysis } from '$lib/core/types/tjm';
+  import type { TJMAnalysis, TJMRegion } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import { getTJMAnalysis } from '$lib/shell/facades/tjm.facade';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
@@ -26,6 +26,11 @@
   let userTjmMax = $state(0);
   let profileStacks = $state<string[]>([]);
   let userSeniority = $state<SeniorityLevel | null>(null);
+  let selectedRegion = $state<TJMRegion | null>(null);
+  // Region options are snapshotted from the unfiltered analysis so the dropdown
+  // keeps showing every available region even after a region filter is applied
+  // (the filtered analysis would otherwise shrink to a single region).
+  let regionOptions = $state<{ region: TJMRegion; label: string }[]>([]);
   let dashboardSection: HTMLElement | null = $state(null);
   const connection = getConnectionStore();
 
@@ -33,12 +38,24 @@
     isLoading = true;
     error = null;
     try {
-      analysis = await getTJMAnalysis(profileStacks.length > 0 ? profileStacks : undefined);
+      analysis = await getTJMAnalysis(
+        profileStacks.length > 0 ? profileStacks : undefined,
+        selectedRegion ?? undefined
+      );
+      if (!selectedRegion && analysis?.regionInsights) {
+        regionOptions = analysis.regionInsights.map(({ region, label }) => ({ region, label }));
+      }
     } catch (err) {
       error = err instanceof Error ? err.message : 'Impossible de charger les tendances TJM';
     } finally {
       isLoading = false;
     }
+  }
+
+  function handleRegionChange(event: Event) {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    selectedRegion = value ? (value as TJMRegion) : null;
+    void loadAnalysis();
   }
 
   async function loadProfileAndAnalysis() {
@@ -250,6 +267,27 @@
         <span>Mode hors ligne</span>
       </div>
     {/if}
+
+    <div class="mt-3 flex items-center gap-2">
+      <label
+        for="tjm-region-filter"
+        class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted"
+      >
+        Région
+      </label>
+      <select
+        id="tjm-region-filter"
+        class="rounded-lg border border-border-light bg-surface-white px-2 py-1 text-xs text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+        value={selectedRegion ?? ''}
+        onchange={handleRegionChange}
+        aria-label="Filtrer les tendances TJM par région"
+      >
+        <option value="">Toutes les régions</option>
+        {#each regionOptions as option}
+          <option value={option.region}>{option.label}</option>
+        {/each}
+      </select>
+    </div>
 
     <div class="mt-4">
       <OperationalStoryCard

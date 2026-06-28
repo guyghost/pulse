@@ -82,6 +82,8 @@
       step="5"
       value={scanInterval}
       onchange={onScanIntervalChange}
+      disabled={!autoScan}
+      aria-disabled={!autoScan ? 'true' : undefined}
       aria-label="Fréquence de scan"
       class="flex-1 accent-blueprint-blue"
     />

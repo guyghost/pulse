@@ -759,18 +759,16 @@ git add -A && git commit -m "feat(ui): add design tokens and atomic components (
 
 **Files:**
 - Create: `src/ui/molecules/MissionCard.svelte`
-- Create: `src/ui/molecules/TJMGauge.svelte`
 - Create: `src/ui/molecules/ConnectorStatus.svelte`
 - Create: `src/ui/molecules/FilterBar.svelte`
 - Create: `src/ui/molecules/SearchInput.svelte`
 - Create: `src/ui/molecules/TrendBadge.svelte`
 
-**Step 1: Create all 6 molecule components**
+**Step 1: Create all 5 molecule components**
 
 Each receives data via `$props()` — no XState access, no direct service calls.
 
 - **MissionCard.svelte**: `{ mission: Mission }` — card with colored left border based on score, title, stack badges, TJM, location, source badge. Expandable description. `transition:slide`.
-- **TJMGauge.svelte**: `{ missionTjm: number, range: TJMRange }` — horizontal bar showing market range with mission TJM marker. Color: green if within, amber if below, red if above.
 - **ConnectorStatus.svelte**: `{ name, status: ConnectorStatus, lastSync: Date | null }` — row with indicator dot, name, status text, relative time since last sync.
 - **FilterBar.svelte**: `{ filters, onFilterChange }` — horizontal bar with Chip components for stack, TJM range, location, remote mode.
 - **SearchInput.svelte**: `{ value, onSearch }` — input with debounce (300ms), search icon, clear button.
@@ -781,7 +779,7 @@ Each receives data via `$props()` — no XState access, no direct service calls.
 **Step 3: Commit**
 
 ```bash
-git add -A && git commit -m "feat(ui): add molecule components (MissionCard, TJMGauge, FilterBar, SearchInput, ConnectorStatus, TrendBadge)"
+git add -A && git commit -m "feat(ui): add molecule components (MissionCard, FilterBar, SearchInput, ConnectorStatus, TrendBadge)"
 ```
 
 ---

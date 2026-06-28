@@ -23,6 +23,14 @@ describe('normalize profile helpers', () => {
     ]);
   });
 
+  it('deduplicates case-insensitively while preserving the first-seen casing', () => {
+    // Bug 6: adding "react" when "React" exists must not create a duplicate.
+    expect(appendUniqueNormalized(['React'], 'react')).toEqual(['React']);
+    expect(appendUniqueNormalized([' SaaS '], 'saas')).toEqual(['SaaS']);
+    // Mixed existing duplicates are also collapsed case-insensitively.
+    expect(appendUniqueNormalized(['React', 'react', 'Node'])).toEqual(['React', 'Node']);
+  });
+
   it('fills missing profile fields with save-safe defaults', () => {
     expect(withProfileDefaults({ firstName: 'Guy' })).toEqual({
       firstName: 'Guy',

@@ -140,7 +140,7 @@ describe('operational UI constraints', () => {
     );
     expect(source).toContain('Missions proposées plus bas');
     expect(source).toContain('Missions proposées');
-    expect(source).toContain('Voir les ${formatMissionCount(newCount)}');
+    expect(source).toContain('Voir les ${formatStoryMissionCount(newCount)} nouvelles');
     expect(source).toContain('visibleFeedMissionLabel');
     expect(source).toContain('missionFeedReached = sectionRect.top <= containerRect.bottom - 48');
   });
@@ -360,7 +360,8 @@ describe('operational UI constraints', () => {
     const source = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
 
     expect(source).toContain('const recommendedTrackedMission = $derived.by');
-    expect(source).toContain('isTrackingDue(record, now)');
+    expect(source).toContain('!isTerminalStatus(record.currentStatus)');
+    expect(source).toContain('isDueFollowUp(record, now)');
     expect(source).toContain("record.currentStatus === 'application_prepared'");
     expect(source).toContain('onPrimaryAction={handleApplicationStoryAction}');
     expect(source).toContain('function openRecommendedDossier()');

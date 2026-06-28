@@ -131,7 +131,10 @@ export async function injectMissions(page: Page, count: number) {
     el.dispatchEvent(new Event('change', { bubbles: true }));
   }, count);
   await expect(missionCountInput).toHaveValue(String(count));
-  await page.getByRole('button', { name: 'inject' }).click();
+  // exact: true — the DevPanel also has an "Inject QA seed (500)" button whose
+  // accessible name contains "inject", which would otherwise cause a strict-mode
+  // violation (2 elements). We want the volume injector button named exactly "inject".
+  await page.getByRole('button', { name: 'inject', exact: true }).click();
   await closeDevPanel(page);
 
   // Two dev-mode timing hazards can mask the injected set:
@@ -381,11 +384,15 @@ export async function favoriteMission(card: Locator) {
   const starBtn = favoriteButton(card);
   await expect(starBtn).toBeVisible();
   await starBtn.click();
+  // 5000ms — dev-mode favorite persistence re-renders the (possibly filtered) list
+  // asynchronously and can exceed 1s under parallel-suite load; the 1000ms poll flaked
+  // ~1-in-3 full runs on the "favorite from search results" path. Aligns with the file's
+  // other polls (injectMissions, expectMissionCount, waitForMissions all use 5000ms).
   await expect
     .poll(
       async () =>
         card.page().getByRole('button', { name: 'Retirer la mission des favoris' }).count(),
-      { timeout: 1000 }
+      { timeout: 5000 }
     )
     .toBeGreaterThan(previousFavoritesCount);
 }
@@ -397,7 +404,8 @@ export async function unfavoriteMission(card: Locator) {
   const starBtn = unfavoriteButton(card);
   await expect(starBtn).toBeVisible();
   await starBtn.click();
-  await expect(favoriteButton(card)).toBeVisible({ timeout: 1000 });
+  // 5000ms — same dev-mode re-render timing as favoriteMission above.
+  await expect(favoriteButton(card)).toBeVisible({ timeout: 5000 });
 }
 
 /**

@@ -336,12 +336,22 @@
   }
 
   async function copyPayload(): Promise<void> {
-    await navigator.clipboard.writeText(selectedPayload);
+    try {
+      await navigator.clipboard.writeText(selectedPayload);
+    } catch {
+      await showToast('Copie impossible : presse-papier indisponible', 'error');
+      return;
+    }
     await showToast('Bloc de mise à jour copié', 'success');
   }
 
   async function pushPlatform(platform: ProfilePlatform): Promise<void> {
-    await navigator.clipboard.writeText(buildPlatformPayload(platform, selectedFields));
+    try {
+      await navigator.clipboard.writeText(buildPlatformPayload(platform, selectedFields));
+    } catch {
+      await showToast(`${platform.name} : copie impossible, presse-papier indisponible`, 'error');
+      return;
+    }
     pushedPlatformIds = new Set([...pushedPlatformIds, platform.id]);
     await openExternalUrl(platform.profileUrl).catch(() => {});
     await showToast(`${platform.name}: mise à jour prête à coller`, 'success');
@@ -409,6 +419,7 @@
       linkedInImportResult = result;
       if (!result.imported) {
         await showToast(`LinkedIn: ${result.errorMessage}`, 'error');
+        await showToast(getLinkedInRecoveryHint(result.errorCode), 'info');
         return;
       }
 
@@ -470,7 +481,12 @@
       return;
     }
 
-    await navigator.clipboard.writeText(selectedPayload);
+    try {
+      await navigator.clipboard.writeText(selectedPayload);
+    } catch {
+      await showToast('Copie impossible : presse-papier indisponible', 'error');
+      return;
+    }
     pushedPlatformIds = new Set(platforms.map((platform) => platform.id));
     await showToast('Mise à jour préparée pour toutes les plateformes', 'success');
   }

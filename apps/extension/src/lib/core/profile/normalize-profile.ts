@@ -41,7 +41,19 @@ export function appendUniqueNormalized(
   const normalizedItems = (items ?? []).map(normalizeTextInput).filter(Boolean);
   const normalizedPending = normalizeTextInput(pendingItem);
   const nextItems = normalizedPending ? [...normalizedItems, normalizedPending] : normalizedItems;
-  return Array.from(new Set(nextItems));
+  // Dedupe case-insensitively (so "React" and "react" collapse) while keeping
+  // the first-seen display casing. Mirrors the LinkedIn normalizer's behavior.
+  const seen = new Set<string>();
+  const result: string[] = [];
+  for (const item of nextItems) {
+    const key = item.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    result.push(item);
+  }
+  return result;
 }
 
 export const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({

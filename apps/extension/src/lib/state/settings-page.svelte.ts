@@ -34,6 +34,7 @@ import {
   openExternalUrl,
 } from '$lib/shell/facades/feed-data.facade';
 import { sendMessage, subscribeMessages } from '$lib/shell/messaging/bridge';
+import { showToast } from '$lib/shell/notifications/toast-service';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
 import { getPremium } from '$lib/shell/facades/premium.facade';
@@ -134,6 +135,7 @@ export class SettingsPageController {
   connectedSyncError = $state<string | null>(null);
 
   showResetConfirm = $state(false);
+  resetError = $state<string | null>(null);
 
   isExporting = $state(false);
   exportSuccess = $state(false);
@@ -519,6 +521,7 @@ export class SettingsPageController {
   }
 
   async resetAll(): Promise<void> {
+    this.resetError = null;
     try {
       const response = await sendMessage({ type: 'RESET_LOCAL_DATA' });
       if (response.type !== 'LOCAL_DATA_RESET' || !response.payload.reset) {
@@ -530,8 +533,13 @@ export class SettingsPageController {
       }
       this.showResetConfirm = false;
       this.options.onNavigateToOnboarding?.();
-    } catch {
-      // Hors contexte extension
+    } catch (err) {
+      // Surface the failure instead of swallowing it: keep the confirmation
+      // gate open so the user stays in control, expose the error, and notify.
+      const message = err instanceof Error ? err.message : 'Réinitialisation impossible';
+      this.resetError = message;
+      this.showResetConfirm = true;
+      await showToast(message, 'error');
     }
   }
 

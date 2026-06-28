@@ -99,6 +99,52 @@ describe('OnboardingWizard', () => {
     expect(target.textContent).toContain('Recevoir un insight');
   });
 
+  // ONB-01: when the alert save fails, the wizard must stay on the alert step
+  // so the user can retry, instead of advancing to the insight step.
+  // The page signals failure by resolving to `false` (it catches the facade
+  // error, shows a toast, and returns false). A resolved-but-false promise is
+  // the faithful reproduction of the production bug: the old wizard ignored the
+  // return value and always called goNext() after the await resolved.
+  it('stays on the alert step when the alert save fails', async () => {
+    const onSaveAlertPreferences = vi.fn().mockResolvedValue(false);
+    const target = mountWizard({ onSaveAlertPreferences });
+    await tick();
+
+    clickButton(target, 'Configurer le radar');
+    await tick();
+    clickButton(target, /Continuer avec/);
+    await tick();
+    clickButton(target, 'Créer une première alerte');
+    await tick();
+    clickButton(target, 'Voir le premier insight');
+    await flushAsyncStep();
+
+    expect(onSaveAlertPreferences).toHaveBeenCalledOnce();
+    // Still on the alert step (4/5)...
+    expect(target.textContent).toContain('Alerte prioritaire');
+    expect(target.textContent).not.toContain('Action recommandée après le scan');
+  });
+
+  // Defensive: a handler that throws (rejects) must also block advancement.
+  it('stays on the alert step when the alert save rejects', async () => {
+    const onSaveAlertPreferences = vi.fn().mockRejectedValue(new Error('boom'));
+    const target = mountWizard({ onSaveAlertPreferences });
+    await tick();
+
+    clickButton(target, 'Configurer le radar');
+    await tick();
+    clickButton(target, /Continuer avec/);
+    await tick();
+    clickButton(target, 'Créer une première alerte');
+    await tick();
+    clickButton(target, 'Voir le premier insight');
+    await flushAsyncStep();
+
+    expect(onSaveAlertPreferences).toHaveBeenCalledOnce();
+    expect(target.textContent).toContain('Alerte prioritaire');
+    expect(target.textContent).not.toContain('Action recommandée après le scan');
+  });
+
   it('submits a complete normalized profile from current fields', async () => {
     const onComplete = vi.fn();
     const target = mountWizard({ onComplete });
@@ -130,5 +176,35 @@ describe('OnboardingWizard', () => {
         tjmMax: 750,
       })
     );
+  });
+
+  // B-1: incremental stack edits must signal onUpdateProfile so the hosting
+  // page can propagate them (previously the wizard emitted the callback but
+  // OnboardingPage never wired it, so every call was a no-op).
+  it('emits incremental profile updates when stack chips change', async () => {
+    const onUpdateProfile = vi.fn();
+    const target = mountWizard({ onUpdateProfile });
+    await tick();
+
+    const stackInput = target.querySelector('#ob-stack') as HTMLInputElement;
+    stackInput.value = 'React';
+    stackInput.dispatchEvent(new Event('input', { bubbles: true }));
+    (
+      target.querySelector('button[aria-label="Ajouter la stack technique"]') as HTMLButtonElement
+    ).click();
+    await tick();
+
+    expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({ stack: ['React'] }));
+
+    // Removing a chip also propagates the updated stack.
+    onUpdateProfile.mockClear();
+    (
+      [...target.querySelectorAll('button')].find((b) =>
+        (b.textContent ?? '').includes('React')
+      ) as HTMLButtonElement
+    ).click();
+    await tick();
+
+    expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({ stack: [] }));
   });
 });
