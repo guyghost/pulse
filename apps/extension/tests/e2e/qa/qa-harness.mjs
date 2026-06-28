@@ -105,10 +105,13 @@ export async function buildSeedSnapshot() {
   try {
     await gotoApp(page);
     await openDevPanel(page);
-    await page.getByTitle('Inject QA seed (500) puis recharger', { exact: false }).click({ timeout: 4000 }).catch(async () => {
-      // Fall back to text match.
-      await page.getByText('Inject QA seed (500)').click({ timeout: 4000 });
-    });
+    await page
+      .getByTitle('Inject QA seed (500) puis recharger', { exact: false })
+      .click({ timeout: 4000 })
+      .catch(async () => {
+        // Fall back to text match.
+        await page.getByText('Inject QA seed (500)').click({ timeout: 4000 });
+      });
     await page.waitForLoadState('domcontentloaded');
     await page.waitForTimeout(1500);
     await snapshotStorage(page, STORAGE_STATE_PATH);
@@ -192,14 +195,18 @@ export async function currentPage(page) {
   return await page.evaluate(() => {
     // There is no global hook; infer from the active nav button aria-pressed.
     const btns = Array.from(document.querySelectorAll('nav[aria-label="Main navigation"] button'));
-    const active = btns.find((b) => b.getAttribute('aria-current') === 'page' || b.getAttribute('aria-pressed') === 'true');
+    const active = btns.find(
+      (b) => b.getAttribute('aria-current') === 'page' || b.getAttribute('aria-pressed') === 'true'
+    );
     return active ? (active.getAttribute('aria-label') || active.innerText || '').trim() : null;
   });
 }
 
 export function dumpConsole(label, { consoleErrors, pageFailures }) {
   if (consoleErrors.length || pageFailures.length) {
-    console.log(`[console:${label}] errors=${consoleErrors.length} pageerrors=${pageFailures.length}`);
+    console.log(
+      `[console:${label}] errors=${consoleErrors.length} pageerrors=${pageFailures.length}`
+    );
     for (const e of consoleErrors.slice(0, 12)) console.log('  ERR:', e.slice(0, 240));
     for (const e of pageFailures.slice(0, 6)) console.log('  PAGEERR:', e.slice(0, 240));
   }

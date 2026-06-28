@@ -28,11 +28,15 @@ function esc(s) {
 let md = '';
 md += '# MissionPulse — Phase B Interactive QA: Confirmed Bugs\n\n';
 md += '`reports/qa/qa-runner-bugs.md` — produced by the `qa-runner` agent (Phase B).\n\n';
-md += 'Environment: Vite dev server (port 5176, PID 23083), target `http://localhost:5176/src/sidepanel/index.html`, ';
+md +=
+  'Environment: Vite dev server (port 5176, PID 23083), target `http://localhost:5176/src/sidepanel/index.html`, ';
 md += 'Playwright 1.59.1 (headless Chromium), 400x760 side-panel viewport. ';
-md += 'Seeded via the DevPanel "Inject QA seed (500)" path (~500 missions, full profile, healthy/degraded/broken connectors, 9 trackings across all statuses), snapshotted to a reusable `storageState`. ';
-md += 'Each scenario boots an isolated context; failure paths are exercised by wrapping `chrome.runtime.sendMessage` to reject on chosen message types. ';
-md += 'No destructive actions were executed (the reset confirmation was armed but NOT confirmed), no source changes, no commits/PRs.\n\n';
+md +=
+  'Seeded via the DevPanel "Inject QA seed (500)" path (~500 missions, full profile, healthy/degraded/broken connectors, 9 trackings across all statuses), snapshotted to a reusable `storageState`. ';
+md +=
+  'Each scenario boots an isolated context; failure paths are exercised by wrapping `chrome.runtime.sendMessage` to reject on chosen message types. ';
+md +=
+  'No destructive actions were executed (the reset confirmation was armed but NOT confirmed), no source changes, no commits/PRs.\n\n';
 
 // Summary counts
 const counts = { confirmed: 0, masked: 0, clean: 0, partial: 0, refuted: 0 };
@@ -46,9 +50,17 @@ md += `- Findings: ${findings.length}\n`;
 md += `- Confirmed bugs: ${counts.confirmed} (HIGH ${bySev.HIGH}, MED ${bySev.MED}, LOW ${bySev.LOW})\n`;
 md += `- Dev-masked (code defect real, unreachable in dev): ${counts.masked}\n`;
 md += `- No-defect (clean sweep): ${counts.clean}\n\n`;
-md += 'Severity counts among confirmed bugs: HIGH=' + bySev.HIGH + ', MED=' + bySev.MED + ', LOW=' + bySev.LOW + '.\n\n';
+md +=
+  'Severity counts among confirmed bugs: HIGH=' +
+  bySev.HIGH +
+  ', MED=' +
+  bySev.MED +
+  ', LOW=' +
+  bySev.LOW +
+  '.\n\n';
 
-md += 'Status legend: CONFIRMED = reproduced live; DEV-MASKED = code defect confirmed but the dev stub hides the symptom; NO DEFECT = swept and clean.\n\n';
+md +=
+  'Status legend: CONFIRMED = reproduced live; DEV-MASKED = code defect confirmed but the dev stub hides the symptom; NO DEFECT = swept and clean.\n\n';
 
 md += '## Confirmed bugs (by severity)\n\n';
 for (const f of ordered.filter((x) => x.status === 'confirmed')) {
@@ -107,8 +119,11 @@ md += 'node tests/e2e/qa/smoke.mjs     # boots + builds /tmp/qa-storage-state.js
 md += 'node tests/e2e/qa/run-qa.mjs    # all scenarios -> /tmp/qa-findings.json + screenshots/\n';
 md += 'node tests/e2e/qa/generate-report.mjs\n';
 md += '```\n\n';
-md += 'Harness & scenarios live under `apps/extension/tests/e2e/qa/` (no `*.test.*` suffix, so the Playwright runner ignores them).\n';
+md +=
+  'Harness & scenarios live under `apps/extension/tests/e2e/qa/` (no `*.test.*` suffix, so the Playwright runner ignores them).\n';
 
 writeFileSync(REPORT, md);
 console.log('wrote', REPORT, '(' + md.length + ' bytes)');
-console.log('confirmed=' + counts.confirmed + ' masked=' + counts.masked + ' clean=' + counts.clean);
+console.log(
+  'confirmed=' + counts.confirmed + ' masked=' + counts.masked + ' clean=' + counts.clean
+);

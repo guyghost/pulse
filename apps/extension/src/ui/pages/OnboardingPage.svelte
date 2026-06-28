@@ -59,7 +59,9 @@
 
   // Returns true on success, false on failure so the wizard can stay on the
   // alert step and let the user retry (ONB-01).
-  async function handleSaveAlertPreferences(preferences: ConnectedAlertPreferences): Promise<boolean> {
+  async function handleSaveAlertPreferences(
+    preferences: ConnectedAlertPreferences
+  ): Promise<boolean> {
     isSavingAlertPreferences = true;
     try {
       alertPreferences = await saveAlertPreferences(preferences);
