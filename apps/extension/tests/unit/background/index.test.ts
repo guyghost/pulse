@@ -453,38 +453,80 @@ describe('background auto-scan notifications', () => {
     });
   });
 
-  it('responds with a graceful French sync_unavailable for SYNC_LINKEDIN_PROFILE_IMPORT', () => {
+  it('merges and persists the LinkedIn profile on SYNC_LINKEDIN_PROFILE_IMPORT', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();
+    getProfile.mockResolvedValueOnce(profile);
 
-    messageListener?.(
-      {
-        type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
-        payload: {
-          profile: {
-            title: 'Lead Frontend',
-            summary: 'Test summary',
-            experiences: [],
-            skills: [],
-            education: [],
-            links: [],
-            source: 'linkedin',
-            confidence: 0.9,
-            capturedAt: '2026-06-27T00:00:00.000Z',
-            profileUrl: 'https://www.linkedin.com/in/test',
-          },
-        },
-      },
+    const draft = {
+      title: 'Lead Frontend Svelte',
+      summary: 'Test summary',
+      experiences: [],
+      skills: [{ skill: 'React', source: 'linkedin' as const, confidence: 0.9 }],
+      education: [],
+      links: [],
+      source: 'linkedin' as const,
+      confidence: 0.9,
+      capturedAt: '2026-06-27T00:00:00.000Z',
+      profileUrl: 'https://www.linkedin.com/in/test',
+    };
+
+    const handled = messageListener?.(
+      { type: 'SYNC_LINKEDIN_PROFILE_IMPORT', payload: { profile: draft } },
       {},
       sendResponse
     );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(getProfile).toHaveBeenCalled();
+    expect(saveProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        jobTitle: 'Lead Frontend Svelte',
+        stack: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
+      })
+    );
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'PROFILE_UPDATED',
+      payload: expect.objectContaining({ jobTitle: 'Lead Frontend Svelte' }),
+    });
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'LINKEDIN_PROFILE_IMPORTED',
+      payload: { imported: true, profile: draft },
+    });
+  });
+
+  it('responds with sync_failed when persisting the merged profile throws', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+    saveProfile.mockRejectedValueOnce(new Error('IndexedDB indisponible'));
+
+    const draft = {
+      title: 'Lead Frontend Svelte',
+      summary: '',
+      experiences: [],
+      skills: [],
+      education: [],
+      links: [],
+      source: 'linkedin' as const,
+      confidence: 0.9,
+      capturedAt: '2026-06-27T00:00:00.000Z',
+      profileUrl: 'https://www.linkedin.com/in/test',
+    };
+
+    messageListener?.(
+      { type: 'SYNC_LINKEDIN_PROFILE_IMPORT', payload: { profile: draft } },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(sendResponse).toHaveBeenCalledWith({
       type: 'LINKEDIN_PROFILE_IMPORTED',
       payload: {
         imported: false,
-        errorCode: 'sync_unavailable',
-        errorMessage: expect.stringMatching(/compte|synchronisation/i),
+        errorCode: 'sync_failed',
+        errorMessage: 'IndexedDB indisponible',
       },
     });
   });
