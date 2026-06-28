@@ -114,7 +114,7 @@ apps/extension/src/lib/
 ```
 apps/extension/src/ui/
 ├── atoms/       # Button, Badge, Chip, Toast, Skeleton, ConnectionIndicator
-├── molecules/   # MissionCard, SearchInput, LastScanInfo, TJMGauge, ConnectorStatus
+├── molecules/   # MissionCard, SearchInput, LastScanInfo, ConnectorStatus
 ├── organisms/   # MissionFeed, FilterBar, ProfileSection, ScanSettings, MissionComparison, DangerZone
 ├── templates/   # FeedLayout, SettingsLayout, OnboardingLayout
 └── pages/       # FeedPage, TJMPage, SettingsPage, OnboardingPage
