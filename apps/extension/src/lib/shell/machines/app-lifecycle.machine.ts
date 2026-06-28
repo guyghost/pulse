@@ -1,6 +1,7 @@
 import { assign, fromPromise, setup } from 'xstate';
 import type { UserProfile } from '$lib/core/types/profile';
 import type { Page } from '$lib/state/app-navigation.svelte';
+import { withProfileDefaults } from '$lib/core/profile/normalize-profile';
 
 export interface AppLifecycleDeps {
   loadProfile(): Promise<UserProfile | null>;
@@ -134,6 +135,10 @@ export const appLifecycleMachine = setup({
     completeOnboarding: assign(({ context }) => {
       context.deps.setOnboardingCompleted().catch(() => {});
       return {
+        // ONB-02: seed a minimal valid profile when none exists (e.g. the user
+        // skipped onboarding) so the feed degrades gracefully instead of
+        // scoring against a null profile. A real profile is preserved as-is.
+        profile: context.profile ?? withProfileDefaults({}),
         hasCompletedOnboarding: true,
         transitionDirection: 1 as const,
         previousPageIndex: context.previousPageIndexFor('feed'),

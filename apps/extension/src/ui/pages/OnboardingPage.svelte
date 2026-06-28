@@ -14,6 +14,7 @@
     saveAlertPreferences,
   } from '$lib/shell/facades/alert-preferences.facade';
   import { showToast } from '$lib/shell/notifications/toast-service';
+  import { withProfileDefaults } from '$lib/core/profile/normalize-profile';
 
   const { onComplete, onSkip }: { onComplete?: () => void; onSkip?: () => void } = $props();
 
@@ -34,6 +35,10 @@
   const errorMessage = $derived(profileActor.snapshot.context.error);
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let isSavingAlertPreferences = $state(false);
+  // Incremental profile updates from the wizard (stack add/remove, …). Kept in
+  // a local draft and forwarded to the profile machine so partial data is not
+  // silently dropped between steps (B-1).
+  let profileDraft = $state<UserProfile>(withProfileDefaults({}));
 
   (async () => {
     alertPreferences = await getAlertPreferences();
@@ -52,16 +57,27 @@
     profileActor.send({ type: 'RETRY' });
   }
 
-  async function handleSaveAlertPreferences(preferences: ConnectedAlertPreferences) {
+  // Returns true on success, false on failure so the wizard can stay on the
+  // alert step and let the user retry (ONB-01).
+  async function handleSaveAlertPreferences(preferences: ConnectedAlertPreferences): Promise<boolean> {
     isSavingAlertPreferences = true;
     try {
       alertPreferences = await saveAlertPreferences(preferences);
       await showToast('Première alerte créée', 'success');
+      return true;
     } catch {
       await showToast("Impossible d'enregistrer l'alerte", 'error');
+      return false;
     } finally {
       isSavingAlertPreferences = false;
     }
+  }
+
+  // Propagates incremental wizard edits to the profile machine (the in-page
+  // store) so they are not lost between steps (B-1).
+  function handleUpdateProfile(partial: Partial<UserProfile>) {
+    profileDraft = withProfileDefaults({ ...profileDraft, ...partial });
+    profileActor.send({ type: 'PROFILE_UPDATED', profile: profileDraft });
   }
 
   function submitProfile(profile: UserProfile): Promise<void> {
@@ -93,6 +109,7 @@
   <OnboardingWizard
     onComplete={handleComplete}
     {onSkip}
+    onUpdateProfile={handleUpdateProfile}
     onRetry={handleRetry}
     {isSaving}
     {hasError}
