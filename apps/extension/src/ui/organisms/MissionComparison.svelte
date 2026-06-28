@@ -23,6 +23,17 @@
     severity: 'success' | 'attention' | 'neutral';
   };
 
+  /**
+   * Single source of truth for a mission's score across the comparison
+   * (table cell, ranking and recommendation evidence). Prefers the fused
+   * breakdown.total and only falls back to legacy semantic/score when no
+   * breakdown exists — matching sort-missions.ts so the table can never
+   * diverge from the ranking/recommendation.
+   */
+  function getMissionScore(mission: Mission): number {
+    return mission.scoreBreakdown?.total ?? mission.semanticScore ?? mission.score ?? 0;
+  }
+
   const fields: { label: string; key: string; render: (m: Mission) => string }[] = [
     { label: 'TJM', key: 'tjm', render: (m) => (m.tjm ? `${m.tjm} €/j` : '—') },
     { label: 'Localisation', key: 'location', render: (m) => m.location ?? '—' },
@@ -37,29 +48,24 @@
     {
       label: 'Score',
       key: 'score',
-      render: (m) => {
-        const s = m.semanticScore ?? m.score;
-        return s !== null ? `${s}/100` : '—';
-      },
+      render: (m) => `${getMissionScore(m)}/100`,
     },
     { label: 'Source', key: 'source', render: (m) => m.source },
     { label: 'Client', key: 'client', render: (m) => m.client ?? '—' },
   ];
 
-  function getScore(mission: Mission): number {
-    return mission.scoreBreakdown?.total ?? mission.semanticScore ?? mission.score ?? 0;
-  }
-
   function formatTjm(value: number | null): string {
     return typeof value === 'number' ? `${value} €/j` : 'Non précisé';
   }
 
-  const rankedMissions = $derived([...missions].sort((a, b) => getScore(b) - getScore(a)));
+  const rankedMissions = $derived(
+    [...missions].sort((a, b) => getMissionScore(b) - getMissionScore(a))
+  );
   const recommendedMission = $derived(rankedMissions[0] ?? null);
   const runnerUpMission = $derived(rankedMissions[1] ?? null);
   const scoreGap = $derived(
     recommendedMission && runnerUpMission
-      ? getScore(recommendedMission) - getScore(runnerUpMission)
+      ? getMissionScore(recommendedMission) - getMissionScore(runnerUpMission)
       : 0
   );
   const bestTjmMission = $derived(
@@ -96,9 +102,9 @@
     return [
       {
         label: 'Score',
-        value: `${getScore(recommendedMission)}/100`,
+        value: `${getMissionScore(recommendedMission)}/100`,
         icon: 'target',
-        severity: getScore(recommendedMission) >= 80 ? 'success' : 'attention',
+        severity: getMissionScore(recommendedMission) >= 80 ? 'success' : 'attention',
       },
       {
         label: 'Écart',
