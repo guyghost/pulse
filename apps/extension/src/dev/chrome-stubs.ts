@@ -14,6 +14,7 @@ import { buildScoreBreakdown } from '$lib/core/scoring/final-score';
 import type { CanonicalCandidateProfileDraft } from '$lib/core/profile-extractors/types';
 import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extractors/merge-candidate-profile';
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
+import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
@@ -618,10 +619,34 @@ function createChromeStubs() {
             writeDevTrackings(without);
             return { type: 'TRACKING_RESTORED', payload: null };
           }
-          case 'GENERATE_ASSET':
-            // In dev mode, no AI backend available (neither Gemini Nano nor premium GLM)
-            console.log('[Chrome Stub] GENERATE_ASSET (no AI in dev mode):', message.payload);
-            return { type: 'GENERATION_RESULT', payload: { asset: null } };
+          case 'GENERATE_ASSET': {
+            // Dev mode returns a realistic mock asset so the kit-generation UI
+            // flow is exercisable without a service worker. premium_enabled is
+            // true in dev storage, so the production premium gate is bypassed.
+            const { missionId: genMissionId, generationType: genType } = (message.payload ??
+              {}) as {
+              missionId: string;
+              generationType: GenerationType;
+            };
+            const genNow = Date.now();
+            const devContentByType: Record<GenerationType, string> = {
+              pitch:
+                'Développeur Svelte/TypeScript, 8 ans d’expérience. Disponible immédiatement pour cette mission en hybride à Paris.',
+              'cover-message':
+                'Bonjour, votre mission correspond à mon expertise Svelte et TypeScript. Disponible pour en discuter cette semaine.',
+              'cv-summary':
+                'Lead Frontend Svelte / TypeScript spécialisé en design systems, 8 ans d’expérience, TJM 650-900€.',
+            };
+            const devAsset: GeneratedAsset = {
+              id: `gen-dev-${genType}-${genMissionId}-${genNow}`,
+              missionId: genMissionId,
+              type: genType,
+              content: devContentByType[genType],
+              createdAt: genNow,
+              modelUsed: 'dev-mock',
+            };
+            return { type: 'GENERATION_RESULT', payload: { asset: devAsset } };
+          }
           case 'GET_GENERATED_ASSETS':
             return { type: 'GENERATED_ASSETS_RESULT', payload: [] };
           case 'SHOW_TOAST':

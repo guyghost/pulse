@@ -22,7 +22,7 @@ export interface GeneratedAsset {
   readonly modelUsed: string; // e.g. 'gemini-nano', 'unknown'
 }
 
-export type GenerationErrorCode = 'INSUFFICIENT_CREDITS' | 'GENERATION_FAILED';
+export type GenerationErrorCode = 'INSUFFICIENT_CREDITS' | 'GENERATION_FAILED' | 'PREMIUM_REQUIRED';
 
 export interface GenerationResultPayload {
   readonly asset: GeneratedAsset | null;
