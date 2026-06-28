@@ -30,6 +30,8 @@ const saveTracking = vi.fn();
 const deleteTracking = vi.fn();
 const getAllTrackings = vi.fn();
 const getGeneratedAssetsForMission = vi.fn();
+const saveGeneratedAsset = vi.fn();
+const generateAsset = vi.fn();
 const getAllHealthSnapshots = vi.fn();
 const resetHealthSnapshot = vi.fn();
 const loadTJMHistory = vi.fn();
@@ -234,8 +236,12 @@ vi.mock('../../../src/lib/shell/storage/tracking', () => ({
 }));
 
 vi.mock('../../../src/lib/shell/storage/generated-assets', () => ({
-  saveGeneratedAsset: vi.fn(async () => undefined),
+  saveGeneratedAsset,
   getGeneratedAssetsForMission,
+}));
+
+vi.mock('../../../src/lib/shell/ai/mission-generator', () => ({
+  generateAsset,
 }));
 
 vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
@@ -350,6 +356,8 @@ describe('background auto-scan notifications', () => {
     deleteTracking.mockResolvedValue(undefined);
     getAllTrackings.mockResolvedValue([]);
     getGeneratedAssetsForMission.mockResolvedValue([]);
+    saveGeneratedAsset.mockResolvedValue(undefined);
+    generateAsset.mockResolvedValue(null);
     getAllHealthSnapshots.mockResolvedValue(new Map());
     loadTJMHistory.mockResolvedValue({ records: [] });
     verifyProfilePage.mockResolvedValue({
@@ -486,6 +494,69 @@ describe('background auto-scan notifications', () => {
         errorCode: 'sync_unavailable',
         errorMessage: expect.stringMatching(/compte|synchronisation/i),
       },
+    });
+  });
+
+  it('returns PREMIUM_REQUIRED for GENERATE_ASSET when premium is not enabled', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ premium_enabled: false });
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.(
+      {
+        type: 'GENERATE_ASSET',
+        payload: { missionId: 'mission-1', generationType: 'pitch' },
+      },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(generateAsset).not.toHaveBeenCalled();
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'GENERATION_RESULT',
+      payload: { asset: null, error: 'PREMIUM_REQUIRED' },
+    });
+  });
+
+  it('generates and persists an asset for GENERATE_ASSET when premium is enabled', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ premium_enabled: true });
+    getMissions.mockResolvedValueOnce([makeMission({ id: 'mission-1' })]);
+    getProfile.mockResolvedValueOnce(profile);
+    const fakeAsset = {
+      id: 'gen-pitch-mission-1-1000',
+      missionId: 'mission-1',
+      type: 'pitch' as const,
+      content: 'Generated pitch content.',
+      createdAt: 1000,
+      modelUsed: 'gemini-nano',
+    };
+    generateAsset.mockResolvedValueOnce(fakeAsset);
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.(
+      {
+        type: 'GENERATE_ASSET',
+        payload: { missionId: 'mission-1', generationType: 'pitch' },
+      },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(generateAsset).toHaveBeenCalledWith(
+      'mission-1',
+      'pitch',
+      expect.objectContaining({ id: 'mission-1' }),
+      profile
+    );
+    expect(saveGeneratedAsset).toHaveBeenCalledWith(fakeAsset);
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'GENERATION_RESULT',
+      payload: { asset: fakeAsset },
     });
   });
 

@@ -1060,11 +1060,59 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     // ── Generation handlers ──
 
     if (message.type === 'GENERATE_ASSET') {
-      sendResponse({
-        type: 'GENERATION_RESULT',
-        payload: { asset: null, error: 'GENERATION_UNAVAILABLE' },
-      });
-      return false;
+      const { missionId, generationType } = message.payload;
+
+      // Kit generation is a premium-gated feature. The on-device Gemini Nano
+      // generator (shell/ai/mission-generator) is loaded lazily so the service
+      // worker does not pay the AI module cost until a generation is requested.
+      (async () => {
+        try {
+          const { premium_enabled } = await chrome.storage.local.get('premium_enabled');
+          if (premium_enabled !== true) {
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: { asset: null, error: 'PREMIUM_REQUIRED' },
+            });
+            return;
+          }
+
+          const { generateAsset } = await import('../lib/shell/ai/mission-generator');
+          const { saveGeneratedAsset } = await import('../lib/shell/storage/generated-assets');
+
+          // Reuse the worker's existing mission/profile read paths (same
+          // accessors as GET_FEED_MISSIONS / GET_PROFILE). Only a getAll
+          // mission accessor is available, so filter by id.
+          const [missions, profile] = await Promise.all([getMissions(), getProfile()]);
+          const mission = missions.find((m) => m.id === missionId) ?? null;
+
+          if (!mission || !profile) {
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: { asset: null, error: 'GENERATION_FAILED' },
+            });
+            return;
+          }
+
+          const asset = await generateAsset(missionId, generationType, mission, profile);
+          if (!asset) {
+            sendResponse({
+              type: 'GENERATION_RESULT',
+              payload: { asset: null, error: 'GENERATION_FAILED' },
+            });
+            return;
+          }
+
+          await saveGeneratedAsset(asset);
+          sendResponse({ type: 'GENERATION_RESULT', payload: { asset } });
+        } catch (err) {
+          console.warn('[MissionPulse] GENERATE_ASSET error:', err);
+          sendResponse({
+            type: 'GENERATION_RESULT',
+            payload: { asset: null, error: 'GENERATION_FAILED' },
+          });
+        }
+      })();
+      return true;
     }
 
     if (message.type === 'GET_GENERATED_ASSETS') {

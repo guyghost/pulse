@@ -408,12 +408,13 @@
 
       if (response.type !== 'GENERATION_RESULT' || !response.payload.asset) {
         const error = response.type === 'GENERATION_RESULT' ? response.payload.error : null;
-        await showToast(
-          error === 'INSUFFICIENT_CREDITS'
-            ? 'Crédits insuffisants pour générer ce contenu'
-            : 'Génération indisponible pour cette mission',
-          'error'
-        );
+        if (error === 'PREMIUM_REQUIRED') {
+          await showToast('La génération de kits est réservée à MissionPulse Premium', 'error');
+        } else if (error === 'INSUFFICIENT_CREDITS') {
+          await showToast('Crédits insuffisants pour générer ce contenu', 'error');
+        } else {
+          await showToast('Génération indisponible pour cette mission', 'error');
+        }
         return;
       }
 
