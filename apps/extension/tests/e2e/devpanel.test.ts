@@ -37,7 +37,7 @@ test.describe('DevPanel', () => {
     const injectCount = parseInt(sliderValue, 10);
     expect(injectCount).toBeGreaterThan(0);
 
-    await page.getByRole('button', { name: 'inject' }).click();
+    await page.getByRole('button', { name: 'inject', exact: true }).click();
     await closeDevPanel(page);
 
     // Verify exact count is displayed
