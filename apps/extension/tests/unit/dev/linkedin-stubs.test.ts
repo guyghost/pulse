@@ -52,9 +52,25 @@ describe('dev chrome stub — LinkedIn preview/import/sync', () => {
   });
 
   it('SYNC_LINKEDIN_PROFILE_IMPORT returns a successful import (dev happy path)', async () => {
+    // The SYNC message contract carries the previewed draft (the CvPage only
+    // syncs after a successful preview), so the dev stub merges it into the
+    // stored profile rather than no-op'ing on a null payload.
+    const draft: CanonicalCandidateProfileDraft = {
+      title: 'Lead Frontend Svelte',
+      summary: 'Architecte front-end Svelte et TypeScript.',
+      experiences: [],
+      skills: [{ skill: 'Svelte', source: 'linkedin', confidence: 0.95 }],
+      education: [],
+      links: [],
+      source: 'linkedin',
+      confidence: 0.9,
+      capturedAt: '2026-06-27T00:00:00.000Z',
+      profileUrl: 'https://www.linkedin.com/in/dev-preview',
+    };
+
     const response = (await chrome.runtime.sendMessage({
       type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
-      payload: { profile: null },
+      payload: { profile: draft },
     })) as {
       type: string;
       payload: { imported: boolean; profile?: CanonicalCandidateProfileDraft };
