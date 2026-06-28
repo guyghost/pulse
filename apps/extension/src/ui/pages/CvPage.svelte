@@ -418,14 +418,8 @@
       const result = await syncLinkedInProfileImport(linkedInPreviewResult.profile);
       linkedInImportResult = result;
       if (!result.imported) {
-        if (result.errorCode === 'sync_unavailable') {
-          await showToast(
-            'La synchronisation LinkedIn nécessite un compte connecté. L’aperçu reste disponible pour une mise à jour manuelle.',
-            'info'
-          );
-          return;
-        }
         await showToast(`LinkedIn: ${result.errorMessage}`, 'error');
+        await showToast(getLinkedInRecoveryHint(result.errorCode), 'info');
         return;
       }
 

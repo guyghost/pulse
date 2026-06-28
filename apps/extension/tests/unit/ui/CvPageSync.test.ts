@@ -48,9 +48,8 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => {
             type: 'LINKEDIN_PROFILE_IMPORTED',
             payload: {
               imported: false,
-              errorCode: 'sync_unavailable',
-              errorMessage:
-                'La synchronisation LinkedIn nécessite un compte connecté. L\u2019aperçu reste disponible pour une mise à jour manuelle.',
+              errorCode: 'sync_failed',
+              errorMessage: 'La synchronisation LinkedIn a échoué.',
             },
           };
         case 'OPEN_EXTERNAL_URL':
@@ -66,12 +65,12 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => {
 import CvPage from '../../../src/ui/pages/CvPage.svelte';
 
 /**
- * Regression for CV-01 (1c): when the LinkedIn profile sync is unavailable
- * (no connected account / no sync backend), CvPage must show an informational
- * toast — not an error — so the user understands the preview is still usable
- * for a manual update.
+ * Regression for CV-01: when the LinkedIn profile sync fails (e.g. the profile
+ * store is unavailable), CvPage must surface the service-worker errorMessage
+ * as an error toast plus a recovery hint as an info toast so the user knows
+ * the preview is still usable for a manual update.
  */
-describe('CvPage LinkedIn sync unavailable', () => {
+describe('CvPage LinkedIn sync failure recovery', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
     initToastService();
@@ -97,7 +96,7 @@ describe('CvPage LinkedIn sync unavailable', () => {
     await tick();
   }
 
-  it('shows an info toast (not error) when sync is unavailable', async () => {
+  it('shows an error toast plus a recovery hint when sync fails', async () => {
     const target = await mountAndLoad();
 
     // Trigger the LinkedIn preview so "Enregistrer comme source" appears.
@@ -117,7 +116,12 @@ describe('CvPage LinkedIn sync unavailable', () => {
     await flush();
 
     const toasts = getToastActor()?.toasts ?? [];
-    expect(toasts.filter((t) => t.toastType === 'info').length).toBeGreaterThan(0);
-    expect(toasts.filter((t) => t.toastType === 'error').length).toBe(0);
+    const errorToasts = toasts.filter((t) => t.toastType === 'error');
+    const infoToasts = toasts.filter((t) => t.toastType === 'info');
+    expect(errorToasts.length).toBeGreaterThan(0);
+    expect(
+      errorToasts.some((t) => t.message.includes('La synchronisation LinkedIn a échoué.'))
+    ).toBe(true);
+    expect(infoToasts.length).toBeGreaterThan(0);
   });
 });

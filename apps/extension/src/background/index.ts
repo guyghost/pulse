@@ -75,6 +75,7 @@ import { getGeneratedAssetsForMission } from '../lib/shell/storage/generated-ass
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
+import { mergeCandidateProfileIntoUserProfile } from '../lib/core/profile-extractors/merge-candidate-profile';
 import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
 import { loadTJMHistory } from '../lib/shell/storage/tjm-history';
@@ -831,22 +832,38 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     }
 
     if (message.type === 'SYNC_LINKEDIN_PROFILE_IMPORT') {
-      sendResponse({
-        type: 'LINKEDIN_PROFILE_IMPORTED',
-        payload: {
-          imported: false,
-          errorCode: 'sync_unavailable',
-          errorMessage:
-            'La synchronisation LinkedIn nécessite un compte connecté. L’aperçu reste disponible pour une mise à jour manuelle.',
-        },
-      });
-      return false;
+      (async () => {
+        try {
+          const draft = message.payload.profile;
+          const current = await getProfile();
+          const merged = mergeCandidateProfileIntoUserProfile(current, draft);
+          await saveProfile(merged);
+          chrome.runtime.sendMessage({ type: 'PROFILE_UPDATED', payload: merged }).catch(() => {
+            // Side panel not open, ignore
+          });
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_IMPORTED',
+            payload: { imported: true, profile: draft },
+          });
+        } catch (error) {
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_IMPORTED',
+            payload: {
+              imported: false,
+              errorCode: 'sync_failed',
+              errorMessage:
+                error instanceof Error ? error.message : 'La synchronisation LinkedIn a échoué.',
+            },
+          });
+        }
+      })();
+      return true;
     }
 
     if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
       const startedAt = Date.now();
       previewLinkedInProfile(startedAt, message.payload?.tabId)
-        .then(async (preview) => {
+        .then((preview) => {
           if (!preview.payload.extracted) {
             sendResponse({
               type: 'LINKEDIN_PROFILE_IMPORTED',
@@ -859,22 +876,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
-          const response = await previewLinkedInProfile(startedAt, message.payload?.tabId);
-          if (response.payload.extracted) {
-            sendResponse({
-              type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: { imported: true, profile: response.payload.profile },
-            });
-          } else {
-            sendResponse({
-              type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: {
-                imported: false,
-                errorCode: response.payload.errorCode,
-                errorMessage: response.payload.errorMessage,
-              },
-            });
-          }
+          sendResponse({
+            type: 'LINKEDIN_PROFILE_IMPORTED',
+            payload: { imported: true, profile: preview.payload.profile },
+          });
         })
         .catch((error) => {
           sendResponse({

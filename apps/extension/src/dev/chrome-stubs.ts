@@ -12,6 +12,7 @@ import { createInitialHealthSnapshot, type ConnectorHealthSnapshot } from '$lib/
 import { scoreMission } from '$lib/core/scoring/relevance';
 import { buildScoreBreakdown } from '$lib/core/scoring/final-score';
 import type { CanonicalCandidateProfileDraft } from '$lib/core/profile-extractors/types';
+import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extractors/merge-candidate-profile';
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
 
@@ -384,14 +385,18 @@ function createChromeStubs() {
               type: 'LINKEDIN_PROFILE_IMPORTED',
               payload: { imported: true, profile: mockLinkedInProfile },
             };
-          case 'SYNC_LINKEDIN_PROFILE_IMPORT':
-            // Dev happy path: sync succeeds so the preview → persist flow is
-            // exercisable. Production communicates graceful unavailability
-            // instead (see background/index.ts SYNC handler).
+          case 'SYNC_LINKEDIN_PROFILE_IMPORT': {
+            const draft = (message.payload as { profile: CanonicalCandidateProfileDraft }).profile;
+            const current = readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile);
+            const merged = mergeCandidateProfileIntoUserProfile(current, draft);
+            writeDevStorage(DEV_PROFILE_STORAGE_KEY, merged);
+            storage.profile = merged;
+            emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: merged });
             return {
               type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: { imported: true, profile: mockLinkedInProfile },
+              payload: { imported: true, profile: draft },
             };
+          }
           case 'GET_FEED_MISSIONS':
             return {
               type: 'FEED_MISSIONS_RESULT',
