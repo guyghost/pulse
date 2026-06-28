@@ -12,18 +12,24 @@ import {
 import { createInitialHealthSnapshot, type ConnectorHealthSnapshot } from '$lib/core/types/health';
 import { scoreMission } from '$lib/core/scoring/relevance';
 import { buildScoreBreakdown } from '$lib/core/scoring/final-score';
+import type { CanonicalCandidateProfileDraft } from '$lib/core/profile-extractors/types';
+import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
+import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
 const DEV_SAVED_VIEWS_STORAGE_KEY = '__missionpulse_dev_saved_views';
 const DEV_ALERT_PREFERENCES_STORAGE_KEY = '__missionpulse_dev_alert_preferences';
 const DEV_PROFILE_STORAGE_KEY = '__missionpulse_dev_profile';
-// DEV-only extensions: persist hidden/seen/trackings/health so the QA seed
-// (src/dev/qa-seed.ts) and the DevPanel can exercise every state deterministically.
+// DEV-only extensions: persist hidden/seen/trackings/health + onboarding/first-scan
+// flags so the QA seed (src/dev/qa-seed.ts) and the DevPanel can exercise every
+// state deterministically, and so dev toggles survive reload.
 const DEV_HIDDEN_STORAGE_KEY = '__missionpulse_dev_hidden';
 const DEV_SEEN_STORAGE_KEY = '__missionpulse_dev_seen';
 const DEV_TRACKINGS_STORAGE_KEY = '__missionpulse_dev_trackings';
 const DEV_HEALTH_STORAGE_KEY = '__missionpulse_dev_health';
+const DEV_ONBOARDING_COMPLETED_KEY = '__missionpulse_dev_onboarding_completed';
+const DEV_FIRST_SCAN_DONE_KEY = '__missionpulse_dev_first_scan_done';
 
 type RuntimeMessage = { type: string; payload?: unknown };
 type RuntimeMessageListener = (
@@ -48,6 +54,159 @@ function writeDevStorage(key: string, value: unknown): void {
   } catch {
     // Dev-only persistence should never break the app shell.
   }
+}
+
+/**
+ * Minimal in-memory Storage used only when the host environment has no real
+ * `window.localStorage` (e.g. some vitest jsdom setups). In the real dev
+ * browser this is a no-op — a native localStorage exists and is returned early.
+ * This lets the localStorage-backed dev persistence (trackings, profile,
+ * favorites, …) round-trip correctly in tests instead of silently no-op'ing.
+ */
+function createMemoryStorage(): Storage {
+  const store = new Map<string, string>();
+  return {
+    getItem: (key: string): string | null => (store.has(key) ? (store.get(key) as string) : null),
+    setItem: (key: string, value: string): void => {
+      store.set(key, String(value));
+    },
+    removeItem: (key: string): void => {
+      store.delete(key);
+    },
+    clear: (): void => {
+      store.clear();
+    },
+    key: (index: number): string | null => [...store.keys()][index] ?? null,
+    get length(): number {
+      return store.size;
+    },
+  };
+}
+
+function ensureDevStorage(): void {
+  if (typeof window === 'undefined') {
+    return;
+  }
+  try {
+    if (window.localStorage) {
+      return;
+    }
+  } catch {
+    // Accessing localStorage can throw in some sandboxed environments.
+  }
+  Object.defineProperty(window, 'localStorage', {
+    value: createMemoryStorage(),
+    configurable: true,
+    writable: true,
+  });
+}
+
+/**
+ * Mock canonical LinkedIn profile used by the PREVIEW/IMPORT/SYNC dev stubs so
+ * the CV preview → persist flow is exercisable without a service worker.
+ */
+const mockLinkedInProfile: CanonicalCandidateProfileDraft = {
+  title: 'Lead Frontend Svelte',
+  summary: 'Architecte front-end spécialisée Svelte, TypeScript et design systems.',
+  experiences: [
+    {
+      title: 'Lead Frontend',
+      company: 'Acme Corp',
+      location: 'Paris',
+      startDate: '2022-01',
+      endDate: null,
+      isCurrent: true,
+      description: 'Refonte de la plateforme interne en SvelteKit.',
+      skills: ['Svelte', 'TypeScript'],
+      source: 'linkedin',
+      sourceExternalId: null,
+      positionIndex: 0,
+    },
+  ],
+  skills: [
+    { skill: 'Svelte', source: 'linkedin', confidence: 0.95 },
+    { skill: 'TypeScript', source: 'linkedin', confidence: 0.9 },
+    { skill: 'Tailwind CSS', source: 'linkedin', confidence: 0.85 },
+  ],
+  education: [
+    {
+      school: 'École Polytechnique',
+      degree: "Diplôme d'ingénieur",
+      field: 'Informatique',
+      startDate: '2014',
+      endDate: '2017',
+      description: '',
+      source: 'linkedin',
+      positionIndex: 0,
+    },
+  ],
+  links: [],
+  source: 'linkedin',
+  confidence: 0.92,
+  capturedAt: '2026-06-27T00:00:00.000Z',
+  profileUrl: 'https://www.linkedin.com/in/dev-preview',
+};
+
+/**
+ * Default dev trackings (mirror the previous inline GET_TRACKINGS payload) used
+ * to seed the localStorage-backed store on fresh storage.
+ */
+function defaultDevTrackings(now: number): MissionTracking[] {
+  return [
+    {
+      missionId: 'mock-0',
+      currentStatus: 'selected',
+      history: [
+        { from: null, to: 'detected', timestamp: now - 86_400_000, note: null },
+        { from: 'detected', to: 'selected', timestamp: now - 43_200_000, note: null },
+      ],
+      generatedAssetIds: [],
+      userRating: null,
+      notes: '',
+      nextActionAt: new Date(now - 3_600_000).toISOString(),
+    },
+    {
+      missionId: 'mock-1',
+      currentStatus: 'application_prepared',
+      history: [
+        { from: null, to: 'detected', timestamp: now - 172_800_000, note: null },
+        { from: 'detected', to: 'selected', timestamp: now - 120_000_000, note: null },
+        { from: 'selected', to: 'application_prepared', timestamp: now - 86_400_000, note: null },
+      ],
+      generatedAssetIds: ['asset-dev-1'],
+      userRating: 4,
+      notes: 'Relancer demain matin',
+      nextActionAt: new Date(now + 86_400_000).toISOString(),
+    },
+    {
+      missionId: 'mock-2',
+      currentStatus: 'applied',
+      history: [
+        { from: null, to: 'detected', timestamp: now - 259_200_000, note: null },
+        { from: 'detected', to: 'selected', timestamp: now - 220_000_000, note: null },
+        {
+          from: 'selected',
+          to: 'application_prepared',
+          timestamp: now - 180_000_000,
+          note: null,
+        },
+        { from: 'application_prepared', to: 'applied', timestamp: now - 86_400_000, note: null },
+      ],
+      generatedAssetIds: [],
+      userRating: null,
+      notes: '',
+      nextActionAt: null,
+    },
+  ];
+}
+
+function readDevTrackings(now: number): MissionTracking[] {
+  const stored = readDevStorage<MissionTracking[] | null>(DEV_TRACKINGS_STORAGE_KEY, null);
+  return stored && stored.length > 0 ? stored : defaultDevTrackings(now);
+}
+
+function writeDevTrackings(trackings: MissionTracking[]): void {
+  writeDevStorage(DEV_TRACKINGS_STORAGE_KEY, trackings);
 }
 
 function serializeMissionForBridge(mission: Mission): SerializedMission {
@@ -107,9 +266,9 @@ const storage: Record<string, unknown> = {
   feedSortBy: 'score',
   profile: readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile),
   premium_enabled: true,
-  first_scan_done: true,
+  first_scan_done: readDevStorage<boolean>(DEV_FIRST_SCAN_DONE_KEY, true),
   profile_banner_dismissed: false,
-  onboarding_completed: true,
+  onboarding_completed: readDevStorage<boolean>(DEV_ONBOARDING_COMPLETED_KEY, true),
   feed_tour_seen: false,
   tjm_history: generateMockTJMHistory(),
 };
@@ -216,6 +375,24 @@ function createChromeStubs() {
               },
             };
           }
+          case 'PREVIEW_LINKEDIN_PROFILE':
+            return {
+              type: 'LINKEDIN_PROFILE_PREVIEWED',
+              payload: { extracted: true, profile: mockLinkedInProfile },
+            };
+          case 'IMPORT_LINKEDIN_PROFILE':
+            return {
+              type: 'LINKEDIN_PROFILE_IMPORTED',
+              payload: { imported: true, profile: mockLinkedInProfile },
+            };
+          case 'SYNC_LINKEDIN_PROFILE_IMPORT':
+            // Dev happy path: sync succeeds so the preview → persist flow is
+            // exercisable. Production communicates graceful unavailability
+            // instead (see background/index.ts SYNC handler).
+            return {
+              type: 'LINKEDIN_PROFILE_IMPORTED',
+              payload: { imported: true, profile: mockLinkedInProfile },
+            };
           case 'GET_FEED_MISSIONS':
             return {
               type: 'FEED_MISSIONS_RESULT',
@@ -319,6 +496,10 @@ function createChromeStubs() {
             return { type: 'EXTERNAL_URL_OPENED', payload: { opened: true } };
           case 'GET_FIRST_SCAN_DONE':
             return { type: 'FIRST_SCAN_DONE_RESULT', payload: storage.first_scan_done === true };
+          case 'SET_FIRST_SCAN_DONE':
+            storage.first_scan_done = true;
+            writeDevStorage(DEV_FIRST_SCAN_DONE_KEY, true);
+            return { type: 'FIRST_SCAN_DONE_SET', payload: { saved: true } };
           case 'GET_PROFILE_BANNER_DISMISSED':
             return {
               type: 'PROFILE_BANNER_DISMISSED_RESULT',
@@ -334,9 +515,11 @@ function createChromeStubs() {
             };
           case 'SET_ONBOARDING_COMPLETED':
             storage.onboarding_completed = true;
+            writeDevStorage(DEV_ONBOARDING_COMPLETED_KEY, true);
             return { type: 'ONBOARDING_COMPLETED_SET', payload: { saved: true } };
           case 'CLEAR_ONBOARDING_COMPLETED':
             storage.onboarding_completed = false;
+            writeDevStorage(DEV_ONBOARDING_COMPLETED_KEY, false);
             return { type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: true } };
           case 'GET_FEED_TOUR_SEEN':
             return { type: 'FEED_TOUR_SEEN_RESULT', payload: storage.feed_tour_seen === true };
@@ -387,121 +570,49 @@ function createChromeStubs() {
               );
             });
           case 'GET_TRACKINGS': {
-            const storedTrackings = readDevStorage<MissionTracking[] | null>(
-              DEV_TRACKINGS_STORAGE_KEY,
-              null
-            );
-            if (
-              import.meta.env.DEV &&
-              Array.isArray(storedTrackings) &&
-              storedTrackings.length > 0
-            ) {
-              return { type: 'TRACKINGS_RESULT', payload: storedTrackings };
-            }
-            return {
-              type: 'TRACKINGS_RESULT',
-              payload: [
-                {
-                  missionId: 'mock-0',
-                  currentStatus: 'selected',
-                  history: [
-                    { from: null, to: 'detected', timestamp: Date.now() - 86_400_000, note: null },
-                    {
-                      from: 'detected',
-                      to: 'selected',
-                      timestamp: Date.now() - 43_200_000,
-                      note: null,
-                    },
-                  ],
-                  generatedAssetIds: [],
-                  userRating: null,
-                  notes: '',
-                  nextActionAt: new Date(Date.now() - 3_600_000).toISOString(),
-                },
-                {
-                  missionId: 'mock-1',
-                  currentStatus: 'application_prepared',
-                  history: [
-                    { from: null, to: 'detected', timestamp: Date.now() - 172_800_000, note: null },
-                    {
-                      from: 'detected',
-                      to: 'selected',
-                      timestamp: Date.now() - 120_000_000,
-                      note: null,
-                    },
-                    {
-                      from: 'selected',
-                      to: 'application_prepared',
-                      timestamp: Date.now() - 86_400_000,
-                      note: null,
-                    },
-                  ],
-                  generatedAssetIds: ['asset-dev-1'],
-                  userRating: 4,
-                  notes: 'Relancer demain matin',
-                  nextActionAt: new Date(Date.now() + 86_400_000).toISOString(),
-                },
-                {
-                  missionId: 'mock-2',
-                  currentStatus: 'applied',
-                  history: [
-                    { from: null, to: 'detected', timestamp: Date.now() - 259_200_000, note: null },
-                    {
-                      from: 'detected',
-                      to: 'selected',
-                      timestamp: Date.now() - 220_000_000,
-                      note: null,
-                    },
-                    {
-                      from: 'selected',
-                      to: 'application_prepared',
-                      timestamp: Date.now() - 180_000_000,
-                      note: null,
-                    },
-                    {
-                      from: 'application_prepared',
-                      to: 'applied',
-                      timestamp: Date.now() - 86_400_000,
-                      note: null,
-                    },
-                  ],
-                  generatedAssetIds: [],
-                  userRating: null,
-                  notes: '',
-                  nextActionAt: null,
-                },
-              ],
-            };
+            const now = Date.now();
+            const all = readDevTrackings(now);
+            const p = message.payload as { status?: ApplicationStatus } | undefined;
+            const filtered = p?.status ? all.filter((t) => t.currentStatus === p.status) : all;
+            return { type: 'TRACKINGS_RESULT', payload: filtered };
           }
           case 'UPDATE_TRACKING': {
-            const p = message.payload as Record<string, unknown> | undefined;
-            return {
-              type: 'TRACKING_UPDATED',
-              payload: {
-                missionId: p?.missionId,
-                currentStatus: p?.status,
-                history: [],
-                generatedAssetIds: [],
-                userRating: null,
-                notes: '',
-                nextActionAt: null,
-              },
+            const p = message.payload as {
+              missionId: string;
+              status: ApplicationStatus;
+              note?: string;
             };
+            const now = Date.now();
+            const all = readDevTrackings(now);
+            const existing =
+              all.find((t) => t.missionId === p.missionId) ?? createTracking(p.missionId, now);
+            const updated = transitionStatus(existing, p.status, now, p.note ?? null) ?? existing;
+            const without = all.filter((t) => t.missionId !== p.missionId);
+            writeDevTrackings([...without, updated]);
+            return { type: 'TRACKING_UPDATED', payload: updated };
           }
           case 'UPDATE_TRACKING_DETAILS': {
-            const p = message.payload as Record<string, unknown> | undefined;
-            return {
-              type: 'TRACKING_UPDATED',
-              payload: {
-                missionId: p?.missionId,
-                currentStatus: 'detected',
-                history: [],
-                generatedAssetIds: [],
-                userRating: null,
-                notes: '',
-                nextActionAt: p?.nextActionAt ?? null,
-              },
-            };
+            const p = message.payload as { missionId: string; nextActionAt?: string | null };
+            const now = Date.now();
+            const all = readDevTrackings(now);
+            const existing =
+              all.find((t) => t.missionId === p.missionId) ?? createTracking(p.missionId, now);
+            const updated: MissionTracking = { ...existing, nextActionAt: p.nextActionAt ?? null };
+            const without = all.filter((t) => t.missionId !== p.missionId);
+            writeDevTrackings([...without, updated]);
+            return { type: 'TRACKING_UPDATED', payload: updated };
+          }
+          case 'RESTORE_TRACKING': {
+            const p = message.payload as { missionId: string; tracking: MissionTracking | null };
+            const now = Date.now();
+            const all = readDevTrackings(now);
+            const without = all.filter((t) => t.missionId !== p.missionId);
+            if (p.tracking) {
+              writeDevTrackings([...without, p.tracking]);
+              return { type: 'TRACKING_RESTORED', payload: p.tracking };
+            }
+            writeDevTrackings(without);
+            return { type: 'TRACKING_RESTORED', payload: null };
           }
           case 'GENERATE_ASSET':
             // In dev mode, no AI backend available (neither Gemini Nano nor premium GLM)
@@ -623,6 +734,7 @@ function createChromeStubs() {
 }
 
 export function installChromeStubs(): void {
+  ensureDevStorage();
   if (!globalThis.chrome?.runtime?.id) {
     (globalThis as Record<string, unknown>).chrome = createChromeStubs();
     console.log('[Dev] Chrome API stubs installed');

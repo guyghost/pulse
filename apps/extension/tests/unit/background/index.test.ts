@@ -453,6 +453,42 @@ describe('background auto-scan notifications', () => {
     });
   });
 
+  it('responds with a graceful French sync_unavailable for SYNC_LINKEDIN_PROFILE_IMPORT', () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
+        payload: {
+          profile: {
+            title: 'Lead Frontend',
+            summary: 'Test summary',
+            experiences: [],
+            skills: [],
+            education: [],
+            links: [],
+            source: 'linkedin',
+            confidence: 0.9,
+            capturedAt: '2026-06-27T00:00:00.000Z',
+            profileUrl: 'https://www.linkedin.com/in/test',
+          },
+        },
+      },
+      {},
+      sendResponse
+    );
+
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'LINKEDIN_PROFILE_IMPORTED',
+      payload: {
+        imported: false,
+        errorCode: 'sync_unavailable',
+        errorMessage: expect.stringMatching(/compte|synchronisation/i),
+      },
+    });
+  });
+
   it('routes settings through the service worker shell', async () => {
     expect(messageListener).toBeTypeOf('function');
     const settings = {

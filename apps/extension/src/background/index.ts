@@ -836,7 +836,8 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         payload: {
           imported: false,
           errorCode: 'sync_unavailable',
-          errorMessage: 'Sync not available',
+          errorMessage:
+            'La synchronisation LinkedIn nécessite un compte connecté. L’aperçu reste disponible pour une mise à jour manuelle.',
         },
       });
       return false;
