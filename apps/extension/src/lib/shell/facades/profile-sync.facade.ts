@@ -21,7 +21,9 @@ export async function verifyProfilePage(
     payload: { url, fields },
   });
 
-  if (response.type === 'PROFILE_PAGE_VERIFIED') {
+  // Guard null/unknown responses (e.g. the dev `default` stub path, or a
+  // missing production handler) so we never read `.type` off null.
+  if (response?.type === 'PROFILE_PAGE_VERIFIED') {
     return response.payload;
   }
 
@@ -39,7 +41,7 @@ export async function verifyProfilePage(
 export async function importLinkedInProfile(): Promise<LinkedInProfileImportResult> {
   const response = await sendMessage({ type: 'IMPORT_LINKEDIN_PROFILE' });
 
-  if (response.type !== 'LINKEDIN_PROFILE_IMPORTED') {
+  if (response?.type !== 'LINKEDIN_PROFILE_IMPORTED') {
     return {
       imported: false,
       errorCode: 'unexpected_response',
@@ -53,7 +55,7 @@ export async function importLinkedInProfile(): Promise<LinkedInProfileImportResu
 export async function previewLinkedInProfile(): Promise<LinkedInProfilePreviewResult> {
   const response = await sendMessage({ type: 'PREVIEW_LINKEDIN_PROFILE' });
 
-  if (response.type !== 'LINKEDIN_PROFILE_PREVIEWED') {
+  if (response?.type !== 'LINKEDIN_PROFILE_PREVIEWED') {
     return {
       extracted: false,
       errorCode: 'unexpected_response',
@@ -72,7 +74,7 @@ export async function syncLinkedInProfileImport(
     payload: { profile },
   });
 
-  if (response.type !== 'LINKEDIN_PROFILE_IMPORTED') {
+  if (response?.type !== 'LINKEDIN_PROFILE_IMPORTED') {
     return {
       imported: false,
       errorCode: 'unexpected_response',
