@@ -70,6 +70,7 @@ import {
   getTrackingsByStatus,
 } from '../lib/shell/storage/tracking';
 import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
+import { isTerminalStatus } from '../lib/core/tracking/pipeline-summary';
 import { getGeneratedAssetsForMission } from '../lib/shell/storage/generated-assets';
 import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
@@ -958,8 +959,13 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             return;
           }
 
-          await saveTracking(updated);
-          sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
+          // APP-01: a terminal status (accepted/rejected/archived) ends the
+          // follow-up cycle. Clear any stale nextActionAt so a past date can
+          // never resurrect as an overdue relance later.
+          const persisted = isTerminalStatus(status) ? { ...updated, nextActionAt: null } : updated;
+
+          await saveTracking(persisted);
+          sendResponse({ type: 'TRACKING_UPDATED', payload: persisted });
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING error:', err);
           sendResponse({

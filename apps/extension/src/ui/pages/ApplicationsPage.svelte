@@ -13,7 +13,11 @@
   import { createTrackingStore } from '$lib/state/tracking.svelte';
   import { sendMessage } from '$lib/shell/messaging/bridge';
   import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
-  import { summarizeApplicationPipeline } from '$lib/core/tracking/pipeline-summary';
+  import {
+    summarizeApplicationPipeline,
+    isDueFollowUp,
+    isTerminalStatus,
+  } from '$lib/core/tracking/pipeline-summary';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
   import OperationalStoryCard, {
     type OperationalEvidence,
@@ -104,19 +108,25 @@
 
   const recommendedTrackedMission = $derived.by(() => {
     const now = Date.now();
-    const dueMission = [...trackedMissions]
-      .filter(({ record }) => isTrackingDue(record, now))
+    // Terminal missions (accepted/rejected/archived) are outcomes, not actionable
+    // dossiers — never recommend them, even when a stale nextActionAt survives.
+    const actionable = trackedMissions.filter(
+      ({ record }) => !isTerminalStatus(record.currentStatus)
+    );
+
+    const dueMission = [...actionable]
+      .filter(({ record }) => isDueFollowUp(record, now))
       .sort((a, b) => getNextActionTimestamp(a.record) - getNextActionTimestamp(b.record))[0];
 
     if (dueMission) {
       return dueMission;
     }
 
-    const preparedMission = trackedMissions.find(
+    const preparedMission = actionable.find(
       ({ record }) => record.currentStatus === 'application_prepared'
     );
 
-    return preparedMission ?? trackedMissions[0] ?? null;
+    return preparedMission ?? actionable[0] ?? null;
   });
 
   const applicationStory = $derived.by(() => {
@@ -208,10 +218,6 @@
 
     const timestamp = Date.parse(record.nextActionAt);
     return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
-  }
-
-  function isTrackingDue(record: MissionTracking, now: number): boolean {
-    return getNextActionTimestamp(record) <= now;
   }
 
   function getMissionScore(mission: Mission): number {
@@ -314,7 +320,7 @@
   }
 
   function getRecommendedDossierReason(item: TrackedMission): string {
-    if (isTrackingDue(item.record, Date.now())) {
+    if (isDueFollowUp(item.record, Date.now())) {
       return 'Relance échue: reprenez ce dossier avant de parcourir le reste du pipeline.';
     }
 
@@ -364,7 +370,12 @@
       return;
     }
 
+    const errorBefore = tracking.error;
     await tracking.updateNextActionAt(selectedMission.id, dateTimeLocalToIso(nextActionInput));
+    if (tracking.error && tracking.error !== errorBefore) {
+      await showToast(tracking.error, 'error');
+      return;
+    }
     await showToast('Prochaine action mise à jour', 'success');
   }
 
@@ -374,7 +385,12 @@
     }
 
     nextActionInput = '';
+    const errorBefore = tracking.error;
     await tracking.updateNextActionAt(selectedMission.id, null);
+    if (tracking.error && tracking.error !== errorBefore) {
+      await showToast(tracking.error, 'error');
+      return;
+    }
     await showToast('Prochaine action effacée', 'success');
   }
 

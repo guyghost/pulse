@@ -488,6 +488,72 @@ describe('background auto-scan notifications', () => {
     });
   });
 
+  it('clears nextActionAt when transitioning to a terminal status (APP-01)', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    getTracking.mockResolvedValueOnce(
+      makeTracking({
+        missionId: 'mission-1',
+        currentStatus: 'offer',
+        nextActionAt: '2026-06-18T09:00:00.000Z',
+      })
+    );
+
+    const handled = messageListener?.(
+      { type: 'UPDATE_TRACKING', payload: { missionId: 'mission-1', status: 'accepted' } },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    // The persisted record reaches the terminal status with the stale follow-up cleared.
+    expect(saveTracking).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'mission-1',
+        currentStatus: 'accepted',
+        nextActionAt: null,
+      })
+    );
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'TRACKING_UPDATED',
+      payload: expect.objectContaining({
+        missionId: 'mission-1',
+        currentStatus: 'accepted',
+        nextActionAt: null,
+      }),
+    });
+  });
+
+  it('keeps nextActionAt when transitioning to a non-terminal status (APP-01)', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+
+    getTracking.mockResolvedValueOnce(
+      makeTracking({
+        missionId: 'mission-1',
+        currentStatus: 'application_prepared',
+        nextActionAt: '2026-06-18T09:00:00.000Z',
+      })
+    );
+
+    messageListener?.(
+      { type: 'UPDATE_TRACKING', payload: { missionId: 'mission-1', status: 'applied' } },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(saveTracking).toHaveBeenCalledWith(
+      expect.objectContaining({
+        missionId: 'mission-1',
+        currentStatus: 'applied',
+        nextActionAt: '2026-06-18T09:00:00.000Z',
+      })
+    );
+  });
+
   it('loads on Chrome 114-129 when action user settings events are unavailable', async () => {
     vi.resetModules();
     vi.stubGlobal('chrome', {

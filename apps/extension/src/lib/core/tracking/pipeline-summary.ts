@@ -37,12 +37,34 @@ const ACTIVE_STATUSES = new Set<ApplicationStatus>([
   'offer',
 ]);
 
+/**
+ * Terminal statuses: the mission reached an outcome and no longer requires a
+ * follow-up. A stale `nextActionAt` on a terminal mission must never resurrect
+ * as an overdue relance.
+ */
+const TERMINAL_STATUSES = new Set<ApplicationStatus>(['accepted', 'rejected', 'archived']);
+
+export function isTerminalStatus(status: ApplicationStatus): boolean {
+  return TERMINAL_STATUSES.has(status);
+}
+
 function isDue(nextActionAt: string | null | undefined, now: number): boolean {
   if (!nextActionAt) {
     return false;
   }
   const timestamp = Date.parse(nextActionAt);
   return Number.isFinite(timestamp) && timestamp <= now;
+}
+
+/**
+ * A mission counts as a due follow-up only when it is still active (not yet
+ * accepted/rejected/archived) AND its next action is in the past.
+ *
+ * Single source of truth shared by the pipeline summary and the Applications
+ * page recommended-dossier logic, so the two can never diverge.
+ */
+export function isDueFollowUp(tracking: MissionTracking, now: number): boolean {
+  return ACTIVE_STATUSES.has(tracking.currentStatus) && isDue(tracking.nextActionAt, now);
 }
 
 export function summarizeApplicationPipeline(
@@ -69,7 +91,7 @@ export function summarizeApplicationPipeline(
     if (ACTIVE_STATUSES.has(tracking.currentStatus)) {
       activeCount += 1;
     }
-    if (isDue(tracking.nextActionAt, now)) {
+    if (isDueFollowUp(tracking, now)) {
       dueFollowUps += 1;
     }
   }
