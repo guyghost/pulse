@@ -55,6 +55,7 @@ function waitForSnapshot(
 function createDeps(overrides: Partial<AppLifecycleDeps> = {}): AppLifecycleDeps {
   return {
     loadProfile: vi.fn().mockResolvedValue(null),
+    saveProfile: vi.fn().mockResolvedValue(undefined),
     getFirstScanDone: vi.fn().mockResolvedValue(false),
     getOnboardingCompleted: vi.fn().mockResolvedValue(false),
     setOnboardingCompleted: vi.fn().mockResolvedValue(undefined),
@@ -145,5 +146,48 @@ describe('app lifecycle machine', () => {
 
     actor.send({ type: 'COMPLETE_ONBOARDING' });
     expect(actor.getSnapshot().context.profile).toEqual(profile);
+  });
+
+  // ONB-02 regression: the seeded default profile must be persisted so that
+  // skipping onboarding survives a reload (loadProfile returns it next boot).
+  it('persists the seeded default profile when onboarding completes with none', async () => {
+    const deps = createDeps();
+    const actor = createActor(appLifecycleMachine, {
+      input: { deps, pageIndex },
+    }).start();
+
+    await waitForSnapshot(actor, (s) => s.matches('ready'));
+    expect(actor.getSnapshot().context.profile).toBeNull();
+
+    actor.send({ type: 'COMPLETE_ONBOARDING' });
+
+    expect(deps.saveProfile).toHaveBeenCalledOnce();
+    // Persisted default profile carries every required field.
+    expect(deps.saveProfile).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firstName: expect.any(String),
+        stack: expect.any(Array),
+        tjmMin: expect.any(Number),
+        tjmMax: expect.any(Number),
+        location: expect.any(String),
+        remote: 'any',
+        seniority: 'senior',
+        jobTitle: expect.any(String),
+        searchKeywords: expect.any(Array),
+      })
+    );
+  });
+
+  it('does not persist a profile when onboarding completes with an existing one', async () => {
+    const deps = createDeps({ loadProfile: vi.fn().mockResolvedValue(profile) });
+    const actor = createActor(appLifecycleMachine, {
+      input: { deps, pageIndex },
+    }).start();
+
+    await waitForSnapshot(actor, (s) => s.matches('ready'));
+
+    actor.send({ type: 'COMPLETE_ONBOARDING' });
+
+    expect(deps.saveProfile).not.toHaveBeenCalled();
   });
 });
