@@ -47,7 +47,7 @@
     const diff = Date.now() - persisted.lastSyncAt;
     const minutes = Math.floor(diff / 60000);
     if (minutes < 1) {
-      return 'il y a 0min';
+      return "à l'instant";
     }
     if (minutes < 60) {
       return `il y a ${minutes}min`;

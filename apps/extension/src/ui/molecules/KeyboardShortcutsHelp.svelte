@@ -8,8 +8,10 @@
 
   let { isOpen = $bindable(false) }: { isOpen?: boolean } = $props();
 
-  // Group shortcuts by category
-  const shortcutsByCategory = $derived(() => {
+  // Group shortcuts by category. $derived.by evaluates the function so the
+  // value is the grouped array (reactive to any $state/$derived read inside),
+  // rather than storing the function itself.
+  const shortcutsByCategory = $derived.by(() => {
     const shortcuts = getRegisteredShortcuts();
     const grouped = new Map<string, ShortcutConfig[]>();
 
@@ -90,7 +92,7 @@
 
     <!-- Shortcuts list -->
     <div class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-      {#each shortcutsByCategory() as [category, shortcuts]}
+      {#each shortcutsByCategory as [category, shortcuts]}
         <section>
           <h3 class="mb-2 text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted">
             {category}

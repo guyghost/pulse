@@ -6,7 +6,7 @@
   interface Props {
     backup: BackupData | null;
     error: ValidationError | null;
-    onConfirm: () => void;
+    onConfirm: () => void | Promise<void>;
     onCancel: () => void;
   }
 
@@ -14,14 +14,24 @@
 
   let isRestoring = $state(false);
   let confirmationText = $state('');
+  let restoreError = $state<string | null>(null);
   const canConfirmRestore = $derived(Boolean(backup) && confirmationText === 'RESTAURER');
 
-  function handleConfirm() {
+  // Wrap the confirm flow so isRestoring is always reset (finally), even when
+  // the restore rejects. The modal stays open with an inline error for retry.
+  async function handleConfirm() {
     if (!canConfirmRestore) {
       return;
     }
     isRestoring = true;
-    onConfirm();
+    restoreError = null;
+    try {
+      await onConfirm();
+    } catch (err) {
+      restoreError = err instanceof Error ? err.message : 'Erreur lors de la restauration';
+    } finally {
+      isRestoring = false;
+    }
   }
 
   function formatDate(timestamp: number): string {
@@ -186,6 +196,25 @@
         bind:value={confirmationText}
         autocomplete="off"
       />
+
+      {#if restoreError}
+        <div
+          class="mb-4 rounded-2xl border border-status-red/20 bg-status-red/8 p-3"
+          role="alert"
+          aria-live="assertive"
+        >
+          <p
+            class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-status-red"
+          >
+            <Icon name="alert-circle" size={13} class="shrink-0" />
+            Restauration échouée
+          </p>
+          <p class="mt-1.5 text-xs leading-5 text-text-primary">{restoreError}</p>
+          <p class="mt-1 text-xs leading-5 text-text-subtle">
+            Aucune donnée n’a été écrasée. Vous pouvez réessayer.
+          </p>
+        </div>
+      {/if}
 
       <div class="flex gap-3">
         <Button variant="ghost" onclick={onCancel}>
