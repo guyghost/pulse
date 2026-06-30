@@ -4,12 +4,12 @@ Last verified: 2026-06-30 (monorepo `pnpm build`, `pnpm typecheck`, `pnpm lint`,
 
 ## Architecture overview
 
-| App | Stack | Deploy target | Domain |
-|-----|-------|---------------|--------|
-| `@pulse/landing` | SvelteKit + adapter-vercel | Vercel (microfrontend host) | `missionpulse.app` |
-| `@pulse/dashboard` | SvelteKit + adapter-vercel | Vercel (microfrontend, `/dashboard`) | `missionpulse.app/dashboard` |
-| `@pulse/extension` | Svelte 5 + Vite + CRXJS MV3 | Chrome Web Store (ZIP via GitHub Release) | N/A |
-| `@pulse/ui` | Svelte package | Built as dependency | N/A |
+| App                | Stack                       | Deploy target                             | Domain                       |
+| ------------------ | --------------------------- | ----------------------------------------- | ---------------------------- |
+| `@pulse/landing`   | SvelteKit + adapter-vercel  | Vercel (microfrontend host)               | `missionpulse.app`           |
+| `@pulse/dashboard` | SvelteKit + adapter-vercel  | Vercel (microfrontend, `/dashboard`)      | `missionpulse.app/dashboard` |
+| `@pulse/extension` | Svelte 5 + Vite + CRXJS MV3 | Chrome Web Store (ZIP via GitHub Release) | N/A                          |
+| `@pulse/ui`        | Svelte package              | Built as dependency                       | N/A                          |
 
 Landing and dashboard are wired via `apps/landing/microfrontends.json` (Vercel microfrontends).
 
@@ -19,13 +19,10 @@ Landing and dashboard are wired via `apps/landing/microfrontends.json` (Vercel m
 
 ```bash
 pnpm install --frozen-lockfile
-pnpm format:check
-pnpm lint
-pnpm typecheck    # landing has no typecheck script yet — see gaps below
-pnpm test
-pnpm build
-pnpm --filter @pulse/extension verify-manifest dist/manifest.json
+pnpm deploy:preflight
 ```
+
+`deploy:preflight` runs format, lint, typecheck, test, build, manifest verify, env documentation checks, and dev-artifact scan.
 
 CI (`.github/workflows/ci.yml`) runs lint, format, typecheck, test, build, manifest verify, and E2E on PRs.
 
@@ -37,32 +34,32 @@ Extension releases (`.github/workflows/release.yml`) tag `v*.*.*`, bump version,
 
 ### Landing (`apps/landing/.env.example`)
 
-| Variable | Scope | Required | Purpose |
-|----------|-------|----------|---------|
-| `PUBLIC_SUPABASE_URL` | public | yes | Supabase project URL |
-| `PUBLIC_SUPABASE_ANON_KEY` | public | yes | Supabase anon key (client-safe) |
-| `PUBLIC_CHROME_STORE_URL` | public | recommended | Install CTA link |
-| `PUBLIC_LANDING_URL` | public | recommended | Canonical site URL (redirects, OG) |
-| `SUPABASE_SERVICE_ROLE_KEY` | private | yes (server) | Admin client (webhooks, credits) |
-| `GLM_API_KEY` | private | for `/api/generate` | Zhipu GLM API |
-| `GLM_MODEL` | private | optional | Default `glm-4-flash` |
-| `LEMON_SQUEEZY_API_KEY` | private | for checkout | Lemon Squeezy API |
-| `LEMON_SQUEEZY_STORE_ID` | private | for checkout | Store ID |
-| `LEMON_SQUEEZY_WEBHOOK_SECRET` | private | for webhooks | HMAC verification |
-| `LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID` | private | for checkout | Credit pack variant |
-| `LEMON_SQUEEZY_CREDITS_PRO_VARIANT_ID` | private | for checkout | Credit pack variant |
-| `LEMON_SQUEEZY_CREDITS_POWER_VARIANT_ID` | private | for checkout | Credit pack variant |
-| `MISSIONPULSE_PERF_CACHE_HTML` | private | optional | Set `1` to cache HTML 5 min |
+| Variable                                   | Scope   | Required            | Purpose                            |
+| ------------------------------------------ | ------- | ------------------- | ---------------------------------- |
+| `PUBLIC_SUPABASE_URL`                      | public  | yes                 | Supabase project URL               |
+| `PUBLIC_SUPABASE_ANON_KEY`                 | public  | yes                 | Supabase anon key (client-safe)    |
+| `PUBLIC_CHROME_STORE_URL`                  | public  | recommended         | Install CTA link                   |
+| `PUBLIC_LANDING_URL`                       | public  | recommended         | Canonical site URL (redirects, OG) |
+| `SUPABASE_SERVICE_ROLE_KEY`                | private | yes (server)        | Admin client (webhooks, credits)   |
+| `GLM_API_KEY`                              | private | for `/api/generate` | Zhipu GLM API                      |
+| `GLM_MODEL`                                | private | optional            | Default `glm-4-flash`              |
+| `LEMON_SQUEEZY_API_KEY`                    | private | for checkout        | Lemon Squeezy API                  |
+| `LEMON_SQUEEZY_STORE_ID`                   | private | for checkout        | Store ID                           |
+| `LEMON_SQUEEZY_WEBHOOK_SECRET`             | private | for webhooks        | HMAC verification                  |
+| `LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID` | private | for checkout        | Credit pack variant                |
+| `LEMON_SQUEEZY_CREDITS_PRO_VARIANT_ID`     | private | for checkout        | Credit pack variant                |
+| `LEMON_SQUEEZY_CREDITS_POWER_VARIANT_ID`   | private | for checkout        | Credit pack variant                |
+| `MISSIONPULSE_PERF_CACHE_HTML`             | private | optional            | Set `1` to cache HTML 5 min        |
 
 ### Dashboard (`apps/dashboard/.env.example`)
 
-| Variable | Scope | Required | Purpose |
-|----------|-------|----------|---------|
-| `PUBLIC_SUPABASE_URL` | public | yes | Same Supabase project as landing |
-| `PUBLIC_SUPABASE_ANON_KEY` | public | yes | Anon key |
-| `PUBLIC_LANDING_URL` | public | yes | Auth redirects, login links |
-| `PUBLIC_CHROME_STORE_URL` | public | recommended | Extension install link |
-| `PUBLIC_DASHBOARD_BASE_PATH` | build-time | optional | Default `/dashboard` |
+| Variable                     | Scope      | Required    | Purpose                          |
+| ---------------------------- | ---------- | ----------- | -------------------------------- |
+| `PUBLIC_SUPABASE_URL`        | public     | yes         | Same Supabase project as landing |
+| `PUBLIC_SUPABASE_ANON_KEY`   | public     | yes         | Anon key                         |
+| `PUBLIC_LANDING_URL`         | public     | yes         | Auth redirects, login links      |
+| `PUBLIC_CHROME_STORE_URL`    | public     | recommended | Extension install link           |
+| `PUBLIC_DASHBOARD_BASE_PATH` | build-time | optional    | Default `/dashboard`             |
 
 ### Extension
 
@@ -114,7 +111,16 @@ OAuth callback: `apps/landing/src/routes/api/auth/callback/+server.ts` → redir
 
 1. Production Supabase project with Auth (email, passkey if enabled).
 2. Redirect URLs: `https://missionpulse.app/api/auth/callback`, local dev URLs for preview.
-3. Run migrations from `apps/landing/supabase/` if applicable.
+3. Apply migrations:
+
+```bash
+# One-time: link CLI to production project
+supabase link --project-ref <your-project-ref> --workdir apps/landing
+
+# Push all migrations in apps/landing/supabase/migrations/
+supabase db push --workdir apps/landing
+```
+
 4. Store `SUPABASE_SERVICE_ROLE_KEY` only in Vercel server env (never `PUBLIC_*`).
 
 ### Lemon Squeezy
@@ -164,10 +170,10 @@ Verified: production `dist/` contains no `bootstrapDevMode`, `DevPanel`, `chrome
 
 ## DNS & domains
 
-| Record | Target |
-|--------|--------|
-| `missionpulse.app` | Vercel landing project |
-| `www` | Redirect to apex (recommended) |
+| Record             | Target                         |
+| ------------------ | ------------------------------ |
+| `missionpulse.app` | Vercel landing project         |
+| `www`              | Redirect to apex (recommended) |
 
 Preview deployments use `*.vercel.app`; add Supabase redirect URLs per preview if testing auth.
 
@@ -187,15 +193,15 @@ Preview deployments use `*.vercel.app`; add Supabase redirect URLs per preview i
 
 ## Known gaps (non-blocking for build)
 
-| Priority | Item |
-|----------|------|
-| High | Commit or fix WIP changes; 4 extension tests + format:check fail on uncommitted FeedPage/App files |
-| High | Configure Vercel env vars and Supabase production project |
-| Medium | `@pulse/landing` has no `typecheck` / `lint` scripts (skipped in turbo) |
-| Medium | Hardcoded Supabase URL in extension manifest — consider build-time injection |
-| Low | CSP not configured (rely on Vercel headers + SvelteKit defaults) |
-| Low | `reports/performance/` artifacts untracked — exclude from deploy/commits |
-| Low | Dashboard `MISSIONPULSE_PERF_CACHE_HTML` not in `.env.example` |
+| Priority | Item                                                                                         | Owner |
+| -------- | -------------------------------------------------------------------------------------------- | ----- |
+| High     | Configure Vercel env vars (see tables above)                                                 | Ops   |
+| High     | Supabase production project + migrations (`apps/landing/supabase/migrations/`)               | Ops   |
+| High     | Supabase Auth redirect URLs: `https://missionpulse.app/api/auth/callback`                    | Ops   |
+| High     | Lemon Squeezy webhook: `https://missionpulse.app/api/webhooks/lemon`                         | Ops   |
+| High     | Chrome Web Store GitHub secrets for release workflow                                         | Ops   |
+| Medium   | Hardcoded Supabase URL in extension manifest — changing project requires code + CWS resubmit | Dev   |
+| Low      | CSP not configured (rely on Vercel headers + SvelteKit defaults)                             | Dev   |
 
 ---
 
