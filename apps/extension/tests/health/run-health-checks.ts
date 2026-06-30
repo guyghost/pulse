@@ -68,12 +68,14 @@ function checkRegressionFixtures(entry: (typeof CONNECTOR_HEALTH_REGISTRY)[numbe
     };
   }
 
-  const htmlFixtures = readdirSync(fixtureDir).filter((file) => file.endsWith('.html'));
+  const htmlFixtures = readdirSync(fixtureDir).filter(
+    (file) => file.endsWith('.html') || file.endsWith('.json')
+  );
   if (htmlFixtures.length === 0) {
     return {
       name: 'regression-fixtures',
       status: 'fail' as const,
-      detail: 'No HTML fixtures found',
+      detail: 'No regression fixtures found',
     };
   }
 

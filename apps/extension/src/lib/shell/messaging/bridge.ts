@@ -198,6 +198,12 @@ export type BridgeMessage =
   | {
       type: 'DIAGNOSTIC_EXPORT_RESULT';
       payload: import('../../core/diagnostics/diagnostic-report').DiagnosticReport;
+    }
+  // Parser health (mission count anomalies)
+  | { type: 'GET_PARSER_HEALTH' }
+  | {
+      type: 'PARSER_HEALTH_RESULT';
+      payload: import('../../core/connectors/parser-health-logic').ConnectorHealthRecord[];
     };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {

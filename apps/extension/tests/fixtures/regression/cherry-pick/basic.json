@@ -1,0 +1,28 @@
+[
+  {
+    "id": 1234,
+    "name": "Dev React Senior",
+    "slug": "dev-react-senior-1234",
+    "minimum_rate": 500,
+    "maximum_rate": 700,
+    "duration": "6 mois",
+    "city": "Paris",
+    "displacement": "partially_remote_3",
+    "company": { "name": "Acme Corp" },
+    "skills": [{ "name": "React" }, { "name": "TypeScript" }],
+    "description": "Mission React pour projet e-commerce"
+  },
+  {
+    "id": 5678,
+    "name": "Lead Java Spring",
+    "slug": "lead-java-spring-5678",
+    "minimum_rate": null,
+    "maximum_rate": 650,
+    "duration": "3 mois",
+    "city": "Lyon",
+    "displacement": "remote",
+    "company": { "name": "Tech SA" },
+    "skills": [{ "name": "Java" }, { "name": "Spring" }],
+    "description": null
+  }
+]

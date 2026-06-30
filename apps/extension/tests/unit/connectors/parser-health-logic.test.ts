@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import {
   evaluateParserHealth,
   buildParserWarning,
+  deriveParserHealthAlert,
   BROKEN_PARSER_THRESHOLD,
   type ConnectorHealthRecord,
 } from '../../../src/lib/core/connectors/parser-health-logic';
@@ -207,6 +208,32 @@ describe('parser-health-logic (Core)', () => {
       expect(buildParserWarning('hiway', 42)).toBe(
         'Parser anomaly: hiway returned 0 missions after previously returning 42'
       );
+    });
+  });
+
+  describe('deriveParserHealthAlert', () => {
+    it('returns incident when consecutive zeros reach threshold', () => {
+      const alert = deriveParserHealthAlert(
+        makeRecord({ consecutiveZeros: BROKEN_PARSER_THRESHOLD, lastMissionCount: 0 })
+      );
+      expect(alert?.severity).toBe('incident');
+      expect(alert?.statusLabel).toBe('Parser probablement cassé');
+    });
+
+    it('returns attention when last scan empty after prior success', () => {
+      const alert = deriveParserHealthAlert(
+        makeRecord({ lastMissionCount: 0, lastSuccessAt: EARLIER, consecutiveZeros: 1 })
+      );
+      expect(alert?.severity).toBe('attention');
+      expect(alert?.statusLabel).toBe('Signal parser anormal');
+    });
+
+    it('returns null for healthy record', () => {
+      expect(
+        deriveParserHealthAlert(
+          makeRecord({ lastMissionCount: 4, consecutiveZeros: 0, lastSuccessAt: NOW })
+        )
+      ).toBeNull();
     });
   });
 

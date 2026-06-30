@@ -73,7 +73,15 @@ export function runParserRegression(
   parser: (html: string, now: Date) => Mission[],
   now: Date
 ): ParserRegressionResult {
-  const missions = parser(html, now).map(normalizeMissionForRegression);
+  return runParserRegressionGeneric(html, parser, now);
+}
+
+export function runParserRegressionGeneric<T>(
+  input: T,
+  parser: (input: T, now: Date) => Mission[],
+  now: Date
+): ParserRegressionResult {
+  const missions = parser(input, now).map(normalizeMissionForRegression);
   const validationErrors = validateRegressionMissions(missions);
   return { missions, validationErrors };
 }

@@ -1,0 +1,18 @@
+[
+  {
+    "id": "col-cmmq3g2742fdd3ujib0q31f8f",
+    "title": "PMO d'un chantier d'intégration IT",
+    "client": "Acme Corp",
+    "stack": ["DOCKER", "DEVOPS", "AWS"],
+    "tjm": 400,
+    "location": "Paris, France",
+    "remote": "hybrid",
+    "duration": null,
+    "url": "https://www.collective.work/job/pmo-dun-chantier-dintegration-it-6xd7",
+    "source": "collective",
+    "scrapedAt": "2026-03-14T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  }
+]

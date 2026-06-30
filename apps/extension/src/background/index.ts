@@ -50,6 +50,7 @@ import {
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 import { getAllHealthSnapshots, resetHealthSnapshot } from '../lib/shell/storage/connector-health';
 import { collectDiagnosticExport } from '../lib/shell/diagnostics/collect-diagnostic-export';
+import { getAllParserHealth } from '../lib/shell/scan/parser-health';
 import {
   clearFeedTourSeen,
   clearOnboardingCompleted,
@@ -962,6 +963,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               environment: {},
             },
           });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_PARSER_HEALTH') {
+      getAllParserHealth()
+        .then((records) => {
+          sendResponse({ type: 'PARSER_HEALTH_RESULT', payload: records });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_PARSER_HEALTH error:', err);
+          sendResponse({ type: 'PARSER_HEALTH_RESULT', payload: [] });
         });
       return true;
     }

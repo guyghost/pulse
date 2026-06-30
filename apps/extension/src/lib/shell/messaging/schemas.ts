@@ -878,6 +878,20 @@ export const MessageSchemas = {
       }),
     }),
   }),
+
+  // Parser health
+  GET_PARSER_HEALTH: z.object({ type: z.literal('GET_PARSER_HEALTH') }),
+  PARSER_HEALTH_RESULT: z.object({
+    type: z.literal('PARSER_HEALTH_RESULT'),
+    payload: z.array(
+      z.object({
+        connectorId: z.string(),
+        lastMissionCount: z.number(),
+        lastSuccessAt: z.number().nullable(),
+        consecutiveZeros: z.number(),
+      })
+    ),
+  }),
 } as const;
 
 export type MessageType = keyof typeof MessageSchemas;

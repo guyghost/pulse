@@ -949,6 +949,7 @@
               activeSourceFilter={page.selectedSource}
               enabledConnectors={controller.enabledConnectorIds}
               healthSnapshots={controller.healthSnapshots}
+              parserHealthRecords={controller.parserHealthRecords}
               onRefresh={() => controller.checkSourceSessions()}
               onFilterBySource={(id) => {
                 page.setSelectedSource(id as MissionSource | null);
@@ -1101,6 +1102,7 @@
                 activeSourceFilter={page.selectedSource}
                 enabledConnectors={controller.enabledConnectorIds}
                 healthSnapshots={controller.healthSnapshots}
+                parserHealthRecords={controller.parserHealthRecords}
                 onRefresh={() => controller.checkSourceSessions()}
                 onFilterBySource={(id) => {
                   page.setSelectedSource(id as MissionSource | null);

@@ -43,4 +43,4 @@ Implémenté le 2026-06-30 :
 | `.github/workflows/connector-health.yml` | ✅ cron quotidien          |
 | Export diagnostic Settings               | ✅ `GET_DIAGNOSTIC_EXPORT` |
 
-Prochaines itérations : golden regression pour free-work, hiway, collective, cherry-pick.
+Prochaines itérations : ~~golden regression pour free-work, hiway, collective, cherry-pick~~ ✅ (7 fixtures, 5 connecteurs).
