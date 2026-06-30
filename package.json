@@ -23,6 +23,8 @@
     "dev:env": "node scripts/write-local-supabase-env.mjs",
     "build": "turbo build",
     "test": "turbo test",
+    "test:e2e": "pnpm --filter @pulse/extension test:e2e",
+    "test:e2e:full": "pnpm --filter @pulse/extension test:e2e:full",
     "test:watch": "turbo test:watch",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",

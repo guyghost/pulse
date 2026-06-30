@@ -1,7 +1,7 @@
-import { test, expect, type Page } from '@playwright/test';
+import { test, expect } from '../fixtures';
+import type { Page } from '@playwright/test';
 import {
   captureMemoryMetrics,
-  ensureFeedVisible,
   expectMissionCount,
   favoritesToggle,
   favoriteMission,
@@ -156,10 +156,8 @@ async function mockMultiBatchPartialScan(page: Page) {
   });
 }
 
-test.describe('Performance - Virtual List', () => {
+test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
   test('renders large dataset efficiently', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Mesurer le temps de rendu
     const startTime = Date.now();
     await injectMissions(page, 500);
@@ -177,8 +175,6 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('only renders visible items in DOM', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter 500 missions
     await injectMissions(page, 500);
 
@@ -200,8 +196,6 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('handles rapid scrolling efficiently', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter 300 missions
     await injectMissions(page, 300);
 
@@ -236,8 +230,6 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('no memory leaks with large dataset', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Mesurer mémoire de départ
     const initialMemory = await captureMemoryMetrics(page);
 
@@ -283,8 +275,6 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('smooth scroll performance with 500 items', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter 500 missions
     await injectMissions(page, 500);
 
@@ -323,8 +313,6 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('search performance with large dataset', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter 300 missions
     await injectMissions(page, 300);
 
@@ -354,8 +342,6 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('filter toggle performance with large dataset', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter 200 missions
     await injectMissions(page, 200);
 
@@ -386,7 +372,6 @@ test.describe('Performance - Virtual List', () => {
 
   test('keeps feed stable while multiple partial scan batches arrive', async ({ page }) => {
     await mockMultiBatchPartialScan(page);
-    await ensureFeedVisible(page);
     await injectMissions(page, 120);
     await expectMissionCount(page, 120, 5000);
 
@@ -403,8 +388,6 @@ test.describe('Performance - Virtual List', () => {
   });
 
   test('maintains scroll position when filtering', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter 200 missions
     await injectMissions(page, 200);
 

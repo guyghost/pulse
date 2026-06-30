@@ -37,9 +37,9 @@ Runs on every push to `main` and on all pull requests.
 │                                                              │
 │  setup ──► lint ──┐                                         │
 │           │        │                                         │
-│           └──► format ─┼──► test ──► build ──► test-e2e     │
-│           │              │                                   │
-│           └──► typecheck ┘                                   │
+│           └──► format ─┼──► test ──┬──► build                    │
+│           │              │         └──► test-e2e (PRs only)      │
+│           └──► typecheck ┘                                       │
 │                                                              │
 └─────────────────────────────────────────────────────────────┘
 ```
@@ -60,6 +60,9 @@ Runs on every push to `main` and on all pull requests.
 - Coverage upload to Codecov
 - Concurrency groups to cancel old runs
 - E2E tests only on PRs (cost optimization)
+- E2E runs in parallel with `build` (no extension artifact required)
+- E2E bootstraps `@pulse/ui` via `pnpm --filter @pulse/extension test:e2e`
+- CI excludes `@slow` tests (performance, offline); run `pnpm test:e2e:full` locally for the full suite
 
 ### 2. Release Workflow (`release.yml`)
 

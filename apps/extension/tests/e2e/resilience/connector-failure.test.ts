@@ -1,6 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import {
-  ensureFeedVisible,
   expectMissionCount,
   injectMissions,
   missionCards,
@@ -12,8 +11,6 @@ import { generateBalancedDataset } from '../../fixtures/large-dataset';
 
 test.describe('Connector Resilience', () => {
   test('handles connector HTTP 500 error gracefully', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Simuler une erreur 500 via le dev panel
     await setFeedState(page, 'error');
 
@@ -22,8 +19,6 @@ test.describe('Connector Resilience', () => {
   });
 
   test('continues scanning when one connector fails', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter des missions normalement
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
@@ -86,8 +81,6 @@ test.describe('Connector Resilience', () => {
       });
     });
 
-    await ensureFeedVisible(page);
-
     // Attendre un peu pour voir si une erreur s'affiche
     await page.waitForTimeout(2000);
 
@@ -145,8 +138,6 @@ test.describe('Connector Resilience', () => {
         },
       });
     });
-
-    await ensureFeedVisible(page);
 
     // Attendre l'erreur
     await page.waitForTimeout(1500);
@@ -220,8 +211,6 @@ test.describe('Connector Resilience', () => {
       });
     }, missions);
 
-    await ensureFeedVisible(page);
-
     // Attendre que les missions apparaissent
     await waitForMissions(page, 1, 10000);
 
@@ -269,8 +258,6 @@ test.describe('Connector Resilience', () => {
         },
       });
     });
-
-    await ensureFeedVisible(page);
 
     // Attendre le timeout
     await page.waitForTimeout(500);
@@ -356,8 +343,6 @@ test.describe('Connector Resilience', () => {
         },
       });
     }, shouldFail);
-
-    await ensureFeedVisible(page);
 
     // Attendre l'erreur
     await page.waitForTimeout(500);

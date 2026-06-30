@@ -1,5 +1,6 @@
-import { test, expect, type Page } from '@playwright/test';
-import { ensureFeedVisible, injectMissions, toggleOffline } from './helpers';
+import { test, expect } from './fixtures';
+import type { Page } from '@playwright/test';
+import { injectMissions, toggleOffline } from './helpers';
 
 async function seedTJMHistory(page: Page) {
   await page.evaluate(async () => {
@@ -62,15 +63,12 @@ async function seedTJMHistory(page: Page) {
 
 test.describe('TJM page', () => {
   test('shows TJM tab in main navigation', async ({ page }) => {
-    await ensureFeedVisible(page);
     await expect(
       page.getByRole('navigation', { name: 'Main navigation' }).getByRole('button', { name: 'TJM' })
     ).toBeVisible();
   });
 
   test('shows an empty state when no TJM history exists', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await page.evaluate(async () => {
       await chrome.storage.local.remove('tjm_history');
     });
@@ -85,7 +83,6 @@ test.describe('TJM page', () => {
   });
 
   test('renders dashboard data when TJM history is available', async ({ page }) => {
-    await ensureFeedVisible(page);
     await seedTJMHistory(page);
 
     await page
@@ -94,14 +91,14 @@ test.describe('TJM page', () => {
       .click();
 
     await expect(page.getByRole('heading', { name: 'Analyse TJM' })).toBeVisible();
-    await expect(page.getByText("Vue d'ensemble")).toBeVisible();
-    await expect(page.getByText('Junior', { exact: true })).toBeVisible();
-    await expect(page.getByText('Confirmé', { exact: true })).toBeVisible();
-    await expect(page.getByText('Senior', { exact: true })).toBeVisible();
+    const tjmPage = page.getByTestId('page-tjm');
+    await expect(tjmPage.getByText("Vue d'ensemble")).toBeVisible();
+    await expect(tjmPage.getByText('Junior', { exact: true })).toBeVisible();
+    await expect(tjmPage.getByText('Confirmé', { exact: true })).toBeVisible();
+    await expect(tjmPage.getByText('Senior', { exact: true })).toBeVisible();
   });
 
   test('shows cached TJM data while offline', async ({ page }) => {
-    await ensureFeedVisible(page);
     await injectMissions(page, 3);
     await seedTJMHistory(page);
 
@@ -113,8 +110,9 @@ test.describe('TJM page', () => {
       .getByRole('button', { name: 'TJM' })
       .click();
 
-    await expect(page.getByText('Mode hors ligne', { exact: true })).toBeVisible();
-    await expect(page.getByText("Vue d'ensemble")).toBeVisible();
+    const tjmPage = page.getByTestId('page-tjm');
+    await expect(tjmPage.getByText('Mode hors ligne', { exact: true })).toBeVisible();
+    await expect(tjmPage.getByText("Vue d'ensemble")).toBeVisible();
 
     await toggleOffline(page, false);
   });

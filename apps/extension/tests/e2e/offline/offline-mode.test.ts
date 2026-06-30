@@ -1,7 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import {
   allMissionsToggle,
-  ensureFeedVisible,
   expectMissionCount,
   favoriteButton,
   favoritesToggle,
@@ -18,14 +17,12 @@ import {
   triggerScan,
 } from '../helpers';
 
-test.describe('Offline Mode', () => {
+test.describe('Offline Mode', { tag: '@slow' }, () => {
   test.afterEach(async ({ page }) => {
     await toggleOffline(page, false);
   });
 
   test('shows offline indicator when connection is lost', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
 
@@ -39,8 +36,6 @@ test.describe('Offline Mode', () => {
   });
 
   test('missions remain visible when going offline', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 8);
     await page.waitForTimeout(700);
 
@@ -62,8 +57,6 @@ test.describe('Offline Mode', () => {
   });
 
   test('scan is disabled when offline', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
@@ -81,8 +74,6 @@ test.describe('Offline Mode', () => {
   });
 
   test('restores connection and allows scan again', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await toggleOffline(page, true);
     await page.waitForTimeout(300);
 
@@ -100,8 +91,6 @@ test.describe('Offline Mode', () => {
   });
 
   test('favorite actions work while offline', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 5);
     await page.waitForTimeout(700);
 
@@ -119,8 +108,6 @@ test.describe('Offline Mode', () => {
   });
 
   test('hide action works while offline', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
 
@@ -136,8 +123,6 @@ test.describe('Offline Mode', () => {
   });
 
   test('search works with cached missions while offline', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 10);
     await waitForMissions(page, 10, 5000);
 
@@ -161,8 +146,6 @@ test.describe('Offline Mode', () => {
   });
 
   test('navigation between tabs works offline', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 3);
     await waitForMissions(page, 3, 5000);
 
@@ -202,8 +185,6 @@ test.describe('Offline Mode', () => {
   });
 
   test('page reload while offline shows cached data', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
 
