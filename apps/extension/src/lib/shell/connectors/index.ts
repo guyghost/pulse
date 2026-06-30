@@ -1,6 +1,8 @@
 import type { PlatformConnector } from './platform-connector';
 import type { Result, AppError } from '$lib/core/errors';
+import type { ConnectorId } from './meta';
 import { handleError, isRetryable } from '../errors/error-handler';
+export { getConnectorsMeta, type ConnectorMeta, type ConnectorId } from './meta';
 
 // Static imports — dynamic import() injects Vite's __vitePreload polyfill
 // which uses `document` APIs and crashes in Chrome extension service workers.
@@ -18,64 +20,13 @@ const CONNECTOR_REGISTRY = {
   hiway: () => Promise.resolve(new HiwayConnector()),
   collective: () => Promise.resolve(new CollectiveConnector()),
   'cherry-pick': () => Promise.resolve(new CherryPickConnector()),
-} as const;
-
-export type ConnectorId = keyof typeof CONNECTOR_REGISTRY;
-
-// Static connector metadata for UI display (without loading full connector code)
-export interface ConnectorMeta {
-  id: ConnectorId;
-  name: string;
-  icon: string;
-  url: string;
-}
+} satisfies Record<ConnectorId, () => Promise<PlatformConnector>>;
 
 /**
  * Get list of all available connector IDs
  */
 export function getConnectorIds(): ConnectorId[] {
   return Object.keys(CONNECTOR_REGISTRY) as ConnectorId[];
-}
-
-/**
- * Get static metadata for all connectors (lightweight, no dynamic import)
- * Used for UI display without loading connector code
- */
-export function getConnectorsMeta(): ConnectorMeta[] {
-  // Static metadata to avoid loading connector code
-  // This should be kept in sync with actual connector implementations
-  return [
-    {
-      id: 'free-work',
-      name: 'Free-Work',
-      icon: 'https://www.google.com/s2/favicons?domain=free-work.com&sz=32',
-      url: 'https://www.free-work.com',
-    },
-    {
-      id: 'lehibou',
-      name: 'LeHibou',
-      icon: 'https://www.google.com/s2/favicons?domain=lehibou.com&sz=32',
-      url: 'https://www.lehibou.com',
-    },
-    {
-      id: 'hiway',
-      name: 'Hiway',
-      icon: 'https://www.google.com/s2/favicons?domain=hiway-missions.fr&sz=32',
-      url: 'https://hiway-missions.fr',
-    },
-    {
-      id: 'collective',
-      name: 'Collective',
-      icon: 'https://www.google.com/s2/favicons?domain=collective.work&sz=32',
-      url: 'https://app.collective.work/',
-    },
-    {
-      id: 'cherry-pick',
-      name: 'Cherry Pick',
-      icon: 'https://www.google.com/s2/favicons?domain=cherry-pick.io&sz=32',
-      url: 'https://www.cherry-pick.io',
-    },
-  ];
 }
 
 /**

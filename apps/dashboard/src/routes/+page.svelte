@@ -612,6 +612,103 @@
   <meta name="robots" content="noindex, nofollow" />
 </svelte:head>
 
+{#if configurationMissing && !isConnected}
+  <main class="min-h-screen bg-page-canvas">
+    <section class="mx-auto max-w-4xl px-4 py-8 md:px-8">
+      <div class="flex items-center justify-between gap-3 border-b border-border-light pb-4">
+        <a href="/" class="flex h-11 items-center gap-3" aria-label="MissionPulse Dashboard">
+          <span
+            class="flex h-9 w-9 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-primary"
+          >
+            <svg viewBox="0 0 128 128" class="h-6 w-6" aria-hidden="true">
+              <polyline
+                points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
+                fill="none"
+                stroke="currentColor"
+                stroke-width="8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </span>
+          <span class="text-sm font-semibold tracking-normal">MissionPulse</span>
+        </a>
+        <a
+          class="inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-page-canvas"
+          href={data.loginUrl || '/login'}
+        >
+          Se connecter
+        </a>
+      </div>
+
+      <section class="pt-8">
+        <div class="flex flex-wrap items-center gap-2">
+          <h1 class="text-3xl font-semibold tracking-normal text-text-primary md:text-4xl">
+            Pilotage missions
+          </h1>
+          <span
+            class="rounded-full border border-status-orange/25 bg-status-orange/8 px-2 py-1 text-xs font-medium text-status-orange"
+          >
+            Setup local
+          </span>
+        </div>
+        <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
+          Le dashboard connecté attend la configuration Supabase. Les surfaces restent accessibles
+          pour vérifier les ancres et le shell avant connexion.
+        </p>
+      </section>
+
+      <section
+        class="mt-6 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/8 p-4 shadow-subtle-2"
+        aria-labelledby="dashboard-setup-title"
+      >
+        <p id="dashboard-setup-title" class="text-sm font-medium text-text-primary">
+          Checklist de setup
+        </p>
+        <ol class="mt-4 grid gap-2 md:grid-cols-3" aria-label="Progression setup dashboard">
+          {#each dashboardSetupSteps as step, index}
+            <li class="rounded-lg border border-border-light bg-surface-white p-3">
+              <div class="flex items-start gap-3">
+                <span
+                  class="flex h-7 w-7 shrink-0 items-center justify-center rounded-full border border-blueprint-blue/25 bg-blueprint-blue/8 text-xs font-semibold text-blueprint-blue"
+                  aria-hidden="true"
+                >
+                  {index + 1}
+                </span>
+                <div class="min-w-0">
+                  <p class="text-sm font-semibold text-text-primary">{step.title}</p>
+                  <p class="mt-1 text-xs leading-5 text-text-subtle">{step.detail}</p>
+                </div>
+              </div>
+            </li>
+          {/each}
+        </ol>
+      </section>
+
+      <section id="applications" class="mt-6 rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2">
+        <h2 class="text-lg font-semibold text-text-primary">Candidatures</h2>
+        <p class="mt-2 text-sm leading-6 text-text-subtle">
+          Les candidatures synchronisées apparaîtront après connexion du compte et liaison de
+          l'extension.
+        </p>
+      </section>
+
+      <section id="cv" class="mt-6 rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2">
+        <h2 class="text-lg font-semibold text-text-primary">CV</h2>
+        <p class="mt-2 text-sm leading-6 text-text-subtle">
+          Les suggestions CV seront calculées après le premier snapshot connecté.
+        </p>
+      </section>
+
+      <section id="sync" class="mt-6 rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2">
+        <h2 class="text-lg font-semibold text-text-primary">Synchronisation</h2>
+        <p class="mt-2 text-sm leading-6 text-text-subtle">
+          La synchronisation sera disponible dès que Supabase et l'extension seront reliés.
+        </p>
+      </section>
+    </section>
+  </main>
+{:else}
 <main class="min-h-screen bg-page-canvas">
   <aside
     class="fixed inset-y-0 left-0 hidden w-64 border-r border-border-light bg-surface-white px-4 py-4 lg:block"
@@ -3123,3 +3220,4 @@
     </div>
   </section>
 </main>
+{/if}

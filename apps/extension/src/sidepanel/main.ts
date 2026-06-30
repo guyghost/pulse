@@ -15,9 +15,15 @@ async function init() {
     throw new Error('[MissionPulse] Root element #app not found');
   }
 
+  const initialShells = Array.from(target.querySelectorAll('[data-initial-shell]'));
   mount(App, {
     target,
   });
+  window.setTimeout(() => {
+    for (const shell of initialShells) {
+      shell.remove();
+    }
+  }, 500);
 }
 
 init();

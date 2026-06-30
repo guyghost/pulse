@@ -38,14 +38,6 @@ export default defineConfig({
       input: {
         sidepanel: resolve(__dirname, 'src/sidepanel/index.html'),
       },
-      output: {
-        manualChunks: (id) => {
-          // Core types and logic in main chunk
-          if (id.includes('/lib/core/')) {
-            return 'core';
-          }
-        },
-      },
     },
   },
 });

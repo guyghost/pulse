@@ -26,6 +26,7 @@
     "test:watch": "turbo test:watch",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "perf:measure": "node scripts/performance/measure-page-load.mjs",
     "format": "turbo format",
     "format:check": "turbo format:check",
     "supabase:start": "supabase start --workdir apps/landing && node scripts/patch-local-supabase-passkey-auth.mjs",
@@ -33,6 +34,7 @@
     "supabase:status": "supabase status --workdir apps/landing",
     "supabase:reset": "supabase db reset --workdir apps/landing",
     "ci:check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "deploy:preflight": "node scripts/deploy-preflight.mjs",
     "improvement:loop": "node scripts/improvement-loop.mjs",
     "clean": "turbo clean && rm -rf node_modules .turbo",
     "prepare": "simple-git-hooks"
