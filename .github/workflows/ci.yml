@@ -237,7 +237,7 @@ jobs:
     name: E2E Tests
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    needs: build
+    needs: test
     if: github.event_name == 'pull_request'
 
     steps:
@@ -261,14 +261,17 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Install Playwright browsers
-        run: pnpm --filter @pulse/extension exec playwright install chromium
-
-      - name: Download build artifact
-        uses: actions/download-artifact@v4
+      - name: Cache Playwright browsers
+        uses: actions/cache@v6
+        id: playwright-cache
         with:
-          name: chrome-extension-dist
-          path: apps/extension/dist/
+          path: ~/.cache/ms-playwright
+          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+          restore-keys: |
+            playwright-${{ runner.os }}-
+
+      - name: Install Playwright browsers
+        run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
 
       - name: Run E2E tests
         run: pnpm --filter @pulse/extension test:e2e
@@ -280,3 +283,13 @@ jobs:
           name: playwright-report
           path: apps/extension/playwright-report/
           retention-days: 7
+          if-no-files-found: ignore
+
+      - name: Upload Playwright test results
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: playwright-test-results
+          path: apps/extension/test-results/
+          retention-days: 7
+          if-no-files-found: ignore

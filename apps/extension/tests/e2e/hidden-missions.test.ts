@@ -14,7 +14,7 @@ import {
 
 test.describe('Hidden Missions Flow', () => {
   test.beforeEach(async ({ page }) => {
-    // Clear hidden state from previous tests
+    // Clear hidden state from previous tests (must run before navigation)
     await page.addInitScript(() => {
       try {
         localStorage.removeItem('hiddenMissions');
@@ -22,10 +22,10 @@ test.describe('Hidden Missions Flow', () => {
         /* ignore */
       }
     });
+    await ensureFeedVisible(page);
   });
 
   test('hides a mission and decreases count', async ({ page }) => {
-    await ensureFeedVisible(page);
     await clearAndInjectMissions(page, 5);
 
     const initialCount = await missionCards(page).count();
@@ -41,7 +41,6 @@ test.describe('Hidden Missions Flow', () => {
   });
 
   test('revealing hidden missions restores count', async ({ page }) => {
-    await ensureFeedVisible(page);
     await clearAndInjectMissions(page, 5);
 
     const initialCount = await missionCards(page).count();
@@ -55,7 +54,6 @@ test.describe('Hidden Missions Flow', () => {
   });
 
   test('hidden missions link is not visible when none are hidden', async ({ page }) => {
-    await ensureFeedVisible(page);
     await clearAndInjectMissions(page, 5);
 
     await expect(
@@ -64,7 +62,6 @@ test.describe('Hidden Missions Flow', () => {
   });
 
   test('combining hide and favorite filters works', async ({ page }) => {
-    await ensureFeedVisible(page);
     await clearAndInjectMissions(page, 5);
 
     const initialCount = await missionCards(page).count();

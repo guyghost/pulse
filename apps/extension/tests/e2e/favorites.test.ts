@@ -1,7 +1,6 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from './fixtures';
 import {
   allMissionsToggle,
-  ensureFeedVisible,
   favoriteButton,
   favoritesToggle,
   missionCards,
@@ -12,7 +11,6 @@ import {
 
 test.describe('Favorites Flow', () => {
   test('marks a mission as favorite and star becomes filled', async ({ page }) => {
-    await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
     const card = missionCards(page).first();
@@ -23,7 +21,6 @@ test.describe('Favorites Flow', () => {
   });
 
   test('unfavorites a mission and star reverts', async ({ page }) => {
-    await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
     const card = missionCards(page).first();
@@ -35,7 +32,6 @@ test.describe('Favorites Flow', () => {
   });
 
   test('favorites filter shows only favorited missions', async ({ page }) => {
-    await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
     // Record initial count
@@ -58,7 +54,6 @@ test.describe('Favorites Flow', () => {
   });
 
   test('favorites filter shows zero when no favorites', async ({ page }) => {
-    await ensureFeedVisible(page);
     await waitForMissions(page, 5, 10000);
 
     await favoritesToggle(page).click();

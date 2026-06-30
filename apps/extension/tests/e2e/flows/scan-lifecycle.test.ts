@@ -1,6 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import {
-  ensureFeedVisible,
   expectMissionCount,
   feedSearchInput,
   injectMissions,
@@ -9,35 +8,28 @@ import {
   clearFeedSearch,
   waitForMissions,
   setFeedState,
+  expectFeedEmptyState,
 } from '../helpers';
 
 test.describe('Scan Lifecycle', () => {
   test('feed loads with missions on mount', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Missions appear after auto-scan / mock data
     await expect(page.getByText(/\d+ missions?/).first()).toBeVisible({ timeout: 10000 });
   });
 
   test('refresh button is visible and clickable', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     const refreshBtn = scanButton(page);
     await expect(refreshBtn).toBeVisible();
     await expect(refreshBtn).toBeEnabled();
   });
 
   test('injecting missions populates the feed', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 7);
     await waitForMissions(page, 7, 5000);
     await expectMissionCount(page, 7);
   });
 
   test('consecutive injections do not duplicate missions', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
     await expectMissionCount(page, 5);
@@ -51,8 +43,6 @@ test.describe('Scan Lifecycle', () => {
   });
 
   test('search works after missions are loaded', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 10);
     await waitForMissions(page, 10, 5000);
 
@@ -69,8 +59,6 @@ test.describe('Scan Lifecycle', () => {
   });
 
   test('filter panel toggles open and closed', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
 
@@ -86,16 +74,12 @@ test.describe('Scan Lifecycle', () => {
   });
 
   test('empty state shows when dev panel sets empty', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await setFeedState(page, 'empty');
 
-    await expect(page.getByText('Aucune mission')).toBeVisible({ timeout: 5000 });
+    await expectFeedEmptyState(page, 5000);
   });
 
   test('mission cards are rendered with correct count', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 10);
     await waitForMissions(page, 10, 5000);
 

@@ -1,16 +1,12 @@
-import { test, expect } from '@playwright/test';
-import { ensureFeedVisible } from './helpers';
-
+import { test, expect } from './fixtures';
 test.describe('Export Flow', () => {
   test('export section is accessible from settings', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
   });
 
   test('all three export format buttons are visible and enabled', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     const jsonBtn = page.getByRole('button', { name: 'JSON' });
@@ -27,7 +23,6 @@ test.describe('Export Flow', () => {
   });
 
   test('export JSON with no favorites shows error toast', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
 
@@ -41,7 +36,6 @@ test.describe('Export Flow', () => {
   });
 
   test('export CSV with no favorites shows error toast', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
 
@@ -53,7 +47,6 @@ test.describe('Export Flow', () => {
   });
 
   test('export Markdown with no favorites shows error toast', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
 
@@ -65,7 +58,6 @@ test.describe('Export Flow', () => {
   });
 
   test('export buttons remain enabled after failed export', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
 

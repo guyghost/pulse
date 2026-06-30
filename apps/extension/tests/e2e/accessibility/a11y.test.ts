@@ -1,9 +1,8 @@
-import { test, expect } from '@playwright/test';
+import { test, expect } from '../fixtures';
 import {
   SIDE_PANEL,
   mockNoProfile,
   completeOnboarding as _completeOnboarding,
-  ensureFeedVisible,
   expectFeedReady,
   expectMissionCount,
   copyLinkButton,
@@ -74,8 +73,6 @@ test.describe('Accessibility', () => {
   });
 
   test('keyboard navigation on mission cards', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter des missions
     await injectMissions(page, 5);
     await waitForMissions(page, 5, 5000);
@@ -109,8 +106,6 @@ test.describe('Accessibility', () => {
   });
 
   test('ARIA labels on action buttons', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await injectMissions(page, 3);
     await waitForMissions(page, 3, 5000);
 
@@ -138,8 +133,6 @@ test.describe('Accessibility', () => {
   });
 
   test('aria-pressed on toggle buttons', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     const favoriteFilter = favoritesToggle(page);
     await expect(favoriteFilter).toHaveAttribute('aria-pressed', 'false');
 
@@ -151,8 +144,6 @@ test.describe('Accessibility', () => {
   });
 
   test('aria-expanded on collapsible sections', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     const filterToggle = page.getByRole('button', { name: 'Afficher les filtres' });
     await expect(filterToggle).toHaveAttribute('aria-expanded', 'false');
     await expect(filterToggle).toHaveAttribute('aria-controls');
@@ -169,8 +160,6 @@ test.describe('Accessibility', () => {
   });
 
   test('aria-current on navigation tabs', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Vérifier l'état actif sur Feed
     const feedTab = navButton(page, 'Feed');
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
@@ -189,8 +178,6 @@ test.describe('Accessibility', () => {
   });
 
   test('heading hierarchy is correct', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Vérifier la hiérarchie des headings
     const headings = await page.locator('h1, h2, h3').all();
     const headingLevels: number[] = [];
@@ -245,8 +232,6 @@ test.describe('Accessibility', () => {
   });
 
   test('focus trap in dev panel', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Ouvrir le dev panel
     await openDevPanel(page);
 
@@ -284,8 +269,6 @@ test.describe('Accessibility', () => {
   });
 
   test('skip link or main landmark exists', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Vérifier la présence de landmarks
     const main = page.locator('main');
     const hasMain = (await main.count()) > 0;
@@ -298,8 +281,6 @@ test.describe('Accessibility', () => {
   });
 
   test('live region for dynamic updates', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Chercher une région live pour les annonces
     const liveRegion = page.locator('[aria-live]');
     const hasLiveRegion = (await liveRegion.count()) > 0;
@@ -315,8 +296,6 @@ test.describe('Accessibility', () => {
   });
 
   test('sufficient color contrast on text', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Injecter des missions pour avoir du contenu à tester
     await page.keyboard.press('Control+Shift+D');
     await expect(page.getByText('DEV PANEL')).toBeVisible();
@@ -375,8 +354,6 @@ test.describe('Accessibility', () => {
   });
 
   test('keyboard accessible dropdowns or selects', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     // Naviguer vers Settings
     await page.getByRole('button', { name: 'Settings' }).click();
 

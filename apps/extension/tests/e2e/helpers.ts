@@ -88,6 +88,22 @@ export async function expectFeedReady(page: Page) {
 // Dev Panel Helpers
 // ============================================================================
 
+export function devPanel(page: Page): Locator {
+  return page.locator('div.fixed.bottom-0').filter({ has: page.getByText('DEV PANEL') });
+}
+
+export function devPanelMissionCountInput(page: Page): Locator {
+  return devPanel(page).locator('input[type="range"][max="500"]');
+}
+
+export function feedRegion(page: Page): Locator {
+  return page.getByTestId('mission-feed');
+}
+
+export async function expectFeedEmptyState(page: Page, timeout = 5000) {
+  await expect(feedRegion(page).getByText(/Aucune mission/)).toBeVisible({ timeout });
+}
+
 export async function waitForDevPanel(page: Page) {
   await page.locator('button:has-text("Ctrl+Shift+D")').waitFor({ state: 'visible' });
 }
@@ -101,7 +117,6 @@ export async function openDevPanel(page: Page) {
   ) {
     return;
   }
-  await waitForDevPanel(page);
   await page.keyboard.press('Control+Shift+KeyD');
   await expect(page.getByText('DEV PANEL')).toBeVisible({ timeout: 10000 });
 }
@@ -118,13 +133,13 @@ export async function closeDevPanel(page: Page) {
 
 export async function setFeedState(page: Page, state: 'empty' | 'loading' | 'loaded' | 'error') {
   await openDevPanel(page);
-  await page.getByRole('button', { name: state }).click();
+  await devPanel(page).getByRole('button', { name: state }).click();
   await closeDevPanel(page);
 }
 
 export async function injectMissions(page: Page, count: number) {
   await openDevPanel(page);
-  const missionCountInput = page.locator('input[type="range"]');
+  const missionCountInput = devPanelMissionCountInput(page);
   await missionCountInput.evaluate((el, val) => {
     (el as HTMLInputElement).value = String(val);
     el.dispatchEvent(new Event('input', { bubbles: true }));
@@ -134,7 +149,7 @@ export async function injectMissions(page: Page, count: number) {
   // exact: true — the DevPanel also has an "Inject QA seed (500)" button whose
   // accessible name contains "inject", which would otherwise cause a strict-mode
   // violation (2 elements). We want the volume injector button named exactly "inject".
-  await page.getByRole('button', { name: 'inject', exact: true }).click();
+  await devPanel(page).getByRole('button', { name: 'inject', exact: true }).click();
   await closeDevPanel(page);
 
   // Two dev-mode timing hazards can mask the injected set:
@@ -143,7 +158,8 @@ export async function injectMissions(page: Page, count: number) {
   //  2. `smartLoad()` auto-scans on mount; its delayed SCAN_COMPLETE (~800ms) re-reads the
   //     pre-injection localStorage snapshot and overwrites the feed with the default 10 missions.
   // Waiting for the scan to settle, then re-dispatching synchronously, makes the injection stick.
-  await page.waitForTimeout(1200);
+  await expect.poll(async () => getMissionTotalCount(page), { timeout: 5000 }).toBeGreaterThan(0);
+  await page.waitForTimeout(800);
   await page.evaluate(() => {
     const detail = JSON.parse(window.localStorage.getItem('__missionpulse_dev_missions') ?? '[]');
     window.dispatchEvent(new CustomEvent('dev:missions', { detail }));
