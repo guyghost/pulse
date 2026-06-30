@@ -1,19 +1,10 @@
 <script lang="ts">
-  import FeedPage from '../ui/pages/FeedPage.svelte';
-  import ProfilePage from '../ui/pages/ProfilePage.svelte';
-  import CvPage from '../ui/pages/CvPage.svelte';
-  import ApplicationsPage from '../ui/pages/ApplicationsPage.svelte';
-  import TJMPage from '../ui/pages/TJMPage.svelte';
-  import SettingsPage from '../ui/pages/SettingsPage.svelte';
-  import OnboardingPage from '../ui/pages/OnboardingPage.svelte';
   import { Icon } from '@pulse/ui';
   import ConnectionIndicator from '../ui/atoms/ConnectionIndicator.svelte';
   import ToastContainer from '../ui/organisms/ToastContainer.svelte';
   import OperationalEmptyState from '../ui/molecules/OperationalEmptyState.svelte';
   import { fly, fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
-  import { ripple } from '../ui/actions/ripple';
-  import { generateMockMissions } from '../dev/mocks';
   import type { LogEntry } from '../dev/bridge-logger';
   import type { ToastType } from '$lib/state/toast.svelte.ts';
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
@@ -24,6 +15,60 @@
 
   const nav = createAppNavigation();
   const theme = createThemeStore();
+
+  let FeedPage: typeof import('../ui/pages/FeedPage.svelte').default | null = $state(null);
+  let ProfilePage: typeof import('../ui/pages/ProfilePage.svelte').default | null = $state(null);
+  let CvPage: typeof import('../ui/pages/CvPage.svelte').default | null = $state(null);
+  let ApplicationsPage: typeof import('../ui/pages/ApplicationsPage.svelte').default | null =
+    $state(null);
+  let TJMPage: typeof import('../ui/pages/TJMPage.svelte').default | null = $state(null);
+  let SettingsPage: typeof import('../ui/pages/SettingsPage.svelte').default | null = $state(null);
+  let OnboardingPage: typeof import('../ui/pages/OnboardingPage.svelte').default | null =
+    $state(null);
+
+  function loadPage(page: Page): void {
+    if (page === 'feed' && !FeedPage) {
+      import('../ui/pages/FeedPage.svelte').then((m) => {
+        FeedPage = m.default;
+      });
+      return;
+    }
+    if (page === 'profile' && !ProfilePage) {
+      import('../ui/pages/ProfilePage.svelte').then((m) => {
+        ProfilePage = m.default;
+      });
+      return;
+    }
+    if (page === 'cv' && !CvPage) {
+      import('../ui/pages/CvPage.svelte').then((m) => {
+        CvPage = m.default;
+      });
+      return;
+    }
+    if (page === 'applications' && !ApplicationsPage) {
+      import('../ui/pages/ApplicationsPage.svelte').then((m) => {
+        ApplicationsPage = m.default;
+      });
+      return;
+    }
+    if (page === 'tjm' && !TJMPage) {
+      import('../ui/pages/TJMPage.svelte').then((m) => {
+        TJMPage = m.default;
+      });
+      return;
+    }
+    if (page === 'settings' && !SettingsPage) {
+      import('../ui/pages/SettingsPage.svelte').then((m) => {
+        SettingsPage = m.default;
+      });
+      return;
+    }
+    if (page === 'onboarding' && !OnboardingPage) {
+      import('../ui/pages/OnboardingPage.svelte').then((m) => {
+        OnboardingPage = m.default;
+      });
+    }
+  }
 
   // Load premium status from storage on mount
   $effect(() => {
@@ -66,6 +111,49 @@
   const lockedPremiumPage = $derived(
     premium.isPremium ? null : (PREMIUM_LOCKS[nav.currentPage] ?? null)
   );
+  let initialPageLoadScheduled = $state(false);
+  let secondaryPagesPreloaded = $state(false);
+  let premiumPagesPreloaded = $state(false);
+
+  $effect(() => {
+    if (lockedPremiumPage || nav.bootStatus !== 'ready') {
+      return;
+    }
+
+    const page = nav.currentPage;
+    if (!initialPageLoadScheduled) {
+      initialPageLoadScheduled = true;
+      requestAnimationFrame(() => loadPage(page));
+      return;
+    }
+
+    loadPage(page);
+  });
+
+  $effect(() => {
+    if (nav.bootStatus !== 'ready' || secondaryPagesPreloaded) {
+      return;
+    }
+
+    secondaryPagesPreloaded = true;
+    window.setTimeout(() => {
+      loadPage('profile');
+      loadPage('settings');
+    }, 80);
+  });
+
+  $effect(() => {
+    if (nav.bootStatus !== 'ready' || !premium.isPremium || premiumPagesPreloaded) {
+      return;
+    }
+
+    premiumPagesPreloaded = true;
+    window.setTimeout(() => {
+      loadPage('cv');
+      loadPage('applications');
+      loadPage('tjm');
+    }, 80);
+  });
 
   function isPremiumLocked(page: Page): boolean {
     return !premium.isPremium && page in PREMIUM_LOCKS;
@@ -100,9 +188,14 @@
   }
 
   function devInjectMissions(count: number) {
-    const missions = generateMockMissions(count);
-    window.localStorage.setItem('__missionpulse_dev_missions', JSON.stringify(missions));
-    window.dispatchEvent(new CustomEvent('dev:missions', { detail: missions }));
+    if (!import.meta.env.DEV) {
+      return;
+    }
+    import('../dev/mocks').then(({ generateMockMissions }) => {
+      const missions = generateMockMissions(count);
+      window.localStorage.setItem('__missionpulse_dev_missions', JSON.stringify(missions));
+      window.dispatchEvent(new CustomEvent('dev:missions', { detail: missions }));
+    });
   }
 
   function devSetState(state: 'empty' | 'loading' | 'loaded' | 'error') {
@@ -198,7 +291,6 @@
           {#each visibleNavItems as item}
             {@const itemLocked = isPremiumLocked(item.page)}
             <button
-              use:ripple
               class="relative flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
           {feedNavCompact
                 ? nav.currentPage === item.page
@@ -266,10 +358,28 @@
             if (import.meta.env.DEV) console.error('[FeedPage crash]', e);
           }}
         >
-          <FeedPage
-            onNavigateToOnboarding={nav.resetToOnboarding}
-            onNavigateToProfile={() => nav.navigate('profile')}
-          />
+          {#if FeedPage}
+            <FeedPage
+              onNavigateToOnboarding={nav.resetToOnboarding}
+              onNavigateToProfile={() => nav.navigate('profile')}
+            />
+          {:else}
+            <div
+              data-testid="feed-scroll-container"
+              class="relative h-full overflow-y-auto px-4 pt-4"
+            >
+              <section class="section-card-strong rounded-2xl p-5">
+                <p class="eyebrow text-blueprint-blue">MissionPulse</p>
+                <div class="mt-4 h-12 w-3/4 rounded-xl bg-subtle-gray"></div>
+                <div class="mt-6 h-10 rounded-xl border border-border-light bg-surface-white"></div>
+                <div class="mt-4 grid grid-cols-3 gap-3">
+                  <div class="h-16 rounded-xl bg-page-canvas"></div>
+                  <div class="h-16 rounded-xl bg-page-canvas"></div>
+                  <div class="h-16 rounded-xl bg-page-canvas"></div>
+                </div>
+              </section>
+            </div>
+          {/if}
           {#snippet failed(error, reset)}
             <div class="p-4">
               <OperationalEmptyState
@@ -291,6 +401,7 @@
 
       {#if nav.currentPage === 'onboarding'}
         <div
+          data-testid="page-onboarding"
           class="absolute inset-0 overflow-y-auto"
           in:fly={{ x: 30, duration: 200, easing: cubicOut }}
           out:fade={{ duration: 100 }}
@@ -300,7 +411,26 @@
               if (import.meta.env.DEV) console.error('[OnboardingPage crash]', e);
             }}
           >
-            <OnboardingPage onComplete={nav.completeOnboarding} onSkip={nav.completeOnboarding} />
+            {#if OnboardingPage}
+              <OnboardingPage onComplete={nav.completeOnboarding} onSkip={nav.completeOnboarding} />
+            {:else}
+              <div class="relative flex h-full flex-col px-4 py-6">
+                <div class="section-card-strong relative my-auto w-full rounded-2xl p-5">
+                  <p class="eyebrow text-blueprint-blue/80">MissionPulse</p>
+                  <h1 class="mt-3 text-xl font-semibold leading-tight text-text-primary">
+                    Configurez votre premier scan
+                  </h1>
+                  <div class="mt-6 grid grid-cols-3 gap-2">
+                    <div class="h-16 rounded-lg border border-border-light bg-surface-white"></div>
+                    <div class="h-16 rounded-lg border border-border-light bg-surface-white"></div>
+                    <div class="h-16 rounded-lg border border-border-light bg-surface-white"></div>
+                  </div>
+                  <div
+                    class="mt-5 h-28 rounded-xl border border-border-light bg-surface-white"
+                  ></div>
+                </div>
+              </div>
+            {/if}
             {#snippet failed(error, reset)}
               <div class="p-4">
                 <OperationalEmptyState
@@ -322,6 +452,7 @@
       {/if}
       {#if lockedPremiumPage}
         <div
+          data-testid={`page-${nav.currentPage}`}
           class="absolute inset-0 overflow-y-auto"
           in:fly={{ x: 30, duration: 200, easing: cubicOut }}
           out:fade={{ duration: 100 }}
@@ -342,11 +473,14 @@
           </div>
         </div>
       {/if}
-      {#if nav.currentPage === 'tjm' && premium.isPremium}
+      {#if TJMPage && premium.isPremium}
         <div
+          data-testid="page-tjm"
           class="absolute inset-0 overflow-y-auto"
-          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-          out:fade={{ duration: 100 }}
+          class:invisible={nav.currentPage !== 'tjm'}
+          class:pointer-events-none={nav.currentPage !== 'tjm'}
+          aria-hidden={nav.currentPage !== 'tjm'}
+          inert={nav.currentPage !== 'tjm'}
         >
           <svelte:boundary
             onerror={(e) => {
@@ -376,11 +510,14 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'profile'}
+      {#if ProfilePage}
         <div
+          data-testid="page-profile"
           class="absolute inset-0 overflow-y-auto"
-          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-          out:fade={{ duration: 100 }}
+          class:invisible={nav.currentPage !== 'profile'}
+          class:pointer-events-none={nav.currentPage !== 'profile'}
+          aria-hidden={nav.currentPage !== 'profile'}
+          inert={nav.currentPage !== 'profile'}
         >
           <svelte:boundary
             onerror={(e) => {
@@ -407,11 +544,14 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'cv' && premium.isPremium}
+      {#if CvPage && premium.isPremium}
         <div
+          data-testid="page-cv"
           class="absolute inset-0 overflow-y-auto"
-          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-          out:fade={{ duration: 100 }}
+          class:invisible={nav.currentPage !== 'cv'}
+          class:pointer-events-none={nav.currentPage !== 'cv'}
+          aria-hidden={nav.currentPage !== 'cv'}
+          inert={nav.currentPage !== 'cv'}
         >
           <svelte:boundary
             onerror={(e) => {
@@ -438,11 +578,14 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'applications' && premium.isPremium}
+      {#if ApplicationsPage && premium.isPremium}
         <div
+          data-testid="page-applications"
           class="absolute inset-0 overflow-y-auto"
-          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-          out:fade={{ duration: 100 }}
+          class:invisible={nav.currentPage !== 'applications'}
+          class:pointer-events-none={nav.currentPage !== 'applications'}
+          aria-hidden={nav.currentPage !== 'applications'}
+          inert={nav.currentPage !== 'applications'}
         >
           <svelte:boundary
             onerror={(e) => {
@@ -469,11 +612,14 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if nav.currentPage === 'settings'}
+      {#if SettingsPage}
         <div
+          data-testid="page-settings"
           class="absolute inset-0 overflow-y-auto"
-          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-          out:fade={{ duration: 100 }}
+          class:invisible={nav.currentPage !== 'settings'}
+          class:pointer-events-none={nav.currentPage !== 'settings'}
+          aria-hidden={nav.currentPage !== 'settings'}
+          inert={nav.currentPage !== 'settings'}
         >
           <svelte:boundary
             onerror={(e) => {

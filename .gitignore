@@ -15,6 +15,7 @@ output/
 .superset/
 test-results/
 coverage/
+reports/performance/
 .claude/worktrees/
 .worktrees/
 .turbo/

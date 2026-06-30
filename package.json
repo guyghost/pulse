@@ -26,6 +26,7 @@
     "test:watch": "turbo test:watch",
     "lint": "turbo lint",
     "typecheck": "turbo typecheck",
+    "perf:measure": "node scripts/performance/measure-page-load.mjs",
     "format": "turbo format",
     "format:check": "turbo format:check",
     "supabase:start": "supabase start --workdir apps/landing && node scripts/patch-local-supabase-passkey-auth.mjs",

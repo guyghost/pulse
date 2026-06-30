@@ -12,7 +12,7 @@ import type { SavedFeedView } from '../../core/types/feed-view';
 
 export type FeedSortBy = 'score' | 'date' | 'tjm';
 
-export { getConnectorsMeta, detectAllConnectorSessions } from '../connectors/index';
+export { getConnectorsMeta } from '../connectors/meta';
 export { markAsSeen } from '../../core/seen/mark-seen';
 export {
   toggleFavorite,

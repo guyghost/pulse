@@ -195,31 +195,19 @@
     type SourceStatus,
   } from '$lib/shell/facades/feed-controller.svelte';
   import { createFeedPageState } from '$lib/state/feed-page.svelte';
-  import { createTrackingStore } from '$lib/state/tracking.svelte';
   import {
     STATUS_LABELS,
     type ApplicationStatus,
     type MissionTracking,
   } from '$lib/core/types/tracking';
-  import VirtualMissionFeed from '../organisms/VirtualMissionFeed.svelte';
   import { pullToRefresh } from '../actions/pull-to-refresh';
   import { tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
-  import ConnectorStatusList from '../molecules/ConnectorStatusList.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
-  import FilterBar from '../organisms/FilterBar.svelte';
-  import FeedActionDashboard from '../organisms/FeedActionDashboard.svelte';
-  import SourceHealthPanel from '../organisms/SourceHealthPanel.svelte';
-  import LastScanInfo from '../molecules/LastScanInfo.svelte';
-  import KeyboardShortcutsHelp from '../molecules/KeyboardShortcutsHelp.svelte';
   import type { MissionSource } from '$lib/core/types/mission';
-  import MissionComparison from '../organisms/MissionComparison.svelte';
-  import MissionInvestigationDrawer from '../organisms/MissionInvestigationDrawer.svelte';
-  import ProfileRefinementBanner from '../molecules/ProfileRefinementBanner.svelte';
-  import ConnectorAlertBar from '../molecules/ConnectorAlertBar.svelte';
-  import FeedTourOverlay, { type FeedTourStep } from '../molecules/FeedTourOverlay.svelte';
+  import type { FeedTourStep } from '../molecules/FeedTourOverlay.svelte';
   import OperationalStoryCard from '../molecules/OperationalStoryCard.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
   import { getProfileBannerDismissed, setFeedTourSeen } from '$lib/shell/facades/app-flags.facade';
@@ -256,8 +244,151 @@
   const feed = createFeedStore();
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
-  const tracking = createTrackingStore();
   page.setup();
+
+  type TrackingStore = ReturnType<typeof import('$lib/state/tracking.svelte').createTrackingStore>;
+  const emptyTrackings = new Map<string, MissionTracking>();
+  let tracking = $state<TrackingStore | null>(null);
+  let trackingLoadPromise: Promise<TrackingStore> | null = null;
+
+  function loadTrackingStore(): Promise<TrackingStore> {
+    if (tracking) {
+      return Promise.resolve(tracking);
+    }
+
+    trackingLoadPromise ??= import('$lib/state/tracking.svelte').then(({ createTrackingStore }) => {
+      if (tracking) {
+        return tracking;
+      }
+      const store = createTrackingStore();
+      tracking = store;
+      store.loadTrackings().catch(() => {});
+      return store;
+    });
+
+    return trackingLoadPromise;
+  }
+
+  let VirtualMissionFeed: typeof import('../organisms/VirtualMissionFeed.svelte').default | null =
+    $state(null);
+  let SourceHealthPanel: typeof import('../organisms/SourceHealthPanel.svelte').default | null =
+    $state(null);
+  let FeedActionDashboard: typeof import('../organisms/FeedActionDashboard.svelte').default | null =
+    $state(null);
+  let ConnectorStatusList: typeof import('../molecules/ConnectorStatusList.svelte').default | null =
+    $state(null);
+  let LastScanInfo: typeof import('../molecules/LastScanInfo.svelte').default | null = $state(null);
+  let FilterBar: typeof import('../organisms/FilterBar.svelte').default | null = $state(null);
+  let KeyboardShortcutsHelp:
+    | typeof import('../molecules/KeyboardShortcutsHelp.svelte').default
+    | null = $state(null);
+  let MissionInvestigationDrawer:
+    | typeof import('../organisms/MissionInvestigationDrawer.svelte').default
+    | null = $state(null);
+  let MissionComparison: typeof import('../organisms/MissionComparison.svelte').default | null =
+    $state(null);
+  let ProfileRefinementBanner:
+    | typeof import('../molecules/ProfileRefinementBanner.svelte').default
+    | null = $state(null);
+  let ConnectorAlertBar: typeof import('../molecules/ConnectorAlertBar.svelte').default | null =
+    $state(null);
+  let FeedTourOverlay: typeof import('../molecules/FeedTourOverlay.svelte').default | null =
+    $state(null);
+
+  function loadFeedContent(): void {
+    if (!VirtualMissionFeed) {
+      import('../organisms/VirtualMissionFeed.svelte').then((module) => {
+        VirtualMissionFeed = module.default;
+      });
+    }
+  }
+
+  function loadFeedChrome(): void {
+    if (!SourceHealthPanel) {
+      import('../organisms/SourceHealthPanel.svelte').then((module) => {
+        SourceHealthPanel = module.default;
+      });
+    }
+    if (!FeedActionDashboard) {
+      import('../organisms/FeedActionDashboard.svelte').then((module) => {
+        FeedActionDashboard = module.default;
+      });
+    }
+    if (!ConnectorStatusList) {
+      import('../molecules/ConnectorStatusList.svelte').then((module) => {
+        ConnectorStatusList = module.default;
+      });
+    }
+    if (!LastScanInfo) {
+      import('../molecules/LastScanInfo.svelte').then((module) => {
+        LastScanInfo = module.default;
+      });
+    }
+  }
+
+  function loadFilterBar(): void {
+    if (!FilterBar) {
+      import('../organisms/FilterBar.svelte').then((module) => {
+        FilterBar = module.default;
+      });
+    }
+  }
+
+  function loadShortcutsHelp(): void {
+    if (!KeyboardShortcutsHelp) {
+      import('../molecules/KeyboardShortcutsHelp.svelte').then((module) => {
+        KeyboardShortcutsHelp = module.default;
+      });
+    }
+  }
+
+  function loadInvestigationDrawer(): void {
+    if (!MissionInvestigationDrawer) {
+      import('../organisms/MissionInvestigationDrawer.svelte').then((module) => {
+        MissionInvestigationDrawer = module.default;
+      });
+    }
+  }
+
+  function loadComparison(): void {
+    if (!MissionComparison) {
+      import('../organisms/MissionComparison.svelte').then((module) => {
+        MissionComparison = module.default;
+      });
+    }
+  }
+
+  function loadRefinementBanner(): void {
+    if (!ProfileRefinementBanner) {
+      import('../molecules/ProfileRefinementBanner.svelte').then((module) => {
+        ProfileRefinementBanner = module.default;
+      });
+    }
+  }
+
+  function loadConnectorAlertBar(): void {
+    if (!ConnectorAlertBar) {
+      import('../molecules/ConnectorAlertBar.svelte').then((module) => {
+        ConnectorAlertBar = module.default;
+      });
+    }
+  }
+
+  function loadFeedTourOverlay(): void {
+    if (!FeedTourOverlay) {
+      import('../molecules/FeedTourOverlay.svelte').then((module) => {
+        FeedTourOverlay = module.default;
+      });
+    }
+  }
+
+  $effect(() => {
+    requestAnimationFrame(() => {
+      loadFeedContent();
+      loadFeedChrome();
+      loadTrackingStore().catch(() => {});
+    });
+  });
 
   // Refinement banner: shown only on zero-config first scan (no profile yet)
   let showRefinementBanner = $state(false);
@@ -273,6 +404,48 @@
   let showComparison = $state(false);
   let investigationMission = $state<(typeof page.displayMissions)[number] | null>(null);
   let scrollStopTimeout: ReturnType<typeof setTimeout> | null = null;
+
+  $effect(() => {
+    if (page.showFilters) {
+      loadFilterBar();
+    }
+  });
+
+  $effect(() => {
+    if (page.showShortcutsHelp) {
+      loadShortcutsHelp();
+    }
+  });
+
+  $effect(() => {
+    if (investigationMission) {
+      loadInvestigationDrawer();
+    }
+  });
+
+  $effect(() => {
+    if (showComparison && page.comparisonMissions.length >= 2) {
+      loadComparison();
+    }
+  });
+
+  $effect(() => {
+    if (showRefinementBanner && page.profileLoaded && page.profileNeedsCompletion) {
+      loadRefinementBanner();
+    }
+  });
+
+  $effect(() => {
+    if (brokenConnectors.length > 0) {
+      loadConnectorAlertBar();
+    }
+  });
+
+  $effect(() => {
+    if (activeTourStep) {
+      loadFeedTourOverlay();
+    }
+  });
 
   const tourSteps: FeedTourStep[] = [
     {
@@ -643,7 +816,7 @@
   }
 
   function getTrackingUpdatedAt(missionId: string): number | null {
-    const record = tracking.getTrackingForMission(missionId);
+    const record = tracking?.getTrackingForMission(missionId);
     return record ? getLastTransitionTime(record) : null;
   }
 
@@ -651,12 +824,13 @@
     missionId: string,
     status: ApplicationStatus
   ): Promise<void> {
-    const previousTracking = cloneTrackingSnapshot(tracking.getTrackingForMission(missionId));
-    await tracking.transitionStatus(missionId, status);
+    const trackingStore = await loadTrackingStore();
+    const previousTracking = cloneTrackingSnapshot(trackingStore.getTrackingForMission(missionId));
+    await trackingStore.transitionStatus(missionId, status);
     showToastAction(`Statut: ${STATUS_LABELS[status]}`, 'success', {
       label: 'Annuler',
       onClick: () => {
-        void tracking.restoreTracking(missionId, previousTracking);
+        void trackingStore.restoreTracking(missionId, previousTracking);
       },
     });
   }
@@ -702,7 +876,6 @@
     ]);
     showRefinementBanner = !bannerDismissed;
     alertPreferences = storedAlertPreferences;
-    await tracking.loadTrackings();
   })().catch(() => {});
 
   $effect(() => {
@@ -941,22 +1114,24 @@
                 </Tooltip>
               </div>
             </div>
-            <SourceHealthPanel
-              sources={controller.sourceStatuses as SourceStatus[]}
-              isChecking={controller.isCheckingSources}
-              compact={true}
-              scanResultCounts={page.sourceMissionCounts}
-              activeSourceFilter={page.selectedSource}
-              enabledConnectors={controller.enabledConnectorIds}
-              healthSnapshots={controller.healthSnapshots}
-              onRefresh={() => controller.checkSourceSessions()}
-              onFilterBySource={(id) => {
-                page.setSelectedSource(id as MissionSource | null);
-              }}
-              onToggleConnector={(id) => controller.handleToggleConnector(id)}
-              onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
-              onReconnect={handleOpenExternalUrl}
-            />
+            {#if SourceHealthPanel}
+              <SourceHealthPanel
+                sources={controller.sourceStatuses as SourceStatus[]}
+                isChecking={controller.isCheckingSources}
+                compact={true}
+                scanResultCounts={page.sourceMissionCounts}
+                activeSourceFilter={page.selectedSource}
+                enabledConnectors={controller.enabledConnectorIds}
+                healthSnapshots={controller.healthSnapshots}
+                onRefresh={() => controller.checkSourceSessions()}
+                onFilterBySource={(id) => {
+                  page.setSelectedSource(id as MissionSource | null);
+                }}
+                onToggleConnector={(id) => controller.handleToggleConnector(id)}
+                onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
+                onReconnect={handleOpenExternalUrl}
+              />
+            {/if}
             <div class="mt-3">
               <OperationalStoryCard
                 eyebrow="À faire maintenant"
@@ -972,17 +1147,19 @@
               />
             </div>
             {@render feedActionQueueBlock(true)}
-            <FeedActionDashboard
-              summary={page.dashboardSummary}
-              insightSummary={page.insightSummary}
-              scoreDistribution={page.scoreDistribution}
-              selectedScoreBucket={page.selectedScoreBucket}
-              showNewOnly={page.showNewOnly}
-              brokenConnectorCount={brokenConnectors.length}
-              onToggleNewOnly={page.toggleNewOnly}
-              onToggleFavorites={page.toggleFavoritesFilter}
-              onSetScoreBucket={page.setSelectedScoreBucket}
-            />
+            {#if FeedActionDashboard}
+              <FeedActionDashboard
+                summary={page.dashboardSummary}
+                insightSummary={page.insightSummary}
+                scoreDistribution={page.scoreDistribution}
+                selectedScoreBucket={page.selectedScoreBucket}
+                showNewOnly={page.showNewOnly}
+                brokenConnectorCount={brokenConnectors.length}
+                onToggleNewOnly={page.toggleNewOnly}
+                onToggleFavorites={page.toggleFavoritesFilter}
+                onSetScoreBucket={page.setSelectedScoreBucket}
+              />
+            {/if}
           {:else}
             <!-- Full: hero with description, progress, stats -->
             <div class="relative pr-14">
@@ -1086,50 +1263,58 @@
             </div>
             {@render feedActionQueueBlock(false)}
 
-            <ConnectorStatusList
-              statuses={controller.connectorStatuses}
-              persistedStatuses={controller.persistedStatuses}
-              isScanning={feedChromeBusy}
-            />
+            {#if ConnectorStatusList}
+              <ConnectorStatusList
+                statuses={controller.connectorStatuses}
+                persistedStatuses={controller.persistedStatuses}
+                isScanning={feedChromeBusy}
+              />
+            {/if}
 
             {#if !feedIsColdLoading}
-              <SourceHealthPanel
-                sources={controller.sourceStatuses as SourceStatus[]}
-                isChecking={controller.isCheckingSources}
-                compact={true}
-                scanResultCounts={page.sourceMissionCounts}
-                activeSourceFilter={page.selectedSource}
-                enabledConnectors={controller.enabledConnectorIds}
-                healthSnapshots={controller.healthSnapshots}
-                onRefresh={() => controller.checkSourceSessions()}
-                onFilterBySource={(id) => {
-                  page.setSelectedSource(id as MissionSource | null);
-                }}
-                onToggleConnector={(id) => controller.handleToggleConnector(id)}
-                onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
-                onReconnect={handleOpenExternalUrl}
-              />
-              {#if page.totalMissions > 0}
-                <FeedActionDashboard
-                  summary={page.dashboardSummary}
-                  insightSummary={page.insightSummary}
-                  scoreDistribution={page.scoreDistribution}
-                  selectedScoreBucket={page.selectedScoreBucket}
-                  showNewOnly={page.showNewOnly}
-                  brokenConnectorCount={brokenConnectors.length}
-                  onToggleNewOnly={page.toggleNewOnly}
-                  onToggleFavorites={page.toggleFavoritesFilter}
-                  onSetScoreBucket={page.setSelectedScoreBucket}
+              {#if SourceHealthPanel}
+                <SourceHealthPanel
+                  sources={controller.sourceStatuses as SourceStatus[]}
+                  isChecking={controller.isCheckingSources}
+                  compact={true}
+                  scanResultCounts={page.sourceMissionCounts}
+                  activeSourceFilter={page.selectedSource}
+                  enabledConnectors={controller.enabledConnectorIds}
+                  healthSnapshots={controller.healthSnapshots}
+                  onRefresh={() => controller.checkSourceSessions()}
+                  onFilterBySource={(id) => {
+                    page.setSelectedSource(id as MissionSource | null);
+                  }}
+                  onToggleConnector={(id) => controller.handleToggleConnector(id)}
+                  onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
+                  onReconnect={handleOpenExternalUrl}
                 />
+              {/if}
+              {#if page.totalMissions > 0}
+                {#if FeedActionDashboard}
+                  <FeedActionDashboard
+                    summary={page.dashboardSummary}
+                    insightSummary={page.insightSummary}
+                    scoreDistribution={page.scoreDistribution}
+                    selectedScoreBucket={page.selectedScoreBucket}
+                    showNewOnly={page.showNewOnly}
+                    brokenConnectorCount={brokenConnectors.length}
+                    onToggleNewOnly={page.toggleNewOnly}
+                    onToggleFavorites={page.toggleFavoritesFilter}
+                    onSetScoreBucket={page.setSelectedScoreBucket}
+                  />
+                {/if}
               {/if}
             {/if}
 
             {#if !feedIsColdLoading && controller.lastScanAt}
               <div class="mt-2">
-                <LastScanInfo
-                  lastScanAt={controller.lastScanAt}
-                  missionCount={controller.lastScanMissionCount}
-                />
+                {#if LastScanInfo}
+                  <LastScanInfo
+                    lastScanAt={controller.lastScanAt}
+                    missionCount={controller.lastScanMissionCount}
+                  />
+                {/if}
               </div>
             {/if}
 
@@ -1175,7 +1360,7 @@
             {#if feedChromeBusy}Chargement des missions en cours{/if}
           </div>
 
-          {#if showRefinementBanner && !controller.isScanning && page.profileLoaded && page.profileNeedsCompletion}
+          {#if showRefinementBanner && !controller.isScanning && page.profileLoaded && page.profileNeedsCompletion && ProfileRefinementBanner}
             <ProfileRefinementBanner
               completion={page.profileCompletion}
               missingItems={page.missingProfileItems}
@@ -1351,7 +1536,7 @@
             </div>
           </div>
 
-          {#if page.showFilters}
+          {#if page.showFilters && FilterBar}
             <div
               id="filter-panel"
               class="absolute left-5 right-5 top-[calc(100%-0.5rem)] z-30 max-h-80 overflow-y-auto rounded-2xl border border-border-light bg-surface-white p-2 shadow-subtle-3"
@@ -1383,7 +1568,7 @@
         </div>
       </section>
 
-      {#if brokenConnectors.length > 0}
+      {#if brokenConnectors.length > 0 && ConnectorAlertBar}
         <ConnectorAlertBar
           {brokenConnectors}
           onRecheck={(connectorId) => controller.recheckConnector(connectorId)}
@@ -1469,31 +1654,47 @@
         ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
         : ''}"
     >
-      <VirtualMissionFeed
-        missions={visibleFeedMissions}
-        isLoading={feedIsColdLoading}
-        error={page.error}
-        seenIds={page.seenIds}
-        favorites={page.favorites}
-        hidden={page.hidden}
-        comparisonMissionIds={page.comparisonMissionIds}
-        trackingByMissionId={tracking.trackings}
-        sortBy={page.sortBy}
-        resetKey={missionFeedResetKey}
-        filterActive={page.filterActive || showAlertOnly}
-        onMissionSeen={page.handleMissionSeen}
-        onToggleFavorite={page.handleToggleFavorite}
-        onHide={page.handleHide}
-        onToggleCompare={page.toggleCompare}
-        onStatusTransition={handleTrackingTransition}
-        onCopyLink={page.handleCopyLink}
-        onOpenLink={handleOpenExternalUrl}
-        onInvestigateMission={(mission) => (investigationMission = mission)}
-        onRetry={handleMissionFeedScanAction}
-        onStartScan={handleMissionFeedScanAction}
-        onClearFilters={handleClearMissionFilters}
-        tourStep={activeTourStep?.id ?? null}
-      />
+      {#if VirtualMissionFeed}
+        <VirtualMissionFeed
+          missions={visibleFeedMissions}
+          isLoading={feedIsColdLoading}
+          error={page.error}
+          seenIds={page.seenIds}
+          favorites={page.favorites}
+          hidden={page.hidden}
+          comparisonMissionIds={page.comparisonMissionIds}
+          trackingByMissionId={tracking?.trackings ?? emptyTrackings}
+          sortBy={page.sortBy}
+          resetKey={missionFeedResetKey}
+          filterActive={page.filterActive || showAlertOnly}
+          onMissionSeen={page.handleMissionSeen}
+          onToggleFavorite={page.handleToggleFavorite}
+          onHide={page.handleHide}
+          onToggleCompare={page.toggleCompare}
+          onStatusTransition={handleTrackingTransition}
+          onCopyLink={page.handleCopyLink}
+          onOpenLink={handleOpenExternalUrl}
+          onInvestigateMission={(mission) => (investigationMission = mission)}
+          onRetry={handleMissionFeedScanAction}
+          onStartScan={handleMissionFeedScanAction}
+          onClearFilters={handleClearMissionFilters}
+          tourStep={activeTourStep?.id ?? null}
+        />
+      {:else}
+        <div class="flex flex-col gap-3" aria-busy="true">
+          {#each Array(3) as _}
+            <div class="section-card rounded-xl p-4">
+              <div class="h-4 w-2/3 rounded bg-subtle-gray"></div>
+              <div class="mt-3 h-3 w-1/2 rounded bg-subtle-gray"></div>
+              <div class="mt-4 flex gap-2">
+                <div class="h-6 w-16 rounded-full bg-subtle-gray"></div>
+                <div class="h-6 w-20 rounded-full bg-subtle-gray"></div>
+                <div class="h-6 w-14 rounded-full bg-subtle-gray"></div>
+              </div>
+            </div>
+          {/each}
+        </div>
+      {/if}
     </div>
     {#if showAlertOnly}
       <button
@@ -1517,9 +1718,11 @@
   </div>
 </div>
 
-<KeyboardShortcutsHelp bind:isOpen={page.showShortcutsHelp} />
+{#if KeyboardShortcutsHelp}
+  <KeyboardShortcutsHelp bind:isOpen={page.showShortcutsHelp} />
+{/if}
 
-{#if activeTourStep}
+{#if activeTourStep && FeedTourOverlay}
   <FeedTourOverlay
     step={activeTourStep}
     stepIndex={tourStepIndex}
@@ -1529,14 +1732,14 @@
   />
 {/if}
 
-{#if investigationMission}
+{#if investigationMission && MissionInvestigationDrawer}
   <MissionInvestigationDrawer
     mission={investigationMission}
     isCompared={page.comparisonMissionIds.includes(investigationMission.id)}
     compareDisabled={page.comparisonMissionIds.length >= 3 &&
       !page.comparisonMissionIds.includes(investigationMission.id)}
     isHidden={investigationMission.id in page.hidden}
-    trackingStatus={tracking.getTrackingForMission(investigationMission.id)?.currentStatus ?? null}
+    trackingStatus={tracking?.getTrackingForMission(investigationMission.id)?.currentStatus ?? null}
     trackingUpdatedAt={getTrackingUpdatedAt(investigationMission.id)}
     onClose={() => (investigationMission = null)}
     onOpenLink={handleOpenExternalUrl}
@@ -1572,7 +1775,7 @@
   </div>
 {/if}
 
-{#if showComparison && page.comparisonMissions.length >= 2}
+{#if showComparison && page.comparisonMissions.length >= 2 && MissionComparison}
   {#key page.comparisonMissionIds.join(',')}
     <MissionComparison missions={page.comparisonMissions} onClose={closeComparison} />
   {/key}

@@ -7,6 +7,7 @@
   let mobileMenuOpen = $state(false);
   let scrolled = $state(false);
   let activeShowcaseStep = $state<ShowcaseStep>('scanner');
+  let showDeferredContent = $state(false);
 
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
   const showcaseSteps: { id: ShowcaseStep; label: string }[] = [
@@ -25,6 +26,18 @@
   });
 
   $effect(() => {
+    const id = window.setTimeout(() => {
+      showDeferredContent = true;
+    }, 0);
+
+    return () => window.clearTimeout(id);
+  });
+
+  $effect(() => {
+    if (!showDeferredContent) {
+      return;
+    }
+
     const observer = new IntersectionObserver(
       (entries) => {
         entries.forEach((entry) => {
@@ -247,6 +260,7 @@
   </div>
 </section>
 
+{#if showDeferredContent}
 <!-- Product showcase -->
 <section class="product-showcase" id="workflow" aria-label="Aperçu de MissionPulse">
   <div class="container">
@@ -1301,3 +1315,4 @@
     </div>
   </div>
 </footer>
+{/if}
