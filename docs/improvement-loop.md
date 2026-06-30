@@ -65,6 +65,16 @@ git diff tests/fixtures/regression/
 
 Vérifier manuellement les diffs avant commit.
 
+### Matrice fixtures (17 cas)
+
+| Connecteur  | Fixtures                                                   | Cas couverts                                                  |
+| ----------- | ---------------------------------------------------------- | ------------------------------------------------------------- |
+| lehibou     | `basic`, `no-price`, `remote`, `encoding`, `hybrid-onsite` | TJM absent, full remote, encodage HTML/NBSP, hybride + onsite |
+| free-work   | `basic`, `remote-modes`, `tjm-edge`                        | full/partial/none, TJM null et min seul                       |
+| hiway       | `basic`, `remote-modes`, `tjm-null`                        | télétravail/hybride/présentiel, budget null                   |
+| collective  | `basic`, `remote-tjm`, `encoding`                          | REMOTE/HYBRID/ON_SITE, formats TJM variés, accents            |
+| cherry-pick | `basic`, `remote-rates`, `tjm-description`                 | displacement API, TJM depuis description                      |
+
 ## OpenSpec — backlog actif
 
 | Change                    | Focus                               |

@@ -1,0 +1,21 @@
+[
+  {
+    "id": "hw-tjm-null",
+    "title": "Mission sans budget",
+    "description": "Budget à définir",
+    "company": "Budget TBD",
+    "budget": null,
+    "skills": "DevOps",
+    "start_date": "2026-04-01",
+    "posted_date": "2026-03-15",
+    "mission_location": "Paris",
+    "location": "hybride",
+    "duration": "6",
+    "status": "En attente",
+    "posted_by": "freelance",
+    "business_fee_type": "fixed",
+    "business_fee_amount": "30",
+    "created_at": "2026-03-15T10:00:00Z",
+    "updated_at": null
+  }
+]

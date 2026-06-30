@@ -1,0 +1,18 @@
+[
+  {
+    "id": "hw-hw-tjm-null",
+    "title": "Mission sans budget",
+    "client": "Budget TBD",
+    "stack": ["DevOps"],
+    "tjm": null,
+    "location": "Paris",
+    "remote": "hybrid",
+    "duration": "6 mois",
+    "url": "https://hiway-missions.fr/admin/freelance/mission/hw-tjm-null",
+    "source": "hiway",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": "2026-04-01",
+    "seniority": null,
+    "publishedAt": "2026-03-15T10:00:00Z"
+  }
+]

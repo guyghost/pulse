@@ -1,0 +1,50 @@
+[
+  {
+    "id": "cp-3001",
+    "title": "Dev Remote",
+    "client": "Remote CP",
+    "stack": ["React"],
+    "tjm": 550,
+    "location": "Paris",
+    "remote": "full",
+    "duration": "6 mois",
+    "url": "https://app.cherry-pick.io/ext/missions/dev-remote-3001",
+    "source": "cherry-pick",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  },
+  {
+    "id": "cp-3002",
+    "title": "Dev Sur Site",
+    "client": "Onsite CP",
+    "stack": ["Java"],
+    "tjm": 500,
+    "location": "Lyon",
+    "remote": "onsite",
+    "duration": "3 mois",
+    "url": "https://app.cherry-pick.io/ext/missions/dev-onsite-3002",
+    "source": "cherry-pick",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  },
+  {
+    "id": "cp-3003",
+    "title": "Dev Hybride",
+    "client": "Hybrid CP",
+    "stack": ["TypeScript"],
+    "tjm": 570,
+    "location": "Nantes",
+    "remote": "hybrid",
+    "duration": "4 mois",
+    "url": "https://app.cherry-pick.io/ext/missions/dev-hybrid-3003",
+    "source": "cherry-pick",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  }
+]

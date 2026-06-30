@@ -1,0 +1,47 @@
+[
+  {
+    "id": "col-remote-001",
+    "slug": "mission-teletravail-001",
+    "name": "Lead DevOps Remote",
+    "sumUp": "Mission 100% remote.",
+    "description": "<p>Stack cloud</p>",
+    "budgetBrief": "TJM HT max 636 €",
+    "workPreferences": ["REMOTE"],
+    "isPermanentContract": false,
+    "idealStartDate": "ASAP",
+    "projectTypes": ["AWS", "TERRAFORM"],
+    "publishedAt": "2026-03-14T10:00:00.000Z",
+    "company": { "name": "Cloud Remote", "logoUrl": null },
+    "location": { "fullNameFrench": "France", "fullNameEnglish": "France" }
+  },
+  {
+    "id": "col-hybrid-002",
+    "slug": "mission-hybride-002",
+    "name": "PMO Hybride",
+    "sumUp": "2 jours sur site.",
+    "description": "<p>PMO IT</p>",
+    "budgetBrief": "600/700",
+    "workPreferences": ["HYBRID"],
+    "isPermanentContract": false,
+    "idealStartDate": "2026-04-01",
+    "projectTypes": ["PMO", "AGILE"],
+    "publishedAt": "2026-03-14T09:00:00.000Z",
+    "company": { "name": "Hybrid Corp", "logoUrl": null },
+    "location": { "fullNameFrench": "Paris, France", "fullNameEnglish": "Paris, France" }
+  },
+  {
+    "id": "col-onsite-003",
+    "slug": "mission-onsite-003",
+    "name": "Ingénieur sur site",
+    "sumUp": "Présentiel requis.",
+    "description": "<p>Infra</p>",
+    "budgetBrief": "400-450€ (Journalier)",
+    "workPreferences": ["ON_SITE"],
+    "isPermanentContract": false,
+    "idealStartDate": "ASAP",
+    "projectTypes": ["LINUX"],
+    "publishedAt": "2026-03-14T08:00:00.000Z",
+    "company": { "name": "Onsite SA", "logoUrl": null },
+    "location": { "fullNameFrench": "Lyon, France", "fullNameEnglish": "Lyon, France" }
+  }
+]
