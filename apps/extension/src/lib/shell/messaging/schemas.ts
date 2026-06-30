@@ -837,6 +837,47 @@ export const MessageSchemas = {
     type: z.literal('PREMIUM_SET'),
     payload: z.object({ saved: z.boolean() }),
   }),
+
+  // Diagnostic export
+  GET_DIAGNOSTIC_EXPORT: z.object({ type: z.literal('GET_DIAGNOSTIC_EXPORT') }),
+  DIAGNOSTIC_EXPORT_RESULT: z.object({
+    type: z.literal('DIAGNOSTIC_EXPORT_RESULT'),
+    payload: z.object({
+      version: z.literal('1'),
+      exportedAt: z.string(),
+      extensionVersion: z.string(),
+      errors: z.object({
+        summary: z.object({
+          total: z.number(),
+          byType: z.record(z.number()),
+          last24h: z.number(),
+        }),
+        recent: z.array(
+          z.object({
+            type: z.string(),
+            message: z.string(),
+            timestamp: z.number(),
+            connectorId: z.string().optional(),
+          })
+        ),
+      }),
+      connectors: z.array(
+        z.object({
+          connectorId: z.string(),
+          circuitState: z.enum(['closed', 'open', 'half-open']),
+          consecutiveFailures: z.number(),
+          totalFailures: z.number(),
+          totalSuccesses: z.number(),
+          lastSuccessAt: z.number().nullable(),
+          lastFailureAt: z.number().nullable(),
+        })
+      ),
+      environment: z.object({
+        userAgent: z.string().optional(),
+        chromeVersion: z.string().optional(),
+      }),
+    }),
+  }),
 } as const;
 
 export type MessageType = keyof typeof MessageSchemas;

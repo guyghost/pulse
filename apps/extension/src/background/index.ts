@@ -49,6 +49,7 @@ import {
 } from '../lib/shell/notifications/notify-missions';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 import { getAllHealthSnapshots, resetHealthSnapshot } from '../lib/shell/storage/connector-health';
+import { collectDiagnosticExport } from '../lib/shell/diagnostics/collect-diagnostic-export';
 import {
   clearFeedTourSeen,
   clearOnboardingCompleted,
@@ -939,6 +940,28 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           console.warn('[MissionPulse] RECHECK_CONNECTOR_HEALTH error:', err);
           const snapshots = await loadConnectorHealthSnapshots();
           sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: snapshots });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_DIAGNOSTIC_EXPORT') {
+      collectDiagnosticExport(new Date())
+        .then((report) => {
+          sendResponse({ type: 'DIAGNOSTIC_EXPORT_RESULT', payload: report });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_DIAGNOSTIC_EXPORT error:', err);
+          sendResponse({
+            type: 'DIAGNOSTIC_EXPORT_RESULT',
+            payload: {
+              version: '1',
+              exportedAt: new Date().toISOString(),
+              extensionVersion: '0.2.2',
+              errors: { summary: { total: 0, byType: {}, last24h: 0 }, recent: [] },
+              connectors: [],
+              environment: {},
+            },
+          });
         });
       return true;
     }

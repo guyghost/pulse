@@ -209,6 +209,15 @@
       ?.scrollIntoView({ behavior: 'smooth', block: 'start' });
   }
 
+  async function handleExportDiagnostic() {
+    const result = await settings.exportDiagnostic();
+    if (!result.ok) {
+      await showToast(result.error, 'error');
+      return;
+    }
+    await showToast('Diagnostic exporté', 'success');
+  }
+
   const profileReadyForBackup = $derived(
     settings.firstName.trim().length > 0 ||
       settings.jobTitle.trim().length > 0 ||
@@ -980,6 +989,37 @@
               Restaurer
             {/snippet}
           </Button>
+        </div>
+      </div>
+
+      <div class="section-card rounded-xl p-5 space-y-4">
+        <div>
+          <h3 class="text-sm font-medium text-text-primary">Diagnostic</h3>
+          <p class="mt-1 text-xs text-text-subtle">
+            Exportez un rapport local pour signaler un problème de connecteur ou de scan. Aucune
+            session ni cookie n'est inclus.
+          </p>
+        </div>
+        <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
+          <div class="flex items-start gap-2">
+            <Icon name="activity" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+            <div class="min-w-0">
+              <p class="text-xs font-medium text-text-primary">Rapport technique</p>
+              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+                Erreurs récentes, état des connecteurs et version Chrome. À joindre aux issues
+                GitHub si un scan échoue de façon répétée.
+              </p>
+            </div>
+          </div>
+          <div class="mt-3">
+            <button
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+              onclick={handleExportDiagnostic}
+            >
+              <Icon name="file-json" size={14} class="text-blueprint-blue" />
+              Exporter le diagnostic
+            </button>
+          </div>
         </div>
       </div>
 
