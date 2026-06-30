@@ -1,0 +1,86 @@
+{
+  "hydra:totalItems": 2,
+  "hydra:member": [
+    {
+      "@id": "/job_postings/dev-react-senior",
+      "id": 12345,
+      "title": "Développeur React Senior",
+      "slug": "dev-react-senior",
+      "description": "Mission React/TypeScript pour un grand compte bancaire.",
+      "candidateProfile": null,
+      "companyDescription": null,
+      "minDailySalary": 500,
+      "maxDailySalary": 600,
+      "minAnnualSalary": null,
+      "maxAnnualSalary": null,
+      "dailySalary": "500-600 €",
+      "annualSalary": null,
+      "currency": "EUR",
+      "duration": 6,
+      "durationValue": 6,
+      "durationPeriod": "month",
+      "renewable": false,
+      "remoteMode": "full",
+      "contracts": ["contractor"],
+      "location": {
+        "locality": "Paris",
+        "adminLevel1": "Île-de-France",
+        "label": "Paris, Île-de-France",
+        "shortLabel": "Paris (75)"
+      },
+      "company": { "name": "Société ABC", "slug": "societe-abc" },
+      "job": { "name": "Développeur", "slug": "developpeur" },
+      "skills": [
+        { "name": "React", "slug": "react" },
+        { "name": "TypeScript", "slug": "typescript" },
+        { "name": "Node.js", "slug": "nodejs" }
+      ],
+      "publishedAt": "2026-03-11T10:00:00+01:00",
+      "startsAt": null,
+      "applicationType": "turnover",
+      "applicationContact": null,
+      "applicationUrl": null,
+      "experienceLevel": "senior"
+    },
+    {
+      "@id": "/job_postings/dev-java-spring",
+      "id": 67890,
+      "title": "Développeur Java Spring",
+      "slug": "dev-java-spring",
+      "description": "Mission Java sur site à Lyon.",
+      "candidateProfile": null,
+      "companyDescription": null,
+      "minDailySalary": 450,
+      "maxDailySalary": 550,
+      "minAnnualSalary": null,
+      "maxAnnualSalary": null,
+      "dailySalary": "450-550 €",
+      "annualSalary": null,
+      "currency": "EUR",
+      "duration": 3,
+      "durationValue": 3,
+      "durationPeriod": "month",
+      "renewable": false,
+      "remoteMode": "partial",
+      "contracts": ["contractor"],
+      "location": {
+        "locality": "Lyon",
+        "adminLevel1": "Auvergne-Rhône-Alpes",
+        "label": "Lyon, Auvergne-Rhône-Alpes",
+        "shortLabel": "Lyon (69)"
+      },
+      "company": { "name": "Entreprise XYZ", "slug": "entreprise-xyz" },
+      "job": { "name": "Développeur", "slug": "developpeur" },
+      "skills": [
+        { "name": "Java", "slug": "java" },
+        { "name": "Spring Boot", "slug": "spring-boot" }
+      ],
+      "publishedAt": "2026-03-11T09:00:00+01:00",
+      "startsAt": null,
+      "applicationType": "turnover",
+      "applicationContact": null,
+      "applicationUrl": null,
+      "experienceLevel": "intermediate"
+    }
+  ]
+}

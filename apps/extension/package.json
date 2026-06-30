@@ -13,6 +13,8 @@
     "test:coverage": "vitest run --coverage",
     "test:e2e": "playwright test",
     "test:regression": "vitest run tests/unit/regression/parser-regression.test.ts",
+    "health-check": "tsx tests/health/run-health-checks.ts",
+    "health-check:json": "HEALTH_CHECK_JSON=1 tsx tests/health/run-health-checks.ts --json",
     "lint": "eslint . --ext .ts,.svelte",
     "lint:fix": "eslint . --ext .ts,.svelte --fix",
     "format": "prettier --write .",

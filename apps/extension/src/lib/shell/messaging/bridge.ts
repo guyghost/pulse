@@ -192,7 +192,19 @@ export type BridgeMessage =
   | { type: 'GET_PREMIUM_STATUS' }
   | { type: 'PREMIUM_STATUS_RESULT'; payload: boolean }
   | { type: 'SET_PREMIUM'; payload: boolean }
-  | { type: 'PREMIUM_SET'; payload: { saved: boolean } };
+  | { type: 'PREMIUM_SET'; payload: { saved: boolean } }
+  // Diagnostic export (privacy-first, local only)
+  | { type: 'GET_DIAGNOSTIC_EXPORT' }
+  | {
+      type: 'DIAGNOSTIC_EXPORT_RESULT';
+      payload: import('../../core/diagnostics/diagnostic-report').DiagnosticReport;
+    }
+  // Parser health (mission count anomalies)
+  | { type: 'GET_PARSER_HEALTH' }
+  | {
+      type: 'PARSER_HEALTH_RESULT';
+      payload: import('../../core/connectors/parser-health-logic').ConnectorHealthRecord[];
+    };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

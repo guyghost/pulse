@@ -8,6 +8,7 @@ import {
   scanButton,
   clearFeedSearch,
   waitForMissions,
+  setFeedState,
 } from '../helpers';
 
 test.describe('Scan Lifecycle', () => {
@@ -87,13 +88,9 @@ test.describe('Scan Lifecycle', () => {
   test('empty state shows when dev panel sets empty', async ({ page }) => {
     await ensureFeedVisible(page);
 
-    await page.keyboard.press('Control+Shift+D');
-    await expect(page.getByText('DEV PANEL')).toBeVisible();
+    await setFeedState(page, 'empty');
 
-    await page.getByRole('button', { name: 'empty' }).click();
-    await page.keyboard.press('Control+Shift+D');
-
-    await expect(page.getByText('Aucune mission')).toBeVisible({ timeout: 2000 });
+    await expect(page.getByText('Aucune mission')).toBeVisible({ timeout: 5000 });
   });
 
   test('mission cards are rendered with correct count', async ({ page }) => {

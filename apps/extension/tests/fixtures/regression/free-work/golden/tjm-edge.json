@@ -1,0 +1,34 @@
+[
+  {
+    "id": "fw-20001",
+    "title": "Mission TJM à négocier",
+    "client": "Budget Flou",
+    "stack": ["Agile"],
+    "tjm": null,
+    "location": "Nantes, Pays de la Loire",
+    "remote": "full",
+    "duration": "6 mois",
+    "url": "https://www.free-work.com/fr/tech-it/consultant/job-mission/no-tjm",
+    "source": "free-work",
+    "scrapedAt": "2026-03-11T12:00:00.000Z",
+    "startDate": null,
+    "seniority": "senior",
+    "publishedAt": "2026-03-11T10:00:00+01:00"
+  },
+  {
+    "id": "fw-20002",
+    "title": "Mission TJM plancher",
+    "client": "Plancher SAS",
+    "stack": ["Kubernetes"],
+    "tjm": 700,
+    "location": "Bordeaux, Nouvelle-Aquitaine",
+    "remote": "hybrid",
+    "duration": "4 mois",
+    "url": "https://www.free-work.com/fr/tech-it/architecte/job-mission/min-only-tjm",
+    "source": "free-work",
+    "scrapedAt": "2026-03-11T12:00:00.000Z",
+    "startDate": null,
+    "seniority": "senior",
+    "publishedAt": "2026-03-11T09:00:00+01:00"
+  }
+]

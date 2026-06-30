@@ -1,0 +1,18 @@
+[
+  {
+    "id": "col-col-encoding-001",
+    "title": "Intégration d'un chantier à la Côte d'Azur",
+    "client": "Société Générale & Fils",
+    "stack": ["JAVA", "SPRING"],
+    "tjm": null,
+    "location": "Nice, Provence-Alpes-Côte d'Azur",
+    "remote": "hybrid",
+    "duration": null,
+    "url": "https://www.collective.work/job/integration-chantier-cote-azur",
+    "source": "collective",
+    "scrapedAt": "2026-03-14T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  }
+]

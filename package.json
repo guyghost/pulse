@@ -33,6 +33,7 @@
     "supabase:status": "supabase status --workdir apps/landing",
     "supabase:reset": "supabase db reset --workdir apps/landing",
     "ci:check": "pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build",
+    "improvement:loop": "node scripts/improvement-loop.mjs",
     "clean": "turbo clean && rm -rf node_modules .turbo",
     "prepare": "simple-git-hooks"
   },

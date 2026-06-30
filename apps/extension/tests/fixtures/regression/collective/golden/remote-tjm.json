@@ -1,0 +1,50 @@
+[
+  {
+    "id": "col-col-remote-001",
+    "title": "Lead DevOps Remote",
+    "client": "Cloud Remote",
+    "stack": ["AWS", "TERRAFORM"],
+    "tjm": 636,
+    "location": "France",
+    "remote": "full",
+    "duration": null,
+    "url": "https://www.collective.work/job/mission-teletravail-001",
+    "source": "collective",
+    "scrapedAt": "2026-03-14T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  },
+  {
+    "id": "col-col-hybrid-002",
+    "title": "PMO Hybride",
+    "client": "Hybrid Corp",
+    "stack": ["PMO", "AGILE"],
+    "tjm": 600,
+    "location": "Paris, France",
+    "remote": "hybrid",
+    "duration": null,
+    "url": "https://www.collective.work/job/mission-hybride-002",
+    "source": "collective",
+    "scrapedAt": "2026-03-14T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  },
+  {
+    "id": "col-col-onsite-003",
+    "title": "Ingénieur sur site",
+    "client": "Onsite SA",
+    "stack": ["LINUX"],
+    "tjm": 400,
+    "location": "Lyon, France",
+    "remote": "onsite",
+    "duration": null,
+    "url": "https://www.collective.work/job/mission-onsite-003",
+    "source": "collective",
+    "scrapedAt": "2026-03-14T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  }
+]
