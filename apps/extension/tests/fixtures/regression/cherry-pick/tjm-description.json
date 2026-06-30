@@ -1,0 +1,15 @@
+[
+  {
+    "id": 4001,
+    "name": "Architecte Cloud",
+    "slug": "architecte-cloud-4001",
+    "minimum_rate": null,
+    "maximum_rate": null,
+    "duration": "12 mois",
+    "city": "Paris",
+    "displacement": "remote",
+    "company": { "name": "Cloud SA" },
+    "skills": [{ "name": "AWS" }, { "name": "Terraform" }],
+    "description": "Qualification faite par : AO Nom du client : Agirc-Arrco TJM : 930/1030 Localisation de la mission : Paris 12eme Durée de la mission : 12 mois"
+  }
+]

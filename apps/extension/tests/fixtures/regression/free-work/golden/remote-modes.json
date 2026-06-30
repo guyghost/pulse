@@ -1,0 +1,50 @@
+[
+  {
+    "id": "fw-10001",
+    "title": "Développeur Full Remote",
+    "client": "Remote Corp",
+    "stack": ["TypeScript"],
+    "tjm": 550,
+    "location": "Paris, Île-de-France",
+    "remote": "full",
+    "duration": "6 mois",
+    "url": "https://www.free-work.com/fr/tech-it/developpeur/job-mission/dev-full-remote",
+    "source": "free-work",
+    "scrapedAt": "2026-03-11T12:00:00.000Z",
+    "startDate": null,
+    "seniority": "senior",
+    "publishedAt": "2026-03-11T10:00:00+01:00"
+  },
+  {
+    "id": "fw-10002",
+    "title": "Développeur Hybride",
+    "client": "Hybrid SA",
+    "stack": ["Java"],
+    "tjm": 480,
+    "location": "Lille, Hauts-de-France",
+    "remote": "hybrid",
+    "duration": "3 mois",
+    "url": "https://www.free-work.com/fr/tech-it/developpeur/job-mission/dev-hybrid",
+    "source": "free-work",
+    "scrapedAt": "2026-03-11T12:00:00.000Z",
+    "startDate": null,
+    "seniority": "confirmed",
+    "publishedAt": "2026-03-11T09:00:00+01:00"
+  },
+  {
+    "id": "fw-10003",
+    "title": "Développeur Sur Site",
+    "client": "Onsite Ltd",
+    "stack": ["Python"],
+    "tjm": 420,
+    "location": "Marseille, PACA",
+    "remote": "onsite",
+    "duration": "2 mois",
+    "url": "https://www.free-work.com/fr/tech-it/developpeur/job-mission/dev-onsite",
+    "source": "free-work",
+    "scrapedAt": "2026-03-11T12:00:00.000Z",
+    "startDate": null,
+    "seniority": "junior",
+    "publishedAt": "2026-03-11T08:00:00+01:00"
+  }
+]

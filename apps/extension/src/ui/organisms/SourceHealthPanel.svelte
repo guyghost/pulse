@@ -4,6 +4,10 @@
   import Tooltip from '../atoms/Tooltip.svelte';
   import type { AppError } from '$lib/core/errors';
   import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
+  import {
+    deriveParserHealthAlert,
+    type ConnectorHealthRecord,
+  } from '$lib/core/connectors/parser-health-logic';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
   import ConnectorHealthCard from '../molecules/ConnectorHealthCard.svelte';
 
@@ -23,6 +27,7 @@
     onRecheckConnector,
     onReconnect,
     healthSnapshots,
+    parserHealthRecords,
   }: {
     sources: SourceStatus[];
     isChecking?: boolean;
@@ -36,6 +41,7 @@
     onRecheckConnector?: (connectorId: string, enable?: boolean) => void;
     onReconnect?: (url: string) => void;
     healthSnapshots?: Map<string, ConnectorHealthSnapshot>;
+    parserHealthRecords?: Map<string, ConnectorHealthRecord>;
   } = $props();
 
   const imgFailed = $state<Record<string, boolean>>({});
@@ -86,7 +92,8 @@
     source: SourceStatus,
     snapshot: ConnectorHealthSnapshot | undefined,
     missionCount: number,
-    isEnabled: boolean
+    isEnabled: boolean,
+    parserRecord: ConnectorHealthRecord | undefined
   ): SourceDiagnosis {
     if (!isEnabled) {
       return {
@@ -133,6 +140,19 @@
           severity: 'attention',
         };
       }
+    }
+
+    const parserAlert =
+      source.sessionStatus === 'connected' && parserRecord
+        ? deriveParserHealthAlert(parserRecord)
+        : null;
+    if (parserAlert) {
+      return {
+        statusLabel: parserAlert.statusLabel,
+        impact: parserAlert.impact,
+        action: parserAlert.action,
+        severity: parserAlert.severity,
+      };
     }
 
     if (missionCount === 0) {
@@ -340,8 +360,15 @@
           {@const isEnabled = enabledConnectors ? enabledConnectors.has(source.connectorId) : true}
           {@const isActive = source.sessionStatus === 'connected' && isEnabled}
           {@const snap = healthSnapshots?.get(source.connectorId)}
+          {@const parserRecord = parserHealthRecords?.get(source.connectorId)}
           {@const healthStatus = snap ? deriveHealthStatus(snap) : null}
-          {@const diagnosis = getSourceDiagnosis(source, snap, missionCount, isEnabled)}
+          {@const diagnosis = getSourceDiagnosis(
+            source,
+            snap,
+            missionCount,
+            isEnabled,
+            parserRecord
+          )}
           {@const sourceErrorCopy = getConnectorErrorCopy({
             connectorId: source.connectorId,
             connectorName: source.name,
@@ -412,6 +439,9 @@
                 {/if}
                 {#if snap?.lastFailureAt}
                   <span class="text-status-red">Échec {getRelativeTime(snap.lastFailureAt)}</span>
+                {/if}
+                {#if parserRecord && deriveParserHealthAlert(parserRecord)}
+                  <span class="text-status-orange">Parser {parserRecord.consecutiveZeros}×0</span>
                 {/if}
               </div>
               {#if source.error}

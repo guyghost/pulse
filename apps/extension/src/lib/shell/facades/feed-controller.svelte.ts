@@ -9,6 +9,7 @@
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
 import type { SeniorityLevel } from '$lib/core/types/profile';
 import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
+import type { ConnectorHealthRecord } from '$lib/core/connectors/parser-health-logic';
 import type { ConnectorStatus, PersistedConnectorStatus } from '$lib/core/types/connector-status';
 import type { AppError } from '$lib/core/errors/app-error';
 import { deduplicateMissions } from '$lib/core/scoring/dedup';
@@ -231,6 +232,8 @@ export interface FeedController {
   get scanProgress(): ScanProgress;
   /** Santé des connecteurs (circuit breaker snapshots) */
   get healthSnapshots(): Map<string, ConnectorHealthSnapshot>;
+  /** Anomalies parser (zéros consécutifs, chute soudaine) */
+  get parserHealthRecords(): Map<string, ConnectorHealthRecord>;
 
   // Source session state
   get sourceStatuses(): SourceStatus[];
@@ -248,6 +251,7 @@ export interface FeedController {
   checkSourceSessions(): Promise<void>;
   handleToggleConnector(id: string): Promise<void>;
   refreshHealthSnapshots(): Promise<void>;
+  refreshParserHealth(): Promise<void>;
   recheckConnector(id: string, enable?: boolean): Promise<void>;
 
   // Cleanup
@@ -284,6 +288,7 @@ export function createFeedController(feedStore: {
   let isCheckingSources = $state(false);
   let enabledConnectorIds = $state<Set<string>>(new Set());
   let healthSnapshots = $state<Map<string, ConnectorHealthSnapshot>>(new Map());
+  let parserHealthRecords = $state<Map<string, ConnectorHealthRecord>>(new Map());
   let partialScanBaseMissions: Mission[] = [];
   let partialScanConnectorMissions = new Map<string, Mission[]>();
   let partialScanCompletedSources = new Set<string>();
@@ -642,6 +647,19 @@ export function createFeedController(feedStore: {
     }
   }
 
+  async function refreshParserHealth(): Promise<void> {
+    try {
+      const response = await sendMessage({ type: 'GET_PARSER_HEALTH' });
+      if (response.type === 'PARSER_HEALTH_RESULT' && Array.isArray(response.payload)) {
+        parserHealthRecords = new Map(
+          response.payload.map((record) => [record.connectorId, record])
+        );
+      }
+    } catch {
+      // Outside extension context
+    }
+  }
+
   async function refreshHealthSnapshots(): Promise<void> {
     try {
       const response = await sendMessage({ type: 'GET_CONNECTOR_HEALTH' });
@@ -724,7 +742,10 @@ export function createFeedController(feedStore: {
                 err instanceof Error ? err.message : 'Impossible de finaliser le scan'
               );
             })
-            .finally(finishScanLifecycle);
+            .finally(() => {
+              void refreshParserHealth();
+              finishScanLifecycle();
+            });
         }
 
         if (message?.type === 'MISSIONS_UPDATED' && Array.isArray(message.payload)) {
@@ -777,6 +798,7 @@ export function createFeedController(feedStore: {
     setupBridgeListener();
 
     await refreshHealthSnapshots();
+    await refreshParserHealth();
 
     // Check source sessions on mount
     checkSourceSessions();
@@ -862,6 +884,9 @@ export function createFeedController(feedStore: {
     get healthSnapshots() {
       return healthSnapshots;
     },
+    get parserHealthRecords() {
+      return parserHealthRecords;
+    },
 
     // Methods
     startScan,
@@ -872,6 +897,7 @@ export function createFeedController(feedStore: {
     checkSourceSessions,
     handleToggleConnector,
     refreshHealthSnapshots,
+    refreshParserHealth,
     recheckConnector,
 
     // Cleanup

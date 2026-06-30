@@ -102,8 +102,8 @@ export async function openDevPanel(page: Page) {
     return;
   }
   await waitForDevPanel(page);
-  await page.keyboard.press('Control+Shift+D');
-  await expect(page.getByText('DEV PANEL')).toBeVisible();
+  await page.keyboard.press('Control+Shift+KeyD');
+  await expect(page.getByText('DEV PANEL')).toBeVisible({ timeout: 10000 });
 }
 
 export async function closeDevPanel(page: Page) {

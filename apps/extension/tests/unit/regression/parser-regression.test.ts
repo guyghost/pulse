@@ -1,18 +1,24 @@
 import { afterAll, describe, expect, it } from 'vitest';
 import { mkdirSync, readdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, parse } from 'node:path';
+import type { Mission } from '../../../src/lib/core/types/mission';
 import {
   runParserRegression,
+  runParserRegressionGeneric,
   type NormalizedMissionRegression,
 } from '../../../src/lib/core/connectors/parser-regression';
-import { REGRESSION_REGISTRY } from '../../fixtures/regression/registry';
+import {
+  REGRESSION_REGISTRY,
+  type ParserRegressionFormat,
+} from '../../fixtures/regression/registry';
 
 interface RegressionCase {
   connectorId: string;
   fixturePath: string;
   goldenPath: string;
   now: Date;
-  parser: (html: string, now: Date) => unknown;
+  format: ParserRegressionFormat;
+  parser: (input: never, now: Date) => Mission[];
 }
 
 const FIXTURES_ROOT = join(process.cwd(), 'tests/fixtures/regression');
@@ -22,8 +28,9 @@ function buildCases(): RegressionCase[] {
   return REGRESSION_REGISTRY.flatMap((entry) => {
     const connectorDir = join(FIXTURES_ROOT, entry.fixtureDir);
     const goldenDir = join(connectorDir, 'golden');
+    const extension = entry.format === 'html' ? '.html' : '.json';
     const fixtureFiles = readdirSync(connectorDir)
-      .filter((file) => file.endsWith('.html'))
+      .filter((file) => file.endsWith(extension))
       .sort();
 
     return fixtureFiles.map((file) => {
@@ -34,6 +41,7 @@ function buildCases(): RegressionCase[] {
         fixturePath,
         goldenPath,
         now: entry.now,
+        format: entry.format,
         parser: entry.parser,
       };
     });
@@ -114,8 +122,20 @@ describe('parser regression fixtures', () => {
 
     it(`${testCase.connectorId} parses ${fixtureName}`, () => {
       try {
-        const html = readFileSync(testCase.fixturePath, 'utf8');
-        const result = runParserRegression(html, testCase.parser, testCase.now);
+        const raw = readFileSync(testCase.fixturePath, 'utf8');
+        const input = testCase.format === 'html' ? raw : JSON.parse(raw);
+        const result =
+          testCase.format === 'html'
+            ? runParserRegression(
+                raw,
+                testCase.parser as (html: string, now: Date) => Mission[],
+                testCase.now
+              )
+            : runParserRegressionGeneric(
+                input,
+                testCase.parser as (data: never, now: Date) => Mission[],
+                testCase.now
+              );
 
         if (result.validationErrors.length > 0) {
           throw new Error(

@@ -35,6 +35,7 @@ import {
 } from '$lib/shell/facades/feed-data.facade';
 import { sendMessage, subscribeMessages } from '$lib/shell/messaging/bridge';
 import { showToast } from '$lib/shell/notifications/toast-service';
+import { buildDiagnosticFilename } from '$lib/core/diagnostics/diagnostic-report';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
 import { getPremium } from '$lib/shell/facades/premium.facade';
@@ -692,5 +693,20 @@ export class SettingsPageController {
 
   triggerFileSelect(): void {
     this.fileInput?.click();
+  }
+
+  async exportDiagnostic(): Promise<Result<void, string>> {
+    try {
+      const response = await sendMessage({ type: 'GET_DIAGNOSTIC_EXPORT' });
+      if (response.type !== 'DIAGNOSTIC_EXPORT_RESULT') {
+        return { ok: false, error: 'Réponse diagnostic inattendue' };
+      }
+
+      const exportedAt = new Date(response.payload.exportedAt);
+      downloadJSON(response.payload, buildDiagnosticFilename(exportedAt));
+      return { ok: true, value: undefined };
+    } catch {
+      return { ok: false, error: "Impossible d'exporter le diagnostic" };
+    }
   }
 }

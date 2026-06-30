@@ -1,0 +1,50 @@
+[
+  {
+    "id": "hw-hw-remote-full",
+    "title": "Dev Full Remote",
+    "client": "Remote Inc",
+    "stack": ["React", "Node.js"],
+    "tjm": 650,
+    "location": "France",
+    "remote": "full",
+    "duration": "6 mois",
+    "url": "https://hiway-missions.fr/admin/freelance/mission/hw-remote-full",
+    "source": "hiway",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": "2026-04-01",
+    "seniority": null,
+    "publishedAt": "2026-03-15T10:00:00Z"
+  },
+  {
+    "id": "hw-hw-remote-hybrid",
+    "title": "Dev Hybride",
+    "client": "Hybrid Co",
+    "stack": ["Java"],
+    "tjm": 580,
+    "location": "Lille",
+    "remote": "hybrid",
+    "duration": "3-6 mois",
+    "url": "https://hiway-missions.fr/admin/freelance/mission/hw-remote-hybrid",
+    "source": "hiway",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": "2026-05-01",
+    "seniority": null,
+    "publishedAt": "2026-03-14T10:00:00Z"
+  },
+  {
+    "id": "hw-hw-remote-onsite",
+    "title": "Dev Présentiel",
+    "client": "Onsite SA",
+    "stack": ["Python"],
+    "tjm": 520,
+    "location": "Lyon",
+    "remote": "onsite",
+    "duration": "12 mois",
+    "url": "https://hiway-missions.fr/admin/freelance/mission/hw-remote-onsite",
+    "source": "hiway",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": "2026-06-01",
+    "seniority": null,
+    "publishedAt": "2026-03-13T10:00:00Z"
+  }
+]

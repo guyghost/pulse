@@ -1,0 +1,20 @@
+[
+  {
+    "id": "col-encoding-001",
+    "slug": "integration-chantier-cote-azur",
+    "name": "Intégration d'un chantier à la Côte d'Azur",
+    "sumUp": "Mission d'intégration pour un grand compte bancaire français.",
+    "description": "<p>Études &amp; déploiement</p>",
+    "budgetBrief": "selon profil",
+    "workPreferences": ["HYBRID"],
+    "isPermanentContract": false,
+    "idealStartDate": "Dès que possible",
+    "projectTypes": ["JAVA", "SPRING"],
+    "publishedAt": "2026-03-14T10:00:00.000Z",
+    "company": { "name": "Société Générale & Fils", "logoUrl": null },
+    "location": {
+      "fullNameFrench": "Nice, Provence-Alpes-Côte d'Azur",
+      "fullNameEnglish": "Nice, French Riviera"
+    }
+  }
+]

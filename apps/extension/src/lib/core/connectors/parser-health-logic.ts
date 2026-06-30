@@ -99,3 +99,38 @@ export const evaluateParserHealth = (
 
   return { record, status };
 };
+
+export interface ParserHealthAlert {
+  severity: 'attention' | 'incident';
+  statusLabel: string;
+  impact: string;
+  action: string;
+}
+
+/**
+ * Derives a user-facing parser health alert from a persisted record.
+ * Pure — no I/O.
+ */
+export const deriveParserHealthAlert = (
+  record: ConnectorHealthRecord
+): ParserHealthAlert | null => {
+  if (record.consecutiveZeros >= BROKEN_PARSER_THRESHOLD) {
+    return {
+      severity: 'incident',
+      statusLabel: 'Parser probablement cassé',
+      impact: `${record.consecutiveZeros} scans consécutifs sans mission — le format de la plateforme a peut-être changé.`,
+      action: 'Exportez un diagnostic depuis Paramètres et signalez le problème.',
+    };
+  }
+
+  if (record.lastMissionCount === 0 && record.lastSuccessAt !== null) {
+    return {
+      severity: 'attention',
+      statusLabel: 'Signal parser anormal',
+      impact: 'La source a déjà produit des missions mais le dernier scan est vide.',
+      action: 'Relancez le diagnostic ou vérifiez la plateforme.',
+    };
+  }
+
+  return null;
+};

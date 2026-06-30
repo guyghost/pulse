@@ -1,0 +1,41 @@
+[
+  {
+    "id": 3001,
+    "name": "Dev Remote",
+    "slug": "dev-remote-3001",
+    "minimum_rate": 500,
+    "maximum_rate": 600,
+    "duration": "6 mois",
+    "city": "Paris",
+    "displacement": "remote",
+    "company": { "name": "Remote CP" },
+    "skills": [{ "name": "React" }],
+    "description": "Mission full remote"
+  },
+  {
+    "id": 3002,
+    "name": "Dev Sur Site",
+    "slug": "dev-onsite-3002",
+    "minimum_rate": 450,
+    "maximum_rate": 550,
+    "duration": "3 mois",
+    "city": "Lyon",
+    "displacement": "no_remote",
+    "company": { "name": "Onsite CP" },
+    "skills": [{ "name": "Java" }],
+    "description": "Mission présentielle"
+  },
+  {
+    "id": 3003,
+    "name": "Dev Hybride",
+    "slug": "dev-hybrid-3003",
+    "minimum_rate": 520,
+    "maximum_rate": 620,
+    "duration": "4 mois",
+    "city": "Nantes",
+    "displacement": "partially_remote_3",
+    "company": { "name": "Hybrid CP" },
+    "skills": [{ "name": "TypeScript" }],
+    "description": "3 jours remote"
+  }
+]
