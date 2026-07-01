@@ -14,6 +14,8 @@ import {
   setFeedState,
   allMissionsToggle,
   unfavoriteButton,
+  expectFeedEmptyState,
+  feedRegion,
 } from './helpers';
 
 /**
@@ -227,7 +229,7 @@ test.describe('Feed', () => {
 
     await setFeedState(page, 'empty');
 
-    await expect(page.getByText('Aucune mission')).toBeVisible({ timeout: 2000 });
+    await expectFeedEmptyState(page, 2000);
   });
 
   test('search filters missions', async ({ page }) => {
@@ -258,7 +260,9 @@ test.describe('Feed', () => {
 
     await setFeedState(page, 'error');
 
-    await expect(page.getByText('[Dev] Simulated error')).toBeVisible({ timeout: 2000 });
+    await expect(feedRegion(page).getByText('[Dev] Simulated error')).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('new missions show unseen indicator (blue left border)', async ({ page }) => {

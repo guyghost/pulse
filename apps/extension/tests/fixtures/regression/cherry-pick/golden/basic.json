@@ -1,0 +1,34 @@
+[
+  {
+    "id": "cp-1234",
+    "title": "Dev React Senior",
+    "client": "Acme Corp",
+    "stack": ["React", "TypeScript"],
+    "tjm": 600,
+    "location": "Paris",
+    "remote": "hybrid",
+    "duration": "6 mois",
+    "url": "https://app.cherry-pick.io/ext/missions/dev-react-senior-1234",
+    "source": "cherry-pick",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  },
+  {
+    "id": "cp-5678",
+    "title": "Lead Java Spring",
+    "client": "Tech SA",
+    "stack": ["Java", "Spring"],
+    "tjm": 650,
+    "location": "Lyon",
+    "remote": "full",
+    "duration": "3 mois",
+    "url": "https://app.cherry-pick.io/ext/missions/lead-java-spring-5678",
+    "source": "cherry-pick",
+    "scrapedAt": "2026-03-15T12:00:00.000Z",
+    "startDate": null,
+    "seniority": null,
+    "publishedAt": null
+  }
+]

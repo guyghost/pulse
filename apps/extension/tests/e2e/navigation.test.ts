@@ -1,9 +1,6 @@
-import { test, expect } from '@playwright/test';
-import { ensureFeedVisible } from './helpers';
-
+import { test, expect } from './fixtures';
 test.describe('Navigation', () => {
   test('navigates between tabs: Feed → TJM → Settings → Feed', async ({ page }) => {
-    await ensureFeedVisible(page);
     await expect(page.getByRole('button', { name: 'Feed' })).toHaveAttribute(
       'aria-current',
       'page'
@@ -25,8 +22,6 @@ test.describe('Navigation', () => {
   });
 
   test('active tab is visually highlighted', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
     const feedTab = nav.getByRole('button', { name: 'Feed' });
     await expect(feedTab).toHaveAttribute('aria-current', 'page');
@@ -38,8 +33,6 @@ test.describe('Navigation', () => {
   });
 
   test('page transitions are smooth (content changes on nav)', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
 
     await nav.getByRole('button', { name: 'TJM' }).click();

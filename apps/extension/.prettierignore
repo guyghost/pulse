@@ -2,6 +2,7 @@ dist/
 node_modules/
 coverage/
 test-results/
+playwright-report/
 .svelte-kit/
 pnpm-lock.yaml
 *.png

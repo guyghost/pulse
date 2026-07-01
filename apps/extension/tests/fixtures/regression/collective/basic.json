@@ -1,0 +1,17 @@
+[
+  {
+    "id": "cmmq3g2742fdd3ujib0q31f8f",
+    "slug": "pmo-dun-chantier-dintegration-it-6xd7",
+    "name": "PMO d'un chantier d'intégration IT",
+    "sumUp": "Mission de PMO pour un chantier IT complexe.",
+    "description": "<p>Description HTML complète</p>",
+    "budgetBrief": "400-450€ (Journalier)",
+    "workPreferences": ["HYBRID"],
+    "isPermanentContract": false,
+    "idealStartDate": "ASAP",
+    "projectTypes": ["DOCKER", "DEVOPS", "AWS"],
+    "publishedAt": "2026-03-14T10:00:00.000Z",
+    "company": { "name": "Acme Corp", "logoUrl": null },
+    "location": { "fullNameFrench": "Paris, France", "fullNameEnglish": "Paris, France" }
+  }
+]

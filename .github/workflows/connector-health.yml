@@ -1,0 +1,106 @@
+name: Connector Health
+
+on:
+  schedule:
+    - cron: '0 8 * * *'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+
+env:
+  NODE_VERSION: '22'
+  PNPM_VERSION: '10.32.1'
+
+jobs:
+  health-check:
+    name: Connector Health Checks
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Run connector health checks
+        id: health
+        continue-on-error: true
+        run: pnpm --filter @pulse/extension health-check:json > health-report.json
+
+      - name: Check health status
+        run: |
+          cat health-report.json
+          node -e "const r=require('./health-report.json'); if(r.status!=='pass') process.exit(1)"
+
+      - name: Upload health report
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: connector-health-report
+          path: health-report.json
+          retention-days: 14
+
+      - name: Create issue on failure
+        if: failure()
+        uses: actions/github-script@v7
+        with:
+          script: |
+            const fs = require('node:fs');
+            const report = fs.existsSync('health-report.json')
+              ? fs.readFileSync('health-report.json', 'utf8')
+              : 'Report unavailable';
+            const title = `Connector health check failed — ${new Date().toISOString().split('T')[0]}`;
+            const body = [
+              '## Connector health check failure',
+              '',
+              'The scheduled fixture-based health check detected a regression.',
+              '',
+              '```json',
+              report,
+              '```',
+              '',
+              'Run locally:',
+              '```bash',
+              'pnpm --filter @pulse/extension health-check',
+              '```',
+              '',
+              'See `docs/improvement-loop.md` for the full improvement cycle.',
+            ].join('\n');
+
+            const existing = await github.rest.issues.listForRepo({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              state: 'open',
+              labels: 'connector-health',
+            });
+
+            if (existing.data.some((issue) => issue.title === title)) {
+              core.info('Open issue already exists for today');
+              return;
+            }
+
+            await github.rest.issues.create({
+              owner: context.repo.owner,
+              repo: context.repo.repo,
+              title,
+              body,
+              labels: ['connector-health', 'bug'],
+            });

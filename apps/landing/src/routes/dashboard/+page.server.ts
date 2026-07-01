@@ -3,8 +3,13 @@ import { redirect } from '@sveltejs/kit';
 import { CREDIT_PACK_LIST } from '$lib/credits';
 import { createSupabaseAdminClient, createSupabaseServerClient } from '$lib/server/supabase';
 import { grantPremiumMonthlyCredits } from '$lib/server/credits';
+import { hasSupabaseAuthCookie } from '$lib/server/auth-cookie';
 
 export const load: PageServerLoad = async ({ cookies, url }) => {
+  if (!hasSupabaseAuthCookie(cookies)) {
+    redirect(303, '/login');
+  }
+
   const supabase = createSupabaseServerClient(cookies);
   const {
     data: { session },

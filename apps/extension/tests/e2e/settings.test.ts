@@ -1,10 +1,8 @@
-import { test, expect } from '@playwright/test';
-import { ensureFeedVisible, expectFeedReady, navButton } from './helpers';
+import { test, expect } from './fixtures';
+import { expectFeedReady, navButton } from './helpers';
 
 test.describe('Settings Flow', () => {
   test('navigates to settings without the profile editor section', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('button', { name: 'Settings' })).toHaveAttribute(
       'aria-current',
@@ -16,7 +14,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('profile tab is available and displays current profile information', async ({ page }) => {
-    await ensureFeedVisible(page);
     await navButton(page, 'Profil').click();
 
     await expect(navButton(page, 'Profil')).toHaveAttribute('aria-current', 'page');
@@ -27,7 +24,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('profile tab edit mode shows form fields', async ({ page }) => {
-    await ensureFeedVisible(page);
     await navButton(page, 'Profil').click();
 
     const editBtn = page.getByRole('button', { name: 'Modifier le profil' }).first();
@@ -40,7 +36,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('canceling profile edit returns to read-only mode', async ({ page }) => {
-    await ensureFeedVisible(page);
     await navButton(page, 'Profil').click();
 
     await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
@@ -51,7 +46,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('profile tab saves partial profile edits', async ({ page }) => {
-    await ensureFeedVisible(page);
     await navButton(page, 'Profil').click();
     await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
 
@@ -87,7 +81,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('profile stack editor adds and removes technologies', async ({ page }) => {
-    await ensureFeedVisible(page);
     await navButton(page, 'Profil').click();
     await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
 
@@ -103,7 +96,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('adding stack item via Enter key works', async ({ page }) => {
-    await ensureFeedVisible(page);
     await navButton(page, 'Profil').click();
     await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
 
@@ -115,7 +107,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('scan frequency slider is visible and adjustable', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByText('Fréquence', { exact: true })).toBeVisible();
@@ -125,7 +116,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('notifications toggle switches state', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     const notificationsSwitch = page.getByRole('switch', { name: 'Activer les notifications' });
@@ -138,7 +128,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('auto-scan toggle switches state', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     const autoScanSwitch = page.getByRole('switch', { name: 'Activer le scan automatique' });
@@ -151,7 +140,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('disabling auto-scan dims the frequency section', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     const autoScanSwitch = page.getByRole('switch', { name: 'Activer le scan automatique' });
@@ -165,7 +153,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('local AI status section is present', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByRole('heading', { name: 'IA locale' })).toBeVisible();
@@ -178,7 +165,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('danger zone shows reset button', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByText('Zone dangereuse')).toBeVisible();
@@ -186,7 +172,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('clicking reset shows confirmation dialog', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await page.getByText('Réinitialiser tout').click();
@@ -197,8 +182,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('settings page remains accessible after navigation', async ({ page }) => {
-    await ensureFeedVisible(page);
-
     await page.getByRole('button', { name: 'Settings' }).click();
     await expect(page.getByRole('heading', { name: 'Paramètres' })).toBeVisible();
 
@@ -216,7 +199,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('settings page shows export section', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByText('Export').first()).toBeVisible({ timeout: 3000 });
@@ -226,7 +208,6 @@ test.describe('Settings Flow', () => {
   });
 
   test('settings page shows backup section', async ({ page }) => {
-    await ensureFeedVisible(page);
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByText('Sauvegarde').first()).toBeVisible({ timeout: 3000 });

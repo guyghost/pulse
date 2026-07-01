@@ -1,4 +1,5 @@
-import { test, expect } from '@playwright/test';
+import { test as baseTest, expect } from '@playwright/test';
+import { test as feedTest } from '../fixtures';
 import {
   SIDE_PANEL,
   mockNoProfile,
@@ -8,7 +9,6 @@ import {
   favoriteMission,
   feedSearchInput,
   hideMission,
-  ensureFeedVisible,
   expectFeedReady,
   expectMissionCount,
   missionCards,
@@ -20,14 +20,8 @@ import {
   clearFeedSearch,
 } from '../helpers';
 
-test.describe('Full User Journey', () => {
-  test.beforeEach(async ({ page }) => {
-    // Cleanup: réinitialiser l'état avant chaque test
-    await page.goto('about:blank');
-  });
-
-  test('complete user journey from onboarding to feed interactions', async ({ page }) => {
-    // 1. Première ouverture → onboarding affiché
+baseTest.describe('Full User Journey', () => {
+  baseTest('complete user journey from onboarding to feed interactions', async ({ page }) => {
     await mockNoProfile(page);
     await page.goto(SIDE_PANEL);
 
@@ -35,176 +29,122 @@ test.describe('Full User Journey', () => {
       timeout: 5000,
     });
 
-    // 2. Remplir le profil
     await completeOnboarding(page, {
       firstName: 'Jean',
       jobTitle: 'Développeur React Senior',
     });
 
-    // 3. Arriver sur le feed. The greeting is asserted after reload below: the FeedPage mounts
-    // hidden during onboarding and loads the profile as null; the no-profile mock does not
-    // broadcast PROFILE_UPDATED, so the greeting only appears after a fresh page load.
     await expectFeedReady(page);
 
-    // 4. Lancer un scan (le scan auto démarre)
-    // Attendre que le scan charge des missions
     await waitForMissions(page, 1, 10000);
 
-    // 5. Voir des missions apparaître
     const initialCount = await getDisplayedMissionCount(page);
     expect(initialCount).toBeGreaterThanOrEqual(1);
 
-    // Injecter des missions supplémentaires pour les tests suivants
     await injectMissions(page, 5);
-    await waitForMissions(page, 5, 5000);
+    await expectMissionCount(page, 5, 5000);
 
-    // 6. Marquer une mission comme favorite
     const firstCard = await getFirstMissionCard(page);
     await favoriteMission(firstCard);
 
-    // 7. Vérifier le compteur de favoris
     await toggleFavoritesFilter(page, true);
-    await expectMissionCount(page, 1, 2000);
+    await expectMissionCount(page, 1, 5000);
 
-    // Retourner à toutes les missions
     await toggleFavoritesFilter(page, false);
-    await expectMissionCount(page, 5, 2000);
+    await expectMissionCount(page, 5, 5000);
 
-    // 8. Masquer une mission
     const cardToHide = await getFirstMissionCard(page);
     await hideMission(cardToHide);
 
-    // 9. Vérifier le filtre "masquées"
-    // Le compteur doit avoir diminué
     await expectMissionCount(page, 4, 2000);
-
-    // Le lien "Voir les masquées" doit apparaître
     await expect(page.getByRole('button', { name: /Voir les? \d+ mission.*masqu/i })).toBeVisible();
 
-    // Afficher les missions masquées
     await showHiddenMissions(page);
-
-    // On devrait revoir 5 missions
     await expectMissionCount(page, 5, 2000);
 
-    // 10. Recharger la page → données persistées
     await page.reload();
 
-    // Le profil doit être conservé : l'onboarding ne réapparaît pas (le formulaire est absent) et
-    // le feed est directement accessible. We assert on the onboarding form being gone rather than
-    // the "Bonjour, {firstName}" hero, which only renders in the non-condensed feed view.
     await expect(page.locator('#ob-firstname')).not.toBeVisible({ timeout: 5000 });
     await expectFeedReady(page);
   });
 
-  test('user can favorite multiple missions and filter persists', async ({ page }) => {
-    await ensureFeedVisible(page);
+  feedTest.describe('Feed interactions', () => {
+    feedTest('user can favorite multiple missions and filter persists', async ({ page }) => {
+      await injectMissions(page, 10);
+      await waitForMissions(page, 10, 5000);
 
-    // Injecter 10 missions
-    await injectMissions(page, 10);
-    await waitForMissions(page, 10, 5000);
+      for (let i = 0; i < 3; i++) {
+        const card = missionCards(page).nth(i);
+        await favoriteMission(card);
+      }
 
-    // Favoriser 3 missions
-    for (let i = 0; i < 3; i++) {
-      const card = missionCards(page).nth(i);
-      await favoriteMission(card);
-    }
+      await toggleFavoritesFilter(page, true);
+      await expectMissionCount(page, 3, 2000);
 
-    // Filtrer les favoris
-    await toggleFavoritesFilter(page, true);
-    await expectMissionCount(page, 3, 2000);
+      await page.reload();
+      await expectFeedReady(page);
 
-    // Recharger et vérifier que les favoris sont conservés
-    await page.reload();
+      await expectMissionCount(page, 10, 5000);
+      await toggleFavoritesFilter(page, true);
+      await expectMissionCount(page, 3, 5000);
+    });
 
-    // Attendre le chargement
-    await expectFeedReady(page);
+    feedTest('user can navigate through different views and back', async ({ page }) => {
+      await injectMissions(page, 3);
+      await waitForMissions(page, 3, 5000);
 
-    // Le filtre revient à "toutes", mais les favoris sauvegardés restent disponibles.
-    await expectMissionCount(page, 10, 5000);
-    await toggleFavoritesFilter(page, true);
-    await expectMissionCount(page, 3, 5000);
-  });
+      await navButton(page, 'TJM').click();
+      await expect(navButton(page, 'TJM')).toHaveAttribute('aria-current', 'page');
 
-  test('user can navigate through different views and back', async ({ page }) => {
-    await ensureFeedVisible(page);
+      await navButton(page, 'Settings').click();
+      await expect(navButton(page, 'Settings')).toHaveAttribute('aria-current', 'page');
 
-    // Injecter des missions
-    await injectMissions(page, 3);
-    await waitForMissions(page, 3, 5000);
+      await navButton(page, 'Feed').click();
+      await expectFeedReady(page);
 
-    // Naviguer vers TJM
-    await navButton(page, 'TJM').click();
-    await expect(navButton(page, 'TJM')).toHaveAttribute('aria-current', 'page');
+      await expectMissionCount(page, 3, 3000);
+    });
 
-    // Naviguer vers Settings
-    await navButton(page, 'Settings').click();
-    await expect(navButton(page, 'Settings')).toHaveAttribute('aria-current', 'page');
+    feedTest('user can search and favorite from search results', async ({ page }) => {
+      await injectMissions(page, 10);
+      await waitForMissions(page, 10, 5000);
 
-    // Revenir au Feed
-    await navButton(page, 'Feed').click();
-    await expectFeedReady(page);
+      const initialCount = 10;
 
-    // Les missions doivent toujours être là
-    await expectMissionCount(page, 3, 3000);
-  });
+      await feedSearchInput(page).fill('React');
+      await page.waitForTimeout(500);
 
-  test('user can search and favorite from search results', async ({ page }) => {
-    await ensureFeedVisible(page);
+      const filteredCount = await getDisplayedMissionCount(page);
+      expect(filteredCount).toBeLessThanOrEqual(initialCount);
 
-    // Injecter des missions
-    await injectMissions(page, 10);
-    await waitForMissions(page, 10, 5000);
+      await expect(feedSearchInput(page)).toHaveValue('React');
 
-    // Mémoriser le nombre de missions
-    const initialCount = 10;
+      const firstResult = await getFirstMissionCard(page);
+      await favoriteMission(firstResult);
 
-    // Rechercher
-    await feedSearchInput(page).fill('React');
-    await page.waitForTimeout(500);
+      await clearFeedSearch(page);
+      await page.waitForTimeout(300);
 
-    // Vérifier qu'on a des résultats filtrés
-    const filteredCount = await getDisplayedMissionCount(page);
-    expect(filteredCount).toBeLessThanOrEqual(initialCount);
+      await expectMissionCount(page, initialCount, 2000);
 
-    // Vérifier que la recherche a bien filtré
-    await expect(feedSearchInput(page)).toHaveValue('React');
+      await toggleFavoritesFilter(page, true);
+      await expectMissionCount(page, 1, 2000);
+    });
 
-    // Favoriser la première mission des résultats de recherche
-    const firstResult = await getFirstMissionCard(page);
-    await favoriteMission(firstResult);
+    feedTest('hidden missions count shows correct number', async ({ page }) => {
+      await injectMissions(page, 8);
+      await waitForMissions(page, 8, 5000);
 
-    // Effacer la recherche
-    await clearFeedSearch(page);
-    await page.waitForTimeout(300);
+      for (let i = 0; i < 3; i++) {
+        const card = missionCards(page).first();
+        await hideMission(card);
+      }
 
-    // Vérifier qu'on retrouve toutes les missions
-    await expectMissionCount(page, initialCount, 2000);
+      await expectMissionCount(page, 5, 2000);
+      await expect(page.getByRole('button', { name: /Voir les 3 mission.*masqu/i })).toBeVisible();
 
-    // Vérifier que le favori est toujours là
-    await toggleFavoritesFilter(page, true);
-    await expectMissionCount(page, 1, 2000);
-  });
-
-  test('hidden missions count shows correct number', async ({ page }) => {
-    await ensureFeedVisible(page);
-
-    // Injecter 8 missions
-    await injectMissions(page, 8);
-    await waitForMissions(page, 8, 5000);
-
-    // Masquer 3 missions
-    for (let i = 0; i < 3; i++) {
-      const card = missionCards(page).first();
-      await hideMission(card);
-    }
-
-    // Vérifier le compteur de masquées
-    await expectMissionCount(page, 5, 2000);
-    await expect(page.getByRole('button', { name: /Voir les 3 mission.*masqu/i })).toBeVisible();
-
-    // Cliquer pour voir les masquées
-    await showHiddenMissions(page);
-    await expectMissionCount(page, 8, 2000);
+      await showHiddenMissions(page);
+      await expectMissionCount(page, 8, 2000);
+    });
   });
 });

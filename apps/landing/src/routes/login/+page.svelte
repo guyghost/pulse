@@ -1,19 +1,29 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import { goto } from '$app/navigation';
+  import { page } from '$app/state';
   import {
     passkeyErrorMessage,
     requestEmailSessionLink,
     signInWithPasskey,
   } from '$lib/auth/passkey';
 
-  let { data } = $props();
-
   let formError = $state<string | undefined>(undefined);
   let email = $state('');
   let linkSent = $state(false);
   let submitting = $state(false);
-  const redirectTo = $derived(data.redirectTo ?? '/dashboard');
+  const redirectTo = $derived(
+    browser ? normalizeRedirectPath(page.url.searchParams.get('redirectTo')) : '/dashboard'
+  );
   const loginIntent = $derived(getLoginIntent(redirectTo));
+
+  function normalizeRedirectPath(value: string | null): string {
+    if (!value || !value.startsWith('/') || value.startsWith('//')) {
+      return '/dashboard';
+    }
+
+    return value;
+  }
 
   function getLoginIntent(path: string): {
     title: string;

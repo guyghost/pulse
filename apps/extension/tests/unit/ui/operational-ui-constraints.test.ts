@@ -159,7 +159,8 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Premium verrouillé');
     expect(source).toContain('aria-label={itemLocked');
     expect(source).toContain('primaryActionLabel="Voir les réglages"');
-    expect(source).toContain("nav.currentPage === 'profile'");
+    expect(source).toContain('data-testid="page-profile"');
+    expect(source).toContain("nav.currentPage !== 'profile'");
     expect(source).not.toContain('Profil premium verrouillé');
     expect(source).not.toContain("nav.currentPage === 'profile' && premium.isPremium");
     expect(source).not.toContain('NAV_ITEMS.filter');
@@ -477,7 +478,8 @@ describe('operational UI constraints', () => {
     expect(drawerSource.indexOf('Transformer la décision')).toBeLessThan(
       drawerSource.indexOf('Détails techniques')
     );
-    expect(feedSource).toContain('const tracking = createTrackingStore()');
+    expect(feedSource).toContain('function loadTrackingStore()');
+    expect(feedSource).toContain('createTrackingStore');
     expect(feedSource).toContain('onSelectForTracking');
     expect(feedSource).toContain('function handleInvestigationSelectForTracking()');
     expect(feedSource).toContain("handleTrackingTransition(investigationMission.id, 'selected')");
@@ -508,7 +510,7 @@ describe('operational UI constraints', () => {
     expect(source).toContain('const previousTracking = cloneTrackingSnapshot');
     expect(source).toContain('showToastAction(`Statut: ${STATUS_LABELS[status]}`');
     expect(source).toContain("label: 'Annuler'");
-    expect(source).toContain('tracking.restoreTracking(missionId, previousTracking)');
+    expect(source).toContain('trackingStore.restoreTracking(missionId, previousTracking)');
   });
 
   it('keeps feed undo and hidden-filter microcopy accented', () => {
@@ -562,7 +564,9 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('let showComparison = $state(false)');
     expect(feedSource).toContain('function openComparison()');
     expect(feedSource).toContain('onclick={openComparison}');
-    expect(feedSource).toContain('{#if showComparison && page.comparisonMissions.length >= 2}');
+    expect(feedSource).toContain(
+      '{#if showComparison && page.comparisonMissions.length >= 2 && MissionComparison}'
+    );
     expect(feedSource).not.toContain('onclick={() => {}}');
   });
 

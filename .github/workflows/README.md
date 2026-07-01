@@ -108,12 +108,12 @@ When secrets are not configured, the workflow succeeds with a warning.
 
 | Action                            | Version | Purpose           |
 | --------------------------------- | ------- | ----------------- |
-| `actions/checkout`                | v4      | Git checkout      |
-| `actions/setup-node`              | v4      | Node.js setup     |
-| `pnpm/action-setup`               | v4      | pnpm setup        |
-| `actions/cache`                   | v4      | Dependency cache  |
+| `actions/checkout`                | v7      | Git checkout      |
+| `actions/setup-node`              | v6      | Node.js setup     |
+| `pnpm/action-setup`               | v6      | pnpm setup        |
+| `actions/cache`                   | v6      | Dependency cache  |
 | `actions/upload-artifact`         | v4      | Artifact upload   |
 | `actions/download-artifact`       | v4      | Artifact download |
-| `codecov/codecov-action`          | v4      | Coverage upload   |
+| `codecov/codecov-action`          | v7      | Coverage upload   |
 | `softprops/action-gh-release`     | v2      | GitHub releases   |
 | `mnao305/chrome-extension-upload` | v5.0.0  | CWS publish       |
