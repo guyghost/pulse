@@ -403,6 +403,9 @@
   let showAlertOnly = $state(false);
   let showComparison = $state(false);
   let showAdvancedControls = $state(false);
+  // Tracks whether the advanced panel was opened by the user (vs. auto-expanded
+  // by a broken-connector state). Lets us auto-collapse only the auto-expand.
+  let advancedControlsUserOpened = $state(false);
   let investigationMission = $state<(typeof page.displayMissions)[number] | null>(null);
   let scrollStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -944,8 +947,12 @@
   }
 
   $effect(() => {
-    if (brokenConnectors.length > 0) {
+    const hasBroken = brokenConnectors.length > 0;
+    if (hasBroken && !showAdvancedControls) {
       showAdvancedControls = true;
+      advancedControlsUserOpened = false;
+    } else if (!hasBroken && showAdvancedControls && !advancedControlsUserOpened) {
+      showAdvancedControls = false;
     }
   });
 
@@ -1517,7 +1524,10 @@
             <button
               type="button"
               class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-[10px] font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary"
-              onclick={() => (showAdvancedControls = !showAdvancedControls)}
+              onclick={() => {
+                advancedControlsUserOpened = true;
+                showAdvancedControls = !showAdvancedControls;
+              }}
               aria-expanded={showAdvancedControls}
               aria-label={showAdvancedControls
                 ? 'Masquer les détails opérationnels'
@@ -1527,43 +1537,41 @@
             </button>
           </div>
 
-          {#if showAdvancedControls}
-            <div class="mt-2" aria-label="Presets métier du feed">
-              <div class="mb-1 flex items-center justify-between gap-2">
-                <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
-                  Presets métier
-                </p>
-                {#if page.decisionPreset}
-                  <button
-                    type="button"
-                    class="text-[10px] font-medium text-blueprint-blue hover:text-blueprint-blue/80"
-                    onclick={page.clearAllFilters}
-                  >
-                    Réinitialiser
-                  </button>
-                {/if}
-              </div>
-              <div class="flex gap-1.5 overflow-x-auto pb-1">
-                {#each page.decisionPresets as preset}
-                  <button
-                    type="button"
-                    class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
-                      ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                      : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                    onclick={() => page.applyDecisionPreset(preset.id)}
-                    aria-pressed={preset.active}
-                    disabled={preset.count === 0 && !preset.active}
-                    title={preset.description}
-                  >
-                    <span>{preset.label}</span>
-                    <span class="rounded-md bg-page-canvas px-1 py-0.5 text-[9px]">
-                      {preset.count}
-                    </span>
-                  </button>
-                {/each}
-              </div>
+          <div class="mt-2" aria-label="Presets métier du feed">
+            <div class="mb-1 flex items-center justify-between gap-2">
+              <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                Presets métier
+              </p>
+              {#if page.decisionPreset}
+                <button
+                  type="button"
+                  class="text-[10px] font-medium text-blueprint-blue hover:text-blueprint-blue/80"
+                  onclick={page.clearAllFilters}
+                >
+                  Réinitialiser
+                </button>
+              {/if}
             </div>
-          {/if}
+            <div class="flex gap-1.5 overflow-x-auto pb-1">
+              {#each page.decisionPresets as preset}
+                <button
+                  type="button"
+                  class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
+                    ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                    : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                  onclick={() => page.applyDecisionPreset(preset.id)}
+                  aria-pressed={preset.active}
+                  disabled={preset.count === 0 && !preset.active}
+                  title={preset.description}
+                >
+                  <span>{preset.label}</span>
+                  <span class="rounded-md bg-page-canvas px-1 py-0.5 text-[9px]">
+                    {preset.count}
+                  </span>
+                </button>
+              {/each}
+            </div>
+          </div>
 
           {#if page.showFilters && FilterBar}
             <div
