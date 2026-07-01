@@ -1,0 +1,174 @@
+{
+  "generatedAt": "2026-06-29T08:42:36.809Z",
+  "label": "after-extension-persistent-static-shell",
+  "budgetMs": 50,
+  "iterations": 7,
+  "warmups": 3,
+  "skipBuild": false,
+  "browserExecutable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "summary": [
+    {
+      "id": "extension.feed",
+      "app": "extension",
+      "type": "extension-url",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto px-4 pt-4\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote \nURL: about:blank\nBody: "
+    },
+    {
+      "id": "extension.onboarding",
+      "app": "extension",
+      "type": "extension-url",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Error: strict mode violation: getByRole('heading', { name: 'Configurez votre premier scan' }) resolved to 2 elements:\n    1) <h1>↵                  Configurez votre premier scan↵…</h1> aka locator('section').filter({ hasText: 'MissionPulse Configurez votre' }).getByRole('heading')\n    2) <h1 class=\"mt-3 text-xl font-semibold leading-tight text-text-primary\">Configurez votre premier scan</h1> aka getByRole('main').getByRole('heading', { name: 'Configurez votre premier scan' })\n\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Configurez votre premier scan' }) to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Configurez votre premier scan MISSIONPULSE Configurez votre premier scan Pulse utilise vos sessions Chrome pour récupérer les missions et afficher celles à traiter en premier. SCAN Multi-source SCORE Pertinence TJM Ajuste PREMIER LANCEMENT Comprendre Pulse Commencez par la plateforme à scanner en premier. 2 minutes Modifiable ensuite 1/5 Voir le feed Choisissez la première plateforme à scanner. Pulse récupère les missions depuis vos sessions Chrome, puis affiche celles à traiter en premier. Configurer le radar Personnalisez vos résultats Cette étape est facultative. Ajoutez au moi\nURL: about:blank\nBody: "
+    },
+    {
+      "id": "extension.profile",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto px-4 pt-4\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    },
+    {
+      "id": "extension.cv",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    },
+    {
+      "id": "extension.applications",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    },
+    {
+      "id": "extension.tjm",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    },
+    {
+      "id": "extension.settings",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    }
+  ],
+  "details": [
+    {
+      "id": "extension.feed",
+      "app": "extension",
+      "type": "extension-url",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "stub": {
+        "onboardingCompleted": true
+      },
+      "samples": [],
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto px-4 pt-4\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote \nURL: about:blank\nBody: "
+    },
+    {
+      "id": "extension.onboarding",
+      "app": "extension",
+      "type": "extension-url",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "stub": {
+        "onboardingCompleted": false,
+        "firstScanDone": false,
+        "profile": null,
+        "premium": false
+      },
+      "samples": [],
+      "error": "locator.waitFor: Error: strict mode violation: getByRole('heading', { name: 'Configurez votre premier scan' }) resolved to 2 elements:\n    1) <h1>↵                  Configurez votre premier scan↵…</h1> aka locator('section').filter({ hasText: 'MissionPulse Configurez votre' }).getByRole('heading')\n    2) <h1 class=\"mt-3 text-xl font-semibold leading-tight text-text-primary\">Configurez votre premier scan</h1> aka getByRole('main').getByRole('heading', { name: 'Configurez votre premier scan' })\n\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Configurez votre premier scan' }) to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Configurez votre premier scan MISSIONPULSE Configurez votre premier scan Pulse utilise vos sessions Chrome pour récupérer les missions et afficher celles à traiter en premier. SCAN Multi-source SCORE Pertinence TJM Ajuste PREMIER LANCEMENT Comprendre Pulse Commencez par la plateforme à scanner en premier. 2 minutes Modifiable ensuite 1/5 Voir le feed Choisissez la première plateforme à scanner. Pulse récupère les missions depuis vos sessions Chrome, puis affiche celles à traiter en premier. Configurer le radar Personnalisez vos résultats Cette étape est facultative. Ajoutez au moi\nURL: about:blank\nBody: "
+    },
+    {
+      "id": "extension.profile",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 1,
+      "samples": [],
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto px-4 pt-4\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    },
+    {
+      "id": "extension.cv",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 2,
+      "samples": [],
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    },
+    {
+      "id": "extension.applications",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 3,
+      "samples": [],
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    },
+    {
+      "id": "extension.tjm",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 4,
+      "samples": [],
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    },
+    {
+      "id": "extension.settings",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 5,
+      "samples": [],
+      "error": "locator.waitFor: Error: strict mode violation: locator('[data-testid=\"feed-scroll-container\"]') resolved to 2 elements:\n    1) <div class=\"initial-shell\" data-initial-shell=\"\" data-testid=\"feed-scroll-container\">…</div> aka getByTestId('feed-scroll-container').first()\n    2) <div data-testid=\"feed-scroll-container\" class=\"relative h-full overflow-y-auto\">…</div> aka getByRole('main').getByTestId('feed-scroll-container')\n\nCall log:\n\u001b[2m  - waiting for locator('[data-testid=\"feed-scroll-container\"]') to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: MISSIONPULSE Feed Profil CV Suivi TJM Réglages MISSIONPULSE 54 missions À FAIRE MAINTENANT À traiter 54 missions prioritaires à examiner 54 nouvelles missions au total. Commencez par celles qui dépassent le seuil 70+. NOUVELLES 54 PRIORITAIRES 70+ 54 SOURCES EN ERREUR 0 Voir les 54 missions prioritaires FILE D’ACTIONS 3 priorités Traiter 54 missions en alerte Seuil 70+ franchi selon vos critères. Qualifier 54 missions Affiche uniquement les missions non vues. Aller aux missions 54 missions visibles selon les filtres courants. Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 37 Remote "
+    }
+  ]
+}

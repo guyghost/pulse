@@ -1,0 +1,254 @@
+{
+  "generatedAt": "2026-06-29T08:20:52.424Z",
+  "label": "debug-extension",
+  "budgetMs": 50,
+  "iterations": 1,
+  "warmups": 0,
+  "skipBuild": true,
+  "browserExecutable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "summary": [
+    {
+      "id": "extension.feed",
+      "app": "extension",
+      "type": "extension-url",
+      "samples": 1,
+      "minMs": 200.2,
+      "p50Ms": 200.2,
+      "p95Ms": 200.2,
+      "maxMs": 200.2,
+      "meanMs": 200.2,
+      "pass": false
+    },
+    {
+      "id": "extension.onboarding",
+      "app": "extension",
+      "type": "extension-url",
+      "samples": 1,
+      "minMs": 161.1,
+      "p50Ms": 161.1,
+      "p95Ms": 161.1,
+      "maxMs": 161.1,
+      "meanMs": 161.1,
+      "pass": false
+    },
+    {
+      "id": "extension.profile",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 1,
+      "minMs": 83.7,
+      "p50Ms": 83.7,
+      "p95Ms": 83.7,
+      "maxMs": 83.7,
+      "meanMs": 83.7,
+      "pass": false
+    },
+    {
+      "id": "extension.cv",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 1,
+      "minMs": 38.6,
+      "p50Ms": 38.6,
+      "p95Ms": 38.6,
+      "maxMs": 38.6,
+      "meanMs": 38.6,
+      "pass": true
+    },
+    {
+      "id": "extension.applications",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Error: strict mode violation: getByRole('heading', { name: 'Candidatures' }) resolved to 2 elements:\n    1) <h2 class=\"text-base font-semibold text-text-primary\">Candidatures</h2> aka getByRole('heading', { name: 'Candidatures', exact: true })\n    2) <h3 class=\"mt-1 text-sm font-semibold leading-5 text-text-primary\">2 candidatures préparées mais pas encore envoyées</h3> aka getByRole('heading', { name: '2 candidatures préparées mais' })\n\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Candidatures' }) to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: Feed Profil CV Suivi TJM Réglages PIPELINE Candidatures Local uniquement Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier. Ces statuts restent dans l'extension tant que le compte MissionPulse n'est pas connecté. PRIORITÉ Prêt à envoyer 2 candidatures préparées mais pas encore envoyées Le contenu existe déjà. La prochaine action utile est de finaliser l’envoi ou de changer le statut. ACTIVES 6 RELANCES 0 PRÊTES 2 Continuer le dossier DOSSIER RECOMMANDÉ Mission TypeScript 5 Kit prêt: finalisez l’envoi ou changez le statut pour garder le pipeline propre. Prépa"
+    },
+    {
+      "id": "extension.tjm",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 1,
+      "minMs": 37.4,
+      "p50Ms": 37.4,
+      "p95Ms": 37.4,
+      "maxMs": 37.4,
+      "meanMs": 37.4,
+      "pass": true
+    },
+    {
+      "id": "extension.settings",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 1,
+      "minMs": 47.8,
+      "p50Ms": 47.8,
+      "p95Ms": 47.8,
+      "maxMs": 47.8,
+      "meanMs": 47.8,
+      "pass": true
+    }
+  ],
+  "details": [
+    {
+      "id": "extension.feed",
+      "app": "extension",
+      "type": "extension-url",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "stub": {
+        "onboardingCompleted": true
+      },
+      "samples": [
+        {
+          "durationMs": 200.2,
+          "domContentLoadedMs": 172,
+          "loadEventMs": 0,
+          "responseStartMs": 3,
+          "firstPaintMs": 68,
+          "firstContentfulPaintMs": null,
+          "transferSize": 909,
+          "encodedBodySize": 609,
+          "wallClockMs": 315.6,
+          "warmup": false,
+          "consoleErrorCount": 0,
+          "consoleErrors": []
+        }
+      ]
+    },
+    {
+      "id": "extension.onboarding",
+      "app": "extension",
+      "type": "extension-url",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "stub": {
+        "onboardingCompleted": false,
+        "firstScanDone": false,
+        "profile": null,
+        "premium": false
+      },
+      "samples": [
+        {
+          "durationMs": 161.1,
+          "domContentLoadedMs": 142,
+          "loadEventMs": 0,
+          "responseStartMs": 2,
+          "firstPaintMs": 64,
+          "firstContentfulPaintMs": null,
+          "transferSize": 909,
+          "encodedBodySize": 609,
+          "wallClockMs": 267.9,
+          "warmup": false,
+          "consoleErrorCount": 0,
+          "consoleErrors": []
+        }
+      ]
+    },
+    {
+      "id": "extension.profile",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 1,
+      "samples": [
+        {
+          "durationMs": 83.7,
+          "domContentLoadedMs": 154,
+          "loadEventMs": 235,
+          "responseStartMs": 2,
+          "firstPaintMs": 72,
+          "firstContentfulPaintMs": 196,
+          "transferSize": 909,
+          "encodedBodySize": 609,
+          "wallClockMs": 259.4,
+          "warmup": false,
+          "consoleErrorCount": 1,
+          "consoleErrors": [
+            "Failed to load resource: the server responded with a status of 404 (Not Found)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "extension.cv",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 2,
+      "samples": [
+        {
+          "durationMs": 38.6,
+          "domContentLoadedMs": 128,
+          "loadEventMs": 132,
+          "responseStartMs": 2,
+          "firstPaintMs": 96,
+          "firstContentfulPaintMs": 152,
+          "transferSize": 300,
+          "encodedBodySize": 609,
+          "wallClockMs": 180.1,
+          "warmup": false,
+          "consoleErrorCount": 0,
+          "consoleErrors": []
+        }
+      ]
+    },
+    {
+      "id": "extension.applications",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 3,
+      "samples": [],
+      "error": "locator.waitFor: Error: strict mode violation: getByRole('heading', { name: 'Candidatures' }) resolved to 2 elements:\n    1) <h2 class=\"text-base font-semibold text-text-primary\">Candidatures</h2> aka getByRole('heading', { name: 'Candidatures', exact: true })\n    2) <h3 class=\"mt-1 text-sm font-semibold leading-5 text-text-primary\">2 candidatures préparées mais pas encore envoyées</h3> aka getByRole('heading', { name: '2 candidatures préparées mais' })\n\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Candidatures' }) to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: Feed Profil CV Suivi TJM Réglages PIPELINE Candidatures Local uniquement Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier. Ces statuts restent dans l'extension tant que le compte MissionPulse n'est pas connecté. PRIORITÉ Prêt à envoyer 2 candidatures préparées mais pas encore envoyées Le contenu existe déjà. La prochaine action utile est de finaliser l’envoi ou de changer le statut. ACTIVES 6 RELANCES 0 PRÊTES 2 Continuer le dossier DOSSIER RECOMMANDÉ Mission TypeScript 5 Kit prêt: finalisez l’envoi ou changez le statut pour garder le pipeline propre. Prépa"
+    },
+    {
+      "id": "extension.tjm",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 4,
+      "samples": [
+        {
+          "durationMs": 37.4,
+          "domContentLoadedMs": 106,
+          "loadEventMs": 110,
+          "responseStartMs": 1,
+          "firstPaintMs": 88,
+          "firstContentfulPaintMs": 128,
+          "transferSize": 300,
+          "encodedBodySize": 609,
+          "wallClockMs": 152.2,
+          "warmup": false,
+          "consoleErrorCount": 0,
+          "consoleErrors": []
+        }
+      ]
+    },
+    {
+      "id": "extension.settings",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 5,
+      "samples": [
+        {
+          "durationMs": 47.8,
+          "domContentLoadedMs": 88,
+          "loadEventMs": 91,
+          "responseStartMs": 1,
+          "firstPaintMs": 76,
+          "firstContentfulPaintMs": 108,
+          "transferSize": 300,
+          "encodedBodySize": 609,
+          "wallClockMs": 144,
+          "warmup": false,
+          "consoleErrorCount": 0,
+          "consoleErrors": []
+        }
+      ]
+    }
+  ]
+}
