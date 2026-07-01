@@ -271,6 +271,7 @@
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let showAlertOnly = $state(false);
   let showComparison = $state(false);
+  let showAdvancedControls = $state(false);
   let investigationMission = $state<(typeof page.displayMissions)[number] | null>(null);
   let scrollStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -770,6 +771,12 @@
   }
 
   $effect(() => {
+    if (brokenConnectors.length > 0) {
+      showAdvancedControls = true;
+    }
+  });
+
+  $effect(() => {
     const container = feedScrollContainer;
     missionFeedSection;
     visibleFeedMissionCount;
@@ -941,22 +948,6 @@
                 </Tooltip>
               </div>
             </div>
-            <SourceHealthPanel
-              sources={controller.sourceStatuses as SourceStatus[]}
-              isChecking={controller.isCheckingSources}
-              compact={true}
-              scanResultCounts={page.sourceMissionCounts}
-              activeSourceFilter={page.selectedSource}
-              enabledConnectors={controller.enabledConnectorIds}
-              healthSnapshots={controller.healthSnapshots}
-              onRefresh={() => controller.checkSourceSessions()}
-              onFilterBySource={(id) => {
-                page.setSelectedSource(id as MissionSource | null);
-              }}
-              onToggleConnector={(id) => controller.handleToggleConnector(id)}
-              onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
-              onReconnect={handleOpenExternalUrl}
-            />
             <div class="mt-3">
               <OperationalStoryCard
                 eyebrow="À faire maintenant"
@@ -972,17 +963,35 @@
               />
             </div>
             {@render feedActionQueueBlock(true)}
-            <FeedActionDashboard
-              summary={page.dashboardSummary}
-              insightSummary={page.insightSummary}
-              scoreDistribution={page.scoreDistribution}
-              selectedScoreBucket={page.selectedScoreBucket}
-              showNewOnly={page.showNewOnly}
-              brokenConnectorCount={brokenConnectors.length}
-              onToggleNewOnly={page.toggleNewOnly}
-              onToggleFavorites={page.toggleFavoritesFilter}
-              onSetScoreBucket={page.setSelectedScoreBucket}
-            />
+            {#if showAdvancedControls}
+              <SourceHealthPanel
+                sources={controller.sourceStatuses as SourceStatus[]}
+                isChecking={controller.isCheckingSources}
+                compact={true}
+                scanResultCounts={page.sourceMissionCounts}
+                activeSourceFilter={page.selectedSource}
+                enabledConnectors={controller.enabledConnectorIds}
+                healthSnapshots={controller.healthSnapshots}
+                onRefresh={() => controller.checkSourceSessions()}
+                onFilterBySource={(id) => {
+                  page.setSelectedSource(id as MissionSource | null);
+                }}
+                onToggleConnector={(id) => controller.handleToggleConnector(id)}
+                onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
+                onReconnect={handleOpenExternalUrl}
+              />
+              <FeedActionDashboard
+                summary={page.dashboardSummary}
+                insightSummary={page.insightSummary}
+                scoreDistribution={page.scoreDistribution}
+                selectedScoreBucket={page.selectedScoreBucket}
+                showNewOnly={page.showNewOnly}
+                brokenConnectorCount={brokenConnectors.length}
+                onToggleNewOnly={page.toggleNewOnly}
+                onToggleFavorites={page.toggleFavoritesFilter}
+                onSetScoreBucket={page.setSelectedScoreBucket}
+              />
+            {/if}
           {:else}
             <!-- Full: hero with description, progress, stats -->
             <div class="relative pr-14">
@@ -1086,51 +1095,53 @@
             </div>
             {@render feedActionQueueBlock(false)}
 
-            <ConnectorStatusList
-              statuses={controller.connectorStatuses}
-              persistedStatuses={controller.persistedStatuses}
-              isScanning={feedChromeBusy}
-            />
-
-            {#if !feedIsColdLoading}
-              <SourceHealthPanel
-                sources={controller.sourceStatuses as SourceStatus[]}
-                isChecking={controller.isCheckingSources}
-                compact={true}
-                scanResultCounts={page.sourceMissionCounts}
-                activeSourceFilter={page.selectedSource}
-                enabledConnectors={controller.enabledConnectorIds}
-                healthSnapshots={controller.healthSnapshots}
-                onRefresh={() => controller.checkSourceSessions()}
-                onFilterBySource={(id) => {
-                  page.setSelectedSource(id as MissionSource | null);
-                }}
-                onToggleConnector={(id) => controller.handleToggleConnector(id)}
-                onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
-                onReconnect={handleOpenExternalUrl}
+            {#if showAdvancedControls}
+              <ConnectorStatusList
+                statuses={controller.connectorStatuses}
+                persistedStatuses={controller.persistedStatuses}
+                isScanning={feedChromeBusy}
               />
-              {#if page.totalMissions > 0}
-                <FeedActionDashboard
-                  summary={page.dashboardSummary}
-                  insightSummary={page.insightSummary}
-                  scoreDistribution={page.scoreDistribution}
-                  selectedScoreBucket={page.selectedScoreBucket}
-                  showNewOnly={page.showNewOnly}
-                  brokenConnectorCount={brokenConnectors.length}
-                  onToggleNewOnly={page.toggleNewOnly}
-                  onToggleFavorites={page.toggleFavoritesFilter}
-                  onSetScoreBucket={page.setSelectedScoreBucket}
-                />
-              {/if}
-            {/if}
 
-            {#if !feedIsColdLoading && controller.lastScanAt}
-              <div class="mt-2">
-                <LastScanInfo
-                  lastScanAt={controller.lastScanAt}
-                  missionCount={controller.lastScanMissionCount}
+              {#if !feedIsColdLoading}
+                <SourceHealthPanel
+                  sources={controller.sourceStatuses as SourceStatus[]}
+                  isChecking={controller.isCheckingSources}
+                  compact={true}
+                  scanResultCounts={page.sourceMissionCounts}
+                  activeSourceFilter={page.selectedSource}
+                  enabledConnectors={controller.enabledConnectorIds}
+                  healthSnapshots={controller.healthSnapshots}
+                  onRefresh={() => controller.checkSourceSessions()}
+                  onFilterBySource={(id) => {
+                    page.setSelectedSource(id as MissionSource | null);
+                  }}
+                  onToggleConnector={(id) => controller.handleToggleConnector(id)}
+                  onRecheckConnector={(id, enable) => controller.recheckConnector(id, enable)}
+                  onReconnect={handleOpenExternalUrl}
                 />
-              </div>
+                {#if page.totalMissions > 0}
+                  <FeedActionDashboard
+                    summary={page.dashboardSummary}
+                    insightSummary={page.insightSummary}
+                    scoreDistribution={page.scoreDistribution}
+                    selectedScoreBucket={page.selectedScoreBucket}
+                    showNewOnly={page.showNewOnly}
+                    brokenConnectorCount={brokenConnectors.length}
+                    onToggleNewOnly={page.toggleNewOnly}
+                    onToggleFavorites={page.toggleFavoritesFilter}
+                    onSetScoreBucket={page.setSelectedScoreBucket}
+                  />
+                {/if}
+              {/if}
+
+              {#if !feedIsColdLoading && controller.lastScanAt}
+                <div class="mt-2">
+                  <LastScanInfo
+                    lastScanAt={controller.lastScanAt}
+                    missionCount={controller.lastScanMissionCount}
+                  />
+                </div>
+              {/if}
             {/if}
 
             {#if page.isOffline}
@@ -1315,7 +1326,22 @@
             </Tooltip>
           </div>
 
-          <div class="mt-2" aria-label="Presets métier du feed">
+          <div class="mt-2 flex justify-end">
+            <button
+              type="button"
+              class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-[10px] font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary"
+              onclick={() => (showAdvancedControls = !showAdvancedControls)}
+              aria-expanded={showAdvancedControls}
+              aria-label={showAdvancedControls
+                ? 'Masquer les détails opérationnels'
+                : 'Afficher les détails opérationnels'}
+            >
+              {showAdvancedControls ? 'Vue simple' : 'Détails opérationnels'}
+            </button>
+          </div>
+
+          {#if showAdvancedControls}
+            <div class="mt-2" aria-label="Presets métier du feed">
             <div class="mb-1 flex items-center justify-between gap-2">
               <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
                 Presets métier
@@ -1349,7 +1375,8 @@
                 </button>
               {/each}
             </div>
-          </div>
+            </div>
+          {/if}
 
           {#if page.showFilters}
             <div
