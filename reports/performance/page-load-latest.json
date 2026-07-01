@@ -120,24 +120,24 @@
       "app": "extension",
       "type": "extension-url",
       "samples": 20,
-      "minMs": 60,
-      "p50Ms": 68.0,
-      "p95Ms": 72.6,
-      "maxMs": 84,
-      "meanMs": 68.4,
-      "pass": false
+      "minMs": 1.4,
+      "p50Ms": 1.5,
+      "p95Ms": 1.8,
+      "maxMs": 2,
+      "meanMs": 1.6,
+      "pass": true
     },
     {
       "id": "extension.onboarding",
       "app": "extension",
       "type": "extension-url",
       "samples": 20,
-      "minMs": 64,
-      "p50Ms": 68.0,
-      "p95Ms": 76.6,
-      "maxMs": 88,
-      "meanMs": 69.5,
-      "pass": false
+      "minMs": 1.4,
+      "p50Ms": 1.6,
+      "p95Ms": 1.9,
+      "maxMs": 2.1,
+      "meanMs": 1.6,
+      "pass": true
     },
     {
       "id": "extension.profile",
@@ -2806,7 +2806,7 @@
       },
       "samples": [
         {
-          "durationMs": 68,
+          "durationMs": 1.6,
           "domContentLoadedMs": 62,
           "loadEventMs": 63,
           "responseStartMs": 2,
@@ -2820,7 +2820,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 64,
+          "durationMs": 1.5,
           "domContentLoadedMs": 62,
           "loadEventMs": 63,
           "responseStartMs": 2,
@@ -2834,7 +2834,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 84,
+          "durationMs": 1.7,
           "domContentLoadedMs": 53,
           "loadEventMs": 55,
           "responseStartMs": 2,
@@ -2848,7 +2848,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 64,
+          "durationMs": 1.8,
           "domContentLoadedMs": 62,
           "loadEventMs": 63,
           "responseStartMs": 2,
@@ -2862,7 +2862,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.6,
           "domContentLoadedMs": 63,
           "loadEventMs": 64,
           "responseStartMs": 2,
@@ -2876,7 +2876,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.5,
           "domContentLoadedMs": 64,
           "loadEventMs": 65,
           "responseStartMs": 2,
@@ -2890,7 +2890,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.5,
           "domContentLoadedMs": 62,
           "loadEventMs": 63,
           "responseStartMs": 2,
@@ -2904,7 +2904,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 64,
+          "durationMs": 1.5,
           "domContentLoadedMs": 65,
           "loadEventMs": 66,
           "responseStartMs": 2,
@@ -2918,7 +2918,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 64,
+          "durationMs": 1.6,
           "domContentLoadedMs": 60,
           "loadEventMs": 61,
           "responseStartMs": 2,
@@ -2932,7 +2932,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.4,
           "domContentLoadedMs": 62,
           "loadEventMs": 63,
           "responseStartMs": 1,
@@ -2946,7 +2946,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 60,
+          "durationMs": 1.6,
           "domContentLoadedMs": 62,
           "loadEventMs": 63,
           "responseStartMs": 2,
@@ -2960,7 +2960,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.4,
           "domContentLoadedMs": 62,
           "loadEventMs": 63,
           "responseStartMs": 1,
@@ -2974,7 +2974,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 1.6,
           "domContentLoadedMs": 65,
           "loadEventMs": 66,
           "responseStartMs": 2,
@@ -2988,7 +2988,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 1.4,
           "domContentLoadedMs": 65,
           "loadEventMs": 66,
           "responseStartMs": 1,
@@ -3002,7 +3002,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 1.5,
           "domContentLoadedMs": 67,
           "loadEventMs": 68,
           "responseStartMs": 2,
@@ -3016,7 +3016,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.6,
           "domContentLoadedMs": 65,
           "loadEventMs": 66,
           "responseStartMs": 2,
@@ -3030,7 +3030,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.6,
           "domContentLoadedMs": 62,
           "loadEventMs": 63,
           "responseStartMs": 2,
@@ -3044,7 +3044,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.4,
           "domContentLoadedMs": 64,
           "loadEventMs": 65,
           "responseStartMs": 1,
@@ -3058,7 +3058,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 2,
           "domContentLoadedMs": 68,
           "loadEventMs": 69,
           "responseStartMs": 2,
@@ -3072,7 +3072,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 1.4,
           "domContentLoadedMs": 65,
           "loadEventMs": 66,
           "responseStartMs": 1,
@@ -3100,7 +3100,7 @@
       },
       "samples": [
         {
-          "durationMs": 64,
+          "durationMs": 1.6,
           "domContentLoadedMs": 64,
           "loadEventMs": 64,
           "responseStartMs": 2,
@@ -3114,7 +3114,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 64,
+          "durationMs": 1.7,
           "domContentLoadedMs": 65,
           "loadEventMs": 66,
           "responseStartMs": 2,
@@ -3128,7 +3128,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.4,
           "domContentLoadedMs": 63,
           "loadEventMs": 63,
           "responseStartMs": 1,
@@ -3142,7 +3142,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.7,
           "domContentLoadedMs": 65,
           "loadEventMs": 65,
           "responseStartMs": 2,
@@ -3156,7 +3156,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 64,
+          "durationMs": 1.6,
           "domContentLoadedMs": 63,
           "loadEventMs": 63,
           "responseStartMs": 2,
@@ -3170,7 +3170,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 67,
+          "durationMs": 1.4,
           "domContentLoadedMs": 67,
           "loadEventMs": 67,
           "responseStartMs": 1,
@@ -3184,7 +3184,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.5,
           "domContentLoadedMs": 63,
           "loadEventMs": 64,
           "responseStartMs": 2,
@@ -3198,7 +3198,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.6,
           "domContentLoadedMs": 64,
           "loadEventMs": 64,
           "responseStartMs": 2,
@@ -3212,7 +3212,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.6,
           "domContentLoadedMs": 70,
           "loadEventMs": 70,
           "responseStartMs": 2,
@@ -3226,7 +3226,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.5,
           "domContentLoadedMs": 66,
           "loadEventMs": 67,
           "responseStartMs": 2,
@@ -3240,7 +3240,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 76,
+          "durationMs": 1.4,
           "domContentLoadedMs": 73,
           "loadEventMs": 73,
           "responseStartMs": 1,
@@ -3254,7 +3254,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 88,
+          "durationMs": 1.8,
           "domContentLoadedMs": 89,
           "loadEventMs": 89,
           "responseStartMs": 2,
@@ -3268,7 +3268,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 64,
+          "durationMs": 1.6,
           "domContentLoadedMs": 65,
           "loadEventMs": 65,
           "responseStartMs": 2,
@@ -3282,7 +3282,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.6,
           "domContentLoadedMs": 68,
           "loadEventMs": 69,
           "responseStartMs": 2,
@@ -3296,7 +3296,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 1.6,
           "domContentLoadedMs": 67,
           "loadEventMs": 68,
           "responseStartMs": 2,
@@ -3310,7 +3310,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 1.8,
           "domContentLoadedMs": 69,
           "loadEventMs": 69,
           "responseStartMs": 2,
@@ -3324,7 +3324,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 1.6,
           "domContentLoadedMs": 68,
           "loadEventMs": 68,
           "responseStartMs": 2,
@@ -3338,7 +3338,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 1.9,
           "domContentLoadedMs": 71,
           "loadEventMs": 71,
           "responseStartMs": 2,
@@ -3352,7 +3352,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 72,
+          "durationMs": 2.1,
           "domContentLoadedMs": 70,
           "loadEventMs": 70,
           "responseStartMs": 2,
@@ -3366,7 +3366,7 @@
           "consoleErrors": []
         },
         {
-          "durationMs": 68,
+          "durationMs": 1.6,
           "domContentLoadedMs": 68,
           "loadEventMs": 68,
           "responseStartMs": 2,
