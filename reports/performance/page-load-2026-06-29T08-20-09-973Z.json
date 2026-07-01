@@ -1,0 +1,247 @@
+{
+  "generatedAt": "2026-06-29T08:20:09.972Z",
+  "label": "debug-extension",
+  "budgetMs": 50,
+  "iterations": 1,
+  "warmups": 0,
+  "skipBuild": true,
+  "browserExecutable": "/Applications/Google Chrome.app/Contents/MacOS/Google Chrome",
+  "summary": [
+    {
+      "id": "extension.feed",
+      "app": "extension",
+      "type": "extension-url",
+      "samples": 1,
+      "minMs": 135.5,
+      "p50Ms": 135.5,
+      "p95Ms": 135.5,
+      "maxMs": 135.5,
+      "meanMs": 135.5,
+      "pass": false
+    },
+    {
+      "id": "extension.onboarding",
+      "app": "extension",
+      "type": "extension-url",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Configurez votre premier scan' }) to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: Feed Profil CV Suivi TJM Réglages MISSIONPULSE Radar freelance Surveille les pistes utiles, filtre le bruit et garde les meilleures missions à portée de main. À FAIRE MAINTENANT Incident Impossible de récupérer les missions Réessayez le scan ou vérifiez vos sources pour récupérer les missions. NOUVELLES 0 PRIORITAIRES 70+ 0 SOURCES EN ERREUR 0 Réessayer le scan FILE D’ACTIONS 1 priorité Lancer le scan Récupère les missions depuis les sources connectées. VISIBLES 0 FAVORIS 0 MASQUÉES 0 Scoring IA indisponible Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 0 Remote compatible 0 TJM à \nURL: about:blank\nBody: "
+    },
+    {
+      "id": "extension.profile",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 1,
+      "minMs": 89,
+      "p50Ms": 89,
+      "p95Ms": 89,
+      "maxMs": 89,
+      "meanMs": 89,
+      "pass": false
+    },
+    {
+      "id": "extension.cv",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 0,
+      "minMs": null,
+      "p50Ms": null,
+      "p95Ms": null,
+      "maxMs": null,
+      "meanMs": null,
+      "pass": false,
+      "error": "locator.waitFor: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Préparer le même profil partout' }) to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: Feed Profil CV Suivi TJM Réglages DÉCISION Premium verrouillé Profil de référence inclus dans Premium Cette vue prépare un profil candidat cohérent pour LinkedIn, dashboard et plateformes. Vos sessions restent dans Chrome. SURFACE CV Voir les réglages"
+    },
+    {
+      "id": "extension.applications",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 1,
+      "minMs": 23.9,
+      "p50Ms": 23.9,
+      "p95Ms": 23.9,
+      "maxMs": 23.9,
+      "meanMs": 23.9,
+      "pass": true
+    },
+    {
+      "id": "extension.tjm",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 1,
+      "minMs": 21.3,
+      "p50Ms": 21.3,
+      "p95Ms": 21.3,
+      "maxMs": 21.3,
+      "meanMs": 21.3,
+      "pass": true
+    },
+    {
+      "id": "extension.settings",
+      "app": "extension",
+      "type": "extension-nav",
+      "samples": 1,
+      "minMs": 46.6,
+      "p50Ms": 46.6,
+      "p95Ms": 46.6,
+      "maxMs": 46.6,
+      "meanMs": 46.6,
+      "pass": true
+    }
+  ],
+  "details": [
+    {
+      "id": "extension.feed",
+      "app": "extension",
+      "type": "extension-url",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "stub": {
+        "onboardingCompleted": true
+      },
+      "samples": [
+        {
+          "durationMs": 135.5,
+          "domContentLoadedMs": 116,
+          "loadEventMs": 0,
+          "responseStartMs": 2,
+          "firstPaintMs": 64,
+          "firstContentfulPaintMs": null,
+          "transferSize": 909,
+          "encodedBodySize": 609,
+          "wallClockMs": 238.2,
+          "warmup": false,
+          "consoleErrorCount": 0,
+          "consoleErrors": []
+        }
+      ]
+    },
+    {
+      "id": "extension.onboarding",
+      "app": "extension",
+      "type": "extension-url",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "stub": {
+        "onboardingCompleted": false,
+        "firstScanDone": false,
+        "profile": null,
+        "premium": false
+      },
+      "samples": [],
+      "error": "locator.waitFor: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Configurez votre premier scan' }) to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: Feed Profil CV Suivi TJM Réglages MISSIONPULSE Radar freelance Surveille les pistes utiles, filtre le bruit et garde les meilleures missions à portée de main. À FAIRE MAINTENANT Incident Impossible de récupérer les missions Réessayez le scan ou vérifiez vos sources pour récupérer les missions. NOUVELLES 0 PRIORITAIRES 70+ 0 SOURCES EN ERREUR 0 Réessayer le scan FILE D’ACTIONS 1 priorité Lancer le scan Récupère les missions depuis les sources connectées. VISIBLES 0 FAVORIS 0 MASQUÉES 0 Scoring IA indisponible Trier par Pertinence Date TJM PRESETS MÉTIER Prioritaires 0 Remote compatible 0 TJM à \nURL: about:blank\nBody: "
+    },
+    {
+      "id": "extension.profile",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 1,
+      "samples": [
+        {
+          "durationMs": 89,
+          "domContentLoadedMs": 115,
+          "loadEventMs": 198,
+          "responseStartMs": 2,
+          "firstPaintMs": 64,
+          "firstContentfulPaintMs": 156,
+          "transferSize": 909,
+          "encodedBodySize": 609,
+          "wallClockMs": 216.2,
+          "warmup": false,
+          "consoleErrorCount": 1,
+          "consoleErrors": [
+            "[premium] failed to load TypeError: Cannot read properties of undefined (reading 'sendMessage')\n    at ht (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:47:8947)\n    at iv (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:93:812)\n    at Object.load (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:128:15645)\n    at http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:128:17632\n    at yl (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:26655)\n    at os (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:27881)\n    at Oc (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:7552)\n    at So.ks (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:4348)\n    at So.flush (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:1682)\n    at Array.<anonymous> (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:2705)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "extension.cv",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 2,
+      "samples": [],
+      "error": "locator.waitFor: Timeout 10000ms exceeded.\nCall log:\n\u001b[2m  - waiting for getByRole('heading', { name: 'Préparer le même profil partout' }) to be visible\u001b[22m\n\nURL: http://127.0.0.1:4176/src/sidepanel/index.html\nBody: Feed Profil CV Suivi TJM Réglages DÉCISION Premium verrouillé Profil de référence inclus dans Premium Cette vue prépare un profil candidat cohérent pour LinkedIn, dashboard et plateformes. Vos sessions restent dans Chrome. SURFACE CV Voir les réglages"
+    },
+    {
+      "id": "extension.applications",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 3,
+      "samples": [
+        {
+          "durationMs": 23.9,
+          "domContentLoadedMs": 98,
+          "loadEventMs": 101,
+          "responseStartMs": 3,
+          "firstPaintMs": 116,
+          "firstContentfulPaintMs": 116,
+          "transferSize": 300,
+          "encodedBodySize": 609,
+          "wallClockMs": 134.6,
+          "warmup": false,
+          "consoleErrorCount": 1,
+          "consoleErrors": [
+            "[premium] failed to load TypeError: Cannot read properties of undefined (reading 'sendMessage')\n    at ht (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:47:8947)\n    at iv (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:93:812)\n    at Object.load (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:128:15645)\n    at http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:128:17632\n    at yl (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:26655)\n    at os (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:27881)\n    at Oc (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:7552)\n    at So.ks (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:4348)\n    at So.flush (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:1682)\n    at Array.<anonymous> (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:2705)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "extension.tjm",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 4,
+      "samples": [
+        {
+          "durationMs": 21.3,
+          "domContentLoadedMs": 53,
+          "loadEventMs": 56,
+          "responseStartMs": 1,
+          "firstPaintMs": 76,
+          "firstContentfulPaintMs": 76,
+          "transferSize": 300,
+          "encodedBodySize": 609,
+          "wallClockMs": 82.8,
+          "warmup": false,
+          "consoleErrorCount": 1,
+          "consoleErrors": [
+            "[premium] failed to load TypeError: Cannot read properties of undefined (reading 'sendMessage')\n    at ht (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:47:8947)\n    at iv (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:93:812)\n    at Object.load (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:128:15645)\n    at http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:128:17632\n    at yl (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:26655)\n    at os (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:27881)\n    at Oc (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:7552)\n    at So.ks (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:4348)\n    at So.flush (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:1682)\n    at Array.<anonymous> (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:2705)"
+          ]
+        }
+      ]
+    },
+    {
+      "id": "extension.settings",
+      "app": "extension",
+      "type": "extension-nav",
+      "url": "http://127.0.0.1:4176/src/sidepanel/index.html",
+      "navIndex": 5,
+      "samples": [
+        {
+          "durationMs": 46.6,
+          "domContentLoadedMs": 53,
+          "loadEventMs": 56,
+          "responseStartMs": 1,
+          "firstPaintMs": 76,
+          "firstContentfulPaintMs": 76,
+          "transferSize": 300,
+          "encodedBodySize": 609,
+          "wallClockMs": 107.9,
+          "warmup": false,
+          "consoleErrorCount": 1,
+          "consoleErrors": [
+            "[premium] failed to load TypeError: Cannot read properties of undefined (reading 'sendMessage')\n    at ht (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:47:8947)\n    at iv (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:93:812)\n    at Object.load (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:128:15645)\n    at http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:128:17632\n    at yl (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:26655)\n    at os (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:27881)\n    at Oc (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:7552)\n    at So.ks (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:4348)\n    at So.flush (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:1682)\n    at Array.<anonymous> (http://127.0.0.1:4176/assets/sidepanel-k6GLWvI-.js:46:2705)"
+          ]
+        }
+      ]
+    }
+  ]
+}
