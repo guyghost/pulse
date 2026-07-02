@@ -67,7 +67,7 @@ const FeedSavedViewSchema = z
         searchQuery: z.string().max(120),
         selectedStacks: z.array(z.string().min(1).max(48)).max(24),
         selectedSource: z
-          .enum(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'])
+          .enum(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'])
           .nullable(),
         selectedRemote: z.enum(['full', 'hybrid', 'onsite']).nullable(),
         selectedSeniority: z.enum(['junior', 'confirmed', 'senior']).nullable(),

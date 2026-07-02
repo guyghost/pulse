@@ -1,7 +1,13 @@
 import type { SeniorityLevel } from './profile';
 import type { ScoreBreakdown } from './score';
 
-export type MissionSource = 'free-work' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick';
+export type MissionSource =
+  | 'free-work'
+  | 'lehibou'
+  | 'hiway'
+  | 'collective'
+  | 'cherry-pick'
+  | 'malt';
 
 export type RemoteType = 'full' | 'hybrid' | 'onsite';
 

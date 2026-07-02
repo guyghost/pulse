@@ -29,6 +29,7 @@ const SOURCE_CANONICAL_PRIORITY: Record<Mission['source'], number> = {
   hiway: 4,
   collective: 4,
   'free-work': 1,
+  malt: 6,
 };
 
 const STOP_WORDS = new Set([

@@ -21,7 +21,8 @@
     "https://jhgjtlkfewuiiofxfrvh.supabase.co/*",
     "https://*.collective.work/*",
     "https://app.cherry-pick.io/*",
-    "https://missionpulse.app/*"
+    "https://missionpulse.app/*",
+    "https://*.malt.fr/*"
   ],
   "optional_host_permissions": ["https://www.linkedin.com/*"],
   "background": {

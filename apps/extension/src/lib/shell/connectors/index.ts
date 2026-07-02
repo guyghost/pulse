@@ -12,6 +12,7 @@ import { LeHibouConnector } from './lehibou.connector';
 import { HiwayConnector } from './hiway.connector';
 import { CollectiveConnector } from './collective.connector';
 import { CherryPickConnector } from './cherrypick.connector';
+import { MaltConnector } from './malt.connector';
 
 // Factory functions using static imports (service-worker safe)
 const CONNECTOR_REGISTRY = {
@@ -20,6 +21,7 @@ const CONNECTOR_REGISTRY = {
   hiway: () => Promise.resolve(new HiwayConnector()),
   collective: () => Promise.resolve(new CollectiveConnector()),
   'cherry-pick': () => Promise.resolve(new CherryPickConnector()),
+  malt: () => Promise.resolve(new MaltConnector()),
 } satisfies Record<ConnectorId, () => Promise<PlatformConnector>>;
 
 /**

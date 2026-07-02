@@ -1,6 +1,13 @@
 import type { Mission, MissionSource, RemoteType } from '../../src/lib/core/types/mission';
 
-const SOURCES: MissionSource[] = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'];
+const SOURCES: MissionSource[] = [
+  'free-work',
+  'lehibou',
+  'hiway',
+  'collective',
+  'cherry-pick',
+  'malt',
+];
 
 const STACKS = [
   ['React', 'TypeScript', 'Node.js'],

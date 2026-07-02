@@ -106,7 +106,7 @@ describe('validateMission', () => {
   });
 
   it('accepts every valid source', () => {
-    const sources = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'];
+    const sources = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'];
     for (const source of sources) {
       const result = validateMission({ ...makeValidMission(), source });
       expect(result.valid).toBe(true);
