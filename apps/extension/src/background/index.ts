@@ -47,6 +47,11 @@ import {
   notifyHighScoreMissions,
   setupNotificationClickHandler,
 } from '../lib/shell/notifications/notify-missions';
+import {
+  sendDailyDigest,
+  scheduleDailyDigestAlarm,
+  DIGEST_ALARM_NAME,
+} from '../lib/shell/notifications/daily-digest';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
 import { getAllHealthSnapshots, resetHealthSnapshot } from '../lib/shell/storage/connector-health';
 import { collectDiagnosticExport } from '../lib/shell/diagnostics/collect-diagnostic-export';
@@ -1269,9 +1274,20 @@ async function setupAlarm() {
       console.debug(`[MissionPulse] Auto-scan alarm set: every ${settings.scanIntervalMinutes}min`);
     }
   }
+  // Daily digest fires independently of auto-scan — it pushes the top unseen
+  // missions once per day even if the user never opens the panel.
+  scheduleDailyDigestAlarm();
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
+  if (alarm.name === DIGEST_ALARM_NAME) {
+    if (import.meta.env.DEV) {
+      console.debug('[MissionPulse] Daily digest triggered');
+    }
+    await sendDailyDigest();
+    return;
+  }
+
   if (alarm.name !== ALARM_NAME) {
     return;
   }

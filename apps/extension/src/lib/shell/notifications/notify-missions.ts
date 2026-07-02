@@ -204,7 +204,7 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
  */
 export const setupNotificationClickHandler = (): void => {
   chrome.notifications.onClicked.addListener((notificationId) => {
-    if (notificationId === 'high-score-missions') {
+    if (notificationId === 'high-score-missions' || notificationId === 'daily-digest') {
       // Open the side panel when notification is clicked
       chrome.tabs.query({ active: true, currentWindow: true }, async (tabs) => {
         const tab = tabs[0];
