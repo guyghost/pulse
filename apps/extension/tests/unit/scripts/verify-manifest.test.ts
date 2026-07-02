@@ -422,6 +422,48 @@ describe('validateLinkedInProfileImportPermissions', () => {
   });
 });
 
+describe('host_permissions coverage', () => {
+  /**
+   * Reads the real src/manifest.json and verifies every registered
+   * connector has at least one matching host_permission entry.
+   * This guards against forgetting to add host_permissions when a
+   * new connector is registered.
+   */
+  const realManifest: unknown = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'src/manifest.json'), 'utf-8')
+  );
+  const hostPermissions: string[] =
+    (realManifest as { host_permissions?: string[] }).host_permissions ?? [];
+
+  it('should include host_permissions for Malt (.fr)', () => {
+    const hasMaltFr = hostPermissions.some((h) => h.includes('malt.fr'));
+    expect(hasMaltFr).toBe(true);
+  });
+
+  it('should include host_permissions for Malt (.io)', () => {
+    const hasMaltIo = hostPermissions.some((h) => h.includes('malt.io'));
+    expect(hasMaltIo).toBe(true);
+  });
+
+  it('should include host_permissions for all registered connectors', () => {
+    // Every connector meta URL must have at least one matching host_permission
+    // so fetch/cookie requests don't silently fail in production.
+    const connectorDomains: Array<{ name: string; domain: string }> = [
+      { name: 'Free-Work', domain: 'free-work.com' },
+      { name: 'LeHibou', domain: 'lehibou.com' },
+      { name: 'Hiway', domain: 'hiway-missions.fr' },
+      { name: 'Collective', domain: 'collective.work' },
+      { name: 'Cherry Pick', domain: 'cherry-pick.io' },
+      { name: 'Malt', domain: 'malt.fr' },
+    ];
+
+    for (const { name, domain } of connectorDomains) {
+      const hasPermission = hostPermissions.some((h) => h.includes(domain));
+      expect(hasPermission, `host_permissions missing entry for ${name} (${domain})`).toBe(true);
+    }
+  });
+});
+
 describe('validateVersionConsistency', () => {
   /**
    * OpenSpec scenario: Matching versions pass consistency check.

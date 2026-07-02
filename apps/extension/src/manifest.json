@@ -22,7 +22,8 @@
     "https://*.collective.work/*",
     "https://app.cherry-pick.io/*",
     "https://missionpulse.app/*",
-    "https://*.malt.fr/*"
+    "https://*.malt.fr/*",
+    "https://*.malt.io/*"
   ],
   "optional_host_permissions": ["https://www.linkedin.com/*"],
   "background": {
