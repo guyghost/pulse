@@ -55,6 +55,7 @@ import {
 import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 import { subscribeMessages } from '$lib/shell/messaging/bridge';
 import { sortMissions } from '$lib/core/scoring/sort-missions';
+import { rankMissions } from '$lib/core/scoring/rank-missions';
 
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
@@ -486,6 +487,13 @@ export function createFeedPageState(
       selectedSource === null
         ? sourceCountBaseMissions
         : sourceCountBaseMissions.filter((m) => m.source === selectedSource);
+
+    // 'score' sort uses the composite ranking (relevance + freshness + source
+    // diversity) instead of a plain single-key sort. Users can switch to 'date'
+    // or 'tjm' for an explicit single-key sort.
+    if (sortBy === 'score') {
+      return rankMissions(scopedMissions, new Date());
+    }
 
     return sortMissions(scopedMissions, sortBy);
   });
