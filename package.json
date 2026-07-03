@@ -60,7 +60,7 @@
   "devDependencies": {
     "lint-staged": "^16.4.0",
     "simple-git-hooks": "^2.13.1",
-    "supabase": "^2.101.0",
-    "turbo": "^2.10.0"
+    "supabase": "^2.109.0",
+    "turbo": "^2.10.2"
   }
 }
