@@ -199,7 +199,7 @@ jobs:
 
     steps:
       - name: Download extension ZIP artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: missionpulse-zip-${{ needs.build-and-release.outputs.version }}
           path: ./
