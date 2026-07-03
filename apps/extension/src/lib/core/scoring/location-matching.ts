@@ -377,36 +377,47 @@ const areInSameMetroArea = (loc1: string, loc2: string): boolean => {
 };
 
 /**
+ * Accent → plain char mapping (lowercase). Hoisted to module scope so the map
+ * and its compiled character class are built once, not on every call.
+ *
+ * Includes ligatures (œ → oe, æ → ae): String.prototype.normalize('NFD') does
+ * NOT decompose these, so a plain NFD-based approach would silently change
+ * behavior (e.g. "Cœur" → "cur" instead of "coeur").
+ */
+const ACCENT_MAP: Record<string, string> = {
+  à: 'a',
+  â: 'a',
+  ä: 'a',
+  é: 'e',
+  è: 'e',
+  ê: 'e',
+  ë: 'e',
+  î: 'i',
+  ï: 'i',
+  ô: 'o',
+  ö: 'o',
+  ù: 'u',
+  û: 'u',
+  ü: 'u',
+  ç: 'c',
+  œ: 'oe',
+  æ: 'ae',
+};
+
+// Matches any accented/ligature char. Compiled once at module load.
+const ACCENT_CHAR_CLASS = new RegExp(`[${Object.keys(ACCENT_MAP).join('')}]`, 'g');
+
+/**
  * Remove French accents from a string.
  * Pure function - no side effects.
+ *
+ * Uses a single-pass regex replace over the precompiled character class instead
+ * of one `.split().join()` allocation per accent char (previously 17 passes +
+ * an object literal rebuilt on every call). This is a scoring hot path: it runs
+ * via normalizeLight/normalizeLocation on every mission during relevance scoring.
  */
-const removeAccents = (str: string): string => {
-  const accentMap: Record<string, string> = {
-    à: 'a',
-    â: 'a',
-    ä: 'a',
-    é: 'e',
-    è: 'e',
-    ê: 'e',
-    ë: 'e',
-    î: 'i',
-    ï: 'i',
-    ô: 'o',
-    ö: 'o',
-    ù: 'u',
-    û: 'u',
-    ü: 'u',
-    ç: 'c',
-    œ: 'oe',
-    æ: 'ae',
-  };
-
-  let result = str.toLowerCase();
-  for (const [accent, plain] of Object.entries(accentMap)) {
-    result = result.split(accent).join(plain);
-  }
-  return result;
-};
+const removeAccents = (str: string): string =>
+  str.toLowerCase().replace(ACCENT_CHAR_CLASS, (ch) => ACCENT_MAP[ch] ?? ch);
 
 /**
  * Light normalization for synonym matching.
