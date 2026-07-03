@@ -179,7 +179,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload extension ZIP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: missionpulse-zip-${{ steps.version.outputs.version }}
           path: apps/extension/missionpulse-${{ steps.version.outputs.version }}.zip
