@@ -632,17 +632,19 @@ section[id] {
 .hero__title {
   font-family: var(--font-display);
   max-width: 1120px;
-  font-size: clamp(3.35rem, 11vw, 9.25rem);
+  font-size: clamp(2.5rem, 7.5vw, 5.5rem);
   font-weight: 400;
-  line-height: 0.9;
-  margin-bottom: var(--spacing-80);
+  line-height: 0.95;
+  letter-spacing: -0.03em;
+  margin-bottom: var(--spacing-56);
   color: var(--color-text-primary);
   text-align: center;
+  text-wrap: balance;
 }
 
 .hero__title .light-text {
   display: block;
-  margin-top: var(--spacing-16);
+  margin-top: var(--spacing-8);
   color: var(--color-disabled-gray);
 }
 
