@@ -17,6 +17,35 @@
     { id: 'postuler', label: 'Convertir' },
   ];
 
+  type FeatureTier = 'free' | 'premium';
+  const featureMatrix: { label: string; tier: FeatureTier; note?: string }[] = [
+    { label: 'Feed unique, 5 plateformes dédupliquées', tier: 'free' },
+    { label: 'Score stack, TJM, remote, séniorité', tier: 'free' },
+    {
+      label: 'Score sémantique (IA locale Chrome)',
+      tier: 'free',
+      note: 'Quand Gemini Nano est disponible',
+    },
+    { label: 'Comparateur et shortlist quotidienne', tier: 'free' },
+    { label: 'Radar TJM marché par stack', tier: 'premium' },
+    { label: 'Suivi de candidatures (pipeline, notes, relances)', tier: 'premium' },
+    { label: 'Assistant profil et CV', tier: 'premium' },
+    {
+      label: 'Génération pitch, message et résumé CV',
+      tier: 'premium',
+      note: '1 crédit = 1 génération',
+    },
+    { label: 'Dashboard connecté (synchronisation optionnelle)', tier: 'premium' },
+  ];
+
+  const platforms: { name: string; logo: string }[] = [
+    { name: 'Free-Work', logo: '/logos/free-work.png' },
+    { name: 'LeHibou', logo: '/logos/lehibou.png' },
+    { name: 'Hiway', logo: '/logos/hiway.png' },
+    { name: 'Collective', logo: '/logos/collective.png' },
+    { name: 'Cherry Pick', logo: '/logos/cherry-pick.png' },
+  ];
+
   $effect(() => {
     function onScroll() {
       scrolled = window.scrollY > 50;
@@ -124,9 +153,8 @@
 
     <ul class="nav__menu">
       <li><a href="#workflow" class="nav__link">Workflow</a></li>
-      <li><a href="#for-who" class="nav__link">Pour qui</a></li>
-      <li><a href="#features" class="nav__link">Fonctionnalités</a></li>
       <li><a href="#shortlist" class="nav__link">Shortlist</a></li>
+      <li><a href="#features" class="nav__link">Fonctionnalités</a></li>
       <li><a href="#plans" class="nav__link">Offres</a></li>
     </ul>
 
@@ -196,15 +224,12 @@
   >
     <ul>
       <li><a href="#workflow" onclick={closeMobileMenu}>Workflow</a></li>
-      <li><a href="#for-who" onclick={closeMobileMenu}>Pour qui</a></li>
+      <li><a href="#shortlist" onclick={closeMobileMenu}>Shortlist</a></li>
       <li>
         <a href="#features" onclick={closeMobileMenu}>Fonctionnalités</a>
       </li>
       <li>
         <a href="#plans" onclick={closeMobileMenu}>Offres</a>
-      </li>
-      <li>
-        <a href="#platforms" onclick={closeMobileMenu}>Plateformes</a>
       </li>
       <li>
         <a href={chromeStoreUrl} class="btn btn--primary" onclick={closeMobileMenu}>Installer</a>
@@ -641,311 +666,84 @@
     </div>
   </section>
 
-  <!-- Product map -->
-  <section class="product-map section" aria-labelledby="product-map-title">
-    <div class="container">
-      <div class="section-header">
-        <h2 id="product-map-title" class="section-title fade-in">Trois surfaces, un seul flux</h2>
-        <p class="section-subtitle fade-in fade-in-delay-1">
-          MissionPulse sépare clairement le scan local, la gestion du compte et le cockpit connecté.
-        </p>
-      </div>
-
-      <div class="product-map__grid" aria-label="Flux produit MissionPulse">
-        <article class="product-map__item fade-in fade-in-delay-1">
-          <span class="product-map__step">1</span>
-          <p class="product-map__eyebrow">Extension Chrome</p>
-          <h3>Scanner localement</h3>
-          <p>
-            Les plateformes sont consultées depuis vos sessions navigateur. Le feed, les favoris et
-            les premiers scores fonctionnent sans compte.
-          </p>
-        </article>
-
-        <article class="product-map__item fade-in fade-in-delay-2">
-          <span class="product-map__step">2</span>
-          <p class="product-map__eyebrow">Compte MissionPulse</p>
-          <h3>Gérer plan et crédits</h3>
-          <p>
-            Le compte sert à l'abonnement, aux crédits IA, à l'identité et à l'activation de la
-            synchronisation entre appareils.
-          </p>
-        </article>
-
-        <article class="product-map__item fade-in fade-in-delay-3">
-          <span class="product-map__step">3</span>
-          <p class="product-map__eyebrow">Dashboard connecté</p>
-          <h3>Piloter les snapshots</h3>
-          <p>
-            Le cockpit web consolide missions, TJM, CV et candidatures synchronisés. Les cookies et
-            jetons des plateformes restent dans Chrome.
-          </p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- Operational proof -->
-  <section class="proof-strip" aria-labelledby="proof-strip-title">
-    <div class="container">
-      <div class="proof-strip__header fade-in">
-        <p class="proof-strip__eyebrow">Preuves operationnelles</p>
-        <h2 id="proof-strip-title">Chaque signal doit mener a une action</h2>
-      </div>
-
-      <div class="proof-strip__grid">
-        <article class="proof-item fade-in">
-          <span class="proof-item__signal">5 sources</span>
-          <h3>Vous voyez ou chercher en premier</h3>
-          <p>Les plateformes sont consolidees avant decision: prioriser, filtrer ou ignorer.</p>
-        </article>
-        <article class="proof-item fade-in fade-in-delay-1">
-          <span class="proof-item__signal">Local</span>
-          <h3>Les sessions restent dans Chrome</h3>
-          <p>
-            Si une source casse, l'action est de reconnecter ou relancer, pas de transmettre un mot
-            de passe.
-          </p>
-        </article>
-        <article class="proof-item fade-in fade-in-delay-2">
-          <span class="proof-item__signal">Gemini Nano</span>
-          <h3>Le score explique la decision</h3>
-          <p>Les missions fortes remontent avec les raisons de fit avant les details techniques.</p>
-        </article>
-        <article class="proof-item fade-in fade-in-delay-3">
-          <span class="proof-item__signal">20 credits</span>
-          <h3>Les generations restent pilotees</h3>
-          <p>Le compte montre quand recharger avant de bloquer pitch, message ou resume CV.</p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- Pour qui ? -->
-  <section class="for-who section" id="for-who">
-    <div class="container">
-      <div class="section-header">
-        <h2 class="section-title fade-in">Pour qui ?</h2>
-        <p class="section-subtitle fade-in fade-in-delay-1">
-          MissionPulse est conçu pour les développeurs freelances 3+ ans, TJM 450-900€, qui veulent
-          rester visibles sans passer leur matinée dans cinq onglets.
-        </p>
-      </div>
-
-      <div class="features__grid">
-        <article class="glass-card feature-card fade-in fade-in-delay-1">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-              <line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Freelance en recherche</h3>
-          <p class="feature-card__desc">
-            Vous êtes disponible maintenant ou sous 30 jours. MissionPulse transforme votre veille
-            quotidienne en shortlist claire: ouvrir, sauvegarder, postuler ou ignorer.
-          </p>
-        </article>
-
-        <article class="glass-card feature-card fade-in fade-in-delay-2">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M12 20h9" /><path
-                d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
-              />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Dev déjà en mission</h3>
-          <p class="feature-card__desc">
-            Vous gardez un œil sur le marché sans chercher activement. Les alertes remontent
-            seulement les missions à haut score, avec TJM et remote compatibles.
-          </p>
-        </article>
-
-        <article class="glass-card feature-card fade-in fade-in-delay-3">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="12" y1="1" x2="12" y2="23" /><path
-                d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-              />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Consultant qui négocie</h3>
-          <p class="feature-card__desc">
-            Vous ciblez 450-900€ de TJM et voulez savoir quand pousser, refuser ou relancer. Le
-            radar TJM transforme les annonces scannées en repères de négociation.
-          </p>
-        </article>
-      </div>
-    </div>
-  </section>
-
   <!-- Fonctionnalités -->
   <section class="features section" id="features">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title fade-in">Pourquoi les prospects activent</h2>
+        <h2 class="section-title fade-in">Ce que vous obtenez</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          La promesse gratuite est immédiate; les modules Premium prolongent naturellement le
-          workflow quand une mission mérite d'être travaillée.
+          Le gratuit couvre le scan et le scoring. Le premium ouvre la négociation, le suivi et la
+          candidature.
         </p>
       </div>
 
-      <div class="features__grid">
-        <article class="glass-card feature-card fade-in fade-in-delay-1">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Ne ratez plus les bonnes missions</h3>
-          <p class="feature-card__desc">
-            Free-Work, LeHibou, Hiway, Collective et Cherry Pick arrivent dans un seul feed. Vous
-            gardez la couverture marché sans ouvrir cinq onglets chaque matin. Inclus dans le
-            gratuit.
-          </p>
-        </article>
+      <ul class="feature-matrix fade-in fade-in-delay-1" aria-label="Capacités et offre de départ">
+        {#each featureMatrix as row (row.label)}
+          <li class="feature-matrix__row">
+            <span class="feature-matrix__label">
+              {row.label}
+              {#if row.note}<span class="feature-matrix__note">{row.note}</span>{/if}
+            </span>
+            <span class={`feature-matrix__tier feature-matrix__tier--${row.tier}`}>
+              {row.tier === 'free' ? 'Gratuit' : 'Premium'}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  </section>
 
-        <article class="glass-card feature-card fade-in fade-in-delay-2">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <polygon
-                points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
-              />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Passez de 40 annonces à 5 vraies pistes</h3>
-          <p class="feature-card__desc">
-            Le scoring combine stack, TJM, localisation, remote, séniorité et analyse sémantique.
-            Les doublons sont fusionnés pour ne garder que les opportunités uniques. Inclus dans le
-            gratuit quand l'IA locale Chrome est disponible.
-          </p>
-        </article>
-
-        <article class="glass-card feature-card fade-in fade-in-delay-3">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <line x1="12" y1="1" x2="12" y2="23" /><path
-                d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-              />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Négociez avec des données</h3>
-          <p class="feature-card__desc">
-            Le radar TJM Premium suit les taux observés par stack et par source. Vous arrivez en
-            échange avec une fourchette marché, pas une impression.
-          </p>
-        </article>
-
-        <article class="glass-card feature-card fade-in fade-in-delay-4">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-              <line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Transformez la veille en pipeline</h3>
-          <p class="feature-card__desc">
-            Le suivi Premium ajoute statuts de candidature, prochaine action, notes et historique
-            pour garder chaque opportunité qualifiée sous contrôle jusqu'à l'entretien ou l'offre.
-          </p>
-        </article>
-
-        <article class="glass-card feature-card fade-in fade-in-delay-5">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path
-                d="M13.73 21a2 2 0 0 1-3.46 0"
-              />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Postulez plus vite</h3>
-          <p class="feature-card__desc">
-            Pitch court, message recruteur et résumé CV sont générés depuis la mission et votre
-            profil avec les crédits IA de votre compte MissionPulse.
-          </p>
-        </article>
-
-        <article class="glass-card feature-card fade-in fade-in-delay-5">
-          <div class="feature-card__icon">
-            <svg
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              stroke-width="2"
-              stroke-linecap="round"
-              stroke-linejoin="round"
-            >
-              <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-              <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-              <circle cx="12" cy="16" r="1" />
-            </svg>
-          </div>
-          <h3 class="feature-card__title">Local-first &amp; privé</h3>
-          <p class="feature-card__desc">
-            Les plateformes sont consultées depuis vos sessions navigateur, sans stocker vos
-            identifiants. La synchronisation cloud du dashboard connecté est optionnelle et limitée
-            aux snapshots normalisés via Supabase; jamais vos mots de passe, cookies ou jetons de
-            session.
-          </p>
-        </article>
+  <!-- Comment ça marche -->
+  <section class="how-it-works section" id="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title fade-in">Démarrer en 3 minutes</h2>
+        <p class="section-subtitle fade-in fade-in-delay-1">
+          Installez, branchez vos sessions, le feed se remplit seul.
+        </p>
       </div>
+
+      <ol class="steps">
+        <li class="step fade-in fade-in-delay-1">
+          <span class="step__number" aria-hidden="true">1</span>
+          <div class="step__content">
+            <h3 class="step__title">Installez l'extension</h3>
+            <p class="step__desc">
+              Un clic depuis le Chrome Web Store. Compatible Chrome, Brave, Edge, Arc et Dia.
+            </p>
+          </div>
+        </li>
+        <li class="step fade-in fade-in-delay-2">
+          <span class="step__number" aria-hidden="true">2</span>
+          <div class="step__content">
+            <h3 class="step__title">Configurez votre profil</h3>
+            <p class="step__desc">
+              Stack, TJM cible, localisation, séniorité, préférences remote. Le scoring s'adapte à
+              vos critères.
+            </p>
+          </div>
+        </li>
+        <li class="step fade-in fade-in-delay-3">
+          <span class="step__number" aria-hidden="true">3</span>
+          <div class="step__content">
+            <h3 class="step__title">Connectez-vous aux plateformes</h3>
+            <p class="step__desc">
+              Connectez-vous normalement à Free-Work, LeHibou, etc. MissionPulse réutilise vos
+              sessions existantes.
+            </p>
+          </div>
+        </li>
+        <li class="step fade-in fade-in-delay-4">
+          <span class="step__number" aria-hidden="true">4</span>
+          <div class="step__content">
+            <h3 class="step__title">Ouvrez le side panel</h3>
+            <p class="step__desc">
+              Les missions arrivent classées par score. Filtrez, comparez, préparez vos
+              candidatures.
+            </p>
+          </div>
+        </li>
+      </ol>
     </div>
   </section>
 
@@ -1014,236 +812,31 @@
     </div>
   </section>
 
-  <!-- Go-to-market loop -->
-  <section class="experiment-loop section" aria-labelledby="experiment-loop-title">
-    <div class="container">
-      <div class="section-header">
-        <h2 id="experiment-loop-title" class="section-title fade-in">
-          Bêta pilotée par le terrain
-        </h2>
-        <p class="section-subtitle fade-in fade-in-delay-1">
-          Les prochaines itérations suivent un objectif simple: plus d'installs qualifiées, plus de
-          premiers scans, plus de missions sauvegardées.
-        </p>
-      </div>
-
-      <div class="experiment-loop__grid" aria-label="Plan d'expérimentation MissionPulse">
-        <article class="experiment-card fade-in fade-in-delay-1">
-          <span class="experiment-card__week">Semaine 1</span>
-          <h3>Mesurer l'activation</h3>
-          <p>
-            Visite landing, installation, premier scan, mission ouverte, favori ou pipeline, retour
-            J+1.
-          </p>
-        </article>
-        <article class="experiment-card fade-in fade-in-delay-2">
-          <span class="experiment-card__week">Semaine 2</span>
-          <h3>Prouver le canal</h3>
-          <p>
-            Publier la shortlist quotidienne et tester LinkedIn, communautés freelances et
-            newsletters.
-          </p>
-        </article>
-        <article class="experiment-card fade-in fade-in-delay-3">
-          <span class="experiment-card__week">Semaine 3</span>
-          <h3>Tester Premium</h3>
-          <p>
-            Valider le prix 9-15€/mois avec le pipeline, le radar TJM, les alertes et les
-            générations.
-          </p>
-        </article>
-        <article class="experiment-card fade-in fade-in-delay-4">
-          <span class="experiment-card__week">Semaine 4</span>
-          <h3>Corriger les blocages</h3>
-          <p>
-            10 entretiens utilisateurs sur connecteurs, onboarding profil, score et première action.
-          </p>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- Comment ça marche -->
-  <section class="how-it-works section" id="how-it-works">
-    <div class="container">
-      <div class="section-header">
-        <h2 class="section-title fade-in">Comment ça marche</h2>
-        <p class="section-subtitle fade-in fade-in-delay-1">3 minutes pour être opérationnel</p>
-      </div>
-
-      <div class="steps">
-        <div class="step fade-in fade-in-delay-1">
-          <div class="step__number">1</div>
-          <div class="step__content">
-            <h3 class="step__title">Installez l'extension</h3>
-            <p class="step__desc">
-              Un clic depuis le Chrome Web Store. Compatible Chrome, Brave, Edge, Arc et Dia.
-            </p>
-          </div>
-        </div>
-        <div class="step fade-in fade-in-delay-2">
-          <div class="step__number">2</div>
-          <div class="step__content">
-            <h3 class="step__title">Configurez votre profil</h3>
-            <p class="step__desc">
-              Stack, TJM cible, localisation, séniorité, préférences remote. Le scoring s'adapte à
-              vos critères.
-            </p>
-          </div>
-        </div>
-        <div class="step fade-in fade-in-delay-3">
-          <div class="step__number">3</div>
-          <div class="step__content">
-            <h3 class="step__title">Connectez-vous aux plateformes</h3>
-            <p class="step__desc">
-              Connectez-vous normalement à Free-Work, LeHibou, etc. MissionPulse utilise vos
-              sessions existantes.
-            </p>
-          </div>
-        </div>
-        <div class="step fade-in fade-in-delay-4">
-          <div class="step__number">4</div>
-          <div class="step__content">
-            <h3 class="step__title">Ouvrez le side panel</h3>
-            <p class="step__desc">
-              Cliquez sur l'icône MissionPulse. Les missions arrivent classées par score. Filtrez,
-              comparez, préparez vos candidatures.
-            </p>
-          </div>
-        </div>
-      </div>
-    </div>
-  </section>
-
   <!-- Plateformes -->
   <section class="platforms section" id="platforms">
     <div class="container">
       <div class="section-header">
         <h2 class="section-title fade-in">5 plateformes connectées</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          Les principales sources de missions freelance tech en France
+          Les principales sources de missions freelance tech en France, dans un seul feed.
         </p>
       </div>
 
-      <div class="platforms__grid platforms__grid--5">
-        <article class="glass-card platform-card fade-in fade-in-delay-1">
-          <img
-            class="platform-card__logo-img"
-            src="/logos/free-work.png"
-            alt="Free-Work"
-            width="48"
-            height="48"
-            loading="lazy"
-          />
-          <h3 class="platform-card__name">Free-Work</h3>
-          <p class="platform-card__desc">8 000+ missions freelance</p>
-          <div class="platform-card__status">
-            <span class="platform-card__status-dot"></span> Opérationnel
-          </div>
-        </article>
-
-        <article class="glass-card platform-card fade-in fade-in-delay-2">
-          <img
-            class="platform-card__logo-img"
-            src="/logos/lehibou.png"
-            alt="LeHibou"
-            width="48"
-            height="48"
-            loading="lazy"
-          />
-          <h3 class="platform-card__name">LeHibou</h3>
-          <p class="platform-card__desc">Missions IT grands comptes</p>
-          <div class="platform-card__status">
-            <span class="platform-card__status-dot"></span> Opérationnel
-          </div>
-        </article>
-
-        <article class="glass-card platform-card fade-in fade-in-delay-3">
-          <img
-            class="platform-card__logo-img"
-            src="/logos/hiway.png"
-            alt="Hiway"
-            width="48"
-            height="48"
-            loading="lazy"
-          />
-          <h3 class="platform-card__name">Hiway</h3>
-          <p class="platform-card__desc">Portage salarial + missions</p>
-          <div class="platform-card__status">
-            <span class="platform-card__status-dot"></span> Opérationnel
-          </div>
-        </article>
-
-        <article class="glass-card platform-card fade-in fade-in-delay-4">
-          <img
-            class="platform-card__logo-img"
-            src="/logos/collective.png"
-            alt="Collective"
-            width="48"
-            height="48"
-            loading="lazy"
-          />
-          <h3 class="platform-card__name">Collective</h3>
-          <p class="platform-card__desc">Collectif de freelances</p>
-          <div class="platform-card__status">
-            <span class="platform-card__status-dot"></span> Opérationnel
-          </div>
-        </article>
-
-        <article class="glass-card platform-card fade-in fade-in-delay-5">
-          <img
-            class="platform-card__logo-img"
-            src="/logos/cherry-pick.png"
-            alt="Cherry Pick"
-            width="48"
-            height="48"
-            loading="lazy"
-          />
-          <h3 class="platform-card__name">Cherry Pick</h3>
-          <p class="platform-card__desc">Missions tech sélectionnées</p>
-          <div class="platform-card__status">
-            <span class="platform-card__status-dot"></span> Opérationnel
-          </div>
-        </article>
-      </div>
-    </div>
-  </section>
-
-  <!-- Tech Stack -->
-  <section class="tech-stack section" id="tech">
-    <div class="container">
-      <div class="tech-stack__content">
-        <div class="tech-stack__info fade-in">
-          <h2 class="tech-stack__title">Open source &amp; moderne</h2>
-          <p class="tech-stack__desc">
-            MissionPulse garde le scraping dans votre navigateur, respecte une architecture
-            local-first et limite le dashboard connecté aux données normalisées utiles au suivi.
-          </p>
-          <a
-            href="https://github.com/guyghost/pulse"
-            class="tech-stack__github btn btn--secondary"
-            target="_blank"
-            rel="noopener noreferrer"
-          >
-            <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-              <path
-                d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
-              />
-            </svg>
-            Voir sur GitHub
-          </a>
-        </div>
-
-        <div class="tech-stack__badges fade-in fade-in-delay-2">
-          <span class="tech-badge">Svelte 5</span>
-          <span class="tech-badge">TypeScript</span>
-          <span class="tech-badge">Chrome MV3</span>
-          <span class="tech-badge">Gemini Nano</span>
-          <span class="tech-badge">TailwindCSS 4</span>
-          <span class="tech-badge">Vite</span>
-          <span class="tech-badge">Vitest</span>
-        </div>
-      </div>
+      <ul class="platform-strip fade-in fade-in-delay-1" aria-label="Plateformes connectées">
+        {#each platforms as p (p.name)}
+          <li class="platform-strip__item">
+            <img
+              class="platform-strip__logo"
+              src={p.logo}
+              alt={p.name}
+              width="40"
+              height="40"
+              loading="lazy"
+            />
+            <span class="platform-strip__name">{p.name}</span>
+          </li>
+        {/each}
+      </ul>
     </div>
   </section>
 
@@ -1315,6 +908,10 @@
           >
           <a href="mailto:contact@missionpulse.app" class="footer__link">Contact</a>
         </nav>
+
+        <p class="footer__stack">
+          Svelte 5 · TypeScript · Chrome MV3 · Gemini Nano · Tailwind 4 · Architecture local-first
+        </p>
 
         <p class="footer__copy">MissionPulse — 2026. Open source.</p>
       </div>
