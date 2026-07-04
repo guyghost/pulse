@@ -258,7 +258,7 @@
     <div class="flex shrink-0 items-center gap-2">
       {#if mission.scoreBreakdown}
         <span
-          class="rounded-lg px-2 py-1 text-[11px] font-mono font-semibold {scoreColor} {tourHighlight ===
+          class="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg px-2.5 py-1 text-center text-[13px] font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
           'score'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
@@ -266,21 +266,21 @@
         >
       {:else if mission.score !== null}
         <span
-          class="rounded-lg px-2 py-1 text-[11px] font-mono font-semibold {scoreColor} {tourHighlight ===
+          class="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg px-2.5 py-1 text-center text-[13px] font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
           'score'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}">{mission.score}</span
         >
       {/if}
       <div
-        class="flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors group-hover:text-text-primary {tourHighlight ===
+        class="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors group-hover:text-text-primary {tourHighlight ===
         'expand'
           ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
           : ''}"
       >
         <Icon
           name="chevron-down"
-          size={14}
+          size={12}
           class="transition-transform duration-200 {expanded ? 'rotate-180' : ''}"
         />
       </div>
