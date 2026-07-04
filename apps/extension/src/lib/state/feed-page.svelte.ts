@@ -42,6 +42,7 @@ import {
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
 import { showToastAction } from '$lib/shell/notifications/toast-service';
+import { createUndoController, type UndoController } from '$lib/shell/undo/undo-controller';
 import {
   buildProfileImpactItems,
   buildProfileImpactSimulation,
@@ -227,6 +228,35 @@ export function createFeedPageState(
 
   // Cleanup functions
   let cleanupFns: Array<() => void> = [];
+
+  // Undo windows (soft-delete). Persistence is deferred to commit only.
+  // See src/models/undo-window.model.md for the authoritative state model.
+  const hideUndo: UndoController<Record<string, number>> = createUndoController({
+    kind: 'hide',
+    onCommit: () => {
+      saveHidden(hidden).catch(() => {});
+    },
+    onRestore: (_id, snapshot) => {
+      hidden = snapshot;
+    },
+    toastMessage: (id, snapshot) => (id in snapshot ? 'Mission restaurée' : 'Mission masquée'),
+  });
+
+  const viewDeleteUndo: UndoController<{
+    views: SavedFeedView[];
+    activeId: string | null;
+    name: string;
+  }> = createUndoController({
+    kind: 'delete-view',
+    onCommit: () => {
+      setFeedSavedViews(savedViews).catch(() => {});
+    },
+    onRestore: (_id, snapshot) => {
+      savedViews = snapshot.views;
+      activeSavedViewId = snapshot.activeId;
+    },
+    toastMessage: (_id, snapshot) => `Vue « ${snapshot.name} » supprimée`,
+  });
 
   // ============================================================
   // Derived — from feed store
@@ -566,17 +596,10 @@ export function createFeedPageState(
   }
 
   function handleHide(id: string): void {
+    // Soft-delete: apply in-memory now, defer persistence to the undo-window commit.
     const previous = { ...hidden };
-    const wasHidden = id in hidden;
     hidden = toggleHidden(hidden, id, Date.now());
-    saveHidden(hidden).catch(() => {});
-    showToastAction(wasHidden ? 'Mission restaurée' : 'Mission masquée', 'info', {
-      label: 'Annuler',
-      onClick: () => {
-        hidden = previous;
-        saveHidden(previous).catch(() => {});
-      },
-    });
+    hideUndo.request(id, previous);
   }
 
   function handleCopyLink(_id: string): void {
@@ -778,7 +801,7 @@ export function createFeedPageState(
     activeSavedViewId = view.id;
   }
 
-  async function deleteSavedView(viewId: string): Promise<void> {
+  function deleteSavedView(viewId: string): void {
     const deletedView = savedViews.find((item) => item.id === viewId);
     if (!deletedView) {
       return;
@@ -787,17 +810,15 @@ export function createFeedPageState(
     const previousViews = [...savedViews];
     const previousActiveSavedViewId = activeSavedViewId;
     const nextViews = savedViews.filter((item) => item.id !== viewId);
-    await persistSavedViews(nextViews);
+    // Soft-delete: apply in-memory now, defer persistence to the undo-window commit.
+    savedViews = nextViews;
     if (activeSavedViewId === viewId) {
       activeSavedViewId = null;
     }
-    showToastAction(`Vue "${deletedView.name}" supprimée`, 'info', {
-      label: 'Annuler',
-      onClick: () => {
-        savedViews = previousViews;
-        activeSavedViewId = previousActiveSavedViewId;
-        setFeedSavedViews(previousViews).catch(() => {});
-      },
+    viewDeleteUndo.request(viewId, {
+      views: previousViews,
+      activeId: previousActiveSavedViewId,
+      name: deletedView.name,
     });
   }
 
@@ -1014,6 +1035,9 @@ export function createFeedPageState(
       fn();
     }
     cleanupFns = [];
+    // Cancel pending undo windows without committing (safe-by-default, invariant I5).
+    hideUndo.dispose();
+    viewDeleteUndo.dispose();
   }
 
   // ============================================================

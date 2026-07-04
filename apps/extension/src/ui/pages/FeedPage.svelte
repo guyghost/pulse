@@ -201,7 +201,7 @@
     type MissionTracking,
   } from '$lib/core/types/tracking';
   import { pullToRefresh } from '../actions/pull-to-refresh';
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
@@ -245,6 +245,7 @@
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
   page.setup();
+  onDestroy(() => page.dispose());
 
   type TrackingStore = ReturnType<typeof import('$lib/state/tracking.svelte').createTrackingStore>;
   const emptyTrackings = new Map<string, MissionTracking>();

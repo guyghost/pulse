@@ -353,20 +353,48 @@ describe('feed page state', () => {
     expect(page.activeSavedViewId).toBeNull();
 
     expect(toastMock.showToastAction).toHaveBeenCalledWith(
-      'Vue "Remote prioritaire" supprimée',
+      'Vue « Remote prioritaire » supprimée',
       'info',
-      expect.objectContaining({ label: 'Annuler' })
+      expect.objectContaining({ label: 'Annuler' }),
+      6000
     );
     const undoAction = toastMock.showToastAction.mock.calls.at(-1)?.[2].onClick;
     expect(undoAction).toBeDefined();
+
+    // Soft-delete contract: storage is not written while the window is open.
+    const callsBeforeUndo = feedDataMock.setFeedSavedViews.mock.calls.length;
     undoAction?.();
 
     expect(page.savedViews).toHaveLength(1);
     expect(page.savedViews[0].id).toBe(savedId);
     expect(page.activeSavedViewId).toBe(savedId);
-    expect(feedDataMock.setFeedSavedViews).toHaveBeenLastCalledWith([
-      expect.objectContaining({ id: savedId, name: 'Remote prioritaire' }),
-    ]);
+    // Undo reverts in-memory only; no new persistence call.
+    expect(feedDataMock.setFeedSavedViews.mock.calls.length).toBe(callsBeforeUndo);
+  });
+
+  it('commits a deleted feed view to storage only when the undo window times out', async () => {
+    vi.useFakeTimers();
+    try {
+      const feed = createFeedStore();
+      const page = createFeedPageState(feed, makeController());
+      feed.setMissions([makeMission({ id: 'm1', score: 80 })]);
+
+      await page.saveCurrentView('Ma vue');
+      const savedId = page.savedViews[0].id;
+
+      const callsBeforeDelete = feedDataMock.setFeedSavedViews.mock.calls.length;
+      page.deleteSavedView(savedId);
+
+      // While the undo window is open, storage is NOT written.
+      expect(feedDataMock.setFeedSavedViews.mock.calls.length).toBe(callsBeforeDelete);
+
+      // Commit fires when the window times out (DEFAULT_UNDO_WINDOW_MS = 5000).
+      vi.advanceTimersByTime(5000);
+
+      expect(feedDataMock.setFeedSavedViews).toHaveBeenLastCalledWith([]);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 
   it('summarizes score explanations for the current dashboard scope', () => {
