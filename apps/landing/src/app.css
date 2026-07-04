@@ -1580,6 +1580,14 @@ section[id] {
   line-height: 1.65;
 }
 
+.plan-card__anchor {
+  margin: var(--spacing-6) 0 0;
+  color: var(--color-blueprint-blue);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  line-height: 1.5;
+}
+
 .plan-card__list {
   display: grid;
   gap: var(--spacing-12);

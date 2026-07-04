@@ -770,7 +770,10 @@
             <li>Feed centralisé avec recherche, filtres, tri, nouveautés et favoris.</li>
             <li>Scoring de pertinence, déduplication et comparaison des meilleures missions.</li>
             <li>Paramètres de profil, alertes, exports et sauvegarde locale.</li>
-            <li>Scoring sémantique local via Gemini Nano quand Chrome le permet.</li>
+            <li>
+              Scoring sémantique local via l'IA intégrée à Chrome (Gemini Nano), quand Chrome le
+              permet.
+            </li>
           </ul>
           <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer gratuitement</a>
         </article>
@@ -780,13 +783,20 @@
             <span class="plan-card__name">Premium</span>
             <strong class="plan-card__price">12€<small>/mois</small></strong>
             <p>Pour piloter votre prospection comme un pipeline et produire vos candidatures.</p>
+            <p class="plan-card__anchor">≈ 0,40€/jour — moins qu'un café par semaine.</p>
           </div>
           <ul class="plan-card__list">
-            <li>Le dashboard connecté optionnel synchronise les snapshots normalisés.</li>
+            <li>
+              Le dashboard connecté optionnel synchronise votre shortlist et vos candidatures entre
+              vos appareils.
+            </li>
             <li>Pages Premium dans l'extension: profil, CV, suivi de candidatures et radar TJM.</li>
             <li>Pipeline de candidature avec statuts, notes, prochaine action et historique.</li>
             <li>Assistant profil/CV pour garder vos informations cohérentes entre plateformes.</li>
-            <li>20 crédits IA par mois pour générer pitch, message recruteur ou résumé CV.</li>
+            <li>
+              20 contenus générés par mois (pitch, message recruteur ou résumé CV). 1 crédit = 1
+              contenu.
+            </li>
           </ul>
           <a
             href="https://missionpulse.lemonsqueezy.com/checkout"
