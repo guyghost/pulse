@@ -14,6 +14,7 @@ export const MissionSourceSchema = z.enum([
   'hiway',
   'collective',
   'cherry-pick',
+  'malt',
 ]);
 
 export const RemoteTypeSchema = z.enum(['full', 'hybrid', 'onsite']);

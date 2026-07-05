@@ -8,7 +8,7 @@ import { generateMockMissions } from '../../fixtures/large-dataset';
 import { deriveHealthStatus } from '../../../src/lib/core/health/derive-health-status';
 
 const FIXED_NOW = new Date('2026-06-15T12:00:00.000Z');
-const ALL_SOURCES = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'] as const;
+const ALL_SOURCES = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'] as const;
 const ALL_STATUSES = [
   'detected',
   'selected',
@@ -222,7 +222,7 @@ describe('applyQaSeedToLocalStorage — writer', () => {
     expect(trackings).toHaveLength(9);
 
     const health = JSON.parse(sink.getItem(QA_LOCALSTORAGE_KEYS.health) ?? '[]');
-    expect(health).toHaveLength(5);
+    expect(health).toHaveLength(6);
 
     expect(sink.getItem(QA_LOCALSTORAGE_KEYS.favorites)).toBeTruthy();
     expect(sink.getItem(QA_LOCALSTORAGE_KEYS.hidden)).toBeTruthy();

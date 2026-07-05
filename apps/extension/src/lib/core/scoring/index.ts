@@ -2,6 +2,15 @@ export { scoreMission, type DeterministicScoreResult } from './relevance';
 export { deduplicateMissions } from './dedup';
 export { computeFinalScore, computeFinalBreakdown, buildScoreBreakdown } from './final-score';
 export { sortMissions, type MissionSortBy } from './sort-missions';
+export {
+  rankMissions,
+  missionRankScore,
+  freshnessScore,
+  type RankingWeights,
+  type RankingOptions,
+  DEFAULT_RANKING_WEIGHTS,
+  DEFAULT_FRESHNESS_DECAY_DAYS,
+} from './rank-missions';
 export { filterSalariedMissions } from './contract-filter';
 export { filterStaleMissions, isMissionFresh, DEFAULT_MAX_AGE_DAYS } from './mission-freshness';
 export { filterNotifiableMissions } from './notification-filter';

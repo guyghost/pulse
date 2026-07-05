@@ -462,7 +462,14 @@ describe('Hiway connector enabled state', () => {
   it('is in the active connector registry', () => {
     const activeIds = getConnectorIds();
     expect(activeIds).toContain('hiway');
-    expect(activeIds).toEqual(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick']);
+    expect(activeIds).toEqual([
+      'free-work',
+      'lehibou',
+      'hiway',
+      'collective',
+      'cherry-pick',
+      'malt',
+    ]);
   });
 
   it('is in the connectors metadata for UI display', () => {

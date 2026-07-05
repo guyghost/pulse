@@ -406,6 +406,10 @@
   // Tracks whether the advanced panel was opened by the user (vs. auto-expanded
   // by a broken-connector state). Lets us auto-collapse only the auto-expand.
   let advancedControlsUserOpened = $state(false);
+  // Tracks whether the user has interacted with the toggle at all. Once true,
+  // the broken-connector auto-expand stops fighting the user's explicit choice
+  // (e.g. they collapsed to "Vue simple" while a connector is broken).
+  let advancedControlsUserInteracted = $state(false);
   let investigationMission = $state<(typeof page.displayMissions)[number] | null>(null);
   let scrollStopTimeout: ReturnType<typeof setTimeout> | null = null;
 
@@ -948,7 +952,9 @@
 
   $effect(() => {
     const hasBroken = brokenConnectors.length > 0;
-    if (hasBroken && !showAdvancedControls) {
+    if (hasBroken && !showAdvancedControls && !advancedControlsUserInteracted) {
+      // First time a connector breaks: surface it once. After the user has
+      // touched the toggle, respect their explicit choice (see "Vue simple").
       showAdvancedControls = true;
       advancedControlsUserOpened = false;
     } else if (!hasBroken && showAdvancedControls && !advancedControlsUserOpened) {
@@ -1525,7 +1531,8 @@
               type="button"
               class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-[10px] font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary"
               onclick={() => {
-                advancedControlsUserOpened = true;
+                advancedControlsUserInteracted = true;
+                advancedControlsUserOpened = showAdvancedControls ? false : true;
                 showAdvancedControls = !showAdvancedControls;
               }}
               aria-expanded={showAdvancedControls}

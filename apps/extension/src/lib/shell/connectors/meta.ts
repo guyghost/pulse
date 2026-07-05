@@ -1,4 +1,4 @@
-export type ConnectorId = 'free-work' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick';
+export type ConnectorId = 'free-work' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick' | 'malt';
 
 export interface ConnectorMeta {
   id: ConnectorId;
@@ -38,6 +38,12 @@ export function getConnectorsMeta(): ConnectorMeta[] {
       name: 'Cherry Pick',
       icon: 'https://www.google.com/s2/favicons?domain=cherry-pick.io&sz=32',
       url: 'https://www.cherry-pick.io',
+    },
+    {
+      id: 'malt',
+      name: 'Malt',
+      icon: 'https://www.google.com/s2/favicons?domain=malt.fr&sz=32',
+      url: 'https://www.malt.fr',
     },
   ];
 }

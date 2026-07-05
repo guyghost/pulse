@@ -227,6 +227,7 @@ function connectorDisplayName(connectorId: MissionSource): string {
     hiway: 'Hiway',
     collective: 'Collective',
     'cherry-pick': 'Cherry Pick',
+    malt: 'Malt',
   };
   return names[connectorId];
 }
@@ -283,12 +284,14 @@ function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
     return storedHealth;
   }
   const now = Date.now();
-  return ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'].map((connectorId) => ({
-    ...createInitialHealthSnapshot(connectorId, now - 10 * 60_000),
-    totalSuccesses: connectorId === 'free-work' ? 3 : 1,
-    lastSuccessAt: now - (connectorId === 'free-work' ? 2 : 18) * 60_000,
-    recentLatenciesMs: connectorId === 'free-work' ? [420, 510, 460] : [780],
-  }));
+  return ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'].map(
+    (connectorId) => ({
+      ...createInitialHealthSnapshot(connectorId, now - 10 * 60_000),
+      totalSuccesses: connectorId === 'free-work' ? 3 : 1,
+      lastSuccessAt: now - (connectorId === 'free-work' ? 2 : 18) * 60_000,
+      recentLatenciesMs: connectorId === 'free-work' ? [420, 510, 460] : [780],
+    })
+  );
 }
 
 function createChromeStubs() {

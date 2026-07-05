@@ -44,7 +44,14 @@ import type {
 // Constants (mirrors tests/fixtures/large-dataset.ts verbatim for reuse)
 // ============================================================================
 
-const SOURCES: MissionSource[] = ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'];
+const SOURCES: MissionSource[] = [
+  'free-work',
+  'lehibou',
+  'hiway',
+  'collective',
+  'cherry-pick',
+  'malt',
+];
 
 const STACKS = [
   ['React', 'TypeScript', 'Node.js'],
@@ -512,6 +519,7 @@ const HEALTH_BY_SOURCE: Record<MissionSource, HealthVariant> = {
   hiway: 'broken',
   collective: 'healthy',
   'cherry-pick': 'healthy',
+  malt: 'healthy',
 };
 
 /**

@@ -6,13 +6,13 @@ product
 
 ## Users
 
-Freelances tech (développeurs, designers, DevOps, etc.) en France/Europe qui chassent des missions sur plusieurs plateformes (Free-Work, LeHibou, Hiway, Collective, Cherry Pick) et doivent décider rapidement lesquelles méritent une candidature. Ils travaillent sur ordinateur portable, souvent dans des fenêtres de focus courtes entre deux contrats ou en veille en arrière-plan pendant les temps morts.
+Freelances tech (développeurs, designers, DevOps, etc.) en France/Europe qui chassent des missions sur plusieurs plateformes (Free-Work, LeHibou, Hiway, Collective, Cherry Pick, Malt) et doivent décider rapidement lesquelles méritent une candidature. Ils travaillent sur ordinateur portable, souvent dans des fenêtres de focus courtes entre deux contrats ou en veille en arrière-plan pendant les temps morts.
 
-Le job à faire : faire émerger les missions à plus fort signal du bruit de cinq job boards qui se chevauchent, scorer chaque mission selon l'adéquation au profil (stack, TJM, remote, séniorité, urgence), et agir — sans subir le clutter et la charge cognitive des marketplaces sources.
+Le job à faire : faire émerger les missions à plus fort signal du bruit de six job boards qui se chevauchent, scorer chaque mission selon l'adéquation au profil (stack, TJM, remote, séniorité, urgence), et agir — sans subir le clutter et la charge cognitive des marketplaces sources.
 
 ## Product Purpose
 
-MissionPulse est une extension Chrome 100% locale qui agrège les missions freelance de cinq plateformes en un feed scoré unique, avec l'analyse de tendance TJM et des notifications intelligentes. Elle existe parce que les plateformes sources sont bruyantes, inconsistantes, et forcent à jongler entre onglets. Le succès : un freelance ouvre le panneau, scanne un feed dédupliqué et ranké en moins d'une minute, et qualifie (retient ou écarte) chaque mission en confiance. Le design sert le produit — la valeur est le signal, pas le chrome.
+MissionPulse est une extension Chrome 100% locale qui agrège les missions freelance de six plateformes en un feed scoré unique, avec l'analyse de tendance TJM et des notifications intelligentes. Elle existe parce que les plateformes sources sont bruyantes, inconsistantes, et forcent à jongler entre onglets. Le succès : un freelance ouvre le panneau, scanne un feed dédupliqué et ranké en moins d'une minute, et qualifie (retient ou écarte) chaque mission en confiance. Le design sert le produit — la valeur est le signal, pas le chrome.
 
 La réussite se mesure par une recherche plus rapide, une qualification plus simple, et moins d'opportunités ratées.
 

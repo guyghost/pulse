@@ -7,6 +7,7 @@ import {
   validateSchema,
   validateVersionConsistency,
 } from '../../../scripts/verify-manifest.ts';
+import { getConnectorsMeta } from '../../../src/lib/shell/connectors/meta';
 
 // ── Minimal valid manifest fixture ──────────────────────────────────
 
@@ -418,6 +419,56 @@ describe('validateLinkedInProfileImportPermissions', () => {
           expect.stringContaining('https://www.linkedin.com/*'),
         ])
       );
+    }
+  });
+});
+
+describe('host_permissions coverage', () => {
+  /**
+   * Extracts the registrable (last-two-label) domain from a connector URL,
+   * e.g. `https://www.cherry-pick.io` → `cherry-pick.io`,
+   * `https://app.collective.work/` → `collective.work`.
+   */
+  const registrableDomain = (url: string): string => {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    const parts = hostname.split('.');
+    return parts.slice(-2).join('.');
+  };
+
+  /**
+   * Reads the real src/manifest.json and verifies every registered
+   * connector has at least one matching host_permission entry.
+   * This guards against forgetting to add host_permissions when a
+   * new connector is registered.
+   */
+  const realManifest: unknown = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'src/manifest.json'), 'utf-8')
+  );
+  const hostPermissions: string[] =
+    (realManifest as { host_permissions?: string[] }).host_permissions ?? [];
+
+  it('should include host_permissions for Malt (.fr)', () => {
+    const hasMaltFr = hostPermissions.some((h) => h.includes('malt.fr'));
+    expect(hasMaltFr).toBe(true);
+  });
+
+  it('should include host_permissions for Malt (.io)', () => {
+    const hasMaltIo = hostPermissions.some((h) => h.includes('malt.io'));
+    expect(hasMaltIo).toBe(true);
+  });
+
+  it('should include host_permissions for all registered connectors', () => {
+    // Derived from the connector registry so this test stays in sync when
+    // connectors are added or removed — no hardcoded list to forget updating.
+    // The Malt `.io` domain is covered by the explicit test above.
+    const connectorDomains = getConnectorsMeta().map((c) => ({
+      name: c.name,
+      domain: registrableDomain(c.url),
+    }));
+
+    for (const { name, domain } of connectorDomains) {
+      const hasPermission = hostPermissions.some((h) => h.includes(domain));
+      expect(hasPermission, `host_permissions missing entry for ${name} (${domain})`).toBe(true);
     }
   });
 });
