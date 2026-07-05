@@ -1077,7 +1077,7 @@
           : ''}"
       >
         <!-- ── Hero header ── -->
-        <div class="px-5 {page.heroCompact ? 'pt-3 pb-2' : 'pt-4 pb-0'}">
+        <div class="px-5 {page.heroCompact ? 'pt-2.5 pb-1.5' : 'pt-4 pb-0'}">
           {#if page.heroCompact}
             <!-- Compact: single row with stats and scan button -->
             <div class="flex items-center justify-between gap-3">
@@ -1129,7 +1129,7 @@
                 </Tooltip>
               </div>
             </div>
-            <div class="mt-3">
+            <div class="mt-2">
               <OperationalStoryCard
                 eyebrow="À faire maintenant"
                 title={feedStory.title}
@@ -1375,8 +1375,12 @@
           {/if}
         </div>
 
-        <!-- ── Search + Filter toolbar ── -->
-        <div class="border-t border-border-light px-5 py-3">
+        <!-- ── Search + Filter toolbar (condensed-sticky in compact mode) ── -->
+        <div
+          class="border-t border-border-light px-5 {page.heroCompact
+            ? 'sticky top-0 z-20 bg-surface-white/90 py-2 backdrop-blur-md'
+            : 'py-3'}"
+        >
           <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
             {#if feedChromeBusy}Chargement des missions en cours{/if}
           </div>
@@ -1659,7 +1663,7 @@
     tabindex="-1"
     aria-labelledby="mission-feed-title"
   >
-    {#if hasVisibleFeedMissions}
+    {#if hasVisibleFeedMissions && !page.heroCompact}
       <div
         data-testid="mission-feed-anchor"
         class="mb-3 flex items-end justify-between gap-3 border-t border-border-light pt-4"
@@ -1684,7 +1688,9 @@
         </span>
       </div>
     {:else}
-      <h2 id="mission-feed-title" class="sr-only">Missions proposées</h2>
+      <h2 id="mission-feed-title" class="sr-only">
+        {hasVisibleFeedMissions ? 'Missions à examiner' : 'Missions proposées'}
+      </h2>
     {/if}
     <div
       class="rounded-xl transition-all duration-200 {activeTourStep?.id === 'expand' ||
