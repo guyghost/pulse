@@ -4,6 +4,8 @@ import {
   saveConnectorStatuses,
   getConnectorStatuses,
   getMissions,
+  runMigrations,
+  getMigrationStatus,
 } from '../lib/shell/storage/db';
 import type {
   BridgeMessage,
@@ -1010,6 +1012,31 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    // ── DB migration orchestrator handlers ──
+
+    if (message.type === 'GET_MIGRATION_STATUS') {
+      sendResponse({
+        type: 'MIGRATION_STATUS_RESULT',
+        payload: getMigrationStatus(),
+      });
+      return false;
+    }
+
+    if (message.type === 'RUN_MIGRATIONS') {
+      runMigrations()
+        .then((result) => {
+          sendResponse({ type: 'MIGRATION_DONE', payload: result });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] RUN_MIGRATIONS error:', err);
+          sendResponse({
+            type: 'MIGRATION_FAILED',
+            payload: getMigrationStatus(),
+          });
+        });
+      return true;
+    }
+
     // ── Tracking handlers ──
 
     if (message.type === 'UPDATE_TRACKING') {
@@ -1374,11 +1401,46 @@ chrome.storage.onChanged.addListener((changes, area) => {
 // Initial setup
 setupAlarm();
 
+// ── Cold-start migration guard ───────────────────────────────────────────────
+// MV3 service workers restart on every event. `onInstalled` only fires on
+// install/update, so we also run the orchestrator here to catch the rare
+// case where the DB was bumped by a prior SW lifetime that crashed before
+// completing, or where the browser restarted without firing onInstalled.
+// No-op when the DB is already at the right version. Fire-and-forget:
+// openDB() also self-heals on-demand, so we never block startup.
+void runMigrations().catch((err) => {
+  console.warn('[MissionPulse] Cold-start migration guard error:', err);
+});
+
 // ── First-install silent scan ──────────────────────────────────────────────────
 // On fresh install: detect active platform sessions in parallel.
 // If any found, run a silent scan with a default profile so the user
 // lands directly on a populated feed — no wizard required.
 chrome.runtime.onInstalled.addListener(async (details) => {
+  // On every install/update: run the DB migration orchestrator FIRST, so
+  // the schema is reconciled before any read/write happens. Safe to call
+  // on fresh install (no-op) and idempotent on update. See
+  // `src/models/db-migration.model.md`.
+  try {
+    const result = await runMigrations();
+    if (import.meta.env.DEV) {
+      console.debug('[MissionPulse] Migration orchestrator result:', result);
+    }
+    const status = getMigrationStatus();
+    if (status.state === 'downgrade') {
+      chrome.runtime.sendMessage({ type: 'MIGRATION_DOWNGRADE_DETECTED' }).catch(() => {
+        // panel not open — downgrade flag is persisted
+      });
+    } else if (status.state === 'quarantine') {
+      chrome.runtime.sendMessage({ type: 'MIGRATION_QUARANTINED' }).catch(() => {
+        // panel not open — quarantine is persisted
+      });
+    }
+  } catch (err) {
+    console.error('[MissionPulse] Migration orchestrator failed on install:', err);
+    // Non-fatal: openDB() will retry on next access.
+  }
+
   if (details.reason !== 'install') {
     return;
   }
