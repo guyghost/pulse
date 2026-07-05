@@ -54,8 +54,10 @@ export class MaltConnector extends BaseConnector {
       );
       return ok(hasSession);
     } catch {
-      // Cookie API unavailable — assume public access works
-      return ok(true);
+      // Cookie API unavailable — can't confirm a session. Report honestly so
+      // the UI doesn't show a false "connected" state. fetchMissions still
+      // attempts the public search endpoint regardless of this result.
+      return ok(false);
     }
   }
 

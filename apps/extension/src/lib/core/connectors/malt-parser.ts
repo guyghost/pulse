@@ -226,7 +226,15 @@ export const parseMaltJSON = (rows: unknown[], now: Date, baseUrl: string): Miss
       if (typeof row !== 'object' || row === null) {
         return null;
       }
-      return parseMaltProjectRow(row as MaltProjectRow, now, baseUrl);
+      // Defensive parse: a single row with an unexpected field type (e.g. a
+      // number where a string is expected) would throw inside a helper's
+      // `.trim()`/`.toLowerCase()`. Treat such rows as invalid rather than
+      // letting one bad row abort the entire batch.
+      try {
+        return parseMaltProjectRow(row as MaltProjectRow, now, baseUrl);
+      } catch {
+        return null;
+      }
     })
     .filter((m): m is Mission => m !== null);
 };
