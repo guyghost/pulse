@@ -292,6 +292,7 @@
     <div class="mt-4">
       <OperationalStoryCard
         eyebrow="À faire avec votre TJM"
+        variant="compact"
         title={tjmStory.title}
         description={tjmStory.description}
         severity={tjmStory.severity}

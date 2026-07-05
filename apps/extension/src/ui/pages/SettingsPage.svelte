@@ -512,6 +512,7 @@
     <div class="mt-4">
       <OperationalStoryCard
         eyebrow="À vérifier"
+        variant="compact"
         title={settingsStory.title}
         description={settingsStory.description}
         severity={settingsStory.severity}
@@ -762,6 +763,7 @@
         </div>
         <OperationalStoryCard
           eyebrow="Analyse locale"
+          variant="compact"
           title={aiStory.title}
           description={aiStory.description}
           severity={aiStory.severity}
@@ -865,6 +867,7 @@
         </div>
         <OperationalStoryCard
           eyebrow="Décision"
+          variant="compact"
           title={exportStory.title}
           description={exportStory.description}
           severity={exportStory.severity}
@@ -961,6 +964,7 @@
         </div>
         <OperationalStoryCard
           eyebrow="Continuité"
+          variant="compact"
           title={backupStory.title}
           description={backupStory.description}
           severity={backupStory.severity}

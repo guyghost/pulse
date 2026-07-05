@@ -588,6 +588,7 @@
     <div class="mt-4">
       <OperationalStoryCard
         eyebrow="Cohérence CV"
+        variant="compact"
         title={cvStory.title}
         description={cvStory.description}
         severity={cvStory.severity}

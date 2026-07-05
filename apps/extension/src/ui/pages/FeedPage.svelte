@@ -1137,7 +1137,7 @@
                 severity={feedStory.severity}
                 statusLabel={feedStory.statusLabel}
                 evidence={feedStory.evidence}
-                compact={true}
+                variant="inline"
                 primaryActionLabel={feedStory.primaryActionLabel}
                 primaryActionIcon={feedStory.primaryActionIcon}
                 onPrimaryAction={handleFeedStoryPrimaryAction}
