@@ -134,6 +134,14 @@ describe('missionRankScore', () => {
     // 0 * 0.75 + 100 * 0.25 = 25
     expect(missionRankScore(mission, NOW)).toBe(25);
   });
+
+  it('honors a custom decayDays argument', () => {
+    const mission = makeMission({ score: 80, publishedAt: '2026-06-28' }); // 3 days old
+    // default decay 14 → freshness 79: 80*0.75 + 79*0.25 = 79.75 → 80
+    expect(missionRankScore(mission, NOW)).toBe(80);
+    // decay 6 → freshness 50: 80*0.75 + 50*0.25 = 72.5 → 73
+    expect(missionRankScore(mission, NOW, DEFAULT_RANKING_WEIGHTS, 6)).toBe(73);
+  });
 });
 
 // ---------------------------------------------------------------------------
@@ -270,5 +278,26 @@ describe('rankMissions', () => {
   it('uses default constants when no options given', () => {
     expect(DEFAULT_RANKING_WEIGHTS).toEqual({ relevance: 0.75, freshness: 0.25 });
     expect(DEFAULT_FRESHNESS_DECAY_DAYS).toBe(14);
+  });
+
+  it('honors the freshnessDecayDays option end-to-end', () => {
+    const stale = makeMission({
+      id: 'stale',
+      score: 80,
+      publishedAt: '2026-06-21', // 10 days old
+      source: 'free-work',
+    });
+    const fresh = makeMission({
+      id: 'fresh',
+      score: 50,
+      publishedAt: '2026-07-01', // today
+      source: 'lehibou',
+    });
+    // Default 14-day decay: stale freshness 29 → stale 67, fresh 63 → stale first
+    expect(rankMissions([stale, fresh], NOW, { diversify: false })[0].id).toBe('stale');
+    // 3-day decay: stale (10 days) freshness → 0, so stale 60, fresh 63 → fresh first
+    expect(
+      rankMissions([stale, fresh], NOW, { diversify: false, freshnessDecayDays: 3 })[0].id
+    ).toBe('fresh');
   });
 });

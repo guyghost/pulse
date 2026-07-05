@@ -88,10 +88,11 @@ export function freshnessScore(
 export function missionRankScore(
   mission: Mission,
   now: Date,
-  weights: RankingWeights = DEFAULT_RANKING_WEIGHTS
+  weights: RankingWeights = DEFAULT_RANKING_WEIGHTS,
+  decayDays: number = DEFAULT_FRESHNESS_DECAY_DAYS
 ): number {
   const relevance = getMissionScore(mission);
-  const fresh = freshnessScore(mission.publishedAt, now);
+  const fresh = freshnessScore(mission.publishedAt, now, decayDays);
   const total = weights.relevance + weights.freshness;
   // Normalize so the result stays in 0-100 even if weights don't sum to 1
   const wRel = total > 0 ? weights.relevance / total : 0.75;
@@ -140,11 +141,14 @@ export function rankMissions(missions: Mission[], now: Date, options?: RankingOp
 
   const weights = options?.weights ?? DEFAULT_RANKING_WEIGHTS;
   const diversify = options?.diversify ?? true;
+  const decayDays = options?.freshnessDecayDays ?? DEFAULT_FRESHNESS_DECAY_DAYS;
 
-  // 1. Sort by composite score
-  const sorted = [...missions].sort(
-    (a, b) => missionRankScore(b, now, weights) - missionRankScore(a, now, weights)
-  );
+  // 1. Sort by composite score (Schwartzian transform: score each mission once,
+  //    rather than O(n log n) recomputations inside the sort comparator).
+  const sorted = [...missions]
+    .map((m) => ({ m, s: missionRankScore(m, now, weights, decayDays) }))
+    .sort((a, b) => b.s - a.s)
+    .map(({ m }) => m);
 
   // 2. Source diversity: round-robin interleave (skip if disabled or single source)
   const sources = new Set(sorted.map((m) => m.source));
