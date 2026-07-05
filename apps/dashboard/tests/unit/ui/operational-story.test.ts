@@ -20,6 +20,20 @@ describe('connected dashboard operational story', () => {
     );
   });
 
+  it('hides empty hero metrics until meaningful data exists', () => {
+    // M2: metrics visibility is the source of truth for the hero metrics region.
+    expect(source).toContain('deriveMetricsVisibility');
+    expect(source).toContain('const metricsVisibility = $derived(');
+    // When every metric is empty, the 4-card grid is replaced by one honest line.
+    expect(source).toContain("metricsVisibility.phase === 'hidden'");
+    expect(source).toContain('Aucune candidature suivie');
+    // Cards render per-metric availability, so no "0 / N/A / Aucun" ever ships.
+    expect(source).toContain("metricsVisibility.availability.applications === 'has_data'");
+    expect(source).toContain("metricsVisibility.availability.interviews === 'has_data'");
+    expect(source).toContain("metricsVisibility.availability.nextFollowUp === 'has_data'");
+    expect(source).toContain("metricsVisibility.availability.averageScore === 'has_data'");
+  });
+
   it('does not mark the dashboard ready before an extension is linked', () => {
     expect(source).toContain('const hasConnectedExtension = $derived');
     expect(source).toContain(

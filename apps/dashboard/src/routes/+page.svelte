@@ -21,6 +21,7 @@
     canShowStatusBanner,
     canShowSetupChecklist,
   } from '../models/dashboard-surface.model';
+  import { deriveMetricsVisibility } from '../models/metrics-visibility.model';
   import type { ActionData, PageData } from './$types';
   import type {
     ApplicationStage,
@@ -101,6 +102,15 @@
     })
   );
   const feedIsPrimary = $derived(isFeedPrimary(dashboardPhase));
+  // M2 — metrics visibility: empty hero metrics are omitted, never shown as 0 / N/A.
+  const metricsVisibility = $derived(
+    deriveMetricsVisibility({
+      applicationCount: applications.length,
+      averageScore,
+      interviewCount: counts.interview,
+      nextFollowUp,
+    })
+  );
   // Progressive disclosure: show the feed, not a capped slice. Reveal in pages.
   const FEED_PAGE_SIZE = 12;
   let feedVisibleCount = $state(FEED_PAGE_SIZE);
@@ -1420,53 +1430,63 @@
         {/if}
 
         {#if !setupRequired}
-          <section
-            class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
-            aria-label="Indicateurs candidatures"
-          >
-            <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
-              <p class="text-xs font-medium uppercase text-text-subtle">Candidatures</p>
-              <div class="mt-3 flex items-end justify-between">
-                <p class="text-3xl font-semibold">{applications.length}</p>
-                <Badge
-                  label={applicationCountBadgeLabel}
-                  variant={applications.length > 0 ? 'success' : 'source'}
-                />
-              </div>
-            </div>
-            <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
-              <p class="text-xs font-medium uppercase text-text-subtle">Taux moyen</p>
-              <div class="mt-3 flex items-end justify-between">
-                <p class="text-3xl font-semibold">{averageScore}%</p>
-                <Badge
-                  label={averageScoreBadgeLabel}
-                  variant={averageScore > 0 ? 'status' : 'source'}
-                />
-              </div>
-            </div>
-            <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
-              <p class="text-xs font-medium uppercase text-text-subtle">Entretiens</p>
-              <div class="mt-3 flex items-end justify-between">
-                <p class="text-3xl font-semibold">{counts.interview}</p>
-                <Badge
-                  label={interviewBadgeLabel}
-                  variant={counts.interview > 0 ? 'warning' : 'source'}
-                />
-              </div>
-            </div>
-            <div class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2">
-              <p class="text-xs font-medium uppercase text-text-subtle">Prochaine relance</p>
-              <div class="mt-3 flex items-end justify-between">
-                <p class="text-3xl font-semibold">
-                  {formatDate(nextFollowUp?.nextActionAt ?? null)}
-                </p>
-                <Badge
-                  label={nextFollowUpBadgeLabel}
-                  variant={nextFollowUp ? 'warning' : 'source'}
-                />
-              </div>
-            </div>
-          </section>
+          {#if metricsVisibility.phase === 'hidden'}
+            <p class="text-sm leading-6 text-text-subtle">
+              Aucune candidature suivie. Le feed est votre point de départ.
+            </p>
+          {:else}
+            <section
+              class="grid gap-3 md:grid-cols-2 xl:grid-cols-4"
+              aria-label="Indicateurs candidatures"
+            >
+              {#if metricsVisibility.availability.applications === 'has_data'}
+                <div
+                  class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+                >
+                  <p class="text-xs font-medium uppercase text-text-subtle">Candidatures</p>
+                  <div class="mt-3 flex items-end justify-between">
+                    <p class="text-3xl font-semibold">{applications.length}</p>
+                    <Badge label={applicationCountBadgeLabel} variant="success" />
+                  </div>
+                </div>
+              {/if}
+              {#if metricsVisibility.availability.averageScore === 'has_data'}
+                <div
+                  class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+                >
+                  <p class="text-xs font-medium uppercase text-text-subtle">Taux moyen</p>
+                  <div class="mt-3 flex items-end justify-between">
+                    <p class="text-3xl font-semibold">{averageScore}%</p>
+                    <Badge label={averageScoreBadgeLabel} variant="status" />
+                  </div>
+                </div>
+              {/if}
+              {#if metricsVisibility.availability.interviews === 'has_data'}
+                <div
+                  class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+                >
+                  <p class="text-xs font-medium uppercase text-text-subtle">Entretiens</p>
+                  <div class="mt-3 flex items-end justify-between">
+                    <p class="text-3xl font-semibold">{counts.interview}</p>
+                    <Badge label={interviewBadgeLabel} variant="warning" />
+                  </div>
+                </div>
+              {/if}
+              {#if metricsVisibility.availability.nextFollowUp === 'has_data'}
+                <div
+                  class="rounded-lg border border-border-light bg-surface-white p-4 shadow-subtle-2"
+                >
+                  <p class="text-xs font-medium uppercase text-text-subtle">Prochaine relance</p>
+                  <div class="mt-3 flex items-end justify-between">
+                    <p class="text-3xl font-semibold">
+                      {formatDate(nextFollowUp?.nextActionAt ?? null)}
+                    </p>
+                    <Badge label={nextFollowUpBadgeLabel} variant="warning" />
+                  </div>
+                </div>
+              {/if}
+            </section>
+          {/if}
 
           <section id="tjm" class="mt-6" aria-labelledby="tjm-radar-title">
             <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
