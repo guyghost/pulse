@@ -1,5 +1,6 @@
 <script lang="ts">
   import { env } from '$env/dynamic/public';
+  import { tick } from 'svelte';
   import { theme } from '$lib/theme.svelte';
 
   type ShowcaseStep = 'scanner' | 'qualifier' | 'comparer' | 'postuler';
@@ -120,18 +121,63 @@
     }
   }
 
-  function toggleShortcuts(): void {
-    shortcutsOpen = !shortcutsOpen;
+  let lastFocused: HTMLElement | null = null;
+  let shortcutsCardEl = $state<HTMLDivElement>();
+
+  async function openShortcuts(): Promise<void> {
+    lastFocused = (document.activeElement as HTMLElement) ?? null;
+    shortcutsOpen = true;
+    await tick();
+    // Move focus into the dialog after the DOM flushes; tick() ensures the
+    // card is rendered and visible before focus, avoiding a race with Svelte's
+    // deferred effect scheduling.
+    shortcutsCardEl?.focus({ preventScroll: true });
   }
 
   function closeShortcuts(): void {
     shortcutsOpen = false;
+    if (lastFocused) {
+      lastFocused.focus({ preventScroll: true });
+      lastFocused = null;
+    }
+  }
+
+  function toggleShortcuts(): void {
+    if (shortcutsOpen) {
+      closeShortcuts();
+    } else {
+      openShortcuts();
+    }
   }
 
   function isTypingTarget(el: EventTarget | null): boolean {
     if (!(el instanceof HTMLElement)) return false;
     const tag = el.tagName;
     return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  }
+
+  // Keep Tab focus cycling inside the dialog while it is open.
+  function trapTab(event: KeyboardEvent, container: HTMLElement): void {
+    const focusable = container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length === 0) {
+      event.preventDefault();
+      container.focus({ preventScroll: true });
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey) {
+      if (active === first || !container.contains(active)) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      }
+    } else if (active === last || !container.contains(active)) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
   }
 
   const shortcuts: Shortcuts[] = [
@@ -147,10 +193,24 @@
       if (isTypingTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) {
         return;
       }
-      if (event.key === 'Escape') {
-        if (shortcutsOpen) {
+      // While the help overlay is open, only Esc and ? close it; Tab is trapped
+      // inside the dialog. All other global shortcuts are blocked.
+      if (shortcutsOpen) {
+        if (event.key === 'Escape' || event.key === '?') {
+          event.preventDefault();
           closeShortcuts();
-        } else if (mobileMenuOpen) {
+        } else if (event.key === 'Tab') {
+          const overlay = document.querySelector('.shortcuts-overlay');
+          if (overlay instanceof HTMLElement) {
+            trapTab(event, overlay);
+          } else {
+            event.preventDefault();
+          }
+        }
+        return;
+      }
+      if (event.key === 'Escape') {
+        if (mobileMenuOpen) {
           closeMobileMenu();
         }
         return;
@@ -1021,11 +1081,11 @@
   class="shortcuts-overlay"
   class:is-open={shortcutsOpen}
   role="dialog"
-  aria-modal="true"
+  aria-modal={shortcutsOpen ? 'true' : 'false'}
   aria-label="Raccourcis clavier"
   aria-hidden={!shortcutsOpen}
 >
-  <div class="shortcuts-card" role="document" tabindex="-1">
+  <div class="shortcuts-card" bind:this={shortcutsCardEl} tabindex="-1">
     <div class="shortcuts-card__header">
       <h2 class="shortcuts-card__title">Raccourcis clavier</h2>
       <button class="shortcuts-card__close" aria-label="Fermer" onclick={closeShortcuts}>

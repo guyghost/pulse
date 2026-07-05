@@ -85,10 +85,12 @@
   --spacing-16: 16px;
   --spacing-20: 20px;
   --spacing-24: 24px;
+  --spacing-28: 28px;
   --spacing-32: 32px;
   --spacing-36: 36px;
   --spacing-40: 40px;
   --spacing-44: 44px;
+  --spacing-56: 56px;
   --spacing-80: 80px;
   --spacing-120: 120px;
   --spacing-140: 140px;
@@ -1579,7 +1581,7 @@ section[id] {
 }
 
 .plan-card__anchor {
-  margin: var(--spacing-6) 0 0;
+  margin: var(--spacing-8) 0 0;
   color: var(--color-blueprint-blue);
   font-size: 0.8125rem;
   font-weight: 500;
@@ -2041,7 +2043,7 @@ section[id] {
   position: absolute;
   top: -100%;
   left: var(--spacing-16);
-  z-index: 1000;
+  z-index: 1100;
   padding: var(--spacing-8) var(--spacing-16);
   background: var(--color-text-primary);
   color: var(--color-surface-white);
@@ -2061,7 +2063,7 @@ section[id] {
 .footer__shortcuts {
   display: flex;
   flex-wrap: wrap;
-  gap: var(--spacing-6);
+  gap: var(--spacing-8);
   align-items: center;
   font-size: 0.8125rem;
   color: var(--color-text-muted);
@@ -2090,7 +2092,7 @@ kbd {
 .shortcuts-overlay {
   position: fixed;
   inset: 0;
-  z-index: 1000;
+  z-index: 1200;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -2098,13 +2100,18 @@ kbd {
   background: color-mix(in srgb, var(--color-text-primary) 48%, transparent);
   opacity: 0;
   visibility: hidden;
+  /* On close, hide visibility after opacity fades (0.15s delay). */
   transition:
     opacity 0.15s ease-out,
-    visibility 0.15s ease-out;
+    visibility 0s linear 0.15s;
 }
 .shortcuts-overlay.is-open {
   opacity: 1;
   visibility: visible;
+  /* On open, show visibility immediately so children are focusable at once. */
+  transition:
+    opacity 0.15s ease-out,
+    visibility 0s;
 }
 
 .shortcuts-card {
