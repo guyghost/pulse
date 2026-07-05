@@ -36,20 +36,32 @@ describe('connected dashboard operational story', () => {
     );
   });
 
-  it('collapses empty dashboard surfaces into one setup preview', () => {
-    expect(source).toContain('interface DashboardSetupPreviewItem');
-    expect(source).toContain('const dashboardSetupPreviewItems = $derived');
-    expect(source).toContain('Surfaces activées après setup');
-    expect(source).toContain('Le dashboard évite ainsi les métriques vides ou les N/A');
-    expect(source).toContain('Pipeline activé après setup');
+  it('surfaces the mission feed as the primary dashboard surface', () => {
+    // M1: the dashboard phase is the single source of truth for what renders, in what order.
+    expect(source).toContain('deriveDashboardPhase');
+    expect(source).toContain('const dashboardPhase = $derived(');
+    expect(source).toContain('const feedIsPrimary = $derived(isFeedPrimary(dashboardPhase))');
+    // The feed renders first in onboarding + live, gated by the model (not by setup chrome).
+    expect(source).toContain("{#if dashboardPhase === 'onboarding' || feedIsPrimary}");
+    // The capped slice is gone; progressive disclosure replaces it.
+    expect(source).not.toContain('.slice(0, 6)');
+    expect(source).toContain('visibleMissionFeed');
+    expect(source).toContain('Afficher plus de missions');
+    // The "Surfaces activées après setup" preview grid + its vacuous-metrics line are gone.
+    expect(source).not.toContain('Surfaces activées après setup');
+    expect(source).not.toContain('dashboardSetupPreviewItems');
+    expect(source).not.toContain('DashboardSetupPreviewItem');
+    expect(source).not.toContain('Le dashboard évite ainsi les métriques vides ou les N/A');
+    // Metrics remain in the authenticated surface, behind the setup guard (tightened next).
     expect(source).toContain('{#if !setupRequired}');
     expect(source).toContain('aria-label="Indicateurs candidatures"');
   });
 
-  it('keeps dashboard navigation vocabulary stable', () => {
+  it('keeps core dashboard vocabulary without an in-page anchor nav', () => {
     expect(source).toContain('Candidatures');
-    expect(source).toContain('>Synchronisation</a');
-    expect(source).toContain('href="#cv">CV</a');
+    // The 3-tab anchor nav that sat between the user and the feed is removed (distill).
+    expect(normalizedSource).not.toContain('>Synchronisation</a');
+    expect(normalizedSource).not.toContain('href="#cv">CV</a');
     expect(normalizedSource).not.toContain('> Explore </a');
     expect(normalizedSource).not.toContain('> Profil CV </a');
     expect(normalizedSource).not.toContain('> Synchronisations</a');
