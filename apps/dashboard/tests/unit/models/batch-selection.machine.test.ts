@@ -23,6 +23,7 @@ const summary = (action: 'archive' | 'select', requestedCount: number): BulkSumm
   requestedCount,
   appliedCount: requestedCount,
   skippedCount: 0,
+  failedCount: 0,
   truncatedCount: 0,
 });
 
@@ -219,5 +220,29 @@ describe('batch selection transition — invariants', () => {
   it('selectedCount reflects the set size', () => {
     expect(selectedCount(selecting(['m1', 'm2', 'm3']))).toBe(3);
     expect(selectedCount(initialBatchSelectionState)).toBe(0);
+  });
+
+  it('BulkSummary carries failedCount so partial failures are not folded into skipped', () => {
+    // 3 requested, 1 truncated by the cap, 1 applied, 0 skipped, 1 failed.
+    // Invariant: applied + skipped + failed === requested - truncated (1 + 0 + 1 === 3 - 1).
+    const partial: BulkSummary = {
+      action: 'archive',
+      requestedCount: 3,
+      appliedCount: 1,
+      skippedCount: 0,
+      failedCount: 1,
+      truncatedCount: 1,
+    };
+    const applying: BatchSelectionState = {
+      status: 'applying',
+      selectedIds: new Set(['m1', 'm2']),
+      action: 'archive',
+      summary: null,
+      errorMessage: null,
+    };
+    const next = transition(applying, { type: 'APPLY_SUCCESS', summary: partial });
+    expect(next.status).toBe('done');
+    expect(next.summary?.failedCount).toBe(1);
+    expect(next.summary?.skippedCount).toBe(0);
   });
 });

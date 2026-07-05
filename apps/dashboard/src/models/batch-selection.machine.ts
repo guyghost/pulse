@@ -26,10 +26,21 @@ export interface BulkSummary {
   /** Original selection size the user submitted (before the server cap). */
   requestedCount: number;
   appliedCount: number;
+  /** Genuine no-ops: `ok && !changed` (e.g. archive an already-archived mission). */
   skippedCount: number;
+  /** Per-mission failures: `!ok` outcomes (transition invalid, DB error, conflict). */
+  failedCount: number;
   /** IDs dropped because the submission exceeded the server-side cap. */
   truncatedCount: number;
 }
+
+/**
+ * Invariant: every requested mission resolves to exactly one disposition.
+ *   appliedCount + skippedCount + failedCount === requestedCount - truncatedCount
+ * A failure is never silently folded into `skipped`; the server action surfaces
+ * it (as `failedCount` on a partial-success summary, or as `fail()` when nothing
+ * was applied) so the user sees that some missions could not be processed.
+ */
 
 export interface BatchSelectionState {
   status: 'idle' | 'selecting' | 'applying' | 'done' | 'error';

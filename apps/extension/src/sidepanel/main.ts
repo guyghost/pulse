@@ -38,6 +38,11 @@ async function init() {
   }
 
   const initialShells = Array.from(target.querySelectorAll('[data-initial-shell]'));
+  // P1: commit-to-mount signal for shell-boot.ts. Once this is set, the async
+  // sendMessage callback in shell-boot must never rewrite #app (it would wipe
+  // the mounted Svelte tree or strand an uncaptured skeleton). Set synchronously
+  // here so capture -> signal -> mount never yields to a microtask.
+  (window as unknown as { __missionPulseAppMounted?: boolean }).__missionPulseAppMounted = true;
   mount(App, {
     target,
   });

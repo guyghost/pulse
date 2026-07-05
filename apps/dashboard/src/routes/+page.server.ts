@@ -3,6 +3,8 @@ import type { Actions, PageServerLoad } from './$types';
 import { fail, redirect, type Cookies } from '@sveltejs/kit';
 import {
   APPLICATION_STAGES,
+  isAllowedApplicationTransition,
+  canonicalizeLegacyApplicationStage,
   transitionApplicationStage,
   type ApplicationPipelineEvent,
   type ApplicationStage,
@@ -572,9 +574,11 @@ export const load: PageServerLoad = async ({ cookies }) => {
 type MissionStageTransition = 'selected' | 'archived';
 
 type MissionTransitionOutcome =
-  // `changed` distinguishes a real stage transition from a no-op (mission already
-  // in a non-`detected` stage). Bulk actions count only `changed` as `applied`,
-  // so the feedback never claims a change that didn't happen.
+  // `changed` distinguishes a real stage transition from a no-op (mission
+  // already in a stage where the requested transition is a no-op). Bulk actions
+  // count `changed` as `applied`, `ok && !changed` as `skipped`, and `!ok` as
+  // `failed`, so the feedback never claims a change that didn't happen and never
+  // folds a failure into a skip.
   | { ok: true; changed: boolean; message: string }
   | { ok: false; status: 400 | 404 | 409 | 500; message: string };
 
@@ -615,11 +619,17 @@ async function applyMissionStageTransition(
     .maybeSingle<ExistingApplicationSelectionRow>();
 
   if (existingApplication) {
-    if (existingApplication.stage === 'detected') {
+    // Honor the real current stage. The domain allows archiving from every
+    // non-archived stage (e.g. selected/applied/interview/... -> archived), so a
+    // bulk archive must not skip a tracked mission just because it left `detected`.
+    // Selecting is only permitted from `detected`, so a mission already past
+    // selection falls through to the genuine no-op branch below.
+    const fromStage = canonicalizeLegacyApplicationStage(existingApplication.stage);
+    if (fromStage && isAllowedApplicationTransition(fromStage, toStage)) {
       const occurredAt = new Date();
       const event = transitionApplicationStage({
         applicationId: existingApplication.id,
-        fromStage: 'detected',
+        fromStage,
         toStage,
         occurredAt,
         createdBy: 'dashboard',
@@ -627,7 +637,7 @@ async function applyMissionStageTransition(
           action: actionKey,
           applicationId: existingApplication.id,
           revision: existingApplication.revision,
-          fromStage: 'detected',
+          fromStage,
           toStage,
         }),
         note: `Mission ${participle} depuis le feed dashboard.`,
@@ -1645,6 +1655,7 @@ export const actions: Actions = {
 
     let applied = 0;
     let skipped = 0;
+    let failed = 0;
     for (const missionId of missionIds) {
       const outcome = await applyMissionStageTransition(
         supabase,
@@ -1652,11 +1663,25 @@ export const actions: Actions = {
         missionId,
         'selected'
       );
-      if (outcome.ok && outcome.changed) {
+      if (!outcome.ok) {
+        failed += 1;
+      } else if (outcome.changed) {
         applied += 1;
       } else {
         skipped += 1;
       }
+    }
+
+    // `skipped` is reserved for genuine no-ops (ok && !changed). A per-mission
+    // failure (!ok) must never be folded into skipped. When nothing was applied
+    // and at least one failed, the batch made no progress: surface a failure so
+    // the user is not told "0 selected" as if it succeeded. Partial failures
+    // (some applied, some failed) are reported honestly via `failed` in the
+    // success summary.
+    if (failed > 0 && applied === 0) {
+      return fail(500, {
+        bulkSelectionError: `Échec : ${failed} mission(s) n'ont pas pu être sélectionnée(s).`,
+      });
     }
 
     return {
@@ -1664,6 +1689,7 @@ export const actions: Actions = {
         action: 'select' as const,
         applied,
         skipped,
+        failed,
         total: requestedCount,
         truncated: requestedCount - missionIds.length,
       },
@@ -1687,6 +1713,7 @@ export const actions: Actions = {
 
     let applied = 0;
     let skipped = 0;
+    let failed = 0;
     for (const missionId of missionIds) {
       const outcome = await applyMissionStageTransition(
         supabase,
@@ -1694,11 +1721,21 @@ export const actions: Actions = {
         missionId,
         'archived'
       );
-      if (outcome.ok && outcome.changed) {
+      if (!outcome.ok) {
+        failed += 1;
+      } else if (outcome.changed) {
         applied += 1;
       } else {
         skipped += 1;
       }
+    }
+
+    // See bulkSelectMissions: `skipped` is for no-ops only; surface a failure
+    // when the batch made no progress and at least one mission errored.
+    if (failed > 0 && applied === 0) {
+      return fail(500, {
+        bulkSelectionError: `Échec : ${failed} mission(s) n'ont pas pu être archivée(s).`,
+      });
     }
 
     return {
@@ -1706,6 +1743,7 @@ export const actions: Actions = {
         action: 'archive' as const,
         applied,
         skipped,
+        failed,
         total: requestedCount,
         truncated: requestedCount - missionIds.length,
       },

@@ -26,12 +26,13 @@ function expectApplicationUpdateBeforeEventUpsert(section: string): void {
 
 describe('dashboard pipeline event write order', () => {
   it('does not insert transition events before optimistic-lock application updates', () => {
-    // The shared applyMissionStageTransition helper owns the detected→target
+    // The shared applyMissionStageTransition helper owns the detected->target
     // write path for both per-mission and bulk actions, so the invariant only
     // needs to hold there (single occurrence) plus the standalone
-    // transitionApplication action.
+    // transitionApplication action. The existing-application branch now guards
+    // on the real domain transition graph rather than hardcoding `detected`.
     expectApplicationUpdateBeforeEventUpsert(
-      sourceAfter("if (existingApplication.stage === 'detected') {")
+      sourceAfter('if (fromStage && isAllowedApplicationTransition(fromStage, toStage)) {')
     );
     expectApplicationUpdateBeforeEventUpsert(sourceAfter('transitionApplication: async'));
   });
@@ -50,13 +51,19 @@ describe('dashboard bulk action truncation reporting', () => {
     expect(helperSection).toContain('.slice(0, BULK_MISSION_CAP)');
   });
 
-  it('both bulk actions report total from requestedCount and a truncated delta', () => {
+  it('both bulk actions report total from requestedCount, a truncated delta, and split applied/skipped/failed', () => {
     const selectSection = sourceAfter('bulkSelectMissions: async');
     const archiveSection = sourceAfter('bulkArchiveMissions: async');
     for (const section of [selectSection, archiveSection]) {
       expect(section).toContain('total: requestedCount');
       expect(section).toContain('truncated: requestedCount - missionIds.length');
-      expect(section).toContain('outcome.ok && outcome.changed');
+      // Accounting: `applied` counts real transitions (ok && changed), `skipped`
+      // counts genuine no-ops (ok && !changed), and `failed` counts errors
+      // (!ok). A failure must never be folded into skipped.
+      expect(section).toContain('failed += 1');
+      expect(section).toContain('applied += 1');
+      expect(section).toContain('skipped += 1');
+      expect(section).toContain('failed > 0 && applied === 0');
     }
   });
 });

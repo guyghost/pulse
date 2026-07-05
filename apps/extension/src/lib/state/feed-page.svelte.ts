@@ -246,8 +246,18 @@ export function createFeedPageState(
       }
       saveHidden(persist).catch(() => {});
     },
-    onRestore: (_id, snapshot) => {
-      hidden = snapshot;
+    onRestore: (id, snapshot) => {
+      // Restore ONLY the target entry. Rolling back the whole snapshot would
+      // clobber a sibling hide whose undo window is still open (the snapshot was
+      // captured before that sibling was hidden). Merge: set the target's
+      // presence to its pre-action state, leave every other entry untouched.
+      const next = { ...hidden };
+      if (id in snapshot) {
+        next[id] = snapshot[id];
+      } else {
+        delete next[id];
+      }
+      hidden = next;
     },
     toastMessage: (id, snapshot) => (id in snapshot ? 'Mission restaurée' : 'Mission masquée'),
   });

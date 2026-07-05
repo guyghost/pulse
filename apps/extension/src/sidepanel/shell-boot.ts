@@ -58,6 +58,16 @@ function initShellBoot() {
     chrome.runtime.sendMessage({ type: 'GET_ONBOARDING_COMPLETED' }) as Promise<MessageResponse>,
   ])
     .then(([profileResponse, firstScanResponse, onboardingResponse]) => {
+      // P1: the sendMessage round-trip can resolve after main.ts has committed
+      // to mounting (or even after Svelte mounted). Writing the skeleton then
+      // would either destroy the live Svelte tree (innerHTML overwrite) or leave
+      // an uncaptured `[data-initial-shell]` stuck on screen. main.ts sets this
+      // flag synchronously immediately before mount(), and capture->mount never
+      // yields to a microtask, so if the flag is up we are too late: do not touch
+      // the DOM.
+      if ((window as unknown as { __missionPulseAppMounted?: boolean }).__missionPulseAppMounted) {
+        return;
+      }
       const hasProfile =
         profileResponse?.type === 'PROFILE_RESULT' && profileResponse.payload !== null;
       const firstScanDone =

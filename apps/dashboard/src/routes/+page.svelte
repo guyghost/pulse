@@ -130,14 +130,16 @@
   function batchFeedbackLabel(summary: BulkSummary): string {
     const verb = summary.action === 'archive' ? 'Archivées' : 'Sélectionnées';
     const skipped = summary.skippedCount > 0 ? ` · ${summary.skippedCount} ignorée(s)` : '';
+    const failed = summary.failedCount > 0 ? ` · ${summary.failedCount} échouée(s)` : '';
     const truncated =
       summary.truncatedCount > 0 ? ` · ${summary.truncatedCount} au-delà du plafond` : '';
-    return `${verb}: ${summary.appliedCount}/${summary.requestedCount}${skipped}${truncated}`;
+    return `${verb}: ${summary.appliedCount}/${summary.requestedCount}${skipped}${failed}${truncated}`;
   }
   interface BulkActionResult {
     action: BulkAction;
     applied: number;
     skipped: number;
+    failed: number;
     total: number;
     truncated: number;
   }
@@ -154,6 +156,7 @@
               requestedCount: resultSummary.total,
               appliedCount: resultSummary.applied,
               skippedCount: resultSummary.skipped,
+              failedCount: resultSummary.failed ?? 0,
               truncatedCount: resultSummary.truncated ?? 0,
             });
           }
