@@ -2,53 +2,25 @@
  * Tracking persistence — IndexedDB storage for mission tracking records.
  *
  * Shell module: I/O operations, async.
+ *
+ * NOTE: The `mission_tracking` object store is created by the central
+ * migration orchestrator (db.ts v4). This module never opens its own
+ * versioned connection — it reuses the single shared `openDB()` opener
+ * to avoid the dual-opener version conflict (see db-migration.model.md).
  */
 
 import type { MissionTracking } from '../../core/types/tracking';
 import type { ApplicationStatus } from '../../core/types/tracking';
 import { normalizeStoredMissionTracking } from '../../core/tracking/migration';
+import { openDB } from './db';
 
-const DB_NAME = 'missionpulse';
 const TRACKING_STORE = 'mission_tracking';
-
-/**
- * Open (or create) the tracking object store.
- * Adds the 'mission_tracking' store if it doesn't exist yet (DB version upgrade).
- */
-function openDBWithTracking(): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME);
-
-    request.onsuccess = () => {
-      const db = request.result;
-
-      // Create the tracking store if it doesn't exist
-      if (!db.objectStoreNames.contains(TRACKING_STORE)) {
-        db.close();
-        // Upgrade needed — increment version
-        const upgradeRequest = indexedDB.open(DB_NAME, db.version + 1);
-        upgradeRequest.onupgradeneeded = () => {
-          const store = upgradeRequest.result.createObjectStore(TRACKING_STORE, {
-            keyPath: 'missionId',
-          });
-          store.createIndex('currentStatus', 'currentStatus', { unique: false });
-        };
-        upgradeRequest.onsuccess = () => resolve(upgradeRequest.result);
-        upgradeRequest.onerror = () => reject(upgradeRequest.error);
-      } else {
-        resolve(db);
-      }
-    };
-
-    request.onerror = () => reject(request.error);
-  });
-}
 
 /**
  * Save (upsert) a tracking record.
  */
 export async function saveTracking(tracking: MissionTracking): Promise<void> {
-  const db = await openDBWithTracking();
+  const db = await openDB();
   const tx = db.transaction(TRACKING_STORE, 'readwrite');
   const store = tx.objectStore(TRACKING_STORE);
   store.put(tracking);
@@ -67,7 +39,7 @@ export async function saveTrackings(trackings: MissionTracking[]): Promise<void>
     return;
   }
 
-  const db = await openDBWithTracking();
+  const db = await openDB();
   const tx = db.transaction(TRACKING_STORE, 'readwrite');
   const store = tx.objectStore(TRACKING_STORE);
 
@@ -86,7 +58,7 @@ export async function saveTrackings(trackings: MissionTracking[]): Promise<void>
  * Returns null if no tracking exists for this mission.
  */
 export async function getTracking(missionId: string): Promise<MissionTracking | null> {
-  const db = await openDBWithTracking();
+  const db = await openDB();
   const tx = db.transaction(TRACKING_STORE, 'readonly');
   const store = tx.objectStore(TRACKING_STORE);
   const request = store.get(missionId);
@@ -103,7 +75,7 @@ export async function getTracking(missionId: string): Promise<MissionTracking | 
  * Get all tracking records.
  */
 export async function getAllTrackings(): Promise<MissionTracking[]> {
-  const db = await openDBWithTracking();
+  const db = await openDB();
   const tx = db.transaction(TRACKING_STORE, 'readonly');
   const store = tx.objectStore(TRACKING_STORE);
   const request = store.getAll();
@@ -135,7 +107,7 @@ export async function getTrackingsByStatus(status: ApplicationStatus): Promise<M
  * Delete a tracking record.
  */
 export async function deleteTracking(missionId: string): Promise<void> {
-  const db = await openDBWithTracking();
+  const db = await openDB();
   const tx = db.transaction(TRACKING_STORE, 'readwrite');
   const store = tx.objectStore(TRACKING_STORE);
   store.delete(missionId);
@@ -150,7 +122,7 @@ export async function deleteTracking(missionId: string): Promise<void> {
  * Clear all tracking records.
  */
 export async function clearTrackings(): Promise<void> {
-  const db = await openDBWithTracking();
+  const db = await openDB();
   const tx = db.transaction(TRACKING_STORE, 'readwrite');
   const store = tx.objectStore(TRACKING_STORE);
   store.clear();
