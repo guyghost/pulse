@@ -437,8 +437,8 @@ test.describe('Feed', () => {
 
     await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
 
-    // Favorites filter button — text is "Favoris" when not active
-    await expect(page.getByRole('button', { name: /Favoris/ })).toBeVisible();
+    // Favorites filter button — matches aria-label "Filtrer les favoris" or visible text "Favoris"
+    await expect(page.getByRole('button', { name: /favoris/i })).toBeVisible();
     // Refresh/scan button is visible (title changes based on state)
     await expect(scanButton(page)).toBeVisible();
   });
