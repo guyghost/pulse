@@ -69,11 +69,13 @@ function observeCssReady() {
       for (const entry of list.getEntries()) {
         const resource = entry as PerformanceResourceTiming;
         // The sidepanel CSS is the only render-blocking stylesheet in the document.
-        if (
-          !state.cssSelectorResolved &&
-          resource.initiatorType === 'css' &&
-          resource.name.includes('sidepanel')
-        ) {
+        // Per the Resource Timing spec, a <link rel="stylesheet"> reports
+        // initiatorType as 'link' (only CSS @import / url() reports 'css'), so
+        // accept both. The name filter keeps font/image resources out.
+        const isStylesheet = resource.initiatorType === 'link' || resource.initiatorType === 'css';
+        const isSidepanelCss =
+          resource.name.includes('sidepanel') || resource.name.endsWith('.css');
+        if (!state.cssSelectorResolved && isStylesheet && isSidepanelCss) {
           state.cssReady = resource.responseEnd;
         }
       }

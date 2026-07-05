@@ -11,9 +11,18 @@ launchMarks.install();
 // App.svelte's later loadPage('feed') reuses this in-flight promise. Marks fire
 // here so the harness records the true chunk-resolve time, not the post-rAF time.
 launchMarks.markImportStart('feed');
-void import('../ui/pages/FeedPage.svelte').then(() => {
-  launchMarks.markPageLoaded('feed');
-});
+void import('../ui/pages/FeedPage.svelte')
+  .then(() => {
+    launchMarks.markPageLoaded('feed');
+  })
+  .catch((err: unknown) => {
+    if (import.meta.env.DEV) {
+      console.warn('[MissionPulse] FeedPage pre-warm failed; will retry on navigation', err);
+    }
+    // Do not mark the page as loaded: the snapshot should honestly reflect that
+    // the pre-warm did not resolve. App.svelte's loadPage('feed') re-attempts the
+    // import on first navigation and surfaces any real error through that path.
+  });
 
 async function init() {
   if (import.meta.env.DEV) {

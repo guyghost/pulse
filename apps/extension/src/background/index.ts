@@ -1311,6 +1311,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       console.debug('[MissionPulse] Daily digest triggered');
     }
     await sendDailyDigest();
+    // Reschedule the next fire. The alarm is one-shot (no periodInMinutes) so
+    // that recomputing DIGEST_HOUR in local time keeps it stable across DST.
+    scheduleDailyDigestAlarm();
     return;
   }
 

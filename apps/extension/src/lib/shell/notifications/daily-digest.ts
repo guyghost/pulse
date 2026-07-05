@@ -30,13 +30,15 @@ export const DIGEST_HOUR = 9;
 /** Maximum missions to include in the digest. */
 export const DIGEST_MAX_RESULTS = 3;
 
-const MS_PER_DAY = 24 * 60 * 60 * 1000;
-
 /**
  * Compute the epoch timestamp of the next digest fire time.
  *
  * Returns the next occurrence of DIGEST_HOUR (local time). If that hour
  * has already passed today, returns tomorrow's occurrence.
+ *
+ * Advances by calendar day (setDate + setHours) rather than adding a fixed
+ * 24h in ms, so the local wall-clock hour is preserved across DST transitions
+ * (a day can be 23h on spring-forward and 25h on fall-back).
  *
  * Pure function — `now` is injected for testability.
  */
@@ -44,7 +46,8 @@ export function nextDigestTime(now: Date = new Date()): number {
   const next = new Date(now);
   next.setHours(DIGEST_HOUR, 0, 0, 0);
   if (next.getTime() <= now.getTime()) {
-    next.setTime(next.getTime() + MS_PER_DAY);
+    next.setDate(next.getDate() + 1);
+    next.setHours(DIGEST_HOUR, 0, 0, 0);
   }
   return next.getTime();
 }
@@ -52,13 +55,16 @@ export function nextDigestTime(now: Date = new Date()): number {
 /**
  * Schedule (or reschedule) the daily digest alarm.
  *
- * Creates a Chrome alarm that fires daily at DIGEST_HOUR (local time).
+ * Creates a one-shot Chrome alarm that fires at the next DIGEST_HOUR (local
+ * time). The alarm handler reschedules itself after each fire, so local time
+ * is preserved across DST transitions (a fixed periodInMinutes of 24*60 would
+ * drift by ±1h on DST changeovers).
+ *
  * Call during service worker initialization and when settings change.
  */
 export function scheduleDailyDigestAlarm(): void {
   chrome.alarms.create(DIGEST_ALARM_NAME, {
     when: nextDigestTime(),
-    periodInMinutes: 24 * 60,
   });
 }
 
