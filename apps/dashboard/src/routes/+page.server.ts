@@ -572,7 +572,10 @@ export const load: PageServerLoad = async ({ cookies }) => {
 type MissionStageTransition = 'selected' | 'archived';
 
 type MissionTransitionOutcome =
-  | { ok: true; message: string }
+  // `changed` distinguishes a real stage transition from a no-op (mission already
+  // in a non-`detected` stage). Bulk actions count only `changed` as `applied`,
+  // so the feedback never claims a change that didn't happen.
+  | { ok: true; changed: boolean; message: string }
   | { ok: false; status: 400 | 404 | 409 | 500; message: string };
 
 /**
@@ -676,10 +679,14 @@ async function applyMissionStageTransition(
 
       await markEntityPendingExtensionPull(supabase, userId, 'applications', event.occurredAt);
 
-      return { ok: true, message: `Mission ${participle}: ${mission.title}.` };
+      return { ok: true, changed: true, message: `Mission ${participle}: ${mission.title}.` };
     }
 
-    return { ok: true, message: `Mission déjà suivie en ${existingApplication.stage}.` };
+    return {
+      ok: true,
+      changed: false,
+      message: `Mission déjà suivie en ${existingApplication.stage}.`,
+    };
   }
 
   const occurredAt = new Date();
@@ -763,7 +770,7 @@ async function applyMissionStageTransition(
     }
 
     await markEntityPendingExtensionPull(supabase, userId, 'applications', event.occurredAt);
-    return { ok: true, message: `Mission ${participle}: ${mission.title}.` };
+    return { ok: true, changed: true, message: `Mission ${participle}: ${mission.title}.` };
   }
 
   const patch = buildMissionArchiveInsertPatch(occurredAt.toISOString());
@@ -843,7 +850,7 @@ async function applyMissionStageTransition(
   }
 
   await markEntityPendingExtensionPull(supabase, userId, 'applications', archivedEvent.occurredAt);
-  return { ok: true, message: `Mission ${participle}: ${mission.title}.` };
+  return { ok: true, changed: true, message: `Mission ${participle}: ${mission.title}.` };
 }
 
 const BULK_MISSION_CAP = 50;
@@ -1639,7 +1646,7 @@ export const actions: Actions = {
         missionId,
         'selected'
       );
-      if (outcome.ok) {
+      if (outcome.ok && outcome.changed) {
         applied += 1;
       } else {
         skipped += 1;
@@ -1680,7 +1687,7 @@ export const actions: Actions = {
         missionId,
         'archived'
       );
-      if (outcome.ok) {
+      if (outcome.ok && outcome.changed) {
         applied += 1;
       } else {
         skipped += 1;

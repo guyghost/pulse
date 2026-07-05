@@ -173,13 +173,32 @@ describe('batch selection transition — guards (rejected transitions)', () => {
 });
 
 describe('batch selection transition — invariants', () => {
-  it('selection persists across applying → error (retry path)', () => {
+  it('selection persists across applying → error → applying (retry keeps selection + clears error)', () => {
     let s = selecting(['m1', 'm2']);
     s = transition(s, { type: 'APPLY_BULK', action: 'select' });
     expect(s.status).toBe('applying');
     s = transition(s, { type: 'APPLY_ERROR', message: 'transient' });
     expect(s.status).toBe('error');
     expect(s.selectedIds.size).toBe(2);
+    // Retry from error: APPLY_BULK is accepted again, selection preserved, error cleared.
+    s = transition(s, { type: 'APPLY_BULK', action: 'select' });
+    expect(s.status).toBe('applying');
+    expect(s.selectedIds.size).toBe(2);
+    expect(s.errorMessage).toBeNull();
+  });
+
+  it('APPLY_BULK from error with an empty selection is still rejected', () => {
+    // An error state always carries the selection that failed, but guard anyway:
+    // if selection were empty, retry is rejected rather than entering applying.
+    const errored: BatchSelectionState = {
+      status: 'error',
+      selectedIds: new Set<string>(),
+      action: 'archive',
+      summary: null,
+      errorMessage: 'transient',
+    };
+    const next = transition(errored, { type: 'APPLY_BULK', action: 'archive' });
+    expect(next.status).toBe('error');
   });
 
   it('isInteractionLocked is true for applying/done/error only', () => {

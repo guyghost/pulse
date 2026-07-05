@@ -12,7 +12,8 @@
  *  - `APPLY_BULK` is rejected unless `selectedIds.size > 0` (guard).
  *  - `applying` / `done` / `error` disable checkbox toggling and the action bar.
  *  - `EXIT_SELECT_MODE` and `DISMISS` clear the selection and return to idle.
- *  - Selection persists across `selecting → applying → error → selecting`.
+ *  - Selection persists across `selecting → applying → error → applying` so a
+ *    failed bulk action can be retried without re-selecting.
  *  - `selectedIds` never contains duplicate ids.
  *
  * The LLM never decides a transition; the model does. Server actions produce
@@ -118,7 +119,9 @@ export function transition(
     }
 
     case 'APPLY_BULK': {
-      if (state.status !== 'selecting') return state;
+      // Retry is allowed from `error` so the user can re-apply without dismissing
+      // (which would clear the selection). All other statuses reject.
+      if (state.status !== 'selecting' && state.status !== 'error') return state;
       if (state.selectedIds.size === 0) return state; // guard: nothing to apply
       return {
         status: 'applying',
@@ -142,7 +145,7 @@ export function transition(
 
     case 'APPLY_ERROR': {
       if (state.status !== 'applying') return state;
-      // Selection persists so the user can retry.
+      // Selection persists so the user can retry via APPLY_BULK (handled above).
       return {
         status: 'error',
         selectedIds: state.selectedIds,

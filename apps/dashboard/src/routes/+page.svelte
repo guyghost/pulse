@@ -1324,13 +1324,36 @@
                 {:else if batchSelection.status === 'error'}
                   <div class="flex flex-wrap items-center justify-between gap-3">
                     <p class="text-xs leading-5 text-status-red">{batchSelection.errorMessage}</p>
-                    <button
-                      type="button"
-                      onclick={batchDismiss}
-                      class="text-xs font-medium text-text-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
-                    >
-                      Fermer
-                    </button>
+                    <div class="flex flex-wrap items-center gap-2">
+                      {#if batchSelection.action}
+                        <form
+                          method="POST"
+                          action={batchSelection.action === 'archive'
+                            ? '?/bulkArchiveMissions'
+                            : '?/bulkSelectMissions'}
+                          use:enhance={batchSelection.action === 'archive'
+                            ? bulkArchiveEnhance
+                            : bulkSelectEnhance}
+                        >
+                          {#each [...batchSelection.selectedIds] as missionId}
+                            <input type="hidden" name="missionIds" value={missionId} />
+                          {/each}
+                          <button
+                            type="submit"
+                            class="inline-flex h-8 items-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+                          >
+                            Réessayer ({batchSelection.count})
+                          </button>
+                        </form>
+                      {/if}
+                      <button
+                        type="button"
+                        onclick={batchDismiss}
+                        class="text-xs font-medium text-text-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+                      >
+                        Fermer
+                      </button>
+                    </div>
                   </div>
                 {:else}
                   <div class="flex flex-wrap items-center justify-between gap-3">
