@@ -7,6 +7,7 @@ import {
   validateSchema,
   validateVersionConsistency,
 } from '../../../scripts/verify-manifest.ts';
+import { getConnectorsMeta } from '../../../src/lib/shell/connectors/meta';
 
 // ── Minimal valid manifest fixture ──────────────────────────────────
 
@@ -424,6 +425,17 @@ describe('validateLinkedInProfileImportPermissions', () => {
 
 describe('host_permissions coverage', () => {
   /**
+   * Extracts the registrable (last-two-label) domain from a connector URL,
+   * e.g. `https://www.cherry-pick.io` → `cherry-pick.io`,
+   * `https://app.collective.work/` → `collective.work`.
+   */
+  const registrableDomain = (url: string): string => {
+    const hostname = new URL(url).hostname.replace(/^www\./, '');
+    const parts = hostname.split('.');
+    return parts.slice(-2).join('.');
+  };
+
+  /**
    * Reads the real src/manifest.json and verifies every registered
    * connector has at least one matching host_permission entry.
    * This guards against forgetting to add host_permissions when a
@@ -446,16 +458,13 @@ describe('host_permissions coverage', () => {
   });
 
   it('should include host_permissions for all registered connectors', () => {
-    // Every connector meta URL must have at least one matching host_permission
-    // so fetch/cookie requests don't silently fail in production.
-    const connectorDomains: Array<{ name: string; domain: string }> = [
-      { name: 'Free-Work', domain: 'free-work.com' },
-      { name: 'LeHibou', domain: 'lehibou.com' },
-      { name: 'Hiway', domain: 'hiway-missions.fr' },
-      { name: 'Collective', domain: 'collective.work' },
-      { name: 'Cherry Pick', domain: 'cherry-pick.io' },
-      { name: 'Malt', domain: 'malt.fr' },
-    ];
+    // Derived from the connector registry so this test stays in sync when
+    // connectors are added or removed — no hardcoded list to forget updating.
+    // The Malt `.io` domain is covered by the explicit test above.
+    const connectorDomains = getConnectorsMeta().map((c) => ({
+      name: c.name,
+      domain: registrableDomain(c.url),
+    }));
 
     for (const { name, domain } of connectorDomains) {
       const hasPermission = hostPermissions.some((h) => h.includes(domain));
