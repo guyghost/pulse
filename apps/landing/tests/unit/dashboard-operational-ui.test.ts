@@ -23,24 +23,23 @@ describe('landing account dashboard operational UI', () => {
     expect(source).not.toContain('<table');
   });
 
-  it('keeps the public proof strip decision-oriented instead of raw stats', () => {
-    expect(homeSource).toContain('Preuves operationnelles');
-    expect(homeSource).toContain('Chaque signal doit mener a une action');
-    expect(homeSource).toContain('Vous voyez ou chercher en premier');
-    expect(homeSource).toContain('Le score explique la decision');
-    expect(homeSource).toContain('Les generations restent pilotees');
+  it('keeps the public proof decision-oriented instead of raw stats', () => {
+    expect(homeSource).toContain('scoring déterministe');
+    expect(homeSource).toContain('Le même classement à chaque scan');
     expect(homeSource).not.toContain('stat-item__value');
     expect(homeSource).not.toContain('Crédits Premium / mois');
   });
 
   it('implements the freelance acquisition wedge on the public landing', () => {
-    expect(homeSource).toContain('Les bonnes missions freelance');
+    expect(homeSource).toContain('5 plateformes');
+    expect(homeSource).toContain('1 feed scoré');
+    expect(homeSource).toContain('Zéro doublon');
     expect(homeSource).toContain('Développeurs 3+ ans');
     expect(homeSource).toContain('TJM 450-900€');
     expect(homeSource).toContain('Shortlist quotidienne');
     expect(homeSource).toContain('missions Java, Spring Boot et frontend senior');
-    expect(homeSource).toContain('Tester Premium');
-    expect(homeSource).toContain('prix 9-15€/mois');
+    expect(homeSource).toContain('Passer à Premium');
+    expect(homeSource).toContain('0,40€/jour');
     expect(homeSource).toContain('12€<small>/mois</small>');
   });
 });

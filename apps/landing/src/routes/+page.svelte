@@ -1,5 +1,6 @@
 <script lang="ts">
   import { env } from '$env/dynamic/public';
+  import { tick } from 'svelte';
   import { theme } from '$lib/theme.svelte';
 
   type ShowcaseStep = 'scanner' | 'qualifier' | 'comparer' | 'postuler';
@@ -8,6 +9,7 @@
   let scrolled = $state(false);
   let activeShowcaseStep = $state<ShowcaseStep>('scanner');
   let showDeferredContent = $state(false);
+  let shortcutsOpen = $state(false);
 
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
   const showcaseSteps: { id: ShowcaseStep; label: string }[] = [
@@ -15,6 +17,35 @@
     { id: 'qualifier', label: 'Qualifier' },
     { id: 'comparer', label: 'Décider' },
     { id: 'postuler', label: 'Convertir' },
+  ];
+
+  type FeatureTier = 'free' | 'premium';
+  const featureMatrix: { label: string; tier: FeatureTier; note?: string }[] = [
+    { label: 'Feed unique, 5 plateformes dédupliquées', tier: 'free' },
+    { label: 'Score stack, TJM, remote, séniorité', tier: 'free' },
+    {
+      label: 'Score sémantique (IA locale Chrome)',
+      tier: 'free',
+      note: 'Quand Gemini Nano est disponible',
+    },
+    { label: 'Comparateur et shortlist quotidienne', tier: 'free' },
+    { label: 'Radar TJM marché par stack', tier: 'premium' },
+    { label: 'Suivi de candidatures (pipeline, notes, relances)', tier: 'premium' },
+    { label: 'Assistant profil et CV', tier: 'premium' },
+    {
+      label: 'Génération pitch, message et résumé CV',
+      tier: 'premium',
+      note: '1 crédit = 1 génération',
+    },
+    { label: 'Dashboard connecté (synchronisation optionnelle)', tier: 'premium' },
+  ];
+
+  const platforms: { name: string; logo: string }[] = [
+    { name: 'Free-Work', logo: '/logos/free-work.png' },
+    { name: 'LeHibou', logo: '/logos/lehibou.png' },
+    { name: 'Hiway', logo: '/logos/hiway.png' },
+    { name: 'Collective', logo: '/logos/collective.png' },
+    { name: 'Cherry Pick', logo: '/logos/cherry-pick.png' },
   ];
 
   $effect(() => {
@@ -61,6 +92,138 @@
   function closeMobileMenu() {
     mobileMenuOpen = false;
   }
+
+  type Shortcuts = {
+    key: string;
+    label: string;
+    action: () => void;
+  };
+
+  const prefersReducedMotion = (): boolean =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const scrollBehavior = (): ScrollBehavior => (prefersReducedMotion() ? 'auto' : 'smooth');
+
+  function jumpTo(id: string): void {
+    const target = document.getElementById(id);
+    if (target) {
+      target.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    }
+  }
+
+  function focusInstallCta(): void {
+    const target = document.querySelector<HTMLElement>('#install [data-primary-cta]');
+    if (target) {
+      target.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+      target.focus({ preventScroll: true });
+    } else {
+      jumpTo('install');
+    }
+  }
+
+  let lastFocused: HTMLElement | null = null;
+  let shortcutsCardEl = $state<HTMLDivElement>();
+
+  async function openShortcuts(): Promise<void> {
+    lastFocused = (document.activeElement as HTMLElement) ?? null;
+    shortcutsOpen = true;
+    await tick();
+    // Move focus into the dialog after the DOM flushes; tick() ensures the
+    // card is rendered and visible before focus, avoiding a race with Svelte's
+    // deferred effect scheduling.
+    shortcutsCardEl?.focus({ preventScroll: true });
+  }
+
+  function closeShortcuts(): void {
+    shortcutsOpen = false;
+    if (lastFocused) {
+      lastFocused.focus({ preventScroll: true });
+      lastFocused = null;
+    }
+  }
+
+  function toggleShortcuts(): void {
+    if (shortcutsOpen) {
+      closeShortcuts();
+    } else {
+      openShortcuts();
+    }
+  }
+
+  function isTypingTarget(el: EventTarget | null): boolean {
+    if (!(el instanceof HTMLElement)) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  }
+
+  // Keep Tab focus cycling inside the dialog while it is open.
+  function trapTab(event: KeyboardEvent, container: HTMLElement): void {
+    const focusable = container.querySelectorAll<HTMLElement>(
+      'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])'
+    );
+    if (focusable.length === 0) {
+      event.preventDefault();
+      container.focus({ preventScroll: true });
+      return;
+    }
+    const first = focusable[0];
+    const last = focusable[focusable.length - 1];
+    const active = document.activeElement;
+    if (event.shiftKey) {
+      if (active === first || !container.contains(active)) {
+        event.preventDefault();
+        last.focus({ preventScroll: true });
+      }
+    } else if (active === last || !container.contains(active)) {
+      event.preventDefault();
+      first.focus({ preventScroll: true });
+    }
+  }
+
+  const shortcuts: Shortcuts[] = [
+    { key: '/', label: 'Installer MissionPulse', action: focusInstallCta },
+    { key: 's', label: 'Aller au workflow', action: () => jumpTo('workflow') },
+    { key: 'p', label: 'Aller aux offres', action: () => jumpTo('plans') },
+    { key: '?', label: 'Afficher les raccourcis', action: toggleShortcuts },
+  ];
+
+  $effect(() => {
+    function onKeydown(event: KeyboardEvent) {
+      // Ignore when the user is typing somewhere, or using OS/browser modifiers.
+      if (isTypingTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      // While the help overlay is open, only Esc and ? close it; Tab is trapped
+      // inside the dialog. All other global shortcuts are blocked.
+      if (shortcutsOpen) {
+        if (event.key === 'Escape' || event.key === '?') {
+          event.preventDefault();
+          closeShortcuts();
+        } else if (event.key === 'Tab') {
+          const overlay = document.querySelector('.shortcuts-overlay');
+          if (overlay instanceof HTMLElement) {
+            trapTab(event, overlay);
+          } else {
+            event.preventDefault();
+          }
+        }
+        return;
+      }
+      if (event.key === 'Escape') {
+        if (mobileMenuOpen) {
+          closeMobileMenu();
+        }
+        return;
+      }
+      const match = shortcuts.find((s) => s.key === event.key);
+      if (match) {
+        event.preventDefault();
+        match.action();
+      }
+    }
+    window.addEventListener('keydown', onKeydown);
+    return () => window.removeEventListener('keydown', onKeydown);
+  });
 </script>
 
 <svelte:head>
@@ -103,6 +266,9 @@
   <meta name="twitter:image" content="https://missionpulse.app/og-image.png" />
 </svelte:head>
 
+<!-- Skip to content (keyboard users) -->
+<a href="#hero" class="skip-link">Aller au contenu</a>
+
 <!-- Navigation -->
 <nav class="nav" class:nav--scrolled={scrolled} aria-label="Navigation principale">
   <div class="container nav__container">
@@ -124,9 +290,8 @@
 
     <ul class="nav__menu">
       <li><a href="#workflow" class="nav__link">Workflow</a></li>
-      <li><a href="#for-who" class="nav__link">Pour qui</a></li>
-      <li><a href="#features" class="nav__link">Fonctionnalités</a></li>
       <li><a href="#shortlist" class="nav__link">Shortlist</a></li>
+      <li><a href="#features" class="nav__link">Fonctionnalités</a></li>
       <li><a href="#plans" class="nav__link">Offres</a></li>
     </ul>
 
@@ -196,15 +361,12 @@
   >
     <ul>
       <li><a href="#workflow" onclick={closeMobileMenu}>Workflow</a></li>
-      <li><a href="#for-who" onclick={closeMobileMenu}>Pour qui</a></li>
+      <li><a href="#shortlist" onclick={closeMobileMenu}>Shortlist</a></li>
       <li>
         <a href="#features" onclick={closeMobileMenu}>Fonctionnalités</a>
       </li>
       <li>
         <a href="#plans" onclick={closeMobileMenu}>Offres</a>
-      </li>
-      <li>
-        <a href="#platforms" onclick={closeMobileMenu}>Plateformes</a>
       </li>
       <li>
         <a href={chromeStoreUrl} class="btn btn--primary" onclick={closeMobileMenu}>Installer</a>
@@ -230,17 +392,18 @@
         >
           <polygon points="5 3 19 12 5 21 5 3"></polygon>
         </svg>
-        Radar quotidien · Freelances tech France · Scan gratuit
+        Radar quotidien · Scan gratuit
       </div>
 
       <h1 class="hero__title">
-        Les bonnes missions freelance<br /><span class="light-text">à traiter maintenant</span>
+        5 plateformes.<br />1 feed scoré.<br /><span class="light-text">Zéro doublon.</span>
       </h1>
 
       <div class="hero__bottom-bar">
         <p class="hero__description">
-          MissionPulse scanne Free-Work, LeHibou, Hiway, Collective et Cherry Pick, puis remonte les
-          opportunités 80+ compatibles avec votre stack, votre TJM et votre remote.
+          Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans un seul feed, scoré selon votre
+          stack, votre TJM et votre remote. Le dernier scan a remonté 42 missions, dont 8 à
+          contacter maintenant.
         </p>
 
         <div class="hero__actions">
@@ -261,1058 +424,696 @@
 </section>
 
 {#if showDeferredContent}
-<!-- Product showcase -->
-<section class="product-showcase" id="workflow" aria-label="Aperçu de MissionPulse">
-  <div class="container">
-    <div class="showcase-shell fade-in">
-      <div class="showcase-logos" aria-label="Plateformes scannées">
-        <img src="/logos/free-work.png" alt="Free-Work" width="112" height="40" />
-        <img src="/logos/lehibou.png" alt="LeHibou" width="112" height="40" />
-        <img src="/logos/hiway.png" alt="Hiway" width="112" height="40" />
-        <img src="/logos/collective.png" alt="Collective" width="112" height="40" />
-        <img src="/logos/cherry-pick.png" alt="Cherry Pick" width="112" height="40" />
-      </div>
+  <!-- Product showcase -->
+  <section class="product-showcase" id="workflow" aria-label="Aperçu de MissionPulse">
+    <div class="container">
+      <div class="showcase-shell fade-in">
+        <div class="showcase-logos" aria-label="Plateformes scannées">
+          <img src="/logos/free-work.png" alt="Free-Work" width="112" height="40" />
+          <img src="/logos/lehibou.png" alt="LeHibou" width="112" height="40" />
+          <img src="/logos/hiway.png" alt="Hiway" width="112" height="40" />
+          <img src="/logos/collective.png" alt="Collective" width="112" height="40" />
+          <img src="/logos/cherry-pick.png" alt="Cherry Pick" width="112" height="40" />
+        </div>
 
-      <p class="showcase-caption">
-        Le feed gratuit prouve la valeur dès le premier scan: une mission 80+, un TJM compatible,
-        une action immédiate. Premium ajoute le suivi, le radar TJM, le profil/CV et les générations
-        par crédits.
-      </p>
+        <p class="showcase-caption">
+          Le feed gratuit prouve la valeur dès le premier scan: une mission 80+, un TJM compatible,
+          une action immédiate. Premium ajoute le suivi, le radar TJM, le profil/CV et les
+          générations par crédits.
+        </p>
 
-      <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
-        {#each showcaseSteps as step}
-          <button
-            id={`showcase-tab-${step.id}`}
-            class="showcase-tab"
-            class:showcase-tab--active={activeShowcaseStep === step.id}
-            type="button"
-            role="tab"
-            aria-selected={activeShowcaseStep === step.id}
-            aria-controls="showcase-panel"
-            onclick={() => (activeShowcaseStep = step.id)}
-          >
-            {step.label}
-          </button>
-        {/each}
-      </div>
+        <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
+          {#each showcaseSteps as step}
+            <button
+              id={`showcase-tab-${step.id}`}
+              class="showcase-tab"
+              class:showcase-tab--active={activeShowcaseStep === step.id}
+              type="button"
+              role="tab"
+              aria-selected={activeShowcaseStep === step.id}
+              aria-controls="showcase-panel"
+              onclick={() => (activeShowcaseStep = step.id)}
+            >
+              {step.label}
+            </button>
+          {/each}
+        </div>
 
-      <div
-        id="showcase-panel"
-        class="app-preview"
-        role="tabpanel"
-        aria-labelledby={`showcase-tab-${activeShowcaseStep}`}
-        aria-label="Aperçu du side panel MissionPulse"
-      >
-        <div class="app-preview__topbar">
-          <div>
-            <p class="app-preview__eyebrow">Side panel</p>
-            <h2 class="app-preview__title">
+        <div
+          id="showcase-panel"
+          class="app-preview"
+          role="tabpanel"
+          aria-labelledby={`showcase-tab-${activeShowcaseStep}`}
+          aria-label="Aperçu du side panel MissionPulse"
+        >
+          <div class="app-preview__topbar">
+            <div>
+              <p class="app-preview__eyebrow">Side panel</p>
+              <h2 class="app-preview__title">
+                {#if activeShowcaseStep === 'scanner'}
+                  MissionPulse Feed
+                {:else if activeShowcaseStep === 'qualifier'}
+                  Pourquoi cette mission ?
+                {:else if activeShowcaseStep === 'comparer'}
+                  Dashboard de décision
+                {:else}
+                  Assistant candidature Premium
+                {/if}
+              </h2>
+            </div>
+            <div class="app-preview__actions" aria-hidden="true">
+              <span></span>
+              <span></span>
+              <span></span>
+            </div>
+          </div>
+
+          <div class="app-preview__toolbar">
+            <span class="app-preview__tab app-preview__tab--active">
               {#if activeShowcaseStep === 'scanner'}
-                MissionPulse Feed
+                Top missions
               {:else if activeShowcaseStep === 'qualifier'}
-                Pourquoi cette mission ?
+                Score détaillé
               {:else if activeShowcaseStep === 'comparer'}
-                Dashboard de décision
+                Premium
               {:else}
-                Assistant candidature Premium
+                Crédits IA
               {/if}
-            </h2>
+            </span>
+            <span class="app-preview__pill">
+              {#if activeShowcaseStep === 'scanner'}
+                Scan terminé
+              {:else if activeShowcaseStep === 'qualifier'}
+                Grade A
+              {:else if activeShowcaseStep === 'comparer'}
+                Pipeline
+              {:else}
+                1 crédit
+              {/if}
+            </span>
+            <span class="app-preview__toggle">Auto</span>
           </div>
-          <div class="app-preview__actions" aria-hidden="true">
-            <span></span>
-            <span></span>
-            <span></span>
-          </div>
+
+          {#if activeShowcaseStep === 'scanner'}
+            <div class="app-preview__body">
+              <div class="score-flow" aria-label="Résumé du scan">
+                <article class="score-card">
+                  <span class="score-card__label">Trouvées</span>
+                  <strong>42</strong>
+                  <span>missions consolidées</span>
+                </article>
+                <article class="score-card">
+                  <span class="score-card__label">Dédupliquées</span>
+                  <strong>31</strong>
+                  <span>opportunités uniques</span>
+                </article>
+                <article class="score-card score-card--highlight">
+                  <span class="score-card__label">À contacter</span>
+                  <strong>8</strong>
+                  <span>scores supérieurs à 85</span>
+                </article>
+              </div>
+
+              <div class="mission-list" aria-label="Missions recommandées">
+                <div class="mission-list__header">
+                  <span>Mission</span>
+                  <span>Score</span>
+                  <span>TJM</span>
+                </div>
+                <article class="mission-row">
+                  <div>
+                    <strong>Lead Svelte / TypeScript</strong>
+                    <span>Free-Work · Remote hybride</span>
+                  </div>
+                  <mark>A</mark>
+                  <span>720€</span>
+                </article>
+                <article class="mission-row">
+                  <div>
+                    <strong>Architecte Frontend</strong>
+                    <span>LeHibou · Paris</span>
+                  </div>
+                  <mark>A</mark>
+                  <span>780€</span>
+                </article>
+                <article class="mission-row">
+                  <div>
+                    <strong>Fullstack Platform</strong>
+                    <span>Hiway · Remote</span>
+                  </div>
+                  <mark>A</mark>
+                  <span>690€</span>
+                </article>
+                <article class="mission-row">
+                  <div>
+                    <strong>Consultant Design System</strong>
+                    <span>Collective · Lyon</span>
+                  </div>
+                  <mark>B</mark>
+                  <span>650€</span>
+                </article>
+              </div>
+            </div>
+          {:else if activeShowcaseStep === 'qualifier'}
+            <div class="app-preview__body app-preview__body--detail">
+              <div class="score-flow" aria-label="Facteurs de qualification">
+                <article class="score-card score-card--highlight">
+                  <span class="score-card__label">Stack</span>
+                  <strong>A</strong>
+                  <span>Svelte, TypeScript, design system</span>
+                </article>
+                <article class="score-card">
+                  <span class="score-card__label">TJM</span>
+                  <strong>+120€</strong>
+                  <span>au-dessus de votre minimum</span>
+                </article>
+                <article class="score-card">
+                  <span class="score-card__label">Contrainte</span>
+                  <strong>Remote</strong>
+                  <span>compatible avec vos préférences</span>
+                </article>
+              </div>
+
+              <div class="insight-panel" aria-label="Explication du score">
+                <h3>Pourquoi elle matche</h3>
+                <p>
+                  MissionPulse transforme le scoring en critères lisibles pour décider vite, sans
+                  ouvrir chaque annonce une par une.
+                </p>
+                <div class="insight-meter">
+                  <span>Compétences clés</span>
+                  <strong>A</strong>
+                  <div><i class="insight-meter__bar insight-meter__bar--95"></i></div>
+                </div>
+                <div class="insight-meter">
+                  <span>TJM & durée</span>
+                  <strong>A</strong>
+                  <div><i class="insight-meter__bar insight-meter__bar--90"></i></div>
+                </div>
+                <div class="insight-meter">
+                  <span>Localisation</span>
+                  <strong>A</strong>
+                  <div><i class="insight-meter__bar insight-meter__bar--90"></i></div>
+                </div>
+                <ul class="insight-list">
+                  <li>Annonce senior sans signaux de régie bas niveau.</li>
+                  <li>Stack alignée avec votre profil prioritaire.</li>
+                  <li>Client final et durée longue détectés.</li>
+                </ul>
+              </div>
+            </div>
+          {:else if activeShowcaseStep === 'comparer'}
+            <div class="app-preview__body app-preview__body--wide">
+              <div class="compare-board" aria-label="Comparaison de missions">
+                <article class="compare-card compare-card--selected">
+                  <span class="compare-card__rank">#1</span>
+                  <h3>Lead Svelte</h3>
+                  <p>Free-Work · Remote hybride</p>
+                  <dl>
+                    <div>
+                      <dt>Score</dt>
+                      <dd>A</dd>
+                    </div>
+                    <div>
+                      <dt>TJM</dt>
+                      <dd>720€</dd>
+                    </div>
+                    <div>
+                      <dt>Durée</dt>
+                      <dd>12 mois</dd>
+                    </div>
+                  </dl>
+                </article>
+                <article class="compare-card">
+                  <span class="compare-card__rank">#2</span>
+                  <h3>Architecte Frontend</h3>
+                  <p>LeHibou · Paris</p>
+                  <dl>
+                    <div>
+                      <dt>Score</dt>
+                      <dd>A</dd>
+                    </div>
+                    <div>
+                      <dt>TJM</dt>
+                      <dd>780€</dd>
+                    </div>
+                    <div>
+                      <dt>Durée</dt>
+                      <dd>6 mois</dd>
+                    </div>
+                  </dl>
+                </article>
+                <article class="compare-card">
+                  <span class="compare-card__rank">#3</span>
+                  <h3>Fullstack Platform</h3>
+                  <p>Hiway · Remote</p>
+                  <dl>
+                    <div>
+                      <dt>Score</dt>
+                      <dd>A</dd>
+                    </div>
+                    <div>
+                      <dt>TJM</dt>
+                      <dd>690€</dd>
+                    </div>
+                    <div>
+                      <dt>Durée</dt>
+                      <dd>9 mois</dd>
+                    </div>
+                  </dl>
+                </article>
+              </div>
+
+              <div class="decision-panel" aria-label="Aide à la décision">
+                <h3>Décision assistée</h3>
+                <p>
+                  Premium relie shortlist, TJM, profil et suivi pour arbitrer les meilleures pistes.
+                </p>
+                <div class="decision-row">
+                  <span>Meilleur fit profil</span><strong>Lead Svelte</strong>
+                </div>
+                <div class="decision-row">
+                  <span>Meilleur TJM</span><strong>Architecte Frontend</strong>
+                </div>
+                <div class="decision-row">
+                  <span>Moins de friction</span><strong>Full remote</strong>
+                </div>
+              </div>
+            </div>
+          {:else}
+            <div class="app-preview__body app-preview__body--detail">
+              <div class="score-flow" aria-label="Checklist candidature">
+                <article class="score-card score-card--highlight">
+                  <span class="score-card__label">Contact</span>
+                  <strong>Prêt</strong>
+                  <span>pitch généré via crédit IA</span>
+                </article>
+                <article class="score-card">
+                  <span class="score-card__label">CV</span>
+                  <strong>Aligné</strong>
+                  <span>mots-clés recommandés extraits</span>
+                </article>
+                <article class="score-card">
+                  <span class="score-card__label">Suivi</span>
+                  <strong>J+2</strong>
+                  <span>prochaine action dans le pipeline</span>
+                </article>
+              </div>
+
+              <div class="message-panel" aria-label="Message de candidature">
+                <h3>Message de candidature</h3>
+                <p>
+                  Bonjour, votre mission Lead Svelte / TypeScript correspond fortement à mon
+                  expérience design system et plateformes front complexes.
+                </p>
+                <p>
+                  Disponible sous 2 semaines, TJM cible 720€, remote hybride possible. Je peux vous
+                  partager deux références proches.
+                </p>
+                <div class="message-actions">
+                  <span>Copier le message</span>
+                  <span>Ouvrir l’annonce</span>
+                </div>
+              </div>
+            </div>
+          {/if}
         </div>
-
-        <div class="app-preview__toolbar">
-          <span class="app-preview__tab app-preview__tab--active">
-            {#if activeShowcaseStep === 'scanner'}
-              Top missions
-            {:else if activeShowcaseStep === 'qualifier'}
-              Score détaillé
-            {:else if activeShowcaseStep === 'comparer'}
-              Premium
-            {:else}
-              Crédits IA
-            {/if}
-          </span>
-          <span class="app-preview__pill">
-            {#if activeShowcaseStep === 'scanner'}
-              Scan terminé
-            {:else if activeShowcaseStep === 'qualifier'}
-              Grade A
-            {:else if activeShowcaseStep === 'comparer'}
-              Pipeline
-            {:else}
-              1 crédit
-            {/if}
-          </span>
-          <span class="app-preview__toggle">Auto</span>
-        </div>
-
-        {#if activeShowcaseStep === 'scanner'}
-          <div class="app-preview__body">
-            <div class="score-flow" aria-label="Résumé du scan">
-              <article class="score-card">
-                <span class="score-card__label">Trouvées</span>
-                <strong>42</strong>
-                <span>missions consolidées</span>
-              </article>
-              <article class="score-card">
-                <span class="score-card__label">Dédupliquées</span>
-                <strong>31</strong>
-                <span>opportunités uniques</span>
-              </article>
-              <article class="score-card score-card--highlight">
-                <span class="score-card__label">À contacter</span>
-                <strong>8</strong>
-                <span>scores supérieurs à 85</span>
-              </article>
-            </div>
-
-            <div class="mission-list" aria-label="Missions recommandées">
-              <div class="mission-list__header">
-                <span>Mission</span>
-                <span>Score</span>
-                <span>TJM</span>
-              </div>
-              <article class="mission-row">
-                <div>
-                  <strong>Lead Svelte / TypeScript</strong>
-                  <span>Free-Work · Remote hybride</span>
-                </div>
-                <mark>A</mark>
-                <span>720€</span>
-              </article>
-              <article class="mission-row">
-                <div>
-                  <strong>Architecte Frontend</strong>
-                  <span>LeHibou · Paris</span>
-                </div>
-                <mark>A</mark>
-                <span>780€</span>
-              </article>
-              <article class="mission-row">
-                <div>
-                  <strong>Fullstack Platform</strong>
-                  <span>Hiway · Remote</span>
-                </div>
-                <mark>A</mark>
-                <span>690€</span>
-              </article>
-              <article class="mission-row">
-                <div>
-                  <strong>Consultant Design System</strong>
-                  <span>Collective · Lyon</span>
-                </div>
-                <mark>B</mark>
-                <span>650€</span>
-              </article>
-            </div>
-          </div>
-        {:else if activeShowcaseStep === 'qualifier'}
-          <div class="app-preview__body app-preview__body--detail">
-            <div class="score-flow" aria-label="Facteurs de qualification">
-              <article class="score-card score-card--highlight">
-                <span class="score-card__label">Stack</span>
-                <strong>A</strong>
-                <span>Svelte, TypeScript, design system</span>
-              </article>
-              <article class="score-card">
-                <span class="score-card__label">TJM</span>
-                <strong>+120€</strong>
-                <span>au-dessus de votre minimum</span>
-              </article>
-              <article class="score-card">
-                <span class="score-card__label">Contrainte</span>
-                <strong>Remote</strong>
-                <span>compatible avec vos préférences</span>
-              </article>
-            </div>
-
-            <div class="insight-panel" aria-label="Explication du score">
-              <h3>Pourquoi elle matche</h3>
-              <p>
-                MissionPulse transforme le scoring en critères lisibles pour décider vite, sans
-                ouvrir chaque annonce une par une.
-              </p>
-              <div class="insight-meter">
-                <span>Compétences clés</span>
-                <strong>A</strong>
-                <div><i class="insight-meter__bar insight-meter__bar--95"></i></div>
-              </div>
-              <div class="insight-meter">
-                <span>TJM & durée</span>
-                <strong>A</strong>
-                <div><i class="insight-meter__bar insight-meter__bar--90"></i></div>
-              </div>
-              <div class="insight-meter">
-                <span>Localisation</span>
-                <strong>A</strong>
-                <div><i class="insight-meter__bar insight-meter__bar--90"></i></div>
-              </div>
-              <ul class="insight-list">
-                <li>Annonce senior sans signaux de régie bas niveau.</li>
-                <li>Stack alignée avec votre profil prioritaire.</li>
-                <li>Client final et durée longue détectés.</li>
-              </ul>
-            </div>
-          </div>
-        {:else if activeShowcaseStep === 'comparer'}
-          <div class="app-preview__body app-preview__body--wide">
-            <div class="compare-board" aria-label="Comparaison de missions">
-              <article class="compare-card compare-card--selected">
-                <span class="compare-card__rank">#1</span>
-                <h3>Lead Svelte</h3>
-                <p>Free-Work · Remote hybride</p>
-                <dl>
-                  <div>
-                    <dt>Score</dt>
-                    <dd>A</dd>
-                  </div>
-                  <div>
-                    <dt>TJM</dt>
-                    <dd>720€</dd>
-                  </div>
-                  <div>
-                    <dt>Durée</dt>
-                    <dd>12 mois</dd>
-                  </div>
-                </dl>
-              </article>
-              <article class="compare-card">
-                <span class="compare-card__rank">#2</span>
-                <h3>Architecte Frontend</h3>
-                <p>LeHibou · Paris</p>
-                <dl>
-                  <div>
-                    <dt>Score</dt>
-                    <dd>A</dd>
-                  </div>
-                  <div>
-                    <dt>TJM</dt>
-                    <dd>780€</dd>
-                  </div>
-                  <div>
-                    <dt>Durée</dt>
-                    <dd>6 mois</dd>
-                  </div>
-                </dl>
-              </article>
-              <article class="compare-card">
-                <span class="compare-card__rank">#3</span>
-                <h3>Fullstack Platform</h3>
-                <p>Hiway · Remote</p>
-                <dl>
-                  <div>
-                    <dt>Score</dt>
-                    <dd>A</dd>
-                  </div>
-                  <div>
-                    <dt>TJM</dt>
-                    <dd>690€</dd>
-                  </div>
-                  <div>
-                    <dt>Durée</dt>
-                    <dd>9 mois</dd>
-                  </div>
-                </dl>
-              </article>
-            </div>
-
-            <div class="decision-panel" aria-label="Aide à la décision">
-              <h3>Décision assistée</h3>
-              <p>
-                Premium relie shortlist, TJM, profil et suivi pour arbitrer les meilleures pistes.
-              </p>
-              <div class="decision-row">
-                <span>Meilleur fit profil</span><strong>Lead Svelte</strong>
-              </div>
-              <div class="decision-row">
-                <span>Meilleur TJM</span><strong>Architecte Frontend</strong>
-              </div>
-              <div class="decision-row">
-                <span>Moins de friction</span><strong>Full remote</strong>
-              </div>
-            </div>
-          </div>
-        {:else}
-          <div class="app-preview__body app-preview__body--detail">
-            <div class="score-flow" aria-label="Checklist candidature">
-              <article class="score-card score-card--highlight">
-                <span class="score-card__label">Contact</span>
-                <strong>Prêt</strong>
-                <span>pitch généré via crédit IA</span>
-              </article>
-              <article class="score-card">
-                <span class="score-card__label">CV</span>
-                <strong>Aligné</strong>
-                <span>mots-clés recommandés extraits</span>
-              </article>
-              <article class="score-card">
-                <span class="score-card__label">Suivi</span>
-                <strong>J+2</strong>
-                <span>prochaine action dans le pipeline</span>
-              </article>
-            </div>
-
-            <div class="message-panel" aria-label="Message de candidature">
-              <h3>Message de candidature</h3>
-              <p>
-                Bonjour, votre mission Lead Svelte / TypeScript correspond fortement à mon
-                expérience design system et plateformes front complexes.
-              </p>
-              <p>
-                Disponible sous 2 semaines, TJM cible 720€, remote hybride possible. Je peux vous
-                partager deux références proches.
-              </p>
-              <div class="message-actions">
-                <span>Copier le message</span>
-                <span>Ouvrir l’annonce</span>
-              </div>
-            </div>
-          </div>
-        {/if}
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- Daily radar -->
-<section class="daily-radar section" id="shortlist" aria-labelledby="daily-radar-title">
-  <div class="container">
-    <div class="daily-radar__layout">
-      <div class="daily-radar__content fade-in">
-        <p class="daily-radar__eyebrow">Shortlist quotidienne</p>
-        <h2 id="daily-radar-title" class="daily-radar__title">
-          Commencez par les missions Java, Spring Boot et frontend senior qui valent un message
-          aujourd'hui.
-        </h2>
-        <p class="daily-radar__desc">
-          Chaque matin, MissionPulse sert le même réflexe produit: scanner les plateformes, isoler
-          les annonces au bon TJM, puis décider quoi ouvrir, sauvegarder ou relancer.
+  <!-- Daily radar -->
+  <section class="daily-radar section" id="shortlist" aria-labelledby="daily-radar-title">
+    <div class="container">
+      <div class="daily-radar__layout">
+        <div class="daily-radar__content fade-in">
+          <p class="daily-radar__eyebrow">Shortlist quotidienne</p>
+          <h2 id="daily-radar-title" class="daily-radar__title">
+            Commencez par les missions Java, Spring Boot et frontend senior qui valent un message
+            aujourd'hui.
+          </h2>
+          <p class="daily-radar__desc">
+            Chaque matin, MissionPulse sert le même réflexe produit: scanner les plateformes, isoler
+            les annonces au bon TJM, puis décider quoi ouvrir, sauvegarder ou relancer.
+          </p>
+          <div class="daily-radar__actions">
+            <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Scanner mes plateformes</a>
+            <a
+              href="mailto:contact@missionpulse.app?subject=Shortlist%20quotidienne%20Java%20Spring%20Boot"
+              class="btn btn--secondary btn--lg">Recevoir la shortlist</a
+            >
+          </div>
+        </div>
+
+        <div class="radar-board fade-in fade-in-delay-2" aria-label="Exemple de shortlist">
+          <div class="radar-board__header">
+            <span>Shortlist Java / Spring Boot</span>
+            <strong>Ce matin</strong>
+          </div>
+          <article class="radar-row radar-row--hot">
+            <div>
+              <strong>Tech Lead Java / Spring Boot</strong>
+              <span>Client final · Remote hybride · 12 mois</span>
+            </div>
+            <mark>92</mark>
+            <span>780€</span>
+          </article>
+          <article class="radar-row">
+            <div>
+              <strong>Backend Kotlin / Kafka</strong>
+              <span>ESN sélective · Paris · Démarrage rapide</span>
+            </div>
+            <mark>87</mark>
+            <span>720€</span>
+          </article>
+          <article class="radar-row">
+            <div>
+              <strong>Fullstack TypeScript / Java</strong>
+              <span>Scale-up · Full remote · Produit B2B</span>
+            </div>
+            <mark>84</mark>
+            <span>690€</span>
+          </article>
+          <div class="radar-board__footer">
+            <span>Action suivante</span>
+            <strong>Ouvrir #1 et générer le pitch</strong>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- Fonctionnalités -->
+  <section class="features section" id="features">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title fade-in">Ce que vous obtenez</h2>
+        <p class="section-subtitle fade-in fade-in-delay-1">
+          Le gratuit couvre le scan et le scoring. Le premium ouvre la négociation, le suivi et la
+          candidature.
         </p>
-        <div class="daily-radar__actions">
-          <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Scanner mes plateformes</a>
+      </div>
+
+      <ul class="feature-matrix fade-in fade-in-delay-1" aria-label="Capacités et offre de départ">
+        {#each featureMatrix as row (row.label)}
+          <li class="feature-matrix__row">
+            <span class="feature-matrix__label">
+              {row.label}
+              {#if row.note}<span class="feature-matrix__note">{row.note}</span>{/if}
+            </span>
+            <span class={`feature-matrix__tier feature-matrix__tier--${row.tier}`}>
+              {row.tier === 'free' ? 'Gratuit' : 'Premium'}
+            </span>
+          </li>
+        {/each}
+      </ul>
+    </div>
+  </section>
+
+  <!-- Comment ça marche -->
+  <section class="how-it-works section" id="how-it-works">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title fade-in">Démarrer en 3 minutes</h2>
+        <p class="section-subtitle fade-in fade-in-delay-1">
+          Installez, branchez vos sessions, le feed se remplit seul.
+        </p>
+      </div>
+
+      <ol class="steps">
+        <li class="step fade-in fade-in-delay-1">
+          <span class="step__number" aria-hidden="true">1</span>
+          <div class="step__content">
+            <h3 class="step__title">Installez l'extension</h3>
+            <p class="step__desc">
+              Un clic depuis le Chrome Web Store. Compatible Chrome, Brave, Edge, Arc et Dia.
+            </p>
+          </div>
+        </li>
+        <li class="step fade-in fade-in-delay-2">
+          <span class="step__number" aria-hidden="true">2</span>
+          <div class="step__content">
+            <h3 class="step__title">Configurez votre profil</h3>
+            <p class="step__desc">
+              Stack, TJM cible, localisation, séniorité, préférences remote. Le scoring s'adapte à
+              vos critères.
+            </p>
+          </div>
+        </li>
+        <li class="step fade-in fade-in-delay-3">
+          <span class="step__number" aria-hidden="true">3</span>
+          <div class="step__content">
+            <h3 class="step__title">Connectez-vous aux plateformes</h3>
+            <p class="step__desc">
+              Connectez-vous normalement à Free-Work, LeHibou, etc. MissionPulse réutilise vos
+              sessions existantes.
+            </p>
+          </div>
+        </li>
+        <li class="step fade-in fade-in-delay-4">
+          <span class="step__number" aria-hidden="true">4</span>
+          <div class="step__content">
+            <h3 class="step__title">Ouvrez le side panel</h3>
+            <p class="step__desc">
+              Les missions arrivent classées par score. Filtrez, comparez, préparez vos
+              candidatures.
+            </p>
+          </div>
+        </li>
+      </ol>
+    </div>
+  </section>
+
+  <!-- Offres -->
+  <section class="plans section" id="plans">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title fade-in">Gratuit ou Premium ?</h2>
+        <p class="section-subtitle fade-in fade-in-delay-1">
+          Commencez par scanner localement dans l'extension, puis connectez votre compte quand vous
+          voulez piloter la conversion dans le dashboard connecté.
+        </p>
+      </div>
+
+      <div class="plans__grid" aria-label="Comparaison gratuit et Premium">
+        <article class="plan-card fade-in fade-in-delay-1">
+          <div class="plan-card__header">
+            <span class="plan-card__name">Gratuit</span>
+            <strong class="plan-card__price">0€</strong>
+            <p>Pour valider la valeur en quelques minutes depuis l'extension Chrome.</p>
+          </div>
+          <ul class="plan-card__list">
+            <li>Scan des 5 plateformes connectées depuis vos sessions navigateur.</li>
+            <li>Feed centralisé avec recherche, filtres, tri, nouveautés et favoris.</li>
+            <li>Scoring de pertinence, déduplication et comparaison des meilleures missions.</li>
+            <li>Paramètres de profil, alertes, exports et sauvegarde locale.</li>
+            <li>
+              Scoring sémantique local via l'IA intégrée à Chrome (Gemini Nano), quand Chrome le
+              permet.
+            </li>
+          </ul>
+          <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer gratuitement</a>
+        </article>
+
+        <article class="plan-card plan-card--featured fade-in fade-in-delay-2">
+          <div class="plan-card__header">
+            <span class="plan-card__name">Premium</span>
+            <strong class="plan-card__price">12€<small>/mois</small></strong>
+            <p>Pour piloter votre prospection comme un pipeline et produire vos candidatures.</p>
+            <p class="plan-card__anchor">≈ 0,40€/jour — moins qu'un café par semaine.</p>
+          </div>
+          <ul class="plan-card__list">
+            <li>
+              Le dashboard connecté optionnel synchronise votre shortlist et vos candidatures entre
+              vos appareils.
+            </li>
+            <li>Pages Premium dans l'extension: profil, CV, suivi de candidatures et radar TJM.</li>
+            <li>Pipeline de candidature avec statuts, notes, prochaine action et historique.</li>
+            <li>Assistant profil/CV pour garder vos informations cohérentes entre plateformes.</li>
+            <li>
+              20 contenus générés par mois (pitch, message recruteur ou résumé CV). 1 crédit = 1
+              contenu.
+            </li>
+          </ul>
           <a
-            href="mailto:contact@missionpulse.app?subject=Shortlist%20quotidienne%20Java%20Spring%20Boot"
-            class="btn btn--secondary btn--lg">Recevoir la shortlist</a
+            href="https://missionpulse.lemonsqueezy.com/checkout"
+            class="btn btn--primary btn--lg"
+            target="_blank"
+            rel="noopener noreferrer"
           >
-        </div>
-      </div>
-
-      <div class="radar-board fade-in fade-in-delay-2" aria-label="Exemple de shortlist">
-        <div class="radar-board__header">
-          <span>Shortlist Java / Spring Boot</span>
-          <strong>Ce matin</strong>
-        </div>
-        <article class="radar-row radar-row--hot">
-          <div>
-            <strong>Tech Lead Java / Spring Boot</strong>
-            <span>Client final · Remote hybride · 12 mois</span>
-          </div>
-          <mark>92</mark>
-          <span>780€</span>
+            Passer à Premium
+          </a>
         </article>
-        <article class="radar-row">
-          <div>
-            <strong>Backend Kotlin / Kafka</strong>
-            <span>ESN sélective · Paris · Démarrage rapide</span>
-          </div>
-          <mark>87</mark>
-          <span>720€</span>
-        </article>
-        <article class="radar-row">
-          <div>
-            <strong>Fullstack TypeScript / Java</strong>
-            <span>Scale-up · Full remote · Produit B2B</span>
-          </div>
-          <mark>84</mark>
-          <span>690€</span>
-        </article>
-        <div class="radar-board__footer">
-          <span>Action suivante</span>
-          <strong>Ouvrir #1 et générer le pitch</strong>
-        </div>
       </div>
-    </div>
-  </div>
-</section>
 
-<!-- Product map -->
-<section class="product-map section" aria-labelledby="product-map-title">
-  <div class="container">
-    <div class="section-header">
-      <h2 id="product-map-title" class="section-title fade-in">Trois surfaces, un seul flux</h2>
-      <p class="section-subtitle fade-in fade-in-delay-1">
-        MissionPulse sépare clairement le scan local, la gestion du compte et le cockpit connecté.
-      </p>
-    </div>
-
-    <div class="product-map__grid" aria-label="Flux produit MissionPulse">
-      <article class="product-map__item fade-in fade-in-delay-1">
-        <span class="product-map__step">1</span>
-        <p class="product-map__eyebrow">Extension Chrome</p>
-        <h3>Scanner localement</h3>
-        <p>
-          Les plateformes sont consultées depuis vos sessions navigateur. Le feed, les favoris et
-          les premiers scores fonctionnent sans compte.
-        </p>
-      </article>
-
-      <article class="product-map__item fade-in fade-in-delay-2">
-        <span class="product-map__step">2</span>
-        <p class="product-map__eyebrow">Compte MissionPulse</p>
-        <h3>Gérer plan et crédits</h3>
-        <p>
-          Le compte sert à l'abonnement, aux crédits IA, à l'identité et à l'activation de la
-          synchronisation entre appareils.
-        </p>
-      </article>
-
-      <article class="product-map__item fade-in fade-in-delay-3">
-        <span class="product-map__step">3</span>
-        <p class="product-map__eyebrow">Dashboard connecté</p>
-        <h3>Piloter les snapshots</h3>
-        <p>
-          Le cockpit web consolide missions, TJM, CV et candidatures synchronisés. Les cookies et
-          jetons des plateformes restent dans Chrome.
-        </p>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- Operational proof -->
-<section class="proof-strip" aria-labelledby="proof-strip-title">
-  <div class="container">
-    <div class="proof-strip__header fade-in">
-      <p class="proof-strip__eyebrow">Preuves operationnelles</p>
-      <h2 id="proof-strip-title">Chaque signal doit mener a une action</h2>
-    </div>
-
-    <div class="proof-strip__grid">
-      <article class="proof-item fade-in">
-        <span class="proof-item__signal">5 sources</span>
-        <h3>Vous voyez ou chercher en premier</h3>
-        <p>Les plateformes sont consolidees avant decision: prioriser, filtrer ou ignorer.</p>
-      </article>
-      <article class="proof-item fade-in fade-in-delay-1">
-        <span class="proof-item__signal">Local</span>
-        <h3>Les sessions restent dans Chrome</h3>
-        <p>
-          Si une source casse, l'action est de reconnecter ou relancer, pas de transmettre un mot de
-          passe.
-        </p>
-      </article>
-      <article class="proof-item fade-in fade-in-delay-2">
-        <span class="proof-item__signal">Gemini Nano</span>
-        <h3>Le score explique la decision</h3>
-        <p>Les missions fortes remontent avec les raisons de fit avant les details techniques.</p>
-      </article>
-      <article class="proof-item fade-in fade-in-delay-3">
-        <span class="proof-item__signal">20 credits</span>
-        <h3>Les generations restent pilotees</h3>
-        <p>Le compte montre quand recharger avant de bloquer pitch, message ou resume CV.</p>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- Pour qui ? -->
-<section class="for-who section" id="for-who">
-  <div class="container">
-    <div class="section-header">
-      <h2 class="section-title fade-in">Pour qui ?</h2>
-      <p class="section-subtitle fade-in fade-in-delay-1">
-        MissionPulse est conçu pour les développeurs freelances 3+ ans, TJM 450-900€, qui veulent
-        rester visibles sans passer leur matinée dans cinq onglets.
-      </p>
-    </div>
-
-    <div class="features__grid">
-      <article class="glass-card feature-card fade-in fade-in-delay-1">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" /><circle cx="9" cy="7" r="4" />
-            <line x1="19" y1="8" x2="19" y2="14" /><line x1="22" y1="11" x2="16" y2="11" />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Freelance en recherche</h3>
-        <p class="feature-card__desc">
-          Vous êtes disponible maintenant ou sous 30 jours. MissionPulse transforme votre veille
-          quotidienne en shortlist claire: ouvrir, sauvegarder, postuler ou ignorer.
-        </p>
-      </article>
-
-      <article class="glass-card feature-card fade-in fade-in-delay-2">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M12 20h9" /><path
-              d="M16.5 3.5a2.121 2.121 0 0 1 3 3L7 19l-4 1 1-4L16.5 3.5z"
-            />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Dev déjà en mission</h3>
-        <p class="feature-card__desc">
-          Vous gardez un œil sur le marché sans chercher activement. Les alertes remontent seulement
-          les missions à haut score, avec TJM et remote compatibles.
-        </p>
-      </article>
-
-      <article class="glass-card feature-card fade-in fade-in-delay-3">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="12" y1="1" x2="12" y2="23" /><path
-              d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-            />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Consultant qui négocie</h3>
-        <p class="feature-card__desc">
-          Vous ciblez 450-900€ de TJM et voulez savoir quand pousser, refuser ou relancer. Le radar
-          TJM transforme les annonces scannées en repères de négociation.
-        </p>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- Fonctionnalités -->
-<section class="features section" id="features">
-  <div class="container">
-    <div class="section-header">
-      <h2 class="section-title fade-in">Pourquoi les prospects activent</h2>
-      <p class="section-subtitle fade-in fade-in-delay-1">
-        La promesse gratuite est immédiate; les modules Premium prolongent naturellement le workflow
-        quand une mission mérite d'être travaillée.
-      </p>
-    </div>
-
-    <div class="features__grid">
-      <article class="glass-card feature-card fade-in fade-in-delay-1">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M21 12a9 9 0 1 1-6.219-8.56" /><polyline points="21 3 21 9 15 9" />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Ne ratez plus les bonnes missions</h3>
-        <p class="feature-card__desc">
-          Free-Work, LeHibou, Hiway, Collective et Cherry Pick arrivent dans un seul feed. Vous
-          gardez la couverture marché sans ouvrir cinq onglets chaque matin. Inclus dans le gratuit.
-        </p>
-      </article>
-
-      <article class="glass-card feature-card fade-in fade-in-delay-2">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <polygon
-              points="12 2 15.09 8.26 22 9.27 17 14.14 18.18 21.02 12 17.77 5.82 21.02 7 14.14 2 9.27 8.91 8.26 12 2"
-            />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Passez de 40 annonces à 5 vraies pistes</h3>
-        <p class="feature-card__desc">
-          Le scoring combine stack, TJM, localisation, remote, séniorité et analyse sémantique. Les
-          doublons sont fusionnés pour ne garder que les opportunités uniques. Inclus dans le
-          gratuit quand l'IA locale Chrome est disponible.
-        </p>
-      </article>
-
-      <article class="glass-card feature-card fade-in fade-in-delay-3">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <line x1="12" y1="1" x2="12" y2="23" /><path
-              d="M17 5H9.5a3.5 3.5 0 0 0 0 7h5a3.5 3.5 0 0 1 0 7H6"
-            />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Négociez avec des données</h3>
-        <p class="feature-card__desc">
-          Le radar TJM Premium suit les taux observés par stack et par source. Vous arrivez en
-          échange avec une fourchette marché, pas une impression.
-        </p>
-      </article>
-
-      <article class="glass-card feature-card fade-in fade-in-delay-4">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <rect x="3" y="3" width="18" height="18" rx="2" ry="2" />
-            <line x1="9" y1="3" x2="9" y2="21" /><line x1="15" y1="3" x2="15" y2="21" />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Transformez la veille en pipeline</h3>
-        <p class="feature-card__desc">
-          Le suivi Premium ajoute statuts de candidature, prochaine action, notes et historique pour
-          garder chaque opportunité qualifiée sous contrôle jusqu'à l'entretien ou l'offre.
-        </p>
-      </article>
-
-      <article class="glass-card feature-card fade-in fade-in-delay-5">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <path d="M18 8A6 6 0 0 0 6 8c0 7-3 9-3 9h18s-3-2-3-9" /><path
-              d="M13.73 21a2 2 0 0 1-3.46 0"
-            />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Postulez plus vite</h3>
-        <p class="feature-card__desc">
-          Pitch court, message recruteur et résumé CV sont générés depuis la mission et votre profil
-          avec les crédits IA de votre compte MissionPulse.
-        </p>
-      </article>
-
-      <article class="glass-card feature-card fade-in fade-in-delay-5">
-        <div class="feature-card__icon">
-          <svg
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
-          >
-            <rect x="3" y="11" width="18" height="11" rx="2" ry="2" />
-            <path d="M7 11V7a5 5 0 0 1 10 0v4" />
-            <circle cx="12" cy="16" r="1" />
-          </svg>
-        </div>
-        <h3 class="feature-card__title">Local-first &amp; privé</h3>
-        <p class="feature-card__desc">
-          Les plateformes sont consultées depuis vos sessions navigateur, sans stocker vos
-          identifiants. La synchronisation cloud du dashboard connecté est optionnelle et limitée
-          aux snapshots normalisés via Supabase; jamais vos mots de passe, cookies ou jetons de
-          session.
-        </p>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- Offres -->
-<section class="plans section" id="plans">
-  <div class="container">
-    <div class="section-header">
-      <h2 class="section-title fade-in">Gratuit ou Premium ?</h2>
-      <p class="section-subtitle fade-in fade-in-delay-1">
-        Commencez par scanner localement dans l'extension, puis connectez votre compte quand vous
-        voulez piloter la conversion dans le dashboard connecté.
-      </p>
-    </div>
-
-    <div class="plans__grid" aria-label="Comparaison gratuit et Premium">
-      <article class="plan-card fade-in fade-in-delay-1">
-        <div class="plan-card__header">
-          <span class="plan-card__name">Gratuit</span>
-          <strong class="plan-card__price">0€</strong>
-          <p>Pour valider la valeur en quelques minutes depuis l'extension Chrome.</p>
-        </div>
-        <ul class="plan-card__list">
-          <li>Scan des 5 plateformes connectées depuis vos sessions navigateur.</li>
-          <li>Feed centralisé avec recherche, filtres, tri, nouveautés et favoris.</li>
-          <li>Scoring de pertinence, déduplication et comparaison des meilleures missions.</li>
-          <li>Paramètres de profil, alertes, exports et sauvegarde locale.</li>
-          <li>Scoring sémantique local via Gemini Nano quand Chrome le permet.</li>
-        </ul>
-        <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer gratuitement</a>
-      </article>
-
-      <article class="plan-card plan-card--featured fade-in fade-in-delay-2">
-        <div class="plan-card__header">
-          <span class="plan-card__name">Premium</span>
-          <strong class="plan-card__price">12€<small>/mois</small></strong>
-          <p>Pour piloter votre prospection comme un pipeline et produire vos candidatures.</p>
-        </div>
-        <ul class="plan-card__list">
-          <li>Le dashboard connecté optionnel synchronise les snapshots normalisés.</li>
-          <li>Pages Premium dans l'extension: profil, CV, suivi de candidatures et radar TJM.</li>
-          <li>Pipeline de candidature avec statuts, notes, prochaine action et historique.</li>
-          <li>Assistant profil/CV pour garder vos informations cohérentes entre plateformes.</li>
-          <li>20 crédits IA par mois pour générer pitch, message recruteur ou résumé CV.</li>
-        </ul>
-        <a
-          href="https://missionpulse.lemonsqueezy.com/checkout"
-          class="btn btn--primary btn--lg"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          Passer à Premium
-        </a>
-      </article>
-    </div>
-
-    <div class="credits-strip fade-in fade-in-delay-3">
-      <div>
-        <span class="credits-strip__label">Crédits IA à la demande</span>
-        <p>
-          Besoin de générer plus de contenus ? Packs disponibles depuis votre compte: 5 crédits à
-          4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€.
-        </p>
-      </div>
-      <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>
-    </div>
-  </div>
-</section>
-
-<!-- Go-to-market loop -->
-<section class="experiment-loop section" aria-labelledby="experiment-loop-title">
-  <div class="container">
-    <div class="section-header">
-      <h2 id="experiment-loop-title" class="section-title fade-in">Bêta pilotée par le terrain</h2>
-      <p class="section-subtitle fade-in fade-in-delay-1">
-        Les prochaines itérations suivent un objectif simple: plus d'installs qualifiées, plus de
-        premiers scans, plus de missions sauvegardées.
-      </p>
-    </div>
-
-    <div class="experiment-loop__grid" aria-label="Plan d'expérimentation MissionPulse">
-      <article class="experiment-card fade-in fade-in-delay-1">
-        <span class="experiment-card__week">Semaine 1</span>
-        <h3>Mesurer l'activation</h3>
-        <p>
-          Visite landing, installation, premier scan, mission ouverte, favori ou pipeline, retour
-          J+1.
-        </p>
-      </article>
-      <article class="experiment-card fade-in fade-in-delay-2">
-        <span class="experiment-card__week">Semaine 2</span>
-        <h3>Prouver le canal</h3>
-        <p>
-          Publier la shortlist quotidienne et tester LinkedIn, communautés freelances et
-          newsletters.
-        </p>
-      </article>
-      <article class="experiment-card fade-in fade-in-delay-3">
-        <span class="experiment-card__week">Semaine 3</span>
-        <h3>Tester Premium</h3>
-        <p>
-          Valider le prix 9-15€/mois avec le pipeline, le radar TJM, les alertes et les générations.
-        </p>
-      </article>
-      <article class="experiment-card fade-in fade-in-delay-4">
-        <span class="experiment-card__week">Semaine 4</span>
-        <h3>Corriger les blocages</h3>
-        <p>
-          10 entretiens utilisateurs sur connecteurs, onboarding profil, score et première action.
-        </p>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- Comment ça marche -->
-<section class="how-it-works section" id="how-it-works">
-  <div class="container">
-    <div class="section-header">
-      <h2 class="section-title fade-in">Comment ça marche</h2>
-      <p class="section-subtitle fade-in fade-in-delay-1">3 minutes pour être opérationnel</p>
-    </div>
-
-    <div class="steps">
-      <div class="step fade-in fade-in-delay-1">
-        <div class="step__number">1</div>
-        <div class="step__content">
-          <h3 class="step__title">Installez l'extension</h3>
-          <p class="step__desc">
-            Un clic depuis le Chrome Web Store. Compatible Chrome, Brave, Edge, Arc et Dia.
+      <div class="credits-strip fade-in fade-in-delay-3">
+        <div>
+          <span class="credits-strip__label">Crédits IA à la demande</span>
+          <p>
+            Besoin de générer plus de contenus ? Packs disponibles depuis votre compte: 5 crédits à
+            4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€.
           </p>
         </div>
-      </div>
-      <div class="step fade-in fade-in-delay-2">
-        <div class="step__number">2</div>
-        <div class="step__content">
-          <h3 class="step__title">Configurez votre profil</h3>
-          <p class="step__desc">
-            Stack, TJM cible, localisation, séniorité, préférences remote. Le scoring s'adapte à vos
-            critères.
-          </p>
-        </div>
-      </div>
-      <div class="step fade-in fade-in-delay-3">
-        <div class="step__number">3</div>
-        <div class="step__content">
-          <h3 class="step__title">Connectez-vous aux plateformes</h3>
-          <p class="step__desc">
-            Connectez-vous normalement à Free-Work, LeHibou, etc. MissionPulse utilise vos sessions
-            existantes.
-          </p>
-        </div>
-      </div>
-      <div class="step fade-in fade-in-delay-4">
-        <div class="step__number">4</div>
-        <div class="step__content">
-          <h3 class="step__title">Ouvrez le side panel</h3>
-          <p class="step__desc">
-            Cliquez sur l'icône MissionPulse. Les missions arrivent classées par score. Filtrez,
-            comparez, préparez vos candidatures.
-          </p>
-        </div>
+        <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>
       </div>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- Plateformes -->
-<section class="platforms section" id="platforms">
-  <div class="container">
-    <div class="section-header">
-      <h2 class="section-title fade-in">5 plateformes connectées</h2>
-      <p class="section-subtitle fade-in fade-in-delay-1">
-        Les principales sources de missions freelance tech en France
-      </p>
-    </div>
-
-    <div class="platforms__grid platforms__grid--5">
-      <article class="glass-card platform-card fade-in fade-in-delay-1">
-        <img
-          class="platform-card__logo-img"
-          src="/logos/free-work.png"
-          alt="Free-Work"
-          width="48"
-          height="48"
-          loading="lazy"
-        />
-        <h3 class="platform-card__name">Free-Work</h3>
-        <p class="platform-card__desc">8 000+ missions freelance</p>
-        <div class="platform-card__status">
-          <span class="platform-card__status-dot"></span> Opérationnel
-        </div>
-      </article>
-
-      <article class="glass-card platform-card fade-in fade-in-delay-2">
-        <img
-          class="platform-card__logo-img"
-          src="/logos/lehibou.png"
-          alt="LeHibou"
-          width="48"
-          height="48"
-          loading="lazy"
-        />
-        <h3 class="platform-card__name">LeHibou</h3>
-        <p class="platform-card__desc">Missions IT grands comptes</p>
-        <div class="platform-card__status">
-          <span class="platform-card__status-dot"></span> Opérationnel
-        </div>
-      </article>
-
-      <article class="glass-card platform-card fade-in fade-in-delay-3">
-        <img
-          class="platform-card__logo-img"
-          src="/logos/hiway.png"
-          alt="Hiway"
-          width="48"
-          height="48"
-          loading="lazy"
-        />
-        <h3 class="platform-card__name">Hiway</h3>
-        <p class="platform-card__desc">Portage salarial + missions</p>
-        <div class="platform-card__status">
-          <span class="platform-card__status-dot"></span> Opérationnel
-        </div>
-      </article>
-
-      <article class="glass-card platform-card fade-in fade-in-delay-4">
-        <img
-          class="platform-card__logo-img"
-          src="/logos/collective.png"
-          alt="Collective"
-          width="48"
-          height="48"
-          loading="lazy"
-        />
-        <h3 class="platform-card__name">Collective</h3>
-        <p class="platform-card__desc">Collectif de freelances</p>
-        <div class="platform-card__status">
-          <span class="platform-card__status-dot"></span> Opérationnel
-        </div>
-      </article>
-
-      <article class="glass-card platform-card fade-in fade-in-delay-5">
-        <img
-          class="platform-card__logo-img"
-          src="/logos/cherry-pick.png"
-          alt="Cherry Pick"
-          width="48"
-          height="48"
-          loading="lazy"
-        />
-        <h3 class="platform-card__name">Cherry Pick</h3>
-        <p class="platform-card__desc">Missions tech sélectionnées</p>
-        <div class="platform-card__status">
-          <span class="platform-card__status-dot"></span> Opérationnel
-        </div>
-      </article>
-    </div>
-  </div>
-</section>
-
-<!-- Tech Stack -->
-<section class="tech-stack section" id="tech">
-  <div class="container">
-    <div class="tech-stack__content">
-      <div class="tech-stack__info fade-in">
-        <h2 class="tech-stack__title">Open source &amp; moderne</h2>
-        <p class="tech-stack__desc">
-          MissionPulse garde le scraping dans votre navigateur, respecte une architecture
-          local-first et limite le dashboard connecté aux données normalisées utiles au suivi.
+  <!-- Plateformes -->
+  <section class="platforms section" id="platforms">
+    <div class="container">
+      <div class="section-header">
+        <h2 class="section-title fade-in">5 plateformes connectées</h2>
+        <p class="section-subtitle fade-in fade-in-delay-1">
+          Les principales sources de missions freelance tech en France, dans un seul feed.
         </p>
-        <a
-          href="https://github.com/guyghost/pulse"
-          class="tech-stack__github btn btn--secondary"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor">
-            <path
-              d="M12 0c-6.626 0-12 5.373-12 12 0 5.302 3.438 9.8 8.207 11.387.599.111.793-.261.793-.577v-2.234c-3.338.726-4.033-1.416-4.033-1.416-.546-1.387-1.333-1.756-1.333-1.756-1.089-.745.083-.729.083-.729 1.205.084 1.839 1.237 1.839 1.237 1.07 1.834 2.807 1.304 3.492.997.107-.775.418-1.305.762-1.604-2.665-.305-5.467-1.334-5.467-5.931 0-1.311.469-2.381 1.236-3.221-.124-.303-.535-1.524.117-3.176 0 0 1.008-.322 3.301 1.23.957-.266 1.983-.399 3.003-.404 1.02.005 2.047.138 3.006.404 2.291-1.552 3.297-1.23 3.297-1.23.653 1.653.242 2.874.118 3.176.77.84 1.235 1.911 1.235 3.221 0 4.609-2.807 5.624-5.479 5.921.43.372.823 1.102.823 2.222v3.293c0 .319.192.694.801.576 4.765-1.589 8.199-6.086 8.199-11.386 0-6.627-5.373-12-12-12z"
+      </div>
+
+      <ul class="platform-strip fade-in fade-in-delay-1" aria-label="Plateformes connectées">
+        {#each platforms as p (p.name)}
+          <li class="platform-strip__item">
+            <img
+              class="platform-strip__logo"
+              src={p.logo}
+              alt={p.name}
+              width="40"
+              height="40"
+              loading="lazy"
             />
-          </svg>
-          Voir sur GitHub
-        </a>
-      </div>
-
-      <div class="tech-stack__badges fade-in fade-in-delay-2">
-        <span class="tech-badge">Svelte 5</span>
-        <span class="tech-badge">TypeScript</span>
-        <span class="tech-badge">Chrome MV3</span>
-        <span class="tech-badge">Gemini Nano</span>
-        <span class="tech-badge">TailwindCSS 4</span>
-        <span class="tech-badge">Vite</span>
-        <span class="tech-badge">Vitest</span>
-      </div>
+            <span class="platform-strip__name">{p.name}</span>
+          </li>
+        {/each}
+      </ul>
     </div>
-  </div>
-</section>
+  </section>
 
-<!-- CTA -->
-<section class="cta section" id="install">
-  <div class="container">
-    <div class="cta__card fade-in">
-      <div class="cta__content">
-        <h2 class="cta__title">Prêt à installer votre radar mission ?</h2>
-        <p class="cta__desc">
-          Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le compte sert au
-          dashboard connecté optionnel, au radar TJM, au suivi de candidature, au profil/CV et aux
-          crédits de génération; l'exécution plateforme reste dans votre navigateur.
-        </p>
-        <a
-          href={chromeStoreUrl}
-          class="btn btn--primary btn--lg"
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          <svg
-            width="20"
-            height="20"
-            viewBox="0 0 24 24"
-            fill="none"
-            stroke="currentColor"
-            stroke-width="2"
-            stroke-linecap="round"
-            stroke-linejoin="round"
+  <!-- CTA -->
+  <section class="cta section" id="install">
+    <div class="container">
+      <div class="cta__card fade-in">
+        <div class="cta__content">
+          <h2 class="cta__title">Prêt à installer votre radar mission ?</h2>
+          <p class="cta__desc">
+            Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le compte sert au
+            dashboard connecté optionnel, au radar TJM, au suivi de candidature, au profil/CV et aux
+            crédits de génération; l'exécution plateforme reste dans votre navigateur.
+          </p>
+          <p class="cta__proof">
+            <span class="cta__proof-dot" aria-hidden="true"></span>
+            Le même classement à chaque scan — scoring déterministe, aucune opacité, aucun tirage aléatoire.
+            Vos 5 plateformes, scannées depuis vos sessions existantes.
+          </p>
+          <a
+            href={chromeStoreUrl}
+            class="btn btn--primary btn--lg"
+            target="_blank"
+            rel="noopener noreferrer"
+            data-primary-cta
           >
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          Installer sur Chrome Web Store
-        </a>
-      </div>
-    </div>
-  </div>
-</section>
-
-<!-- Footer -->
-<footer class="footer">
-  <div class="container">
-    <div class="footer__content">
-      <div class="footer__brand">
-        <div class="footer__logo">
-          <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 128 128">
-            <polyline
-              points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
+            <svg
+              width="20"
+              height="20"
+              viewBox="0 0 24 24"
               fill="none"
-              stroke="var(--color-text-primary)"
-              stroke-width="8"
+              stroke="currentColor"
+              stroke-width="2"
               stroke-linecap="round"
               stroke-linejoin="round"
-            />
-          </svg>
+            >
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+              <polyline points="7 10 12 15 17 10" />
+              <line x1="12" y1="15" x2="12" y2="3" />
+            </svg>
+            Installer sur Chrome Web Store
+          </a>
         </div>
-        <span class="footer__title">Mission<span>Pulse</span></span>
       </div>
-
-      <nav class="footer__links" aria-label="Navigation footer">
-        <a href="/privacy" class="footer__link">Confidentialité</a>
-        <a
-          href="https://github.com/guyghost/pulse"
-          class="footer__link"
-          target="_blank"
-          rel="noopener noreferrer">GitHub</a
-        >
-        <a href="mailto:contact@missionpulse.app" class="footer__link">Contact</a>
-      </nav>
-
-      <p class="footer__copy">MissionPulse — 2026. Open source.</p>
     </div>
-  </div>
-</footer>
+  </section>
+
+  <!-- Footer -->
+  <footer class="footer">
+    <div class="container">
+      <div class="footer__content">
+        <div class="footer__brand">
+          <div class="footer__logo">
+            <svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 128 128">
+              <polyline
+                points="18,64 38,64 46,44 54,84 64,38 74,78 82,52 90,64 110,64"
+                fill="none"
+                stroke="var(--color-text-primary)"
+                stroke-width="8"
+                stroke-linecap="round"
+                stroke-linejoin="round"
+              />
+            </svg>
+          </div>
+          <span class="footer__title">Mission<span>Pulse</span></span>
+        </div>
+
+        <nav class="footer__links" aria-label="Navigation footer">
+          <a href="/privacy" class="footer__link">Confidentialité</a>
+          <a
+            href="https://github.com/guyghost/pulse"
+            class="footer__link"
+            target="_blank"
+            rel="noopener noreferrer">GitHub</a
+          >
+          <a href="mailto:contact@missionpulse.app" class="footer__link">Contact</a>
+        </nav>
+
+        <p class="footer__stack">
+          Svelte 5 · TypeScript · Chrome MV3 · Gemini Nano · Tailwind 4 · Architecture local-first
+        </p>
+
+        <p class="footer__shortcuts">
+          <kbd>/</kbd> installer · <kbd>s</kbd> workflow · <kbd>p</kbd> offres · <kbd>?</kbd> aide
+        </p>
+
+        <p class="footer__copy">MissionPulse — 2026. Open source.</p>
+      </div>
+    </div>
+  </footer>
 {/if}
+
+<!-- Keyboard shortcuts help -->
+<div
+  class="shortcuts-overlay"
+  class:is-open={shortcutsOpen}
+  role="dialog"
+  aria-modal={shortcutsOpen ? 'true' : 'false'}
+  aria-label="Raccourcis clavier"
+  aria-hidden={!shortcutsOpen}
+>
+  <div class="shortcuts-card" bind:this={shortcutsCardEl} tabindex="-1">
+    <div class="shortcuts-card__header">
+      <h2 class="shortcuts-card__title">Raccourcis clavier</h2>
+      <button class="shortcuts-card__close" aria-label="Fermer" onclick={closeShortcuts}>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+        </svg>
+      </button>
+    </div>
+    <ul class="shortcuts-list">
+      {#each shortcuts as s (s.key)}
+        <li>
+          <kbd>{s.key}</kbd>
+          <span>{s.label}</span>
+        </li>
+      {/each}
+      <li>
+        <kbd>Esc</kbd>
+        <span>Fermer ce panneau ou le menu mobile</span>
+      </li>
+    </ul>
+  </div>
+</div>
