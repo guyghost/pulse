@@ -1,6 +1,6 @@
 import { env } from '$env/dynamic/public';
 import type { Actions, PageServerLoad } from './$types';
-import { fail, redirect } from '@sveltejs/kit';
+import { fail, redirect, type Cookies } from '@sveltejs/kit';
 import {
   APPLICATION_STAGES,
   transitionApplicationStage,
@@ -568,6 +568,325 @@ export const load: PageServerLoad = async ({ cookies }) => {
     ),
   };
 };
+
+type MissionStageTransition = 'selected' | 'archived';
+
+type MissionTransitionOutcome =
+  // `changed` distinguishes a real stage transition from a no-op (mission already
+  // in a non-`detected` stage). Bulk actions count only `changed` as `applied`,
+  // so the feedback never claims a change that didn't happen.
+  | { ok: true; changed: boolean; message: string }
+  | { ok: false; status: 400 | 404 | 409 | 500; message: string };
+
+/**
+ * Shared transaction for a single mission stage transition (select or archive).
+ * Pure orchestration of the existing per-mission write path: mission ownership
+ * check → detected→target transition (or insert) → optimistic revision update →
+ * pipeline event → mark pending extension pull. Used by both the per-mission
+ * actions and the bulk actions so the two paths can never drift.
+ */
+async function applyMissionStageTransition(
+  supabase: ReturnType<typeof createSupabaseServerClient>,
+  userId: string,
+  missionId: string,
+  toStage: MissionStageTransition
+): Promise<MissionTransitionOutcome> {
+  const participle = toStage === 'selected' ? 'sélectionnée' : 'archivée';
+  const verb = toStage === 'selected' ? 'sélectionner' : 'archiver';
+  const transitionNoun = toStage === 'selected' ? 'de sélection' : "d'archivage";
+  const actionKey = toStage === 'selected' ? 'select' : 'archive';
+
+  const { data: mission, error: missionError } = await supabase
+    .from('missions')
+    .select('id, title')
+    .eq('id', missionId)
+    .eq('user_id', userId)
+    .single<MissionSelectionRow>();
+
+  if (missionError || !mission) {
+    return { ok: false, status: 404, message: 'Mission introuvable.' };
+  }
+
+  const { data: existingApplication } = await supabase
+    .from('applications')
+    .select('id, stage, revision')
+    .eq('mission_id', missionId)
+    .eq('user_id', userId)
+    .maybeSingle<ExistingApplicationSelectionRow>();
+
+  if (existingApplication) {
+    if (existingApplication.stage === 'detected') {
+      const occurredAt = new Date();
+      const event = transitionApplicationStage({
+        applicationId: existingApplication.id,
+        fromStage: 'detected',
+        toStage,
+        occurredAt,
+        createdBy: 'dashboard',
+        clientEventId: buildDashboardPipelineClientEventId({
+          action: actionKey,
+          applicationId: existingApplication.id,
+          revision: existingApplication.revision,
+          fromStage: 'detected',
+          toStage,
+        }),
+        note: `Mission ${participle} depuis le feed dashboard.`,
+      });
+
+      if (!event) {
+        return { ok: false, status: 500, message: `Transition ${transitionNoun} invalide.` };
+      }
+
+      const patch = buildApplicationStageUpdatePatch(toStage, event.occurredAt);
+      const { error: updateError } = await supabase
+        .from('applications')
+        .update({
+          stage: patch.stage,
+          archived_at: patch.archived_at,
+          revision: existingApplication.revision + 1,
+          updated_by: patch.updated_by,
+          updated_at: event.occurredAt,
+        })
+        .eq('id', existingApplication.id)
+        .eq('user_id', userId)
+        .eq('revision', existingApplication.revision)
+        .select('id')
+        .single<{ id: string }>();
+
+      if (updateError) {
+        if (updateError.code !== 'PGRST116') {
+          return { ok: false, status: 500, message: `La mission n'a pas pu être ${participle}.` };
+        }
+        return {
+          ok: false,
+          status: 409,
+          message: `La candidature a changé depuis l'ouverture de la page. Rechargez avant de ${verb}.`,
+        };
+      }
+
+      const eventInserted = await upsertDashboardPipelineEvent(supabase, userId, event, {
+        source: 'dashboard_feed',
+        mission_id: missionId,
+      });
+
+      if (!eventInserted) {
+        return {
+          ok: false,
+          status: 500,
+          message: `La mission est ${participle}, mais l'événement pipeline n'a pas pu être enregistré.`,
+        };
+      }
+
+      await markEntityPendingExtensionPull(supabase, userId, 'applications', event.occurredAt);
+
+      return { ok: true, changed: true, message: `Mission ${participle}: ${mission.title}.` };
+    }
+
+    return {
+      ok: true,
+      changed: false,
+      message: `Mission déjà suivie en ${existingApplication.stage}.`,
+    };
+  }
+
+  const occurredAt = new Date();
+  const detectedAt = new Date(occurredAt.getTime() - 1);
+
+  if (toStage === 'selected') {
+    const patch = buildMissionSelectionInsertPatch();
+    const { data: application, error: insertError } = await supabase
+      .from('applications')
+      .insert({
+        user_id: userId,
+        mission_id: missionId,
+        stage: patch.stage,
+        notes: patch.notes,
+        revision: patch.revision,
+        updated_by: patch.updated_by,
+        updated_at: occurredAt.toISOString(),
+      })
+      .select('id')
+      .single<{ id: string }>();
+
+    if (insertError || !application) {
+      return { ok: false, status: 500, message: `La mission n'a pas pu être ${participle}.` };
+    }
+
+    const detectedEvent = transitionApplicationStage({
+      applicationId: application.id,
+      fromStage: null,
+      toStage: 'detected',
+      occurredAt: detectedAt,
+      createdBy: 'dashboard',
+      clientEventId: buildDashboardPipelineClientEventId({
+        action: 'detect',
+        applicationId: application.id,
+        revision: patch.revision,
+        fromStage: null,
+        toStage: 'detected',
+      }),
+      note: 'Mission détectée depuis le feed dashboard.',
+    });
+    const event = transitionApplicationStage({
+      applicationId: application.id,
+      fromStage: 'detected',
+      toStage: 'selected',
+      occurredAt,
+      createdBy: 'dashboard',
+      clientEventId: buildDashboardPipelineClientEventId({
+        action: 'select',
+        applicationId: application.id,
+        revision: patch.revision,
+        fromStage: 'detected',
+        toStage: 'selected',
+      }),
+      note: 'Mission sélectionnée depuis le feed dashboard.',
+    });
+
+    if (!event) {
+      return { ok: false, status: 500, message: 'Transition de sélection invalide.' };
+    }
+    if (!detectedEvent) {
+      return { ok: false, status: 500, message: 'Transition de détection invalide.' };
+    }
+
+    const detectedEventInserted = await upsertDashboardPipelineEvent(
+      supabase,
+      userId,
+      detectedEvent,
+      { source: 'dashboard_feed', mission_id: missionId }
+    );
+    const eventInserted = await upsertDashboardPipelineEvent(supabase, userId, event, {
+      source: 'dashboard_feed',
+      mission_id: missionId,
+    });
+
+    if (!detectedEventInserted || !eventInserted) {
+      return {
+        ok: false,
+        status: 500,
+        message: `La mission est ${participle}, mais l'événement pipeline n'a pas pu être enregistré.`,
+      };
+    }
+
+    await markEntityPendingExtensionPull(supabase, userId, 'applications', event.occurredAt);
+    return { ok: true, changed: true, message: `Mission ${participle}: ${mission.title}.` };
+  }
+
+  const patch = buildMissionArchiveInsertPatch(occurredAt.toISOString());
+  const { data: application, error: insertError } = await supabase
+    .from('applications')
+    .insert({
+      user_id: userId,
+      mission_id: missionId,
+      stage: patch.stage,
+      notes: patch.notes,
+      revision: patch.revision,
+      updated_by: patch.updated_by,
+      archived_at: patch.archived_at,
+      updated_at: occurredAt.toISOString(),
+    })
+    .select('id')
+    .single<{ id: string }>();
+
+  if (insertError || !application) {
+    return { ok: false, status: 500, message: `La mission n'a pas pu être ${participle}.` };
+  }
+
+  const detectedEvent = transitionApplicationStage({
+    applicationId: application.id,
+    fromStage: null,
+    toStage: 'detected',
+    occurredAt: detectedAt,
+    createdBy: 'dashboard',
+    clientEventId: buildDashboardPipelineClientEventId({
+      action: 'detect',
+      applicationId: application.id,
+      revision: patch.revision,
+      fromStage: null,
+      toStage: 'detected',
+    }),
+    note: 'Mission détectée depuis le feed dashboard.',
+  });
+  const archivedEvent = transitionApplicationStage({
+    applicationId: application.id,
+    fromStage: 'detected',
+    toStage: 'archived',
+    occurredAt,
+    createdBy: 'dashboard',
+    clientEventId: buildDashboardPipelineClientEventId({
+      action: 'archive',
+      applicationId: application.id,
+      revision: patch.revision,
+      fromStage: 'detected',
+      toStage: 'archived',
+    }),
+    note: 'Mission archivée depuis le feed dashboard.',
+  });
+
+  if (!detectedEvent || !archivedEvent) {
+    return { ok: false, status: 500, message: `Transition ${transitionNoun} invalide.` };
+  }
+
+  const detectedEventInserted = await upsertDashboardPipelineEvent(
+    supabase,
+    userId,
+    detectedEvent,
+    { source: 'dashboard_feed', mission_id: missionId }
+  );
+  const archivedEventInserted = await upsertDashboardPipelineEvent(
+    supabase,
+    userId,
+    archivedEvent,
+    { source: 'dashboard_feed', mission_id: missionId }
+  );
+
+  if (!detectedEventInserted || !archivedEventInserted) {
+    return {
+      ok: false,
+      status: 500,
+      message: `La mission est ${participle}, mais l'événement pipeline n'a pas pu être enregistré.`,
+    };
+  }
+
+  await markEntityPendingExtensionPull(supabase, userId, 'applications', archivedEvent.occurredAt);
+  return { ok: true, changed: true, message: `Mission ${participle}: ${mission.title}.` };
+}
+
+const BULK_MISSION_CAP = 50;
+
+async function resolveAuthenticatedDashboardRequest(cookies: Cookies) {
+  const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
+  if (!hasSupabaseConfig) {
+    return {
+      kind: 'unavailable' as const,
+      error: 'Dashboard connecté indisponible pour le moment.',
+    };
+  }
+  const supabase = createSupabaseServerClient(cookies);
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) {
+    return { kind: 'unauthenticated' as const, error: 'Session requise.' };
+  }
+  return { kind: 'ok' as const, supabase, session };
+}
+
+type DashboardRequest = Awaited<ReturnType<typeof resolveAuthenticatedDashboardRequest>>;
+
+function readBulkMissionIds(formData: FormData): { ids: string[]; requestedCount: number } {
+  const ids = formData
+    .getAll('missionIds')
+    .filter((value): value is string => typeof value === 'string' && value.length > 0);
+  const unique = Array.from(new Set(ids));
+  return {
+    ids: unique.slice(0, BULK_MISSION_CAP),
+    // `requestedCount` reflects what the user actually submitted (post-dedup,
+    // pre-cap) so truncation is reported honestly instead of silently dropped.
+    requestedCount: unique.length,
+  };
+}
 
 export const actions: Actions = {
   updateAlertPreferences: async ({ cookies, request }) => {
@@ -1254,416 +1573,143 @@ export const actions: Actions = {
   },
 
   selectMission: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
-    if (!hasSupabaseConfig) {
-      return fail(503, { selectionError: 'Dashboard connecté indisponible pour le moment.' });
+    const request_ = await resolveAuthenticatedDashboardRequest(cookies);
+    if (request_.kind === 'unavailable') {
+      return fail(503, { selectionError: request_.error });
     }
-
-    const supabase = createSupabaseServerClient(cookies);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return fail(401, { selectionError: 'Session requise.' });
+    if (request_.kind === 'unauthenticated') {
+      return fail(401, { selectionError: request_.error });
     }
+    const { supabase, session } = request_;
 
     const formData = await request.formData();
     const missionId = formData.get('missionId');
-
     if (typeof missionId !== 'string' || missionId.length === 0) {
       return fail(400, { selectionError: 'Mission invalide.' });
     }
 
-    const { data: mission, error: missionError } = await supabase
-      .from('missions')
-      .select('id, title')
-      .eq('id', missionId)
-      .eq('user_id', session.user.id)
-      .single<MissionSelectionRow>();
-
-    if (missionError || !mission) {
-      return fail(404, { selectionError: 'Mission introuvable.' });
-    }
-
-    const { data: existingApplication } = await supabase
-      .from('applications')
-      .select('id, stage, revision')
-      .eq('mission_id', missionId)
-      .eq('user_id', session.user.id)
-      .maybeSingle<ExistingApplicationSelectionRow>();
-
-    if (existingApplication) {
-      if (existingApplication.stage === 'detected') {
-        const occurredAt = new Date();
-        const event = transitionApplicationStage({
-          applicationId: existingApplication.id,
-          fromStage: 'detected',
-          toStage: 'selected',
-          occurredAt,
-          createdBy: 'dashboard',
-          clientEventId: buildDashboardPipelineClientEventId({
-            action: 'select',
-            applicationId: existingApplication.id,
-            revision: existingApplication.revision,
-            fromStage: 'detected',
-            toStage: 'selected',
-          }),
-          note: 'Mission sélectionnée depuis le feed dashboard.',
-        });
-
-        if (!event) {
-          return fail(500, { selectionError: 'Transition de sélection invalide.' });
-        }
-
-        const patch = buildApplicationStageUpdatePatch('selected', event.occurredAt);
-        const { error: updateError } = await supabase
-          .from('applications')
-          .update({
-            stage: patch.stage,
-            archived_at: patch.archived_at,
-            revision: existingApplication.revision + 1,
-            updated_by: patch.updated_by,
-            updated_at: event.occurredAt,
-          })
-          .eq('id', existingApplication.id)
-          .eq('user_id', session.user.id)
-          .eq('revision', existingApplication.revision)
-          .select('id')
-          .single<{ id: string }>();
-
-        if (updateError) {
-          if (updateError.code !== 'PGRST116') {
-            return fail(500, { selectionError: "La mission n'a pas pu être sélectionnée." });
-          }
-
-          return fail(409, {
-            selectionError:
-              "La candidature a changé depuis l'ouverture de la page. Rechargez avant de sélectionner.",
-          });
-        }
-
-        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
-          source: 'dashboard_feed',
-          mission_id: missionId,
-        });
-
-        if (!eventInserted) {
-          return fail(500, {
-            selectionError:
-              "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
-          });
-        }
-
-        await markEntityPendingExtensionPull(
-          supabase,
-          session.user.id,
-          'applications',
-          event.occurredAt
-        );
-
-        return { selectionSuccess: `Mission sélectionnée: ${mission.title}.` };
-      }
-
-      return {
-        selectionSuccess: `Mission déjà suivie en ${existingApplication.stage}.`,
-      };
-    }
-
-    const occurredAt = new Date();
-    const patch = buildMissionSelectionInsertPatch();
-    const { data: application, error: insertError } = await supabase
-      .from('applications')
-      .insert({
-        user_id: session.user.id,
-        mission_id: missionId,
-        stage: patch.stage,
-        notes: patch.notes,
-        revision: patch.revision,
-        updated_by: patch.updated_by,
-        updated_at: occurredAt.toISOString(),
-      })
-      .select('id')
-      .single<{ id: string }>();
-
-    if (insertError || !application) {
-      return fail(500, { selectionError: "La mission n'a pas pu être sélectionnée." });
-    }
-
-    const detectedAt = new Date(occurredAt.getTime() - 1);
-    const detectedEvent = transitionApplicationStage({
-      applicationId: application.id,
-      fromStage: null,
-      toStage: 'detected',
-      occurredAt: detectedAt,
-      createdBy: 'dashboard',
-      clientEventId: buildDashboardPipelineClientEventId({
-        action: 'detect',
-        applicationId: application.id,
-        revision: patch.revision,
-        fromStage: null,
-        toStage: 'detected',
-      }),
-      note: 'Mission détectée depuis le feed dashboard.',
-    });
-    const event = transitionApplicationStage({
-      applicationId: application.id,
-      fromStage: 'detected',
-      toStage: 'selected',
-      occurredAt,
-      createdBy: 'dashboard',
-      clientEventId: buildDashboardPipelineClientEventId({
-        action: 'select',
-        applicationId: application.id,
-        revision: patch.revision,
-        fromStage: 'detected',
-        toStage: 'selected',
-      }),
-      note: 'Mission sélectionnée depuis le feed dashboard.',
-    });
-
-    if (!event) {
-      return fail(500, { selectionError: 'Transition de sélection invalide.' });
-    }
-
-    if (!detectedEvent) {
-      return fail(500, { selectionError: 'Transition de détection invalide.' });
-    }
-
-    const detectedEventInserted = await upsertDashboardPipelineEvent(
+    const outcome = await applyMissionStageTransition(
       supabase,
       session.user.id,
-      detectedEvent,
-      {
-        source: 'dashboard_feed',
-        mission_id: missionId,
-      }
+      missionId,
+      'selected'
     );
-    const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
-      source: 'dashboard_feed',
-      mission_id: missionId,
-    });
-
-    if (!detectedEventInserted || !eventInserted) {
-      return fail(500, {
-        selectionError:
-          "La mission est sélectionnée, mais l'événement pipeline n'a pas pu être enregistré.",
-      });
+    if (!outcome.ok) {
+      return fail(outcome.status, { selectionError: outcome.message });
     }
-
-    await markEntityPendingExtensionPull(
-      supabase,
-      session.user.id,
-      'applications',
-      event.occurredAt
-    );
-
-    return { selectionSuccess: `Mission sélectionnée: ${mission.title}.` };
+    return { selectionSuccess: outcome.message };
   },
 
   archiveMission: async ({ cookies, request }) => {
-    const hasSupabaseConfig = Boolean(env.PUBLIC_SUPABASE_URL && env.PUBLIC_SUPABASE_ANON_KEY);
-    if (!hasSupabaseConfig) {
-      return fail(503, { selectionError: 'Dashboard connecté indisponible pour le moment.' });
+    const request_ = await resolveAuthenticatedDashboardRequest(cookies);
+    if (request_.kind === 'unavailable') {
+      return fail(503, { selectionError: request_.error });
     }
-
-    const supabase = createSupabaseServerClient(cookies);
-    const {
-      data: { session },
-    } = await supabase.auth.getSession();
-
-    if (!session) {
-      return fail(401, { selectionError: 'Session requise.' });
+    if (request_.kind === 'unauthenticated') {
+      return fail(401, { selectionError: request_.error });
     }
+    const { supabase, session } = request_;
 
     const formData = await request.formData();
     const missionId = formData.get('missionId');
-
     if (typeof missionId !== 'string' || missionId.length === 0) {
       return fail(400, { selectionError: 'Mission invalide.' });
     }
 
-    const { data: mission, error: missionError } = await supabase
-      .from('missions')
-      .select('id, title')
-      .eq('id', missionId)
-      .eq('user_id', session.user.id)
-      .single<MissionSelectionRow>();
-
-    if (missionError || !mission) {
-      return fail(404, { selectionError: 'Mission introuvable.' });
-    }
-
-    const { data: existingApplication } = await supabase
-      .from('applications')
-      .select('id, stage, revision')
-      .eq('mission_id', missionId)
-      .eq('user_id', session.user.id)
-      .maybeSingle<ExistingApplicationSelectionRow>();
-
-    if (existingApplication) {
-      if (existingApplication.stage === 'detected') {
-        const occurredAt = new Date();
-        const event = transitionApplicationStage({
-          applicationId: existingApplication.id,
-          fromStage: 'detected',
-          toStage: 'archived',
-          occurredAt,
-          createdBy: 'dashboard',
-          clientEventId: buildDashboardPipelineClientEventId({
-            action: 'archive',
-            applicationId: existingApplication.id,
-            revision: existingApplication.revision,
-            fromStage: 'detected',
-            toStage: 'archived',
-          }),
-          note: 'Mission archivée depuis le feed dashboard.',
-        });
-
-        if (!event) {
-          return fail(500, { selectionError: "Transition d'archivage invalide." });
-        }
-
-        const patch = buildApplicationStageUpdatePatch('archived', event.occurredAt);
-        const { error: updateError } = await supabase
-          .from('applications')
-          .update({
-            stage: patch.stage,
-            archived_at: patch.archived_at,
-            revision: existingApplication.revision + 1,
-            updated_by: patch.updated_by,
-            updated_at: event.occurredAt,
-          })
-          .eq('id', existingApplication.id)
-          .eq('user_id', session.user.id)
-          .eq('revision', existingApplication.revision)
-          .select('id')
-          .single<{ id: string }>();
-
-        if (updateError) {
-          if (updateError.code !== 'PGRST116') {
-            return fail(500, { selectionError: "La mission n'a pas pu être archivée." });
-          }
-
-          return fail(409, {
-            selectionError:
-              "La candidature a changé depuis l'ouverture de la page. Rechargez avant d'archiver.",
-          });
-        }
-
-        const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
-          source: 'dashboard_feed',
-          mission_id: missionId,
-        });
-
-        if (!eventInserted) {
-          return fail(500, {
-            selectionError:
-              "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",
-          });
-        }
-
-        await markEntityPendingExtensionPull(
-          supabase,
-          session.user.id,
-          'applications',
-          event.occurredAt
-        );
-
-        return { selectionSuccess: `Mission archivée: ${mission.title}.` };
-      }
-
-      return {
-        selectionSuccess: `Mission déjà suivie en ${existingApplication.stage}.`,
-      };
-    }
-
-    const occurredAt = new Date();
-    const detectedAt = new Date(occurredAt.getTime() - 1);
-    const patch = buildMissionArchiveInsertPatch(occurredAt.toISOString());
-    const { data: application, error: insertError } = await supabase
-      .from('applications')
-      .insert({
-        user_id: session.user.id,
-        mission_id: missionId,
-        stage: patch.stage,
-        notes: patch.notes,
-        revision: patch.revision,
-        updated_by: patch.updated_by,
-        archived_at: patch.archived_at,
-        updated_at: occurredAt.toISOString(),
-      })
-      .select('id')
-      .single<{ id: string }>();
-
-    if (insertError || !application) {
-      return fail(500, { selectionError: "La mission n'a pas pu être archivée." });
-    }
-
-    const event = transitionApplicationStage({
-      applicationId: application.id,
-      fromStage: null,
-      toStage: 'detected',
-      occurredAt: detectedAt,
-      createdBy: 'dashboard',
-      clientEventId: buildDashboardPipelineClientEventId({
-        action: 'detect',
-        applicationId: application.id,
-        revision: patch.revision,
-        fromStage: null,
-        toStage: 'detected',
-      }),
-      note: 'Mission détectée depuis le feed dashboard.',
-    });
-    const archivedEvent = transitionApplicationStage({
-      applicationId: application.id,
-      fromStage: 'detected',
-      toStage: 'archived',
-      occurredAt,
-      createdBy: 'dashboard',
-      clientEventId: buildDashboardPipelineClientEventId({
-        action: 'archive',
-        applicationId: application.id,
-        revision: patch.revision,
-        fromStage: 'detected',
-        toStage: 'archived',
-      }),
-      note: 'Mission archivée depuis le feed dashboard.',
-    });
-
-    if (!event || !archivedEvent) {
-      return fail(500, { selectionError: "Transition d'archivage invalide." });
-    }
-
-    const eventInserted = await upsertDashboardPipelineEvent(supabase, session.user.id, event, {
-      source: 'dashboard_feed',
-      mission_id: missionId,
-    });
-    const archivedEventInserted = await upsertDashboardPipelineEvent(
+    const outcome = await applyMissionStageTransition(
       supabase,
       session.user.id,
-      archivedEvent,
-      {
-        source: 'dashboard_feed',
-        mission_id: missionId,
-      }
+      missionId,
+      'archived'
     );
+    if (!outcome.ok) {
+      return fail(outcome.status, { selectionError: outcome.message });
+    }
+    return { selectionSuccess: outcome.message };
+  },
 
-    if (!eventInserted || !archivedEventInserted) {
-      return fail(500, {
-        selectionError:
-          "La mission est archivée, mais l'événement pipeline n'a pas pu être enregistré.",
-      });
+  bulkSelectMissions: async ({ cookies, request }) => {
+    const request_ = await resolveAuthenticatedDashboardRequest(cookies);
+    if (request_.kind === 'unavailable') {
+      return fail(503, { bulkSelectionError: request_.error });
+    }
+    if (request_.kind === 'unauthenticated') {
+      return fail(401, { bulkSelectionError: request_.error });
+    }
+    const { supabase, session } = request_;
+
+    const { ids: missionIds, requestedCount } = readBulkMissionIds(await request.formData());
+    if (missionIds.length === 0) {
+      return fail(400, { bulkSelectionError: 'Sélectionnez au moins une mission.' });
     }
 
-    await markEntityPendingExtensionPull(
-      supabase,
-      session.user.id,
-      'applications',
-      archivedEvent.occurredAt
-    );
+    let applied = 0;
+    let skipped = 0;
+    for (const missionId of missionIds) {
+      const outcome = await applyMissionStageTransition(
+        supabase,
+        session.user.id,
+        missionId,
+        'selected'
+      );
+      if (outcome.ok && outcome.changed) {
+        applied += 1;
+      } else {
+        skipped += 1;
+      }
+    }
 
-    return { selectionSuccess: `Mission archivée: ${mission.title}.` };
+    return {
+      bulkSelectionSuccess: {
+        action: 'select' as const,
+        applied,
+        skipped,
+        total: requestedCount,
+        truncated: requestedCount - missionIds.length,
+      },
+    };
+  },
+
+  bulkArchiveMissions: async ({ cookies, request }) => {
+    const request_ = await resolveAuthenticatedDashboardRequest(cookies);
+    if (request_.kind === 'unavailable') {
+      return fail(503, { bulkSelectionError: request_.error });
+    }
+    if (request_.kind === 'unauthenticated') {
+      return fail(401, { bulkSelectionError: request_.error });
+    }
+    const { supabase, session } = request_;
+
+    const { ids: missionIds, requestedCount } = readBulkMissionIds(await request.formData());
+    if (missionIds.length === 0) {
+      return fail(400, { bulkSelectionError: 'Sélectionnez au moins une mission.' });
+    }
+
+    let applied = 0;
+    let skipped = 0;
+    for (const missionId of missionIds) {
+      const outcome = await applyMissionStageTransition(
+        supabase,
+        session.user.id,
+        missionId,
+        'archived'
+      );
+      if (outcome.ok && outcome.changed) {
+        applied += 1;
+      } else {
+        skipped += 1;
+      }
+    }
+
+    return {
+      bulkSelectionSuccess: {
+        action: 'archive' as const,
+        applied,
+        skipped,
+        total: requestedCount,
+        truncated: requestedCount - missionIds.length,
+      },
+    };
   },
 
   transitionApplication: async ({ cookies, request }) => {

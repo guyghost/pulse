@@ -26,12 +26,37 @@ function expectApplicationUpdateBeforeEventUpsert(section: string): void {
 
 describe('dashboard pipeline event write order', () => {
   it('does not insert transition events before optimistic-lock application updates', () => {
+    // The shared applyMissionStageTransition helper owns the detected→target
+    // write path for both per-mission and bulk actions, so the invariant only
+    // needs to hold there (single occurrence) plus the standalone
+    // transitionApplication action.
     expectApplicationUpdateBeforeEventUpsert(
       sourceAfter("if (existingApplication.stage === 'detected') {")
     );
-    expectApplicationUpdateBeforeEventUpsert(
-      sourceAfter("if (existingApplication.stage === 'detected') {", 2)
-    );
     expectApplicationUpdateBeforeEventUpsert(sourceAfter('transitionApplication: async'));
+  });
+});
+
+describe('dashboard bulk action truncation reporting', () => {
+  // The cap exists to bound payload/transaction size, but it must not silently
+  // drop selected missions. `requestedCount` is the pre-cap submission size and
+  // `truncated` is the number dropped, so the UI can surface the partial result
+  // instead of reporting a misleading full success.
+  it('readBulkMissionIds returns the requested count alongside the capped ids', () => {
+    const helperSection = pageServerSource.slice(
+      pageServerSource.indexOf('function readBulkMissionIds(')
+    );
+    expect(helperSection).toContain('requestedCount: unique.length');
+    expect(helperSection).toContain('.slice(0, BULK_MISSION_CAP)');
+  });
+
+  it('both bulk actions report total from requestedCount and a truncated delta', () => {
+    const selectSection = sourceAfter('bulkSelectMissions: async');
+    const archiveSection = sourceAfter('bulkArchiveMissions: async');
+    for (const section of [selectSection, archiveSection]) {
+      expect(section).toContain('total: requestedCount');
+      expect(section).toContain('truncated: requestedCount - missionIds.length');
+      expect(section).toContain('outcome.ok && outcome.changed');
+    }
   });
 });
