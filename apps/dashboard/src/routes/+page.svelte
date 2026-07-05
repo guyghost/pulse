@@ -130,13 +130,16 @@
   function batchFeedbackLabel(summary: BulkSummary): string {
     const verb = summary.action === 'archive' ? 'Archivées' : 'Sélectionnées';
     const skipped = summary.skippedCount > 0 ? ` · ${summary.skippedCount} ignorée(s)` : '';
-    return `${verb}: ${summary.appliedCount}/${summary.requestedCount}${skipped}`;
+    const truncated =
+      summary.truncatedCount > 0 ? ` · ${summary.truncatedCount} au-delà du plafond` : '';
+    return `${verb}: ${summary.appliedCount}/${summary.requestedCount}${skipped}${truncated}`;
   }
   interface BulkActionResult {
     action: BulkAction;
     applied: number;
     skipped: number;
     total: number;
+    truncated: number;
   }
   function bulkSubmitFactory(action: BulkAction): SubmitFunction {
     return () => {
@@ -151,6 +154,7 @@
               requestedCount: resultSummary.total,
               appliedCount: resultSummary.applied,
               skippedCount: resultSummary.skipped,
+              truncatedCount: resultSummary.truncated ?? 0,
             });
           }
           await update();
@@ -1253,7 +1257,7 @@
                     <span class="text-xs text-text-subtle">{formatDate(mission.scrapedAt)}</span>
                     {#if mission.applicationStage}
                       <Badge label={stageLabels[mission.applicationStage]} variant="status" />
-                    {:else if !batchSelection.isSelecting && isConnected}
+                    {:else if !batchSelection.isSelecting && isConnected && !batchSelection.isLocked}
                       <div class="flex items-center gap-2">
                         <form method="POST" action="?/archiveMission">
                           <input type="hidden" name="missionId" value={mission.id} />
@@ -1274,7 +1278,7 @@
                           </button>
                         </form>
                       </div>
-                    {:else if !batchSelection.isSelecting}
+                    {:else if !batchSelection.isSelecting && !batchSelection.isLocked}
                       <a
                         class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
                         href={mission.url}

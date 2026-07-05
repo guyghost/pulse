@@ -23,6 +23,7 @@ const summary = (action: 'archive' | 'select', requestedCount: number): BulkSumm
   requestedCount,
   appliedCount: requestedCount,
   skippedCount: 0,
+  truncatedCount: 0,
 });
 
 describe('batch selection transition — authorized transitions', () => {

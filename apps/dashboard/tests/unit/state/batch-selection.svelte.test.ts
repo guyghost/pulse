@@ -65,6 +65,7 @@ describe('BatchSelectionStore (M3 wrapper)', () => {
       requestedCount: 1,
       appliedCount: 1,
       skippedCount: 0,
+      truncatedCount: 0,
     });
     expect(store.status).toBe('done');
     expect(store.isLocked).toBe(true);
@@ -73,6 +74,7 @@ describe('BatchSelectionStore (M3 wrapper)', () => {
       requestedCount: 1,
       appliedCount: 1,
       skippedCount: 0,
+      truncatedCount: 0,
     });
 
     store.dismiss();

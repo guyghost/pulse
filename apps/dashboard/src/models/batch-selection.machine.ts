@@ -24,9 +24,12 @@ export type BulkAction = 'archive' | 'select';
 
 export interface BulkSummary {
   action: BulkAction;
+  /** Original selection size the user submitted (before the server cap). */
   requestedCount: number;
   appliedCount: number;
   skippedCount: number;
+  /** IDs dropped because the submission exceeded the server-side cap. */
+  truncatedCount: number;
 }
 
 export interface BatchSelectionState {

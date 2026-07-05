@@ -875,11 +875,17 @@ async function resolveAuthenticatedDashboardRequest(cookies: Cookies) {
 
 type DashboardRequest = Awaited<ReturnType<typeof resolveAuthenticatedDashboardRequest>>;
 
-function readBulkMissionIds(formData: FormData): string[] {
+function readBulkMissionIds(formData: FormData): { ids: string[]; requestedCount: number } {
   const ids = formData
     .getAll('missionIds')
     .filter((value): value is string => typeof value === 'string' && value.length > 0);
-  return Array.from(new Set(ids)).slice(0, BULK_MISSION_CAP);
+  const unique = Array.from(new Set(ids));
+  return {
+    ids: unique.slice(0, BULK_MISSION_CAP),
+    // `requestedCount` reflects what the user actually submitted (post-dedup,
+    // pre-cap) so truncation is reported honestly instead of silently dropped.
+    requestedCount: unique.length,
+  };
 }
 
 export const actions: Actions = {
@@ -1632,7 +1638,7 @@ export const actions: Actions = {
     }
     const { supabase, session } = request_;
 
-    const missionIds = readBulkMissionIds(await request.formData());
+    const { ids: missionIds, requestedCount } = readBulkMissionIds(await request.formData());
     if (missionIds.length === 0) {
       return fail(400, { bulkSelectionError: 'Sélectionnez au moins une mission.' });
     }
@@ -1658,7 +1664,8 @@ export const actions: Actions = {
         action: 'select' as const,
         applied,
         skipped,
-        total: missionIds.length,
+        total: requestedCount,
+        truncated: requestedCount - missionIds.length,
       },
     };
   },
@@ -1673,7 +1680,7 @@ export const actions: Actions = {
     }
     const { supabase, session } = request_;
 
-    const missionIds = readBulkMissionIds(await request.formData());
+    const { ids: missionIds, requestedCount } = readBulkMissionIds(await request.formData());
     if (missionIds.length === 0) {
       return fail(400, { bulkSelectionError: 'Sélectionnez au moins une mission.' });
     }
@@ -1699,7 +1706,8 @@ export const actions: Actions = {
         action: 'archive' as const,
         applied,
         skipped,
-        total: missionIds.length,
+        total: requestedCount,
+        truncated: requestedCount - missionIds.length,
       },
     };
   },
