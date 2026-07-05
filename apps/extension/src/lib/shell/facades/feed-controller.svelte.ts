@@ -65,6 +65,7 @@ const missionSources = new Set<MissionSource>([
   'hiway',
   'collective',
   'cherry-pick',
+  'malt',
 ]);
 const remoteTypes = new Set<RemoteType>(['full', 'hybrid', 'onsite']);
 const seniorityLevels = new Set<SeniorityLevel>(['junior', 'confirmed', 'senior']);

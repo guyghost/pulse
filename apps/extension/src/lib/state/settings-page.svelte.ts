@@ -59,7 +59,7 @@ interface SettingsPageControllerOptions {
  */
 const DEFAULT_SETTINGS: AppSettings = {
   scanIntervalMinutes: 30,
-  enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick'],
+  enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'],
   notifications: true,
   autoScan: true,
   maxSemanticPerScan: 10,
