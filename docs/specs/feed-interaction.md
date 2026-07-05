@@ -135,8 +135,8 @@ core feed loop.
 ### Acceptance Criteria
 
 1. **AC-3.1 — Source filter:** `setSelectedSource(source)` filters to a single
-   connector source (`free-work`, `lehibou`, `hiway`, `collective`, `cherry-pick`).
-   `null` clears it.
+   connector source (`free-work`, `lehibou`, `hiway`, `collective`, `cherry-pick`,
+   `malt`). `null` clears it.
 
 2. **AC-3.2 — Remote filter:** `setSelectedRemote(remote)` filters by work mode
    (`full`, `hybrid`, `onsite`). `null` clears it.
