@@ -861,6 +861,11 @@
             dashboard connecté optionnel, au radar TJM, au suivi de candidature, au profil/CV et aux
             crédits de génération; l'exécution plateforme reste dans votre navigateur.
           </p>
+          <p class="cta__proof">
+            <span class="cta__proof-dot" aria-hidden="true"></span>
+            Le même classement à chaque scan — scoring déterministe, aucune opacité, aucun tirage aléatoire.
+            Vos 5 plateformes, scannées depuis vos sessions existantes.
+          </p>
           <a
             href={chromeStoreUrl}
             class="btn btn--primary btn--lg"

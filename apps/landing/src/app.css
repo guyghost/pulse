@@ -1811,10 +1811,35 @@ section[id] {
 
 .cta__desc {
   max-width: 520px;
-  margin: 0 auto var(--spacing-32);
+  margin: 0 auto var(--spacing-16);
   color: var(--color-text-subtle);
   font-size: 1rem;
   line-height: 1.6;
+}
+
+.cta__proof {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  justify-content: center;
+  gap: var(--spacing-8);
+  max-width: 560px;
+  margin: 0 auto var(--spacing-28);
+  color: var(--color-text-muted);
+  font-size: 0.875rem;
+  line-height: 1.55;
+}
+
+.cta__proof-dot {
+  position: relative;
+  top: 2px;
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: var(--color-blueprint-blue);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--color-blueprint-blue) 18%, transparent);
 }
 
 /* ===== Footer ===== */
