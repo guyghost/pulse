@@ -16,6 +16,7 @@ import { getConnectedAlertPreferences } from '../storage/connected-alert-prefere
 import { recordAlertHistoryEntry } from '../storage/alert-history';
 import { filterSmartNotifications } from '../../core/scoring/smart-notification';
 import { markAsSeen } from '../../core/seen/mark-seen';
+import { isMutedUntilActive } from './notify-missions';
 
 /** Chrome alarm name for the daily digest. */
 export const DIGEST_ALARM_NAME = 'daily-digest';
@@ -88,9 +89,12 @@ export async function sendDailyDigest(): Promise<DigestResult> {
     return { sent: false, missionIds: [] };
   }
 
-  // Respect connected-alert preferences (user may have disabled alerts)
+  // Respect connected-alert preferences (user may have disabled or muted alerts)
   const alertPrefs = await getConnectedAlertPreferences();
-  if (alertPrefs && !alertPrefs.enabled) {
+  if (
+    alertPrefs &&
+    (!alertPrefs.enabled || isMutedUntilActive(alertPrefs.mutedUntil, Date.now()))
+  ) {
     return { sent: false, missionIds: [] };
   }
 

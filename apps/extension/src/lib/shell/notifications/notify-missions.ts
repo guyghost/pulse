@@ -26,7 +26,7 @@ function buildAlertHistoryId(triggeredAt: number, missions: Mission[]): string {
   return `alert-${triggeredAt}-${missionKey || 'empty'}`;
 }
 
-function isMutedUntilActive(mutedUntil: string | null, now: number): boolean {
+export function isMutedUntilActive(mutedUntil: string | null, now: number): boolean {
   if (!mutedUntil) {
     return false;
   }
