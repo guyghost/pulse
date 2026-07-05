@@ -54,12 +54,10 @@
 
   interface DashboardOperationalStory {
     tone: DashboardStoryTone;
-    badge: string;
     title: string;
     impact: string;
     action: string;
     actionTarget: DashboardStoryActionTarget;
-    signals: string[];
   }
 
   interface DashboardSetupStep {
@@ -609,83 +607,59 @@
     if (input.configurationMissing || !input.isConnected) {
       return {
         tone: 'attention',
-        badge: 'Connexion requise',
         title: 'Aucune extension connectée au cockpit',
-        impact:
-          'Le dashboard ne peut pas encore confirmer les missions, candidatures, CV et statuts synchronisés.',
-        action: "Prochaine action: installer l'extension, connecter le compte puis lancer un scan.",
+        impact: "Installer l'extension MissionPulse, connecter le compte puis lancer un scan.",
+        action: "Installer l'extension",
         actionTarget: 'install',
-        signals: ['Extension absente', 'Snapshots indisponibles', 'Sessions gardées dans Chrome'],
       };
     }
 
     if (input.hasSyncActionRequired) {
       return {
         tone: 'incident',
-        badge: 'Arbitrage requis',
-        title: 'La synchronisation demande une décision',
-        impact: `${input.syncConflictCount} conflit(s) et ${input.syncErrorCount} erreur(s) peuvent rendre les données connectées incomplètes.`,
-        action: 'Prochaine action: ouvrir la synchronisation et résoudre les champs prioritaires.',
+        title: `${input.syncConflictCount} conflit${input.syncConflictCount > 1 ? 's' : ''} de sync à arbitrer · ${input.syncErrorCount} erreur${input.syncErrorCount > 1 ? 's' : ''}`,
+        impact: 'Les champs en conflit peuvent rendre la donnée connectée incomplète.',
+        action: 'Arbitrer la sync',
         actionTarget: 'sync',
-        signals: ['Conflit détecté', 'Fiabilité partielle', 'Action manuelle utile'],
       };
     }
 
     if (input.nextFollowUp) {
       return {
         tone: 'attention',
-        badge: 'À traiter',
-        title: `Relance à préparer pour ${input.nextFollowUp.title}`,
-        impact: `Le dossier est au statut ${stageLabels[input.nextFollowUp.stage]} avec une prochaine action datée.`,
-        action:
-          'Prochaine action: ouvrir la candidature et traiter la relance avant de scanner plus.',
+        title: `Relance à préparer: ${input.nextFollowUp.title}`,
+        impact: `Candidature au statut ${stageLabels[input.nextFollowUp.stage]}, prochaine action datée.`,
+        action: 'Traiter la relance',
         actionTarget: 'applications',
-        signals: [
-          'Relance détectée',
-          `${input.applicationCount} candidatures suivies`,
-          'Pipeline actif',
-        ],
-      };
-    }
-
-    if (input.topFreshMission && input.topFreshMission.score >= 85) {
-      return {
-        tone: 'success',
-        badge: 'Opportunité',
-        title: `${input.topFreshMission.title} ressort comme meilleure mission fraîche`,
-        impact: `Score ${input.topFreshMission.score}% sur ${sourceLabels[input.topFreshMission.source]}. Le feed contient ${input.freshMissionCount} mission(s) récente(s).`,
-        action: 'Prochaine action: sélectionner cette mission ou comparer les meilleures options.',
-        actionTarget: 'mission-feed',
-        signals: ['Mission fraîche', 'Score élevé', 'Décision de sélection'],
       };
     }
 
     if (!input.canPrepareCvSync) {
       return {
         tone: 'attention',
-        badge: 'Précondition',
-        title: 'Le CV ne peut pas encore être synchronisé',
-        impact:
-          'La préparation CV dépend du profil, des plateformes prêtes et de l’accès compte/Premium.',
-        action: 'Prochaine action: ouvrir le CV et résoudre la première précondition affichée.',
+        title: 'CV non synchronisable',
+        impact: `Précondition manquante — ${input.creditBalance} crédit${input.creditBalance > 1 ? 's' : ''} restant.`,
+        action: 'Ouvrir le CV',
         actionTarget: 'cv',
-        signals: ['CV à vérifier', 'Synchronisation limitée', `${input.creditBalance} crédits`],
+      };
+    }
+
+    if (input.topFreshMission && input.topFreshMission.score >= 85) {
+      return {
+        tone: 'success',
+        title: `${input.topFreshMission.title} — score ${input.topFreshMission.score}%`,
+        impact: `Mission fraîche (${input.freshMissionCount} récente${input.freshMissionCount > 1 ? 's' : ''}) sur ${sourceLabels[input.topFreshMission.source]}.`,
+        action: 'Sélectionner',
+        actionTarget: 'mission-feed',
       };
     }
 
     return {
       tone: 'success',
-      badge: 'Normal',
-      title: 'Le cockpit est prêt pour arbitrer les missions',
-      impact:
-        'Aucun conflit prioritaire détecté. Les données connectées peuvent être utilisées pour sélectionner, relancer ou générer.',
-      action: 'Prochaine action: traiter la meilleure mission ou vérifier la prochaine relance.',
+      title: 'Cockpit prêt',
+      impact: `${input.applicationCount} candidature${input.applicationCount > 1 ? 's' : ''} suivie${input.applicationCount > 1 ? 's' : ''}, ${input.freshMissionCount} mission${input.freshMissionCount > 1 ? 's' : ''} fraîche${input.freshMissionCount > 1 ? 's' : ''}.`,
+      action: 'Traiter le feed',
       actionTarget: 'mission-feed',
-      signals: [
-        'Sync stable',
-        `${input.applicationCount} candidatures`,
-        `${input.freshMissionCount} fraîches`,
-      ],
     };
   }
 
@@ -1500,82 +1474,43 @@
           </section>
         {/if}
 
-        {#if !setupRequired}
+        {#if !setupRequired && (operationalStory.tone === 'attention' || operationalStory.tone === 'incident')}
           <section
-            class="mb-6 rounded-xl border p-4 shadow-subtle-2 {operationalStory.tone === 'incident'
-              ? 'border-status-red/25 bg-status-red/8'
-              : operationalStory.tone === 'attention'
-                ? 'border-status-orange/25 bg-status-orange/8'
-                : 'border-blueprint-blue/20 bg-blueprint-blue/8'}"
+            class="mb-6 flex flex-col gap-3 rounded-lg border p-4 md:flex-row md:items-center md:justify-between {operationalStory.tone ===
+            'incident'
+              ? 'border-status-red/30 bg-status-red/8'
+              : 'border-border-light bg-surface-white'}"
             aria-labelledby="operational-story-title"
           >
-            <div class="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+            <div class="flex items-start gap-3">
+              <span
+                aria-hidden="true"
+                class="mt-1.5 inline-block h-2 w-2 shrink-0 rounded-full {operationalStory.tone ===
+                'incident'
+                  ? 'bg-status-red'
+                  : 'bg-status-orange'}"
+              ></span>
               <div class="min-w-0">
-                <div class="flex flex-wrap items-center gap-2">
-                  <p class="eyebrow text-text-subtle">État opérationnel</p>
-                  <Badge
-                    label={operationalStory.badge}
-                    variant={operationalStory.tone === 'incident'
-                      ? 'error'
-                      : operationalStory.tone === 'attention'
-                        ? 'warning'
-                        : 'success'}
-                  />
-                </div>
-                <h2
-                  id="operational-story-title"
-                  class="mt-2 text-xl font-semibold text-text-primary"
-                >
+                <h2 id="operational-story-title" class="text-sm font-semibold text-text-primary">
                   {operationalStory.title}
                 </h2>
-                <div class="mt-4 grid gap-3 md:grid-cols-2">
-                  <div>
-                    <p
-                      class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle"
-                    >
-                      Impact
-                    </p>
-                    <p class="mt-1 text-sm leading-6 text-text-secondary">
-                      {operationalStory.impact}
-                    </p>
-                  </div>
-                  <div>
-                    <p
-                      class="text-[11px] font-semibold uppercase tracking-[0.12em] text-text-subtle"
-                    >
-                      Action recommandée
-                    </p>
-                    <p class="mt-1 text-sm font-medium leading-6 text-text-primary">
-                      {operationalStory.action}
-                    </p>
-                  </div>
-                </div>
-                <div class="mt-4 flex flex-wrap gap-2">
-                  {#each operationalStory.signals as signal}
-                    <span
-                      class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1 text-xs font-medium text-text-subtle"
-                    >
-                      {signal}
-                    </span>
-                  {/each}
-                </div>
+                <p class="mt-1 text-sm leading-6 text-text-secondary">{operationalStory.impact}</p>
               </div>
-
-              <a
-                class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
-                href={operationalStory.actionTarget === 'install'
-                  ? chromeStoreUrl
-                  : operationalStory.actionTarget === 'sync'
-                    ? '#sync'
-                    : operationalStory.actionTarget === 'applications'
-                      ? '#applications'
-                      : operationalStory.actionTarget === 'cv'
-                        ? '#cv'
-                        : '#mission-feed-title'}
-              >
-                Aller à l'action
-              </a>
             </div>
+            <a
+              class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-surface-white hover:bg-blueprint-blue/90"
+              href={operationalStory.actionTarget === 'install'
+                ? chromeStoreUrl
+                : operationalStory.actionTarget === 'sync'
+                  ? '#sync'
+                  : operationalStory.actionTarget === 'applications'
+                    ? '#applications'
+                    : operationalStory.actionTarget === 'cv'
+                      ? '#cv'
+                      : '#mission-feed-title'}
+            >
+              {operationalStory.action}
+            </a>
           </section>
         {/if}
 

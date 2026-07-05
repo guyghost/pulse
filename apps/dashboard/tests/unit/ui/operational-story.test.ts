@@ -5,16 +5,24 @@ describe('connected dashboard operational story', () => {
   const source = readFileSync('src/routes/+page.svelte', 'utf8');
   const normalizedSource = source.replace(/\s+/g, ' ');
 
-  it('prioritizes a narrative operational state before metrics', () => {
+  it('renders a compact status banner only on attention or incident', () => {
+    // The operational story is a decision function (model) that drives a compact
+    // banner — not an always-on corporate narrative.
     expect(source).toContain('interface DashboardOperationalStory');
     expect(source).toContain('function getDashboardOperationalStory');
-    expect(source).toContain('État opérationnel');
-    expect(source).toContain('Impact');
-    expect(source).toContain('Action recommandée');
-    expect(source).toContain("Prochaine action: installer l'extension");
-    expect(source).toContain('La synchronisation demande une décision');
-    expect(source).toContain('Relance à préparer');
-    expect(source).toContain('ressort comme meilleure mission fraîche');
+    // The banner renders only for actionable tones; success never paints chrome.
+    expect(source).toContain(
+      "operationalStory.tone === 'attention' || operationalStory.tone === 'incident'"
+    );
+    // The decorative storytelling chrome is gone.
+    expect(source).not.toContain('État opérationnel');
+    expect(source).not.toContain('Action recommandée');
+    expect(source).not.toContain('Aller à l’action');
+    expect(source).not.toContain('operationalStory.signals');
+    // Copy is concrete and verifiable (counts + verbs), not vague adjectives.
+    expect(source).toContain('de sync à arbitrer');
+    expect(source).toContain('Relance à préparer:');
+    // Ordering: when it renders, the banner precedes the metrics region.
     expect(source.indexOf('operational-story-title')).toBeLessThan(
       source.indexOf('aria-label="Indicateurs candidatures"')
     );
