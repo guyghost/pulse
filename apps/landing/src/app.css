@@ -2042,3 +2042,175 @@ section[id] {
 .text-right {
   text-align: right;
 }
+
+/* ===== Skip link ===== */
+.skip-link {
+  position: absolute;
+  top: -100%;
+  left: var(--spacing-16);
+  z-index: 1000;
+  padding: var(--spacing-8) var(--spacing-16);
+  background: var(--color-text-primary);
+  color: var(--color-surface-white);
+  border-radius: var(--radius-md);
+  font-size: 0.875rem;
+  font-weight: 500;
+  text-decoration: none;
+  transition: top 0.15s ease-out;
+}
+.skip-link:focus-visible {
+  top: var(--spacing-8);
+  outline: 2px solid var(--color-blueprint-blue);
+  outline-offset: 2px;
+}
+
+/* ===== Keyboard shortcut hint (footer) ===== */
+.footer__shortcuts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--spacing-6);
+  align-items: center;
+  font-size: 0.8125rem;
+  color: var(--color-text-muted);
+  letter-spacing: 0.01em;
+}
+
+kbd {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 1.25rem;
+  padding: 0.0625rem 0.3125rem;
+  margin: 0 0.125rem;
+  font-family: var(--font-geist);
+  font-size: 0.75rem;
+  font-weight: 600;
+  line-height: 1;
+  color: var(--color-text-secondary);
+  background: var(--color-surface-white);
+  border: 1px solid var(--color-disabled-gray);
+  border-bottom-width: 2px;
+  border-radius: var(--radius-sm);
+}
+
+/* ===== Shortcuts help overlay ===== */
+.shortcuts-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: var(--spacing-16);
+  background: color-mix(in srgb, var(--color-text-primary) 48%, transparent);
+  opacity: 0;
+  visibility: hidden;
+  transition:
+    opacity 0.15s ease-out,
+    visibility 0.15s ease-out;
+}
+.shortcuts-overlay.is-open {
+  opacity: 1;
+  visibility: visible;
+}
+
+.shortcuts-card {
+  width: 100%;
+  max-width: 26rem;
+  padding: var(--spacing-24);
+  background: var(--color-surface-white);
+  border: 1px solid var(--color-border-light);
+  border-radius: var(--radius-lg);
+  box-shadow: 0 20px 60px -20px rgba(12, 10, 9, 0.35);
+  transform: translateY(8px);
+  transition: transform 0.15s ease-out;
+}
+.shortcuts-overlay.is-open .shortcuts-card {
+  transform: translateY(0);
+}
+
+.shortcuts-card__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: var(--spacing-16);
+}
+.shortcuts-card__title {
+  font-family: var(--font-display);
+  font-size: 1.125rem;
+  font-weight: 600;
+  color: var(--color-text-primary);
+  letter-spacing: -0.01em;
+}
+.shortcuts-card__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 2rem;
+  height: 2rem;
+  padding: 0;
+  color: var(--color-text-muted);
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-sm);
+  cursor: pointer;
+  transition:
+    color 0.15s ease,
+    background 0.15s ease;
+}
+.shortcuts-card__close:hover {
+  color: var(--color-text-primary);
+  background: var(--color-subtle-gray);
+}
+.shortcuts-card__close:focus-visible {
+  outline: 2px solid var(--color-blueprint-blue);
+  outline-offset: 2px;
+}
+
+.shortcuts-list {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.shortcuts-list li {
+  display: flex;
+  align-items: center;
+  gap: var(--spacing-12);
+  padding: var(--spacing-8) 0;
+  border-bottom: 1px solid var(--color-border-light);
+  font-size: 0.875rem;
+  color: var(--color-text-secondary);
+}
+.shortcuts-list li:last-child {
+  border-bottom: none;
+}
+.shortcuts-list kbd {
+  min-width: 2.5rem;
+}
+
+@media (max-width: 640px) {
+  .footer__shortcuts {
+    display: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .skip-link,
+  .shortcuts-overlay,
+  .shortcuts-card {
+    transition: none;
+  }
+}
+
+html.dark .shortcuts-card {
+  background: #1c1917;
+  border-color: #2a2724;
+}
+html.dark .shortcuts-card__close:hover {
+  background: #2a2724;
+}
+html.dark kbd {
+  color: var(--color-text-secondary);
+  background: #2a2724;
+  border-color: #3a3734;
+}

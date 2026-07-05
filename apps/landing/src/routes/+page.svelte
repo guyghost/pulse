@@ -8,6 +8,7 @@
   let scrolled = $state(false);
   let activeShowcaseStep = $state<ShowcaseStep>('scanner');
   let showDeferredContent = $state(false);
+  let shortcutsOpen = $state(false);
 
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
   const showcaseSteps: { id: ShowcaseStep; label: string }[] = [
@@ -90,6 +91,79 @@
   function closeMobileMenu() {
     mobileMenuOpen = false;
   }
+
+  type Shortcuts = {
+    key: string;
+    label: string;
+    action: () => void;
+  };
+
+  const prefersReducedMotion = (): boolean =>
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+
+  const scrollBehavior = (): ScrollBehavior => (prefersReducedMotion() ? 'auto' : 'smooth');
+
+  function jumpTo(id: string): void {
+    const target = document.getElementById(id);
+    if (target) {
+      target.scrollIntoView({ behavior: scrollBehavior(), block: 'start' });
+    }
+  }
+
+  function focusInstallCta(): void {
+    const target = document.querySelector<HTMLElement>('#install [data-primary-cta]');
+    if (target) {
+      target.scrollIntoView({ behavior: scrollBehavior(), block: 'center' });
+      target.focus({ preventScroll: true });
+    } else {
+      jumpTo('install');
+    }
+  }
+
+  function toggleShortcuts(): void {
+    shortcutsOpen = !shortcutsOpen;
+  }
+
+  function closeShortcuts(): void {
+    shortcutsOpen = false;
+  }
+
+  function isTypingTarget(el: EventTarget | null): boolean {
+    if (!(el instanceof HTMLElement)) return false;
+    const tag = el.tagName;
+    return tag === 'INPUT' || tag === 'TEXTAREA' || tag === 'SELECT' || el.isContentEditable;
+  }
+
+  const shortcuts: Shortcuts[] = [
+    { key: '/', label: 'Installer MissionPulse', action: focusInstallCta },
+    { key: 's', label: 'Aller au workflow', action: () => jumpTo('workflow') },
+    { key: 'p', label: 'Aller aux offres', action: () => jumpTo('plans') },
+    { key: '?', label: 'Afficher les raccourcis', action: toggleShortcuts },
+  ];
+
+  $effect(() => {
+    function onKeydown(event: KeyboardEvent) {
+      // Ignore when the user is typing somewhere, or using OS/browser modifiers.
+      if (isTypingTarget(event.target) || event.metaKey || event.ctrlKey || event.altKey) {
+        return;
+      }
+      if (event.key === 'Escape') {
+        if (shortcutsOpen) {
+          closeShortcuts();
+        } else if (mobileMenuOpen) {
+          closeMobileMenu();
+        }
+        return;
+      }
+      const match = shortcuts.find((s) => s.key === event.key);
+      if (match) {
+        event.preventDefault();
+        match.action();
+      }
+    }
+    window.addEventListener('keydown', onKeydown);
+    return () => window.removeEventListener('keydown', onKeydown);
+  });
 </script>
 
 <svelte:head>
@@ -131,6 +205,9 @@
   />
   <meta name="twitter:image" content="https://missionpulse.app/og-image.png" />
 </svelte:head>
+
+<!-- Skip to content (keyboard users) -->
+<a href="#hero" class="skip-link">Aller au contenu</a>
 
 <!-- Navigation -->
 <nav class="nav" class:nav--scrolled={scrolled} aria-label="Navigation principale">
@@ -871,6 +948,7 @@
             class="btn btn--primary btn--lg"
             target="_blank"
             rel="noopener noreferrer"
+            data-primary-cta
           >
             <svg
               width="20"
@@ -928,8 +1006,54 @@
           Svelte 5 · TypeScript · Chrome MV3 · Gemini Nano · Tailwind 4 · Architecture local-first
         </p>
 
+        <p class="footer__shortcuts">
+          <kbd>/</kbd> installer · <kbd>s</kbd> workflow · <kbd>p</kbd> offres · <kbd>?</kbd> aide
+        </p>
+
         <p class="footer__copy">MissionPulse — 2026. Open source.</p>
       </div>
     </div>
   </footer>
 {/if}
+
+<!-- Keyboard shortcuts help -->
+<div
+  class="shortcuts-overlay"
+  class:is-open={shortcutsOpen}
+  role="dialog"
+  aria-modal="true"
+  aria-label="Raccourcis clavier"
+  aria-hidden={!shortcutsOpen}
+>
+  <div class="shortcuts-card" role="document" tabindex="-1">
+    <div class="shortcuts-card__header">
+      <h2 class="shortcuts-card__title">Raccourcis clavier</h2>
+      <button class="shortcuts-card__close" aria-label="Fermer" onclick={closeShortcuts}>
+        <svg
+          width="18"
+          height="18"
+          viewBox="0 0 24 24"
+          fill="none"
+          stroke="currentColor"
+          stroke-width="2"
+          stroke-linecap="round"
+          stroke-linejoin="round"
+        >
+          <path d="M18 6 6 18" /><path d="m6 6 12 12" />
+        </svg>
+      </button>
+    </div>
+    <ul class="shortcuts-list">
+      {#each shortcuts as s (s.key)}
+        <li>
+          <kbd>{s.key}</kbd>
+          <span>{s.label}</span>
+        </li>
+      {/each}
+      <li>
+        <kbd>Esc</kbd>
+        <span>Fermer ce panneau ou le menu mobile</span>
+      </li>
+    </ul>
+  </div>
+</div>
