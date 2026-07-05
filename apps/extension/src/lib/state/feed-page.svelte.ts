@@ -233,8 +233,17 @@ export function createFeedPageState(
   // See src/models/undo-window.model.md for the authoritative state model.
   const hideUndo: UndoController<Record<string, number>> = createUndoController({
     kind: 'hide',
-    onCommit: () => {
-      saveHidden(hidden).catch(() => {});
+    onCommit: (_id, _snapshot, { stillPending }) => {
+      // Persist every hidden mission EXCEPT those whose undo window is still open —
+      // committing must not finalize a sibling hide the user can still undo.
+      const pendingIds = new Set(stillPending.map((p) => p.targetId));
+      const persist: Record<string, number> = {};
+      for (const [hid, ts] of Object.entries(hidden)) {
+        if (!pendingIds.has(hid)) {
+          persist[hid] = ts;
+        }
+      }
+      saveHidden(persist).catch(() => {});
     },
     onRestore: (_id, snapshot) => {
       hidden = snapshot;
@@ -248,8 +257,13 @@ export function createFeedPageState(
     name: string;
   }> = createUndoController({
     kind: 'delete-view',
-    onCommit: () => {
-      setFeedSavedViews(savedViews).catch(() => {});
+    onCommit: (_id, _snapshot, { stillPending }) => {
+      // Re-include any view whose undo window is still open — its in-memory
+      // deletion must not be finalized by a sibling view's commit.
+      const restoreViews = stillPending.flatMap((p) =>
+        p.snapshot.views.filter((v) => v.id === p.targetId)
+      );
+      setFeedSavedViews([...savedViews, ...restoreViews]).catch(() => {});
     },
     onRestore: (_id, snapshot) => {
       savedViews = snapshot.views;

@@ -25,7 +25,7 @@ safe-by-default — storage still has the data, so it reappears on next load.
 
 Applies to two actions (both initiated from the side panel):
 
-| Action       | Target id    | Snapshot captured at REQUEST                | Restore on UNDO             | Commit on TIMEOUT/DISMISS         |
+| Action       | Target id    | Snapshot captured at REQUEST                | Restore on UNDO             | Commit on TIMEOUT                 |
 | ------------ | ------------ | ------------------------------------------- | --------------------------- | --------------------------------- |
 | Hide mission | `mission.id` | previous `hidden: Record<id, ts>`           | `hidden` reverted in memory | persist final `hidden` to storage |
 | Delete view  | `view.id`    | previous `savedViews` + `activeSavedViewId` | both reverted in memory     | persist final `savedViews`        |
@@ -37,7 +37,7 @@ One instance per target id. The reducer (`core/undo/undo-window.ts`) manages a
 
 ```
 States:   idle · pending-undo · committed
-Events:   REQUEST · UNDO · TIMEOUT · DISMISS
+Events:   REQUEST · UNDO · TIMEOUT
 ```
 
 ```
@@ -47,20 +47,24 @@ Events:   REQUEST · UNDO · TIMEOUT · DISMISS
                                           UNDO                        │
    idle ◄─────────────────────────────────────────── (restore) ◄──────┤
                                                                       │
-                                          TIMEOUT / DISMISS           │
+                                          TIMEOUT                     │
    committed ◄───────────────────────────────────── (commit) ◄────────┘
                                   terminal
 ```
 
 ### Transition table
 
-| from         | event                            | to           | Effect emitted to the shell                                  |
-| ------------ | -------------------------------- | ------------ | ------------------------------------------------------------ |
-| idle         | REQUEST                          | pending-undo | `start-timer` (deadline = now + durationMs); show undo toast |
-| pending-undo | UNDO                             | idle         | `restore(snapshot)`; cancel-timer; dismiss toast             |
-| pending-undo | TIMEOUT (shell timer fired)      | committed    | `commit(snapshot)`; dismiss toast                            |
-| pending-undo | REQUEST (same target, same kind) | pending-undo | `cancel-timer` + `start-timer` (re-arm; snapshot replaced)   |
-| committed    | \*                               | committed    | terminal — no-op                                             |
+| from         | event                             | to           | Effect emitted to the shell                                      |
+| ------------ | --------------------------------- | ------------ | ---------------------------------------------------------------- |
+| idle         | REQUEST                           | pending-undo | `start-timer` (deadline = now + durationMs); show undo toast     |
+| pending-undo | UNDO                              | idle         | `restore(snapshot)`; cancel-timer; dismiss toast                 |
+| pending-undo | TIMEOUT (shell timer fired)       | committed    | `commit(snapshot, stillPending)`; dismiss toast                  |
+| pending-undo | REQUEST (same target, same kind)  | pending-undo | `cancel-timer` + `start-timer` (re-arm; snapshot replaced)       |
+| pending-undo | REQUEST (same target, other kind) | pending-undo | rejected → `none` (I1; shell must never issue conflicting kinds) |
+| any          | EXPIRE_ALL(now)                   | committed\*  | `commit-all(entries)` for every entry with `deadline <= now`     |
+| committed    | \*                                | committed    | terminal — no-op                                                 |
+
+\* Only the expired entries commit; still-open windows are untouched (I6).
 
 **Timer ownership (shell):** the shell owns exactly one `setTimeout` per pending
 target, started on `start-timer` and cleared on `cancel-timer` / panel destroy. The
@@ -68,11 +72,15 @@ undo toast is a **non-authoritative visual**: its internal auto-dismiss timer an
 close button are cosmetic — clicking the toast's `×` does **not** commit early; the
 undo window simply runs its full duration unless the user clicks **Annuler**. This
 keeps a single source of timing truth (the shell timer) and avoids double-timer bugs.
+The toast's lifecycle follows the undo window: the shell dismisses the toast on
+`UNDO`, on `commit`, on re-arm, and on panel destroy, so a resolved action does not
+leave a stale toast behind.
 
-`EXPIRE_ALL(now)` is a bulk safety primitive the shell may call on unload: for every
-pending entry whose `deadline <= now`, emit `commit`. In practice the shell clears its
-timers on unload and commits nothing (safe-by-default, invariant I5), so `EXPIRE_ALL`
-is a documented escape hatch rather than part of the happy path.
+`EXPIRE_ALL(now)` is a bulk safety primitive: for every pending entry whose
+`deadline <= now`, emit a single `commit-all` effect listing **all** expired targets
+so the shell commits every one — no expired entry is dropped silently. In practice the
+shell clears its timers on unload and commits nothing (safe-by-default, invariant I5),
+so `EXPIRE_ALL` is a documented escape hatch rather than part of the happy path.
 
 ## Invariants
 
@@ -83,7 +91,7 @@ is a documented escape hatch rather than part of the happy path.
 - **I2 — Storage is the commit step, never the request step.** While any entry is
   `pending-undo`, `chrome.storage` MUST still contain the pre-action collection.
   `REQUEST` emits only `start-timer`, never `commit`. Persistence happens solely on
-  `TIMEOUT` / `DISMISS` / `EXPIRE_ALL`.
+  `TIMEOUT` / `commit-all`.
 - **I3 — Snapshots are immutable.** `UNDO` restores the exact object captured at
   REQUEST. The reducer never mutates a snapshot.
 - **I4 — Deadlines are deterministic.** `deadline === requestedAt + durationMs`.
@@ -93,6 +101,11 @@ is a documented escape hatch rather than part of the happy path.
   reappears on next load. No silent data loss.
 - **I6 — Timers are cancellable.** `UNDO`, a re-arm, and panel destroy all cancel
   the active shell timer so no late `TIMEOUT` fires against a restored target.
+- **I7 — Commit scopes to the committing target.** When one target commits, the
+  shell must NOT finalize a _different_ target whose window is still open. The
+  `commit` effect carries `stillPending` (the other open windows' snapshots); the
+  committer excludes them (hide: omit their ids from the persisted map; delete-view:
+  re-include their views in the persisted list).
 
 ## Constants
 
@@ -100,7 +113,8 @@ is a documented escape hatch rather than part of the happy path.
 
 ## Executable model
 
-`apps/extension/src/core/undo/undo-window.ts` — pure reducer returning
+`apps/extension/src/lib/core/undo/undo-window.ts` — pure reducer returning
 `{ state, effect }`. Fully unit-tested with no I/O, no timers, no `Date.now`.
-The shell (`lib/state/feed-page.svelte.ts`) owns: timers, `chrome.storage`
-persistence, toast display, and in-memory collection mutation.
+The shell (`lib/shell/undo/undo-controller.ts` + `lib/state/feed-page.svelte.ts`)
+owns: timers, `chrome.storage` persistence, toast display, and in-memory
+collection mutation.

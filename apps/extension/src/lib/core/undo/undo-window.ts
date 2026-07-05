@@ -40,7 +40,6 @@ export type UndoEvent<TSnapshot> =
     }
   | { readonly type: 'UNDO'; readonly targetId: string }
   | { readonly type: 'TIMEOUT'; readonly targetId: string }
-  | { readonly type: 'DISMISS'; readonly targetId: string }
   | { readonly type: 'EXPIRE_ALL'; readonly now: number };
 
 /**
@@ -57,7 +56,14 @@ export type UndoEffect<TSnapshot> =
     }
   | { readonly kind: 'cancel-timer'; readonly targetId: string }
   | { readonly kind: 'restore'; readonly targetId: string; readonly snapshot: TSnapshot }
-  | { readonly kind: 'commit'; readonly targetId: string; readonly snapshot: TSnapshot };
+  | { readonly kind: 'commit'; readonly targetId: string; readonly snapshot: TSnapshot }
+  | {
+      readonly kind: 'commit-all';
+      readonly entries: ReadonlyArray<{
+        readonly targetId: string;
+        readonly snapshot: TSnapshot;
+      }>;
+    };
 
 export interface UndoReducerResult<TSnapshot> {
   readonly state: UndoState<TSnapshot>;
@@ -85,6 +91,12 @@ export function reduceUndoWindow<TSnapshot>(
 ): UndoReducerResult<TSnapshot> {
   switch (event.type) {
     case 'REQUEST': {
+      // I1 (strict): reject a REQUEST whose kind conflicts with an already-pending
+      // entry for the same target. Same-kind re-arms (snapshot + deadline replaced).
+      const existing = prev.pending.get(event.targetId);
+      if (existing && existing.kind !== event.kind) {
+        return { state: prev, effect: { kind: 'none' } };
+      }
       const deadline = event.requestedAt + event.durationMs;
       const entry: UndoPendingEntry<TSnapshot> = {
         kind: event.kind,
@@ -120,8 +132,7 @@ export function reduceUndoWindow<TSnapshot>(
       };
     }
 
-    case 'TIMEOUT':
-    case 'DISMISS': {
+    case 'TIMEOUT': {
       const entry = prev.pending.get(event.targetId);
       if (!entry) {
         return { state: prev, effect: { kind: 'none' } };
@@ -135,11 +146,9 @@ export function reduceUndoWindow<TSnapshot>(
     }
 
     case 'EXPIRE_ALL': {
-      // Safety net (e.g. on unload): commit every entry whose deadline has passed.
-      // Never expires a still-open window early (invariant I6). Emits the first
-      // commit only — the shell calls this repeatedly or drains via TIMEOUT per
-      // target. For determinism we emit 'none' when nothing is expirable; the
-      // shell drains expired targets through normal TIMEOUT handling on reload.
+      // Safety net: commit every entry whose deadline has passed. Never expires a
+      // still-open window early (invariant I6). Emits a single `commit-all` effect
+      // listing EVERY expired target so the shell commits them all — no silent drops.
       const expired: UndoPendingEntry<TSnapshot>[] = [];
       for (const entry of prev.pending.values()) {
         if (entry.deadline <= event.now) {
@@ -153,12 +162,12 @@ export function reduceUndoWindow<TSnapshot>(
       for (const entry of expired) {
         next.delete(entry.targetId);
       }
-      // Return the first expired target's commit; remaining expired targets are
-      // committed by the shell draining the returned (now-emptied-of-those) state.
-      const first = expired[0];
       return {
         state: { pending: next },
-        effect: { kind: 'commit', targetId: first.targetId, snapshot: first.snapshot },
+        effect: {
+          kind: 'commit-all',
+          entries: expired.map((e) => ({ targetId: e.targetId, snapshot: e.snapshot })),
+        },
       };
     }
 

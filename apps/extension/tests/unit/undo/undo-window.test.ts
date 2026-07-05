@@ -6,6 +6,7 @@ import {
   getPending,
   DEFAULT_UNDO_WINDOW_MS,
   type UndoState,
+  type UndoEvent,
 } from '../../../src/lib/core/undo/undo-window';
 
 const NOW = 1_000_000;
@@ -74,6 +75,29 @@ describe('reduceUndoWindow — REQUEST', () => {
     });
     expect(effect.kind).toBe('start-timer');
   });
+
+  it('rejects a REQUEST whose kind conflicts with a pending entry (I1)', () => {
+    const { state: s1 } = reduceUndoWindow(createUndoState<Snap>(), {
+      type: 'REQUEST',
+      kind: 'hide',
+      targetId: 'm1',
+      snapshot: snap('a'),
+      requestedAt: NOW,
+      durationMs: DURATION,
+    });
+    const { state, effect } = reduceUndoWindow(s1, {
+      type: 'REQUEST',
+      kind: 'delete-view',
+      targetId: 'm1',
+      snapshot: snap('b'),
+      requestedAt: NOW,
+      durationMs: DURATION,
+    });
+    expect(effect.kind).toBe('none');
+    // Original pending entry is untouched.
+    expect(getPending(state, 'm1')?.kind).toBe('hide');
+    expect(getPending(state, 'm1')?.snapshot).toEqual(snap('a'));
+  });
 });
 
 describe('reduceUndoWindow — UNDO', () => {
@@ -119,10 +143,12 @@ describe('reduceUndoWindow — TIMEOUT / DISMISS', () => {
     expect(effect).toEqual({ kind: 'commit', targetId: 'v1', snapshot: snap('prev') });
   });
 
-  it('DISMISS also commits (user dismissed the toast early)', () => {
-    const s1 = reduceUndoState();
-    const { effect } = reduceUndoWindow(s1, { type: 'DISMISS', targetId: 'v1' });
-    expect(effect.kind).toBe('commit');
+  it('DISMISS is not an event — toast close is cosmetic (timer is sole commit trigger)', () => {
+    // Compile-time guard: DISMISS was removed from UndoEvent. If it is re-added,
+    // this assignment becomes a type error, forcing an update here. The toast ×
+    // and auto-dismiss never commit early by design (see model doc, decision D1).
+    const noDismiss: 'DISMISS' extends UndoEvent<Snap>['type'] ? true : false = false;
+    expect(noDismiss).toBe(false);
   });
 
   it('TIMEOUT for an unknown target is a no-op', () => {
@@ -169,8 +195,48 @@ describe('reduceUndoWindow — EXPIRE_ALL (safety net)', () => {
     const { state: next, effect } = reduceUndoWindow(state, { type: 'EXPIRE_ALL', now: NOW });
     expect(isPending(next, 'open')).toBe(true); // untouched
     expect(isPending(next, 'expired')).toBe(false);
-    expect(effect.kind).toBe('commit');
-    expect((effect as { targetId: string }).targetId).toBe('expired');
+    expect(effect.kind).toBe('commit-all');
+    expect(effect).toMatchObject({
+      kind: 'commit-all',
+      entries: [{ targetId: 'expired' }],
+    });
+  });
+
+  it('EXPIRE_ALL lists EVERY expired target in commit-all — none dropped silently', () => {
+    let state = createUndoState<Snap>();
+    state = reduceUndoWindow(state, {
+      type: 'REQUEST',
+      kind: 'hide',
+      targetId: 'e1',
+      snapshot: snap('e1'),
+      requestedAt: NOW - 10_000,
+      durationMs: 5_000, // deadline in the past
+    }).state;
+    state = reduceUndoWindow(state, {
+      type: 'REQUEST',
+      kind: 'hide',
+      targetId: 'e2',
+      snapshot: snap('e2'),
+      requestedAt: NOW - 9_000,
+      durationMs: 5_000, // deadline in the past
+    }).state;
+    state = reduceUndoWindow(state, {
+      type: 'REQUEST',
+      kind: 'hide',
+      targetId: 'open',
+      snapshot: snap('o'),
+      requestedAt: NOW,
+      durationMs: 5_000, // still open
+    }).state;
+
+    const { state: next, effect } = reduceUndoWindow(state, { type: 'EXPIRE_ALL', now: NOW });
+    expect(isPending(next, 'open')).toBe(true);
+    expect(isPending(next, 'e1')).toBe(false);
+    expect(isPending(next, 'e2')).toBe(false);
+    expect(effect).toMatchObject({
+      kind: 'commit-all',
+      entries: [{ targetId: 'e1' }, { targetId: 'e2' }],
+    });
   });
 
   it('emits none when nothing is expirable', () => {

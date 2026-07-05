@@ -356,7 +356,7 @@ describe('feed page state', () => {
       'Vue « Remote prioritaire » supprimée',
       'info',
       expect.objectContaining({ label: 'Annuler' }),
-      6000
+      5000
     );
     const undoAction = toastMock.showToastAction.mock.calls.at(-1)?.[2].onClick;
     expect(undoAction).toBeDefined();

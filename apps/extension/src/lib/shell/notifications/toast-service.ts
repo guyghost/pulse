@@ -55,10 +55,11 @@ export function showToastAction(
   toastType: ToastType,
   action: ToastAction,
   duration = 6000
-): void {
+): number | undefined {
   if (toastStore) {
-    toastStore.add(message, toastType, duration, action);
+    return toastStore.add(message, toastType, duration, action);
   }
+  return undefined;
 }
 
 /**

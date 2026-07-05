@@ -20,13 +20,27 @@ import {
   type UndoEffect,
   type UndoState,
 } from '$lib/core/undo/undo-window';
-import { showToastAction } from '$lib/shell/notifications/toast-service';
+import { dismissToast, showToastAction } from '$lib/shell/notifications/toast-service';
 
 export interface UndoControllerOptions<TSnapshot> {
   readonly kind: UndoActionKind;
   readonly durationMs?: number;
-  /** Persist the post-action state. Called exactly once when the window commits. */
-  readonly onCommit: (targetId: string, snapshot: TSnapshot) => void;
+  /**
+   * Persist the post-action state for one target. Called exactly once when that
+   * target's window commits. `stillPending` lists OTHER targets whose windows are
+   * still open (snapshots included) so the committer can exclude them — e.g. hide
+   * must not persist another mission whose undo window is still open.
+   */
+  readonly onCommit: (
+    targetId: string,
+    snapshot: TSnapshot,
+    context: {
+      readonly stillPending: ReadonlyArray<{
+        readonly targetId: string;
+        readonly snapshot: TSnapshot;
+      }>;
+    }
+  ) => void;
   /** Revert in-memory state to the captured snapshot. Storage was never written. */
   readonly onRestore: (targetId: string, snapshot: TSnapshot) => void;
   /** Toast message shown when the window opens. */
@@ -48,6 +62,25 @@ export function createUndoController<TSnapshot>(
   const durationMs = opts.durationMs ?? DEFAULT_UNDO_WINDOW_MS;
   let state: UndoState<TSnapshot> = createUndoState();
   const timers = new Map<string, ReturnType<typeof setTimeout>>();
+  const toastIds = new Map<string, number>();
+
+  function pendingSnapshotsExcept(exclude: string): { targetId: string; snapshot: TSnapshot }[] {
+    const out: { targetId: string; snapshot: TSnapshot }[] = [];
+    for (const entry of state.pending.values()) {
+      if (entry.targetId !== exclude) {
+        out.push({ targetId: entry.targetId, snapshot: entry.snapshot });
+      }
+    }
+    return out;
+  }
+
+  function clearToast(targetId: string): void {
+    const id = toastIds.get(targetId);
+    if (id !== undefined) {
+      dismissToast(id);
+      toastIds.delete(targetId);
+    }
+  }
 
   function clearTimer(targetId: string): void {
     const existing = timers.get(targetId);
@@ -61,17 +94,22 @@ export function createUndoController<TSnapshot>(
     switch (effect.kind) {
       case 'start-timer': {
         clearTimer(effect.targetId);
+        // Re-arm clears any lingering toast from a previous window for this target.
+        clearToast(effect.targetId);
         const entry = state.pending.get(effect.targetId);
         if (entry) {
-          showToastAction(
+          const toastId = showToastAction(
             opts.toastMessage(effect.targetId, entry.snapshot),
             'info',
             {
               label: 'Annuler',
               onClick: () => undo(effect.targetId),
             },
-            durationMs + 1000
+            durationMs
           );
+          if (toastId !== undefined) {
+            toastIds.set(effect.targetId, toastId);
+          }
         }
         const timer = setTimeout(() => {
           timers.delete(effect.targetId);
@@ -82,12 +120,34 @@ export function createUndoController<TSnapshot>(
       }
       case 'restore': {
         clearTimer(effect.targetId);
+        clearToast(effect.targetId);
         opts.onRestore(effect.targetId, effect.snapshot);
         break;
       }
       case 'commit': {
         clearTimer(effect.targetId);
-        opts.onCommit(effect.targetId, effect.snapshot);
+        clearToast(effect.targetId);
+        const stillPending = pendingSnapshotsExcept(effect.targetId);
+        opts.onCommit(effect.targetId, effect.snapshot, { stillPending });
+        break;
+      }
+      case 'commit-all': {
+        for (const entry of effect.entries) {
+          clearTimer(entry.targetId);
+          clearToast(entry.targetId);
+        }
+        // After EXPIRE_ALL, the reducer removed every expired entry; `state.pending`
+        // holds only GENUINELY still-open windows. A batch sibling is committing too,
+        // so it is NOT "still pending" — it must be finalized alongside this target
+        // (persisted), never excluded. Excluding it would silently drop a just-committed
+        // sibling from the persisted map. So stillPending = only the open windows.
+        const remaining = [...state.pending.values()].map((e) => ({
+          targetId: e.targetId,
+          snapshot: e.snapshot,
+        }));
+        for (const entry of effect.entries) {
+          opts.onCommit(entry.targetId, entry.snapshot, { stillPending: remaining });
+        }
         break;
       }
       case 'cancel-timer':
@@ -132,6 +192,10 @@ export function createUndoController<TSnapshot>(
       clearTimeout(timer);
     }
     timers.clear();
+    for (const id of toastIds.values()) {
+      dismissToast(id);
+    }
+    toastIds.clear();
     // Safe-by-default: do NOT commit. In-memory pending state is dropped; storage
     // still holds the pre-action state (invariant I5).
     state = createUndoState();
