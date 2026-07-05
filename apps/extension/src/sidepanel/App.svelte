@@ -194,11 +194,17 @@
   let bridgeLogs: LogEntry[] = $state([]);
 
   if (import.meta.env.DEV) {
-    import('../dev/DevPanel.svelte').then((m) => {
-      DevPanel = m.default;
-    });
-    import('../ui/organisms/MetricsPanel.svelte').then((m) => {
-      MetricsPanel = m.default;
+    // Load DevPanel eagerly and signal readiness for E2E tests
+    Promise.all([
+      import('../dev/DevPanel.svelte').then((m) => {
+        DevPanel = m.default;
+      }),
+      import('../ui/organisms/MetricsPanel.svelte').then((m) => {
+        MetricsPanel = m.default;
+      }),
+    ]).then(() => {
+      // Signal to E2E tests that DevPanel is ready
+      (window as unknown as { __devPanelReady?: boolean }).__devPanelReady = true;
     });
   }
 
