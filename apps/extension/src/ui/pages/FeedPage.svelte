@@ -201,7 +201,7 @@
     type MissionTracking,
   } from '$lib/core/types/tracking';
   import { pullToRefresh } from '../actions/pull-to-refresh';
-  import { tick } from 'svelte';
+  import { onDestroy, tick } from 'svelte';
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
@@ -211,6 +211,10 @@
   import OperationalStoryCard from '../molecules/OperationalStoryCard.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
   import { getProfileBannerDismissed, setFeedTourSeen } from '$lib/shell/facades/app-flags.facade';
+  import {
+    getKbdCheatsheetTipSeen,
+    setKbdCheatsheetTipSeen,
+  } from '$lib/shell/facades/app-flags.facade';
   import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
   import { getLastTransitionTime } from '$lib/core/tracking';
@@ -245,6 +249,7 @@
   const controller = createFeedController(feed);
   const page = createFeedPageState(feed, controller);
   page.setup();
+  onDestroy(() => page.dispose());
 
   type TrackingStore = ReturnType<typeof import('$lib/state/tracking.svelte').createTrackingStore>;
   const emptyTrackings = new Map<string, MissionTracking>();
@@ -886,6 +891,26 @@
     alertPreferences = storedAlertPreferences;
   })().catch(() => {});
 
+  // First-run tip: surface the keyboard cheatsheet once.
+  (async () => {
+    const seen = await getKbdCheatsheetTipSeen();
+    if (seen) {
+      return;
+    }
+    showToastAction(
+      'Navigation clavier — appuie sur ? pour voir les raccourcis.',
+      'info',
+      {
+        label: 'Voir les raccourcis',
+        onClick: () => {
+          page.showShortcutsHelp = true;
+        },
+      },
+      8000
+    );
+    await setKbdCheatsheetTipSeen();
+  })().catch(() => {});
+
   $effect(() => {
     function handleOpenTour() {
       tourStepIndex = 0;
@@ -1082,7 +1107,7 @@
           : ''}"
       >
         <!-- ── Hero header ── -->
-        <div class="px-5 {page.heroCompact ? 'pt-3 pb-2' : 'pt-4 pb-0'}">
+        <div class="px-5 {page.heroCompact ? 'pt-2.5 pb-1.5' : 'pt-4 pb-0'}">
           {#if page.heroCompact}
             <!-- Compact: single row with stats and scan button -->
             <div class="flex items-center justify-between gap-3">
@@ -1134,7 +1159,7 @@
                 </Tooltip>
               </div>
             </div>
-            <div class="mt-3">
+            <div class="mt-2">
               <OperationalStoryCard
                 eyebrow="À faire maintenant"
                 title={feedStory.title}
@@ -1142,7 +1167,7 @@
                 severity={feedStory.severity}
                 statusLabel={feedStory.statusLabel}
                 evidence={feedStory.evidence}
-                compact={true}
+                variant="inline"
                 primaryActionLabel={feedStory.primaryActionLabel}
                 primaryActionIcon={feedStory.primaryActionIcon}
                 onPrimaryAction={handleFeedStoryPrimaryAction}
@@ -1380,8 +1405,12 @@
           {/if}
         </div>
 
-        <!-- ── Search + Filter toolbar ── -->
-        <div class="border-t border-border-light px-5 py-3">
+        <!-- ── Search + Filter toolbar (condensed-sticky in compact mode) ── -->
+        <div
+          class="border-t border-border-light px-5 {page.heroCompact
+            ? 'sticky top-0 z-20 bg-surface-white/90 py-2 backdrop-blur-md'
+            : 'py-3'}"
+        >
           <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
             {#if feedChromeBusy}Chargement des missions en cours{/if}
           </div>
@@ -1517,11 +1546,12 @@
               description="Ouvre la liste des commandes disponibles. Raccourci: ?."
             >
               <button
-                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                class="soft-ring inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white px-1.5 font-mono text-[12px] font-semibold leading-none text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
                 onclick={() => (page.showShortcutsHelp = true)}
                 aria-label="Afficher l'aide des raccourcis clavier"
+                title="Raccourcis clavier (?)"
               >
-                <Icon name="help-circle" size={12} />
+                ?
               </button>
             </Tooltip>
           </div>
@@ -1665,7 +1695,7 @@
     tabindex="-1"
     aria-labelledby="mission-feed-title"
   >
-    {#if hasVisibleFeedMissions}
+    {#if hasVisibleFeedMissions && !page.heroCompact}
       <div
         data-testid="mission-feed-anchor"
         class="mb-3 flex items-end justify-between gap-3 border-t border-border-light pt-4"
@@ -1690,7 +1720,9 @@
         </span>
       </div>
     {:else}
-      <h2 id="mission-feed-title" class="sr-only">Missions proposées</h2>
+      <h2 id="mission-feed-title" class="sr-only">
+        {hasVisibleFeedMissions ? 'Missions à examiner' : 'Missions proposées'}
+      </h2>
     {/if}
     <div
       class="rounded-xl transition-all duration-200 {activeTourStep?.id === 'expand' ||

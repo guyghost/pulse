@@ -36,7 +36,7 @@ export class ToastStore {
     toastType: ToastType = 'info',
     duration?: number,
     action: ToastAction | null = null
-  ): void {
+  ): number {
     const resolvedDuration = duration ?? DEFAULT_DURATION;
     const newToast: ToastItem = {
       id: this.nextId,
@@ -56,6 +56,7 @@ export class ToastStore {
       this.autoDismiss(id);
     }, resolvedDuration);
     this.timers.set(id, timer);
+    return id;
   }
 
   dismiss(id: number): void {

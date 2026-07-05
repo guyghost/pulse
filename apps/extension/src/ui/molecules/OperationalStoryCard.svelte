@@ -11,6 +11,8 @@
     severity?: OperationalSeverity;
   };
 
+  export type OperationalStoryVariant = 'full' | 'compact' | 'inline';
+
   const {
     eyebrow,
     title,
@@ -22,6 +24,7 @@
     primaryActionIcon = 'arrow-right',
     secondaryActionLabel = null,
     secondaryActionIcon = 'chevron-right',
+    variant = null,
     compact = false,
     onPrimaryAction,
     onSecondaryAction,
@@ -36,10 +39,18 @@
     primaryActionIcon?: IconName;
     secondaryActionLabel?: string | null;
     secondaryActionIcon?: IconName;
+    /** Display variant. Wins over the legacy `compact` boolean. */
+    variant?: OperationalStoryVariant | null;
+    /** Legacy: true maps to 'compact'. Prefer `variant`. */
     compact?: boolean;
     onPrimaryAction?: () => void;
     onSecondaryAction?: () => void;
   } = $props();
+
+  // `variant` is the source of truth; `compact=true` is a legacy alias.
+  const resolvedVariant = $derived<OperationalStoryVariant>(
+    variant ?? (compact ? 'compact' : 'full')
+  );
 
   const containerClass = $derived(
     severity === 'success'
@@ -65,6 +76,16 @@
             : 'bg-blueprint-blue/8 text-blueprint-blue'
   );
 
+  const iconName = $derived(
+    severity === 'success'
+      ? 'shield-check'
+      : severity === 'attention'
+        ? 'circle-alert'
+        : severity === 'incident' || severity === 'critical'
+          ? 'triangle-alert'
+          : 'radar'
+  );
+
   function evidenceClass(itemSeverity: OperationalSeverity | undefined): string {
     if (itemSeverity === 'success') {
       return 'text-accent-green';
@@ -79,85 +100,115 @@
   }
 </script>
 
-<section
-  class="rounded-xl border p-4 transition-colors {containerClass} {compact
-    ? 'space-y-3'
-    : 'space-y-4'}"
->
-  <div class="flex items-start gap-3">
-    <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {iconClass}">
-      <Icon
-        name={severity === 'success'
-          ? 'shield-check'
-          : severity === 'attention'
-            ? 'circle-alert'
-            : severity === 'incident' || severity === 'critical'
-              ? 'triangle-alert'
-              : 'radar'}
-        size={16}
-      />
+{#if resolvedVariant === 'inline'}
+  <!-- Single-row status strip: icon + title/status + inline action. No evidence, no description. -->
+  <section
+    class="flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-colors {containerClass}"
+  >
+    <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md {iconClass}">
+      <Icon name={iconName} size={13} />
     </div>
+    <div class="flex min-w-0 flex-1 items-center gap-2">
+      {#if eyebrow}
+        <span
+          class="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted"
+        >
+          {eyebrow}
+        </span>
+        <span class="text-text-muted/40" aria-hidden="true">·</span>
+      {/if}
+      <p class="truncate text-xs font-medium text-text-primary">{title}</p>
+      {#if statusLabel}
+        <OperationalStatusBadge label={statusLabel} {severity} />
+      {/if}
+    </div>
+    {#if primaryActionLabel}
+      <button
+        class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
+        onclick={onPrimaryAction}
+        type="button"
+      >
+        {primaryActionLabel}
+        <Icon name={primaryActionIcon} size={12} />
+      </button>
+    {/if}
+  </section>
+{:else}
+  <section
+    class="rounded-xl border p-4 transition-colors {containerClass} {resolvedVariant === 'compact'
+      ? 'space-y-3'
+      : 'space-y-4'}"
+  >
+    <div class="flex items-start gap-3">
+      <div class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg {iconClass}">
+        <Icon name={iconName} size={16} />
+      </div>
 
-    <div class="min-w-0 flex-1">
-      <div class="flex flex-wrap items-center gap-2">
-        {#if eyebrow}
-          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
-            {eyebrow}
-          </p>
-        {/if}
-        {#if statusLabel}
-          <OperationalStatusBadge label={statusLabel} {severity} />
+      <div class="min-w-0 flex-1">
+        <div class="flex flex-wrap items-center gap-2">
+          {#if eyebrow}
+            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+              {eyebrow}
+            </p>
+          {/if}
+          {#if statusLabel}
+            <OperationalStatusBadge label={statusLabel} {severity} />
+          {/if}
+        </div>
+        <h3 class="mt-1 text-sm font-semibold leading-5 text-text-primary">{title}</h3>
+        {#if description && resolvedVariant === 'full'}
+          <p class="mt-1 text-xs leading-5 text-text-subtle">{description}</p>
         {/if}
       </div>
-      <h3 class="mt-1 text-sm font-semibold leading-5 text-text-primary">{title}</h3>
-      {#if description}
-        <p class="mt-1 text-xs leading-5 text-text-subtle">{description}</p>
-      {/if}
     </div>
-  </div>
 
-  {#if evidence.length > 0}
-    <div class="grid grid-cols-3 gap-2">
-      {#each evidence as item}
-        <div class="rounded-lg border border-border-light bg-surface-white/70 px-3 py-2">
-          <p class="flex items-center gap-1 text-[9px] uppercase tracking-[0.13em] text-text-muted">
-            {#if item.icon}
-              <Icon name={item.icon} size={10} />
-            {/if}
-            {item.label}
-          </p>
-          <p
-            class="mt-1 font-mono text-sm font-semibold tabular-nums {evidenceClass(item.severity)}"
+    {#if evidence.length > 0}
+      <div class="grid grid-cols-3 gap-2">
+        {#each evidence as item}
+          <div class="rounded-lg border border-border-light bg-surface-white/70 px-3 py-2">
+            <p
+              class="flex items-center gap-1 text-[9px] uppercase tracking-[0.13em] text-text-muted"
+            >
+              {#if item.icon}
+                <Icon name={item.icon} size={10} />
+              {/if}
+              {item.label}
+            </p>
+            <p
+              class="mt-1 font-mono text-sm font-semibold tabular-nums {evidenceClass(
+                item.severity
+              )}"
+            >
+              {item.value}
+            </p>
+          </div>
+        {/each}
+      </div>
+    {/if}
+
+    {#if primaryActionLabel || secondaryActionLabel}
+      <div class="flex flex-wrap gap-2 border-t border-border-light pt-3">
+        {#if primaryActionLabel}
+          <button
+            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+            onclick={onPrimaryAction}
+            type="button"
           >
-            {item.value}
-          </p>
-        </div>
-      {/each}
-    </div>
-  {/if}
-
-  {#if primaryActionLabel || secondaryActionLabel}
-    <div class="flex flex-wrap gap-2 border-t border-border-light pt-3">
-      {#if primaryActionLabel}
-        <button
-          class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
-          onclick={onPrimaryAction}
-          type="button"
-        >
-          <Icon name={primaryActionIcon} size={13} />
-          {primaryActionLabel}
-        </button>
-      {/if}
-      {#if secondaryActionLabel}
-        <button
-          class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
-          onclick={onSecondaryAction}
-          type="button"
-        >
-          <Icon name={secondaryActionIcon} size={13} />
-          {secondaryActionLabel}
-        </button>
-      {/if}
-    </div>
-  {/if}
-</section>
+            <Icon name={primaryActionIcon} size={13} />
+            {primaryActionLabel}
+          </button>
+        {/if}
+        {#if secondaryActionLabel}
+          <button
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+            onclick={onSecondaryAction}
+            type="button"
+          >
+            <Icon name={secondaryActionIcon} size={13} />
+            {secondaryActionLabel}
+          </button>
+        {/if}
+      </div>
+    {/if}
+  </section>
+{/if}
