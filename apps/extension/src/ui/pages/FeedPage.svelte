@@ -211,6 +211,10 @@
   import OperationalStoryCard from '../molecules/OperationalStoryCard.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
   import { getProfileBannerDismissed, setFeedTourSeen } from '$lib/shell/facades/app-flags.facade';
+  import {
+    getKbdCheatsheetTipSeen,
+    setKbdCheatsheetTipSeen,
+  } from '$lib/shell/facades/app-flags.facade';
   import { openExternalUrl } from '$lib/shell/facades/feed-data.facade';
   import { deriveHealthStatus } from '$lib/core/health/derive-health-status';
   import { getLastTransitionTime } from '$lib/core/tracking';
@@ -883,6 +887,26 @@
     alertPreferences = storedAlertPreferences;
   })().catch(() => {});
 
+  // First-run tip: surface the keyboard cheatsheet once.
+  (async () => {
+    const seen = await getKbdCheatsheetTipSeen();
+    if (seen) {
+      return;
+    }
+    showToastAction(
+      'Navigation clavier — appuie sur ? pour voir les raccourcis.',
+      'info',
+      {
+        label: 'Voir les raccourcis',
+        onClick: () => {
+          page.showShortcutsHelp = true;
+        },
+      },
+      8000
+    );
+    await setKbdCheatsheetTipSeen();
+  })().catch(() => {});
+
   $effect(() => {
     function handleOpenTour() {
       tourStepIndex = 0;
@@ -1516,11 +1540,12 @@
               description="Ouvre la liste des commandes disponibles. Raccourci: ?."
             >
               <button
-                class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                class="soft-ring inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white px-1.5 font-mono text-[12px] font-semibold leading-none text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
                 onclick={() => (page.showShortcutsHelp = true)}
                 aria-label="Afficher l'aide des raccourcis clavier"
+                title="Raccourcis clavier (?)"
               >
-                <Icon name="help-circle" size={12} />
+                ?
               </button>
             </Tooltip>
           </div>

@@ -56,10 +56,12 @@ import {
   clearOnboardingCompleted,
   getFeedTourSeen,
   getFirstScanDone,
+  getKbdCheatsheetTipSeen,
   getOnboardingCompleted,
   getProfileBannerDismissed,
   setFeedTourSeen,
   setFirstScanDone,
+  setKbdCheatsheetTipSeen,
   setOnboardingCompleted,
   setProfileBannerDismissed,
 } from '../lib/shell/storage/first-scan';
@@ -788,6 +790,30 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] CLEAR_FEED_TOUR_SEEN error:', err);
           sendResponse({ type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_KBD_CHEATSHEET_TIP_SEEN') {
+      getKbdCheatsheetTipSeen()
+        .then((seen) => {
+          sendResponse({ type: 'KBD_CHEATSHEET_TIP_SEEN_RESULT', payload: seen });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_KBD_CHEATSHEET_TIP_SEEN error:', err);
+          sendResponse({ type: 'KBD_CHEATSHEET_TIP_SEEN_RESULT', payload: false });
+        });
+      return true;
+    }
+
+    if (message.type === 'SET_KBD_CHEATSHEET_TIP_SEEN') {
+      setKbdCheatsheetTipSeen()
+        .then(() => {
+          sendResponse({ type: 'KBD_CHEATSHEET_TIP_SEEN_SET', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SET_KBD_CHEATSHEET_TIP_SEEN error:', err);
+          sendResponse({ type: 'KBD_CHEATSHEET_TIP_SEEN_SET', payload: { saved: false } });
         });
       return true;
     }

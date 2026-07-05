@@ -12,6 +12,7 @@ const KEY_FIRST_SCAN = 'first_scan_done';
 const KEY_BANNER_DISMISSED = 'profile_banner_dismissed';
 const KEY_ONBOARDING_COMPLETED = 'onboarding_completed';
 const KEY_FEED_TOUR_SEEN = 'feed_tour_seen';
+const KEY_KBD_CHEATSHEET_TIP_SEEN = 'kbd_cheatsheet_tip_seen';
 
 export async function getFirstScanDone(): Promise<boolean> {
   try {
@@ -92,6 +93,23 @@ export async function setFeedTourSeen(): Promise<void> {
 export async function clearFeedTourSeen(): Promise<void> {
   try {
     await chrome.storage.local.remove(KEY_FEED_TOUR_SEEN);
+  } catch {
+    // Non-critical
+  }
+}
+
+export async function getKbdCheatsheetTipSeen(): Promise<boolean> {
+  try {
+    const result = await chrome.storage.local.get(KEY_KBD_CHEATSHEET_TIP_SEEN);
+    return result[KEY_KBD_CHEATSHEET_TIP_SEEN] === true;
+  } catch {
+    return false;
+  }
+}
+
+export async function setKbdCheatsheetTipSeen(): Promise<void> {
+  try {
+    await chrome.storage.local.set({ [KEY_KBD_CHEATSHEET_TIP_SEEN]: true });
   } catch {
     // Non-critical
   }
