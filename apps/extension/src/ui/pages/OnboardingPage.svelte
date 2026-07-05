@@ -3,8 +3,7 @@
   import OnboardingWizard from '../organisms/OnboardingWizard.svelte';
   import type { UserProfile } from '$lib/core/types/profile';
   import { getProfile, saveProfile as persistProfile } from '$lib/shell/facades/settings.facade';
-  import { profileMachine } from '$lib/shell/machines/profile.machine';
-  import { createSvelteActor } from '$lib/shell/state/xstate.svelte';
+  import { createProfileStore } from '$lib/state/profile.svelte';
   import {
     DEFAULT_CONNECTED_ALERT_PREFERENCES,
     type ConnectedAlertPreferences,
@@ -18,15 +17,11 @@
 
   const { onComplete, onSkip }: { onComplete?: () => void; onSkip?: () => void } = $props();
 
-  const profileActor = createSvelteActor(profileMachine, {
-    input: {
-      deps: {
-        loadProfile: getProfile,
-        saveProfile: async (profile) => {
-          await persistProfile(profile);
-          return profile;
-        },
-      },
+  const profileActor = createProfileStore({
+    loadProfile: getProfile,
+    saveProfile: async (profile) => {
+      await persistProfile(profile);
+      return profile;
     },
   });
 
@@ -36,7 +31,7 @@
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let isSavingAlertPreferences = $state(false);
   // Incremental profile updates from the wizard (stack add/remove, …). Kept in
-  // a local draft and forwarded to the profile machine so partial data is not
+  // a local draft and forwarded to the profile store so partial data is not
   // silently dropped between steps (B-1).
   let profileDraft = $state<UserProfile>(withProfileDefaults({}));
 
@@ -49,7 +44,7 @@
       await submitProfile(profile);
       onComplete?.();
     } catch {
-      // The machine exposes the error state to the wizard.
+      // The store exposes the error state to the wizard.
     }
   }
 
@@ -75,7 +70,7 @@
     }
   }
 
-  // Propagates incremental wizard edits to the profile machine (the in-page
+  // Propagates incremental wizard edits to the profile store (the in-page
   // store) so they are not lost between steps (B-1).
   function handleUpdateProfile(partial: Partial<UserProfile>) {
     profileDraft = withProfileDefaults({ ...profileDraft, ...partial });

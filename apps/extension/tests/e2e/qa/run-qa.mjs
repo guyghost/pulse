@@ -858,7 +858,7 @@ async function s_onboardingSkipNullProfile() {
       actual: `after skip: dev localStorage profile present=${!!profile}; feed anchor rendered=${feedAnchor > 0} (mockProfile fallback hides the null state).`,
       evidence: [evidence],
       codeRefs: [
-        'src/lib/shell/machines/app-lifecycle.machine.ts:134-142',
+        'src/lib/state/app-navigation.svelte.ts:120-140',
         'src/dev/chrome-stubs.ts:108,163-164',
       ],
     });

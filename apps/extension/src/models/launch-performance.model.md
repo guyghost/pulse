@@ -199,9 +199,10 @@ the initial cold boot (feed).
 
 - **Icon registry lazy-split** — already a separate lazy chunk; NOT on the
   critical path. No action.
-- **`app-lifecycle.machine.ts` removal** — dead code (only imported by a test),
-  lives in a lazy `xstate.svelte` chunk, NOT on the critical path. Safe cleanup,
-  no perf impact.
+- **`app-lifecycle.machine.ts` removal** — DONE. XState dependency removed
+  entirely; the dead `app-lifecycle.machine.ts` and the live `profile.machine.ts`
+  were migrated to a runes-based `src/lib/state/profile.svelte.ts`. The lazy
+  `xstate.svelte` chunk (42.88 kB / 13.79 kB gzip) is gone from the build.
 - **Aggressive App-graph reduction** — the only lever that can break the floor;
   requires product-level decisions on which first-paint features to defer. Not
   undertaken without an explicit decision (see §12).

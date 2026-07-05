@@ -5,8 +5,7 @@
  * without mocks. Consumed by the feed UI to drive multi-select + bulk actions.
  *
  * A typed reducer is used instead of xstate to match the dashboard's existing
- * pure-core pattern (lib/core/dashboard.ts) and avoid a new runtime dependency
- * (xstate currently lives only in apps/extension).
+ * pure-core pattern (lib/core/dashboard.ts) and avoid a new runtime dependency.
  *
  * Invariants (asserted in tests/unit/models/batch-selection.machine.test.ts):
  *  - `APPLY_BULK` is rejected unless `selectedIds.size > 0` (guard).
