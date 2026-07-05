@@ -5,19 +5,41 @@ describe('connected dashboard operational story', () => {
   const source = readFileSync('src/routes/+page.svelte', 'utf8');
   const normalizedSource = source.replace(/\s+/g, ' ');
 
-  it('prioritizes a narrative operational state before metrics', () => {
+  it('renders a compact status banner only on attention or incident', () => {
+    // The operational story is a decision function (model) that drives a compact
+    // banner — not an always-on corporate narrative.
     expect(source).toContain('interface DashboardOperationalStory');
     expect(source).toContain('function getDashboardOperationalStory');
-    expect(source).toContain('État opérationnel');
-    expect(source).toContain('Impact');
-    expect(source).toContain('Action recommandée');
-    expect(source).toContain("Prochaine action: installer l'extension");
-    expect(source).toContain('La synchronisation demande une décision');
-    expect(source).toContain('Relance à préparer');
-    expect(source).toContain('ressort comme meilleure mission fraîche');
+    // The banner renders only for actionable tones; success never paints chrome.
+    expect(source).toContain(
+      "operationalStory.tone === 'attention' || operationalStory.tone === 'incident'"
+    );
+    // The decorative storytelling chrome is gone.
+    expect(source).not.toContain('État opérationnel');
+    expect(source).not.toContain('Action recommandée');
+    expect(source).not.toContain('Aller à l’action');
+    expect(source).not.toContain('operationalStory.signals');
+    // Copy is concrete and verifiable (counts + verbs), not vague adjectives.
+    expect(source).toContain('de sync à arbitrer');
+    expect(source).toContain('Relance à préparer:');
+    // Ordering: when it renders, the banner precedes the metrics region.
     expect(source.indexOf('operational-story-title')).toBeLessThan(
       source.indexOf('aria-label="Indicateurs candidatures"')
     );
+  });
+
+  it('hides empty hero metrics until meaningful data exists', () => {
+    // M2: metrics visibility is the source of truth for the hero metrics region.
+    expect(source).toContain('deriveMetricsVisibility');
+    expect(source).toContain('const metricsVisibility = $derived(');
+    // When every metric is empty, the 4-card grid is replaced by one honest line.
+    expect(source).toContain("metricsVisibility.phase === 'hidden'");
+    expect(source).toContain('Aucune candidature suivie');
+    // Cards render per-metric availability, so no "0 / N/A / Aucun" ever ships.
+    expect(source).toContain("metricsVisibility.availability.applications === 'has_data'");
+    expect(source).toContain("metricsVisibility.availability.interviews === 'has_data'");
+    expect(source).toContain("metricsVisibility.availability.nextFollowUp === 'has_data'");
+    expect(source).toContain("metricsVisibility.availability.averageScore === 'has_data'");
   });
 
   it('does not mark the dashboard ready before an extension is linked', () => {
@@ -36,20 +58,32 @@ describe('connected dashboard operational story', () => {
     );
   });
 
-  it('collapses empty dashboard surfaces into one setup preview', () => {
-    expect(source).toContain('interface DashboardSetupPreviewItem');
-    expect(source).toContain('const dashboardSetupPreviewItems = $derived');
-    expect(source).toContain('Surfaces activées après setup');
-    expect(source).toContain('Le dashboard évite ainsi les métriques vides ou les N/A');
-    expect(source).toContain('Pipeline activé après setup');
+  it('surfaces the mission feed as the primary dashboard surface', () => {
+    // M1: the dashboard phase is the single source of truth for what renders, in what order.
+    expect(source).toContain('deriveDashboardPhase');
+    expect(source).toContain('const dashboardPhase = $derived(');
+    expect(source).toContain('const feedIsPrimary = $derived(isFeedPrimary(dashboardPhase))');
+    // The feed renders first in onboarding + live, gated by the model (not by setup chrome).
+    expect(source).toContain("{#if dashboardPhase === 'onboarding' || feedIsPrimary}");
+    // The capped slice is gone; progressive disclosure replaces it.
+    expect(source).not.toContain('.slice(0, 6)');
+    expect(source).toContain('visibleMissionFeed');
+    expect(source).toContain('Afficher plus de missions');
+    // The "Surfaces activées après setup" preview grid + its vacuous-metrics line are gone.
+    expect(source).not.toContain('Surfaces activées après setup');
+    expect(source).not.toContain('dashboardSetupPreviewItems');
+    expect(source).not.toContain('DashboardSetupPreviewItem');
+    expect(source).not.toContain('Le dashboard évite ainsi les métriques vides ou les N/A');
+    // Metrics remain in the authenticated surface, behind the setup guard (tightened next).
     expect(source).toContain('{#if !setupRequired}');
     expect(source).toContain('aria-label="Indicateurs candidatures"');
   });
 
-  it('keeps dashboard navigation vocabulary stable', () => {
+  it('keeps core dashboard vocabulary without an in-page anchor nav', () => {
     expect(source).toContain('Candidatures');
-    expect(source).toContain('>Synchronisation</a');
-    expect(source).toContain('href="#cv">CV</a');
+    // The 3-tab anchor nav that sat between the user and the feed is removed (distill).
+    expect(normalizedSource).not.toContain('>Synchronisation</a');
+    expect(normalizedSource).not.toContain('href="#cv">CV</a');
     expect(normalizedSource).not.toContain('> Explore </a');
     expect(normalizedSource).not.toContain('> Profil CV </a');
     expect(normalizedSource).not.toContain('> Synchronisations</a');

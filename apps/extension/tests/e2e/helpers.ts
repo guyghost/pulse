@@ -117,6 +117,13 @@ export async function openDevPanel(page: Page) {
   ) {
     return;
   }
+  // Wait for DevPanel component to finish loading (it's dynamically imported in App.svelte)
+  await page.waitForFunction(
+    () => {
+      return (window as unknown as { __devPanelReady?: boolean }).__devPanelReady === true;
+    },
+    { timeout: 10000 }
+  );
   await page.keyboard.press('Control+Shift+KeyD');
   await expect(page.getByText('DEV PANEL')).toBeVisible({ timeout: 10000 });
 }

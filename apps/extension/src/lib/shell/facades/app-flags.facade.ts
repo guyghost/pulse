@@ -54,3 +54,15 @@ export async function clearFeedTourSeen(): Promise<void> {
     throw new Error('Feed tour flag clear failed.');
   }
 }
+
+export async function getKbdCheatsheetTipSeen(): Promise<boolean> {
+  const response = await sendMessage({ type: 'GET_KBD_CHEATSHEET_TIP_SEEN' });
+  return response.type === 'KBD_CHEATSHEET_TIP_SEEN_RESULT' ? response.payload : false;
+}
+
+export async function setKbdCheatsheetTipSeen(): Promise<void> {
+  const response = await sendMessage({ type: 'SET_KBD_CHEATSHEET_TIP_SEEN' });
+  if (response.type !== 'KBD_CHEATSHEET_TIP_SEEN_SET' || !response.payload.saved) {
+    throw new Error('Keyboard cheatsheet tip flag save failed.');
+  }
+}

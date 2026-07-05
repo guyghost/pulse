@@ -65,5 +65,13 @@
     >
       <Icon name="x" size={14} />
     </button>
+  {:else}
+    <kbd
+      class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 select-none rounded-md border border-border-light bg-subtle-gray px-1.5 py-0.5 font-mono text-[10px] font-medium text-text-muted"
+      aria-hidden="true"
+      title="Appuyez sur / pour rechercher"
+    >
+      /
+    </kbd>
   {/if}
 </div>

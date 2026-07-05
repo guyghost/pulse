@@ -1,6 +1,28 @@
 import '../ui/design-tokens.css';
 import App from './App.svelte';
 import { mount } from 'svelte';
+import { launchMarks } from '../lib/shell/metrics';
+
+// Install launch marks before any async work so FCP / CSS resource timing is captured.
+launchMarks.install();
+
+// Model §5 — phase-3 overlap: start the FeedPage chunk fetch+compile now, in
+// parallel with the main bundle mount. ES module imports are singletons, so
+// App.svelte's later loadPage('feed') reuses this in-flight promise. Marks fire
+// here so the harness records the true chunk-resolve time, not the post-rAF time.
+launchMarks.markImportStart('feed');
+void import('../ui/pages/FeedPage.svelte')
+  .then(() => {
+    launchMarks.markPageLoaded('feed');
+  })
+  .catch((err: unknown) => {
+    if (import.meta.env.DEV) {
+      console.warn('[MissionPulse] FeedPage pre-warm failed; will retry on navigation', err);
+    }
+    // Do not mark the page as loaded: the snapshot should honestly reflect that
+    // the pre-warm did not resolve. App.svelte's loadPage('feed') re-attempts the
+    // import on first navigation and surfaces any real error through that path.
+  });
 
 async function init() {
   if (import.meta.env.DEV) {
@@ -16,9 +38,15 @@ async function init() {
   }
 
   const initialShells = Array.from(target.querySelectorAll('[data-initial-shell]'));
+  // P1: commit-to-mount signal for shell-boot.ts. Once this is set, the async
+  // sendMessage callback in shell-boot must never rewrite #app (it would wipe
+  // the mounted Svelte tree or strand an uncaptured skeleton). Set synchronously
+  // here so capture -> signal -> mount never yields to a microtask.
+  (window as unknown as { __missionPulseAppMounted?: boolean }).__missionPulseAppMounted = true;
   mount(App, {
     target,
   });
+  launchMarks.markAppMounted();
   window.setTimeout(() => {
     for (const shell of initialShells) {
       shell.remove();

@@ -46,8 +46,7 @@ import {
   normalizeTextInput,
   withProfileDefaults,
 } from '$lib/core/profile/normalize-profile';
-import { profileMachine, type ProfileStatus } from '$lib/shell/machines/profile.machine';
-import { createSvelteActor } from '$lib/shell/state/xstate.svelte';
+import { createProfileStore, type ProfileStatus } from '$lib/state/profile.svelte';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
@@ -88,15 +87,11 @@ const exportFormatLabels: Record<ExportFormat, string> = {
 export class SettingsPageController {
   private readonly unsubscribeProfileMessages = this.subscribeProfileMessages();
 
-  private readonly profileActor = createSvelteActor(profileMachine, {
-    input: {
-      deps: {
-        loadProfile: getProfile,
-        saveProfile: async (profile) => {
-          await saveProfile(profile);
-          return profile;
-        },
-      },
+  private readonly profileActor = createProfileStore({
+    loadProfile: getProfile,
+    saveProfile: async (profile) => {
+      await saveProfile(profile);
+      return profile;
     },
   });
 

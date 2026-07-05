@@ -482,6 +482,7 @@
     <div class="mt-4">
       <OperationalStoryCard
         eyebrow="Priorité"
+        variant="compact"
         title={applicationStory.title}
         description={applicationStory.description}
         severity={applicationStory.severity}

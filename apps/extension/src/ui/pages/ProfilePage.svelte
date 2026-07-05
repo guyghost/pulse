@@ -218,6 +218,7 @@
     <div class="mt-4">
       <OperationalStoryCard
         eyebrow="Impact du profil"
+        variant="compact"
         title={profileStory.title}
         description={profileStory.description}
         severity={profileStory.severity}

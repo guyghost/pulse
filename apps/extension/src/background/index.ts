@@ -61,10 +61,12 @@ import {
   clearOnboardingCompleted,
   getFeedTourSeen,
   getFirstScanDone,
+  getKbdCheatsheetTipSeen,
   getOnboardingCompleted,
   getProfileBannerDismissed,
   setFeedTourSeen,
   setFirstScanDone,
+  setKbdCheatsheetTipSeen,
   setOnboardingCompleted,
   setProfileBannerDismissed,
 } from '../lib/shell/storage/first-scan';
@@ -797,6 +799,30 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    if (message.type === 'GET_KBD_CHEATSHEET_TIP_SEEN') {
+      getKbdCheatsheetTipSeen()
+        .then((seen) => {
+          sendResponse({ type: 'KBD_CHEATSHEET_TIP_SEEN_RESULT', payload: seen });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_KBD_CHEATSHEET_TIP_SEEN error:', err);
+          sendResponse({ type: 'KBD_CHEATSHEET_TIP_SEEN_RESULT', payload: false });
+        });
+      return true;
+    }
+
+    if (message.type === 'SET_KBD_CHEATSHEET_TIP_SEEN') {
+      setKbdCheatsheetTipSeen()
+        .then(() => {
+          sendResponse({ type: 'KBD_CHEATSHEET_TIP_SEEN_SET', payload: { saved: true } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SET_KBD_CHEATSHEET_TIP_SEEN error:', err);
+          sendResponse({ type: 'KBD_CHEATSHEET_TIP_SEEN_SET', payload: { saved: false } });
+        });
+      return true;
+    }
+
     if (message.type === 'VERIFY_PROFILE_PAGE') {
       verifyProfilePage(message.payload.url, message.payload.fields)
         .then((result) => {
@@ -1285,6 +1311,9 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       console.debug('[MissionPulse] Daily digest triggered');
     }
     await sendDailyDigest();
+    // Reschedule the next fire. The alarm is one-shot (no periodInMinutes) so
+    // that recomputing DIGEST_HOUR in local time keeps it stable across DST.
+    scheduleDailyDigestAlarm();
     return;
   }
 

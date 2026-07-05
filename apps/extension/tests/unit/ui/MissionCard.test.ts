@@ -136,7 +136,7 @@ describe('MissionCard', () => {
   it('affiche le score avec la bonne couleur pour score >= 80', async () => {
     const target = mountCard({ mission: makeMission({ score: 85 }) });
     await tick();
-    const scoreEl = target.querySelector('.font-mono.font-semibold');
+    const scoreEl = target.querySelector('.font-mono.font-bold');
     expect(scoreEl).not.toBeNull();
     expect(scoreEl!.textContent).toContain('85');
     expect(scoreEl!.className).toContain('text-accent-green');
@@ -145,7 +145,7 @@ describe('MissionCard', () => {
   it('affiche le score avec la bonne couleur pour score entre 50 et 79', async () => {
     const target = mountCard({ mission: makeMission({ score: 65 }) });
     await tick();
-    const scoreEl = target.querySelector('.font-mono.font-semibold');
+    const scoreEl = target.querySelector('.font-mono.font-bold');
     expect(scoreEl).not.toBeNull();
     expect(scoreEl!.textContent).toContain('65');
     expect(scoreEl!.className).toContain('text-accent-amber');
