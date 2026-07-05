@@ -1021,16 +1021,9 @@
           <section class="mt-6" aria-labelledby="mission-feed-title">
             <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p class="eyebrow text-text-subtle">Feed connecté</p>
-                <div class="mt-1 flex flex-wrap items-center gap-2">
-                  <h2 id="mission-feed-title" class="text-lg font-semibold text-text-primary">
-                    Missions détectées par l'extension
-                  </h2>
-                  <Badge
-                    label={missionFeed.length > 0 ? 'Synchronisé' : 'En attente extension'}
-                    variant={missionFeed.length > 0 ? 'success' : 'source'}
-                  />
-                </div>
+                <h2 id="mission-feed-title" class="text-lg font-semibold text-text-primary">
+                  Missions détectées par l'extension
+                </h2>
               </div>
               <div class="flex flex-wrap items-center gap-3">
                 <p class="text-sm text-text-subtle">
@@ -1587,22 +1580,15 @@
         {/if}
 
         {#if !setupRequired}
-          <section
-            class="mb-6 rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
-            aria-labelledby="success-milestones-title"
-          >
+          <section class="mb-8" aria-labelledby="success-milestones-title">
             <div class="flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p class="eyebrow text-text-subtle">Résultats débloqués</p>
-                <h2
-                  id="success-milestones-title"
-                  class="mt-1 text-lg font-semibold text-text-primary"
-                >
+                <h2 id="success-milestones-title" class="text-lg font-semibold text-text-primary">
                   Jalons de confiance
                 </h2>
                 <p class="mt-2 max-w-3xl text-sm leading-6 text-text-subtle">
-                  Les premiers gains concrets restent visibles: mission qualifiée, relance traitée,
-                  CV prêt et export disponible.
+                  Résultats débloqués: mission qualifiée, relance traitée, CV prêt et export
+                  disponible.
                 </p>
               </div>
             </div>
@@ -1701,8 +1687,7 @@
           <section id="tjm" class="mt-6" aria-labelledby="tjm-radar-title">
             <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p class="eyebrow text-text-subtle">Radar TJM</p>
-                <h2 id="tjm-radar-title" class="mt-1 text-lg font-semibold text-text-primary">
+                <h2 id="tjm-radar-title" class="text-lg font-semibold text-text-primary">
                   Tendances marché synchronisées
                 </h2>
               </div>
@@ -1839,8 +1824,7 @@
           <section class="mt-6" aria-labelledby="feature-flags-title">
             <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p class="eyebrow text-text-subtle">Feature flipping</p>
-                <h2 id="feature-flags-title" class="mt-1 text-lg font-semibold text-text-primary">
+                <h2 id="feature-flags-title" class="text-lg font-semibold text-text-primary">
                   Fonctionnalités disponibles sur le dashboard
                 </h2>
               </div>
@@ -1879,11 +1863,7 @@
           <section id="comparison" class="mt-6" aria-labelledby="mission-comparison-title">
             <div class="mb-3 flex flex-col gap-2 md:flex-row md:items-end md:justify-between">
               <div>
-                <p class="eyebrow text-text-subtle">Shortlist</p>
-                <h2
-                  id="mission-comparison-title"
-                  class="mt-1 text-lg font-semibold text-text-primary"
-                >
+                <h2 id="mission-comparison-title" class="text-lg font-semibold text-text-primary">
                   Comparaison des missions prioritaires
                 </h2>
               </div>
@@ -1982,8 +1962,7 @@
               <article class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm">
                 <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
                   <div>
-                    <p class="eyebrow text-text-subtle">Candidatures</p>
-                    <h2 class="mt-2 text-lg font-semibold text-text-primary">
+                    <h2 class="text-lg font-semibold text-text-primary">
                       Pipeline activé après setup
                     </h2>
                     <p class="mt-2 max-w-2xl text-sm leading-6 text-text-subtle">
@@ -2149,8 +2128,7 @@
               <section class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm">
                 <div class="flex items-start justify-between gap-4">
                   <div>
-                    <p class="eyebrow text-text-subtle">Candidature active</p>
-                    <h2 class="mt-2 text-lg font-semibold leading-tight">
+                    <h2 class="text-lg font-semibold leading-tight">
                       {selectedApplication.title}
                     </h2>
                     <p class="mt-1 text-sm text-text-subtle">
@@ -2450,8 +2428,7 @@
               <section class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm">
                 <div class="flex items-start justify-between gap-4">
                   <div>
-                    <p class="eyebrow text-text-subtle">Historique IA</p>
-                    <h2 class="mt-2 text-lg font-semibold">Assets générés</h2>
+                    <h2 class="text-lg font-semibold">Assets générés</h2>
                   </div>
                   <Badge label={`${generatedAssets.length}`} variant="source" size="md" />
                 </div>
@@ -2493,8 +2470,7 @@
             >
               <div class="flex items-start justify-between gap-4">
                 <div>
-                  <p class="eyebrow text-text-subtle">Profil candidat</p>
-                  <h2 class="mt-2 text-lg font-semibold">CV principal</h2>
+                  <h2 class="text-lg font-semibold">CV principal</h2>
                   <p class="mt-1 text-sm text-text-subtle">{cvDisplayTitle}</p>
                 </div>
                 <Badge
@@ -2926,8 +2902,7 @@
               id="sync"
               class="rounded-xl border border-border-light bg-surface-white p-5 shadow-sm"
             >
-              <p class="eyebrow text-text-subtle">Connecteurs</p>
-              <h2 class="mt-2 text-lg font-semibold">Synchronisation extension</h2>
+              <h2 class="text-lg font-semibold">Synchronisation extension</h2>
               <p class="mt-1 text-sm leading-6 text-text-subtle">
                 {readiness.readyPlatforms}/{readiness.totalPlatforms} plateformes prêtes. La synchro CV
                 est activée uniquement pour les comptes connectés; le dashboard prépare le plan, et l'extension
@@ -3373,8 +3348,7 @@
         >
           <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
             <div>
-              <p class="eyebrow text-text-subtle">Confidentialité</p>
-              <h2 id="privacy-title" class="mt-1 text-lg font-semibold text-text-primary">
+              <h2 id="privacy-title" class="text-lg font-semibold text-text-primary">
                 Données connectées
               </h2>
               <p class="mt-2 text-sm leading-6 text-text-subtle">
