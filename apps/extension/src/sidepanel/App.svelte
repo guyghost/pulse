@@ -12,6 +12,7 @@
   import { createAppNavigation, NAV_ITEMS, type Page } from '$lib/state/app-navigation.svelte';
   import { createThemeStore } from '$lib/state/theme.svelte';
   import { premium } from '$lib/state/premium.svelte';
+  import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
 
   const nav = createAppNavigation();
   const theme = createThemeStore();
@@ -28,44 +29,58 @@
 
   function loadPage(page: Page): void {
     if (page === 'feed' && !FeedPage) {
+      launchMarks.markImportStart('feed');
       import('../ui/pages/FeedPage.svelte').then((m) => {
         FeedPage = m.default;
+        launchMarks.markPageLoaded('feed');
       });
       return;
     }
     if (page === 'profile' && !ProfilePage) {
+      launchMarks.markImportStart('profile');
       import('../ui/pages/ProfilePage.svelte').then((m) => {
         ProfilePage = m.default;
+        launchMarks.markPageLoaded('profile');
       });
       return;
     }
     if (page === 'cv' && !CvPage) {
+      launchMarks.markImportStart('cv');
       import('../ui/pages/CvPage.svelte').then((m) => {
         CvPage = m.default;
+        launchMarks.markPageLoaded('cv');
       });
       return;
     }
     if (page === 'applications' && !ApplicationsPage) {
+      launchMarks.markImportStart('applications');
       import('../ui/pages/ApplicationsPage.svelte').then((m) => {
         ApplicationsPage = m.default;
+        launchMarks.markPageLoaded('applications');
       });
       return;
     }
     if (page === 'tjm' && !TJMPage) {
+      launchMarks.markImportStart('tjm');
       import('../ui/pages/TJMPage.svelte').then((m) => {
         TJMPage = m.default;
+        launchMarks.markPageLoaded('tjm');
       });
       return;
     }
     if (page === 'settings' && !SettingsPage) {
+      launchMarks.markImportStart('settings');
       import('../ui/pages/SettingsPage.svelte').then((m) => {
         SettingsPage = m.default;
+        launchMarks.markPageLoaded('settings');
       });
       return;
     }
     if (page === 'onboarding' && !OnboardingPage) {
+      launchMarks.markImportStart('onboarding');
       import('../ui/pages/OnboardingPage.svelte').then((m) => {
         OnboardingPage = m.default;
+        launchMarks.markPageLoaded('onboarding');
       });
     }
   }

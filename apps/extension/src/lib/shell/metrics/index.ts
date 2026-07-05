@@ -23,3 +23,6 @@ export {
   markPerformance,
   measurePerformance,
 } from './performance-monitor';
+
+// Launch performance marks (production-safe)
+export { launchMarks } from './launch-marks';

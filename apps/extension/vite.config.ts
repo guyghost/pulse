@@ -31,6 +31,8 @@ export default defineConfig({
     conditions: ['browser', 'import', 'module', 'default'],
   },
   build: {
+    // Extension runs in Chrome only — emit modern ESNext, skip down-level transpile.
+    target: 'esnext',
     modulePreload: { polyfill: false },
     chunkSizeWarningLimit: 600,
     outDir: 'dist',
