@@ -26,11 +26,12 @@ function expectApplicationUpdateBeforeEventUpsert(section: string): void {
 
 describe('dashboard pipeline event write order', () => {
   it('does not insert transition events before optimistic-lock application updates', () => {
+    // The shared applyMissionStageTransition helper owns the detected→target
+    // write path for both per-mission and bulk actions, so the invariant only
+    // needs to hold there (single occurrence) plus the standalone
+    // transitionApplication action.
     expectApplicationUpdateBeforeEventUpsert(
       sourceAfter("if (existingApplication.stage === 'detected') {")
-    );
-    expectApplicationUpdateBeforeEventUpsert(
-      sourceAfter("if (existingApplication.stage === 'detected') {", 2)
     );
     expectApplicationUpdateBeforeEventUpsert(sourceAfter('transitionApplication: async'));
   });

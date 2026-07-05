@@ -22,6 +22,9 @@
     canShowSetupChecklist,
   } from '../models/dashboard-surface.model';
   import { deriveMetricsVisibility } from '../models/metrics-visibility.model';
+  import type { BulkAction, BulkSummary } from '../models/batch-selection.machine';
+  import { BatchSelectionStore } from '$lib/state/batch-selection.svelte';
+  import { enhance, type SubmitFunction } from '$app/forms';
   import type { ActionData, PageData } from './$types';
   import type {
     ApplicationStage,
@@ -124,6 +127,86 @@
     if (feedVisibleCount > filteredMissionFeed.length) {
       feedVisibleCount = FEED_PAGE_SIZE;
     }
+  });
+  // M3 — batch selection: the pure transition table drives multi-select + bulk actions.
+  // The store only sends events; the model decides every transition.
+  const batchSelection = new BatchSelectionStore();
+  const batchVisibleIds = $derived(visibleMissionFeed.map((mission) => mission.id));
+  function batchEnter() {
+    batchSelection.enterSelectMode();
+  }
+  function batchExit() {
+    batchSelection.exitSelectMode();
+  }
+  function batchToggle(id: string) {
+    batchSelection.toggle(id);
+  }
+  function batchSelectAllVisible() {
+    batchSelection.selectVisible(batchVisibleIds);
+  }
+  function batchClear() {
+    batchSelection.clear();
+  }
+  function batchDismiss() {
+    batchSelection.dismiss();
+  }
+  function batchFeedbackLabel(summary: BulkSummary): string {
+    const verb = summary.action === 'archive' ? 'Archivées' : 'Sélectionnées';
+    const skipped = summary.skippedCount > 0 ? ` · ${summary.skippedCount} ignorée(s)` : '';
+    return `${verb}: ${summary.appliedCount}/${summary.requestedCount}${skipped}`;
+  }
+  interface BulkActionResult {
+    action: BulkAction;
+    applied: number;
+    skipped: number;
+    total: number;
+  }
+  function bulkSubmitFactory(action: BulkAction): SubmitFunction {
+    return () => {
+      batchSelection.apply(action);
+      return async ({ result, update }) => {
+        if (result.type === 'success') {
+          const payload = result.data as { bulkSelectionSuccess?: BulkActionResult } | undefined;
+          const resultSummary = payload?.bulkSelectionSuccess;
+          if (resultSummary) {
+            batchSelection.reportSuccess({
+              action: resultSummary.action,
+              requestedCount: resultSummary.total,
+              appliedCount: resultSummary.applied,
+              skippedCount: resultSummary.skipped,
+            });
+          }
+          await update();
+          return;
+        }
+        if (result.type === 'failure') {
+          const payload = result.data as { bulkSelectionError?: string } | undefined;
+          batchSelection.reportError(payload?.bulkSelectionError ?? "Échec de l'opération en lot.");
+          return;
+        }
+        await update();
+      };
+    };
+  }
+  const bulkArchiveEnhance = bulkSubmitFactory('archive');
+  const bulkSelectEnhance = bulkSubmitFactory('select');
+  let bulkDismissTimer: ReturnType<typeof setTimeout> | null = null;
+  $effect(() => {
+    if (batchSelection.status === 'done') {
+      if (bulkDismissTimer) {
+        clearTimeout(bulkDismissTimer);
+      }
+      bulkDismissTimer = setTimeout(() => {
+        batchSelection.dismiss();
+        bulkDismissTimer = null;
+      }, 4000);
+    }
+    return () => {
+      if (bulkDismissTimer) {
+        clearTimeout(bulkDismissTimer);
+        bulkDismissTimer = null;
+      }
+    };
   });
   const hasDashboardSnapshots = $derived(
     missionFeed.length > 0 || applications.length > 0 || connectedSyncStatuses.length > 0
@@ -949,10 +1032,31 @@
                   />
                 </div>
               </div>
-              <p class="text-sm text-text-subtle">
-                {filteredMissionFeed.length}/{missionFeed.length} affichées, {freshMissionCount}
-                fraîches
-              </p>
+              <div class="flex flex-wrap items-center gap-3">
+                <p class="text-sm text-text-subtle">
+                  {filteredMissionFeed.length}/{missionFeed.length} affichées, {freshMissionCount}
+                  fraîches
+                </p>
+                {#if missionFeed.length > 0}
+                  {#if batchSelection.isSelecting}
+                    <button
+                      type="button"
+                      onclick={batchExit}
+                      class="inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-subtle hover:bg-subtle-gray focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+                    >
+                      Annuler
+                    </button>
+                  {:else}
+                    <button
+                      type="button"
+                      onclick={batchEnter}
+                      class="inline-flex h-8 items-center rounded-lg border border-border-light bg-surface-white px-3 text-xs font-medium text-text-primary hover:bg-subtle-gray focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+                    >
+                      Sélectionner
+                    </button>
+                  {/if}
+                {/if}
+              </div>
             </div>
 
             {#if form?.selectionError}
@@ -1075,10 +1179,27 @@
 
               {#each visibleMissionFeed as mission}
                 <article
-                  class="rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+                  class={[
+                    'rounded-xl border bg-surface-white p-4 shadow-subtle-2',
+                    batchSelection.isSelecting && batchSelection.isSelected(mission.id)
+                      ? 'border-blueprint-blue/40 ring-1 ring-blueprint-blue/30'
+                      : 'border-border-light',
+                  ].join(' ')}
                 >
                   <div class="flex items-start justify-between gap-3">
-                    <div class="flex flex-wrap gap-1.5">
+                    <div class="flex flex-wrap items-center gap-1.5">
+                      {#if batchSelection.isSelecting}
+                        <label class="flex items-center">
+                          <input
+                            type="checkbox"
+                            class="h-4 w-4 rounded border-border-light text-blueprint-blue focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+                            checked={batchSelection.isSelected(mission.id)}
+                            disabled={batchSelection.isLocked}
+                            onchange={() => batchToggle(mission.id)}
+                          />
+                          <span class="sr-only">Sélectionner {mission.title}</span>
+                        </label>
+                      {/if}
                       <Badge label={sourceLabels[mission.source]} variant="source" />
                       {#if mission.sourceHealthStatus}
                         <Badge
@@ -1162,7 +1283,7 @@
                     <span class="text-xs text-text-subtle">{formatDate(mission.scrapedAt)}</span>
                     {#if mission.applicationStage}
                       <Badge label={stageLabels[mission.applicationStage]} variant="status" />
-                    {:else if isConnected}
+                    {:else if !batchSelection.isSelecting && isConnected}
                       <div class="flex items-center gap-2">
                         <form method="POST" action="?/archiveMission">
                           <input type="hidden" name="missionId" value={mission.id} />
@@ -1183,7 +1304,7 @@
                           </button>
                         </form>
                       </div>
-                    {:else}
+                    {:else if !batchSelection.isSelecting}
                       <a
                         class="text-xs font-medium text-blueprint-blue hover:text-text-primary"
                         href={mission.url}
@@ -1209,6 +1330,95 @@
                     ({visibleMissionFeed.length}/{filteredMissionFeed.length})
                   </span>
                 </button>
+              </div>
+            {/if}
+            {#if batchSelection.status !== 'idle'}
+              <div
+                class="sticky bottom-4 z-30 mt-4 rounded-xl border border-border-light bg-surface-white/95 px-4 py-3 shadow-subtle-2 backdrop-blur supports-[backdrop-filter]:bg-surface-white/90"
+                role="region"
+                aria-label="Actions par lot"
+              >
+                {#if batchSelection.status === 'done' && batchSelection.summary}
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-xs leading-5 text-accent-green">
+                      {batchFeedbackLabel(batchSelection.summary)}
+                    </p>
+                    <button
+                      type="button"
+                      onclick={batchDismiss}
+                      class="text-xs font-medium text-text-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                {:else if batchSelection.status === 'error'}
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-xs leading-5 text-status-red">{batchSelection.errorMessage}</p>
+                    <button
+                      type="button"
+                      onclick={batchDismiss}
+                      class="text-xs font-medium text-text-subtle hover:text-text-primary focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+                    >
+                      Fermer
+                    </button>
+                  </div>
+                {:else}
+                  <div class="flex flex-wrap items-center justify-between gap-3">
+                    <p class="text-xs font-medium text-text-subtle">
+                      {batchSelection.count} sélectionnée{batchSelection.count > 1 ? 's' : ''}
+                    </p>
+                    <div class="flex flex-wrap items-center gap-2">
+                      <button
+                        type="button"
+                        onclick={batchSelectAllVisible}
+                        disabled={batchSelection.isLocked}
+                        class="inline-flex h-8 items-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-medium text-text-primary hover:bg-subtle-gray focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Tout sélectionner ({batchVisibleIds.length})
+                      </button>
+                      <button
+                        type="button"
+                        onclick={batchClear}
+                        disabled={batchSelection.isLocked || batchSelection.count === 0}
+                        class="inline-flex h-8 items-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-medium text-text-subtle hover:bg-subtle-gray focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-not-allowed disabled:opacity-50"
+                      >
+                        Effacer
+                      </button>
+                      <form
+                        method="POST"
+                        action="?/bulkArchiveMissions"
+                        use:enhance={bulkArchiveEnhance}
+                      >
+                        {#each [...batchSelection.selectedIds] as missionId}
+                          <input type="hidden" name="missionIds" value={missionId} />
+                        {/each}
+                        <button
+                          type="submit"
+                          disabled={batchSelection.isLocked || batchSelection.count === 0}
+                          class="inline-flex h-8 items-center rounded-lg border border-border-light bg-page-canvas px-3 text-xs font-medium text-text-subtle hover:bg-subtle-gray focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Archiver ({batchSelection.count})
+                        </button>
+                      </form>
+                      <form
+                        method="POST"
+                        action="?/bulkSelectMissions"
+                        use:enhance={bulkSelectEnhance}
+                      >
+                        {#each [...batchSelection.selectedIds] as missionId}
+                          <input type="hidden" name="missionIds" value={missionId} />
+                        {/each}
+                        <button
+                          type="submit"
+                          disabled={batchSelection.isLocked || batchSelection.count === 0}
+                          class="inline-flex h-8 items-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-not-allowed disabled:opacity-50"
+                        >
+                          Sélectionner ({batchSelection.count})
+                        </button>
+                      </form>
+                    </div>
+                  </div>
+                {/if}
               </div>
             {/if}
           </section>
