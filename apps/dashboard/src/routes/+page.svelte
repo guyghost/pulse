@@ -24,8 +24,8 @@
   import { deriveMetricsVisibility } from '../models/metrics-visibility.model';
   import type { BulkAction, BulkSummary } from '../models/batch-selection.machine';
   import { BatchSelectionStore } from '$lib/state/batch-selection.svelte';
-  import { enhance, type SubmitFunction } from '$app/forms';
-  import type { ActionData, PageData } from './$types';
+  import { enhance } from '$app/forms';
+  import type { ActionData, PageData, SubmitFunction } from './$types';
   import type {
     ApplicationStage,
     ApplicationTimelineEvent,
@@ -99,37 +99,16 @@
       isConnected,
       configurationMissing,
       hasConnectedExtension,
-      missionFeedCount: missionFeed.length,
+      missionFeedLength: missionFeed.length,
     })
   );
   const feedIsPrimary = $derived(isFeedPrimary(dashboardPhase));
-  // M2 — metrics visibility: empty hero metrics are omitted, never shown as 0 / N/A.
-  const metricsVisibility = $derived(
-    deriveMetricsVisibility({
-      applicationCount: applications.length,
-      averageScore,
-      interviewCount: counts.interview,
-      nextFollowUp,
-    })
-  );
-  // Progressive disclosure: show the feed, not a capped slice. Reveal in pages.
-  const FEED_PAGE_SIZE = 12;
-  let feedVisibleCount = $state(FEED_PAGE_SIZE);
-  const visibleMissionFeed = $derived(filteredMissionFeed.slice(0, feedVisibleCount));
-  const canRevealMoreMissions = $derived(feedVisibleCount < filteredMissionFeed.length);
-  function revealMoreMissions() {
-    feedVisibleCount = Math.min(feedVisibleCount + FEED_PAGE_SIZE, filteredMissionFeed.length);
-  }
-  $effect(() => {
-    // When filters narrow below the visible window, snap back to the first page.
-    if (feedVisibleCount > filteredMissionFeed.length) {
-      feedVisibleCount = FEED_PAGE_SIZE;
-    }
-  });
+  // M2 metrics-visibility and the progressive-disclosure feed cluster are declared below,
+  // after `averageScore`, `nextFollowUp`, and `filteredMissionFeed` come into scope.
   // M3 — batch selection: the pure transition table drives multi-select + bulk actions.
   // The store only sends events; the model decides every transition.
   const batchSelection = new BatchSelectionStore();
-  const batchVisibleIds = $derived(visibleMissionFeed.map((mission) => mission.id));
+  // `batchVisibleIds` is derived near `visibleMissionFeed`, below `filteredMissionFeed`.
   function batchEnter() {
     batchSelection.enterSelectMode();
   }
@@ -281,6 +260,15 @@
   let privacyConfirmation = $state('');
   const averageScore = $derived(getAverageApplicationScore(applications));
   const nextFollowUp = $derived(getNextFollowUp(applications));
+  // M2 — metrics visibility: empty hero metrics are omitted, never shown as 0 / N/A.
+  const metricsVisibility = $derived(
+    deriveMetricsVisibility({
+      applicationCount: applications.length,
+      averageScore,
+      interviewCount: counts.interview,
+      nextFollowUp,
+    })
+  );
   const canDeleteConnectedData = $derived(isConnected && privacyConfirmation === 'SUPPRIMER');
   const applicationCountBadgeLabel = $derived(
     applications.length > 0
@@ -328,6 +316,21 @@
       sourceLabels
     )
   );
+  // Progressive disclosure: show the feed, not a capped slice. Reveal in pages.
+  const FEED_PAGE_SIZE = 12;
+  let feedVisibleCount = $state(FEED_PAGE_SIZE);
+  const visibleMissionFeed = $derived(filteredMissionFeed.slice(0, feedVisibleCount));
+  const canRevealMoreMissions = $derived(feedVisibleCount < filteredMissionFeed.length);
+  function revealMoreMissions() {
+    feedVisibleCount = Math.min(feedVisibleCount + FEED_PAGE_SIZE, filteredMissionFeed.length);
+  }
+  $effect(() => {
+    // When filters narrow below the visible window, snap back to the first page.
+    if (feedVisibleCount > filteredMissionFeed.length) {
+      feedVisibleCount = FEED_PAGE_SIZE;
+    }
+  });
+  const batchVisibleIds = $derived(visibleMissionFeed.map((mission) => mission.id));
   const selectedApplication = $derived(
     filteredApplications.find((application) => application.id === selectedApplicationId) ??
       filteredApplications[0] ??
