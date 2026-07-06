@@ -248,11 +248,16 @@
           </span>
         {/if}
       </div>
-      <h3 class="mt-2 text-[0.9375rem] font-medium leading-snug text-text-primary">
+      <h3
+        class="mt-2 line-clamp-2 break-words text-[0.9375rem] font-medium leading-snug text-text-primary"
+        title={mission.title}
+      >
         {mission.title}
       </h3>
       {#if mission.client}
-        <p class="mt-1 text-xs text-text-subtle">{mission.client}</p>
+        <p class="mt-1 line-clamp-1 break-words text-xs text-text-subtle" title={mission.client}>
+          {mission.client}
+        </p>
       {/if}
     </div>
     <div class="flex shrink-0 items-center gap-2">
