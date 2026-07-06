@@ -5,6 +5,7 @@ import {
   isPending,
   getPending,
   DEFAULT_UNDO_WINDOW_MS,
+  type UndoState,
   type UndoEvent,
 } from '../../../src/lib/core/undo/undo-window';
 
@@ -158,6 +159,17 @@ describe('reduceUndoWindow — TIMEOUT / DISMISS', () => {
     expect(effect.kind).toBe('none');
   });
 });
+
+function reduceUndoState(): UndoState<Snap> {
+  return reduceUndoWindow(createUndoState<Snap>(), {
+    type: 'REQUEST',
+    kind: 'delete-view',
+    targetId: 'v1',
+    snapshot: snap('prev'),
+    requestedAt: NOW,
+    durationMs: DURATION,
+  }).state;
+}
 
 describe('reduceUndoWindow — EXPIRE_ALL (safety net)', () => {
   it('commits only entries whose deadline <= now (I6) and never expires an open window early', () => {
