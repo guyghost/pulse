@@ -229,19 +229,6 @@
     onNavigateToProfile,
   }: { onNavigateToOnboarding?: () => void; onNavigateToProfile?: () => void } = $props();
 
-  type FeedActionQueueTone = 'critical' | 'attention' | 'success' | 'neutral';
-
-  type FeedActionQueueItem = {
-    id: string;
-    title: string;
-    description: string;
-    icon: IconName;
-    endIcon: IconName;
-    tone: FeedActionQueueTone;
-    action: () => void;
-    disabled?: boolean;
-  };
-
   // ============================================================
   // Initialization
   // ============================================================
@@ -568,99 +555,6 @@
     return alertMissions.length;
   });
 
-  const feedActionQueue = $derived.by((): FeedActionQueueItem[] => {
-    const actions: FeedActionQueueItem[] = [];
-    const firstBroken = brokenConnectors[0];
-    const newCount = page.dashboardSummary.newCount;
-    const highScoreCount = page.dashboardSummary.highScoreCount;
-    const visibleCount = page.dashboardSummary.visibleCount;
-
-    if (firstBroken) {
-      actions.push({
-        id: 'source-diagnostic',
-        title: `Corriger ${firstBroken.connectorName}`,
-        description: 'Relance le diagnostic avant de traiter les missions.',
-        icon: 'circle-alert',
-        endIcon: 'refresh-cw',
-        tone: 'critical',
-        action: recheckFirstBrokenConnector,
-      });
-    }
-
-    if (alertMatchCount > 0) {
-      actions.push({
-        id: 'alert-priority',
-        title: `Traiter ${formatMissionCount(alertMatchCount)} en alerte`,
-        description: `Seuil ${alertPreferences.scoreThreshold}+ franchi selon vos critères.`,
-        icon: 'target',
-        endIcon: 'chevron-down',
-        tone: 'success',
-        action: showPriorityMissions,
-      });
-    } else if (highScoreCount > 0) {
-      actions.push({
-        id: 'high-score',
-        title: `Voir les ${formatMissionCount(highScoreCount)} prioritaires`,
-        description: 'Affiche les missions les plus fortes en premier.',
-        icon: 'target',
-        endIcon: 'chevron-down',
-        tone: 'success',
-        action: showPriorityMissions,
-      });
-    }
-
-    if (newCount > 0) {
-      actions.push({
-        id: 'new-missions',
-        title: `Qualifier ${formatMissionCount(newCount)}`,
-        description: 'Affiche uniquement les missions non vues.',
-        icon: 'sparkles',
-        endIcon: 'chevron-down',
-        tone: 'attention',
-        action: showNewMissions,
-      });
-    }
-
-    if (page.comparisonMissions.length >= 2) {
-      actions.push({
-        id: 'compare',
-        title: 'Comparer la sélection',
-        description: 'Départage les missions retenues avant de postuler.',
-        icon: 'git-compare-arrows',
-        endIcon: 'git-compare-arrows',
-        tone: 'neutral',
-        action: openComparison,
-      });
-    }
-
-    if (actions.length < 3) {
-      if (visibleCount > 0) {
-        actions.push({
-          id: 'mission-list',
-          title: 'Aller aux missions',
-          description: `${formatMissionCount(visibleCount)} visibles selon les filtres courants.`,
-          icon: 'chevron-down',
-          endIcon: 'chevron-down',
-          tone: 'neutral',
-          action: scrollToMissionFeedAction,
-        });
-      } else {
-        actions.push({
-          id: 'scan',
-          title: 'Lancer le scan',
-          description: 'Récupère les missions depuis les sources connectées.',
-          icon: 'scan-line',
-          endIcon: 'play',
-          tone: 'neutral',
-          action: startFeedScanFromQueue,
-          disabled: page.isOffline || controller.isScanning || page.isLoading,
-        });
-      }
-    }
-
-    return actions.slice(0, 3);
-  });
-
   const feedStory = $derived(
     buildFeedStory({
       error: page.error,
@@ -738,41 +632,6 @@
       return;
     }
 
-    controller.startScan();
-  }
-
-  function recheckFirstBrokenConnector(): void {
-    const firstBroken = brokenConnectors[0];
-    if (!firstBroken) {
-      return;
-    }
-    controller.recheckConnector(firstBroken.connectorId);
-  }
-
-  function showPriorityMissions(): void {
-    if (alertMatchCount > 0) {
-      showAlertOnly = true;
-    } else if (page.selectedScoreBucket !== 'strong') {
-      page.setSelectedScoreBucket('strong');
-    }
-    void scrollToMissionFeed();
-  }
-
-  function showNewMissions(): void {
-    if (!page.showNewOnly) {
-      page.toggleNewOnly();
-    }
-    void scrollToMissionFeed();
-  }
-
-  function scrollToMissionFeedAction(): void {
-    void scrollToMissionFeed();
-  }
-
-  function startFeedScanFromQueue(): void {
-    if (page.isOffline || controller.isScanning || page.isLoading) {
-      return;
-    }
     controller.startScan();
   }
 
@@ -867,19 +726,6 @@
       return;
     }
     void handleTrackingTransition(investigationMission.id, 'selected');
-  }
-
-  function feedActionToneClass(tone: FeedActionQueueTone): string {
-    if (tone === 'critical') {
-      return 'border-status-red/25 bg-status-red/6 text-status-red hover:bg-status-red/10';
-    }
-    if (tone === 'attention') {
-      return 'border-status-orange/25 bg-status-orange/6 text-status-orange hover:bg-status-orange/10';
-    }
-    if (tone === 'success') {
-      return 'border-blueprint-blue/20 bg-blueprint-blue/6 text-blueprint-blue hover:bg-blueprint-blue/10';
-    }
-    return 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray';
   }
 
   (async () => {
@@ -1002,58 +848,6 @@
   });
 </script>
 
-{#snippet feedActionQueueBlock(compact: boolean)}
-  <div
-    class={compact
-      ? 'mt-2 border-t border-border-light pt-2'
-      : 'mt-3 border-t border-border-light pt-3'}
-  >
-    <div class="mb-2 flex items-center justify-between gap-3">
-      <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
-        File d’actions
-      </p>
-      <p class="text-[10px] text-text-muted">
-        {feedActionQueue.length} priorité{feedActionQueue.length > 1 ? 's' : ''}
-      </p>
-    </div>
-    <div
-      class="grid gap-2"
-      data-testid="feed-action-queue"
-      aria-label="Actions prioritaires du feed"
-    >
-      {#each feedActionQueue as item (item.id)}
-        <button
-          type="button"
-          class="group flex min-w-0 items-center gap-3 rounded-xl border px-3 py-2 text-left transition-all duration-150 disabled:cursor-not-allowed disabled:opacity-55 {feedActionToneClass(
-            item.tone
-          )}"
-          onclick={item.action}
-          disabled={item.disabled}
-          aria-label={`Action prioritaire: ${item.title}. ${item.description}`}
-        >
-          <span
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-surface-white/80"
-            aria-hidden="true"
-          >
-            <Icon name={item.icon} size={14} />
-          </span>
-          <span class="min-w-0 flex-1">
-            <span class="block truncate text-xs font-semibold text-text-primary">{item.title}</span>
-            <span class="mt-0.5 block text-[10px] leading-4 text-text-subtle">
-              {item.description}
-            </span>
-          </span>
-          <Icon
-            name={item.endIcon}
-            size={13}
-            class="shrink-0 opacity-55 transition-opacity group-hover:opacity-100"
-          />
-        </button>
-      {/each}
-    </div>
-  </div>
-{/snippet}
-
 <div
   bind:this={feedScrollContainer}
   data-testid="feed-scroll-container"
@@ -1173,7 +967,6 @@
                 onPrimaryAction={handleFeedStoryPrimaryAction}
               />
             </div>
-            {@render feedActionQueueBlock(true)}
             {#if showAdvancedControls}
               {#if SourceHealthPanel}
                 <SourceHealthPanel
@@ -1309,8 +1102,6 @@
                 onPrimaryAction={handleFeedStoryPrimaryAction}
               />
             </div>
-            {@render feedActionQueueBlock(false)}
-
             {#if showAdvancedControls}
               {#if ConnectorStatusList}
                 <ConnectorStatusList
@@ -1377,24 +1168,6 @@
                 <span>Mode hors ligne — Données en cache</span>
               </div>
             {/if}
-
-            <div class="mt-6 grid grid-cols-3 gap-3">
-              <div
-                class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5"
-                aria-label={`${page.visibleCount} missions visibles`}
-              >
-                <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Visibles</p>
-                <p class="mt-2 text-xl font-semibold text-text-primary">{page.visibleCount}</p>
-              </div>
-              <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-                <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Favoris</p>
-                <p class="mt-2 text-xl font-semibold text-text-primary">{page.favoriteCount}</p>
-              </div>
-              <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-                <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Masquées</p>
-                <p class="mt-2 text-xl font-semibold text-text-primary">{page.hiddenCount}</p>
-              </div>
-            </div>
             {#if page.aiStatus === 'after-download'}
               <p class="mt-2 text-center text-[11px] text-text-muted">
                 Scoring IA en téléchargement...
@@ -1574,41 +1347,43 @@
             </button>
           </div>
 
-          <div class="mt-2" aria-label="Presets métier du feed">
-            <div class="mb-1 flex items-center justify-between gap-2">
-              <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
-                Presets métier
-              </p>
-              {#if page.decisionPreset}
-                <button
-                  type="button"
-                  class="text-[10px] font-medium text-blueprint-blue hover:text-blueprint-blue/80"
-                  onclick={page.clearAllFilters}
-                >
-                  Réinitialiser
-                </button>
-              {/if}
+          {#if showAdvancedControls}
+            <div class="mt-2" aria-label="Presets métier du feed">
+              <div class="mb-1 flex items-center justify-between gap-2">
+                <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                  Presets métier
+                </p>
+                {#if page.decisionPreset}
+                  <button
+                    type="button"
+                    class="text-[10px] font-medium text-blueprint-blue hover:text-blueprint-blue/80"
+                    onclick={page.clearAllFilters}
+                  >
+                    Réinitialiser
+                  </button>
+                {/if}
+              </div>
+              <div class="flex gap-1.5 overflow-x-auto pb-1">
+                {#each page.decisionPresets as preset}
+                  <button
+                    type="button"
+                    class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
+                      ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+                      : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
+                    onclick={() => page.applyDecisionPreset(preset.id)}
+                    aria-pressed={preset.active}
+                    disabled={preset.count === 0 && !preset.active}
+                    title={preset.description}
+                  >
+                    <span>{preset.label}</span>
+                    <span class="rounded-md bg-page-canvas px-1 py-0.5 text-[9px]">
+                      {preset.count}
+                    </span>
+                  </button>
+                {/each}
+              </div>
             </div>
-            <div class="flex gap-1.5 overflow-x-auto pb-1">
-              {#each page.decisionPresets as preset}
-                <button
-                  type="button"
-                  class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
-                    ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                    : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                  onclick={() => page.applyDecisionPreset(preset.id)}
-                  aria-pressed={preset.active}
-                  disabled={preset.count === 0 && !preset.active}
-                  title={preset.description}
-                >
-                  <span>{preset.label}</span>
-                  <span class="rounded-md bg-page-canvas px-1 py-0.5 text-[9px]">
-                    {preset.count}
-                  </span>
-                </button>
-              {/each}
-            </div>
-          </div>
+          {/if}
 
           {#if page.showFilters && FilterBar}
             <div

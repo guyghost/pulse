@@ -411,21 +411,28 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('Facteurs de scoring du périmètre courant');
   });
 
-  it('keeps the feed story followed by a compact action queue', () => {
+  it('distills the feed to a single next-action story (no redundant action queue)', () => {
     const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
 
-    expect(source).toContain('type FeedActionQueueItem');
-    expect(source).toContain('const feedActionQueue = $derived.by');
-    expect(source).toContain('data-testid="feed-action-queue"');
-    expect(source).toContain('File d’actions');
-    expect(source).toContain('Corriger ${firstBroken.connectorName}');
-    expect(source).toContain('Traiter ${formatMissionCount(alertMatchCount)} en alerte');
-    expect(source).toContain('Qualifier ${formatMissionCount(newCount)}');
-    expect(source).toContain('{@render feedActionQueueBlock(true)}');
-    expect(source).toContain('{@render feedActionQueueBlock(false)}');
-    expect(source.indexOf('{@render feedActionQueueBlock(false)}')).toBeLessThan(
-      source.indexOf('<ConnectorStatusList')
-    );
+    // The OperationalStoryCard is the single next-action surface: one adaptive CTA.
+    expect(source).toContain('eyebrow="À faire maintenant"');
+    expect(source).toContain('variant="inline"');
+    expect(source).toContain('onPrimaryAction={handleFeedStoryPrimaryAction}');
+
+    // The redundant parallel "File d’actions" queue has been removed.
+    expect(source).not.toContain('type FeedActionQueueItem');
+    expect(source).not.toContain('const feedActionQueue = $derived.by');
+    expect(source).not.toContain('data-testid="feed-action-queue"');
+    expect(source).not.toContain('File d’actions');
+    expect(source).not.toContain('{@render feedActionQueueBlock(true)}');
+    expect(source).not.toContain('{@render feedActionQueueBlock(false)}');
+
+    // Business presets stay available but move off the critical path,
+    // gated behind "Détails opérationnels" (progressive disclosure).
+    const presetsIdx = source.indexOf('aria-label="Presets métier du feed"');
+    const advancedIdx = source.lastIndexOf('{#if showAdvancedControls}', presetsIdx);
+    expect(advancedIdx).toBeGreaterThan(-1);
+    expect(advancedIdx).toBeLessThan(presetsIdx);
   });
 
   it('keeps feed filters decision-oriented with business presets', () => {
