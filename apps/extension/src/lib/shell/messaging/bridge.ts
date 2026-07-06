@@ -208,7 +208,24 @@ export type BridgeMessage =
   | {
       type: 'PARSER_HEALTH_RESULT';
       payload: import('../../core/connectors/parser-health-logic').ConnectorHealthRecord[];
-    };
+    }
+  // DB migration orchestrator (service worker → side panel)
+  | { type: 'GET_MIGRATION_STATUS' }
+  | {
+      type: 'MIGRATION_STATUS_RESULT';
+      payload: import('../storage/migration-types').MigrationSnapshot;
+    }
+  | { type: 'RUN_MIGRATIONS' }
+  | {
+      type: 'MIGRATION_DONE';
+      payload: import('../storage/migration-types').MigrationResult;
+    }
+  | {
+      type: 'MIGRATION_FAILED';
+      payload: import('../storage/migration-types').MigrationSnapshot;
+    }
+  | { type: 'MIGRATION_DOWNGRADE_DETECTED' }
+  | { type: 'MIGRATION_QUARANTINED' };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

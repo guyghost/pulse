@@ -200,6 +200,18 @@ vi.mock('../../../src/lib/shell/storage/db', () => ({
   getConnectorStatuses,
   getMissionById: vi.fn(async () => null),
   getMissions,
+  runMigrations: vi.fn(async () => ({
+    ok: true,
+    from: { db: null, data: null },
+    to: { db: 4, data: 1 },
+  })),
+  getMigrationStatus: vi.fn(() => ({
+    state: 'idle',
+    storedDbVersion: 4,
+    storedDataVersion: 1,
+    lastError: null,
+    rejectedCount: 0,
+  })),
 }));
 
 vi.mock('../../../src/lib/shell/scan/rescore', () => ({

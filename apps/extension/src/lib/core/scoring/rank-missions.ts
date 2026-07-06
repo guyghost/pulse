@@ -184,9 +184,9 @@ function interleaveBySource(scoreSorted: Mission[]): Mission[] {
   while (remaining > 0) {
     let placedAny = false;
     for (const source of sources) {
-      const idx = indices.get(source)!;
-      const bucket = buckets.get(source)!;
-      if (idx < bucket.length) {
+      const idx = indices.get(source) ?? 0;
+      const bucket = buckets.get(source);
+      if (bucket && idx < bucket.length) {
         result.push(bucket[idx]);
         indices.set(source, idx + 1);
         remaining--;
