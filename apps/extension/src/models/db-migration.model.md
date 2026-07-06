@@ -186,8 +186,8 @@ Notes:
   `QuotaExceededError` on any write fails the migration → `failed` (no
   destruction — the previous transactions already committed are recoverable
   on next run thanks to idempotency).
-- **Enter `verifying`**: stream each store through its Zod schema; count
-  rejects. Three outcomes:
+- **Enter `verifying`**: validate the `missions` and `profile` stores through
+  their parse functions; count rejects. Three outcomes:
   - 0 rejects → `idle`.
   - `0 < rejects ≤ 10%` → `idle` with a dev warning; rejects are left in place
     (the runtime readers already filter them).
@@ -203,9 +203,10 @@ Notes:
      `chrome.storage.local` quota shared with other keys), abort the backup
      per-store and record `missionpulse.backup = { partial: true, stores:
 { missions: { truncated: true, savedCount } } }`. Never write invalid
-     JSON — truncation always lands on a complete record boundary. If even
-     one record cannot be serialized (e.g. structured-clone failure), that
-     record is skipped and counted in `backup.skipped`.
+     JSON — truncation always lands on a complete record boundary. Records
+     that cannot be serialized (e.g. circular references) are silently skipped;
+     the resulting `stores[name].count` reflects only the records that were
+     kept.
   2. `indexedDB.deleteDatabase('missionpulse')`.
   3. Re-open → triggers full structural cascade from v0, then `readVersions`
      re-runs (explicit transition in the graph).

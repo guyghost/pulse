@@ -1025,7 +1025,14 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     if (message.type === 'RUN_MIGRATIONS') {
       runMigrations()
         .then((result) => {
-          sendResponse({ type: 'MIGRATION_DONE', payload: result });
+          if (!result.ok) {
+            sendResponse({
+              type: 'MIGRATION_FAILED',
+              payload: getMigrationStatus(),
+            });
+          } else {
+            sendResponse({ type: 'MIGRATION_DONE', payload: result });
+          }
         })
         .catch((err) => {
           console.warn('[MissionPulse] RUN_MIGRATIONS error:', err);
@@ -1408,9 +1415,15 @@ setupAlarm();
 // completing, or where the browser restarted without firing onInstalled.
 // No-op when the DB is already at the right version. Fire-and-forget:
 // openDB() also self-heals on-demand, so we never block startup.
-void runMigrations().catch((err) => {
-  console.warn('[MissionPulse] Cold-start migration guard error:', err);
-});
+void runMigrations()
+  .then((result) => {
+    if (!result.ok) {
+      console.warn('[MissionPulse] Cold-start migration guard failed:', result.message);
+    }
+  })
+  .catch((err) => {
+    console.warn('[MissionPulse] Cold-start migration guard error:', err);
+  });
 
 // ── First-install silent scan ──────────────────────────────────────────────────
 // On fresh install: detect active platform sessions in parallel.
@@ -1423,7 +1436,9 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   // `src/models/db-migration.model.md`.
   try {
     const result = await runMigrations();
-    if (import.meta.env.DEV) {
+    if (!result.ok) {
+      console.warn('[MissionPulse] Migration orchestrator failed on install:', result.message);
+    } else if (import.meta.env.DEV) {
       console.debug('[MissionPulse] Migration orchestrator result:', result);
     }
     const status = getMigrationStatus();

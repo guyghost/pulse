@@ -216,7 +216,7 @@ function setState(state: MigrationState, extra?: Partial<MigrationSnapshot>): vo
 }
 
 function isVersionError(err: unknown): boolean {
-  return err instanceof DOMException && (err.name === 'VersionError' || err.code === 0);
+  return err instanceof DOMException && err.name === 'VersionError';
 }
 
 function isQuotaError(err: unknown): boolean {
@@ -603,6 +603,7 @@ async function backupBeforeDestruction(): Promise<void> {
   const serialized: Record<string, unknown[]> = {};
   let totalBytes = 0;
   let overflowed = false;
+  const encoder = new TextEncoder();
 
   try {
     for (const storeName of Array.from(db.objectStoreNames)) {
@@ -612,12 +613,19 @@ async function backupBeforeDestruction(): Promise<void> {
       const records = await readAllFromStore(db, storeName);
       const kept: unknown[] = [];
       for (const record of records) {
-        const chunk = JSON.stringify(record);
-        if (totalBytes + chunk.length > BACKUP_MAX_BYTES) {
+        let chunk: string;
+        try {
+          chunk = JSON.stringify(record);
+        } catch {
+          // Skip records that cannot be serialized (circular refs, etc.)
+          continue;
+        }
+        const byteLength = encoder.encode(chunk).byteLength;
+        if (totalBytes + byteLength > BACKUP_MAX_BYTES) {
           overflowed = true;
           break;
         }
-        totalBytes += chunk.length;
+        totalBytes += byteLength;
         kept.push(record);
       }
       serialized[storeName] = kept;
