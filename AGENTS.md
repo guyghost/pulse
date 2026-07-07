@@ -229,15 +229,15 @@ export class ScanOrchestrator {
 
 ### Modules d'état du projet
 
-| Module              | Localisation                                | Rôle                                              |
-| ------------------- | ------------------------------------------- | ------------------------------------------------- |
-| `feed`              | `src/lib/state/feed.svelte.ts`              | État du feed : missions, recherche, filtrage      |
-| `feed-page`         | `src/lib/state/feed-page.svelte.ts`         | État complet FeedPage (seen, favoris, filtres, comparaison) |
-| `app-navigation`    | `src/lib/state/app-navigation.svelte.ts`    | Routing, transitions, onboarding              |
-| `onboarding`        | `src/lib/state/onboarding.svelte.ts`        | Wizard de configuration initiale                  |
-| `connection`        | `src/lib/state/connection.svelte.ts`        | Détection de l'état réseau                        |
-| `toast`             | `src/lib/state/toast.svelte.ts`             | Notifications toast UI                            |
-| `settings-page`     | `src/lib/state/settings-page.svelte.ts`     | Orchestration de la page Settings                 |
+| Module           | Localisation                             | Rôle                                                        |
+| ---------------- | ---------------------------------------- | ----------------------------------------------------------- |
+| `feed`           | `src/lib/state/feed.svelte.ts`           | État du feed : missions, recherche, filtrage                |
+| `feed-page`      | `src/lib/state/feed-page.svelte.ts`      | État complet FeedPage (seen, favoris, filtres, comparaison) |
+| `app-navigation` | `src/lib/state/app-navigation.svelte.ts` | Routing, transitions, onboarding                            |
+| `onboarding`     | `src/lib/state/onboarding.svelte.ts`     | Wizard de configuration initiale                            |
+| `connection`     | `src/lib/state/connection.svelte.ts`     | Détection de l'état réseau                                  |
+| `toast`          | `src/lib/state/toast.svelte.ts`          | Notifications toast UI                                      |
+| `settings-page`  | `src/lib/state/settings-page.svelte.ts`  | Orchestration de la page Settings                           |
 
 ## TailwindCSS 4 — Config CSS-first
 
@@ -277,9 +277,9 @@ La landing utilise `apps/landing/src/app.css` qui importe les custom properties 
   --color-status-violet: #6b4aff;
 
   /* Typographie */
-  --font-display: 'FH Total Display Regular', ...;  /* Hero headlines */
-  --font-geist: 'Geist', ...;                       /* Body & UI */
-  --font-sans: 'Geist', ...;                         /* Alias Geist */
+  --font-display: 'FH Total Display Regular', ...; /* Hero headlines */
+  --font-geist: 'Geist', ...; /* Body & UI */
+  --font-sans: 'Geist', ...; /* Alias Geist */
 }
 ```
 
@@ -379,7 +379,7 @@ Le scoring sémantique est optionnel et non-bloquant : si Gemini Nano n'est pas 
 
 ```bash
 pnpm dev
-# Ouvrir http://localhost:5173/src/sidepanel/index.html
+# Ouvrir http://localhost:5176/src/sidepanel/index.html
 ```
 
 En mode dev, les APIs Chrome sont automatiquement stubées avec des données mock. L'UI est fonctionnelle sans charger l'extension.
