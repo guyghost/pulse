@@ -1,5 +1,5 @@
 import type { Mission, RemoteType } from '../types/mission';
-import { createMission, parseTJM } from './parser-utils';
+import { createMission, parseTJM, stripHtml } from './parser-utils';
 
 const SOURCE = 'cherry-pick' as const;
 const BASE_URL = 'https://app.cherry-pick.io';
@@ -66,6 +66,16 @@ const METADATA_KEYS = [
   'Lien vers la fiche de poste',
   'Date de d(?:e|é)marrage',
   'Dur(?:e|é)e de la mission',
+];
+
+const DESCRIPTION_SKILL_PREFIXES = [
+  'la mission ',
+  'description ',
+  'description du poste',
+  'contexte ',
+  'contexte de la mission',
+  'nous recherchons',
+  'au sein ',
 ];
 
 interface DescriptionMeta {
@@ -150,6 +160,53 @@ function normalizeDuration(d: string | number | null): string | null {
   return str;
 }
 
+function normalizeSkillText(raw: string): string {
+  return raw
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function readSkillName(skill: CherryPickMission['skills'][number]): string | null {
+  if (typeof skill === 'string') {
+    return skill;
+  }
+  return typeof skill?.name === 'string' ? skill.name : null;
+}
+
+function isConciseSkillLabel(skill: string): boolean {
+  const clean = stripHtml(skill).trim();
+  if (!clean) {
+    return false;
+  }
+  if (clean.length > 64) {
+    return false;
+  }
+  if (/[;:]/.test(clean)) {
+    return false;
+  }
+
+  const normalized = normalizeSkillText(clean);
+  if (DESCRIPTION_SKILL_PREFIXES.some((prefix) => normalized.startsWith(prefix))) {
+    return false;
+  }
+  if (normalized.includes(' correspond fortement ') || normalized.includes(' nous recherchons ')) {
+    return false;
+  }
+
+  return normalized.split(/\s+/).length <= 6;
+}
+
+function extractSkills(skills: CherryPickMission['skills'] | null): string[] {
+  return (skills ?? [])
+    .map(readSkillName)
+    .filter((skill): skill is string => skill !== null)
+    .map((skill) => stripHtml(skill).trim())
+    .filter(isConciseSkillLabel);
+}
+
 export function parseCherryPickMissions(missions: CherryPickMission[], now: Date): Mission[] {
   return missions.map((m) => {
     const meta = parseDescriptionMeta(m.description);
@@ -160,7 +217,7 @@ export function parseCherryPickMissions(missions: CherryPickMission[], now: Date
       title: m.name,
       client: m.company?.name ?? meta.client,
       description: meta.cleanDescription,
-      stack: (m.skills ?? []).map((s) => (typeof s === 'string' ? s : s.name)),
+      stack: extractSkills(m.skills),
       tjm: apiTjm ?? meta.tjm,
       location: m.city ?? meta.location,
       remote: mapRemote(m.displacement),

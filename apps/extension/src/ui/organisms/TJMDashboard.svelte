@@ -409,12 +409,8 @@
                   <span class="text-[10px] font-mono text-text-muted"
                     >{region.min}–{region.max}€</span
                   >
-                  <span
-                    class="text-[11px] font-mono tabular-nums {region.trend === 'up'
-                      ? 'text-blueprint-blue'
-                      : region.trend === 'down'
-                        ? 'text-status-red'
-                        : 'text-text-subtle'}">{region.average}€</span
+                  <span class="text-[11px] font-mono tabular-nums text-text-primary"
+                    >{region.average}€</span
                   >
                 </div>
               </div>

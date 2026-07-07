@@ -247,6 +247,51 @@ describe('deduplicateMissions', () => {
     expect(result.duplicateRelations[0].confidence).toBeGreaterThanOrEqual(0.8);
   });
 
+  it('deduplicates a Cherry Pick mission republished on Free-Work with language in the title', () => {
+    const result = deduplicateMissionsDetailed([
+      makeMission({
+        id: 'fw-tech-lead-bff',
+        title: 'Tech Lead BFF (Java)',
+        client: 'Cherry Pick',
+        stack: ['Java', 'Spring'],
+        tjm: 630,
+        location: null,
+        remote: 'hybrid',
+        description:
+          'Description du Poste : Nous recherchons une/un Tech Lead experimente specialise dans la gestion de solutions applicatives.',
+        url: 'https://www.free-work.com/fr/tech-it/tech-lead/job-mission/tech-lead-bff-java',
+        source: 'free-work',
+      }),
+      makeMission({
+        id: 'cp-tech-lead-bff',
+        title: 'Tech Lead BFF (H/F)',
+        client: 'Cherry Pick',
+        stack: ['Java', 'Spring Boot', 'Postman', 'Kubernetes'],
+        tjm: null,
+        location: null,
+        remote: 'hybrid',
+        description:
+          'Contexte de la mission Au sein de la DSI Mode et plus particulierement du domaine IT Digital.',
+        url: 'https://app.cherry-pick.io/ext/missions/tech-lead-bff-123',
+        source: 'cherry-pick',
+      }),
+    ]);
+
+    expect(result.missions).toHaveLength(1);
+    expect(result.missions[0]).toMatchObject({
+      id: 'cp-tech-lead-bff',
+      source: 'cherry-pick',
+    });
+    expect(result.duplicateRelations).toEqual([
+      expect.objectContaining({
+        canonicalMissionId: 'cp-tech-lead-bff',
+        duplicateMissionId: 'fw-tech-lead-bff',
+        reason: 'same_title_stack_proxy_client',
+      }),
+    ]);
+    expect(result.duplicateRelations[0].confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
   it('keeps same title and stack when real locations are incompatible', () => {
     const missions = [
       makeMission({

@@ -84,6 +84,9 @@ const PROXY_CLIENT_NAMES = new Set([
 ]);
 
 const REMOTE_LOCATION_TOKENS = new Set(['remote', 'teletravail', 'france']);
+const PROXY_REPOST_MIN_TITLE_SCORE = 0.75;
+const PROXY_REPOST_MIN_STACK_SCORE = 0.5;
+const PROXY_REPOST_CONFIDENCE_FLOOR = 0.82;
 
 /**
  * Normalizes free text for tokenization/comparison.
@@ -340,7 +343,11 @@ const compareMissions = (mission: Mission, existing: Mission): MissionMatch | nu
     compareTjm(mission, existing) * 0.02;
 
   if (client.usesProxyClient) {
-    return { confidence, reason: 'same_title_stack_proxy_client' };
+    const proxyConfidence =
+      titleScore >= PROXY_REPOST_MIN_TITLE_SCORE && stackScore >= PROXY_REPOST_MIN_STACK_SCORE
+        ? Math.max(confidence, PROXY_REPOST_CONFIDENCE_FLOOR)
+        : confidence;
+    return { confidence: proxyConfidence, reason: 'same_title_stack_proxy_client' };
   }
 
   if (client.score >= 0.75) {

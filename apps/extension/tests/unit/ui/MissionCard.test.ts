@@ -139,7 +139,8 @@ describe('MissionCard', () => {
     const scoreEl = target.querySelector('.font-mono.font-bold');
     expect(scoreEl).not.toBeNull();
     expect(scoreEl!.textContent).toContain('85');
-    expect(scoreEl!.className).toContain('text-accent-green');
+    expect(scoreEl!.className).toContain('text-text-primary');
+    expect(scoreEl!.className).toContain('bg-accent-green/15');
   });
 
   it('affiche le score avec la bonne couleur pour score entre 50 et 79', async () => {
@@ -148,7 +149,8 @@ describe('MissionCard', () => {
     const scoreEl = target.querySelector('.font-mono.font-bold');
     expect(scoreEl).not.toBeNull();
     expect(scoreEl!.textContent).toContain('65');
-    expect(scoreEl!.className).toContain('text-accent-amber');
+    expect(scoreEl!.className).toContain('text-text-primary');
+    expect(scoreEl!.className).toContain('bg-accent-amber/15');
   });
 
   it('affiche le client quand il est present', async () => {

@@ -15,7 +15,7 @@ Mission Pulse exudes a focused, data-driven clarity, presenting complex financia
 | Blueprint Blue | `#0b64e9` | `--color-blueprint-blue` | Primary brand accent, used for all calls-to-action, interactive states, and key navigational elements to draw attention without being overwhelming. |
 | Text Primary   | `#0c0a09` | `--color-text-primary`   | Main body text, headlines, and critical information for maximum readability against light backgrounds.                                              |
 | Text Secondary | `#1c1917` | `--color-text-secondary` | Subheadings, supporting text, and less emphasized information, a subtle step lighter than primary text but still high contrast.                     |
-| Text Muted     | `#a6a09b` | `--color-text-muted`     | Placeholder text, minor labels, and supplementary details, providing a softer visual presence.                                                      |
+| Text Muted     | `#6b6561` | `--color-text-muted`     | Placeholder text, minor labels, and supplementary details, providing a softer visual presence.                                                      |
 | Text Subtle    | `#57534d` | `--color-text-subtle`    | Less prominent text like captions or descriptions, visually receding while remaining legible.                                                       |
 | Subtle Gray    | `#ececea` | `--color-subtle-gray`    | Backgrounds for subtle containers like badges or minor card elements, offering a hint of differentiation.                                           |
 | Border Light   | `#f0efef` | `--color-border-light`   | Distinguishes UI elements with a subtle border, especially for form fields and interactive elements.                                                |
@@ -147,7 +147,7 @@ Blueprint Blue text (#0b64e9, although data shows browser default #0000ee for li
 
 **Role:** Global Navigation
 
-Typically Geist font, weight 400, size 14px, #a6a09b text transforming to #000000 on hover. Simple text link for top-level navigation.
+Typically Geist font, weight 400, size 14px, #6b6561 text transforming to #000000 on hover. Simple text link for top-level navigation.
 
 ### Display Headline - 'The Grand Statement'
 
@@ -208,7 +208,7 @@ The page primarily uses a max-width contained layout, likely centered, though sp
    - Page Background: #f5f5f4
    - CTA Blue: #0b64e9
    - Surface White: #ffffff
-   - Text Muted: #a6a09b
+   - Text Muted: #6b6561
 
 2. **Example Component Prompts:**
    - Create a primary filled button: Blueprint Blue background (#0b64e9), white text (#ffffff), 8px radius, with 12px vertical padding and 16px horizontal padding. Text in Geist, 16px, weight 500.
@@ -236,7 +236,7 @@ The page primarily uses a max-width contained layout, likely centered, though sp
   --color-blueprint-blue: #0b64e9;
   --color-text-primary: #0c0a09;
   --color-text-secondary: #1c1917;
-  --color-text-muted: #a6a09b;
+  --color-text-muted: #6b6561;
   --color-text-subtle: #57534d;
   --color-subtle-gray: #ececea;
   --color-border-light: #f0efef;
@@ -344,7 +344,7 @@ The page primarily uses a max-width contained layout, likely centered, though sp
   --color-blueprint-blue: #0b64e9;
   --color-text-primary: #0c0a09;
   --color-text-secondary: #1c1917;
-  --color-text-muted: #a6a09b;
+  --color-text-muted: #6b6561;
   --color-text-subtle: #57534d;
   --color-subtle-gray: #ececea;
   --color-border-light: #f0efef;

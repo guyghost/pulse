@@ -92,7 +92,7 @@
           mission.tjm !== null
             ? `À examiner en premier : score fort et TJM ${mission.tjm}€/j.`
             : 'À examiner en premier : score fort, TJM à vérifier dans l’annonce.',
-        tone: 'border-accent-green/20 bg-accent-green/8 text-accent-green',
+        tone: 'border-accent-green/20 bg-accent-green/10 text-text-primary',
       };
     }
 
@@ -100,7 +100,7 @@
       return {
         label: 'Point de vigilance',
         text: 'TJM sous votre cible : gardez cette mission seulement si le contexte compense.',
-        tone: 'border-status-orange/20 bg-status-orange/8 text-status-orange',
+        tone: 'border-status-orange/20 bg-status-orange/10 text-text-primary',
       };
     }
 
@@ -108,23 +108,25 @@
       return {
         label: 'À comparer',
         text: 'Potentiel correct : comparez avec les missions 80+ avant de postuler.',
-        tone: 'border-status-yellow/30 bg-status-yellow/12 text-status-orange',
+        tone: 'border-status-yellow/30 bg-status-yellow/12 text-text-primary',
       };
     }
 
     return {
       label: 'À qualifier',
       text: 'Priorité faible : ouvrez seulement si la source ou le client est stratégique.',
-      tone: 'border-border-light bg-page-canvas text-text-subtle',
+      tone: 'border-border-light bg-subtle-gray text-text-subtle',
     };
   });
 
+  // Tier hue carried by the background tint; glyph stays neutral for WCAG AA.
+  // Low tier is intentionally de-emphasized (subtle text on a calm neutral block).
   const scoreColor = $derived(
     scoreValue >= 80
-      ? 'text-accent-green bg-accent-green/10'
+      ? 'text-text-primary bg-accent-green/15'
       : scoreValue >= 50
-        ? 'text-accent-amber bg-accent-amber/10'
-        : 'text-text-muted bg-page-canvas'
+        ? 'text-text-primary bg-accent-amber/15'
+        : 'text-text-subtle bg-subtle-gray'
   );
 
   function barColor(value: number): string {

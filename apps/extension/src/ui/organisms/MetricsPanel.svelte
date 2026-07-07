@@ -357,12 +357,12 @@
 
   function toneClasses(tone: DiagnosticTone): string {
     if (tone === 'incident') {
-      return 'border-status-red/25 bg-status-red/8 text-status-red';
+      return 'border-status-red/25 bg-status-red/8 text-text-primary';
     }
     if (tone === 'attention') {
-      return 'border-status-orange/25 bg-status-orange/8 text-status-orange';
+      return 'border-status-orange/25 bg-status-orange/8 text-text-primary';
     }
-    return 'border-blueprint-blue/20 bg-blueprint-blue/6 text-blueprint-blue';
+    return 'border-blueprint-blue/20 bg-blueprint-blue/6 text-text-primary';
   }
 </script>
 
@@ -440,13 +440,7 @@
                 <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-text-primary">
                   {signal.value}
                 </p>
-                <p
-                  class="text-[10px] font-medium {signal.tone === 'incident'
-                    ? 'text-status-red'
-                    : signal.tone === 'attention'
-                      ? 'text-status-orange'
-                      : 'text-blueprint-blue'}"
-                >
+                <p class="text-[10px] font-medium text-text-secondary">
                   {signal.state}
                 </p>
               </div>
@@ -772,7 +766,7 @@
           Exporter le contexte JSON
         </button>
         <button
-          class="rounded-lg border border-status-red/25 bg-status-red/8 px-3 py-1.5 text-xs font-medium text-status-red transition-colors hover:bg-status-red/12"
+          class="rounded-lg border border-status-red/25 bg-status-red/8 px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-status-red/12"
           onclick={resetMetrics}
         >
           Vider la session

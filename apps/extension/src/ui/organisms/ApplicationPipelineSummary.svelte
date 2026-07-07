@@ -94,26 +94,18 @@
             <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
               {card.label}
             </p>
-            <p
-              class="mt-1 text-lg font-semibold tabular-nums {card.severity === 'attention'
-                ? 'text-status-orange'
-                : card.severity === 'incident'
-                  ? 'text-status-red'
-                  : card.severity === 'success'
-                    ? 'text-text-primary'
-                    : 'text-text-primary'}"
-            >
+            <p class="mt-1 text-lg font-semibold tabular-nums text-text-primary">
               {card.value}
             </p>
           </div>
           <span
             class="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-lg {card.severity ===
             'attention'
-              ? 'bg-status-orange/10 text-status-orange'
+              ? 'bg-status-orange/12 text-text-primary'
               : card.severity === 'incident'
-                ? 'bg-status-red/10 text-status-red'
+                ? 'bg-status-red/12 text-text-primary'
                 : card.severity === 'success'
-                  ? 'bg-accent-green/10 text-accent-green'
+                  ? 'bg-accent-green/12 text-text-primary'
                   : 'bg-subtle-gray text-text-muted'}"
             aria-hidden="true"
           >
