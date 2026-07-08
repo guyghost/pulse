@@ -106,9 +106,24 @@ const rawStackScore = (missionStack: string[], profileStack: string[]): number =
   if (missionStack.length === 0) {
     return 0;
   }
-  const normalizedProfile = profileStack.filter(Boolean).map((s) => s.toLowerCase());
-  const matches = missionStack.filter((s) => s && normalizedProfile.includes(s.toLowerCase()));
-  return (matches.length / missionStack.length) * 100;
+  // Build the profile once as a Set for O(1) membership checks. This runs once
+  // per mission during scoring; the previous Array.includes made it O(m) per
+  // mission-stack entry. Output is identical: each truthy mission-stack entry
+  // that matches a (lowercased) profile entry counts once toward the numerator,
+  // and the denominator stays the full missionStack.length.
+  const profileSet = new Set<string>();
+  for (const entry of profileStack) {
+    if (entry) {
+      profileSet.add(entry.toLowerCase());
+    }
+  }
+  let matchCount = 0;
+  for (const entry of missionStack) {
+    if (entry && profileSet.has(entry.toLowerCase())) {
+      matchCount++;
+    }
+  }
+  return (matchCount / missionStack.length) * 100;
 };
 
 /**
