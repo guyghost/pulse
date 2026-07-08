@@ -112,21 +112,37 @@ const tokenize = (text: string | null | undefined): Set<string> =>
       .filter((token) => token.length > 1 && !STOP_WORDS.has(token))
   );
 
+/**
+ * Counts shared elements between two sets, iterating the smaller set to minimise
+ * membership checks. Allocates no intermediate arrays/sets — important because
+ * this runs per mission-pair during deduplication.
+ */
+const intersectionSize = (a: Set<string>, b: Set<string>): number => {
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  let count = 0;
+  for (const token of small) {
+    if (large.has(token)) {
+      count++;
+    }
+  }
+  return count;
+};
+
 const jaccardSimilarity = (a: Set<string>, b: Set<string>): number => {
   if (a.size === 0 && b.size === 0) {
     return 0;
   }
-  const intersection = new Set([...a].filter((x) => b.has(x)));
-  const union = new Set([...a, ...b]);
-  return intersection.size / union.size;
+  const shared = intersectionSize(a, b);
+  // Inclusion-exclusion: |A ∪ B| = |A| + |B| − |A ∩ B|. Avoids a Set allocation.
+  const union = a.size + b.size - shared;
+  return shared / union;
 };
 
 const overlapCoefficient = (a: Set<string>, b: Set<string>): number => {
   if (a.size === 0 || b.size === 0) {
     return 0;
   }
-  const intersectionSize = [...a].filter((token) => b.has(token)).length;
-  return intersectionSize / Math.min(a.size, b.size);
+  return intersectionSize(a, b) / Math.min(a.size, b.size);
 };
 
 const weightedTokenSimilarity = (a: Set<string>, b: Set<string>): number => {
