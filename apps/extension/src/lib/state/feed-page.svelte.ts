@@ -328,7 +328,10 @@ export function createFeedPageState(
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
   });
 
-  const sourceCountBaseMissions = $derived.by(() => {
+  // Shared base filter (enabled connectors + favorites + hidden) reused by both
+  // sourceCountBaseMissions and dashboardScopeMissions so this prefix runs once.
+  // Output-equivalent to the previous inline prefix in both deriveds.
+  const baseFilteredMissions = $derived.by(() => {
     let result = missions ?? [];
     if (controller.enabledConnectorIds.size > 0) {
       result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
@@ -339,6 +342,11 @@ export function createFeedPageState(
     if (!showHidden) {
       result = filterHidden(result, hidden);
     }
+    return result;
+  });
+
+  const sourceCountBaseMissions = $derived.by(() => {
+    let result = baseFilteredMissions;
 
     if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
       const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
@@ -370,16 +378,7 @@ export function createFeedPageState(
   });
 
   const dashboardScopeMissions = $derived.by(() => {
-    let result = missions ?? [];
-    if (controller.enabledConnectorIds.size > 0) {
-      result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
-    }
-    if (showFavoritesOnly) {
-      result = filterFavoritesOnly(result, favorites);
-    }
-    if (!showHidden) {
-      result = filterHidden(result, hidden);
-    }
+    let result = baseFilteredMissions;
     if (selectedSource !== null) {
       result = result.filter((m) => m.source === selectedSource);
     }
