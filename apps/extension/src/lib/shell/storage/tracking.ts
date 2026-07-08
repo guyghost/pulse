@@ -96,11 +96,75 @@ export async function getAllTrackings(): Promise<MissionTracking[]> {
 }
 
 /**
- * Get tracking records filtered by status.
+ * Reverse map of `LEGACY_STAGE_MAP` (packages/domain/src/index.ts).
+ *
+ * The `currentStatus` index is built on the STORED value, but older records
+ * were written before the canonical-status rename and are still keyed under
+ * their legacy stage (e.g. `'interested'` instead of canonical `'selected'`).
+ * `saveTracking` never normalizes on write, so those legacy keys persist on
+ * disk and in the index. Each canonical status maps to every stored
+ * `currentStatus` that canonicalizes to it (the canonical key itself plus its
+ * legacy aliases). When the domain map changes, update this too.
+ */
+const STATUS_INDEX_KEYS: Record<ApplicationStatus, readonly string[]> = {
+  detected: ['detected', 'new'],
+  selected: ['selected', 'interested', 'draft'],
+  application_prepared: ['application_prepared', 'applying'],
+  applied: ['applied'],
+  interview: ['interview'],
+  offer: ['offer'],
+  accepted: ['accepted'],
+  rejected: ['rejected'],
+  archived: ['archived', 'withdrawn'],
+};
+
+function awaitIndexGetAll(request: IDBRequest<unknown[]>): Promise<unknown[]> {
+  return new Promise((resolve, reject) => {
+    request.onsuccess = () => resolve(request.result ?? []);
+    request.onerror = () => reject(request.error);
+  });
+}
+
+function compareMissionId(a: MissionTracking, b: MissionTracking): number {
+  return a.missionId < b.missionId ? -1 : a.missionId > b.missionId ? 1 : 0;
+}
+
+/**
+ * Get tracking records filtered by canonical status.
+ *
+ * Uses the `currentStatus` index for an O(matching) lookup instead of a full
+ * table scan. Because the index is built on the stored value, we query the
+ * union of the canonical status and its legacy aliases, then normalize each
+ * record and dedupe by `missionId`. Results are sorted by `missionId` to
+ * match `getAll()`'s primary-key ordering. Falls back to a full scan + filter
+ * if the index is somehow absent.
  */
 export async function getTrackingsByStatus(status: ApplicationStatus): Promise<MissionTracking[]> {
-  const trackings = await getAllTrackings();
-  return trackings.filter((tracking) => tracking.currentStatus === status);
+  const db = await openDB();
+  const tx = db.transaction(TRACKING_STORE, 'readonly');
+  const store = tx.objectStore(TRACKING_STORE);
+
+  if (store.indexNames.contains('currentStatus')) {
+    const indexKeys = STATUS_INDEX_KEYS[status];
+    const index = store.index('currentStatus');
+    const batches = await Promise.all(indexKeys.map((key) => awaitIndexGetAll(index.getAll(key))));
+
+    const seen = new Set<string>();
+    const out: MissionTracking[] = [];
+    for (const raw of batches.flat()) {
+      const tracking = normalizeStoredMissionTracking(raw);
+      if (tracking && tracking.currentStatus === status && !seen.has(tracking.missionId)) {
+        seen.add(tracking.missionId);
+        out.push(tracking);
+      }
+    }
+    out.sort(compareMissionId);
+    return out;
+  }
+
+  // Defensive fallback: index absent (should not happen on a v4 DB).
+  const all = await getAllTrackings();
+  return all.filter((tracking) => tracking.currentStatus === status);
 }
 
 /**
