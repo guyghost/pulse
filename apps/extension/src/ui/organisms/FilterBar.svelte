@@ -92,7 +92,7 @@
 <div class="flex flex-col gap-3 rounded-2xl border border-border-light bg-page-canvas p-3">
   <div>
     <div class="mb-2 flex items-center justify-between gap-2">
-      <p class="text-[11px] uppercase tracking-[0.15em] text-text-muted">Vues</p>
+      <p class="text-[11px] uppercase tracking-[0.15em] text-text-subtle">Vues</p>
       <Tooltip
         label={savedViewLimitReached
           ? 'Limite de vues atteinte'
@@ -171,7 +171,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-muted">Source</p>
+    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Source</p>
     <div class="flex flex-wrap gap-1.5">
       {#each sources as source}
         <Chip
@@ -184,7 +184,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-muted">Mode de travail</p>
+    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Mode de travail</p>
     <div class="flex flex-wrap gap-1.5">
       {#each remoteTypes as remote}
         <Chip
@@ -197,7 +197,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-muted">Séniorité</p>
+    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Séniorité</p>
     <div class="flex flex-wrap gap-1.5">
       {#each seniorityLevels as level}
         <Chip
@@ -211,7 +211,7 @@
 
   {#if availableStacks.length > 0}
     <div>
-      <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-muted">Technologies</p>
+      <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Technologies</p>
       <div class="flex flex-wrap gap-1.5">
         {#each availableStacks as stack}
           <Chip
