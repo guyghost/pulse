@@ -6,6 +6,7 @@
  *  - Idempotency (second run is a no-op)                            [Inv-3]
  *  - Downgrade detection (stored > DB_VERSION → no data loss)       [Inv-4]
  *  - Quarantine is non-destructive (>10% invalid → move, not wipe)  [Inv-6]
+ *  - Verify is migration-gated (skipped when no migration pending)   [Inv-6b]
  *  - Concurrent runMigrations() dedup (cold-start guard)            [Inv-9]
  *
  * Module singletons (migrationSnapshot, migrationInProgress, inFlightOpen)
@@ -178,10 +179,9 @@ describe('DB migration orchestrator', () => {
   it('quarantine is non-destructive: keeps valid, moves invalid [Inv-6]', async () => {
     const db = await importFresh();
 
-    // First run brings the DB to v4 + idle.
-    await db.runMigrations();
-
-    // Inject 8 valid missions via the validated writer...
+    // Build the v4 schema WITHOUT running the orchestrator, so the app-data
+    // version marker stays unset. The next runMigrations() will therefore see
+    // `dataPending === true`, enter `verifying`, and run the quarantine sweep.
     const { generateMockMissions } = await import('../../../src/dev/mocks');
     const valid = generateMockMissions(8);
     await db.saveMissions(valid);
@@ -198,7 +198,7 @@ describe('DB migration orchestrator', () => {
     });
     handle.close();
 
-    // Second run: verifyStores finds the invalid records, ratio = 2/10 = 20% > 10%.
+    // First orchestrator run: dataPending=true → verify runs → 2/10 = 20% > 10%.
     const result = await db.runMigrations();
     expect(result.ok).toBe(true);
 
@@ -223,6 +223,55 @@ describe('DB migration orchestrator', () => {
     });
     const quarantinedIds = (quarantined as Array<{ id: string }>).map((q) => q.id).sort();
     expect(quarantinedIds).toEqual(['missions:bad-1', 'missions:bad-2']);
+  });
+
+  it('skips verifyStores on a steady-state cold start (no migration pending) [Inv-6b]', async () => {
+    const db = await importFresh();
+
+    // Bring the DB fully up to date (versions current).
+    const first = await db.runMigrations();
+    expect(first.ok).toBe(true);
+
+    // Inject valid + bad records AFTER the DB is at steady state.
+    const { generateMockMissions } = await import('../../../src/dev/mocks');
+    const valid = generateMockMissions(8);
+    await db.saveMissions(valid);
+
+    const handle = await db.openDB();
+    await new Promise<void>((resolve, reject) => {
+      const tx = handle.transaction('missions', 'readwrite');
+      const store = tx.objectStore('missions');
+      store.put({ id: 'bad-1' }); // missing required fields
+      store.put({ id: 'bad-2', garbage: true });
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+    });
+    handle.close();
+
+    // Second run: nothing pending → verify is skipped → bad records stay in place.
+    const second = await db.runMigrations();
+    expect(second.ok).toBe(true);
+
+    // Valid missions still readable (runtime parse skips the bad ones).
+    const survivors = await db.getMissions();
+    expect(survivors.map((m) => m.id).sort()).toEqual(valid.map((m) => m.id).sort());
+
+    // Quarantine stays EMPTY — proving verify did not run (20% bad would otherwise
+    // trigger quarantine).
+    const quarantined = await new Promise<unknown[]>((resolve, reject) => {
+      const h = indexedDB.open(DB_NAME, 4);
+      h.onsuccess = () => {
+        const tx = h.result.transaction('quarantine', 'readonly');
+        const req = tx.objectStore('quarantine').getAll();
+        req.onsuccess = () => {
+          h.result.close();
+          resolve(req.result);
+        };
+        req.onerror = () => reject(req.error);
+      };
+      h.onerror = () => reject(h.error);
+    });
+    expect(quarantined).toEqual([]);
   });
 
   it('concurrent runMigrations() calls share a single in-flight promise [Inv-9]', async () => {

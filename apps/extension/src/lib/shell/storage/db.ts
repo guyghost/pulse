@@ -394,20 +394,29 @@ async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult>
     }
   }
 
-  // Verifying
-  setState('verifying');
-  const verifyResult = await verifyStores(db);
-  db.close();
+  // Post-migration integrity sweep. Only runs when a structural or data
+  // migration was actually applied this session (the realistic corruption
+  // window: schema/data drift). On steady-state cold starts — both versions
+  // current — the O(n) scan is skipped; day-to-day corruption is still
+  // caught lazily by the runtime parse-on-read guard (`trackRuntimeReject`).
+  const migrationApplied = structuralPending || dataPending;
+  if (migrationApplied) {
+    setState('verifying');
+    const verifyResult = await verifyStores(db);
+    db.close();
 
-  if (verifyResult.quarantineNeeded) {
-    setState('quarantine');
-    try {
-      await quarantineInvalidRecords(verifyResult.invalidByStore);
-    } catch (err) {
-      const message = err instanceof Error ? err.message : String(err);
-      setState('failed', { lastError: { code: 'data_throw', message } });
-      return { ok: false, code: 'data_throw', message };
+    if (verifyResult.quarantineNeeded) {
+      setState('quarantine');
+      try {
+        await quarantineInvalidRecords(verifyResult.invalidByStore);
+      } catch (err) {
+        const message = err instanceof Error ? err.message : String(err);
+        setState('failed', { lastError: { code: 'data_throw', message } });
+        return { ok: false, code: 'data_throw', message };
+      }
     }
+  } else {
+    db.close();
   }
 
   await chrome.storage.local.remove(MIGRATION_KEYS.downgrade);
