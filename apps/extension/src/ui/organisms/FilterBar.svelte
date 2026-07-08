@@ -1,10 +1,35 @@
+<script module lang="ts">
+  import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
+  import type { MissionSource, RemoteType } from '$lib/core/types/mission';
+  import type { SeniorityLevel } from '$lib/core/types/profile';
+
+  // Static option lists — allocated once at module load instead of on every
+  // component render. getConnectorsMeta() is pure and returns the constant
+  // platform catalog (independent of the enabled-connector state).
+  const sources: { value: MissionSource; label: string }[] = getConnectorsMeta().map((m) => ({
+    value: m.id as MissionSource,
+    label: m.name,
+  }));
+
+  const remoteTypes: { value: RemoteType; label: string }[] = [
+    { value: 'full', label: 'Full remote' },
+    { value: 'hybrid', label: 'Hybride' },
+    { value: 'onsite', label: 'Sur site' },
+  ];
+
+  const seniorityLevels: { value: SeniorityLevel; label: string }[] = [
+    { value: 'junior', label: 'Junior' },
+    { value: 'confirmed', label: 'Confirmé' },
+    { value: 'senior', label: 'Senior' },
+  ];
+</script>
+
 <script lang="ts">
   import { Chip } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import type { MissionSource, RemoteType } from '$lib/core/types/mission';
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import type { SavedFeedView } from '$lib/core/types/feed-view';
-  import { getConnectorsMeta } from '$lib/shell/facades/feed-data.facade';
   import Tooltip from '../atoms/Tooltip.svelte';
 
   const {
@@ -55,23 +80,6 @@
       selectedRemote !== null ||
       selectedSeniority !== null
   );
-
-  const sources: { value: MissionSource; label: string }[] = getConnectorsMeta().map((m) => ({
-    value: m.id as MissionSource,
-    label: m.name,
-  }));
-
-  const remoteTypes: { value: RemoteType; label: string }[] = [
-    { value: 'full', label: 'Full remote' },
-    { value: 'hybrid', label: 'Hybride' },
-    { value: 'onsite', label: 'Sur site' },
-  ];
-
-  const seniorityLevels: { value: SeniorityLevel; label: string }[] = [
-    { value: 'junior', label: 'Junior' },
-    { value: 'confirmed', label: 'Confirmé' },
-    { value: 'senior', label: 'Senior' },
-  ];
 
   async function handleSaveSubmit(event: SubmitEvent) {
     event.preventDefault();
