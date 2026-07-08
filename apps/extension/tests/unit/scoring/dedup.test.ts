@@ -339,6 +339,55 @@ describe('deduplicateMissions', () => {
     expect(result.find((m) => m.id === '4')).toBeDefined(); // Different mission
   });
 
+  it('rewrites duplicate relations when the canonical mission is replaced in a chain', () => {
+    // Three structurally-identical missions of increasing quality. Each
+    // incoming mission beats the current canonical, so the relation that
+    // pointed at the previous canonical must be re-pointed at the new one.
+    // This exercises the O(1) relation re-canonicalization path.
+    const result = deduplicateMissionsDetailed([
+      makeMission({
+        id: 'low',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        source: 'free-work',
+        tjm: null,
+        description: '',
+      }),
+      makeMission({
+        id: 'mid',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        source: 'free-work',
+        tjm: 500,
+        description: 'Short description here',
+      }),
+      makeMission({
+        id: 'high',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        source: 'cherry-pick',
+        tjm: 700,
+        description: 'Longer detailed description with more context about the mission',
+      }),
+    ]);
+
+    expect(result.missions.map((mission) => mission.id)).toEqual(['high']);
+    expect(result.duplicateRelations).toEqual([
+      {
+        canonicalMissionId: 'high',
+        duplicateMissionId: 'low',
+        confidence: 1,
+        reason: 'same_structured_signature',
+      },
+      {
+        canonicalMissionId: 'high',
+        duplicateMissionId: 'mid',
+        confidence: 1,
+        reason: 'same_structured_signature',
+      },
+    ]);
+  });
+
   describe('regression: undefined safety', () => {
     it('should not crash when mission has undefined title (cast via as any)', () => {
       const mission = makeMission({ title: undefined } as any);
