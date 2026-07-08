@@ -127,4 +127,28 @@ describe('semantic cache', () => {
     );
     expect(chrome.storage.local.remove).toHaveBeenCalled();
   });
+
+  it('does not duplicate index entries when re-caching existing keys', async () => {
+    const first = new Map([
+      ['mission-1', { score: 80, reason: 'A' }],
+      ['mission-2', { score: 82, reason: 'B' }],
+    ]);
+    await cacheSemanticScores(first, baseProfile);
+
+    // Re-cache mission-1 alongside a new key.
+    const second = new Map([
+      ['mission-3', { score: 84, reason: 'C' }],
+      ['mission-1', { score: 81, reason: 'A-updated' }],
+    ]);
+    await cacheSemanticScores(second, baseProfile);
+
+    const index = mockStorage['semantic-cache-index'] as string[];
+    // No duplicates in the index.
+    expect(new Set(index).size).toBe(index.length);
+    // Existing key moved to the tail; new key appended after survivors. Keys are
+    // stored as `semantic-<profile-fingerprint>-<missionId>`; the fingerprint
+    // never contains `mission`, so slice from the first `mission-` occurrence.
+    const missionIds = index.map((key) => key.slice(key.indexOf('mission-')));
+    expect(missionIds).toEqual(['mission-2', 'mission-3', 'mission-1']);
+  });
 });
