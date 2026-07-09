@@ -58,8 +58,8 @@ test.describe('Onboarding', () => {
     await expect(page.locator('#ob-firstname')).toBeVisible();
     await page.locator('#ob-firstname').fill('Guy');
     await page.locator('#ob-jobtitle').fill('Dev React Senior');
-    await page.locator('#ob-stack').fill('React');
-    await page.getByRole('button', { name: 'Ajouter la stack technique' }).click();
+    await page.locator('#ob-keywords').fill('React');
+    await page.getByRole('button', { name: 'Ajouter le mot-clé' }).click();
     await expect(page.getByRole('button', { name: 'React' })).toBeVisible();
     await page.locator('#ob-location').fill('Paris');
     await expect(page.getByRole('button', { name: 'Sauvegarder mon profil' })).toBeEnabled();

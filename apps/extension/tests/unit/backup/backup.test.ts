@@ -21,10 +21,9 @@ function createTestProfile(overrides?: Partial<UserProfile>): UserProfile {
     location: 'Paris',
     remote: 'hybrid',
     seniority: 'senior',
-    stack: ['Svelte', 'TypeScript'],
+    keywords: ['Svelte', 'TypeScript'],
     tjmMin: 400,
     tjmMax: 600,
-    searchKeywords: [],
     ...overrides,
   };
 }

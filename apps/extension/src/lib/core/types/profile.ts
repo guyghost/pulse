@@ -61,7 +61,13 @@ export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
 
 export interface UserProfile {
   firstName: string;
-  stack: string[];
+  /**
+   * Unified keyword list — feeds BOTH local scoring (matched against
+   * `mission.stack`) and the connector API free-text `query`. Replaces the
+   * former split between `stack` (scoring) and `searchKeywords` (query).
+   * See `models/keywords-unification.model.md`.
+   */
+  keywords: string[];
   tjmMin: number;
   tjmMax: number;
   location: string;
@@ -70,12 +76,12 @@ export interface UserProfile {
   jobTitle: string;
   /** Optional custom scoring weights. Defaults to DEFAULT_SCORING_WEIGHTS if not provided. */
   scoringWeights?: ScoringWeights;
-  /** User-defined search keywords sent to connector APIs for server-side filtering */
-  searchKeywords: string[];
   /**
    * Professional experiences, edited in the CV tab and pushed to LinkedIn and
-   * the mission connectors. Optional for backward compatibility with stored
-   * profiles; treat as `[]` when absent.
+   * the mission connectors. The schema's `.default([])` and
+   * {@link withProfileDefaults} guarantee this is always present on parsed or
+   * constructed profiles; legacy stored records without it are normalized to
+   * `[]` by the migration registry and profile preprocessor.
    */
-  experiences?: Experience[];
+  experiences: Experience[];
 }

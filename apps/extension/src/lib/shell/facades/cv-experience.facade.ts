@@ -77,14 +77,13 @@ export function createCvExperienceDeps(): CvExperienceDeps {
 function createBlankProfile() {
   return {
     firstName: '',
-    stack: [] as string[],
+    keywords: [] as string[],
     tjmMin: 0,
     tjmMax: 0,
     location: '',
     remote: 'any' as const,
     seniority: 'senior' as const,
     jobTitle: '',
-    searchKeywords: [] as string[],
     experiences: [] as Experience[],
   };
 }

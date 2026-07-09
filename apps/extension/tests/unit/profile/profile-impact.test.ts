@@ -14,8 +14,7 @@ function makeProfile(overrides: Partial<ProfileImpactInput> = {}): ProfileImpact
     remote: 'any',
     tjmMin: 0,
     tjmMax: 0,
-    stack: [],
-    searchKeywords: [],
+    keywords: [],
     ...overrides,
   };
 }
@@ -25,26 +24,26 @@ describe('profile impact model', () => {
     const items = buildProfileImpactItems(makeProfile());
 
     expect(items.map((item) => item.id).slice(0, 5)).toEqual([
-      'stack',
+      'keywords',
       'tjm-min',
       'remote',
       'location',
-      'search-keywords',
+      'job-title',
     ]);
-    expect(items.map((item) => item.weight).slice(0, 5)).toEqual([25, 20, 15, 15, 10]);
+    expect(items.map((item) => item.weight).slice(0, 5)).toEqual([35, 20, 15, 15, 8]);
   });
 
   it('computes weighted completion from completed impact fields', () => {
     const items = buildProfileImpactItems(
       makeProfile({
         firstName: 'Guy',
-        stack: ['Svelte', 'TypeScript'],
+        keywords: ['Svelte', 'TypeScript'],
         tjmMin: 650,
         location: 'Paris',
       })
     );
 
-    expect(computeProfileImpactCompletion(items)).toBe(62);
+    expect(computeProfileImpactCompletion(items)).toBe(72);
   });
 
   it('simulates the gain from the three highest-impact missing fields', () => {
@@ -52,14 +51,14 @@ describe('profile impact model', () => {
     const simulation = buildProfileImpactSimulation(items);
 
     expect(simulation.currentCompletion).toBe(2);
-    expect(simulation.nextCompletion).toBe(62);
-    expect(simulation.delta).toBe(60);
+    expect(simulation.nextCompletion).toBe(72);
+    expect(simulation.delta).toBe(70);
     expect(simulation.prioritizedItems.map((item) => item.id)).toEqual([
-      'stack',
+      'keywords',
       'tjm-min',
       'remote',
     ]);
-    expect(simulation.title).toContain('Stack technique, TJM minimum, Mode de travail');
+    expect(simulation.title).toContain('Mots-clés, TJM minimum, Mode de travail');
   });
 
   it('marks a fully specified profile as ready for scoring and alerts', () => {
@@ -71,8 +70,7 @@ describe('profile impact model', () => {
         remote: 'hybrid',
         tjmMin: 650,
         tjmMax: 850,
-        stack: ['Svelte', 'TypeScript'],
-        searchKeywords: ['SaaS'],
+        keywords: ['Svelte', 'TypeScript', 'SaaS'],
       })
     );
     const simulation = buildProfileImpactSimulation(items);

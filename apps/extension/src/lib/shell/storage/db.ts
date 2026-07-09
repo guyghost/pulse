@@ -59,7 +59,7 @@ export const DB_VERSION = 4;
  * Applicative data version. Bump when an entity Zod schema changes shape and
  * a data migration is appended to `DATA_MIGRATIONS`.
  */
-export const APP_DATA_VERSION = 1;
+export const APP_DATA_VERSION = 2;
 
 // ============================================================================
 // Single opener with versionchange + blocked handling

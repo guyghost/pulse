@@ -19,14 +19,13 @@ import {
 
 const profile: UserProfile = {
   firstName: 'Guy',
-  stack: ['Svelte', 'TypeScript'],
+  keywords: ['Svelte', 'TypeScript', 'mission svelte'],
   tjmMin: 600,
   tjmMax: 800,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Lead Frontend',
-  searchKeywords: ['mission svelte'],
 };
 
 const settings: AppSettings = {

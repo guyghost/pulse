@@ -29,14 +29,13 @@ function makeDraft(
 function makeProfile(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
     firstName: 'Guy',
-    stack: ['Svelte', 'TypeScript'],
+    keywords: ['Svelte', 'TypeScript', 'mission svelte'],
     tjmMin: 650,
     tjmMax: 900,
     location: 'Paris',
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Lead Frontend',
-    searchKeywords: ['mission svelte'],
     ...overrides,
   };
 }
@@ -69,9 +68,9 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
     expect(merged.jobTitle).toBe('Nouveau titre LinkedIn');
   });
 
-  it('unions the current stack with draft skills, deduping case-insensitively while keeping first casing', () => {
+  it('unions the current keywords with draft skills, deduping case-insensitively while keeping first casing', () => {
     const merged = mergeCandidateProfileIntoUserProfile(
-      makeProfile({ stack: ['Svelte', 'TypeScript'] }),
+      makeProfile({ keywords: ['Svelte', 'TypeScript'] }),
       makeDraft({
         skills: [
           { skill: 'svelte', source: 'linkedin', confidence: 0.9 },
@@ -82,7 +81,7 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
       NOW
     );
 
-    expect(merged.stack).toEqual(['Svelte', 'TypeScript', 'React']);
+    expect(merged.keywords).toEqual(['Svelte', 'TypeScript', 'React']);
   });
 
   it('keeps the current location when it is non-empty', () => {
@@ -134,7 +133,7 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
 
     expect(merged).toEqual({
       firstName: '',
-      stack: [],
+      keywords: [],
       tjmMin: 0,
       tjmMax: 0,
       location: '',
@@ -142,19 +141,18 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
       seniority: 'senior',
       jobTitle: 'Solo Title',
       scoringWeights: undefined,
-      searchKeywords: [],
       experiences: [],
     });
   });
 
-  it('preserves tjm, remote, seniority and searchKeywords from the current profile', () => {
+  it('preserves tjm, remote, seniority and keywords from the current profile', () => {
     const merged = mergeCandidateProfileIntoUserProfile(
       makeProfile({
         tjmMin: 700,
         tjmMax: 950,
         remote: 'full',
         seniority: 'confirmed',
-        searchKeywords: ['react', 'remote'],
+        keywords: ['react', 'remote'],
       }),
       makeDraft({ title: 'Nouveau titre' }),
       NOW
@@ -164,7 +162,7 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
     expect(merged.tjmMax).toBe(950);
     expect(merged.remote).toBe('full');
     expect(merged.seniority).toBe('confirmed');
-    expect(merged.searchKeywords).toEqual(['react', 'remote']);
+    expect(merged.keywords).toEqual(['react', 'remote']);
     expect(merged.firstName).toBe('Guy');
   });
 
@@ -180,15 +178,15 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
   });
 
   it('does not mutate the input current profile', () => {
-    const current = makeProfile({ stack: ['Svelte'] });
+    const current = makeProfile({ keywords: ['Svelte'] });
     const merged = mergeCandidateProfileIntoUserProfile(
       current,
       makeDraft({ skills: [{ skill: 'React', source: 'linkedin', confidence: 0.9 }] }),
       NOW
     );
 
-    expect(current.stack).toEqual(['Svelte']);
-    expect(merged.stack).not.toBe(current.stack);
-    expect(merged.stack).toEqual(['Svelte', 'React']);
+    expect(current.keywords).toEqual(['Svelte']);
+    expect(merged.keywords).not.toBe(current.keywords);
+    expect(merged.keywords).toEqual(['Svelte', 'React']);
   });
 });

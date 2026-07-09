@@ -28,14 +28,13 @@ import {
 
 const profile: UserProfile = {
   firstName: 'Guy',
-  stack: ['Svelte'],
+  keywords: ['Svelte', 'mission svelte'],
   tjmMin: 600,
   tjmMax: 800,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Lead Frontend',
-  searchKeywords: ['mission svelte'],
 };
 
 describe('feed data facade profile bridge', () => {

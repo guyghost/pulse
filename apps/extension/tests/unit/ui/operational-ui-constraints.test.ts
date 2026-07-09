@@ -313,12 +313,13 @@ describe('operational UI constraints', () => {
     const profileSource = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
     const impactSource = readFileSync('src/lib/core/profile/profile-impact.ts', 'utf8');
 
-    expect(impactSource).toContain("id: 'stack'");
+    expect(impactSource).toContain("id: 'keywords'");
     expect(impactSource).toContain("id: 'tjm-min'");
     expect(impactSource).toContain("id: 'remote'");
     expect(impactSource).toContain("id: 'location'");
-    expect(impactSource).toContain("id: 'search-keywords'");
-    expect(impactSource.indexOf("id: 'stack'")).toBeLessThan(impactSource.indexOf("id: 'remote'"));
+    expect(impactSource.indexOf("id: 'keywords'")).toBeLessThan(
+      impactSource.indexOf("id: 'remote'")
+    );
     expect(profileSource).toContain('buildProfileImpactItems');
     expect(profileSource).toContain('buildProfileImpactSimulation');
     expect(profileSource).toContain('Priorités d’impact');

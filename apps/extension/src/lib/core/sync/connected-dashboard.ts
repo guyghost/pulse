@@ -9,6 +9,7 @@ import type { ConnectorHealthSnapshot } from '../types/health';
 import type { GeneratedAsset, GenerationType } from '../types/generation';
 import type { Mission, MissionSource, RemoteType } from '../types/mission';
 import type { SeniorityLevel, UserProfile } from '../types/profile';
+import { appendUniqueNormalized } from '../profile/normalize-profile';
 import type { Grade } from '../types/score';
 import type { MissionTracking, StatusTransition } from '../types/tracking';
 import {
@@ -402,14 +403,28 @@ export function remoteCandidateProfileToUserProfile(
 
   return {
     firstName,
-    stack: dashboardSkills.length > 0 ? dashboardSkills : [...(existingProfile?.stack ?? [])],
+    // Dashboard skills are authoritative when present, but the user's manual
+    // keywords (domain terms, sectors) are preserved by merging with the
+    // existing unified list. Pre-unification this was `stack` (dashboard or
+    // existing) + `searchKeywords` (always preserved); both now live in
+    // `keywords`. Dedup is case-insensitive (first-seen casing wins) and the
+    // result is capped to 40 to stay within the schema limit.
+    keywords:
+      dashboardSkills.length > 0
+        ? appendUniqueNormalized([...dashboardSkills, ...(existingProfile?.keywords ?? [])]).slice(
+            0,
+            40
+          )
+        : [...(existingProfile?.keywords ?? [])],
     tjmMin,
     tjmMax,
     location: snapshot.location?.trim() || existingProfile?.location || '',
     remote: snapshot.remote_preference ?? existingProfile?.remote ?? 'any',
     seniority: snapshot.seniority ?? existingProfile?.seniority ?? 'senior',
     jobTitle,
-    searchKeywords: existingProfile ? [...existingProfile.searchKeywords] : [],
+    // The connected-dashboard snapshot does not carry CV experiences; preserve
+    // the user's existing entries so syncing the dashboard does not wipe them.
+    experiences: [...(existingProfile?.experiences ?? [])],
     scoringWeights: existingProfile?.scoringWeights
       ? { ...existingProfile.scoringWeights }
       : undefined,
@@ -444,11 +459,9 @@ export function shouldClearLocalCandidateProfile(
     existingProfile.seniority === lastConnectedProfile.seniority &&
     existingProfile.tjmMin === lastConnectedProfile.tjmMin &&
     existingProfile.tjmMax === lastConnectedProfile.tjmMax &&
-    existingProfile.stack.length === lastConnectedProfile.stack.length &&
-    existingProfile.stack.every((item, index) => item === lastConnectedProfile.stack[index]) &&
-    existingProfile.searchKeywords.length === lastConnectedProfile.searchKeywords.length &&
-    existingProfile.searchKeywords.every(
-      (item, index) => item === lastConnectedProfile.searchKeywords[index]
+    existingProfile.keywords.length === lastConnectedProfile.keywords.length &&
+    existingProfile.keywords.every(
+      (item, index) => item === lastConnectedProfile.keywords[index]
     ) &&
     sameWeights
   );

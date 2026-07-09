@@ -8,14 +8,13 @@ import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 const profile: UserProfile = {
   firstName: 'Guy',
-  stack: ['TypeScript', 'React', 'Node.js'],
+  keywords: ['TypeScript', 'React', 'Node.js'],
   tjmMin: 500,
   tjmMax: 700,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Developpeur Fullstack',
-  searchKeywords: [],
 };
 
 const mission: Mission = {

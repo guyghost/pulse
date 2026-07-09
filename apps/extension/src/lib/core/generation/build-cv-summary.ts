@@ -16,7 +16,7 @@ import type { UserProfile } from '../types/profile';
  */
 export const buildCvSummaryPrompt = (mission: Mission, profile: UserProfile): string => {
   // Find overlapping stack items
-  const profileStackLower = profile.stack.map((s) => s.toLowerCase());
+  const profileStackLower = profile.keywords.map((s) => s.toLowerCase());
   const matchingStack = mission.stack.filter((s) => profileStackLower.includes(s.toLowerCase()));
   const missingStack = mission.stack.filter((s) => !profileStackLower.includes(s.toLowerCase()));
 
@@ -32,7 +32,7 @@ Mission cible:
 
 Ton profil:
 - Poste: ${profile.jobTitle}
-- Stack: ${profile.stack.join(', ')}
+- Stack: ${profile.keywords.join(', ')}
 - Seniorité: ${profile.seniority}
 ${matchingStack.length > 0 ? `- Compétences matchantes: ${matchingStack.join(', ')}` : ''}
 ${missingStack.length > 0 ? `- Compétences manquantes (ne pas mentionner): ${missingStack.join(', ')}` : ''}

@@ -7,14 +7,13 @@ import type { AppSettings } from '../../../src/lib/core/types/app-settings';
 
 const profile: UserProfile = {
   firstName: 'Guy',
-  stack: ['Svelte'],
+  keywords: ['Svelte'],
   tjmMin: 600,
   tjmMax: 800,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Lead Frontend',
-  searchKeywords: [],
 };
 
 const settings: AppSettings = {

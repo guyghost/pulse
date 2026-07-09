@@ -34,7 +34,7 @@ describe('normalize profile helpers', () => {
   it('fills missing profile fields with save-safe defaults', () => {
     expect(withProfileDefaults({ firstName: 'Guy' })).toEqual({
       firstName: 'Guy',
-      stack: [],
+      keywords: [],
       tjmMin: 0,
       tjmMax: 0,
       location: '',
@@ -42,7 +42,6 @@ describe('normalize profile helpers', () => {
       seniority: 'senior',
       jobTitle: '',
       scoringWeights: undefined,
-      searchKeywords: [],
       experiences: [],
     });
   });
@@ -52,10 +51,8 @@ describe('normalize profile helpers', () => {
       firstName: ' Guy ',
       jobTitle: ' Architecte   Svelte ',
       location: ' Paris ',
-      stack: [' Svelte '],
-      stackInput: 'TypeScript',
-      searchKeywords: [' mission '],
-      keywordInput: 'front',
+      keywords: [' Svelte ', ' mission '],
+      keywordInput: 'TypeScript',
       tjmMin: 600,
       tjmMax: 750,
       remote: 'hybrid',
@@ -67,8 +64,7 @@ describe('normalize profile helpers', () => {
       firstName: 'Guy',
       jobTitle: 'Architecte Svelte',
       location: 'Paris',
-      stack: ['Svelte', 'TypeScript'],
-      searchKeywords: ['mission', 'front'],
+      keywords: ['Svelte', 'mission', 'TypeScript'],
       tjmMin: 600,
       tjmMax: 750,
       remote: 'hybrid',

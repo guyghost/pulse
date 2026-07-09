@@ -410,14 +410,13 @@ function buildAlertPreferences(baseDate: Date): ConnectedAlertPreferences {
 function buildCompleteProfile(): UserProfile {
   return {
     firstName: 'Alice',
-    stack: ['TypeScript', 'React', 'Node.js', 'Svelte'],
+    keywords: ['TypeScript', 'React', 'Node.js', 'Svelte'],
     tjmMin: 500,
     tjmMax: 750,
     location: 'Paris',
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Développeur Fullstack',
-    searchKeywords: [],
     experiences: [
       {
         id: 'exp-seed-1',
@@ -457,14 +456,14 @@ function buildCompleteProfile(): UserProfile {
 function buildIncompleteProfile(): UserProfile {
   return {
     firstName: '',
-    stack: [],
+    keywords: [],
     tjmMin: 0,
     tjmMax: 0,
     location: '',
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: '',
-    searchKeywords: [],
+    experiences: [],
   };
 }
 

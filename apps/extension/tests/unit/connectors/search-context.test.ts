@@ -4,32 +4,30 @@ import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 /**
  * Helper to create a valid UserProfile with defaults and overrides.
- * searchKeywords is now a required field in UserProfile.
+ * keywords is now the unified field on UserProfile.
  */
 function makeProfile(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
     firstName: 'Test',
-    stack: ['TypeScript', 'React'],
+    keywords: ['TypeScript', 'React'],
     tjmMin: 500,
     tjmMax: 800,
     location: 'Paris',
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Développeur Fullstack',
-    searchKeywords: [], // Default to empty array
     ...overrides,
   };
 }
 
 describe('buildSearchContext', () => {
   /**
-   * Test 1: With searchKeywords — query should be searchKeywords joined by space
+   * Test 1: With keywords — query should be keywords joined by space
    */
-  describe('query from searchKeywords', () => {
-    it('builds query from searchKeywords array joined by space', () => {
+  describe('query from keywords', () => {
+    it('builds query from keywords array joined by space', () => {
       const profile = makeProfile({
-        searchKeywords: ['React', 'Developer'],
-        stack: ['React', 'TypeScript'],
+        keywords: ['React', 'Developer'],
       });
       const lastSync = new Date('2026-03-20T10:00:00Z');
 
@@ -39,18 +37,18 @@ describe('buildSearchContext', () => {
       expect(context.skills).toEqual([]);
     });
 
-    it('handles single searchKeyword', () => {
+    it('handles single keyword', () => {
       const profile = makeProfile({
-        searchKeywords: ['Fullstack'],
+        keywords: ['Fullstack'],
       });
       const context = buildSearchContext(profile, null);
 
       expect(context.query).toBe('Fullstack');
     });
 
-    it('handles searchKeywords with many terms', () => {
+    it('handles keywords with many terms', () => {
       const profile = makeProfile({
-        searchKeywords: ['React', 'Node.js', 'Fullstack', 'Freelance'],
+        keywords: ['React', 'Node.js', 'Fullstack', 'Freelance'],
       });
       const context = buildSearchContext(profile, null);
 
@@ -59,14 +57,14 @@ describe('buildSearchContext', () => {
   });
 
   /**
-   * Test 2: Without searchKeywords (empty array), with jobTitle — query should be EMPTY
+   * Test 2: Without keywords (empty array), with jobTitle — query should be EMPTY
    * jobTitle is NOT used as fallback because it's too restrictive for API keyword search.
    * Relevance is handled by local scoring (scoreMission), not server-side filtering.
    */
   describe('query does NOT fallback to jobTitle', () => {
-    it('returns empty query when searchKeywords is empty (even if jobTitle exists)', () => {
+    it('returns empty query when keywords is empty (even if jobTitle exists)', () => {
       const profile = makeProfile({
-        searchKeywords: [],
+        keywords: [],
         jobTitle: 'Développeur Frontend',
       });
       const context = buildSearchContext(profile, null);
@@ -76,7 +74,7 @@ describe('buildSearchContext', () => {
 
     it('returns empty query for special character jobTitle (no fallback)', () => {
       const profile = makeProfile({
-        searchKeywords: [],
+        keywords: [],
         jobTitle: 'Développeur C#/.NET',
       });
       const context = buildSearchContext(profile, null);
@@ -86,12 +84,12 @@ describe('buildSearchContext', () => {
   });
 
   /**
-   * Test 3: Without searchKeywords or jobTitle — query should be empty string
+   * Test 3: Without keywords or jobTitle — query should be empty string
    */
   describe('query empty fallback', () => {
-    it('returns empty string when both searchKeywords and jobTitle are empty', () => {
+    it('returns empty string when both keywords and jobTitle are empty', () => {
       const profile = makeProfile({
-        searchKeywords: [],
+        keywords: [],
         jobTitle: '',
       });
       const context = buildSearchContext(profile, null);
@@ -101,7 +99,7 @@ describe('buildSearchContext', () => {
 
     it('trims leading/trailing whitespace from query', () => {
       const profile = makeProfile({
-        searchKeywords: ['  React  ', '  TypeScript  '],
+        keywords: ['  React  ', '  TypeScript  '],
       });
       const context = buildSearchContext(profile, null);
 
@@ -111,9 +109,9 @@ describe('buildSearchContext', () => {
       expect(context.query.endsWith(' ')).toBe(false);
     });
 
-    it('ignores blank searchKeywords when building query', () => {
+    it('ignores blank keywords when building query', () => {
       const profile = makeProfile({
-        searchKeywords: ['React', ' ', '', '\t', 'TypeScript'],
+        keywords: ['React', ' ', '', '\t', 'TypeScript'],
       });
       const context = buildSearchContext(profile, null);
 
@@ -129,25 +127,25 @@ describe('buildSearchContext', () => {
   describe('skills mapping', () => {
     it('returns empty skills array (skills not sent to APIs)', () => {
       const profile = makeProfile({
-        stack: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'],
+        keywords: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'],
       });
       const context = buildSearchContext(profile, null);
 
       expect(context.skills).toEqual([]);
     });
 
-    it('returns empty skills array even when stack is empty', () => {
+    it('returns empty skills array even when keywords is empty', () => {
       const profile = makeProfile({
-        stack: [],
+        keywords: [],
       });
       const context = buildSearchContext(profile, null);
 
       expect(context.skills).toEqual([]);
     });
 
-    it('returns empty skills regardless of stack contents', () => {
+    it('returns empty skills regardless of keywords contents', () => {
       const profile = makeProfile({
-        stack: ['Vue.js', 'Nuxt', 'TypeScript', 'GraphQL'],
+        keywords: ['Vue.js', 'Nuxt', 'TypeScript', 'GraphQL'],
       });
       const context = buildSearchContext(profile, null);
 
@@ -263,8 +261,7 @@ describe('buildSearchContext', () => {
     it('builds full context with all fields populated', () => {
       const profile = makeProfile({
         firstName: 'Jean',
-        searchKeywords: ['React', 'TypeScript', 'Senior'],
-        stack: ['React', 'TypeScript', 'Node.js', 'PostgreSQL'],
+        keywords: ['React', 'TypeScript', 'Senior'],
         tjmMin: 600,
         tjmMax: 800,
         location: 'Paris',
@@ -290,8 +287,7 @@ describe('buildSearchContext', () => {
   describe('minimal profile', () => {
     it('builds context with minimal profile (empty arrays, empty strings)', () => {
       const profile = makeProfile({
-        searchKeywords: [],
-        stack: [],
+        keywords: [],
         location: '',
         jobTitle: '',
         remote: 'any',
@@ -310,27 +306,27 @@ describe('buildSearchContext', () => {
    * Test 10: Edge cases
    */
   describe('edge cases', () => {
-    it('handles searchKeywords with special characters', () => {
+    it('handles keywords with special characters', () => {
       const profile = makeProfile({
-        searchKeywords: ['C#', '.NET', 'Azure DevOps'],
+        keywords: ['C#', '.NET', 'Azure DevOps'],
       });
       const context = buildSearchContext(profile, null);
 
       expect(context.query).toBe('C# .NET Azure DevOps');
     });
 
-    it('handles searchKeywords with accented characters', () => {
+    it('handles keywords with accented characters', () => {
       const profile = makeProfile({
-        searchKeywords: ['Développeur', 'Ingénieur', 'Études'],
+        keywords: ['Développeur', 'Ingénieur', 'Études'],
       });
       const context = buildSearchContext(profile, null);
 
       expect(context.query).toBe('Développeur Ingénieur Études');
     });
 
-    it('trims leading/trailing whitespace from searchKeywords', () => {
+    it('trims leading/trailing whitespace from keywords', () => {
       const profile = makeProfile({
-        searchKeywords: ['  React  ', '  TypeScript  '],
+        keywords: ['  React  ', '  TypeScript  '],
       });
       const context = buildSearchContext(profile, null);
 

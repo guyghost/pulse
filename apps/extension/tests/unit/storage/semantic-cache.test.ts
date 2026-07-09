@@ -36,14 +36,13 @@ vi.stubGlobal('chrome', {
 
 const baseProfile: UserProfile = {
   firstName: 'Guy',
-  stack: ['TypeScript', 'React'],
+  keywords: ['TypeScript', 'React'],
   tjmMin: 500,
   tjmMax: 700,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Developpeur Fullstack',
-  searchKeywords: [],
 };
 
 describe('semantic cache', () => {
@@ -70,7 +69,7 @@ describe('semantic cache', () => {
     await expect(
       getCachedSemanticScores(['mission-1'], {
         ...baseProfile,
-        stack: ['Go', 'Rust'],
+        keywords: ['Go', 'Rust'],
         jobTitle: 'Developpeur backend',
       })
     ).resolves.toEqual(new Map());
