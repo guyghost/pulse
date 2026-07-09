@@ -141,7 +141,7 @@ export type BridgeMessage =
   | {
       type: 'LINKEDIN_PROFILE_IMPORTED';
       payload:
-        | { imported: true; profile: CanonicalCandidateProfileDraft }
+        | { imported: true; profile: CanonicalCandidateProfileDraft; addedCount?: number }
         | { imported: false; errorCode: string; errorMessage: string };
     }
   // Scan orchestration (panel ↔ service worker)

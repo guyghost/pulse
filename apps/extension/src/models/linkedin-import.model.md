@@ -43,9 +43,26 @@ checking-permission ──PERMISSION_GRANTED──► extracting
 checking-permission ──PERMISSION_DENIED───► idle   (toast: "Autorisation LinkedIn refusée.")
 extracting ──EXTRACT_OK(profile)──► merging
 extracting ──EXTRACT_ERR(code,msg)──► idle   (toast: msg, typée par code)
-merging ──MERGE_OK──► idle   (toast: "Expériences LinkedIn importées avec succès.")
+merging ──MERGE_OK(addedCount, draftCount)──► idle   (toast: branch par compteur)
 merging ──MERGE_ERR(msg)──► idle   (toast: msg)
 ```
+
+### `MERGE_OK` branches (truthful, count-aware)
+
+The merge outcome toast MUST reflect how many experiences were actually added,
+not just that the merge ran. The SW computes `addedCount` via the pure
+`countNewlyAddedExperiences(current, draft.experiences)` helper (same dedup key
+as `mergeExperiences`), and `draftCount = draft.experiences.length`.
+
+| Condition                            | Toast type | Message                                                                                                                                    |
+| ------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
+| `draftCount === 0`                   | info       | "Aucune expérience trouvée sur votre profil LinkedIn. Ouvrez votre profil, défilez jusqu'à la section Expérience, puis relancez l'import." |
+| `addedCount === 0 && draftCount > 0` | info       | "Vos expériences LinkedIn sont déjà présentes dans votre CV."                                                                              |
+| `addedCount > 0`                     | success    | "{addedCount} expérience(s) LinkedIn importée(s) avec succès."                                                                             |
+
+This fixes the "success toast but no data" regression: a partial extraction
+(headline/skills found, 0 experiences) or a fully-deduped merge no longer
+reports a misleading success.
 
 `isImporting === true` for `checking-permission | extracting | merging` (button
 disabled, reentrancy blocked).
@@ -57,8 +74,10 @@ disabled, reentrancy blocked).
   `ensureLinkedInHostPermission()` (facade).
 - `EXTRACT_OK(profile) | EXTRACT_ERR(code, message)` — result of
   `importLinkedInProfile()` (bridge `IMPORT_LINKEDIN_PROFILE`).
-- `MERGE_OK | MERGE_ERR(message)` — result of `syncLinkedInProfileImport(profile)`
-  (bridge `SYNC_LINKEDIN_PROFILE_IMPORT` → `PROFILE_UPDATED`).
+- `MERGE_OK(addedCount, draftCount) | MERGE_ERR(message)` — result of
+  `syncLinkedInProfileImport(profile)` (bridge `SYNC_LINKEDIN_PROFILE_IMPORT`
+  → `PROFILE_UPDATED`). `addedCount` is computed by the pure
+  `countNewlyAddedExperiences` helper; `draftCount = profile.experiences.length`.
 
 ## Effects (shell)
 
@@ -132,6 +151,9 @@ extracting → merging` sequence.
    signals, and only when no profile sections are present. The bare words
    "challenge" / "checkpoint" in body prose must NOT trigger a block — they
    appear in legitimate profile text.
+8. The merge toast is count-aware: `MERGE_OK` carries `addedCount` +
+   `draftCount`, and the UI branches on them. A merge that adds 0 experiences
+   (empty extraction or full dedup) MUST NOT surface a success toast.
 
 ## Non-goals
 

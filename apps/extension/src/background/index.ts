@@ -88,6 +88,7 @@ import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
 import { mergeCandidateProfileIntoUserProfile } from '../lib/core/profile-extractors/merge-candidate-profile';
+import { countNewlyAddedExperiences } from '../lib/core/cv/experience-helpers';
 import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
 import { loadTJMHistory } from '../lib/shell/storage/tjm-history';
@@ -872,6 +873,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         try {
           const draft = message.payload.profile;
           const current = await getProfile();
+          const addedCount = countNewlyAddedExperiences(
+            current?.experiences ?? [],
+            draft.experiences
+          );
           const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
           await saveProfile(merged);
           chrome.runtime.sendMessage({ type: 'PROFILE_UPDATED', payload: merged }).catch(() => {
@@ -879,7 +884,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           });
           sendResponse({
             type: 'LINKEDIN_PROFILE_IMPORTED',
-            payload: { imported: true, profile: draft },
+            payload: { imported: true, profile: draft, addedCount },
           });
         } catch (error) {
           sendResponse({

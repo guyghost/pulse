@@ -13,6 +13,7 @@ import { scoreMission } from '$lib/core/scoring/relevance';
 import { buildScoreBreakdown } from '$lib/core/scoring/final-score';
 import type { CanonicalCandidateProfileDraft } from '$lib/core/profile-extractors/types';
 import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extractors/merge-candidate-profile';
+import { countNewlyAddedExperiences } from '$lib/core/cv/experience-helpers';
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
@@ -399,13 +400,17 @@ function createChromeStubs() {
           case 'SYNC_LINKEDIN_PROFILE_IMPORT': {
             const draft = (message.payload as { profile: CanonicalCandidateProfileDraft }).profile;
             const current = readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile);
+            const addedCount = countNewlyAddedExperiences(
+              current?.experiences ?? [],
+              draft.experiences
+            );
             const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
             writeDevStorage(DEV_PROFILE_STORAGE_KEY, merged);
             storage.profile = merged;
             emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: merged });
             return {
               type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: { imported: true, profile: draft },
+              payload: { imported: true, profile: draft, addedCount },
             };
           }
           case 'GET_FEED_MISSIONS':
