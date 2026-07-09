@@ -94,6 +94,26 @@ permission, `tab.url` is `undefined` and the URL classification would produce a
 misleading `profile_not_found`. With the permission granted (by the side panel
 gate), `tab.url` is readable for LinkedIn tabs.
 
+### Blocked-reason detection (DOM)
+
+`blockedReason` is computed inside `extractLinkedInProfileFromDom` (injected into
+the page). It is the **fallback** for challenge interstitials LinkedIn serves on
+a `/in/` URL without changing the URL — URL-path redirects to `/checkpoint/` or
+`/challenge/` are already caught earlier by `classifyLinkedInUrl`.
+
+Detection is **specific, not greedy**:
+
+- Block signals are challenge-page-specific phrases only: "security
+  verification", "unusual activity", "verify your identity", "temporarily
+  restricted", "security check".
+- The bare words "challenge" / "checkpoint" are NOT block signals: they appear
+  in legitimate profile prose (e.g. "I enjoy new challenges", "project
+  checkpoint") and previously caused false `rate_limited_or_blocked` errors that
+  blocked real imports.
+- Defensive guard: text signals are authoritative only when the page has no
+  parseable profile sections (no headline, no experiences, no education). A page
+  that yielded real profile sections is never treated as blocked on text alone.
+
 ## Invariants
 
 1. `chrome.permissions.request()` is called **only** from the side panel during
@@ -108,6 +128,10 @@ extracting → merging` sequence.
    null/unknown bridge responses (facade graceful handling).
 6. The LLM never decides a transition. It may only enrich extracted content in
    a dedicated AI worker. **Le LLM produit des signaux ; le modèle décide.**
+7. DOM block detection is specific: only challenge-page phrases are block
+   signals, and only when no profile sections are present. The bare words
+   "challenge" / "checkpoint" in body prose must NOT trigger a block — they
+   appear in legitimate profile text.
 
 ## Non-goals
 
