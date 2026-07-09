@@ -155,7 +155,7 @@ jobs:
 
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: MissionPulse v${{ steps.version.outputs.version }}
           body: |
@@ -179,7 +179,7 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload extension ZIP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: missionpulse-zip-${{ steps.version.outputs.version }}
           path: apps/extension/missionpulse-${{ steps.version.outputs.version }}.zip
@@ -199,13 +199,13 @@ jobs:
 
     steps:
       - name: Download extension ZIP artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: missionpulse-zip-${{ needs.build-and-release.outputs.version }}
           path: ./
 
       - name: Publish to Chrome Web Store
-        uses: mnao305/chrome-extension-upload@v5.0.0
+        uses: mnao305/chrome-extension-upload@v6.0.0
         with:
           file-path: missionpulse-${{ needs.build-and-release.outputs.version }}.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}

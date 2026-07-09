@@ -18,19 +18,10 @@ import {
 } from '../types/alert-preferences';
 
 export type SyncEntity =
-  | 'missions'
-  | 'applications'
-  | 'candidate_profile'
-  | 'connector_health'
-  | 'alert_preferences';
+  'missions' | 'applications' | 'candidate_profile' | 'connector_health' | 'alert_preferences';
 
 export type ConnectorHealthSyncStatus =
-  | 'ready'
-  | 'needs_permission'
-  | 'needs_session'
-  | 'blocked'
-  | 'error'
-  | 'syncing';
+  'ready' | 'needs_permission' | 'needs_session' | 'blocked' | 'error' | 'syncing';
 
 export interface MissionUpsertRow {
   user_id: string;

@@ -16,11 +16,7 @@ import { validateMessage } from './schemas';
 // ============================================================================
 
 export type ErrorCategory =
-  | 'VALIDATION_ERROR'
-  | 'CONNECTOR_ERROR'
-  | 'STORAGE_ERROR'
-  | 'PAYLOAD_TOO_LARGE'
-  | 'UNKNOWN';
+  'VALIDATION_ERROR' | 'CONNECTOR_ERROR' | 'STORAGE_ERROR' | 'PAYLOAD_TOO_LARGE' | 'UNKNOWN';
 
 export interface BoundaryErrorResponse {
   success: false;

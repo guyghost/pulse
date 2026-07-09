@@ -90,9 +90,7 @@ export interface CanonicalCandidateProfileDraft {
 }
 
 export type ProfileExtractorParseErrorCode =
-  | 'malformed_payload'
-  | 'unsupported_source'
-  | 'dom_changed';
+  'malformed_payload' | 'unsupported_source' | 'dom_changed';
 
 export interface ProfileExtractorParseError {
   code: ProfileExtractorParseErrorCode;
