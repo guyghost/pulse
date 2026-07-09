@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { UserProfile } from '$lib/core/types/profile';
+  import type { RemoteType } from '$lib/core/types/mission';
   import { Chip } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import { ripple } from '../actions/ripple';
@@ -49,6 +50,7 @@
   let firstName = $state('');
   let jobTitle = $state('');
   let location = $state('');
+  let remote = $state<RemoteType | 'any'>('any');
   let keywords = $state<string[]>([]);
   let keywordInput = $state('');
   let tjm = $state(600);
@@ -56,6 +58,16 @@
   let alertThreshold = $state(80);
   let selectedSource = $state('Free-Work');
   let loadedAlertRevision = $state(-1);
+
+  // Work-mode options mirror `ProfileSection.remoteOptions` (Settings) so the
+  // onboarding preference feeds the scorer with the exact same shape/labels.
+  // See `models/onboarding-workmode-location.model.md`.
+  const workModeOptions: Array<{ value: RemoteType | 'any'; label: string }> = [
+    { value: 'any', label: 'Indifférent' },
+    { value: 'full', label: 'Remote' },
+    { value: 'hybrid', label: 'Hybride' },
+    { value: 'onsite', label: 'Présentiel' },
+  ];
 
   const onboardingSteps: OnboardingStep[] = [
     {
@@ -110,7 +122,7 @@
       keywords,
       tjmMin: tjm,
       tjmMax: tjm + 150,
-      remote: 'any',
+      remote,
       seniority: 'senior',
     });
 
@@ -448,9 +460,33 @@
       id="ob-location"
       type="text"
       class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
-      placeholder="ex: Paris ou remote"
+      placeholder="Paris, Lyon, Bordeaux…"
       bind:value={location}
     />
+  </div>
+
+  <div>
+    <p
+      id="ob-workmode-label"
+      class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
+    >
+      Mode de travail
+    </p>
+    <div class="grid grid-cols-4 gap-1.5" role="group" aria-labelledby="ob-workmode-label">
+      {#each workModeOptions as option}
+        <button
+          type="button"
+          class="min-h-11 rounded-lg border px-2 py-2.5 text-xs font-medium transition-colors {remote ===
+          option.value
+            ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
+            : 'border-border-light bg-page-canvas text-text-primary hover:bg-surface-white'}"
+          aria-pressed={remote === option.value}
+          onclick={() => (remote = option.value)}
+        >
+          {option.label}
+        </button>
+      {/each}
+    </div>
   </div>
 
   <div>
