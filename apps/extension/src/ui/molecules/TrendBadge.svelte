@@ -20,7 +20,7 @@
         : {
             icon: 'minus' as const,
             label: 'Stable',
-            class: 'text-text-primary bg-blueprint-blue/15',
+            class: 'text-text-primary bg-text-muted/15',
           }
   );
 </script>

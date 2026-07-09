@@ -66,6 +66,29 @@
   );
   const confidencePct = $derived(analysis ? Math.round(analysis.confidence * 100) : 0);
   const hasTjmTarget = $derived(userTjmMin > 0 && userTjmMax > 0 && !isTargetInverted);
+  // Positioning geometry: projects the market range and the user target onto a
+  // shared 0–100 scale so both bars stay comparable in one glance.
+  const positioning = $derived.by(() => {
+    if (!selectedMarketRange || userTargetMedian === null) {
+      return null;
+    }
+    const market = selectedMarketRange;
+    const lo = Math.min(market.min, userTjmMin);
+    const hi = Math.max(market.max, userTjmMax);
+    const pad = Math.max(40, Math.round((hi - lo) * 0.08));
+    const scaleMin = lo - pad;
+    const scaleMax = hi + pad;
+    const span = scaleMax - scaleMin || 1;
+    const pct = (value: number) => Math.max(0, Math.min(100, ((value - scaleMin) / span) * 100));
+    return {
+      marketLeft: pct(market.min),
+      marketWidth: Math.max(3, pct(market.max) - pct(market.min)),
+      medianLeft: pct(market.median),
+      userLeft: pct(userTjmMin),
+      userWidth: Math.max(3, pct(userTjmMax) - pct(userTjmMin)),
+      marketMedian: market.median,
+    };
+  });
   const tjmSetupSteps = $derived.by<TjmSetupStep[]>(() => [
     {
       title: 'Scanner le feed',
@@ -268,17 +291,11 @@
             style:width="{confidencePct}%"
           ></div>
         </div>
-        <p class="mt-1.5 text-[10px] leading-snug text-text-muted">
-          Basée sur {analysis.dataPoints} mission{analysis.dataPoints > 1 ? 's' : ''} analysée{analysis.dataPoints >
-          1
-            ? 's'
-            : ''}.
-        </p>
       </div>
     </div>
 
     <!-- User positioning -->
-    {#if selectedMarketRange && userTargetMedian !== null && userTargetDelta !== null}
+    {#if positioning && userTargetDelta !== null}
       <div class="section-card rounded-xl p-5">
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
@@ -286,32 +303,56 @@
               Votre positionnement
             </p>
             <p class="mt-1 text-xs leading-relaxed text-text-subtle">
-              Cible {userTjmMin}–{userTjmMax}€ face au marché
+              Cible {userTjmMin}–{userTjmMax}€ ·
               {userSeniority
                 ? levels.find((level) => level.key === userSeniority)?.label
-                : 'Confirmé'}.
+                : 'Confirmé'}
             </p>
           </div>
           <div class="text-right">
             <p class="text-xl font-semibold tabular-nums text-text-primary">
               {formatDelta(userTargetDelta)}
             </p>
-            <p class="text-[9px] text-text-muted">vs médiane</p>
+            <p class="text-[10px] text-text-muted">vs médiane</p>
           </div>
         </div>
-        <div class="mt-4 grid grid-cols-3 gap-2 text-center">
-          <div class="rounded-lg bg-page-canvas px-2 py-2">
-            <p class="text-[9px] uppercase tracking-[0.12em] text-text-muted">Marché bas</p>
-            <p class="mt-1 text-xs font-mono text-text-primary">{selectedMarketRange.min}€</p>
+
+        <div class="mt-5 space-y-2.5">
+          <div class="flex items-center gap-3">
+            <span class="w-16 shrink-0 text-[10px] text-text-muted">Marché</span>
+            <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
+              <div
+                class="absolute inset-y-0 rounded-full bg-text-muted/35 transition-all duration-500"
+                style:left="{positioning.marketLeft}%"
+                style:width="{positioning.marketWidth}%"
+              ></div>
+              <div
+                class="absolute top-1/2 h-3.5 w-[2px] -translate-y-1/2 rounded-full bg-text-primary transition-all duration-500"
+                style:left="{positioning.medianLeft}%"
+                title="Médiane marché"
+              ></div>
+            </div>
           </div>
-          <div class="rounded-lg bg-blueprint-blue/6 px-2 py-2">
-            <p class="text-[9px] uppercase tracking-[0.12em] text-blueprint-blue">Médiane</p>
-            <p class="mt-1 text-xs font-mono text-text-primary">{selectedMarketRange.median}€</p>
+          <div class="flex items-center gap-3">
+            <span class="w-16 shrink-0 text-[10px] text-text-muted">Votre cible</span>
+            <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
+              <div
+                class="absolute inset-y-0 rounded-full bg-blueprint-blue transition-all duration-500"
+                style:left="{positioning.userLeft}%"
+                style:width="{positioning.userWidth}%"
+              ></div>
+            </div>
           </div>
-          <div class="rounded-lg bg-page-canvas px-2 py-2">
-            <p class="text-[9px] uppercase tracking-[0.12em] text-text-muted">Marché haut</p>
-            <p class="mt-1 text-xs font-mono text-text-primary">{selectedMarketRange.max}€</p>
-          </div>
+        </div>
+
+        <div class="mt-2 flex items-center gap-3">
+          <span class="w-16 shrink-0"></span>
+          <p class="flex-1 text-[10px] leading-relaxed text-text-muted">
+            Trait plein : médiane marché
+            <span class="font-mono tabular-nums text-text-subtle"
+              >{positioning.marketMedian}€/j</span
+            >.
+          </p>
         </div>
       </div>
     {/if}
@@ -320,31 +361,40 @@
     <div class="space-y-3">
       {#each levels as level}
         {@const range = analysis[level.key]}
+        {@const isSelected = userSeniority === level.key}
         <div
-          class="section-card rounded-xl overflow-hidden {userSeniority === level.key
-            ? 'ring-2 ring-blueprint-blue/15'
+          class="section-card rounded-xl p-5 transition-shadow {isSelected
+            ? 'ring-2 ring-blueprint-blue/30'
             : ''}"
         >
-          <div class="h-[2px] bg-blueprint-blue/20"></div>
-          <div class="p-5">
-            <div class="flex items-center justify-between">
-              <div class="flex items-center gap-3">
-                <div
-                  class="flex h-8 w-8 items-center justify-center rounded-lg bg-blueprint-blue/8"
-                >
-                  <Icon name={level.icon} size={14} class="text-blueprint-blue" />
-                </div>
-                <div>
+          <div class="flex items-center justify-between">
+            <div class="flex items-center gap-3">
+              <div
+                class="flex h-8 w-8 items-center justify-center rounded-lg {isSelected
+                  ? 'bg-blueprint-blue/15'
+                  : 'bg-blueprint-blue/8'}"
+              >
+                <Icon name={level.icon} size={14} class="text-blueprint-blue" />
+              </div>
+              <div>
+                <div class="flex items-center gap-2">
                   <p class="text-xs font-medium text-text-primary">{level.label}</p>
-                  <p class="text-[10px] font-mono text-text-muted">{range.min}–{range.max}€</p>
+                  {#if isSelected}
+                    <span
+                      class="rounded-full bg-blueprint-blue/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blueprint-blue"
+                    >
+                      Vous
+                    </span>
+                  {/if}
                 </div>
+                <p class="text-[10px] font-mono text-text-muted">{range.min}–{range.max}€</p>
               </div>
-              <div class="text-right">
-                <p class="text-xl font-semibold tabular-nums text-text-primary">
-                  {range.median}<span class="ml-0.5 text-sm font-normal text-text-muted">€</span>
-                </p>
-                <p class="text-[9px] text-text-muted">/jour</p>
-              </div>
+            </div>
+            <div class="text-right">
+              <p class="text-xl font-semibold tabular-nums text-text-primary">
+                {range.median}<span class="ml-0.5 text-sm font-normal text-text-muted">€</span>
+              </p>
+              <p class="text-[10px] text-text-muted">/jour</p>
             </div>
           </div>
         </div>
@@ -427,25 +477,6 @@
               </div>
             </div>
           {/each}
-        </div>
-      </div>
-    {/if}
-
-    <!-- Recommendation -->
-    {#if analysis.recommendation}
-      <div class="section-card-strong rounded-xl p-5">
-        <div class="flex items-start gap-3">
-          <div
-            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/8"
-          >
-            <Icon name="lightbulb" size={14} class="text-blueprint-blue" />
-          </div>
-          <div>
-            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-              Recommandation
-            </p>
-            <p class="mt-1.5 text-xs leading-relaxed text-text-subtle">{analysis.recommendation}</p>
-          </div>
         </div>
       </div>
     {/if}
