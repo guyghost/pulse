@@ -20,7 +20,9 @@ test.describe('Settings Flow', () => {
     await expect(
       page.getByRole('heading', { name: /Votre profil MissionPulse|Bonjour/ })
     ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Profil' })).toBeVisible();
+    // Use exact: true to match only the "Profil" heading in ProfileSection,
+    // not other headings that contain "profil" as a substring
+    await expect(page.getByRole('heading', { name: 'Profil', exact: true })).toBeVisible();
   });
 
   test('profile tab edit mode shows form fields', async ({ page }) => {
