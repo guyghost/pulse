@@ -29,8 +29,13 @@
 
   const isLoading = $derived(store.feedStatus === 'loading');
   const hasError = $derived(store.feedStatus === 'error' && store.experiences.length === 0);
-  const isAdding = $derived(store.editStatus === 'adding');
-  const isEditing = $derived(store.editStatus === 'editing' || store.editStatus === 'error');
+  const isAdding = $derived(
+    store.editStatus === 'adding' || (store.editStatus === 'error' && store.editingId === null)
+  );
+  const isEditing = $derived(
+    store.editStatus === 'editing' || (store.editStatus === 'error' && store.editingId !== null)
+  );
+  const showEditError = $derived(store.editStatus === 'error' && Boolean(store.editError));
   const busyId = $derived(
     store.editStatus === 'saving' || store.editStatus === 'deleting' ? store.editingId : null
   );
@@ -101,6 +106,17 @@
       onPrimaryAction={() => store.newExperience()}
     />
   {:else}
+    {#if showEditError}
+      <div
+        role="alert"
+        aria-live="assertive"
+        class="flex items-start gap-2 rounded-xl border border-status-red/30 bg-status-red/5 px-4 py-3 text-xs text-status-red"
+      >
+        <Icon name="triangle-alert" size={14} />
+        <span class="flex-1">{store.editError}</span>
+      </div>
+    {/if}
+
     {#if isAdding}
       <div in:fly={{ y: 12, duration: 220, easing: cubicOut }}>
         <ExperienceCard

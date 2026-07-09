@@ -291,8 +291,10 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
       }
       setPlatformStatus(target.id, 'copying');
       try {
-        const payload = payloads.get(target.id) ?? sample;
-        await deps.copyToClipboard(payload);
+        // Payload is already on the clipboard from the global probe above.
+        // Re-copying here would fail once the first opened tab steals focus
+        // (no clipboardWrite permission; navigator.clipboard needs transient
+        // activation), so we only open the profile URL and let the user paste.
         await deps.openUrl(target.profileUrl);
         setPlatformStatus(target.id, 'done');
         done += 1;
@@ -350,6 +352,12 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     editStatus = 'idle';
     editingId = null;
     draft = null;
+    // External update (e.g. LinkedIn import) invalidates prior sync state —
+    // reset the sync machine so stale statuses/lastSyncedAt don't persist.
+    syncStatus = 'idle';
+    syncError = null;
+    lastSyncedAt = null;
+    platformStatuses = new Map();
   }
 
   return {

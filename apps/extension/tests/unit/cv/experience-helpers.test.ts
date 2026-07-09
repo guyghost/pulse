@@ -6,6 +6,7 @@ import {
   formatExperienceDateRange,
   formatExperiencePayload,
   mergeExperiences,
+  normalizeDateToMonth,
   normalizeExperience,
   recomputePositionIndex,
 } from '../../../src/lib/core/cv/experience-helpers';
@@ -239,6 +240,69 @@ describe('mergeExperiences', () => {
       [expect.stringContaining(`exp-${NOW}`), 0],
       ['a', 1],
     ]);
+  });
+
+  it('normalizes YYYY-MM-DD imported dates to YYYY-MM', () => {
+    const result = mergeExperiences(
+      [],
+      [
+        draft({
+          title: 'Dev',
+          company: 'Co',
+          startDate: '2023-01-15',
+          endDate: '2024-06-30',
+          isCurrent: false,
+        }),
+      ],
+      NOW
+    );
+    expect(result[0].startDate).toBe('2023-01');
+    expect(result[0].endDate).toBe('2024-06');
+  });
+
+  it('clears endDate when a merged entry becomes current', () => {
+    const current = [
+      baseExperience({
+        id: 'local-1',
+        title: 'Lead',
+        company: 'Acme',
+        startDate: '2023-01',
+        endDate: '2024-01',
+        isCurrent: false,
+      }),
+    ];
+    const incoming = [
+      draft({ title: 'Lead', company: 'Acme', startDate: '2023-01', isCurrent: true }),
+    ];
+
+    const result = mergeExperiences(current, incoming, NOW);
+    expect(result[0].isCurrent).toBe(true);
+    expect(result[0].endDate).toBeNull();
+  });
+});
+
+describe('normalizeDateToMonth', () => {
+  it('normalizes YYYY-MM-DD to YYYY-MM', () => {
+    expect(normalizeDateToMonth('2023-01-15')).toBe('2023-01');
+  });
+
+  it('pads single-digit months', () => {
+    expect(normalizeDateToMonth('2023-6-5')).toBe('2023-06');
+  });
+
+  it('leaves already-canonical YYYY-MM unchanged', () => {
+    expect(normalizeDateToMonth('2023-01')).toBe('2023-01');
+  });
+
+  it('returns null for empty or whitespace input', () => {
+    expect(normalizeDateToMonth('')).toBeNull();
+    expect(normalizeDateToMonth('   ')).toBeNull();
+    expect(normalizeDateToMonth(null)).toBeNull();
+    expect(normalizeDateToMonth(undefined)).toBeNull();
+  });
+
+  it('returns unknown formats trimmed rather than corrupting them', () => {
+    expect(normalizeDateToMonth('Jan 2023')).toBe('Jan 2023');
   });
 });
 

@@ -233,7 +233,7 @@ const ProfilePayloadSchema = z
     tjmMax: z.number().optional(),
   })
   .passthrough()
-  .refine(maxBytes(10_240), { message: 'SAVE_PROFILE payload exceeds 10KB limit' });
+  .refine(maxBytes(80_000), { message: 'SAVE_PROFILE payload exceeds 80KB limit' });
 
 const LinkedInTabPayloadSchema = z.object({ tabId: z.number().int().positive().optional() });
 

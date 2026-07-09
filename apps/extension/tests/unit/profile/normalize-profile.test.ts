@@ -77,4 +77,38 @@ describe('normalize profile helpers', () => {
 
     expect(result).toEqual({ ok: false, error: PROFILE_TJM_RANGE_ERROR });
   });
+
+  it('preserves experiences passed through the draft input', () => {
+    const experiences = [
+      {
+        id: 'exp-1',
+        title: 'Lead',
+        company: 'Acme',
+        location: 'Paris',
+        startDate: '2023-01',
+        endDate: null,
+        isCurrent: true,
+        description: 'Desc.',
+        skills: ['Svelte'],
+        source: 'manual' as const,
+        sourceExternalId: null,
+        positionIndex: 0,
+        updatedAt: 1_700_000_000_000,
+      },
+    ];
+    const result = normalizeProfileDraft({
+      firstName: 'Guy',
+      experiences,
+    });
+
+    expect(result.ok).toBe(true);
+    expect(result.profile?.experiences).toEqual(experiences);
+  });
+
+  it('defaults experiences to an empty array when not provided', () => {
+    const result = normalizeProfileDraft({ firstName: 'Guy' });
+
+    expect(result.ok).toBe(true);
+    expect(result.profile?.experiences).toEqual([]);
+  });
 });

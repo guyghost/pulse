@@ -137,7 +137,12 @@ export function mergeExperiences(
   const result: Experience[] = current.map((exp) => ({ ...exp, skills: [...exp.skills] }));
 
   incoming.forEach((draft, importIndex) => {
-    const key = experienceKey(draft.company, draft.title, draft.startDate);
+    // Normalize imported dates (LinkedIn yields YYYY-MM-DD) to the canonical
+    // YYYY-MM month format so they dedupe against manual entries and are valid
+    // when edited through the month input.
+    const draftStart = normalizeDateToMonth(draft.startDate);
+    const draftEnd = normalizeDateToMonth(draft.endDate);
+    const key = experienceKey(draft.company, draft.title, draftStart);
     const existingIdx = result.findIndex(
       (exp) => experienceKey(exp.company, exp.title, exp.startDate) === key
     );
@@ -145,13 +150,14 @@ export function mergeExperiences(
     if (existingIdx >= 0) {
       const existing = result[existingIdx];
       const keepDescription = existing.source === 'manual' || draft.description.length === 0;
+      const mergedIsCurrent = existing.isCurrent || draft.isCurrent;
       result[existingIdx] = {
         ...existing,
         skills: unionSkills(existing.skills, draft.skills),
         description: keepDescription ? existing.description : draft.description,
         location: existing.location ?? draft.location,
-        endDate: existing.isCurrent ? null : (existing.endDate ?? draft.endDate ?? null),
-        isCurrent: existing.isCurrent || draft.isCurrent,
+        endDate: mergedIsCurrent ? null : (existing.endDate ?? draftEnd ?? null),
+        isCurrent: mergedIsCurrent,
         sourceExternalId: existing.sourceExternalId ?? draft.sourceExternalId,
       };
       return;
@@ -162,8 +168,8 @@ export function mergeExperiences(
       title: draft.title,
       company: draft.company,
       location: draft.location,
-      startDate: draft.startDate,
-      endDate: draft.isCurrent ? null : draft.endDate,
+      startDate: draftStart,
+      endDate: draft.isCurrent ? null : draftEnd,
       isCurrent: draft.isCurrent,
       description: draft.description,
       skills: [...draft.skills],
@@ -175,6 +181,27 @@ export function mergeExperiences(
   });
 
   return recomputePositionIndex(result);
+}
+
+/**
+ * Normalize a date string to the canonical `YYYY-MM` month format used by
+ * {@link Experience}. Accepts `YYYY-MM`, `YYYY-M`, `YYYY-MM-DD`, and `YYYY-M-D`.
+ * Unknown formats are returned trimmed (unchanged) so manual entries are not
+ * corrupted. Returns null for empty/whitespace input.
+ */
+export function normalizeDateToMonth(date: string | null | undefined): string | null {
+  if (!date) {
+    return null;
+  }
+  const trimmed = date.trim();
+  if (trimmed.length === 0) {
+    return null;
+  }
+  const match = /^(\d{4})-(\d{1,2})(?:-\d{1,2})?$/.exec(trimmed);
+  if (!match) {
+    return trimmed;
+  }
+  return `${match[1]}-${match[2].padStart(2, '0')}`;
 }
 
 function experienceKey(company: string | null, title: string, startDate: string | null): string {

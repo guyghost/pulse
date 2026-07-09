@@ -5,6 +5,11 @@
     createCvExperienceDeps,
     getCvSyncTargets,
   } from '$lib/shell/facades/cv-experience.facade';
+  import {
+    importLinkedInProfile,
+    syncLinkedInProfileImport,
+  } from '$lib/shell/facades/profile-sync.facade';
+  import { showToast } from '$lib/shell/notifications/toast-service';
   import { createCvExperienceStore } from '$lib/state/cv-experience.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import ExperienceFeed from '../organisms/ExperienceFeed.svelte';
@@ -19,7 +24,33 @@
   const store = createCvExperienceStore(createCvExperienceDeps());
   const platforms = getCvSyncTargets();
 
+  let isImporting = $state(false);
+
   store.load();
+
+  async function handleLinkedInImport(): Promise<void> {
+    if (isImporting) {
+      return;
+    }
+    isImporting = true;
+    try {
+      const extracted = await importLinkedInProfile();
+      if (!extracted.imported) {
+        showToast(extracted.errorMessage, 'error');
+        return;
+      }
+      const result = await syncLinkedInProfileImport(extracted.profile);
+      if (result.imported) {
+        showToast('Expériences LinkedIn importées avec succès.', 'success');
+      } else {
+        showToast(result.errorMessage, 'error');
+      }
+    } catch (err) {
+      showToast(err instanceof Error ? err.message : "L'import LinkedIn a échoué.", 'error');
+    } finally {
+      isImporting = false;
+    }
+  }
 
   $effect(() => {
     const unsubscribe = subscribeMessages((message) => {
@@ -50,12 +81,23 @@
           vers vos plateformes connectées pour garder le même profil partout.
         </p>
       </div>
-      {#if onNavigateToProfile}
-        <Button variant="secondary" size="sm" onclick={onNavigateToProfile}>
-          <Icon name="sliders-horizontal" size={14} />
-          Profil
+      <div class="flex flex-wrap items-center gap-2">
+        <Button
+          variant="secondary"
+          size="sm"
+          onclick={handleLinkedInImport}
+          disabled={isImporting || store.isSyncing}
+        >
+          <Icon name="download" size={14} />
+          {isImporting ? 'Import…' : 'Importer LinkedIn'}
         </Button>
-      {/if}
+        {#if onNavigateToProfile}
+          <Button variant="secondary" size="sm" onclick={onNavigateToProfile}>
+            <Icon name="sliders-horizontal" size={14} />
+            Profil
+          </Button>
+        {/if}
+      </div>
     </div>
   </section>
 

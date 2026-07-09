@@ -1,4 +1,4 @@
-import type { UserProfile } from '../types/profile';
+import type { Experience, UserProfile } from '../types/profile';
 
 export interface ProfileDraftInput {
   firstName?: string | null;
@@ -11,6 +11,7 @@ export interface ProfileDraftInput {
   keywords?: readonly string[] | null;
   keywordInput?: string | null;
   scoringWeights?: UserProfile['scoringWeights'];
+  experiences?: readonly Experience[] | null;
 }
 
 export interface NormalizeProfileResult {
@@ -87,6 +88,7 @@ export function normalizeProfileDraft(input: ProfileDraftInput): NormalizeProfil
       tjmMax,
       keywords: appendUniqueNormalized(input.keywords, input.keywordInput),
       scoringWeights: input.scoringWeights,
+      experiences: input.experiences ? [...input.experiences] : [],
     }),
   };
 }

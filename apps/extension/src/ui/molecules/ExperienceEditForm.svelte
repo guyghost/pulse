@@ -48,12 +48,9 @@
   const startDateError = $derived(
     touched && startDate.trim().length === 0 ? 'La date de début est requise.' : ''
   );
-  const endDateError = $derived(
-    !isCurrent && touched && endDate.trim().length === 0
-      ? 'La date de fin est requise (ou cochez « poste actuel »).'
-      : ''
-  );
-  const hasErrors = $derived(Boolean(titleError || companyError || startDateError || endDateError));
+  // End date is optional for past roles — the user may not remember the exact
+  // month. Only validate format when a value is provided.
+  const hasErrors = $derived(Boolean(titleError || companyError || startDateError));
 
   function handleSubmit() {
     touched = true;
@@ -143,11 +140,7 @@
         type="month"
         disabled={isCurrent}
         class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20 disabled:opacity-40"
-        aria-invalid={Boolean(endDateError)}
       />
-      {#if endDateError}
-        <span class="text-[11px] text-status-red">{endDateError}</span>
-      {/if}
     </label>
     <label class="flex items-end gap-2 pb-2">
       <input
