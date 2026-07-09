@@ -146,7 +146,7 @@
         class="mt-3 flex items-center gap-2 rounded-xl border border-status-orange/25 bg-status-orange/8 px-3 py-2 text-xs text-status-orange"
       >
         <Icon name="triangle-alert" size={14} />
-        <span>Mode hors ligne — tendances calculées sur le cache local.</span>
+        <span><span>Mode hors ligne</span> — tendances calculées sur le cache local.</span>
       </div>
     {/if}
 
