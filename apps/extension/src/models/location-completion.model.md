@@ -89,11 +89,14 @@ export const LOCATION_CATALOG: readonly LocationEntry[];
 
 ## UI surface
 
-A single shared `<datalist id="location-catalog">` rendered once per surface
-that hosts the input. Both inputs gain `list="location-catalog"`:
+Each surface renders its **own** `<datalist>` with a surface-scoped `id`, and
+its input references it via `list=`:
 
-- `OnboardingWizard.svelte` → `ob-location` input.
-- `ProfileSection.svelte` → `profileLocation` input (rendered only in edit mode).
+- `OnboardingWizard.svelte` → `ob-location` input with
+  `list="ob-location-catalog"` and `<datalist id="ob-location-catalog">`.
+- `ProfileSection.svelte` → `profileLocation` input with
+  `list="profile-location-catalog"` and
+  `<datalist id="profile-location-catalog">` (rendered only in edit mode).
 
 Native browser behavior handles filtering, keyboard navigation (↑/↓), and
 selection. The text value remains fully editable — the datalist is a _hint_,
@@ -101,9 +104,11 @@ never a constraint. The bound state (`location` / `profileLocation`) is
 unchanged; selecting a suggestion just writes the entry's `label` into it.
 
 Because `<datalist>` is a document-level registry keyed by `id`, and both
-surfaces live in the side panel DOM, one `<datalist>` element per surface is
-sufficient (duplicate ids across separately mounted surfaces are avoided by
-mounting it next to the input that uses it).
+surfaces can be mounted in the same side panel DOM at the same time, each
+surface uses a distinct id (`ob-location-catalog` / `profile-location-catalog`)
+rather than a single shared id. A shared id would collide when both inputs are
+mounted simultaneously; per-surface ids keep the suggestion lists independent
+and avoid duplicate-id DOM violations.
 
 ## States
 

@@ -35,10 +35,18 @@ export interface LocationEntry {
  * Mirrors the normalization rules of `normalizeLocation` in
  * `core/scoring/location-matching.ts` (lowercase, strip accents, hyphens →
  * spaces, collapse whitespace) so aliases line up with what the scorer sees.
- * For every string that appears in this catalog (clean labels and department
- * codes), this function and the scorer's `normalizeLight` agree byte for byte,
- * so derived cache keys are stable. Exported so the derivation module reuses
- * the single normalizer rather than re-implementing it.
+ * Normalization is intentionally a **superset** of the scorer's `normalizeLight`
+ * (in `core/scoring/location-matching.ts`): both lowercase, strip accents, turn
+ * hyphens into spaces, and collapse whitespace. This function additionally
+ * folds the `œ`/`æ` ligatures and replaces *every* non-alphanumeric character
+ * (apostrophes, dots, …) with a space, whereas `normalizeLight` only rewrites
+ * hyphens and leaves other punctuation intact. They therefore agree on every
+ * clean label and department code that appears in this catalog (letters,
+ * digits, spaces, hyphens only), so the derived cache keys are stable against
+ * the scorer's inputs in practice — but they are **not** byte-identical in
+ * general, and must not be assumed to agree on arbitrary user text. Exported
+ * so the derivation module reuses the single normalizer rather than
+ * re-implementing it.
  *
  * Kept pure and dependency-free: this module must not import the scoring
  * module (that would invert the data/algorithm boundary).

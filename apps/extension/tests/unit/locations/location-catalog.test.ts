@@ -3,6 +3,7 @@ import {
   LOCATION_CATALOG,
   LOCATION_LABELS,
   resolveLocationLabel,
+  normalizeLocationAlias,
   type LocationEntry,
 } from '../../../src/lib/core/locations/location-catalog';
 
@@ -24,18 +25,8 @@ describe('LOCATION_CATALOG — structural invariants', () => {
   });
 
   it('each entry has its own canonical name as an alias (normalized)', () => {
-    const norm = (s: string): string =>
-      s
-        .toLowerCase()
-        .normalize('NFD')
-        .replace(/[\u0300-\u036f]/g, '')
-        .replace(/[œæ]/g, (m) => (m === 'œ' ? 'oe' : 'ae'))
-        .replace(/[^a-z0-9\s]/g, ' ')
-        .replace(/\s+/g, ' ')
-        .trim();
-
     for (const e of LOCATION_CATALOG) {
-      expect(e.aliases).toContain(norm(e.label));
+      expect(e.aliases).toContain(normalizeLocationAlias(e.label));
     }
   });
 

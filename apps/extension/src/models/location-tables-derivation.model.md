@@ -104,10 +104,11 @@ cities       = [ normalizeLocationAlias(e.label) for e in catalog if e.metro ===
 departments  = [ code for code in union(e.aliases) if /^\d{2,3}$/.test(code) ]
 ```
 
-- `cities` includes the metro's own canonical entry (e.g. `'paris'`), matching
-  the old `buildMetroAreaCache` behavior where `metroName → metroName` is set
-  explicitly. Including it in `cities` is redundant but harmless and keeps the
-  derivation uniform.
+- `cities` **excludes** the metro's own canonical name (e.g. `'paris'`). That
+  self-mapping is added separately by the scorer's `buildMetroAreaCache`, which
+  always sets `metroName → metroName` regardless of `cities`. Keeping the
+  canonical out of `cities` avoids a redundant entry and matches the derivation
+  contract: `cities` only lists the _surrounding_ places that map onto the metro.
 - `departments` captures petite + grande couronne department codes that appear
   as aliases of member cities (e.g. `92`, `93`, `94`, and now `78`, `91`, `77`,
   `95` for Paris).
