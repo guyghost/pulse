@@ -331,9 +331,10 @@ describe('operational UI constraints', () => {
   it('routes the offline TJM story toward cached signal investigation', () => {
     const source = readFileSync('src/ui/pages/TJMPage.svelte', 'utf8');
 
-    expect(source).toContain("statusLabel: 'Cache local'");
-    expect(source).toContain("primaryActionLabel: 'Inspecter les signaux locaux'");
+    expect(source).toContain("'Cache local'");
+    expect(source).toContain('Inspecter les signaux locaux');
     expect(source).toContain('function inspectLocalSignals()');
+    expect(source).toContain('onclick={inspectLocalSignals}');
   });
 
   it('keeps TJM actions tied to pricing decisions instead of refresh only', () => {
@@ -341,8 +342,8 @@ describe('operational UI constraints', () => {
     const dashboardSource = readFileSync('src/ui/organisms/TJMDashboard.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    expect(pageSource).toContain("primaryActionLabel: 'Ajuster mon TJM cible'");
-    expect(pageSource).toContain("primaryActionLabel: 'Scanner le feed'");
+    expect(pageSource).toContain('Ajuster mon TJM cible');
+    expect(pageSource).toContain('Scanner le feed');
     expect(pageSource).toContain('onNavigateToProfile');
     expect(pageSource).toContain('onNavigateToFeed');
     expect(dashboardSource).toContain('type TjmSetupStep');

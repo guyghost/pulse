@@ -7,9 +7,6 @@
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
-  import OperationalStoryCard, {
-    type OperationalEvidence,
-  } from '../molecules/OperationalStoryCard.svelte';
 
   const {
     onNavigateToProfile,
@@ -31,7 +28,6 @@
   // keeps showing every available region even after a region filter is applied
   // (the filtered analysis would otherwise shrink to a single region).
   let regionOptions = $state<{ region: TJMRegion; label: string }[]>([]);
-  let dashboardSection: HTMLElement | null = $state(null);
   const connection = getConnectionStore();
 
   async function loadAnalysis() {
@@ -74,92 +70,14 @@
   }
 
   const isOffline = $derived(connection.status === 'offline');
+  const profileCalibrated = $derived(userTjmMin > 0 || userTjmMax > 0);
 
-  const tjmStory = $derived.by(() => {
-    const evidence: OperationalEvidence[] = [
-      {
-        label: 'Analyse',
-        value: analysis ? 'OK' : error ? 'Erreur' : 'Aucune',
-        icon: analysis ? 'shield-check' : error ? 'triangle-alert' : 'database',
-        severity: analysis ? 'success' : error ? 'critical' : 'attention',
-      },
-      {
-        label: 'Missions analysées',
-        value: analysis?.dataPoints ?? 0,
-        icon: 'database',
-        severity: analysis && analysis.dataPoints >= 20 ? 'success' : 'attention',
-      },
-      {
-        label: 'Profil',
-        value: userTjmMin > 0 || userTjmMax > 0 ? 'Calibré' : 'À définir',
-        icon: 'badge-euro',
-        severity: userTjmMin > 0 || userTjmMax > 0 ? 'success' : 'attention',
-      },
-    ];
+  let dashboardSection: HTMLElement | undefined = $state(undefined);
 
-    if (error) {
-      return {
-        severity: 'critical' as const,
-        statusLabel: 'Incident',
-        title: 'La décision tarifaire est suspendue',
-        description:
-          'Pulse ne peut pas charger les tendances TJM. Conservez votre fourchette actuelle jusqu’au prochain calcul.',
-        evidence,
-        primaryActionLabel: 'Réessayer',
-        primaryActionIcon: 'refresh-cw',
-      };
-    }
-
-    if (isLoading) {
-      return {
-        severity: 'neutral' as const,
-        statusLabel: 'Calcul',
-        title: 'Pulse consolide les signaux tarifaires',
-        description:
-          'L’analyse compare votre fourchette au marché observé dans les missions stockées.',
-        evidence,
-        primaryActionLabel: null,
-        primaryActionIcon: 'refresh-cw',
-      };
-    }
-
-    if (!analysis) {
-      return {
-        severity: 'attention' as const,
-        statusLabel: 'Données absentes',
-        title: 'Aucun signal marché ne permet de décider un TJM',
-        description:
-          'Le prochain geste utile est de scanner des missions avec TJM, puis de relancer cette analyse.',
-        evidence,
-        primaryActionLabel: 'Scanner le feed',
-        primaryActionIcon: 'briefcase',
-      };
-    }
-
-    if (isOffline) {
-      return {
-        severity: 'attention' as const,
-        statusLabel: 'Cache local',
-        title: 'Le TJM est calculé depuis les données disponibles hors ligne',
-        description:
-          'La tendance reste utile, mais elle peut manquer les dernières missions tant que le réseau n’est pas revenu.',
-        evidence,
-        primaryActionLabel: 'Inspecter les signaux locaux',
-        primaryActionIcon: 'database',
-      };
-    }
-
-    return {
-      severity: 'success' as const,
-      statusLabel: 'Analyse prête',
-      title: 'Votre fourchette TJM est prête à comparer',
-      description:
-        'Comparez votre fourchette aux médianes par seniorité, stack et région avant de qualifier une mission.',
-      evidence,
-      primaryActionLabel: 'Ajuster mon TJM cible',
-      primaryActionIcon: 'badge-euro',
-    };
-  });
+  function inspectLocalSignals(): void {
+    dashboardSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    dashboardSection?.focus({ preventScroll: true });
+  }
 
   $effect(() => {
     loadProfileAndAnalysis();
@@ -176,44 +94,11 @@
 
     return unsubscribe;
   });
-
-  function inspectLocalSignals(): void {
-    dashboardSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
-    dashboardSection?.focus({ preventScroll: true });
-  }
-
-  function handleTjmStoryAction(): void {
-    if (error) {
-      loadAnalysis();
-      return;
-    }
-
-    if (isOffline && analysis) {
-      inspectLocalSignals();
-      return;
-    }
-
-    if (!analysis) {
-      if (onNavigateToFeed) {
-        onNavigateToFeed();
-        return;
-      }
-      loadAnalysis();
-      return;
-    }
-
-    if (onNavigateToProfile) {
-      onNavigateToProfile();
-      return;
-    }
-
-    inspectLocalSignals();
-  }
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
   <!-- Hero -->
-  <section class="section-card-strong rounded-2xl px-5 py-4">
+  <section class="section-card-strong rounded-2xl px-5 py-4" aria-busy={isLoading}>
     <div class="flex items-center justify-between gap-3">
       <div class="flex items-center gap-3">
         <div
@@ -247,26 +132,69 @@
     </div>
 
     {#if analysis && !isLoading}
-      <p class="mt-3 text-[11px] text-text-muted">
-        Mis à jour le {analysis.lastUpdated ?? '—'}
-      </p>
+      <p class="mt-3 text-[11px] text-text-muted">Mis à jour le {analysis.lastUpdated ?? '—'}</p>
     {:else if isLoading}
       <p class="mt-3 text-[11px] text-text-muted">Chargement…</p>
     {/if}
 
     <p class="mt-2 text-[11px] leading-5 text-text-muted">
-      Tendances calculées depuis les missions stockées dans l'extension; le dashboard connecté les
-      consolide après synchronisation.
+      Tendances tirées des missions stockées localement, croisées avec votre fourchette cible.
     </p>
 
     {#if isOffline}
       <div
-        class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-xs text-blueprint-blue"
+        class="mt-3 flex items-center gap-2 rounded-xl border border-status-orange/25 bg-status-orange/8 px-3 py-2 text-xs text-status-orange"
       >
-        <Icon name="database" size={14} />
-        <span>Mode hors ligne</span>
+        <Icon name="triangle-alert" size={14} />
+        <span><span>Mode hors ligne</span> — tendances calculées sur le cache local.</span>
       </div>
     {/if}
+
+    <div class="mt-4 flex flex-wrap items-center gap-2">
+      <span
+        class="inline-flex items-center gap-1.5 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+      >
+        <Icon
+          name={isOffline ? 'database' : 'badge-euro'}
+          size={12}
+          class={isOffline ? 'text-status-orange' : 'text-blueprint-blue'}
+        />
+        {isOffline ? 'Cache local' : `Profil ${profileCalibrated ? 'calibré' : 'à définir'}`}
+      </span>
+    </div>
+
+    <div class="mt-2 flex flex-wrap gap-2">
+      {#if isOffline}
+        <button
+          type="button"
+          onclick={inspectLocalSignals}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-status-orange/25 bg-status-orange/8 px-3 py-1.5 text-[11px] font-medium text-status-orange transition-colors hover:bg-status-orange/14"
+        >
+          <Icon name="search" size={12} />
+          Inspecter les signaux locaux
+        </button>
+      {/if}
+      {#if onNavigateToProfile}
+        <button
+          type="button"
+          onclick={onNavigateToProfile}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/6 px-3 py-1.5 text-[11px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/12"
+        >
+          <Icon name="sliders-horizontal" size={12} />
+          Ajuster mon TJM cible
+        </button>
+      {/if}
+      {#if onNavigateToFeed && !isOffline}
+        <button
+          type="button"
+          onclick={onNavigateToFeed}
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border-light bg-surface-white px-3 py-1.5 text-[11px] font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
+        >
+          <Icon name="radar" size={12} />
+          Scanner le feed
+        </button>
+      {/if}
+    </div>
 
     <div class="mt-3 flex items-center gap-2">
       <label
@@ -288,25 +216,10 @@
         {/each}
       </select>
     </div>
-
-    <div class="mt-4">
-      <OperationalStoryCard
-        eyebrow="À faire avec votre TJM"
-        variant="compact"
-        title={tjmStory.title}
-        description={tjmStory.description}
-        severity={tjmStory.severity}
-        statusLabel={tjmStory.statusLabel}
-        evidence={tjmStory.evidence}
-        primaryActionLabel={tjmStory.primaryActionLabel}
-        primaryActionIcon={tjmStory.primaryActionIcon}
-        onPrimaryAction={handleTjmStoryAction}
-      />
-    </div>
   </section>
 
   <!-- Dashboard -->
-  <section class="mt-4" bind:this={dashboardSection} tabindex="-1">
+  <section class="mt-4" tabindex="-1" bind:this={dashboardSection}>
     <TJMDashboard
       {analysis}
       {isLoading}
