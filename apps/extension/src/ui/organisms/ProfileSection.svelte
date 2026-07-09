@@ -6,6 +6,7 @@
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import Tooltip from '../atoms/Tooltip.svelte';
   import { REMOTE_OPTIONS as remoteOptions } from '../constants/remote-options';
+  import { LOCATION_LABELS } from '$lib/core/locations/location-catalog';
 
   /* eslint-disable prefer-const */
   let {
@@ -100,8 +101,14 @@
         type="text"
         placeholder="Localisation"
         class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+        list="profile-location-catalog"
         bind:value={profileLocation}
       />
+      <datalist id="profile-location-catalog">
+        {#each LOCATION_LABELS as label}
+          <option value={label} />
+        {/each}
+      </datalist>
       <div class="grid grid-cols-2 gap-2">
         <label class="space-y-1">
           <span class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">

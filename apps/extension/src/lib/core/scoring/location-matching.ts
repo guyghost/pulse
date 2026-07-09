@@ -8,6 +8,8 @@
  * @module location-matching
  */
 
+import { REGION_SYNONYMS, METRO_AREAS } from '../locations/derive-location-tables';
+
 /**
  * Result of a location match comparison.
  * - 'exact': Perfect match after normalization or substring match
@@ -19,190 +21,12 @@
 export type LocationMatchResult = 'exact' | 'synonym' | 'nearby' | 'partial' | 'none';
 
 /**
- * Mapping of canonical location names to their regional synonyms.
- * Each key maps to an array of strings that should be considered equivalent.
+ * Regional synonym and metro-area tables are derived from the single source
+ * of truth in `core/locations/location-catalog.ts` (see
+ * `models/location-tables-derivation.model.md`). The derivation lives in
+ * `core/locations/derive-location-tables.ts`; only the resulting tables are
+ * imported here. The matching algorithm below is unchanged.
  */
-const REGION_SYNONYMS: Record<string, string[]> = {
-  // Île-de-France / Paris
-  paris: ['paris', '75', 'ile de france', 'idf', 'paris 75', 'paris 1er'],
-  'ile de france': ['ile de france', 'idf', 'paris', '75', 'region parisienne'],
-
-  // Lyon / Rhône
-  lyon: ['lyon', '69', 'rhone', 'metropole lyonnaise'],
-  rhone: ['rhone', '69', 'lyon'],
-
-  // Marseille / Bouches-du-Rhône
-  marseille: ['marseille', '13', 'bouche du rhone', 'bouches du rhone'],
-  'bouche du rhone': ['bouche du rhone', 'bouches du rhone', '13', 'marseille'],
-
-  // Bordeaux / Gironde
-  bordeaux: ['bordeaux', '33', 'gironde'],
-  gironde: ['gironde', '33', 'bordeaux'],
-
-  // Toulouse / Haute-Garonne
-  toulouse: ['toulouse', '31', 'haute garonne'],
-  'haute garonne': ['haute garonne', '31', 'toulouse'],
-
-  // Nantes / Loire-Atlantique
-  nantes: ['nantes', '44', 'loire atlantique'],
-  'loire atlantique': ['loire atlantique', '44', 'nantes'],
-
-  // Lille / Nord
-  lille: ['lille', '59', 'nord'],
-  nord: ['nord', '59', 'lille'],
-
-  // Nice / Alpes-Maritimes
-  nice: ['nice', '06', 'alpes maritimes'],
-  'alpes maritimes': ['alpes maritimes', '06', 'nice'],
-
-  // Strasbourg / Bas-Rhin
-  strasbourg: ['strasbourg', '67', 'bas rhin'],
-  'bas rhin': ['bas rhin', '67', 'strasbourg'],
-
-  // Remote work synonyms
-  remote: [
-    'remote',
-    'teletravail',
-    'full remote',
-    'distanciel',
-    'home office',
-    'a distance',
-    '100 remote',
-  ],
-};
-
-/**
- * Metropolitan area definitions.
- * Each metro area contains cities that are considered 'nearby' to the main city.
- * Cities are normalized (lowercase, no accents, hyphens → spaces).
- */
-interface MetroAreaData {
-  /** Cities belonging to this metro area (normalized) */
-  cities: string[];
-  /** Department codes that belong to this metro area */
-  departments: string[];
-}
-
-const METRO_AREAS: Record<string, MetroAreaData> = {
-  // Paris (petite couronne: 92, 93, 94)
-  paris: {
-    departments: ['92', '93', '94'],
-    cities: [
-      'nanterre',
-      'boulogne billancourt',
-      'la defense',
-      'neuilly sur seine',
-      'saint denis',
-      'montreuil',
-      'creteil',
-      'vincennes',
-      'levallois perret',
-      'issy les moulineaux',
-      'courbevoie',
-      'puteaux',
-      'clichy',
-      'colombes',
-      'villejuif',
-      'ivry sur seine',
-      'bobigny',
-      'pantin',
-      'aubervilliers',
-      'noisy le grand',
-      'rueil malmaison',
-      'antony',
-      'clamart',
-      'sevran',
-      'aulnay sous bois',
-      'saint ouen',
-      'gennevilliers',
-      'asnieres sur seine',
-      'suresnes',
-      'meudon',
-      'malakoff',
-      'chatillon',
-      'bagneux',
-      'fontenay sous bois',
-      'nogent sur marne',
-      'saint mande',
-      'charenton le pont',
-      'maisons alfort',
-      'vitry sur seine',
-    ],
-  },
-
-  // Lyon
-  lyon: {
-    departments: [],
-    cities: [
-      'villeurbanne',
-      'venissieux',
-      'vaulx en velin',
-      'bron',
-      'saint priest',
-      'caluire et cuire',
-      'ecully',
-      'oullins',
-      'tassin la demi lune',
-      'rillieux la pape',
-      'meyzieu',
-      'decines charpieu',
-    ],
-  },
-
-  // Marseille
-  marseille: {
-    departments: [],
-    cities: [
-      'aix en provence',
-      'aubagne',
-      'martigues',
-      'vitrolles',
-      'salon de provence',
-      'la ciotat',
-      'istres',
-      'gardanne',
-      'miramas',
-    ],
-  },
-
-  // Bordeaux
-  bordeaux: {
-    departments: [],
-    cities: [
-      'merignac',
-      'pessac',
-      'talence',
-      'begles',
-      'cenon',
-      'gradignan',
-      'villenave d ornon',
-      'le bouscat',
-      'bruges',
-      'blanquefort',
-      'floirac',
-      'lormont',
-      'carbon blanc',
-    ],
-  },
-
-  // Toulouse
-  toulouse: {
-    departments: [],
-    cities: [
-      'blagnac',
-      'colomiers',
-      'tournefeuille',
-      'balma',
-      'ramonville saint agne',
-      'muret',
-      'cugnaux',
-      'l union',
-      'castanet tolosan',
-      'saint orens de gameville',
-      'fenouillet',
-    ],
-  },
-};
 
 /**
  * Build a lookup cache where each synonym maps to its canonical form.
