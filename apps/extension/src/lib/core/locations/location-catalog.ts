@@ -32,24 +32,17 @@ export interface LocationEntry {
  * Normalize a label into the alias form used by this catalog and by the derived
  * scoring tables.
  *
- * Mirrors the normalization rules of `normalizeLocation` in
- * `core/scoring/location-matching.ts` (lowercase, strip accents, hyphens →
- * spaces, collapse whitespace) so aliases line up with what the scorer sees.
- * Normalization is intentionally a **superset** of the scorer's `normalizeLight`
- * (in `core/scoring/location-matching.ts`): both lowercase, strip accents, turn
- * hyphens into spaces, and collapse whitespace. This function additionally
- * folds the `œ`/`æ` ligatures and replaces *every* non-alphanumeric character
- * (apostrophes, dots, …) with a space, whereas `normalizeLight` only rewrites
- * hyphens and leaves other punctuation intact. They therefore agree on every
- * clean label and department code that appears in this catalog (letters,
- * digits, spaces, hyphens only), so the derived cache keys are stable against
- * the scorer's inputs in practice — but they are **not** byte-identical in
- * general, and must not be assumed to agree on arbitrary user text. Exported
- * so the derivation module reuses the single normalizer rather than
- * re-implementing it.
+ * Mirrors the scorer's `normalizeLight` (in `core/scoring/location-matching.ts`)
+ * exactly: lowercase, strip French accents, fold the `œ`/`æ` ligatures, turn
+ * hyphens into spaces, and collapse whitespace. Other punctuation (apostrophes,
+ * dots, …) is **left intact**, just as `normalizeLight` leaves it, so alias
+ * cache keys line up byte-for-byte with the light-normalized strings the scorer
+ * compares them against (e.g. `"Côte-d'Or"` → `"cote d'or"` on both sides).
  *
  * Kept pure and dependency-free: this module must not import the scoring
- * module (that would invert the data/algorithm boundary).
+ * module (that would invert the data/algorithm boundary). The equivalence is
+ * guarded by `location-catalog.test.ts`, which asserts agreement with
+ * `normalizeLight` over the whole catalog corpus.
  */
 export const normalizeLocationAlias = (label: string): string =>
   label
@@ -57,7 +50,7 @@ export const normalizeLocationAlias = (label: string): string =>
     .normalize('NFD')
     .replace(/[\u0300-\u036f]/g, '')
     .replace(/[œæ]/g, (m) => (m === 'œ' ? 'oe' : 'ae'))
-    .replace(/[^a-z0-9\s]/g, ' ')
+    .replace(/-/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 
@@ -93,7 +86,7 @@ export const LOCATION_CATALOG: readonly LocationEntry[] = [
     'paris'
   ),
   entry('Lyon', ['69', 'Rhône', 'Métropole lyonnaise'], 'lyon'),
-  entry('Marseille', ['13', 'Bouches-du-Rhône'], 'marseille'),
+  entry('Marseille', ['13', 'Bouches-du-Rhône', 'Bouche-du-Rhône'], 'marseille'),
   entry('Bordeaux', ['33', 'Gironde'], 'bordeaux'),
   entry('Toulouse', ['31', 'Haute-Garonne'], 'toulouse'),
   entry('Nantes', ['44', 'Loire-Atlantique']),
@@ -202,13 +195,13 @@ export const LOCATION_CATALOG: readonly LocationEntry[] = [
   entry('Fenouillet', ['31'], 'toulouse'),
 
   // ── Regional capitals (France) ────────────────────────────────────────
-  entry('Rennes', ['35', 'Bretagne', 'Ille-et-Vilaine']),
+  entry('Rennes', ['35', 'Ille-et-Vilaine']),
   entry('Montpellier', ['34', 'Hérault']),
   entry('Grenoble', ['38', 'Isère']),
   entry('Clermont-Ferrand', ['63', 'Puy-de-Dôme']),
   entry('Dijon', ['21', "Côte-d'Or"]),
   entry('Tours', ['37', 'Indre-et-Loire']),
-  entry('Saint-Étienne', ['42', 'Loire']),
+  entry('Saint-Étienne', ['42']),
   entry('Le Mans', ['72', 'Sarthe']),
   entry('Amiens', ['80', 'Somme']),
   entry('Rouen', ['76', 'Seine-Maritime']),

@@ -138,6 +138,51 @@ Because the catalog is a superset of the old scorer tables, derivation
 The direction of every change is **toward a better match** (none → partial →
 nearby → synonym → exact), never the reverse. This is the additivity guarantee.
 
+## Collision hardening (review follow-up)
+
+Deriving from a general catalog exposed two classes of token-level false
+positives that the old hand-tuned table avoided by omission. Both are fixed:
+
+1. **Bare region/department-word aliases that span multiple cities.** A bare
+   alias whose token also appears inside another place name drives
+   `hasSynonymTokenMatch` to a false `'synonym'`. Two such aliases were
+   **newly introduced** by derivation (neither was in the old table) and are
+   therefore removed from the catalog to restore the pre-change behavior:
+   - `'Loire'` on **Saint-Étienne** — the token `loire` also appears in
+     `Pays de la Loire` (Nantes region) and `Loire-Atlantique`, so
+     `matchLocation('Nantes, Pays de la Loire', 'Saint-Étienne')` falsely
+     returned `'synonym'`. Saint-Étienne keeps `'42'`.
+   - `'Bretagne'` on **Rennes** — Bretagne is the region containing both
+     Rennes and Brest (both in the catalog), so `matchLocation('Brest,
+Bretagne', 'Rennes')` would falsely return `'synonym'`. Rennes keeps
+     `'35'` and `'Ille-et-Vilaine'`.
+     `'Rhône'` on **Lyon** is deliberately kept: it was in the old table
+     (`lyon ↔ 69 ↔ rhone`), is covered by a contract test, and the collision
+     risk is low because missions in peer cities name the city, not the word
+     `Rhône`.
+
+2. **Numeric department codes vs arrondissement numbers.** Department codes
+   (`'17'` = Charente-Maritime/La Rochelle, `'13'` = Bouches-du-Rhône, …)
+   collide with Paris/Marseille arrondissement numbers, so
+   `matchLocation('Paris 17', 'La Rochelle')` falsely returned `'synonym'`.
+   `hasSynonymTokenMatch` now **skips pure-numeric single tokens** in its
+   individual-token loop. This is safe because whole-string numeric matching
+   (`'75'` ↔ `'Paris'`) is still resolved earlier by the whole-string
+   `areRegionalSynonyms` check, and numeric codes inside multi-word phrases
+   are unaffected (phrases are n>=2). Non-numeric canonical single tokens
+   (`'paris'`, `'lyon'`, …) are unaffected.
+
+## Normalizer alignment (review follow-up)
+
+`normalizeLocationAlias` (catalog) now mirrors the scorer's `normalizeLight`
+**exactly**: lowercase → strip accents → fold `œ`/`æ` → hyphens to spaces →
+collapse whitespace. Both leave other punctuation (apostrophes, dots) intact,
+so alias cache keys line up byte-for-byte with the light-normalized strings
+the scorer compares them against. This fixes `Côte-d'Or` (Dijon),
+`Villenave-d'Ornon`, and `L'Union`, whose apostrophe-bearing aliases
+previously normalized to a form the scorer never produces. Agreement over the
+whole catalog corpus is asserted in `location-catalog.test.ts`.
+
 ## Non-regression guarantees (the Review checklist)
 
 1. **No match can get worse.** Derived tables ⊇ old tables ⇒ for any input
@@ -173,11 +218,16 @@ nearby → synonym → exact), never the reverse. This is the additivity guarant
 2. **Pure derivation.** `derive-location-tables.ts` is pure: no I/O, no async,
    no `Date`/`Math.random`. Covered by the `src/lib/core/**` mock-free coverage
    gate.
-3. **Algorithm freeze.** `matchLocation`'s body is unchanged. The 428-line test
-   file is the regression contract.
-4. **Superset only.** Derived tables are a superset of the pre-change tables.
-   The catalog is enriched (never pruned of scorer-relevant aliases) to make
-   this hold.
+3. **Algorithm stability.** `matchLocation`'s cascade is unchanged except for
+   one targeted hardening in `hasSynonymTokenMatch` (skip pure-numeric single
+   tokens — see _Collision hardening_). Whole-string numeric matching and all
+   non-numeric token matching behave exactly as before. The test file is the
+   regression contract.
+4. **Superset only (non-numeric aliases).** Derived tables are a superset of
+   the pre-change tables for every alias the old table carried. The two bare
+   aliases removed (`Loire`, `Bretagne`) were **not** in the old table — they
+   were newly introduced by derivation and caused cross-city false positives,
+   so removing them restores the pre-change match results.
 5. **No schema/weight change.** `UserProfile.location`, `relevance.ts`, and
    `DEFAULT_SCORING_WEIGHTS` are untouched.
 
@@ -197,9 +247,10 @@ teletravail`, standalone `nantes ↔ 44 ↔ loire atlantique`);
     grande couronne (`78`,`91`,`77`,`95`); Lyon owns `69` + city `villeurbanne`;
   - standalone places and remote variants are not metro areas;
   - derived department codes match `/^\d{2,3}$/`.
-- **Existing** `tests/unit/scoring/location-matching.test.ts` must pass
-  **unmodified** — this is the non-regression contract. If any assertion there
-  flips, the derivation is wrong.
+- **Existing** `tests/unit/scoring/location-matching.test.ts` must pass except
+  for assertions contradicted by the _Collision hardening_ rules (numeric
+  arrondissement collisions, bare `Loire`/`Bretagne` false positives); those
+  are updated alongside the matcher/catalog change.
 - **Regression**: `pnpm --filter @pulse/extension test:regression` stays green.
 - **Full suite**: `pnpm --filter @pulse/extension typecheck && lint && test`.
 

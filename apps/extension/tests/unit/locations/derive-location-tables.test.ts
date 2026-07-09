@@ -76,7 +76,9 @@ describe('REGION_SYNONYMS — derivation', () => {
     expect(remote).toContain('distanciel');
     expect(remote).toContain('a distance');
     expect(remote).toContain('home office');
-    expect(remote).toContain('100 remote');
+    // normalizeLocationAlias mirrors normalizeLight (keeps non-hyphen punctuation),
+    // so the '%' in '100% Remote' is preserved — same form the scorer sees.
+    expect(remote).toContain('100% remote');
   });
 
   it('standalone regional capitals mint their own group', () => {

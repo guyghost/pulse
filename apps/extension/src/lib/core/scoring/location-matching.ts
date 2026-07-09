@@ -367,6 +367,9 @@ const tokenizeLocation = (location: string): string[] => {
     .filter((t) => t.length > 0);
 };
 
+/** Matches a pure-numeric token (department code, arrondissement number, …). */
+const NUMERIC_TOKEN = /^\d+$/;
+
 /**
  * Check if any token from one location matches any token from another.
  *
@@ -387,14 +390,30 @@ const hasTokenMatch = (tokens1: string[], tokens2: string[]): boolean => {
  * Check if any token pair from two locations are regional synonyms.
  * Also checks multi-word phrases for synonyms like "ile de france".
  *
+ * Pure-numeric single tokens (department codes such as `"17"` or `"75"`) are
+ * skipped in the individual-token loop: they collide with arrondissement
+ * numbers and other numeric fragments (e.g. mission `"Paris 17"` must not
+ * match profile `"La Rochelle"` whose department code is `17`). Whole-string
+ * numeric matching (`"75"` vs `"Paris"`) is still handled earlier by the
+ * whole-string `areRegionalSynonyms` check, and numeric codes inside a
+ * multi-word phrase are unaffected here because phrases are n>=2.
+ *
  * @param tokens1 - First set of tokens
  * @param tokens2 - Second set of tokens
  * @returns true if any token pair or phrase pair are synonyms
  */
 const hasSynonymTokenMatch = (tokens1: string[], tokens2: string[]): boolean => {
-  // Check individual tokens
+  // Check individual tokens. Skip pure-numeric tokens: department codes (e.g.
+  // "17") collide with arrondissement numbers and would otherwise produce
+  // false synonym matches like "Paris 17" -> "La Rochelle".
   for (const token1 of tokens1) {
+    if (NUMERIC_TOKEN.test(token1)) {
+      continue;
+    }
     for (const token2 of tokens2) {
+      if (NUMERIC_TOKEN.test(token2)) {
+        continue;
+      }
       if (areRegionalSynonyms(token1, token2)) {
         return true;
       }
@@ -414,8 +433,12 @@ const hasSynonymTokenMatch = (tokens1: string[], tokens2: string[]): boolean => 
   }
 
   // Also check phrases against individual tokens (e.g., "ile de france" vs "paris")
+  // Numeric single tokens are skipped (department codes vs arrondissement numbers).
   for (const phrase1 of phrases1) {
     for (const token2 of tokens2) {
+      if (NUMERIC_TOKEN.test(token2)) {
+        continue;
+      }
       if (areRegionalSynonyms(phrase1, token2)) {
         return true;
       }
@@ -423,6 +446,9 @@ const hasSynonymTokenMatch = (tokens1: string[], tokens2: string[]): boolean => 
   }
 
   for (const token1 of tokens1) {
+    if (NUMERIC_TOKEN.test(token1)) {
+      continue;
+    }
     for (const phrase2 of phrases2) {
       if (areRegionalSynonyms(token1, phrase2)) {
         return true;
