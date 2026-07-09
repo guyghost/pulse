@@ -3,7 +3,7 @@ const MAX_SEEN_IDS = 2000;
 
 export async function getSeenIds(): Promise<string[]> {
   const result = await chrome.storage.local.get([STORAGE_KEY]);
-  return result[STORAGE_KEY] ?? [];
+  return (result[STORAGE_KEY] as string[] | undefined) ?? [];
 }
 
 export async function saveSeenIds(ids: string[]): Promise<void> {

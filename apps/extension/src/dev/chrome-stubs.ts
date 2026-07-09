@@ -469,8 +469,7 @@ function createChromeStubs() {
           case 'GET_TJM_ANALYSIS': {
             const history = storage.tjm_history as TJMHistory | undefined;
             const payload = message.payload as
-              | { profileStacks?: string[]; region?: TJMRegion }
-              | undefined;
+              { profileStacks?: string[]; region?: TJMRegion } | undefined;
             const normalizedStacks =
               payload?.profileStacks && payload.profileStacks.length > 0
                 ? new Set(payload.profileStacks.map((stack) => stack.toLowerCase().trim()))

@@ -272,16 +272,13 @@
   let LastScanInfo: typeof import('../molecules/LastScanInfo.svelte').default | null = $state(null);
   let FilterBar: typeof import('../organisms/FilterBar.svelte').default | null = $state(null);
   let KeyboardShortcutsHelp:
-    | typeof import('../molecules/KeyboardShortcutsHelp.svelte').default
-    | null = $state(null);
+    typeof import('../molecules/KeyboardShortcutsHelp.svelte').default | null = $state(null);
   let MissionInvestigationDrawer:
-    | typeof import('../organisms/MissionInvestigationDrawer.svelte').default
-    | null = $state(null);
+    typeof import('../organisms/MissionInvestigationDrawer.svelte').default | null = $state(null);
   let MissionComparison: typeof import('../organisms/MissionComparison.svelte').default | null =
     $state(null);
   let ProfileRefinementBanner:
-    | typeof import('../molecules/ProfileRefinementBanner.svelte').default
-    | null = $state(null);
+    typeof import('../molecules/ProfileRefinementBanner.svelte').default | null = $state(null);
   let ConnectorAlertBar: typeof import('../molecules/ConnectorAlertBar.svelte').default | null =
     $state(null);
   let FeedTourOverlay: typeof import('../molecules/FeedTourOverlay.svelte').default | null =

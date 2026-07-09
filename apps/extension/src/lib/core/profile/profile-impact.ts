@@ -1,13 +1,7 @@
 import type { UserProfile } from '../types/profile';
 
 export type ProfileImpactFieldId =
-  | 'keywords'
-  | 'tjm-min'
-  | 'remote'
-  | 'location'
-  | 'job-title'
-  | 'tjm-max'
-  | 'first-name';
+  'keywords' | 'tjm-min' | 'remote' | 'location' | 'job-title' | 'tjm-max' | 'first-name';
 
 export type ProfileImpactInput = Pick<
   UserProfile,

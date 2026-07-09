@@ -25,21 +25,9 @@ import {
 export type FeedStatus = 'loading' | 'ready' | 'error';
 export type EditStatus = 'idle' | 'adding' | 'editing' | 'saving' | 'deleting' | 'error';
 export type SyncStatus =
-  | 'idle'
-  | 'preparing'
-  | 'syncing'
-  | 'cancelled'
-  | 'synced'
-  | 'partial'
-  | 'error';
+  'idle' | 'preparing' | 'syncing' | 'cancelled' | 'synced' | 'partial' | 'error';
 export type PlatformSyncStatus =
-  | 'pending'
-  | 'copying'
-  | 'done'
-  | 'error'
-  | 'auth-required'
-  | 'blocked'
-  | 'skipped';
+  'pending' | 'copying' | 'done' | 'error' | 'auth-required' | 'blocked' | 'skipped';
 
 export interface CvExperienceDeps {
   loadExperiences(): Promise<Experience[]>;

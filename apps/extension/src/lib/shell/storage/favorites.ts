@@ -3,7 +3,7 @@ const HIDDEN_KEY = 'hiddenMissions';
 
 export async function getFavorites(): Promise<Record<string, number>> {
   const result = await chrome.storage.local.get([FAVORITES_KEY]);
-  return result[FAVORITES_KEY] ?? {};
+  return (result[FAVORITES_KEY] as Record<string, number> | undefined) ?? {};
 }
 
 export async function saveFavorites(favorites: Record<string, number>): Promise<void> {
@@ -12,7 +12,7 @@ export async function saveFavorites(favorites: Record<string, number>): Promise<
 
 export async function getHidden(): Promise<Record<string, number>> {
   const result = await chrome.storage.local.get([HIDDEN_KEY]);
-  return result[HIDDEN_KEY] ?? {};
+  return (result[HIDDEN_KEY] as Record<string, number> | undefined) ?? {};
 }
 
 export async function saveHidden(hidden: Record<string, number>): Promise<void> {
