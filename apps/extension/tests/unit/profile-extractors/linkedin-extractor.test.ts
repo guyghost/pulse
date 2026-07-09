@@ -90,22 +90,23 @@ describe('LinkedInProfileExtractor', () => {
     }
   });
 
-  it('requests the optional LinkedIn origin permission when it is not granted yet', async () => {
-    const requestedPermissions: chrome.permissions.Permissions[] = [];
+  it('returns permission_required when the LinkedIn origin is not granted and never calls request from the service worker', async () => {
+    const request = vi.fn(async () => true);
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({
+        // scripting/activeTab (declared permissions) are contained; the LinkedIn
+        // origin (optional_host_permissions) is not.
         contains: async (permissions) => Boolean(permissions.permissions?.length),
-        request: async (permissions) => {
-          requestedPermissions.push(permissions);
-          return true;
-        },
+        request,
       })
     );
 
     const result = await extractor.extractProfile(1779436800000);
 
-    expect(result.ok).toBe(true);
-    expect(requestedPermissions).toEqual([{ origins: ['https://www.linkedin.com/*'] }]);
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('permission_required');
+    // MV3 invariant: chrome.permissions.request cannot run in the service worker.
+    expect(request).not.toHaveBeenCalled();
   });
 
   it('returns profile_not_found when the active tab is not a LinkedIn profile', async () => {
@@ -121,13 +122,12 @@ describe('LinkedInProfileExtractor', () => {
     expect(extractorCode(result)).toBe('profile_not_found');
   });
 
-  it('does not request LinkedIn origin permission before validating the active profile tab', async () => {
-    const request = vi.fn(async () => true);
+  it('returns profile_not_found when the active tab url is undefined despite permission being granted', async () => {
+    // With the LinkedIn host permission granted, tab.url is populated for
+    // LinkedIn tabs but stays undefined for non-LinkedIn tabs (no host match).
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({
-        contains: async (permissions) => Boolean(permissions.permissions?.length),
-        request,
-        query: async () => [{ id: 9, url: 'https://www.linkedin.com/feed/' } as chrome.tabs.Tab],
+        query: async () => [{ id: 9 } as chrome.tabs.Tab],
       })
     );
 
@@ -135,27 +135,12 @@ describe('LinkedInProfileExtractor', () => {
 
     expect(result.ok).toBe(false);
     expect(extractorCode(result)).toBe('profile_not_found');
-    expect(request).not.toHaveBeenCalled();
   });
 
   it('returns permission_required when scripting or activeTab is missing', async () => {
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({
         contains: async () => false,
-      })
-    );
-
-    const result = await extractor.extractProfile(1779436800000);
-
-    expect(result.ok).toBe(false);
-    expect(extractorCode(result)).toBe('permission_required');
-  });
-
-  it('returns permission_required when the optional LinkedIn origin permission is refused', async () => {
-    const extractor = new LinkedInProfileExtractor(
-      createChromeDouble({
-        contains: async (permissions) => Boolean(permissions.permissions?.length),
-        request: async () => false,
       })
     );
 

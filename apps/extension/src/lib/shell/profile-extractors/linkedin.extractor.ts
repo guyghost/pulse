@@ -32,7 +32,6 @@ interface ChromeLike {
   };
   permissions?: {
     contains(permissions: chrome.permissions.Permissions): Promise<boolean>;
-    request?(permissions: chrome.permissions.Permissions): Promise<boolean>;
   };
   scripting?: {
     executeScript(
@@ -215,6 +214,22 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
     now: number,
     tabId?: number
   ): Promise<Result<CanonicalCandidateProfileDraft, AppError>> {
+    // Permission gate runs BEFORE resolveTab: without the LinkedIn host
+    // permission, chrome.tabs.query returns tab.url === undefined and the URL
+    // classification would emit a misleading profile_not_found. The origin is
+    // requested from the side panel (user gesture) before this bridge call;
+    // see src/models/linkedin-import.model.md.
+    const scriptingReady = await this.ensureExtractionPermission();
+    if (!scriptingReady) {
+      return err(
+        createProfileExtractorError(
+          'permission_required',
+          'LinkedIn profile import requires the LinkedIn host permission. Grant it from the MissionPulse side panel before importing.',
+          now
+        )
+      );
+    }
+
     const tab = await this.resolveTab(tabId);
     if (!tab?.id || !tab.url) {
       return err(
@@ -240,13 +255,13 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
       );
     }
 
-    const scriptingReady = await this.ensureExtractionPermission();
-    if (!scriptingReady || !this.chromeApi.scripting?.executeScript || !this.chromeApi.tabs) {
+    if (!this.chromeApi.scripting?.executeScript) {
       return err(
         createProfileExtractorError(
           'permission_required',
-          'LinkedIn profile import requires activeTab and scripting permissions.',
-          now
+          'LinkedIn profile import requires the scripting permission.',
+          now,
+          { url: tab.url }
         )
       );
     }
@@ -336,16 +351,12 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
       return false;
     }
 
-    const hasLinkedInOrigin = await this.chromeApi.permissions.contains({
+    // Contains-only: the LinkedIn host permission is requested from the side
+    // panel (user gesture) before the bridge call. The service worker cannot
+    // call chrome.permissions.request (MV3). See src/models/linkedin-import.model.md.
+    return this.chromeApi.permissions.contains({
       origins: ['https://www.linkedin.com/*'],
     });
-    if (hasLinkedInOrigin) {
-      return true;
-    }
-
-    return (
-      this.chromeApi.permissions.request?.({ origins: ['https://www.linkedin.com/*'] }) ?? false
-    );
   }
 
   private async resolveTab(tabId?: number): Promise<chrome.tabs.Tab | null> {

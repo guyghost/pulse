@@ -6,6 +6,7 @@
     getCvSyncTargets,
   } from '$lib/shell/facades/cv-experience.facade';
   import {
+    ensureLinkedInHostPermission,
     importLinkedInProfile,
     syncLinkedInProfileImport,
   } from '$lib/shell/facades/profile-sync.facade';
@@ -34,6 +35,11 @@
     }
     isImporting = true;
     try {
+      const granted = await ensureLinkedInHostPermission();
+      if (!granted) {
+        showToast('Autorisation LinkedIn refusée.', 'error');
+        return;
+      }
       const extracted = await importLinkedInProfile();
       if (!extracted.imported) {
         showToast(extracted.errorMessage, 'error');
