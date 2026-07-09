@@ -167,6 +167,23 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('Premium pages hidden');
   });
 
+  it('gates premium surfaces through the premium feature flag', () => {
+    const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
+    const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+
+    // The pure decision + feature store are wired into the UI gating.
+    expect(appSource).toContain("from '$lib/core/features/flags'");
+    expect(appSource).toContain('canAccessPremium');
+    expect(appSource).toContain('features.premiumFeatureActive');
+    // Page rendering consults the combined access decision, not raw isPremium.
+    expect(appSource).toContain('TJMPage && premiumAccessible');
+    expect(appSource).toContain('CvPage && premiumAccessible');
+    expect(appSource).toContain('ApplicationsPage && premiumAccessible');
+    // Settings reflects the dormant vs active state.
+    expect(settingsSource).toContain('features.premiumFeatureActive');
+    expect(settingsSource).toContain('Premium désactivé');
+  });
+
   it('keeps onboarding focused with duration and minimal shell navigation', () => {
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
     const wizardSource = readFileSync('src/ui/organisms/OnboardingWizard.svelte', 'utf8');

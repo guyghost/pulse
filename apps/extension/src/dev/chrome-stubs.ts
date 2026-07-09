@@ -16,6 +16,11 @@ import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extracto
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
+import { resolvePremiumFeatureFlag, shouldPremiumGate } from '$lib/core/features/flags';
+import {
+  DEV_PREMIUM_FEATURE_STORAGE_KEY,
+  DEV_PREMIUM_ENABLED_STORAGE_KEY,
+} from '$lib/state/features.svelte';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
@@ -267,7 +272,8 @@ const storage: Record<string, unknown> = {
   newMissionCount: 0,
   feedSortBy: 'score',
   profile: readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile),
-  premium_enabled: true,
+  premium_enabled: readDevStorage<boolean>(DEV_PREMIUM_ENABLED_STORAGE_KEY, true),
+  premium_feature_enabled: readDevStorage<boolean>(DEV_PREMIUM_FEATURE_STORAGE_KEY, false),
   first_scan_done: readDevStorage<boolean>(DEV_FIRST_SCAN_DONE_KEY, true),
   profile_banner_dismissed: false,
   onboarding_completed: readDevStorage<boolean>(DEV_ONBOARDING_COMPLETED_KEY, true),
@@ -367,6 +373,7 @@ function createChromeStubs() {
             };
           case 'SET_PREMIUM':
             storage.premium_enabled = message.payload === true;
+            writeDevStorage(DEV_PREMIUM_ENABLED_STORAGE_KEY, message.payload === true);
             return { type: 'PREMIUM_SET', payload: { saved: true } };
           case 'VERIFY_PROFILE_PAGE': {
             const p = message.payload as Record<string, unknown> | undefined;
@@ -624,8 +631,17 @@ function createChromeStubs() {
           }
           case 'GENERATE_ASSET': {
             // Dev mode returns a realistic mock asset so the kit-generation UI
-            // flow is exercisable without a service worker. premium_enabled is
-            // true in dev storage, so the production premium gate is bypassed.
+            // flow is exercisable without a service worker. The premium gate
+            // is honoured so the "active + free" DevPanel scenario produces
+            // PREMIUM_REQUIRED just like production. When dormant (flag off),
+            // generation is always allowed. See models/premium-feature-flag.model.md.
+            const featureActive = resolvePremiumFeatureFlag(storage.premium_feature_enabled);
+            if (shouldPremiumGate(featureActive, storage.premium_enabled === true)) {
+              return {
+                type: 'GENERATION_RESULT',
+                payload: { asset: null, error: 'PREMIUM_REQUIRED' },
+              };
+            }
             const { missionId: genMissionId, generationType: genType } = (message.payload ??
               {}) as {
               missionId: string;
