@@ -31,6 +31,25 @@ export const BackupDataSchema = z.object({
         remote: z.number(),
       })
       .optional(),
+    experiences: z
+      .array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          company: z.string().nullable(),
+          location: z.string().nullable(),
+          startDate: z.string().nullable(),
+          endDate: z.string().nullable(),
+          isCurrent: z.boolean(),
+          description: z.string(),
+          skills: z.array(z.string()),
+          source: z.enum(['linkedin', 'manual', 'connector-import']),
+          sourceExternalId: z.string().nullable(),
+          positionIndex: z.number().int().min(0),
+          updatedAt: z.number().int().min(0),
+        })
+      )
+      .optional(),
   }),
   settings: z.object({
     scanIntervalMinutes: z.number(),
@@ -82,10 +101,14 @@ export function createBackup(
   hidden: Record<string, number>,
   timestamp: number
 ): BackupData {
+  const normalizedProfile: UserProfile = {
+    ...profile,
+    experiences: profile.experiences ?? [],
+  };
   return {
     version: CURRENT_BACKUP_VERSION,
     timestamp,
-    profile,
+    profile: normalizedProfile,
     settings,
     favorites,
     hidden,

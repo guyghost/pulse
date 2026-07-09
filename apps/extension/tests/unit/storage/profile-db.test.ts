@@ -13,6 +13,7 @@ const profile: UserProfile = {
   seniority: 'senior',
   jobTitle: 'Architecte Svelte',
   searchKeywords: ['mission svelte'],
+  experiences: [],
 };
 
 describe('profile IndexedDB store', () => {

@@ -132,6 +132,7 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
       jobTitle: 'Solo Title',
       scoringWeights: undefined,
       searchKeywords: [],
+      experiences: [],
     });
   });
 

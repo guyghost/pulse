@@ -43,6 +43,7 @@ describe('normalize profile helpers', () => {
       jobTitle: '',
       scoringWeights: undefined,
       searchKeywords: [],
+      experiences: [],
     });
   });
 

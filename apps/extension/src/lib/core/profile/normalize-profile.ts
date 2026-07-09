@@ -67,6 +67,7 @@ export const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile 
   jobTitle: profile.jobTitle ?? '',
   scoringWeights: profile.scoringWeights,
   searchKeywords: [...(profile.searchKeywords ?? [])],
+  experiences: [...(profile.experiences ?? [])],
 });
 
 export function normalizeProfileDraft(input: ProfileDraftInput): NormalizeProfileResult {

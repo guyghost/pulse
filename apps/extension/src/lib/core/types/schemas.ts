@@ -135,6 +135,25 @@ export const UserProfileSchema = z
     scoringWeights: ScoringWeightsSchema.optional(),
     /** User-defined search keywords sent to connector APIs for server-side filtering */
     searchKeywords: z.array(z.string()).default([]),
+    experiences: z
+      .array(
+        z.object({
+          id: z.string(),
+          title: z.string(),
+          company: z.string().nullable(),
+          location: z.string().nullable(),
+          startDate: z.string().nullable(),
+          endDate: z.string().nullable(),
+          isCurrent: z.boolean(),
+          description: z.string(),
+          skills: z.array(z.string()),
+          source: z.enum(['linkedin', 'manual', 'connector-import']),
+          sourceExternalId: z.string().nullable(),
+          positionIndex: z.number().int().min(0),
+          updatedAt: z.number().int().min(0),
+        })
+      )
+      .default([]),
   })
   .refine((p) => p.tjmMax === 0 || p.tjmMax >= p.tjmMin, {
     message: 'Le TJM maximum doit être supérieur ou égal au TJM minimum',

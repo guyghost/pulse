@@ -73,15 +73,16 @@ describe('operational UI constraints', () => {
 
   it('keeps loading states tied to source and progression context', () => {
     const cvSource = readFileSync('src/ui/pages/CvPage.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/organisms/ExperienceFeed.svelte', 'utf8');
     const applicationsSource = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
 
-    expect(cvSource).toContain('type LoadingProgressStep');
-    expect(cvSource).toContain('Chargement CV');
-    expect(cvSource).toContain('Progression du chargement CV');
-    expect(cvSource).toContain('Profil canonique');
-    expect(cvSource).toContain('Plateformes');
-    expect(cvSource).toContain('Écarts');
-    expect(cvSource).toContain('role="status"');
+    // CvPage delegates loading to the experience feed, which ties its skeleton
+    // to the store's feedStatus and surfaces the entry count as progression.
+    expect(cvSource).toContain('store.load()');
+    expect(cvSource).toContain('ExperienceFeed');
+    expect(feedSource).toContain("feedStatus === 'loading'");
+    expect(feedSource).toContain('Skeleton');
+    expect(feedSource).toContain('store.experiences.length');
     expect(applicationsSource).toContain('type LoadingProgressStep');
     expect(applicationsSource).toContain('Chargement candidatures');
     expect(applicationsSource).toContain('Progression du chargement candidatures');
@@ -351,26 +352,19 @@ describe('operational UI constraints', () => {
     expect(appSource).toContain("onNavigateToFeed={() => nav.navigate('feed')}");
   });
 
-  it('routes missing CV source states to import or profile completion', () => {
+  it('routes missing CV source states to add-experience or retry', () => {
     const cvSource = readFileSync('src/ui/pages/CvPage.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/organisms/ExperienceFeed.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    expect(cvSource).toContain("primaryActionLabel: 'Importer LinkedIn'");
-    expect(cvSource).toContain('secondaryActionLabel="Compléter le profil"');
-    expect(cvSource).toContain('onSecondaryAction={completeProfileManually}');
-    expect(cvSource).toContain("primaryActionLabel: 'Prévisualiser LinkedIn'");
-    expect(cvSource).not.toContain('const linkedInPrimaryLabel');
-    expect(cvSource).toContain(
-      "const sourceActionLabel = $derived(profile ? 'Tout préparer' : 'Compléter le profil')"
-    );
-    expect(cvSource).toContain('type CvWorkflowStep');
-    expect(cvSource).toContain('const cvWorkflowSteps = $derived.by');
-    expect(cvSource).toContain('Source canonique');
-    expect(cvSource).toContain('Plateformes à mettre à jour');
-    expect(cvSource).toContain('Dashboard connecté');
-    expect(cvSource).toContain('Enregistrer comme source');
-    expect(cvSource).not.toContain('Profil CV synchronisé dans Supabase');
-    expect(cvSource).toContain('function handleSourceAction()');
+    // CvPage wires the sync panel + feed; the feed owns empty/error routing.
+    expect(cvSource).toContain('CvSyncPanel');
+    expect(cvSource).toContain('ExperienceFeed');
+    expect(cvSource).toContain('onNavigateToProfile');
+    expect(feedSource).toContain('primaryActionLabel="Ajouter une expérience"');
+    expect(feedSource).toContain('primaryActionLabel="Réessayer"');
+    expect(feedSource).toContain('onPrimaryAction={() => store.reload()}');
+    expect(feedSource).toContain('onPrimaryAction={() => store.newExperience()}');
     expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
   });
 

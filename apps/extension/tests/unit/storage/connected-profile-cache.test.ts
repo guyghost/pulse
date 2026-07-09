@@ -17,6 +17,7 @@ const profile: UserProfile = {
   jobTitle: 'Architecte frontend',
   searchKeywords: ['svelte mission'],
   scoringWeights: { stack: 40, location: 20, tjm: 25, remote: 15 },
+  experiences: [],
 };
 
 describe('connected candidate profile cache', () => {
