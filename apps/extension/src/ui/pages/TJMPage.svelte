@@ -72,7 +72,7 @@
   const isOffline = $derived(connection.status === 'offline');
   const profileCalibrated = $derived(userTjmMin > 0 || userTjmMax > 0);
 
-  let dashboardSection = $state<HTMLElement>();
+  let dashboardSection: HTMLElement | undefined = $state(undefined);
 
   function inspectLocalSignals(): void {
     dashboardSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
