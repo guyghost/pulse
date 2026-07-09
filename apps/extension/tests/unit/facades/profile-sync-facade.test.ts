@@ -1,7 +1,7 @@
 /**
  * @vitest-environment jsdom
  */
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CanonicalCandidateProfileDraft } from '../../../src/lib/core/profile-extractors/types';
 import {
   ensureLinkedInHostPermission,
@@ -113,7 +113,7 @@ describe('profile-sync facade — ensureLinkedInHostPermission (side-panel permi
     expect(request).toHaveBeenCalledWith(linkedinOrigin);
   });
 
-  it('returns false when chrome.permissions is unavailable (e.g. service-worker context)', async () => {
+  it('returns false when chrome.permissions is unavailable (permissions API missing)', async () => {
     vi.stubGlobal('chrome', { runtime: {} });
 
     await expect(ensureLinkedInHostPermission()).resolves.toBe(false);
