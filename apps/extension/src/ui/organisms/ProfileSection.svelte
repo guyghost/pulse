@@ -5,6 +5,7 @@
   import type { RemoteType } from '$lib/core/types/mission';
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import Tooltip from '../atoms/Tooltip.svelte';
+  import { REMOTE_OPTIONS as remoteOptions } from '../constants/remote-options';
 
   /* eslint-disable prefer-const */
   let {
@@ -45,13 +46,6 @@
     onRemoveKeyword: (keyword: string) => void;
   } = $props();
   /* eslint-enable prefer-const */
-
-  const remoteOptions: Array<{ value: RemoteType | 'any'; label: string }> = [
-    { value: 'any', label: 'Indifférent' },
-    { value: 'full', label: 'Remote' },
-    { value: 'hybrid', label: 'Hybride' },
-    { value: 'onsite', label: 'Présentiel' },
-  ];
 
   const seniorityOptions: Array<{ value: SeniorityLevel; label: string }> = [
     { value: 'junior', label: 'Junior' },

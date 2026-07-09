@@ -10,6 +10,7 @@
     DEFAULT_CONNECTED_ALERT_PREFERENCES,
     type ConnectedAlertPreferences,
   } from '$lib/core/types/alert-preferences';
+  import { REMOTE_OPTIONS as workModeOptions } from '../constants/remote-options';
 
   type OnboardingStepId = 'understand' | 'source' | 'activity' | 'alert' | 'insight';
 
@@ -58,16 +59,6 @@
   let alertThreshold = $state(80);
   let selectedSource = $state('Free-Work');
   let loadedAlertRevision = $state(-1);
-
-  // Work-mode options mirror `ProfileSection.remoteOptions` (Settings) so the
-  // onboarding preference feeds the scorer with the exact same shape/labels.
-  // See `models/onboarding-workmode-location.model.md`.
-  const workModeOptions: Array<{ value: RemoteType | 'any'; label: string }> = [
-    { value: 'any', label: 'Indifférent' },
-    { value: 'full', label: 'Remote' },
-    { value: 'hybrid', label: 'Hybride' },
-    { value: 'onsite', label: 'Présentiel' },
-  ];
 
   const onboardingSteps: OnboardingStep[] = [
     {
