@@ -11,6 +11,7 @@
     type ConnectedAlertPreferences,
   } from '$lib/core/types/alert-preferences';
   import { REMOTE_OPTIONS as workModeOptions } from '../constants/remote-options';
+  import { LOCATION_LABELS } from '$lib/core/locations/location-catalog';
 
   type OnboardingStepId = 'understand' | 'source' | 'activity' | 'alert' | 'insight';
 
@@ -452,8 +453,14 @@
       type="text"
       class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
       placeholder="Paris, Lyon, Bordeaux…"
+      list="ob-location-catalog"
       bind:value={location}
     />
+    <datalist id="ob-location-catalog">
+      {#each LOCATION_LABELS as label}
+        <option value={label} />
+      {/each}
+    </datalist>
   </div>
 
   <div>
