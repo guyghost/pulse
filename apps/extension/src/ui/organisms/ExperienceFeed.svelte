@@ -5,7 +5,6 @@
   import type { CvExperienceStore } from '$lib/state/cv-experience.svelte';
   import type { Experience } from '$lib/core/types/profile';
   import ExperienceCard from '../molecules/ExperienceCard.svelte';
-  import type { ExperienceFormData } from '../molecules/ExperienceEditForm.svelte';
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
 
   const { store }: { store: CvExperienceStore } = $props();
@@ -36,8 +35,8 @@
     store.editStatus === 'saving' || store.editStatus === 'deleting' ? store.editingId : null
   );
 
-  function handleSave(data: ExperienceFormData) {
-    store.saveExperience(data as Experience);
+  function handleSave(experience: Experience) {
+    store.saveExperience(experience);
   }
 </script>
 
@@ -62,20 +61,23 @@
   </div>
 
   {#if isLoading}
-    {#each Array(3) as _}
-      <div class="section-card rounded-xl p-4 space-y-3">
-        <Skeleton width="55%" height="0.95rem" />
-        <Skeleton width="35%" height="0.75rem" />
-        <div class="flex gap-2">
-          <Skeleton width="3rem" height="1rem" rounded="full" />
-          <Skeleton width="4rem" height="1rem" rounded="full" />
+    <div aria-busy="true" role="status" aria-live="polite" class="flex flex-col gap-3">
+      <span class="sr-only">Chargement de vos expériences…</span>
+      {#each Array(3) as _}
+        <div class="section-card rounded-xl p-4 space-y-3">
+          <Skeleton width="55%" height="0.95rem" />
+          <Skeleton width="35%" height="0.75rem" />
+          <div class="flex gap-2">
+            <Skeleton width="3rem" height="1rem" rounded="full" />
+            <Skeleton width="4rem" height="1rem" rounded="full" />
+          </div>
         </div>
-      </div>
-    {/each}
+      {/each}
+    </div>
   {:else if hasError}
     <OperationalEmptyState
       title="Impossible de charger vos expériences"
-      description={store.error ?? 'Une erreur est survenue.'}
+      description={store.feedError ?? 'Une erreur est survenue.'}
       severity="critical"
       statusLabel="Erreur"
       icon="triangle-alert"

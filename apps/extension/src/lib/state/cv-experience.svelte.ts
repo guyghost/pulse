@@ -62,7 +62,9 @@ export interface CvExperienceStore {
   readonly syncStatus: SyncStatus;
   readonly platformStatuses: Map<string, PlatformSyncStatus>;
   readonly lastSyncedAt: number | null;
-  readonly error: string | null;
+  readonly feedError: string | null;
+  readonly editError: string | null;
+  readonly syncError: string | null;
   readonly canSync: boolean;
   readonly isSyncing: boolean;
   // feed
@@ -92,7 +94,9 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
   let syncStatus = $state<SyncStatus>('idle');
   let platformStatuses = $state<Map<string, PlatformSyncStatus>>(new Map());
   let lastSyncedAt = $state<number | null>(null);
-  let error = $state<string | null>(null);
+  let feedError = $state<string | null>(null);
+  let editError = $state<string | null>(null);
+  let syncError = $state<string | null>(null);
 
   const canSync = $derived(experiences.length > 0 && !isSyncBusy(syncStatus));
   const isSyncing = $derived(syncStatus === 'preparing' || syncStatus === 'syncing');
@@ -120,13 +124,13 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
   // ── Feed machine ────────────────────────────────────────────────────────
   async function load(): Promise<void> {
     feedStatus = 'loading';
-    error = null;
+    feedError = null;
     try {
       const result = await deps.loadExperiences();
       experiences = recomputePositionIndex(result);
       feedStatus = 'ready';
     } catch (err) {
-      error = errorMessage(err, 'Impossible de charger vos expériences.');
+      feedError = errorMessage(err, 'Impossible de charger vos expériences.');
       feedStatus = 'error';
     }
   }
@@ -160,7 +164,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     );
     editingId = null;
     editStatus = 'adding';
-    error = null;
+    editError = null;
   }
 
   function editExperience(id: string): void {
@@ -174,7 +178,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     draft = { ...target, skills: [...target.skills] };
     editingId = id;
     editStatus = 'editing';
-    error = null;
+    editError = null;
   }
 
   function cancelEdit(): void {
@@ -184,7 +188,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     draft = null;
     editingId = null;
     editStatus = 'idle';
-    error = null;
+    editError = null;
   }
 
   async function saveExperience(draftInput: Experience): Promise<void> {
@@ -199,7 +203,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     );
     draft = normalized;
     editStatus = 'saving';
-    error = null;
+    editError = null;
     try {
       const next = isNew
         ? [...experiences, normalized]
@@ -212,7 +216,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
       editStatus = 'idle';
       feedStatus = 'ready';
     } catch (err) {
-      error = errorMessage(err, 'Impossible d’enregistrer l’expérience.');
+      editError = errorMessage(err, 'Impossible d’enregistrer l’expérience.');
       editStatus = 'error';
     }
   }
@@ -223,7 +227,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     }
     editingId = id;
     editStatus = 'deleting';
-    error = null;
+    editError = null;
     try {
       const next = recomputePositionIndex(experiences.filter((exp) => exp.id !== id));
       await deps.saveExperiences(next);
@@ -232,7 +236,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
       editStatus = 'idle';
       feedStatus = 'ready';
     } catch (err) {
-      error = errorMessage(err, 'Impossible de supprimer l’expérience.');
+      editError = errorMessage(err, 'Impossible de supprimer l’expérience.');
       editStatus = 'error';
     }
   }
@@ -244,12 +248,12 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     }
     if (experiences.length === 0) {
       syncStatus = 'error';
-      error = SYNC_EMPTY;
+      syncError = SYNC_EMPTY;
       resetPlatformStatuses();
       return;
     }
     syncStatus = 'preparing';
-    error = null;
+    syncError = null;
     resetPlatformStatuses();
 
     // Pure prepare in core.
@@ -264,7 +268,15 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
         setPlatformStatus(target.id, 'error');
       }
       syncStatus = 'error';
-      error = SYNC_COPY_DENIED;
+      syncError = SYNC_COPY_DENIED;
+      return;
+    }
+
+    // Cancellation may have landed during the clipboard probe.
+    if (readSyncStatus() === 'cancelled') {
+      for (const target of deps.platforms) {
+        setPlatformStatus(target.id, 'skipped');
+      }
       return;
     }
 
@@ -306,7 +318,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     }
 
     if (failed > 0 && done === 0) {
-      error = 'La synchronisation a échoué sur toutes les plateformes.';
+      syncError = 'La synchronisation a échoué sur toutes les plateformes.';
     }
   }
 
@@ -333,7 +345,8 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     }
     experiences = recomputePositionIndex(incoming);
     feedStatus = 'ready';
-    error = null;
+    feedError = null;
+    editError = null;
     editStatus = 'idle';
     editingId = null;
     draft = null;
@@ -364,8 +377,14 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     get lastSyncedAt() {
       return lastSyncedAt;
     },
-    get error() {
-      return error;
+    get feedError() {
+      return feedError;
+    },
+    get editError() {
+      return editError;
+    },
+    get syncError() {
+      return syncError;
     },
     get canSync() {
       return canSync;

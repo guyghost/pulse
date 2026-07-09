@@ -25,7 +25,7 @@
     draft?: Experience | null;
     onEdit?: () => void;
     onDelete?: () => void;
-    onSave?: (data: ExperienceFormData) => void;
+    onSave?: (experience: Experience) => void;
     onCancelEdit?: () => void;
   } = $props();
 

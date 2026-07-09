@@ -4,7 +4,7 @@ Source of truth for the CV tab behavior: an editable feed of professional
 experiences and a cross-platform sync that pushes them to LinkedIn and the
 mission connectors. Modeled as three cooperating state machines in a Svelte 5
 runes module (`src/lib/state/cv-experience.svelte.ts`), per the project standard
-(runnes over XState — see `profile-state.model.md`).
+(runes over XState — see `profile-state.model.md`).
 
 The LLM never decides a transition. It may propose adapted summary copy inside a
 dedicated AI worker; the model decides whether that copy is accepted and when
@@ -125,7 +125,9 @@ interface CvExperienceContext {
   syncStatus: SyncStatus;
   platformStatuses: Map<string, PlatformSyncStatus>;
   lastSyncedAt: number | null; // epoch ms
-  error: string | null; // feed/edit/sync error copy
+  feedError: string | null; // feed machine error copy
+  editError: string | null; // edit machine error copy
+  syncError: string | null; // sync machine error copy
 }
 ```
 
@@ -230,6 +232,8 @@ targets)` in core. If `experiences.length === 0` → `PREPARE_ERROR`. Else →
    per-platform statuses at `ALL_SETTLED`, not stored independently of them.
 8. The sync operates on the **committed** experiences list, never on an unsaved
    `draft`. An open edit draft does not participate in sync.
+9. Error slots are per-machine (`feedError`/`editError`/`syncError`): a failure in
+   one machine never overwrites another machine's terminal error copy.
 
 ## Public API (consumed by CvPage)
 
@@ -244,7 +248,9 @@ createCvExperienceStore(deps): {
   syncStatus: SyncStatus;
   platformStatuses: Map<string, PlatformSyncStatus>;
   lastSyncedAt: number | null;
-  error: string | null;
+  feedError: string | null;
+  editError: string | null;
+  syncError: string | null;
   // feed
   load(): void;
   // edit

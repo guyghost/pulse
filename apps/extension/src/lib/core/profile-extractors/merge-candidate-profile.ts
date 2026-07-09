@@ -27,7 +27,7 @@ import type { CanonicalCandidateProfileDraft } from './types';
 export function mergeCandidateProfileIntoUserProfile(
   current: UserProfile | null,
   draft: CanonicalCandidateProfileDraft,
-  now: number = 0
+  now: number
 ): UserProfile {
   const base = withProfileDefaults({ ...current });
 

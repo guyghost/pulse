@@ -52,7 +52,7 @@
       case 'partial':
         return `Synchronisé sur ${doneCount}/${platforms.length} plateformes.`;
       case 'error':
-        return store.error ?? 'La synchronisation a échoué.';
+        return store.syncError ?? 'La synchronisation a échoué.';
       case 'cancelled':
         return 'Synchronisation annulée.';
       default:

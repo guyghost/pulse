@@ -6,6 +6,8 @@ import type {
 } from '../../../src/lib/core/profile-extractors/types';
 import { mergeCandidateProfileIntoUserProfile } from '../../../src/lib/core/profile-extractors/merge-candidate-profile';
 
+const NOW = 1_700_000_000_000;
+
 function makeDraft(
   overrides: Partial<CanonicalCandidateProfileDraft> = {}
 ): CanonicalCandidateProfileDraft {
@@ -60,7 +62,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
   it('overwrites jobTitle with the draft title', () => {
     const merged = mergeCandidateProfileIntoUserProfile(
       makeProfile({ jobTitle: 'Ancien titre' }),
-      makeDraft({ title: 'Nouveau titre LinkedIn' })
+      makeDraft({ title: 'Nouveau titre LinkedIn' }),
+      NOW
     );
 
     expect(merged.jobTitle).toBe('Nouveau titre LinkedIn');
@@ -75,7 +78,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
           { skill: 'React', source: 'linkedin', confidence: 0.8 },
           { skill: 'TYPESCRIPT', source: 'linkedin', confidence: 0.7 },
         ],
-      })
+      }),
+      NOW
     );
 
     expect(merged.stack).toEqual(['Svelte', 'TypeScript', 'React']);
@@ -86,7 +90,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
       makeProfile({ location: 'Lyon' }),
       makeDraft({
         experiences: [experience({ location: 'Marseille' })],
-      })
+      }),
+      NOW
     );
 
     expect(merged.location).toBe('Lyon');
@@ -101,7 +106,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
           experience({ title: 'Dev', location: 'Bordeaux', positionIndex: 1 }),
           experience({ title: 'Junior', location: 'Nantes', positionIndex: 2 }),
         ],
-      })
+      }),
+      NOW
     );
 
     expect(merged.location).toBe('Bordeaux');
@@ -112,14 +118,19 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
       makeProfile({ location: '   ' }),
       makeDraft({
         experiences: [experience({ location: null }), experience({ location: '  ' })],
-      })
+      }),
+      NOW
     );
 
     expect(merged.location).toBe('');
   });
 
   it('returns a complete UserProfile with defaults when current is null', () => {
-    const merged = mergeCandidateProfileIntoUserProfile(null, makeDraft({ title: 'Solo Title' }));
+    const merged = mergeCandidateProfileIntoUserProfile(
+      null,
+      makeDraft({ title: 'Solo Title' }),
+      NOW
+    );
 
     expect(merged).toEqual({
       firstName: '',
@@ -145,7 +156,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
         seniority: 'confirmed',
         searchKeywords: ['react', 'remote'],
       }),
-      makeDraft({ title: 'Nouveau titre' })
+      makeDraft({ title: 'Nouveau titre' }),
+      NOW
     );
 
     expect(merged.tjmMin).toBe(700);
@@ -160,7 +172,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
     const weights = { stack: 50, location: 10, tjm: 30, remote: 10 };
     const merged = mergeCandidateProfileIntoUserProfile(
       makeProfile({ scoringWeights: weights }),
-      makeDraft()
+      makeDraft(),
+      NOW
     );
 
     expect(merged.scoringWeights).toEqual(weights);
@@ -170,7 +183,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
     const current = makeProfile({ stack: ['Svelte'] });
     const merged = mergeCandidateProfileIntoUserProfile(
       current,
-      makeDraft({ skills: [{ skill: 'React', source: 'linkedin', confidence: 0.9 }] })
+      makeDraft({ skills: [{ skill: 'React', source: 'linkedin', confidence: 0.9 }] }),
+      NOW
     );
 
     expect(current.stack).toEqual(['Svelte']);
