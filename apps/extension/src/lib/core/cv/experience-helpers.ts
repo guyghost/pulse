@@ -204,6 +204,34 @@ export function normalizeDateToMonth(date: string | null | undefined): string | 
   return `${match[1]}-${match[2].padStart(2, '0')}`;
 }
 
+/**
+ * Count how many of the incoming drafts would be ADDED as new experiences —
+ * i.e. do not match any current entry by the {@link mergeExperiences} dedup key
+ * `(company, title, normalizeDateToMonth(startDate))`. Mirrors the dedup logic
+ * WITHOUT performing the merge, so the shell can report a truthful
+ * "N new experiences imported" count and avoid a success toast when nothing was
+ * actually added (empty extraction or full dedup).
+ *
+ * STRICTLY PURE.
+ */
+export function countNewlyAddedExperiences(
+  current: readonly Experience[],
+  incoming: readonly CandidateExperienceDraft[]
+): number {
+  const existingKeys = new Set(
+    current.map((exp) => experienceKey(exp.company, exp.title, exp.startDate))
+  );
+  let added = 0;
+  for (const draft of incoming) {
+    const draftStart = normalizeDateToMonth(draft.startDate);
+    const key = experienceKey(draft.company, draft.title, draftStart);
+    if (!existingKeys.has(key)) {
+      added += 1;
+    }
+  }
+  return added;
+}
+
 function experienceKey(company: string | null, title: string, startDate: string | null): string {
   return `${(company ?? '').toLowerCase()}|${title.toLowerCase()}|${startDate ?? ''}`;
 }

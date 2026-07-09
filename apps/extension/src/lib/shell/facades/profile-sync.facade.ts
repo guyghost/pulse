@@ -8,6 +8,10 @@ export type LinkedInProfileImportResult =
   | { imported: true; profile: CanonicalCandidateProfileDraft }
   | { imported: false; errorCode: string; errorMessage: string };
 
+export type LinkedInProfileSyncResult =
+  | { imported: true; profile: CanonicalCandidateProfileDraft; addedCount: number }
+  | { imported: false; errorCode: string; errorMessage: string };
+
 export type LinkedInProfilePreviewResult =
   | { extracted: true; profile: CanonicalCandidateProfileDraft }
   | { extracted: false; errorCode: string; errorMessage: string };
@@ -112,7 +116,7 @@ export async function previewLinkedInProfile(): Promise<LinkedInProfilePreviewRe
 
 export async function syncLinkedInProfileImport(
   profile: CanonicalCandidateProfileDraft
-): Promise<LinkedInProfileImportResult> {
+): Promise<LinkedInProfileSyncResult> {
   const response = await sendMessage({
     type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
     payload: { profile },
@@ -126,5 +130,16 @@ export async function syncLinkedInProfileImport(
     };
   }
 
-  return response.payload;
+  const payload = response.payload;
+  if (!payload.imported) {
+    return payload;
+  }
+
+  return {
+    imported: true,
+    profile: payload.profile,
+    // SW omits addedCount only on unexpected/handcrafted responses — default to
+    // a safe 0 so the UI never crashes (the toast will read "already present").
+    addedCount: payload.addedCount ?? 0,
+  };
 }

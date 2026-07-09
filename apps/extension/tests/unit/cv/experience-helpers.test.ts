@@ -3,6 +3,7 @@ import type { Experience } from '../../../src/lib/core/types/profile';
 import type { CandidateExperienceDraft } from '../../../src/lib/core/profile-extractors/types';
 import {
   buildPlatformPayloads,
+  countNewlyAddedExperiences,
   formatExperienceDateRange,
   formatExperiencePayload,
   mergeExperiences,
@@ -278,6 +279,56 @@ describe('mergeExperiences', () => {
     const result = mergeExperiences(current, incoming, NOW);
     expect(result[0].isCurrent).toBe(true);
     expect(result[0].endDate).toBeNull();
+  });
+});
+
+describe('countNewlyAddedExperiences', () => {
+  it('returns 0 when the incoming draft is empty', () => {
+    expect(countNewlyAddedExperiences([baseExperience()], [])).toBe(0);
+  });
+
+  it('counts every draft as new when current is empty', () => {
+    const incoming = [
+      draft({ title: 'A', company: 'Acme', startDate: '2023-01' }),
+      draft({ title: 'B', company: 'Globex', startDate: '2022-01' }),
+    ];
+    expect(countNewlyAddedExperiences([], incoming)).toBe(2);
+  });
+
+  it('returns 0 when every draft already exists by dedup key', () => {
+    const current = [
+      baseExperience({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01' }),
+    ];
+    const incoming = [draft({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01' })];
+    expect(countNewlyAddedExperiences(current, incoming)).toBe(0);
+  });
+
+  it('counts only the drafts that do not match an existing entry', () => {
+    const current = [
+      baseExperience({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01' }),
+    ];
+    const incoming = [
+      draft({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01' }), // dup
+      draft({ title: 'Staff Engineer', company: 'Globex', startDate: '2021-01' }), // new
+    ];
+    expect(countNewlyAddedExperiences(current, incoming)).toBe(1);
+  });
+
+  it('treats YYYY-MM-DD draft start dates the same as the normalized YYYY-MM current key', () => {
+    const current = [
+      baseExperience({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01' }),
+    ];
+    const incoming = [draft({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01-15' })];
+    // Normalized to 2023-01 → matches → 0 added (mirrors mergeExperiences).
+    expect(countNewlyAddedExperiences(current, incoming)).toBe(0);
+  });
+
+  it('is case-insensitive on company and title (matches mergeExperiences dedup)', () => {
+    const current = [
+      baseExperience({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01' }),
+    ];
+    const incoming = [draft({ title: 'LEAD FRONTEND', company: 'ACME', startDate: '2023-01' })];
+    expect(countNewlyAddedExperiences(current, incoming)).toBe(0);
   });
 });
 

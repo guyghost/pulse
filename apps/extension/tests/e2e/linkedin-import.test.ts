@@ -93,7 +93,7 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
             if (message.type === 'SYNC_LINKEDIN_PROFILE_IMPORT') {
               return {
                 type: 'LINKEDIN_PROFILE_IMPORTED',
-                payload: { imported: true, profile },
+                payload: { imported: true, profile, addedCount: 1 },
               };
             }
 
@@ -124,8 +124,8 @@ test.describe('LinkedIn profile import flow', () => {
     // The new CV page has a direct "Importer LinkedIn" button
     await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
 
-    // After successful import, a success toast appears
-    await expect(page.getByText('Expériences LinkedIn importées avec succès.')).toBeVisible();
+    // After successful import, a success toast appears (count-aware: 1 new)
+    await expect(page.getByText('1 expérience LinkedIn importée avec succès.')).toBeVisible();
   });
 
   test('shows typed LinkedIn import errors in toast', async ({ page }) => {

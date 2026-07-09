@@ -511,7 +511,7 @@ describe('background auto-scan notifications', () => {
     });
     expect(sendResponse).toHaveBeenCalledWith({
       type: 'LINKEDIN_PROFILE_IMPORTED',
-      payload: { imported: true, profile: draft },
+      payload: { imported: true, profile: draft, addedCount: 0 },
     });
   });
 

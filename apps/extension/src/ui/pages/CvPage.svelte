@@ -47,7 +47,21 @@
       }
       const result = await syncLinkedInProfileImport(extracted.profile);
       if (result.imported) {
-        showToast('Expériences LinkedIn importées avec succès.', 'success');
+        const draftCount = result.profile.experiences.length;
+        const added = result.addedCount;
+        if (draftCount === 0) {
+          showToast(
+            "Aucune expérience trouvée sur votre profil LinkedIn. Ouvrez votre profil LinkedIn, défilez jusqu'à la section Expérience, puis relancez l'import.",
+            'info'
+          );
+        } else if (added === 0) {
+          showToast('Vos expériences LinkedIn sont déjà présentes dans votre CV.', 'info');
+        } else {
+          showToast(
+            `${added} expérience${added > 1 ? 's' : ''} LinkedIn importée${added > 1 ? 's' : ''} avec succès.`,
+            'success'
+          );
+        }
       } else {
         showToast(result.errorMessage, 'error');
       }
