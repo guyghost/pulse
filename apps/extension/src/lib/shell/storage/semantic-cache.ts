@@ -44,7 +44,7 @@ const normalizeKeyPart = (value: string | number): string =>
 const buildProfileFingerprint = (profile: UserProfile): string =>
   [
     normalizeKeyPart(profile.jobTitle),
-    profile.stack
+    profile.keywords
       .filter(Boolean)
       .map((item) => normalizeKeyPart(item))
       .sort()

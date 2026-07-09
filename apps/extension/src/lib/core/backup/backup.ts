@@ -5,6 +5,7 @@
 
 import { z } from 'zod';
 import type { UserProfile } from '../types/profile';
+import { UserProfileSchema } from '../types/schemas';
 import type { AppSettings } from '../types/app-settings';
 
 // ============================================
@@ -14,24 +15,7 @@ import type { AppSettings } from '../types/app-settings';
 export const BackupDataSchema = z.object({
   version: z.number().int().min(1),
   timestamp: z.number().int().positive(),
-  profile: z.object({
-    firstName: z.string(),
-    stack: z.array(z.string()),
-    tjmMin: z.number(),
-    tjmMax: z.number(),
-    location: z.string(),
-    remote: z.union([z.enum(['full', 'hybrid', 'onsite']), z.literal('any')]),
-    seniority: z.enum(['junior', 'confirmed', 'senior']),
-    jobTitle: z.string(),
-    scoringWeights: z
-      .object({
-        stack: z.number(),
-        location: z.number(),
-        tjm: z.number(),
-        remote: z.number(),
-      })
-      .optional(),
-  }),
+  profile: UserProfileSchema,
   settings: z.object({
     scanIntervalMinutes: z.number(),
     enabledConnectors: z.array(z.string()),

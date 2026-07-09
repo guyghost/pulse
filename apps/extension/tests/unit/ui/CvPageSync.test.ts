@@ -12,14 +12,13 @@ import {
 vi.mock('../../../src/lib/shell/messaging/bridge', () => {
   const mockProfile = {
     firstName: 'Guy',
-    stack: ['Svelte', 'TypeScript'],
+    keywords: ['Svelte', 'TypeScript', 'mission svelte'],
     tjmMin: 650,
     tjmMax: 900,
     location: 'Paris',
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Lead Frontend',
-    searchKeywords: ['mission svelte'],
   };
   const mockDraft = {
     title: 'Lead Frontend Svelte',

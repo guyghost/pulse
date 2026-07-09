@@ -64,7 +64,7 @@
       if (p) {
         userTjmMin = p.tjmMin;
         userTjmMax = p.tjmMax;
-        profileStacks = p.stack;
+        profileStacks = p.keywords;
         userSeniority = p.seniority;
       }
     } catch {

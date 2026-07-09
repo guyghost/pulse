@@ -12,14 +12,13 @@ import type { UserProfile } from '../types/profile';
 
 const DEFAULT_PROFILE = {
   firstName: '',
-  stack: [],
+  keywords: [],
   tjmMin: 0,
   tjmMax: 9999,
   location: '',
   remote: 'any',
   seniority: 'senior',
   jobTitle: '',
-  searchKeywords: [],
   scoringWeights: {
     stack: 0,
     location: 10,
@@ -35,8 +34,7 @@ const DEFAULT_PROFILE = {
 export function createDefaultProfile(): UserProfile {
   return {
     ...DEFAULT_PROFILE,
-    stack: [...DEFAULT_PROFILE.stack],
-    searchKeywords: [...DEFAULT_PROFILE.searchKeywords],
+    keywords: [...DEFAULT_PROFILE.keywords],
     scoringWeights: { ...DEFAULT_PROFILE.scoringWeights },
   };
 }
@@ -44,14 +42,13 @@ export function createDefaultProfile(): UserProfile {
 export function isDefaultProfile(profile: UserProfile): boolean {
   return (
     profile.firstName === DEFAULT_PROFILE.firstName &&
-    profile.stack.length === 0 &&
+    profile.keywords.length === 0 &&
     profile.tjmMin === DEFAULT_PROFILE.tjmMin &&
     profile.tjmMax === DEFAULT_PROFILE.tjmMax &&
     profile.location === DEFAULT_PROFILE.location &&
     profile.remote === DEFAULT_PROFILE.remote &&
     profile.seniority === DEFAULT_PROFILE.seniority &&
     profile.jobTitle === DEFAULT_PROFILE.jobTitle &&
-    profile.searchKeywords.length === 0 &&
     (profile.scoringWeights?.stack ?? 0) === DEFAULT_PROFILE.scoringWeights.stack &&
     (profile.scoringWeights?.location ?? 0) === DEFAULT_PROFILE.scoringWeights.location &&
     (profile.scoringWeights?.tjm ?? 0) === DEFAULT_PROFILE.scoringWeights.tjm &&

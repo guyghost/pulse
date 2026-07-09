@@ -82,14 +82,13 @@ const makeMission = (overrides: Partial<Mission> = {}): Mission => ({
 
 const profile: UserProfile = {
   firstName: 'Guy',
-  stack: ['Svelte', 'TypeScript'],
+  keywords: ['Svelte', 'TypeScript', 'mission svelte'],
   tjmMin: 650,
   tjmMax: 900,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Lead Frontend',
-  searchKeywords: ['mission svelte'],
 };
 
 const makeTracking = (overrides: Partial<MissionTracking> = {}): MissionTracking => ({
@@ -503,7 +502,7 @@ describe('background auto-scan notifications', () => {
     expect(saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({
         jobTitle: 'Lead Frontend Svelte',
-        stack: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
+        keywords: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
       })
     );
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({

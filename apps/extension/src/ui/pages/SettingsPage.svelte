@@ -222,7 +222,7 @@
   const profileReadyForBackup = $derived(
     settings.firstName.trim().length > 0 ||
       settings.jobTitle.trim().length > 0 ||
-      settings.profileStack.length > 0
+      settings.profileKeywords.length > 0
   );
 
   const exportStory = $derived.by(() => {
@@ -624,7 +624,7 @@
 
       <AlertBuilderCard
         preferences={alertPreferences}
-        availableStacks={settings.profileStack}
+        availableStacks={settings.profileKeywords}
         previewMissions={alertPreviewMissions}
         seenMissionIds={alertPreviewSeenIds}
         history={alertHistory}

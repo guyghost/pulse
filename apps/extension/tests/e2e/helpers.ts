@@ -255,9 +255,9 @@ export async function fillOnboardingForm(page: Page, profile: Partial<UserProfil
   if (profile.location) {
     await page.locator('#ob-location').fill(profile.location);
   }
-  if (profile.stack?.[0]) {
-    await page.locator('#ob-stack').fill(profile.stack[0]);
-    await page.locator('#ob-stack + button').click();
+  if (profile.keywords?.[0]) {
+    await page.locator('#ob-keywords').fill(profile.keywords[0]);
+    await page.locator('#ob-keywords + button').click();
   }
 }
 
@@ -269,7 +269,7 @@ export async function completeOnboarding(page: Page, profile: Partial<UserProfil
     firstName: 'Test',
     jobTitle: 'Développeur Fullstack',
     location: 'Paris',
-    stack: ['React'],
+    keywords: ['React'],
     ...profile,
   };
 

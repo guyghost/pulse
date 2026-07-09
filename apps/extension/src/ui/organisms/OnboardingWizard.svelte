@@ -49,8 +49,8 @@
   let firstName = $state('');
   let jobTitle = $state('');
   let location = $state('');
-  let stack = $state<string[]>([]);
-  let stackInput = $state('');
+  let keywords = $state<string[]>([]);
+  let keywordInput = $state('');
   let tjm = $state(600);
   let currentStep = $state<OnboardingStepId>('understand');
   let alertThreshold = $state(80);
@@ -88,18 +88,18 @@
   const currentStepIndex = $derived(onboardingSteps.findIndex((step) => step.id === currentStep));
   const currentStepDefinition = $derived(onboardingSteps[currentStepIndex] ?? onboardingSteps[0]);
 
-  function addStack() {
-    const trimmed = stackInput.trim();
-    if (trimmed && !stack.includes(trimmed)) {
-      stack = [...stack, trimmed];
-      stackInput = '';
-      onUpdateProfile?.({ stack });
+  function addKeyword() {
+    const trimmed = keywordInput.trim();
+    if (trimmed && !keywords.includes(trimmed)) {
+      keywords = [...keywords, trimmed];
+      keywordInput = '';
+      onUpdateProfile?.({ keywords });
     }
   }
 
-  function removeStack(item: string) {
-    stack = stack.filter((s) => s !== item);
-    onUpdateProfile?.({ stack });
+  function removeKeyword(item: string) {
+    keywords = keywords.filter((s) => s !== item);
+    onUpdateProfile?.({ keywords });
   }
 
   function handleComplete() {
@@ -107,12 +107,11 @@
       firstName,
       jobTitle,
       location,
-      stack,
+      keywords,
       tjmMin: tjm,
       tjmMax: tjm + 150,
       remote: 'any',
       seniority: 'senior',
-      searchKeywords: [],
     });
 
     if (result.ok && result.profile) {
@@ -122,7 +121,7 @@
   }
 
   const canSubmit = $derived(
-    firstName.trim().length > 0 && jobTitle.trim().length > 0 && stack.length > 0
+    firstName.trim().length > 0 && jobTitle.trim().length > 0 && keywords.length > 0
   );
 
   function handleSubmit() {
@@ -162,7 +161,7 @@
         enabled: true,
         scoreThreshold: alertThreshold,
         minDailyRate: tjm,
-        requiredStacks: stack,
+        requiredStacks: keywords,
         maxResults: 5,
         mutedUntil: null,
       });
@@ -375,8 +374,8 @@
     <div>
       <p class="text-sm font-semibold text-text-primary">Personnalisez vos résultats</p>
       <p class="mt-1 text-xs leading-relaxed text-text-secondary">
-        Cette étape est facultative. Ajoutez au moins votre poste et votre stack pour mieux classer
-        les missions.
+        Cette étape est facultative. Ajoutez au moins votre poste et vos mots-clés pour mieux
+        classer les missions.
       </p>
     </div>
   </div>
@@ -408,34 +407,34 @@
   </div>
 
   <div>
-    <label for="ob-stack" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
-      >Stack technique</label
+    <label for="ob-keywords" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
+      >Mots-clés</label
     >
     <div class="flex gap-2">
       <input
-        id="ob-stack"
+        id="ob-keywords"
         type="text"
         class="soft-ring flex-1 rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
-        placeholder="ex: React"
-        bind:value={stackInput}
+        placeholder="ex: React, SaaS, marketplace..."
+        bind:value={keywordInput}
         onkeydown={(e) => {
           if (e.key === 'Enter') {
-            addStack();
+            addKeyword();
           }
         }}
       />
       <button
         class="inline-flex min-h-12 items-center justify-center rounded-lg border border-border-light bg-subtle-gray px-4 text-text-secondary transition-all duration-200 hover:bg-subtle-gray hover:text-text-primary"
-        onclick={addStack}
-        aria-label="Ajouter la stack technique"
+        onclick={addKeyword}
+        aria-label="Ajouter le mot-clé"
       >
         <Icon name="plus" size={14} />
       </button>
     </div>
-    {#if stack.length > 0}
+    {#if keywords.length > 0}
       <div class="mt-3 flex flex-wrap gap-2">
-        {#each stack as tech}
-          <Chip label={tech} selected={true} onclick={() => removeStack(tech)} />
+        {#each keywords as tech}
+          <Chip label={tech} selected={true} onclick={() => removeKeyword(tech)} />
         {/each}
       </div>
     {/if}
@@ -497,10 +496,8 @@
     </div>
   {/if}
 
-  {#if firstName.trim().length > 0 && jobTitle.trim().length > 0 && stack.length === 0}
-    <p class="text-xs text-blueprint-blue">
-      Ajoutez au moins une technologie pour activer le scoring.
-    </p>
+  {#if firstName.trim().length > 0 && jobTitle.trim().length > 0 && keywords.length === 0}
+    <p class="text-xs text-blueprint-blue">Ajoutez au moins un mot-clé pour activer le scoring.</p>
   {/if}
 
   <div class="mt-2 flex flex-col gap-2">

@@ -114,28 +114,72 @@ export const MissionSerializedSchema = z.object({
 });
 // ============================================
 
+/**
+ * Normalizes legacy profile records into the unified `keywords` shape before
+ * validation. Records that still carry `stack` and/or `searchKeywords`
+ * (pre-unification schema) are merged into a single `keywords` list with
+ * case-insensitive dedup (first-seen casing wins) and trimmed to the 40-entry
+ * cap so the schema never rejects a migrated record for length. New-shape
+ * records that already have `keywords` pass through untouched (legacy fields
+ * are stripped). This makes reads resilient even before the v1→v2 data
+ * migration has run. See `models/keywords-unification.model.md`.
+ */
+const normalizeLegacyProfileInput = (data: unknown): unknown => {
+  if (!data || typeof data !== 'object') {
+    return data;
+  }
+  const record = data as Record<string, unknown>;
+  // Only touch records that carry legacy `stack`/`searchKeywords` fields.
+  // Records with neither legacy fields nor `keywords` are invalid (missing a
+  // required field) and must be rejected by the schema, not silently healed.
+  if (!('stack' in record) && !('searchKeywords' in record)) {
+    return record;
+  }
+  const { stack: legacyStackRaw, searchKeywords: legacyKeywordsRaw, ...rest } = record;
+  if ('keywords' in record) {
+    return rest;
+  }
+  const legacyStack = Array.isArray(legacyStackRaw) ? legacyStackRaw : [];
+  const legacyKeywords = Array.isArray(legacyKeywordsRaw) ? legacyKeywordsRaw : [];
+  const seen = new Set<string>();
+  const merged: string[] = [];
+  for (const entry of [...legacyStack, ...legacyKeywords]) {
+    if (typeof entry !== 'string' || entry.trim().length === 0) {
+      continue;
+    }
+    const key = entry.toLowerCase();
+    if (seen.has(key)) {
+      continue;
+    }
+    seen.add(key);
+    merged.push(entry);
+  }
+  return { ...rest, keywords: merged.slice(0, 40) };
+};
+
 export const UserProfileSchema = z
-  .object({
-    firstName: z.string().max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
-    stack: z
-      .array(z.string().min(1, 'Chaque compétence doit être non vide'))
-      .max(20, 'Maximum 20 compétences'),
-    tjmMin: z
-      .number()
-      .min(0, 'Le TJM minimum doit être positif')
-      .max(5000, 'Le TJM minimum ne doit pas dépasser 5000'),
-    tjmMax: z
-      .number()
-      .min(0, 'Le TJM maximum doit être positif')
-      .max(5000, 'Le TJM maximum ne doit pas dépasser 5000'),
-    location: z.string(),
-    remote: z.union([RemoteTypeSchema, z.literal('any')]),
-    seniority: SeniorityLevelSchema,
-    jobTitle: z.string(),
-    scoringWeights: ScoringWeightsSchema.optional(),
-    /** User-defined search keywords sent to connector APIs for server-side filtering */
-    searchKeywords: z.array(z.string()).default([]),
-  })
+  .preprocess(
+    normalizeLegacyProfileInput,
+    z.object({
+      firstName: z.string().max(50, 'Le prénom ne doit pas dépasser 50 caractères'),
+      keywords: z
+        .array(z.string().min(1, 'Chaque mot-clé doit être non vide'))
+        .max(40, 'Maximum 40 mots-clés'),
+      tjmMin: z
+        .number()
+        .min(0, 'Le TJM minimum doit être positif')
+        .max(5000, 'Le TJM minimum ne doit pas dépasser 5000'),
+      tjmMax: z
+        .number()
+        .min(0, 'Le TJM maximum doit être positif')
+        .max(5000, 'Le TJM maximum ne doit pas dépasser 5000'),
+      location: z.string(),
+      remote: z.union([RemoteTypeSchema, z.literal('any')]),
+      seniority: SeniorityLevelSchema,
+      jobTitle: z.string(),
+      scoringWeights: ScoringWeightsSchema.optional(),
+    })
+  )
   .refine((p) => p.tjmMax === 0 || p.tjmMax >= p.tjmMin, {
     message: 'Le TJM maximum doit être supérieur ou égal au TJM minimum',
     path: ['tjmMax'],

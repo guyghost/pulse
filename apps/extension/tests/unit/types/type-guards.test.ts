@@ -56,14 +56,13 @@ const makeValidMission = (overrides: Partial<Mission> = {}): Mission => ({
 
 const makeValidProfile = (overrides: Partial<UserProfile> = {}): UserProfile => ({
   firstName: 'John',
-  stack: ['TypeScript', 'React'],
+  keywords: ['TypeScript', 'React'],
   tjmMin: 500,
   tjmMax: 800,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Developer',
-  searchKeywords: [],
   ...overrides,
 });
 
@@ -154,13 +153,13 @@ describe('isUserProfile', () => {
   });
 
   it('returns false for missing required fields', () => {
-    const { stack, ...partial } = makeValidProfile();
+    const { keywords, ...partial } = makeValidProfile();
     expect(isUserProfile(partial)).toBe(false);
   });
 
-  it('returns true for profile with empty stack array', () => {
+  it('returns true for profile with empty keywords array', () => {
     const profile = makeValidProfile({
-      stack: [],
+      keywords: [],
     });
     expect(isUserProfile(profile)).toBe(true);
   });
@@ -325,11 +324,11 @@ describe('parseUserProfile', () => {
     const input = makeValidProfile();
     const result = parseUserProfile(input);
     expect(result).not.toBeNull();
-    expect(result!.stack).toEqual(['TypeScript', 'React']);
+    expect(result!.keywords).toEqual(['TypeScript', 'React']);
   });
 
   it('returns null for invalid profile', () => {
-    const input = { stack: 'not-an-array' };
+    const input = { keywords: 'not-an-array' };
     expect(parseUserProfile(input)).toBeNull();
   });
 
@@ -339,7 +338,7 @@ describe('parseUserProfile', () => {
 
   it('handles corrupted data gracefully', () => {
     const corrupted = {
-      stack: ['React'],
+      keywords: ['React'],
       seniority: 'invalid-level',
     };
     expect(parseUserProfile(corrupted)).toBeNull();

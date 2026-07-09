@@ -30,7 +30,7 @@ Mission:
 Profil:
 - Prénom: ${profile.firstName}
 - Poste: ${profile.jobTitle}
-- Stack: ${profile.stack.join(', ')}
+- Stack: ${profile.keywords.join(', ')}
 - Seniorité: ${profile.seniority}
 - TJM: ${profile.tjmMin}-${profile.tjmMax}€/jour
 

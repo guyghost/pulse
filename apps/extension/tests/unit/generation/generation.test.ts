@@ -37,14 +37,13 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
 function makeProfile(): UserProfile {
   return {
     firstName: 'Alice',
-    stack: ['Go', 'TypeScript', 'PostgreSQL', 'Docker', 'Kubernetes'],
+    keywords: ['Go', 'TypeScript', 'PostgreSQL', 'Docker', 'Kubernetes'],
     tjmMin: 600,
     tjmMax: 800,
     location: 'Paris',
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Développeur Backend Senior',
-    searchKeywords: [],
   };
 }
 

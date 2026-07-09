@@ -34,8 +34,7 @@
       remote: settings.profileRemote,
       tjmMin: settings.tjmMin,
       tjmMax: settings.tjmMax,
-      stack: settings.profileStack,
-      searchKeywords: settings.searchKeywords,
+      keywords: settings.profileKeywords,
     });
   });
 
@@ -92,10 +91,10 @@
         severity: missingProfileItems.length === 0 ? 'success' : 'attention',
       },
       {
-        label: 'Stack',
-        value: settings.profileStack.length,
+        label: 'Mots-clés',
+        value: settings.profileKeywords.length,
         icon: 'layers',
-        severity: settings.profileStack.length > 0 ? 'success' : 'incident',
+        severity: settings.profileKeywords.length > 0 ? 'success' : 'incident',
       },
     ];
 
@@ -319,9 +318,7 @@
       bind:seniority={settings.seniority}
       bind:tjmMin={settings.tjmMin}
       bind:tjmMax={settings.tjmMax}
-      bind:profileStack={settings.profileStack}
-      bind:stackInput={settings.stackInput}
-      bind:searchKeywords={settings.searchKeywords}
+      bind:profileKeywords={settings.profileKeywords}
       bind:keywordInput={settings.keywordInput}
       editing={settings.editingProfile}
       isSaving={settings.isSavingProfile}
@@ -329,8 +326,6 @@
       profileError={settings.profileError}
       onToggleEdit={() => settings.toggleProfileEditing()}
       onSave={handleSave}
-      onAddStack={() => settings.addStack()}
-      onRemoveStack={(tech) => settings.removeStack(tech)}
       onAddKeyword={() => settings.addKeyword()}
       onRemoveKeyword={(keyword) => settings.removeKeyword(keyword)}
     />

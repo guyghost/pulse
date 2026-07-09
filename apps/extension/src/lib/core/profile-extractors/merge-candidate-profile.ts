@@ -9,12 +9,12 @@ import type { CanonicalCandidateProfileDraft } from './types';
  * Merge semantics:
  * - jobTitle ← draft.title (overwrite — importing LinkedIn is an explicit
  *   "use as reference" action).
- * - stack ← union of the current stack and the draft's skills, deduplicated
+ * - keywords ← union of the current keywords and the draft's skills, deduplicated
  *   case-insensitively while keeping the first-seen display casing.
  * - location ← the current location when it is non-empty; otherwise the first
  *   experience that carries a non-empty location; otherwise ''.
- * - All other fields (firstName, tjmMin/Max, remote, seniority, searchKeywords,
- *   scoringWeights) are carried over from the current profile via defaults.
+ * - All other fields (firstName, tjmMin/Max, remote, seniority, scoringWeights)
+ *   are carried over from the current profile via defaults.
  *
  * STRICTLY PURE: no Date, no async, no I/O, no side effects, no chrome.*.
  */
@@ -24,9 +24,9 @@ export function mergeCandidateProfileIntoUserProfile(
 ): UserProfile {
   const base = withProfileDefaults({ ...current });
 
-  const stack = draft.skills.reduce<string[]>(
+  const keywords = draft.skills.reduce<string[]>(
     (acc, skill) => appendUniqueNormalized(acc, skill.skill),
-    [...(current?.stack ?? [])]
+    [...(current?.keywords ?? [])]
   );
 
   const currentLocation = current?.location ?? '';
@@ -40,7 +40,7 @@ export function mergeCandidateProfileIntoUserProfile(
   return {
     ...base,
     jobTitle: draft.title,
-    stack,
+    keywords,
     location,
   };
 }
