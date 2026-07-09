@@ -43,3 +43,15 @@ export function shouldPremiumGate(featureActive: boolean, isPremium: boolean): b
 export function canAccessPremium(featureActive: boolean, isPremium: boolean): boolean {
   return !shouldPremiumGate(featureActive, isPremium);
 }
+
+/**
+ * Coerces an untyped stored value into a valid feature-flag boolean.
+ *
+ * Storage (`chrome.storage.local` / localStorage / JSON) is untyped and may
+ * hold non-boolean values such as the string `'false'`, which is truthy and
+ * would otherwise incorrectly activate gating. Only a strict boolean is
+ * trusted; anything else falls back to {@link PREMIUM_FEATURE_ENABLED}.
+ */
+export function resolvePremiumFeatureFlag(stored: unknown): boolean {
+  return typeof stored === 'boolean' ? stored : PREMIUM_FEATURE_ENABLED;
+}

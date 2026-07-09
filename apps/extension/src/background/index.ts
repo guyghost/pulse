@@ -17,7 +17,7 @@ import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
 import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
-import { PREMIUM_FEATURE_ENABLED, shouldPremiumGate } from '../lib/core/features/flags';
+import { resolvePremiumFeatureFlag, shouldPremiumGate } from '../lib/core/features/flags';
 import {
   DEFAULT_SETTINGS,
   getFeedSavedViews,
@@ -1182,7 +1182,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             'premium_enabled',
             'premium_feature_enabled',
           ]);
-          const featureActive = premium_feature_enabled ?? PREMIUM_FEATURE_ENABLED;
+          const featureActive = resolvePremiumFeatureFlag(premium_feature_enabled);
           if (shouldPremiumGate(featureActive, premium_enabled === true)) {
             sendResponse({
               type: 'GENERATION_RESULT',

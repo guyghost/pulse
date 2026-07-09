@@ -16,7 +16,7 @@ import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extracto
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
-import { PREMIUM_FEATURE_ENABLED, shouldPremiumGate } from '$lib/core/features/flags';
+import { resolvePremiumFeatureFlag, shouldPremiumGate } from '$lib/core/features/flags';
 import {
   DEV_PREMIUM_FEATURE_STORAGE_KEY,
   DEV_PREMIUM_ENABLED_STORAGE_KEY,
@@ -635,9 +635,7 @@ function createChromeStubs() {
             // is honoured so the "active + free" DevPanel scenario produces
             // PREMIUM_REQUIRED just like production. When dormant (flag off),
             // generation is always allowed. See models/premium-feature-flag.model.md.
-            const featureActive = Boolean(
-              storage.premium_feature_enabled ?? PREMIUM_FEATURE_ENABLED
-            );
+            const featureActive = resolvePremiumFeatureFlag(storage.premium_feature_enabled);
             if (shouldPremiumGate(featureActive, storage.premium_enabled === true)) {
               return {
                 type: 'GENERATION_RESULT',
