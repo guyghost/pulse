@@ -4,6 +4,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { CanonicalCandidateProfileDraft } from '../../../src/lib/core/profile-extractors/types';
 import {
+  ensureLinkedInHostPermission,
   importLinkedInProfile,
   previewLinkedInProfile,
   syncLinkedInProfileImport,
@@ -73,5 +74,48 @@ describe('profile-sync facade — graceful handling of null/unknown bridge respo
       comparisons: [],
       summary: { matches: 0, mismatches: 0, missing: 0 },
     });
+  });
+});
+
+describe('profile-sync facade — ensureLinkedInHostPermission (side-panel permission gate)', () => {
+  const linkedinOrigin = { origins: ['https://www.linkedin.com/*'] };
+
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  it('returns true without requesting when the LinkedIn origin is already granted', async () => {
+    const contains = vi.fn(async () => true);
+    const request = vi.fn(async () => true);
+    vi.stubGlobal('chrome', { permissions: { contains, request } });
+
+    await expect(ensureLinkedInHostPermission()).resolves.toBe(true);
+    expect(contains).toHaveBeenCalledWith(linkedinOrigin);
+    expect(request).not.toHaveBeenCalled();
+  });
+
+  it('requests the LinkedIn origin when not yet granted and returns true on accept', async () => {
+    const contains = vi.fn(async () => false);
+    const request = vi.fn(async () => true);
+    vi.stubGlobal('chrome', { permissions: { contains, request } });
+
+    await expect(ensureLinkedInHostPermission()).resolves.toBe(true);
+    expect(contains).toHaveBeenCalledWith(linkedinOrigin);
+    expect(request).toHaveBeenCalledWith(linkedinOrigin);
+  });
+
+  it('returns false when the user denies the LinkedIn origin prompt', async () => {
+    const contains = vi.fn(async () => false);
+    const request = vi.fn(async () => false);
+    vi.stubGlobal('chrome', { permissions: { contains, request } });
+
+    await expect(ensureLinkedInHostPermission()).resolves.toBe(false);
+    expect(request).toHaveBeenCalledWith(linkedinOrigin);
+  });
+
+  it('returns false when chrome.permissions is unavailable (e.g. service-worker context)', async () => {
+    vi.stubGlobal('chrome', { runtime: {} });
+
+    await expect(ensureLinkedInHostPermission()).resolves.toBe(false);
   });
 });

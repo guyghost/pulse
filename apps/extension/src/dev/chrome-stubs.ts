@@ -750,6 +750,13 @@ function createChromeStubs() {
     cookies: {
       getAll: async () => [{ name: 'session', value: 'mock-session' }],
     },
+    permissions: {
+      // Dev stub: pretend the optional LinkedIn host permission is always
+      // granted so the side-panel permission gate (ensureLinkedInHostPermission)
+      // passes in dev mode and e2e without a real Chrome prompt.
+      contains: async () => true,
+      request: async () => true,
+    },
     sidePanel: {
       setPanelBehavior: () => {},
     },
