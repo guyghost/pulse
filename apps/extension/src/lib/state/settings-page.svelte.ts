@@ -389,6 +389,7 @@ export class SettingsPageController {
         remote: this.profileRemote,
         seniority: this.seniority,
         scoringWeights: current?.scoringWeights,
+        experiences: current?.experiences,
       });
 
       if (!normalized.ok || !normalized.profile) {

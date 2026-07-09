@@ -16,6 +16,7 @@ const profile: UserProfile = {
   seniority: 'senior',
   jobTitle: 'Architecte frontend',
   scoringWeights: { stack: 40, location: 20, tjm: 25, remote: 15 },
+  experiences: [],
 };
 
 describe('connected candidate profile cache', () => {

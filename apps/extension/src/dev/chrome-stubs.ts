@@ -399,7 +399,7 @@ function createChromeStubs() {
           case 'SYNC_LINKEDIN_PROFILE_IMPORT': {
             const draft = (message.payload as { profile: CanonicalCandidateProfileDraft }).profile;
             const current = readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile);
-            const merged = mergeCandidateProfileIntoUserProfile(current, draft);
+            const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
             writeDevStorage(DEV_PROFILE_STORAGE_KEY, merged);
             storage.profile = merged;
             emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: merged });

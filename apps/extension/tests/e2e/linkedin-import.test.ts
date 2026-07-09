@@ -71,13 +71,13 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
           }
 
           chromeApi.runtime.sendMessage = async (message) => {
-            if (message.type === 'PREVIEW_LINKEDIN_PROFILE') {
+            if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
               if (bridgeMode !== 'success') {
                 const error = previewErrors[bridgeMode];
                 return {
-                  type: 'LINKEDIN_PROFILE_PREVIEWED',
+                  type: 'LINKEDIN_PROFILE_IMPORTED',
                   payload: {
-                    extracted: false,
+                    imported: false,
                     errorCode: error.errorCode,
                     errorMessage: error.errorMessage,
                   },
@@ -85,8 +85,8 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
               }
 
               return {
-                type: 'LINKEDIN_PROFILE_PREVIEWED',
-                payload: { extracted: true, profile },
+                type: 'LINKEDIN_PROFILE_IMPORTED',
+                payload: { imported: true, profile },
               };
             }
 
@@ -112,57 +112,39 @@ async function openCvPage(page: Page) {
   await expect(nav).toBeVisible();
   await expect(nav.getByRole('button', { name: 'CV' })).toBeVisible();
   await nav.getByRole('button', { name: 'CV' }).click();
-  // The CV hero heading drifted to "Préparer le même profil partout".
-  await expect(
-    page.getByRole('heading', { name: 'Préparer le même profil partout' })
-  ).toBeVisible();
+  // The CV page was redesigned in PR #198 with a new heading.
+  await expect(page.getByRole('heading', { name: 'CV & expériences' })).toBeVisible();
 }
 
 test.describe('LinkedIn profile import flow', () => {
-  test('previews a LinkedIn profile before saving it as the canonical source', async ({ page }) => {
+  test('imports LinkedIn profile and syncs experiences', async ({ page }) => {
     await mockAuthenticatedLinkedInBridge(page, 'success');
     await openCvPage(page);
 
-    await page.getByRole('button', { name: 'Prévisualiser LinkedIn' }).click();
+    // The new CV page has a direct "Importer LinkedIn" button
+    await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Preview LinkedIn' })).toBeVisible();
-    await expect(page.getByText('Consultant Svelte senior')).toBeVisible();
-    await expect(page.getByText('Architecture Svelte, TypeScript')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Enregistrer comme source' })).toBeVisible();
-
-    await page.getByRole('button', { name: 'Enregistrer comme source' }).click();
-
-    await expect(page.getByRole('heading', { name: 'Import LinkedIn' })).toBeVisible();
-    await expect(
-      page.getByText('Profil LinkedIn enregistré comme profil de référence.')
-    ).toBeVisible();
+    // After successful import, a success toast appears
+    await expect(page.getByText('Expériences LinkedIn importées avec succès.')).toBeVisible();
   });
 
-  test('shows typed LinkedIn preview errors without saving the source', async ({ page }) => {
+  test('shows typed LinkedIn import errors in toast', async ({ page }) => {
     await mockAuthenticatedLinkedInBridge(page, 'session-required');
     await openCvPage(page);
 
-    await page.getByRole('button', { name: 'Prévisualiser LinkedIn' }).click();
+    await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Preview LinkedIn' })).toBeVisible();
-    await expect(page.getByText('session_required: Session LinkedIn requise.')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Enregistrer comme source' })).not.toBeVisible();
+    // Error messages now appear as toast notifications
+    await expect(page.getByText('Session LinkedIn requise.')).toBeVisible();
   });
 
-  test('shows recovery guidance for missing LinkedIn permissions', async ({ page }) => {
+  test('shows recovery guidance for missing LinkedIn permissions in toast', async ({ page }) => {
     await mockAuthenticatedLinkedInBridge(page, 'permission-required');
     await openCvPage(page);
 
-    await page.getByRole('button', { name: 'Prévisualiser LinkedIn' }).click();
+    await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
 
-    await expect(page.getByRole('heading', { name: 'Preview LinkedIn' })).toBeVisible();
-    await expect(
-      page.getByText('permission_required: Autorisation LinkedIn refusée.')
-    ).toBeVisible();
-    await expect(
-      // The hint uses a typographic apostrophe (l'aperçu); match the unique apostrophe-free portion.
-      page.getByText(/Autorisez l.+accès LinkedIn dans Chrome, puis relancez/)
-    ).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Enregistrer comme source' })).not.toBeVisible();
+    // Permission errors appear as toast notifications
+    await expect(page.getByText('Autorisation LinkedIn refusée.')).toBeVisible();
   });
 });

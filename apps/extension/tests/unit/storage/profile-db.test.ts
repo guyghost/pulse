@@ -12,6 +12,7 @@ const profile: UserProfile = {
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Architecte Svelte',
+  experiences: [],
 };
 
 describe('profile IndexedDB store', () => {

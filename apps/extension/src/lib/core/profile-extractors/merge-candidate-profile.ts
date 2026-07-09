@@ -1,5 +1,6 @@
 import type { UserProfile } from '../types/profile';
 import { appendUniqueNormalized, withProfileDefaults } from '../profile/normalize-profile';
+import { mergeExperiences } from '../cv/experience-helpers';
 import type { CanonicalCandidateProfileDraft } from './types';
 
 /**
@@ -13,14 +14,20 @@ import type { CanonicalCandidateProfileDraft } from './types';
  *   case-insensitively while keeping the first-seen display casing.
  * - location ← the current location when it is non-empty; otherwise the first
  *   experience that carries a non-empty location; otherwise ''.
+ * - experiences ← {@link mergeExperiences} of the current experiences with the
+ *   draft's experiences. Dedup by (company, title, startDate); manual entries
+ *   are preserved, skills are unioned, positionIndex is recomputed.
  * - All other fields (firstName, tjmMin/Max, remote, seniority, scoringWeights)
  *   are carried over from the current profile via defaults.
  *
  * STRICTLY PURE: no Date, no async, no I/O, no side effects, no chrome.*.
+ * The `now` timestamp is injected by the caller so merge results are deterministic
+ * under test.
  */
 export function mergeCandidateProfileIntoUserProfile(
   current: UserProfile | null,
-  draft: CanonicalCandidateProfileDraft
+  draft: CanonicalCandidateProfileDraft,
+  now: number
 ): UserProfile {
   const base = withProfileDefaults({ ...current });
 
@@ -37,10 +44,13 @@ export function mergeCandidateProfileIntoUserProfile(
     })?.location ?? '';
   const location = currentLocation.trim().length > 0 ? currentLocation : draftLocation;
 
+  const experiences = mergeExperiences(current?.experiences ?? [], draft.experiences, now);
+
   return {
     ...base,
     jobTitle: draft.title,
     keywords,
     location,
+    experiences,
   };
 }

@@ -174,12 +174,12 @@ describe('validateMessage — SAVE_PROFILE', () => {
     expect(r.valid).toBe(true);
   });
 
-  it('rejette un payload dépassant 10 Ko', () => {
-    const huge = { type: 'SAVE_PROFILE', payload: { bio: 'x'.repeat(11_000) } };
+  it('rejette un payload dépassant 80 Ko', () => {
+    const huge = { type: 'SAVE_PROFILE', payload: { bio: 'x'.repeat(81_000) } };
     const r = validateMessage(huge);
     expect(r.valid).toBe(false);
     if (!r.valid) {
-      expect(r.errors.some((e) => e.includes('10KB'))).toBe(true);
+      expect(r.errors.some((e) => e.includes('80KB'))).toBe(true);
     }
   });
 });

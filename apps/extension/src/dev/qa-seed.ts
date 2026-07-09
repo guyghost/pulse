@@ -417,6 +417,39 @@ function buildCompleteProfile(): UserProfile {
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Développeur Fullstack',
+    experiences: [
+      {
+        id: 'exp-seed-1',
+        title: 'Lead Frontend',
+        company: 'Fintech Scale-up',
+        location: 'Paris',
+        startDate: '2023-03',
+        endDate: null,
+        isCurrent: true,
+        description:
+          'Refonte de la plateforme client en Svelte 5 et mise en place du design system.',
+        skills: ['Svelte', 'TypeScript', 'Vite', 'TailwindCSS'],
+        source: 'manual',
+        sourceExternalId: null,
+        positionIndex: 0,
+        updatedAt: 1710000000000,
+      },
+      {
+        id: 'exp-seed-2',
+        title: 'Développeur Fullstack',
+        company: 'Agence Web Lyon',
+        location: 'Lyon',
+        startDate: '2020-09',
+        endDate: '2023-02',
+        isCurrent: false,
+        description: 'Dashboards SaaS pour des clients B2B, API Node.js + React.',
+        skills: ['React', 'Node.js', 'PostgreSQL', 'Docker'],
+        source: 'linkedin',
+        sourceExternalId: 'li-123',
+        positionIndex: 1,
+        updatedAt: 1710000000000,
+      },
+    ],
   };
 }
 
@@ -430,6 +463,7 @@ function buildIncompleteProfile(): UserProfile {
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: '',
+    experiences: [],
   };
 }
 

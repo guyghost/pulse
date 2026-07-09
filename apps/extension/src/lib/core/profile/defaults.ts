@@ -19,6 +19,7 @@ const DEFAULT_PROFILE = {
   remote: 'any',
   seniority: 'senior',
   jobTitle: '',
+  experiences: [],
   scoringWeights: {
     stack: 0,
     location: 10,
@@ -35,6 +36,7 @@ export function createDefaultProfile(): UserProfile {
   return {
     ...DEFAULT_PROFILE,
     keywords: [...DEFAULT_PROFILE.keywords],
+    experiences: [],
     scoringWeights: { ...DEFAULT_PROFILE.scoringWeights },
   };
 }
@@ -49,6 +51,7 @@ export function isDefaultProfile(profile: UserProfile): boolean {
     profile.remote === DEFAULT_PROFILE.remote &&
     profile.seniority === DEFAULT_PROFILE.seniority &&
     profile.jobTitle === DEFAULT_PROFILE.jobTitle &&
+    (profile.experiences ?? []).length === 0 &&
     (profile.scoringWeights?.stack ?? 0) === DEFAULT_PROFILE.scoringWeights.stack &&
     (profile.scoringWeights?.location ?? 0) === DEFAULT_PROFILE.scoringWeights.location &&
     (profile.scoringWeights?.tjm ?? 0) === DEFAULT_PROFILE.scoringWeights.tjm &&

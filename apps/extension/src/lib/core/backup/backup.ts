@@ -66,10 +66,14 @@ export function createBackup(
   hidden: Record<string, number>,
   timestamp: number
 ): BackupData {
+  const normalizedProfile: UserProfile = {
+    ...profile,
+    experiences: profile.experiences ?? [],
+  };
   return {
     version: CURRENT_BACKUP_VERSION,
     timestamp,
-    profile,
+    profile: normalizedProfile,
     settings,
     favorites,
     hidden,
