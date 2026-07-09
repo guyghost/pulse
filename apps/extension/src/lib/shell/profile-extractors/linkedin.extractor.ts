@@ -75,9 +75,15 @@ function classifyLinkedInUrl(url: string): ProfileExtractorErrorCode | null {
   }
 }
 
-function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
+export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   const clean = (value: string | null | undefined): string =>
     (value ?? '').replace(/\s+/g, ' ').trim();
+  // Specific, non-greedy: the bare words "challenge"/"checkpoint" are NOT block
+  // signals — they appear in legitimate profile prose ("I enjoy new challenges")
+  // and previously caused false `rate_limited_or_blocked` errors. Only
+  // challenge-page phrases qualify, and only when no profile sections are
+  // present (see the `hasProfileSections` guard below).
+  // See src/models/linkedin-import.model.md.
   const blockedReasonFromText = (value: string): string | null => {
     const text = value.toLowerCase();
     if (text.includes('security verification')) {
@@ -89,11 +95,11 @@ function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
     if (text.includes('verify your identity')) {
       return 'identity verification required';
     }
+    if (text.includes('security check')) {
+      return 'security check required';
+    }
     if (text.includes('temporarily restricted')) {
       return 'temporarily restricted session';
-    }
-    if (text.includes('checkpoint') || text.includes('challenge')) {
-      return 'linkedin checkpoint challenge';
     }
 
     return null;
@@ -146,11 +152,12 @@ function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   const about = sectionByHeading(['about', 'infos', 'à propos']);
   const experience = sectionByHeading(['experience', 'expérience']);
   const education = sectionByHeading(['education', 'formation']);
-  const blockedReason = blockedReasonFromText(clean(document.body?.innerText));
   const headline =
     text('.pv-text-details__left-panel .text-body-medium') ||
     text('[data-generated-suggestion-target]') ||
     text('main h1');
+  const experiences = sectionItems(experience).map(parseExperience);
+  const educationItems = sectionItems(education).map(parseEducation);
   const summary = about
     ? clean((about as HTMLElement).innerText).replace(/^about|^à propos/i, '')
     : '';
@@ -162,17 +169,27 @@ function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
     }))
     .filter((link) => link.url.includes('linkedin.com') || !link.url.includes('/feed/'));
 
+  // Defensive guard: text-based block signals are authoritative only when the
+  // page has no parseable profile sections. A real profile that mentions
+  // "challenge" or "unusual activity" in its bio must NOT be treated as a
+  // checkpoint interstitial. `innerText` is preferred (layout-aware, ignores
+  // <script>/<style>); `textContent` is a fallback for undrawn/jsdom contexts.
+  const hasProfileSections =
+    Boolean(headline) || experiences.length > 0 || educationItems.length > 0;
+  const bodyText = clean(document.body?.innerText || document.body?.textContent || '');
+  const blockedReason = hasProfileSections ? null : blockedReasonFromText(bodyText);
+
   return {
     profileUrl: window.location.href,
     ...(blockedReason ? { blockedReason } : {}),
     sections: {
       headline,
       summary: clean(summary),
-      experiences: sectionItems(experience).map(parseExperience),
+      experiences,
       skills: allTexts('span[aria-hidden="true"], .pvs-list__item--with-top-padding')
         .filter((value) => value.length <= 80)
         .slice(0, 80),
-      education: sectionItems(education).map(parseEducation),
+      education: educationItems,
       links,
     },
   };
