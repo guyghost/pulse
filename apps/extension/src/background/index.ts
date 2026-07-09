@@ -17,6 +17,7 @@ import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
 import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
+import { PREMIUM_FEATURE_ENABLED, shouldPremiumGate } from '../lib/core/features/flags';
 import {
   DEFAULT_SETTINGS,
   getFeedSavedViews,
@@ -1171,10 +1172,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       // Kit generation is a premium-gated feature. The on-device Gemini Nano
       // generator (shell/ai/mission-generator) is loaded lazily so the service
       // worker does not pay the AI module cost until a generation is requested.
+      //
+      // The premium feature flag deactivates the entire premium system: when
+      // dormant (flag off), the gate is skipped and generation is always
+      // allowed. See models/premium-feature-flag.model.md.
       (async () => {
         try {
-          const { premium_enabled } = await chrome.storage.local.get('premium_enabled');
-          if (premium_enabled !== true) {
+          const { premium_enabled, premium_feature_enabled } = await chrome.storage.local.get([
+            'premium_enabled',
+            'premium_feature_enabled',
+          ]);
+          const featureActive = premium_feature_enabled ?? PREMIUM_FEATURE_ENABLED;
+          if (shouldPremiumGate(featureActive, premium_enabled === true)) {
             sendResponse({
               type: 'GENERATION_RESULT',
               payload: { asset: null, error: 'PREMIUM_REQUIRED' },

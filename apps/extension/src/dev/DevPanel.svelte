@@ -3,6 +3,10 @@
   import type { LogEntry } from './bridge-logger';
   import { metricsCollector } from '../lib/shell/metrics';
   import { applyQaSeedToLocalStorage } from './qa-seed';
+  import {
+    DEV_PREMIUM_FEATURE_STORAGE_KEY,
+    DEV_PREMIUM_ENABLED_STORAGE_KEY,
+  } from '$lib/state/features.svelte';
 
   const {
     onInjectMissions,
@@ -114,6 +118,38 @@
 
   function handleInjectQaSeed() {
     applyQaSeedToLocalStorage();
+    window.location.reload();
+  }
+
+  type PremiumScenario = 'dormant' | 'active-premium' | 'active-free';
+
+  const premiumScenario: PremiumScenario = (() => {
+    try {
+      const feat = window.localStorage.getItem(DEV_PREMIUM_FEATURE_STORAGE_KEY);
+      if (feat !== 'true') {
+        return 'dormant';
+      }
+      const enabled = window.localStorage.getItem(DEV_PREMIUM_ENABLED_STORAGE_KEY);
+      return enabled === 'false' ? 'active-free' : 'active-premium';
+    } catch {
+      return 'dormant';
+    }
+  })();
+
+  function applyPremiumScenario(scenario: PremiumScenario): void {
+    try {
+      if (scenario === 'dormant') {
+        window.localStorage.setItem(DEV_PREMIUM_FEATURE_STORAGE_KEY, 'false');
+      } else {
+        window.localStorage.setItem(DEV_PREMIUM_FEATURE_STORAGE_KEY, 'true');
+        window.localStorage.setItem(
+          DEV_PREMIUM_ENABLED_STORAGE_KEY,
+          scenario === 'active-premium' ? 'true' : 'false'
+        );
+      }
+    } catch {
+      // localStorage unavailable — ignore, reload still applies in-memory defaults
+    }
     window.location.reload();
   }
 </script>
@@ -264,6 +300,53 @@
         </div>
         <p class="mt-1 text-[10px] text-text-subtle">
           Écrit missions, profil, favoris, vues, alertes, suivi candidatures et santé connecteurs.
+        </p>
+      </div>
+
+      <div>
+        <div class="flex items-center justify-between gap-2">
+          <span class="text-[10px] uppercase font-bold text-text-secondary tracking-wider"
+            >Premium</span
+          >
+          <span class="text-[10px] text-text-muted">Scénario : {premiumScenario}</span>
+        </div>
+        <div class="grid grid-cols-3 gap-1 mt-1">
+          <button
+            class="rounded-lg border px-2 py-1.5 text-left text-[11px] transition-colors {premiumScenario ===
+            'dormant'
+              ? 'border-blueprint-blue/40 bg-blueprint-blue/12 text-blueprint-blue'
+              : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray'}"
+            onclick={() => applyPremiumScenario('dormant')}
+            title="Feature dormant : tout déverrouillé, pas de paywall (défaut prod)"
+          >
+            <span class="block font-mono font-semibold">Dormant</span>
+            <span class="block text-[9px] text-text-muted">Tout ouvert</span>
+          </button>
+          <button
+            class="rounded-lg border px-2 py-1.5 text-left text-[11px] transition-colors {premiumScenario ===
+            'active-premium'
+              ? 'border-blueprint-blue/40 bg-blueprint-blue/12 text-blueprint-blue'
+              : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray'}"
+            onclick={() => applyPremiumScenario('active-premium')}
+            title="Feature active + utilisateur premium : gating live, tout déverrouillé"
+          >
+            <span class="block font-mono font-semibold">Active · Premium</span>
+            <span class="block text-[9px] text-text-muted">Gating live</span>
+          </button>
+          <button
+            class="rounded-lg border px-2 py-1.5 text-left text-[11px] transition-colors {premiumScenario ===
+            'active-free'
+              ? 'border-status-red/40 bg-status-red/12 text-status-red'
+              : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray'}"
+            onclick={() => applyPremiumScenario('active-free')}
+            title="Feature active + utilisateur gratuit : locks + PREMIUM_REQUIRED"
+          >
+            <span class="block font-mono font-semibold">Active · Gratuit</span>
+            <span class="block text-[9px] text-text-muted">Paywall visible</span>
+          </button>
+        </div>
+        <p class="mt-1 text-[10px] text-text-subtle">
+          Bascule le flag premium et recharge. Dormant = défaut production.
         </p>
       </div>
 

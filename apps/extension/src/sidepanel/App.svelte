@@ -12,6 +12,8 @@
   import { createAppNavigation, NAV_ITEMS, type Page } from '$lib/state/app-navigation.svelte';
   import { createThemeStore } from '$lib/state/theme.svelte';
   import { premium } from '$lib/state/premium.svelte';
+  import { features } from '$lib/state/features.svelte';
+  import { canAccessPremium } from '$lib/core/features/flags';
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
 
   const nav = createAppNavigation();
@@ -123,8 +125,14 @@
 
   const visibleNavItems = NAV_ITEMS;
   const denseNav = $derived(visibleNavItems.length > 4);
+  // Premium access combines the feature flag with the user's premium status.
+  // When the feature is dormant (flag off), access is always granted and no
+  // surface is gated. See models/premium-feature-flag.model.md.
+  const premiumAccessible = $derived(
+    canAccessPremium(features.premiumFeatureActive, premium.isPremium)
+  );
   const lockedPremiumPage = $derived(
-    premium.isPremium ? null : (PREMIUM_LOCKS[nav.currentPage] ?? null)
+    premiumAccessible ? null : (PREMIUM_LOCKS[nav.currentPage] ?? null)
   );
   let initialPageLoadScheduled = $state(false);
   let secondaryPagesPreloaded = $state(false);
@@ -158,7 +166,7 @@
   });
 
   $effect(() => {
-    if (nav.bootStatus !== 'ready' || !premium.isPremium || premiumPagesPreloaded) {
+    if (nav.bootStatus !== 'ready' || !premiumAccessible || premiumPagesPreloaded) {
       return;
     }
 
@@ -171,7 +179,7 @@
   });
 
   function isPremiumLocked(page: Page): boolean {
-    return !premium.isPremium && page in PREMIUM_LOCKS;
+    return !premiumAccessible && page in PREMIUM_LOCKS;
   }
 
   // Initialize theme on mount
@@ -494,7 +502,7 @@
           </div>
         </div>
       {/if}
-      {#if TJMPage && premium.isPremium}
+      {#if TJMPage && premiumAccessible}
         <div
           data-testid="page-tjm"
           class="absolute inset-0 overflow-y-auto"
@@ -565,7 +573,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if CvPage && premium.isPremium}
+      {#if CvPage && premiumAccessible}
         <div
           data-testid="page-cv"
           class="absolute inset-0 overflow-y-auto"
@@ -599,7 +607,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if ApplicationsPage && premium.isPremium}
+      {#if ApplicationsPage && premiumAccessible}
         <div
           data-testid="page-applications"
           class="absolute inset-0 overflow-y-auto"
