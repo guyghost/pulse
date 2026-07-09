@@ -185,16 +185,33 @@ jobs:
           path: apps/extension/missionpulse-${{ steps.version.outputs.version }}.zip
           retention-days: 30
 
+  check-cws-secrets:
+    name: Check CWS secrets
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - name: Check Chrome Web Store secrets
+        id: check
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+        run: |
+          if [ -n "$CHROME_EXTENSION_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
   publish-to-chrome-store:
     name: Publish to Chrome Web Store
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: build-and-release
+    needs: [build-and-release, check-cws-secrets]
     if: >-
       ${{
         !contains(needs.build-and-release.outputs.version, '-') &&
         !inputs.dry_run &&
-        secrets.CHROME_EXTENSION_ID != ''
+        needs.check-cws-secrets.outputs.configured == 'true'
       }}
 
     steps:
