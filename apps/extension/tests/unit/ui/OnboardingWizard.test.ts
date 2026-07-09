@@ -154,11 +154,9 @@ describe('OnboardingWizard', () => {
     target.querySelector('#ob-firstname')?.dispatchEvent(new Event('input', { bubbles: true }));
     (target.querySelector('#ob-jobtitle') as HTMLInputElement).value = ' Dev React Senior ';
     target.querySelector('#ob-jobtitle')?.dispatchEvent(new Event('input', { bubbles: true }));
-    (target.querySelector('#ob-stack') as HTMLInputElement).value = 'React';
-    target.querySelector('#ob-stack')?.dispatchEvent(new Event('input', { bubbles: true }));
-    (
-      target.querySelector('button[aria-label="Ajouter la stack technique"]') as HTMLButtonElement
-    ).click();
+    (target.querySelector('#ob-keywords') as HTMLInputElement).value = 'React';
+    target.querySelector('#ob-keywords')?.dispatchEvent(new Event('input', { bubbles: true }));
+    (target.querySelector('button[aria-label="Ajouter le mot-clé"]') as HTMLButtonElement).click();
     (target.querySelector('#ob-location') as HTMLInputElement).value = ' Paris ';
     target.querySelector('#ob-location')?.dispatchEvent(new Event('input', { bubbles: true }));
     await tick();
@@ -171,7 +169,7 @@ describe('OnboardingWizard', () => {
         firstName: 'Guy',
         jobTitle: 'Dev React Senior',
         location: 'Paris',
-        stack: ['React'],
+        keywords: ['React'],
         tjmMin: 600,
         tjmMax: 750,
       })
@@ -181,22 +179,20 @@ describe('OnboardingWizard', () => {
   // B-1: incremental stack edits must signal onUpdateProfile so the hosting
   // page can propagate them (previously the wizard emitted the callback but
   // OnboardingPage never wired it, so every call was a no-op).
-  it('emits incremental profile updates when stack chips change', async () => {
+  it('emits incremental profile updates when keyword chips change', async () => {
     const onUpdateProfile = vi.fn();
     const target = mountWizard({ onUpdateProfile });
     await tick();
 
-    const stackInput = target.querySelector('#ob-stack') as HTMLInputElement;
-    stackInput.value = 'React';
-    stackInput.dispatchEvent(new Event('input', { bubbles: true }));
-    (
-      target.querySelector('button[aria-label="Ajouter la stack technique"]') as HTMLButtonElement
-    ).click();
+    const keywordInput = target.querySelector('#ob-keywords') as HTMLInputElement;
+    keywordInput.value = 'React';
+    keywordInput.dispatchEvent(new Event('input', { bubbles: true }));
+    (target.querySelector('button[aria-label="Ajouter le mot-clé"]') as HTMLButtonElement).click();
     await tick();
 
-    expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({ stack: ['React'] }));
+    expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({ keywords: ['React'] }));
 
-    // Removing a chip also propagates the updated stack.
+    // Removing a chip also propagates the updated keywords.
     onUpdateProfile.mockClear();
     (
       [...target.querySelectorAll('button')].find((b) =>
@@ -205,6 +201,6 @@ describe('OnboardingWizard', () => {
     ).click();
     await tick();
 
-    expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({ stack: [] }));
+    expect(onUpdateProfile).toHaveBeenCalledWith(expect.objectContaining({ keywords: [] }));
   });
 });

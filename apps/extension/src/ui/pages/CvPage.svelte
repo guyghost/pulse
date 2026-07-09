@@ -72,7 +72,7 @@
   let linkedInImportResult = $state<LinkedInProfileImportResult | null>(null);
   let verificationResults = $state<Map<string, VerifyProfileResult>>(new Map());
   let selectedFieldIds = $state<Set<string>>(
-    new Set(['title', 'summary', 'stack', 'location', 'remote', 'tjm'])
+    new Set(['title', 'summary', 'keywords', 'location', 'remote', 'tjm'])
   );
 
   const platforms: ProfilePlatform[] = [
@@ -111,13 +111,7 @@
       id: 'summary',
       label: 'Résumé',
       value: buildSummary(profile),
-      quality: profile?.jobTitle && profile.stack.length > 0 ? 'ready' : 'missing',
-    },
-    {
-      id: 'stack',
-      label: 'Stack',
-      value: profile?.stack.join(', ') ?? '',
-      quality: profile && profile.stack.length > 0 ? 'ready' : 'missing',
+      quality: profile?.jobTitle && profile.keywords.length > 0 ? 'ready' : 'missing',
     },
     {
       id: 'location',
@@ -143,8 +137,8 @@
     {
       id: 'keywords',
       label: 'Mots-clés',
-      value: profile?.searchKeywords.join(', ') ?? '',
-      quality: profile && profile.searchKeywords.length > 0 ? 'ready' : 'missing',
+      value: profile?.keywords.join(', ') ?? '',
+      quality: profile && profile.keywords.length > 0 ? 'ready' : 'missing',
     },
   ]);
 
@@ -294,12 +288,12 @@
       return '';
     }
 
-    const stack = value.stack.slice(0, 5).join(', ');
+    const keywords = value.keywords.slice(0, 5).join(', ');
     const seniority = value.seniority === 'senior' ? 'senior' : value.seniority;
     const title = value.jobTitle || 'Freelance';
     const location = value.location ? ` basé à ${value.location}` : '';
 
-    return `${title} ${seniority}${location}. Stack principale: ${stack || 'à compléter'}. TJM cible: ${value.tjmMin}-${value.tjmMax} EUR/j.`;
+    return `${title} ${seniority}${location}. Mots-clés: ${keywords || 'à compléter'}. TJM cible: ${value.tjmMin}-${value.tjmMax} EUR/j.`;
   }
 
   function formatRemote(value: UserProfile['remote']): string {

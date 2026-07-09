@@ -127,9 +127,9 @@ describe('buildQaSeed — favorites / hidden / seen / views / profile', () => {
 
   it('exposes a complete and an incomplete profile variant', () => {
     const seed = buildQaSeed(FIXED_NOW);
-    expect(seed.profile.stack.length).toBeGreaterThan(0);
+    expect(seed.profile.keywords.length).toBeGreaterThan(0);
     expect(seed.profile.jobTitle.length).toBeGreaterThan(0);
-    expect(seed.profileIncomplete.stack).toEqual([]);
+    expect(seed.profileIncomplete.keywords).toEqual([]);
     expect(seed.profileIncomplete.jobTitle).toBe('');
   });
 
@@ -216,7 +216,7 @@ describe('applyQaSeedToLocalStorage — writer', () => {
     expect(missions).toHaveLength(500);
 
     const profile = JSON.parse(sink.getItem(QA_LOCALSTORAGE_KEYS.profile) ?? 'null');
-    expect(profile.stack).toContain('TypeScript');
+    expect(profile.keywords).toContain('TypeScript');
 
     const trackings = JSON.parse(sink.getItem(QA_LOCALSTORAGE_KEYS.trackings) ?? '[]');
     expect(trackings).toHaveLength(9);
@@ -235,7 +235,7 @@ describe('applyQaSeedToLocalStorage — writer', () => {
     const sink = makeMemStorage();
     applyQaSeedToLocalStorage(FIXED_NOW, 'incomplete', sink);
     const profile = JSON.parse(sink.getItem(QA_LOCALSTORAGE_KEYS.profile) ?? 'null');
-    expect(profile.stack).toEqual([]);
+    expect(profile.keywords).toEqual([]);
     expect(profile.jobTitle).toBe('');
   });
 });

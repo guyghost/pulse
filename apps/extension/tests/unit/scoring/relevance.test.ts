@@ -5,7 +5,7 @@ import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 const profile: UserProfile = {
   firstName: 'Test',
-  stack: ['TypeScript', 'React', 'Node.js'],
+  keywords: ['TypeScript', 'React', 'Node.js'],
   tjmMin: 500,
   tjmMax: 700,
   location: 'Paris',
@@ -121,7 +121,7 @@ describe('scoreMission', () => {
   });
 
   it('gives full stack weight when profile has no stack (does not penalize user)', () => {
-    const profileNoStack: UserProfile = { ...profile, stack: [] };
+    const profileNoStack: UserProfile = { ...profile, keywords: [] };
     const mission = makeMission({
       stack: ['React', 'TypeScript', 'Node.js'],
       tjm: 600,
@@ -189,7 +189,7 @@ describe('scoreMission', () => {
   describe('regression: undefined safety', () => {
     const baseProfile: UserProfile = {
       firstName: 'Test',
-      stack: ['TypeScript', 'React'],
+      keywords: ['TypeScript', 'React'],
       location: 'Paris',
       tjmMin: 500,
       tjmMax: 800,
@@ -210,7 +210,7 @@ describe('scoreMission', () => {
     it('should not crash when profile has undefined entries in stack array', () => {
       const profileWithUndefined: UserProfile = {
         ...baseProfile,
-        stack: ['TypeScript', undefined, 'React'] as any,
+        keywords: ['TypeScript', undefined, 'React'] as any,
       };
       const mission = makeMission({ stack: ['React', 'TypeScript'] });
       const s = score(mission, profileWithUndefined);
@@ -240,7 +240,7 @@ describe('scoreMission', () => {
   describe('location nearby scoring', () => {
     const parisProfile: UserProfile = {
       firstName: 'Test',
-      stack: ['TypeScript', 'React'],
+      keywords: ['TypeScript', 'React'],
       location: 'Paris',
       tjmMin: 500,
       tjmMax: 800,

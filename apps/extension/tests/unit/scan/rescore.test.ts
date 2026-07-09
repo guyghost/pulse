@@ -37,13 +37,12 @@ import { rescoreStoredMissions } from '../../../src/lib/shell/scan/rescore';
 const profile: UserProfile = {
   firstName: 'Guy',
   jobTitle: 'Dev',
-  stack: ['TypeScript'],
+  keywords: ['TypeScript'],
   tjmMin: 500,
   tjmMax: 900,
   location: 'Paris',
   remote: 'any',
   seniority: 'senior',
-  searchKeywords: [],
   scoringWeights: {
     stack: 40,
     location: 20,

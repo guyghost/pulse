@@ -19,7 +19,7 @@ Mission:
 
 Profil:
 - Poste: ${profile.jobTitle}
-- Stack: ${profile.stack.join(', ')}
+- Stack: ${profile.keywords.join(', ')}
 - TJM: ${profile.tjmMin}-${profile.tjmMax} EUR/jour
 - Lieu: ${profile.location}
 - Remote: ${profile.remote}

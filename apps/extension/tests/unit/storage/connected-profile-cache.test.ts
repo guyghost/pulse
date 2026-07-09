@@ -8,14 +8,13 @@ import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 const profile: UserProfile = {
   firstName: 'Guy',
-  stack: ['Svelte', 'TypeScript'],
+  keywords: ['Svelte', 'TypeScript', 'svelte mission'],
   tjmMin: 650,
   tjmMax: 900,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Architecte frontend',
-  searchKeywords: ['svelte mission'],
   scoringWeights: { stack: 40, location: 20, tjm: 25, remote: 15 },
 };
 

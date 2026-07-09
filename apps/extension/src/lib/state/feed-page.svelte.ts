@@ -131,8 +131,7 @@ function toProfileImpactInput(profile: UserProfile | null): ProfileImpactInput {
     remote: profile?.remote ?? 'any',
     tjmMin: typeof profile?.tjmMin === 'number' ? profile.tjmMin : 0,
     tjmMax: typeof profile?.tjmMax === 'number' ? profile.tjmMax : 0,
-    stack: Array.isArray(profile?.stack) ? profile.stack : [],
-    searchKeywords: Array.isArray(profile?.searchKeywords) ? profile.searchKeywords : [],
+    keywords: Array.isArray(profile?.keywords) ? profile.keywords : [],
   };
 }
 

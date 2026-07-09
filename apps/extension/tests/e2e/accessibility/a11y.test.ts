@@ -41,7 +41,7 @@ test.describe('Accessibility', () => {
 
     await page.keyboard.type('Développeur');
     await page.keyboard.press('Tab');
-    await expect(page.locator('#ob-stack')).toBeFocused();
+    await expect(page.locator('#ob-keywords')).toBeFocused();
     await page.keyboard.type('React');
     await page.keyboard.press('Enter');
 

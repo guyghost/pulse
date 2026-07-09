@@ -27,7 +27,13 @@ export const DEFAULT_SCORING_WEIGHTS: ScoringWeights = {
 
 export interface UserProfile {
   firstName: string;
-  stack: string[];
+  /**
+   * Unified keyword list — feeds BOTH local scoring (matched against
+   * `mission.stack`) and the connector API free-text `query`. Replaces the
+   * former split between `stack` (scoring) and `searchKeywords` (query).
+   * See `models/keywords-unification.model.md`.
+   */
+  keywords: string[];
   tjmMin: number;
   tjmMax: number;
   location: string;
@@ -36,6 +42,4 @@ export interface UserProfile {
   jobTitle: string;
   /** Optional custom scoring weights. Defaults to DEFAULT_SCORING_WEIGHTS if not provided. */
   scoringWeights?: ScoringWeights;
-  /** User-defined search keywords sent to connector APIs for server-side filtering */
-  searchKeywords: string[];
 }

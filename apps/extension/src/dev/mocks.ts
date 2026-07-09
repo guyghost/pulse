@@ -4,14 +4,13 @@ import type { TJMHistory, TJMRecord, TJMRegion } from '$lib/core/types/tjm';
 
 export const mockProfile: UserProfile = {
   firstName: 'Alice',
-  stack: ['TypeScript', 'React', 'Node.js', 'Svelte'],
+  keywords: ['TypeScript', 'React', 'Node.js', 'Svelte'],
   tjmMin: 500,
   tjmMax: 750,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Développeur Fullstack',
-  searchKeywords: [],
 };
 
 const stacks = [
