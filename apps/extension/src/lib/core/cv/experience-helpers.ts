@@ -218,16 +218,21 @@ export function countNewlyAddedExperiences(
   current: readonly Experience[],
   incoming: readonly CandidateExperienceDraft[]
 ): number {
-  const existingKeys = new Set(
+  // Seed with current-entry keys, then add each accepted draft's key as we go
+  // so duplicates *within* `incoming` are not double-counted — mirroring
+  // {@link mergeExperiences}, which dedups against its growing result array.
+  const seenKeys = new Set(
     current.map((exp) => experienceKey(exp.company, exp.title, exp.startDate))
   );
   let added = 0;
   for (const draft of incoming) {
     const draftStart = normalizeDateToMonth(draft.startDate);
     const key = experienceKey(draft.company, draft.title, draftStart);
-    if (!existingKeys.has(key)) {
-      added += 1;
+    if (seenKeys.has(key)) {
+      continue;
     }
+    seenKeys.add(key);
+    added += 1;
   }
   return added;
 }

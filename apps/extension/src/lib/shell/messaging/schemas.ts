@@ -676,7 +676,11 @@ export const MessageSchemas = {
   LINKEDIN_PROFILE_IMPORTED: z.object({
     type: z.literal('LINKEDIN_PROFILE_IMPORTED'),
     payload: z.union([
-      z.object({ imported: z.literal(true), profile: CanonicalCandidateProfileDraftSchema }),
+      z.object({
+        imported: z.literal(true),
+        profile: CanonicalCandidateProfileDraftSchema,
+        addedCount: z.number().int().nonnegative().optional(),
+      }),
       z.object({
         imported: z.literal(false),
         errorCode: SafeString,

@@ -330,6 +330,17 @@ describe('countNewlyAddedExperiences', () => {
     const incoming = [draft({ title: 'LEAD FRONTEND', company: 'ACME', startDate: '2023-01' })];
     expect(countNewlyAddedExperiences(current, incoming)).toBe(0);
   });
+
+  it('does not double-count duplicates within the incoming list (mirrors mergeExperiences)', () => {
+    // Realistic extractor failure mode (DOM drift / repeated blocks): the same
+    // draft appears twice in `incoming` but not in `current`. mergeExperiences
+    // dedups these against its growing result, so only 1 is actually added.
+    const incoming = [
+      draft({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01' }),
+      draft({ title: 'Lead Frontend', company: 'Acme', startDate: '2023-01' }),
+    ];
+    expect(countNewlyAddedExperiences([], incoming)).toBe(1);
+  });
 });
 
 describe('normalizeDateToMonth', () => {
