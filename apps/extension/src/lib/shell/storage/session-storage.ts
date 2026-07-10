@@ -43,16 +43,33 @@ export async function getDeepLinkIntent(): Promise<DeepLinkIntent | null> {
   return (result[DEEP_LINK_INTENT_KEY] as DeepLinkIntent | undefined) ?? null;
 }
 
+// In-process serialization of the read-then-clear consume (invariant I1).
+// `chrome.storage.session` has no atomic read-and-remove, so two concurrent
+// CONSUME messages (e.g. panel opened in two windows) could both observe the
+// same pending intent before either remove runs. This promise chain forces
+// consumes to execute strictly one after another within this service worker.
+let consumeChain: Promise<void> = Promise.resolve();
+
 /**
  * Atomically read and clear the intent (invariant I1: single consume).
- * Returns the consumed intent, or null if none was pending.
+ * Returns the consumed intent, or null if none was pending. Serialized within
+ * the service worker so only the first concurrent caller wins.
  */
-export async function consumeDeepLinkIntent(): Promise<DeepLinkIntent | null> {
-  const intent = await getDeepLinkIntent();
-  if (intent) {
-    await chrome.storage.session.remove(DEEP_LINK_INTENT_KEY);
-  }
-  return intent;
+export function consumeDeepLinkIntent(): Promise<DeepLinkIntent | null> {
+  const run = consumeChain.then(async () => {
+    const intent = await getDeepLinkIntent();
+    if (intent) {
+      await chrome.storage.session.remove(DEEP_LINK_INTENT_KEY);
+    }
+    return intent;
+  });
+  // Keep the chain alive even if this run rejects, so one failure can't stall
+  // subsequent consumes forever.
+  consumeChain = run.then(
+    () => undefined,
+    () => undefined
+  );
+  return run;
 }
 
 export async function clearDeepLinkIntent(): Promise<void> {

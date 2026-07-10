@@ -36,9 +36,9 @@ surfaced, with a clear way back to the full feed.
 
 Authoritative: `apps/extension/src/models/notification-deep-link.model.md`.
 Two machines: Intent (SW: absent · pending · consumed) and Focus (panel:
-idle · focusing · focused · dismissed). Key invariants: single-consume (I1),
-focus overrides filters without mutating them (F1), focus != seen (F2),
-auto-expire on empty match (F4).
+idle · focused · dismissed). Key invariants: single-consume (I1), focus
+overrides filters without mutating them (F1), focus != seen (F2), auto-expire
+on empty match (F4).
 
 ## Tests
 
@@ -48,7 +48,8 @@ auto-expire on empty match (F4).
 
 ## Risk
 
-- Race: panel consumes intent before missions are indexed -> handled by
-  `focusing` state + `MISSIONS_LOADED` transition (F4).
+- Race: panel consumes intent before missions are indexed -> handled by an
+  optimistic `APPLY` (enter `focused` immediately) plus a deferred `STALE_GUARD`
+  `$effect` that reverts to `idle` if no intent id matches once missions load (F4).
 - Stale intent across a SW restart -> session storage cleared by browser on
   session end; in-session staleness handled by auto-dismiss.

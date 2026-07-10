@@ -65,25 +65,37 @@ Lives in `createFeedPageState()`. Drives `displayMissions` + the banner.
 
 ### States
 
-| State       | Meaning                                                                                        |
-| ----------- | ---------------------------------------------------------------------------------------------- |
-| `idle`      | No intent consumed; feed is normal.                                                            |
-| `focusing`  | Intent consumed, but none of its ids match the loaded missions. (Stale intent → auto-dismiss.) |
-| `focused`   | Feed is filtered to the intent missions; banner visible.                                       |
-| `dismissed` | User (or staleness) dismissed; feed is normal again.                                           |
+| State       | Meaning                                                  |
+| ----------- | -------------------------------------------------------- |
+| `idle`      | No intent consumed; feed is normal.                      |
+| `focused`   | Feed is filtered to the intent missions; banner visible. |
+| `dismissed` | User dismissed; feed is normal again.                    |
+
+The earlier `focusing` intermediate state was removed during implementation
+(see "Race handling" below). `APPLY` enters `focused` optimistically and a
+deferred effect re-checks the match once missions are available.
 
 ### Events
 
-| Event              | From → To                | Side effect                                       |
-| ------------------ | ------------------------ | ------------------------------------------------- |
-| `APPLY(intent)`    | `idle` → `focused`       | set focus ids; feed filters to them               |
-| `APPLY(intent)`    | `idle` → `focusing`      | intent has ids but none loaded yet → retry once   |
-| `APPLY(intent)`    | `idle` → `idle`          | intent is null (nothing consumed)                 |
-| `MISSIONS_LOADED`  | `focusing` → `focused`   | if ≥1 intent id now matches                       |
-| `MISSIONS_LOADED`  | `focusing` → `dismissed` | still zero matches → auto-dismiss                 |
-| `DISMISS`          | `focused` → `dismissed`  | clear focus ids; restore full feed                |
-| `DISMISS`          | `focusing` → `dismissed` | clear focus ids                                   |
-| `NEW_SCAN_APPLIED` | `focused` → `focused`    | keep focus if ids still present, else `dismissed` |
+| Event           | From → To               | Side effect                                       |
+| --------------- | ----------------------- | ------------------------------------------------- |
+| `APPLY(intent)` | `idle` → `focused`      | set focus ids; banner + filter applied at once    |
+| `APPLY(intent)` | `idle` → `idle`         | intent is null (nothing consumed)                 |
+| `STALE_GUARD`   | `focused` → `idle`      | missions loaded but no intent id matches → revert |
+| `DISMISS`       | `focused` → `dismissed` | clear focus ids; restore full feed                |
+
+`STALE_GUARD` is a deferred `$effect`, not a message: it fires after the
+async mission load settles, so a consumed intent survives until missions are
+reactively present.
+
+### Race handling
+
+The panel consumes the intent on mount (async facade call) while missions load
+async in parallel. Rather than an intermediate state, `APPLY` enters `focused`
+optimistically (banner shows immediately, `displayMissions` filters at once)
+and the `STALE_GUARD` effect re-checks the match once `missions.length > 0`.
+This collapses the earlier `focusing` + `MISSIONS_LOADED` design into one state
+and shows the banner without delay.
 
 ### Invariants (Focus)
 
@@ -92,10 +104,10 @@ Lives in `createFeedPageState()`. Drives `displayMissions` + the banner.
   mutated — dismissing restores the prior filter state untouched.
 - **F2 (focus ≠ seen):** focus ids are matched against loaded missions by id,
   never against the seen set. Seen-marking at notify time does not affect focus.
-- **F3 (dismissable):** `DISMISS` is always available in `focused`/`focusing`.
-  It never mutates persisted filter state.
-- **F4 (auto-expire):** if no intent mission is present after the first
-  successful missions load, focus auto-dismisses (no empty feed, no dead lens).
+- **F3 (dismissable):** `DISMISS` is always available in `focused`. It never
+  mutates persisted filter state.
+- **F4 (auto-expire):** once missions are loaded and no intent id matches, the
+  `STALE_GUARD` effect reverts `focused` → `idle` (no empty feed, no dead lens).
 - **F5 (single activation):** once `dismissed`, the panel does not re-enter
   `focused` without a new consumed intent (i.e. a new `NOTIFY` → `APPLY`).
 - **F6 (scroll):** on `focused`, the feed scrolls the mission section into view.
