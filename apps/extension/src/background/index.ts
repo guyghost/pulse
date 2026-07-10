@@ -44,7 +44,11 @@ import {
   saveConnectedAlertPreferences,
 } from '../lib/shell/storage/connected-alert-preferences';
 import { getAlertHistory } from '../lib/shell/storage/alert-history';
-import { setNewMissionCount, resetNewMissionCount } from '../lib/shell/storage/session-storage';
+import {
+  setNewMissionCount,
+  resetNewMissionCount,
+  consumeDeepLinkIntent,
+} from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
   notifyHighScoreMissions,
@@ -353,7 +357,9 @@ async function persistScanResults(
     await clearNewMissionBadge();
   }
 
-  // Send notifications for high-score missions if enabled
+  // Send notifications for high-score missions if enabled. notifyHighScoreMissions
+  // also persists the deep-link focus intent BEFORE the Chrome notification is
+  // shown, so a fast click can never race ahead of the intent write.
   if (newCount > 0) {
     const notification = await notifyHighScoreMissions(newMissions);
     if (notification.shown && notification.notifiedMissionIds.length > 0) {
@@ -665,6 +671,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] RESET_NEW_MISSION_COUNT error:', err);
           sendResponse({ type: 'NEW_MISSION_COUNT_RESET', payload: { reset: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'CONSUME_DEEP_LINK_INTENT') {
+      consumeDeepLinkIntent()
+        .then((intent) => {
+          sendResponse({ type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] CONSUME_DEEP_LINK_INTENT error:', err);
+          sendResponse({ type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent: null } });
         });
       return true;
     }

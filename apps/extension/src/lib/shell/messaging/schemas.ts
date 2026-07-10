@@ -896,6 +896,24 @@ export const MessageSchemas = {
       })
     ),
   }),
+
+  // Deep-link focus intent
+  CONSUME_DEEP_LINK_INTENT: z.object({ type: z.literal('CONSUME_DEEP_LINK_INTENT') }),
+  DEEP_LINK_INTENT_CONSUMED: z.object({
+    type: z.literal('DEEP_LINK_INTENT_CONSUMED'),
+    payload: z.object({
+      intent: z
+        .object({
+          focusMissionIds: z.array(z.string().min(1).max(200)).min(1).max(20),
+          source: z.enum(['notification', 'digest']),
+          triggeredAt: z.number().finite(),
+        })
+        .nullable(),
+    }),
+  }),
+  // SW → live panel broadcast: re-consume a pending deep-link intent after a
+  // notification click on an already-open panel. No payload needed.
+  NOTIFICATION_CLICKED: z.object({ type: z.literal('NOTIFICATION_CLICKED') }),
 } as const;
 
 export type MessageType = keyof typeof MessageSchemas;
