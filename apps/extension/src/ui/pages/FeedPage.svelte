@@ -1487,14 +1487,21 @@
         class="mb-4 flex items-start gap-3 rounded-xl border border-blueprint-blue/25 bg-blueprint-blue/[0.06] px-4 py-3"
         role="status"
       >
-        <div class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blueprint-blue/15 text-blueprint-blue">
+        <div
+          class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blueprint-blue/15 text-blueprint-blue"
+        >
           <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
-            <path d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 3.75v3.69l2.47 2.47-1.06 1.06L7.25 8.06V4.75h1.5z" />
+            <path
+              d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 3.75v3.69l2.47 2.47-1.06 1.06L7.25 8.06V4.75h1.5z"
+            />
           </svg>
         </div>
         <div class="min-w-0 flex-1">
           <p class="text-sm font-semibold text-text-primary">
-            {page.focusMissions.length} mission{page.focusMissions.length > 1 ? 's' : ''} issue{page.focusMissions.length > 1 ? 's' : ''} de la notification
+            {page.focusMissions.length} mission{page.focusMissions.length > 1 ? 's' : ''} issue{page
+              .focusMissions.length > 1
+              ? 's'
+              : ''} de la notification
           </p>
           <p class="mt-0.5 text-xs leading-5 text-text-subtle">
             Notifications · {page.focusSinceLabel}

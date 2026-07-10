@@ -559,7 +559,9 @@ export function createFeedPageState(
     if (focusMode === 'focused' && focusIntent) {
       const focused = selectFocusMissions(missions, focusIntent);
       if (focused.length > 0) {
-        return sortBy === 'score' ? rankMissions(focused, new Date()) : sortMissions(focused, sortBy);
+        return sortBy === 'score'
+          ? rankMissions(focused, new Date())
+          : sortMissions(focused, sortBy);
       }
     }
 
@@ -580,10 +582,10 @@ export function createFeedPageState(
 
   // Focus-lens derived views for the banner UI.
   const focusMissions = $derived(
-    focusMode === 'focused' && focusIntent ? selectFocusMissions(missions, focusIntent) : [],
+    focusMode === 'focused' && focusIntent ? selectFocusMissions(missions, focusIntent) : []
   );
   const focusSinceLabel = $derived(
-    focusIntent ? formatFocusSince(focusIntent.triggeredAt, Date.now()) : '',
+    focusIntent ? formatFocusSince(focusIntent.triggeredAt, Date.now()) : ''
   );
 
   const comparisonMissions = $derived.by(() => {

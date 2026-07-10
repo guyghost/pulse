@@ -370,7 +370,7 @@ async function persistScanResults(
       const intent = createDeepLinkIntent(
         notification.notifiedMissionIds,
         'notification',
-        Date.now(),
+        Date.now()
       );
       if (intent) {
         await setDeepLinkIntent(intent);

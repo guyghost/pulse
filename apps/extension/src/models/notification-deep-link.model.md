@@ -6,6 +6,7 @@
 > model decides what the feed shows.**
 
 Two cooperating state machines, one per context:
+
 - **Intent** (service worker, `chrome.storage.session`) — what to show.
 - **Focus** (side panel, `feed-page.svelte.ts`) — how the feed renders it.
 
@@ -17,31 +18,35 @@ Persisted in `chrome.storage.session` under `deepLinkIntent`. Written when a
 notification is created; read + cleared atomically when the panel mounts.
 
 ### States
-| State | Meaning |
-|---|---|
-| `absent` | No intent in storage. Default. |
-| `pending` | An intent is written, not yet consumed. |
+
+| State      | Meaning                                        |
+| ---------- | ---------------------------------------------- |
+| `absent`   | No intent in storage. Default.                 |
+| `pending`  | An intent is written, not yet consumed.        |
 | `consumed` | Intent has been read and cleared by the panel. |
 
 ### Events
-| Event | From → To | Side effect |
-|---|---|---|
-| `NOTIFY` | any → `pending` | overwrite storage with `{ focusMissionIds, source, triggeredAt }` |
-| `CONSUME` | `pending` → `consumed` | atomically read + remove from storage; return value to panel |
-| `CONSUME` | `absent` → `absent` | no-op, returns `null` |
-| `SESSION_RESET` | any → `absent` | storage area cleared by browser |
+
+| Event           | From → To              | Side effect                                                       |
+| --------------- | ---------------------- | ----------------------------------------------------------------- |
+| `NOTIFY`        | any → `pending`        | overwrite storage with `{ focusMissionIds, source, triggeredAt }` |
+| `CONSUME`       | `pending` → `consumed` | atomically read + remove from storage; return value to panel      |
+| `CONSUME`       | `absent` → `absent`    | no-op, returns `null`                                             |
+| `SESSION_RESET` | any → `absent`         | storage area cleared by browser                                   |
 
 ### Shape
+
 ```ts
 type DeepLinkIntentSource = 'notification' | 'digest';
 interface DeepLinkIntent {
-  focusMissionIds: string[];   // non-empty, ≤ 20, deduped
+  focusMissionIds: string[]; // non-empty, ≤ 20, deduped
   source: DeepLinkIntentSource;
-  triggeredAt: number;         // epoch ms
+  triggeredAt: number; // epoch ms
 }
 ```
 
 ### Invariants (Intent)
+
 - **I1 (single consume):** a given intent is returned to exactly one panel
   mount. `CONSUME` is atomic read-then-clear.
 - **I2 (non-empty):** `NOTIFY` is only fired with ≥1 mission id; empty writes
@@ -59,26 +64,29 @@ interface DeepLinkIntent {
 Lives in `createFeedPageState()`. Drives `displayMissions` + the banner.
 
 ### States
-| State | Meaning |
-|---|---|
-| `idle` | No intent consumed; feed is normal. |
-| `focusing` | Intent consumed, but none of its ids match the loaded missions. (Stale intent → auto-dismiss.) |
-| `focused` | Feed is filtered to the intent missions; banner visible. |
-| `dismissed` | User (or staleness) dismissed; feed is normal again. |
+
+| State       | Meaning                                                                                        |
+| ----------- | ---------------------------------------------------------------------------------------------- |
+| `idle`      | No intent consumed; feed is normal.                                                            |
+| `focusing`  | Intent consumed, but none of its ids match the loaded missions. (Stale intent → auto-dismiss.) |
+| `focused`   | Feed is filtered to the intent missions; banner visible.                                       |
+| `dismissed` | User (or staleness) dismissed; feed is normal again.                                           |
 
 ### Events
-| Event | From → To | Side effect |
-|---|---|---|
-| `APPLY(intent)` | `idle` → `focused` | set focus ids; feed filters to them |
-| `APPLY(intent)` | `idle` → `focusing` | intent has ids but none loaded yet → retry once |
-| `APPLY(intent)` | `idle` → `idle` | intent is null (nothing consumed) |
-| `MISSIONS_LOADED` | `focusing` → `focused` | if ≥1 intent id now matches |
-| `MISSIONS_LOADED` | `focusing` → `dismissed` | still zero matches → auto-dismiss |
-| `DISMISS` | `focused` → `dismissed` | clear focus ids; restore full feed |
-| `DISMISS` | `focusing` → `dismissed` | clear focus ids |
-| `NEW_SCAN_APPLIED` | `focused` → `focused` | keep focus if ids still present, else `dismissed` |
+
+| Event              | From → To                | Side effect                                       |
+| ------------------ | ------------------------ | ------------------------------------------------- |
+| `APPLY(intent)`    | `idle` → `focused`       | set focus ids; feed filters to them               |
+| `APPLY(intent)`    | `idle` → `focusing`      | intent has ids but none loaded yet → retry once   |
+| `APPLY(intent)`    | `idle` → `idle`          | intent is null (nothing consumed)                 |
+| `MISSIONS_LOADED`  | `focusing` → `focused`   | if ≥1 intent id now matches                       |
+| `MISSIONS_LOADED`  | `focusing` → `dismissed` | still zero matches → auto-dismiss                 |
+| `DISMISS`          | `focused` → `dismissed`  | clear focus ids; restore full feed                |
+| `DISMISS`          | `focusing` → `dismissed` | clear focus ids                                   |
+| `NEW_SCAN_APPLIED` | `focused` → `focused`    | keep focus if ids still present, else `dismissed` |
 
 ### Invariants (Focus)
+
 - **F1 (override):** when `focused`, `displayMissions` shows only intent
   missions (still sorted), ignoring all other filters. Other filters are NOT
   mutated — dismissing restores the prior filter state untouched.
