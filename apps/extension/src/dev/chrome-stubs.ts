@@ -271,6 +271,7 @@ const storage: Record<string, unknown> = {
     DEFAULT_CONNECTED_ALERT_PREFERENCES
   ),
   newMissionCount: 0,
+  deepLinkIntent: null as import('$lib/core/deep-link/deep-link-intent').DeepLinkIntent | null,
   feedSortBy: 'score',
   profile: readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile),
   premium_enabled: readDevStorage<boolean>(DEV_PREMIUM_ENABLED_STORAGE_KEY, true),
@@ -505,6 +506,12 @@ function createChromeStubs() {
           case 'RESET_NEW_MISSION_COUNT':
             storage.newMissionCount = 0;
             return { type: 'NEW_MISSION_COUNT_RESET', payload: { reset: true } };
+          case 'CONSUME_DEEP_LINK_INTENT': {
+            // Atomic read + clear, mirroring the SW handler.
+            const intent = storage.deepLinkIntent;
+            storage.deepLinkIntent = null;
+            return { type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent } };
+          }
           case 'GET_PERSISTED_CONNECTOR_STATUSES':
             return { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT', payload: [] };
           case 'CLEAR_EXTENSION_BADGE':

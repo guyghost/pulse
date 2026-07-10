@@ -19,6 +19,7 @@ import type { SavedFeedView } from '../../core/types/feed-view';
 import type { ToastType } from '../../state/toast.svelte';
 import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
 import type { AlertHistoryEntry } from '../../core/types/alert-history';
+import type { DeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -225,7 +226,10 @@ export type BridgeMessage =
       payload: import('../storage/migration-types').MigrationSnapshot;
     }
   | { type: 'MIGRATION_DOWNGRADE_DETECTED' }
-  | { type: 'MIGRATION_QUARANTINED' };
+  | { type: 'MIGRATION_QUARANTINED' }
+  // Deep-link focus intent (panel ↔ service worker)
+  | { type: 'CONSUME_DEEP_LINK_INTENT' }
+  | { type: 'DEEP_LINK_INTENT_CONSUMED'; payload: { intent: DeepLinkIntent | null } };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

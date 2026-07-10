@@ -9,6 +9,7 @@ import type { UserProfile } from '../../core/types/profile';
 import type { Mission } from '../../core/types/mission';
 import type { PersistedConnectorStatus } from '../../core/types/connector-status';
 import type { SavedFeedView } from '../../core/types/feed-view';
+import type { DeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 
 export type FeedSortBy = 'score' | 'date' | 'tjm';
 
@@ -115,4 +116,18 @@ export async function openExternalUrl(url: string): Promise<void> {
 export async function getProfile(): Promise<UserProfile | null> {
   const response = await sendMessage({ type: 'GET_PROFILE' });
   return response.type === 'PROFILE_RESULT' ? response.payload : null;
+}
+
+/**
+ * Atomically consume the pending deep-link focus intent (single-consume, I1).
+ * Returns the intent if one was pending, or null. Never throws — a failure to
+ * consume is non-fatal (panel simply opens on the normal feed).
+ */
+export async function consumeDeepLinkIntent(): Promise<DeepLinkIntent | null> {
+  try {
+    const response = await sendMessage({ type: 'CONSUME_DEEP_LINK_INTENT' });
+    return response.type === 'DEEP_LINK_INTENT_CONSUMED' ? response.payload.intent : null;
+  } catch {
+    return null;
+  }
 }

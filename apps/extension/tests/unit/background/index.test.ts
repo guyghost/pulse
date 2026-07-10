@@ -14,6 +14,8 @@ const getSeenIds = vi.fn();
 const saveSeenIds = vi.fn();
 const setNewMissionCount = vi.fn();
 const resetNewMissionCount = vi.fn();
+const setDeepLinkIntent = vi.fn();
+const consumeDeepLinkIntent = vi.fn();
 const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
 const getProfile = vi.fn();
@@ -236,6 +238,8 @@ vi.mock('../../../src/lib/shell/storage/favorites', () => ({
 vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
   setNewMissionCount,
   resetNewMissionCount,
+  setDeepLinkIntent,
+  consumeDeepLinkIntent,
 }));
 
 vi.mock('../../../src/lib/shell/storage/tracking', () => ({
@@ -343,6 +347,8 @@ describe('background auto-scan notifications', () => {
     });
     getMissions.mockResolvedValue([makeMission()]);
     resetNewMissionCount.mockResolvedValue(undefined);
+    setDeepLinkIntent.mockResolvedValue(undefined);
+    consumeDeepLinkIntent.mockResolvedValue(null);
     getConnectorStatuses.mockResolvedValue([]);
     getFavorites.mockResolvedValue({});
     saveFavorites.mockResolvedValue(undefined);

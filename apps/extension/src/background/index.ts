@@ -44,8 +44,14 @@ import {
   saveConnectedAlertPreferences,
 } from '../lib/shell/storage/connected-alert-preferences';
 import { getAlertHistory } from '../lib/shell/storage/alert-history';
-import { setNewMissionCount, resetNewMissionCount } from '../lib/shell/storage/session-storage';
+import {
+  setNewMissionCount,
+  resetNewMissionCount,
+  setDeepLinkIntent,
+  consumeDeepLinkIntent,
+} from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
+import { createDeepLinkIntent } from '../lib/core/deep-link/deep-link-intent';
 import {
   notifyHighScoreMissions,
   setupNotificationClickHandler,
@@ -357,6 +363,18 @@ async function persistScanResults(
   if (newCount > 0) {
     const notification = await notifyHighScoreMissions(newMissions);
     if (notification.shown && notification.notifiedMissionIds.length > 0) {
+      // Persist the deep-link focus intent so the next panel open lands on
+      // the notified missions. Last-writer-wins: the most recent notification
+      // is what the user expects to see. Pure core helper keeps the intent
+      // shape validated (≤20 ids, deduped) before it touches storage.
+      const intent = createDeepLinkIntent(
+        notification.notifiedMissionIds,
+        'notification',
+        Date.now(),
+      );
+      if (intent) {
+        await setDeepLinkIntent(intent);
+      }
       await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
     }
   }
@@ -665,6 +683,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         .catch((err) => {
           console.warn('[MissionPulse] RESET_NEW_MISSION_COUNT error:', err);
           sendResponse({ type: 'NEW_MISSION_COUNT_RESET', payload: { reset: false } });
+        });
+      return true;
+    }
+
+    if (message.type === 'CONSUME_DEEP_LINK_INTENT') {
+      consumeDeepLinkIntent()
+        .then((intent) => {
+          sendResponse({ type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] CONSUME_DEEP_LINK_INTENT error:', err);
+          sendResponse({ type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent: null } });
         });
       return true;
     }
