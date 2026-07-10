@@ -39,6 +39,7 @@ import {
   filterHidden,
   filterFavoritesOnly,
   consumeDeepLinkIntent,
+  subscribeToNotificationClicked,
 } from '$lib/shell/facades/feed-data.facade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
@@ -303,6 +304,11 @@ export function createFeedPageState(
   // Derived — from feed store
   // ============================================================
   const missions = $derived(feedStore.filteredMissions);
+  // Raw (unfiltered) missions for the focus lens: the deep-link intent points
+  // at specific mission IDs that must be selectable even when a search query
+  // or source filter is active, otherwise STALE_GUARD would auto-dismiss the
+  // lens for missions that are merely filtered out of view.
+  const allMissions = $derived(feedStore.missions);
   const isLoading = $derived(feedStore.state === 'loading');
   const error = $derived(feedStore.error);
   const searchQuery = $derived(feedStore.searchQuery);
@@ -557,7 +563,7 @@ export function createFeedPageState(
     // Focus is an explicit id allow-list applied last, so seen-marking (which
     // powers the badge) doesn't defeat it. Empty match = no override (F-empty).
     if (focusMode === 'focused' && focusIntent) {
-      const focused = selectFocusMissions(missions, focusIntent);
+      const focused = selectFocusMissions(allMissions, focusIntent);
       if (focused.length > 0) {
         return sortBy === 'score'
           ? rankMissions(focused, new Date())
@@ -940,6 +946,24 @@ export function createFeedPageState(
         .catch(() => {});
     });
 
+    // Thread A: when a notification is clicked while the panel is already open,
+    // chrome.sidePanel.open() is a no-op so the mount effect above does not
+    // re-fire. The SW broadcasts NOTIFICATION_CLICKED so we re-consume here.
+    // Safe with the session-storage mutex: if the mount effect already consumed
+    // the intent, this consume returns null and is a no-op.
+    $effect(() => {
+      const unsubscribe = subscribeToNotificationClicked(() => {
+        consumeDeepLinkIntent()
+          .then((intent) => {
+            if (intent) {
+              applyFocusIntent(intent);
+            }
+          })
+          .catch(() => {});
+      });
+      return unsubscribe;
+    });
+
     // F3 (empty match = noop): once missions are loaded, if none match the
     // focus intent, auto-exit focus. Deferred so the intent survives the async
     // mission load that races with consumeDeepLinkIntent on mount.
@@ -947,8 +971,8 @@ export function createFeedPageState(
       if (
         focusMode === 'focused' &&
         focusIntent &&
-        missions.length > 0 &&
-        !hasFocusMatch(missions, focusIntent)
+        allMissions.length > 0 &&
+        !hasFocusMatch(allMissions, focusIntent)
       ) {
         focusMode = 'idle';
         focusIntent = null;

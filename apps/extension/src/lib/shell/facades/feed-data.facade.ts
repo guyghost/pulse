@@ -131,3 +131,35 @@ export async function consumeDeepLinkIntent(): Promise<DeepLinkIntent | null> {
     return null;
   }
 }
+
+/**
+ * Subscribe to NOTIFICATION_CLICKED broadcasts from the service worker.
+ *
+ * The SW fires this when the user clicks a mission notification while the side
+ * panel is already open. chrome.sidePanel.open() is a no-op on an already-open
+ * panel, so without this broadcast the panel would never learn that a fresh
+ * deep-link intent was written and should be consumed (thread A fix).
+ *
+ * Returns an unsubscribe function. The handler is invoked with no arguments.
+ */
+export function subscribeToNotificationClicked(handler: () => void): () => void {
+  if (typeof chrome === 'undefined' || !chrome.runtime?.onMessage) {
+    return () => {};
+  }
+
+  const listener = (message: unknown): undefined => {
+    if (
+      typeof message === 'object' &&
+      message !== null &&
+      (message as { type?: unknown }).type === 'NOTIFICATION_CLICKED'
+    ) {
+      handler();
+    }
+    return undefined;
+  };
+
+  chrome.runtime.onMessage.addListener(listener);
+  return () => {
+    chrome.runtime.onMessage.removeListener(listener);
+  };
+}

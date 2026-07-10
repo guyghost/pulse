@@ -47,11 +47,9 @@ import { getAlertHistory } from '../lib/shell/storage/alert-history';
 import {
   setNewMissionCount,
   resetNewMissionCount,
-  setDeepLinkIntent,
   consumeDeepLinkIntent,
 } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
-import { createDeepLinkIntent } from '../lib/core/deep-link/deep-link-intent';
 import {
   notifyHighScoreMissions,
   setupNotificationClickHandler,
@@ -359,22 +357,12 @@ async function persistScanResults(
     await clearNewMissionBadge();
   }
 
-  // Send notifications for high-score missions if enabled
+  // Send notifications for high-score missions if enabled. notifyHighScoreMissions
+  // also persists the deep-link focus intent BEFORE the Chrome notification is
+  // shown, so a fast click can never race ahead of the intent write.
   if (newCount > 0) {
     const notification = await notifyHighScoreMissions(newMissions);
     if (notification.shown && notification.notifiedMissionIds.length > 0) {
-      // Persist the deep-link focus intent so the next panel open lands on
-      // the notified missions. Last-writer-wins: the most recent notification
-      // is what the user expects to see. Pure core helper keeps the intent
-      // shape validated (≤20 ids, deduped) before it touches storage.
-      const intent = createDeepLinkIntent(
-        notification.notifiedMissionIds,
-        'notification',
-        Date.now()
-      );
-      if (intent) {
-        await setDeepLinkIntent(intent);
-      }
       await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
     }
   }

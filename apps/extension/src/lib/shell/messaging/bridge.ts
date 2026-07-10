@@ -229,7 +229,12 @@ export type BridgeMessage =
   | { type: 'MIGRATION_QUARANTINED' }
   // Deep-link focus intent (panel ↔ service worker)
   | { type: 'CONSUME_DEEP_LINK_INTENT' }
-  | { type: 'DEEP_LINK_INTENT_CONSUMED'; payload: { intent: DeepLinkIntent | null } };
+  | { type: 'DEEP_LINK_INTENT_CONSUMED'; payload: { intent: DeepLinkIntent | null } }
+  // Notification click broadcast (SW → already-open panel): tells a live panel
+  // to re-consume a freshly-written deep-link intent. sidePanel.open() is a
+  // no-op when the panel is already open, so without this the mount effect
+  // would not re-fire and the intent would stay pending.
+  | { type: 'NOTIFICATION_CLICKED' };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

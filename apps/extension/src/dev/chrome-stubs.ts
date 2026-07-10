@@ -512,6 +512,12 @@ function createChromeStubs() {
             storage.deepLinkIntent = null;
             return { type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent } };
           }
+          case 'NOTIFICATION_CLICKED':
+            // SW → live panel broadcast (thread A): fan out to onMessage
+            // listeners so a dev-mode panel can re-consume the intent, mirroring
+            // real Chrome's runtime message delivery.
+            emitRuntimeMessage(message);
+            return null;
           case 'GET_PERSISTED_CONNECTOR_STATUSES':
             return { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT', payload: [] };
           case 'CLEAR_EXTENSION_BADGE':

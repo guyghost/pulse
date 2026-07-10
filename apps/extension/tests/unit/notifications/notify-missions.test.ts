@@ -9,6 +9,7 @@ const recordAlertHistoryEntry = vi.fn();
 const notificationsCreate = vi.fn();
 const sessionGet = vi.fn();
 const sessionSet = vi.fn();
+const sessionRemove = vi.fn();
 
 vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
   getSettings,
@@ -67,6 +68,7 @@ describe('notifyHighScoreMissions', () => {
     recordAlertHistoryEntry.mockResolvedValue(undefined);
     sessionGet.mockResolvedValue({});
     sessionSet.mockResolvedValue(undefined);
+    sessionRemove.mockResolvedValue(undefined);
     notificationsCreate.mockResolvedValue(undefined);
 
     vi.stubGlobal('chrome', {
@@ -74,6 +76,7 @@ describe('notifyHighScoreMissions', () => {
         session: {
           get: sessionGet,
           set: sessionSet,
+          remove: sessionRemove,
         },
       },
       notifications: {
@@ -275,5 +278,41 @@ describe('notifyHighScoreMissions', () => {
 
     expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
     expect(notificationsCreate).not.toHaveBeenCalled();
+  });
+
+  it('writes the deep-link intent BEFORE showing the notification (thread C race)', async () => {
+    const order: string[] = [];
+    notificationsCreate.mockImplementation(async () => {
+      order.push('notify');
+    });
+    sessionSet.mockImplementation(async (payload: unknown) => {
+      if (payload && typeof payload === 'object' && 'deepLinkIntent' in payload) {
+        order.push('intent');
+      }
+    });
+
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
+    await notifyHighScoreMissions([makeMission({ id: 'm1', score: 90 })]);
+
+    const intentIdx = order.indexOf('intent');
+    const notifyIdx = order.indexOf('notify');
+    expect(intentIdx).toBeGreaterThanOrEqual(0);
+    expect(notifyIdx).toBeGreaterThanOrEqual(0);
+    // The intent MUST be persisted first so a fast click can never consume null.
+    expect(intentIdx).toBeLessThan(notifyIdx);
+  });
+
+  it('rolls back the deep-link intent when notification creation fails', async () => {
+    notificationsCreate.mockRejectedValueOnce(new Error('chrome refused'));
+
+    const { notifyHighScoreMissions } =
+      await import('../../../src/lib/shell/notifications/notify-missions');
+    const result = await notifyHighScoreMissions([makeMission({ id: 'm1', score: 90 })]);
+
+    expect(result).toEqual({ shown: false, notifiedMissionIds: [] });
+    // The optimistic intent write must be cleaned up so the next panel open
+    // does not land on missions the user was never actually notified about.
+    expect(sessionRemove).toHaveBeenCalled();
   });
 });

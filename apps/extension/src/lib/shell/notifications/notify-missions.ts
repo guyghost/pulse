@@ -7,6 +7,8 @@ import { getSettings } from '../storage/chrome-storage';
 import { getConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { getSeenIds } from '../storage/seen-missions';
 import { recordAlertHistoryEntry } from '../storage/alert-history';
+import { createDeepLinkIntent } from '../../core/deep-link/deep-link-intent';
+import { setDeepLinkIntent, clearDeepLinkIntent } from '../storage/session-storage';
 
 // ---------------------------------------------------------------------------
 // Rate limit state (in-memory, reset on service worker restart)
@@ -163,6 +165,20 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
   }
 
   try {
+    // Persist the deep-link focus intent BEFORE the notification is shown so a
+    // fast click can never race ahead of the write (thread C). Last-writer-wins:
+    // the most recent notification is what the user expects to land on. If the
+    // notification creation fails below, we roll the intent back so a stale
+    // intent doesn't hijack the next panel open.
+    const intent = createDeepLinkIntent(
+      notifiableMissions.map((mission) => mission.id),
+      'notification',
+      now
+    );
+    if (intent) {
+      await setDeepLinkIntent(intent);
+    }
+
     await chrome.notifications.create('high-score-missions', {
       type: 'basic',
       iconUrl: 'static/icons/icon-128.png',
@@ -194,6 +210,9 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
     };
   } catch (err) {
     console.error('[MissionPulse] Failed to create notification:', err);
+    // Rollback the intent we wrote optimistically above so the next panel open
+    // doesn't land on missions the user was never actually notified about.
+    await clearDeepLinkIntent().catch(() => {});
     return { shown: false, notifiedMissionIds: [] };
   }
 };
@@ -218,6 +237,17 @@ export const setupNotificationClickHandler = (): void => {
         } else {
           // No active tab, open in new tab
           chrome.tabs.create({ url: chrome.runtime.getURL('src/sidepanel/index.html') });
+        }
+
+        // Broadcast to any already-open panel so it re-consumes a freshly-written
+        // deep-link intent. chrome.sidePanel.open() is a no-op when the panel is
+        // already mounted, so without this broadcast the panel's mount effect
+        // would not re-fire and the intent would stay pending (thread A).
+        try {
+          await chrome.runtime.sendMessage({ type: 'NOTIFICATION_CLICKED' });
+        } catch {
+          // Non-critical: if no panel is listening (panel was just opened), the
+          // mount effect handles the consume instead.
         }
       });
 

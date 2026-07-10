@@ -911,6 +911,9 @@ export const MessageSchemas = {
         .nullable(),
     }),
   }),
+  // SW → live panel broadcast: re-consume a pending deep-link intent after a
+  // notification click on an already-open panel. No payload needed.
+  NOTIFICATION_CLICKED: z.object({ type: z.literal('NOTIFICATION_CLICKED') }),
 } as const;
 
 export type MessageType = keyof typeof MessageSchemas;
