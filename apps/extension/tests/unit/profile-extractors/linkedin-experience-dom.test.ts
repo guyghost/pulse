@@ -11,6 +11,10 @@ const DETAIL_FIXTURE = readFileSync(
   resolve(process.cwd(), 'tests/fixtures/linkedin-experience-detail.html'),
   'utf8'
 );
+const SEMANTIC_DETAIL_FIXTURE = readFileSync(
+  resolve(process.cwd(), 'tests/fixtures/linkedin-experience-semantic-detail.html'),
+  'utf8'
+);
 const EMPTY_FIXTURE = readFileSync(
   resolve(process.cwd(), 'tests/fixtures/linkedin-experience-empty.html'),
   'utf8'
@@ -90,6 +94,225 @@ describe('extractLinkedInExperiencesFromDom', () => {
       }),
     ]);
     expect(snapshot.experiences).toHaveLength(3);
+  });
+
+  it('parses current semantic LinkedIn position entities without historical CSS classes', async () => {
+    render(SEMANTIC_DETAIL_FIXTURE);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toHaveLength(2);
+    expect(snapshot.experiences.map((experience) => experience.title)).toEqual([
+      'Technical Lead',
+      'Solution Architect',
+    ]);
+  });
+
+  it('parses a structurally valid generic list row with generated CSS classes', async () => {
+    render(`
+      <main>
+        <section id="experience">
+          <ul>
+            <li class="generated-position-class">
+              <span aria-hidden="true"><strong>Platform Architect</strong></span>
+              <span aria-hidden="true">Fortuneo · Freelance</span>
+              <span aria-hidden="true">févr. 2018 – févr. 2020 · 2 ans</span>
+              <span aria-hidden="true">Paris, France</span>
+            </li>
+            <li class="generated-page-chrome">
+              <span aria-hidden="true">Personnes que vous pourriez connaître</span>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toEqual([
+      expect.objectContaining({
+        title: 'Platform Architect',
+        company: 'Fortuneo',
+        employmentType: 'Freelance',
+      }),
+    ]);
+  });
+
+  it('preserves inherited company context for semantic grouped positions', async () => {
+    render(`
+      <main>
+        <section id="experience">
+          <div role="list">
+            <div role="listitem" data-view-name="profile-component-entity">
+              <span aria-hidden="true"><strong>Acme</strong></span>
+              <span aria-hidden="true">5 ans</span>
+              <div role="list">
+                <div role="listitem" data-view-name="profile-component-entity">
+                  <a href="/in/example/details/experience/?profilePosition=principal">
+                    <span aria-hidden="true"><strong>Principal Engineer</strong></span>
+                  </a>
+                  <span aria-hidden="true">janv. 2024 – aujourd’hui · 2 ans</span>
+                  <span aria-hidden="true">Paris, France</span>
+                </div>
+                <div role="listitem" data-view-name="profile-component-entity">
+                  <a href="/in/example/details/experience/?profilePosition=staff">
+                    <span aria-hidden="true"><strong>Staff Engineer</strong></span>
+                  </a>
+                  <span aria-hidden="true">CDI</span>
+                  <span aria-hidden="true">janv. 2022 – déc. 2023 · 2 ans</span>
+                  <span aria-hidden="true">Lyon, France</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toEqual([
+      expect.objectContaining({ title: 'Principal Engineer', company: 'Acme' }),
+      expect.objectContaining({ title: 'Staff Engineer', company: 'Acme', employmentType: 'CDI' }),
+    ]);
+  });
+
+  it('rejects a strongly identified malformed position instead of merging a partial list', async () => {
+    render(`
+      <main>
+        <section id="experience">
+          <ul>${standaloneRow('valid-position', 'Valid Engineer')}</ul>
+          <div role="listitem" data-view-name="profile-component-entity">
+            <a href="/in/example/details/experience/?profilePosition=malformed-position">
+              <span aria-hidden="true"><strong>Malformed Engineer</strong></span>
+            </a>
+            <span aria-hidden="true">Example Corp · CDI</span>
+          </div>
+        </section>
+      </main>
+    `);
+
+    await expect(extract()).resolves.toEqual({ kind: 'unreadable', experiences: [] });
+  });
+
+  it('ignores an unparseable weak candidate beside a valid position', async () => {
+    render(`
+      <main>
+        <section id="experience">
+          <ul>
+            ${standaloneRow('valid-position', 'Valid Engineer')}
+            <li class="generated-page-chrome">
+              <span aria-hidden="true"><strong>Release history</strong></span>
+              <span aria-hidden="true">2020 – 2022</span>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences.map((experience) => experience.title)).toEqual(['Valid Engineer']);
+  });
+
+  it('keeps a dated description bullet inside its strongly identified position', async () => {
+    render(`
+      <main>
+        <section id="experience">
+          <ul>
+            <li data-entity-urn="urn:li:fsd_profilePosition:strong-parent">
+              <span aria-hidden="true"><strong>Technical Lead</strong></span>
+              <span aria-hidden="true">Acme · Freelance</span>
+              <span aria-hidden="true">janv. 2021 – déc. 2024 · 4 ans</span>
+              <span aria-hidden="true">Paris, France</span>
+              <ul>
+                <li>
+                  <span aria-hidden="true"><strong>Migration phase</strong></span>
+                  <span aria-hidden="true">2020 – 2022</span>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toEqual([
+      expect.objectContaining({ title: 'Technical Lead', company: 'Acme' }),
+    ]);
+  });
+
+  it('does not promote a hyphenated certification line to a date range', async () => {
+    render(`
+      <main>
+        <section id="experience">
+          <ul>
+            ${standaloneRow('valid-position', 'Valid Engineer')}
+            <li class="generated-page-chrome">
+              <span aria-hidden="true"><strong>Security program</strong></span>
+              <span aria-hidden="true">Example Corp · CDI</span>
+              <span aria-hidden="true">ISO-27001 recertified in 2023</span>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences.map((experience) => experience.title)).toEqual(['Valid Engineer']);
+  });
+
+  it('uses a valid representation when the same strong identity also has an incomplete duplicate', async () => {
+    render(`
+      <main>
+        <section id="experience">
+          <ul>${standaloneRow('duplicate-position', 'Canonical Engineer')}</ul>
+          <div role="listitem" data-view-name="profile-component-entity">
+            <a href="/in/example/details/experience/?profilePosition=duplicate-position">
+              <span aria-hidden="true"><strong>Incomplete duplicate</strong></span>
+            </a>
+            <span aria-hidden="true">Example Corp · CDI</span>
+          </div>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences.map((experience) => experience.title)).toEqual([
+      'Canonical Engineer',
+    ]);
   });
 
   it('keeps inherited company separate from date when grouped roles omit employment type', async () => {

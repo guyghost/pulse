@@ -22,7 +22,7 @@ export async function extractLinkedInExperiencesFromDom(
   options: LinkedInExperienceDomOptions
 ): Promise<LinkedInExperienceDomSnapshot> {
   const cleanLine = (value: string | null | undefined): string =>
-    (value ?? '').replace(/[\t\f\v ]+/g, ' ').trim();
+    (value ?? '').replace(/[\t\f\v \u00a0\u202f]+/g, ' ').trim();
 
   const isActionLine = (line: string): boolean =>
     /^(voir plus|show more|afficher plus|see more|modifier|edit|supprimer|delete)(?:\s|$)/i.test(
@@ -32,6 +32,18 @@ export async function extractLinkedInExperiencesFromDom(
     /^\d+\s+(?:an|ans|mois|jour|jours|year|years|month|months|day|days)(?:\s+\d+\s+(?:mois|jours|months|days))?$/i.test(
       line
     );
+  const isDateRangeLine = (line: string): boolean => {
+    const range = cleanLine(line).match(/^(.+?)\s+[–—-]\s+(.+)$/);
+    if (!range) {
+      return false;
+    }
+
+    const [, start = '', end = ''] = range;
+    const hasYear = (value: string): boolean => /\b(19|20)\d{2}\b/.test(value);
+    const isCurrentRoleEnd = (value: string): boolean =>
+      /(?:\b(?:present|current|currently|now|présent|en cours)\b|aujourd['’]hui)/i.test(value);
+    return hasYear(start) && (hasYear(end) || isCurrentRoleEnd(end));
+  };
 
   const visibleLines = (element: Element): string[] => {
     const visibleTextElements = [...element.querySelectorAll('[aria-hidden="true"]')].filter(
@@ -115,22 +127,117 @@ export async function extractLinkedInExperiencesFromDom(
     return null;
   };
 
-  const candidateRows = (root: Element): Element[] => {
-    const preferred = [...root.querySelectorAll('.pvs-list__paged-list-item')];
-    if (preferred.length > 0) {
-      return preferred;
+  const strongPositionSelector =
+    '[data-entity-urn*="profilePosition"], a[href*="profilePosition="]';
+  const rowDiscoverySelector = [
+    strongPositionSelector,
+    '[data-view-name="profile-component-entity"]',
+    '.pvs-list__paged-list-item',
+    'li.artdeco-list__item',
+    '[role="listitem"]',
+    'li',
+  ].join(', ');
+
+  interface CandidateRow {
+    row: Element;
+    strong: boolean;
+    identity: string | undefined;
+  }
+
+  interface ResolvedLeaf extends CandidateRow {
+    inheritedCompany: string | undefined;
+  }
+
+  const rowOwner = (candidate: Element, root: Element): Element => {
+    const structuralOwner = candidate.closest('[role="listitem"], li, .pvs-list__paged-list-item');
+    if (structuralOwner && root.contains(structuralOwner)) {
+      return structuralOwner;
     }
-    return [...root.querySelectorAll('li.artdeco-list__item')];
+
+    const semanticOwner = candidate.closest('[data-view-name="profile-component-entity"]');
+    return semanticOwner && root.contains(semanticOwner) ? semanticOwner : candidate;
   };
 
-  const leafRows = (
-    root: Element
-  ): Array<{ row: Element; inheritedCompany: string | undefined }> => {
-    const candidates = candidateRows(root);
-    const candidateSet = new Set(candidates);
-    const topLevel = candidates.filter((row) => {
+  const positionIdentity = (marker: Element): string | undefined => {
+    const normalize = (value: string): string | undefined => {
+      try {
+        const normalized = decodeURIComponent(value).trim().toLocaleLowerCase();
+        return normalized || undefined;
+      } catch {
+        return undefined;
+      }
+    };
+
+    const entityUrn = marker.getAttribute('data-entity-urn') ?? '';
+    const urnIdentity = entityUrn.match(/profilePosition:(.+)$/i)?.[1];
+    if (urnIdentity) {
+      return normalize(urnIdentity);
+    }
+
+    const href = marker.getAttribute('href');
+    if (!href) {
+      return undefined;
+    }
+    try {
+      const hrefIdentity = new URL(href, window.location.href).searchParams.get('profilePosition');
+      return hrefIdentity ? normalize(hrefIdentity) : undefined;
+    } catch {
+      return undefined;
+    }
+  };
+
+  const hasPositionStructure = (row: Element): boolean => {
+    const lines = visibleLines(row);
+    const dateIndex = lines.findIndex(isDateRangeLine);
+    return dateIndex >= 1;
+  };
+
+  const candidateRows = (root: Element): CandidateRow[] => {
+    const discovered = new Map<Element, CandidateRow>();
+
+    for (const marker of root.querySelectorAll(rowDiscoverySelector)) {
+      const row = rowOwner(marker, root);
+      let candidate = discovered.get(row);
+      if (!candidate) {
+        candidate = { row, strong: false, identity: undefined };
+        discovered.set(row, candidate);
+      }
+
+      if (marker.matches(strongPositionSelector)) {
+        candidate.strong = true;
+        candidate.identity ??= positionIdentity(marker);
+      }
+    }
+
+    const candidates = [...discovered.values()];
+    const strongRows = candidates.filter((candidate) => candidate.strong);
+
+    return candidates.filter((candidate) => {
+      if (candidate.strong) {
+        return true;
+      }
+
+      const containsStrongPosition = strongRows.some(
+        (strongCandidate) =>
+          strongCandidate.row !== candidate.row && candidate.row.contains(strongCandidate.row)
+      );
+      if (containsStrongPosition) {
+        return true;
+      }
+
+      const belongsToStrongPosition = strongRows.some(
+        (strongCandidate) =>
+          strongCandidate.row !== candidate.row && strongCandidate.row.contains(candidate.row)
+      );
+      return !belongsToStrongPosition && hasPositionStructure(candidate.row);
+    });
+  };
+
+  const leafRows = (root: Element, candidates: CandidateRow[]): ResolvedLeaf[] => {
+    const candidateSet = new Set(candidates.map((candidate) => candidate.row));
+    const topLevel = candidates.filter((candidate) => {
       for (
-        let parent = row.parentElement;
+        let parent = candidate.row.parentElement;
         parent && parent !== root;
         parent = parent.parentElement
       ) {
@@ -140,31 +247,31 @@ export async function extractLinkedInExperiencesFromDom(
       }
       return true;
     });
-    const leaves: Array<{ row: Element; inheritedCompany: string | undefined }> = [];
+    const leaves: ResolvedLeaf[] = [];
 
-    for (const row of topLevel) {
+    for (const candidate of topLevel) {
       const descendants = candidates.filter(
-        (candidate) => candidate !== row && row.contains(candidate)
+        (other) => other.row !== candidate.row && candidate.row.contains(other.row)
       );
       if (descendants.length === 0) {
-        leaves.push({ row, inheritedCompany: undefined });
+        leaves.push({ ...candidate, inheritedCompany: undefined });
         continue;
       }
 
-      const groupClone = row.cloneNode(true) as Element;
-      for (const nested of groupClone.querySelectorAll(
-        '.pvs-list__paged-list-item, li.artdeco-list__item'
-      )) {
-        nested.remove();
+      const groupClone = candidate.row.cloneNode(true) as Element;
+      for (const nested of candidateRows(groupClone)) {
+        nested.row.remove();
       }
       const groupCompany = visibleLines(groupClone).find((line) => !isDurationLine(line));
-      const descendantSet = new Set(descendants);
       for (const descendant of descendants) {
         const hasNestedCandidate = descendants.some(
-          (other) => other !== descendant && descendant.contains(other) && descendantSet.has(other)
+          (other) =>
+            other.row !== descendant.row &&
+            descendant.row.contains(other.row) &&
+            candidateSet.has(other.row)
         );
         if (!hasNestedCandidate) {
-          leaves.push({ row: descendant, inheritedCompany: groupCompany });
+          leaves.push({ ...descendant, inheritedCompany: groupCompany });
         }
       }
     }
@@ -179,8 +286,6 @@ export async function extractLinkedInExperiencesFromDom(
   ): RawExperience | null => {
     const lines = visibleLines(row);
     const title = lines[0] ?? '';
-    const isDateRangeLine = (line: string): boolean =>
-      /\b(19|20)\d{2}\b/.test(line) && /[–—-]/.test(line);
     const dateIndex = lines.findIndex(isDateRangeLine);
     const rawDateRange = dateIndex >= 0 ? lines[dateIndex] : undefined;
     const structuralLineBeforeDate = dateIndex > 1 ? (lines[1] ?? '') : '';
@@ -332,6 +437,53 @@ export async function extractLinkedInExperiencesFromDom(
     });
   };
 
+  const resolveExperiences = (
+    root: Element,
+    candidates: CandidateRow[]
+  ): { experiences: RawExperience[]; hasInvalidStrongPosition: boolean } => {
+    interface LeafBucket {
+      leaves: ResolvedLeaf[];
+      strong: boolean;
+    }
+
+    const buckets: LeafBucket[] = [];
+    const bucketByIdentity = new Map<string, LeafBucket>();
+
+    for (const leaf of leafRows(root, candidates)) {
+      if (!leaf.identity) {
+        buckets.push({ leaves: [leaf], strong: leaf.strong });
+        continue;
+      }
+
+      let bucket = bucketByIdentity.get(leaf.identity);
+      if (!bucket) {
+        bucket = { leaves: [], strong: false };
+        bucketByIdentity.set(leaf.identity, bucket);
+        buckets.push(bucket);
+      }
+      bucket.leaves.push(leaf);
+      bucket.strong ||= leaf.strong;
+    }
+
+    const experiences: RawExperience[] = [];
+    let hasInvalidStrongPosition = false;
+    for (const [index, bucket] of buckets.entries()) {
+      const parsed = bucket.leaves
+        .map((leaf) => parseLeaf(leaf.row, leaf.inheritedCompany, index))
+        .find((experience): experience is RawExperience => experience !== null);
+      if (parsed) {
+        experiences.push(parsed);
+      } else if (bucket.strong) {
+        hasInvalidStrongPosition = true;
+      }
+    }
+
+    return {
+      experiences: deduplicateExperiences(experiences),
+      hasInvalidStrongPosition,
+    };
+  };
+
   const snapshot = (kind: 'empty' | 'timeout' | 'unreadable'): LinkedInExperienceDomSnapshot => ({
     kind,
     experiences: [],
@@ -350,11 +502,10 @@ export async function extractLinkedInExperiencesFromDom(
   while (Date.now() <= deadline) {
     const root = resolveRoot();
     const rows = root ? candidateRows(root) : [];
-    const hasParseableExperience = root
-      ? leafRows(root).some(
-          ({ row, inheritedCompany }, index) => parseLeaf(row, inheritedCompany, index) !== null
-        )
-      : false;
+    const resolved = root
+      ? resolveExperiences(root, rows)
+      : { experiences: [], hasInvalidStrongPosition: false };
+    const hasParseableExperience = resolved.experiences.length > 0;
     const bodyText = cleanLine(document.body?.innerText || document.body?.textContent || '');
     const blockedReason = blockedReasonFromText(bodyText);
     if (blockedReason && !hasParseableExperience) {
@@ -397,16 +548,12 @@ export async function extractLinkedInExperiencesFromDom(
             return snapshot('empty');
           }
         } else {
-          const leaves = leafRows(root);
-          const experiences = leaves.map(({ row, inheritedCompany }, index) =>
-            parseLeaf(row, inheritedCompany, index)
-          );
-          if (experiences.length === 0 || experiences.some((experience) => experience === null)) {
+          if (resolved.experiences.length === 0 || resolved.hasInvalidStrongPosition) {
             return snapshot('unreadable');
           }
           return {
             kind: 'ready',
-            experiences: deduplicateExperiences(experiences as RawExperience[]),
+            experiences: resolved.experiences,
           };
         }
       }

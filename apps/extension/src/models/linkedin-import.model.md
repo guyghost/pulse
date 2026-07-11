@@ -247,8 +247,30 @@ The extractor uses structural and accessibility signals, in this order:
 
 1. dedicated `/details/experience/` pathname + the page's main content;
 2. stable `#experience` anchor or an Experience / Expérience heading fallback;
-3. LinkedIn position-row containers, with a conservative list-item fallback;
+3. strong `profilePosition` identities plus weak row-discovery signals
+   (`data-view-name="profile-component-entity"`, `role="listitem"`, and the
+   historical `.pvs-list__paged-list-item` / `li.artdeco-list__item` shapes),
+   then a structurally filtered generic list item inside the resolved Experience
+   root as the last compatibility fallback;
 4. visible/accessibility text nodes inside the resolved position row.
+
+Generated or experiment-specific CSS classes are never the sole gate for a
+position. A nested identity (for example, a `profilePosition` link) is normalized
+to its owning row before parsing. Candidates are classified as `group`,
+`position`, or unrelated `chrome`: groups preserve company context for their
+leaf positions and are never emitted themselves; weak candidates that do not
+have the minimum position structure after inherited context are ignored as page
+chrome. Conversely, a strongly identified `profilePosition` leaf that still
+lacks a required field after group inheritance makes the whole detail snapshot
+`DOM_UNREADABLE`; the importer never drops a malformed identified position and
+merges a partial list. Candidate strength is preserved through parsing: an
+unparseable weak leaf is ignored, while an unparseable strong leaf invalidates
+the snapshot. A strong position row dominates weak descendants such as bullets
+inside its description; those descendants cannot turn the parent into a group
+or become positions themselves. Duplicate hidden/accessibility representations
+of the same canonical `profilePosition` identity form one validation bucket: the
+first parseable representation wins, and the bucket is unreadable only when none
+of its representations is complete.
 
 Line boundaries are captured **before** whitespace normalization. Newlines must
 remain available to distinguish title, company/employment type, date range,
@@ -260,7 +282,9 @@ Field assignment follows these deterministic signals:
 - `title`: first primary/bold line in a leaf position row;
 - `company` + `employmentType`: the company line split once on LinkedIn's middle
   dot separator; the optional right-hand value is preserved as display text;
-- `dateRange`: first line containing a four-digit year and a range separator;
+- `dateRange`: first line whose start contains a four-digit year and whose end,
+  after a whitespace-delimited range separator, contains another year or a
+  localized current-role marker (`Present`, `aujourd’hui`, `en cours`);
 - `location`: first non-duration line immediately after the date line;
 - `description`: remaining prose after structural/action/skill labels;
 - `skills`: values from a whole-line `Compétences` / `Skills` label, either the
@@ -375,6 +399,18 @@ extracting → merging` sequence.
 18. Skills labels are whole-line contracts. Only `Skills` / `Compétences` or
     their colon-delimited inline values are structural; longer prose beginning
     with either word remains in the experience description.
+19. Position discovery is invariant across LinkedIn DOM experiments:
+    `profilePosition` is a strong identity, while semantic entity/list roles and
+    historical classes are weak discovery signals. Unrelated weak candidates
+    cannot invalidate a valid list; a strongly identified malformed leaf still
+    invalidates the complete snapshot after group inheritance and identity
+    deduplication.
+20. Weak descendants of a strong position row are content, not nested positions.
+    A list bullet or skill carrying year-like text cannot replace its owning
+    position or supply group-company context.
+21. Hyphens inside prose or identifiers are not date-range separators. Both
+    temporal bounds must satisfy the date contract before a generic candidate
+    can be promoted to a position.
 
 ## Error and recovery matrix
 
