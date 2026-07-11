@@ -61,7 +61,8 @@ const linkedInPreviewErrors: Record<
 > = {
   'session-required': {
     errorCode: 'session_required',
-    errorMessage: 'Session LinkedIn requise.',
+    errorMessage:
+      'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.',
   },
   'permission-required': {
     errorCode: 'permission_required',
@@ -209,7 +210,12 @@ test.describe('LinkedIn profile import flow', () => {
     await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
 
     // Error messages now appear as toast notifications
-    await expect(page.getByText('Session LinkedIn requise.')).toBeVisible();
+    await expect(
+      page.getByText(
+        'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.',
+        { exact: true }
+      )
+    ).toBeVisible();
   });
 
   test('shows recovery guidance for missing LinkedIn permissions in toast', async ({ page }) => {

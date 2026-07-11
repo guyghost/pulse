@@ -111,6 +111,10 @@ function extractorCode(result: Awaited<ReturnType<LinkedInProfileExtractor['extr
   return result.ok ? null : result.error.context?.profileExtractorCode;
 }
 
+function extractorMessage(result: Awaited<ReturnType<LinkedInProfileExtractor['extractProfile']>>) {
+  return result.ok ? null : result.error.message;
+}
+
 describe('LinkedInProfileExtractor', () => {
   it('detects an existing LinkedIn browser session without storing credentials', async () => {
     const extractor = new LinkedInProfileExtractor(createChromeDouble());
@@ -231,6 +235,9 @@ describe('LinkedInProfileExtractor', () => {
 
     expect(result.ok).toBe(false);
     expect(extractorCode(result)).toBe('session_required');
+    expect(extractorMessage(result)).toBe(
+      'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.'
+    );
   });
 
   it('returns session_required when the active profile tab has no LinkedIn session cookie', async () => {
@@ -243,6 +250,9 @@ describe('LinkedInProfileExtractor', () => {
 
     expect(result.ok).toBe(false);
     expect(extractorCode(result)).toBe('session_required');
+    expect(extractorMessage(result)).toBe(
+      'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.'
+    );
     expect(chromeDouble.scripting?.executeScript).not.toHaveBeenCalled();
   });
 
@@ -259,6 +269,9 @@ describe('LinkedInProfileExtractor', () => {
 
     expect(result.ok).toBe(false);
     expect(extractorCode(result)).toBe('rate_limited_or_blocked');
+    expect(extractorMessage(result)).toBe(
+      'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.'
+    );
   });
 
   it('returns rate_limited_or_blocked when LinkedIn serves a challenge DOM on a profile URL', async () => {
@@ -280,6 +293,9 @@ describe('LinkedInProfileExtractor', () => {
 
     expect(result.ok).toBe(false);
     expect(extractorCode(result)).toBe('rate_limited_or_blocked');
+    expect(extractorMessage(result)).toBe(
+      'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.'
+    );
     expect(chromeDouble.tabs?.create).not.toHaveBeenCalled();
   });
 

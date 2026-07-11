@@ -9,16 +9,16 @@ import {
   createProfileExtractorError,
   type ProfileExtractorErrorCode,
 } from './profile-extractor-errors';
+import {
+  LINKEDIN_SESSION_REQUIRED_COPY,
+  LINKEDIN_VERIFICATION_REQUIRED_COPY,
+} from './linkedin-import-copy';
 
 export const DETAIL_PAGE_LOAD_TIMEOUT_MS = 15_000;
 export const DETAIL_LIST_STABILIZE_TIMEOUT_MS = 10_000;
 export const DETAIL_LIST_OBSERVATION_MS = 500;
 
 const PROFILE_COPY = 'Ouvrez le profil LinkedIn à importer puis réessayez.';
-const SESSION_COPY =
-  'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.';
-const BLOCKED_COPY =
-  'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.';
 const LOAD_COPY =
   'La page complète des expériences LinkedIn n’a pas pu être chargée. Rechargez LinkedIn puis relancez l’import.';
 const DOM_COPY =
@@ -96,11 +96,23 @@ function waitForDetailTab(
       }
     };
 
-    tabs.onUpdated.addListener(onUpdated);
-    tabs.onRemoved.addListener(onRemoved);
     const timer = setTimeout(() => {
       settle(() => reject(new Error('LinkedIn detail tab load timed out.')));
     }, timeoutMs);
+    tabs.onUpdated.addListener(onUpdated);
+    tabs.onRemoved.addListener(onRemoved);
+
+    // The tab can reach `complete` between tabs.create() resolving and listener
+    // registration. Re-read it only after both listeners are installed so that
+    // neither the old state nor a subsequent update can be lost.
+    void tabs.get(tabId).then(
+      (tab) => {
+        if (tab.status === 'complete') {
+          settle(() => resolve(tab));
+        }
+      },
+      (error: unknown) => settle(() => reject(error))
+    );
   });
 }
 
@@ -133,9 +145,14 @@ function errorForSnapshot(
   now: number
 ): AppError {
   if (snapshot.kind === 'blocked') {
-    return createProfileExtractorError('rate_limited_or_blocked', BLOCKED_COPY, now, {
-      reason: snapshot.blockedReason,
-    });
+    return createProfileExtractorError(
+      'rate_limited_or_blocked',
+      LINKEDIN_VERIFICATION_REQUIRED_COPY,
+      now,
+      {
+        reason: snapshot.blockedReason,
+      }
+    );
   }
   if (snapshot.kind === 'unreadable') {
     return createProfileExtractorError('dom_changed', DOM_COPY, now);
@@ -167,9 +184,9 @@ export async function loadCompleteLinkedInExperiences(
     if (urlError) {
       const message =
         urlError === 'session_required'
-          ? SESSION_COPY
+          ? LINKEDIN_SESSION_REQUIRED_COPY
           : urlError === 'rate_limited_or_blocked'
-            ? BLOCKED_COPY
+            ? LINKEDIN_VERIFICATION_REQUIRED_COPY
             : LOAD_COPY;
       return err(createProfileExtractorError(urlError, message, now, { url: readyTab.url }));
     }

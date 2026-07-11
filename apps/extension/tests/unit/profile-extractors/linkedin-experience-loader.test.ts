@@ -30,6 +30,7 @@ interface ChromeDoubleOptions {
   createdTab?: chrome.tabs.Tab;
   createError?: Error;
   readyTab?: chrome.tabs.Tab;
+  getError?: Error;
   snapshot?: LinkedInExperienceDomSnapshot | undefined;
   executeError?: Error;
   removeError?: Error;
@@ -54,7 +55,12 @@ function createChromeDouble(options: ChromeDoubleOptions = {}) {
         }
         return createdTab;
       }),
-      get: vi.fn(async () => readyTab),
+      get: vi.fn(async () => {
+        if (options.getError) {
+          throw options.getError;
+        }
+        return readyTab;
+      }),
       remove: vi.fn(async () => {
         if (options.removeError) {
           throw options.removeError;
@@ -275,6 +281,39 @@ describe('loadCompleteLinkedInExperiences', () => {
 
     expect(result).toEqual({ ok: true, value: [ROW] });
     expect(double.api.tabs.get).toHaveBeenCalledWith(99);
+    expectSingleCleanup(double);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('re-reads a loading tab immediately after subscribing so a lost complete event cannot time out', async () => {
+    vi.useFakeTimers();
+    const double = createChromeDouble({
+      createdTab: { id: 99, url: DETAIL_URL, status: 'loading' } as chrome.tabs.Tab,
+      readyTab: { id: 99, url: DETAIL_URL, status: 'complete' } as chrome.tabs.Tab,
+    });
+
+    const result = await loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW);
+
+    expect(result).toEqual({ ok: true, value: [ROW] });
+    expect(double.api.tabs.get).toHaveBeenCalledTimes(1);
+    expect(double.api.tabs.get).toHaveBeenCalledWith(99);
+    expectSingleCleanup(double);
+    expect(vi.getTimerCount()).toBe(0);
+  });
+
+  it('cleans up listeners once when the immediate tab re-read rejects', async () => {
+    vi.useFakeTimers();
+    const double = createChromeDouble({
+      createdTab: { id: 99, url: DETAIL_URL, status: 'loading' } as chrome.tabs.Tab,
+      getError: new Error('No tab with id 99'),
+    });
+
+    const result = await loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW);
+    double.emitRemoved();
+
+    expect(extractorCode(result)).toBe('detail_page_unavailable');
+    expect(result.ok ? null : result.error.context?.cause).toBe('No tab with id 99');
+    expect(double.api.scripting.executeScript).not.toHaveBeenCalled();
     expectSingleCleanup(double);
     expect(vi.getTimerCount()).toBe(0);
   });

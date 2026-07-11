@@ -16,6 +16,10 @@ import {
   createProfileExtractorError,
   type ProfileExtractorErrorCode,
 } from './profile-extractor-errors';
+import {
+  LINKEDIN_SESSION_REQUIRED_COPY,
+  LINKEDIN_VERIFICATION_REQUIRED_COPY,
+} from './linkedin-import-copy';
 
 interface LinkedInDomProfileSnapshot {
   profileUrl: string;
@@ -272,8 +276,10 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
         createProfileExtractorError(
           urlError,
           urlError === 'session_required'
-            ? 'LinkedIn requires a browser session before import.'
-            : 'The active tab is not a LinkedIn profile page.',
+            ? LINKEDIN_SESSION_REQUIRED_COPY
+            : urlError === 'rate_limited_or_blocked'
+              ? LINKEDIN_VERIFICATION_REQUIRED_COPY
+              : 'The active tab is not a LinkedIn profile page.',
           now,
           { url: tab.url }
         )
@@ -298,12 +304,9 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
     }
     if (!session.value) {
       return err(
-        createProfileExtractorError(
-          'session_required',
-          'LinkedIn requires an authenticated browser session before import.',
-          now,
-          { url: tab.url }
-        )
+        createProfileExtractorError('session_required', LINKEDIN_SESSION_REQUIRED_COPY, now, {
+          url: tab.url,
+        })
       );
     }
 
@@ -338,7 +341,7 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
         return err(
           createProfileExtractorError(
             'rate_limited_or_blocked',
-            'LinkedIn blocked profile extraction with a challenge or checkpoint.',
+            LINKEDIN_VERIFICATION_REQUIRED_COPY,
             now,
             { url: tab.url, reason: snapshot.blockedReason }
           )
