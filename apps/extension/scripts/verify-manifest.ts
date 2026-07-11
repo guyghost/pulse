@@ -2,13 +2,18 @@
 /**
  * verify-manifest.ts - Validate Chrome extension manifest.json
  *
- * Usage: tsx scripts/verify-manifest.ts [manifest-path] [--expected-version <semver>]
+ * Usage: tsx scripts/verify-manifest.ts [manifest-path] [--expected-version <semver>] [--post-build]
  *
  * Validates that manifest.json conforms to Chrome Extension Manifest V3
  * requirements and contains all required fields.
  *
  * Options:
  *   --expected-version <semver>  Fail if manifest version doesn't match (used in CI release)
+ *   --post-build                 Run post-build checks on a filtered dist/manifest.json:
+ *                                no excluded-connector patterns leak through, and every
+ *                                shipped connector's declared host_permissions are present.
+ *                                Without it, runs the source-manifest full-catalog coverage
+ *                                check instead.
  *
  * Exit codes:
  *   0 - Valid manifest
@@ -19,6 +24,8 @@ import { readFileSync, existsSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { z } from 'zod';
+import { getAllConnectorsMeta, ALL_CONNECTOR_IDS } from '../src/lib/shell/connectors/meta';
+import { resolveIncludedConnectors, type ConnectorConfig } from './resolve-connectors';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = dirname(__filename);
@@ -140,13 +147,93 @@ export const validateLinkedInProfileImportPermissions = (
   return errors.length === 0 ? { valid: true } : { valid: false, errors };
 };
 
+/**
+ * Extracts the registrable (last-two-label) domain from a connector URL,
+ * e.g. `https://www.cherry-pick.io` → `cherry-pick.io`,
+ * `https://app.collective.work/` → `collective.work`.
+ */
+export const registrableDomainOf = (url: string): string => {
+  const hostname = new URL(url).hostname.replace(/^www\./, '');
+  const parts = hostname.split('.');
+  return parts.slice(-2).join('.');
+};
+
+export interface HostPermissionConnector {
+  id: string;
+  name: string;
+  url: string;
+  hostPermissions: readonly string[];
+}
+
+/**
+ * Validates that every host_permission pattern declared by every connector in
+ * `connectors` is present in the manifest. Checks each declared pattern
+ * exactly (not a domain substring) so a connector owning several patterns
+ * (e.g. Malt's `.fr` and `.io`) cannot pass when only one is present. Used on
+ * the SOURCE manifest (which must cover the full catalog so any build subset
+ * finds its patterns).
+ */
+export const validateHostPermissionCoverage = (
+  manifest: Pick<ManifestV3, 'host_permissions'>,
+  connectors: readonly HostPermissionConnector[]
+): { valid: true } | { valid: false; errors: string[] } => {
+  const manifestPatterns = new Set(manifest.host_permissions ?? []);
+  const errors: string[] = [];
+
+  for (const connector of connectors) {
+    for (const pattern of connector.hostPermissions) {
+      if (!manifestPatterns.has(pattern)) {
+        errors.push(`host_permissions missing pattern "${pattern}" for ${connector.name}`);
+      }
+    }
+  }
+
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+};
+
+/**
+ * Validates least-privilege: no host_permission pattern in the manifest is
+ * owned by a connector NOT in `shippedConnectors`. Use on a FILTERED build
+ * output (dist/manifest.json) to confirm excluded connectors left no patterns
+ * behind. Patterns not owned by ANY connector in `allConnectors` (infra like
+ * Supabase) are always allowed.
+ */
+export const validateNoExcludedConnectorPatterns = (
+  manifest: Pick<ManifestV3, 'host_permissions'>,
+  allConnectors: readonly HostPermissionConnector[],
+  shippedConnectors: readonly HostPermissionConnector[]
+): { valid: true } | { valid: false; errors: string[] } => {
+  const hostPermissions = manifest.host_permissions ?? [];
+  const shippedPatterns = new Set<string>(shippedConnectors.flatMap((c) => c.hostPermissions));
+  const allOwnedPatterns = new Set<string>(allConnectors.flatMap((c) => c.hostPermissions));
+  const errors: string[] = [];
+
+  for (const pattern of hostPermissions) {
+    // Pattern not owned by any connector (infra) — always fine.
+    if (!allOwnedPatterns.has(pattern)) {
+      continue;
+    }
+    // Owned by a shipped connector — fine.
+    if (shippedPatterns.has(pattern)) {
+      continue;
+    }
+    // Owned by a connector, but that connector is not shipped — leak.
+    errors.push(
+      `host_permission "${pattern}" is owned by an excluded connector — least-privilege violation`
+    );
+  }
+
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+};
+
 // Pure argument parsing — no side effects
 
 export const parseArgs = (
   rawArgs: string[]
-): { manifestPath: string | null; expectedVersion: string | null } => {
+): { manifestPath: string | null; expectedVersion: string | null; postBuild: boolean } => {
   let manifestPath: string | null = null;
   let expectedVersion: string | null = null;
+  let postBuild = false;
 
   const args = [...rawArgs];
   while (args.length > 0) {
@@ -160,18 +247,24 @@ export const parseArgs = (
       if (value !== undefined) {
         expectedVersion = value;
       }
+    } else if (arg === '--post-build') {
+      postBuild = true;
     } else if (!arg.startsWith('--')) {
       manifestPath = arg;
     }
   }
 
-  return { manifestPath, expectedVersion };
+  return { manifestPath, expectedVersion, postBuild };
 };
 
 // Main function
 
 export const main = (): void => {
-  const { manifestPath: manifestPathArg, expectedVersion } = parseArgs(process.argv.slice(2));
+  const {
+    manifestPath: manifestPathArg,
+    expectedVersion,
+    postBuild,
+  } = parseArgs(process.argv.slice(2));
   const projectRoot = resolve(__dirname, '..');
 
   const manifestPath = manifestPathArg
@@ -247,6 +340,72 @@ export const main = (): void => {
     } else {
       console.log('✅ Version consistency check passed');
     }
+  }
+
+  // Connector host_permission checks. The catalog is the single source of
+  // truth for which patterns each connector owns (see meta.ts).
+  const allConnectors: HostPermissionConnector[] = getAllConnectorsMeta().map((c) => ({
+    id: c.id,
+    name: c.name,
+    url: c.url,
+    hostPermissions: c.hostPermissions,
+  }));
+
+  if (postBuild) {
+    // Post-build (dist/manifest.json): enforce least-privilege. No pattern
+    // owned by an excluded connector may survive the filter, and every
+    // shipped connector's declared patterns must be present.
+    const configPath = resolve(projectRoot, 'connectors.config.json');
+    const connectorConfig: ConnectorConfig = existsSync(configPath)
+      ? (() => {
+          try {
+            return JSON.parse(readFileSync(configPath, 'utf-8')) as ConnectorConfig;
+          } catch {
+            return {};
+          }
+        })()
+      : {};
+    const resolution = resolveIncludedConnectors({
+      allIds: [...ALL_CONNECTOR_IDS],
+      config: connectorConfig,
+      env: process.env,
+    });
+    const shippedIds = new Set(resolution.included);
+    const shippedConnectors = allConnectors.filter((c) => shippedIds.has(c.id));
+
+    const excludedResult = validateNoExcludedConnectorPatterns(
+      schemaResult.data,
+      allConnectors,
+      shippedConnectors
+    );
+    if (!excludedResult.valid) {
+      console.error('❌ Excluded connector patterns leaked into built manifest:\n');
+      excludedResult.errors.forEach((error) => console.error(`  - ${error}`));
+      process.exit(1);
+    }
+    console.log('✅ No excluded connector patterns in built manifest');
+
+    const shippedCoverageResult = validateHostPermissionCoverage(
+      schemaResult.data,
+      shippedConnectors
+    );
+    if (!shippedCoverageResult.valid) {
+      console.error('❌ Built manifest missing shipped connector host_permissions:\n');
+      shippedCoverageResult.errors.forEach((error) => console.error(`  - ${error}`));
+      process.exit(1);
+    }
+    console.log('✅ Shipped connector host_permissions coverage check passed');
+  } else {
+    // Source manifest (src/manifest.json): must cover the FULL catalog so any
+    // build subset can find its patterns. Guards against forgetting to add
+    // host_permissions when a connector is registered.
+    const coverageResult = validateHostPermissionCoverage(schemaResult.data, allConnectors);
+    if (!coverageResult.valid) {
+      console.error('❌ Source manifest missing connector host_permissions:\n');
+      coverageResult.errors.forEach((error) => console.error(`  - ${error}`));
+      process.exit(1);
+    }
+    console.log('✅ Connector host_permissions coverage check passed');
   }
 
   // Summary

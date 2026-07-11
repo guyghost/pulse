@@ -9,7 +9,16 @@
 #   version - Optional version to set (e.g., "1.0.0")
 #
 # Environment:
-#   NODE_ENV - Set to "production" by default
+#   NODE_ENV              - Set to "production" by default
+#   CONNECTORS_INCLUDE    - Comma-separated connector IDs to ship (overrides config).
+#                           When set, determines the output entirely (all others excluded).
+#   CONNECTORS_EXCLUDE    - Comma-separated connector IDs to drop (overrides config).
+#                           Ignored if CONNECTORS_INCLUDE is set.
+#                           Example: CONNECTORS_EXCLUDE=malt,collective ./scripts/build-extension.sh
+#
+#   When neither env var is set, apps/extension/connectors.config.json is used
+#   (default: { "exclude": ["malt", "collective"] }).
+#   See: src/models/connector-build-config.model.md
 #
 # Exit codes:
 #   0 - Success
@@ -97,6 +106,16 @@ verify_manifest() {
     log_success "manifest.json is valid"
 }
 
+# Verify the built dist/manifest.json (post-filter): no excluded-connector
+# patterns leak through, and every shipped connector's host_permissions are
+# present. Resolves the shipped set from connectors.config.json + env vars,
+# matching what vite.config.ts applied at build time.
+verify_built_manifest() {
+    log_info "Verifying built dist/manifest.json (post-build connector checks)..."
+    pnpm tsx "$SCRIPT_DIR/verify-manifest.ts" "$PROJECT_ROOT/dist/manifest.json" --post-build
+    log_success "Built manifest passes post-build connector checks"
+}
+
 # Install dependencies
 install_deps() {
     log_info "Installing dependencies..."
@@ -134,6 +153,14 @@ create_zip() {
 print_summary() {
     local version
     version=$(node -p "require('$PROJECT_ROOT/package.json').version")
+    local connectors_desc
+    if [[ -n "${CONNECTORS_INCLUDE:-}" ]]; then
+        connectors_desc="include=$CONNECTORS_INCLUDE"
+    elif [[ -n "${CONNECTORS_EXCLUDE:-}" ]]; then
+        connectors_desc="exclude=$CONNECTORS_EXCLUDE"
+    else
+        connectors_desc="via connectors.config.json"
+    fi
 
     echo ""
     echo "======================================"
@@ -141,6 +168,7 @@ print_summary() {
     echo "======================================"
     echo "  Version:    $version"
     echo "  Env:        $NODE_ENV"
+    echo "  Connectors: $connectors_desc"
     echo "  Output:     $PROJECT_ROOT/dist/"
     echo "  ZIP:        $PROJECT_ROOT/missionpulse-${version}.zip"
     echo "======================================"
@@ -167,6 +195,7 @@ main() {
 
     verify_manifest
     run_build
+    verify_built_manifest
     create_zip
     print_summary
 

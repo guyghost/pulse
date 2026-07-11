@@ -1,6 +1,7 @@
 import type { PlatformConnector } from './platform-connector';
 import type { Result, AppError } from '$lib/core/errors';
 import type { ConnectorId } from './meta';
+import { INCLUDED_CONNECTOR_IDS } from './build-config';
 import { handleError, isRetryable } from '../errors/error-handler';
 export { getConnectorsMeta, type ConnectorMeta, type ConnectorId } from './meta';
 
@@ -24,18 +25,32 @@ const CONNECTOR_REGISTRY = {
   malt: () => Promise.resolve(new MaltConnector()),
 } satisfies Record<ConnectorId, () => Promise<PlatformConnector>>;
 
+const INCLUDED_SET: ReadonlySet<ConnectorId> = new Set(INCLUDED_CONNECTOR_IDS);
+
 /**
- * Get list of all available connector IDs
+ * True if a connector id ships in this build (not filtered out by
+ * connectors.config.json / CONNECTORS_INCLUDE/EXCLUDE).
+ */
+export function isConnectorIncluded(id: ConnectorId): boolean {
+  return INCLUDED_SET.has(id);
+}
+
+/**
+ * Get list of connector IDs shipped in this build.
+ * Excluded connectors are omitted entirely — the scanner cannot reach them.
  */
 export function getConnectorIds(): ConnectorId[] {
-  return Object.keys(CONNECTOR_REGISTRY) as ConnectorId[];
+  return (Object.keys(CONNECTOR_REGISTRY) as ConnectorId[]).filter(isConnectorIncluded);
 }
 
 /**
  * Load a connector by ID asynchronously
- * @returns The connector instance or null if not found
+ * @returns The connector instance or null if not found OR excluded from this build
  */
 export async function getConnector(id: string): Promise<PlatformConnector | null> {
+  if (!INCLUDED_SET.has(id as ConnectorId)) {
+    return null;
+  }
   const factory = CONNECTOR_REGISTRY[id as ConnectorId];
   if (!factory) {
     return null;

@@ -6,8 +6,11 @@ import {
   validateLinkedInProfileImportPermissions,
   validateSchema,
   validateVersionConsistency,
+  validateHostPermissionCoverage,
+  validateNoExcludedConnectorPatterns,
+  registrableDomainOf,
 } from '../../../scripts/verify-manifest.ts';
-import { getConnectorsMeta } from '../../../src/lib/shell/connectors/meta';
+import { getAllConnectorsMeta } from '../../../src/lib/shell/connectors/meta';
 
 // ── Minimal valid manifest fixture ──────────────────────────────────
 
@@ -373,6 +376,7 @@ describe('parseArgs', () => {
     expect(parseArgs(['dist/manifest.json', '--expected-version', '1.2.3'])).toEqual({
       manifestPath: 'dist/manifest.json',
       expectedVersion: '1.2.3',
+      postBuild: false,
     });
   });
 
@@ -380,6 +384,7 @@ describe('parseArgs', () => {
     expect(parseArgs(['--expected-version', '1.2.3'])).toEqual({
       manifestPath: null,
       expectedVersion: '1.2.3',
+      postBuild: false,
     });
   });
 
@@ -387,6 +392,15 @@ describe('parseArgs', () => {
     expect(parseArgs(['dist/manifest.json', '--verbose'])).toEqual({
       manifestPath: 'dist/manifest.json',
       expectedVersion: null,
+      postBuild: false,
+    });
+  });
+
+  it('should enable post-build mode with --post-build', () => {
+    expect(parseArgs(['dist/manifest.json', '--post-build'])).toEqual({
+      manifestPath: 'dist/manifest.json',
+      expectedVersion: null,
+      postBuild: true,
     });
   });
 });
@@ -425,17 +439,6 @@ describe('validateLinkedInProfileImportPermissions', () => {
 
 describe('host_permissions coverage', () => {
   /**
-   * Extracts the registrable (last-two-label) domain from a connector URL,
-   * e.g. `https://www.cherry-pick.io` → `cherry-pick.io`,
-   * `https://app.collective.work/` → `collective.work`.
-   */
-  const registrableDomain = (url: string): string => {
-    const hostname = new URL(url).hostname.replace(/^www\./, '');
-    const parts = hostname.split('.');
-    return parts.slice(-2).join('.');
-  };
-
-  /**
    * Reads the real src/manifest.json and verifies every registered
    * connector has at least one matching host_permission entry.
    * This guards against forgetting to add host_permissions when a
@@ -457,19 +460,109 @@ describe('host_permissions coverage', () => {
     expect(hasMaltIo).toBe(true);
   });
 
-  it('should include host_permissions for all registered connectors', () => {
-    // Derived from the connector registry so this test stays in sync when
-    // connectors are added or removed — no hardcoded list to forget updating.
-    // The Malt `.io` domain is covered by the explicit test above.
-    const connectorDomains = getConnectorsMeta().map((c) => ({
-      name: c.name,
-      domain: registrableDomain(c.url),
-    }));
+  it('should include host_permissions for all registered connectors (via validateHostPermissionCoverage)', () => {
+    // The source manifest must cover the FULL catalog so any build subset
+    // finds its patterns. getAllConnectorsMeta() returns the full catalog.
+    const result = validateHostPermissionCoverage(
+      { host_permissions: hostPermissions },
+      getAllConnectorsMeta().map((c) => ({
+        id: c.id,
+        name: c.name,
+        url: c.url,
+        hostPermissions: c.hostPermissions,
+      }))
+    );
+    expect(result.valid).toBe(true);
+  });
 
-    for (const { name, domain } of connectorDomains) {
-      const hasPermission = hostPermissions.some((h) => h.includes(domain));
-      expect(hasPermission, `host_permissions missing entry for ${name} (${domain})`).toBe(true);
+  it('should report a missing pattern when a connector owns several and only one is present', () => {
+    // Malt owns both *.malt.fr and *.malt.io. A manifest that only has the
+    // .fr pattern must fail the exact-match coverage check.
+    const result = validateHostPermissionCoverage({ host_permissions: ['https://*.malt.fr/*'] }, [
+      {
+        id: 'malt',
+        name: 'Malt',
+        url: 'https://www.malt.fr',
+        hostPermissions: ['https://*.malt.fr/*', 'https://*.malt.io/*'],
+      },
+    ]);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.includes('malt.io'))).toBe(true);
     }
+  });
+
+  it('should report missing host_permissions when a connector is uncovered', () => {
+    const result = validateHostPermissionCoverage({ host_permissions: ['https://example.com/*'] }, [
+      {
+        id: 'malt',
+        name: 'Malt',
+        url: 'https://www.malt.fr',
+        hostPermissions: ['https://*.malt.fr/*'],
+      },
+    ]);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors[0]).toContain('Malt');
+      expect(result.errors[0]).toContain('malt.fr');
+    }
+  });
+});
+
+describe('registrableDomainOf', () => {
+  it('extracts last-two-label domain', () => {
+    expect(registrableDomainOf('https://www.cherry-pick.io')).toBe('cherry-pick.io');
+    expect(registrableDomainOf('https://app.collective.work/')).toBe('collective.work');
+    expect(registrableDomainOf('https://www.malt.fr')).toBe('malt.fr');
+  });
+});
+
+describe('validateNoExcludedConnectorPatterns', () => {
+  const ALL = getAllConnectorsMeta().map((c) => ({
+    id: c.id,
+    name: c.name,
+    url: c.url,
+    hostPermissions: c.hostPermissions,
+  }));
+
+  it('passes when manifest only contains shipped connector patterns + infra', () => {
+    // Ship everything except malt; manifest has no malt patterns.
+    const shipped = ALL.filter((c) => c.id !== 'malt');
+    const maltPatterns = ALL.find((c) => c.id === 'malt')!.hostPermissions;
+    const manifestPatterns = [
+      ...shipped.flatMap((c) => c.hostPermissions),
+      'https://supabase.co/*', // infra — not owned by any connector
+    ].filter((p) => !maltPatterns.includes(p));
+
+    const result = validateNoExcludedConnectorPatterns(
+      { host_permissions: manifestPatterns },
+      ALL,
+      shipped
+    );
+    expect(result.valid).toBe(true);
+  });
+
+  it('fails when a filtered manifest still contains an excluded connector pattern', () => {
+    const shipped = ALL.filter((c) => c.id !== 'malt');
+    // Simulate a build that forgot to strip malt patterns.
+    const result = validateNoExcludedConnectorPatterns(
+      { host_permissions: ['https://*.malt.fr/*', 'https://*.free-work.com/*'] },
+      ALL,
+      shipped
+    );
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.includes('malt.fr'))).toBe(true);
+    }
+  });
+
+  it('allows unowned infra patterns (Supabase, missionpulse.app)', () => {
+    const result = validateNoExcludedConnectorPatterns(
+      { host_permissions: ['https://supabase.co/*', 'https://missionpulse.app/*'] },
+      ALL,
+      []
+    );
+    expect(result.valid).toBe(true);
   });
 });
 
