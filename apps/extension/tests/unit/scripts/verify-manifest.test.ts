@@ -10,7 +10,7 @@ import {
   validateNoExcludedConnectorPatterns,
   registrableDomainOf,
 } from '../../../scripts/verify-manifest.ts';
-import { getConnectorsMeta, getAllConnectorsMeta } from '../../../src/lib/shell/connectors/meta';
+import { getAllConnectorsMeta } from '../../../src/lib/shell/connectors/meta';
 
 // ── Minimal valid manifest fixture ──────────────────────────────────
 
@@ -376,6 +376,7 @@ describe('parseArgs', () => {
     expect(parseArgs(['dist/manifest.json', '--expected-version', '1.2.3'])).toEqual({
       manifestPath: 'dist/manifest.json',
       expectedVersion: '1.2.3',
+      postBuild: false,
     });
   });
 
@@ -383,6 +384,7 @@ describe('parseArgs', () => {
     expect(parseArgs(['--expected-version', '1.2.3'])).toEqual({
       manifestPath: null,
       expectedVersion: '1.2.3',
+      postBuild: false,
     });
   });
 
@@ -390,6 +392,15 @@ describe('parseArgs', () => {
     expect(parseArgs(['dist/manifest.json', '--verbose'])).toEqual({
       manifestPath: 'dist/manifest.json',
       expectedVersion: null,
+      postBuild: false,
+    });
+  });
+
+  it('should enable post-build mode with --post-build', () => {
+    expect(parseArgs(['dist/manifest.json', '--post-build'])).toEqual({
+      manifestPath: 'dist/manifest.json',
+      expectedVersion: null,
+      postBuild: true,
     });
   });
 });
@@ -451,18 +462,44 @@ describe('host_permissions coverage', () => {
 
   it('should include host_permissions for all registered connectors (via validateHostPermissionCoverage)', () => {
     // The source manifest must cover the FULL catalog so any build subset
-    // finds its patterns. getConnectorsMeta() returns the full catalog in
-    // vitest (build-config falls back when the define is absent).
+    // finds its patterns. getAllConnectorsMeta() returns the full catalog.
     const result = validateHostPermissionCoverage(
       { host_permissions: hostPermissions },
-      getConnectorsMeta().map((c) => ({ id: c.id, name: c.name, url: c.url }))
+      getAllConnectorsMeta().map((c) => ({
+        id: c.id,
+        name: c.name,
+        url: c.url,
+        hostPermissions: c.hostPermissions,
+      }))
     );
     expect(result.valid).toBe(true);
   });
 
+  it('should report a missing pattern when a connector owns several and only one is present', () => {
+    // Malt owns both *.malt.fr and *.malt.io. A manifest that only has the
+    // .fr pattern must fail the exact-match coverage check.
+    const result = validateHostPermissionCoverage({ host_permissions: ['https://*.malt.fr/*'] }, [
+      {
+        id: 'malt',
+        name: 'Malt',
+        url: 'https://www.malt.fr',
+        hostPermissions: ['https://*.malt.fr/*', 'https://*.malt.io/*'],
+      },
+    ]);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors.some((e) => e.includes('malt.io'))).toBe(true);
+    }
+  });
+
   it('should report missing host_permissions when a connector is uncovered', () => {
     const result = validateHostPermissionCoverage({ host_permissions: ['https://example.com/*'] }, [
-      { id: 'malt', name: 'Malt', url: 'https://www.malt.fr' },
+      {
+        id: 'malt',
+        name: 'Malt',
+        url: 'https://www.malt.fr',
+        hostPermissions: ['https://*.malt.fr/*'],
+      },
     ]);
     expect(result.valid).toBe(false);
     if (!result.valid) {

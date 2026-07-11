@@ -104,8 +104,12 @@ Loads `resolveIncludedConnectors()` once at config-eval time and:
 
 1. **Manifest filter** — rewrites `manifest.host_permissions` to keep only
    patterns owned by an `included` connector. Ownership is declared in
-   `meta.ts` (`ConnectorMeta.hostPermissions: string[]`). Patterns not owned
-   by any connector (e.g. the Supabase host) are always kept.
+   `meta.ts` (`ConnectorMeta.hostPermissions: string[]`). Patterns owned by
+   an excluded connector are dropped; patterns not owned by any connector
+   (e.g. the extension's own `missionpulse.app` host) are always kept.
+   Connector-owned infra hosts are declared in that connector's
+   `hostPermissions` so they travel with it — e.g. Hiway's Supabase REST host
+   is listed under Hiway and drops out when Hiway is excluded.
 2. **Compile-time define** — exposes the resolved list as
    `__PULSE_INCLUDED_CONNECTORS__` (string array literal) for runtime code.
 
@@ -191,7 +195,9 @@ Manifest coverage (`verify-manifest.test.ts`):
 - Connector `host_permissions` check now iterates the **resolved** included
   set, not the full catalog — so excluding `malt` no longer fails the Malt
   host_permission assertion.
-- Supabase / non-connector patterns are always retained.
+- Non-connector patterns (the extension's own `missionpulse.app` host) are
+  always retained. Connector-owned infra hosts (Hiway's Supabase REST host)
+  are declared under their owning connector so they drop with it.
 
 ## OpenSpec change
 

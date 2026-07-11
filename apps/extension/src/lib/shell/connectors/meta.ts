@@ -39,7 +39,9 @@ const CATALOG: readonly ConnectorMeta[] = [
     name: 'Hiway',
     icon: 'https://www.google.com/s2/favicons?domain=hiway-missions.fr&sz=32',
     url: 'https://hiway-missions.fr',
-    hostPermissions: ['https://hiway-missions.fr/*'],
+    // Hiway fetches missions from a Supabase REST endpoint; that host is
+    // Hiway-owned infra and must be dropped when Hiway is excluded.
+    hostPermissions: ['https://hiway-missions.fr/*', 'https://jhgjtlkfewuiiofxfrvh.supabase.co/*'],
   },
   {
     id: 'collective',

@@ -52,7 +52,7 @@ function filterHostPermissions(
   return hostPermissions.filter((pattern) => {
     const owner = catalog.find((c) => c.hostPermissions.includes(pattern));
     if (!owner) {
-      return true; // Unowned pattern (Supabase, missionpulse.app, …)
+      return true; // Unowned pattern (missionpulse.app, …) — infra, always retained
     }
     return includedSet.has(owner.id);
   });

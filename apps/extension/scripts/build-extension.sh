@@ -106,6 +106,16 @@ verify_manifest() {
     log_success "manifest.json is valid"
 }
 
+# Verify the built dist/manifest.json (post-filter): no excluded-connector
+# patterns leak through, and every shipped connector's host_permissions are
+# present. Resolves the shipped set from connectors.config.json + env vars,
+# matching what vite.config.ts applied at build time.
+verify_built_manifest() {
+    log_info "Verifying built dist/manifest.json (post-build connector checks)..."
+    pnpm tsx "$SCRIPT_DIR/verify-manifest.ts" "$PROJECT_ROOT/dist/manifest.json" --post-build
+    log_success "Built manifest passes post-build connector checks"
+}
+
 # Install dependencies
 install_deps() {
     log_info "Installing dependencies..."
@@ -185,6 +195,7 @@ main() {
 
     verify_manifest
     run_build
+    verify_built_manifest
     create_zip
     print_summary
 
