@@ -20,7 +20,11 @@
     platforms: PlatformSyncTarget[];
   } = $props();
 
-  const isEditing = $derived(store.editStatus === 'editing' || store.editStatus === 'saving');
+  // Keep the form mounted through 'error' so a failed save surfaces inline
+  // and the user can retry without the local field state being discarded.
+  const isEditing = $derived(
+    store.editStatus === 'editing' || store.editStatus === 'saving' || store.editStatus === 'error'
+  );
   const isPushing = $derived(store.pushStatus === 'preparing' || store.pushStatus === 'pushing');
   const doneCount = $derived(countByStatus(store.platformStatuses, 'done'));
 
@@ -77,6 +81,8 @@
   let noteDraft = $state<string>(untrack(() => store.draft?.note ?? ''));
 
   const needsDate = $derived(statusDraft === 'from-date' || statusDraft === 'in-mission-until');
+  // A dated status is meaningless without a date; block save until one is set.
+  const dateMissing = $derived(needsDate && dateDraft.trim() === '');
   const noteLen = $derived(noteDraft.length);
 
   function handleSave() {
@@ -177,8 +183,12 @@
           <input
             bind:value={dateDraft}
             type="date"
+            required={needsDate}
             class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
           />
+          {#if dateMissing}
+            <span class="text-[10px] text-status-red">La date est requise pour ce statut.</span>
+          {/if}
         </label>
       {/if}
 
@@ -209,7 +219,13 @@
         <Button variant="ghost" size="sm" type="button" onclick={() => store.cancelEdit()}>
           Annuler
         </Button>
-        <Button variant="primary" size="sm" type="submit" loading={store.editStatus === 'saving'}>
+        <Button
+          variant="primary"
+          size="sm"
+          type="submit"
+          loading={store.editStatus === 'saving'}
+          disabled={dateMissing}
+        >
           <Icon name="check-circle" size={14} />
           Enregistrer
         </Button>

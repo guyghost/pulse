@@ -83,3 +83,56 @@ describe('SettingsPageController.resetAll — SET-02 failure surfacing', () => {
     controller.destroy();
   });
 });
+
+describe('SettingsPageController.saveProfile — availability preservation', () => {
+  beforeEach(() => {
+    bridgeMock.sendMessage.mockReset();
+    toastMock.showToast.mockClear();
+  });
+
+  it('carries through the current availability when saving profile edits', async () => {
+    // Regression: saveProfile previously rebuilt the draft without `availability`,
+    // silently dropping the field on every settings save.
+    const existingAvailability = {
+      status: 'from-date' as const,
+      date: '2026-09-01',
+      note: 'Open to remote',
+      updatedAt: 100,
+    };
+    const storedProfile = {
+      firstName: 'Ada',
+      jobTitle: 'Dev',
+      location: 'Lyon',
+      tjmMin: 500,
+      tjmMax: 700,
+      keywords: ['react'],
+      remote: 'any' as const,
+      seniority: 'senior' as const,
+      scoringWeights: null,
+      experiences: [],
+      availability: existingAvailability,
+    };
+
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: storedProfile });
+      }
+      if (message.type === 'SAVE_PROFILE') {
+        // Facade expects a non-null PROFILE_RESULT payload.
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: message.payload });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController({ onNavigateToOnboarding: vi.fn() });
+    await controller.saveProfile();
+
+    const saveCall = bridgeMock.sendMessage.mock.calls.find((c) => c[0]?.type === 'SAVE_PROFILE');
+    expect(saveCall, 'SAVE_PROFILE must be sent').toBeTruthy();
+    expect((saveCall[0] as { payload: { availability: unknown } }).payload.availability).toEqual(
+      existingAvailability
+    );
+
+    controller.destroy();
+  });
+});
