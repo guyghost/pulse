@@ -249,12 +249,19 @@ describe('validateMessage — LinkedIn preview and sync import', () => {
   });
 
   it('accepte une preview LinkedIn extraite', () => {
-    expect(
-      validateMessage({
-        type: 'LINKEDIN_PROFILE_PREVIEWED',
-        payload: { extracted: true, profile: linkedinDraft },
-      }).valid
-    ).toBe(true);
+    const result = validateMessage({
+      type: 'LINKEDIN_PROFILE_PREVIEWED',
+      payload: { extracted: true, profile: linkedinDraft },
+    });
+
+    expect(result).toMatchObject({
+      valid: true,
+      message: {
+        payload: {
+          profile: { experiences: [{ employmentType: 'Freelance' }] },
+        },
+      },
+    });
   });
 
   it('accepte une erreur de preview LinkedIn typée', () => {
@@ -277,6 +284,28 @@ describe('validateMessage — LinkedIn preview and sync import', () => {
         payload: { profile: linkedinDraft },
       }).valid
     ).toBe(true);
+  });
+
+  it("applique un type d'emploi nul au draft d'un ancien contexte d'extension", () => {
+    const legacyDraft = {
+      ...linkedinDraft,
+      experiences: linkedinDraft.experiences.map(
+        ({ employmentType: _employmentType, ...experience }) => experience
+      ),
+    };
+    const result = validateMessage({
+      type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
+      payload: { profile: legacyDraft },
+    });
+
+    expect(result).toMatchObject({
+      valid: true,
+      message: {
+        payload: {
+          profile: { experiences: [{ employmentType: null }] },
+        },
+      },
+    });
   });
 
   it('accepte un draft de profil canonique venant d’une autre plateforme enregistrable', () => {
