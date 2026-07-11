@@ -119,6 +119,7 @@ const mockLinkedInProfile: CanonicalCandidateProfileDraft = {
     {
       title: 'Lead Frontend',
       company: 'Acme Corp',
+      employmentType: 'Freelance',
       location: 'Paris',
       startDate: '2022-01',
       endDate: null,

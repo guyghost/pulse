@@ -37,9 +37,10 @@ export function formatExperiencePayload(experiences: readonly Experience[]): str
   }
 
   const blocks = experiences.map((exp) => {
-    const head = [exp.title, exp.company].filter((part) => part && part.length > 0).join(' — ');
+    const role = [exp.title, exp.company].filter(Boolean).join(' — ');
+    const contract = exp.employmentType ? ` · ${exp.employmentType}` : '';
     const range = formatExperienceDateRange(exp);
-    const lines: string[] = [head + (range ? ` · ${range}` : '')];
+    const lines = [`${role}${contract}${range ? ` · ${range}` : ''}`];
     if (exp.location) {
       lines.push(exp.location);
     }
@@ -89,6 +90,7 @@ export function normalizeExperience(
     id: draft.id ?? generateId(),
     title,
     company: trimToNull(draft.company) ?? null,
+    employmentType: trimToNull(draft.employmentType) ?? null,
     location: trimToNull(draft.location) ?? null,
     startDate: trimToNull(draft.startDate) ?? null,
     endDate,
@@ -155,6 +157,7 @@ export function mergeExperiences(
         ...existing,
         skills: unionSkills(existing.skills, draft.skills),
         description: keepDescription ? existing.description : draft.description,
+        employmentType: existing.employmentType ?? draft.employmentType,
         location: existing.location ?? draft.location,
         endDate: mergedIsCurrent ? null : (existing.endDate ?? draftEnd ?? null),
         isCurrent: mergedIsCurrent,
@@ -167,6 +170,7 @@ export function mergeExperiences(
       id: `exp-${now}-${importIndex}`,
       title: draft.title,
       company: draft.company,
+      employmentType: draft.employmentType,
       location: draft.location,
       startDate: draftStart,
       endDate: draft.isCurrent ? null : draftEnd,

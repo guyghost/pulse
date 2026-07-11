@@ -37,7 +37,13 @@ function createChromeDouble(
                 sections: {
                   headline: 'Lead Svelte',
                   summary: 'Frontend senior',
-                  experiences: [{ title: 'Lead Frontend', company: 'ScaleOps' }],
+                  experiences: [
+                    {
+                      title: 'Lead Frontend',
+                      company: 'ScaleOps',
+                      employmentType: 'Freelance',
+                    },
+                  ],
                   skills: ['Svelte', 'TypeScript'],
                   education: [],
                   links: [],
@@ -86,6 +92,7 @@ describe('LinkedInProfileExtractor', () => {
       expect(result.value.experiences[0]).toMatchObject({
         title: 'Lead Frontend',
         company: 'ScaleOps',
+        employmentType: 'Freelance',
       });
     }
   });

@@ -8,6 +8,7 @@ const linkedInProfile = {
     {
       title: 'Lead Frontend',
       company: 'Atelier Nova',
+      employmentType: 'Freelance',
       location: 'Paris',
       startDate: '2024-01-01',
       endDate: null,

@@ -17,6 +17,7 @@ describe('linkedin profile parser', () => {
           {
             title: 'Lead Frontend',
             company: 'ScaleOps',
+            employmentType: 'Freelance',
             location: 'Paris',
             dateRange: 'Jan 2021 - Present',
             description: 'Migration Svelte 5',
@@ -54,6 +55,7 @@ describe('linkedin profile parser', () => {
       {
         title: 'Lead Frontend',
         company: 'ScaleOps',
+        employmentType: 'Freelance',
         location: 'Paris',
         startDate: '2021-01-01',
         endDate: null,
@@ -65,6 +67,10 @@ describe('linkedin profile parser', () => {
         positionIndex: 0,
       },
     ]);
+    expect(result.value.experiences[0]).toMatchObject({
+      company: 'ScaleOps',
+      employmentType: 'Freelance',
+    });
     expect(result.value.skills.map((skill) => skill.skill)).toEqual([
       'TypeScript',
       'Architecture frontend',

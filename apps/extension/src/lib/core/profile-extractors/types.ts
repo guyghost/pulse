@@ -5,6 +5,7 @@ export type ProfileExtractorSource = string;
 export interface RawExperience {
   title?: string;
   company?: string;
+  employmentType?: string;
   location?: string;
   dateRange?: string;
   description?: string;
@@ -42,6 +43,7 @@ export interface RawPlatformProfile {
 export interface CandidateExperienceDraft {
   title: string;
   company: string | null;
+  employmentType: string | null;
   location: string | null;
   startDate: string | null;
   endDate: string | null;

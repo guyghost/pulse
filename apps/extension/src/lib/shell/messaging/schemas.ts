@@ -287,6 +287,7 @@ const ProfileExtractorSourceSchema = z.enum(['linkedin', 'malt', 'other']);
 const CandidateExperienceDraftSchema = z.object({
   title: SafeString,
   company: SafeString.nullable(),
+  employmentType: SafeString.nullable().default(null),
   location: SafeString.nullable(),
   startDate: z.string().max(32).nullable(),
   endDate: z.string().max(32).nullable(),

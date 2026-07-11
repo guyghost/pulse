@@ -154,6 +154,7 @@ function normalizeExperiences(
       {
         title,
         company: cleanText(experience.company) || null,
+        employmentType: cleanText(experience.employmentType) || null,
         location: cleanText(experience.location) || null,
         startDate: dates.startDate,
         endDate: dates.endDate,

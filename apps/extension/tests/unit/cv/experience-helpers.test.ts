@@ -25,6 +25,7 @@ function baseExperience(overrides: Partial<Experience> = {}): Experience {
     id: 'exp-1',
     title: 'Lead Frontend',
     company: 'Acme',
+    employmentType: null,
     location: 'Paris',
     startDate: '2023-01',
     endDate: null,
@@ -43,6 +44,7 @@ function draft(overrides: Partial<CandidateExperienceDraft> = {}): CandidateExpe
   return {
     title: 'Lead Frontend',
     company: 'Acme',
+    employmentType: null,
     location: 'Paris',
     startDate: '2023-01',
     endDate: null,
@@ -280,6 +282,22 @@ describe('mergeExperiences', () => {
     expect(result[0].isCurrent).toBe(true);
     expect(result[0].endDate).toBeNull();
   });
+
+  it('fills only an empty local employment type from an imported contract', () => {
+    const merged = mergeExperiences(
+      [baseExperience({ employmentType: null })],
+      [draft({ employmentType: 'Freelance' })],
+      NOW
+    );
+    expect(merged[0].employmentType).toBe('Freelance');
+
+    const kept = mergeExperiences(
+      [baseExperience({ employmentType: 'CDI' })],
+      [draft({ employmentType: 'Freelance' })],
+      NOW
+    );
+    expect(kept[0].employmentType).toBe('CDI');
+  });
 });
 
 describe('countNewlyAddedExperiences', () => {
@@ -425,6 +443,12 @@ describe('formatExperiencePayload', () => {
     ]);
     expect(result).toContain('\n\n');
     expect(result.split('\n\n')).toHaveLength(2);
+  });
+
+  it('includes the employment type in the role header', () => {
+    expect(formatExperiencePayload([baseExperience({ employmentType: 'Freelance' })])).toContain(
+      'Lead Frontend — Acme · Freelance'
+    );
   });
 });
 
