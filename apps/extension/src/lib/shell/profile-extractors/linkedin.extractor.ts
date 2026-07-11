@@ -89,28 +89,28 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   // Specific, non-greedy: the bare words "challenge"/"checkpoint" are NOT block
   // signals — they appear in legitimate profile prose ("I enjoy new challenges")
   // and previously caused false `rate_limited_or_blocked` errors. Only
-  // challenge-page phrases qualify, and only when no profile sections are
-  // present (see the `hasProfileSections` guard below).
+  // challenge-page phrases qualify, and only with explicit corroboration when
+  // no strong profile marker is present (see the guard below).
   // See src/models/linkedin-import.model.md.
-  const blockedReasonFromText = (value: string): string | null => {
+  const blockedSignalsFromText = (value: string): string[] => {
     const text = value.toLowerCase();
+    const signals: string[] = [];
     if (text.includes('security verification')) {
-      return 'security verification required';
+      signals.push('security verification required');
     }
     if (text.includes('unusual activity')) {
-      return 'unusual activity challenge';
+      signals.push('unusual activity challenge');
     }
     if (text.includes('verify your identity')) {
-      return 'identity verification required';
+      signals.push('identity verification required');
     }
     if (text.includes('security check')) {
-      return 'security check required';
+      signals.push('security check required');
     }
     if (text.includes('temporarily restricted')) {
-      return 'temporarily restricted session';
+      signals.push('temporarily restricted session');
     }
-
-    return null;
+    return signals;
   };
   const isChallengeHeading = (value: string): boolean =>
     /^(?:security verification(?: required)?|security check(?: required)?|verify your identity|unusual activity(?: detected)?|temporarily restricted(?: account|session)?)[.!:]?$/i.test(
@@ -164,11 +164,11 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   const about = sectionByHeading(['about', 'infos', 'à propos']);
   const experience = sectionByHeading(['experience', 'expérience']);
   const education = sectionByHeading(['education', 'formation']);
+  const mainHeading = text('main h1');
   const headlineCandidate =
     text('.pv-text-details__left-panel .text-body-medium') ||
     text('[data-generated-suggestion-target]') ||
-    text('main h1');
-  const headline = isChallengeHeading(headlineCandidate) ? '' : headlineCandidate;
+    mainHeading;
   const experiences = sectionItems(experience).map(parseExperience);
   const educationItems = sectionItems(education).map(parseEducation);
   const summary = about
@@ -188,10 +188,45 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   // checkpoint interstitial. `innerText` is preferred (layout-aware, ignores
   // <script>/<style>); `textContent` is a fallback for undrawn/jsdom contexts.
   const bodyText = clean(document.body?.innerText || document.body?.textContent || '');
-  const blockSignal = blockedReasonFromText(bodyText);
-  const hasProfileSections =
-    Boolean(headline) || experiences.length > 0 || educationItems.length > 0;
-  const blockedReason = hasProfileSections ? null : blockSignal;
+  const bodySignals = blockedSignalsFromText(bodyText);
+  const bodyWithoutMainHeading = document.body?.cloneNode(true) as HTMLElement | undefined;
+  for (const heading of bodyWithoutMainHeading?.querySelectorAll('main h1') ?? []) {
+    heading.remove();
+  }
+  const outsideHeadingText = clean(
+    bodyWithoutMainHeading?.innerText || bodyWithoutMainHeading?.textContent || ''
+  );
+  const outsideHeadingSignals = blockedSignalsFromText(outsideHeadingText);
+  const challengeHeadingReason = isChallengeHeading(mainHeading)
+    ? (blockedSignalsFromText(mainHeading)[0] ?? null)
+    : null;
+  const hasVerificationControl = Boolean(
+    document.querySelector(
+      'form[action*="checkpoint" i], form[action*="challenge" i], input[name*="verification" i], input[name*="challenge" i], input[name*="pin" i], [data-test*="verification" i], [data-testid*="verification" i], [data-test*="challenge" i], [data-testid*="challenge" i]'
+    )
+  );
+  const firstPathSegment = window.location.pathname.split('/').filter(Boolean)[0]?.toLowerCase();
+  const isReservedChallengeRoute =
+    firstPathSegment === 'checkpoint' || firstPathSegment === 'challenge';
+  const hasStrongProfileMarkers =
+    Boolean(about || experience || education || (mainHeading && !challengeHeadingReason)) ||
+    experiences.length > 0 ||
+    educationItems.length > 0;
+  const hasDistinctSignalOutsideHeading = Boolean(
+    challengeHeadingReason &&
+    outsideHeadingSignals.some((signal) => signal !== challengeHeadingReason)
+  );
+  const hasCorroboratedDomChallenge =
+    !hasStrongProfileMarkers &&
+    ((Boolean(challengeHeadingReason) &&
+      (hasDistinctSignalOutsideHeading || hasVerificationControl)) ||
+      bodySignals.length >= 2 ||
+      (bodySignals.length >= 1 && hasVerificationControl));
+  const blockedReason =
+    isReservedChallengeRoute || hasCorroboratedDomChallenge
+      ? (challengeHeadingReason ?? bodySignals[0] ?? 'linkedin challenge route')
+      : null;
+  const headline = blockedReason ? '' : headlineCandidate;
 
   return {
     profileUrl: window.location.href,

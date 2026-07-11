@@ -200,9 +200,10 @@ export async function extractLinkedInExperiencesFromDom(
           )
         )
       : undefined;
-    const skillsIndex = lines.findIndex((line) => /^(compétences|skills)\s*:?/i.test(line));
+    const skillsLabelPattern = /^(?:compétences|skills)(?:\s*:\s*(.*))?$/i;
+    const skillsIndex = lines.findIndex((line) => skillsLabelPattern.test(line));
     const skillsLine = skillsIndex >= 0 ? lines[skillsIndex] : '';
-    const skillsValue = skillsLine.replace(/^(compétences|skills)\s*:?\s*/i, '');
+    const skillsValue = skillsLine.match(skillsLabelPattern)?.[1] ?? '';
     const skills = skillsValue
       ? skillsValue
           .split(/\s+[·•]\s+|\s*,\s*/)

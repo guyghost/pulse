@@ -263,7 +263,10 @@ Field assignment follows these deterministic signals:
 - `dateRange`: first line containing a four-digit year and a range separator;
 - `location`: first non-duration line immediately after the date line;
 - `description`: remaining prose after structural/action/skill labels;
-- `skills`: values following an exact `Compétences` / `Skills` label.
+- `skills`: values from a whole-line `Compétences` / `Skills` label, either the
+  label alone or the label followed by a colon and inline values. The label
+  match is anchored to the complete line: prose such as "Skills developed
+  while leading..." remains description text.
 
 `employmentType` is an optional canonical experience field. Legacy/manual
 experiences normalize it to `null`; import must not append the value to the
@@ -296,7 +299,7 @@ the page). It is the **fallback** for challenge interstitials LinkedIn serves on
 a `/in/` URL without changing the URL — URL-path redirects to `/checkpoint/` or
 `/challenge/` are already caught earlier by `classifyLinkedInUrl`.
 
-Detection is **specific, not greedy**:
+Detection is **specific, corroborated, and not greedy**:
 
 - Block signals are challenge-page-specific phrases only: "security
   verification", "unusual activity", "verify your identity", "temporarily
@@ -305,18 +308,28 @@ Detection is **specific, not greedy**:
   in legitimate profile prose (e.g. "I enjoy new challenges", "project
   checkpoint") and previously caused false `rate_limited_or_blocked` errors that
   blocked real imports.
-- Defensive guard: text signals are authoritative only when the page has no
-  parseable profile sections (no headline, no experiences, no education). A page
-  that yielded real profile sections is never treated as blocked on text alone.
-- Challenge detection is evaluated independently from the generic `main h1`
-  headline fallback. A challenge-specific heading such as "Security
-  verification" is matched as a complete normalized heading (not a substring
-  inside a genuine title such as "Security Check Engineer"), is not profile
-  data, and cannot make `hasProfileSections` true;
-  when no real profile section was parsed, its block signal remains
-  authoritative and the returned headline is empty. A genuine profile headline
-  or parsed experience/education section still protects legitimate profile
-  prose containing the same words from a false positive.
+- A single free-text phrase is never sufficient on a profile URL. A DOM
+  challenge requires corroboration from one of these deterministic structures:
+  (1) a reserved `/checkpoint/` or `/challenge/` route; (2) an exact
+  challenge-specific `main h1` plus a distinct challenge phrase outside that
+  heading or a verification control; (3) at least two distinct
+  challenge-specific phrases; or (4) a challenge phrase plus a verification
+  control. Verification controls are structural form/input/test markers, not
+  generic button text.
+- Defensive guard: text/heading corroboration is authoritative only when the
+  page has no strong profile marker (recognized About, Experience, or Education
+  section, parsed experience/education, or a non-challenge `main h1`). These
+  markers protect titles and biography prose from false positives. A stale
+  secondary headline selector alone is not a strong marker because LinkedIn can
+  leave it mounted behind an interstitial.
+- Challenge detection is evaluated independently from headline selection. A
+  corroborated challenge-specific `main h1` such as "Security verification" is
+  prioritized over stale `.pv-text-details__left-panel` or
+  `[data-generated-suggestion-target]` text, is returned with an empty headline,
+  and terminates before the detail tab opens. Conversely, the exact headline
+  "Security verification" without a second challenge signal, reserved route,
+  verification control, or other corroboration remains legitimate profile data
+  even when lazy profile sections have not rendered.
 
 ## Invariants
 
@@ -355,8 +368,13 @@ extracting → merging` sequence.
     exposes a recognized empty state. An absent/unreadable list is `dom_changed`.
 16. Grouped leaves inherit company independently from their optional employment
     type; a date-range line can never populate or mutate either field.
-17. A challenge-specific `main h1` is never accepted as a profile headline and
-    cannot suppress the corresponding `blockedReason`.
+17. A corroborated challenge-specific `main h1` is never accepted as a profile
+    headline and cannot be suppressed by stale profile headline markup. The same
+    text without corroboration remains a legitimate headline and cannot alone
+    produce `blockedReason`.
+18. Skills labels are whole-line contracts. Only `Skills` / `Compétences` or
+    their colon-delimited inline values are structural; longer prose beginning
+    with either word remains in the experience description.
 
 ## Error and recovery matrix
 

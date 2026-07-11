@@ -371,6 +371,47 @@ describe('LinkedInProfileExtractor', () => {
     expect(chromeDouble.tabs?.create).not.toHaveBeenCalled();
   });
 
+  it('blocks a corroborated challenge h1 before opening details despite residual profile text', async () => {
+    document.body.innerHTML = `
+      <main>
+        <h1>Security verification</h1>
+        <div class="pv-text-details__left-panel">
+          <p class="text-body-medium">Principal Security Engineer</p>
+        </div>
+        <p>Please verify your identity to continue.</p>
+      </main>
+    `;
+    const sourceSnapshot = extractLinkedInProfileFromDom();
+    const chromeDouble = createChromeDouble({ sourceSnapshot });
+    const extractor = new LinkedInProfileExtractor(chromeDouble);
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(sourceSnapshot.blockedReason).toBe('security verification required');
+    expect(sourceSnapshot.sections.headline).toBe('');
+    expect(extractorCode(result)).toBe('rate_limited_or_blocked');
+    expect(chromeDouble.tabs?.create).not.toHaveBeenCalled();
+  });
+
+  it('continues to the detail page for an uncorroborated Security verification headline', async () => {
+    document.body.innerHTML = '<main><h1>Security verification</h1></main>';
+    const sourceSnapshot = {
+      ...extractLinkedInProfileFromDom(),
+      profileUrl: linkedinTab.url,
+    };
+    const chromeDouble = createChromeDouble({ sourceSnapshot });
+    const extractor = new LinkedInProfileExtractor(chromeDouble);
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(sourceSnapshot.blockedReason).toBeUndefined();
+    expect(sourceSnapshot.sections.headline).toBe('Security verification');
+    expect(result.ok).toBe(true);
+    expect(chromeDouble.tabs?.create).toHaveBeenCalledWith(
+      expect.objectContaining({ active: false })
+    );
+  });
+
   it('returns the detail failure before the canonical parser can accept source rows', async () => {
     const chromeDouble = createChromeDouble({
       createDetailTab: async () => {
