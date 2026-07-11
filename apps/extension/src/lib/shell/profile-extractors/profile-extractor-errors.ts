@@ -4,6 +4,7 @@ export type ProfileExtractorErrorCode =
   | 'permission_required'
   | 'session_required'
   | 'profile_not_found'
+  | 'detail_page_unavailable'
   | 'dom_changed'
   | 'rate_limited_or_blocked'
   | 'sync_failed';

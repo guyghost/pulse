@@ -129,6 +129,7 @@ export type ProfileExtractorHealthCode =
   | 'permission_required'
   | 'session_required'
   | 'profile_not_found'
+  | 'detail_page_unavailable'
   | 'dom_changed'
   | 'rate_limited_or_blocked'
   | 'sync_failed'
@@ -775,6 +776,7 @@ export function normalizeProfileExtractorHealthCode(
     value === 'permission_required' ||
     value === 'session_required' ||
     value === 'profile_not_found' ||
+    value === 'detail_page_unavailable' ||
     value === 'dom_changed' ||
     value === 'rate_limited_or_blocked' ||
     value === 'sync_failed'
