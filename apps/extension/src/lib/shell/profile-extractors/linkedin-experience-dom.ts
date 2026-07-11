@@ -263,18 +263,28 @@ export async function extractLinkedInExperiencesFromDom(
   let unchangedCycles = 0;
 
   while (Date.now() <= deadline) {
+    const root = resolveRoot();
+    const rows = root ? candidateRows(root) : [];
+    const hasParseableExperience = root
+      ? leafRows(root).some(
+          ({ row, inheritedCompany }, index) => parseLeaf(row, inheritedCompany, index) !== null
+        )
+      : false;
     const bodyText = cleanLine(document.body?.innerText || document.body?.textContent || '');
     const blockedReason = blockedReasonFromText(bodyText);
-    if (blockedReason) {
+    if (blockedReason && !hasParseableExperience) {
       return { kind: 'blocked', experiences: [], blockedReason };
     }
 
-    const root = resolveRoot();
     if (root) {
-      const rows = candidateRows(root);
       const recognizedList =
         rows.length > 0 || Boolean(root.querySelector('.pvs-list, ul.artdeco-list'));
       sawRecognizedList ||= recognizedList;
+      const documentElement = document.documentElement;
+      const height = documentElement.scrollHeight;
+      if (recognizedList) {
+        documentElement.scrollTop = height;
+      }
 
       if (rows.length === 0) {
         const hasEmptyOwnerAction = [...root.querySelectorAll('button, a')].some((action) =>
@@ -286,9 +296,6 @@ export async function extractLinkedInExperiencesFromDom(
           return snapshot('empty');
         }
       } else {
-        const documentElement = document.documentElement;
-        const height = documentElement.scrollHeight;
-        documentElement.scrollTop = height;
         const bottomReached = documentElement.scrollTop + documentElement.clientHeight >= height;
         const hasActiveLoader = [
           ...document.querySelectorAll(

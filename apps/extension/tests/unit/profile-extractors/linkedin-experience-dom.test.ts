@@ -19,6 +19,10 @@ const CHALLENGE_FIXTURE = readFileSync(
   resolve(process.cwd(), 'tests/fixtures/linkedin-experience-challenge.html'),
   'utf8'
 );
+const LAZY_EMPTY_FIXTURE = readFileSync(
+  resolve(process.cwd(), 'tests/fixtures/linkedin-experience-lazy-empty.html'),
+  'utf8'
+);
 
 const DEFAULT_OPTIONS: LinkedInExperienceDomOptions = {
   stabilizationTimeoutMs: 100,
@@ -55,6 +59,9 @@ function standaloneRow(id: string, title: string): string {
 describe('extractLinkedInExperiencesFromDom', () => {
   afterEach(() => {
     document.body.innerHTML = '';
+    delete document.documentElement.scrollHeight;
+    delete document.documentElement.clientHeight;
+    delete document.documentElement.scrollTop;
   });
 
   it('parses a standalone position and only leaf roles from a company group', async () => {
@@ -93,6 +100,41 @@ describe('extractLinkedInExperiencesFromDom', () => {
 
   it('classifies a security verification page as blocked', async () => {
     render(CHALLENGE_FIXTURE);
+
+    await expect(extract()).resolves.toEqual({
+      kind: 'blocked',
+      experiences: [],
+      blockedReason: 'security verification required',
+    });
+  });
+
+  it('does not block challenge-like prose inside a valid experience row', async () => {
+    render(
+      DETAIL_FIXTURE.replace(
+        'Pilotage de la plateforme de paiement.',
+        'Analyse des unusual activity alerts et du security check sans verify your identity.'
+      )
+    );
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences[0]?.description).toContain('unusual activity');
+  });
+
+  it('keeps challenge text authoritative when candidate markup is not parseable', async () => {
+    render(`
+      <main>
+        <section id="experience">
+          <h1>Security verification</h1>
+          <p>Please verify your identity.</p>
+          <ul class="pvs-list"><li class="pvs-list__paged-list-item">Incomplete row</li></ul>
+        </section>
+      </main>
+    `);
 
     await expect(extract()).resolves.toEqual({
       kind: 'blocked',
@@ -155,6 +197,40 @@ describe('extractLinkedInExperiencesFromDom', () => {
       throw new Error('expected ready');
     }
     expect(snapshot.experiences.map((experience) => experience.title)).toEqual(['First', 'Second']);
+  });
+
+  it('scrolls a recognized zero-row list so its first lazy row can load', async () => {
+    render(LAZY_EMPTY_FIXTURE);
+    const list = document.querySelector('.pvs-list');
+    if (!list) {
+      throw new Error('expected list');
+    }
+    let scrollTop = 0;
+    let scrollCount = 0;
+    Object.defineProperties(document.documentElement, {
+      scrollHeight: { configurable: true, get: () => 100 },
+      clientHeight: { configurable: true, get: () => 20 },
+      scrollTop: {
+        configurable: true,
+        get: () => scrollTop,
+        set: (value: number) => {
+          scrollTop = value;
+          scrollCount += 1;
+          if (scrollCount === 1) {
+            list.insertAdjacentHTML('beforeend', standaloneRow('lazy-first', 'Lazy First'));
+          }
+        },
+      },
+    });
+
+    const snapshot = await extract();
+
+    expect(scrollCount).toBeGreaterThan(0);
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences.map((experience) => experience.title)).toEqual(['Lazy First']);
   });
 
   it('removes accessible duplicates and action text before assigning fields', async () => {
