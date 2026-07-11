@@ -128,7 +128,7 @@ export const AvailabilitySchema = z.object({
 });
 
 /**
- * validation. Records that still carry `stack` and/or `searchKeywords`
+ * Preprocesses legacy profile input before schema validation. Records that still carry `stack` and/or `searchKeywords`
  * (pre-unification schema) are merged into a single `keywords` list with
  * case-insensitive dedup (first-seen casing wins) and trimmed to the 40-entry
  * cap so the schema never rejects a migrated record for length. New-shape

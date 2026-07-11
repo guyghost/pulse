@@ -81,7 +81,11 @@ export function createAvailabilityStore(deps: AvailabilityDeps): AvailabilitySto
   let editError = $state<string | null>(null);
   let pushError = $state<string | null>(null);
 
-  const canPush = $derived(availability !== null && !isPushBusy(pushStatus));
+  // Matches model invariant: canPush requires a committed availability, no
+  // in-flight save, and no busy push.
+  const canPush = $derived(
+    availability !== null && editStatus !== 'saving' && !isPushBusy(pushStatus)
+  );
   const isPushing = $derived(pushStatus === 'preparing' || pushStatus === 'pushing');
 
   function readPushStatus(): PushStatus {

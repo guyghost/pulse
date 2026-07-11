@@ -31,6 +31,13 @@ describe('isValidAvailabilityDate', () => {
     expect(isValidAvailabilityDate('2026-02-31')).toBe(false);
   });
 
+  it('accepts Feb 29 on a leap year and rejects it otherwise (pure calendar math)', () => {
+    expect(isValidAvailabilityDate('2024-02-29')).toBe(true);
+    expect(isValidAvailabilityDate('2025-02-29')).toBe(false);
+    expect(isValidAvailabilityDate('2100-02-29')).toBe(false);
+    expect(isValidAvailabilityDate('2000-02-29')).toBe(true);
+  });
+
   it('rejects malformed input', () => {
     expect(isValidAvailabilityDate('')).toBe(false);
     expect(isValidAvailabilityDate(null)).toBe(false);
@@ -106,6 +113,15 @@ describe('formatAvailabilityPayload', () => {
       baseAvailability({ status: 'in-mission-until', date: '2026-12-15' })
     );
     expect(out).toBe("En mission jusqu'au 15/12/2026");
+  });
+
+  it('falls back gracefully when a date-bearing status has a null date', () => {
+    const from = formatAvailabilityPayload(baseAvailability({ status: 'from-date', date: null }));
+    const until = formatAvailabilityPayload(
+      baseAvailability({ status: 'in-mission-until', date: null })
+    );
+    expect(from).toBe('Disponible prochainement');
+    expect(until).toBe('En mission');
   });
 
   it('appends a non-empty note on a new line', () => {

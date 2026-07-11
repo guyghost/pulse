@@ -16,6 +16,19 @@ export type { PlatformSyncTarget };
 /** Statuses that carry a meaningful `date`. */
 const DATE_STATUSES: ReadonlySet<AvailabilityStatus> = new Set(['from-date', 'in-mission-until']);
 
+/** Days per month for a non-leap year (index 0 = January). */
+const DAYS_IN_MONTH = [31, 28, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31] as const;
+
+/** Pure leap-year check (Gregorian). */
+function isLeapYear(year: number): boolean {
+  return (year % 4 === 0 && year % 100 !== 0) || year % 400 === 0;
+}
+
+/** Pure day-count for a month, accounting for February in leap years. */
+function daysInMonth(year: number, month: number): number {
+  return month === 2 && isLeapYear(year) ? 29 : DAYS_IN_MONTH[month - 1];
+}
+
 /** Returns true when `value` is a valid `YYYY-MM-DD` calendar date. */
 export function isValidAvailabilityDate(value: string | null | undefined): boolean {
   if (!value) {
@@ -28,13 +41,12 @@ export function isValidAvailabilityDate(value: string | null | undefined): boole
   const year = Number(match[1]);
   const month = Number(match[2]);
   const day = Number(match[3]);
-  if (month < 1 || month > 12 || day < 1 || day > 31) {
+  if (month < 1 || month > 12 || day < 1) {
     return false;
   }
-  // Construct with time components to avoid UTC offset surprises; invalid
-  // calendar dates (e.g. 2026-02-31) roll over and change the day.
-  const d = new Date(Date.UTC(year, month - 1, day));
-  return d.getUTCFullYear() === year && d.getUTCMonth() === month - 1 && d.getUTCDate() === day;
+  // Pure calendar check (no Date construction) so this stays deterministic
+  // and testable without host time semantics.
+  return day <= daysInMonth(year, month);
 }
 
 /**
@@ -84,10 +96,16 @@ function availabilityHeadline(availability: Availability): string {
   switch (availability.status) {
     case 'immediate':
       return 'Disponible immédiatement';
-    case 'from-date':
-      return `Disponible à partir du ${formatAvailabilityDate(availability.date)}`;
-    case 'in-mission-until':
-      return `En mission jusqu'au ${formatAvailabilityDate(availability.date)}`;
+    case 'from-date': {
+      const formatted = formatAvailabilityDate(availability.date);
+      // Fall back when the date is missing/invalid so the sentence never ends
+      // with a dangling preposition and trailing space.
+      return formatted ? `Disponible à partir du ${formatted}` : 'Disponible prochainement';
+    }
+    case 'in-mission-until': {
+      const formatted = formatAvailabilityDate(availability.date);
+      return formatted ? `En mission jusqu'au ${formatted}` : 'En mission';
+    }
     case 'unavailable':
       return 'Non disponible';
   }

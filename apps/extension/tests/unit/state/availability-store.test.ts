@@ -122,6 +122,28 @@ describe('availability store — edit', () => {
     store.startEdit(); // no-op
     expect(store.draft).toBe(firstDraft);
   });
+
+  it('disables canPush while a save is in flight (model invariant)', async () => {
+    // Hold the save promise so we can observe editStatus === 'saving'.
+    let releaseSave: () => void = () => {};
+    const savePromise = new Promise<void>((resolve) => {
+      releaseSave = resolve;
+    });
+    const deps = makeDeps({ saveAvailability: vi.fn().mockReturnValue(savePromise) });
+    const store = createAvailabilityStore(deps);
+    store.applyProfileUpdate(savedAvailability);
+    expect(store.canPush).toBe(true);
+
+    store.startEdit();
+    const saving = store.saveDraft('immediate', null, '');
+    expect(store.editStatus).toBe('saving');
+    expect(store.canPush).toBe(false);
+
+    releaseSave();
+    await saving;
+    expect(store.editStatus).toBe('idle');
+    expect(store.canPush).toBe(true);
+  });
 });
 
 describe('availability store — push', () => {

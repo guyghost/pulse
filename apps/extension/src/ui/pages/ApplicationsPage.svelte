@@ -40,7 +40,7 @@
   const availabilityStore = createAvailabilityStore(createAvailabilityDeps());
   const availabilityPlatforms = getAvailabilityPushTargets();
 
-  availabilityStore.load();
+  void availabilityStore.load();
 
   $effect(() => {
     const unsubscribe = subscribeMessages((message) => {
