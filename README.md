@@ -92,11 +92,7 @@ CONNECTORS_EXCLUDE=malt,collective pnpm build
 CONNECTORS_INCLUDE=free-work,lehibou pnpm build
 ```
 
-Résolution : `CONNECTORS_INCLUDE` > `include` du fichier > `CONNECTORS_EXCLUDE`
-
-> `exclude` du fichier > tout inclure. En `dev` et `test` le fichier est ignoré
-> (le catalogue complet reste visible pour des assertions déterministes) ; seules
-> les variables d'environnement s'appliquent.
+Résolution : `CONNECTORS_INCLUDE` > `include` du fichier > `CONNECTORS_EXCLUDE` > `exclude` du fichier > tout inclure. En `dev` et `test` le fichier est ignoré (le catalogue complet reste visible pour des assertions déterministes) ; seules les variables d'environnement s'appliquent.
 
 Détails : `apps/extension/src/models/connector-build-config.model.md`.
 

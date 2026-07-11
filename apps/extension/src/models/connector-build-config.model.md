@@ -60,9 +60,10 @@ Env vars are comma-separated connector IDs, e.g.
 
 ## Resolution function (pure)
 
-Lives in `apps/extension/scripts/resolve-connectors.mjs` so it can run in
-`vite.config.ts`, `verify-manifest.ts`, and `build-extension.sh` without a
-TypeScript compile step.
+Lives in `apps/extension/scripts/resolve-connectors.ts` so it can run in
+`vite.config.ts`, `verify-manifest.ts`, and `build-extension.sh`. It is part
+of the extension's TypeScript program (`scripts/**/*.ts` is in `tsconfig.json`)
+and is imported directly by the build tooling.
 
 ```
 resolveIncludedConnectors({ allIds, config, env }) → {
@@ -194,7 +195,5 @@ Manifest coverage (`verify-manifest.test.ts`):
 
 ## OpenSpec change
 
-This change is recorded in `openspec/changes/169-connector-build-time-config/`
-(proposal + tasks + spec deltas) following the project's spec-driven
-workflow. The `169` number is the next available change id at authoring
-time.
+This change is recorded in `openspec/changes/connector-build-time-config/`
+(proposal) following the project's spec-driven workflow.

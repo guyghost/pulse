@@ -31,7 +31,9 @@ export const DEFAULT_SETTINGS: AppSettings = {
   scanIntervalMinutes: 30,
   // Intersect with connectors shipped in this build so excluded connectors
   // never appear as "enabled" defaults (see connector-build-config.model.md).
-  enabledConnectors: INCLUDED_CONNECTOR_IDS as string[],
+  // Copy into a new array so the build-time constant can't be mutated by callers
+  // changing DEFAULT_SETTINGS.enabledConnectors.
+  enabledConnectors: [...INCLUDED_CONNECTOR_IDS],
   notifications: true,
   autoScan: true,
   maxSemanticPerScan: 10,
@@ -68,8 +70,8 @@ export const getSettings = async (): Promise<AppSettings> => {
   // Sanitize enabledConnectors against this build's catalog: drop any id that
   // isn't shipped (e.g. a connector excluded at build time but still present in
   // previously stored user settings). See connector-build-config.model.md.
-  const included = new Set<string>(INCLUDED_CONNECTOR_IDS as readonly string[]);
-  merged.enabledConnectors = parseResult.data.enabledConnectors.filter((id) => included.has(id));
+  const included = new Set<string>(INCLUDED_CONNECTOR_IDS);
+  merged.enabledConnectors = merged.enabledConnectors.filter((id) => included.has(id));
 
   return merged;
 };

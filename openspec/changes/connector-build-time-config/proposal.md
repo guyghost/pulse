@@ -54,7 +54,7 @@ test). Cette proposal ne le duplique pas.
 
 ### Runtime
 
-- **`src/lib/shell/connectors/build-config.ts`** — accessoir single source of
+- **`src/lib/shell/connectors/build-config.ts`** — accessor single source of
   truth. Lit `__PULSE_INCLUDED_CONNECTORS__` via garde `typeof` (fallback sur le
   catalogue complet si le define est absent → dev/test).
 - **`src/lib/shell/connectors/meta.ts`** — `getConnectorsMeta()` filtre via

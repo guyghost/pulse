@@ -2,7 +2,7 @@
  * Build-time connector accessor.
  *
  * `INCLUDED_CONNECTOR_IDS` is the resolved list of connector IDs shipped in
- * this build (see scripts/resolve-connectors.mjs + connectors.config.json).
+ * this build (see scripts/resolve-connectors.ts + connectors.config.json).
  * Vite injects it as the `__PULSE_INCLUDED_CONNECTORS__` compile-time
  * constant (see vite.config.ts). In dev and vitest the define is absent, so
  * `typeof` guards against ReferenceError and we fall back to the full
