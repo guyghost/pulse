@@ -101,7 +101,116 @@ describe('DB migration orchestrator', () => {
         'quarantine',
       ])
     );
-    expect(db.DB_VERSION).toBe(4);
+    expect(db.DB_VERSION).toBe(5);
+  });
+
+  it('upgrades legacy tracking v4 databases by adding quarantine at v5', async () => {
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, 4);
+      req.onupgradeneeded = () => {
+        const handle = req.result;
+        const missionStore = handle.createObjectStore('missions', { keyPath: 'id' });
+        missionStore.createIndex('source', 'source', { unique: false });
+        missionStore.createIndex('scrapedAt', 'scrapedAt', { unique: false });
+        handle.createObjectStore('profile', { keyPath: 'id' });
+        handle.createObjectStore('connector_status', { keyPath: 'connectorId' });
+        const genStore = handle.createObjectStore('generated_assets', { keyPath: 'id' });
+        genStore.createIndex('missionId', 'missionId', { unique: false });
+        const trackingStore = handle.createObjectStore('mission_tracking', {
+          keyPath: 'missionId',
+        });
+        trackingStore.createIndex('currentStatus', 'currentStatus', { unique: false });
+      };
+      req.onsuccess = () => {
+        req.result.close();
+        resolve();
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    const db = await importFresh();
+    const result = await db.runMigrations();
+    expect(result.ok).toBe(true);
+
+    const handle = await db.openDB();
+    const stores = Array.from(handle.objectStoreNames);
+    handle.close();
+    expect(stores).toEqual(expect.arrayContaining(['mission_tracking', 'quarantine']));
+  });
+
+  it('preserves the profile object-store key during the v1→v2 profile data migration', async () => {
+    const db = await importFresh();
+    await new Promise<void>((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, db.DB_VERSION);
+      req.onupgradeneeded = () => {
+        const handle = req.result;
+        const missionStore = handle.createObjectStore('missions', { keyPath: 'id' });
+        missionStore.createIndex('source', 'source', { unique: false });
+        missionStore.createIndex('scrapedAt', 'scrapedAt', { unique: false });
+        handle.createObjectStore('profile', { keyPath: 'id' });
+        handle.createObjectStore('connector_status', { keyPath: 'connectorId' });
+        const genStore = handle.createObjectStore('generated_assets', { keyPath: 'id' });
+        genStore.createIndex('missionId', 'missionId', { unique: false });
+        const trackingStore = handle.createObjectStore('mission_tracking', {
+          keyPath: 'missionId',
+        });
+        trackingStore.createIndex('currentStatus', 'currentStatus', { unique: false });
+        const quarantineStore = handle.createObjectStore('quarantine', { keyPath: 'id' });
+        quarantineStore.createIndex('originalStore', 'originalStore', { unique: false });
+      };
+      req.onsuccess = () => {
+        const handle = req.result;
+        const tx = handle.transaction('profile', 'readwrite');
+        tx.objectStore('profile').put({
+          id: 'current',
+          firstName: 'Guy',
+          stack: ['Svelte'],
+          searchKeywords: ['Chrome extension'],
+          keywords: ['TypeScript'],
+          tjmMin: 600,
+          tjmMax: 800,
+          location: 'Paris',
+          remote: 'hybrid',
+          seniority: 'senior',
+          jobTitle: 'Lead Frontend',
+        });
+        tx.oncomplete = () => {
+          handle.close();
+          resolve();
+        };
+        tx.onerror = () => reject(tx.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    const result = await db.runMigrations();
+    expect(result.ok).toBe(true);
+
+    const migrated = await new Promise<Record<string, unknown> | undefined>((resolve, reject) => {
+      const req = indexedDB.open(DB_NAME, db.DB_VERSION);
+      req.onsuccess = () => {
+        const handle = req.result;
+        const tx = handle.transaction('profile', 'readonly');
+        const get = tx.objectStore('profile').get('current');
+        get.onsuccess = () => {
+          handle.close();
+          resolve(get.result as Record<string, unknown> | undefined);
+        };
+        get.onerror = () => reject(get.error);
+      };
+      req.onerror = () => reject(req.error);
+    });
+
+    expect(migrated).toEqual(
+      expect.objectContaining({
+        id: 'current',
+        keywords: ['TypeScript', 'Svelte', 'Chrome extension'],
+        experiences: [],
+        availability: null,
+      })
+    );
+    expect(migrated).not.toHaveProperty('stack');
+    expect(migrated).not.toHaveProperty('searchKeywords');
   });
 
   it('is idempotent — a second run is a no-op success [Inv-3]', async () => {
@@ -123,7 +232,7 @@ describe('DB migration orchestrator', () => {
     // Pre-create the DB at a version higher than DB_VERSION with user data.
     const userRecord = { id: 'precious', payload: 'do-not-destroy' };
     await new Promise<void>((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 5);
+      const req = indexedDB.open(DB_NAME, 6);
       req.onupgradeneeded = () => {
         req.result.createObjectStore('future_store', { keyPath: 'id' });
       };
@@ -142,7 +251,7 @@ describe('DB migration orchestrator', () => {
 
     const db = await importFresh();
     const storedBefore = await db.probeStoredDbVersion();
-    expect(storedBefore).toBe(5);
+    expect(storedBefore).toBe(6);
 
     const result = await db.runMigrations();
 
@@ -155,7 +264,7 @@ describe('DB migration orchestrator', () => {
 
     // Data MUST still be there — downgrade never destroys.
     const preserved = await new Promise<unknown>((resolve, reject) => {
-      const req = indexedDB.open(DB_NAME, 5);
+      const req = indexedDB.open(DB_NAME, 6);
       req.onsuccess = () => {
         const handle = req.result;
         if (!handle.objectStoreNames.contains('future_store')) {
@@ -209,7 +318,7 @@ describe('DB migration orchestrator', () => {
 
     // Invalid records were moved to the quarantine store (not deleted into the void).
     const quarantined = await new Promise<unknown[]>((resolve, reject) => {
-      const h = indexedDB.open(DB_NAME, 4);
+      const h = indexedDB.open(DB_NAME, db.DB_VERSION);
       h.onsuccess = () => {
         const tx = h.result.transaction('quarantine', 'readonly');
         const req = tx.objectStore('quarantine').getAll();
@@ -259,7 +368,7 @@ describe('DB migration orchestrator', () => {
     // Quarantine stays EMPTY — proving verify did not run (20% bad would otherwise
     // trigger quarantine).
     const quarantined = await new Promise<unknown[]>((resolve, reject) => {
-      const h = indexedDB.open(DB_NAME, 4);
+      const h = indexedDB.open(DB_NAME, db.DB_VERSION);
       h.onsuccess = () => {
         const tx = h.result.transaction('quarantine', 'readonly');
         const req = tx.objectStore('quarantine').getAll();

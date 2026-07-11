@@ -24,6 +24,30 @@ describe('UserProfileSchema — validation Zod', () => {
     expect(result.success).toBe(true);
   });
 
+  it('applique une valeur nulle aux expériences persistées par une ancienne version', () => {
+    const parsed = UserProfileSchema.parse({
+      ...validProfile(),
+      experiences: [
+        {
+          id: 'legacy',
+          title: 'Dev',
+          company: 'Acme',
+          location: null,
+          startDate: '2020-01',
+          endDate: null,
+          isCurrent: true,
+          description: '',
+          skills: [],
+          source: 'manual',
+          sourceExternalId: null,
+          positionIndex: 0,
+          updatedAt: 1,
+        },
+      ],
+    });
+    expect(parsed.experiences[0].employmentType).toBeNull();
+  });
+
   it('accepte un profil avec scoringWeights valides', () => {
     const profile = {
       ...validProfile(),

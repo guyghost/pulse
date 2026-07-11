@@ -119,6 +119,7 @@ const mockLinkedInProfile: CanonicalCandidateProfileDraft = {
     {
       title: 'Lead Frontend',
       company: 'Acme Corp',
+      employmentType: 'Freelance',
       location: 'Paris',
       startDate: '2022-01',
       endDate: null,
@@ -128,6 +129,20 @@ const mockLinkedInProfile: CanonicalCandidateProfileDraft = {
       source: 'linkedin',
       sourceExternalId: null,
       positionIndex: 0,
+    },
+    {
+      title: 'Product Engineer',
+      company: 'Studio Kanso',
+      employmentType: 'CDI',
+      location: 'Lyon',
+      startDate: '2019-09',
+      endDate: '2021-12',
+      isCurrent: false,
+      description: 'Construction d’un design system pour les équipes produit.',
+      skills: ['TypeScript', 'Design Systems'],
+      source: 'linkedin',
+      sourceExternalId: null,
+      positionIndex: 1,
     },
   ],
   skills: [

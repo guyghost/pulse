@@ -60,6 +60,20 @@ describe('extractLinkedInProfileFromDom — blocked-reason detection', () => {
     expect(snapshot.sections.experiences).toHaveLength(1);
   });
 
+  it('does not block corroboration-like biography prose below a genuine profile h1', () => {
+    renderProfile(`
+      <main>
+        <h1>Jane Doe</h1>
+        <p>I investigate unusual activity and help customers verify your identity safely.</p>
+      </main>
+    `);
+
+    const snapshot: DomSnapshot = extractLinkedInProfileFromDom();
+
+    expect(snapshot.blockedReason).toBeUndefined();
+    expect(snapshot.sections.headline).toBe('Jane Doe');
+  });
+
   it('blocks when LinkedIn serves a security-verification interstitial with no profile sections', () => {
     renderProfile(`
       <div>
@@ -73,6 +87,63 @@ describe('extractLinkedInProfileFromDom — blocked-reason detection', () => {
     expect(snapshot.blockedReason).toBe('security verification required');
     expect(snapshot.sections.experiences).toHaveLength(0);
     expect(snapshot.sections.headline).toBe('');
+  });
+
+  it('does not let a challenge phrase in a profile-headline selector suppress blocking', () => {
+    renderProfile(`
+      <main>
+        <div class="pv-text-details__left-panel">
+          <p class="text-body-medium">Security verification</p>
+        </div>
+        <p>Please verify your identity to continue.</p>
+      </main>
+    `);
+
+    const snapshot: DomSnapshot = extractLinkedInProfileFromDom();
+
+    expect(snapshot.blockedReason).toBe('security verification required');
+    expect(snapshot.sections.headline).toBe('');
+  });
+
+  it('prioritizes a corroborated challenge h1 over residual profile headline markup', () => {
+    renderProfile(`
+      <main>
+        <h1>Security verification</h1>
+        <div class="pv-text-details__left-panel">
+          <p class="text-body-medium">Principal Security Engineer</p>
+        </div>
+        <p>Please verify your identity to continue.</p>
+      </main>
+    `);
+
+    const snapshot: DomSnapshot = extractLinkedInProfileFromDom();
+
+    expect(snapshot.blockedReason).toBe('security verification required');
+    expect(snapshot.sections.headline).toBe('');
+  });
+
+  it('keeps an uncorroborated Security verification h1 as a legitimate headline', () => {
+    renderProfile('<main><h1>Security verification</h1></main>');
+
+    const snapshot: DomSnapshot = extractLinkedInProfileFromDom();
+
+    expect(snapshot.blockedReason).toBeUndefined();
+    expect(snapshot.sections.headline).toBe('Security verification');
+  });
+
+  it('preserves a genuine headline that only contains challenge vocabulary', () => {
+    renderProfile(`
+      <main><h1>Security Check Engineer</h1></main>
+      <section>
+        <h2>Experience</h2>
+        <ul><li>SRE\nAcme\n2021 — 2024</li></ul>
+      </section>
+    `);
+
+    const snapshot: DomSnapshot = extractLinkedInProfileFromDom();
+
+    expect(snapshot.blockedReason).toBeUndefined();
+    expect(snapshot.sections.headline).toBe('Security Check Engineer');
   });
 
   it('does not treat the bare word "checkpoint" in profile prose as a block signal', () => {

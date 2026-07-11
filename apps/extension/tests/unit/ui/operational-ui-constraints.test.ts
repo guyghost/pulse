@@ -367,6 +367,7 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('primaryActionLabel="Réessayer"');
     expect(feedSource).toContain('onPrimaryAction={() => store.reload()}');
     expect(feedSource).toContain('onPrimaryAction={() => store.newExperience()}');
+    expect(feedSource).toContain('employmentType: null');
     expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
   });
 

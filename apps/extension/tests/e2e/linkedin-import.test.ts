@@ -8,6 +8,7 @@ const linkedInProfile = {
     {
       title: 'Lead Frontend',
       company: 'Atelier Nova',
+      employmentType: 'Freelance',
       location: 'Paris',
       startDate: '2024-01-01',
       endDate: null,
@@ -17,6 +18,20 @@ const linkedInProfile = {
       source: 'linkedin',
       sourceExternalId: 'linkedin-experience-0',
       positionIndex: 0,
+    },
+    {
+      title: 'Product Engineer',
+      company: 'Studio Kanso',
+      employmentType: 'CDI',
+      location: 'Lyon',
+      startDate: '2021-09-01',
+      endDate: '2023-12-31',
+      isCurrent: false,
+      description: 'Construction d’un design system produit.',
+      skills: ['Svelte', 'Design Systems'],
+      source: 'linkedin',
+      sourceExternalId: 'linkedin-experience-1',
+      positionIndex: 1,
     },
   ],
   skills: [
@@ -31,25 +46,38 @@ const linkedInProfile = {
   profileUrl: 'https://www.linkedin.com/in/example/',
 };
 
-type LinkedInBridgeMode = 'success' | 'session-required' | 'permission-required';
+const emptyLinkedInProfile = { ...linkedInProfile, experiences: [] };
+
+type LinkedInBridgeMode =
+  | 'success'
+  | 'empty-success'
+  | 'session-required'
+  | 'permission-required'
+  | 'detail-page-unavailable';
 
 const linkedInPreviewErrors: Record<
-  Exclude<LinkedInBridgeMode, 'success'>,
+  Exclude<LinkedInBridgeMode, 'success' | 'empty-success'>,
   { errorCode: string; errorMessage: string }
 > = {
   'session-required': {
     errorCode: 'session_required',
-    errorMessage: 'Session LinkedIn requise.',
+    errorMessage:
+      'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.',
   },
   'permission-required': {
     errorCode: 'permission_required',
     errorMessage: 'Autorisation LinkedIn refusée.',
   },
+  'detail-page-unavailable': {
+    errorCode: 'detail_page_unavailable',
+    errorMessage:
+      'La page complète des expériences LinkedIn n’a pas pu être chargée. Rechargez LinkedIn puis relancez l’import.',
+  },
 };
 
 async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeMode) {
   await page.addInitScript(
-    ({ bridgeMode, profile, previewErrors }) => {
+    ({ bridgeMode, profile, emptyProfile, previewErrors }) => {
       let chromeValue: unknown = undefined;
       Object.defineProperty(window, 'chrome', {
         configurable: true,
@@ -72,7 +100,7 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
 
           chromeApi.runtime.sendMessage = async (message) => {
             if (message.type === 'IMPORT_LINKEDIN_PROFILE') {
-              if (bridgeMode !== 'success') {
+              if (bridgeMode !== 'success' && bridgeMode !== 'empty-success') {
                 const error = previewErrors[bridgeMode];
                 return {
                   type: 'LINKEDIN_PROFILE_IMPORTED',
@@ -86,15 +114,15 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
 
               return {
                 type: 'LINKEDIN_PROFILE_IMPORTED',
-                payload: { imported: true, profile },
+                payload: {
+                  imported: true,
+                  profile: bridgeMode === 'empty-success' ? emptyProfile : profile,
+                },
               };
             }
 
             if (message.type === 'SYNC_LINKEDIN_PROFILE_IMPORT') {
-              return {
-                type: 'LINKEDIN_PROFILE_IMPORTED',
-                payload: { imported: true, profile, addedCount: 1 },
-              };
+              return originalSendMessage.call(chromeApi.runtime, message);
             }
 
             return originalSendMessage.call(chromeApi.runtime, message);
@@ -102,7 +130,12 @@ async function mockAuthenticatedLinkedInBridge(page: Page, mode: LinkedInBridgeM
         },
       });
     },
-    { bridgeMode: mode, profile: linkedInProfile, previewErrors: linkedInPreviewErrors }
+    {
+      bridgeMode: mode,
+      profile: linkedInProfile,
+      emptyProfile: emptyLinkedInProfile,
+      previewErrors: linkedInPreviewErrors,
+    }
   );
 }
 
@@ -124,8 +157,50 @@ test.describe('LinkedIn profile import flow', () => {
     // The new CV page has a direct "Importer LinkedIn" button
     await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
 
-    // After successful import, a success toast appears (count-aware: 1 new)
-    await expect(page.getByText('1 expérience LinkedIn importée avec succès.')).toBeVisible();
+    await expect(page.getByText('2 expériences LinkedIn importées avec succès.')).toBeVisible();
+    const freelanceExperience = page.getByRole('button', {
+      name: /Lead Frontend · Atelier Nova/,
+    });
+    await expect(freelanceExperience).toBeVisible();
+    await expect(freelanceExperience.getByText('Freelance', { exact: true })).toBeVisible();
+    await expect(
+      page.getByRole('button', { name: /Product Engineer · Studio Kanso/ })
+    ).toBeVisible();
+  });
+
+  test('does not duplicate experiences when the same LinkedIn profile is imported twice', async ({
+    page,
+  }) => {
+    await mockAuthenticatedLinkedInBridge(page, 'success');
+    await openCvPage(page);
+
+    const importButton = page.getByRole('button', { name: 'Importer LinkedIn' });
+    await importButton.click();
+    await expect(page.getByText('2 expériences LinkedIn importées avec succès.')).toBeVisible();
+    await expect(importButton).toBeEnabled();
+
+    await importButton.click();
+
+    await expect(
+      page.getByText('Vos expériences LinkedIn sont déjà présentes dans votre CV.', { exact: true })
+    ).toBeVisible();
+    await expect(page.getByText('5 entrées', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Lead Frontend · Atelier Nova/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /Product Engineer · Studio Kanso/ })).toHaveCount(
+      1
+    );
+  });
+
+  test('shows a truthful empty-profile outcome without scroll instructions', async ({ page }) => {
+    await mockAuthenticatedLinkedInBridge(page, 'empty-success');
+    await openCvPage(page);
+
+    await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
+
+    await expect(
+      page.getByText('Aucune expérience renseignée sur votre profil LinkedIn.', { exact: true })
+    ).toBeVisible();
+    await expect(page.getByText(/défilez/i)).toHaveCount(0);
   });
 
   test('shows typed LinkedIn import errors in toast', async ({ page }) => {
@@ -135,7 +210,12 @@ test.describe('LinkedIn profile import flow', () => {
     await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
 
     // Error messages now appear as toast notifications
-    await expect(page.getByText('Session LinkedIn requise.')).toBeVisible();
+    await expect(
+      page.getByText(
+        'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.',
+        { exact: true }
+      )
+    ).toBeVisible();
   });
 
   test('shows recovery guidance for missing LinkedIn permissions in toast', async ({ page }) => {
@@ -146,5 +226,21 @@ test.describe('LinkedIn profile import flow', () => {
 
     // Permission errors appear as toast notifications
     await expect(page.getByText('Autorisation LinkedIn refusée.')).toBeVisible();
+  });
+
+  test('shows actionable recovery guidance when the LinkedIn detail page is unavailable', async ({
+    page,
+  }) => {
+    await mockAuthenticatedLinkedInBridge(page, 'detail-page-unavailable');
+    await openCvPage(page);
+
+    await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
+
+    await expect(
+      page.getByText(
+        'La page complète des expériences LinkedIn n’a pas pu être chargée. Rechargez LinkedIn puis relancez l’import.',
+        { exact: true }
+      )
+    ).toBeVisible();
   });
 });

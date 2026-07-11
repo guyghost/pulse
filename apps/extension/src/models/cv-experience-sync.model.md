@@ -19,6 +19,7 @@ interface Experience {
   id: string; // `${idPrefix}-${positionIndex}` or generated UUID
   title: string; // e.g. "Lead Frontend"
   company: string | null; // e.g. "Acme"
+  employmentType: string | null; // e.g. "Freelance", "CDI", "Temps plein"
   location: string | null;
   startDate: string | null; // ISO month "YYYY-MM" or null
   endDate: string | null; // null when isCurrent
@@ -35,6 +36,13 @@ interface Experience {
 `UserProfile` is extended with `experiences: Experience[]` (default `[]`). The
 existing flat fields (jobTitle, stack, tjm, location, …) are unchanged; scoring
 ignores `experiences`.
+
+`employmentType` is optional domain data, persisted independently from
+`company`. Stored legacy experiences without the property are normalized to
+`null`; no IndexedDB version bump is required because profile schema parsing and
+the existing migration/default boundary supply the field. The edit form exposes
+it as an optional text field, cards display it when present, and sync payloads
+place it next to the company without changing the de-duplication key.
 
 ### PlatformSyncTarget
 
@@ -213,8 +221,10 @@ targets)` in core. If `experiences.length === 0` → `PREPARE_ERROR`. Else →
 - **`PROFILE_UPDATED`** (LinkedIn re-import or external profile save):
   `mergeExperiences(current, incoming)` (pure, core) dedups by
   `(company, title, startDate)` case-insensitively, keeping the local copy's
-  `id`/`positionIndex`/`description` edits and unioning `skills`. Manual entries
-  (`source: 'manual'`) are never overwritten by an import, only supplemented.
+  `id`/`positionIndex`/`description` edits, keeping a non-empty local
+  `employmentType` or filling it from the import, and unioning `skills`. Manual
+  entries (`source: 'manual'`) are never overwritten by an import, only
+  supplemented.
 
 ## Invariants
 
@@ -234,6 +244,9 @@ targets)` in core. If `experiences.length === 0` → `PREPARE_ERROR`. Else →
    `draft`. An open edit draft does not participate in sync.
 9. Error slots are per-machine (`feedError`/`editError`/`syncError`): a failure in
    one machine never overwrites another machine's terminal error copy.
+10. `employmentType` is `null` or trimmed non-empty display text. It is never
+    folded into `company`, and it does not affect the experience de-duplication
+    key.
 
 ## Public API (consumed by CvPage)
 

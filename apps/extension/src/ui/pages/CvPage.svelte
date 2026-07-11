@@ -50,10 +50,7 @@
         const draftCount = result.profile.experiences.length;
         const added = result.addedCount;
         if (draftCount === 0) {
-          showToast(
-            "Aucune expérience trouvée sur votre profil LinkedIn. Ouvrez votre profil LinkedIn, défilez jusqu'à la section Expérience, puis relancez l'import.",
-            'info'
-          );
+          showToast('Aucune expérience renseignée sur votre profil LinkedIn.', 'info');
         } else if (added === 0) {
           showToast('Vos expériences LinkedIn sont déjà présentes dans votre CV.', 'info');
         } else {

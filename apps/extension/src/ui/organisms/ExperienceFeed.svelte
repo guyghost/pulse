@@ -14,6 +14,7 @@
       id: 'blank',
       title: '',
       company: null,
+      employmentType: null,
       location: null,
       startDate: null,
       endDate: null,

@@ -48,12 +48,18 @@ export const STRUCTURAL_MIGRATIONS: StructuralMigration[] = [
     const genStore = db.createObjectStore('generated_assets', { keyPath: 'id' });
     genStore.createIndex('missionId', 'missionId', { unique: false });
   },
-  // → v4: mission_tracking (absorbed from tracking.ts) + quarantine (on-demand)
+  // → v4: mission_tracking (absorbed from tracking.ts)
   (db) => {
     const trackingStore = db.createObjectStore('mission_tracking', {
       keyPath: 'missionId',
     });
     trackingStore.createIndex('currentStatus', 'currentStatus', { unique: false });
+  },
+  // → v5: quarantine (on-demand invalid-record isolation)
+  (db) => {
+    if (db.objectStoreNames.contains('quarantine')) {
+      return;
+    }
     const quarantineStore = db.createObjectStore('quarantine', { keyPath: 'id' });
     quarantineStore.createIndex('originalStore', 'originalStore', { unique: false });
   },
@@ -115,7 +121,10 @@ export const DATA_MIGRATIONS: DataMigration[] = [
             reject(new Error('v1→v2 profile migration produced an invalid profile'));
             return;
           }
-          cursor.update(parsed.data);
+          cursor.update({
+            ...parsed.data,
+            id: record.id ?? cursor.key ?? 'current',
+          });
           cursor.continue();
         };
       });

@@ -196,6 +196,7 @@ export const UserProfileSchema = z
             id: z.string(),
             title: z.string(),
             company: z.string().nullable(),
+            employmentType: z.string().nullable().default(null),
             location: z.string().nullable(),
             startDate: z.string().nullable(),
             endDate: z.string().nullable(),

@@ -53,7 +53,7 @@ const deserializeStoredDate = (value: string): Date | null => {
  * Structural IndexedDB version. Bump when a store/index is added or removed.
  * Must equal `STRUCTURAL_MIGRATIONS.length` in `migration-registry.ts`.
  */
-export const DB_VERSION = 4;
+export const DB_VERSION = 5;
 
 /**
  * Applicative data version. Bump when an entity Zod schema changes shape and

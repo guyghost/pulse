@@ -9,9 +9,18 @@ import type {
 } from '../../core/profile-extractors/types';
 import type { PlatformProfileExtractor } from './platform-profile-extractor';
 import {
+  loadCompleteLinkedInExperiences,
+  type LinkedInExperienceChromeApi,
+} from './linkedin-experience-loader';
+import {
   createProfileExtractorError,
   type ProfileExtractorErrorCode,
 } from './profile-extractor-errors';
+import {
+  LINKEDIN_SESSION_REQUIRED_COPY,
+  LINKEDIN_VERIFICATION_REQUIRED_COPY,
+} from './linkedin-import-copy';
+import { classifyLinkedInReservedRoute } from './linkedin-url-classification';
 
 interface LinkedInDomProfileSnapshot {
   profileUrl: string;
@@ -33,20 +42,21 @@ interface ChromeLike {
   permissions?: {
     contains(permissions: chrome.permissions.Permissions): Promise<boolean>;
   };
-  scripting?: {
-    executeScript(
-      injection: chrome.scripting.ScriptInjection<[], LinkedInDomProfileSnapshot>
-    ): Promise<chrome.scripting.InjectionResult<LinkedInDomProfileSnapshot>[]>;
-  };
-  tabs?: {
-    get(tabId: number): Promise<chrome.tabs.Tab>;
-    query(queryInfo: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]>;
-  };
+  scripting?: LinkedInExperienceChromeApi['scripting'];
+  tabs?: LinkedInExperienceChromeApi['tabs'] & Pick<typeof chrome.tabs, 'query'>;
 }
 
 function getChromeApi(): ChromeLike {
   return typeof chrome === 'undefined' ? {} : chrome;
 }
+
+export interface LinkedInProfileExtractorDependencies {
+  parseLinkedInProfilePayload: typeof parseLinkedInProfilePayload;
+}
+
+const DEFAULT_DEPENDENCIES: LinkedInProfileExtractorDependencies = {
+  parseLinkedInProfilePayload,
+};
 
 function isLinkedInProfileUrl(url: string): boolean {
   try {
@@ -63,11 +73,9 @@ function classifyLinkedInUrl(url: string): ProfileExtractorErrorCode | null {
     if (parsed.hostname !== 'www.linkedin.com') {
       return 'profile_not_found';
     }
-    if (parsed.pathname.includes('/login') || parsed.pathname.includes('/uas/login')) {
-      return 'session_required';
-    }
-    if (parsed.pathname.includes('/checkpoint') || parsed.pathname.includes('/challenge')) {
-      return 'rate_limited_or_blocked';
+    const reservedRouteError = classifyLinkedInReservedRoute(parsed);
+    if (reservedRouteError) {
+      return reservedRouteError;
     }
     return isLinkedInProfileUrl(url) ? null : 'profile_not_found';
   } catch {
@@ -81,29 +89,33 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   // Specific, non-greedy: the bare words "challenge"/"checkpoint" are NOT block
   // signals — they appear in legitimate profile prose ("I enjoy new challenges")
   // and previously caused false `rate_limited_or_blocked` errors. Only
-  // challenge-page phrases qualify, and only when no profile sections are
-  // present (see the `hasProfileSections` guard below).
+  // challenge-page phrases qualify, and only with explicit corroboration when
+  // no strong profile marker is present (see the guard below).
   // See src/models/linkedin-import.model.md.
-  const blockedReasonFromText = (value: string): string | null => {
+  const blockedSignalsFromText = (value: string): string[] => {
     const text = value.toLowerCase();
+    const signals: string[] = [];
     if (text.includes('security verification')) {
-      return 'security verification required';
+      signals.push('security verification required');
     }
     if (text.includes('unusual activity')) {
-      return 'unusual activity challenge';
+      signals.push('unusual activity challenge');
     }
     if (text.includes('verify your identity')) {
-      return 'identity verification required';
+      signals.push('identity verification required');
     }
     if (text.includes('security check')) {
-      return 'security check required';
+      signals.push('security check required');
     }
     if (text.includes('temporarily restricted')) {
-      return 'temporarily restricted session';
+      signals.push('temporarily restricted session');
     }
-
-    return null;
+    return signals;
   };
+  const isChallengeHeading = (value: string): boolean =>
+    /^(?:security verification(?: required)?|security check(?: required)?|verify your identity|unusual activity(?: detected)?|temporarily restricted(?: account|session)?)[.!:]?$/i.test(
+      clean(value)
+    );
   const text = (selector: string): string => clean(document.querySelector(selector)?.textContent);
   const allTexts = (selector: string): string[] =>
     [...document.querySelectorAll(selector)].map((item) => clean(item.textContent)).filter(Boolean);
@@ -152,10 +164,11 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   const about = sectionByHeading(['about', 'infos', 'à propos']);
   const experience = sectionByHeading(['experience', 'expérience']);
   const education = sectionByHeading(['education', 'formation']);
-  const headline =
+  const mainHeading = text('main h1');
+  const headlineCandidate =
     text('.pv-text-details__left-panel .text-body-medium') ||
     text('[data-generated-suggestion-target]') ||
-    text('main h1');
+    mainHeading;
   const experiences = sectionItems(experience).map(parseExperience);
   const educationItems = sectionItems(education).map(parseEducation);
   const summary = about
@@ -174,10 +187,46 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   // "challenge" or "unusual activity" in its bio must NOT be treated as a
   // checkpoint interstitial. `innerText` is preferred (layout-aware, ignores
   // <script>/<style>); `textContent` is a fallback for undrawn/jsdom contexts.
-  const hasProfileSections =
-    Boolean(headline) || experiences.length > 0 || educationItems.length > 0;
   const bodyText = clean(document.body?.innerText || document.body?.textContent || '');
-  const blockedReason = hasProfileSections ? null : blockedReasonFromText(bodyText);
+  const bodySignals = blockedSignalsFromText(bodyText);
+  const bodyWithoutMainHeading = document.body?.cloneNode(true) as HTMLElement | undefined;
+  for (const heading of bodyWithoutMainHeading?.querySelectorAll('main h1') ?? []) {
+    heading.remove();
+  }
+  const outsideHeadingText = clean(
+    bodyWithoutMainHeading?.innerText || bodyWithoutMainHeading?.textContent || ''
+  );
+  const outsideHeadingSignals = blockedSignalsFromText(outsideHeadingText);
+  const challengeHeadingReason = isChallengeHeading(mainHeading)
+    ? (blockedSignalsFromText(mainHeading)[0] ?? null)
+    : null;
+  const hasVerificationControl = Boolean(
+    document.querySelector(
+      'form[action*="checkpoint" i], form[action*="challenge" i], input[name*="verification" i], input[name*="challenge" i], input[name*="pin" i], [data-test*="verification" i], [data-testid*="verification" i], [data-test*="challenge" i], [data-testid*="challenge" i]'
+    )
+  );
+  const firstPathSegment = window.location.pathname.split('/').filter(Boolean)[0]?.toLowerCase();
+  const isReservedChallengeRoute =
+    firstPathSegment === 'checkpoint' || firstPathSegment === 'challenge';
+  const hasStrongProfileMarkers =
+    Boolean(about || experience || education || (mainHeading && !challengeHeadingReason)) ||
+    experiences.length > 0 ||
+    educationItems.length > 0;
+  const hasDistinctSignalOutsideHeading = Boolean(
+    challengeHeadingReason &&
+    outsideHeadingSignals.some((signal) => signal !== challengeHeadingReason)
+  );
+  const hasCorroboratedDomChallenge =
+    !hasStrongProfileMarkers &&
+    ((Boolean(challengeHeadingReason) &&
+      (hasDistinctSignalOutsideHeading || hasVerificationControl)) ||
+      bodySignals.length >= 2 ||
+      (bodySignals.length >= 1 && hasVerificationControl));
+  const blockedReason =
+    isReservedChallengeRoute || hasCorroboratedDomChallenge
+      ? (challengeHeadingReason ?? bodySignals[0] ?? 'linkedin challenge route')
+      : null;
+  const headline = blockedReason ? '' : headlineCandidate;
 
   return {
     profileUrl: window.location.href,
@@ -199,7 +248,10 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
   readonly id = 'linkedin' as const;
   readonly name = 'LinkedIn';
 
-  constructor(private readonly chromeApi: ChromeLike = getChromeApi()) {}
+  constructor(
+    private readonly chromeApi: ChromeLike = getChromeApi(),
+    private readonly dependencies: LinkedInProfileExtractorDependencies = DEFAULT_DEPENDENCIES
+  ) {}
 
   async detectSession(now: number): Promise<Result<boolean, AppError>> {
     if (!this.chromeApi.cookies?.getAll) {
@@ -264,15 +316,18 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
         createProfileExtractorError(
           urlError,
           urlError === 'session_required'
-            ? 'LinkedIn requires a browser session before import.'
-            : 'The active tab is not a LinkedIn profile page.',
+            ? LINKEDIN_SESSION_REQUIRED_COPY
+            : urlError === 'rate_limited_or_blocked'
+              ? LINKEDIN_VERIFICATION_REQUIRED_COPY
+              : 'The active tab is not a LinkedIn profile page.',
           now,
           { url: tab.url }
         )
       );
     }
 
-    if (!this.chromeApi.scripting?.executeScript) {
+    const scripting = this.chromeApi.scripting;
+    if (!scripting?.executeScript) {
       return err(
         createProfileExtractorError(
           'permission_required',
@@ -289,17 +344,25 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
     }
     if (!session.value) {
       return err(
+        createProfileExtractorError('session_required', LINKEDIN_SESSION_REQUIRED_COPY, now, {
+          url: tab.url,
+        })
+      );
+    }
+
+    const tabs = this.chromeApi.tabs;
+    if (!tabs) {
+      return err(
         createProfileExtractorError(
-          'session_required',
-          'LinkedIn requires an authenticated browser session before import.',
-          now,
-          { url: tab.url }
+          'profile_not_found',
+          'Open a LinkedIn profile tab before importing.',
+          now
         )
       );
     }
 
     try {
-      const [result] = await this.chromeApi.scripting.executeScript({
+      const [result] = await scripting.executeScript({
         target: { tabId: tab.id },
         func: extractLinkedInProfileFromDom,
       });
@@ -318,18 +381,26 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
         return err(
           createProfileExtractorError(
             'rate_limited_or_blocked',
-            'LinkedIn blocked profile extraction with a challenge or checkpoint.',
+            LINKEDIN_VERIFICATION_REQUIRED_COPY,
             now,
             { url: tab.url, reason: snapshot.blockedReason }
           )
         );
       }
 
-      const parsed = parseLinkedInProfilePayload({
+      const detail = await loadCompleteLinkedInExperiences({ tabs, scripting }, tab.url, now);
+      if (!detail.ok) {
+        return detail;
+      }
+
+      const parsed = this.dependencies.parseLinkedInProfilePayload({
         source: 'linkedin',
         profileUrl: snapshot.profileUrl || tab.url,
         capturedAt: new Date(now),
-        sections: snapshot.sections,
+        sections: {
+          ...snapshot.sections,
+          experiences: detail.value,
+        },
       });
 
       if (!parsed.ok) {

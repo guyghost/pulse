@@ -49,16 +49,49 @@ describe('dev chrome stub — LinkedIn preview/import/sync', () => {
     expect(response.type).toBe('LINKEDIN_PROFILE_IMPORTED');
     expect(response.payload.imported).toBe(true);
     assertDraftShape(response.payload.profile);
+    expect(response.payload.profile?.experiences).toHaveLength(2);
+    expect(response.payload.profile?.experiences).toEqual(
+      expect.arrayContaining([expect.objectContaining({ employmentType: 'Freelance' })])
+    );
   });
 
-  it('SYNC_LINKEDIN_PROFILE_IMPORT returns a successful import (dev happy path)', async () => {
+  it('SYNC_LINKEDIN_PROFILE_IMPORT reports the number of newly returned rows', async () => {
     // The SYNC message contract carries the previewed draft (the CvPage only
     // syncs after a successful preview), so the dev stub merges it into the
     // stored profile rather than no-op'ing on a null payload.
     const draft: CanonicalCandidateProfileDraft = {
       title: 'Lead Frontend Svelte',
       summary: 'Architecte front-end Svelte et TypeScript.',
-      experiences: [],
+      experiences: [
+        {
+          title: 'Consultant Svelte',
+          company: 'Collectif Atlas',
+          employmentType: 'Freelance',
+          location: 'Paris',
+          startDate: '2024-01',
+          endDate: null,
+          isCurrent: true,
+          description: 'Architecture frontend.',
+          skills: ['Svelte'],
+          source: 'linkedin',
+          sourceExternalId: 'stub-new-0',
+          positionIndex: 0,
+        },
+        {
+          title: 'Product Engineer',
+          company: 'Studio Kanso',
+          employmentType: 'CDI',
+          location: 'Lyon',
+          startDate: '2021-09',
+          endDate: '2023-12',
+          isCurrent: false,
+          description: 'Design system produit.',
+          skills: ['TypeScript'],
+          source: 'linkedin',
+          sourceExternalId: 'stub-new-1',
+          positionIndex: 1,
+        },
+      ],
       skills: [{ skill: 'Svelte', source: 'linkedin', confidence: 0.95 }],
       education: [],
       links: [],
@@ -73,11 +106,16 @@ describe('dev chrome stub — LinkedIn preview/import/sync', () => {
       payload: { profile: draft },
     })) as {
       type: string;
-      payload: { imported: boolean; profile?: CanonicalCandidateProfileDraft };
+      payload: {
+        imported: boolean;
+        profile?: CanonicalCandidateProfileDraft;
+        addedCount?: number;
+      };
     };
 
     expect(response.type).toBe('LINKEDIN_PROFILE_IMPORTED');
     expect(response.payload.imported).toBe(true);
+    expect(response.payload.addedCount).toBe(draft.experiences.length);
     assertDraftShape(response.payload.profile);
   });
 });

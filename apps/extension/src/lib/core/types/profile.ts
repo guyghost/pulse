@@ -21,6 +21,7 @@ export interface Experience {
   id: string;
   title: string;
   company: string | null;
+  employmentType: string | null;
   location: string | null;
   /** ISO month "YYYY-MM" or null when unknown. */
   startDate: string | null;

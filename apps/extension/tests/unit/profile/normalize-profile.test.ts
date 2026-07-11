@@ -85,6 +85,7 @@ describe('normalize profile helpers', () => {
         id: 'exp-1',
         title: 'Lead',
         company: 'Acme',
+        employmentType: null,
         location: 'Paris',
         startDate: '2023-01',
         endDate: null,

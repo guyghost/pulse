@@ -109,6 +109,13 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     platformStatuses = next;
   }
 
+  function resetSyncSnapshot(): void {
+    syncStatus = 'idle';
+    syncError = null;
+    lastSyncedAt = null;
+    platformStatuses = new Map();
+  }
+
   // ── Feed machine ────────────────────────────────────────────────────────
   async function load(): Promise<void> {
     feedStatus = 'loading';
@@ -137,6 +144,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
       {
         title: '',
         company: null,
+        employmentType: null,
         location: null,
         startDate: null,
         endDate: null,
@@ -203,6 +211,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
       editingId = null;
       editStatus = 'idle';
       feedStatus = 'ready';
+      resetSyncSnapshot();
     } catch (err) {
       editError = errorMessage(err, 'Impossible d’enregistrer l’expérience.');
       editStatus = 'error';
@@ -223,6 +232,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
       editingId = null;
       editStatus = 'idle';
       feedStatus = 'ready';
+      resetSyncSnapshot();
     } catch (err) {
       editError = errorMessage(err, 'Impossible de supprimer l’expérience.');
       editStatus = 'error';
@@ -342,10 +352,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
     draft = null;
     // External update (e.g. LinkedIn import) invalidates prior sync state —
     // reset the sync machine so stale statuses/lastSyncedAt don't persist.
-    syncStatus = 'idle';
-    syncError = null;
-    lastSyncedAt = null;
-    platformStatuses = new Map();
+    resetSyncSnapshot();
   }
 
   return {
