@@ -416,6 +416,8 @@ export function remoteCandidateProfileToUserProfile(
     // The connected-dashboard snapshot does not carry CV experiences; preserve
     // the user's existing entries so syncing the dashboard does not wipe them.
     experiences: [...(existingProfile?.experiences ?? [])],
+    // The dashboard snapshot does not carry availability either; preserve it.
+    availability: existingProfile?.availability ?? null,
     scoringWeights: existingProfile?.scoringWeights
       ? { ...existingProfile.scoringWeights }
       : undefined,

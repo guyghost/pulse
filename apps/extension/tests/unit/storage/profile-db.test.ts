@@ -13,6 +13,7 @@ const profile: UserProfile = {
   seniority: 'senior',
   jobTitle: 'Architecte Svelte',
   experiences: [],
+  availability: null,
 };
 
 describe('profile IndexedDB store', () => {

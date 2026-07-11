@@ -450,6 +450,12 @@ function buildCompleteProfile(): UserProfile {
         updatedAt: 1710000000000,
       },
     ],
+    availability: {
+      status: 'from-date',
+      date: '2026-01-15',
+      note: '',
+      updatedAt: 1710000000000,
+    },
   };
 }
 
@@ -464,6 +470,7 @@ function buildIncompleteProfile(): UserProfile {
     seniority: 'senior',
     jobTitle: '',
     experiences: [],
+    availability: null,
   };
 }
 

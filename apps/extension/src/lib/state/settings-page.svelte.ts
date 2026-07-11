@@ -390,6 +390,7 @@ export class SettingsPageController {
         seniority: this.seniority,
         scoringWeights: current?.scoringWeights,
         experiences: current?.experiences,
+        availability: current?.availability,
       });
 
       if (!normalized.ok || !normalized.profile) {

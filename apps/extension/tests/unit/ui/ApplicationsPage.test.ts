@@ -17,6 +17,17 @@ vi.mock('../../../src/lib/shell/notifications/toast-service', () => ({
   showToast,
   showToastAction,
 }));
+vi.mock('../../../src/lib/shell/facades/availability.facade', () => ({
+  createAvailabilityDeps: () => ({
+    loadAvailability: () => Promise.resolve(null),
+    saveAvailability: () => Promise.resolve(undefined),
+    copyToClipboard: () => Promise.resolve(undefined),
+    openUrl: () => Promise.resolve(undefined),
+    platforms: [],
+    now: () => 0,
+  }),
+  getAvailabilityPushTargets: () => [],
+}));
 
 import ApplicationsPage from '../../../src/ui/pages/ApplicationsPage.svelte';
 

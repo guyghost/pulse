@@ -85,5 +85,6 @@ function createBlankProfile() {
     seniority: 'senior' as const,
     jobTitle: '',
     experiences: [] as Experience[],
+    availability: null as import('$lib/core/types/availability').Availability | null,
   };
 }

@@ -1,4 +1,5 @@
 import type { Experience, UserProfile } from '../types/profile';
+import type { Availability } from '../types/availability';
 
 export interface ProfileDraftInput {
   firstName?: string | null;
@@ -12,6 +13,7 @@ export interface ProfileDraftInput {
   keywordInput?: string | null;
   scoringWeights?: UserProfile['scoringWeights'];
   experiences?: readonly Experience[] | null;
+  availability?: Availability | null;
 }
 
 export interface NormalizeProfileResult {
@@ -66,6 +68,7 @@ export const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile 
   jobTitle: profile.jobTitle ?? '',
   scoringWeights: profile.scoringWeights,
   experiences: [...(profile.experiences ?? [])],
+  availability: profile.availability ?? null,
 });
 
 export function normalizeProfileDraft(input: ProfileDraftInput): NormalizeProfileResult {
@@ -89,6 +92,7 @@ export function normalizeProfileDraft(input: ProfileDraftInput): NormalizeProfil
       keywords: appendUniqueNormalized(input.keywords, input.keywordInput),
       scoringWeights: input.scoringWeights,
       experiences: input.experiences ? [...input.experiences] : [],
+      availability: input.availability ?? null,
     }),
   };
 }
