@@ -25,7 +25,7 @@ const LAZY_EMPTY_FIXTURE = readFileSync(
 );
 
 const DEFAULT_OPTIONS: LinkedInExperienceDomOptions = {
-  stabilizationTimeoutMs: 100,
+  stabilizationTimeoutMs: 500,
   observationMs: 2,
   stableCycles: 2,
 };
