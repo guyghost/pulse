@@ -45,6 +45,14 @@ function getChromeApi(): ChromeLike {
   return typeof chrome === 'undefined' ? {} : chrome;
 }
 
+export interface LinkedInProfileExtractorDependencies {
+  parseLinkedInProfilePayload: typeof parseLinkedInProfilePayload;
+}
+
+const DEFAULT_DEPENDENCIES: LinkedInProfileExtractorDependencies = {
+  parseLinkedInProfilePayload,
+};
+
 function isLinkedInProfileUrl(url: string): boolean {
   try {
     const parsed = new URL(url);
@@ -196,7 +204,10 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
   readonly id = 'linkedin' as const;
   readonly name = 'LinkedIn';
 
-  constructor(private readonly chromeApi: ChromeLike = getChromeApi()) {}
+  constructor(
+    private readonly chromeApi: ChromeLike = getChromeApi(),
+    private readonly dependencies: LinkedInProfileExtractorDependencies = DEFAULT_DEPENDENCIES
+  ) {}
 
   async detectSession(now: number): Promise<Result<boolean, AppError>> {
     if (!this.chromeApi.cookies?.getAll) {
@@ -339,7 +350,7 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
         return detail;
       }
 
-      const parsed = parseLinkedInProfilePayload({
+      const parsed = this.dependencies.parseLinkedInProfilePayload({
         source: 'linkedin',
         profileUrl: snapshot.profileUrl || tab.url,
         capturedAt: new Date(now),

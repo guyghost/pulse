@@ -182,6 +182,9 @@ describe('loadCompleteLinkedInExperiences', () => {
     const result = await loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW);
 
     expect(extractorCode(result)).toBe('rate_limited_or_blocked');
+    expect(result.ok ? null : result.error.message).toBe(
+      'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.'
+    );
     expectSingleCreate(double);
     expectSingleCleanup(double);
   });
@@ -277,10 +280,22 @@ describe('loadCompleteLinkedInExperiences', () => {
   });
 
   it.each([
-    ['https://www.linkedin.com/login', 'session_required'],
-    ['https://www.linkedin.com/checkpoint/challenge/', 'rate_limited_or_blocked'],
-    ['https://www.linkedin.com/feed/', 'detail_page_unavailable'],
-  ])('reclassifies ready redirect %s as %s', async (url, expectedCode) => {
+    [
+      'https://www.linkedin.com/login',
+      'session_required',
+      'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.',
+    ],
+    [
+      'https://www.linkedin.com/checkpoint/challenge/',
+      'rate_limited_or_blocked',
+      'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.',
+    ],
+    [
+      'https://www.linkedin.com/feed/',
+      'detail_page_unavailable',
+      'La page complète des expériences LinkedIn n’a pas pu être chargée. Rechargez LinkedIn puis relancez l’import.',
+    ],
+  ])('reclassifies ready redirect %s as %s', async (url, expectedCode, expectedMessage) => {
     const double = createChromeDouble({
       createdTab: { id: 99, url, status: 'complete' } as chrome.tabs.Tab,
     });
@@ -288,6 +303,7 @@ describe('loadCompleteLinkedInExperiences', () => {
     const result = await loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW);
 
     expect(extractorCode(result)).toBe(expectedCode);
+    expect(result.ok ? null : result.error.message).toBe(expectedMessage);
     expect(double.api.scripting.executeScript).not.toHaveBeenCalled();
     expectSingleCreate(double);
     expectSingleCleanup(double);
@@ -317,10 +333,16 @@ describe('loadCompleteLinkedInExperiences', () => {
 
   it('preserves successful rows when cleanup fails', async () => {
     const double = createChromeDouble({ removeError: new Error('Already gone') });
+    const warning = vi.spyOn(console, 'warn').mockImplementation(() => undefined);
 
     const result = await loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW);
 
     expect(result).toEqual({ ok: true, value: [ROW] });
+    expect(warning).toHaveBeenCalledWith('[MissionPulse][LinkedInExperienceImport]', {
+      event: 'detail_tab_cleanup_failed',
+      tabId: 99,
+      cause: 'Already gone',
+    });
     expectSingleCleanup(double);
   });
 

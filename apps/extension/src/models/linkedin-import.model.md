@@ -166,6 +166,15 @@ recoverable extraction failure; the source profile tab is never closed.
 manual close, or readiness timeout. `dom_changed` is reserved for a page that
 loaded but whose experience structure or empty state cannot be recognized.
 
+Recovery copy is determined by the typed terminal error, never by free text:
+
+- `session_required`: ask the user to reconnect to LinkedIn, then relaunch the
+  import;
+- `rate_limited_or_blocked`: ask the user to complete LinkedIn's security
+  verification/challenge, then relaunch the import;
+- `detail_page_unavailable`: ask the user to reload LinkedIn, then relaunch the
+  import.
+
 #### Detail URL and tab lifecycle
 
 - The detail URL is derived structurally from the already validated `/in/{slug}`
@@ -176,7 +185,9 @@ loaded but whose experience structure or empty state cannot be recognized.
 - `chrome.tabs.remove(createdTabId)` runs from a `finally`-equivalent cleanup
   path on success, parse error, redirect, timeout, cancellation, or challenge.
 - A close failure is recorded for diagnostics but MUST NOT replace a successful
-  extraction result or the original extraction error.
+  extraction result or the original extraction error. The shell emits a
+  structured `detail_tab_cleanup_failed` warning containing only the temporary
+  tab id and sanitized cause.
 
 #### Readiness and completeness
 

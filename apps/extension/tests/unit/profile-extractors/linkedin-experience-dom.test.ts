@@ -199,6 +199,33 @@ describe('extractLinkedInExperiencesFromDom', () => {
     expect(snapshot.experiences.map((experience) => experience.title)).toEqual(['First', 'Second']);
   });
 
+  it('deduplicates distinct DOM rows by title, company, and start month', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            ${standaloneRow('first-source-row', 'Staff Engineer')}
+            ${standaloneRow('duplicate-source-row', 'Staff Engineer')}
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toHaveLength(1);
+    expect(snapshot.experiences[0]).toMatchObject({
+      title: 'Staff Engineer',
+      company: 'Example Corp',
+      dateRange: 'janv. 2024 – aujourd’hui',
+      externalId: 'urn:li:fsd_profilePosition:first-source-row',
+    });
+  });
+
   it('scrolls a recognized zero-row list so its first lazy row can load', async () => {
     render(LAZY_EMPTY_FIXTURE);
     const list = document.querySelector('.pvs-list');

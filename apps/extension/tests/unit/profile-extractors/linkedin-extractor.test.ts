@@ -1,5 +1,9 @@
 import { describe, expect, it, vi } from 'vitest';
-import { LinkedInProfileExtractor } from '../../../src/lib/shell/profile-extractors/linkedin.extractor';
+import { parseLinkedInProfilePayload } from '../../../src/lib/core/profile-extractors/linkedin-parser';
+import {
+  LinkedInProfileExtractor,
+  type LinkedInProfileExtractorDependencies,
+} from '../../../src/lib/shell/profile-extractors/linkedin.extractor';
 
 type LinkedInChromeDouble = ConstructorParameters<typeof LinkedInProfileExtractor>[0];
 
@@ -144,6 +148,18 @@ describe('LinkedInProfileExtractor', () => {
     expect(chromeDouble.tabs?.remove).toHaveBeenCalledWith(99);
   });
 
+  it('routes a complete detail payload through the injected canonical parser', async () => {
+    const parseLinkedInProfile = vi.fn(parseLinkedInProfilePayload);
+    const extractor = new LinkedInProfileExtractor(createChromeDouble(), {
+      parseLinkedInProfilePayload: parseLinkedInProfile,
+    });
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(true);
+    expect(parseLinkedInProfile).toHaveBeenCalledTimes(1);
+  });
+
   it('returns permission_required when the LinkedIn origin is not granted and never calls request from the service worker', async () => {
     const request = vi.fn(async () => true);
     const extractor = new LinkedInProfileExtractor(
@@ -273,7 +289,11 @@ describe('LinkedInProfileExtractor', () => {
         throw new Error('detail tab unavailable');
       },
     });
-    const extractor = new LinkedInProfileExtractor(chromeDouble);
+    const parseLinkedInProfile = vi.fn(parseLinkedInProfilePayload);
+    const dependencies: LinkedInProfileExtractorDependencies = {
+      parseLinkedInProfilePayload: parseLinkedInProfile,
+    };
+    const extractor = new LinkedInProfileExtractor(chromeDouble, dependencies);
 
     const result = await extractor.extractProfile(1779436800000);
 
@@ -281,6 +301,7 @@ describe('LinkedInProfileExtractor', () => {
     expect(extractorCode(result)).toBe('detail_page_unavailable');
     expect(chromeDouble.scripting?.executeScript).toHaveBeenCalledTimes(1);
     expect(chromeDouble.tabs?.remove).not.toHaveBeenCalled();
+    expect(parseLinkedInProfile).not.toHaveBeenCalled();
   });
 
   it('returns dom_changed when LinkedIn returns an empty sanitized payload', async () => {

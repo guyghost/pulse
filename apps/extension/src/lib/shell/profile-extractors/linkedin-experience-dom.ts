@@ -248,6 +248,87 @@ export async function extractLinkedInExperiencesFromDom(
     };
   };
 
+  const normalizeBusinessKeyText = (value: string | undefined): string =>
+    cleanLine(value)
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .toLocaleLowerCase();
+
+  const startMonthKey = (dateRange: string | undefined): string => {
+    const start = normalizeBusinessKeyText(dateRange?.split(/\s+[–—-]\s+/, 1)[0]);
+    const year = start.match(/\b(19|20)\d{2}\b/)?.[0] ?? '';
+    if (!year) {
+      return '';
+    }
+
+    const monthAliases: Record<string, string> = {
+      jan: '01',
+      janv: '01',
+      january: '01',
+      janvier: '01',
+      feb: '02',
+      febr: '02',
+      february: '02',
+      fev: '02',
+      fevr: '02',
+      fevrier: '02',
+      mar: '03',
+      mars: '03',
+      march: '03',
+      apr: '04',
+      april: '04',
+      avr: '04',
+      avril: '04',
+      may: '05',
+      mai: '05',
+      jun: '06',
+      june: '06',
+      juin: '06',
+      jul: '07',
+      july: '07',
+      juil: '07',
+      juillet: '07',
+      aug: '08',
+      august: '08',
+      aou: '08',
+      aout: '08',
+      sep: '09',
+      sept: '09',
+      september: '09',
+      septembre: '09',
+      oct: '10',
+      october: '10',
+      octobre: '10',
+      nov: '11',
+      november: '11',
+      novembre: '11',
+      dec: '12',
+      december: '12',
+      decembre: '12',
+    };
+    const month = start
+      .split(/[^a-z]+/)
+      .map((token) => monthAliases[token])
+      .find((value) => value !== undefined);
+    return `${year}-${month ?? '01'}`;
+  };
+
+  const deduplicateExperiences = (experiences: RawExperience[]): RawExperience[] => {
+    const seen = new Set<string>();
+    return experiences.filter((experience) => {
+      const key = [
+        normalizeBusinessKeyText(experience.title),
+        normalizeBusinessKeyText(experience.company),
+        startMonthKey(experience.dateRange),
+      ].join('|');
+      if (seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  };
+
   const snapshot = (kind: 'empty' | 'timeout' | 'unreadable'): LinkedInExperienceDomSnapshot => ({
     kind,
     experiences: [],
@@ -322,7 +403,10 @@ export async function extractLinkedInExperiencesFromDom(
           if (experiences.length === 0 || experiences.some((experience) => experience === null)) {
             return snapshot('unreadable');
           }
-          return { kind: 'ready', experiences: experiences as RawExperience[] };
+          return {
+            kind: 'ready',
+            experiences: deduplicateExperiences(experiences as RawExperience[]),
+          };
         }
       }
     }

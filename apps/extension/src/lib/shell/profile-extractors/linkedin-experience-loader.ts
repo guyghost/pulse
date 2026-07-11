@@ -15,6 +15,10 @@ export const DETAIL_LIST_STABILIZE_TIMEOUT_MS = 10_000;
 export const DETAIL_LIST_OBSERVATION_MS = 500;
 
 const PROFILE_COPY = 'Ouvrez le profil LinkedIn à importer puis réessayez.';
+const SESSION_COPY =
+  'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.';
+const BLOCKED_COPY =
+  'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.';
 const LOAD_COPY =
   'La page complète des expériences LinkedIn n’a pas pu être chargée. Rechargez LinkedIn puis relancez l’import.';
 const DOM_COPY =
@@ -61,12 +65,8 @@ function waitForDetailTab(
 
   return new Promise((resolve, reject) => {
     let settled = false;
-    let timer: ReturnType<typeof setTimeout> | undefined;
-
     const removeListeners = (): void => {
-      if (timer !== undefined) {
-        clearTimeout(timer);
-      }
+      clearTimeout(timer);
       tabs.onUpdated.removeListener(onUpdated);
       tabs.onRemoved.removeListener(onRemoved);
     };
@@ -98,7 +98,7 @@ function waitForDetailTab(
 
     tabs.onUpdated.addListener(onUpdated);
     tabs.onRemoved.addListener(onRemoved);
-    timer = setTimeout(() => {
+    const timer = setTimeout(() => {
       settle(() => reject(new Error('LinkedIn detail tab load timed out.')));
     }, timeoutMs);
   });
@@ -133,7 +133,7 @@ function errorForSnapshot(
   now: number
 ): AppError {
   if (snapshot.kind === 'blocked') {
-    return createProfileExtractorError('rate_limited_or_blocked', LOAD_COPY, now, {
+    return createProfileExtractorError('rate_limited_or_blocked', BLOCKED_COPY, now, {
       reason: snapshot.blockedReason,
     });
   }
@@ -165,7 +165,13 @@ export async function loadCompleteLinkedInExperiences(
     const readyTab = await waitForDetailTab(chromeApi.tabs, created, DETAIL_PAGE_LOAD_TIMEOUT_MS);
     const urlError = classifyDetailTabUrl(readyTab.url);
     if (urlError) {
-      return err(createProfileExtractorError(urlError, LOAD_COPY, now, { url: readyTab.url }));
+      const message =
+        urlError === 'session_required'
+          ? SESSION_COPY
+          : urlError === 'rate_limited_or_blocked'
+            ? BLOCKED_COPY
+            : LOAD_COPY;
+      return err(createProfileExtractorError(urlError, message, now, { url: readyTab.url }));
     }
 
     const [injection] = await chromeApi.scripting.executeScript({
@@ -195,7 +201,13 @@ export async function loadCompleteLinkedInExperiences(
     );
   } finally {
     if (createdTabId !== null) {
-      await chromeApi.tabs.remove(createdTabId).catch(() => undefined);
+      await chromeApi.tabs.remove(createdTabId).catch((error: unknown) => {
+        console.warn('[MissionPulse][LinkedInExperienceImport]', {
+          event: 'detail_tab_cleanup_failed',
+          tabId: createdTabId,
+          cause: error instanceof Error ? error.message : String(error),
+        });
+      });
     }
   }
 }
