@@ -106,6 +106,13 @@ export function createAvailabilityStore(deps: AvailabilityDeps): AvailabilitySto
     platformStatuses = next;
   }
 
+  function resetPushSnapshot(): void {
+    pushStatus = 'idle';
+    pushError = null;
+    lastPushedAt = null;
+    platformStatuses = new Map();
+  }
+
   // ── Load/Edit machine ──────────────────────────────────────────────────
   async function load(): Promise<void> {
     loadStatus = 'loading';
@@ -159,6 +166,7 @@ export function createAvailabilityStore(deps: AvailabilityDeps): AvailabilitySto
       draft = null;
       editStatus = 'idle';
       loadStatus = 'idle';
+      resetPushSnapshot();
     } catch (err) {
       editError = errorMessage(err, "Impossible d'enregistrer la disponibilité.");
       editStatus = 'error';
@@ -267,10 +275,7 @@ export function createAvailabilityStore(deps: AvailabilityDeps): AvailabilitySto
     editError = null;
     editStatus = 'idle';
     draft = null;
-    pushStatus = 'idle';
-    pushError = null;
-    lastPushedAt = null;
-    platformStatuses = new Map();
+    resetPushSnapshot();
   }
 
   return {

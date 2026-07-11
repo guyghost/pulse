@@ -16,6 +16,8 @@ import { getConnectedAlertPreferences } from '../storage/connected-alert-prefere
 import { recordAlertHistoryEntry } from '../storage/alert-history';
 import { filterSmartNotifications } from '../../core/scoring/smart-notification';
 import { markAsSeen } from '../../core/seen/mark-seen';
+import { createDeepLinkIntent } from '../../core/deep-link/deep-link-intent';
+import { clearDeepLinkIntent, setDeepLinkIntent } from '../storage/session-storage';
 import { isMutedUntilActive } from './notify-missions';
 
 /** Chrome alarm name for the daily digest. */
@@ -150,8 +152,19 @@ export async function sendDailyDigest(): Promise<DigestResult> {
     })
     .join('\n');
 
-  // Create notification
+  const notifiedIds = topMissions.map((m) => m.id);
+  const now = Date.now();
+
+  // Create notification. Persist the digest deep-link intent before the
+  // notification is visible so clicks cannot consume a stale high-score intent.
   try {
+    const intent = createDeepLinkIntent(notifiedIds, 'digest', now);
+    if (intent) {
+      await setDeepLinkIntent(intent);
+    } else {
+      await clearDeepLinkIntent();
+    }
+
     await chrome.notifications.create(DIGEST_NOTIFICATION_ID, {
       type: 'basic',
       iconUrl: 'static/icons/icon-128.png',
@@ -162,11 +175,11 @@ export async function sendDailyDigest(): Promise<DigestResult> {
     });
   } catch (err) {
     console.error('[MissionPulse] Failed to send daily digest:', err);
+    await clearDeepLinkIntent().catch(() => {});
     return { sent: false, missionIds: [] };
   }
 
   // Mark notified missions as seen so they don't reappear
-  const notifiedIds = topMissions.map((m) => m.id);
   try {
     const updatedSeenIds = markAsSeen(seenIds, notifiedIds);
     await saveSeenIds(updatedSeenIds);
@@ -175,7 +188,6 @@ export async function sendDailyDigest(): Promise<DigestResult> {
   }
 
   // Record alert history entry for consistency with scan notifications
-  const now = Date.now();
   try {
     await recordAlertHistoryEntry({
       id: `digest-${now}-${notifiedIds.slice(0, 3).join('-').slice(0, 90)}`,

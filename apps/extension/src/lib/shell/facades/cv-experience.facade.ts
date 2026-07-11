@@ -12,7 +12,7 @@ import type { CvExperienceDeps } from '$lib/state/cv-experience.svelte';
 import { getProfile, saveProfile } from './settings.facade';
 import { getConnectorsMeta, openExternalUrl } from './feed-data.facade';
 
-const LINKEDIN_PROFILE_URL = 'https://www.linkedin.com/in/';
+const LINKEDIN_PROFILE_URL = 'https://www.linkedin.com/in/me/';
 
 /** Build the sync target list (LinkedIn + the 6 mission connectors). */
 export function getCvSyncTargets(): PlatformSyncTarget[] {

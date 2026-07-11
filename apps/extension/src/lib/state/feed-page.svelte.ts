@@ -588,7 +588,7 @@ export function createFeedPageState(
 
   // Focus-lens derived views for the banner UI.
   const focusMissions = $derived(
-    focusMode === 'focused' && focusIntent ? selectFocusMissions(missions, focusIntent) : []
+    focusMode === 'focused' && focusIntent ? selectFocusMissions(allMissions, focusIntent) : []
   );
   const focusSinceLabel = $derived(
     focusIntent ? formatFocusSince(focusIntent.triggeredAt, Date.now()) : ''

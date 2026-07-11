@@ -15,6 +15,7 @@
   import { features } from '$lib/state/features.svelte';
   import { canAccessPremium } from '$lib/core/features/flags';
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
+  import { subscribeToNotificationClicked } from '$lib/shell/facades/feed-data.facade';
 
   const nav = createAppNavigation();
   const theme = createThemeStore();
@@ -279,6 +280,13 @@
     if (nav.currentPage !== 'feed') {
       feedNavCompact = false;
     }
+  });
+
+  $effect(() => {
+    const unsubscribe = subscribeToNotificationClicked(() => {
+      nav.navigate('feed');
+    });
+    return unsubscribe;
   });
 
   if (import.meta.env.DEV) {

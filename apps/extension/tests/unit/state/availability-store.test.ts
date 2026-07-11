@@ -103,6 +103,23 @@ describe('availability store — edit', () => {
     expect(store.availability?.status).toBe('from-date');
   });
 
+  it('saveDraft resets stale push state after local edits', async () => {
+    const store = createAvailabilityStore(makeDeps());
+    store.applyProfileUpdate(savedAvailability);
+    await store.startPush();
+    expect(store.pushStatus).toBe('pushed');
+    expect(store.lastPushedAt).toBe(NOW);
+    expect(store.platformStatuses.get('free-work')).toBe('done');
+
+    store.startEdit();
+    await store.saveDraft('from-date', '2026-09-01', 'Nouvelle dispo');
+
+    expect(store.pushStatus).toBe('idle');
+    expect(store.lastPushedAt).toBeNull();
+    expect(store.pushError).toBeNull();
+    expect(store.platformStatuses.size).toBe(0);
+  });
+
   it('saveDraft surfaces an error and keeps the draft', async () => {
     const deps = makeDeps({
       saveAvailability: vi.fn().mockRejectedValue(new Error('disk full')),

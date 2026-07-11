@@ -2,7 +2,9 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mission } from '$lib/core/types/mission';
 
 const getSettings = vi.fn();
+const getMissions = vi.fn();
 const getSeenIds = vi.fn();
+const saveSeenIds = vi.fn();
 const getConnectedAlertPreferences = vi.fn();
 const recordAlertHistoryEntry = vi.fn();
 
@@ -15,8 +17,13 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
   getSettings,
 }));
 
+vi.mock('../../../src/lib/shell/storage/db', () => ({
+  getMissions,
+}));
+
 vi.mock('../../../src/lib/shell/storage/seen-missions', () => ({
   getSeenIds,
+  saveSeenIds,
 }));
 
 vi.mock('../../../src/lib/shell/storage/connected-alert-preferences', () => ({
@@ -64,6 +71,8 @@ describe('notifyHighScoreMissions', () => {
     });
 
     getSeenIds.mockResolvedValue([]);
+    saveSeenIds.mockResolvedValue(undefined);
+    getMissions.mockResolvedValue([]);
     getConnectedAlertPreferences.mockResolvedValue(null);
     recordAlertHistoryEntry.mockResolvedValue(undefined);
     sessionGet.mockResolvedValue({});
@@ -95,6 +104,7 @@ describe('notifyHighScoreMissions', () => {
       },
       runtime: {
         getURL: vi.fn((path: string) => path),
+        sendMessage: vi.fn(async () => undefined),
       },
     });
   });
@@ -314,5 +324,88 @@ describe('notifyHighScoreMissions', () => {
     // The optimistic intent write must be cleaned up so the next panel open
     // does not land on missions the user was never actually notified about.
     expect(sessionRemove).toHaveBeenCalled();
+  });
+});
+
+describe('sendDailyDigest', () => {
+  beforeEach(() => {
+    vi.resetModules();
+    vi.clearAllMocks();
+    vi.spyOn(Date, 'now').mockReturnValue(1_700_000_000_000);
+
+    getSettings.mockResolvedValue({
+      scanIntervalMinutes: 30,
+      enabledConnectors: ['free-work'],
+      notifications: true,
+      autoScan: true,
+      maxSemanticPerScan: 10,
+      notificationScoreThreshold: 70,
+      respectRateLimits: true,
+      customDelayMs: 0,
+    });
+    getMissions.mockResolvedValue([makeMission({ id: 'digest-1', title: 'Digest mission' })]);
+    getSeenIds.mockResolvedValue([]);
+    saveSeenIds.mockResolvedValue(undefined);
+    getConnectedAlertPreferences.mockResolvedValue(null);
+    recordAlertHistoryEntry.mockResolvedValue(undefined);
+    sessionGet.mockResolvedValue({});
+    sessionSet.mockResolvedValue(undefined);
+    sessionRemove.mockResolvedValue(undefined);
+    notificationsCreate.mockResolvedValue(undefined);
+
+    vi.stubGlobal('chrome', {
+      storage: {
+        session: {
+          get: sessionGet,
+          set: sessionSet,
+          remove: sessionRemove,
+        },
+      },
+      notifications: {
+        create: notificationsCreate,
+        onClicked: {
+          addListener: vi.fn(),
+        },
+        clear: vi.fn(async () => undefined),
+      },
+    });
+  });
+
+  it('writes a digest deep-link intent before creating the notification', async () => {
+    const order: string[] = [];
+    sessionSet.mockImplementation(async (payload: unknown) => {
+      if (payload && typeof payload === 'object' && 'deepLinkIntent' in payload) {
+        order.push('intent');
+      }
+    });
+    notificationsCreate.mockImplementation(async () => {
+      order.push('notify');
+    });
+
+    const { sendDailyDigest } =
+      await import('../../../src/lib/shell/notifications/daily-digest');
+    const result = await sendDailyDigest();
+
+    expect(result).toEqual({ sent: true, missionIds: ['digest-1'] });
+    expect(sessionSet).toHaveBeenCalledWith({
+      deepLinkIntent: {
+        focusMissionIds: ['digest-1'],
+        source: 'digest',
+        triggeredAt: 1_700_000_000_000,
+      },
+    });
+    expect(order).toEqual(['intent', 'notify']);
+  });
+
+  it('clears the digest deep-link intent when notification creation fails', async () => {
+    notificationsCreate.mockRejectedValueOnce(new Error('notification blocked'));
+
+    const { sendDailyDigest } =
+      await import('../../../src/lib/shell/notifications/daily-digest');
+    const result = await sendDailyDigest();
+
+    expect(result).toEqual({ sent: false, missionIds: [] });
+    expect(sessionRemove).toHaveBeenCalled();
+    expect(saveSeenIds).not.toHaveBeenCalled();
   });
 });
