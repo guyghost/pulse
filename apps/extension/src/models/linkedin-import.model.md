@@ -271,7 +271,13 @@ company name or silently discard it.
 
 LinkedIn can group several roles under one company. A container with nested
 position rows is a group, not a position: its company label is inherited by each
-leaf row, and only leaf rows are emitted. Standalone rows are emitted directly.
+leaf row, and only leaf rows are emitted. In a grouped leaf, field assignment is
+structural: after the title, the first date-range line fixes the date boundary;
+only a non-date line between the title and that boundary may be the optional
+`employmentType`. When the date immediately follows the title, the inherited
+company is preserved and `employmentType` stays absent. A period, duration, or
+location is never concatenated to the inherited company and never interpreted
+as an employment type. Standalone rows are emitted directly.
 Rows are de-duplicated using the same normalized `(title, company, start month)`
 business key used by the canonical CV merge; DOM order only determines
 `positionIndex`.
@@ -302,6 +308,15 @@ Detection is **specific, not greedy**:
 - Defensive guard: text signals are authoritative only when the page has no
   parseable profile sections (no headline, no experiences, no education). A page
   that yielded real profile sections is never treated as blocked on text alone.
+- Challenge detection is evaluated independently from the generic `main h1`
+  headline fallback. A challenge-specific heading such as "Security
+  verification" is matched as a complete normalized heading (not a substring
+  inside a genuine title such as "Security Check Engineer"), is not profile
+  data, and cannot make `hasProfileSections` true;
+  when no real profile section was parsed, its block signal remains
+  authoritative and the returned headline is empty. A genuine profile headline
+  or parsed experience/education section still protects legitimate profile
+  prose containing the same words from a false positive.
 
 ## Invariants
 
@@ -338,6 +353,10 @@ extracting → merging` sequence.
     positions are emitted, with inherited company context where required.
 15. A zero-experience result is truthful only when LinkedIn's dedicated page
     exposes a recognized empty state. An absent/unreadable list is `dom_changed`.
+16. Grouped leaves inherit company independently from their optional employment
+    type; a date-range line can never populate or mutate either field.
+17. A challenge-specific `main h1` is never accepted as a profile headline and
+    cannot suppress the corresponding `blockedReason`.
 
 ## Error and recovery matrix
 

@@ -112,6 +112,10 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
 
     return null;
   };
+  const isChallengeHeading = (value: string): boolean =>
+    /^(?:security verification(?: required)?|security check(?: required)?|verify your identity|unusual activity(?: detected)?|temporarily restricted(?: account|session)?)[.!:]?$/i.test(
+      clean(value)
+    );
   const text = (selector: string): string => clean(document.querySelector(selector)?.textContent);
   const allTexts = (selector: string): string[] =>
     [...document.querySelectorAll(selector)].map((item) => clean(item.textContent)).filter(Boolean);
@@ -160,10 +164,11 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   const about = sectionByHeading(['about', 'infos', 'à propos']);
   const experience = sectionByHeading(['experience', 'expérience']);
   const education = sectionByHeading(['education', 'formation']);
-  const headline =
+  const headlineCandidate =
     text('.pv-text-details__left-panel .text-body-medium') ||
     text('[data-generated-suggestion-target]') ||
     text('main h1');
+  const headline = isChallengeHeading(headlineCandidate) ? '' : headlineCandidate;
   const experiences = sectionItems(experience).map(parseExperience);
   const educationItems = sectionItems(education).map(parseEducation);
   const summary = about
@@ -182,10 +187,11 @@ export function extractLinkedInProfileFromDom(): LinkedInDomProfileSnapshot {
   // "challenge" or "unusual activity" in its bio must NOT be treated as a
   // checkpoint interstitial. `innerText` is preferred (layout-aware, ignores
   // <script>/<style>); `textContent` is a fallback for undrawn/jsdom contexts.
+  const bodyText = clean(document.body?.innerText || document.body?.textContent || '');
+  const blockSignal = blockedReasonFromText(bodyText);
   const hasProfileSections =
     Boolean(headline) || experiences.length > 0 || educationItems.length > 0;
-  const bodyText = clean(document.body?.innerText || document.body?.textContent || '');
-  const blockedReason = hasProfileSections ? null : blockedReasonFromText(bodyText);
+  const blockedReason = hasProfileSections ? null : blockSignal;
 
   return {
     profileUrl: window.location.href,

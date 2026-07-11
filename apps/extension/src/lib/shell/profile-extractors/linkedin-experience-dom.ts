@@ -179,17 +179,19 @@ export async function extractLinkedInExperiencesFromDom(
   ): RawExperience | null => {
     const lines = visibleLines(row);
     const title = lines[0] ?? '';
-    const dateIndex = lines.findIndex(
-      (line) => /\b(19|20)\d{2}\b/.test(line) && /[–—-]/.test(line)
+    const isDateRangeLine = (line: string): boolean =>
+      /\b(19|20)\d{2}\b/.test(line) && /[–—-]/.test(line);
+    const dateIndex = lines.findIndex(isDateRangeLine);
+    const rawDateRange = dateIndex >= 0 ? lines[dateIndex] : undefined;
+    const structuralLineBeforeDate = dateIndex > 1 ? (lines[1] ?? '') : '';
+    const [standaloneCompany = '', standaloneEmploymentType = ''] = structuralLineBeforeDate.split(
+      /\s+[·•]\s+/,
+      2
     );
-    const rawCompanyLine = lines[1] ?? '';
-    const companyLine = inheritedCompany
-      ? /\s+[·•]\s+/.test(rawCompanyLine)
-        ? rawCompanyLine
-        : `${inheritedCompany}${rawCompanyLine ? ` · ${rawCompanyLine}` : ''}`
-      : rawCompanyLine;
-    const [companyPart = '', employmentPart = ''] = companyLine.split(/\s+[·•]\s+/, 2);
-    const rawDateRange = lines.find((line) => /\b(19|20)\d{2}\b/.test(line) && /[–—-]/.test(line));
+    const company = inheritedCompany ? cleanLine(inheritedCompany) : cleanLine(standaloneCompany);
+    const employmentType = inheritedCompany
+      ? cleanLine(structuralLineBeforeDate)
+      : cleanLine(standaloneEmploymentType);
     const dateRange = rawDateRange
       ? cleanLine(
           rawDateRange.replace(
@@ -233,13 +235,13 @@ export async function extractLinkedInExperiencesFromDom(
       .map((anchor) => (anchor as HTMLAnchorElement).href)
       .find((href) => /\/details\/experience\//.test(href) || /profilePosition=/.test(href));
 
-    if (!title || !cleanLine(companyPart) || !dateRange) {
+    if (!title || !company || !dateRange) {
       return null;
     }
     return {
       title,
-      company: cleanLine(companyPart),
-      ...(cleanLine(employmentPart) ? { employmentType: cleanLine(employmentPart) } : {}),
+      company,
+      ...(employmentType ? { employmentType } : {}),
       dateRange,
       ...(location ? { location } : {}),
       ...(description ? { description } : {}),

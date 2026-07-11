@@ -92,6 +92,56 @@ describe('extractLinkedInExperiencesFromDom', () => {
     expect(snapshot.experiences).toHaveLength(3);
   });
 
+  it('keeps inherited company separate from date when grouped roles omit employment type', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <ul class="pvs-list">
+            <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_company:acme">
+              <span aria-hidden="true"><strong>Acme</strong></span>
+              <span aria-hidden="true">4 ans</span>
+              <ul class="pvs-list">
+                <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:no-type">
+                  <span aria-hidden="true"><strong>Principal Engineer</strong></span>
+                  <span aria-hidden="true">janv. 2024 – aujourd’hui · 2 ans</span>
+                  <span aria-hidden="true">Paris, Île-de-France, France</span>
+                </li>
+                <li class="pvs-list__paged-list-item" data-entity-urn="urn:li:fsd_profilePosition:with-type">
+                  <span aria-hidden="true"><strong>Staff Engineer</strong></span>
+                  <span aria-hidden="true">CDI</span>
+                  <span aria-hidden="true">janv. 2022 – déc. 2023 · 2 ans</span>
+                  <span aria-hidden="true">Lyon, Auvergne-Rhône-Alpes, France</span>
+                </li>
+              </ul>
+            </li>
+          </ul>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toEqual([
+      expect.objectContaining({
+        title: 'Principal Engineer',
+        company: 'Acme',
+        dateRange: 'janv. 2024 – aujourd’hui',
+      }),
+      expect.objectContaining({
+        title: 'Staff Engineer',
+        company: 'Acme',
+        employmentType: 'CDI',
+        dateRange: 'janv. 2022 – déc. 2023',
+      }),
+    ]);
+    expect(snapshot.experiences[0]).not.toHaveProperty('employmentType');
+    expect(snapshot.experiences[0]?.company).not.toMatch(/2024|aujourd’hui/);
+  });
+
   it('waits through an Add position action when lazy position rows appear', async () => {
     render(`
       <main data-testid="experience-detail-root">

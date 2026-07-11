@@ -1,9 +1,17 @@
-import { describe, expect, it, vi } from 'vitest';
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { parseLinkedInProfilePayload } from '../../../src/lib/core/profile-extractors/linkedin-parser';
 import {
   LinkedInProfileExtractor,
+  extractLinkedInProfileFromDom,
   type LinkedInProfileExtractorDependencies,
 } from '../../../src/lib/shell/profile-extractors/linkedin.extractor';
+
+const SOURCE_CHALLENGE_FIXTURE = readFileSync(
+  resolve(process.cwd(), 'tests/fixtures/linkedin-profile-challenge.html'),
+  'utf8'
+);
 
 type LinkedInChromeDouble = ConstructorParameters<typeof LinkedInProfileExtractor>[0];
 
@@ -116,6 +124,10 @@ function extractorMessage(result: Awaited<ReturnType<LinkedInProfileExtractor['e
 }
 
 describe('LinkedInProfileExtractor', () => {
+  afterEach(() => {
+    document.body.innerHTML = '';
+  });
+
   it('detects an existing LinkedIn browser session without storing credentials', async () => {
     const extractor = new LinkedInProfileExtractor(createChromeDouble());
 
@@ -341,6 +353,21 @@ describe('LinkedInProfileExtractor', () => {
     expect(extractorMessage(result)).toBe(
       'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.'
     );
+    expect(chromeDouble.tabs?.create).not.toHaveBeenCalled();
+  });
+
+  it('keeps a source challenge h1 blocked without treating it as a profile headline', async () => {
+    document.body.innerHTML = SOURCE_CHALLENGE_FIXTURE;
+    const sourceSnapshot = extractLinkedInProfileFromDom();
+    const chromeDouble = createChromeDouble({ sourceSnapshot });
+    const extractor = new LinkedInProfileExtractor(chromeDouble);
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(sourceSnapshot.blockedReason).toBe('security verification required');
+    expect(sourceSnapshot.sections.headline).toBe('');
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('rate_limited_or_blocked');
     expect(chromeDouble.tabs?.create).not.toHaveBeenCalled();
   });
 
