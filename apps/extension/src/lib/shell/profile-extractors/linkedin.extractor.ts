@@ -9,6 +9,10 @@ import type {
 } from '../../core/profile-extractors/types';
 import type { PlatformProfileExtractor } from './platform-profile-extractor';
 import {
+  loadCompleteLinkedInExperiences,
+  type LinkedInExperienceChromeApi,
+} from './linkedin-experience-loader';
+import {
   createProfileExtractorError,
   type ProfileExtractorErrorCode,
 } from './profile-extractor-errors';
@@ -33,15 +37,8 @@ interface ChromeLike {
   permissions?: {
     contains(permissions: chrome.permissions.Permissions): Promise<boolean>;
   };
-  scripting?: {
-    executeScript(
-      injection: chrome.scripting.ScriptInjection<[], LinkedInDomProfileSnapshot>
-    ): Promise<chrome.scripting.InjectionResult<LinkedInDomProfileSnapshot>[]>;
-  };
-  tabs?: {
-    get(tabId: number): Promise<chrome.tabs.Tab>;
-    query(queryInfo: chrome.tabs.QueryInfo): Promise<chrome.tabs.Tab[]>;
-  };
+  scripting?: LinkedInExperienceChromeApi['scripting'];
+  tabs?: LinkedInExperienceChromeApi['tabs'] & Pick<typeof chrome.tabs, 'query'>;
 }
 
 function getChromeApi(): ChromeLike {
@@ -272,7 +269,8 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
       );
     }
 
-    if (!this.chromeApi.scripting?.executeScript) {
+    const scripting = this.chromeApi.scripting;
+    if (!scripting?.executeScript) {
       return err(
         createProfileExtractorError(
           'permission_required',
@@ -298,8 +296,19 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
       );
     }
 
+    const tabs = this.chromeApi.tabs;
+    if (!tabs) {
+      return err(
+        createProfileExtractorError(
+          'profile_not_found',
+          'Open a LinkedIn profile tab before importing.',
+          now
+        )
+      );
+    }
+
     try {
-      const [result] = await this.chromeApi.scripting.executeScript({
+      const [result] = await scripting.executeScript({
         target: { tabId: tab.id },
         func: extractLinkedInProfileFromDom,
       });
@@ -325,11 +334,19 @@ export class LinkedInProfileExtractor implements PlatformProfileExtractor {
         );
       }
 
+      const detail = await loadCompleteLinkedInExperiences({ tabs, scripting }, tab.url, now);
+      if (!detail.ok) {
+        return detail;
+      }
+
       const parsed = parseLinkedInProfilePayload({
         source: 'linkedin',
         profileUrl: snapshot.profileUrl || tab.url,
         capturedAt: new Date(now),
-        sections: snapshot.sections,
+        sections: {
+          ...snapshot.sections,
+          experiences: detail.value,
+        },
       });
 
       if (!parsed.ok) {

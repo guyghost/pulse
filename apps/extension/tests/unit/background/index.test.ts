@@ -486,7 +486,22 @@ describe('background auto-scan notifications', () => {
     const draft = {
       title: 'Lead Frontend Svelte',
       summary: 'Test summary',
-      experiences: [],
+      experiences: [
+        {
+          title: 'Technical Lead',
+          company: 'ScaleOps',
+          employmentType: 'Freelance',
+          location: 'Paris',
+          startDate: '2024-01-01',
+          endDate: null,
+          isCurrent: true,
+          description: 'Architecture de la plateforme.',
+          skills: ['Svelte', 'TypeScript'],
+          source: 'linkedin' as const,
+          sourceExternalId: 'urn:li:position:1',
+          positionIndex: 0,
+        },
+      ],
       skills: [{ skill: 'React', source: 'linkedin' as const, confidence: 0.9 }],
       education: [],
       links: [],
@@ -509,6 +524,13 @@ describe('background auto-scan notifications', () => {
       expect.objectContaining({
         jobTitle: 'Lead Frontend Svelte',
         keywords: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
+        experiences: [
+          expect.objectContaining({
+            title: 'Technical Lead',
+            employmentType: 'Freelance',
+            source: 'linkedin',
+          }),
+        ],
       })
     );
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
@@ -517,7 +539,7 @@ describe('background auto-scan notifications', () => {
     });
     expect(sendResponse).toHaveBeenCalledWith({
       type: 'LINKEDIN_PROFILE_IMPORTED',
-      payload: { imported: true, profile: draft, addedCount: 0 },
+      payload: { imported: true, profile: draft, addedCount: 1 },
     });
   });
 

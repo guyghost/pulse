@@ -8,58 +8,99 @@ const linkedinTab = {
   url: 'https://www.linkedin.com/in/example/',
 } as chrome.tabs.Tab;
 
+const linkedInSessionCookie: chrome.cookies.Cookie = {
+  domain: '.linkedin.com',
+  hostOnly: false,
+  httpOnly: true,
+  name: 'li_at',
+  path: '/',
+  sameSite: 'unspecified',
+  secure: true,
+  session: true,
+  storeId: '0',
+  value: 'session',
+};
+
 function createChromeDouble(
   overrides: Partial<{
     contains: (permissions: chrome.permissions.Permissions) => Promise<boolean>;
     request: (permissions: chrome.permissions.Permissions) => Promise<boolean>;
     query: () => Promise<chrome.tabs.Tab[]>;
-    executeScript: () => Promise<chrome.scripting.InjectionResult<unknown>[]>;
+    sourceSnapshot: unknown;
+    createDetailTab: () => Promise<chrome.tabs.Tab>;
+    detailSnapshot: unknown;
     getAllCookies: () => Promise<chrome.cookies.Cookie[]>;
   }> = {}
 ): LinkedInChromeDouble {
+  const detailTab = {
+    id: 99,
+    url: 'https://www.linkedin.com/in/example/details/experience/',
+    status: 'complete',
+  } as chrome.tabs.Tab;
+
   return {
     permissions: {
       contains: vi.fn(overrides.contains ?? (async () => true)),
       request: vi.fn(overrides.request ?? (async () => true)),
     },
     tabs: {
+      create: vi.fn(overrides.createDetailTab ?? (async () => detailTab)),
       get: vi.fn(async () => linkedinTab),
       query: vi.fn(overrides.query ?? (async () => [linkedinTab])),
+      remove: vi.fn(async () => undefined),
+      onUpdated: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
+      onRemoved: {
+        addListener: vi.fn(),
+        removeListener: vi.fn(),
+      },
     },
     scripting: {
-      executeScript: vi.fn(
-        overrides.executeScript ??
-          (async () => [
-            {
-              frameId: 0,
-              result: {
-                profileUrl: 'https://www.linkedin.com/in/example/',
-                sections: {
-                  headline: 'Lead Svelte',
-                  summary: 'Frontend senior',
+      executeScript: vi.fn(async (injection: { target: { tabId: number } }) => [
+        {
+          frameId: 0,
+          result:
+            injection.target.tabId === 99
+              ? (overrides.detailSnapshot ?? {
+                  kind: 'ready',
                   experiences: [
                     {
-                      title: 'Lead Frontend',
+                      title: 'Technical Lead',
                       company: 'ScaleOps',
                       employmentType: 'Freelance',
                     },
+                    {
+                      title: 'Software Engineer',
+                      company: 'Acme',
+                      employmentType: 'Permanent',
+                    },
                   ],
-                  skills: ['Svelte', 'TypeScript'],
-                  education: [],
-                  links: [],
-                },
-              },
-            },
-          ])
-      ),
+                })
+              : (overrides.sourceSnapshot ?? {
+                  profileUrl: 'https://www.linkedin.com/in/example/',
+                  sections: {
+                    headline: 'Lead Svelte',
+                    summary: 'Frontend senior',
+                    experiences: [
+                      {
+                        title: 'Incomplete visible row',
+                        company: 'Profile summary only',
+                      },
+                    ],
+                    skills: ['Svelte', 'TypeScript'],
+                    education: [],
+                    links: [],
+                  },
+                }),
+        },
+      ]),
     },
     cookies: {
-      getAll: vi.fn(
-        overrides.getAllCookies ??
-          (async () => [{ name: 'li_at' } as unknown as chrome.cookies.Cookie])
-      ),
+      getAll: vi.fn(overrides.getAllCookies ?? (async () => [linkedInSessionCookie])),
     },
-  } as unknown as LinkedInChromeDouble;
+  } satisfies LinkedInChromeDouble;
 }
 
 function extractorCode(result: Awaited<ReturnType<LinkedInProfileExtractor['extractProfile']>>) {
@@ -77,24 +118,30 @@ describe('LinkedInProfileExtractor', () => {
   });
 
   it('extracts the active LinkedIn profile tab into a canonical draft', async () => {
-    const extractor = new LinkedInProfileExtractor(createChromeDouble());
+    const chromeDouble = createChromeDouble();
+    const extractor = new LinkedInProfileExtractor(chromeDouble);
 
     const result = await extractor.extractProfile(1779436800000);
 
     expect(result.ok).toBe(true);
-    if (result.ok) {
-      expect(result.value).toMatchObject({
-        title: 'Lead Svelte',
-        summary: 'Frontend senior',
-        source: 'linkedin',
-        capturedAt: '2026-05-22T08:00:00.000Z',
-      });
-      expect(result.value.experiences[0]).toMatchObject({
-        title: 'Lead Frontend',
-        company: 'ScaleOps',
-        employmentType: 'Freelance',
-      });
+    if (!result.ok) {
+      throw new Error('expected success');
     }
+    expect(result.value).toMatchObject({
+      title: 'Lead Svelte',
+      summary: 'Frontend senior',
+      source: 'linkedin',
+      capturedAt: '2026-05-22T08:00:00.000Z',
+    });
+    expect(result.value.experiences.map((item) => item.title)).toEqual([
+      'Technical Lead',
+      'Software Engineer',
+    ]);
+    expect(result.value.experiences[0].employmentType).toBe('Freelance');
+    expect(chromeDouble.tabs?.create).toHaveBeenCalledWith(
+      expect.objectContaining({ active: false })
+    );
+    expect(chromeDouble.tabs?.remove).toHaveBeenCalledWith(99);
   });
 
   it('returns permission_required when the LinkedIn origin is not granted and never calls request from the service worker', async () => {
@@ -199,49 +246,59 @@ describe('LinkedInProfileExtractor', () => {
   });
 
   it('returns rate_limited_or_blocked when LinkedIn serves a challenge DOM on a profile URL', async () => {
-    const extractor = new LinkedInProfileExtractor(
-      createChromeDouble({
-        executeScript: async () => [
-          {
-            frameId: 0,
-            result: {
-              profileUrl: 'https://www.linkedin.com/in/example/',
-              blockedReason: 'security verification required',
-              sections: {
-                experiences: [],
-                skills: [],
-                education: [],
-                links: [],
-              },
-            },
-          },
-        ],
-      })
-    );
+    const chromeDouble = createChromeDouble({
+      sourceSnapshot: {
+        profileUrl: 'https://www.linkedin.com/in/example/',
+        blockedReason: 'security verification required',
+        sections: {
+          experiences: [],
+          skills: [],
+          education: [],
+          links: [],
+        },
+      },
+    });
+    const extractor = new LinkedInProfileExtractor(chromeDouble);
 
     const result = await extractor.extractProfile(1779436800000);
 
     expect(result.ok).toBe(false);
     expect(extractorCode(result)).toBe('rate_limited_or_blocked');
+    expect(chromeDouble.tabs?.create).not.toHaveBeenCalled();
+  });
+
+  it('returns the detail failure before the canonical parser can accept source rows', async () => {
+    const chromeDouble = createChromeDouble({
+      createDetailTab: async () => {
+        throw new Error('detail tab unavailable');
+      },
+    });
+    const extractor = new LinkedInProfileExtractor(chromeDouble);
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(false);
+    expect(extractorCode(result)).toBe('detail_page_unavailable');
+    expect(chromeDouble.scripting?.executeScript).toHaveBeenCalledTimes(1);
+    expect(chromeDouble.tabs?.remove).not.toHaveBeenCalled();
   });
 
   it('returns dom_changed when LinkedIn returns an empty sanitized payload', async () => {
     const extractor = new LinkedInProfileExtractor(
       createChromeDouble({
-        executeScript: async () => [
-          {
-            frameId: 0,
-            result: {
-              profileUrl: 'https://www.linkedin.com/in/example/',
-              sections: {
-                experiences: [],
-                skills: [],
-                education: [],
-                links: [],
-              },
-            },
+        sourceSnapshot: {
+          profileUrl: 'https://www.linkedin.com/in/example/',
+          sections: {
+            experiences: [],
+            skills: [],
+            education: [],
+            links: [],
           },
-        ],
+        },
+        detailSnapshot: {
+          kind: 'empty',
+          experiences: [],
+        },
       })
     );
 
