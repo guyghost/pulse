@@ -382,8 +382,7 @@ describe('sendDailyDigest', () => {
       order.push('notify');
     });
 
-    const { sendDailyDigest } =
-      await import('../../../src/lib/shell/notifications/daily-digest');
+    const { sendDailyDigest } = await import('../../../src/lib/shell/notifications/daily-digest');
     const result = await sendDailyDigest();
 
     expect(result).toEqual({ sent: true, missionIds: ['digest-1'] });
@@ -400,8 +399,7 @@ describe('sendDailyDigest', () => {
   it('clears the digest deep-link intent when notification creation fails', async () => {
     notificationsCreate.mockRejectedValueOnce(new Error('notification blocked'));
 
-    const { sendDailyDigest } =
-      await import('../../../src/lib/shell/notifications/daily-digest');
+    const { sendDailyDigest } = await import('../../../src/lib/shell/notifications/daily-digest');
     const result = await sendDailyDigest();
 
     expect(result).toEqual({ sent: false, missionIds: [] });

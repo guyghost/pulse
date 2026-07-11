@@ -28,7 +28,9 @@ function makeDeps(overrides: Partial<CvExperienceDeps> = {}): CvExperienceDeps {
     saveExperiences: vi.fn().mockResolvedValue(undefined),
     copyToClipboard: vi.fn().mockResolvedValue(undefined),
     openUrl: vi.fn().mockResolvedValue(undefined),
-    platforms: [{ id: 'linkedin', name: 'LinkedIn', profileUrl: 'https://www.linkedin.com/in/me/' }],
+    platforms: [
+      { id: 'linkedin', name: 'LinkedIn', profileUrl: 'https://www.linkedin.com/in/me/' },
+    ],
     now: () => NOW,
     generateId: vi.fn(() => 'exp-1'),
     ...overrides,
