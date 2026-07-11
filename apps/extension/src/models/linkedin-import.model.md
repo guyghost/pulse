@@ -6,6 +6,12 @@ profile. The flow crosses two Chrome contexts (side panel → service worker) vi
 the typed bridge, and is gated by an **optional** LinkedIn host permission
 requested in-context from the side panel.
 
+For experiences, "complete import" means every position exposed by LinkedIn's
+dedicated `/details/experience/` page, including positions hidden behind the
+profile-page "Tout afficher" / "Show all" affordance. The result MUST NOT depend
+on the source tab's scroll position or on the subset currently rendered in the
+profile summary card.
+
 The LLM never decides a transition. It may later enrich extracted content
 inside a dedicated AI worker; the model decides when extraction/merge run and
 how errors surface. **Le LLM produit des signaux ; le modèle décide.**
@@ -54,15 +60,15 @@ not just that the merge ran. The SW computes `addedCount` via the pure
 `countNewlyAddedExperiences(current, draft.experiences)` helper (same dedup key
 as `mergeExperiences`), and `draftCount = draft.experiences.length`.
 
-| Condition                            | Toast type | Message                                                                                                                                    |
-| ------------------------------------ | ---------- | ------------------------------------------------------------------------------------------------------------------------------------------ |
-| `draftCount === 0`                   | info       | "Aucune expérience trouvée sur votre profil LinkedIn. Ouvrez votre profil, défilez jusqu'à la section Expérience, puis relancez l'import." |
-| `addedCount === 0 && draftCount > 0` | info       | "Vos expériences LinkedIn sont déjà présentes dans votre CV."                                                                              |
-| `addedCount > 0`                     | success    | "{addedCount} expérience(s) LinkedIn importée(s) avec succès."                                                                             |
+| Condition                            | Toast type | Message                                                        |
+| ------------------------------------ | ---------- | -------------------------------------------------------------- |
+| `draftCount === 0`                   | info       | "Aucune expérience renseignée sur votre profil LinkedIn."      |
+| `addedCount === 0 && draftCount > 0` | info       | "Vos expériences LinkedIn sont déjà présentes dans votre CV."  |
+| `addedCount > 0`                     | success    | "{addedCount} expérience(s) LinkedIn importée(s) avec succès." |
 
-This fixes the "success toast but no data" regression: a partial extraction
-(headline/skills found, 0 experiences) or a fully-deduped merge no longer
-reports a misleading success.
+This fixes the "success toast but no data" regression: a recognized empty
+LinkedIn profile or a fully-deduped merge no longer reports a misleading
+success. An unreadable/partial experience page fails before merge.
 
 `isImporting === true` for `checking-permission | extracting | merging` (button
 disabled, reentrancy blocked).
@@ -73,7 +79,9 @@ disabled, reentrancy blocked).
 - `PERMISSION_GRANTED | PERMISSION_DENIED` — result of
   `ensureLinkedInHostPermission()` (facade).
 - `EXTRACT_OK(profile) | EXTRACT_ERR(code, message)` — result of
-  `importLinkedInProfile()` (bridge `IMPORT_LINKEDIN_PROFILE`).
+  `importLinkedInProfile()` (bridge `IMPORT_LINKEDIN_PROFILE`). The typed error
+  union includes recoverable `detail_page_unavailable` in addition to the
+  existing permission, session, profile, DOM, and challenge codes.
 - `MERGE_OK(addedCount, draftCount) | MERGE_ERR(message)` — result of
   `syncLinkedInProfileImport(profile)` (bridge `SYNC_LINKEDIN_PROFILE_IMPORT`
   → `PROFILE_UPDATED`). `addedCount` is computed by the pure
@@ -104,14 +112,132 @@ classifyLinkedInUrl(tab.url)
   └ login ⇒ session_required | checkpoint ⇒ rate_limited_or_blocked | non-/in/ ⇒ profile_not_found
 detectSession(cookies li_at)
   └ absent ⇒ session_required
-scripting.executeScript(extractLinkedInProfileFromDom)
-  └ blockedReason ⇒ rate_limited_or_blocked | empty ⇒ dom_changed | else ⇒ canonical draft
+capture source profile metadata (headline, summary, skills, education, links)
+derive /in/{slug}/details/experience/ from the validated profile URL
+run complete-experience submachine (inactive temporary tab; see below)
+combine source metadata + complete experiences
+  └ blockedReason ⇒ rate_limited_or_blocked | unreadable ⇒ dom_changed | else ⇒ canonical draft
 ```
 
 The permission check runs **before** `resolveTab`: without the LinkedIn host
 permission, `tab.url` is `undefined` and the URL classification would produce a
 misleading `profile_not_found`. With the permission granted (by the side panel
 gate), `tab.url` is readable for LinkedIn tabs.
+
+### Complete-experience submachine (service worker)
+
+The profile summary card is not a complete source: LinkedIn may render only a
+subset and place the rest behind "Tout afficher". The extractor therefore owns
+a bounded submachine that reads the dedicated experience page without
+navigating or mutating the user's active profile tab.
+
+```text
+resolving-detail-url
+  ├─ INVALID_PROFILE_URL ───────────────────────────────► detail-error(profile_not_found)
+  └─ DETAIL_URL_RESOLVED(url) ──────────────────────────► opening-detail-tab
+
+opening-detail-tab
+  ├─ TAB_OPEN_FAILED ───────────────────────────────────► detail-error(detail_page_unavailable)
+  └─ TAB_OPENED(tabId, active=false) ───────────────────► waiting-detail-page
+
+waiting-detail-page
+  ├─ PAGE_READY ────────────────────────────────────────► extracting-detail
+  ├─ LOGIN_REDIRECT ────────────────────────────────────► detail-error(session_required)
+  ├─ CHALLENGE_REDIRECT | CHALLENGE_DOM ────────────────► detail-error(rate_limited_or_blocked)
+  ├─ TAB_CLOSED | TIMEOUT ──────────────────────────────► detail-error(detail_page_unavailable)
+  └─ SIDE_PANEL_CLOSED ─────────────────────────────────► waiting-detail-page
+
+extracting-detail
+  ├─ LIST_STABLE(items) ────────────────────────────────► closing-detail-tab
+  ├─ DOM_UNREADABLE ────────────────────────────────────► detail-error(dom_changed)
+  ├─ TIMEOUT ───────────────────────────────────────────► detail-error(detail_page_unavailable)
+  └─ CHALLENGE_DOM ─────────────────────────────────────► detail-error(rate_limited_or_blocked)
+
+detail-error(error) ────────────────────────────────────► closing-detail-tab(error)
+closing-detail-tab(result) ── TAB_CLOSED_OR_ABSENT ─────► detail-terminal(result)
+```
+
+`SIDE_PANEL_CLOSED` does not cancel service-worker cleanup. Once a temporary tab
+has been created, the service worker finishes the bounded operation and executes
+the cleanup path. Closing the temporary tab manually is treated as a typed,
+recoverable extraction failure; the source profile tab is never closed.
+
+`detail_page_unavailable` is a recoverable shell error for tab creation/load,
+manual close, or readiness timeout. `dom_changed` is reserved for a page that
+loaded but whose experience structure or empty state cannot be recognized.
+
+#### Detail URL and tab lifecycle
+
+- The detail URL is derived structurally from the already validated `/in/{slug}`
+  URL, not from localized link text such as "Tout afficher".
+- The service worker opens exactly one tab with `active: false`; it never
+  navigates or focuses the source profile tab.
+- The created `tabId` is recorded before waiting for page readiness.
+- `chrome.tabs.remove(createdTabId)` runs from a `finally`-equivalent cleanup
+  path on success, parse error, redirect, timeout, cancellation, or challenge.
+- A close failure is recorded for diagnostics but MUST NOT replace a successful
+  extraction result or the original extraction error.
+
+#### Readiness and completeness
+
+- The shell constants are explicit: `DETAIL_PAGE_LOAD_TIMEOUT_MS = 15_000`,
+  `DETAIL_LIST_STABILIZE_TIMEOUT_MS = 10_000`, and
+  `DETAIL_LIST_OBSERVATION_MS = 500`.
+- Extraction starts only after the detail document reports readiness and the
+  final URL has been classified again.
+- The injected function may wait asynchronously for the experience root.
+- It scrolls the dedicated list to its end and observes the number of candidate
+  position rows. The list is complete only after it has reached its end, exposes
+  no active loading indicator, and keeps both row count and document height
+  stable for two consecutive observation cycles.
+- The wait is bounded by a hard timeout. Timeout produces
+  `detail_page_unavailable`; it does not merge the partial rows accumulated
+  before the timeout.
+- A successfully recognized LinkedIn empty state may return zero experiences.
+  Zero rows without a recognized experience root or empty state is
+  `dom_changed`, not a successful empty import.
+
+#### Experience DOM contract
+
+The extractor uses structural and accessibility signals, in this order:
+
+1. dedicated `/details/experience/` pathname + the page's main content;
+2. stable `#experience` anchor or an Experience / Expérience heading fallback;
+3. LinkedIn position-row containers, with a conservative list-item fallback;
+4. visible/accessibility text nodes inside the resolved position row.
+
+Line boundaries are captured **before** whitespace normalization. Newlines must
+remain available to distinguish title, company/employment type, date range,
+location, description, and skills. Hidden accessibility duplicates and action
+labels are removed before field assignment.
+
+Field assignment follows these deterministic signals:
+
+- `title`: first primary/bold line in a leaf position row;
+- `company` + `employmentType`: the company line split once on LinkedIn's middle
+  dot separator; the optional right-hand value is preserved as display text;
+- `dateRange`: first line containing a four-digit year and a range separator;
+- `location`: first non-duration line immediately after the date line;
+- `description`: remaining prose after structural/action/skill labels;
+- `skills`: values following an exact `Compétences` / `Skills` label.
+
+`employmentType` is an optional canonical experience field. Legacy/manual
+experiences normalize it to `null`; import must not append the value to the
+company name or silently discard it.
+
+LinkedIn can group several roles under one company. A container with nested
+position rows is a group, not a position: its company label is inherited by each
+leaf row, and only leaf rows are emitted. Standalone rows are emitted directly.
+Rows are de-duplicated using the same normalized `(title, company, start month)`
+business key used by the canonical CV merge; DOM order only determines
+`positionIndex`.
+
+#### Retry policy
+
+There is no automatic full retry: silently opening several LinkedIn pages can
+increase rate-limit risk. After a terminal error, the user may explicitly click
+"Importer LinkedIn" again. A new click starts a new submachine only after the
+previous temporary tab has reached its cleanup terminal state.
 
 ### Blocked-reason detection (DOM)
 
@@ -154,6 +280,37 @@ extracting → merging` sequence.
 8. The merge toast is count-aware: `MERGE_OK` carries `addedCount` +
    `draftCount`, and the UI branches on them. A merge that adds 0 experiences
    (empty extraction or full dedup) MUST NOT surface a success toast.
+9. A CV import obtains experiences from the dedicated detail page, never from
+   the incomplete profile summary card. Source-tab scroll position is irrelevant.
+10. The active LinkedIn profile tab is never navigated, focused, or closed by
+    extraction.
+11. At most one inactive detail tab exists per import, and every terminal path
+    reached after `TAB_OPENED` attempts to close that created tab exactly once.
+12. Partial detail-page results are never merged. Only `LIST_STABLE(items)` or a
+    recognized empty state can reach the canonical parser.
+13. Text line boundaries are preserved until after field assignment; whitespace
+    normalization cannot collapse a whole experience into its title.
+14. Grouped company containers do not become duplicate experiences: only leaf
+    positions are emitted, with inherited company context where required.
+15. A zero-experience result is truthful only when LinkedIn's dedicated page
+    exposes a recognized empty state. An absent/unreadable list is `dom_changed`.
+
+## Error and recovery matrix
+
+| Condition                                      | Code                      | User recovery                                                        |
+| ---------------------------------------------- | ------------------------- | -------------------------------------------------------------------- |
+| LinkedIn permission missing/refused            | `permission_required`     | Grant the optional LinkedIn permission and retry.                    |
+| Login redirect or missing `li_at` session      | `session_required`        | Sign in to LinkedIn, then retry.                                     |
+| Source tab is not a `/in/{slug}` profile       | `profile_not_found`       | Open the intended LinkedIn profile.                                  |
+| Checkpoint/challenge URL or DOM                | `rate_limited_or_blocked` | Complete LinkedIn verification; do not auto-retry.                   |
+| Detail tab cannot load or is manually closed   | `detail_page_unavailable` | Keep Chrome online and retry explicitly.                             |
+| Detail list never stabilizes before timeout    | `detail_page_unavailable` | Reload LinkedIn and retry; no partial data is saved.                 |
+| Experience root/rows no longer match contracts | `dom_changed`             | Update MissionPulse; do not instruct the user to scroll the profile. |
+| Recognized detail-page empty state             | success with 0 rows       | Explain that LinkedIn contains no experience to import.              |
+
+The UI MUST NOT use the current generic instruction "défilez jusqu'à la section
+Expérience" for `dom_changed`: the complete importer owns navigation and lazy
+loading, so scrolling is no longer a valid recovery action.
 
 ## Non-goals
 
@@ -161,3 +318,8 @@ extracting → merging` sequence.
 - Do not move LinkedIn to required `host_permissions` (breaks the
   minimal-permission, privacy-first posture; in-context request is the pattern).
 - Do not request the LinkedIn origin from the service worker.
+- Do not click localized "Tout afficher" text or navigate the source tab.
+- Do not call undocumented LinkedIn APIs or depend on fetched application-shell
+  HTML; extraction uses the authenticated, rendered detail page.
+- Do not merge the visible summary-card subset as a fallback after a detail-page
+  timeout or parse failure.
