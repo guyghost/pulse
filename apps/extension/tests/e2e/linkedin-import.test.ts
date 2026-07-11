@@ -167,6 +167,29 @@ test.describe('LinkedIn profile import flow', () => {
     ).toBeVisible();
   });
 
+  test('does not duplicate experiences when the same LinkedIn profile is imported twice', async ({
+    page,
+  }) => {
+    await mockAuthenticatedLinkedInBridge(page, 'success');
+    await openCvPage(page);
+
+    const importButton = page.getByRole('button', { name: 'Importer LinkedIn' });
+    await importButton.click();
+    await expect(page.getByText('2 expériences LinkedIn importées avec succès.')).toBeVisible();
+    await expect(importButton).toBeEnabled();
+
+    await importButton.click();
+
+    await expect(
+      page.getByText('Vos expériences LinkedIn sont déjà présentes dans votre CV.', { exact: true })
+    ).toBeVisible();
+    await expect(page.getByText('5 entrées', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: /Lead Frontend · Atelier Nova/ })).toHaveCount(1);
+    await expect(page.getByRole('button', { name: /Product Engineer · Studio Kanso/ })).toHaveCount(
+      1
+    );
+  });
+
   test('shows a truthful empty-profile outcome without scroll instructions', async ({ page }) => {
     await mockAuthenticatedLinkedInBridge(page, 'empty-success');
     await openCvPage(page);
