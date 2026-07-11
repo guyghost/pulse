@@ -1392,6 +1392,7 @@ export function createFeedPageState(
     toggleCompare,
     clearComparison,
     clearAllFilters,
+    applyFocusIntent,
     dismissFocus,
 
     // Lifecycle

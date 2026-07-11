@@ -240,13 +240,7 @@ describe('feed page state', () => {
     expect(page.displayMissions.map((mission) => mission.id)).toEqual(['strong-1', 'strong-2']);
   });
 
-  it('keeps the focus banner active when search filters out the focused mission', async () => {
-    feedDataMock.consumeDeepLinkIntent.mockResolvedValueOnce({
-      focusMissionIds: ['focused-1'],
-      source: 'notification',
-      triggeredAt: 1_700_000_000_000,
-    });
-
+  it('keeps the focus banner active when search filters out the focused mission', () => {
     const feed = createFeedStore();
     const page = createFeedPageState(feed, makeController());
     feed.setMissions([
@@ -254,11 +248,11 @@ describe('feed page state', () => {
       makeMission({ id: 'search-hit', title: 'Rust backend mission', stack: ['Rust'], score: 75 }),
     ]);
 
-    page.setup();
-    await vi.waitFor(() => {
-      expect(page.focusMode).toBe('focused');
+    page.applyFocusIntent({
+      focusMissionIds: ['focused-1'],
+      source: 'notification',
+      triggeredAt: 1_700_000_000_000,
     });
-
     feed.search('rust');
 
     expect(page.displayMissions.map((mission) => mission.id)).toEqual(['focused-1']);
