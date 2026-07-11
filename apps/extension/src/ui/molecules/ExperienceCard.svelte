@@ -85,6 +85,9 @@
               <Icon name="calendar-clock" size={12} />
               {dateRange}
             </span>
+            {#if experience.employmentType}
+              <span>{experience.employmentType}</span>
+            {/if}
             {#if experience.location}
               <span>{experience.location}</span>
             {/if}

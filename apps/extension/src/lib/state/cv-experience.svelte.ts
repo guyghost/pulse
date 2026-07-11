@@ -137,6 +137,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
       {
         title: '',
         company: null,
+        employmentType: null,
         location: null,
         startDate: null,
         endDate: null,
