@@ -87,11 +87,11 @@ describe('tracking storage', () => {
     expect(all[0]?.currentStatus).toBe('selected');
   });
 
-  it('exposes a currentStatus index on the mission_tracking store (v4 schema)', async () => {
+  it('exposes a currentStatus index on the mission_tracking store', async () => {
     await saveTracking(legacyTracking);
 
     const indexNames = await new Promise<string[]>((resolve, reject) => {
-      const req = indexedDB.open(TRACKING_DB_NAME, 4);
+      const req = indexedDB.open(TRACKING_DB_NAME);
       req.onsuccess = () => {
         const handle = req.result;
         const tx = handle.transaction('mission_tracking', 'readonly');
