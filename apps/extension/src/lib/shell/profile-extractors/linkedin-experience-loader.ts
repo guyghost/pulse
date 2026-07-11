@@ -36,6 +36,9 @@ export interface LinkedInExperienceChromeApi {
 type DetailTabsApi = LinkedInExperienceChromeApi['tabs'];
 type UpdatedListener = Parameters<typeof chrome.tabs.onUpdated.addListener>[0];
 type RemovedListener = Parameters<typeof chrome.tabs.onRemoved.addListener>[0];
+type CompleteExperienceResult = Result<RawExperience[], AppError>;
+
+const inFlightByDetailUrl = new Map<string, Promise<CompleteExperienceResult>>();
 
 export function buildLinkedInExperienceDetailUrl(profileUrl: string): string | null {
   try {
@@ -159,20 +162,15 @@ function errorForSnapshot(
   return createProfileExtractorError('detail_page_unavailable', LOAD_COPY, now);
 }
 
-export async function loadCompleteLinkedInExperiences(
+async function runCompleteLinkedInExperienceLoad(
   chromeApi: LinkedInExperienceChromeApi,
-  profileUrl: string,
+  detailUrl: string,
   now: number
-): Promise<Result<RawExperience[], AppError>> {
+): Promise<CompleteExperienceResult> {
   let createdTabId: number | null = null;
 
   try {
-    const url = buildLinkedInExperienceDetailUrl(profileUrl);
-    if (!url) {
-      return err(createProfileExtractorError('profile_not_found', PROFILE_COPY, now));
-    }
-
-    const created = await chromeApi.tabs.create({ url, active: false });
+    const created = await chromeApi.tabs.create({ url: detailUrl, active: false });
     if (created.id === undefined) {
       return err(createProfileExtractorError('detail_page_unavailable', LOAD_COPY, now));
     }
@@ -226,4 +224,28 @@ export async function loadCompleteLinkedInExperiences(
       });
     }
   }
+}
+
+export function loadCompleteLinkedInExperiences(
+  chromeApi: LinkedInExperienceChromeApi,
+  profileUrl: string,
+  now: number
+): Promise<CompleteExperienceResult> {
+  const detailUrl = buildLinkedInExperienceDetailUrl(profileUrl);
+  if (!detailUrl) {
+    return Promise.resolve(
+      err(createProfileExtractorError('profile_not_found', PROFILE_COPY, now))
+    );
+  }
+
+  const existing = inFlightByDetailUrl.get(detailUrl);
+  if (existing) {
+    return existing;
+  }
+
+  const operation = runCompleteLinkedInExperienceLoad(chromeApi, detailUrl, now).finally(() => {
+    inFlightByDetailUrl.delete(detailUrl);
+  });
+  inFlightByDetailUrl.set(detailUrl, operation);
+  return operation;
 }

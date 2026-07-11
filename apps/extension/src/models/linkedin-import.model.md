@@ -213,8 +213,33 @@ Recovery copy is determined by the typed terminal error, never by free text:
   `detail_page_unavailable`; it does not merge the partial rows accumulated
   before the timeout.
 - A successfully recognized LinkedIn empty state may return zero experiences.
-  Zero rows without a recognized experience root or empty state is
-  `dom_changed`, not a successful empty import.
+  The generic owner action `Add position` / `Ajouter un poste` is not an empty
+  signal by itself: LinkedIn can render it while position rows are still being
+  lazy-loaded. A canonical empty result requires all of these invariants:
+  (1) the dedicated experience root is present, (2) a structural LinkedIn empty
+  container (`.artdeco-empty-state` or an explicit empty-state test marker) is
+  present, (3) zero position rows remain after scrolling/observation,
+  (4) document height and row count are stable for the configured consecutive
+  cycles, and (5) no active loader is visible. A zero-row page without that
+  structural empty signal is `dom_changed` after the bounded observation;
+  a page that exposed rows but never stabilized is a timeout. Neither case may
+  be merged as an empty profile.
+
+#### Single-flight ownership
+
+- The service-worker shell owns one module-scoped complete-experience operation
+  per canonical detail URL. Concurrent preview/import requests for the same
+  profile join the same Promise and therefore create, extract from, and close
+  exactly one temporary tab.
+- The first caller is the leader. Its injected `now` value deterministically
+  timestamps any shared `AppError`; followers receive the exact same `Result`
+  value rather than rebuilding an error with their own clock.
+- The in-flight entry is released only after the leader's terminal cleanup has
+  completed (including a caught tab-close failure). A later explicit invocation
+  starts a new operation with its own tab and its own `now` value.
+- Different canonical detail URLs are independent. This mutualization does not
+  create an implicit retry and does not broaden the single-tab invariant beyond
+  one profile operation.
 
 #### Experience DOM contract
 

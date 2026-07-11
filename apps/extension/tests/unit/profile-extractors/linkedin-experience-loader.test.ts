@@ -34,6 +34,8 @@ interface ChromeDoubleOptions {
   snapshot?: LinkedInExperienceDomSnapshot | undefined;
   executeError?: Error;
   removeError?: Error;
+  executeGate?: Promise<void>;
+  removeGate?: Promise<void>;
 }
 
 function createChromeDouble(options: ChromeDoubleOptions = {}) {
@@ -62,6 +64,7 @@ function createChromeDouble(options: ChromeDoubleOptions = {}) {
         return readyTab;
       }),
       remove: vi.fn(async () => {
+        await options.removeGate;
         if (options.removeError) {
           throw options.removeError;
         }
@@ -77,6 +80,7 @@ function createChromeDouble(options: ChromeDoubleOptions = {}) {
     },
     scripting: {
       executeScript: vi.fn(async () => {
+        await options.executeGate;
         if (options.executeError) {
           throw options.executeError;
         }
@@ -143,6 +147,52 @@ describe('buildLinkedInExperienceDetailUrl', () => {
 });
 
 describe('loadCompleteLinkedInExperiences', () => {
+  it('shares one tab, extraction, cleanup, result, and leader clock across concurrent callers', async () => {
+    let releaseExecution = (): void => undefined;
+    const executeGate = new Promise<void>((resolve) => {
+      releaseExecution = resolve;
+    });
+    const double = createChromeDouble({
+      snapshot: { kind: 'unreadable', experiences: [] },
+      executeGate,
+    });
+
+    const leader = loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW);
+    const follower = loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW + 1_000);
+    await vi.waitFor(() => expect(double.api.scripting.executeScript).toHaveBeenCalledTimes(1));
+    releaseExecution();
+    const [leaderResult, followerResult] = await Promise.all([leader, follower]);
+
+    expect(followerResult).toBe(leaderResult);
+    expect(leaderResult.ok ? null : leaderResult.error.timestamp).toBe(NOW);
+    expectSingleCreate(double);
+    expect(double.api.scripting.executeScript).toHaveBeenCalledTimes(1);
+    expectSingleCleanup(double);
+  });
+
+  it('keeps the single flight locked through cleanup and starts a new cycle after terminal cleanup', async () => {
+    let releaseCleanup = (): void => undefined;
+    const removeGate = new Promise<void>((resolve) => {
+      releaseCleanup = resolve;
+    });
+    const double = createChromeDouble({ removeGate });
+
+    const leader = loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW);
+    await vi.waitFor(() => expect(double.api.tabs.remove).toHaveBeenCalledTimes(1));
+    const duringCleanup = loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW + 1_000);
+    expect(double.api.tabs.create).toHaveBeenCalledTimes(1);
+    releaseCleanup();
+    const [leaderResult, cleanupFollowerResult] = await Promise.all([leader, duringCleanup]);
+    expect(cleanupFollowerResult).toBe(leaderResult);
+
+    const nextResult = await loadCompleteLinkedInExperiences(double.api, PROFILE_URL, NOW + 2_000);
+
+    expect(nextResult).toEqual({ ok: true, value: [ROW] });
+    expect(double.api.tabs.create).toHaveBeenCalledTimes(2);
+    expect(double.api.scripting.executeScript).toHaveBeenCalledTimes(2);
+    expect(double.api.tabs.remove).toHaveBeenCalledTimes(2);
+  });
+
   it('opens one inactive tab, injects the bounded DOM extractor, and cleans up ready rows', async () => {
     const double = createChromeDouble();
 

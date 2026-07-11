@@ -92,10 +92,51 @@ describe('extractLinkedInExperiencesFromDom', () => {
     expect(snapshot.experiences).toHaveLength(3);
   });
 
-  it('recognizes the exact owner empty action inside the experience root', async () => {
-    render(EMPTY_FIXTURE);
+  it('waits through an Add position action when lazy position rows appear', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <h1>Experience</h1>
+          <button type="button">Add position</button>
+          <ul class="pvs-list"></ul>
+        </section>
+      </main>
+    `);
+    const list = document.querySelector('.pvs-list');
+    if (!list) {
+      throw new Error('expected list');
+    }
+    window.setTimeout(() => {
+      list.insertAdjacentHTML('beforeend', standaloneRow('lazy-after-add', 'Lazy Role'));
+    }, 3);
 
-    await expect(extract()).resolves.toEqual({ kind: 'empty', experiences: [] });
+    const snapshot = await extract({ observationMs: 5, stableCycles: 2 });
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences.map((experience) => experience.title)).toEqual(['Lazy Role']);
+  });
+
+  it('recognizes a structurally explicit empty state only after loader-free stabilization', async () => {
+    render(EMPTY_FIXTURE);
+    const root = document.querySelector('#experience');
+    if (!root) {
+      throw new Error('expected experience root');
+    }
+    root.insertAdjacentHTML('beforeend', '<div aria-busy="true">Chargement</div>');
+    let loaderRemoved = false;
+    window.setTimeout(() => {
+      root.querySelector('[aria-busy="true"]')?.remove();
+      loaderRemoved = true;
+    }, 3);
+
+    await expect(extract({ observationMs: 5, stableCycles: 2 })).resolves.toEqual({
+      kind: 'empty',
+      experiences: [],
+    });
+    expect(loaderRemoved).toBe(true);
   });
 
   it('classifies a security verification page as blocked', async () => {
@@ -288,6 +329,23 @@ describe('extractLinkedInExperiencesFromDom', () => {
     render(`
       <main data-testid="experience-detail-root">
         <section id="experience"><h1>Expérience</h1><p>Aucun contenu disponible.</p></section>
+      </main>
+    `);
+
+    await expect(extract({ stabilizationTimeoutMs: 15, observationMs: 2 })).resolves.toEqual({
+      kind: 'unreadable',
+      experiences: [],
+    });
+  });
+
+  it('returns unreadable after observing zero rows without a structural empty signal', async () => {
+    render(`
+      <main data-testid="experience-detail-root">
+        <section id="experience">
+          <h1>Expérience</h1>
+          <button type="button">Ajouter un poste</button>
+          <ul class="pvs-list"></ul>
+        </section>
       </main>
     `);
 

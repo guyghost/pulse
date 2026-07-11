@@ -338,7 +338,8 @@ export async function extractLinkedInExperiencesFromDom(
   const observationMs = Math.max(0, options.observationMs);
   const stableCycles = Math.max(1, options.stableCycles);
   const deadline = Date.now() + timeoutMs;
-  let sawRecognizedList = false;
+  let sawRows = false;
+  let sawExplicitEmptyState = false;
   let previousRowCount = -1;
   let previousHeight = -1;
   let unchangedCycles = 0;
@@ -358,44 +359,41 @@ export async function extractLinkedInExperiencesFromDom(
     }
 
     if (root) {
-      const recognizedList =
-        rows.length > 0 || Boolean(root.querySelector('.pvs-list, ul.artdeco-list'));
-      sawRecognizedList ||= recognizedList;
+      const hasExplicitEmptyState = Boolean(
+        root.querySelector(
+          '.artdeco-empty-state, [data-test-empty-state], [data-testid="empty-state"]'
+        )
+      );
+      sawRows ||= rows.length > 0;
+      sawExplicitEmptyState ||= hasExplicitEmptyState;
       const documentElement = document.documentElement;
       const height = documentElement.scrollHeight;
-      if (recognizedList) {
-        documentElement.scrollTop = height;
-      }
+      documentElement.scrollTop = height;
+      const bottomReached = documentElement.scrollTop + documentElement.clientHeight >= height;
+      const hasActiveLoader = [
+        ...document.querySelectorAll(
+          '[aria-busy="true"], [role="progressbar"], .artdeco-loader, .pvs-loader'
+        ),
+      ].some(
+        (loader) => !loader.hasAttribute('hidden') && loader.getAttribute('aria-hidden') !== 'true'
+      );
 
-      if (rows.length === 0) {
-        const hasEmptyOwnerAction = [...root.querySelectorAll('button, a')].some((action) =>
-          /^(ajouter un poste|add position)$/.test(
-            cleanLine(action.textContent).toLocaleLowerCase()
-          )
-        );
-        if (hasEmptyOwnerAction) {
-          return snapshot('empty');
-        }
+      if (hasActiveLoader) {
+        unchangedCycles = 0;
+      } else if (rows.length === previousRowCount && height === previousHeight) {
+        unchangedCycles += 1;
       } else {
-        const bottomReached = documentElement.scrollTop + documentElement.clientHeight >= height;
-        const hasActiveLoader = [
-          ...document.querySelectorAll(
-            '[aria-busy="true"], [role="progressbar"], .artdeco-loader, .pvs-loader'
-          ),
-        ].some(
-          (loader) =>
-            !loader.hasAttribute('hidden') && loader.getAttribute('aria-hidden') !== 'true'
-        );
+        unchangedCycles = 0;
+      }
+      previousRowCount = rows.length;
+      previousHeight = height;
 
-        if (rows.length === previousRowCount && height === previousHeight) {
-          unchangedCycles += 1;
+      if (bottomReached && !hasActiveLoader && unchangedCycles >= stableCycles) {
+        if (rows.length === 0) {
+          if (hasExplicitEmptyState) {
+            return snapshot('empty');
+          }
         } else {
-          unchangedCycles = 0;
-        }
-        previousRowCount = rows.length;
-        previousHeight = height;
-
-        if (bottomReached && !hasActiveLoader && unchangedCycles >= stableCycles) {
           const leaves = leafRows(root);
           const experiences = leaves.map(({ row, inheritedCompany }, index) =>
             parseLeaf(row, inheritedCompany, index)
@@ -420,5 +418,5 @@ export async function extractLinkedInExperiencesFromDom(
     });
   }
 
-  return snapshot(sawRecognizedList ? 'timeout' : 'unreadable');
+  return snapshot(sawRows || sawExplicitEmptyState ? 'timeout' : 'unreadable');
 }
