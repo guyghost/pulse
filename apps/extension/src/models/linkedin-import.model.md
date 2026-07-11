@@ -124,6 +124,14 @@ permission, `tab.url` is `undefined` and the URL classification would produce a
 misleading `profile_not_found`. With the permission granted (by the side panel
 gate), `tab.url` is readable for LinkedIn tabs.
 
+URL classification is segment-exact. Session routes are `/login[/...]` and
+`/uas/login[/...]`; verification routes are `/checkpoint[/...]` and
+`/challenge[/...]`. These reserved names are classified only when they occupy
+the corresponding leading route segment. They MUST NOT match substrings inside
+a valid profile slug such as `/in/login/`, `/in/checkpoint-engineer/`, or
+`/in/challenge-consulting/`. Source-page and detail-page classification consume
+the same pure route classifier.
+
 ### Complete-experience submachine (service worker)
 
 The profile summary card is not a complete source: LinkedIn may render only a

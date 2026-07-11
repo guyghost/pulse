@@ -176,6 +176,26 @@ describe('loadCompleteLinkedInExperiences', () => {
     expectSingleCleanup(double);
   });
 
+  it.each(['challenge-consulting', 'checkpoint-engineer', 'login'])(
+    'accepts reserved words inside the legitimate detail profile slug %s',
+    async (slug) => {
+      const detailUrl = `https://www.linkedin.com/in/${slug}/details/experience/`;
+      const double = createChromeDouble({
+        createdTab: { id: 99, url: detailUrl, status: 'complete' } as chrome.tabs.Tab,
+      });
+
+      const result = await loadCompleteLinkedInExperiences(
+        double.api,
+        `https://www.linkedin.com/in/${slug}/`,
+        NOW
+      );
+
+      expect(result).toEqual({ ok: true, value: [ROW] });
+      expect(double.api.scripting.executeScript).toHaveBeenCalledTimes(1);
+      expectSingleCleanup(double);
+    }
+  );
+
   it('maps a challenge snapshot and cleans up without retrying', async () => {
     const double = createChromeDouble({
       snapshot: {
@@ -325,7 +345,17 @@ describe('loadCompleteLinkedInExperiences', () => {
       'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.',
     ],
     [
+      'https://www.linkedin.com/uas/login',
+      'session_required',
+      'Votre session LinkedIn a expiré. Reconnectez-vous à LinkedIn puis relancez l’import.',
+    ],
+    [
       'https://www.linkedin.com/checkpoint/challenge/',
+      'rate_limited_or_blocked',
+      'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.',
+    ],
+    [
+      'https://www.linkedin.com/challenge/security/',
       'rate_limited_or_blocked',
       'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.',
     ],

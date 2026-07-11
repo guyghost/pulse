@@ -240,6 +240,37 @@ describe('LinkedInProfileExtractor', () => {
     );
   });
 
+  it.each([
+    'https://www.linkedin.com/in/challenge-consulting/',
+    'https://www.linkedin.com/in/checkpoint-engineer/',
+    'https://www.linkedin.com/in/login/',
+  ])('accepts reserved words inside a legitimate profile slug: %s', async (url) => {
+    const extractor = new LinkedInProfileExtractor(
+      createChromeDouble({
+        query: async () => [{ id: 9, url } as chrome.tabs.Tab],
+      })
+    );
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(result.ok).toBe(true);
+  });
+
+  it.each(['https://www.linkedin.com/uas/login', 'https://www.linkedin.com/login/sso'])(
+    'returns session_required for the reserved session route %s',
+    async (url) => {
+      const extractor = new LinkedInProfileExtractor(
+        createChromeDouble({
+          query: async () => [{ id: 9, url } as chrome.tabs.Tab],
+        })
+      );
+
+      const result = await extractor.extractProfile(1779436800000);
+
+      expect(extractorCode(result)).toBe('session_required');
+    }
+  );
+
   it('returns session_required when the active profile tab has no LinkedIn session cookie', async () => {
     const chromeDouble = createChromeDouble({
       getAllCookies: async () => [],
@@ -272,6 +303,20 @@ describe('LinkedInProfileExtractor', () => {
     expect(extractorMessage(result)).toBe(
       'LinkedIn demande une vérification de sécurité. Terminez cette vérification dans LinkedIn puis relancez l’import.'
     );
+  });
+
+  it('returns rate_limited_or_blocked for the reserved challenge route', async () => {
+    const extractor = new LinkedInProfileExtractor(
+      createChromeDouble({
+        query: async () => [
+          { id: 9, url: 'https://www.linkedin.com/challenge/security/' } as chrome.tabs.Tab,
+        ],
+      })
+    );
+
+    const result = await extractor.extractProfile(1779436800000);
+
+    expect(extractorCode(result)).toBe('rate_limited_or_blocked');
   });
 
   it('returns rate_limited_or_blocked when LinkedIn serves a challenge DOM on a profile URL', async () => {

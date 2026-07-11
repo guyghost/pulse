@@ -20,6 +20,7 @@ import {
   LINKEDIN_SESSION_REQUIRED_COPY,
   LINKEDIN_VERIFICATION_REQUIRED_COPY,
 } from './linkedin-import-copy';
+import { classifyLinkedInReservedRoute } from './linkedin-url-classification';
 
 interface LinkedInDomProfileSnapshot {
   profileUrl: string;
@@ -72,11 +73,9 @@ function classifyLinkedInUrl(url: string): ProfileExtractorErrorCode | null {
     if (parsed.hostname !== 'www.linkedin.com') {
       return 'profile_not_found';
     }
-    if (parsed.pathname.includes('/login') || parsed.pathname.includes('/uas/login')) {
-      return 'session_required';
-    }
-    if (parsed.pathname.includes('/checkpoint') || parsed.pathname.includes('/challenge')) {
-      return 'rate_limited_or_blocked';
+    const reservedRouteError = classifyLinkedInReservedRoute(parsed);
+    if (reservedRouteError) {
+      return reservedRouteError;
     }
     return isLinkedInProfileUrl(url) ? null : 'profile_not_found';
   } catch {

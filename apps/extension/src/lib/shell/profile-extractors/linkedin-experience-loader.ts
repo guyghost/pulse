@@ -13,6 +13,7 @@ import {
   LINKEDIN_SESSION_REQUIRED_COPY,
   LINKEDIN_VERIFICATION_REQUIRED_COPY,
 } from './linkedin-import-copy';
+import { classifyLinkedInReservedRoute } from './linkedin-url-classification';
 
 export const DETAIL_PAGE_LOAD_TIMEOUT_MS = 15_000;
 export const DETAIL_LIST_STABILIZE_TIMEOUT_MS = 10_000;
@@ -126,11 +127,9 @@ function classifyDetailTabUrl(url: string | undefined): ProfileExtractorErrorCod
     if (parsed.hostname !== 'www.linkedin.com') {
       return 'detail_page_unavailable';
     }
-    if (parsed.pathname.includes('/login') || parsed.pathname.includes('/uas/login')) {
-      return 'session_required';
-    }
-    if (parsed.pathname.includes('/checkpoint') || parsed.pathname.includes('/challenge')) {
-      return 'rate_limited_or_blocked';
+    const reservedRouteError = classifyLinkedInReservedRoute(parsed);
+    if (reservedRouteError) {
+      return reservedRouteError;
     }
     return /^\/in\/[^/]+\/details\/experience\/?$/.test(parsed.pathname)
       ? null
