@@ -11,6 +11,7 @@
 import { z } from 'zod';
 import type { AppSettings } from '../../core/types/app-settings';
 import type { SavedFeedView } from '../../core/types/feed-view';
+import { INCLUDED_CONNECTOR_IDS } from '../connectors/build-config';
 
 const SettingsSchema = z.object({
   scanIntervalMinutes: z.number().int().min(1).max(1440),
@@ -28,7 +29,11 @@ export type { AppSettings } from '../../core/types/app-settings';
 
 export const DEFAULT_SETTINGS: AppSettings = {
   scanIntervalMinutes: 30,
-  enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'],
+  // Intersect with connectors shipped in this build so excluded connectors
+  // never appear as "enabled" defaults (see connector-build-config.model.md).
+  // Copy into a new array so the build-time constant can't be mutated by callers
+  // changing DEFAULT_SETTINGS.enabledConnectors.
+  enabledConnectors: [...INCLUDED_CONNECTOR_IDS],
   notifications: true,
   autoScan: true,
   maxSemanticPerScan: 10,
@@ -60,7 +65,15 @@ export const getSettings = async (): Promise<AppSettings> => {
   }
 
   // Merge with defaults to fill any missing optional fields
-  return { ...DEFAULT_SETTINGS, ...parseResult.data };
+  const merged: AppSettings = { ...DEFAULT_SETTINGS, ...parseResult.data };
+
+  // Sanitize enabledConnectors against this build's catalog: drop any id that
+  // isn't shipped (e.g. a connector excluded at build time but still present in
+  // previously stored user settings). See connector-build-config.model.md.
+  const included = new Set<string>(INCLUDED_CONNECTOR_IDS);
+  merged.enabledConnectors = merged.enabledConnectors.filter((id) => included.has(id));
+
+  return merged;
 };
 
 export const setSettings = async (settings: AppSettings): Promise<void> => {

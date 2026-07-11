@@ -7,7 +7,9 @@
         "PUBLIC_CHROME_STORE_URL",
         "PUBLIC_LANDING_URL",
         "PUBLIC_SUPABASE_ANON_KEY",
-        "PUBLIC_SUPABASE_URL"
+        "PUBLIC_SUPABASE_URL",
+        "CONNECTORS_INCLUDE",
+        "CONNECTORS_EXCLUDE"
       ],
       "outputs": ["dist/**", ".svelte-kit/**", ".vercel/**"]
     },
