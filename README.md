@@ -68,6 +68,38 @@ pnpm test         # Tests unitaires
 pnpm build        # Build extension
 ```
 
+### Inclure / exclure des connecteurs au build
+
+Certains connecteurs peuvent être instables (DOM cassé, faux positifs). Vous
+pouvez choisir à build-time quels connecteurs embarquer dans le package. Les
+connecteurs exclus disparaissent du `host_permissions` du manifest, du catalogue
+UI, du registry scanner, et des réglages par défaut.
+
+**Fichier de config** (`apps/extension/connectors.config.json`, versionné) —
+source de vérité par défaut :
+
+```json
+{ "exclude": ["malt", "collective"] }
+```
+
+**Variables d'environnement** (override, l'env gagne sur le fichier) :
+
+```bash
+# Exclure à la volée
+CONNECTORS_EXCLUDE=malt,collective pnpm build
+
+# Ou n'inclure que certains connecteurs (les autres sont exclus)
+CONNECTORS_INCLUDE=free-work,lehibou pnpm build
+```
+
+Résolution : `CONNECTORS_INCLUDE` > `include` du fichier > `CONNECTORS_EXCLUDE`
+
+> `exclude` du fichier > tout inclure. En `dev` et `test` le fichier est ignoré
+> (le catalogue complet reste visible pour des assertions déterministes) ; seules
+> les variables d'environnement s'appliquent.
+
+Détails : `apps/extension/src/models/connector-build-config.model.md`.
+
 ## Tech Stack
 
 | Couche     | Technologie                                | Version |

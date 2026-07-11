@@ -140,6 +140,86 @@ export const validateLinkedInProfileImportPermissions = (
   return errors.length === 0 ? { valid: true } : { valid: false, errors };
 };
 
+/**
+ * Extracts the registrable (last-two-label) domain from a connector URL,
+ * e.g. `https://www.cherry-pick.io` → `cherry-pick.io`,
+ * `https://app.collective.work/` → `collective.work`.
+ */
+export const registrableDomainOf = (url: string): string => {
+  const hostname = new URL(url).hostname.replace(/^www\./, '');
+  const parts = hostname.split('.');
+  return parts.slice(-2).join('.');
+};
+
+export interface HostPermissionConnector {
+  id: string;
+  name: string;
+  url: string;
+}
+
+/**
+ * Validates that every connector in `connectors` has at least one matching
+ * host_permission entry in the manifest. Guards against forgetting to add
+ * host_permissions when a connector is registered. Used on the SOURCE manifest
+ * (which must cover the full catalog so any build subset finds its patterns).
+ */
+export const validateHostPermissionCoverage = (
+  manifest: Pick<ManifestV3, 'host_permissions'>,
+  connectors: readonly HostPermissionConnector[]
+): { valid: true } | { valid: false; errors: string[] } => {
+  const hostPermissions = manifest.host_permissions ?? [];
+  const errors: string[] = [];
+
+  for (const connector of connectors) {
+    const domain = registrableDomainOf(connector.url);
+    const hasPermission = hostPermissions.some((h) => h.includes(domain));
+    if (!hasPermission) {
+      errors.push(`host_permissions missing entry for ${connector.name} (${domain})`);
+    }
+  }
+
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+};
+
+/**
+ * Validates least-privilege: no host_permission pattern in the manifest is
+ * owned by a connector NOT in `shippedConnectors`. Use on a FILTERED build
+ * output (dist/manifest.json) to confirm excluded connectors left no patterns
+ * behind. Patterns not owned by ANY connector in `allConnectors` (infra like
+ * Supabase) are always allowed.
+ */
+export const validateNoExcludedConnectorPatterns = (
+  manifest: Pick<ManifestV3, 'host_permissions'>,
+  allConnectors: readonly (HostPermissionConnector & {
+    hostPermissions: readonly string[];
+  })[],
+  shippedConnectors: readonly (HostPermissionConnector & {
+    hostPermissions: readonly string[];
+  })[]
+): { valid: true } | { valid: false; errors: string[] } => {
+  const hostPermissions = manifest.host_permissions ?? [];
+  const shippedPatterns = new Set<string>(shippedConnectors.flatMap((c) => c.hostPermissions));
+  const allOwnedPatterns = new Set<string>(allConnectors.flatMap((c) => c.hostPermissions));
+  const errors: string[] = [];
+
+  for (const pattern of hostPermissions) {
+    // Pattern not owned by any connector (infra) — always fine.
+    if (!allOwnedPatterns.has(pattern)) {
+      continue;
+    }
+    // Owned by a shipped connector — fine.
+    if (shippedPatterns.has(pattern)) {
+      continue;
+    }
+    // Owned by a connector, but that connector is not shipped — leak.
+    errors.push(
+      `host_permission "${pattern}" is owned by an excluded connector — least-privilege violation`
+    );
+  }
+
+  return errors.length === 0 ? { valid: true } : { valid: false, errors };
+};
+
 // Pure argument parsing — no side effects
 
 export const parseArgs = (

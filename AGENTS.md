@@ -337,12 +337,35 @@ Convention pour ajouter un connecteur :
 1. Créer le parser pur dans `src/lib/core/connectors/{platform}-parser.ts` — fonction `parse{Platform}HTML(html, now, idPrefix)`
 2. Créer le connecteur I/O dans `src/lib/shell/connectors/{platform}.connector.ts` — utilise le parser pur + bridge
 3. Enregistrer dans `src/lib/shell/connectors/index.ts`
-4. Ajouter le `host_permissions` dans `manifest.json`
+4. Ajouter le `host_permissions` dans `manifest.json` **et** déclarer les mêmes patterns dans `hostPermissions` de l'entrée `CATALOG` (`src/lib/shell/connectors/meta.ts`) — c'est ce qui permet au build de filtrer les permissions quand le connecteur est exclu
 5. Ajouter un test du parser dans `tests/unit/connectors/` (testable sans mocks)
 
 Le scraping est aujourd'hui piloté directement par les connecteurs shell et l'orchestration du scanner côté service worker. Le parser reste pur dans `core/`, et toute récupération réseau/session reste dans `shell/`.
 
 Quand un connecteur casse (DOM changé), il doit throw une `ConnectorError` typée. Le `ConnectorRunner` passe en état `error` et notifie l'utilisateur. Les autres connecteurs continuent.
+
+### Inclure / exclure des connecteurs au build
+
+Quand un connecteur est durablement cassé ou non souhaité dans un package, on
+peut l'exclure à build-time plutôt que de le retirer du code. Un connecteur
+exclu disparaît du `host_permissions` du manifest, du catalogue UI
+(`meta.ts`), du registry scanner (`index.ts`) et des réglages par défaut
+(`chrome-storage.ts`).
+
+- **Config par défaut** : `apps/extension/connectors.config.json`
+  (`{ "include"?: string[], "exclude"?: string[] }`).
+- **Override env** : `CONNECTORS_INCLUDE` / `CONNECTORS_EXCLUDE` (listes
+  séparées par `,`). L'env gagne sur le fichier.
+- **Résolveur pur** : `scripts/resolve-connectors.ts`
+  (`resolveIncludedConnectors`). Utilisé par `vite.config.ts` (build-only) qui
+  filtre le manifest et injecte `__PULSE_INCLUDED_CONNECTORS__`.
+- **Accessor runtime** : `src/lib/shell/connectors/build-config.ts` —
+  `INCLUDED_CONNECTOR_IDS`, seule source de vérité au runtime.
+
+Règle : `include` l'emporte sur `exclude` ; env l'emporte sur fichier. Dev et
+test ignorent le fichier (le define est absent → fallback catalogue complet).
+
+Source de vérité : `src/models/connector-build-config.model.md`.
 
 ## Sémantique — Scoring via Gemini Nano
 
