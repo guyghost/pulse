@@ -20,6 +20,7 @@ const DEFAULT_PROFILE = {
   seniority: 'senior',
   jobTitle: '',
   experiences: [],
+  availability: null,
   scoringWeights: {
     stack: 0,
     location: 10,
@@ -37,6 +38,7 @@ export function createDefaultProfile(): UserProfile {
     ...DEFAULT_PROFILE,
     keywords: [...DEFAULT_PROFILE.keywords],
     experiences: [],
+    availability: null,
     scoringWeights: { ...DEFAULT_PROFILE.scoringWeights },
   };
 }

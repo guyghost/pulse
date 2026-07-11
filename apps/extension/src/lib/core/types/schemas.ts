@@ -115,7 +115,19 @@ export const MissionSerializedSchema = z.object({
 // ============================================
 
 /**
- * Normalizes legacy profile records into the unified `keywords` shape before
+ * Availability sub-schema for `UserProfile.availability`. Nullable: `null` means
+ * the freelancer has never set their availability. The `.default(null)` on the
+ * parent field backfills any stored record created before this field existed.
+ * See `models/availability-sync.model.md`.
+ */
+export const AvailabilitySchema = z.object({
+  status: z.enum(['immediate', 'from-date', 'in-mission-until', 'unavailable']),
+  date: z.string().nullable(),
+  note: z.string(),
+  updatedAt: z.number().int().min(0),
+});
+
+/**
  * validation. Records that still carry `stack` and/or `searchKeywords`
  * (pre-unification schema) are merged into a single `keywords` list with
  * case-insensitive dedup (first-seen casing wins) and trimmed to the 40-entry
@@ -197,6 +209,7 @@ export const UserProfileSchema = z
           })
         )
         .default([]),
+      availability: AvailabilitySchema.nullable().default(null),
     })
   )
   .refine((p) => p.tjmMax === 0 || p.tjmMax >= p.tjmMin, {

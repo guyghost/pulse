@@ -60,6 +60,12 @@ export const mockProfile: UserProfile = {
       updatedAt: 1710000000000,
     },
   ],
+  availability: {
+    status: 'immediate',
+    date: null,
+    note: 'Disponible pour une mission full-remote, 4 jours/semaine.',
+    updatedAt: 1710000000000,
+  },
 };
 
 const stacks = [

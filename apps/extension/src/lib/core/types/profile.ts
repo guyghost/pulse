@@ -1,6 +1,7 @@
 export type SeniorityLevel = 'junior' | 'confirmed' | 'senior';
 
 import type { RemoteType } from './mission';
+import type { Availability } from './availability';
 
 /**
  * Origin of a professional experience entry.
@@ -84,4 +85,13 @@ export interface UserProfile {
    * `[]` by the migration registry and profile preprocessor.
    */
   experiences: Experience[];
+  /**
+   * Freelancer availability, edited in the Suivi tab and pushed to the mission
+   * connectors. `null` = never set. The schema's `.default(null)` and
+   * {@link withProfileDefaults} guarantee this is always present on parsed or
+   * constructed profiles; legacy stored records without it are normalized to
+   * `null` on read by `UserProfileSchema`. See
+   * `models/availability-sync.model.md`.
+   */
+  availability: Availability | null;
 }
