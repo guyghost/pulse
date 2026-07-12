@@ -189,11 +189,10 @@ export default tseslint.config(
     },
   },
 
-  // ─── eslint-plugin-svelte v3: adoption of newly-promoted recommended rules ──
-  // v3 promoted these rules to errors in the recommended set. The codebase
-  // has now adopted `require-each-key` and `no-useless-children-snippet` (they
-  // run as errors). The two `prefer-*` reactivity rules still surface as
-  // warnings pending incremental migration (SvelteSet/SvelteMap, $derived).
+  // ─── eslint-plugin-svelte v3: newly-promoted recommended rules ───────────
+  // The codebase now fully adopts the v3 recommended rules: `require-each-key`,
+  // `no-useless-children-snippet`, `prefer-svelte-reactivity` (SvelteMap/Set/Date),
+  // and `prefer-writable-derived` all run at the recommended level (error).
   //
   // `no-navigation-without-resolve` is a SvelteKit-only rule (it expects
   // `resolve()` from `$app/paths`). This app is a Chrome extension built with
@@ -202,8 +201,6 @@ export default tseslint.config(
   {
     files: ['**/*.ts', '**/*.svelte'],
     rules: {
-      'svelte/prefer-writable-derived': 'warn',
-      'svelte/prefer-svelte-reactivity': 'warn',
       'svelte/no-navigation-without-resolve': 'off',
     },
   }

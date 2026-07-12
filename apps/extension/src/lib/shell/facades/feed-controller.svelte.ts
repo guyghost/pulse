@@ -7,6 +7,7 @@
  * Uses Svelte 5 runes for reactive state.
  */
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
+import { SvelteMap, SvelteSet } from 'svelte/reactivity';
 import type { SeniorityLevel } from '$lib/core/types/profile';
 import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
 import type { ConnectorHealthRecord } from '$lib/core/connectors/parser-health-logic';
@@ -280,19 +281,19 @@ export function createFeedController(feedStore: {
   let pendingMissionCount = $state(0);
   let pendingConnectorCount = $state(0);
   let isApplyingPendingMissions = $state(false);
-  let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
-  let scanResultCounts = $state<Map<string, number>>(new Map());
+  const connectorStatuses = new SvelteMap<string, ConnectorStatus>();
+  const scanResultCounts = new SvelteMap<string, number>();
   let persistedStatuses = $state<PersistedConnectorStatus[]>([]);
   let lastScanAt = $state<number | null>(null);
   let lastScanMissionCount = $state<number>(0);
   let sourceStatuses = $state<SourceStatus[]>([]);
   let isCheckingSources = $state(false);
-  let enabledConnectorIds = $state<Set<string>>(new Set());
-  let healthSnapshots = $state<Map<string, ConnectorHealthSnapshot>>(new Map());
-  let parserHealthRecords = $state<Map<string, ConnectorHealthRecord>>(new Map());
+  let enabledConnectorIds = new SvelteSet<string>();
+  let healthSnapshots = new SvelteMap<string, ConnectorHealthSnapshot>();
+  let parserHealthRecords = new SvelteMap<string, ConnectorHealthRecord>();
   let partialScanBaseMissions: Mission[] = [];
-  let partialScanConnectorMissions = new Map<string, Mission[]>();
-  let partialScanCompletedSources = new Set<string>();
+  let partialScanConnectorMissions = new SvelteMap<string, Mission[]>();
+  let partialScanCompletedSources = new SvelteSet<string>();
   let pendingScanMissions: Mission[] | null = null;
   let pendingScanKind: 'partial' | 'final' | null = null;
 
@@ -330,7 +331,7 @@ export function createFeedController(feedStore: {
     }
     scanCompleted = false;
     isScanning = true;
-    connectorStatuses = new Map();
+    connectorStatuses.clear();
     beginPartialScan();
     feedStore.load();
 
@@ -365,14 +366,14 @@ export function createFeedController(feedStore: {
       // Service worker might not be available
     });
     isScanning = false;
-    connectorStatuses = new Map();
+    connectorStatuses.clear();
     resetPartialScan();
     clearPendingScanUpdate();
   }
 
   function finishScanLifecycle(): void {
     isScanning = false;
-    connectorStatuses = new Map();
+    connectorStatuses.clear();
     resetPartialScan();
   }
 
@@ -382,15 +383,15 @@ export function createFeedController(feedStore: {
 
   function beginPartialScan(): void {
     partialScanBaseMissions = readFeedMissionsSnapshot();
-    partialScanConnectorMissions = new Map();
-    partialScanCompletedSources = new Set();
+    partialScanConnectorMissions = new SvelteMap();
+    partialScanCompletedSources = new SvelteSet();
     clearPendingScanUpdate();
   }
 
   function resetPartialScan(): void {
     partialScanBaseMissions = [];
-    partialScanConnectorMissions = new Map();
-    partialScanCompletedSources = new Set();
+    partialScanConnectorMissions = new SvelteMap();
+    partialScanCompletedSources = new SvelteSet();
   }
 
   function clearPendingScanUpdate(): void {
@@ -438,8 +439,11 @@ export function createFeedController(feedStore: {
       return;
     }
 
-    partialScanConnectorMissions = new Map(partialScanConnectorMissions).set(connectorId, missions);
-    partialScanCompletedSources = new Set(partialScanCompletedSources).add(connectorId);
+    partialScanConnectorMissions = new SvelteMap(partialScanConnectorMissions).set(
+      connectorId,
+      missions
+    );
+    partialScanCompletedSources = new SvelteSet(partialScanCompletedSources).add(connectorId);
     markPendingPartialScanUpdate();
   }
 
@@ -480,11 +484,10 @@ export function createFeedController(feedStore: {
     resetPartialScan();
 
     // Compter par source pour l'affichage
-    const counts = new Map<string, number>();
+    scanResultCounts.clear();
     for (const m of missions) {
-      counts.set(m.source, (counts.get(m.source) ?? 0) + 1);
+      scanResultCounts.set(m.source, (scanResultCounts.get(m.source) ?? 0) + 1);
     }
-    scanResultCounts = counts;
     lastScanAt = Date.now();
     lastScanMissionCount = missions.length;
 
@@ -529,7 +532,7 @@ export function createFeedController(feedStore: {
       ]);
       if (stored.length > 0) {
         feedStore.setMissions(
-          deduplicateEnabledSources(stored, new Set(settings.enabledConnectors))
+          deduplicateEnabledSources(stored, new SvelteSet(settings.enabledConnectors))
         );
         // Use connector statuses to determine freshness
         const lastSync = statuses.reduce<number | null>((max, s) => {
@@ -592,8 +595,8 @@ export function createFeedController(feedStore: {
       );
 
       // Merge results into source statuses
-      const lastSyncMap = new Map(lastSyncResults.map((r) => [r.id, r.lastSyncAt]));
-      const resultMap = new Map(results.map((r) => [r.connectorId, r]));
+      const lastSyncMap = new SvelteMap(lastSyncResults.map((r) => [r.id, r.lastSyncAt]));
+      const resultMap = new SvelteMap(results.map((r) => [r.connectorId, r]));
 
       sourceStatuses = sourceStatuses.map((s) => {
         const result = resultMap.get(s.connectorId);
@@ -633,16 +636,14 @@ export function createFeedController(feedStore: {
   // ============================================================
 
   async function handleToggleConnector(id: string): Promise<void> {
-    const updated = new Set(enabledConnectorIds);
-    if (updated.has(id)) {
-      updated.delete(id);
+    if (enabledConnectorIds.has(id)) {
+      enabledConnectorIds.delete(id);
     } else {
-      updated.add(id);
+      enabledConnectorIds.add(id);
     }
-    enabledConnectorIds = updated;
     try {
       const settings = await getSettings();
-      await setSettings({ ...settings, enabledConnectors: [...updated] });
+      await setSettings({ ...settings, enabledConnectors: [...enabledConnectorIds] });
     } catch {
       /* Non-critical: settings persistence */
     }
@@ -652,7 +653,7 @@ export function createFeedController(feedStore: {
     try {
       const response = await sendMessage({ type: 'GET_PARSER_HEALTH' });
       if (response.type === 'PARSER_HEALTH_RESULT' && Array.isArray(response.payload)) {
-        parserHealthRecords = new Map(
+        parserHealthRecords = new SvelteMap(
           response.payload.map((record) => [record.connectorId, record])
         );
       }
@@ -665,7 +666,7 @@ export function createFeedController(feedStore: {
     try {
       const response = await sendMessage({ type: 'GET_CONNECTOR_HEALTH' });
       if (response.type === 'CONNECTOR_HEALTH_RESULT' && Array.isArray(response.payload)) {
-        healthSnapshots = new Map(
+        healthSnapshots = new SvelteMap(
           response.payload.map((snapshot) => [snapshot.connectorId, snapshot])
         );
       }
@@ -681,12 +682,12 @@ export function createFeedController(feedStore: {
         payload: { connectorId: id, enable },
       });
       if (response.type === 'CONNECTOR_HEALTH_RESULT' && Array.isArray(response.payload)) {
-        healthSnapshots = new Map(
+        healthSnapshots = new SvelteMap(
           response.payload.map((snapshot) => [snapshot.connectorId, snapshot])
         );
       }
       if (enable) {
-        enabledConnectorIds = new Set(enabledConnectorIds).add(id);
+        enabledConnectorIds.add(id);
       }
     } catch (err) {
       feedStore.setError(
@@ -706,9 +707,9 @@ export function createFeedController(feedStore: {
         if (message?.type === 'SCAN_PROGRESS' && message.payload) {
           const payload = message.payload;
           // Mettre à jour les états de connecteurs pour l'UI
-          const updated = new Map<string, ConnectorStatus>();
+          connectorStatuses.clear();
           for (const cp of payload.connectorProgress) {
-            updated.set(cp.connectorId, {
+            connectorStatuses.set(cp.connectorId, {
               connectorId: cp.connectorId,
               connectorName: cp.connectorName,
               state: cp.state,
@@ -719,12 +720,11 @@ export function createFeedController(feedStore: {
               completedAt: null,
             });
           }
-          connectorStatuses = updated;
         }
 
         if (message?.type === 'CONNECTOR_HEALTH_UPDATED' && message.payload?.snapshot) {
           const snap = message.payload.snapshot as ConnectorHealthSnapshot;
-          healthSnapshots = new Map(healthSnapshots).set(snap.connectorId, snap);
+          healthSnapshots.set(snap.connectorId, snap);
         }
 
         if (message?.type === 'SCAN_PARTIAL_RESULT' && message.payload) {
@@ -777,7 +777,7 @@ export function createFeedController(feedStore: {
     try {
       const [statuses, settings] = await Promise.all([getConnectorStatuses(), getSettings()]);
       persistedStatuses = statuses;
-      enabledConnectorIds = new Set(settings.enabledConnectors);
+      enabledConnectorIds = new SvelteSet(settings.enabledConnectors);
     } catch {
       /* Non-critical */
     }

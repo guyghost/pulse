@@ -56,6 +56,9 @@
   let selectedMissionId = $state<string | null>(null);
   let assets = $state<GeneratedAsset[]>([]);
   let generatingType = $state<GenerationType | null>(null);
+  // nextActionInput is intentionally writable: bound to a text input and reset on save.
+  // Cannot be a read-only $derived because the user edits it; the $effect resets it on selection/tracking change.
+  // eslint-disable-next-line svelte/prefer-writable-derived
   let nextActionInput = $state('');
   let loadError = $state<string | null>(null);
 

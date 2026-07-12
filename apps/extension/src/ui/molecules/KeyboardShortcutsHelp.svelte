@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteMap } from 'svelte/reactivity';
   import { Icon } from '@pulse/ui';
   import {
     getRegisteredShortcuts,
@@ -13,7 +14,7 @@
   // rather than storing the function itself.
   const shortcutsByCategory = $derived.by(() => {
     const shortcuts = getRegisteredShortcuts();
-    const grouped = new Map<string, ShortcutConfig[]>();
+    const grouped = new SvelteMap<string, ShortcutConfig[]>();
 
     for (const shortcut of shortcuts) {
       const category = shortcut.category || 'Autres';

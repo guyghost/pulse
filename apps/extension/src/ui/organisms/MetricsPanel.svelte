@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteMap } from 'svelte/reactivity';
   import { Icon } from '@pulse/ui';
   import { metricsCollector, getWebVitals } from '../../lib/shell/metrics';
   import type { Metric } from '../../lib/core/metrics/types';
@@ -73,7 +74,7 @@
 
   const missionsByConnector = $derived.by(() => {
     const connectorMetrics = allMetrics.filter((m) => m.name === 'scan.missions.per_connector');
-    const latestByConnector = new Map<string, number>();
+    const latestByConnector = new SvelteMap<string, number>();
     for (const metric of connectorMetrics) {
       if (metric.tags?.connectorId) {
         latestByConnector.set(metric.tags.connectorId, metric.value);
@@ -112,7 +113,7 @@
 
   const avgTimings = $derived.by(() => {
     const timingMetrics = allMetrics.filter((m) => m.name.startsWith('timing.'));
-    const byOperation = new Map<string, number[]>();
+    const byOperation = new SvelteMap<string, number[]>();
 
     for (const metric of timingMetrics) {
       const operation = metric.name.replace('timing.', '');
@@ -120,7 +121,10 @@
       byOperation.set(operation, [...values, metric.value]);
     }
 
-    const result = new Map<string, { avg: number; count: number; min: number; max: number }>();
+    const result = new SvelteMap<
+      string,
+      { avg: number; count: number; min: number; max: number }
+    >();
     for (const [operation, values] of byOperation) {
       const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
       result.set(operation, {

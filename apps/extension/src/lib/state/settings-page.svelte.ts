@@ -1,4 +1,5 @@
 import type { BackupData, Result, ValidationError } from '$lib/core/backup/backup';
+import { SvelteDate } from 'svelte/reactivity';
 import {
   createBackup,
   generateBackupFilename,
@@ -298,7 +299,7 @@ export class SettingsPageController {
     if (!this.lastScanAt) {
       return 'Aucun scan enregistré';
     }
-    return `Dernier déclenchement ${scanDateFormatter.format(new Date(this.lastScanAt))}`;
+    return `Dernier déclenchement ${scanDateFormatter.format(new SvelteDate(this.lastScanAt))}`;
   }
 
   get scanHistoryLabel(): string {
@@ -324,7 +325,7 @@ export class SettingsPageController {
     if (nextScanAt <= Date.now()) {
       return 'Prochain scan dès que Chrome déclenche l’alarme';
     }
-    return `Prochain déclenchement vers ${scanDateFormatter.format(new Date(nextScanAt))}`;
+    return `Prochain déclenchement vers ${scanDateFormatter.format(new SvelteDate(nextScanAt))}`;
   }
 
   get scanHistoryTone(): 'success' | 'attention' | 'neutral' {
@@ -532,7 +533,7 @@ export class SettingsPageController {
 
       const allMissions = await getMissions();
       const favoriteMissions = allMissions.filter((m) => favoriteIds.includes(m.id));
-      const now = new Date();
+      const now = new SvelteDate();
       const filename = generateFilename('favoris', format, now);
       const exportedCount = favoriteMissions.length;
 
@@ -678,7 +679,7 @@ export class SettingsPageController {
         return { ok: false, error: 'Réponse diagnostic inattendue' };
       }
 
-      const exportedAt = new Date(response.payload.exportedAt);
+      const exportedAt = new SvelteDate(response.payload.exportedAt);
       downloadJSON(response.payload, buildDiagnosticFilename(exportedAt));
       return { ok: true, value: undefined };
     } catch {
