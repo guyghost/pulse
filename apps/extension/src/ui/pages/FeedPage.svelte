@@ -1375,7 +1375,7 @@
                 {/if}
               </div>
               <div class="flex gap-1.5 overflow-x-auto pb-1">
-                {#each page.decisionPresets as preset}
+                {#each page.decisionPresets as preset (preset.id)}
                   <button
                     type="button"
                     class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
@@ -1580,7 +1580,7 @@
         />
       {:else}
         <div class="flex flex-col gap-3" aria-busy="true">
-          {#each Array(3) as _}
+          {#each Array(3) as _, i (i)}
             <div class="section-card rounded-xl p-4">
               <div class="h-4 w-2/3 rounded bg-subtle-gray"></div>
               <div class="mt-3 h-3 w-1/2 rounded bg-subtle-gray"></div>

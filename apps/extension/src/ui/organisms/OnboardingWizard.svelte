@@ -225,7 +225,7 @@
     </div>
 
     <div class="mt-4 grid grid-cols-5 gap-1" aria-label="Progression onboarding">
-      {#each onboardingSteps as step, index}
+      {#each onboardingSteps as step, index (index)}
         <button
           type="button"
           class="h-1.5 rounded-full transition-colors {index <= currentStepIndex
@@ -275,7 +275,7 @@
         Pulse utilisera vos sessions navigateur existantes. Aucun identifiant n’est stocké.
       </p>
       <div class="mt-3 grid grid-cols-2 gap-2">
-        {#each ['Free-Work', 'LeHibou', 'Hiway', 'Collective'] as source}
+        {#each ['Free-Work', 'LeHibou', 'Hiway', 'Collective'] as source (source)}
           <button
             type="button"
             class="rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors {selectedSource ===
@@ -437,7 +437,7 @@
     </div>
     {#if keywords.length > 0}
       <div class="mt-3 flex flex-wrap gap-2">
-        {#each keywords as tech}
+        {#each keywords as tech (tech)}
           <Chip label={tech} selected={true} onclick={() => removeKeyword(tech)} />
         {/each}
       </div>
@@ -457,7 +457,7 @@
       bind:value={location}
     />
     <datalist id="ob-location-catalog">
-      {#each LOCATION_LABELS as label}
+      {#each LOCATION_LABELS as label (label)}
         <option value={label} />
       {/each}
     </datalist>
@@ -471,7 +471,7 @@
       Mode de travail
     </p>
     <div class="grid grid-cols-4 gap-1.5" role="group" aria-labelledby="ob-workmode-label">
-      {#each workModeOptions as option}
+      {#each workModeOptions as option, i (i)}
         <button
           type="button"
           class="min-h-11 rounded-lg border px-2 py-2.5 text-xs font-medium transition-colors {remote ===

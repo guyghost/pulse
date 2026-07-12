@@ -326,7 +326,7 @@
           <section class="section-card-strong rounded-xl p-4 sm:p-5">
             <h3 class="text-base font-semibold text-text-primary">Preuves principales</h3>
             <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {#each missionFacts as fact}
+              {#each missionFacts as fact, i (i)}
                 <div class="rounded-lg bg-page-canvas px-3 py-3">
                   <p
                     class="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.13em] text-text-muted"
@@ -346,7 +346,7 @@
             <section class="section-card rounded-xl p-4 sm:p-5">
               <h3 class="text-base font-semibold text-text-primary">Compétences détectées</h3>
               <div class="mt-3 flex flex-wrap gap-2">
-                {#each visibleStack as skill}
+                {#each visibleStack as skill (skill)}
                   <span
                     class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-xs font-medium text-text-secondary"
                   >
@@ -383,7 +383,7 @@
               </details>
               <h3 class="mt-5 text-base font-semibold text-text-primary">Score par critère</h3>
               <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                {#each scoreLines as line}
+                {#each scoreLines as line, i (i)}
                   {@const grade = scoreToGrade(line.value)}
                   <div
                     class="flex items-center justify-between gap-3 rounded-lg bg-page-canvas px-3 py-3"

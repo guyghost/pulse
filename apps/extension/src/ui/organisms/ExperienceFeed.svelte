@@ -69,7 +69,7 @@
   {#if isLoading}
     <div aria-busy="true" role="status" aria-live="polite" class="flex flex-col gap-3">
       <span class="sr-only">Chargement de vos expériences…</span>
-      {#each Array(3) as _}
+      {#each Array(3) as _, i (i)}
         <div class="section-card rounded-xl p-4 space-y-3">
           <Skeleton width="55%" height="0.95rem" />
           <Skeleton width="35%" height="0.75rem" />

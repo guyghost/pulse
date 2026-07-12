@@ -92,13 +92,13 @@
 
     <!-- Shortcuts list -->
     <div class="flex-1 overflow-y-auto px-4 py-3 space-y-4">
-      {#each shortcutsByCategory as [category, shortcuts]}
+      {#each shortcutsByCategory as [category, shortcuts] (category)}
         <section>
           <h3 class="mb-2 text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted">
             {category}
           </h3>
           <div class="space-y-1">
-            {#each shortcuts as shortcut}
+            {#each shortcuts as shortcut, i (i)}
               <div class="flex items-center justify-between rounded-lg bg-page-canvas px-3 py-2">
                 <span class="text-[13px] text-text-secondary">
                   {shortcut.description}

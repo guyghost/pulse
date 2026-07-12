@@ -158,7 +158,7 @@
 
     {#if evidence.length > 0}
       <div class="grid grid-cols-3 gap-2">
-        {#each evidence as item}
+        {#each evidence as item, i (i)}
           <div class="rounded-lg border border-border-light bg-surface-white/70 px-3 py-2">
             <p
               class="flex items-center gap-1 text-[9px] uppercase tracking-[0.13em] text-text-muted"

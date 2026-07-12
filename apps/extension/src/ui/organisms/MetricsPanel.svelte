@@ -429,7 +429,7 @@
             <p class="mt-2 text-sm font-medium text-text-primary">{operationalSummary.action}</p>
           </div>
           <div class="grid grid-cols-2 gap-2 md:w-80">
-            {#each prioritySignals as signal}
+            {#each prioritySignals as signal, i (i)}
               <div class="rounded-xl border border-surface-white/70 bg-surface-white/70 px-3 py-2">
                 <div class="flex items-center justify-between gap-2">
                   <span class="text-[9px] font-medium uppercase tracking-[0.14em] text-text-muted">
@@ -452,7 +452,7 @@
       <nav
         class="flex gap-1 overflow-x-auto rounded-xl border border-border-light bg-surface-white p-1"
       >
-        {#each tabs as tab}
+        {#each tabs as tab (tab.id)}
           <button
             class="shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-colors {activeTab ===
             tab.id
@@ -472,7 +472,7 @@
               Signaux prioritaires
             </p>
             <div class="mt-3 space-y-2">
-              {#each prioritySignals as signal}
+              {#each prioritySignals as signal, i (i)}
                 <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
@@ -503,7 +503,7 @@
               </div>
             {:else}
               <div class="mt-3 space-y-2">
-                {#each [...missionsByConnector] as [connectorId, count]}
+                {#each [...missionsByConnector] as [connectorId, count] (connectorId)}
                   <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
                       <div class="min-w-0">
@@ -543,7 +543,7 @@
           </div>
 
           <div class="mt-3 space-y-2">
-            {#each scanHistory as metric}
+            {#each scanHistory as metric, i (i)}
               {@const missions = allMetrics.find(
                 (m) => m.name === 'scan.missions.total' && m.timestamp === metric.timestamp
               )}
@@ -579,7 +579,7 @@
             Incidents récents
           </p>
           <div class="mt-3 space-y-2">
-            {#each recentErrors as error}
+            {#each recentErrors as error, i (i)}
               <article class="rounded-xl border border-status-red/20 bg-status-red/8 px-3 py-2.5">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -631,7 +631,7 @@
           </div>
 
           <div class="mt-3 space-y-2">
-            {#each cacheHistory as metric}
+            {#each cacheHistory as metric, i (i)}
               {@const hits = allMetrics.find(
                 (m) => m.name === 'cache.memory.hits' && m.timestamp === metric.timestamp
               )}
@@ -668,7 +668,7 @@
             Latences à prioriser
           </p>
           <div class="mt-3 space-y-2">
-            {#each slowestTimings as [operation, stats]}
+            {#each slowestTimings as [operation, stats] (operation)}
               <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
@@ -709,7 +709,7 @@
             Expérience perçue
           </p>
           <div class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-            {#each [{ label: 'FCP', value: webVitals.fcp, limit: 1800, incident: 3000, help: 'Premier contenu visible' }, { label: 'LCP', value: webVitals.lcp, limit: 2500, incident: 4000, help: 'Contenu principal visible' }, { label: 'CLS', value: webVitals.cls, limit: 0.1, incident: 0.25, help: 'Stabilité visuelle' }, { label: 'FID', value: webVitals.fid ?? 0, limit: 100, incident: 300, help: 'Réactivité interaction' }] as vital}
+            {#each [{ label: 'FCP', value: webVitals.fcp, limit: 1800, incident: 3000, help: 'Premier contenu visible' }, { label: 'LCP', value: webVitals.lcp, limit: 2500, incident: 4000, help: 'Contenu principal visible' }, { label: 'CLS', value: webVitals.cls, limit: 0.1, incident: 0.25, help: 'Stabilité visuelle' }, { label: 'FID', value: webVitals.fid ?? 0, limit: 100, incident: 300, help: 'Réactivité interaction' }] as vital (vital.label)}
               {@const measured = vital.value > 0}
               {@const tone = !measured
                 ? 'attention'
@@ -733,7 +733,7 @@
           </div>
 
           <div class="mt-3 space-y-2">
-            {#each webVitalsHistory as metric}
+            {#each webVitalsHistory as metric, i (i)}
               <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                 <div class="flex items-center justify-between gap-3">
                   <div>

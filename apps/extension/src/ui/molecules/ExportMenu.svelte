@@ -110,7 +110,7 @@
 
       <!-- Formats -->
       <div class="p-1 pt-2">
-        {#each formats as format}
+        {#each formats as format (format.id)}
           <button
             class="flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-text-primary transition-colors hover:bg-subtle-gray"
             onclick={() => handleFormatSelect(format.id)}

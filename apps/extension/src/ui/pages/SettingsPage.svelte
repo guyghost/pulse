@@ -536,7 +536,7 @@
 
   <section class="section-card rounded-xl p-4" aria-label="Sections de réglages">
     <div class="grid gap-2 sm:grid-cols-2">
-      {#each settingsSections as section}
+      {#each settingsSections as section (section.id)}
         <button
           type="button"
           class="flex min-h-20 items-start gap-3 rounded-lg border border-border-light bg-page-canvas p-3 text-left transition-colors hover:border-blueprint-blue/25 hover:bg-blueprint-blue/6 focus:outline-none focus:ring-2 focus:ring-blueprint-blue/30"
@@ -808,7 +808,7 @@
             </div>
           </div>
           <div class="mt-3 grid gap-2 sm:grid-cols-2">
-            {#each aiTransparencyItems as item}
+            {#each aiTransparencyItems as item, i (i)}
               <div class="rounded-md bg-surface-white px-2.5 py-2">
                 <div class="flex items-center gap-1.5">
                   <Icon name={item.icon} size={12} class="text-blueprint-blue" />
@@ -848,7 +848,7 @@
           <p class="mt-1 text-xs text-text-subtle">Choisir le thème de l'interface.</p>
         </div>
         <div class="flex gap-2">
-          {#each [{ id: 'light', label: 'Clair', icon: 'sun' }, { id: 'dark', label: 'Sombre', icon: 'moon' }, { id: 'system', label: 'Système', icon: 'monitor' }] as option}
+          {#each [{ id: 'light', label: 'Clair', icon: 'sun' }, { id: 'dark', label: 'Sombre', icon: 'moon' }, { id: 'system', label: 'Système', icon: 'monitor' }] as option (option.id)}
             <button
               class="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors
                 {settings.theme === option.id
@@ -980,10 +980,8 @@
         />
         <div class="flex flex-wrap gap-2">
           <Button variant="secondary" onclick={handleCreateBackup}>
-            {#snippet children()}
-              <Icon name="download" size={14} class="mr-1" />
-              Créer une sauvegarde
-            {/snippet}
+            <Icon name="download" size={14} class="mr-1" />
+            Créer une sauvegarde
           </Button>
           <input
             type="file"
@@ -993,10 +991,8 @@
             bind:this={settings.fileInput}
           />
           <Button variant="ghost" onclick={() => settings.triggerFileSelect()}>
-            {#snippet children()}
-              <Icon name="upload" size={14} class="mr-1" />
-              Restaurer
-            {/snippet}
+            <Icon name="upload" size={14} class="mr-1" />
+            Restaurer
           </Button>
         </div>
       </div>
@@ -1041,16 +1037,12 @@
         </div>
         <div class="flex flex-wrap gap-2">
           <Button variant="secondary" onclick={() => settings.restartOnboarding()}>
-            {#snippet children()}
-              <Icon name="star" size={14} class="mr-1" />
-              Rejouer l'onboarding
-            {/snippet}
+            <Icon name="star" size={14} class="mr-1" />
+            Rejouer l'onboarding
           </Button>
           <Button variant="ghost" onclick={() => settings.replayFeedTour()}>
-            {#snippet children()}
-              <Icon name="play" size={14} class="mr-1" />
-              Revoir le tour du feed
-            {/snippet}
+            <Icon name="play" size={14} class="mr-1" />
+            Revoir le tour du feed
           </Button>
         </div>
       </div>

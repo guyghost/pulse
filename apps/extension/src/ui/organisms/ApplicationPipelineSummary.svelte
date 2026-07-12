@@ -79,7 +79,7 @@
 
 <div class="mt-4 space-y-3">
   <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-    {#each insightCards as card}
+    {#each insightCards as card, i (i)}
       <div
         class="rounded-lg border bg-surface-white px-3 py-2.5 {card.severity === 'attention'
           ? 'border-status-orange/25'
@@ -131,7 +131,7 @@
       {/if}
     </div>
     <div class="space-y-2">
-      {#each summary.stages as stage}
+      {#each summary.stages as stage, i (i)}
         {@const width = Math.max(3, Math.round((stage.count / maxStageCount) * 100))}
         <div>
           <div class="flex items-center justify-between gap-2">

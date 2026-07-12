@@ -189,19 +189,22 @@ export default tseslint.config(
     },
   },
 
-  // ─── eslint-plugin-svelte v3: relax newly-promoted recommended rules ──
-  // v3 promoted these rules to errors in the recommended set. The existing
-  // codebase predates them; surface them as warnings so the v3 bump lands
-  // cleanly and they can be adopted incrementally without failing CI.
-  // prefer-svelte-reactivity also fires in .ts files, hence the dual scope.
+  // ─── eslint-plugin-svelte v3: adoption of newly-promoted recommended rules ──
+  // v3 promoted these rules to errors in the recommended set. The codebase
+  // has now adopted `require-each-key` and `no-useless-children-snippet` (they
+  // run as errors). The two `prefer-*` reactivity rules still surface as
+  // warnings pending incremental migration (SvelteSet/SvelteMap, $derived).
+  //
+  // `no-navigation-without-resolve` is a SvelteKit-only rule (it expects
+  // `resolve()` from `$app/paths`). This app is a Chrome extension built with
+  // @crxjs/vite-plugin + plain Svelte (no @sveltejs/kit, no `$app/paths`), so
+  // the rule does not apply and is disabled.
   {
     files: ['**/*.ts', '**/*.svelte'],
     rules: {
-      'svelte/require-each-key': 'warn',
       'svelte/prefer-writable-derived': 'warn',
       'svelte/prefer-svelte-reactivity': 'warn',
-      'svelte/no-navigation-without-resolve': 'warn',
-      'svelte/no-useless-children-snippet': 'warn',
+      'svelte/no-navigation-without-resolve': 'off',
     },
   }
 );

@@ -358,7 +358,7 @@
 
       {#if suggestedStacks.length > 0}
         <div class="mt-2 flex flex-wrap gap-1.5">
-          {#each suggestedStacks.slice(0, 4) as stack}
+          {#each suggestedStacks.slice(0, 4) as stack (stack)}
             <button
               type="button"
               class="rounded-md bg-surface-white px-2 py-1 text-[10px] text-text-subtle transition-colors hover:text-text-primary"
@@ -372,7 +372,7 @@
 
       {#if requiredStacks.length > 0}
         <div class="mt-3 flex flex-wrap gap-1.5">
-          {#each requiredStacks as stack}
+          {#each requiredStacks as stack (stack)}
             <button
               type="button"
               class="inline-flex items-center gap-1 rounded-md bg-blueprint-blue/8 px-2 py-1 text-[10px] font-medium text-blueprint-blue"
@@ -442,7 +442,7 @@
 
     {#if recentAlertHistory.length > 0}
       <div class="mt-3 space-y-2">
-        {#each recentAlertHistory as entry}
+        {#each recentAlertHistory as entry, i (i)}
           <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
             <div class="flex items-center justify-between gap-2">
               <span class="text-[10px] font-medium text-text-subtle">

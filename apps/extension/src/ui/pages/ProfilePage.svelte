@@ -261,7 +261,7 @@
 
       {#if topProfilePriorities.length > 0}
         <div class="mt-3 space-y-2">
-          {#each topProfilePriorities as item}
+          {#each topProfilePriorities as item (item.id)}
             <button
               type="button"
               class="group flex w-full items-start gap-3 rounded-lg border border-border-light bg-surface-white/65 px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/20 hover:bg-surface-white"
