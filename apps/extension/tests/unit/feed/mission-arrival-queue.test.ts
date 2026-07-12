@@ -75,6 +75,26 @@ describe('mission arrival queue model', () => {
     expect(cancelled.effects).toEqual([]);
   });
 
+  it('clears active dwells when leaving the stable queue', () => {
+    const entered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
+      type: 'ENTER_NEW_QUEUE',
+      orderedUnseenIds: ['mission-1'],
+    }).state;
+    const withDwell = transitionMissionArrivalQueue(entered, {
+      type: 'DWELL_STARTED',
+      missionId: 'mission-1',
+      now: 100,
+    }).state;
+
+    const exited = transitionMissionArrivalQueue(withDwell, { type: 'EXIT_NEW_QUEUE' });
+    expect(exited.state.queue).toEqual({
+      value: 'all-feed',
+      queueIds: [],
+      dwells: {},
+    });
+    expect(exited.effects).toEqual([]);
+  });
+
   it('freezes at most three previews while pending arrivals continue', () => {
     const initial = createMissionArrivalQueueState();
     const buffered = transitionMissionArrivalQueue(initial, {

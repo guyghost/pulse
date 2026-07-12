@@ -105,10 +105,12 @@ describe('MissionArrivalStack', () => {
   });
 
   it('disables refresh while pending missions are being applied', async () => {
+    const onClose = vi.fn();
     const target = mountStack({
       count: 3,
       missions: [makeMission(1)],
       state: 'refreshing',
+      onClose,
     });
     await tick();
 
@@ -117,5 +119,12 @@ describe('MissionArrivalStack', () => {
     ) as HTMLButtonElement;
     expect(refresh.disabled).toBe(true);
     expect(refresh.textContent).toContain('Actualisation…');
+
+    const closeButton = target.querySelector(
+      'button[aria-label="Fermer les nouvelles arrivées"]'
+    ) as HTMLButtonElement;
+    expect(closeButton.disabled).toBe(true);
+    closeButton.click();
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

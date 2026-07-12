@@ -735,6 +735,7 @@ export function createFeedPageState(
     }
 
     if (arrivalQueueState.stack.value !== 'refreshing') {
+      arrivalPreviewCatalog = {};
       dispatchArrival({ type: 'SCAN_CANCELLED' });
     }
   }
@@ -1158,6 +1159,14 @@ export function createFeedPageState(
     $effect(() => {
       const pendingMissions = controller.pendingMissions;
       syncArrivalBuffer(pendingMissions, controller.hasPendingMissions);
+    });
+
+    $effect(() => {
+      if (newQueueRequested && !stableQueueActive) {
+        enterStableNewQueue();
+      } else if (!newQueueRequested && stableQueueActive) {
+        exitStableNewQueue();
+      }
     });
 
     // Load favorites & hidden

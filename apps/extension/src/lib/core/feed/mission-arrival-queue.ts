@@ -132,7 +132,7 @@ export function transitionMissionArrivalQueue(
           queue: {
             value: 'all-feed',
             queueIds: [],
-            dwells: { ...state.queue.dwells },
+            dwells: {},
           },
         },
         effects: [],

@@ -112,8 +112,9 @@
 
         <button
           type="button"
-          class="grid size-9 shrink-0 place-items-center rounded-lg text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
+          class="grid size-9 shrink-0 place-items-center rounded-lg text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-not-allowed disabled:opacity-50 disabled:hover:bg-transparent disabled:hover:text-text-subtle"
           aria-label="Fermer les nouvelles arrivées"
+          disabled={isRefreshing}
           onclick={() => onClose?.()}
         >
           <Icon name="x" size={16} />
