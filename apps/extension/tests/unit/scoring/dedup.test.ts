@@ -247,6 +247,51 @@ describe('deduplicateMissions', () => {
     expect(result.duplicateRelations[0].confidence).toBeGreaterThanOrEqual(0.8);
   });
 
+  it('deduplicates a Cherry Pick mission republished on Free-Work with language in the title', () => {
+    const result = deduplicateMissionsDetailed([
+      makeMission({
+        id: 'fw-tech-lead-bff',
+        title: 'Tech Lead BFF (Java)',
+        client: 'Cherry Pick',
+        stack: ['Java', 'Spring'],
+        tjm: 630,
+        location: null,
+        remote: 'hybrid',
+        description:
+          'Description du Poste : Nous recherchons une/un Tech Lead experimente specialise dans la gestion de solutions applicatives.',
+        url: 'https://www.free-work.com/fr/tech-it/tech-lead/job-mission/tech-lead-bff-java',
+        source: 'free-work',
+      }),
+      makeMission({
+        id: 'cp-tech-lead-bff',
+        title: 'Tech Lead BFF (H/F)',
+        client: 'Cherry Pick',
+        stack: ['Java', 'Spring Boot', 'Postman', 'Kubernetes'],
+        tjm: null,
+        location: null,
+        remote: 'hybrid',
+        description:
+          'Contexte de la mission Au sein de la DSI Mode et plus particulierement du domaine IT Digital.',
+        url: 'https://app.cherry-pick.io/ext/missions/tech-lead-bff-123',
+        source: 'cherry-pick',
+      }),
+    ]);
+
+    expect(result.missions).toHaveLength(1);
+    expect(result.missions[0]).toMatchObject({
+      id: 'cp-tech-lead-bff',
+      source: 'cherry-pick',
+    });
+    expect(result.duplicateRelations).toEqual([
+      expect.objectContaining({
+        canonicalMissionId: 'cp-tech-lead-bff',
+        duplicateMissionId: 'fw-tech-lead-bff',
+        reason: 'same_title_stack_proxy_client',
+      }),
+    ]);
+    expect(result.duplicateRelations[0].confidence).toBeGreaterThanOrEqual(0.8);
+  });
+
   it('keeps same title and stack when real locations are incompatible', () => {
     const missions = [
       makeMission({
@@ -292,6 +337,55 @@ describe('deduplicateMissions', () => {
     expect(result.find((m) => m.id === '3')).toBeDefined(); // Kept (has more info)
     expect(result.find((m) => m.id === '2')).toBeDefined(); // Different mission
     expect(result.find((m) => m.id === '4')).toBeDefined(); // Different mission
+  });
+
+  it('rewrites duplicate relations when the canonical mission is replaced in a chain', () => {
+    // Three structurally-identical missions of increasing quality. Each
+    // incoming mission beats the current canonical, so the relation that
+    // pointed at the previous canonical must be re-pointed at the new one.
+    // This exercises the O(1) relation re-canonicalization path.
+    const result = deduplicateMissionsDetailed([
+      makeMission({
+        id: 'low',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        source: 'free-work',
+        tjm: null,
+        description: '',
+      }),
+      makeMission({
+        id: 'mid',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        source: 'free-work',
+        tjm: 500,
+        description: 'Short description here',
+      }),
+      makeMission({
+        id: 'high',
+        title: 'Dev React Senior',
+        stack: ['React', 'TypeScript'],
+        source: 'cherry-pick',
+        tjm: 700,
+        description: 'Longer detailed description with more context about the mission',
+      }),
+    ]);
+
+    expect(result.missions.map((mission) => mission.id)).toEqual(['high']);
+    expect(result.duplicateRelations).toEqual([
+      {
+        canonicalMissionId: 'high',
+        duplicateMissionId: 'low',
+        confidence: 1,
+        reason: 'same_structured_signature',
+      },
+      {
+        canonicalMissionId: 'high',
+        duplicateMissionId: 'mid',
+        confidence: 1,
+        reason: 'same_structured_signature',
+      },
+    ]);
   });
 
   describe('regression: undefined safety', () => {

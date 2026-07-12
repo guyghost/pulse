@@ -10,8 +10,13 @@
   } from '$lib/core/types/tracking';
   import { STATUS_LABELS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { getMissions } from '$lib/shell/facades/feed-data.facade';
+  import {
+    createAvailabilityDeps,
+    getAvailabilityPushTargets,
+  } from '$lib/shell/facades/availability.facade';
   import { createTrackingStore } from '$lib/state/tracking.svelte';
-  import { sendMessage } from '$lib/shell/messaging/bridge';
+  import { createAvailabilityStore } from '$lib/state/availability.svelte';
+  import { sendMessage, subscribeMessages } from '$lib/shell/messaging/bridge';
   import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import {
     summarizeApplicationPipeline,
@@ -19,6 +24,7 @@
     isTerminalStatus,
   } from '$lib/core/tracking/pipeline-summary';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
+  import AvailabilityPanel from '../organisms/AvailabilityPanel.svelte';
   import OperationalStoryCard, {
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
@@ -31,6 +37,19 @@
   const isOffline = $derived(connection.status === 'offline');
 
   const tracking = createTrackingStore();
+  const availabilityStore = createAvailabilityStore(createAvailabilityDeps());
+  const availabilityPlatforms = getAvailabilityPushTargets();
+
+  void availabilityStore.load();
+
+  $effect(() => {
+    const unsubscribe = subscribeMessages((message) => {
+      if (message.type === 'PROFILE_UPDATED') {
+        availabilityStore.applyProfileUpdate(message.payload.availability ?? null);
+      }
+    });
+    return unsubscribe;
+  });
 
   let missions = $state<Mission[]>([]);
   let isLoading = $state(true);
@@ -454,6 +473,8 @@
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
+  <AvailabilityPanel store={availabilityStore} platforms={availabilityPlatforms} />
+
   <section class="section-card-strong rounded-2xl px-5 py-4">
     <div class="flex items-start justify-between gap-4">
       <div>

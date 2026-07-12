@@ -45,7 +45,7 @@ Mission:
 
 Profil:
 - Poste: ${profile.jobTitle}
-- Stack: ${profile.stack.join(', ')}
+- Stack: ${profile.keywords.join(', ')}
 - Seniorité: ${profile.seniority}
 - TJM attendu: ${profile.tjmMin}-${profile.tjmMax}€/jour
 ${matchContext}

@@ -6,6 +6,8 @@ import type {
 } from '../../../src/lib/core/profile-extractors/types';
 import { mergeCandidateProfileIntoUserProfile } from '../../../src/lib/core/profile-extractors/merge-candidate-profile';
 
+const NOW = 1_700_000_000_000;
+
 function makeDraft(
   overrides: Partial<CanonicalCandidateProfileDraft> = {}
 ): CanonicalCandidateProfileDraft {
@@ -27,14 +29,13 @@ function makeDraft(
 function makeProfile(overrides: Partial<UserProfile> = {}): UserProfile {
   return {
     firstName: 'Guy',
-    stack: ['Svelte', 'TypeScript'],
+    keywords: ['Svelte', 'TypeScript', 'mission svelte'],
     tjmMin: 650,
     tjmMax: 900,
     location: 'Paris',
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Lead Frontend',
-    searchKeywords: ['mission svelte'],
     ...overrides,
   };
 }
@@ -43,6 +44,7 @@ function experience(overrides: Partial<CandidateExperienceDraft> = {}): Candidat
   return {
     title: 'Lead',
     company: null,
+    employmentType: null,
     location: null,
     startDate: null,
     endDate: null,
@@ -60,25 +62,27 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
   it('overwrites jobTitle with the draft title', () => {
     const merged = mergeCandidateProfileIntoUserProfile(
       makeProfile({ jobTitle: 'Ancien titre' }),
-      makeDraft({ title: 'Nouveau titre LinkedIn' })
+      makeDraft({ title: 'Nouveau titre LinkedIn' }),
+      NOW
     );
 
     expect(merged.jobTitle).toBe('Nouveau titre LinkedIn');
   });
 
-  it('unions the current stack with draft skills, deduping case-insensitively while keeping first casing', () => {
+  it('unions the current keywords with draft skills, deduping case-insensitively while keeping first casing', () => {
     const merged = mergeCandidateProfileIntoUserProfile(
-      makeProfile({ stack: ['Svelte', 'TypeScript'] }),
+      makeProfile({ keywords: ['Svelte', 'TypeScript'] }),
       makeDraft({
         skills: [
           { skill: 'svelte', source: 'linkedin', confidence: 0.9 },
           { skill: 'React', source: 'linkedin', confidence: 0.8 },
           { skill: 'TYPESCRIPT', source: 'linkedin', confidence: 0.7 },
         ],
-      })
+      }),
+      NOW
     );
 
-    expect(merged.stack).toEqual(['Svelte', 'TypeScript', 'React']);
+    expect(merged.keywords).toEqual(['Svelte', 'TypeScript', 'React']);
   });
 
   it('keeps the current location when it is non-empty', () => {
@@ -86,7 +90,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
       makeProfile({ location: 'Lyon' }),
       makeDraft({
         experiences: [experience({ location: 'Marseille' })],
-      })
+      }),
+      NOW
     );
 
     expect(merged.location).toBe('Lyon');
@@ -101,7 +106,8 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
           experience({ title: 'Dev', location: 'Bordeaux', positionIndex: 1 }),
           experience({ title: 'Junior', location: 'Nantes', positionIndex: 2 }),
         ],
-      })
+      }),
+      NOW
     );
 
     expect(merged.location).toBe('Bordeaux');
@@ -112,18 +118,23 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
       makeProfile({ location: '   ' }),
       makeDraft({
         experiences: [experience({ location: null }), experience({ location: '  ' })],
-      })
+      }),
+      NOW
     );
 
     expect(merged.location).toBe('');
   });
 
   it('returns a complete UserProfile with defaults when current is null', () => {
-    const merged = mergeCandidateProfileIntoUserProfile(null, makeDraft({ title: 'Solo Title' }));
+    const merged = mergeCandidateProfileIntoUserProfile(
+      null,
+      makeDraft({ title: 'Solo Title' }),
+      NOW
+    );
 
     expect(merged).toEqual({
       firstName: '',
-      stack: [],
+      keywords: [],
       tjmMin: 0,
       tjmMax: 0,
       location: '',
@@ -131,27 +142,29 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
       seniority: 'senior',
       jobTitle: 'Solo Title',
       scoringWeights: undefined,
-      searchKeywords: [],
+      experiences: [],
+      availability: null,
     });
   });
 
-  it('preserves tjm, remote, seniority and searchKeywords from the current profile', () => {
+  it('preserves tjm, remote, seniority and keywords from the current profile', () => {
     const merged = mergeCandidateProfileIntoUserProfile(
       makeProfile({
         tjmMin: 700,
         tjmMax: 950,
         remote: 'full',
         seniority: 'confirmed',
-        searchKeywords: ['react', 'remote'],
+        keywords: ['react', 'remote'],
       }),
-      makeDraft({ title: 'Nouveau titre' })
+      makeDraft({ title: 'Nouveau titre' }),
+      NOW
     );
 
     expect(merged.tjmMin).toBe(700);
     expect(merged.tjmMax).toBe(950);
     expect(merged.remote).toBe('full');
     expect(merged.seniority).toBe('confirmed');
-    expect(merged.searchKeywords).toEqual(['react', 'remote']);
+    expect(merged.keywords).toEqual(['react', 'remote']);
     expect(merged.firstName).toBe('Guy');
   });
 
@@ -159,21 +172,23 @@ describe('mergeCandidateProfileIntoUserProfile', () => {
     const weights = { stack: 50, location: 10, tjm: 30, remote: 10 };
     const merged = mergeCandidateProfileIntoUserProfile(
       makeProfile({ scoringWeights: weights }),
-      makeDraft()
+      makeDraft(),
+      NOW
     );
 
     expect(merged.scoringWeights).toEqual(weights);
   });
 
   it('does not mutate the input current profile', () => {
-    const current = makeProfile({ stack: ['Svelte'] });
+    const current = makeProfile({ keywords: ['Svelte'] });
     const merged = mergeCandidateProfileIntoUserProfile(
       current,
-      makeDraft({ skills: [{ skill: 'React', source: 'linkedin', confidence: 0.9 }] })
+      makeDraft({ skills: [{ skill: 'React', source: 'linkedin', confidence: 0.9 }] }),
+      NOW
     );
 
-    expect(current.stack).toEqual(['Svelte']);
-    expect(merged.stack).not.toBe(current.stack);
-    expect(merged.stack).toEqual(['Svelte', 'React']);
+    expect(current.keywords).toEqual(['Svelte']);
+    expect(merged.keywords).not.toBe(current.keywords);
+    expect(merged.keywords).toEqual(['Svelte', 'React']);
   });
 });

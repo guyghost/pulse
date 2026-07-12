@@ -87,15 +87,9 @@
   );
 
   function evidenceClass(itemSeverity: OperationalSeverity | undefined): string {
-    if (itemSeverity === 'success') {
-      return 'text-accent-green';
-    }
-    if (itemSeverity === 'attention' || itemSeverity === 'incident') {
-      return 'text-status-orange';
-    }
-    if (itemSeverity === 'critical') {
-      return 'text-status-red';
-    }
+    // Severity hue is carried by the card border/background and the leading icon
+    // chip; the evidence value stays in neutral ink so the figure stays legible
+    // (semantic-colored small numerals fell below WCAG AA).
     return 'text-text-primary';
   }
 </script>

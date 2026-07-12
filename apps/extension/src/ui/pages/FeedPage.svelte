@@ -272,16 +272,13 @@
   let LastScanInfo: typeof import('../molecules/LastScanInfo.svelte').default | null = $state(null);
   let FilterBar: typeof import('../organisms/FilterBar.svelte').default | null = $state(null);
   let KeyboardShortcutsHelp:
-    | typeof import('../molecules/KeyboardShortcutsHelp.svelte').default
-    | null = $state(null);
+    typeof import('../molecules/KeyboardShortcutsHelp.svelte').default | null = $state(null);
   let MissionInvestigationDrawer:
-    | typeof import('../organisms/MissionInvestigationDrawer.svelte').default
-    | null = $state(null);
+    typeof import('../organisms/MissionInvestigationDrawer.svelte').default | null = $state(null);
   let MissionComparison: typeof import('../organisms/MissionComparison.svelte').default | null =
     $state(null);
   let ProfileRefinementBanner:
-    | typeof import('../molecules/ProfileRefinementBanner.svelte').default
-    | null = $state(null);
+    typeof import('../molecules/ProfileRefinementBanner.svelte').default | null = $state(null);
   let ConnectorAlertBar: typeof import('../molecules/ConnectorAlertBar.svelte').default | null =
     $state(null);
   let FeedTourOverlay: typeof import('../molecules/FeedTourOverlay.svelte').default | null =
@@ -535,6 +532,10 @@
   const feedIsColdLoading = $derived(page.isLoading && !hasVisibleFeedMissions);
   const feedChromeBusy = $derived(controller.isScanning || feedIsColdLoading);
   const visibleFeedMissionLabel = $derived(formatMissionCount(visibleFeedMissionCount));
+
+  // Focus lens (notification deep-link): banner shows when the feed is filtered
+  // to the notified missions. See src/models/notification-deep-link.model.md.
+  const focusActive = $derived(page.focusMode === 'focused' && page.focusMissions.length > 0);
   const pendingMissionLabel = $derived(formatMissionCount(controller.pendingMissionCount));
   const pendingConnectorLabel = $derived(
     controller.pendingConnectorCount > 0
@@ -820,6 +821,16 @@
       emitFeedScrollState(false, missionScrollTop);
     }, 260);
   }
+
+  $effect(() => {
+    // Auto-scroll to the mission feed when the focus lens activates, so the
+    // user lands on the notified missions instead of staying at the hero.
+    if (focusActive) {
+      void tick().then(() => {
+        missionFeedSection?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
+  });
 
   $effect(() => {
     const hasBroken = brokenConnectors.length > 0;
@@ -1470,6 +1481,42 @@
     tabindex="-1"
     aria-labelledby="mission-feed-title"
   >
+    {#if focusActive}
+      <div
+        data-testid="focus-lens-banner"
+        class="mb-4 flex items-start gap-3 rounded-xl border border-blueprint-blue/25 bg-blueprint-blue/[0.06] px-4 py-3"
+        role="status"
+      >
+        <div
+          class="mt-0.5 flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-blueprint-blue/15 text-blueprint-blue"
+        >
+          <svg class="h-4 w-4" viewBox="0 0 16 16" fill="currentColor" aria-hidden="true">
+            <path
+              d="M8 1a7 7 0 1 0 0 14A7 7 0 0 0 8 1zm.75 3.75v3.69l2.47 2.47-1.06 1.06L7.25 8.06V4.75h1.5z"
+            />
+          </svg>
+        </div>
+        <div class="min-w-0 flex-1">
+          <p class="text-sm font-semibold text-text-primary">
+            {page.focusMissions.length} mission{page.focusMissions.length > 1 ? 's' : ''} issue{page
+              .focusMissions.length > 1
+              ? 's'
+              : ''} de la notification
+          </p>
+          <p class="mt-0.5 text-xs leading-5 text-text-subtle">
+            Notifications · {page.focusSinceLabel}
+          </p>
+        </div>
+        <button
+          type="button"
+          onclick={() => page.dismissFocus()}
+          class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blueprint-blue/40"
+          data-testid="focus-lens-dismiss"
+        >
+          Voir tout le feed
+        </button>
+      </div>
+    {/if}
     {#if hasVisibleFeedMissions && !page.heroCompact}
       <div
         data-testid="mission-feed-anchor"

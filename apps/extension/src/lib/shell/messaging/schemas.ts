@@ -233,7 +233,7 @@ const ProfilePayloadSchema = z
     tjmMax: z.number().optional(),
   })
   .passthrough()
-  .refine(maxBytes(10_240), { message: 'SAVE_PROFILE payload exceeds 10KB limit' });
+  .refine(maxBytes(80_000), { message: 'SAVE_PROFILE payload exceeds 80KB limit' });
 
 const LinkedInTabPayloadSchema = z.object({ tabId: z.number().int().positive().optional() });
 
@@ -287,6 +287,7 @@ const ProfileExtractorSourceSchema = z.enum(['linkedin', 'malt', 'other']);
 const CandidateExperienceDraftSchema = z.object({
   title: SafeString,
   company: SafeString.nullable(),
+  employmentType: SafeString.nullable().default(null),
   location: SafeString.nullable(),
   startDate: z.string().max(32).nullable(),
   endDate: z.string().max(32).nullable(),
@@ -676,7 +677,11 @@ export const MessageSchemas = {
   LINKEDIN_PROFILE_IMPORTED: z.object({
     type: z.literal('LINKEDIN_PROFILE_IMPORTED'),
     payload: z.union([
-      z.object({ imported: z.literal(true), profile: CanonicalCandidateProfileDraftSchema }),
+      z.object({
+        imported: z.literal(true),
+        profile: CanonicalCandidateProfileDraftSchema,
+        addedCount: z.number().int().nonnegative().optional(),
+      }),
       z.object({
         imported: z.literal(false),
         errorCode: SafeString,
@@ -892,6 +897,24 @@ export const MessageSchemas = {
       })
     ),
   }),
+
+  // Deep-link focus intent
+  CONSUME_DEEP_LINK_INTENT: z.object({ type: z.literal('CONSUME_DEEP_LINK_INTENT') }),
+  DEEP_LINK_INTENT_CONSUMED: z.object({
+    type: z.literal('DEEP_LINK_INTENT_CONSUMED'),
+    payload: z.object({
+      intent: z
+        .object({
+          focusMissionIds: z.array(z.string().min(1).max(200)).min(1).max(20),
+          source: z.enum(['notification', 'digest']),
+          triggeredAt: z.number().finite(),
+        })
+        .nullable(),
+    }),
+  }),
+  // SW → live panel broadcast: re-consume a pending deep-link intent after a
+  // notification click on an already-open panel. No payload needed.
+  NOTIFICATION_CLICKED: z.object({ type: z.literal('NOTIFICATION_CLICKED') }),
 } as const;
 
 export type MessageType = keyof typeof MessageSchemas;

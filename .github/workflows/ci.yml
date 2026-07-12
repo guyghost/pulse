@@ -212,7 +212,7 @@ jobs:
         run: pnpm turbo build
 
       - name: Verify built manifest.json
-        run: pnpm --filter @pulse/extension verify-manifest dist/manifest.json
+        run: pnpm --filter @pulse/extension verify-manifest dist/manifest.json --post-build
 
       - name: Create extension ZIP
         run: |
@@ -220,14 +220,14 @@ jobs:
           zip -r ../missionpulse-ci.zip .
 
       - name: Upload build directory artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: chrome-extension-dist
           path: apps/extension/dist/
           retention-days: 7
 
       - name: Upload extension ZIP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: chrome-extension-zip
           path: apps/extension/missionpulse-ci.zip
@@ -277,7 +277,7 @@ jobs:
         run: pnpm --filter @pulse/extension test:e2e
 
       - name: Upload Playwright report
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-report
@@ -286,7 +286,7 @@ jobs:
           if-no-files-found: ignore
 
       - name: Upload Playwright test results
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         if: always()
         with:
           name: playwright-test-results

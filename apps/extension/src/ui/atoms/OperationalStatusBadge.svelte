@@ -9,15 +9,18 @@
     severity?: OperationalSeverity;
   } = $props();
 
+  // Approach B: neutral text on hue tint. Severity hue is carried by the
+  // background tint + border (stronger color signal than tiny colored text),
+  // keeping every label at AA contrast regardless of severity.
   const toneClass = $derived(
     severity === 'success'
-      ? 'border-accent-green/25 bg-accent-green/10 text-accent-green'
+      ? 'border-accent-green/25 bg-accent-green/15 text-text-primary'
       : severity === 'attention'
-        ? 'border-status-yellow/30 bg-status-yellow/15 text-status-orange'
+        ? 'border-status-yellow/30 bg-status-yellow/20 text-text-primary'
         : severity === 'incident'
-          ? 'border-status-orange/30 bg-status-orange/10 text-status-orange'
+          ? 'border-status-orange/30 bg-status-orange/15 text-text-primary'
           : severity === 'critical'
-            ? 'border-status-red/30 bg-status-red/10 text-status-red'
+            ? 'border-status-red/30 bg-status-red/15 text-text-primary'
             : 'border-border-light bg-page-canvas text-text-subtle'
   );
 </script>

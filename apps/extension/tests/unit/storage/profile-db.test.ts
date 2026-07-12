@@ -5,14 +5,15 @@ import { clearProfile, getProfile, saveProfile } from '../../../src/lib/shell/st
 
 const profile: UserProfile = {
   firstName: '',
-  stack: ['Svelte Save'],
+  keywords: ['Svelte Save', 'mission svelte'],
   tjmMin: 600,
   tjmMax: 800,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Architecte Svelte',
-  searchKeywords: ['mission svelte'],
+  experiences: [],
+  availability: null,
 };
 
 describe('profile IndexedDB store', () => {

@@ -47,7 +47,7 @@
       <Icon name="alert-triangle" size={14} class="text-status-red" />
     </div>
     <div>
-      <p class="text-sm font-medium text-status-red">Zone dangereuse</p>
+      <p class="text-sm font-medium text-text-primary">Zone dangereuse</p>
       <p class="mt-0.5 text-xs text-text-subtle">
         Supprimer toutes les données locales (profil, missions, cache).
       </p>
@@ -56,7 +56,7 @@
   <div class="mt-4">
     {#if showResetConfirm}
       <div class="rounded-xl border border-status-red/20 bg-status-red/6 px-3 py-2.5">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-status-red">
+        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-primary">
           Suppression irréversible
         </p>
         <p class="mt-1.5 text-xs leading-4 text-text-primary">
@@ -99,21 +99,22 @@
             Annuler
           </button>
           <button
-            class="rounded-lg border border-status-red/25 bg-status-red/10 px-3 py-1.5 text-xs font-medium text-status-red transition-colors hover:bg-status-red/15 disabled:cursor-not-allowed disabled:opacity-40"
+            class="rounded-lg border border-status-red/25 bg-status-red/10 px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-status-red/15 disabled:cursor-not-allowed disabled:opacity-40"
             onclick={handleConfirmReset}
             disabled={!canConfirmReset}
             aria-disabled={!canConfirmReset}
           >
+            <Icon name="trash-2" size={12} class="mr-1 text-status-red" />
             Supprimer définitivement
           </button>
         </div>
       </div>
     {:else}
       <button
-        class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-xs font-medium text-status-red transition-colors hover:bg-status-red/10"
+        class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-status-red/10"
         onclick={onShowConfirm}
       >
-        <Icon name="trash-2" size={12} class="mr-1" />
+        <Icon name="trash-2" size={12} class="mr-1 text-status-red" />
         Réinitialiser tout
       </button>
     {/if}

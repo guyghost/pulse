@@ -267,6 +267,31 @@ describe('parseCherryPickMissions', () => {
     );
     expect(missions[0].stack).toEqual([]);
   });
+
+  it('ignore les faux skills Cherry Pick qui contiennent une description ou une justification', () => {
+    const missions = parseCherryPickMissions(
+      [
+        {
+          ...FIXTURE_MISSIONS[0],
+          name: 'Tech Lead BFF (H/F)',
+          skills: [
+            { name: 'Java' },
+            { name: 'Spring Boot' },
+            { name: 'Postman' },
+            {
+              name: 'La mission Tech Lead BFF correspond fortement au profil avec une experience significative en Java, Spring Boot et Kubernetes.',
+            },
+            {
+              name: 'Description du Poste : Nous recherchons une/un Tech Lead experimente specialise dans la gestion de solutions applicatives.',
+            },
+          ],
+        },
+      ],
+      NOW
+    );
+
+    expect(missions[0].stack).toEqual(['Java', 'Spring Boot', 'Postman']);
+  });
 });
 
 describe('CherryPickConnector.detectSession', () => {

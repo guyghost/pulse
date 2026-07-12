@@ -130,8 +130,8 @@
     {#if relativeTime && connectorState === 'error'}
       <span class="text-[9px] text-text-muted">{relativeTime}</span>
     {/if}
-    <span class="flex items-center gap-1 text-[10px] {stateConfig.color}">
-      <span class="shrink-0" class:animate-spin={stateConfig.spin}>
+    <span class="flex items-center gap-1 text-[10px] text-text-primary">
+      <span class="shrink-0 {stateConfig.color}" class:animate-spin={stateConfig.spin}>
         <Icon name={stateConfig.icon} size={12} />
       </span>
       <span class="max-w-40 truncate">{stateConfig.label}</span>

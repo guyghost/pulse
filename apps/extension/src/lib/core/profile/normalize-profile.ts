@@ -1,4 +1,5 @@
-import type { UserProfile } from '../types/profile';
+import type { Experience, UserProfile } from '../types/profile';
+import type { Availability } from '../types/availability';
 
 export interface ProfileDraftInput {
   firstName?: string | null;
@@ -8,11 +9,11 @@ export interface ProfileDraftInput {
   seniority?: UserProfile['seniority'] | null;
   tjmMin?: number | string | null;
   tjmMax?: number | string | null;
-  stack?: readonly string[] | null;
-  stackInput?: string | null;
-  searchKeywords?: readonly string[] | null;
+  keywords?: readonly string[] | null;
   keywordInput?: string | null;
   scoringWeights?: UserProfile['scoringWeights'];
+  experiences?: readonly Experience[] | null;
+  availability?: Availability | null;
 }
 
 export interface NormalizeProfileResult {
@@ -58,7 +59,7 @@ export function appendUniqueNormalized(
 
 export const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile => ({
   firstName: profile.firstName ?? '',
-  stack: [...(profile.stack ?? [])],
+  keywords: [...(profile.keywords ?? [])],
   tjmMin: profile.tjmMin ?? 0,
   tjmMax: profile.tjmMax ?? 0,
   location: profile.location ?? '',
@@ -66,7 +67,8 @@ export const withProfileDefaults = (profile: Partial<UserProfile>): UserProfile 
   seniority: profile.seniority ?? 'senior',
   jobTitle: profile.jobTitle ?? '',
   scoringWeights: profile.scoringWeights,
-  searchKeywords: [...(profile.searchKeywords ?? [])],
+  experiences: [...(profile.experiences ?? [])],
+  availability: profile.availability ?? null,
 });
 
 export function normalizeProfileDraft(input: ProfileDraftInput): NormalizeProfileResult {
@@ -87,9 +89,10 @@ export function normalizeProfileDraft(input: ProfileDraftInput): NormalizeProfil
       seniority: input.seniority ?? 'senior',
       tjmMin,
       tjmMax,
-      stack: appendUniqueNormalized(input.stack, input.stackInput),
-      searchKeywords: appendUniqueNormalized(input.searchKeywords, input.keywordInput),
+      keywords: appendUniqueNormalized(input.keywords, input.keywordInput),
       scoringWeights: input.scoringWeights,
+      experiences: input.experiences ? [...input.experiences] : [],
+      availability: input.availability ?? null,
     }),
   };
 }

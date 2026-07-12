@@ -23,6 +23,33 @@ interface FieldCompatibility {
   readonly usesProxyClient?: boolean;
 }
 
+/**
+ * Pre-computes every text-derived value the comparison helpers need for a
+ * mission: the four token sets (title/client/location/stack) plus the derived
+ * client flags, structural signature, remote/tjm, and normalized URL shape.
+ * Building this bundle once per mission lets compareMissions avoid
+ * re-tokenizing the same fields on every candidate pair — a mission is
+ * compared against many candidates, so this is the hot path.
+ *
+ * Invariant: each field equals what the on-the-fly computation produced
+ * before (tokenize/normalizeClientName/isProxyClientName/buildMissionSignature/
+ * normalizeUrl/hasSpecificMissionPath are all pure and idempotent), so cached
+ * comparisons are byte-identical to uncached ones.
+ */
+interface MissionComparisonCache {
+  readonly title: Set<string>;
+  readonly clientTokens: Set<string>;
+  readonly locationTokens: Set<string>;
+  readonly stackTokens: Set<string>;
+  readonly clientProxy: boolean;
+  readonly normalizedClient: string;
+  readonly signature: string;
+  readonly remote: Mission['remote'];
+  readonly tjm: Mission['tjm'];
+  readonly normalizedUrl: string;
+  readonly hasSpecificPath: boolean;
+}
+
 const SOURCE_CANONICAL_PRIORITY: Record<Mission['source'], number> = {
   'cherry-pick': 5,
   lehibou: 4,
@@ -84,6 +111,9 @@ const PROXY_CLIENT_NAMES = new Set([
 ]);
 
 const REMOTE_LOCATION_TOKENS = new Set(['remote', 'teletravail', 'france']);
+const PROXY_REPOST_MIN_TITLE_SCORE = 0.75;
+const PROXY_REPOST_MIN_STACK_SCORE = 0.5;
+const PROXY_REPOST_CONFIDENCE_FLOOR = 0.82;
 
 /**
  * Normalizes free text for tokenization/comparison.
@@ -109,21 +139,37 @@ const tokenize = (text: string | null | undefined): Set<string> =>
       .filter((token) => token.length > 1 && !STOP_WORDS.has(token))
   );
 
+/**
+ * Counts shared elements between two sets, iterating the smaller set to minimise
+ * membership checks. Allocates no intermediate arrays/sets — important because
+ * this runs per mission-pair during deduplication.
+ */
+const intersectionSize = (a: Set<string>, b: Set<string>): number => {
+  const [small, large] = a.size <= b.size ? [a, b] : [b, a];
+  let count = 0;
+  for (const token of small) {
+    if (large.has(token)) {
+      count++;
+    }
+  }
+  return count;
+};
+
 const jaccardSimilarity = (a: Set<string>, b: Set<string>): number => {
   if (a.size === 0 && b.size === 0) {
     return 0;
   }
-  const intersection = new Set([...a].filter((x) => b.has(x)));
-  const union = new Set([...a, ...b]);
-  return intersection.size / union.size;
+  const shared = intersectionSize(a, b);
+  // Inclusion-exclusion: |A ∪ B| = |A| + |B| − |A ∩ B|. Avoids a Set allocation.
+  const union = a.size + b.size - shared;
+  return shared / union;
 };
 
 const overlapCoefficient = (a: Set<string>, b: Set<string>): number => {
   if (a.size === 0 || b.size === 0) {
     return 0;
   }
-  const intersectionSize = [...a].filter((token) => b.has(token)).length;
-  return intersectionSize / Math.min(a.size, b.size);
+  return intersectionSize(a, b) / Math.min(a.size, b.size);
 };
 
 const weightedTokenSimilarity = (a: Set<string>, b: Set<string>): number => {
@@ -204,35 +250,55 @@ const buildCandidateKey = (mission: Mission): string =>
     .filter(Boolean)
     .join(' ');
 
-const compareClients = (a: Mission, b: Mission): FieldCompatibility => {
-  const aProxy = isProxyClientName(a.client);
-  const bProxy = isProxyClientName(b.client);
-  const aClient = normalizeClientName(a.client);
-  const bClient = normalizeClientName(b.client);
+/**
+ * Builds the per-mission comparison cache. Every field here is what the
+ * comparison helpers used to recompute inline on each pair; centralizing it
+ * preserves exact outputs while removing redundant tokenization.
+ */
+const buildComparisonCache = (mission: Mission): MissionComparisonCache => ({
+  title: tokenize(mission.title),
+  clientTokens: tokenize(normalizeClientName(mission.client)),
+  locationTokens: tokenize(mission.location),
+  stackTokens: tokenize(getStackItems(mission).join(' ')),
+  clientProxy: isProxyClientName(mission.client),
+  normalizedClient: normalizeClientName(mission.client),
+  signature: buildMissionSignature(mission),
+  remote: mission.remote,
+  tjm: mission.tjm,
+  normalizedUrl: normalizeUrl(mission.url),
+  hasSpecificPath: hasSpecificMissionPath(mission.url),
+});
 
-  if (aProxy || bProxy) {
+const compareClients = (
+  a: MissionComparisonCache,
+  b: MissionComparisonCache
+): FieldCompatibility => {
+  if (a.clientProxy || b.clientProxy) {
     return { compatible: true, score: 0.65, usesProxyClient: true };
   }
 
-  if (!aClient && !bClient) {
+  if (!a.normalizedClient && !b.normalizedClient) {
     return { compatible: true, score: 0.55 };
   }
 
-  if (!aClient || !bClient) {
+  if (!a.normalizedClient || !b.normalizedClient) {
     return { compatible: true, score: 0.5 };
   }
 
-  if (compact(aClient) === compact(bClient)) {
+  if (compact(a.normalizedClient) === compact(b.normalizedClient)) {
     return { compatible: true, score: 1 };
   }
 
-  const score = weightedTokenSimilarity(tokenize(aClient), tokenize(bClient));
+  const score = weightedTokenSimilarity(a.clientTokens, b.clientTokens);
   return { compatible: score >= 0.75, score };
 };
 
-const compareLocations = (a: Mission, b: Mission): FieldCompatibility => {
-  const aTokens = tokenize(a.location);
-  const bTokens = tokenize(b.location);
+const compareLocations = (
+  a: MissionComparisonCache,
+  b: MissionComparisonCache
+): FieldCompatibility => {
+  const aTokens = a.locationTokens;
+  const bTokens = b.locationTokens;
 
   if (aTokens.size === 0 && bTokens.size === 0) {
     return { compatible: true, score: 0.5 };
@@ -255,9 +321,9 @@ const compareLocations = (a: Mission, b: Mission): FieldCompatibility => {
   return { compatible: hasRemoteContext, score: hasRemoteContext ? 0.4 : 0 };
 };
 
-const compareStacks = (a: Mission, b: Mission): number => {
-  const aTokens = tokenize(getStackItems(a).join(' '));
-  const bTokens = tokenize(getStackItems(b).join(' '));
+const compareStacks = (a: MissionComparisonCache, b: MissionComparisonCache): number => {
+  const aTokens = a.stackTokens;
+  const bTokens = b.stackTokens;
 
   if (aTokens.size === 0 && bTokens.size === 0) {
     return 0.55;
@@ -270,14 +336,14 @@ const compareStacks = (a: Mission, b: Mission): number => {
   return weightedTokenSimilarity(aTokens, bTokens);
 };
 
-const compareRemote = (a: Mission, b: Mission): number => {
+const compareRemote = (a: MissionComparisonCache, b: MissionComparisonCache): number => {
   if (!a.remote || !b.remote) {
     return 0.5;
   }
   return a.remote === b.remote ? 1 : 0.3;
 };
 
-const compareTjm = (a: Mission, b: Mission): number => {
+const compareTjm = (a: MissionComparisonCache, b: MissionComparisonCache): number => {
   if (typeof a.tjm !== 'number' || typeof b.tjm !== 'number') {
     return 0.5;
   }
@@ -297,50 +363,53 @@ const compareTjm = (a: Mission, b: Mission): number => {
   return 0.2;
 };
 
-const compareMissions = (mission: Mission, existing: Mission): MissionMatch | null => {
-  const missionUrl = normalizeUrl(mission.url);
-  const existingUrl = normalizeUrl(existing.url);
+const compareMissions = (
+  a: MissionComparisonCache,
+  b: MissionComparisonCache
+): MissionMatch | null => {
   if (
-    missionUrl &&
-    missionUrl === existingUrl &&
-    hasSpecificMissionPath(mission.url) &&
-    hasSpecificMissionPath(existing.url)
+    a.normalizedUrl &&
+    a.normalizedUrl === b.normalizedUrl &&
+    a.hasSpecificPath &&
+    b.hasSpecificPath
   ) {
     return { confidence: 1, reason: 'same_url' };
   }
 
-  const client = compareClients(mission, existing);
+  const client = compareClients(a, b);
   if (!client.compatible) {
     return null;
   }
 
-  const location = compareLocations(mission, existing);
+  const location = compareLocations(a, b);
   if (!location.compatible) {
     return null;
   }
 
-  const missionSignature = buildMissionSignature(mission);
-  const existingSignature = buildMissionSignature(existing);
-  if (missionSignature && missionSignature === existingSignature) {
+  if (a.signature && a.signature === b.signature) {
     return { confidence: 1, reason: 'same_structured_signature' };
   }
 
-  const titleScore = weightedTokenSimilarity(tokenize(mission.title), tokenize(existing.title));
+  const titleScore = weightedTokenSimilarity(a.title, b.title);
   if (titleScore < 0.45) {
     return null;
   }
 
-  const stackScore = compareStacks(mission, existing);
+  const stackScore = compareStacks(a, b);
   const confidence =
     titleScore * 0.62 +
     stackScore * 0.18 +
     client.score * 0.1 +
     location.score * 0.06 +
-    compareRemote(mission, existing) * 0.02 +
-    compareTjm(mission, existing) * 0.02;
+    compareRemote(a, b) * 0.02 +
+    compareTjm(a, b) * 0.02;
 
   if (client.usesProxyClient) {
-    return { confidence, reason: 'same_title_stack_proxy_client' };
+    const proxyConfidence =
+      titleScore >= PROXY_REPOST_MIN_TITLE_SCORE && stackScore >= PROXY_REPOST_MIN_STACK_SCORE
+        ? Math.max(confidence, PROXY_REPOST_CONFIDENCE_FLOOR)
+        : confidence;
+    return { confidence: proxyConfidence, reason: 'same_title_stack_proxy_client' };
   }
 
   if (client.score >= 0.75) {
@@ -389,6 +458,34 @@ export const deduplicateMissionsDetailed = (
   const duplicateRelations: MissionDuplicateRelation[] = [];
   const tokenCache = new Map<string, Set<string>>();
 
+  // Per-mission comparison cache: title/client/location/stack token sets plus
+  // derived values, built once per mission so compareMissions never
+  // re-tokenizes the same fields across candidate pairs.
+  const comparisonCache = new Map<string, MissionComparisonCache>();
+  const getComparisonCache = (mission: Mission): MissionComparisonCache => {
+    const cached = comparisonCache.get(mission.id);
+    if (cached) {
+      return cached;
+    }
+    const built = buildComparisonCache(mission);
+    comparisonCache.set(mission.id, built);
+    return built;
+  };
+
+  // canonicalMissionId → indices into duplicateRelations currently pointing at
+  // that canonical. Maintained incrementally so that when a canonical mission
+  // is replaced we can rewrite its relations in O(affected) instead of scanning
+  // the whole relations array on every re-canonicalization.
+  const canonicalRelationIndices = new Map<string, number[]>();
+  const recordCanonicalRelation = (canonicalId: string, relationIndex: number): void => {
+    const indices = canonicalRelationIndices.get(canonicalId);
+    if (indices) {
+      indices.push(relationIndex);
+    } else {
+      canonicalRelationIndices.set(canonicalId, [relationIndex]);
+    }
+  };
+
   // Inverted index (token → set of result indices containing it)
   const invertedIndex = new Map<string, Set<number>>();
 
@@ -418,6 +515,7 @@ export const deduplicateMissionsDetailed = (
     const tokens = tokenize(key);
     tokenCache.set(mission.id, tokens);
     const missionScore = computeMissionScore(mission);
+    const missionComparison = getComparisonCache(mission);
 
     // Find candidates via inverted index
     // Only compare against missions that share at least one token
@@ -440,19 +538,25 @@ export const deduplicateMissionsDetailed = (
         continue;
       }
 
-      const match = compareMissions(mission, existing);
+      const match = compareMissions(missionComparison, getComparisonCache(existing));
       if (match && match.confidence >= threshold) {
         const existingScore = computeMissionScore(existing);
 
         if (missionScore > existingScore) {
-          for (let relationIndex = 0; relationIndex < duplicateRelations.length; relationIndex++) {
-            const relation = duplicateRelations[relationIndex];
-            if (relation.canonicalMissionId === existing.id) {
+          // Rewrite every relation that treated `existing` as canonical so it
+          // now points at the higher-quality incoming `mission`. Indexed lookup
+          // keeps this O(affected) instead of scanning the whole relations
+          // array. The final duplicateRelations contents and order are
+          // identical to the previous full-scan rewrite.
+          const existingCanonicalIndices = canonicalRelationIndices.get(existing.id);
+          if (existingCanonicalIndices) {
+            for (const relationIndex of existingCanonicalIndices) {
               duplicateRelations[relationIndex] = {
-                ...relation,
+                ...duplicateRelations[relationIndex],
                 canonicalMissionId: mission.id,
               };
             }
+            canonicalRelationIndices.delete(existing.id);
           }
           duplicateRelations.push({
             canonicalMissionId: mission.id,
@@ -460,6 +564,10 @@ export const deduplicateMissionsDetailed = (
             confidence: match.confidence,
             reason: match.reason,
           });
+          // The rewritten relations (plus the new one) now belong to mission.id.
+          const missionCanonicalIndices = existingCanonicalIndices ?? [];
+          missionCanonicalIndices.push(duplicateRelations.length - 1);
+          canonicalRelationIndices.set(mission.id, missionCanonicalIndices);
           // Replace with higher-quality mission
           updateInvertedIndex(idx, existingTokens, tokens);
           result[idx] = mission;
@@ -470,6 +578,7 @@ export const deduplicateMissionsDetailed = (
             confidence: match.confidence,
             reason: match.reason,
           });
+          recordCanonicalRelation(existing.id, duplicateRelations.length - 1);
         }
         isDuplicate = true;
         break;

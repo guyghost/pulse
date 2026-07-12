@@ -5,6 +5,8 @@
   import type { RemoteType } from '$lib/core/types/mission';
   import type { SeniorityLevel } from '$lib/core/types/profile';
   import Tooltip from '../atoms/Tooltip.svelte';
+  import { REMOTE_OPTIONS as remoteOptions } from '../constants/remote-options';
+  import { LOCATION_LABELS } from '$lib/core/locations/location-catalog';
 
   /* eslint-disable prefer-const */
   let {
@@ -15,9 +17,7 @@
     seniority = $bindable('senior'),
     tjmMin = $bindable(0),
     tjmMax = $bindable(0),
-    profileStack = $bindable([]),
-    stackInput = $bindable(''),
-    searchKeywords = $bindable([]),
+    profileKeywords = $bindable([]),
     keywordInput = $bindable(''),
     editing,
     isSaving = false,
@@ -25,8 +25,6 @@
     profileError,
     onToggleEdit,
     onSave,
-    onAddStack,
-    onRemoveStack,
     onAddKeyword,
     onRemoveKeyword,
   }: {
@@ -37,9 +35,7 @@
     seniority: SeniorityLevel;
     tjmMin: number;
     tjmMax: number;
-    profileStack: string[];
-    stackInput: string;
-    searchKeywords: string[];
+    profileKeywords: string[];
     keywordInput: string;
     editing: boolean;
     isSaving?: boolean;
@@ -47,19 +43,10 @@
     profileError: string | null;
     onToggleEdit: () => void;
     onSave: () => void | Promise<void>;
-    onAddStack: () => void;
-    onRemoveStack: (tech: string) => void;
     onAddKeyword: () => void;
     onRemoveKeyword: (keyword: string) => void;
   } = $props();
   /* eslint-enable prefer-const */
-
-  const remoteOptions: Array<{ value: RemoteType | 'any'; label: string }> = [
-    { value: 'any', label: 'Indifférent' },
-    { value: 'full', label: 'Remote' },
-    { value: 'hybrid', label: 'Hybride' },
-    { value: 'onsite', label: 'Présentiel' },
-  ];
 
   const seniorityOptions: Array<{ value: SeniorityLevel; label: string }> = [
     { value: 'junior', label: 'Junior' },
@@ -114,8 +101,14 @@
         type="text"
         placeholder="Localisation"
         class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+        list="profile-location-catalog"
         bind:value={profileLocation}
       />
+      <datalist id="profile-location-catalog">
+        {#each LOCATION_LABELS as label}
+          <option value={label} />
+        {/each}
+      </datalist>
       <div class="grid grid-cols-2 gap-2">
         <label class="space-y-1">
           <span class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
@@ -160,54 +153,13 @@
       </div>
 
       <div class="space-y-2">
-        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
-          Stack technique
-        </p>
+        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">Mots-clés</p>
         <div class="flex gap-2">
           <input
             type="text"
-            aria-label="Stack technique"
-            id="stack-input"
-            placeholder="ex: React, Node.js..."
-            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
-            bind:value={stackInput}
-            onkeydown={(e) => {
-              if (e.key === 'Enter') {
-                onAddStack();
-              }
-            }}
-          />
-          <Tooltip
-            label="Ajouter la stack"
-            description="Ajoute cette compétence aux critères de matching."
-          >
-            <button
-              class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
-              onclick={onAddStack}
-              aria-label="Ajouter la stack technique"
-            >
-              <Icon name="plus" size={13} />
-            </button>
-          </Tooltip>
-        </div>
-        {#if profileStack.length > 0}
-          <div class="flex flex-wrap gap-1.5 pt-1">
-            {#each profileStack as tech}
-              <Chip label={tech} selected={true} onclick={() => onRemoveStack(tech)} />
-            {/each}
-          </div>
-        {/if}
-      </div>
-
-      <div class="space-y-2">
-        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
-          Mots-clés de recherche
-        </p>
-        <div class="flex gap-2">
-          <input
-            type="text"
-            aria-label="Mot-clé de recherche"
-            placeholder="ex: SaaS, marketplace, data..."
+            aria-label="Mots-clés"
+            id="profile-keywords-input"
+            placeholder="ex: React, Node.js, SaaS, marketplace..."
             class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={keywordInput}
             onkeydown={(e) => {
@@ -217,21 +169,21 @@
             }}
           />
           <Tooltip
-            label="Ajouter le mot-cle"
-            description="Ajoute ce signal aux recherches et recommandations."
+            label="Ajouter le mot-clé"
+            description="Ajoute ce mot-clé au scoring et aux recherches."
           >
             <button
               class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
               onclick={onAddKeyword}
-              aria-label="Ajouter le mot-clé de recherche"
+              aria-label="Ajouter le mot-clé"
             >
               <Icon name="plus" size={13} />
             </button>
           </Tooltip>
         </div>
-        {#if searchKeywords.length > 0}
+        {#if profileKeywords.length > 0}
           <div class="flex flex-wrap gap-1.5 pt-1">
-            {#each searchKeywords as keyword}
+            {#each profileKeywords as keyword}
               <Chip label={keyword} selected={true} onclick={() => onRemoveKeyword(keyword)} />
             {/each}
           </div>
@@ -275,27 +227,17 @@
       {#if tjmMin > 0 || tjmMax > 0}
         <p class="text-text-subtle">TJM : {tjmMin} – {tjmMax} €/jour</p>
       {/if}
-      {#if profileStack.length > 0}
+      {#if profileKeywords.length > 0}
         <div class="flex flex-wrap gap-1.5 pt-1">
-          {#each profileStack as tech}
+          {#each profileKeywords as keyword}
             <span
               class="inline-flex items-center rounded-md bg-blueprint-blue/6 px-2 py-0.5 text-[11px] text-blueprint-blue"
-              >{tech}</span
-            >
-          {/each}
-        </div>
-      {:else}
-        <p class="text-xs text-text-muted">Aucune technologie renseignée</p>
-      {/if}
-      {#if searchKeywords.length > 0}
-        <div class="flex flex-wrap gap-1.5 pt-1">
-          {#each searchKeywords as keyword}
-            <span
-              class="inline-flex items-center rounded-md bg-subtle-gray px-2 py-0.5 text-[11px] text-text-subtle"
               >{keyword}</span
             >
           {/each}
         </div>
+      {:else}
+        <p class="text-xs text-text-muted">Aucun mot-clé renseigné</p>
       {/if}
     </div>
   {/if}

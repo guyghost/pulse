@@ -44,7 +44,7 @@ const normalizeKeyPart = (value: string | number): string =>
 const buildProfileFingerprint = (profile: UserProfile): string =>
   [
     normalizeKeyPart(profile.jobTitle),
-    profile.stack
+    profile.keywords
       .filter(Boolean)
       .map((item) => normalizeKeyPart(item))
       .sort()
@@ -184,7 +184,10 @@ export const cacheSemanticScores = async (
   await chrome.storage.local.set(toStore);
 
   const indexedKeys = await readCacheIndex();
-  const nextKeys = [...indexedKeys.filter((key) => !cacheKeys.includes(key)), ...cacheKeys];
+  // O(1) membership lookup instead of O(n) Array.includes inside the filter —
+  // meaningful once the index approaches MAX_SEMANTIC_CACHE_ENTRIES.
+  const cachedKeySet = new Set(cacheKeys);
+  const nextKeys = [...indexedKeys.filter((key) => !cachedKeySet.has(key)), ...cacheKeys];
   const overflowCount = Math.max(0, nextKeys.length - MAX_SEMANTIC_CACHE_ENTRIES);
   const overflowKeys = nextKeys.slice(0, overflowCount);
   const retainedKeys = nextKeys.slice(overflowCount);

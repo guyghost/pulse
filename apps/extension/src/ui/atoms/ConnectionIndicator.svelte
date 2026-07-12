@@ -25,7 +25,7 @@
           color: 'bg-blueprint-blue',
           bgColor: 'bg-blueprint-blue/10',
           borderColor: 'border-blueprint-blue/25',
-          textColor: 'text-blueprint-blue',
+          textColor: 'text-text-primary',
           icon: 'wifi',
           label: 'En ligne',
         };
@@ -34,7 +34,7 @@
           color: 'bg-blueprint-blue',
           bgColor: 'bg-blueprint-blue/10',
           borderColor: 'border-blueprint-blue/30',
-          textColor: 'text-blueprint-blue',
+          textColor: 'text-text-primary',
           icon: 'wifi-slow',
           label: 'Connexion lente',
         };
@@ -43,7 +43,7 @@
           color: 'bg-status-red',
           bgColor: 'bg-status-red/8',
           borderColor: 'border-status-red/20',
-          textColor: 'text-status-red',
+          textColor: 'text-text-primary',
           icon: 'wifi-off',
           label: 'Hors ligne',
         };

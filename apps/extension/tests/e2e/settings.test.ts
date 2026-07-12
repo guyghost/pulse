@@ -20,7 +20,9 @@ test.describe('Settings Flow', () => {
     await expect(
       page.getByRole('heading', { name: /Votre profil MissionPulse|Bonjour/ })
     ).toBeVisible();
-    await expect(page.getByRole('heading', { name: 'Profil' })).toBeVisible();
+    // Use exact: true to match only the "Profil" heading in ProfileSection,
+    // not other headings that contain "profil" as a substring
+    await expect(page.getByRole('heading', { name: 'Profil', exact: true })).toBeVisible();
   });
 
   test('profile tab edit mode shows form fields', async ({ page }) => {
@@ -52,7 +54,7 @@ test.describe('Settings Flow', () => {
     const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
     await profileSection.locator('input[placeholder="Prénom"]').fill('');
     await profileSection.locator('input[placeholder^="Poste"]').fill('Architecte Svelte');
-    await profileSection.locator('#stack-input').fill('Svelte Save');
+    await profileSection.locator('#profile-keywords-input').fill('Svelte Save');
     await profileSection.getByRole('button', { name: 'Enregistrer le profil' }).click();
 
     await navButton(page, 'Feed').click();
@@ -80,14 +82,14 @@ test.describe('Settings Flow', () => {
     await expect(reloadedProfileSection.getByText('Svelte Save')).toBeVisible();
   });
 
-  test('profile stack editor adds and removes technologies', async ({ page }) => {
+  test('profile keywords editor adds and removes technologies', async ({ page }) => {
     await navButton(page, 'Profil').click();
     await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
 
     const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
-    const stackInput = page.locator('#stack-input');
-    await expect(stackInput).toBeVisible();
-    await stackInput.fill('TypeScript E2E');
+    const keywordInput = page.locator('#profile-keywords-input');
+    await expect(keywordInput).toBeVisible();
+    await keywordInput.fill('TypeScript E2E');
     await page.keyboard.press('Enter');
     await expect(profileSection.getByRole('button', { name: 'TypeScript E2E' })).toBeVisible();
 
@@ -95,13 +97,13 @@ test.describe('Settings Flow', () => {
     await expect(profileSection.getByRole('button', { name: 'TypeScript E2E' })).not.toBeVisible();
   });
 
-  test('adding stack item via Enter key works', async ({ page }) => {
+  test('adding keyword item via Enter key works', async ({ page }) => {
     await navButton(page, 'Profil').click();
     await page.getByRole('button', { name: 'Modifier le profil' }).first().click();
 
     const profileSection = page.locator('.section-card').filter({ hasText: 'Vos informations' });
-    const stackInput = page.locator('#stack-input');
-    await stackInput.fill('Svelte E2E');
+    const keywordInput = page.locator('#profile-keywords-input');
+    await keywordInput.fill('Svelte E2E');
     await page.keyboard.press('Enter');
     await expect(profileSection.getByRole('button', { name: 'Svelte E2E' })).toBeVisible();
   });

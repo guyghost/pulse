@@ -8,14 +8,13 @@ import type { UserProfile } from '../../../src/lib/core/types/profile';
 function validProfile(): UserProfile {
   return {
     firstName: 'Guy',
-    stack: ['React', 'TypeScript'],
+    keywords: ['React', 'TypeScript'],
     tjmMin: 500,
     tjmMax: 700,
     location: 'Paris',
     remote: 'hybrid',
     seniority: 'senior',
     jobTitle: 'Développeur React Senior',
-    searchKeywords: [],
   };
 }
 
@@ -23,6 +22,30 @@ describe('UserProfileSchema — validation Zod', () => {
   it('accepte un profil valide', () => {
     const result = UserProfileSchema.safeParse(validProfile());
     expect(result.success).toBe(true);
+  });
+
+  it('applique une valeur nulle aux expériences persistées par une ancienne version', () => {
+    const parsed = UserProfileSchema.parse({
+      ...validProfile(),
+      experiences: [
+        {
+          id: 'legacy',
+          title: 'Dev',
+          company: 'Acme',
+          location: null,
+          startDate: '2020-01',
+          endDate: null,
+          isCurrent: true,
+          description: '',
+          skills: [],
+          source: 'manual',
+          sourceExternalId: null,
+          positionIndex: 0,
+          updatedAt: 1,
+        },
+      ],
+    });
+    expect(parsed.experiences[0].employmentType).toBeNull();
   });
 
   it('accepte un profil avec scoringWeights valides', () => {
@@ -84,21 +107,21 @@ describe('UserProfileSchema — validation Zod', () => {
     expect(result.success).toBe(false);
   });
 
-  it('rejette plus de 20 compétences dans stack', () => {
+  it('rejette plus de 40 mots-clés dans keywords', () => {
     const profile = {
       ...validProfile(),
-      stack: Array.from({ length: 21 }, (_, i) => `Skill${i}`),
+      keywords: Array.from({ length: 41 }, (_, i) => `Skill${i}`),
     };
     const result = UserProfileSchema.safeParse(profile);
     expect(result.success).toBe(false);
     if (!result.success) {
       const messages = result.error.issues.map((i) => i.message).join(', ');
-      expect(messages).toContain('20');
+      expect(messages).toContain('40');
     }
   });
 
-  it('rejette une compétence vide dans stack', () => {
-    const profile = { ...validProfile(), stack: ['React', ''] };
+  it('rejette un mot-clé vide dans keywords', () => {
+    const profile = { ...validProfile(), keywords: ['React', ''] };
     const result = UserProfileSchema.safeParse(profile);
     expect(result.success).toBe(false);
   });

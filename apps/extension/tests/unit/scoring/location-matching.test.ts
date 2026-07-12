@@ -341,6 +341,39 @@ describe('matchLocation', () => {
     it('does NOT match random cities', () => {
       expect(matchLocation('Nice', 'Lille')).toBe('none');
     });
+
+    // Regression: bare 'Loire' alias on Saint-Étienne collided with the
+    // 'Pays de la Loire' token, falsely matching Nantes to Saint-Étienne.
+    it('does NOT match Nantes (Pays de la Loire) with Saint-Étienne', () => {
+      expect(matchLocation('Nantes, Pays de la Loire', 'Saint-Étienne')).toBe('none');
+    });
+
+    // Regression: bare 'Bretagne' alias on Rennes collided with Brest, which
+    // is also in Bretagne but a distinct city.
+    it('does NOT match Brest (Bretagne) with Rennes', () => {
+      expect(matchLocation('Brest, Bretagne', 'Rennes')).toBe('none');
+    });
+
+    // Regression: department code '17' (Charente-Maritime / La Rochelle)
+    // collided with the Paris arrondissement number, so 'Paris 17' matched La
+    // Rochelle as a synonym.
+    it('does NOT match Paris 17 (arrondissement) with La Rochelle', () => {
+      expect(matchLocation('Paris 17', 'La Rochelle')).toBe('none');
+    });
+  });
+
+  describe('review follow-up: aliases restored and aligned', () => {
+    // Singular 'Bouche-du-Rhône' alias was present in the old hardcoded table
+    // but missing from the catalog; restored alongside the plural form.
+    it('matches Marseille with singular Bouche-du-Rhône', () => {
+      expect(matchLocation('Marseille', 'Bouche-du-Rhône')).toBe('synonym');
+    });
+
+    // Apostrophe-bearing aliases must normalize the same way the scorer's
+    // normalizeLight does, so the derived cache key lines up byte-for-byte.
+    it("matches Dijon with Côte-d'Or (apostrophe alias)", () => {
+      expect(matchLocation('Dijon', "Côte-d'Or")).toBe('synonym');
+    });
   });
 
   describe('null and edge case handling', () => {

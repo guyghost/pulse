@@ -13,9 +13,15 @@ import { scoreMission } from '$lib/core/scoring/relevance';
 import { buildScoreBreakdown } from '$lib/core/scoring/final-score';
 import type { CanonicalCandidateProfileDraft } from '$lib/core/profile-extractors/types';
 import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extractors/merge-candidate-profile';
+import { countNewlyAddedExperiences } from '$lib/core/cv/experience-helpers';
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
+import { resolvePremiumFeatureFlag, shouldPremiumGate } from '$lib/core/features/flags';
+import {
+  DEV_PREMIUM_FEATURE_STORAGE_KEY,
+  DEV_PREMIUM_ENABLED_STORAGE_KEY,
+} from '$lib/state/features.svelte';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
@@ -113,6 +119,7 @@ const mockLinkedInProfile: CanonicalCandidateProfileDraft = {
     {
       title: 'Lead Frontend',
       company: 'Acme Corp',
+      employmentType: 'Freelance',
       location: 'Paris',
       startDate: '2022-01',
       endDate: null,
@@ -122,6 +129,20 @@ const mockLinkedInProfile: CanonicalCandidateProfileDraft = {
       source: 'linkedin',
       sourceExternalId: null,
       positionIndex: 0,
+    },
+    {
+      title: 'Product Engineer',
+      company: 'Studio Kanso',
+      employmentType: 'CDI',
+      location: 'Lyon',
+      startDate: '2019-09',
+      endDate: '2021-12',
+      isCurrent: false,
+      description: 'Construction d’un design system pour les équipes produit.',
+      skills: ['TypeScript', 'Design Systems'],
+      source: 'linkedin',
+      sourceExternalId: null,
+      positionIndex: 1,
     },
   ],
   skills: [
@@ -265,9 +286,11 @@ const storage: Record<string, unknown> = {
     DEFAULT_CONNECTED_ALERT_PREFERENCES
   ),
   newMissionCount: 0,
+  deepLinkIntent: null as import('$lib/core/deep-link/deep-link-intent').DeepLinkIntent | null,
   feedSortBy: 'score',
   profile: readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile),
-  premium_enabled: true,
+  premium_enabled: readDevStorage<boolean>(DEV_PREMIUM_ENABLED_STORAGE_KEY, true),
+  premium_feature_enabled: readDevStorage<boolean>(DEV_PREMIUM_FEATURE_STORAGE_KEY, false),
   first_scan_done: readDevStorage<boolean>(DEV_FIRST_SCAN_DONE_KEY, true),
   profile_banner_dismissed: false,
   onboarding_completed: readDevStorage<boolean>(DEV_ONBOARDING_COMPLETED_KEY, true),
@@ -367,6 +390,7 @@ function createChromeStubs() {
             };
           case 'SET_PREMIUM':
             storage.premium_enabled = message.payload === true;
+            writeDevStorage(DEV_PREMIUM_ENABLED_STORAGE_KEY, message.payload === true);
             return { type: 'PREMIUM_SET', payload: { saved: true } };
           case 'VERIFY_PROFILE_PAGE': {
             const p = message.payload as Record<string, unknown> | undefined;
@@ -392,13 +416,17 @@ function createChromeStubs() {
           case 'SYNC_LINKEDIN_PROFILE_IMPORT': {
             const draft = (message.payload as { profile: CanonicalCandidateProfileDraft }).profile;
             const current = readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile);
-            const merged = mergeCandidateProfileIntoUserProfile(current, draft);
+            const addedCount = countNewlyAddedExperiences(
+              current?.experiences ?? [],
+              draft.experiences
+            );
+            const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
             writeDevStorage(DEV_PROFILE_STORAGE_KEY, merged);
             storage.profile = merged;
             emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: merged });
             return {
               type: 'LINKEDIN_PROFILE_IMPORTED',
-              payload: { imported: true, profile: draft },
+              payload: { imported: true, profile: draft, addedCount },
             };
           }
           case 'GET_FEED_MISSIONS':
@@ -462,8 +490,7 @@ function createChromeStubs() {
           case 'GET_TJM_ANALYSIS': {
             const history = storage.tjm_history as TJMHistory | undefined;
             const payload = message.payload as
-              | { profileStacks?: string[]; region?: TJMRegion }
-              | undefined;
+              { profileStacks?: string[]; region?: TJMRegion } | undefined;
             const normalizedStacks =
               payload?.profileStacks && payload.profileStacks.length > 0
                 ? new Set(payload.profileStacks.map((stack) => stack.toLowerCase().trim()))
@@ -494,6 +521,18 @@ function createChromeStubs() {
           case 'RESET_NEW_MISSION_COUNT':
             storage.newMissionCount = 0;
             return { type: 'NEW_MISSION_COUNT_RESET', payload: { reset: true } };
+          case 'CONSUME_DEEP_LINK_INTENT': {
+            // Atomic read + clear, mirroring the SW handler.
+            const intent = storage.deepLinkIntent;
+            storage.deepLinkIntent = null;
+            return { type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent } };
+          }
+          case 'NOTIFICATION_CLICKED':
+            // SW → live panel broadcast (thread A): fan out to onMessage
+            // listeners so a dev-mode panel can re-consume the intent, mirroring
+            // real Chrome's runtime message delivery.
+            emitRuntimeMessage(message);
+            return null;
           case 'GET_PERSISTED_CONNECTOR_STATUSES':
             return { type: 'PERSISTED_CONNECTOR_STATUSES_RESULT', payload: [] };
           case 'CLEAR_EXTENSION_BADGE':
@@ -624,8 +663,17 @@ function createChromeStubs() {
           }
           case 'GENERATE_ASSET': {
             // Dev mode returns a realistic mock asset so the kit-generation UI
-            // flow is exercisable without a service worker. premium_enabled is
-            // true in dev storage, so the production premium gate is bypassed.
+            // flow is exercisable without a service worker. The premium gate
+            // is honoured so the "active + free" DevPanel scenario produces
+            // PREMIUM_REQUIRED just like production. When dormant (flag off),
+            // generation is always allowed. See models/premium-feature-flag.model.md.
+            const featureActive = resolvePremiumFeatureFlag(storage.premium_feature_enabled);
+            if (shouldPremiumGate(featureActive, storage.premium_enabled === true)) {
+              return {
+                type: 'GENERATION_RESULT',
+                payload: { asset: null, error: 'PREMIUM_REQUIRED' },
+              };
+            }
             const { missionId: genMissionId, generationType: genType } = (message.payload ??
               {}) as {
               missionId: string;
@@ -733,6 +781,13 @@ function createChromeStubs() {
     },
     cookies: {
       getAll: async () => [{ name: 'session', value: 'mock-session' }],
+    },
+    permissions: {
+      // Dev stub: pretend the optional LinkedIn host permission is always
+      // granted so the side-panel permission gate (ensureLinkedInHostPermission)
+      // passes in dev mode and e2e without a real Chrome prompt.
+      contains: async () => true,
+      request: async () => true,
     },
     sidePanel: {
       setPanelBehavior: () => {},

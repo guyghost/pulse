@@ -23,14 +23,13 @@ describe('dev chrome stub — SAVE_PROFILE propagation', () => {
   // Distinctive stack so a profile-influenced rescore is observable.
   const savedProfile: UserProfile = {
     firstName: 'Rustacean',
-    stack: ['rust', 'wasm'],
+    keywords: ['rust', 'wasm'],
     tjmMin: 550,
     tjmMax: 950,
     location: 'Paris',
     remote: 'full',
     seniority: 'senior',
     jobTitle: 'Systems Engineer',
-    searchKeywords: [],
   };
 
   type DevMessage = { type: string; payload?: unknown };

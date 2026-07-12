@@ -95,18 +95,19 @@ type DataMigration = (deps: DataMigrationDeps) => Promise<void>;
                           ▼                                                  ▼
                   struct < DB_VERSION                              struct = DB_VERSION
                   AND/OR data < APP_DATA_VERSION                    AND data = APP_DATA_VERSION
+                  (migration applied → verify)                      (no migration → skip verify)
                           │                                                  │
                           ▼                                                  ▼
                 ┌─────────────────┐                                   ┌───────────┐
-                │ migratingStruct │ throws ──► corruptRepair           │ verifying │
-                └────────┬────────┘                                   └─────┬─────┘
-                         │ success                                          │
-              ┌──────────┴───────────┐                              invariants OK
-              ▼                      ▼                                    │
-   data pending? yes         data pending? no                             ▼
-        ┌───────────────┐         ┌──────────┐                       ┌─────────┐
-        │ migratingData │ throws  │ verifying│◄──────────────────────│  idle   │
-        └───────┬───────┘─►failed └────┬─────┘                        └─────────┘
+                │ migratingStruct │ throws ──► corruptRepair           │   idle    │
+                └────────┬────────┘                                   └───────────┘
+                         │ success
+              ┌──────────┴───────────┐
+              ▼                      ▼
+   data pending? yes         data pending? no
+        ┌───────────────┐         ┌──────────┐
+        │ migratingData │ throws  │ verifying│
+        └───────┬───────┘─►failed └────┬─────┘
                 │ success              │
                 └──────────────────────┘
 
@@ -186,8 +187,9 @@ Notes:
   `QuotaExceededError` on any write fails the migration → `failed` (no
   destruction — the previous transactions already committed are recoverable
   on next run thanks to idempotency).
-- **Enter `verifying`**: validate the `missions` and `profile` stores through
-  their parse functions; count rejects. Three outcomes:
+- **Enter `verifying`** (only when `structuralPending || dataPending`):
+  validate the `missions` and `profile` stores through their parse functions;
+  count rejects. Three outcomes:
   - 0 rejects → `idle`.
   - `0 < rejects ≤ 10%` → `idle` with a dev warning; rejects are left in place
     (the runtime readers already filter them).
@@ -259,6 +261,13 @@ Notes:
     `getMissionById`) increment `rejectedCount` on each `parseMission → null`.
     The count is surfaced in the dev panel and triggers a one-time toast when
     it crosses a threshold (configurable, default 50).
+11. **Verify is migration-gated.** `verifyStores` runs only when a structural
+    or data migration was applied this session (`structuralPending ||
+dataPending`). On steady-state cold starts — both versions current — the
+    full-store validation scan is skipped to keep startup off the critical
+    path; corruption is still detected lazily by the runtime parse-on-read
+    guard (`trackRuntimeReject`) and surfaced via `rejectedCount`. The full
+    quarantine path still runs whenever a migration occurred.
 
 ## Triggers
 

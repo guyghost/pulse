@@ -38,8 +38,12 @@ export const scoreMission = (
   const weights = profile.scoringWeights ?? DEFAULT_SCORING_WEIGHTS;
   const normalizedWeights = normalizeWeights(weights);
 
-  // Raw match percentages (0-100) — directly gradable
-  const stackMatch = rawStackScore(mission.stack, profile.stack);
+  // Raw match percentages (0-100) — directly gradable.
+  // NOTE: mission.stack is the platform-parsed tech stack; profile.keywords is
+  // the unified keyword list (post-unification). The dimension name "stack" in
+  // ScoringWeights/breakdown is unchanged — it names the scoring axis, not the
+  // profile field. See models/keywords-unification.model.md.
+  const stackMatch = rawStackScore(mission.stack, profile.keywords);
   const locationMatch = rawLocationScore(mission.location, profile.location);
   const tjmMatch = rawTjmScore(mission.tjm, profile.tjmMin, profile.tjmMax);
   const remoteMatch = rawRemoteScore(mission.remote, profile.remote);
@@ -97,18 +101,39 @@ const normalizeWeights = (weights: ScoringWeights): ScoringWeights => {
 
 /**
  * Raw stack match percentage (0-100).
- * Returns % of mission stack that matches the profile.
+ * Returns % of mission stack that matches the profile keywords.
+ *
+ * Scoring-neutral merge invariant: the denominator is `missionStack.length`,
+ * NOT `profileKeywords.length`. Adding domain keywords (e.g. "SaaS", "fintech")
+ * that never appear in a mission's parsed stack does not change any mission's
+ * score — they are simply never matched. This is what makes it safe to merge
+ * the former `stack` and `searchKeywords` into a single `keywords` list.
  */
-const rawStackScore = (missionStack: string[], profileStack: string[]): number => {
-  if (profileStack.length === 0) {
+const rawStackScore = (missionStack: string[], profileKeywords: string[]): number => {
+  if (profileKeywords.length === 0) {
     return 100;
   }
   if (missionStack.length === 0) {
     return 0;
   }
-  const normalizedProfile = profileStack.filter(Boolean).map((s) => s.toLowerCase());
-  const matches = missionStack.filter((s) => s && normalizedProfile.includes(s.toLowerCase()));
-  return (matches.length / missionStack.length) * 100;
+  // Build the profile keywords once as a Set for O(1) membership checks. This
+  // runs once per mission during scoring; the previous Array.includes made it
+  // O(m) per mission-stack entry. Output is identical: each truthy mission-stack
+  // entry that matches a (lowercased) profile keyword counts once toward the
+  // numerator, and the denominator stays the full missionStack.length.
+  const profileSet = new Set<string>();
+  for (const entry of profileKeywords) {
+    if (entry) {
+      profileSet.add(entry.toLowerCase());
+    }
+  }
+  let matchCount = 0;
+  for (const entry of missionStack) {
+    if (entry && profileSet.has(entry.toLowerCase())) {
+      matchCount++;
+    }
+  }
+  return (matchCount / missionStack.length) * 100;
 };
 
 /**

@@ -38,6 +38,8 @@ import {
   toggleHidden,
   filterHidden,
   filterFavoritesOnly,
+  consumeDeepLinkIntent,
+  subscribeToNotificationClicked,
 } from '$lib/shell/facades/feed-data.facade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
@@ -57,6 +59,12 @@ import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
 import { subscribeMessages } from '$lib/shell/messaging/bridge';
 import { sortMissions } from '$lib/core/scoring/sort-missions';
 import { rankMissions } from '$lib/core/scoring/rank-missions';
+import type { DeepLinkIntent } from '$lib/core/deep-link/deep-link-intent';
+import {
+  selectFocusMissions,
+  hasFocusMatch,
+  formatFocusSince,
+} from '$lib/core/deep-link/deep-link-intent';
 
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
@@ -131,8 +139,7 @@ function toProfileImpactInput(profile: UserProfile | null): ProfileImpactInput {
     remote: profile?.remote ?? 'any',
     tjmMin: typeof profile?.tjmMin === 'number' ? profile.tjmMin : 0,
     tjmMax: typeof profile?.tjmMax === 'number' ? profile.tjmMax : 0,
-    stack: Array.isArray(profile?.stack) ? profile.stack : [],
-    searchKeywords: Array.isArray(profile?.searchKeywords) ? profile.searchKeywords : [],
+    keywords: Array.isArray(profile?.keywords) ? profile.keywords : [],
   };
 }
 
@@ -227,6 +234,16 @@ export function createFeedPageState(
   let pendingSeenIds = new Set<string>();
   let seenFlushTimer: ReturnType<typeof setTimeout> | null = null;
 
+  // ============================================================
+  // Focus lens — driven by the notification deep-link intent.
+  // See src/models/notification-deep-link.model.md (Focus machine).
+  // focusMode is the ONLY driver of displayMissions override; the LLM never
+  // decides a transition here — the intent is consumed atomically once on
+  // mount and dismissed explicitly by the user (or implicitly on empty).
+  // ============================================================
+  let focusMode = $state<'idle' | 'focused' | 'dismissed'>('idle');
+  let focusIntent = $state<DeepLinkIntent | null>(null);
+
   // Cleanup functions
   let cleanupFns: Array<() => void> = [];
 
@@ -287,6 +304,11 @@ export function createFeedPageState(
   // Derived — from feed store
   // ============================================================
   const missions = $derived(feedStore.filteredMissions);
+  // Raw (unfiltered) missions for the focus lens: the deep-link intent points
+  // at specific mission IDs that must be selectable even when a search query
+  // or source filter is active, otherwise STALE_GUARD would auto-dismiss the
+  // lens for missions that are merely filtered out of view.
+  const allMissions = $derived(feedStore.missions);
   const isLoading = $derived(feedStore.state === 'loading');
   const error = $derived(feedStore.error);
   const searchQuery = $derived(feedStore.searchQuery);
@@ -328,7 +350,10 @@ export function createFeedPageState(
     return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
   });
 
-  const sourceCountBaseMissions = $derived.by(() => {
+  // Shared base filter (enabled connectors + favorites + hidden) reused by both
+  // sourceCountBaseMissions and dashboardScopeMissions so this prefix runs once.
+  // Output-equivalent to the previous inline prefix in both deriveds.
+  const baseFilteredMissions = $derived.by(() => {
     let result = missions ?? [];
     if (controller.enabledConnectorIds.size > 0) {
       result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
@@ -339,6 +364,11 @@ export function createFeedPageState(
     if (!showHidden) {
       result = filterHidden(result, hidden);
     }
+    return result;
+  });
+
+  const sourceCountBaseMissions = $derived.by(() => {
+    let result = baseFilteredMissions;
 
     if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
       const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
@@ -370,16 +400,7 @@ export function createFeedPageState(
   });
 
   const dashboardScopeMissions = $derived.by(() => {
-    let result = missions ?? [];
-    if (controller.enabledConnectorIds.size > 0) {
-      result = result.filter((m) => controller.enabledConnectorIds.has(m.source));
-    }
-    if (showFavoritesOnly) {
-      result = filterFavoritesOnly(result, favorites);
-    }
-    if (!showHidden) {
-      result = filterHidden(result, hidden);
-    }
+    let result = baseFilteredMissions;
     if (selectedSource !== null) {
       result = result.filter((m) => m.source === selectedSource);
     }
@@ -537,6 +558,19 @@ export function createFeedPageState(
   const sourceMissionCounts = $derived(feedAggregates.sourceMissionCounts);
 
   const displayMissions = $derived.by(() => {
+    // Focus lens (F1, F2): when focused, the feed shows ONLY the missions from
+    // the consumed deep-link intent, regardless of seen/new/source filters.
+    // Focus is an explicit id allow-list applied last, so seen-marking (which
+    // powers the badge) doesn't defeat it. Empty match = no override (F-empty).
+    if (focusMode === 'focused' && focusIntent) {
+      const focused = selectFocusMissions(allMissions, focusIntent);
+      if (focused.length > 0) {
+        return sortBy === 'score'
+          ? rankMissions(focused, new Date())
+          : sortMissions(focused, sortBy);
+      }
+    }
+
     const scopedMissions =
       selectedSource === null
         ? sourceCountBaseMissions
@@ -551,6 +585,14 @@ export function createFeedPageState(
 
     return sortMissions(scopedMissions, sortBy);
   });
+
+  // Focus-lens derived views for the banner UI.
+  const focusMissions = $derived(
+    focusMode === 'focused' && focusIntent ? selectFocusMissions(allMissions, focusIntent) : []
+  );
+  const focusSinceLabel = $derived(
+    focusIntent ? formatFocusSince(focusIntent.triggeredAt, Date.now()) : ''
+  );
 
   const comparisonMissions = $derived.by(() => {
     if (comparisonMissionIds.length < 2) {
@@ -867,10 +909,76 @@ export function createFeedPageState(
   }
 
   // ============================================================
+  // Focus lens — notification deep-link (see Focus machine in model).
+  // applyFocusIntent enters 'focused' optimistically. The empty-match guard
+  // (F3: empty match = noop) is deferred to the effect in setup(), which runs
+  // once missions have loaded reactively — this avoids a race where the intent
+  // is consumed before the async mission load completes.
+  // dismissFocus: user-initiated exit → 'dismissed'. The intent is already
+  // consumed atomically at the SW level, so we only clear local state.
+  // ============================================================
+  function applyFocusIntent(intent: DeepLinkIntent): void {
+    focusIntent = intent;
+    focusMode = 'focused';
+  }
+
+  function dismissFocus(): void {
+    focusMode = 'dismissed';
+    focusIntent = null;
+  }
+
+  // ============================================================
   // Setup — run effects on first call
   // ============================================================
 
   function setup(): void {
+    // Consume the deep-link focus intent once on mount (single-consume, I1).
+    // The SW atomically reads+clears session storage, so only this first panel
+    // open lands on the notified missions. A failure to consume is non-fatal:
+    // the panel simply opens on the normal feed.
+    $effect(() => {
+      consumeDeepLinkIntent()
+        .then((intent) => {
+          if (intent) {
+            applyFocusIntent(intent);
+          }
+        })
+        .catch(() => {});
+    });
+
+    // Thread A: when a notification is clicked while the panel is already open,
+    // chrome.sidePanel.open() is a no-op so the mount effect above does not
+    // re-fire. The SW broadcasts NOTIFICATION_CLICKED so we re-consume here.
+    // Safe with the session-storage mutex: if the mount effect already consumed
+    // the intent, this consume returns null and is a no-op.
+    $effect(() => {
+      const unsubscribe = subscribeToNotificationClicked(() => {
+        consumeDeepLinkIntent()
+          .then((intent) => {
+            if (intent) {
+              applyFocusIntent(intent);
+            }
+          })
+          .catch(() => {});
+      });
+      return unsubscribe;
+    });
+
+    // F3 (empty match = noop): once missions are loaded, if none match the
+    // focus intent, auto-exit focus. Deferred so the intent survives the async
+    // mission load that races with consumeDeepLinkIntent on mount.
+    $effect(() => {
+      if (
+        focusMode === 'focused' &&
+        focusIntent &&
+        allMissions.length > 0 &&
+        !hasFocusMatch(allMissions, focusIntent)
+      ) {
+        focusMode = 'idle';
+        focusIntent = null;
+      }
+    });
+
     // Load seen IDs
     $effect(() => {
       getSeenIds()
@@ -1247,6 +1355,17 @@ export function createFeedPageState(
       return comparisonMissions;
     },
 
+    // Focus lens (notification deep-link)
+    get focusMode() {
+      return focusMode;
+    },
+    get focusMissions() {
+      return focusMissions;
+    },
+    get focusSinceLabel() {
+      return focusSinceLabel;
+    },
+
     // Setters for non-bind cases
     setShowFilters(v: boolean) {
       showFilters = v;
@@ -1273,6 +1392,8 @@ export function createFeedPageState(
     toggleCompare,
     clearComparison,
     clearAllFilters,
+    applyFocusIntent,
+    dismissFocus,
 
     // Lifecycle
     setup,

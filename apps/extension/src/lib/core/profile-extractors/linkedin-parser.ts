@@ -43,6 +43,7 @@ function rawExperiences(value: unknown): RawExperience[] {
       {
         title: optionalString(item.title),
         company: optionalString(item.company),
+        employmentType: optionalString(item.employmentType),
         location: optionalString(item.location),
         dateRange: optionalString(item.dateRange),
         description: optionalString(item.description),

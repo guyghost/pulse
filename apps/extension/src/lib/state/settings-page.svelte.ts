@@ -102,9 +102,7 @@ export class SettingsPageController {
   seniority = $state<UserProfile['seniority']>('senior');
   tjmMin = $state(0);
   tjmMax = $state(0);
-  profileStack = $state<string[]>([]);
-  stackInput = $state('');
-  searchKeywords = $state<string[]>([]);
+  profileKeywords = $state<string[]>([]);
   keywordInput = $state('');
   editingProfile = $state(false);
   profileSaved = $state(false);
@@ -207,8 +205,7 @@ export class SettingsPageController {
     this.seniority = profile.seniority ?? 'senior';
     this.tjmMin = profile.tjmMin ?? 0;
     this.tjmMax = profile.tjmMax ?? 0;
-    this.profileStack = profile.stack ?? [];
-    this.searchKeywords = profile.searchKeywords ?? [];
+    this.profileKeywords = profile.keywords ?? [];
     this.profileActor.send({ type: 'PROFILE_UPDATED', profile });
   }
 
@@ -353,32 +350,18 @@ export class SettingsPageController {
     this.editingProfile = !this.editingProfile;
   }
 
-  addStack(): void {
-    const trimmed = normalizeTextInput(this.stackInput);
-    if (!trimmed || this.profileStack.includes(trimmed)) {
-      return;
-    }
-
-    this.profileStack = [...this.profileStack, trimmed];
-    this.stackInput = '';
-  }
-
-  removeStack(item: string): void {
-    this.profileStack = this.profileStack.filter((s) => s !== item);
-  }
-
   addKeyword(): void {
     const trimmed = normalizeTextInput(this.keywordInput);
-    if (!trimmed || this.searchKeywords.includes(trimmed)) {
+    if (!trimmed || this.profileKeywords.includes(trimmed)) {
       return;
     }
 
-    this.searchKeywords = [...this.searchKeywords, trimmed];
+    this.profileKeywords = [...this.profileKeywords, trimmed];
     this.keywordInput = '';
   }
 
   removeKeyword(item: string): void {
-    this.searchKeywords = this.searchKeywords.filter((keyword) => keyword !== item);
+    this.profileKeywords = this.profileKeywords.filter((keyword) => keyword !== item);
   }
 
   async saveProfile(): Promise<void> {
@@ -387,8 +370,7 @@ export class SettingsPageController {
 
     try {
       const current = await getProfile();
-      const nextStack = appendUniqueNormalized(this.profileStack, this.stackInput);
-      const nextSearchKeywords = appendUniqueNormalized(this.searchKeywords, this.keywordInput);
+      const nextKeywords = appendUniqueNormalized(this.profileKeywords, this.keywordInput);
       const nextTjmMin = normalizeDailyRate(this.tjmMin);
       const nextTjmMax = normalizeDailyRate(this.tjmMax);
 
@@ -403,11 +385,12 @@ export class SettingsPageController {
         location: normalizeTextInput(this.profileLocation),
         tjmMin: nextTjmMin,
         tjmMax: nextTjmMax,
-        stack: nextStack,
+        keywords: nextKeywords,
         remote: this.profileRemote,
         seniority: this.seniority,
         scoringWeights: current?.scoringWeights,
-        searchKeywords: nextSearchKeywords,
+        experiences: current?.experiences,
+        availability: current?.availability,
       });
 
       if (!normalized.ok || !normalized.profile) {
@@ -423,9 +406,7 @@ export class SettingsPageController {
       this.profileLocation = nextProfile.location;
       this.tjmMin = nextProfile.tjmMin;
       this.tjmMax = nextProfile.tjmMax;
-      this.profileStack = nextProfile.stack;
-      this.stackInput = '';
-      this.searchKeywords = nextProfile.searchKeywords;
+      this.profileKeywords = nextProfile.keywords;
       this.keywordInput = '';
       this.editingProfile = false;
       this.profileSaved = true;

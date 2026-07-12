@@ -8,6 +8,7 @@
   import DangerZone from '../organisms/DangerZone.svelte';
   import type { Mission } from '$lib/core/types/mission';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
+  import { features } from '$lib/state/features.svelte';
   import type { ExportFormat } from '$lib/core/export/mission-export';
   import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import OperationalStoryCard, {
@@ -221,7 +222,7 @@
   const profileReadyForBackup = $derived(
     settings.firstName.trim().length > 0 ||
       settings.jobTitle.trim().length > 0 ||
-      settings.profileStack.length > 0
+      settings.profileKeywords.length > 0
   );
 
   const exportStory = $derived.by(() => {
@@ -623,7 +624,7 @@
 
       <AlertBuilderCard
         preferences={alertPreferences}
-        availableStacks={settings.profileStack}
+        availableStacks={settings.profileKeywords}
         previewMissions={alertPreviewMissions}
         seenMissionIds={alertPreviewSeenIds}
         history={alertHistory}
@@ -692,7 +693,11 @@
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
             <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
             <p class="mt-1 text-xs font-medium text-text-primary">
-              {settings.premiumEnabled ? 'Premium local actif' : 'Gratuit local'}
+              {features.premiumFeatureActive
+                ? settings.premiumEnabled
+                  ? 'Premium local actif'
+                  : 'Gratuit local'
+                : 'Premium désactivé'}
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">

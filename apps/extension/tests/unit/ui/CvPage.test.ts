@@ -4,18 +4,13 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { mount, tick } from 'svelte';
 import { installChromeStubs } from '../../../src/dev/chrome-stubs';
-import {
-  initToastService,
-  getToastActor,
-  stopToastService,
-} from '../../../src/lib/shell/notifications/toast-service';
 import CvPage from '../../../src/ui/pages/CvPage.svelte';
 
 /**
  * Regression for the CV clipboard bug: navigator.clipboard.writeText can reject
- * (no permission, non-secure context, etc.). Previously the rejection was
- * unhandled and no feedback was given. After the fix, an error toast is shown
- * and pushedPlatformIds is not flipped.
+ * (no permission, non-secure context, etc.). The sync flow must surface the
+ * failure in the panel and mark every platform as errored — no platform should
+ * be marked as synced.
  */
 describe('CvPage clipboard resilience', () => {
   let originalClipboardDescriptor: PropertyDescriptor | undefined;
@@ -24,7 +19,6 @@ describe('CvPage clipboard resilience', () => {
     const globalRecord = globalThis as unknown as Record<string, unknown>;
     delete globalRecord.chrome;
     installChromeStubs();
-    initToastService();
 
     originalClipboardDescriptor = Object.getOwnPropertyDescriptor(navigator, 'clipboard');
     Object.defineProperty(navigator, 'clipboard', {
@@ -38,7 +32,6 @@ describe('CvPage clipboard resilience', () => {
   });
 
   afterEach(() => {
-    stopToastService();
     if (originalClipboardDescriptor) {
       Object.defineProperty(navigator, 'clipboard', originalClipboardDescriptor);
     }
@@ -48,42 +41,45 @@ describe('CvPage clipboard resilience', () => {
     const target = document.createElement('div');
     document.body.appendChild(target);
     mount(CvPage, { target });
-    // Resolve the on-mount getProfile() IIFE.
+    // Resolve the on-mount profile load.
     await tick();
     await new Promise((resolve) => setTimeout(resolve, 0));
     await tick();
     return target;
   }
 
-  it('shows an error toast when copyPayload clipboard write fails', async () => {
-    const target = await mountAndLoad();
-
-    const copyBtn = [...target.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('Copier')
-    );
-    expect(copyBtn).toBeTruthy();
-    copyBtn!.click();
+  async function flush() {
     await tick();
     await new Promise((resolve) => setTimeout(resolve, 0));
     await tick();
+  }
 
-    const actor = getToastActor();
-    const errorToasts = (actor?.toasts ?? []).filter((t) => t.toastType === 'error');
-    expect(errorToasts.length).toBeGreaterThan(0);
+  it('surfaces a sync error in the panel when clipboard write fails', async () => {
+    const target = await mountAndLoad();
+
+    const syncBtn = [...target.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Synchroniser')
+    );
+    expect(syncBtn).toBeTruthy();
+    syncBtn!.click();
+    await flush();
+
+    // The global clipboard probe fails → every platform errored → error headline.
+    expect(target.textContent).toContain('refusé');
   });
 
-  it('does not mark a platform as pushed when clipboard fails', async () => {
+  it('does not mark any platform as synced when clipboard fails', async () => {
     const target = await mountAndLoad();
 
-    const pushBtn = [...target.querySelectorAll('button')].find((b) =>
-      b.textContent?.includes('Copier et ouvrir')
+    const syncBtn = [...target.querySelectorAll('button')].find((b) =>
+      b.textContent?.includes('Synchroniser')
     );
-    expect(pushBtn).toBeTruthy();
-    pushBtn!.click();
-    await tick();
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    await tick();
+    expect(syncBtn).toBeTruthy();
+    syncBtn!.click();
+    await flush();
 
-    expect(target.textContent).not.toContain('Prêt');
+    expect(target.textContent).not.toContain('Synchronisé');
+    // Each platform should surface the failure instead.
+    expect(target.textContent).toContain('Échec');
   });
 });

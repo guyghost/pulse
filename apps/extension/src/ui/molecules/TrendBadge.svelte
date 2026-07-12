@@ -9,18 +9,18 @@
       ? {
           icon: 'trending-up' as const,
           label: 'Hausse',
-          class: 'text-blueprint-blue bg-blueprint-blue/10',
+          class: 'text-text-primary bg-blueprint-blue/15',
         }
       : trend === 'down'
         ? {
             icon: 'trending-down' as const,
             label: 'Baisse',
-            class: 'text-status-red bg-status-red/10',
+            class: 'text-text-primary bg-status-red/15',
           }
         : {
             icon: 'minus' as const,
             label: 'Stable',
-            class: 'text-blueprint-blue bg-blueprint-blue/10',
+            class: 'text-text-primary bg-text-muted/15',
           }
   );
 </script>

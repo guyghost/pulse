@@ -155,7 +155,7 @@ jobs:
 
       - name: Create GitHub Release
         if: ${{ !inputs.dry_run }}
-        uses: softprops/action-gh-release@v2
+        uses: softprops/action-gh-release@v3
         with:
           name: MissionPulse v${{ steps.version.outputs.version }}
           body: |
@@ -179,33 +179,50 @@ jobs:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Upload extension ZIP artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: missionpulse-zip-${{ steps.version.outputs.version }}
           path: apps/extension/missionpulse-${{ steps.version.outputs.version }}.zip
           retention-days: 30
 
+  check-cws-secrets:
+    name: Check CWS secrets
+    runs-on: ubuntu-latest
+    outputs:
+      configured: ${{ steps.check.outputs.configured }}
+    steps:
+      - name: Check Chrome Web Store secrets
+        id: check
+        env:
+          CHROME_EXTENSION_ID: ${{ secrets.CHROME_EXTENSION_ID }}
+        run: |
+          if [ -n "$CHROME_EXTENSION_ID" ]; then
+            echo "configured=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "configured=false" >> "$GITHUB_OUTPUT"
+          fi
+
   publish-to-chrome-store:
     name: Publish to Chrome Web Store
     runs-on: ubuntu-latest
     timeout-minutes: 10
-    needs: build-and-release
+    needs: [build-and-release, check-cws-secrets]
     if: >-
       ${{
         !contains(needs.build-and-release.outputs.version, '-') &&
         !inputs.dry_run &&
-        secrets.CHROME_EXTENSION_ID != ''
+        needs.check-cws-secrets.outputs.configured == 'true'
       }}
 
     steps:
       - name: Download extension ZIP artifact
-        uses: actions/download-artifact@v4
+        uses: actions/download-artifact@v8
         with:
           name: missionpulse-zip-${{ needs.build-and-release.outputs.version }}
           path: ./
 
       - name: Publish to Chrome Web Store
-        uses: mnao305/chrome-extension-upload@v5.0.0
+        uses: mnao305/chrome-extension-upload@v6.0.0
         with:
           file-path: missionpulse-${{ needs.build-and-release.outputs.version }}.zip
           extension-id: ${{ secrets.CHROME_EXTENSION_ID }}

@@ -14,6 +14,8 @@ const getSeenIds = vi.fn();
 const saveSeenIds = vi.fn();
 const setNewMissionCount = vi.fn();
 const resetNewMissionCount = vi.fn();
+const setDeepLinkIntent = vi.fn();
+const consumeDeepLinkIntent = vi.fn();
 const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
 const getProfile = vi.fn();
@@ -82,14 +84,13 @@ const makeMission = (overrides: Partial<Mission> = {}): Mission => ({
 
 const profile: UserProfile = {
   firstName: 'Guy',
-  stack: ['Svelte', 'TypeScript'],
+  keywords: ['Svelte', 'TypeScript', 'mission svelte'],
   tjmMin: 650,
   tjmMax: 900,
   location: 'Paris',
   remote: 'hybrid',
   seniority: 'senior',
   jobTitle: 'Lead Frontend',
-  searchKeywords: ['mission svelte'],
 };
 
 const makeTracking = (overrides: Partial<MissionTracking> = {}): MissionTracking => ({
@@ -237,6 +238,8 @@ vi.mock('../../../src/lib/shell/storage/favorites', () => ({
 vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
   setNewMissionCount,
   resetNewMissionCount,
+  setDeepLinkIntent,
+  consumeDeepLinkIntent,
 }));
 
 vi.mock('../../../src/lib/shell/storage/tracking', () => ({
@@ -344,6 +347,8 @@ describe('background auto-scan notifications', () => {
     });
     getMissions.mockResolvedValue([makeMission()]);
     resetNewMissionCount.mockResolvedValue(undefined);
+    setDeepLinkIntent.mockResolvedValue(undefined);
+    consumeDeepLinkIntent.mockResolvedValue(null);
     getConnectorStatuses.mockResolvedValue([]);
     getFavorites.mockResolvedValue({});
     saveFavorites.mockResolvedValue(undefined);
@@ -481,7 +486,22 @@ describe('background auto-scan notifications', () => {
     const draft = {
       title: 'Lead Frontend Svelte',
       summary: 'Test summary',
-      experiences: [],
+      experiences: [
+        {
+          title: 'Technical Lead',
+          company: 'ScaleOps',
+          employmentType: 'Freelance',
+          location: 'Paris',
+          startDate: '2024-01-01',
+          endDate: null,
+          isCurrent: true,
+          description: 'Architecture de la plateforme.',
+          skills: ['Svelte', 'TypeScript'],
+          source: 'linkedin' as const,
+          sourceExternalId: 'urn:li:position:1',
+          positionIndex: 0,
+        },
+      ],
       skills: [{ skill: 'React', source: 'linkedin' as const, confidence: 0.9 }],
       education: [],
       links: [],
@@ -503,7 +523,14 @@ describe('background auto-scan notifications', () => {
     expect(saveProfile).toHaveBeenCalledWith(
       expect.objectContaining({
         jobTitle: 'Lead Frontend Svelte',
-        stack: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
+        keywords: expect.arrayContaining(['Svelte', 'TypeScript', 'React']),
+        experiences: [
+          expect.objectContaining({
+            title: 'Technical Lead',
+            employmentType: 'Freelance',
+            source: 'linkedin',
+          }),
+        ],
       })
     );
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
@@ -512,7 +539,7 @@ describe('background auto-scan notifications', () => {
     });
     expect(sendResponse).toHaveBeenCalledWith({
       type: 'LINKEDIN_PROFILE_IMPORTED',
-      payload: { imported: true, profile: draft },
+      payload: { imported: true, profile: draft, addedCount: 1 },
     });
   });
 
@@ -551,9 +578,12 @@ describe('background auto-scan notifications', () => {
     });
   });
 
-  it('returns PREMIUM_REQUIRED for GENERATE_ASSET when premium is not enabled', async () => {
+  it('returns PREMIUM_REQUIRED for GENERATE_ASSET when premium feature is active and user is not premium', async () => {
     expect(messageListener).toBeTypeOf('function');
-    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ premium_enabled: false });
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
+      premium_enabled: false,
+      premium_feature_enabled: true,
+    });
     const sendResponse = vi.fn();
 
     const handled = messageListener?.(
@@ -574,9 +604,46 @@ describe('background auto-scan notifications', () => {
     });
   });
 
-  it('generates and persists an asset for GENERATE_ASSET when premium is enabled', async () => {
+  it('allows GENERATE_ASSET when premium feature is dormant even if user is not premium', async () => {
     expect(messageListener).toBeTypeOf('function');
-    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({ premium_enabled: true });
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
+      premium_enabled: false,
+      premium_feature_enabled: false,
+    });
+    getMissions.mockResolvedValueOnce([makeMission({ id: 'mission-1' })]);
+    getProfile.mockResolvedValueOnce(profile);
+    const fakeAsset = {
+      id: 'gen-pitch-mission-1-1000',
+      missionId: 'mission-1',
+      type: 'pitch' as const,
+      content: 'Generated pitch content.',
+      createdAt: 1000,
+      modelUsed: 'gemini-nano',
+    };
+    generateAsset.mockResolvedValueOnce(fakeAsset);
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.(
+      {
+        type: 'GENERATE_ASSET',
+        payload: { missionId: 'mission-1', generationType: 'pitch' },
+      },
+      {},
+      sendResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(handled).toBe(true);
+    expect(generateAsset).toHaveBeenCalled();
+    expect(saveGeneratedAsset).toHaveBeenCalledWith(fakeAsset);
+  });
+
+  it('generates and persists an asset for GENERATE_ASSET when premium feature is active and user is premium', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
+      premium_enabled: true,
+      premium_feature_enabled: true,
+    });
     getMissions.mockResolvedValueOnce([makeMission({ id: 'mission-1' })]);
     getProfile.mockResolvedValueOnce(profile);
     const fakeAsset = {

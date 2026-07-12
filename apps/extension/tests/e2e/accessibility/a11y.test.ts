@@ -41,13 +41,13 @@ test.describe('Accessibility', () => {
 
     await page.keyboard.type('Développeur');
     await page.keyboard.press('Tab');
-    await expect(page.locator('#ob-stack')).toBeFocused();
+    await expect(page.locator('#ob-keywords')).toBeFocused();
     await page.keyboard.type('React');
     await page.keyboard.press('Enter');
 
     // Aller jusqu'au bouton submit sans dépendre d'un nombre fixe de champs optionnels.
     const submitButton = page.getByRole('button', { name: 'Sauvegarder mon profil' });
-    for (let i = 0; i < 8; i++) {
+    for (let i = 0; i < 12; i++) {
       if (await submitButton.evaluate((el) => el === document.activeElement)) {
         break;
       }

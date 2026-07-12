@@ -17,6 +17,7 @@ import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
 import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
+import { resolvePremiumFeatureFlag, shouldPremiumGate } from '../lib/core/features/flags';
 import {
   DEFAULT_SETTINGS,
   getFeedSavedViews,
@@ -43,7 +44,11 @@ import {
   saveConnectedAlertPreferences,
 } from '../lib/shell/storage/connected-alert-preferences';
 import { getAlertHistory } from '../lib/shell/storage/alert-history';
-import { setNewMissionCount, resetNewMissionCount } from '../lib/shell/storage/session-storage';
+import {
+  setNewMissionCount,
+  resetNewMissionCount,
+  consumeDeepLinkIntent,
+} from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
   notifyHighScoreMissions,
@@ -87,6 +92,7 @@ import { validateMessage } from '../lib/shell/messaging/schemas';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
 import { mergeCandidateProfileIntoUserProfile } from '../lib/core/profile-extractors/merge-candidate-profile';
+import { countNewlyAddedExperiences } from '../lib/core/cv/experience-helpers';
 import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
 import { loadTJMHistory } from '../lib/shell/storage/tjm-history';
@@ -351,7 +357,9 @@ async function persistScanResults(
     await clearNewMissionBadge();
   }
 
-  // Send notifications for high-score missions if enabled
+  // Send notifications for high-score missions if enabled. notifyHighScoreMissions
+  // also persists the deep-link focus intent BEFORE the Chrome notification is
+  // shown, so a fast click can never race ahead of the intent write.
   if (newCount > 0) {
     const notification = await notifyHighScoreMissions(newMissions);
     if (notification.shown && notification.notifiedMissionIds.length > 0) {
@@ -667,6 +675,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    if (message.type === 'CONSUME_DEEP_LINK_INTENT') {
+      consumeDeepLinkIntent()
+        .then((intent) => {
+          sendResponse({ type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent } });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] CONSUME_DEEP_LINK_INTENT error:', err);
+          sendResponse({ type: 'DEEP_LINK_INTENT_CONSUMED', payload: { intent: null } });
+        });
+      return true;
+    }
+
     if (message.type === 'CLEAR_EXTENSION_BADGE') {
       chrome.action
         .setBadgeText({ text: '' })
@@ -871,14 +891,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         try {
           const draft = message.payload.profile;
           const current = await getProfile();
-          const merged = mergeCandidateProfileIntoUserProfile(current, draft);
+          const addedCount = countNewlyAddedExperiences(
+            current?.experiences ?? [],
+            draft.experiences
+          );
+          const merged = mergeCandidateProfileIntoUserProfile(current, draft, Date.now());
           await saveProfile(merged);
           chrome.runtime.sendMessage({ type: 'PROFILE_UPDATED', payload: merged }).catch(() => {
             // Side panel not open, ignore
           });
           sendResponse({
             type: 'LINKEDIN_PROFILE_IMPORTED',
-            payload: { imported: true, profile: draft },
+            payload: { imported: true, profile: draft, addedCount },
           });
         } catch (error) {
           sendResponse({
@@ -1171,10 +1195,18 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       // Kit generation is a premium-gated feature. The on-device Gemini Nano
       // generator (shell/ai/mission-generator) is loaded lazily so the service
       // worker does not pay the AI module cost until a generation is requested.
+      //
+      // The premium feature flag deactivates the entire premium system: when
+      // dormant (flag off), the gate is skipped and generation is always
+      // allowed. See models/premium-feature-flag.model.md.
       (async () => {
         try {
-          const { premium_enabled } = await chrome.storage.local.get('premium_enabled');
-          if (premium_enabled !== true) {
+          const { premium_enabled, premium_feature_enabled } = await chrome.storage.local.get([
+            'premium_enabled',
+            'premium_feature_enabled',
+          ]);
+          const featureActive = resolvePremiumFeatureFlag(premium_feature_enabled);
+          if (shouldPremiumGate(featureActive, premium_enabled === true)) {
             sendResponse({
               type: 'GENERATION_RESULT',
               payload: { asset: null, error: 'PREMIUM_REQUIRED' },

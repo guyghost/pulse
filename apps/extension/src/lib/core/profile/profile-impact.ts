@@ -1,25 +1,11 @@
 import type { UserProfile } from '../types/profile';
 
 export type ProfileImpactFieldId =
-  | 'stack'
-  | 'tjm-min'
-  | 'remote'
-  | 'location'
-  | 'search-keywords'
-  | 'job-title'
-  | 'tjm-max'
-  | 'first-name';
+  'keywords' | 'tjm-min' | 'remote' | 'location' | 'job-title' | 'tjm-max' | 'first-name';
 
 export type ProfileImpactInput = Pick<
   UserProfile,
-  | 'firstName'
-  | 'jobTitle'
-  | 'location'
-  | 'remote'
-  | 'tjmMin'
-  | 'tjmMax'
-  | 'stack'
-  | 'searchKeywords'
+  'firstName' | 'jobTitle' | 'location' | 'remote' | 'tjmMin' | 'tjmMax' | 'keywords'
 >;
 
 export interface ProfileImpactItem {
@@ -51,12 +37,12 @@ interface ProfileImpactDefinition {
 
 const PROFILE_IMPACT_DEFINITIONS: ProfileImpactDefinition[] = [
   {
-    id: 'stack',
-    label: 'Stack technique',
-    weight: 25,
-    impact: 'Scoring de pertinence et alertes prioritaires',
-    action: 'Ajouter 3 à 5 technologies qui déclenchent une vraie décision.',
-    isComplete: (profile) => profile.stack.length > 0,
+    id: 'keywords',
+    label: 'Mots-clés',
+    weight: 35,
+    impact: 'Scoring de pertinence, recherche connecteur et alertes ciblées',
+    action: 'Ajouter technologies, secteurs ou contextes (ex. React, SaaS, fintech).',
+    isComplete: (profile) => profile.keywords.length > 0,
   },
   {
     id: 'tjm-min',
@@ -81,14 +67,6 @@ const PROFILE_IMPACT_DEFINITIONS: ProfileImpactDefinition[] = [
     impact: 'Pondération des missions proches ou hybrides',
     action: 'Renseigner la zone qui doit servir de référence au radar.',
     isComplete: (profile) => profile.location.trim().length > 0,
-  },
-  {
-    id: 'search-keywords',
-    label: 'Mots-clés',
-    weight: 10,
-    impact: 'Recherche connecteur et alertes plus ciblées',
-    action: 'Ajouter les secteurs, contextes ou domaines à remonter en priorité.',
-    isComplete: (profile) => profile.searchKeywords.length > 0,
   },
   {
     id: 'job-title',
@@ -163,7 +141,7 @@ export function buildProfileImpactSimulation(items: ProfileImpactItem[]): Profil
       prioritizedItems,
       title: 'Le radar profil utilise déjà tous les signaux clés',
       description:
-        'La stack, le TJM, le remote, la localisation et les mots-clés peuvent alimenter les recherches, le scoring et les alertes.',
+        'Les mots-clés, le TJM, le remote et la localisation alimentent les recherches, le scoring et les alertes.',
     };
   }
 

@@ -59,11 +59,7 @@ export interface ValidationError extends BaseAppError {
 
 /** Union discriminating de toutes les erreurs applicatives */
 export type AppError =
-  | NetworkError
-  | StorageError
-  | ParsingError
-  | ConnectorError
-  | ValidationError;
+  NetworkError | StorageError | ParsingError | ConnectorError | ValidationError;
 
 // ============================================================================
 // Type guards

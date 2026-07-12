@@ -73,15 +73,16 @@ describe('operational UI constraints', () => {
 
   it('keeps loading states tied to source and progression context', () => {
     const cvSource = readFileSync('src/ui/pages/CvPage.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/organisms/ExperienceFeed.svelte', 'utf8');
     const applicationsSource = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
 
-    expect(cvSource).toContain('type LoadingProgressStep');
-    expect(cvSource).toContain('Chargement CV');
-    expect(cvSource).toContain('Progression du chargement CV');
-    expect(cvSource).toContain('Profil canonique');
-    expect(cvSource).toContain('Plateformes');
-    expect(cvSource).toContain('Écarts');
-    expect(cvSource).toContain('role="status"');
+    // CvPage delegates loading to the experience feed, which ties its skeleton
+    // to the store's feedStatus and surfaces the entry count as progression.
+    expect(cvSource).toContain('store.load()');
+    expect(cvSource).toContain('ExperienceFeed');
+    expect(feedSource).toContain("feedStatus === 'loading'");
+    expect(feedSource).toContain('Skeleton');
+    expect(feedSource).toContain('store.experiences.length');
     expect(applicationsSource).toContain('type LoadingProgressStep');
     expect(applicationsSource).toContain('Chargement candidatures');
     expect(applicationsSource).toContain('Progression du chargement candidatures');
@@ -165,6 +166,23 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain("nav.currentPage === 'profile' && premium.isPremium");
     expect(source).not.toContain('NAV_ITEMS.filter');
     expect(source).not.toContain('Premium pages hidden');
+  });
+
+  it('gates premium surfaces through the premium feature flag', () => {
+    const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
+    const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+
+    // The pure decision + feature store are wired into the UI gating.
+    expect(appSource).toContain("from '$lib/core/features/flags'");
+    expect(appSource).toContain('canAccessPremium');
+    expect(appSource).toContain('features.premiumFeatureActive');
+    // Page rendering consults the combined access decision, not raw isPremium.
+    expect(appSource).toContain('TJMPage && premiumAccessible');
+    expect(appSource).toContain('CvPage && premiumAccessible');
+    expect(appSource).toContain('ApplicationsPage && premiumAccessible');
+    // Settings reflects the dormant vs active state.
+    expect(settingsSource).toContain('features.premiumFeatureActive');
+    expect(settingsSource).toContain('Premium désactivé');
   });
 
   it('keeps onboarding focused with duration and minimal shell navigation', () => {
@@ -295,12 +313,13 @@ describe('operational UI constraints', () => {
     const profileSource = readFileSync('src/ui/pages/ProfilePage.svelte', 'utf8');
     const impactSource = readFileSync('src/lib/core/profile/profile-impact.ts', 'utf8');
 
-    expect(impactSource).toContain("id: 'stack'");
+    expect(impactSource).toContain("id: 'keywords'");
     expect(impactSource).toContain("id: 'tjm-min'");
     expect(impactSource).toContain("id: 'remote'");
     expect(impactSource).toContain("id: 'location'");
-    expect(impactSource).toContain("id: 'search-keywords'");
-    expect(impactSource.indexOf("id: 'stack'")).toBeLessThan(impactSource.indexOf("id: 'remote'"));
+    expect(impactSource.indexOf("id: 'keywords'")).toBeLessThan(
+      impactSource.indexOf("id: 'remote'")
+    );
     expect(profileSource).toContain('buildProfileImpactItems');
     expect(profileSource).toContain('buildProfileImpactSimulation');
     expect(profileSource).toContain('Priorités d’impact');
@@ -312,9 +331,10 @@ describe('operational UI constraints', () => {
   it('routes the offline TJM story toward cached signal investigation', () => {
     const source = readFileSync('src/ui/pages/TJMPage.svelte', 'utf8');
 
-    expect(source).toContain("statusLabel: 'Cache local'");
-    expect(source).toContain("primaryActionLabel: 'Inspecter les signaux locaux'");
+    expect(source).toContain("'Cache local'");
+    expect(source).toContain('Inspecter les signaux locaux');
     expect(source).toContain('function inspectLocalSignals()');
+    expect(source).toContain('onclick={inspectLocalSignals}');
   });
 
   it('keeps TJM actions tied to pricing decisions instead of refresh only', () => {
@@ -322,8 +342,8 @@ describe('operational UI constraints', () => {
     const dashboardSource = readFileSync('src/ui/organisms/TJMDashboard.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    expect(pageSource).toContain("primaryActionLabel: 'Ajuster mon TJM cible'");
-    expect(pageSource).toContain("primaryActionLabel: 'Scanner le feed'");
+    expect(pageSource).toContain('Ajuster mon TJM cible');
+    expect(pageSource).toContain('Scanner le feed');
     expect(pageSource).toContain('onNavigateToProfile');
     expect(pageSource).toContain('onNavigateToFeed');
     expect(dashboardSource).toContain('type TjmSetupStep');
@@ -334,26 +354,20 @@ describe('operational UI constraints', () => {
     expect(appSource).toContain("onNavigateToFeed={() => nav.navigate('feed')}");
   });
 
-  it('routes missing CV source states to import or profile completion', () => {
+  it('routes missing CV source states to add-experience or retry', () => {
     const cvSource = readFileSync('src/ui/pages/CvPage.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/organisms/ExperienceFeed.svelte', 'utf8');
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    expect(cvSource).toContain("primaryActionLabel: 'Importer LinkedIn'");
-    expect(cvSource).toContain('secondaryActionLabel="Compléter le profil"');
-    expect(cvSource).toContain('onSecondaryAction={completeProfileManually}');
-    expect(cvSource).toContain("primaryActionLabel: 'Prévisualiser LinkedIn'");
-    expect(cvSource).not.toContain('const linkedInPrimaryLabel');
-    expect(cvSource).toContain(
-      "const sourceActionLabel = $derived(profile ? 'Tout préparer' : 'Compléter le profil')"
-    );
-    expect(cvSource).toContain('type CvWorkflowStep');
-    expect(cvSource).toContain('const cvWorkflowSteps = $derived.by');
-    expect(cvSource).toContain('Source canonique');
-    expect(cvSource).toContain('Plateformes à mettre à jour');
-    expect(cvSource).toContain('Dashboard connecté');
-    expect(cvSource).toContain('Enregistrer comme source');
-    expect(cvSource).not.toContain('Profil CV synchronisé dans Supabase');
-    expect(cvSource).toContain('function handleSourceAction()');
+    // CvPage wires the sync panel + feed; the feed owns empty/error routing.
+    expect(cvSource).toContain('CvSyncPanel');
+    expect(cvSource).toContain('ExperienceFeed');
+    expect(cvSource).toContain('onNavigateToProfile');
+    expect(feedSource).toContain('primaryActionLabel="Ajouter une expérience"');
+    expect(feedSource).toContain('primaryActionLabel="Réessayer"');
+    expect(feedSource).toContain('onPrimaryAction={() => store.reload()}');
+    expect(feedSource).toContain('onPrimaryAction={() => store.newExperience()}');
+    expect(feedSource).toContain('employmentType: null');
     expect(appSource).toContain("onNavigateToProfile={() => nav.navigate('profile')}");
   });
 

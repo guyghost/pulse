@@ -23,6 +23,8 @@ const feedDataMock = vi.hoisted(() => ({
   setFeedSortBy: vi.fn(),
   getFeedSavedViews: vi.fn(),
   setFeedSavedViews: vi.fn(),
+  consumeDeepLinkIntent: vi.fn(),
+  subscribeToNotificationClicked: vi.fn(),
   syncFavoriteMission: vi.fn(),
 }));
 const toastMock = vi.hoisted(() => ({
@@ -186,8 +188,16 @@ describe('feed page state', () => {
     feedDataMock.getFeedSortBy.mockResolvedValue('score');
     feedDataMock.setFeedSortBy.mockResolvedValue(undefined);
     feedDataMock.saveSeenIds.mockResolvedValue(undefined);
+    feedDataMock.getSeenIds.mockResolvedValue([]);
+    feedDataMock.getFavorites.mockResolvedValue({});
+    feedDataMock.getHidden.mockResolvedValue({});
+    feedDataMock.getProfile.mockResolvedValue(null);
+    feedDataMock.resetNewMissionCount.mockResolvedValue(undefined);
+    feedDataMock.clearExtensionBadge.mockResolvedValue(undefined);
     feedDataMock.getFeedSavedViews.mockResolvedValue([]);
     feedDataMock.setFeedSavedViews.mockResolvedValue(undefined);
+    feedDataMock.consumeDeepLinkIntent.mockResolvedValue(null);
+    feedDataMock.subscribeToNotificationClicked.mockReturnValue(() => {});
   });
 
   it('counts source filter pills from the same missions shown by source filtering', () => {
@@ -228,6 +238,25 @@ describe('feed page state', () => {
 
     expect(page.visibleCount).toBe(2);
     expect(page.displayMissions.map((mission) => mission.id)).toEqual(['strong-1', 'strong-2']);
+  });
+
+  it('keeps the focus banner active when search filters out the focused mission', () => {
+    const feed = createFeedStore();
+    const page = createFeedPageState(feed, makeController());
+    feed.setMissions([
+      makeMission({ id: 'focused-1', title: 'Focused Svelte mission', score: 92 }),
+      makeMission({ id: 'search-hit', title: 'Rust backend mission', stack: ['Rust'], score: 75 }),
+    ]);
+
+    page.applyFocusIntent({
+      focusMissionIds: ['focused-1'],
+      source: 'notification',
+      triggeredAt: 1_700_000_000_000,
+    });
+    feed.search('rust');
+
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual(['focused-1']);
+    expect(page.focusMissions.map((mission) => mission.id)).toEqual(['focused-1']);
   });
 
   it('filters the feed to unseen missions from the dashboard toggle', () => {

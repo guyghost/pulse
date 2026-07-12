@@ -120,23 +120,22 @@ export function parseFreeWorkAPI(data: FreeWorkApiResponse, now: Date): Mission[
 
   return data['hydra:member']
     .filter((p) => isFreelanceContract(p.contracts ?? []))
-    .map(
-      (p): Mission =>
-        createMission({
-          id: `fw-${p.id}`,
-          title: p.title,
-          client: p.company?.name ?? null,
-          description: p.description ?? '',
-          stack: (p.skills ?? []).map((s) => s.name),
-          tjm: p.minDailySalary ?? p.maxDailySalary ?? null,
-          location: p.location?.label ?? p.location?.shortLabel ?? null,
-          remote: mapRemoteMode(p.remoteMode),
-          duration: formatDuration(p.durationValue, p.durationPeriod),
-          url: buildJobUrl(p.slug, p.job?.slug ?? null),
-          source: SOURCE,
-          scrapedAt: now,
-          seniority: mapExperienceLevel(p.experienceLevel),
-          publishedAt: p.publishedAt ?? null,
-        })
+    .map((p): Mission =>
+      createMission({
+        id: `fw-${p.id}`,
+        title: p.title,
+        client: p.company?.name ?? null,
+        description: p.description ?? '',
+        stack: (p.skills ?? []).map((s) => s.name),
+        tjm: p.minDailySalary ?? p.maxDailySalary ?? null,
+        location: p.location?.label ?? p.location?.shortLabel ?? null,
+        remote: mapRemoteMode(p.remoteMode),
+        duration: formatDuration(p.durationValue, p.durationPeriod),
+        url: buildJobUrl(p.slug, p.job?.slug ?? null),
+        source: SOURCE,
+        scrapedAt: now,
+        seniority: mapExperienceLevel(p.experienceLevel),
+        publishedAt: p.publishedAt ?? null,
+      })
     );
 }

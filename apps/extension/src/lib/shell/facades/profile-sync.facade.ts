@@ -8,9 +8,57 @@ export type LinkedInProfileImportResult =
   | { imported: true; profile: CanonicalCandidateProfileDraft }
   | { imported: false; errorCode: string; errorMessage: string };
 
+export type LinkedInProfileSyncResult =
+  | { imported: true; profile: CanonicalCandidateProfileDraft; addedCount: number }
+  | { imported: false; errorCode: string; errorMessage: string };
+
 export type LinkedInProfilePreviewResult =
   | { extracted: true; profile: CanonicalCandidateProfileDraft }
   | { extracted: false; errorCode: string; errorMessage: string };
+
+const LINKEDIN_HOST_PERMISSION: chrome.permissions.Permissions = {
+  origins: ['https://www.linkedin.com/*'],
+};
+
+interface ChromePermissionsLike {
+  contains(permissions: chrome.permissions.Permissions): Promise<boolean>;
+  request(permissions: chrome.permissions.Permissions): Promise<boolean>;
+}
+
+function getChromePermissions(): ChromePermissionsLike | undefined {
+  if (typeof chrome === 'undefined') {
+    return undefined;
+  }
+  const permissions = chrome.permissions as ChromePermissionsLike | undefined;
+  if (!permissions?.contains || !permissions.request) {
+    return undefined;
+  }
+  return permissions;
+}
+
+/**
+ * Ensures the optional LinkedIn host permission is granted before the side
+ * panel asks the service worker to extract the active LinkedIn tab.
+ *
+ * `chrome.permissions.request()` MUST run in a UI context (side panel) during a
+ * user gesture — it cannot run in the service worker (MV3). Returns false when
+ * the API is unavailable or the user denies the prompt.
+ * See `src/models/linkedin-import.model.md`.
+ */
+export async function ensureLinkedInHostPermission(): Promise<boolean> {
+  const permissions = getChromePermissions();
+  if (!permissions) {
+    return false;
+  }
+  if (await permissions.contains(LINKEDIN_HOST_PERMISSION)) {
+    return true;
+  }
+  try {
+    return await permissions.request(LINKEDIN_HOST_PERMISSION);
+  } catch {
+    return false;
+  }
+}
 
 export async function verifyProfilePage(
   url: string,
@@ -68,7 +116,7 @@ export async function previewLinkedInProfile(): Promise<LinkedInProfilePreviewRe
 
 export async function syncLinkedInProfileImport(
   profile: CanonicalCandidateProfileDraft
-): Promise<LinkedInProfileImportResult> {
+): Promise<LinkedInProfileSyncResult> {
   const response = await sendMessage({
     type: 'SYNC_LINKEDIN_PROFILE_IMPORT',
     payload: { profile },
@@ -82,5 +130,16 @@ export async function syncLinkedInProfileImport(
     };
   }
 
-  return response.payload;
+  const payload = response.payload;
+  if (!payload.imported) {
+    return payload;
+  }
+
+  return {
+    imported: true,
+    profile: payload.profile,
+    // SW omits addedCount only on unexpected/handcrafted responses — default to
+    // a safe 0 so the UI never crashes (the toast will read "already present").
+    addedCount: payload.addedCount ?? 0,
+  };
 }

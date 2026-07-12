@@ -16,6 +16,7 @@
 
 import type { UserProfile } from '../../core/types/profile';
 import { UserProfileSchema } from '../../core/types/schemas';
+import { appendUniqueNormalized } from '../../core/profile/normalize-profile';
 
 // ============================================================================
 // Structural migrations (run inside onupgradeneeded)
@@ -47,12 +48,18 @@ export const STRUCTURAL_MIGRATIONS: StructuralMigration[] = [
     const genStore = db.createObjectStore('generated_assets', { keyPath: 'id' });
     genStore.createIndex('missionId', 'missionId', { unique: false });
   },
-  // → v4: mission_tracking (absorbed from tracking.ts) + quarantine (on-demand)
+  // → v4: mission_tracking (absorbed from tracking.ts)
   (db) => {
     const trackingStore = db.createObjectStore('mission_tracking', {
       keyPath: 'missionId',
     });
     trackingStore.createIndex('currentStatus', 'currentStatus', { unique: false });
+  },
+  // → v5: quarantine (on-demand invalid-record isolation)
+  (db) => {
+    if (db.objectStoreNames.contains('quarantine')) {
+      return;
+    }
     const quarantineStore = db.createObjectStore('quarantine', { keyPath: 'id' });
     quarantineStore.createIndex('originalStore', 'originalStore', { unique: false });
   },
@@ -78,14 +85,51 @@ export type DataMigration = (deps: DataMigrationDeps) => Promise<void>;
 /**
  * Ordered data migrations. Index + 1 === the target APP_DATA_VERSION.
  *
- * Today: APP_DATA_VERSION = 1, no data migrations yet. The registry exists so
- * the next schema change (e.g. adding a required field to Mission) is a
- * one-line append + version bump.
+ * v1 → v2 (below): unifies the legacy `stack` + `searchKeywords` profile
+ * fields into a single `keywords: string[]`. Idempotent — safe to re-run on
+ * already-migrated records (legacy fields are stripped, `keywords` preserved).
  */
 export const DATA_MIGRATIONS: DataMigration[] = [
-  // v0 → v1: example shape — currently a no-op placeholder.
-  // Replace with a real migration when MissionSchema/UserProfileSchema change.
-  // async (_deps) => { /* idempotent transform */ },
+  // v1 → v2: merge `stack` + `searchKeywords` → `keywords` on stored profiles.
+  async ({ runRW }) => {
+    await runRW(['profile'], (profileStore) => {
+      return new Promise<void>((resolve, reject) => {
+        const cursorReq = profileStore.openCursor();
+        cursorReq.onerror = () => reject(cursorReq.error);
+        cursorReq.onsuccess = () => {
+          const cursor = cursorReq.result;
+          if (!cursor) {
+            resolve();
+            return;
+          }
+          const record = cursor.value as Record<string, unknown>;
+          const asStrings = (value: unknown): string[] =>
+            Array.isArray(value) ? value.filter((v): v is string => typeof v === 'string') : [];
+          const existingKeywords = asStrings(record.keywords);
+          const legacyStack = asStrings(record.stack);
+          const legacySearchKeywords = asStrings(record.searchKeywords);
+          const merged = appendUniqueNormalized([
+            ...existingKeywords,
+            ...legacyStack,
+            ...legacySearchKeywords,
+          ]).slice(0, 40);
+          const next: Record<string, unknown> = { ...record, keywords: merged };
+          delete next.stack;
+          delete next.searchKeywords;
+          const parsed = UserProfileSchema.safeParse(next);
+          if (!parsed.success) {
+            reject(new Error('v1→v2 profile migration produced an invalid profile'));
+            return;
+          }
+          cursor.update({
+            ...parsed.data,
+            id: record.id ?? cursor.key ?? 'current',
+          });
+          cursor.continue();
+        };
+      });
+    });
+  },
 ];
 
 // ============================================================================

@@ -21,12 +21,7 @@ export type MigrationState =
   | 'failed';
 
 export type MigrationErrorCode =
-  | 'downgrade'
-  | 'corrupt'
-  | 'quota'
-  | 'structural_throw'
-  | 'data_throw'
-  | 'unknown';
+  'downgrade' | 'corrupt' | 'quota' | 'structural_throw' | 'data_throw' | 'unknown';
 
 export interface MigrationError {
   code: MigrationErrorCode;
@@ -47,8 +42,7 @@ export interface MigrationVersions {
 }
 
 export type MigrationResult =
-  | ({ ok: true } & MigrationVersions)
-  | { ok: false; code: MigrationErrorCode; message: string };
+  ({ ok: true } & MigrationVersions) | { ok: false; code: MigrationErrorCode; message: string };
 
 /**
  * Storage keys used by the orchestrator in `chrome.storage.local`.
