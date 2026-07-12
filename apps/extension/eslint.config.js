@@ -187,5 +187,21 @@ export default tseslint.config(
     rules: {
       'no-console': 'off',
     },
+  },
+
+  // ─── eslint-plugin-svelte v3: relax newly-promoted recommended rules ──
+  // v3 promoted these rules to errors in the recommended set. The existing
+  // codebase predates them; surface them as warnings so the v3 bump lands
+  // cleanly and they can be adopted incrementally without failing CI.
+  // prefer-svelte-reactivity also fires in .ts files, hence the dual scope.
+  {
+    files: ['**/*.ts', '**/*.svelte'],
+    rules: {
+      'svelte/require-each-key': 'warn',
+      'svelte/prefer-writable-derived': 'warn',
+      'svelte/prefer-svelte-reactivity': 'warn',
+      'svelte/no-navigation-without-resolve': 'warn',
+      'svelte/no-useless-children-snippet': 'warn',
+    },
   }
 );
