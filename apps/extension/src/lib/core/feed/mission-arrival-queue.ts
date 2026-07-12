@@ -85,6 +85,10 @@ function uniqueIds(ids: string[]): string[] {
   return [...new Set(ids.filter(Boolean))];
 }
 
+function sameIds(left: string[], right: string[]): boolean {
+  return left.length === right.length && left.every((id, index) => id === right[index]);
+}
+
 function unchanged(state: MissionArrivalQueueState): MissionArrivalQueueTransition {
   return { state, effects: [] };
 }
@@ -203,6 +207,9 @@ export function transitionMissionArrivalQueue(
         };
       }
       if (state.stack.value === 'open') {
+        if (sameIds(state.stack.pendingIds, pendingIds)) {
+          return unchanged(state);
+        }
         return {
           state: {
             ...state,
@@ -217,6 +224,9 @@ export function transitionMissionArrivalQueue(
         };
       }
       if (state.stack.value === 'refreshing') {
+        return unchanged(state);
+      }
+      if (state.stack.value === 'collapsed' && sameIds(state.stack.pendingIds, pendingIds)) {
         return unchanged(state);
       }
       return {
