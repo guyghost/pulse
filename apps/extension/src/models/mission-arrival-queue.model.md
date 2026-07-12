@@ -73,22 +73,22 @@ shell; several cards may be measured independently.
 
 ## Events
 
-| Event               | Payload             | Meaning                                                         |
-| ------------------- | ------------------- | --------------------------------------------------------------- |
-| `ENTER_NEW_QUEUE`   | `orderedUnseenIds`  | Enter Nouvelles and capture stable membership.                  |
-| `EXIT_NEW_QUEUE`    | none                | Leave Nouvelles and discard the in-memory snapshot.             |
-| `DWELL_STARTED`     | `missionId`, `now`  | A queue card is at least 60% visible.                           |
-| `DWELL_CANCELLED`   | `missionId`         | The card dropped below 60% before the threshold.                |
-| `DWELL_ELAPSED`     | `missionId`, `now`  | The same card stayed visible for at least 1500ms.               |
-| `ARRIVALS_BUFFERED` | `orderedPendingIds` | The controller has a new deterministic pending snapshot.        |
-| `OPEN_STACK`        | `orderedPreviewIds` | Open the drawer and freeze at most three ordered previews.      |
-| `CLOSE_STACK`       | none                | Collapse the drawer without changing either queue.              |
-| `REFRESH_QUEUE`     | none                | Explicitly apply all pending arrivals.                          |
-| `REFRESH_SUCCEEDED` | `orderedUnseenIds`  | Replace the stable snapshot and clear the stack.                |
-| `REFRESH_FAILED`    | `message`           | Keep current and pending queues intact; expose retry.           |
-| `RETRY_REFRESH`     | none                | Retry the same explicit application.                            |
-| `SCAN_CANCELLED`    | none                | Discard the uncommitted scan buffer; keep current queue intact. |
-| `PANEL_CLOSED`      | none                | End dwell timers and discard in-memory snapshots.               |
+| Event               | Payload             | Meaning                                                          |
+| ------------------- | ------------------- | ---------------------------------------------------------------- |
+| `ENTER_NEW_QUEUE`   | `orderedUnseenIds`  | Enter Nouvelles and capture stable membership.                   |
+| `EXIT_NEW_QUEUE`    | none                | Leave Nouvelles and discard the in-memory snapshot.              |
+| `DWELL_STARTED`     | `missionId`, `now`  | A queue card is at least 60% visible.                            |
+| `DWELL_CANCELLED`   | `missionId`         | The card dropped below 60% before the threshold.                 |
+| `DWELL_ELAPSED`     | `missionId`, `now`  | The same card stayed visible for at least 1500ms.                |
+| `ARRIVALS_BUFFERED` | `orderedPendingIds` | The controller has a new deterministic pending snapshot.         |
+| `OPEN_STACK`        | `orderedPreviewIds` | Open the drawer and freeze at most three ordered previews.       |
+| `CLOSE_STACK`       | none                | Collapse an open or failed drawer without changing either queue. |
+| `REFRESH_QUEUE`     | none                | Explicitly apply all pending arrivals.                           |
+| `REFRESH_SUCCEEDED` | `orderedUnseenIds`  | Replace the stable snapshot and clear the stack.                 |
+| `REFRESH_FAILED`    | `message`           | Keep current and pending queues intact; expose retry.            |
+| `RETRY_REFRESH`     | none                | Retry the same explicit application.                             |
+| `SCAN_CANCELLED`    | none                | Discard the uncommitted scan buffer; keep current queue intact.  |
+| `PANEL_CLOSED`      | none                | End dwell timers and discard in-memory snapshots.                |
 
 Search and facet events project the captured membership through the current
 filters. An explicit sort event may reorder `queueIds`; it may not add or remove
@@ -107,7 +107,7 @@ membership.
 | stack / `collapsed`                             | `ARRIVALS_BUFFERED(ids)`           | `collapsed`     | replace the pending snapshot                                                   |
 | stack / `collapsed`                             | `OPEN_STACK`                       | `open`          | freeze top-three previews; focus drawer heading                                |
 | stack / `open`                                  | `ARRIVALS_BUFFERED(ids)`           | `open`          | update count/pending ids; keep previews frozen                                 |
-| stack / `open`                                  | `CLOSE_STACK`                      | `collapsed`     | restore focus to stack trigger                                                 |
+| stack / `open` or `refresh-error`               | `CLOSE_STACK`                      | `collapsed`     | clear any error message; restore focus to stack trigger                        |
 | stack / `collapsed`, `open`, or `refresh-error` | `REFRESH_QUEUE` or `RETRY_REFRESH` | `refreshing`    | apply controller buffer exactly once                                           |
 | stack / `refreshing`                            | `REFRESH_SUCCEEDED(ids)`           | `empty`         | clear stack; rebuild queue only when queue region is stable; scroll feed start |
 | stack / `refreshing`                            | `REFRESH_FAILED(message)`          | `refresh-error` | retain current queue and pending ids; announce error politely                  |
@@ -151,7 +151,8 @@ Events that do not appear above are rejected as no-ops. In particular,
   one primary action: **Actualiser la file avec les N missions**.
 - New batches received while open update the count and an optional
   `+N supplémentaires` summary, but never replace a preview being read.
-- `Escape` closes the drawer. Closing restores focus to the stack trigger.
+- `Escape` closes the open or failed drawer. An in-progress refresh is not
+  interruptible. Closing restores focus to the stack trigger.
 - An application failure keeps the drawer open, keeps both queues intact, and
   displays **Impossible d’actualiser la file. Réessayer.**
 

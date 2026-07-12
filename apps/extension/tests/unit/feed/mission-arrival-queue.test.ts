@@ -174,6 +174,31 @@ describe('mission arrival queue model', () => {
     expect(retried.effects).toEqual([{ type: 'apply-pending' }]);
   });
 
+  it('allows a failed drawer to collapse without interrupting an active refresh', () => {
+    const buffered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
+      type: 'ARRIVALS_BUFFERED',
+      orderedPendingIds: ['new-1'],
+    }).state;
+    const refreshing = transitionMissionArrivalQueue(buffered, { type: 'REFRESH_QUEUE' }).state;
+    const failed = transitionMissionArrivalQueue(refreshing, {
+      type: 'REFRESH_FAILED',
+      message: 'Impossible d’actualiser la file. Réessayer.',
+    }).state;
+
+    const collapsed = transitionMissionArrivalQueue(failed, { type: 'CLOSE_STACK' });
+    expect(collapsed.state.stack).toEqual({
+      value: 'collapsed',
+      pendingIds: ['new-1'],
+      previewIds: [],
+      message: null,
+    });
+    expect(collapsed.effects).toEqual([{ type: 'focus-stack-trigger' }]);
+
+    const ignored = transitionMissionArrivalQueue(refreshing, { type: 'CLOSE_STACK' });
+    expect(ignored.state).toBe(refreshing);
+    expect(ignored.effects).toEqual([]);
+  });
+
   it('clears only the stack on scan cancellation and resets both regions on panel close', () => {
     const entered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
       type: 'ENTER_NEW_QUEUE',

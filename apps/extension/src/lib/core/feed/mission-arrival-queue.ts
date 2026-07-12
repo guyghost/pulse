@@ -269,7 +269,7 @@ export function transitionMissionArrivalQueue(
     }
 
     case 'CLOSE_STACK':
-      if (state.stack.value !== 'open') {
+      if (state.stack.value !== 'open' && state.stack.value !== 'refresh-error') {
         return unchanged(state);
       }
       return {
