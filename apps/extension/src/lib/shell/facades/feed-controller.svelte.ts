@@ -288,9 +288,9 @@ export function createFeedController(feedStore: {
   let lastScanMissionCount = $state<number>(0);
   let sourceStatuses = $state<SourceStatus[]>([]);
   let isCheckingSources = $state(false);
-  let enabledConnectorIds = new SvelteSet<string>();
-  let healthSnapshots = new SvelteMap<string, ConnectorHealthSnapshot>();
-  let parserHealthRecords = new SvelteMap<string, ConnectorHealthRecord>();
+  const enabledConnectorIds = new SvelteSet<string>();
+  const healthSnapshots = new SvelteMap<string, ConnectorHealthSnapshot>();
+  const parserHealthRecords = new SvelteMap<string, ConnectorHealthRecord>();
   let partialScanBaseMissions: Mission[] = [];
   let partialScanConnectorMissions = new SvelteMap<string, Mission[]>();
   let partialScanCompletedSources = new SvelteSet<string>();
@@ -653,9 +653,10 @@ export function createFeedController(feedStore: {
     try {
       const response = await sendMessage({ type: 'GET_PARSER_HEALTH' });
       if (response.type === 'PARSER_HEALTH_RESULT' && Array.isArray(response.payload)) {
-        parserHealthRecords = new SvelteMap(
-          response.payload.map((record) => [record.connectorId, record])
-        );
+        parserHealthRecords.clear();
+        for (const record of response.payload) {
+          parserHealthRecords.set(record.connectorId, record);
+        }
       }
     } catch {
       // Outside extension context
@@ -666,9 +667,10 @@ export function createFeedController(feedStore: {
     try {
       const response = await sendMessage({ type: 'GET_CONNECTOR_HEALTH' });
       if (response.type === 'CONNECTOR_HEALTH_RESULT' && Array.isArray(response.payload)) {
-        healthSnapshots = new SvelteMap(
-          response.payload.map((snapshot) => [snapshot.connectorId, snapshot])
-        );
+        healthSnapshots.clear();
+        for (const snapshot of response.payload) {
+          healthSnapshots.set(snapshot.connectorId, snapshot);
+        }
       }
     } catch {
       // Outside extension context
@@ -682,9 +684,10 @@ export function createFeedController(feedStore: {
         payload: { connectorId: id, enable },
       });
       if (response.type === 'CONNECTOR_HEALTH_RESULT' && Array.isArray(response.payload)) {
-        healthSnapshots = new SvelteMap(
-          response.payload.map((snapshot) => [snapshot.connectorId, snapshot])
-        );
+        healthSnapshots.clear();
+        for (const snapshot of response.payload) {
+          healthSnapshots.set(snapshot.connectorId, snapshot);
+        }
       }
       if (enable) {
         enabledConnectorIds.add(id);
@@ -777,7 +780,10 @@ export function createFeedController(feedStore: {
     try {
       const [statuses, settings] = await Promise.all([getConnectorStatuses(), getSettings()]);
       persistedStatuses = statuses;
-      enabledConnectorIds = new SvelteSet(settings.enabledConnectors);
+      enabledConnectorIds.clear();
+      for (const connectorId of settings.enabledConnectors) {
+        enabledConnectorIds.add(connectorId);
+      }
     } catch {
       /* Non-critical */
     }
