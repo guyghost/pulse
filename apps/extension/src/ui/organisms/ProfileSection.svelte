@@ -106,7 +106,7 @@
       />
       <datalist id="profile-location-catalog">
         {#each LOCATION_LABELS as label}
-          <option value={label} />
+          <option value={label}></option>
         {/each}
       </datalist>
       <div class="grid grid-cols-2 gap-2">

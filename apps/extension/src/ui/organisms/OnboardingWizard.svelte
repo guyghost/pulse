@@ -458,7 +458,7 @@
     />
     <datalist id="ob-location-catalog">
       {#each LOCATION_LABELS as label}
-        <option value={label} />
+        <option value={label}></option>
       {/each}
     </datalist>
   </div>
