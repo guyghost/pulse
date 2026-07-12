@@ -48,9 +48,10 @@ reorder it.
 
 ### 2. Anchored stack
 
-Pending scan results appear in a compact layered control directly above the
-bottom navigation. The feed reserves space for the collapsed control so mission
-actions remain reachable.
+Pending scan results appear in a compact layered control anchored to the lower
+edge of the feed viewport. MissionPulse navigation remains at the top; this
+feature does not add bottom navigation. The feed reserves space for the
+collapsed control so mission actions remain reachable.
 
 The stack uses no decorative glass, gradient, or wide shadow. A maximum of three
 solid layers communicates depth; a numeric `+N` communicates actual volume.
@@ -82,7 +83,7 @@ a retry.
 | Element          | Specification                                                             |
 | ---------------- | ------------------------------------------------------------------------- |
 | Collapsed height | minimum 44px target; approximately 56px including layered depth           |
-| Position         | anchored above existing bottom navigation                                 |
+| Position         | anchored to the lower edge of the feed; navigation remains at the top     |
 | Layer depth      | maximum three visual slabs                                                |
 | Drawer previews  | maximum three compact mission previews                                    |
 | Drawer height    | content-driven with a bounded panel-height ceiling; never full screen     |
@@ -100,10 +101,10 @@ introduce permanent tabs, a modal, or a second feed route.
 
 ### Functional core
 
-A pure reducer owns states, events, guards, and effects described in the model.
-Inputs include ordered ids and injected timestamps. Pure helpers deduplicate ids,
-validate dwell completion, and select preview ids. Core performs no timing,
-storage, DOM, Chrome API, or async operation.
+A pure reducer owns two parallel regions described in the model: stable queue
+membership and arrival-stack inspection. Inputs include ordered ids and injected
+timestamps. Pure helpers deduplicate ids, validate dwell completion, and select
+preview ids. Core performs no timing, storage, DOM, Chrome API, or async operation.
 
 ### Imperative shell
 

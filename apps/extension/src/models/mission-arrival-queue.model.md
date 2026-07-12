@@ -37,38 +37,39 @@ remain governed by their existing models.
 
 ## State
 
+Queue reading and scan arrivals are parallel regions. A stack may accumulate
+while the user reads either the normal feed or a stable Nouvelles snapshot.
+
 ```ts
-type ArrivalQueueState =
-  | { value: 'all-feed' }
-  | {
-      value: 'stable-queue';
-      queueIds: string[];
-      dwell: null | { missionId: string; startedAt: number };
-      pendingArrivalIds: string[];
-    }
-  | {
-      value: 'drawer-open';
-      queueIds: string[];
-      dwell: null | { missionId: string; startedAt: number };
-      pendingArrivalIds: string[];
-      previewIds: string[];
-    }
-  | {
-      value: 'refreshing';
-      previousQueueIds: string[];
-      pendingArrivalIds: string[];
-    }
-  | {
-      value: 'refresh-error';
-      queueIds: string[];
-      pendingArrivalIds: string[];
-      message: string;
-    };
+interface ArrivalQueueState {
+  queue:
+    | { value: 'all-feed'; queueIds: []; dwells: Record<string, number> }
+    | {
+        value: 'stable-queue';
+        queueIds: string[];
+        dwells: Record<string, number>;
+      };
+  stack:
+    | { value: 'empty'; pendingIds: []; previewIds: []; message: null }
+    | {
+        value: 'collapsed' | 'open' | 'refreshing';
+        pendingIds: string[];
+        previewIds: string[];
+        message: null;
+      }
+    | {
+        value: 'refresh-error';
+        pendingIds: string[];
+        previewIds: string[];
+        message: string;
+      };
+}
 ```
 
 All ids are deduplicated. `queueIds` is an ordered membership snapshot;
 `previewIds` contains at most three ids, ordered exactly as those missions would
-appear after refresh. `startedAt` is injected by the shell.
+appear after refresh. Each `dwells[missionId]` timestamp is injected by the
+shell; several cards may be measured independently.
 
 ## Events
 
@@ -80,7 +81,7 @@ appear after refresh. `startedAt` is injected by the shell.
 | `DWELL_CANCELLED`   | `missionId`         | The card dropped below 60% before the threshold.                |
 | `DWELL_ELAPSED`     | `missionId`, `now`  | The same card stayed visible for at least 1500ms.               |
 | `ARRIVALS_BUFFERED` | `orderedPendingIds` | The controller has a new deterministic pending snapshot.        |
-| `OPEN_STACK`        | none                | Open the anchored non-modal drawer.                             |
+| `OPEN_STACK`        | `orderedPreviewIds` | Open the drawer and freeze at most three ordered previews.      |
 | `CLOSE_STACK`       | none                | Collapse the drawer without changing either queue.              |
 | `REFRESH_QUEUE`     | none                | Explicitly apply all pending arrivals.                          |
 | `REFRESH_SUCCEEDED` | `orderedUnseenIds`  | Replace the stable snapshot and clear the stack.                |
@@ -95,23 +96,23 @@ membership.
 
 ## Transition table
 
-| From                            | Event                     | To               | Effects                                                        |
-| ------------------------------- | ------------------------- | ---------------- | -------------------------------------------------------------- |
-| `all-feed`                      | `ENTER_NEW_QUEUE(ids)`    | `stable-queue`   | capture ids; preserve scroll                                   |
-| `stable-queue`                  | `DWELL_STARTED(id, now)`  | `stable-queue`   | start one cancellable 1500ms timer                             |
-| `stable-queue`                  | `DWELL_CANCELLED(id)`     | `stable-queue`   | cancel matching timer                                          |
-| `stable-queue`                  | `DWELL_ELAPSED(id, now)`  | `stable-queue`   | emit `mark-seen(id)`; clear dwell; do **not** remove id        |
-| `stable-queue`                  | `ARRIVALS_BUFFERED(ids)`  | `stable-queue`   | replace pending snapshot; show/update collapsed stack          |
-| `stable-queue`                  | `OPEN_STACK`              | `drawer-open`    | freeze top-three `previewIds`; move focus to drawer heading    |
-| `drawer-open`                   | `ARRIVALS_BUFFERED(ids)`  | `drawer-open`    | update count/pending ids; keep `previewIds` frozen             |
-| `drawer-open`                   | `CLOSE_STACK`             | `stable-queue`   | restore focus to stack trigger                                 |
-| `stable-queue` or `drawer-open` | `REFRESH_QUEUE`           | `refreshing`     | apply controller buffer exactly once                           |
-| `refreshing`                    | `REFRESH_SUCCEEDED(ids)`  | `stable-queue`   | rebuild snapshot; clear stack; scroll feed start into view     |
-| `refreshing`                    | `REFRESH_FAILED(message)` | `refresh-error`  | retain previous and pending ids; announce error politely       |
-| `refresh-error`                 | `RETRY_REFRESH`           | `refreshing`     | retry same pending application                                 |
-| any queue state                 | `EXIT_NEW_QUEUE`          | `all-feed`       | cancel dwell; drop queue snapshot; preserve persisted seen ids |
-| any queue state                 | `SCAN_CANCELLED`          | same queue state | clear pending ids/stack only                                   |
-| any                             | `PANEL_CLOSED`            | `all-feed`       | cancel timers; drop in-memory state                            |
+| Region / from                                   | Event                              | To              | Effects                                                                        |
+| ----------------------------------------------- | ---------------------------------- | --------------- | ------------------------------------------------------------------------------ |
+| queue / `all-feed`                              | `ENTER_NEW_QUEUE(ids)`             | `stable-queue`  | capture ids; preserve scroll                                                   |
+| queue / any                                     | `DWELL_STARTED(id, now)`           | same mode       | record or replace the dwell for id                                             |
+| queue / any                                     | `DWELL_CANCELLED(id)`              | same mode       | clear the matching dwell only                                                  |
+| queue / any                                     | `DWELL_ELAPSED(id, now)`           | same mode       | emit `mark-seen(id)`; clear dwell; do **not** remove id                        |
+| queue / any                                     | `EXIT_NEW_QUEUE`                   | `all-feed`      | clear dwell and snapshot; keep persisted seen ids                              |
+| stack / `empty`                                 | `ARRIVALS_BUFFERED(ids)`           | `collapsed`     | show the anchored stack                                                        |
+| stack / `collapsed`                             | `ARRIVALS_BUFFERED(ids)`           | `collapsed`     | replace the pending snapshot                                                   |
+| stack / `collapsed`                             | `OPEN_STACK`                       | `open`          | freeze top-three previews; focus drawer heading                                |
+| stack / `open`                                  | `ARRIVALS_BUFFERED(ids)`           | `open`          | update count/pending ids; keep previews frozen                                 |
+| stack / `open`                                  | `CLOSE_STACK`                      | `collapsed`     | restore focus to stack trigger                                                 |
+| stack / `collapsed`, `open`, or `refresh-error` | `REFRESH_QUEUE` or `RETRY_REFRESH` | `refreshing`    | apply controller buffer exactly once                                           |
+| stack / `refreshing`                            | `REFRESH_SUCCEEDED(ids)`           | `empty`         | clear stack; rebuild queue only when queue region is stable; scroll feed start |
+| stack / `refreshing`                            | `REFRESH_FAILED(message)`          | `refresh-error` | retain current queue and pending ids; announce error politely                  |
+| stack / any                                     | `SCAN_CANCELLED`                   | `empty`         | clear pending ids only; queue region is unchanged                              |
+| both / any                                      | `PANEL_CLOSED`                     | initial state   | cancel timers; drop in-memory state                                            |
 
 Events that do not appear above are rejected as no-ops. In particular,
 `DWELL_ELAPSED` is rejected unless it matches the active dwell id and satisfies
@@ -131,9 +132,11 @@ Events that do not appear above are rejected as no-ops. In particular,
 
 ### Collapsed anchored stack
 
-- Render only when `pendingArrivalIds.length > 0`.
-- Anchor above the existing bottom navigation. Reserve enough feed bottom padding
-  that the collapsed control does not cover the final mission actions.
+- Render only when `stack.pendingIds.length > 0`.
+- Anchor to the lower edge of the feed viewport. MissionPulse navigation remains
+  at the top of the side panel; the stack does not imply or introduce bottom
+  navigation. Reserve enough feed bottom padding that the collapsed control does
+  not cover the final mission actions.
 - Visual depth is capped at three solid layers regardless of count. The numeric
   count is authoritative.
 - The whole trigger is keyboard reachable and at least 44px high.
@@ -196,6 +199,9 @@ Events that do not appear above are rejected as no-ops. In particular,
 - **I10 — Focus lens precedence.** Notification focus remains an explicit
   allow-list and bypasses this queue until dismissed; arrival state is preserved
   underneath.
+- **I11 — Independent regions.** Entering or exiting Nouvelles never clears the
+  arrival stack; buffering, opening, or closing the stack never changes queue
+  mode or queue membership.
 
 ## Review of non-happy paths
 
