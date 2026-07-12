@@ -136,6 +136,9 @@ function makeController(enabledConnectorIds = new Set<string>()): FeedController
     get pendingConnectorCount() {
       return 0;
     },
+    get pendingMissions() {
+      return [];
+    },
     get isApplyingPendingMissions() {
       return false;
     },
