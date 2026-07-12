@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
+  import type { MissionDwellSignal } from '$lib/core/feed/mission-arrival-queue';
   import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
   import { getLastTransitionTime } from '$lib/core/tracking';
   import MissionCard from '../molecules/MissionCard.svelte';
@@ -21,8 +22,10 @@
     sortBy = 'score',
     resetKey = '',
     filterActive = false,
+    stableQueueActive = false,
     tourStep = null,
     onMissionSeen,
+    onMissionReadSignal,
     onToggleFavorite,
     onHide,
     onToggleCompare,
@@ -45,8 +48,10 @@
     sortBy?: 'score' | 'date' | 'tjm';
     resetKey?: string;
     filterActive?: boolean;
+    stableQueueActive?: boolean;
     tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onMissionSeen?: (id: string) => void;
+    onMissionReadSignal?: (id: string, signal: MissionDwellSignal) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
     onToggleCompare?: (id: string) => void;
@@ -219,7 +224,14 @@
           trackingStatus={missionTracking?.currentStatus ?? null}
           trackingUpdatedAt={missionTracking ? getLastTransitionTime(missionTracking) : null}
           tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
-          onVisible={() => onMissionSeen?.(mission.id)}
+          showSeenStatus={stableQueueActive}
+          onReadSignal={(signal) => {
+            if (onMissionReadSignal) {
+              onMissionReadSignal(mission.id, signal);
+            } else if (signal.type === 'elapsed') {
+              onMissionSeen?.(mission.id);
+            }
+          }}
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}
           onToggleCompare={() => onToggleCompare?.(mission.id)}
