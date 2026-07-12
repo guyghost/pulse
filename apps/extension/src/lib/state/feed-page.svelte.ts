@@ -714,10 +714,19 @@ export function createFeedPageState(
     hasPendingMissions: boolean = pendingMissions.length > 0
   ): void {
     if (hasPendingMissions && pendingMissions.length > 0) {
-      arrivalPreviewCatalog = {
-        ...arrivalPreviewCatalog,
-        ...Object.fromEntries(pendingMissions.map((mission) => [mission.id, mission])),
-      };
+      let nextCatalog = arrivalPreviewCatalog;
+      for (const mission of pendingMissions) {
+        if (nextCatalog[mission.id] === mission) {
+          continue;
+        }
+        if (nextCatalog === arrivalPreviewCatalog) {
+          nextCatalog = { ...arrivalPreviewCatalog };
+        }
+        nextCatalog[mission.id] = mission;
+      }
+      if (nextCatalog !== arrivalPreviewCatalog) {
+        arrivalPreviewCatalog = nextCatalog;
+      }
       dispatchArrival({
         type: 'ARRIVALS_BUFFERED',
         orderedPendingIds: pendingMissions.map((mission) => mission.id),
