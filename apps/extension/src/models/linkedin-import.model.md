@@ -259,11 +259,15 @@ The extractor uses structural and accessibility signals, in this order:
 Generated or experiment-specific CSS classes are never the sole gate for a
 position. A nested identity (for example, a `profilePosition` link or an owner
 edit-form link) is normalized to its owning row before parsing. When LinkedIn's
-owner view exposes no recognized structural row wrapper, the descriptive
-edit-form link may own itself: its accessible text contains the title, company,
-date range, and location required by the position contract. The adjacent
-"Modifier" link carries the same numeric identity and is treated as a duplicate
-representation, never as a second experience. Candidates are classified as `group`,
+owner view exposes no recognized structural row wrapper, the owner is the
+smallest ancestor that contains the identified position structure and its
+associated content. This preserves description text rendered as a sibling of
+the descriptive edit-form link without absorbing an adjacent position. If no
+such ancestor exists, the descriptive edit-form link may own itself: its
+accessible text contains the title, company, date range, and location required
+by the position contract. The adjacent "Modifier" link carries the same numeric
+identity and is treated as a duplicate representation, never as a second
+experience. Candidates are classified as `group`,
 `position`, or unrelated `chrome`: groups preserve company context for their
 leaf positions and are never emitted themselves; weak candidates that do not
 have the minimum position structure after inherited context are ignored as page
@@ -422,6 +426,10 @@ extracting → merging` sequence.
     link and its adjacent edit action resolve to the same `/edit/forms/{id}`
     bucket, and one parseable representation is sufficient. The action-only
     duplicate can neither invalidate the bucket nor create another experience.
+23. Owner-view descriptions belong to the identified position even when
+    LinkedIn renders them as siblings of the descriptive edit-form link. Owner
+    resolution must preserve that prose while remaining bounded to one position
+    identity; content from an adjacent position must never leak into it.
 
 ## Error and recovery matrix
 

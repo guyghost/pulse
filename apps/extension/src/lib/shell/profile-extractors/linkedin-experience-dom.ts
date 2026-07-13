@@ -151,16 +151,6 @@ export async function extractLinkedInExperiencesFromDom(
     inheritedCompany: string | undefined;
   }
 
-  const rowOwner = (candidate: Element, root: Element): Element => {
-    const structuralOwner = candidate.closest('[role="listitem"], li, .pvs-list__paged-list-item');
-    if (structuralOwner && root.contains(structuralOwner)) {
-      return structuralOwner;
-    }
-
-    const semanticOwner = candidate.closest('[data-view-name="profile-component-entity"]');
-    return semanticOwner && root.contains(semanticOwner) ? semanticOwner : candidate;
-  };
-
   const positionIdentity = (marker: Element): string | undefined => {
     const normalize = (value: string): string | undefined => {
       try {
@@ -198,6 +188,53 @@ export async function extractLinkedInExperiencesFromDom(
     } catch {
       return undefined;
     }
+  };
+
+  const rowOwner = (candidate: Element, root: Element): Element => {
+    const structuralOwner = candidate.closest('[role="listitem"], li, .pvs-list__paged-list-item');
+    if (structuralOwner && root.contains(structuralOwner)) {
+      return structuralOwner;
+    }
+
+    const semanticOwner = candidate.closest('[data-view-name="profile-component-entity"]');
+    if (semanticOwner && root.contains(semanticOwner)) {
+      return semanticOwner;
+    }
+
+    if (!candidate.matches('a[href*="/details/experience/edit/forms/"]')) {
+      return candidate;
+    }
+
+    const identity = positionIdentity(candidate);
+    if (!identity) {
+      return candidate;
+    }
+
+    for (
+      let ancestor = candidate.parentElement;
+      ancestor && ancestor !== root;
+      ancestor = ancestor.parentElement
+    ) {
+      const ownerLinks = [
+        ...ancestor.querySelectorAll('a[href*="/details/experience/edit/forms/"]'),
+      ];
+      const ownerIdentities = new Set(ownerLinks.map(positionIdentity).filter(Boolean));
+      if (ownerIdentities.size !== 1 || !ownerIdentities.has(identity)) {
+        break;
+      }
+
+      const contentWithoutIdentityLinks = ancestor.cloneNode(true) as Element;
+      for (const link of contentWithoutIdentityLinks.querySelectorAll(
+        'a[href*="/details/experience/edit/forms/"]'
+      )) {
+        link.remove();
+      }
+      if (cleanLine(contentWithoutIdentityLinks.textContent)) {
+        return ancestor;
+      }
+    }
+
+    return candidate;
   };
 
   const hasPositionStructure = (row: Element): boolean => {

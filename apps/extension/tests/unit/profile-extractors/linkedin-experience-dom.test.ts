@@ -149,6 +149,62 @@ describe('extractLinkedInExperiencesFromDom', () => {
     ]);
   });
 
+  it('includes an owner-view description rendered beside the edit-form link', async () => {
+    render(`
+      <main>
+        <section>
+          <h1>Expérience</h1>
+          <div class="generated-owner-position">
+            <a href="/in/guyghost/details/experience/edit/forms/2397304299/">
+              <span aria-hidden="true"><strong>Technical Lead</strong></span>
+              <span aria-hidden="true">BNP Paribas Personal Finance · Freelance</span>
+              <span aria-hidden="true">janv. 2023 - oct. 2025 · 2 ans 10 mois</span>
+              <span aria-hidden="true">Levallois-Perret, Île-de-France, France · Hybride</span>
+            </a>
+            <div class="generated-owner-position-details">
+              <span aria-hidden="true">Pilotage de la plateforme de paiement.</span>
+            </div>
+            <a href="/in/guyghost/details/experience/edit/forms/2397304299/">
+              Modifier Technical Lead chez BNP Paribas Personal Finance
+            </a>
+          </div>
+          <div class="generated-owner-position">
+            <a href="/in/guyghost/details/experience/edit/forms/9876543210/">
+              <span aria-hidden="true"><strong>Solution Architect</strong></span>
+              <span aria-hidden="true">ING · CDI</span>
+              <span aria-hidden="true">mars 2020 - déc. 2022 · 2 ans 10 mois</span>
+              <span aria-hidden="true">Paris, France</span>
+            </a>
+            <div class="generated-owner-position-details">
+              <span aria-hidden="true">Architecture des services critiques.</span>
+            </div>
+          </div>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toEqual([
+      expect.objectContaining({
+        title: 'Technical Lead',
+        company: 'BNP Paribas Personal Finance',
+        description: 'Pilotage de la plateforme de paiement.',
+        externalId: 'linkedin-owner-position-2397304299',
+      }),
+      expect.objectContaining({
+        title: 'Solution Architect',
+        company: 'ING',
+        description: 'Architecture des services critiques.',
+        externalId: 'linkedin-owner-position-9876543210',
+      }),
+    ]);
+  });
+
   it('parses a structurally valid generic list row with generated CSS classes', async () => {
     render(`
       <main>
