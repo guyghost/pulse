@@ -418,12 +418,12 @@ export function createFeedPageState(
   const stableQueueActive = $derived(arrivalQueueState.queue.value === 'stable-queue');
   const stableQueueIds = $derived(
     arrivalQueueState.queue.value === 'stable-queue'
-      ? new Set(arrivalQueueState.queue.queueIds)
+      ? new SvelteSet(arrivalQueueState.queue.queueIds)
       : null
   );
 
   function sortCurrentMissions(input: Mission[]): Mission[] {
-    return sortBy === 'score' ? rankMissions(input, new Date()) : sortMissions(input, sortBy);
+    return sortBy === 'score' ? rankMissions(input, new SvelteDate()) : sortMissions(input, sortBy);
   }
 
   const newQueueCandidateMissions = $derived.by(() => {
@@ -626,15 +626,7 @@ export function createFeedPageState(
     // 'score' sort uses the composite ranking (relevance + freshness + source
     // diversity) instead of a plain single-key sort. Users can switch to 'date'
     // or 'tjm' for an explicit single-key sort.
-<<<<<<< HEAD
-    if (sortBy === 'score') {
-      return rankMissions(scopedMissions, new SvelteDate());
-    }
-
-    return sortMissions(scopedMissions, sortBy);
-=======
     return sortCurrentMissions(scopedMissions);
->>>>>>> origin/develop
   });
 
   const pendingMissionsSorted = $derived(sortCurrentMissions(controller.pendingMissions));

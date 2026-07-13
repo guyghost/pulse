@@ -177,7 +177,7 @@
     </section>
   {:else}
     <div class="relative h-[4.75rem]">
-      {#each layerIndexes as _, index}
+      {#each layerIndexes as _, index (index)}
         <div
           class="absolute inset-x-0 h-14 rounded-xl border border-border-light bg-surface-white"
           class:top-0={index === 0}

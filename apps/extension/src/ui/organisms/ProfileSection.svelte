@@ -105,13 +105,8 @@
         bind:value={profileLocation}
       />
       <datalist id="profile-location-catalog">
-<<<<<<< HEAD
         {#each LOCATION_LABELS as label (label)}
-          <option value={label} />
-=======
-        {#each LOCATION_LABELS as label}
           <option value={label}></option>
->>>>>>> origin/develop
         {/each}
       </datalist>
       <div class="grid grid-cols-2 gap-2">
