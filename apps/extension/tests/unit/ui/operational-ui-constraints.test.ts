@@ -107,7 +107,9 @@ describe('operational UI constraints', () => {
     expect(feedSource).toContain('class="relative h-full overflow-y-auto"');
     expect(feedSource).toContain('data-testid="feed-scroll-container"');
     expect(feedSource).toContain('data-testid="mission-feed"');
-    expect(feedSource).toContain('class="px-4 pb-28 pt-4 focus:outline-none"');
+    expect(feedSource).toContain(
+      "class=\"px-4 pt-4 focus:outline-none {page.arrivalStackVisible ? 'pb-40' : 'pb-28'}\""
+    );
     expect(feedSource).not.toContain('class="flex-1 overflow-y-auto px-4 pb-5 pt-4"');
     expect(appSource).toContain('class="absolute inset-0 overflow-hidden"');
     expect(appSource).not.toContain(
@@ -128,6 +130,26 @@ describe('operational UI constraints', () => {
     expect(source).toContain('@media (prefers-reduced-motion: reduce)');
     expect(source).toContain('transition-duration: 0.01ms !important');
     expect(source).toContain('animation-iteration-count: 1 !important');
+  });
+
+  it('keeps buffered mission arrivals anchored, bounded, and explicitly applied', () => {
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const stackSource = readFileSync('src/ui/organisms/MissionArrivalStack.svelte', 'utf8');
+    const toastSource = readFileSync('src/ui/organisms/ToastContainer.svelte', 'utf8');
+
+    expect(feedSource).toContain("import('../organisms/MissionArrivalStack.svelte')");
+    expect(feedSource).toContain('page.startArrivalRefresh()');
+    expect(feedSource).toContain('await controller.applyPendingMissions()');
+    expect(feedSource).toContain('page.completeArrivalRefresh()');
+    expect(feedSource).toContain('stableQueueActive={page.stableQueueActive}');
+    expect(feedSource).toContain('onMissionReadSignal={page.handleMissionReadSignal}');
+    expect(feedSource).not.toContain('data-testid="pending-missions-banner"');
+
+    expect(stackSource).toContain('missions.slice(0, 3)');
+    expect(stackSource).toContain('data-testid="arrival-stack-layer"');
+    expect(stackSource).toContain('@media (prefers-reduced-motion: reduce)');
+    expect(stackSource).not.toContain('backdrop');
+    expect(toastSource).toContain('bottom-[var(--toast-bottom-offset,4rem)]');
   });
 
   it('guides users from the feed summary to missions below the fold', () => {

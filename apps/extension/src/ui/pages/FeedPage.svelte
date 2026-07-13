@@ -277,6 +277,8 @@
     typeof import('../organisms/MissionInvestigationDrawer.svelte').default | null = $state(null);
   let MissionComparison: typeof import('../organisms/MissionComparison.svelte').default | null =
     $state(null);
+  let MissionArrivalStack: typeof import('../organisms/MissionArrivalStack.svelte').default | null =
+    $state(null);
   let ProfileRefinementBanner:
     typeof import('../molecules/ProfileRefinementBanner.svelte').default | null = $state(null);
   let ConnectorAlertBar: typeof import('../molecules/ConnectorAlertBar.svelte').default | null =
@@ -343,6 +345,14 @@
     if (!MissionComparison) {
       import('../organisms/MissionComparison.svelte').then((module) => {
         MissionComparison = module.default;
+      });
+    }
+  }
+
+  function loadMissionArrivalStack(): void {
+    if (!MissionArrivalStack) {
+      import('../organisms/MissionArrivalStack.svelte').then((module) => {
+        MissionArrivalStack = module.default;
       });
     }
   }
@@ -424,6 +434,23 @@
     if (showComparison && page.comparisonMissions.length >= 2) {
       loadComparison();
     }
+  });
+
+  $effect(() => {
+    if (page.arrivalStackVisible) {
+      loadMissionArrivalStack();
+    }
+  });
+
+  $effect(() => {
+    const root = document.documentElement;
+    if (!page.arrivalStackVisible) {
+      root.style.removeProperty('--toast-bottom-offset');
+      return;
+    }
+
+    root.style.setProperty('--toast-bottom-offset', '6.5rem');
+    return () => root.style.removeProperty('--toast-bottom-offset');
   });
 
   $effect(() => {
@@ -536,11 +563,10 @@
   // Focus lens (notification deep-link): banner shows when the feed is filtered
   // to the notified missions. See src/models/notification-deep-link.model.md.
   const focusActive = $derived(page.focusMode === 'focused' && page.focusMissions.length > 0);
-  const pendingMissionLabel = $derived(formatMissionCount(controller.pendingMissionCount));
-  const pendingConnectorLabel = $derived(
-    controller.pendingConnectorCount > 0
-      ? `${controller.pendingConnectorCount} source${controller.pendingConnectorCount > 1 ? 's' : ''}`
-      : 'scan terminé'
+  const arrivalDrawerExpanded = $derived(
+    page.arrivalStackState.value === 'open' ||
+      page.arrivalStackState.value === 'refreshing' ||
+      page.arrivalStackState.value === 'refresh-error'
   );
   const missionFeedResetKey = $derived(
     `${page.missionListResetKey}::alert:${showAlertOnly ? 'alert' : 'all'}`
@@ -664,12 +690,32 @@
     controller.startScan();
   }
 
-  function handleApplyPendingMissions(): void {
-    controller.applyPendingMissions().catch((err) => {
+  async function handleApplyPendingMissions(): Promise<void> {
+    const transitionEffects = page.startArrivalRefresh();
+    if (!transitionEffects.some((effect) => effect.type === 'apply-pending')) {
+      return;
+    }
+
+    try {
+      await controller.applyPendingMissions();
+      const completionEffects = page.completeArrivalRefresh();
+      await tick();
+      if (
+        completionEffects.some((effect) => effect.type === 'scroll-feed-start') &&
+        missionFeedSection
+      ) {
+        const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+        missionFeedSection.scrollIntoView({
+          behavior: reduceMotion ? 'auto' : 'smooth',
+          block: 'start',
+        });
+      }
+    } catch (err) {
+      page.failArrivalRefresh('Impossible d’actualiser la file. Réessayer.');
       if (import.meta.env.DEV) {
         console.warn('[FeedPage] apply pending missions failed:', err);
       }
-    });
+    }
   }
 
   function handleOpenExternalUrl(url: string): void {
@@ -1435,41 +1481,6 @@
           onEnableAndScan={(connectorId) => controller.recheckConnector(connectorId, true)}
         />
       {/if}
-
-      {#if controller.hasPendingMissions}
-        <section
-          class="mt-4 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/6 px-4 py-3"
-          data-testid="pending-missions-banner"
-          aria-live="polite"
-        >
-          <div class="flex items-center gap-3">
-            <span
-              class="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-surface-white text-blueprint-blue"
-              aria-hidden="true"
-            >
-              <Icon name="download" size={15} />
-            </span>
-            <div class="min-w-0 flex-1">
-              <p class="text-xs font-semibold text-text-primary">
-                {pendingMissionLabel} prête{controller.pendingMissionCount > 1 ? 's' : ''} à afficher
-              </p>
-              <p class="mt-0.5 text-[10px] leading-4 text-text-subtle">
-                Le feed reste stable pendant la collecte. Appliquez les résultats quand vous êtes
-                prêt. Source: {pendingConnectorLabel}.
-              </p>
-            </div>
-            <button
-              type="button"
-              class="shrink-0 rounded-lg border border-blueprint-blue/20 bg-surface-white px-3 py-2 text-[11px] font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/8 disabled:cursor-wait disabled:opacity-60"
-              onclick={handleApplyPendingMissions}
-              disabled={controller.isApplyingPendingMissions}
-              aria-label={`Afficher ${pendingMissionLabel} dans le feed`}
-            >
-              {controller.isApplyingPendingMissions ? 'Application...' : 'Afficher'}
-            </button>
-          </div>
-        </section>
-      {/if}
     </div>
   </div>
 
@@ -1477,7 +1488,7 @@
   <div
     bind:this={missionFeedSection}
     data-testid="mission-feed"
-    class="px-4 pb-28 pt-4 focus:outline-none"
+    class="px-4 pt-4 focus:outline-none {page.arrivalStackVisible ? 'pb-40' : 'pb-28'}"
     tabindex="-1"
     aria-labelledby="mission-feed-title"
   >
@@ -1565,7 +1576,8 @@
           sortBy={page.sortBy}
           resetKey={missionFeedResetKey}
           filterActive={page.filterActive || showAlertOnly}
-          onMissionSeen={page.handleMissionSeen}
+          stableQueueActive={page.stableQueueActive}
+          onMissionReadSignal={page.handleMissionReadSignal}
           onToggleFavorite={page.handleToggleFavorite}
           onHide={page.handleHide}
           onToggleCompare={page.toggleCompare}
@@ -1616,6 +1628,18 @@
   </div>
 </div>
 
+{#if page.arrivalStackVisible && MissionArrivalStack}
+  <MissionArrivalStack
+    count={controller.pendingMissionCount}
+    missions={page.arrivalPreviewMissions}
+    state={page.arrivalStackState.value}
+    errorMessage={page.arrivalStackState.message}
+    onOpen={page.openArrivalStack}
+    onClose={page.closeArrivalStack}
+    onRefresh={handleApplyPendingMissions}
+  />
+{/if}
+
 {#if KeyboardShortcutsHelp}
   <KeyboardShortcutsHelp bind:isOpen={page.showShortcutsHelp} />
 {/if}
@@ -1647,9 +1671,11 @@
   />
 {/if}
 
-{#if page.comparisonMissionIds.length > 0}
+{#if page.comparisonMissionIds.length > 0 && !arrivalDrawerExpanded}
   <div
-    class="fixed bottom-4 left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl"
+    class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
+      ? 'bottom-24'
+      : 'bottom-4'}"
   >
     <span class="text-xs text-text-secondary">
       {page.comparisonMissionIds.length}/3 sélectionnée{page.comparisonMissionIds.length > 1

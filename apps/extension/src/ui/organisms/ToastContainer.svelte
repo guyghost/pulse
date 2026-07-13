@@ -23,7 +23,7 @@
 
 {#if store.toasts.length > 0}
   <div
-    class="absolute bottom-16 left-3 right-3 z-50 flex flex-col gap-2"
+    class="absolute bottom-[var(--toast-bottom-offset,4rem)] left-3 right-3 z-50 flex flex-col gap-2 transition-[bottom] duration-200"
     aria-live="polite"
     aria-atomic="true"
   >

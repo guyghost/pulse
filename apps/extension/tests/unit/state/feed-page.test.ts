@@ -119,7 +119,10 @@ function makeScoreBreakdown(overrides: Partial<NonNullable<Mission['scoreBreakdo
   };
 }
 
-function makeController(enabledConnectorIds = new Set<string>()): FeedController {
+function makeController(
+  enabledConnectorIds = new Set<string>(),
+  pendingMissions: Mission[] = []
+): FeedController {
   return {
     get isScanning() {
       return false;
@@ -128,13 +131,16 @@ function makeController(enabledConnectorIds = new Set<string>()): FeedController
       return false;
     },
     get hasPendingMissions() {
-      return false;
+      return pendingMissions.length > 0;
     },
     get pendingMissionCount() {
-      return 0;
+      return pendingMissions.length;
     },
     get pendingConnectorCount() {
       return 0;
+    },
+    get pendingMissions() {
+      return [...pendingMissions];
     },
     get isApplyingPendingMissions() {
       return false;
@@ -282,6 +288,59 @@ describe('feed page state', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('keeps a read mission in the active stable new queue until the queue is reopened', () => {
+    vi.useFakeTimers();
+    try {
+      const feed = createFeedStore();
+      const page = createFeedPageState(feed, makeController());
+      feed.setMissions([
+        makeMission({ id: 'new-1', score: 88 }),
+        makeMission({ id: 'new-2', score: 72 }),
+      ]);
+
+      page.toggleNewOnly();
+      expect(page.stableQueueActive).toBe(true);
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-1', 'new-2']);
+
+      page.handleMissionReadSignal('new-1', { type: 'started', at: 0 });
+      page.handleMissionReadSignal('new-1', { type: 'elapsed', at: 1500 });
+      vi.advanceTimersByTime(120);
+
+      expect(page.seenIds).toContain('new-1');
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-1', 'new-2']);
+
+      page.toggleNewOnly();
+      page.toggleNewOnly();
+
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-2']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('opens frozen arrival previews without changing normal feed membership', () => {
+    const feed = createFeedStore();
+    const pending = [
+      makeMission({ id: 'pending-1', score: 91 }),
+      makeMission({ id: 'pending-2', score: 86 }),
+      makeMission({ id: 'pending-3', score: 82 }),
+      makeMission({ id: 'pending-4', score: 78 }),
+    ];
+    const page = createFeedPageState(feed, makeController(new Set(), pending));
+    feed.setMissions([makeMission({ id: 'current-1' })]);
+
+    expect(page.arrivalStackState.value).toBe('collapsed');
+    page.openArrivalStack();
+
+    expect(page.arrivalStackState.value).toBe('open');
+    expect(page.arrivalPreviewMissions.map((mission) => mission.id)).toEqual([
+      'pending-1',
+      'pending-2',
+      'pending-3',
+    ]);
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual(['current-1']);
   });
 
   it('applies decision presets for business-oriented feed filtering', () => {

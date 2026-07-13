@@ -333,6 +333,7 @@ describe('feed controller facade', () => {
     expect(controller.hasPendingMissions).toBe(true);
     expect(controller.pendingMissionCount).toBe(1);
     expect(controller.pendingConnectorCount).toBe(1);
+    expect(controller.pendingMissions.map((mission) => mission.id)).toEqual(['new-free-work']);
     expect(feedStore.setMissions).not.toHaveBeenCalled();
     expect(currentMissions.map((mission) => mission.id)).toEqual(['old-free-work', 'old-lehibou']);
 
@@ -342,6 +343,7 @@ describe('feed controller facade', () => {
     expect(currentMissions.map((mission) => mission.id)).toEqual(['old-lehibou', 'new-free-work']);
     expect(currentMissions[1].scrapedAt).toEqual(new Date('2026-05-22T08:08:00.000Z'));
     expect(controller.hasPendingMissions).toBe(false);
+    expect(controller.pendingMissions).toEqual([]);
 
     bridgeListener?.({
       type: 'SCAN_COMPLETE',
@@ -419,6 +421,10 @@ describe('feed controller facade', () => {
     expect(currentMissions.map((mission) => mission.id)).toEqual(['existing-feed']);
     expect(controller.hasPendingMissions).toBe(true);
     expect(controller.pendingMissionCount).toBe(2);
+    expect(controller.pendingMissions.map((mission) => mission.id)).toEqual([
+      'final-duplicate-a',
+      'final-duplicate-b',
+    ]);
 
     await controller.applyPendingMissions();
 
@@ -430,6 +436,7 @@ describe('feed controller facade', () => {
       expect.objectContaining({ id: 'final-duplicate-a' }),
       expect.objectContaining({ id: 'final-duplicate-b' }),
     ]);
+    expect(controller.pendingMissions).toEqual([]);
     controller.dispose();
   });
 

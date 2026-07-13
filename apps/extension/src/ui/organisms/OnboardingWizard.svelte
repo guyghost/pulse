@@ -457,8 +457,13 @@
       bind:value={location}
     />
     <datalist id="ob-location-catalog">
+<<<<<<< HEAD
       {#each LOCATION_LABELS as label (label)}
         <option value={label} />
+=======
+      {#each LOCATION_LABELS as label}
+        <option value={label}></option>
+>>>>>>> origin/develop
       {/each}
     </datalist>
   </div>

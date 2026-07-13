@@ -87,6 +87,14 @@ describe('MissionCard', () => {
     expect(target.textContent).not.toContain('Nouveau');
   });
 
+  it('affiche "Vu" pour une mission lue dans une file stable', async () => {
+    const target = mountCard({ isSeen: true, showSeenStatus: true });
+    await tick();
+
+    expect(target.textContent).toContain('Vu');
+    expect(target.textContent).not.toContain('Nouveau');
+  });
+
   it('affiche le timestamp du dernier changement de statut', async () => {
     const target = mountCard({
       trackingStatus: 'selected',
