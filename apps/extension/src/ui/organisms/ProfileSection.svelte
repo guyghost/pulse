@@ -105,7 +105,7 @@
         bind:value={profileLocation}
       />
       <datalist id="profile-location-catalog">
-        {#each LOCATION_LABELS as label}
+        {#each LOCATION_LABELS as label (label)}
           <option value={label}></option>
         {/each}
       </datalist>
@@ -118,7 +118,7 @@
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={profileRemote}
           >
-            {#each remoteOptions as option}
+            {#each remoteOptions as option, i (i)}
               <option value={option.value}>{option.label}</option>
             {/each}
           </select>
@@ -131,7 +131,7 @@
             class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={seniority}
           >
-            {#each seniorityOptions as option}
+            {#each seniorityOptions as option, i (i)}
               <option value={option.value}>{option.label}</option>
             {/each}
           </select>
@@ -183,7 +183,7 @@
         </div>
         {#if profileKeywords.length > 0}
           <div class="flex flex-wrap gap-1.5 pt-1">
-            {#each profileKeywords as keyword}
+            {#each profileKeywords as keyword (keyword)}
               <Chip label={keyword} selected={true} onclick={() => onRemoveKeyword(keyword)} />
             {/each}
           </div>
@@ -192,9 +192,7 @@
 
       <div class="pt-1">
         <Button variant="secondary" onclick={onSave} loading={isSaving}>
-          {#snippet children()}
-            {isSaving ? 'Sauvegarde...' : profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}
-          {/snippet}
+          {isSaving ? 'Sauvegarde...' : profileSaved ? 'Sauvegardé !' : 'Enregistrer le profil'}
         </Button>
       </div>
       {#if profileError}
@@ -229,7 +227,7 @@
       {/if}
       {#if profileKeywords.length > 0}
         <div class="flex flex-wrap gap-1.5 pt-1">
-          {#each profileKeywords as keyword}
+          {#each profileKeywords as keyword (keyword)}
             <span
               class="inline-flex items-center rounded-md bg-blueprint-blue/6 px-2 py-0.5 text-[11px] text-blueprint-blue"
               >{keyword}</span

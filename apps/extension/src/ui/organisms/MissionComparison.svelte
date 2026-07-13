@@ -187,7 +187,7 @@
             </div>
 
             <div class="mt-3 grid grid-cols-2 gap-2">
-              {#each decisionEvidence as item}
+              {#each decisionEvidence as item, i (i)}
                 <div
                   class="rounded-lg border px-2 py-1.5 {item.severity === 'attention'
                     ? 'border-status-orange/25 bg-status-orange/5'
@@ -222,7 +222,7 @@
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted self-end">Mission</div>
-        {#each missions as mission}
+        {#each missions as mission (mission.id)}
           <div class="px-2">
             <a
               href={mission.url}
@@ -242,9 +242,9 @@
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">Stack</div>
-        {#each missions as mission}
+        {#each missions as mission (mission.id)}
           <div class="flex flex-wrap gap-1 px-2">
-            {#each mission.stack.slice(0, 5) as tech}
+            {#each mission.stack.slice(0, 5) as tech (tech)}
               <span
                 class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-[10px] text-blueprint-blue"
                 >{tech}</span
@@ -258,13 +258,13 @@
       </div>
 
       <!-- Data rows -->
-      {#each fields as field, i}
+      {#each fields as field, i (i)}
         <div
           class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
           style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
         >
           <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">{field.label}</div>
-          {#each missions as mission}
+          {#each missions as mission (mission.id)}
             <div class="px-2 text-xs text-text-primary">{field.render(mission)}</div>
           {/each}
         </div>
@@ -276,7 +276,7 @@
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div></div>
-        {#each missions as mission}
+        {#each missions as mission (mission.id)}
           <div class="px-2">
             <a
               href={mission.url}

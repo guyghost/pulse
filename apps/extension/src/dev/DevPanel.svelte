@@ -217,7 +217,7 @@
           <span class="text-[10px] text-text-muted">Simuler une situation visible</span>
         </div>
         <div class="grid grid-cols-2 gap-1 mt-1 sm:flex">
-          {#each [{ id: 'empty', label: 'empty', hint: 'Valider état vide' }, { id: 'loading', label: 'loading', hint: 'Valider skeleton' }, { id: 'loaded', label: 'loaded', hint: 'Valider feed actif' }, { id: 'error', label: 'error', hint: 'Valider incident' }] as state}
+          {#each [{ id: 'empty', label: 'empty', hint: 'Valider état vide' }, { id: 'loading', label: 'loading', hint: 'Valider skeleton' }, { id: 'loaded', label: 'loaded', hint: 'Valider feed actif' }, { id: 'error', label: 'error', hint: 'Valider incident' }] as state (state.id)}
             <button
               class="rounded-lg border border-border-light bg-surface-white px-2 py-1.5 text-left text-[11px] transition-colors hover:bg-subtle-gray"
               onclick={() => onSetState?.(state.id as 'empty' | 'loading' | 'loaded' | 'error')}
@@ -367,7 +367,7 @@
                 Aucun message runtime. Lancez un scan ou changez d’état.
               </p>
             {:else}
-              {#each logs as log}
+              {#each logs as log, i (i)}
                 <div class="flex gap-2">
                   <span class="text-text-muted">{log.time}</span>
                   <span

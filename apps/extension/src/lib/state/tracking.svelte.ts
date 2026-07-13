@@ -6,6 +6,7 @@
  */
 
 import type { MissionTracking } from '$lib/core/types/tracking';
+import { SvelteMap } from 'svelte/reactivity';
 import type { ApplicationStatus } from '$lib/core/types/tracking';
 import { STATUS_LABELS } from '$lib/core/types/tracking';
 import { sendMessage } from '$lib/shell/messaging/bridge';
@@ -14,7 +15,7 @@ export type TrackingState = 'idle' | 'loading' | 'loaded' | 'error';
 
 export function createTrackingStore() {
   let state = $state<TrackingState>('idle');
-  let trackings = $state<Map<string, MissionTracking>>(new Map());
+  const trackings = new SvelteMap<string, MissionTracking>();
   let error = $state<string | null>(null);
 
   /**
@@ -31,11 +32,10 @@ export function createTrackingStore() {
       });
 
       if (response.type === 'TRACKINGS_RESULT' && Array.isArray(response.payload)) {
-        const map = new Map<string, MissionTracking>();
+        trackings.clear();
         for (const t of response.payload) {
-          map.set(t.missionId, t);
+          trackings.set(t.missionId, t);
         }
-        trackings = map;
         state = 'loaded';
       } else {
         error = 'Failed to load tracking data';
@@ -63,9 +63,7 @@ export function createTrackingStore() {
 
       if (response.type === 'TRACKING_UPDATED' && response.payload) {
         const updated = response.payload;
-        const newMap = new Map(trackings);
-        newMap.set(updated.missionId, updated);
-        trackings = newMap;
+        trackings.set(updated.missionId, updated);
       } else {
         error = 'Failed to update tracking';
       }
@@ -83,9 +81,7 @@ export function createTrackingStore() {
 
       if (response.type === 'TRACKING_UPDATED' && response.payload) {
         const updated = response.payload;
-        const newMap = new Map(trackings);
-        newMap.set(updated.missionId, updated);
-        trackings = newMap;
+        trackings.set(updated.missionId, updated);
       } else {
         error = 'Failed to update next action';
       }
@@ -105,13 +101,11 @@ export function createTrackingStore() {
       });
 
       if (response.type === 'TRACKING_RESTORED') {
-        const newMap = new Map(trackings);
         if (response.payload) {
-          newMap.set(response.payload.missionId, response.payload);
+          trackings.set(response.payload.missionId, response.payload);
         } else {
-          newMap.delete(missionId);
+          trackings.delete(missionId);
         }
-        trackings = newMap;
       } else {
         error = 'Failed to restore tracking';
       }

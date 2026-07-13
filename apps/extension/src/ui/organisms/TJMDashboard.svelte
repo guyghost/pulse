@@ -359,7 +359,7 @@
 
     <!-- Level cards -->
     <div class="space-y-3">
-      {#each levels as level}
+      {#each levels as level (level)}
         {@const range = analysis[level.key]}
         {@const isSelected = userSeniority === level.key}
         <div
@@ -408,7 +408,7 @@
           Stacks suivies
         </p>
         <div class="space-y-3">
-          {#each analysis.topStacks as stack}
+          {#each analysis.topStacks as stack, i (i)}
             {@const maxAverage = Math.max(...analysis.topStacks.map((item) => item.average), 1)}
             {@const barWidth = Math.max(8, Math.round((stack.average / maxAverage) * 100))}
             <div>
@@ -447,7 +447,7 @@
           TJM par région
         </p>
         <div class="space-y-3">
-          {#each analysis.regionInsights.slice(0, 8) as region}
+          {#each analysis.regionInsights.slice(0, 8) as region, i (i)}
             {@const barWidth = Math.max(
               15,
               Math.round((region.average / (analysis.regionInsights[0]?.average || 1)) * 100)
@@ -512,7 +512,7 @@
         </div>
 
         <div class="mt-4 space-y-2">
-          {#each tjmSetupSteps as step, index}
+          {#each tjmSetupSteps as step, index (index)}
             <button
               type="button"
               class="group flex w-full items-start gap-3 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/20 hover:bg-surface-white disabled:cursor-not-allowed disabled:opacity-60"

@@ -187,5 +187,21 @@ export default tseslint.config(
     rules: {
       'no-console': 'off',
     },
+  },
+
+  // ─── eslint-plugin-svelte v3: newly-promoted recommended rules ───────────
+  // The codebase now fully adopts the v3 recommended rules: `require-each-key`,
+  // `no-useless-children-snippet`, `prefer-svelte-reactivity` (SvelteMap/Set/Date),
+  // and `prefer-writable-derived` all run at the recommended level (error).
+  //
+  // `no-navigation-without-resolve` is a SvelteKit-only rule (it expects
+  // `resolve()` from `$app/paths`). This app is a Chrome extension built with
+  // @crxjs/vite-plugin + plain Svelte (no @sveltejs/kit, no `$app/paths`), so
+  // the rule does not apply and is disabled.
+  {
+    files: ['**/*.ts', '**/*.svelte'],
+    rules: {
+      'svelte/no-navigation-without-resolve': 'off',
+    },
   }
 );

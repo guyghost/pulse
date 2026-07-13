@@ -1,4 +1,5 @@
 export type ToastType = 'info' | 'error' | 'success';
+import { SvelteMap } from 'svelte/reactivity';
 
 export interface ToastAction {
   label: string;
@@ -29,7 +30,7 @@ export class ToastStore {
   toasts: ToastItem[] = $state([]);
   nextId: number = $state(1);
 
-  private timers = new Map<number, ReturnType<typeof setTimeout>>();
+  private timers = new SvelteMap<number, ReturnType<typeof setTimeout>>();
 
   add(
     message: string,

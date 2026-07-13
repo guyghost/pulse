@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { SvelteMap } from 'svelte/reactivity';
   import { Icon } from '@pulse/ui';
   import {
     getRegisteredShortcuts,
@@ -15,7 +16,7 @@
   // rather than storing the function itself.
   const shortcutsByCategory = $derived.by(() => {
     const shortcuts = getRegisteredShortcuts();
-    const grouped = new Map<string, ShortcutConfig[]>();
+    const grouped = new SvelteMap<string, ShortcutConfig[]>();
 
     for (const shortcut of shortcuts) {
       const category = shortcut.category || 'Autres';
@@ -143,7 +144,7 @@
       <!-- Shortcuts list -->
       <div class="flex-1 overflow-y-auto bg-page-canvas px-4 py-4">
         <div class="space-y-4">
-          {#each shortcutsByCategory as [category, shortcuts]}
+          {#each shortcutsByCategory as [category, shortcuts] (category)}
             <section aria-labelledby={`shortcut-category-${category}`}>
               <h3
                 id={`shortcut-category-${category}`}
@@ -154,7 +155,7 @@
               <div
                 class="overflow-hidden rounded-xl border border-border-light bg-surface-white shadow-subtle-2"
               >
-                {#each shortcuts as shortcut, index}
+                {#each shortcuts as shortcut, index (index)}
                   <div
                     class="flex min-h-12 items-center justify-between gap-3 px-3 py-2.5 {index > 0
                       ? 'border-t border-border-light'

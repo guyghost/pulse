@@ -115,9 +115,7 @@
       </div>
 
       <div class="flex justify-end">
-        <Button variant="secondary" onclick={onCancel}>
-          {#snippet children()}Fermer{/snippet}
-        </Button>
+        <Button variant="secondary" onclick={onCancel}>Fermer</Button>
       </div>
     {:else if backup}
       {@const stats = {
@@ -217,23 +215,19 @@
       {/if}
 
       <div class="flex gap-3">
-        <Button variant="ghost" onclick={onCancel}>
-          {#snippet children()}Annuler{/snippet}
-        </Button>
+        <Button variant="ghost" onclick={onCancel}>Annuler</Button>
         <Button
           variant="primary"
           onclick={handleConfirm}
           disabled={isRestoring || !canConfirmRestore}
         >
-          {#snippet children()}
-            {#if isRestoring}
-              <Icon name="loader-2" size={16} class="animate-spin mr-1" />
-              Restauration...
-            {:else}
-              <Icon name="refresh-cw" size={16} class="mr-1" />
-              Restaurer ce point
-            {/if}
-          {/snippet}
+          {#if isRestoring}
+            <Icon name="loader-2" size={16} class="animate-spin mr-1" />
+            Restauration...
+          {:else}
+            <Icon name="refresh-cw" size={16} class="mr-1" />
+            Restaurer ce point
+          {/if}
         </Button>
       </div>
     {:else}
@@ -244,9 +238,7 @@
       </div>
 
       <div class="flex justify-end">
-        <Button variant="ghost" onclick={onCancel}>
-          {#snippet children()}Annuler{/snippet}
-        </Button>
+        <Button variant="ghost" onclick={onCancel}>Annuler</Button>
       </div>
     {/if}
   </div>

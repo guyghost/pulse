@@ -7,6 +7,7 @@
  * Uses Svelte 5 runes for reactive state.
  */
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
+import { SvelteMap, SvelteSet, SvelteDate } from 'svelte/reactivity';
 import type { SeniorityLevel, UserProfile } from '$lib/core/types/profile';
 import type {
   FeedDecisionPresetId,
@@ -238,7 +239,7 @@ export function createFeedPageState(
   let seenIds = $state<string[]>([]);
   let favorites = $state<Record<string, number>>({});
   let hidden = $state<Record<string, number>>({});
-  let pendingSeenIds = new Set<string>();
+  let pendingSeenIds = new SvelteSet<string>();
   let seenFlushTimer: ReturnType<typeof setTimeout> | null = null;
   const initialArrivalState = controller.hasPendingMissions
     ? transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
@@ -271,7 +272,7 @@ export function createFeedPageState(
     onCommit: (_id, _snapshot, { stillPending }) => {
       // Persist every hidden mission EXCEPT those whose undo window is still open —
       // committing must not finalize a sibling hide the user can still undo.
-      const pendingIds = new Set(stillPending.map((p) => p.targetId));
+      const pendingIds = new SvelteSet(stillPending.map((p) => p.targetId));
       const persist: Record<string, number> = {};
       for (const [hid, ts] of Object.entries(hidden)) {
         if (!pendingIds.has(hid)) {
@@ -334,7 +335,7 @@ export function createFeedPageState(
   // ============================================================
   // Derived — UI computations
   // ============================================================
-  const seenSet = $derived(new Set(Array.isArray(seenIds) ? Array.from(seenIds) : []));
+  const seenSet = $derived(new SvelteSet(Array.isArray(seenIds) ? Array.from(seenIds) : []));
 
   const favoriteCount = $derived(Object.keys(favorites).length);
   const hiddenCount = $derived(Object.keys(hidden).length);
@@ -358,7 +359,7 @@ export function createFeedPageState(
   );
 
   const availableStacks = $derived.by(() => {
-    const counts = new Map<string, number>();
+    const counts = new SvelteMap<string, number>();
     for (const m of missions) {
       for (const s of m.stack) {
         counts.set(s, (counts.get(s) ?? 0) + 1);
@@ -388,7 +389,7 @@ export function createFeedPageState(
     let result = baseFilteredMissions;
 
     if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
-      const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
+      const stacksSet = selectedStacks.length > 0 ? new SvelteSet(selectedStacks) : null;
       result = result.filter((m) => {
         if (selectedRemote !== null && m.remote !== selectedRemote) {
           return false;
@@ -417,12 +418,12 @@ export function createFeedPageState(
   const stableQueueActive = $derived(arrivalQueueState.queue.value === 'stable-queue');
   const stableQueueIds = $derived(
     arrivalQueueState.queue.value === 'stable-queue'
-      ? new Set(arrivalQueueState.queue.queueIds)
+      ? new SvelteSet(arrivalQueueState.queue.queueIds)
       : null
   );
 
   function sortCurrentMissions(input: Mission[]): Mission[] {
-    return sortBy === 'score' ? rankMissions(input, new Date()) : sortMissions(input, sortBy);
+    return sortBy === 'score' ? rankMissions(input, new SvelteDate()) : sortMissions(input, sortBy);
   }
 
   const newQueueCandidateMissions = $derived.by(() => {
@@ -451,7 +452,7 @@ export function createFeedPageState(
       result = result.filter((m) => m.source === selectedSource);
     }
     if (selectedRemote !== null || selectedStacks.length > 0 || selectedSeniority !== null) {
-      const stacksSet = selectedStacks.length > 0 ? new Set(selectedStacks) : null;
+      const stacksSet = selectedStacks.length > 0 ? new SvelteSet(selectedStacks) : null;
       result = result.filter((m) => {
         if (selectedRemote !== null && m.remote !== selectedRemote) {
           return false;
@@ -469,10 +470,10 @@ export function createFeedPageState(
   });
 
   const feedAggregates = $derived.by<FeedAggregates>(() => {
-    const counts = new Map<ScoreBucket, number>(
+    const counts = new SvelteMap<ScoreBucket, number>(
       SCORE_BUCKETS.map((bucket) => [bucket.bucket, 0] as const)
     );
-    const sourceMissionCounts = new Map<string, number>();
+    const sourceMissionCounts = new SvelteMap<string, number>();
     let highScoreCount = 0;
     let newCount = 0;
     let priorityPresetCount = 0;
@@ -612,7 +613,7 @@ export function createFeedPageState(
       const focused = selectFocusMissions(allMissions, focusIntent);
       if (focused.length > 0) {
         return sortBy === 'score'
-          ? rankMissions(focused, new Date())
+          ? rankMissions(focused, new SvelteDate())
           : sortMissions(focused, sortBy);
       }
     }
@@ -648,7 +649,7 @@ export function createFeedPageState(
     if (comparisonMissionIds.length < 2) {
       return [];
     }
-    const idSet = new Set(comparisonMissionIds);
+    const idSet = new SvelteSet(comparisonMissionIds);
     return (missions ?? []).filter((m) => idSet.has(m.id));
   });
 
@@ -780,7 +781,7 @@ export function createFeedPageState(
     }
 
     const nextSeenIds = markAsSeen(Array.from(seenIds), [...pendingSeenIds]);
-    pendingSeenIds = new Set();
+    pendingSeenIds = new SvelteSet();
     seenIds = nextSeenIds;
     saveSeenIds(nextSeenIds).catch(() => {});
   }
@@ -801,7 +802,7 @@ export function createFeedPageState(
       return;
     }
 
-    pendingSeenIds = new Set(pendingSeenIds).add(missionId);
+    pendingSeenIds = new SvelteSet(pendingSeenIds).add(missionId);
     scheduleSeenFlush();
   }
 

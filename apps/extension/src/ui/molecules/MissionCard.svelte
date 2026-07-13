@@ -315,7 +315,7 @@
 
   <!-- Tags -->
   <div class="mt-3 flex flex-wrap gap-1.5">
-    {#each mission.stack.slice(0, 3) as tech}
+    {#each mission.stack.slice(0, 3) as tech (tech)}
       <Badge label={tech} variant="tech" />
     {/each}
     {#if mission.stack.length > 3}
@@ -401,7 +401,7 @@
           { label: 'Mode de travail', value: mission.scoreBreakdown.criteria.remote },
         ]}
         <div class="mt-3 space-y-1.5">
-          {#each lines as line}
+          {#each lines as line, i (i)}
             {@const grade = scoreToGrade(line.value)}
             {@const color =
               grade === 'A'
@@ -591,7 +591,7 @@
 
   {#if trackingStatus && availableTransitions.length > 0 && onStatusTransition}
     <div class="mt-3 flex flex-wrap gap-1.5">
-      {#each availableTransitions as nextStatus}
+      {#each availableTransitions as nextStatus, i (i)}
         {@const label = STATUS_LABELS[nextStatus]}
         {@const variant = STATUS_VARIANTS[nextStatus]}
         <button
