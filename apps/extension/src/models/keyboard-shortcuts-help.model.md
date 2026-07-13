@@ -25,13 +25,13 @@ States: closed · open
   closed ◄────────────────────────────────────┘
 ```
 
-| From   | Event                                      | To     | Effect |
-| ------ | ------------------------------------------ | ------ | ------ |
+| From   | Event                                      | To     | Effect                                                                                |
+| ------ | ------------------------------------------ | ------ | ------------------------------------------------------------------------------------- |
 | closed | `OPEN`                                     | open   | Render the dialog, expose the registry snapshot, and move focus to its close control. |
-| open   | `CLOSE_BUTTON`                             | closed | Set the bound `isOpen` value to `false`. |
-| open   | `CLOSE_BACKDROP` (pointer target is scrim) | closed | Set the bound `isOpen` value to `false`. |
-| open   | `ESCAPE`                                   | closed | Set the bound `isOpen` value to `false`. |
-| open   | Any other key / a pointer inside the panel | open   | No state transition. |
+| open   | `CLOSE_BUTTON`                             | closed | Set the bound `isOpen` value to `false`.                                              |
+| open   | `CLOSE_BACKDROP` (pointer target is scrim) | closed | Set the bound `isOpen` value to `false`.                                              |
+| open   | `ESCAPE`                                   | closed | Set the bound `isOpen` value to `false`.                                              |
+| open   | Any other key / a pointer inside the panel | open   | No state transition.                                                                  |
 
 `open` is not terminal: the panel may be opened again after any close. The
 registered shortcuts themselves continue to be owned by

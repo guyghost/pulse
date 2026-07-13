@@ -79,7 +79,11 @@ describe('KeyboardShortcutsHelp — SET-05 idiomatic reactive grouping', () => {
   });
 
   it.each([
-    ['close button', (target: HTMLElement) => target.querySelector<HTMLButtonElement>('[aria-label="Fermer"]')?.click()],
+    [
+      'close button',
+      (target: HTMLElement) =>
+        target.querySelector<HTMLButtonElement>('[aria-label="Fermer"]')?.click(),
+    ],
     [
       'backdrop',
       (target: HTMLElement) =>

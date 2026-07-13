@@ -151,7 +151,9 @@
               >
                 {category}
               </h3>
-              <div class="overflow-hidden rounded-xl border border-border-light bg-surface-white shadow-subtle-2">
+              <div
+                class="overflow-hidden rounded-xl border border-border-light bg-surface-white shadow-subtle-2"
+              >
                 {#each shortcuts as shortcut, index}
                   <div
                     class="flex min-h-12 items-center justify-between gap-3 px-3 py-2.5 {index > 0
@@ -177,9 +179,7 @@
       <!-- Footer -->
       <footer class="shrink-0 border-t border-border-light bg-surface-white px-4 py-3">
         <div class="flex items-center justify-between gap-3">
-          <p class="text-[11px] leading-4 text-text-subtle">
-            Désactivés pendant la saisie
-          </p>
+          <p class="text-[11px] leading-4 text-text-subtle">Désactivés pendant la saisie</p>
           <button
             type="button"
             class="shrink-0 rounded-lg bg-blueprint-blue px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-blueprint-blue/90"
