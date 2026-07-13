@@ -223,6 +223,23 @@ export function transitionMissionArrivalQueue(
           effects: [],
         };
       }
+      if (state.stack.value === 'refresh-error') {
+        if (sameIds(state.stack.pendingIds, pendingIds)) {
+          return unchanged(state);
+        }
+        return {
+          state: {
+            ...state,
+            stack: {
+              value: 'refresh-error',
+              pendingIds,
+              previewIds: [...state.stack.previewIds],
+              message: state.stack.message,
+            },
+          },
+          effects: [],
+        };
+      }
       if (state.stack.value === 'refreshing') {
         return unchanged(state);
       }
