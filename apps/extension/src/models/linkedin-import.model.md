@@ -247,7 +247,9 @@ The extractor uses structural and accessibility signals, in this order:
 
 1. dedicated `/details/experience/` pathname + the page's main content;
 2. stable `#experience` anchor or an Experience / Expérience heading fallback;
-3. strong `profilePosition` identities plus weak row-discovery signals
+3. strong position identities from either `profilePosition` markers or the
+   owner-view `/details/experience/edit/forms/{id}/` links, plus weak
+   row-discovery signals
    (`data-view-name="profile-component-entity"`, `role="listitem"`, and the
    historical `.pvs-list__paged-list-item` / `li.artdeco-list__item` shapes),
    then a structurally filtered generic list item inside the resolved Experience
@@ -255,8 +257,13 @@ The extractor uses structural and accessibility signals, in this order:
 4. visible/accessibility text nodes inside the resolved position row.
 
 Generated or experiment-specific CSS classes are never the sole gate for a
-position. A nested identity (for example, a `profilePosition` link) is normalized
-to its owning row before parsing. Candidates are classified as `group`,
+position. A nested identity (for example, a `profilePosition` link or an owner
+edit-form link) is normalized to its owning row before parsing. When LinkedIn's
+owner view exposes no recognized structural row wrapper, the descriptive
+edit-form link may own itself: its accessible text contains the title, company,
+date range, and location required by the position contract. The adjacent
+"Modifier" link carries the same numeric identity and is treated as a duplicate
+representation, never as a second experience. Candidates are classified as `group`,
 `position`, or unrelated `chrome`: groups preserve company context for their
 leaf positions and are never emitted themselves; weak candidates that do not
 have the minimum position structure after inherited context are ignored as page
@@ -411,6 +418,10 @@ extracting → merging` sequence.
 21. Hyphens inside prose or identifiers are not date-range separators. Both
     temporal bounds must satisfy the date contract before a generic candidate
     can be promoted to a position.
+22. Owner-view edit links are stable position identities: both the descriptive
+    link and its adjacent edit action resolve to the same `/edit/forms/{id}`
+    bucket, and one parseable representation is sufficient. The action-only
+    duplicate can neither invalidate the bucket nor create another experience.
 
 ## Error and recovery matrix
 
