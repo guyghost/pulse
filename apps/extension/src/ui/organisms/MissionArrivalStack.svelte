@@ -192,7 +192,7 @@
       <button
         type="button"
         class="absolute inset-x-0 top-3 z-10 flex min-h-14 items-center gap-3 rounded-xl border border-border-light bg-surface-white px-4 text-left shadow-md transition-transform hover:-translate-y-0.5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue"
-        aria-label={`Ouvrir les ${countLabel}`}
+        aria-label={boundedCount === 1 ? 'Ouvrir 1 nouvelle mission arrivée' : `Ouvrir les ${countLabel}`}
         onclick={() => onOpen?.()}
         bind:this={triggerElement}
       >
