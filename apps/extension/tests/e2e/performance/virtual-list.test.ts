@@ -8,6 +8,7 @@ import {
   allMissionsToggle,
   feedSearchInput,
   getDisplayedMissionCount,
+  ensureFeedVisible,
   injectMissions,
   missionCards,
   scanButton,
@@ -372,19 +373,28 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
   test('keeps feed stable while multiple partial scan batches arrive', async ({ page }) => {
     await mockMultiBatchPartialScan(page);
+    await ensureFeedVisible(page);
     await injectMissions(page, 120);
     await expectMissionCount(page, 120, 5000);
 
     await scanButton(page).click();
 
-    const pendingBanner = page.getByTestId('pending-missions-banner');
-    await expect(pendingBanner).toBeVisible({ timeout: 2000 });
+    const arrivalStack = page.getByTestId('mission-arrival-stack');
+    await expect(arrivalStack).toBeVisible({ timeout: 2000 });
     await expectMissionCount(page, 120, 1000);
+    await expect(arrivalStack.locator('[data-testid="arrival-stack-layer"]')).toHaveCount(3);
 
     const searchInput = feedSearchInput(page);
     await searchInput.fill('React');
     await expect(searchInput).toHaveValue('React');
-    await expect(pendingBanner.getByRole('button', { name: /Afficher/ })).toBeEnabled();
+    await arrivalStack
+      .getByRole('button', { name: /Ouvrir les \d+ nouvelles missions arrivées/ })
+      .click();
+    await expect(arrivalStack.locator('[data-testid="arrival-preview"]')).toHaveCount(3);
+    await expect(
+      arrivalStack.getByRole('button', { name: /Actualiser la file avec les \d+ missions/ })
+    ).toBeEnabled();
+    await expectMissionCount(page, 120, 1000);
   });
 
   test('maintains scroll position when filtering', async ({ page }) => {

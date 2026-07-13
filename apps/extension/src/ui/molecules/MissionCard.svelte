@@ -1,6 +1,7 @@
 <script lang="ts">
   import { slide } from 'svelte/transition';
   import type { Mission } from '$lib/core/types/mission';
+  import type { MissionDwellSignal } from '$lib/core/feed/mission-arrival-queue';
   import type { ApplicationStatus } from '$lib/core/types/tracking';
   import { STATUS_LABELS, STATUS_VARIANTS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { Badge } from '@pulse/ui';
@@ -18,8 +19,10 @@
     isCompared = false,
     compareDisabled = false,
     isVirtualized = false,
+    showSeenStatus = false,
     tourHighlight = null,
     onVisible: onVisibleCallback,
+    onReadSignal,
     onToggleFavorite,
     onHide,
     onToggleCompare,
@@ -37,8 +40,10 @@
     isCompared?: boolean;
     compareDisabled?: boolean;
     isVirtualized?: boolean;
+    showSeenStatus?: boolean;
     tourHighlight?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onVisible?: () => void;
+    onReadSignal?: (signal: MissionDwellSignal) => void;
     onToggleFavorite?: () => void;
     onHide?: () => void;
     onToggleCompare?: () => void;
@@ -203,7 +208,15 @@
 
 <div
   use:ripple
-  use:onVisibleAction={() => onVisibleCallback?.()}
+  use:onVisibleAction={{
+    disabled: isSeen,
+    onSignal: (signal) => {
+      onReadSignal?.(signal);
+      if (signal.type === 'elapsed' && !onReadSignal) {
+        onVisibleCallback?.();
+      }
+    },
+  }}
   class="group relative cursor-pointer rounded-xl border border-border-light bg-surface-white p-5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
     : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
@@ -240,6 +253,12 @@
             class="inline-flex items-center rounded-full bg-blueprint-blue/8 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-blueprint-blue"
           >
             Nouveau
+          </span>
+        {:else if showSeenStatus}
+          <span
+            class="inline-flex items-center rounded-full bg-subtle-gray px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-text-subtle"
+          >
+            Vu
           </span>
         {/if}
         {#if mission.remote}

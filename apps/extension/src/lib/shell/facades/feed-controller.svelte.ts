@@ -224,6 +224,7 @@ export interface FeedController {
   get hasPendingMissions(): boolean;
   get pendingMissionCount(): number;
   get pendingConnectorCount(): number;
+  get pendingMissions(): Mission[];
   get isApplyingPendingMissions(): boolean;
   get connectorStatuses(): Map<string, ConnectorStatus>;
   get scanResultCounts(): Map<string, number>;
@@ -279,6 +280,7 @@ export function createFeedController(feedStore: {
   let hasPendingMissions = $state(false);
   let pendingMissionCount = $state(0);
   let pendingConnectorCount = $state(0);
+  let pendingMissions = $state<Mission[]>([]);
   let isApplyingPendingMissions = $state(false);
   let connectorStatuses = $state<Map<string, ConnectorStatus>>(new Map());
   let scanResultCounts = $state<Map<string, number>>(new Map());
@@ -399,6 +401,7 @@ export function createFeedController(feedStore: {
     hasPendingMissions = false;
     pendingMissionCount = 0;
     pendingConnectorCount = 0;
+    pendingMissions = [];
     isApplyingPendingMissions = false;
   }
 
@@ -407,15 +410,14 @@ export function createFeedController(feedStore: {
     pendingScanMissions = null;
     hasPendingMissions = true;
     pendingConnectorCount = partialScanCompletedSources.size;
-    pendingMissionCount = [...partialScanConnectorMissions.values()].reduce(
-      (total, missions) => total + missions.length,
-      0
-    );
+    pendingMissions = [...partialScanConnectorMissions.values()].flat();
+    pendingMissionCount = pendingMissions.length;
   }
 
   function setPendingFinalScanUpdate(missions: Mission[]): void {
     pendingScanKind = 'final';
     pendingScanMissions = missions;
+    pendingMissions = [...missions];
     hasPendingMissions = missions.length > 0;
     pendingMissionCount = missions.length;
     pendingConnectorCount = 0;
@@ -847,6 +849,9 @@ export function createFeedController(feedStore: {
     },
     get pendingConnectorCount() {
       return pendingConnectorCount;
+    },
+    get pendingMissions() {
+      return [...pendingMissions];
     },
     get isApplyingPendingMissions() {
       return isApplyingPendingMissions;

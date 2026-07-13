@@ -413,15 +413,27 @@ test.describe('Feed', () => {
 
     await scanButton(page).click();
 
-    const pendingBanner = page.getByTestId('pending-missions-banner');
-    await expect(pendingBanner).toBeVisible({ timeout: 1000 });
+    const arrivalStack = page.getByTestId('mission-arrival-stack');
+    await expect(arrivalStack).toBeVisible({ timeout: 1000 });
     await expect(page.getByText('Partial Scan Action Test')).not.toBeVisible();
     await expect(page.getByText('Collecte...')).toBeVisible();
 
-    await pendingBanner.getByRole('button', { name: /Afficher 1 mission/ }).click();
+    const stackTrigger = arrivalStack.getByRole('button', {
+      name: 'Ouvrir les 1 nouvelle mission arrivée',
+    });
+    await stackTrigger.click();
+    await expect(page.getByTestId('arrival-drawer-heading')).toBeFocused();
+    await expect(page.getByTestId('arrival-preview')).toContainText('Partial Scan Action Test');
+
+    await page.keyboard.press('Escape');
+    await expect(stackTrigger).toBeFocused();
+    await stackTrigger.click();
+
+    await arrivalStack.getByRole('button', { name: 'Actualiser la file avec la mission' }).click();
 
     const partialCard = missionCards(page).filter({ hasText: 'Partial Scan Action Test' });
     await expect(partialCard).toBeVisible();
+    await expect(arrivalStack).not.toBeVisible();
 
     const investigateButton = partialCard.getByRole('button', { name: 'Investiguer →' });
     await expect(investigateButton).toBeEnabled();
@@ -429,6 +441,31 @@ test.describe('Feed', () => {
 
     await expect(page.getByRole('dialog', { name: 'Investigation mission' })).toBeVisible();
     await expect(page.getByText('Collecte...')).toBeVisible();
+  });
+
+  test('keeps the active new-mission queue stable while visible cards become seen', async ({
+    page,
+  }) => {
+    await mockUserWithProfile(page);
+    await page.goto(SIDE_PANEL);
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
+    await injectMissions(page, 8);
+
+    await page.getByRole('button', { name: 'Afficher les détails opérationnels' }).click();
+    const newMissionsToggle = page.getByTitle('Filtrer les nouvelles missions');
+    await newMissionsToggle.click();
+    await expect(newMissionsToggle).toHaveAttribute('aria-pressed', 'true');
+
+    const cards = missionCards(page);
+    const initialCount = await cards.count();
+    const firstCard = cards.first();
+    const firstTitle = await firstCard.locator('h3').textContent();
+    await firstCard.scrollIntoViewIfNeeded();
+
+    await expect(firstCard.getByText('Vu', { exact: true })).toBeVisible({ timeout: 3000 });
+
+    await expect(cards).toHaveCount(initialCount);
+    await expect(cards.first().locator('h3')).toHaveText(firstTitle ?? '');
   });
 
   test('header star button and refresh button are visible', async ({ page }) => {

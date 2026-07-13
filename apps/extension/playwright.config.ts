@@ -1,6 +1,8 @@
 import { defineConfig } from '@playwright/test';
 
 const isCI = Boolean(process.env.CI);
+const port = process.env.PLAYWRIGHT_PORT ?? '5176';
+const baseURL = `http://localhost:${port}`;
 
 export default defineConfig({
   testDir: './tests/e2e',
@@ -14,14 +16,14 @@ export default defineConfig({
   },
   reporter: isCI ? [['github'], ['html', { open: 'never' }]] : [['list']],
   use: {
-    baseURL: 'http://localhost:5176',
+    baseURL,
     headless: true,
     trace: 'on-first-retry',
     screenshot: 'only-on-failure',
   },
   webServer: {
-    command: 'pnpm dev',
-    url: 'http://localhost:5176/src/sidepanel/index.html',
+    command: `pnpm exec vite --port ${port} --strictPort`,
+    url: `${baseURL}/src/sidepanel/index.html`,
     reuseExistingServer: !isCI,
     timeout: 30000,
   },
