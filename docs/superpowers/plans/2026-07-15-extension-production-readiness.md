@@ -261,6 +261,67 @@
   git commit -m "fix(tracking): report persistence failures truthfully"
   ```
 
+### Task 5b: Make tracking mutations revisioned, serialized and restart-safe
+
+**Files:**
+
+- Modify: `apps/extension/src/models/application-tracking.model.md`
+- Create: `apps/extension/src/models/application-tracking.machine.ts`
+- Modify: `apps/extension/src/lib/shell/storage/tracking.ts`
+- Modify: `apps/extension/src/lib/shell/storage/db.ts`
+- Modify: `apps/extension/src/lib/shell/messaging/bridge.ts`
+- Modify: `apps/extension/src/lib/shell/messaging/schemas.ts`
+- Modify: `apps/extension/src/background/index.ts`
+- Modify: `apps/extension/src/lib/state/tracking.svelte.ts`
+- Test: `apps/extension/tests/unit/tracking/`
+- Test: `apps/extension/tests/unit/background/index.test.ts`
+- Test: `apps/extension/tests/unit/state/tracking.test.ts`
+
+**Interfaces:**
+
+- Closes the explicit post-Task-5 debt from `application-tracking.model.md`.
+- Adds mutation IDs, monotonic per-mission revisions, compare-and-swap Undo,
+  per-mission serialization, duplicate-delivery idempotency and restart
+  reconciliation before any success/Undo projection.
+- Adds a durable local outbox only for enabled connected-dashboard sync; remote
+  failure never changes the already-confirmed local application status.
+
+- [ ] **Step 1: Refine and independently review the target model**
+
+  Define the exact protocol version, reserved error code/intent/message matrix,
+  XState events, IndexedDB envelope migration, tombstone lifecycle, restart
+  checkpoint and outbox acknowledgement rules. Stop before implementation until
+  the model review is approved.
+
+- [ ] **Step 2: Add RED actor, storage and integration tests**
+
+  Cover duplicate delivery, same-mission concurrency, different-mission
+  independence, stale Undo after an intervening write/delete/recreate, worker
+  restart before and after commit, lost acknowledgement, deterministic
+  reconciliation and idempotent outbox delivery.
+
+- [ ] **Step 3: Implement the reviewed transaction actor**
+
+  Keep transition/CAS logic pure, IndexedDB and runtime messaging in Shell, and
+  make the UI consume only confirmed revisioned envelopes. A restart or
+  transport-uncertain result must reconcile by mutation ID instead of replaying
+  or guessing.
+
+- [ ] **Step 4: Verify GREEN and migration safety**
+
+  ```bash
+  pnpm --filter @pulse/extension exec vitest run tests/unit/tracking tests/unit/background/index.test.ts tests/unit/state/tracking.test.ts tests/unit/storage
+  pnpm --filter @pulse/extension typecheck
+  pnpm --filter @pulse/extension lint
+  ```
+
+- [ ] **Step 5: Commit**
+
+  ```bash
+  git add apps/extension/src/models/application-tracking.model.md apps/extension/src/models/application-tracking.machine.ts apps/extension/src/lib/shell/storage apps/extension/src/lib/shell/messaging apps/extension/src/background/index.ts apps/extension/src/lib/state/tracking.svelte.ts apps/extension/tests/unit
+  git commit -m "feat(tracking): serialize revisioned mutations"
+  ```
+
 ### Task 6: Make settings persistence transactional and visible
 
 **Files:**
