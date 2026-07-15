@@ -302,6 +302,7 @@ type ReleaseReadinessEvent =
 stateDiagram-v2
   [*] --> audited: AUDIT_RECORDED
   audited --> audited: AUDIT_REQUESTED [noActiveAction] / requestAudit
+  audited --> audited: AUDIT_PASSED [matchingReleaseAndAction] / archiveAuditPassAndClearAction
   audited --> audited: BUILD_REQUESTED / requestBuild
   audited --> rc_built: RC_BUILD_SUCCEEDED [auditClear && artifactIdentified]
   audited --> blocked: BLOCKERS_FOUND [matchingReleaseAndAction] / archiveAuditWithBlockers
@@ -373,6 +374,7 @@ optimistically advance it.
 | initial                                         | `AUDIT_RECORDED`                 | complete audit                                        | `audited`           | Record exact commit, version, findings, owner, and timestamp.                                                                                                        |
 | audited/blocked                                 | `AUDIT_REQUESTED`                | no action, legal source                               | same                | Create requested `audit` action; no blocker is cleared yet.                                                                                                          |
 | audited/blocked                                 | `BLOCKERS_FOUND`                 | matching audit release/operation/action               | `blocked`           | Attach remaining/new blockers, archive the matching audit as failed, and clear the action while preserving source provenance.                                        |
+| `audited`                                       | `AUDIT_PASSED`                   | matching audit release/operation/action               | `audited`           | Attach fresh passing audit evidence, update `auditedAt`, archive the action as passed, and clear `activeAction`/error.                                               |
 | `audited`                                       | `BUILD_REQUESTED`                | no action, audit clear                                | `audited`           | Create requested `build` action.                                                                                                                                     |
 | `rc_built`                                      | `PACKAGE_VALIDATION_REQUESTED`   | no action, artifact identified                        | `rc_built`          | Create requested `validate_package` action for the exact hash.                                                                                                       |
 | `package_validated`                             | `STORE_VALIDATION_REQUESTED`     | no action, exact artifact                             | `package_validated` | Create requested `validate_store` action.                                                                                                                            |
