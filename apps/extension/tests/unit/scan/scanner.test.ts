@@ -118,9 +118,10 @@ if (typeof chrome === 'undefined') {
 import { runScan, ScanError } from '../../../src/lib/shell/scan/scanner';
 import { getConnectors, getConnector } from '../../../src/lib/shell/connectors/index';
 import { getSettings } from '../../../src/lib/shell/storage/chrome-storage';
-import { getProfile, saveMissions } from '../../../src/lib/shell/storage/db';
+import { getProfile, purgeOldMissions, saveMissions } from '../../../src/lib/shell/storage/db';
 import { deduplicateMissionsDetailed } from '../../../src/lib/core/scoring/dedup';
 import { isOnline } from '../../../src/lib/shell/utils/connection-monitor';
+import { metricsCollector } from '../../../src/lib/shell/metrics/collector';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -361,7 +362,7 @@ describe('scanner — runScan', () => {
   });
 
   // 5. Abort signal
-  it('stops scan when abort signal is triggered', async () => {
+  it('rejects with a typed CANCELLED error when already aborted', async () => {
     const controller = new AbortController();
     const missions = [makeMission()];
     const connector = makeConnector('free-work', 'Free-Work', missions);
@@ -373,10 +374,38 @@ describe('scanner — runScan', () => {
     // Abort before scan starts fetching connectors
     controller.abort();
 
-    const result = await runScan(controller.signal);
+    await expect(runScan(controller.signal)).rejects.toMatchObject({
+      name: 'ScanError',
+      code: 'CANCELLED',
+    });
+    expect(saveMissions).not.toHaveBeenCalled();
+  });
 
-    // Aborted scan returns empty missions
-    expect(result.missions).toHaveLength(0);
+  it('does not post-process, persist, purge, emit done, or record metrics after cancellation', async () => {
+    const controller = new AbortController();
+    const missions = [makeMission()];
+    const connector = makeConnector('free-work', 'Free-Work', missions);
+    const onDetailedProgress = vi.fn(
+      (info: { phase: 'connecting' | 'scanning' | 'post-processing' | 'done' }) => {
+        if (info.phase === 'post-processing') {
+          controller.abort();
+        }
+      }
+    );
+
+    (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work']));
+    (getConnector as Mock).mockResolvedValue(connector);
+    (getConnectors as Mock).mockResolvedValue([connector]);
+
+    await expect(
+      runScan(controller.signal, undefined, { pageDelayMs: 0, onDetailedProgress })
+    ).rejects.toMatchObject({ code: 'CANCELLED' });
+
+    expect(deduplicateMissionsDetailed).not.toHaveBeenCalled();
+    expect(saveMissions).not.toHaveBeenCalled();
+    expect(purgeOldMissions).not.toHaveBeenCalled();
+    expect(metricsCollector.recordScanMetrics).not.toHaveBeenCalled();
+    expect(onDetailedProgress).not.toHaveBeenCalledWith(expect.objectContaining({ phase: 'done' }));
   });
 
   // 6. Mutex — concurrent calls
@@ -540,8 +569,8 @@ describe('scanner — runScan', () => {
     expect(result.errors[0].message).toContain('introuvable');
   });
 
-  // Additional: missions are persisted via saveMissions
-  it('persists scored missions via saveMissions', async () => {
+  // Canonical persistence belongs to the service-worker persisting state.
+  it('returns scored missions without persisting inside the scanner', async () => {
     const missions = [makeMission()];
     const connector = makeConnector('free-work', 'Free-Work', missions);
 
@@ -549,9 +578,9 @@ describe('scanner — runScan', () => {
     (getConnector as Mock).mockResolvedValue(connector);
     (getConnectors as Mock).mockResolvedValue([connector]);
 
-    await runScan(undefined, undefined, { pageDelayMs: 0 });
+    const result = await runScan(undefined, undefined, { pageDelayMs: 0 });
 
-    expect(saveMissions).toHaveBeenCalledTimes(1);
-    expect((saveMissions as Mock).mock.calls[0][0]).toHaveLength(1);
+    expect(result.missions).toHaveLength(1);
+    expect(saveMissions).not.toHaveBeenCalled();
   });
 });

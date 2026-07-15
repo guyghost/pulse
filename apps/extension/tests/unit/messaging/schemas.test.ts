@@ -98,14 +98,6 @@ describe('validateMessage — structure de base', () => {
 // ============================================================================
 
 describe('validateMessage — messages sans payload', () => {
-  it('accepte SCAN_START', () => {
-    expect(validateMessage({ type: 'SCAN_START' }).valid).toBe(true);
-  });
-
-  it('accepte SCAN_CANCEL', () => {
-    expect(validateMessage({ type: 'SCAN_CANCEL' }).valid).toBe(true);
-  });
-
   it('accepte GET_PROFILE', () => {
     expect(validateMessage({ type: 'GET_PROFILE' }).valid).toBe(true);
   });
@@ -136,11 +128,26 @@ describe('validateMessage — messages sans payload', () => {
 });
 
 describe('validateMessage — scan progressif', () => {
+  it('exige un operationId pour démarrer et annuler un scan', () => {
+    expect(
+      validateMessage({
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-1', trigger: 'manual' },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({ type: 'SCAN_CANCEL', payload: { operationId: 'operation-1' } }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'SCAN_START' }).valid).toBe(false);
+    expect(validateMessage({ type: 'SCAN_CANCEL' }).valid).toBe(false);
+  });
+
   it('accepte SCAN_PARTIAL_RESULT avec missions par connecteur', () => {
     expect(
       validateMessage({
         type: 'SCAN_PARTIAL_RESULT',
         payload: {
+          operationId: 'operation-1',
           connectorId: 'free-work',
           connectorName: 'Free-Work',
           missions: [{ id: 'mission-1', title: 'Lead Svelte', source: 'free-work' }],
@@ -154,6 +161,7 @@ describe('validateMessage — scan progressif', () => {
       validateMessage({
         type: 'SCAN_PARTIAL_RESULT',
         payload: {
+          operationId: 'operation-1',
           connectorName: 'Free-Work',
           missions: [{ id: 'mission-1', title: 'Lead Svelte', source: 'free-work' }],
         },

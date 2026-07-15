@@ -37,6 +37,7 @@ export interface ConnectorProgress {
  * Payload du message SCAN_PROGRESS
  */
 export interface ScanProgressPayload {
+  operationId: string;
   phase: 'connecting' | 'scanning' | 'post-processing' | 'done';
   current: number;
   total: number;
@@ -44,6 +45,7 @@ export interface ScanProgressPayload {
 }
 
 export interface ScanPartialResultPayload {
+  operationId: string;
   connectorId: string;
   connectorName: string;
   missions: Mission[];
@@ -146,12 +148,17 @@ export type BridgeMessage =
         | { imported: false; errorCode: string; errorMessage: string };
     }
   // Scan orchestration (panel ↔ service worker)
-  | { type: 'SCAN_START' }
+  | { type: 'SCAN_START'; payload: { operationId: string; trigger: 'manual' } }
   | { type: 'SCAN_PROGRESS'; payload: ScanProgressPayload }
   | { type: 'SCAN_PARTIAL_RESULT'; payload: ScanPartialResultPayload }
-  | { type: 'SCAN_COMPLETE'; payload: Mission[] }
-  | { type: 'SCAN_ERROR'; payload: { message: string; code: string } }
-  | { type: 'SCAN_CANCEL' }
+  | { type: 'SCAN_COMPLETE'; payload: { operationId: string; missions: Mission[] } }
+  | { type: 'SCAN_ERROR'; payload: { operationId: string; message: string; code: string } }
+  | { type: 'SCAN_CANCEL'; payload: { operationId: string } }
+  | { type: 'SCAN_CANCELLED'; payload: { operationId: string } }
+  | {
+      type: 'SCAN_BUSY';
+      payload: { operationId: string; activeOperationId: string };
+    }
   // Tracking
   | {
       type: 'UPDATE_TRACKING';

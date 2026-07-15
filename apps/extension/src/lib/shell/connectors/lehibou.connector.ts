@@ -90,7 +90,8 @@ export class LeHibouConnector extends BaseConnector {
 
   async fetchMissions(
     now: number,
-    context?: ConnectorSearchContext
+    context?: ConnectorSearchContext,
+    signal?: AbortSignal
   ): Promise<Result<Mission[], AppError>> {
     try {
       await injectCookieRule(
@@ -124,6 +125,7 @@ export class LeHibouConnector extends BaseConnector {
           credentials: 'include',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify(body),
+          signal,
         });
 
         if (!response.ok) {

@@ -47,6 +47,8 @@ const MissionsPayloadSchema = z.array(MissionSchema).max(500, {
   message: 'MISSIONS_UPDATED payload exceeds 500 items limit',
 });
 
+const ScanOperationIdSchema = z.string().min(1).max(128);
+
 const FeedIdTimestampMapSchema = z
   .record(z.string().max(256), z.number().int().min(0))
   .refine(maxBytes(120_000), { message: 'Feed id map payload exceeds 120KB limit' });
@@ -691,10 +693,14 @@ export const MessageSchemas = {
   }),
 
   // Scan
-  SCAN_START: z.object({ type: z.literal('SCAN_START') }),
+  SCAN_START: z.object({
+    type: z.literal('SCAN_START'),
+    payload: z.object({ operationId: ScanOperationIdSchema, trigger: z.literal('manual') }),
+  }),
   SCAN_PROGRESS: z.object({
     type: z.literal('SCAN_PROGRESS'),
     payload: z.object({
+      operationId: ScanOperationIdSchema,
       phase: ScanProgressPhaseSchema,
       current: z.number().int().min(0),
       total: z.number().int().min(0),
@@ -704,17 +710,39 @@ export const MessageSchemas = {
   SCAN_PARTIAL_RESULT: z.object({
     type: z.literal('SCAN_PARTIAL_RESULT'),
     payload: z.object({
+      operationId: ScanOperationIdSchema,
       connectorId: SafeString,
       connectorName: SafeString,
       missions: MissionsPayloadSchema,
     }),
   }),
-  SCAN_COMPLETE: z.object({ type: z.literal('SCAN_COMPLETE'), payload: MissionsPayloadSchema }),
+  SCAN_COMPLETE: z.object({
+    type: z.literal('SCAN_COMPLETE'),
+    payload: z.object({ operationId: ScanOperationIdSchema, missions: MissionsPayloadSchema }),
+  }),
   SCAN_ERROR: z.object({
     type: z.literal('SCAN_ERROR'),
-    payload: z.object({ message: SafeString, code: SafeString }),
+    payload: z.object({
+      operationId: ScanOperationIdSchema,
+      message: SafeString,
+      code: SafeString,
+    }),
   }),
-  SCAN_CANCEL: z.object({ type: z.literal('SCAN_CANCEL') }),
+  SCAN_CANCEL: z.object({
+    type: z.literal('SCAN_CANCEL'),
+    payload: z.object({ operationId: ScanOperationIdSchema }),
+  }),
+  SCAN_CANCELLED: z.object({
+    type: z.literal('SCAN_CANCELLED'),
+    payload: z.object({ operationId: ScanOperationIdSchema }),
+  }),
+  SCAN_BUSY: z.object({
+    type: z.literal('SCAN_BUSY'),
+    payload: z.object({
+      operationId: ScanOperationIdSchema,
+      activeOperationId: ScanOperationIdSchema,
+    }),
+  }),
 
   // Missions
   MISSIONS_UPDATED: z.object({

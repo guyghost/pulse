@@ -44,7 +44,8 @@ export class HiwayConnector extends BaseConnector {
 
   async fetchMissions(
     now: number,
-    context?: ConnectorSearchContext
+    context?: ConnectorSearchContext,
+    signal?: AbortSignal
   ): Promise<Result<Mission[], AppError>> {
     // Guard: Require actual Supabase config
     if (!this.isConfigured()) {
@@ -80,13 +81,18 @@ export class HiwayConnector extends BaseConnector {
       // the filter excludes all existing missions, resulting in 0 results forever.
       // Instead, we always fetch the latest 100 missions and rely on local dedup.
 
-      const result = await this.fetchJSON(endpoint.toString(), now, {
-        headers: {
-          apikey: SUPABASE_ANON_KEY,
-          Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
-          'Content-Type': 'application/json',
+      const result = await this.fetchJSON(
+        endpoint.toString(),
+        now,
+        {
+          headers: {
+            apikey: SUPABASE_ANON_KEY,
+            Authorization: `Bearer ${SUPABASE_ANON_KEY}`,
+            'Content-Type': 'application/json',
+          },
         },
-      });
+        signal
+      );
 
       if (!result.ok) {
         return err(

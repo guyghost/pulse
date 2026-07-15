@@ -21,6 +21,8 @@ const setupNotificationClickHandler = vi.fn();
 const getProfile = vi.fn();
 const saveProfile = vi.fn();
 const getMissions = vi.fn();
+const saveMissions = vi.fn();
+const purgeOldMissions = vi.fn();
 const saveConnectorStatuses = vi.fn();
 const getConnectorStatuses = vi.fn();
 const getFavorites = vi.fn();
@@ -37,6 +39,7 @@ const generateAsset = vi.fn();
 const getAllHealthSnapshots = vi.fn();
 const resetHealthSnapshot = vi.fn();
 const loadTJMHistory = vi.fn();
+const recordTJMFromMissions = vi.fn();
 const verifyProfilePage = vi.fn();
 const resetLocalData = vi.fn();
 const rescoreStoredMissions = vi.fn();
@@ -201,6 +204,8 @@ vi.mock('../../../src/lib/shell/storage/db', () => ({
   getConnectorStatuses,
   getMissionById: vi.fn(async () => null),
   getMissions,
+  saveMissions,
+  purgeOldMissions,
   runMigrations: vi.fn(async () => ({
     ok: true,
     from: { db: null, data: null },
@@ -221,6 +226,15 @@ vi.mock('../../../src/lib/shell/scan/rescore', () => ({
 
 vi.mock('../../../src/lib/shell/scan/scanner', () => ({
   runScan,
+  ScanError: class ScanError extends Error {
+    constructor(
+      message: string,
+      readonly code: string
+    ) {
+      super(message);
+      this.name = 'ScanError';
+    }
+  },
 }));
 
 vi.mock('../../../src/lib/shell/storage/seen-missions', () => ({
@@ -266,6 +280,7 @@ vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
 
 vi.mock('../../../src/lib/shell/storage/tjm-history', () => ({
   loadTJMHistory,
+  recordTJMFromMissions,
 }));
 
 vi.mock('../../../src/lib/shell/notifications/notify-missions', () => ({
@@ -346,6 +361,9 @@ describe('background auto-scan notifications', () => {
       notifiedMissionIds: ['mission-1'],
     });
     getMissions.mockResolvedValue([makeMission()]);
+    saveMissions.mockResolvedValue(undefined);
+    purgeOldMissions.mockResolvedValue(0);
+    recordTJMFromMissions.mockResolvedValue(undefined);
     resetNewMissionCount.mockResolvedValue(undefined);
     setDeepLinkIntent.mockResolvedValue(undefined);
     consumeDeepLinkIntent.mockResolvedValue(null);
@@ -426,6 +444,113 @@ describe('background auto-scan notifications', () => {
     expect(setNewMissionCount).toHaveBeenCalledWith(0);
     expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
+  });
+
+  it('returns busy for a concurrent start and cancels only the matching operation once', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let activeSignal: AbortSignal | undefined;
+    runScan.mockImplementationOnce(
+      (signal?: AbortSignal) =>
+        new Promise((_resolve, reject) => {
+          activeSignal = signal;
+          signal?.addEventListener(
+            'abort',
+            () => {
+              reject(
+                Object.assign(new Error('Scan annulé'), {
+                  name: 'ScanError',
+                  code: 'CANCELLED',
+                })
+              );
+            },
+            { once: true }
+          );
+        })
+    );
+
+    const activeResponse = vi.fn();
+    const busyResponse = vi.fn();
+    const staleCancelResponse = vi.fn();
+    const cancelResponse = vi.fn();
+
+    expect(
+      messageListener?.(
+        {
+          type: 'SCAN_START',
+          payload: { operationId: 'operation-active', trigger: 'manual' },
+        },
+        {},
+        activeResponse
+      )
+    ).toBe(true);
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(
+      messageListener?.(
+        {
+          type: 'SCAN_START',
+          payload: { operationId: 'operation-rejected', trigger: 'manual' },
+        },
+        {},
+        busyResponse
+      )
+    ).toBe(false);
+    expect(busyResponse).toHaveBeenCalledWith({
+      type: 'SCAN_BUSY',
+      payload: { operationId: 'operation-rejected', activeOperationId: 'operation-active' },
+    });
+    expect(runScan).toHaveBeenCalledTimes(1);
+
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-rejected' } },
+      {},
+      staleCancelResponse
+    );
+    expect(activeSignal?.aborted).toBe(false);
+    expect(staleCancelResponse).toHaveBeenCalledWith({
+      type: 'SCAN_ERROR',
+      payload: {
+        operationId: 'operation-rejected',
+        code: 'STALE_OPERATION',
+        message: 'Aucun scan actif ne correspond à cette opération.',
+      },
+    });
+
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-active' } },
+      {},
+      cancelResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    expect(activeSignal?.aborted).toBe(true);
+    expect(cancelResponse).toHaveBeenCalledWith({
+      type: 'SCAN_CANCELLED',
+      payload: { operationId: 'operation-active' },
+    });
+    expect(activeResponse).toHaveBeenCalledWith({
+      type: 'SCAN_CANCELLED',
+      payload: { operationId: 'operation-active' },
+    });
+
+    const terminalBroadcasts = vi
+      .mocked(chrome.runtime.sendMessage)
+      .mock.calls.map(([message]) => message)
+      .filter(
+        (message) =>
+          typeof message === 'object' &&
+          message !== null &&
+          (message as { type?: string }).type === 'SCAN_CANCELLED'
+      );
+    expect(terminalBroadcasts).toEqual([
+      { type: 'SCAN_CANCELLED', payload: { operationId: 'operation-active' } },
+    ]);
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_COMPLETE' })
+    );
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_ERROR' })
+    );
   });
 
   it('saves profiles through the service worker and rescored missions locally', async () => {

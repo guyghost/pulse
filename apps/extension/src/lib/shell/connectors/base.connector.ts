@@ -10,6 +10,7 @@ import {
   createStorageError,
 } from '$lib/core/errors';
 import { detectBrowser, type BrowserInfo } from '../../core/browser/browser-compat';
+import { abortableDelay } from '../utils/retry-strategy';
 
 // Lazy-initialized browser info singleton for diagnostic logging
 let _browserInfo: BrowserInfo | null = null;
@@ -53,18 +54,20 @@ export abstract class BaseConnector implements PlatformConnector {
     const doFetch = async (): Promise<Result<string, AppError>> => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
+      const onAbort = (): void => controller.abort();
 
       // Combine external signal with internal timeout
       if (signal) {
-        signal.addEventListener('abort', () => controller.abort(), { once: true });
+        if (signal.aborted) {
+          controller.abort();
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
       }
       try {
         const response = await fetch(url, {
           credentials: 'include',
           signal: controller.signal,
         });
-        clearTimeout(timeout);
-
         if (!response.ok) {
           return err(
             createNetworkError(
@@ -83,7 +86,6 @@ export abstract class BaseConnector implements PlatformConnector {
         const text = await response.text();
         return ok(text);
       } catch (e) {
-        clearTimeout(timeout);
         const message = e instanceof Error ? e.message : 'Fetch failed';
         const isAbort = e instanceof Error && e.name === 'AbortError';
 
@@ -102,6 +104,9 @@ export abstract class BaseConnector implements PlatformConnector {
             now
           )
         );
+      } finally {
+        clearTimeout(timeout);
+        signal?.removeEventListener('abort', onAbort);
       }
     };
 
@@ -113,7 +118,7 @@ export abstract class BaseConnector implements PlatformConnector {
 
     // Retry once if retryable
     if (result.error.type === 'network' && result.error.retryable) {
-      await new Promise((r) => setTimeout(r, 1000));
+      await abortableDelay(1000, signal);
       return doFetch();
     }
 
@@ -130,10 +135,14 @@ export abstract class BaseConnector implements PlatformConnector {
     const doFetch = async (): Promise<Result<unknown, AppError>> => {
       const controller = new AbortController();
       const timeout = setTimeout(() => controller.abort(), 15000);
+      const onAbort = (): void => controller.abort();
 
       // Combine external signal with internal timeout
       if (signal) {
-        signal.addEventListener('abort', () => controller.abort(), { once: true });
+        if (signal.aborted) {
+          controller.abort();
+        }
+        signal.addEventListener('abort', onAbort, { once: true });
       }
       try {
         const response = await fetch(url, {
@@ -141,8 +150,6 @@ export abstract class BaseConnector implements PlatformConnector {
           signal: controller.signal,
           ...init,
         });
-        clearTimeout(timeout);
-
         if (!response.ok) {
           return err(
             createNetworkError(
@@ -161,7 +168,6 @@ export abstract class BaseConnector implements PlatformConnector {
         const json = (await response.json()) as unknown;
         return ok(json);
       } catch (e) {
-        clearTimeout(timeout);
         const message = e instanceof Error ? e.message : 'Fetch failed';
         const isAbort = e instanceof Error && e.name === 'AbortError';
 
@@ -180,6 +186,9 @@ export abstract class BaseConnector implements PlatformConnector {
             now
           )
         );
+      } finally {
+        clearTimeout(timeout);
+        signal?.removeEventListener('abort', onAbort);
       }
     };
 
@@ -191,7 +200,7 @@ export abstract class BaseConnector implements PlatformConnector {
 
     // Retry once if retryable
     if (result.error.type === 'network' && result.error.retryable) {
-      await new Promise((r) => setTimeout(r, 1000));
+      await abortableDelay(1000, signal);
       return doFetch();
     }
 
@@ -200,7 +209,8 @@ export abstract class BaseConnector implements PlatformConnector {
 
   abstract fetchMissions(
     now: number,
-    context?: ConnectorSearchContext
+    context?: ConnectorSearchContext,
+    signal?: AbortSignal
   ): Promise<Result<Mission[], AppError>>;
 
   /**

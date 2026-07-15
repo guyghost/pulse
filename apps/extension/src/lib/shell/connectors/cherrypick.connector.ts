@@ -29,7 +29,8 @@ export class CherryPickConnector extends BaseConnector {
 
   async fetchMissions(
     now: number,
-    context?: ConnectorSearchContext
+    context?: ConnectorSearchContext,
+    signal?: AbortSignal
   ): Promise<Result<Mission[], AppError>> {
     try {
       const allMissions: Mission[] = [];
@@ -37,7 +38,7 @@ export class CherryPickConnector extends BaseConnector {
       for (let page = 1; ; page++) {
         // Délai entre les pages (sauf première)
         if (page > 1) {
-          await delayBetweenPages(this.id, page);
+          await delayBetweenPages(this.id, page, signal);
         }
 
         // Build request body with search context
@@ -62,11 +63,16 @@ export class CherryPickConnector extends BaseConnector {
 
         // Paramètre de pagination : { page: N } est le pattern le plus courant
         // pour les API REST paginées type Laravel/Symfony
-        const result = await this.fetchJSON(SEARCH_URL, now, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify(body),
-        });
+        const result = await this.fetchJSON(
+          SEARCH_URL,
+          now,
+          {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(body),
+          },
+          signal
+        );
 
         if (!result.ok) {
           return err(

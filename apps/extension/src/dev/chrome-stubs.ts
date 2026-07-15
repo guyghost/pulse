@@ -318,6 +318,12 @@ function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
 }
 
 function createChromeStubs() {
+  let activeDevScan: {
+    operationId: string;
+    timers: ReturnType<typeof setTimeout>[];
+    resolve: (response: unknown) => void;
+  } | null = null;
+
   const runtimeMessageListeners = new Set<RuntimeMessageListener>();
 
   function emitRuntimeMessage(message: RuntimeMessage): void {
@@ -578,44 +584,87 @@ function createChromeStubs() {
             return { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } };
           case 'SCAN_START':
             return new Promise((resolve) => {
+              const operationId = (message.payload as { operationId: string }).operationId;
+              if (activeDevScan) {
+                resolve({
+                  type: 'SCAN_BUSY',
+                  payload: {
+                    operationId,
+                    activeOperationId: activeDevScan.operationId,
+                  },
+                });
+                return;
+              }
               const runtimeMissions = readDevStorage<Mission[]>(
                 DEV_MISSIONS_STORAGE_KEY,
                 mockMissions
               ).map((m) => ({ ...m, scrapedAt: new Date() }));
               const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
               const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
+              const timers: ReturnType<typeof setTimeout>[] = [];
+              activeDevScan = { operationId, timers, resolve };
 
               groupedBySource.forEach(([connectorId, connectorMissions], index) => {
-                setTimeout(
-                  () => {
-                    emitRuntimeMessage({
-                      type: 'SCAN_PARTIAL_RESULT',
-                      payload: {
-                        connectorId,
-                        connectorName: connectorDisplayName(connectorId),
-                        missions: connectorMissions,
-                      },
-                    });
-                  },
-                  250 + index * 250
+                timers.push(
+                  setTimeout(
+                    () => {
+                      emitRuntimeMessage({
+                        type: 'SCAN_PARTIAL_RESULT',
+                        payload: {
+                          operationId,
+                          connectorId,
+                          connectorName: connectorDisplayName(connectorId),
+                          missions: connectorMissions,
+                        },
+                      });
+                    },
+                    250 + index * 250
+                  )
                 );
               });
 
-              setTimeout(
-                () => {
-                  resolve({
-                    type: 'SCAN_COMPLETE',
-                    payload: bridgeMissions,
-                  });
-                  window.dispatchEvent(
-                    new CustomEvent('dev:missions', {
-                      detail: runtimeMissions,
-                    })
-                  );
-                },
-                Math.max(800, 500 + groupedBySource.length * 250)
+              timers.push(
+                setTimeout(
+                  () => {
+                    if (activeDevScan?.operationId !== operationId) {
+                      return;
+                    }
+                    activeDevScan = null;
+                    resolve({
+                      type: 'SCAN_COMPLETE',
+                      payload: { operationId, missions: bridgeMissions },
+                    });
+                    window.dispatchEvent(
+                      new CustomEvent('dev:missions', {
+                        detail: runtimeMissions,
+                      })
+                    );
+                  },
+                  Math.max(800, 500 + groupedBySource.length * 250)
+                )
               );
             });
+          case 'SCAN_CANCEL': {
+            const operationId = (message.payload as { operationId: string }).operationId;
+            if (!activeDevScan || activeDevScan.operationId !== operationId) {
+              return {
+                type: 'SCAN_ERROR',
+                payload: {
+                  operationId,
+                  code: 'STALE_OPERATION',
+                  message: 'Aucun scan actif ne correspond à cette opération.',
+                },
+              };
+            }
+            for (const timer of activeDevScan.timers) {
+              clearTimeout(timer);
+            }
+            const cancelled = { type: 'SCAN_CANCELLED', payload: { operationId } };
+            activeDevScan.resolve(cancelled);
+            activeDevScan = null;
+            emitRuntimeMessage(cancelled);
+            return cancelled;
+          }
           case 'GET_TRACKINGS': {
             const now = Date.now();
             const all = readDevTrackings(now);

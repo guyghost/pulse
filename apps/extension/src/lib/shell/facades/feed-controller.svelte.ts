@@ -174,28 +174,49 @@ function normalizeBridgeMissions(payload: unknown[]): Mission[] {
 
 function isScanCompleteResponse(
   response: unknown
-): response is { type: 'SCAN_COMPLETE'; payload: unknown[] } {
+): response is { type: 'SCAN_COMPLETE'; payload: { operationId: string; missions: unknown[] } } {
+  if (!isRecord(response) || response.type !== 'SCAN_COMPLETE' || !isRecord(response.payload)) {
+    return false;
+  }
   return (
-    typeof response === 'object' &&
-    response !== null &&
-    (response as { type?: unknown }).type === 'SCAN_COMPLETE' &&
-    Array.isArray((response as { payload?: unknown }).payload)
+    typeof response.payload.operationId === 'string' && Array.isArray(response.payload.missions)
   );
 }
 
-function isScanErrorResponse(
-  response: unknown
-): response is { type: 'SCAN_ERROR'; payload: { message: string; code: string } } {
-  if (
-    typeof response !== 'object' ||
-    response === null ||
-    (response as { type?: unknown }).type !== 'SCAN_ERROR'
-  ) {
+function isScanErrorResponse(response: unknown): response is {
+  type: 'SCAN_ERROR';
+  payload: { operationId: string; message: string; code: string };
+} {
+  if (!isRecord(response) || response.type !== 'SCAN_ERROR') {
     return false;
   }
 
-  const payload = (response as { payload?: unknown }).payload;
-  return typeof payload === 'object' && payload !== null;
+  const payload = response.payload;
+  return isRecord(payload) && typeof payload.operationId === 'string';
+}
+
+function isScanCancelledResponse(
+  response: unknown
+): response is { type: 'SCAN_CANCELLED'; payload: { operationId: string } } {
+  return (
+    isRecord(response) &&
+    response.type === 'SCAN_CANCELLED' &&
+    isRecord(response.payload) &&
+    typeof response.payload.operationId === 'string'
+  );
+}
+
+function isScanBusyResponse(response: unknown): response is {
+  type: 'SCAN_BUSY';
+  payload: { operationId: string; activeOperationId: string };
+} {
+  return (
+    isRecord(response) &&
+    response.type === 'SCAN_BUSY' &&
+    isRecord(response.payload) &&
+    typeof response.payload.operationId === 'string' &&
+    typeof response.payload.activeOperationId === 'string'
+  );
 }
 
 // Re-export SourceStatus types for consumers
@@ -247,7 +268,7 @@ export interface FeedController {
 
   // Methods
   startScan(): Promise<void>;
-  stopScan(): void;
+  stopScan(): Promise<void>;
   handleScanComplete(missions: Mission[]): Promise<void>;
   applyPendingMissions(): Promise<void>;
   smartLoad(): Promise<void>;
@@ -270,6 +291,7 @@ export interface FeedController {
 export function createFeedController(feedStore: {
   readonly missions?: Mission[];
   load(): void;
+  reset?(): void;
   setMissions(missions: Mission[]): void;
   setError(msg: string): void;
 }): FeedController {
@@ -298,6 +320,8 @@ export function createFeedController(feedStore: {
   let partialScanCompletedSources = new SvelteSet<string>();
   let pendingScanMissions: Mission[] | null = null;
   let pendingScanKind: 'partial' | 'final' | null = null;
+  let activeScanOperationId: string | null = null;
+  let scanStartedCold = false;
 
   // Bridge message listener cleanup
   let bridgeListenerCleanup: (() => void) | null = null;
@@ -333,17 +357,33 @@ export function createFeedController(feedStore: {
     }
     scanCompleted = false;
     isScanning = true;
+    const operationId = crypto.randomUUID();
+    activeScanOperationId = operationId;
     connectorStatuses.clear();
     beginPartialScan();
+    scanStartedCold = partialScanBaseMissions.length === 0;
     feedStore.load();
 
     try {
       // Envoyer SCAN_START au service worker — il gère toute l'orchestration
-      const response = (await sendMessage({ type: 'SCAN_START' })) as unknown;
+      const response = (await sendMessage({
+        type: 'SCAN_START',
+        payload: { operationId, trigger: 'manual' },
+      })) as unknown;
+      if (activeScanOperationId !== operationId) {
+        return;
+      }
       // Le SW renvoie SCAN_COMPLETE avec les missions traitées
-      if (isScanCompleteResponse(response)) {
-        await handleScanComplete(normalizeBridgeMissions(response.payload));
-      } else if (isScanErrorResponse(response)) {
+      if (isScanCompleteResponse(response) && response.payload.operationId === operationId) {
+        await handleScanComplete(normalizeBridgeMissions(response.payload.missions));
+      } else if (
+        isScanCancelledResponse(response) &&
+        response.payload.operationId === operationId
+      ) {
+        finishCancelledScan(operationId);
+      } else if (isScanBusyResponse(response) && response.payload.operationId === operationId) {
+        feedStore.setError('Un scan est déjà en cours. Veuillez patienter.');
+      } else if (isScanErrorResponse(response) && response.payload.operationId === operationId) {
         const message =
           typeof response.payload.message === 'string'
             ? response.payload.message
@@ -354,29 +394,60 @@ export function createFeedController(feedStore: {
         await recoverFromUnsettledScanResponse(response);
       }
     } catch (err) {
+      if (activeScanOperationId !== operationId) {
+        return;
+      }
       if (import.meta.env.DEV) {
         console.error('[FeedController] startScan error:', err);
       }
       feedStore.setError(err instanceof Error ? err.message : 'Erreur inattendue lors du scan');
     } finally {
-      finishScanLifecycle();
+      finishScanLifecycle(operationId);
     }
   }
 
-  function stopScan(): void {
-    sendMessage({ type: 'SCAN_CANCEL' }).catch(() => {
-      // Service worker might not be available
-    });
-    isScanning = false;
-    connectorStatuses.clear();
-    resetPartialScan();
-    clearPendingScanUpdate();
+  async function stopScan(): Promise<void> {
+    const operationId = activeScanOperationId;
+    if (!operationId) {
+      return;
+    }
+
+    try {
+      const response = await sendMessage({
+        type: 'SCAN_CANCEL',
+        payload: { operationId },
+      });
+      if (isScanCancelledResponse(response) && response.payload.operationId === operationId) {
+        finishCancelledScan(operationId);
+      }
+    } catch (error) {
+      if (activeScanOperationId === operationId) {
+        feedStore.setError(
+          error instanceof Error ? error.message : "Impossible d'annuler le scan en cours."
+        );
+      }
+    }
   }
 
-  function finishScanLifecycle(): void {
+  function finishScanLifecycle(operationId: string): void {
+    if (activeScanOperationId !== operationId) {
+      return;
+    }
+    activeScanOperationId = null;
     isScanning = false;
     connectorStatuses.clear();
     resetPartialScan();
+  }
+
+  function finishCancelledScan(operationId: string): void {
+    if (activeScanOperationId !== operationId) {
+      return;
+    }
+    if (scanStartedCold) {
+      feedStore.reset?.();
+    }
+    clearPendingScanUpdate();
+    finishScanLifecycle(operationId);
   }
 
   function readFeedMissionsSnapshot(): Mission[] {
@@ -711,6 +782,9 @@ export function createFeedController(feedStore: {
         // Progression détaillée pendant le scan
         if (message?.type === 'SCAN_PROGRESS' && message.payload) {
           const payload = message.payload;
+          if (payload.operationId !== activeScanOperationId) {
+            return;
+          }
           // Mettre à jour les états de connecteurs pour l'UI
           connectorStatuses.clear();
           for (const cp of payload.connectorProgress) {
@@ -734,6 +808,9 @@ export function createFeedController(feedStore: {
 
         if (message?.type === 'SCAN_PARTIAL_RESULT' && message.payload) {
           const payload = message.payload;
+          if (payload.operationId !== activeScanOperationId) {
+            return;
+          }
           handleScanPartialResult(
             payload.connectorId,
             normalizeBridgeMissions(payload.missions ?? [])
@@ -741,8 +818,12 @@ export function createFeedController(feedStore: {
         }
 
         // Résultat final du scan (auto-scan du background)
-        if (message?.type === 'SCAN_COMPLETE' && Array.isArray(message.payload)) {
-          handleScanComplete(normalizeBridgeMissions(message.payload))
+        if (
+          message?.type === 'SCAN_COMPLETE' &&
+          message.payload.operationId === activeScanOperationId
+        ) {
+          const operationId = message.payload.operationId;
+          handleScanComplete(normalizeBridgeMissions(message.payload.missions))
             .catch((err) => {
               feedStore.setError(
                 err instanceof Error ? err.message : 'Impossible de finaliser le scan'
@@ -750,8 +831,15 @@ export function createFeedController(feedStore: {
             })
             .finally(() => {
               void refreshParserHealth();
-              finishScanLifecycle();
+              finishScanLifecycle(operationId);
             });
+        }
+
+        if (
+          message?.type === 'SCAN_CANCELLED' &&
+          message.payload.operationId === activeScanOperationId
+        ) {
+          finishCancelledScan(message.payload.operationId);
         }
 
         if (message?.type === 'MISSIONS_UPDATED' && Array.isArray(message.payload)) {
@@ -761,11 +849,14 @@ export function createFeedController(feedStore: {
         }
 
         // Erreur du scan (auto-scan du background)
-        if (message?.type === 'SCAN_ERROR' && message.payload) {
-          const { message: errorMsg, code } = message.payload as { message: string; code: string };
+        if (
+          message?.type === 'SCAN_ERROR' &&
+          message.payload.operationId === activeScanOperationId
+        ) {
+          const { operationId, message: errorMsg, code } = message.payload;
           clearPendingScanUpdate();
           feedStore.setError(humanizeScanError(errorMsg, code));
-          finishScanLifecycle();
+          finishScanLifecycle(operationId);
         }
       });
     } catch {
