@@ -276,6 +276,46 @@ type BeginScanResult =
 let activeScanOperation: ActiveScanOperation | null = null;
 const settledScanOperationIds = new Set<string>();
 
+type ProvisionalScanAdmissionDecision =
+  | { kind: 'accepted' }
+  | { kind: 'busy'; activeOperationId: string }
+  | { kind: 'rejected'; code: string; message: string };
+
+interface ProvisionalScanAdmission {
+  decision: Promise<ProvisionalScanAdmissionDecision>;
+  resolve: (decision: ProvisionalScanAdmissionDecision) => void;
+}
+
+const provisionalScanAdmissions = new Map<string, ProvisionalScanAdmission>();
+let provisionalScanAdmissionTail: Promise<void> = Promise.resolve();
+
+function createProvisionalScanAdmission(): ProvisionalScanAdmission {
+  let resolveDecision: ((decision: ProvisionalScanAdmissionDecision) => void) | undefined;
+  const decision = new Promise<ProvisionalScanAdmissionDecision>((resolve) => {
+    resolveDecision = resolve;
+  });
+  return {
+    decision,
+    resolve: (result) => {
+      resolveDecision?.(result);
+    },
+  };
+}
+
+async function serializeProvisionalScanAdmission<T>(work: () => Promise<T>): Promise<T> {
+  const predecessor = provisionalScanAdmissionTail;
+  let release: (() => void) | undefined;
+  provisionalScanAdmissionTail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await predecessor;
+  try {
+    return await work();
+  } finally {
+    release?.();
+  }
+}
+
 interface ScanAdmissionState {
   operationId: string | null;
   observed: Promise<void>;
@@ -758,51 +798,77 @@ async function beginScanOperation(
   trigger: ScanTrigger,
   options: ExecuteScanOptions
 ): Promise<BeginScanResult> {
-  await waitForScanRecoveryAndRemember();
-  await waitForScanAdmission();
-  if (activeScanOperation) {
-    return { kind: 'busy', outcome: createBusyOutcome(operationId, trigger) };
+  if (provisionalScanAdmissions.has(operationId)) {
+    throw new ScanCommandRejectedError(
+      'DUPLICATE_OPERATION',
+      'Cette opération de scan est déjà en cours d’admission.'
+    );
   }
-
-  const actor = createActor(scanLifecycleMachine, {
-    input: { now: Date.now(), maxRetries: 2, activeLeaseOperationId: null },
-  });
-  const operation: ActiveScanOperation = {
-    operationId,
-    trigger,
-    controller: new AbortController(),
-    actor,
-    terminalMessage: null,
-    terminalBroadcasted: false,
-    checkpointTail: Promise.resolve(),
-    checkpointFailure: null,
-  };
-  actor.start();
-  actor.send({ type: 'START', operationId, trigger });
-  activeScanOperation = operation;
+  const provisionalAdmission = createProvisionalScanAdmission();
+  provisionalScanAdmissions.set(operationId, provisionalAdmission);
 
   try {
-    await saveScanCheckpoint(createScanCheckpoint(operation));
+    const result = await serializeProvisionalScanAdmission(async (): Promise<BeginScanResult> => {
+      await waitForScanRecoveryAndRemember();
+      await waitForScanAdmission();
+      if (activeScanOperation) {
+        const activeOperationId = activeScanOperation.operationId;
+        provisionalAdmission.resolve({ kind: 'busy', activeOperationId });
+        return { kind: 'busy', outcome: createBusyOutcome(operationId, trigger) };
+      }
+
+      const actor = createActor(scanLifecycleMachine, {
+        input: { now: Date.now(), maxRetries: 2, activeLeaseOperationId: null },
+      });
+      const operation: ActiveScanOperation = {
+        operationId,
+        trigger,
+        controller: new AbortController(),
+        actor,
+        terminalMessage: null,
+        terminalBroadcasted: false,
+        checkpointTail: Promise.resolve(),
+        checkpointFailure: null,
+      };
+      actor.start();
+      actor.send({ type: 'START', operationId, trigger });
+
+      try {
+        await saveScanCheckpoint(createScanCheckpoint(operation));
+      } catch (error) {
+        const startFailure = checkpointStorageError(error);
+        if (actor.getSnapshot().value === 'starting') {
+          actor.send({ type: 'START_FAILED', operationId, error: startFailure });
+        }
+        releaseOperationRuntime(operation);
+        throw new ScanCommandRejectedError(startFailure.code, startFailure.message);
+      }
+
+      activeScanOperation = operation;
+      provisionalAdmission.resolve({ kind: 'accepted' });
+
+      let completion: Promise<ScanExecutionOutcome> | null = null;
+      const complete = (): Promise<ScanExecutionOutcome> => {
+        completion ??= executeAcceptedScanOperation(operation, options);
+        return completion;
+      };
+
+      return {
+        kind: 'started',
+        operation,
+        complete,
+      };
+    });
+    return result;
   } catch (error) {
-    const startFailure = checkpointStorageError(error);
-    if (actor.getSnapshot().value === 'starting') {
-      actor.send({ type: 'START_FAILED', operationId, error: startFailure });
+    const rejection = scanCommandRejection(error);
+    provisionalAdmission.resolve({ kind: 'rejected', ...rejection });
+    throw error;
+  } finally {
+    if (provisionalScanAdmissions.get(operationId) === provisionalAdmission) {
+      provisionalScanAdmissions.delete(operationId);
     }
-    releaseOperationRuntime(operation);
-    throw new ScanCommandRejectedError(startFailure.code, startFailure.message);
   }
-
-  let completion: Promise<ScanExecutionOutcome> | null = null;
-  const complete = (): Promise<ScanExecutionOutcome> => {
-    completion ??= executeAcceptedScanOperation(operation, options);
-    return completion;
-  };
-
-  return {
-    kind: 'started',
-    operation,
-    complete,
-  };
 }
 
 async function executeScanOperation(
@@ -1570,7 +1636,22 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
     if (message.type === 'SCAN_CANCEL') {
       void (async (): Promise<ScanCancelRequestedMessage> => {
+        const provisionalDecision = provisionalScanAdmissions.get(
+          message.payload.operationId
+        )?.decision;
         await waitForScanRecoveryAndRemember();
+        if (provisionalDecision) {
+          const decision = await provisionalDecision;
+          if (decision.kind === 'rejected') {
+            throw new ScanCommandRejectedError(decision.code, decision.message);
+          }
+          if (decision.kind === 'busy') {
+            throw new ScanCommandRejectedError(
+              'START_NOT_ACCEPTED',
+              `Le scan ${message.payload.operationId} n’a pas été accepté car ${decision.activeOperationId} est actif.`
+            );
+          }
+        }
         await waitForScanAdmission();
         const operation = activeScanOperation;
         if (

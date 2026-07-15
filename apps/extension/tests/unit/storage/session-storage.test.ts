@@ -229,6 +229,23 @@ describe('session-storage', () => {
         cancellationRequested: true,
       },
     },
+    {
+      name: 'completion with an empty mission id',
+      checkpoint: {
+        ...makeCheckpoint('operation-completed-empty-id', 'completed'),
+        terminal: { type: 'SCAN_COMPLETE' as const, missionIds: [''] },
+      },
+    },
+    {
+      name: 'completion with duplicate mission ids',
+      checkpoint: {
+        ...makeCheckpoint('operation-completed-duplicate-ids', 'completed'),
+        terminal: {
+          type: 'SCAN_COMPLETE' as const,
+          missionIds: ['mission-1', 'mission-1'],
+        },
+      },
+    },
   ])('rejects a semantically impossible checkpoint: $name', async ({ checkpoint }) => {
     await expect(saveScanCheckpoint(checkpoint)).rejects.toThrow(
       'Invalid scan lifecycle checkpoint.'

@@ -1,13 +1,6 @@
 import { test, expect } from '../fixtures';
 import type { Page } from '@playwright/test';
-import {
-  expectMissionCount,
-  injectMissions,
-  missionCards,
-  mockConnectorFailure,
-  scanButton,
-  waitForMissions,
-} from '../helpers';
+import { mockConnectorFailure, scanButton } from '../helpers';
 import { generateBalancedDataset } from '../../fixtures/large-dataset';
 
 type ScanProtocolScenario =
@@ -17,6 +10,11 @@ type ScanProtocolScenario =
       missions: unknown[];
       failedConnectorMessage: string;
       completeDelayMs: number;
+    }
+  | {
+      kind: 'manual-partial-success';
+      mission: Record<string, unknown>;
+      failedConnectorMessage: string;
     }
   | { kind: 'retry'; mission: Record<string, unknown> };
 
@@ -31,6 +29,7 @@ async function mockScanProtocol(page: Page, scenario: ScanProtocolScenario): Pro
       (window as unknown as Record<string, boolean>).__shouldFail = true;
     }
     (window as unknown as Record<string, unknown>).__scanProtocolEmissions = [];
+    (window as unknown as Record<string, unknown>).__scanProtocolRequests = [];
 
     function emitRuntimeMessage(message: unknown): void {
       const emissions = (window as unknown as Record<string, unknown>)
@@ -101,11 +100,34 @@ async function mockScanProtocol(page: Page, scenario: ScanProtocolScenario): Pro
             type?: string;
             payload?: { operationId?: string };
           };
+          if (
+            config.kind === 'manual-partial-success' &&
+            message.type === 'GET_PERSISTED_CONNECTOR_STATUSES'
+          ) {
+            const now = Date.now();
+            return {
+              type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
+              payload: [
+                {
+                  connectorId: 'free-work',
+                  connectorName: 'Free-Work',
+                  lastState: 'done',
+                  missionsCount: 1,
+                  error: null,
+                  lastSyncAt: now,
+                  lastSuccessAt: now,
+                },
+              ],
+            };
+          }
           if (message.type !== 'SCAN_START' || !message.payload?.operationId) {
             return originalSendMessage(rawMessage);
           }
 
           const operationId = message.payload.operationId;
+          const requests = (window as unknown as Record<string, unknown>)
+            .__scanProtocolRequests as unknown[];
+          requests.push(rawMessage);
 
           if (config.kind === 'error') {
             window.setTimeout(() => {
@@ -131,57 +153,64 @@ async function mockScanProtocol(page: Page, scenario: ScanProtocolScenario): Pro
           } else {
             const missions = config.kind === 'partial-success' ? config.missions : [config.mission];
 
-            if (config.kind === 'partial-success') {
-              window.setTimeout(() => {
-                emitRuntimeMessage({
-                  type: 'SCAN_PROGRESS',
-                  payload: {
-                    operationId,
-                    phase: 'scanning',
-                    current: 3,
-                    total: 3,
-                    connectorProgress: [
-                      {
-                        connectorId: 'free-work',
-                        connectorName: 'Free-Work',
-                        state: 'done',
-                        missionsCount: missions.length,
-                        error: null,
-                        retryCount: 0,
-                      },
-                      {
-                        connectorId: 'lehibou',
-                        connectorName: 'LeHibou',
-                        state: 'error',
-                        missionsCount: 0,
-                        error: {
-                          type: 'connector',
-                          message: config.failedConnectorMessage,
-                          recoverable: true,
-                          timestamp: 1,
+            if (config.kind === 'partial-success' || config.kind === 'manual-partial-success') {
+              window.setTimeout(
+                () => {
+                  emitRuntimeMessage({
+                    type: 'SCAN_PROGRESS',
+                    payload: {
+                      operationId,
+                      phase: 'scanning',
+                      current: config.kind === 'manual-partial-success' ? 2 : 3,
+                      total: config.kind === 'manual-partial-success' ? 2 : 3,
+                      connectorProgress: [
+                        {
+                          connectorId: 'free-work',
+                          connectorName: 'Free-Work',
+                          state: 'done',
+                          missionsCount: missions.length,
+                          error: null,
+                          retryCount: 0,
+                        },
+                        {
                           connectorId: 'lehibou',
-                          phase: 'fetch',
+                          connectorName: 'LeHibou',
+                          state: 'error',
+                          missionsCount: 0,
+                          error: {
+                            type: 'connector',
+                            message: config.failedConnectorMessage,
+                            recoverable: true,
+                            timestamp: 1,
+                            connectorId: 'lehibou',
+                            phase: 'fetch',
+                          },
+                          retryCount: 3,
                         },
-                        retryCount: 3,
-                      },
-                      {
-                        connectorId: 'hiway',
-                        connectorName: 'Hiway',
-                        state: 'error',
-                        missionsCount: 0,
-                        error: {
-                          type: 'network',
-                          message: 'Hiway timeout during partial scan',
-                          recoverable: true,
-                          timestamp: 1,
-                          retryable: true,
-                        },
-                        retryCount: 3,
-                      },
-                    ],
-                  },
-                });
-              }, 800);
+                        ...(config.kind === 'partial-success'
+                          ? [
+                              {
+                                connectorId: 'hiway',
+                                connectorName: 'Hiway',
+                                state: 'error',
+                                missionsCount: 0,
+                                error: {
+                                  type: 'network',
+                                  message: 'Hiway timeout during partial scan',
+                                  recoverable: true,
+                                  timestamp: 1,
+                                  retryable: true,
+                                },
+                                retryCount: 3,
+                              },
+                            ]
+                          : []),
+                      ],
+                    },
+                  });
+                },
+                config.kind === 'manual-partial-success' ? 50 : 800
+              );
             }
 
             window.setTimeout(() => {
@@ -236,16 +265,112 @@ test.describe('Connector Resilience', () => {
   });
 
   test('continues scanning when one connector fails', async ({ page }) => {
-    // Injecter des missions normalement
-    await injectMissions(page, 5);
-    await waitForMissions(page, 5, 5000);
+    const [mission] = generateBalancedDataset(1);
+    const missionId = 'causal-survivor-proof';
+    const missionTitle = 'Connecteur survivant — preuve causale';
+    await mockScanProtocol(page, {
+      kind: 'manual-partial-success',
+      mission: {
+        ...mission,
+        id: missionId,
+        title: missionTitle,
+        source: 'free-work',
+        score: 100,
+      },
+      failedConnectorMessage: 'LeHibou indisponible pendant le scan causal',
+    });
 
-    // Vérifier que les missions sont affichées (les autres connecteurs ont continué)
-    const missionCount = await missionCards(page).count();
-    expect(missionCount).toBe(5);
+    await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
+    await page.evaluate(() => {
+      const trace = window as unknown as {
+        __scanProtocolEmissions?: unknown[];
+        __scanProtocolRequests?: unknown[];
+      };
+      trace.__scanProtocolEmissions = [];
+      trace.__scanProtocolRequests = [];
+    });
+    await scanButton(page).click();
 
-    // Vérifier que le compteur affiche 5 missions
-    await expectMissionCount(page, 5, 2000);
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            ({ expectedMissionId, expectedMissionTitle }) => {
+              type ProtocolMessage = {
+                type?: string;
+                payload?: {
+                  operationId?: string;
+                  connectorId?: string;
+                  connectorProgress?: Array<{ connectorId?: string; state?: string }>;
+                  missions?: Array<{ id?: string; title?: string }>;
+                };
+              };
+              const trace = window as unknown as {
+                __scanProtocolEmissions?: ProtocolMessage[];
+                __scanProtocolRequests?: ProtocolMessage[];
+              };
+              const requests = trace.__scanProtocolRequests ?? [];
+              const emissions = trace.__scanProtocolEmissions ?? [];
+              const start = requests.find((message) => message.type === 'SCAN_START');
+              const operationId = start?.payload?.operationId;
+              const scoped = operationId
+                ? emissions.filter((message) => message.payload?.operationId === operationId)
+                : [];
+              const progress = scoped.find((message) => message.type === 'SCAN_PROGRESS');
+              const partial = scoped.find((message) => message.type === 'SCAN_PARTIAL_RESULT');
+              const terminal = scoped.find((message) => message.type === 'SCAN_COMPLETE');
+
+              return {
+                hasUiStart: Boolean(operationId),
+                sameOperation:
+                  scoped.length >= 3 &&
+                  scoped.every((message) => message.payload?.operationId === operationId),
+                failedConnectorObserved: Boolean(
+                  progress?.payload?.connectorProgress?.some(
+                    (connector) =>
+                      connector.connectorId === 'lehibou' && connector.state === 'error'
+                  )
+                ),
+                survivingConnectorObserved: Boolean(
+                  progress?.payload?.connectorProgress?.some(
+                    (connector) =>
+                      connector.connectorId === 'free-work' && connector.state === 'done'
+                  )
+                ),
+                survivingMissionObserved: Boolean(
+                  partial?.payload?.connectorId === 'free-work' &&
+                  partial.payload.missions?.some(
+                    (item) => item.id === expectedMissionId && item.title === expectedMissionTitle
+                  )
+                ),
+                terminalObserved: Boolean(
+                  terminal?.payload?.missions?.some((item) => item.id === expectedMissionId)
+                ),
+              };
+            },
+            { expectedMissionId: missionId, expectedMissionTitle: missionTitle }
+          ),
+        { timeout: 5000 }
+      )
+      .toEqual({
+        hasUiStart: true,
+        sameOperation: true,
+        failedConnectorObserved: true,
+        survivingConnectorObserved: true,
+        survivingMissionObserved: true,
+        terminalObserved: true,
+      });
+
+    const arrivalStack = page.getByTestId('mission-arrival-stack');
+    await expect(arrivalStack).toBeVisible({ timeout: 3000 });
+    await arrivalStack.getByRole('button', { name: /Ouvrir (?:la|les \d+) nouvelle/ }).click();
+    await expect(
+      page.getByTestId('arrival-preview').filter({ hasText: missionTitle })
+    ).toBeVisible();
+    await arrivalStack
+      .getByRole('button', { name: /Actualiser la file avec (?:la mission|les \d+ missions)/ })
+      .click();
+    await expect(page.getByText(missionTitle, { exact: true })).toBeVisible({ timeout: 10000 });
   });
 
   test('shows typed error message for connector failure', async ({ page }) => {

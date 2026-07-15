@@ -198,24 +198,30 @@ describe('scan recovery bootstrap gate', () => {
     }
   );
 
-  it('keeps the terminal checkpoint when payload reconstruction fails before a send attempt', async () => {
+  it('keeps the terminal checkpoint until every committed mission id can be reconstructed', async () => {
     const stored = checkpoint('completed', {
       type: 'SCAN_COMPLETE',
       missionIds: ['mission-unavailable'],
     });
     sessionStore.scanLifecycleCheckpoint = stored;
-    getMissions.mockRejectedValueOnce(new Error('IndexedDB unavailable'));
+    getMissions.mockResolvedValueOnce([]);
 
     const recovery = await import('../../../src/background/scan-recovery');
-    await expect(recovery.waitForScanRecovery()).rejects.toThrow('IndexedDB unavailable');
+    await expect(recovery.waitForScanRecovery()).rejects.toThrow(
+      'Committed mission mission-unavailable is missing'
+    );
 
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalled();
     expect(sessionStore.scanLifecycleCheckpoint).toEqual(stored);
 
+    getMissions.mockResolvedValueOnce([makeMission('mission-unavailable')]);
     await expect(recovery.waitForScanRecovery()).resolves.toBe('operation-completed');
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
       type: 'SCAN_COMPLETE',
-      payload: { operationId: 'operation-completed', missions: [] },
+      payload: {
+        operationId: 'operation-completed',
+        missions: [makeMission('mission-unavailable')],
+      },
     });
     expect(sessionStore.scanLifecycleCheckpoint).toBeUndefined();
   });

@@ -132,7 +132,8 @@ function parseTerminalDecision(value: unknown): ScanTerminalDecision | null | un
   if (
     value.type === 'SCAN_COMPLETE' &&
     Array.isArray(value.missionIds) &&
-    value.missionIds.every((missionId) => typeof missionId === 'string')
+    value.missionIds.every((missionId) => typeof missionId === 'string' && missionId.length > 0) &&
+    new Set(value.missionIds).size === value.missionIds.length
   ) {
     return { type: 'SCAN_COMPLETE', missionIds: [...value.missionIds] };
   }

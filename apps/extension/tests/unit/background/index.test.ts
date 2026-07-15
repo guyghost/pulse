@@ -7,6 +7,7 @@ import type {
   ScanProgressInfo,
   ScanResult,
 } from '../../../src/lib/shell/scan/scanner';
+import type { ScanCheckpoint } from '../../../src/models/scan-lifecycle.machine';
 
 const getSettings = vi.fn();
 const setSettings = vi.fn();
@@ -931,6 +932,413 @@ describe('background auto-scan notifications', () => {
     });
     await vi.waitFor(() => {
       expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-checkpointed-start');
+    });
+  });
+
+  it('admits the next queued start when the first provisional checkpoint fails', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let rejectFirstCheckpoint: ((error: Error) => void) | undefined;
+    let observeFirstCheckpoint: (() => void) | undefined;
+    const firstCheckpointObserved = new Promise<void>((resolve) => {
+      observeFirstCheckpoint = resolve;
+    });
+    saveScanCheckpoint.mockImplementation((checkpoint: ScanCheckpoint) => {
+      if (
+        checkpoint.operationId === 'operation-provisional-failure' &&
+        checkpoint.state === 'starting' &&
+        checkpoint.terminal === null
+      ) {
+        observeFirstCheckpoint?.();
+        return new Promise<void>((_resolve, reject) => {
+          rejectFirstCheckpoint = reject;
+        });
+      }
+      return Promise.resolve();
+    });
+    const firstResponse = vi.fn();
+    const secondResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-provisional-failure', trigger: 'manual' },
+      },
+      {},
+      firstResponse
+    );
+    await firstCheckpointObserved;
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-after-provisional-failure', trigger: 'manual' },
+      },
+      {},
+      secondResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const firstRespondedBeforeDecision = firstResponse.mock.calls.length > 0;
+    const secondRespondedBeforeDecision = secondResponse.mock.calls.length > 0;
+    const secondCheckpointWrittenBeforeDecision = saveScanCheckpoint.mock.calls.some(
+      ([checkpoint]) => checkpoint.operationId === 'operation-after-provisional-failure'
+    );
+    const scannerStartedBeforeDecision = runScan.mock.calls.length > 0;
+
+    rejectFirstCheckpoint?.(new Error('first provisional checkpoint failed'));
+
+    await vi.waitFor(() => {
+      expect(firstResponse).toHaveBeenCalledWith({
+        type: 'SCAN_START_REJECTED',
+        payload: {
+          operationId: 'operation-provisional-failure',
+          code: 'CHECKPOINT_STORAGE',
+          message: 'first provisional checkpoint failed',
+        },
+      });
+      expect(secondResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-after-provisional-failure' },
+      });
+    });
+    expect(firstRespondedBeforeDecision).toBe(false);
+    expect(secondRespondedBeforeDecision).toBe(false);
+    expect(secondCheckpointWrittenBeforeDecision).toBe(false);
+    expect(scannerStartedBeforeDecision).toBe(false);
+    expect(secondResponse).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'SCAN_BUSY' }));
+    await vi.waitFor(() => {
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-after-provisional-failure');
+    });
+  });
+
+  it('reports busy only after the first provisional checkpoint publishes its accepted lease', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let releaseFirstCheckpoint: (() => void) | undefined;
+    let observeFirstCheckpoint: (() => void) | undefined;
+    let releaseFirstScan: (() => void) | undefined;
+    const firstCheckpointObserved = new Promise<void>((resolve) => {
+      observeFirstCheckpoint = resolve;
+    });
+    const firstScanBlocked = new Promise<void>((resolve) => {
+      releaseFirstScan = resolve;
+    });
+    saveScanCheckpoint.mockImplementation((checkpoint: ScanCheckpoint) => {
+      if (
+        checkpoint.operationId === 'operation-provisional-success' &&
+        checkpoint.state === 'starting' &&
+        checkpoint.terminal === null
+      ) {
+        observeFirstCheckpoint?.();
+        return new Promise<void>((resolve) => {
+          releaseFirstCheckpoint = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+    const missions = [makeMission({ id: 'mission-provisional-success' })];
+    runScan.mockImplementationOnce(
+      async (
+        _signal?: AbortSignal,
+        _onProgress?: (info: ScanProgressInfo) => void,
+        options?: ScanOptions
+      ) => {
+        options?.onLifecycleEvent?.({ type: 'CONNECTOR_STARTED', connectorId: 'free-work' });
+        await firstScanBlocked;
+        options?.onLifecycleEvent?.({
+          type: 'CONNECTOR_SUCCEEDED',
+          connectorId: 'free-work',
+          missions,
+        });
+        return { missions, sourceMissions: missions, duplicateRelations: [], errors: [] };
+      }
+    );
+    const firstResponse = vi.fn();
+    const secondResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-provisional-success', trigger: 'manual' },
+      },
+      {},
+      firstResponse
+    );
+    await firstCheckpointObserved;
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-busy-after-acceptance', trigger: 'manual' },
+      },
+      {},
+      secondResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const firstRespondedBeforeDecision = firstResponse.mock.calls.length > 0;
+    const secondRespondedBeforeDecision = secondResponse.mock.calls.length > 0;
+    releaseFirstCheckpoint?.();
+
+    await vi.waitFor(() => {
+      expect(firstResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-provisional-success' },
+      });
+      expect(secondResponse).toHaveBeenCalledWith({
+        type: 'SCAN_BUSY',
+        payload: {
+          operationId: 'operation-busy-after-acceptance',
+          activeOperationId: 'operation-provisional-success',
+        },
+      });
+    });
+    expect(firstRespondedBeforeDecision).toBe(false);
+    expect(secondRespondedBeforeDecision).toBe(false);
+    expect(
+      saveScanCheckpoint.mock.calls.some(
+        ([checkpoint]) => checkpoint.operationId === 'operation-busy-after-acceptance'
+      )
+    ).toBe(false);
+
+    await vi.waitFor(() => {
+      expect(releaseFirstScan).toBeTypeOf('function');
+    });
+    releaseFirstScan?.();
+    await vi.waitFor(() => {
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-provisional-success');
+    });
+  });
+
+  it('waits for a successful provisional start decision before cancelling it', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let releaseStartingCheckpoint: (() => void) | undefined;
+    let observeStartingCheckpoint: (() => void) | undefined;
+    const startingCheckpointObserved = new Promise<void>((resolve) => {
+      observeStartingCheckpoint = resolve;
+    });
+    saveScanCheckpoint.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          observeStartingCheckpoint?.();
+          releaseStartingCheckpoint = resolve;
+        })
+    );
+    const startResponse = vi.fn();
+    const cancelResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-cancel-provisional-success', trigger: 'manual' },
+      },
+      {},
+      startResponse
+    );
+    await startingCheckpointObserved;
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-cancel-provisional-success' } },
+      {},
+      cancelResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const startRespondedBeforeDecision = startResponse.mock.calls.length > 0;
+    const cancelRespondedBeforeDecision = cancelResponse.mock.calls.length > 0;
+    releaseStartingCheckpoint?.();
+
+    await vi.waitFor(() => {
+      expect(startResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-cancel-provisional-success' },
+      });
+      expect(cancelResponse).toHaveBeenCalledWith({
+        type: 'SCAN_CANCEL_REQUESTED',
+        payload: { operationId: 'operation-cancel-provisional-success' },
+      });
+      expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+        type: 'SCAN_CANCELLED',
+        payload: { operationId: 'operation-cancel-provisional-success' },
+      });
+    });
+    expect(startRespondedBeforeDecision).toBe(false);
+    expect(cancelRespondedBeforeDecision).toBe(false);
+  });
+
+  it('rejects cancel with the matching provisional checkpoint failure instead of stale', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let rejectStartingCheckpoint: ((error: Error) => void) | undefined;
+    let observeStartingCheckpoint: (() => void) | undefined;
+    const startingCheckpointObserved = new Promise<void>((resolve) => {
+      observeStartingCheckpoint = resolve;
+    });
+    saveScanCheckpoint.mockImplementationOnce(
+      () =>
+        new Promise<void>((_resolve, reject) => {
+          observeStartingCheckpoint?.();
+          rejectStartingCheckpoint = reject;
+        })
+    );
+    const startResponse = vi.fn();
+    const cancelResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-cancel-provisional-failure', trigger: 'manual' },
+      },
+      {},
+      startResponse
+    );
+    await startingCheckpointObserved;
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-cancel-provisional-failure' } },
+      {},
+      cancelResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const startRespondedBeforeDecision = startResponse.mock.calls.length > 0;
+    const cancelRespondedBeforeDecision = cancelResponse.mock.calls.length > 0;
+    rejectStartingCheckpoint?.(new Error('provisional lease unavailable'));
+
+    await vi.waitFor(() => {
+      expect(startResponse).toHaveBeenCalledWith({
+        type: 'SCAN_START_REJECTED',
+        payload: {
+          operationId: 'operation-cancel-provisional-failure',
+          code: 'CHECKPOINT_STORAGE',
+          message: 'provisional lease unavailable',
+        },
+      });
+      expect(cancelResponse).toHaveBeenCalledWith({
+        type: 'SCAN_CANCEL_REJECTED',
+        payload: {
+          operationId: 'operation-cancel-provisional-failure',
+          code: 'CHECKPOINT_STORAGE',
+          message: 'provisional lease unavailable',
+        },
+      });
+    });
+    expect(startRespondedBeforeDecision).toBe(false);
+    expect(cancelRespondedBeforeDecision).toBe(false);
+    expect(cancelResponse).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ code: 'STALE_OPERATION' }),
+      })
+    );
+    expect(runScan).not.toHaveBeenCalled();
+  });
+
+  it('correlates cancel with a queued start that becomes busy after the accepted lease', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let releaseFirstCheckpoint: (() => void) | undefined;
+    let observeFirstCheckpoint: (() => void) | undefined;
+    let releaseFirstScan: (() => void) | undefined;
+    const firstCheckpointObserved = new Promise<void>((resolve) => {
+      observeFirstCheckpoint = resolve;
+    });
+    const firstScanBlocked = new Promise<void>((resolve) => {
+      releaseFirstScan = resolve;
+    });
+    saveScanCheckpoint.mockImplementation((checkpoint: ScanCheckpoint) => {
+      if (
+        checkpoint.operationId === 'operation-accepted-before-queued-cancel' &&
+        checkpoint.state === 'starting' &&
+        checkpoint.terminal === null
+      ) {
+        observeFirstCheckpoint?.();
+        return new Promise<void>((resolve) => {
+          releaseFirstCheckpoint = resolve;
+        });
+      }
+      return Promise.resolve();
+    });
+    const missions = [makeMission({ id: 'mission-accepted-before-queued-cancel' })];
+    runScan.mockImplementationOnce(
+      async (
+        _signal?: AbortSignal,
+        _onProgress?: (info: ScanProgressInfo) => void,
+        options?: ScanOptions
+      ) => {
+        options?.onLifecycleEvent?.({ type: 'CONNECTOR_STARTED', connectorId: 'free-work' });
+        await firstScanBlocked;
+        options?.onLifecycleEvent?.({
+          type: 'CONNECTOR_SUCCEEDED',
+          connectorId: 'free-work',
+          missions,
+        });
+        return { missions, sourceMissions: missions, duplicateRelations: [], errors: [] };
+      }
+    );
+    const firstResponse = vi.fn();
+    const queuedStartResponse = vi.fn();
+    const queuedCancelResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: {
+          operationId: 'operation-accepted-before-queued-cancel',
+          trigger: 'manual',
+        },
+      },
+      {},
+      firstResponse
+    );
+    await firstCheckpointObserved;
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-queued-then-busy', trigger: 'manual' },
+      },
+      {},
+      queuedStartResponse
+    );
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-queued-then-busy' } },
+      {},
+      queuedCancelResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 25));
+
+    const queuedStartRespondedBeforeDecision = queuedStartResponse.mock.calls.length > 0;
+    const queuedCancelRespondedBeforeDecision = queuedCancelResponse.mock.calls.length > 0;
+    releaseFirstCheckpoint?.();
+
+    await vi.waitFor(() => {
+      expect(firstResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-accepted-before-queued-cancel' },
+      });
+      expect(queuedStartResponse).toHaveBeenCalledWith({
+        type: 'SCAN_BUSY',
+        payload: {
+          operationId: 'operation-queued-then-busy',
+          activeOperationId: 'operation-accepted-before-queued-cancel',
+        },
+      });
+      expect(queuedCancelResponse).toHaveBeenCalledWith({
+        type: 'SCAN_CANCEL_REJECTED',
+        payload: {
+          operationId: 'operation-queued-then-busy',
+          code: 'START_NOT_ACCEPTED',
+          message:
+            'Le scan operation-queued-then-busy n’a pas été accepté car operation-accepted-before-queued-cancel est actif.',
+        },
+      });
+    });
+    expect(queuedStartRespondedBeforeDecision).toBe(false);
+    expect(queuedCancelRespondedBeforeDecision).toBe(false);
+    expect(queuedCancelResponse).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ code: 'STALE_OPERATION' }),
+      })
+    );
+
+    await vi.waitFor(() => {
+      expect(releaseFirstScan).toBeTypeOf('function');
+    });
+    releaseFirstScan?.();
+    await vi.waitFor(() => {
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-accepted-before-queued-cancel');
     });
   });
 

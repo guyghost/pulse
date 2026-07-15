@@ -22,10 +22,23 @@ function selectCommittedMissions(
   missions: readonly Mission[],
   missionIds: readonly string[]
 ): Mission[] {
-  const missionsById = new Map(missions.map((mission) => [mission.id, mission]));
-  return missionIds.flatMap((missionId) => {
+  const expectedMissionIds = new Set(missionIds);
+  const missionsById = new Map<string, Mission>();
+  for (const mission of missions) {
+    if (!expectedMissionIds.has(mission.id)) {
+      continue;
+    }
+    if (missionsById.has(mission.id)) {
+      throw new Error(`Committed mission ${mission.id} is duplicated in durable storage.`);
+    }
+    missionsById.set(mission.id, mission);
+  }
+  return missionIds.map((missionId) => {
     const mission = missionsById.get(missionId);
-    return mission ? [mission] : [];
+    if (!mission) {
+      throw new Error(`Committed mission ${missionId} is missing from durable storage.`);
+    }
+    return mission;
   });
 }
 
