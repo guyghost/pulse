@@ -9,7 +9,12 @@
   import type { ToastType } from '$lib/state/toast.svelte.ts';
   import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
-  import { createAppNavigation, NAV_ITEMS, type Page } from '$lib/state/app-navigation.svelte';
+  import {
+    createAppNavigation,
+    NAV_ITEMS,
+    type Page,
+    type PageLoadSnapshot,
+  } from '$lib/state/app-navigation.svelte';
   import { createThemeStore } from '$lib/state/theme.svelte';
   import { premium } from '$lib/state/premium.svelte';
   import { features } from '$lib/state/features.svelte';
@@ -17,6 +22,30 @@
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
   import { subscribeToNotificationClicked } from '$lib/shell/facades/feed-data.facade';
 
+  type PageModule = { default: unknown };
+  type PageImporter = () => Promise<PageModule>;
+  type PageImporters = Record<Page, PageImporter>;
+
+  const DEFAULT_PAGE_IMPORTERS: PageImporters = {
+    feed: () => import('../ui/pages/FeedPage.svelte'),
+    profile: () => import('../ui/pages/ProfilePage.svelte'),
+    cv: () => import('../ui/pages/CvPage.svelte'),
+    applications: () => import('../ui/pages/ApplicationsPage.svelte'),
+    tjm: () => import('../ui/pages/TJMPage.svelte'),
+    settings: () => import('../ui/pages/SettingsPage.svelte'),
+    onboarding: () => import('../ui/pages/OnboardingPage.svelte'),
+  };
+
+  const {
+    pageImporters: pageImporterOverrides = {},
+  }: {
+    pageImporters?: Partial<PageImporters>;
+  } = $props();
+
+  const pageImporters: PageImporters = $derived({
+    ...DEFAULT_PAGE_IMPORTERS,
+    ...pageImporterOverrides,
+  });
   const nav = createAppNavigation();
   const theme = createThemeStore();
 
@@ -29,64 +58,123 @@
   let SettingsPage: typeof import('../ui/pages/SettingsPage.svelte').default | null = $state(null);
   let OnboardingPage: typeof import('../ui/pages/OnboardingPage.svelte').default | null =
     $state(null);
+  let pageLoads = $state<Partial<Record<Page, PageLoadSnapshot>>>({});
+  let pageRequestSequence = 0;
+  let shellMounted = true;
+  const inFlightPageLoads = new Map<Page, { requestId: string; promise: Promise<void> }>();
 
-  function loadPage(page: Page): void {
-    if (page === 'feed' && !FeedPage) {
-      launchMarks.markImportStart('feed');
-      import('../ui/pages/FeedPage.svelte').then((m) => {
-        FeedPage = m.default;
-        launchMarks.markPageLoaded('feed');
-      });
-      return;
-    }
-    if (page === 'profile' && !ProfilePage) {
-      launchMarks.markImportStart('profile');
-      import('../ui/pages/ProfilePage.svelte').then((m) => {
-        ProfilePage = m.default;
-        launchMarks.markPageLoaded('profile');
-      });
-      return;
-    }
-    if (page === 'cv' && !CvPage) {
-      launchMarks.markImportStart('cv');
-      import('../ui/pages/CvPage.svelte').then((m) => {
-        CvPage = m.default;
-        launchMarks.markPageLoaded('cv');
-      });
-      return;
-    }
-    if (page === 'applications' && !ApplicationsPage) {
-      launchMarks.markImportStart('applications');
-      import('../ui/pages/ApplicationsPage.svelte').then((m) => {
-        ApplicationsPage = m.default;
-        launchMarks.markPageLoaded('applications');
-      });
-      return;
-    }
-    if (page === 'tjm' && !TJMPage) {
-      launchMarks.markImportStart('tjm');
-      import('../ui/pages/TJMPage.svelte').then((m) => {
-        TJMPage = m.default;
-        launchMarks.markPageLoaded('tjm');
-      });
-      return;
-    }
-    if (page === 'settings' && !SettingsPage) {
-      launchMarks.markImportStart('settings');
-      import('../ui/pages/SettingsPage.svelte').then((m) => {
-        SettingsPage = m.default;
-        launchMarks.markPageLoaded('settings');
-      });
-      return;
-    }
-    if (page === 'onboarding' && !OnboardingPage) {
-      launchMarks.markImportStart('onboarding');
-      import('../ui/pages/OnboardingPage.svelte').then((m) => {
-        OnboardingPage = m.default;
-        launchMarks.markPageLoaded('onboarding');
-      });
+  function hasPageComponent(page: Page): boolean {
+    switch (page) {
+      case 'feed':
+        return FeedPage !== null;
+      case 'profile':
+        return ProfilePage !== null;
+      case 'cv':
+        return CvPage !== null;
+      case 'applications':
+        return ApplicationsPage !== null;
+      case 'tjm':
+        return TJMPage !== null;
+      case 'settings':
+        return SettingsPage !== null;
+      case 'onboarding':
+        return OnboardingPage !== null;
     }
   }
+
+  function assignPageComponent(page: Page, component: unknown): void {
+    switch (page) {
+      case 'feed':
+        FeedPage = component as typeof import('../ui/pages/FeedPage.svelte').default;
+        return;
+      case 'profile':
+        ProfilePage = component as typeof import('../ui/pages/ProfilePage.svelte').default;
+        return;
+      case 'cv':
+        CvPage = component as typeof import('../ui/pages/CvPage.svelte').default;
+        return;
+      case 'applications':
+        ApplicationsPage =
+          component as typeof import('../ui/pages/ApplicationsPage.svelte').default;
+        return;
+      case 'tjm':
+        TJMPage = component as typeof import('../ui/pages/TJMPage.svelte').default;
+        return;
+      case 'settings':
+        SettingsPage = component as typeof import('../ui/pages/SettingsPage.svelte').default;
+        return;
+      case 'onboarding':
+        OnboardingPage = component as typeof import('../ui/pages/OnboardingPage.svelte').default;
+    }
+  }
+
+  function setPageLoad(page: Page, snapshot: PageLoadSnapshot): void {
+    pageLoads = { ...pageLoads, [page]: snapshot };
+  }
+
+  function isCurrentPageRequest(page: Page, requestId: string): boolean {
+    return shellMounted && pageLoads[page]?.requestId === requestId;
+  }
+
+  function loadPage(page: Page, retry = false): void {
+    if (isPremiumLocked(page) || hasPageComponent(page)) {
+      return;
+    }
+
+    const current = pageLoads[page];
+    if (current?.status === 'loading' || (current?.status === 'error' && !retry)) {
+      return;
+    }
+    if (retry && current?.status !== 'error') {
+      return;
+    }
+
+    const requestId = `${page}:${(pageRequestSequence += 1)}`;
+    const attempt = (current?.attempt ?? 0) + 1;
+    setPageLoad(page, { status: 'loading', requestId, attempt, error: null });
+    launchMarks.markImportStart(page as PageId);
+
+    const promise = Promise.resolve()
+      .then(() => pageImporters[page]())
+      .then((module) => {
+        if (!isCurrentPageRequest(page, requestId)) {
+          return;
+        }
+        assignPageComponent(page, module.default);
+        setPageLoad(page, { status: 'ready', requestId, attempt, error: null });
+        launchMarks.markPageLoaded(page as PageId);
+      })
+      .catch((error: unknown) => {
+        if (!isCurrentPageRequest(page, requestId)) {
+          return;
+        }
+        setPageLoad(page, {
+          status: 'error',
+          requestId,
+          attempt,
+          error: error instanceof Error ? error.message : 'Page import failed.',
+        });
+      })
+      .finally(() => {
+        if (inFlightPageLoads.get(page)?.requestId === requestId) {
+          inFlightPageLoads.delete(page);
+        }
+      });
+
+    inFlightPageLoads.set(page, { requestId, promise });
+  }
+
+  function retryPage(page: Page): void {
+    loadPage(page, true);
+  }
+
+  $effect(() => {
+    return () => {
+      shellMounted = false;
+      pageRequestSequence += 1;
+      inFlightPageLoads.clear();
+    };
+  });
 
   // Load premium status from storage on mount
   $effect(() => {
@@ -135,9 +223,11 @@
   const lockedPremiumPage = $derived(
     premiumAccessible ? null : (PREMIUM_LOCKS[nav.currentPage] ?? null)
   );
-  let initialPageLoadScheduled = $state(false);
-  let secondaryPagesPreloaded = $state(false);
-  let premiumPagesPreloaded = $state(false);
+  const currentPageLoad = $derived(pageLoads[nav.currentPage]);
+  const currentPageLabel = $derived(
+    NAV_ITEMS.find((item) => item.page === nav.currentPage)?.label ?? 'Onboarding'
+  );
+  let initialPageLoadScheduled = false;
 
   $effect(() => {
     if (lockedPremiumPage || nav.bootStatus !== 'ready') {
@@ -155,28 +245,28 @@
   });
 
   $effect(() => {
-    if (nav.bootStatus !== 'ready' || secondaryPagesPreloaded) {
+    if (nav.bootStatus !== 'ready') {
       return;
     }
 
-    secondaryPagesPreloaded = true;
-    window.setTimeout(() => {
+    const preloadTimer = window.setTimeout(() => {
       loadPage('profile');
       loadPage('settings');
     }, 80);
+    return () => window.clearTimeout(preloadTimer);
   });
 
   $effect(() => {
-    if (nav.bootStatus !== 'ready' || !premiumAccessible || premiumPagesPreloaded) {
+    if (nav.bootStatus !== 'ready' || !premiumAccessible) {
       return;
     }
 
-    premiumPagesPreloaded = true;
-    window.setTimeout(() => {
+    const preloadTimer = window.setTimeout(() => {
       loadPage('cv');
       loadPage('applications');
       loadPage('tjm');
     }, 80);
+    return () => window.clearTimeout(preloadTimer);
   });
 
   function isPremiumLocked(page: Page): boolean {
@@ -384,6 +474,44 @@
       </div>
     {/if}
     <main class="relative flex-1 overflow-hidden">
+      {#if nav.bootStatus === 'error'}
+        <div
+          data-testid="bootstrap-error"
+          class="absolute inset-0 z-20 overflow-y-auto bg-page-canvas p-4"
+        >
+          <OperationalEmptyState
+            title="L’application n’a pas pu démarrer"
+            description="Les données locales nécessaires au démarrage sont momentanément indisponibles. Réessayez sans fermer l’extension."
+            severity="incident"
+            statusLabel="Démarrage interrompu"
+            icon="triangle-alert"
+            proofLabel="Etape"
+            proofValue="Initialisation"
+            primaryActionLabel="Réessayer"
+            primaryActionIcon="refresh-cw"
+            onPrimaryAction={() => void nav.retryBootstrap()}
+          />
+        </div>
+      {/if}
+      {#if nav.bootStatus === 'ready' && currentPageLoad?.status === 'error' && !lockedPremiumPage}
+        <div
+          data-testid={`page-load-error-${nav.currentPage}`}
+          class="absolute inset-0 z-20 overflow-y-auto bg-page-canvas p-4"
+        >
+          <OperationalEmptyState
+            title="Cette vue ne peut pas être chargée"
+            description="Le module local de cette vue est indisponible. Le reste de l’extension demeure utilisable."
+            severity="incident"
+            statusLabel="Chargement interrompu"
+            icon="triangle-alert"
+            proofLabel="Ecran"
+            proofValue={currentPageLabel}
+            primaryActionLabel="Réessayer"
+            primaryActionIcon="refresh-cw"
+            onPrimaryAction={() => retryPage(nav.currentPage)}
+          />
+        </div>
+      {/if}
       <div
         class="absolute inset-0 overflow-hidden"
         class:hidden={nav.currentPage !== 'feed'}

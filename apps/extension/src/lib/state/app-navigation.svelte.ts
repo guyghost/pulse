@@ -16,6 +16,14 @@ import type { UserProfile } from '$lib/core/types/profile';
 
 export type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'onboarding';
 export type AppBootStatus = 'bootstrapping' | 'ready' | 'error';
+export type PageLoadStatus = 'loading' | 'ready' | 'error';
+
+export interface PageLoadSnapshot {
+  status: PageLoadStatus;
+  requestId: string;
+  attempt: number;
+  error: string | null;
+}
 
 const PAGE_INDEX: Record<Page, number> = {
   onboarding: -1,
@@ -52,6 +60,7 @@ export function createAppNavigation() {
   let hasCompletedOnboarding = $state(false);
   let transitionDirection = $state<1 | -1>(1);
   let bootStatus = $state<AppBootStatus>('bootstrapping');
+  let bootError = $state<string | null>(null);
   let previousPageIndex = PAGE_INDEX.feed;
   let profile: UserProfile | null = null;
   let bootstrapRevision = 0;
@@ -59,6 +68,7 @@ export function createAppNavigation() {
   async function bootstrap(): Promise<void> {
     const revision = (bootstrapRevision += 1);
     bootStatus = 'bootstrapping';
+    bootError = null;
 
     try {
       const loadedProfile = await getProfile();
@@ -92,9 +102,18 @@ export function createAppNavigation() {
 
       transitionDirection = 1;
       bootStatus = 'ready';
-    } catch {
+    } catch (error: unknown) {
+      if (revision !== bootstrapRevision) {
+        return;
+      }
+
+      bootError = error instanceof Error ? error.message : 'Bootstrap failed.';
       bootStatus = 'error';
     }
+  }
+
+  function retryBootstrap(): Promise<void> {
+    return bootstrap();
   }
 
   void bootstrap();
@@ -111,6 +130,10 @@ export function createAppNavigation() {
   }
 
   function navigate(page: Page) {
+    if (bootStatus !== 'ready') {
+      return;
+    }
+
     const newIndex = PAGE_INDEX[page];
     transitionDirection = newIndex > previousPageIndex ? 1 : -1;
     previousPageIndex = newIndex;
@@ -160,8 +183,12 @@ export function createAppNavigation() {
     get bootStatus(): AppBootStatus {
       return bootStatus;
     },
+    get bootError(): string | null {
+      return bootError;
+    },
 
     navigate,
+    retryBootstrap,
     completeOnboarding,
     resetToOnboarding,
   };
