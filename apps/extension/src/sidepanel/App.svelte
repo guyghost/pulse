@@ -22,9 +22,19 @@
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
   import { subscribeToNotificationClicked } from '$lib/shell/facades/feed-data.facade';
 
-  type PageModule = { default: unknown };
-  type PageImporter = () => Promise<PageModule>;
-  type PageImporters = Record<Page, PageImporter>;
+  type PageModules = {
+    feed: typeof import('../ui/pages/FeedPage.svelte');
+    profile: typeof import('../ui/pages/ProfilePage.svelte');
+    cv: typeof import('../ui/pages/CvPage.svelte');
+    applications: typeof import('../ui/pages/ApplicationsPage.svelte');
+    tjm: typeof import('../ui/pages/TJMPage.svelte');
+    settings: typeof import('../ui/pages/SettingsPage.svelte');
+    onboarding: typeof import('../ui/pages/OnboardingPage.svelte');
+  };
+  type PageImporters = { [CurrentPage in Page]: () => Promise<PageModules[CurrentPage]> };
+  type PageComponents = {
+    [CurrentPage in Page]: PageModules[CurrentPage]['default'] | null;
+  };
 
   const DEFAULT_PAGE_IMPORTERS: PageImporters = {
     feed: () => import('../ui/pages/FeedPage.svelte'),
@@ -49,63 +59,36 @@
   const nav = createAppNavigation();
   const theme = createThemeStore();
 
-  let FeedPage: typeof import('../ui/pages/FeedPage.svelte').default | null = $state(null);
-  let ProfilePage: typeof import('../ui/pages/ProfilePage.svelte').default | null = $state(null);
-  let CvPage: typeof import('../ui/pages/CvPage.svelte').default | null = $state(null);
-  let ApplicationsPage: typeof import('../ui/pages/ApplicationsPage.svelte').default | null =
-    $state(null);
-  let TJMPage: typeof import('../ui/pages/TJMPage.svelte').default | null = $state(null);
-  let SettingsPage: typeof import('../ui/pages/SettingsPage.svelte').default | null = $state(null);
-  let OnboardingPage: typeof import('../ui/pages/OnboardingPage.svelte').default | null =
-    $state(null);
+  let pageComponents = $state<PageComponents>({
+    feed: null,
+    profile: null,
+    cv: null,
+    applications: null,
+    tjm: null,
+    settings: null,
+    onboarding: null,
+  });
+  const FeedPage = $derived(pageComponents.feed);
+  const ProfilePage = $derived(pageComponents.profile);
+  const CvPage = $derived(pageComponents.cv);
+  const ApplicationsPage = $derived(pageComponents.applications);
+  const TJMPage = $derived(pageComponents.tjm);
+  const SettingsPage = $derived(pageComponents.settings);
+  const OnboardingPage = $derived(pageComponents.onboarding);
   let pageLoads = $state<Partial<Record<Page, PageLoadSnapshot>>>({});
   let pageRequestSequence = 0;
   let shellMounted = true;
   const inFlightPageLoads = new Map<Page, { requestId: string; promise: Promise<void> }>();
 
   function hasPageComponent(page: Page): boolean {
-    switch (page) {
-      case 'feed':
-        return FeedPage !== null;
-      case 'profile':
-        return ProfilePage !== null;
-      case 'cv':
-        return CvPage !== null;
-      case 'applications':
-        return ApplicationsPage !== null;
-      case 'tjm':
-        return TJMPage !== null;
-      case 'settings':
-        return SettingsPage !== null;
-      case 'onboarding':
-        return OnboardingPage !== null;
-    }
+    return pageComponents[page] !== null;
   }
 
-  function assignPageComponent(page: Page, component: unknown): void {
-    switch (page) {
-      case 'feed':
-        FeedPage = component as typeof import('../ui/pages/FeedPage.svelte').default;
-        return;
-      case 'profile':
-        ProfilePage = component as typeof import('../ui/pages/ProfilePage.svelte').default;
-        return;
-      case 'cv':
-        CvPage = component as typeof import('../ui/pages/CvPage.svelte').default;
-        return;
-      case 'applications':
-        ApplicationsPage =
-          component as typeof import('../ui/pages/ApplicationsPage.svelte').default;
-        return;
-      case 'tjm':
-        TJMPage = component as typeof import('../ui/pages/TJMPage.svelte').default;
-        return;
-      case 'settings':
-        SettingsPage = component as typeof import('../ui/pages/SettingsPage.svelte').default;
-        return;
-      case 'onboarding':
-        OnboardingPage = component as typeof import('../ui/pages/OnboardingPage.svelte').default;
-    }
+  function assignPageComponent<CurrentPage extends Page>(
+    page: CurrentPage,
+    module: PageModules[CurrentPage]
+  ): void {
+    pageComponents[page] = module.default;
   }
 
   function setPageLoad(page: Page, snapshot: PageLoadSnapshot): void {
@@ -116,8 +99,13 @@
     return shellMounted && pageLoads[page]?.requestId === requestId;
   }
 
-  function loadPage(page: Page, retry = false): void {
-    if (isPremiumLocked(page) || hasPageComponent(page)) {
+  function loadPage<CurrentPage extends Page>(page: CurrentPage, retry = false): void {
+    if (
+      !shellMounted ||
+      nav.bootStatus !== 'ready' ||
+      isPremiumLocked(page) ||
+      hasPageComponent(page)
+    ) {
       return;
     }
 
@@ -140,7 +128,7 @@
         if (!isCurrentPageRequest(page, requestId)) {
           return;
         }
-        assignPageComponent(page, module.default);
+        assignPageComponent(page, module);
         setPageLoad(page, { status: 'ready', requestId, attempt, error: null });
         launchMarks.markPageLoaded(page as PageId);
       })
@@ -173,6 +161,7 @@
       shellMounted = false;
       pageRequestSequence += 1;
       inFlightPageLoads.clear();
+      nav.dispose();
     };
   });
 
@@ -237,8 +226,18 @@
     const page = nav.currentPage;
     if (!initialPageLoadScheduled) {
       initialPageLoadScheduled = true;
-      requestAnimationFrame(() => loadPage(page));
-      return;
+      const frameId = requestAnimationFrame(() => {
+        if (
+          !shellMounted ||
+          nav.bootStatus !== 'ready' ||
+          nav.currentPage !== page ||
+          isPremiumLocked(page)
+        ) {
+          return;
+        }
+        loadPage(page);
+      });
+      return () => cancelAnimationFrame(frameId);
     }
 
     loadPage(page);
@@ -478,6 +477,9 @@
         <div
           data-testid="bootstrap-error"
           class="absolute inset-0 z-20 overflow-y-auto bg-page-canvas p-4"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
         >
           <OperationalEmptyState
             title="L’application n’a pas pu démarrer"
@@ -497,6 +499,9 @@
         <div
           data-testid={`page-load-error-${nav.currentPage}`}
           class="absolute inset-0 z-20 overflow-y-auto bg-page-canvas p-4"
+          role="alert"
+          aria-live="assertive"
+          aria-atomic="true"
         >
           <OperationalEmptyState
             title="Cette vue ne peut pas être chargée"

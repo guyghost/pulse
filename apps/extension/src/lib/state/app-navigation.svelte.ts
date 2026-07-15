@@ -64,14 +64,24 @@ export function createAppNavigation() {
   let previousPageIndex = PAGE_INDEX.feed;
   let profile: UserProfile | null = null;
   let bootstrapRevision = 0;
+  let disposed = false;
+  let unsubscribeMessages: (() => void) | null = null;
 
   async function bootstrap(): Promise<void> {
+    if (disposed) {
+      return;
+    }
+
     const revision = (bootstrapRevision += 1);
     bootStatus = 'bootstrapping';
     bootError = null;
 
     try {
       const loadedProfile = await getProfile();
+      if (disposed || revision !== bootstrapRevision) {
+        return;
+      }
+
       const [firstScanDone, onboardingCompleted] = loadedProfile
         ? [false, true]
         : await Promise.all([getFirstScanDone(), getOnboardingCompleted()]);
@@ -81,7 +91,7 @@ export function createAppNavigation() {
         onboardingCompleted,
       };
 
-      if (revision !== bootstrapRevision) {
+      if (disposed || revision !== bootstrapRevision) {
         return;
       }
 
@@ -103,7 +113,7 @@ export function createAppNavigation() {
       transitionDirection = 1;
       bootStatus = 'ready';
     } catch (error: unknown) {
-      if (revision !== bootstrapRevision) {
+      if (disposed || revision !== bootstrapRevision) {
         return;
       }
 
@@ -119,8 +129,8 @@ export function createAppNavigation() {
   void bootstrap();
 
   try {
-    subscribeMessages((message) => {
-      if (message.type === 'PROFILE_UPDATED') {
+    unsubscribeMessages = subscribeMessages((message) => {
+      if (!disposed && message.type === 'PROFILE_UPDATED') {
         profile = message.payload;
         hasCompletedOnboarding = true;
       }
@@ -130,7 +140,7 @@ export function createAppNavigation() {
   }
 
   function navigate(page: Page) {
-    if (bootStatus !== 'ready') {
+    if (disposed || bootStatus !== 'ready') {
       return;
     }
 
@@ -141,12 +151,16 @@ export function createAppNavigation() {
   }
 
   function completeOnboarding() {
+    if (disposed) {
+      return;
+    }
+
     setOnboardingCompleted().catch(() => {});
 
     if (profile === null) {
       void import('$lib/core/profile/normalize-profile')
         .then(({ withProfileDefaults }) => {
-          if (profile !== null) {
+          if (disposed || profile !== null) {
             return;
           }
           const seededProfile = withProfileDefaults({});
@@ -163,11 +177,26 @@ export function createAppNavigation() {
   }
 
   function resetToOnboarding() {
+    if (disposed) {
+      return;
+    }
+
     clearOnboardingCompleted().catch(() => {});
     hasCompletedOnboarding = false;
     transitionDirection = -1;
     previousPageIndex = PAGE_INDEX.onboarding;
     currentPage = 'onboarding';
+  }
+
+  function dispose(): void {
+    if (disposed) {
+      return;
+    }
+
+    disposed = true;
+    bootstrapRevision += 1;
+    unsubscribeMessages?.();
+    unsubscribeMessages = null;
   }
 
   return {
@@ -191,5 +220,6 @@ export function createAppNavigation() {
     retryBootstrap,
     completeOnboarding,
     resetToOnboarding,
+    dispose,
   };
 }

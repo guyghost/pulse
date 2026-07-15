@@ -4,6 +4,10 @@ import { mount, tick, unmount } from 'svelte';
 const getProfile = vi.hoisted(() => vi.fn());
 const getFirstScanDone = vi.hoisted(() => vi.fn());
 const getOnboardingCompleted = vi.hoisted(() => vi.fn());
+const subscribeMessages = vi.hoisted(() => vi.fn());
+const unsubscribeMessages = vi.hoisted(() => vi.fn());
+const markImportStart = vi.hoisted(() => vi.fn());
+const markPageLoaded = vi.hoisted(() => vi.fn());
 const premiumState = vi.hoisted(() => ({
   isPremium: false,
   load: vi.fn(),
@@ -25,7 +29,14 @@ vi.mock('../../../src/lib/shell/facades/app-flags.facade', () => ({
 
 vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
   sendMessage: vi.fn().mockResolvedValue({ type: 'NOOP' }),
-  subscribeMessages: () => () => {},
+  subscribeMessages,
+}));
+
+vi.mock('../../../src/lib/shell/metrics/launch-marks', () => ({
+  launchMarks: {
+    markImportStart,
+    markPageLoaded,
+  },
 }));
 
 vi.mock('../../../src/lib/state/theme.svelte', () => ({
@@ -64,10 +75,12 @@ let scheduledTimers: Array<() => void> = [];
 
 function deferred<T>() {
   let resolve!: (value: T | PromiseLike<T>) => void;
-  const promise = new Promise<T>((resolvePromise) => {
+  let reject!: (reason?: unknown) => void;
+  const promise = new Promise<T>((resolvePromise, rejectPromise) => {
     resolve = resolvePromise;
+    reject = rejectPromise;
   });
-  return { promise, resolve };
+  return { promise, resolve, reject };
 }
 
 function resolvedImporter(): TestPageImporter {
@@ -91,6 +104,12 @@ function mountApp(pageImporters: ReturnType<typeof createImporters>): HTMLElemen
   document.body.appendChild(target);
   mountedApps.push(mount(App, { target, props: { pageImporters } }));
   return target;
+}
+
+async function unmountLatestApp(): Promise<void> {
+  const component = mountedApps.pop();
+  expect(component, 'a mounted app should exist').toBeDefined();
+  await unmount(component!);
 }
 
 async function flushShell(): Promise<void> {
@@ -118,10 +137,12 @@ describe('App shell recovery', () => {
     premiumState.isPremium = false;
     featureState.premiumFeatureActive = false;
     scheduledTimers = [];
+    subscribeMessages.mockImplementation(() => unsubscribeMessages);
     vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
       callback(0);
       return 1;
     });
+    vi.stubGlobal('cancelAnimationFrame', vi.fn());
     timeoutSpy = vi.spyOn(window, 'setTimeout').mockImplementation((handler: TimerHandler) => {
       if (typeof handler === 'function') {
         scheduledTimers.push(handler);
@@ -145,6 +166,9 @@ describe('App shell recovery', () => {
 
     await flushShell();
     expect(target.textContent).toContain('L’application n’a pas pu démarrer');
+    expect(target.querySelector('[data-testid="bootstrap-error"]')?.getAttribute('role')).toBe(
+      'alert'
+    );
 
     clickButton(target, 'Réessayer');
     await flushShell();
@@ -165,6 +189,9 @@ describe('App shell recovery', () => {
     await flushShell();
     expect(target.textContent).toContain('Cette vue ne peut pas être chargée');
     expect(feedImporter).toHaveBeenCalledOnce();
+    const errorSurface = target.querySelector('[data-testid="page-load-error-feed"]');
+    expect(errorSurface?.getAttribute('role')).toBe('alert');
+    expect(errorSurface?.getAttribute('aria-live')).toBe('assertive');
 
     clickButton(target, 'Réessayer');
     await flushShell();
@@ -209,4 +236,89 @@ describe('App shell recovery', () => {
     expect(target.textContent).toContain('Premium verrouillé');
     expect(importers.cv).not.toHaveBeenCalled();
   });
+
+  it('cancels and ignores the deferred initial frame after unmount', async () => {
+    let deferredFrame: FrameRequestCallback | null = null;
+    const requestFrame = vi.fn((callback: FrameRequestCallback) => {
+      deferredFrame = callback;
+      return 41;
+    });
+    const cancelFrame = vi.fn();
+    vi.stubGlobal('requestAnimationFrame', requestFrame);
+    vi.stubGlobal('cancelAnimationFrame', cancelFrame);
+    const importers = createImporters();
+    mountApp(importers);
+    await flushShell();
+
+    expect(requestFrame).toHaveBeenCalledOnce();
+    await unmountLatestApp();
+    expect(cancelFrame).toHaveBeenCalledWith(41);
+
+    (deferredFrame as FrameRequestCallback | null)?.(0);
+    await flushShell();
+
+    expect(importers.feed).not.toHaveBeenCalled();
+    expect(markImportStart).not.toHaveBeenCalled();
+  });
+
+  it('ignores the deferred initial frame when a newer navigation wins', async () => {
+    let deferredFrame: FrameRequestCallback | null = null;
+    vi.stubGlobal('requestAnimationFrame', (callback: FrameRequestCallback) => {
+      deferredFrame = callback;
+      return 42;
+    });
+    const importers = createImporters();
+    const target = mountApp(importers);
+    await flushShell();
+
+    clickButton(target, 'Profil');
+    await flushShell();
+    expect(importers.profile).toHaveBeenCalledOnce();
+
+    (deferredFrame as FrameRequestCallback | null)?.(0);
+    await flushShell();
+
+    expect(importers.feed).not.toHaveBeenCalled();
+    expect(markImportStart).not.toHaveBeenCalledWith('feed');
+  });
+
+  it('disposes a pending bootstrap and its bridge subscription on unmount', async () => {
+    const pendingBootstrap = deferred<null>();
+    getProfile.mockReset().mockReturnValueOnce(pendingBootstrap.promise);
+    const importers = createImporters();
+    mountApp(importers);
+    await flushShell();
+
+    await unmountLatestApp();
+    expect(unsubscribeMessages).toHaveBeenCalledOnce();
+
+    pendingBootstrap.resolve(null);
+    await flushShell();
+
+    expect(getFirstScanDone).not.toHaveBeenCalled();
+    expect(getOnboardingCompleted).not.toHaveBeenCalled();
+    expect(importers.feed).not.toHaveBeenCalled();
+  });
+
+  it.each(['resolve', 'reject'] as const)(
+    'ignores a page import %s after unmount',
+    async (settlement) => {
+      const pendingPage = deferred<PageModule>();
+      const feedImporter = vi.fn<TestPageImporter>(() => pendingPage.promise);
+      const importers = createImporters(feedImporter);
+      mountApp(importers);
+      await flushShell();
+      expect(feedImporter).toHaveBeenCalledOnce();
+
+      await unmountLatestApp();
+      if (settlement === 'resolve') {
+        pendingPage.resolve({ default: ConnectionIndicator });
+      } else {
+        pendingPage.reject(new Error('late page failure'));
+      }
+      await flushShell();
+
+      expect(markPageLoaded).not.toHaveBeenCalled();
+    }
+  );
 });
