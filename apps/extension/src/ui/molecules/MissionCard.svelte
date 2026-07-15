@@ -315,7 +315,7 @@
 
   <!-- Tags -->
   <div class="mt-3 flex flex-wrap gap-1.5">
-    {#each mission.stack.slice(0, 3) as tech (tech)}
+    {#each mission.stack.slice(0, 3) as tech, index (`${index}_${tech}`)}
       <Badge label={tech} variant="tech" />
     {/each}
     {#if mission.stack.length > 3}

@@ -237,6 +237,7 @@ export function createFeedPageState(
 
   // Internal state (not directly bound)
   let seenIds = $state<string[]>([]);
+  let seenLoaded = $state(false);
   let favorites = $state<Record<string, number>>({});
   let hidden = $state<Record<string, number>>({});
   let pendingSeenIds = new SvelteSet<string>();
@@ -715,9 +716,20 @@ export function createFeedPageState(
     hasPendingMissions: boolean = pendingMissions.length > 0
   ): void {
     if (hasPendingMissions && pendingMissions.length > 0) {
+      // While the drawer is open, do not overwrite catalog entries for missions
+      // whose ids are already in the frozen preview set — replacing the object
+      // would churn the displayed preview content under the user's eyes.
+      const frozenPreviewIds =
+        arrivalQueueState.stack.value === 'open' ||
+        arrivalQueueState.stack.value === 'refresh-error'
+          ? arrivalQueueState.stack.previewIds
+          : null;
       let nextCatalog = arrivalPreviewCatalog;
       for (const mission of pendingMissions) {
         if (nextCatalog[mission.id] === mission) {
+          continue;
+        }
+        if (frozenPreviewIds?.includes(mission.id)) {
           continue;
         }
         if (nextCatalog === arrivalPreviewCatalog) {
@@ -1012,7 +1024,9 @@ export function createFeedPageState(
     await persistSavedViews(nextViews);
     activeSavedViewId = view.id;
     if (showNewOnly || decisionPreset === 'new') {
-      enterStableNewQueue();
+      if (!stableQueueActive) {
+        enterStableNewQueue();
+      }
     } else {
       exitStableNewQueue();
     }
@@ -1153,8 +1167,11 @@ export function createFeedPageState(
       getSeenIds()
         .then((ids) => {
           seenIds = ids;
+          seenLoaded = true;
         })
-        .catch(() => {});
+        .catch(() => {
+          seenLoaded = true;
+        });
     });
 
     $effect(() => {
@@ -1163,6 +1180,9 @@ export function createFeedPageState(
     });
 
     $effect(() => {
+      if (!seenLoaded) {
+        return;
+      }
       if (newQueueRequested && !stableQueueActive) {
         enterStableNewQueue();
       } else if (!newQueueRequested && stableQueueActive) {
