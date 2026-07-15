@@ -122,8 +122,10 @@ jobs:
         run: pnpm turbo build
 
       - name: Verify built manifest version matches release version
+        env:
+          EXPECTED_VERSION: ${{ steps.version.outputs.version }}
         run: |
-          pnpm --filter @pulse/extension verify-manifest dist/manifest.json --expected-version ${{ steps.version.outputs.version }}
+          pnpm --filter @pulse/extension verify-manifest dist/manifest.json --post-build --expected-version "$EXPECTED_VERSION"
 
       - name: Verify source manifest version matches release version
         run: |

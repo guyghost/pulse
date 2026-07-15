@@ -403,6 +403,16 @@ describe('parseArgs', () => {
       postBuild: true,
     });
   });
+
+  it('should bind post-build validation to the exact expected artifact version', () => {
+    expect(
+      parseArgs(['dist/manifest.json', '--post-build', '--expected-version', '1.2.3'])
+    ).toEqual({
+      manifestPath: 'dist/manifest.json',
+      expectedVersion: '1.2.3',
+      postBuild: true,
+    });
+  });
 });
 
 describe('validateLinkedInProfileImportPermissions', () => {

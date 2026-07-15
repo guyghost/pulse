@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { parse as parseYaml } from 'yaml';
 import { isValidSemver } from '../../../scripts/bump-version.ts';
 import { validateSchema, validateVersionConsistency } from '../../../scripts/verify-manifest.ts';
 
@@ -30,6 +31,54 @@ const WORKSPACE_ROOT = resolve(EXTENSION_ROOT, '..', '..');
 const MANIFEST_PATH = resolve(EXTENSION_ROOT, 'src/manifest.json');
 const PACKAGE_JSON_PATH = resolve(EXTENSION_ROOT, 'package.json');
 const ROOT_PACKAGE_JSON_PATH = resolve(WORKSPACE_ROOT, 'package.json');
+const RELEASE_WORKFLOW_PATH = resolve(WORKSPACE_ROOT, '.github/workflows/release.yml');
+
+type ReleaseWorkflowStep = {
+  name?: string;
+  run?: string;
+  env?: Record<string, string>;
+};
+
+type DeployPreflightModule = {
+  createManifestValidationCommand?: (expectedVersion: string) => {
+    command: string;
+    args: string[];
+  };
+  evaluateRuntimeEnvironment?: (
+    environment: Record<string, string | undefined>,
+    mode: 'production' | 'inspection'
+  ) => {
+    missing: string[];
+    exitCode: 0 | 1;
+  };
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const readReleaseWorkflowSteps = (): ReleaseWorkflowStep[] => {
+  const workflow: unknown = parseYaml(readFileSync(RELEASE_WORKFLOW_PATH, 'utf-8'));
+  if (!isRecord(workflow) || !isRecord(workflow.jobs)) {
+    throw new Error('release.yml must define jobs');
+  }
+
+  const buildJob = workflow.jobs['build-and-release'];
+  if (!isRecord(buildJob) || !Array.isArray(buildJob.steps)) {
+    throw new Error('release.yml must define build-and-release steps');
+  }
+
+  return buildJob.steps.filter(isRecord).map((step) => ({
+    name: typeof step.name === 'string' ? step.name : undefined,
+    run: typeof step.run === 'string' ? step.run : undefined,
+    env:
+      isRecord(step.env) && Object.values(step.env).every((value) => typeof value === 'string')
+        ? (step.env as Record<string, string>)
+        : undefined,
+  }));
+};
+
+const loadDeployPreflight = async (): Promise<DeployPreflightModule> =>
+  (await import('../../../../../scripts/deploy-preflight.mjs')) as DeployPreflightModule;
 
 describe('Release validation — actual project files', () => {
   /**
@@ -191,5 +240,79 @@ describe('Release validation — actual project files', () => {
     for (const key of disallowedKeys) {
       expect(manifest).not.toHaveProperty(key);
     }
+  });
+});
+
+describe('Release validation — fail-closed artifact contracts', () => {
+  it('validates the built manifest with post-build rules and the workflow release version', () => {
+    const manifestStep = readReleaseWorkflowSteps().find(
+      (step) => step.name === 'Verify built manifest version matches release version'
+    );
+
+    expect(manifestStep).toBeDefined();
+    expect(manifestStep?.env).toEqual({
+      EXPECTED_VERSION: '${{ steps.version.outputs.version }}',
+    });
+    expect(manifestStep?.run?.trim()).toBe(
+      'pnpm --filter @pulse/extension verify-manifest dist/manifest.json --post-build --expected-version "$EXPECTED_VERSION"'
+    );
+  });
+
+  it('builds the deploy preflight manifest command from exact structured metadata', async () => {
+    const { createManifestValidationCommand } = await loadDeployPreflight();
+
+    expect(createManifestValidationCommand).toBeTypeOf('function');
+    if (typeof createManifestValidationCommand !== 'function') {
+      return;
+    }
+
+    expect(createManifestValidationCommand('1.2.3')).toEqual({
+      command: 'pnpm',
+      args: [
+        '--filter',
+        '@pulse/extension',
+        'verify-manifest',
+        'dist/manifest.json',
+        '--post-build',
+        '--expected-version',
+        '1.2.3',
+      ],
+    });
+  });
+
+  it('accumulates every missing required variable and fails production preflight', async () => {
+    const { evaluateRuntimeEnvironment } = await loadDeployPreflight();
+
+    expect(evaluateRuntimeEnvironment).toBeTypeOf('function');
+    if (typeof evaluateRuntimeEnvironment !== 'function') {
+      return;
+    }
+
+    expect(evaluateRuntimeEnvironment({}, 'production')).toEqual({
+      missing: [
+        'landing: PUBLIC_SUPABASE_URL',
+        'landing: PUBLIC_SUPABASE_ANON_KEY',
+        'landing: PUBLIC_LANDING_URL',
+        'landing: SUPABASE_SERVICE_ROLE_KEY',
+        'dashboard: PUBLIC_SUPABASE_URL',
+        'dashboard: PUBLIC_SUPABASE_ANON_KEY',
+        'dashboard: PUBLIC_LANDING_URL',
+      ],
+      exitCode: 1,
+    });
+  });
+
+  it('keeps missing required variables non-blocking only in explicit inspection mode', async () => {
+    const { evaluateRuntimeEnvironment } = await loadDeployPreflight();
+
+    expect(evaluateRuntimeEnvironment).toBeTypeOf('function');
+    if (typeof evaluateRuntimeEnvironment !== 'function') {
+      return;
+    }
+
+    expect(evaluateRuntimeEnvironment({}, 'inspection')).toMatchObject({
+      missing: expect.any(Array),
+      exitCode: 0,
+    });
   });
 });

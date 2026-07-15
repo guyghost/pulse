@@ -55,6 +55,7 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.62.1",
     "vite": "^8.1.4",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "yaml": "^2.9.0"
   }
 }
