@@ -23,6 +23,7 @@ type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'o
 
 type AppBootStatus = 'bootstrapping' | 'ready' | 'error';
 type PageLoadStatus = 'loading' | 'ready' | 'error';
+type AppShellLifecycle = 'mounted' | 'disposed';
 
 interface PageLoadSnapshot {
   status: PageLoadStatus;
@@ -32,6 +33,7 @@ interface PageLoadSnapshot {
 }
 
 interface AppShellContext {
+  lifecycle: AppShellLifecycle;
   bootStatus: AppBootStatus;
   bootstrapRevision: number;
   currentPage: Page;
@@ -49,6 +51,8 @@ interface AppShellContext {
 
 Absence from `pages` means a chunk has not been requested. Once requested,
 the only page-load statuses are exactly `loading`, `ready`, and `error`.
+`disposed` belongs only to `AppShellLifecycle`; it is never an alias for an
+app-bootstrap or page-load status.
 
 ## Events
 
@@ -101,6 +105,17 @@ stateDiagram-v2
   ready --> ready: PAGE_LOAD_REQUESTED / reuseLoadedComponent
 ```
 
+```mermaid
+stateDiagram-v2
+  [*] --> mounted
+  mounted --> disposed: UNMOUNT / invalidateAllOperations
+  disposed --> [*]
+```
+
+Lifecycle is orthogonal to bootstrap and per-page loading. `UNMOUNT` moves the
+instance to `disposed`, invalidates every revision/request ID, and prevents all
+later events from reaching either nested machine.
+
 ## Guards
 
 | Guard             | Rule                                                                                                                                           |
@@ -121,18 +136,18 @@ protected page import.
 
 ### Bootstrap and navigation
 
-| From            | Event                      | Guard            | To              | Effects                                                                             |
-| --------------- | -------------------------- | ---------------- | --------------- | ----------------------------------------------------------------------------------- |
-| `bootstrapping` | `BOOT_SUCCEEDED`           | `latestRevision` | `ready`         | Commit flags, choose initial route, clear error.                                    |
-| `bootstrapping` | `BOOT_FAILED`              | `latestRevision` | `error`         | Keep static shell visible and store typed error.                                    |
-| `bootstrapping` | `RETRY_BOOTSTRAP`          | —                | `bootstrapping` | Increment revision and start one replacement read.                                  |
-| `error`         | `RETRY_BOOTSTRAP`          | —                | `bootstrapping` | Clear error, increment revision, read again.                                        |
-| `ready`         | `NAVIGATE`                 | `routeAllowed`   | `ready`         | Update page and direction; request chunk if absent.                                 |
-| `ready`         | `PROFILE_UPDATED`          | —                | `ready`         | Mark onboarding complete; keep the user's current valid page.                       |
-| `ready`         | `PREMIUM_CHANGED`          | —                | `ready`         | Recompute access; keep route and render lock instead of protected page when denied. |
-| any             | `NETWORK_CHANGED`          | —                | same            | Project connectivity only; local shell remains usable.                              |
-| any             | `SERVICE_WORKER_RESTARTED` | —                | same            | Reconnect bridge; re-bootstrap only if local reads cannot be confirmed.             |
-| any             | `UNMOUNT`                  | —                | disposed        | Invalidate revisions/request IDs and unsubscribe listeners.                         |
+| From                | Event                      | Guard            | To                   | Effects                                                                             |
+| ------------------- | -------------------------- | ---------------- | -------------------- | ----------------------------------------------------------------------------------- |
+| `bootstrapping`     | `BOOT_SUCCEEDED`           | `latestRevision` | `ready`              | Commit flags, choose initial route, clear error.                                    |
+| `bootstrapping`     | `BOOT_FAILED`              | `latestRevision` | `error`              | Keep static shell visible and store typed error.                                    |
+| `bootstrapping`     | `RETRY_BOOTSTRAP`          | —                | `bootstrapping`      | Increment revision and start one replacement read.                                  |
+| `error`             | `RETRY_BOOTSTRAP`          | —                | `bootstrapping`      | Clear error, increment revision, read again.                                        |
+| `ready`             | `NAVIGATE`                 | `routeAllowed`   | `ready`              | Update page and direction; request chunk if absent.                                 |
+| `ready`             | `PROFILE_UPDATED`          | —                | `ready`              | Mark onboarding complete; keep the user's current valid page.                       |
+| `ready`             | `PREMIUM_CHANGED`          | —                | `ready`              | Recompute access; keep route and render lock instead of protected page when denied. |
+| any while `mounted` | `NETWORK_CHANGED`          | —                | same                 | Project connectivity only; local shell remains usable.                              |
+| any while `mounted` | `SERVICE_WORKER_RESTARTED` | —                | same                 | Reconnect bridge; re-bootstrap only if local reads cannot be confirmed.             |
+| lifecycle `mounted` | `UNMOUNT`                  | —                | lifecycle `disposed` | Invalidate revisions/request IDs and unsubscribe listeners.                         |
 
 ### Per-page loader
 
@@ -209,6 +224,8 @@ creates a new machine and new operation IDs.
 - A rejected dynamic import must not leave the page in `loading`.
 - `PROFILE_UPDATED` must not silently mark a failed persistence attempt as
   successful.
+- No event is accepted after lifecycle `disposed`; every late result is
+  discarded.
 - No implicit transition may be derived from copy, rendered text, or a toast.
 
 ## Invariants
@@ -221,6 +238,8 @@ creates a new machine and new operation IDs.
 6. The side panel never reads IndexedDB or cookies directly.
 7. An LLM never decides a transition; model events and deterministic guards do.
 8. Shell calls Core; Core never imports Shell or creates time/IDs.
+9. Lifecycle, bootstrap, and page-load states have distinct typed ownership;
+   `disposed` can never appear in an `AppBootStatus` or `PageLoadStatus`.
 
 ## Review checklist
 

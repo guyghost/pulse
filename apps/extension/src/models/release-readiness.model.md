@@ -36,6 +36,46 @@ of these states.
 ## Context and evidence
 
 ```ts
+type ReleaseActionKind =
+  | 'audit'
+  | 'build'
+  | 'validate_package'
+  | 'validate_store'
+  | 'publish_canary'
+  | 'observe_canary'
+  | 'promote_production'
+  | 'rollback';
+
+interface ReleaseAction {
+  kind: ReleaseActionKind;
+  operationId: string;
+  actorId: string;
+  phase: 'requested' | 'running' | 'cancelling' | 'reconciling';
+  requestedAt: string;
+  startedAt: string | null;
+  retryOfOperationId: string | null;
+}
+
+interface FailedReleaseAction {
+  kind: ReleaseActionKind;
+  operationId: string;
+  sourceState: ReleaseReadinessState;
+  retryable: boolean;
+}
+
+interface CompleteAuditEvidence {
+  ref: EvidenceRef;
+  releaseId: string;
+  sourceCommit: string;
+  committedVersion: string;
+  auditedAt: string;
+  coveredGates: readonly (
+    'workflows' | 'security' | 'permissions' | 'metadata' | 'ci' | 'runtime' | 'rollback'
+  )[];
+  openP0Count: 0;
+  openP1Count: 0;
+}
+
 interface ReleaseReadinessContext {
   releaseId: string;
   state: ReleaseReadinessState;
@@ -52,16 +92,19 @@ interface ReleaseReadinessContext {
   mv3ScenarioEvidence: readonly EvidenceRef[];
   storeEvidence: readonly EvidenceRef[];
   canaryEvidence: readonly EvidenceRef[];
+  canaryOutcome: 'not_started' | 'running' | 'passed' | 'failed';
+  rollbackRequired: boolean;
   rollbackArtifactSha256: string | null;
   activeAction: ReleaseAction | null;
+  lastFailedAction: FailedReleaseAction | null;
   resumeFrom: ReleaseReadinessState | null;
   error: ReleaseGateError | null;
 }
 ```
 
-`ReleaseAction` includes an operation ID, actor identity, start time, and one
-of `audit | build | validate_package | validate_store | publish_canary |
-promote_production | rollback`. Secrets are never part of evidence.
+Every action is requested before it starts and remains orthogonal to the eight
+readiness states. `ReleaseGateError` records action kind, failed operation ID,
+and retryability. Secrets are never part of evidence.
 
 ## Events
 
@@ -69,8 +112,57 @@ promote_production | rollback`. Secrets are never part of evidence.
 type ReleaseReadinessEvent =
   | { type: 'AUDIT_RECORDED'; releaseId: string; evidence: EvidenceRef }
   | { type: 'BLOCKERS_FOUND'; releaseId: string; blockers: readonly ReleaseBlocker[] }
-  | { type: 'AUDIT_PASSED'; releaseId: string; evidence: EvidenceRef }
-  | { type: 'BUILD_REQUESTED'; releaseId: string; operationId: string }
+  | {
+      type: 'AUDIT_REQUESTED';
+      releaseId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+    }
+  | { type: 'AUDIT_PASSED'; releaseId: string; operationId: string; evidence: EvidenceRef }
+  | {
+      type: 'BUILD_REQUESTED';
+      releaseId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+    }
+  | {
+      type: 'PACKAGE_VALIDATION_REQUESTED';
+      releaseId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+    }
+  | {
+      type: 'STORE_VALIDATION_REQUESTED';
+      releaseId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+    }
+  | {
+      type: 'CANARY_PUBLICATION_REQUESTED';
+      releaseId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+    }
+  | {
+      type: 'CANARY_OBSERVATION_REQUESTED';
+      releaseId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+    }
+  | {
+      type: 'PRODUCTION_PROMOTION_REQUESTED';
+      releaseId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+    }
+  | { type: 'ACTION_STARTED'; releaseId: string; operationId: string; startedAt: string }
   | {
       type: 'RC_BUILD_SUCCEEDED';
       releaseId: string;
@@ -116,12 +208,25 @@ type ReleaseReadinessEvent =
       evidence: EvidenceRef;
     }
   | {
+      type: 'CANARY_PUBLICATION_FAILED';
+      releaseId: string;
+      operationId: string;
+      error: ReleaseGateError;
+    }
+  | {
       type: 'CANARY_PASSED';
       releaseId: string;
       operationId: string;
+      artifactSha256: string;
       evidence: readonly EvidenceRef[];
     }
-  | { type: 'CANARY_FAILED'; releaseId: string; operationId: string; error: ReleaseGateError }
+  | {
+      type: 'CANARY_FAILED';
+      releaseId: string;
+      operationId: string;
+      error: ReleaseGateError;
+      evidence: readonly EvidenceRef[];
+    }
   | {
       type: 'PRODUCTION_PROMOTED';
       releaseId: string;
@@ -129,7 +234,20 @@ type ReleaseReadinessEvent =
       artifactSha256: string;
       evidence: EvidenceRef;
     }
-  | { type: 'ROLLBACK_REQUESTED'; releaseId: string; operationId: string; reason: string }
+  | {
+      type: 'PRODUCTION_PROMOTION_FAILED';
+      releaseId: string;
+      operationId: string;
+      error: ReleaseGateError;
+    }
+  | {
+      type: 'ROLLBACK_REQUESTED';
+      releaseId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+      reason: string;
+    }
   | {
       type: 'ROLLBACK_SUCCEEDED';
       releaseId: string;
@@ -140,9 +258,37 @@ type ReleaseReadinessEvent =
   | { type: 'ROLLBACK_FAILED'; releaseId: string; operationId: string; error: ReleaseGateError }
   | { type: 'EVIDENCE_INVALIDATED'; releaseId: string; reason: string }
   | { type: 'CANCEL_ACTION'; releaseId: string; operationId: string }
-  | { type: 'RETRY_GATE'; releaseId: string; operationId: string }
+  | { type: 'ACTION_CANCELLED'; releaseId: string; operationId: string }
+  | {
+      type: 'ACTION_CANCEL_FAILED';
+      releaseId: string;
+      operationId: string;
+      error: ReleaseGateError;
+    }
+  | {
+      type: 'RETRY_GATE';
+      releaseId: string;
+      failedOperationId: string;
+      operationId: string;
+      actorId: string;
+      requestedAt: string;
+    }
   | { type: 'SERVICE_RESTARTED'; releaseId: string }
-  | { type: 'NEW_CANDIDATE'; releaseId: string };
+  | {
+      type: 'ACTION_RECONCILED';
+      releaseId: string;
+      operationId: string;
+      outcome: 'not_applied' | 'applied' | 'unknown';
+      evidence: EvidenceRef | null;
+    }
+  | {
+      type: 'NEW_CANDIDATE';
+      previousReleaseId: string;
+      releaseId: string;
+      sourceCommit: string;
+      committedVersion: string;
+      audit: CompleteAuditEvidence;
+    };
 ```
 
 ## Statechart
@@ -150,19 +296,32 @@ type ReleaseReadinessEvent =
 ```mermaid
 stateDiagram-v2
   [*] --> audited: AUDIT_RECORDED
-  audited --> blocked: BLOCKERS_FOUND or gate failure
+  audited --> audited: BUILD_REQUESTED / requestBuild
   audited --> rc_built: RC_BUILD_SUCCEEDED [auditClear && artifactIdentified]
-  blocked --> audited: AUDIT_PASSED [allBlockersResolved]
+  audited --> blocked: BLOCKERS_FOUND or RC_BUILD_FAILED
+  blocked --> blocked: AUDIT_REQUESTED or RETRY_GATE / requestAction
+  blocked --> blocked: BLOCKERS_FOUND [matchingReleaseAndAction] / retainAuditBlockers
+  blocked --> audited: AUDIT_PASSED [matchingReleaseAndAction && allBlockersResolved]
+  rc_built --> rc_built: PACKAGE_VALIDATION_REQUESTED / requestPackageValidation
   rc_built --> package_validated: PACKAGE_VALIDATION_SUCCEEDED [exactArtifact]
   rc_built --> blocked: PACKAGE_VALIDATION_FAILED
+  package_validated --> package_validated: STORE_VALIDATION_REQUESTED / requestStoreValidation
   package_validated --> store_ready: STORE_VALIDATION_SUCCEEDED [storeEvidenceComplete]
   package_validated --> blocked: STORE_VALIDATION_FAILED
+  store_ready --> store_ready: CANARY_PUBLICATION_REQUESTED / requestCanaryPublication
   store_ready --> canary: CANARY_STARTED [sameArtifact && authorized]
-  canary --> production: PRODUCTION_PROMOTED [canaryPassed && sameArtifact]
-  canary --> rolled_back: ROLLBACK_SUCCEEDED
-  production --> rolled_back: ROLLBACK_SUCCEEDED
-  canary --> blocked: CANARY_FAILED [rollbackNotYetConfirmed]
-  rolled_back --> audited: NEW_CANDIDATE
+  canary --> canary: CANARY_OBSERVATION_REQUESTED / requestCanaryObservation
+  canary --> canary: CANARY_PASSED [matchingReleaseAndAction && sameArtifact] / attachCanaryEvidence
+  canary --> canary: PRODUCTION_PROMOTION_REQUESTED [canaryPassed] / requestPromotion
+  canary --> production: PRODUCTION_PROMOTED [matchingReleaseAndAction && canaryPassed && sameArtifact]
+  canary --> canary: ROLLBACK_REQUESTED [authorized] / requestRollback
+  production --> production: ROLLBACK_REQUESTED [authorized] / requestRollback
+  canary --> rolled_back: ROLLBACK_SUCCEEDED [matchingReleaseAndAction]
+  production --> rolled_back: ROLLBACK_SUCCEEDED [matchingReleaseAndAction]
+  canary --> blocked: CANARY_FAILED [matchingReleaseAndAction] / requireRollback
+  blocked --> blocked: ROLLBACK_REQUESTED [rollbackProvenance] / requestRollback
+  blocked --> rolled_back: ROLLBACK_SUCCEEDED [rollbackProvenance && matchingReleaseAndAction]
+  rolled_back --> audited: NEW_CANDIDATE [completeFreshAudit]
   audited --> blocked: EVIDENCE_INVALIDATED
   rc_built --> blocked: EVIDENCE_INVALIDATED
   package_validated --> blocked: EVIDENCE_INVALIDATED
@@ -171,44 +330,92 @@ stateDiagram-v2
 
 Build/validation/publish/rollback actions run while the last stable state
 remains visible in `state`; `activeAction` records the in-flight action. Only a
-typed success event advances the state.
+typed guarded success or external milestone (`CANARY_STARTED`) advances the
+state; request, start, cancel, retry, and reconciliation events do not
+optimistically advance it.
 
 ## Guards
 
-| Guard                      | Rule                                                                                                                             |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------- |
-| `matchingReleaseAndAction` | Release ID and operation ID match current context/active action.                                                                 |
-| `allBlockersResolved`      | Zero open P0 and P1 blockers, each closure linked to fresh evidence.                                                             |
-| `auditClear`               | Audit covers workflows, security, permissions, metadata, CI, runtime, and rollback; no P0/P1.                                    |
-| `artifactIdentified`       | ZIP exists and commit/version/manifest/SHA-256 are non-empty and mutually consistent.                                            |
-| `exactArtifact`            | Validated/installed ZIP SHA equals `artifactSha256`; post-build manifest and committed version match.                            |
-| `localGateComplete`        | Format, lint, typecheck, unit/integration tests, build, post-build manifest validation, and packaged MV3 tests passed.           |
-| `storeEvidenceComplete`    | CWS credentials/config, listing, privacy disclosures, minimal permissions, package metadata, and rollback artifact are verified. |
-| `canaryPassed`             | Defined duration/sample completed with no stop threshold crossed and rollback rehearsal evidenced.                               |
-| `authorized`               | Named human/operator is permitted for the external Store action; required credentials exist.                                     |
-| `sameArtifact`             | Event SHA equals candidate SHA and no rebuild/repack occurred after validation.                                                  |
+| Guard                      | Rule                                                                                                                                                     |
+| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `matchingReleaseAndAction` | Release ID, operation ID, and expected action kind match current context/active action.                                                                  |
+| `settleableAction`         | Matching action phase is `running` or `reconciling`; a result cannot settle a merely requested or cancelling action.                                     |
+| `noActiveAction`           | No action lock exists; otherwise request returns typed `RELEASE_BUSY` without mutation.                                                                  |
+| `legalActionSource`        | Requested kind is allowed from the current state, or from `blocked` with matching `resumeFrom`/failed-action provenance.                                 |
+| `allBlockersResolved`      | Zero open P0 and P1 blockers, each closure linked to fresh evidence.                                                                                     |
+| `auditClear`               | Audit covers workflows, security, permissions, metadata, CI, runtime, and rollback; no P0/P1.                                                            |
+| `artifactIdentified`       | ZIP exists and commit/version/manifest/SHA-256 are non-empty and mutually consistent.                                                                    |
+| `exactArtifact`            | Validated/installed ZIP SHA equals `artifactSha256`; post-build manifest and committed version match.                                                    |
+| `localGateComplete`        | Format, lint, typecheck, unit/integration tests, build, post-build manifest validation, and packaged MV3 tests passed.                                   |
+| `storeEvidenceComplete`    | CWS credentials/config, listing, privacy disclosures, minimal permissions, package metadata, and rollback artifact are verified.                         |
+| `canaryPassed`             | Fresh typed pass evidence is attached for this release/artifact, duration/sample completed, no stop threshold crossed, and rollback rehearsal evidenced. |
+| `authorized`               | Named human/operator is permitted for the external Store action; required credentials exist.                                                             |
+| `sameArtifact`             | Event SHA equals candidate SHA and no rebuild/repack occurred after validation.                                                                          |
+| `rollbackProvenance`       | Current state is canary/production, or state is `blocked` with `rollbackRequired` and `resumeFrom` equal to canary/production.                           |
+| `cancellableAction`        | Action has no externally visible/committed side effect; canary publication, promotion, and rollback after external receipt are not locally cancellable.  |
+| `retryableFailedAction`    | `failedOperationId` matches `lastFailedAction`, error is retryable, rollback is not required, and the new operation ID differs.                          |
+| `completeFreshAudit`       | Previous ID matches current candidate; new ID differs; audit is fresh, complete, bound to new ID/commit/version, and has zero P0/P1.                     |
 
 ## Transition table
 
-| From                  | Event                  | Guard                               | To                  | Required evidence/effects                                              |
-| --------------------- | ---------------------- | ----------------------------------- | ------------------- | ---------------------------------------------------------------------- |
-| initial               | `AUDIT_RECORDED`       | complete audit                      | `audited`           | Record exact commit, version, findings, owner, timestamp.              |
-| `audited`             | `BLOCKERS_FOUND`       | any P0/P1                           | `blocked`           | Attach blocker list; forbid build/publish advancement.                 |
-| `blocked`             | `AUDIT_PASSED`         | all resolved                        | `audited`           | Re-run affected audit/gates; do not resume later state directly.       |
-| `audited`             | `RC_BUILD_SUCCEEDED`   | matching action, audit clear        | `rc_built`          | Build once from clean commit; record ZIP path/hash/manifest/catalogue. |
-| `audited`             | `RC_BUILD_FAILED`      | matching                            | `blocked`           | Attach command/log; retain no candidate artifact claim.                |
-| `rc_built`            | package success        | exact artifact, local gate complete | `package_validated` | Install/test `dist`/ZIP in real MV3 runtime; record matrix and hash.   |
-| `rc_built`            | package failure        | matching                            | `blocked`           | Record failure; invalidate package evidence.                           |
-| `package_validated`   | store success          | complete external evidence          | `store_ready`       | Confirm listing/privacy/permissions/credentials/dashboard fields.      |
-| `package_validated`   | store failure          | matching                            | `blocked`           | Record missing/refused credential or metadata mismatch.                |
-| `store_ready`         | `CANARY_STARTED`       | same artifact, authorized           | `canary`            | Publish exact candidate to limited group; start measured window.       |
-| `canary`              | `PRODUCTION_PROMOTED`  | canary passed, same artifact        | `production`        | Promote without rebuild; record Store version/time/operator.           |
-| canary/production     | rollback success       | authorized, restored hash           | `rolled_back`       | Restore known-good artifact and verify availability/health.            |
-| any pre-release state | `EVIDENCE_INVALIDATED` | matching release                    | `blocked`           | Record reason (changed commit/artifact/metadata/expired proof).        |
+`S*` below means either stable state `S`, or `blocked` with
+`resumeFrom === S` while a matching retry/reconciliation action is active.
 
-`CANARY_FAILED` requires immediate rollback when a stop threshold is crossed.
-Until rollback is confirmed, state is `blocked` with the external canary state
-recorded; it is never relabeled as `rolled_back` optimistically.
+| From                                            | Event                            | Guard                                                 | To                  | Required evidence/effects                                                                                                                                 |
+| ----------------------------------------------- | -------------------------------- | ----------------------------------------------------- | ------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| initial                                         | `AUDIT_RECORDED`                 | complete audit                                        | `audited`           | Record exact commit, version, findings, owner, and timestamp.                                                                                             |
+| `blocked`                                       | `AUDIT_REQUESTED`                | no action, legal source                               | `blocked`           | Create requested `audit` action; no blocker is cleared yet.                                                                                               |
+| `blocked`                                       | `BLOCKERS_FOUND`                 | matching audit action                                 | `blocked`           | Attach remaining/new blockers, record audit failure, and clear the action without changing provenance.                                                    |
+| `audited`                                       | `BUILD_REQUESTED`                | no action, audit clear                                | `audited`           | Create requested `build` action.                                                                                                                          |
+| `rc_built`                                      | `PACKAGE_VALIDATION_REQUESTED`   | no action, artifact identified                        | `rc_built`          | Create requested `validate_package` action for the exact hash.                                                                                            |
+| `package_validated`                             | `STORE_VALIDATION_REQUESTED`     | no action, exact artifact                             | `package_validated` | Create requested `validate_store` action.                                                                                                                 |
+| `store_ready`                                   | `CANARY_PUBLICATION_REQUESTED`   | no action, authorized                                 | `store_ready`       | Create requested `publish_canary` action for the exact hash.                                                                                              |
+| `canary`                                        | `CANARY_OBSERVATION_REQUESTED`   | no action, outcome running                            | `canary`            | Create requested `observe_canary` action and measured window.                                                                                             |
+| `canary`                                        | `PRODUCTION_PROMOTION_REQUESTED` | no action, `canaryPassed`                             | `canary`            | Create requested `promote_production` action.                                                                                                             |
+| canary/production/rollback-provenance `blocked` | `ROLLBACK_REQUESTED`             | no action, authorized, provenance                     | same                | Create requested `rollback` action; never claim restoration yet.                                                                                          |
+| any stable source                               | `ACTION_STARTED`                 | matching requested action                             | same                | Change only action phase to `running`; attach no gate evidence.                                                                                           |
+| `blocked`                                       | `AUDIT_PASSED`                   | matching audit, all resolved                          | `audited`           | Attach fresh closure/audit evidence; clear action/error/resume and invalidate all later-stage evidence.                                                   |
+| `audited*`                                      | `RC_BUILD_SUCCEEDED`             | matching build, audit clear, identified               | `rc_built`          | Record ZIP path/hash/manifest/catalogue; clear action/error/resume.                                                                                       |
+| `rc_built*`                                     | `PACKAGE_VALIDATION_SUCCEEDED`   | matching package action, exact artifact, local gates  | `package_validated` | Attach packaged MV3 evidence for the exact ZIP.                                                                                                           |
+| `package_validated*`                            | `STORE_VALIDATION_SUCCEEDED`     | matching Store action, complete evidence              | `store_ready`       | Attach listing/privacy/permissions/configuration evidence.                                                                                                |
+| `store_ready*`                                  | `CANARY_STARTED`                 | matching publication, same artifact, authorized       | `canary`            | Attach publication receipt, set `canaryOutcome='running'`, clear publication action.                                                                      |
+| `canary*`                                       | `CANARY_PASSED`                  | matching observation, same artifact                   | `canary`            | Append typed pass evidence, set outcome `passed`, and clear action.                                                                                       |
+| `canary*`                                       | `CANARY_FAILED`                  | matching observation                                  | `blocked`           | Append threshold evidence, set outcome `failed`, `resumeFrom='canary'`, and `rollbackRequired=true`.                                                      |
+| `canary*`                                       | `PRODUCTION_PROMOTED`            | matching promotion, canary passed, same artifact      | `production`        | Attach receipt, clear action/error/resume; never rebuild/repack.                                                                                          |
+| canary/production/provenance `blocked`          | `ROLLBACK_SUCCEEDED`             | matching rollback, authorized, restored hash verified | `rolled_back`       | Attach restoration/health proof and clear `rollbackRequired`, action, and error.                                                                          |
+| build/package/Store/promotion action source     | matching typed failure           | matching action                                       | `blocked`           | Preserve logical source in `resumeFrom`, record failed kind/operation/retryability, clear action, and attach error evidence.                              |
+| canary/production                               | `ROLLBACK_FAILED`                | matching rollback                                     | `blocked`           | Preserve source in `resumeFrom`, set `rollbackRequired=true`, clear action, and attach failure evidence.                                                  |
+| rollback-provenance `blocked`                   | `ROLLBACK_FAILED`                | matching rollback                                     | `blocked`           | Preserve original canary/production `resumeFrom` and `rollbackRequired`; attach failure and permit only rollback retry.                                   |
+| any stable source                               | `CANCEL_ACTION`                  | matching cancellable action                           | same                | Set action phase `cancelling`; do not clear lock or evidence.                                                                                             |
+| any stable source                               | `ACTION_CANCELLED`               | matching cancelling action                            | same                | Clear only the action; retain prior stable state/evidence.                                                                                                |
+| any stable source                               | `ACTION_CANCEL_FAILED`           | matching cancelling action                            | same                | Set action phase `reconciling`; keep lock and record error.                                                                                               |
+| `blocked`                                       | `RETRY_GATE`                     | retryable failed action, fresh operation              | `blocked`           | Recreate the same action kind with `retryOfOperationId`; preserve `resumeFrom`.                                                                           |
+| any stable source                               | `SERVICE_RESTARTED`              | active action                                         | same                | Set phase `reconciling`, preserve operation/provenance, and query durable/external receipts.                                                              |
+| any stable source                               | `SERVICE_RESTARTED`              | no active action                                      | same                | Revalidate the full evidence bundle; raise `EVIDENCE_INVALIDATED` if any proof drifted.                                                                   |
+| any stable source                               | `ACTION_RECONCILED(not_applied)` | matching reconciling action, receipt                  | same                | Clear action; retain stable state and allow a fresh request.                                                                                              |
+| any stable source                               | `ACTION_RECONCILED(applied)`     | matching reconciling action, receipt                  | same                | Return phase to `running`; require the matching typed success/failure event to settle.                                                                    |
+| any stable source                               | `ACTION_RECONCILED(unknown)`     | matching reconciling action                           | `blocked`           | Preserve local source; for unknown publish/promote/rollback set canary/production provenance and `rollbackRequired`; clear action and forbid blind retry. |
+| any pre-release state                           | `EVIDENCE_INVALIDATED`           | matching release                                      | `blocked`           | Record drift reason, source state, and invalidate all downstream evidence.                                                                                |
+| `rolled_back`                                   | `NEW_CANDIDATE`                  | `completeFreshAudit`                                  | `audited`           | Atomically replace identity/audit and clear all artifact, Store, canary, rollback, action, error, and resume evidence.                                    |
+
+`CANARY_FAILED` makes confirmed rollback reachable from `blocked`: a matching
+`ROLLBACK_REQUESTED` creates the action there, and its matching
+`ROLLBACK_SUCCEEDED` alone reaches `rolled_back`. Until that acknowledgement,
+the candidate remains `blocked` with `rollbackRequired=true`; Retry cannot
+re-run canary observation or bypass rollback.
+
+The generic failure row is an exhaustive shorthand:
+`RC_BUILD_FAILED -> build`, `PACKAGE_VALIDATION_FAILED -> validate_package`,
+`STORE_VALIDATION_FAILED -> validate_store`, and
+`CANARY_PUBLICATION_FAILED -> publish_canary`, and
+`PRODUCTION_PROMOTION_FAILED -> promote_production`. `CANARY_FAILED` and
+`ROLLBACK_FAILED` use their dedicated rows. A failure without the matching
+kind/release/operation is stale and cannot mutate context.
+
+Every typed success/failure row also requires `settleableAction`; requests must
+first receive `ACTION_STARTED`, while an applied reconciliation may restore the
+phase to `running`. A result received while action phase is `requested` or
+`cancelling` is stale and cannot advance or block the candidate.
 
 ## Side effects and ownership
 
@@ -229,10 +436,11 @@ CI/artifact/external references. The candidate ZIP is retained byte-for-byte;
 its SHA-256 and source commit are durable identifiers. Secrets, cookie values,
 and access tokens are never written into the bundle.
 
-An in-flight `activeAction`/lock may be stored by CI or the release runner, but
-it is not proof of success. After runner/service restart, every referenced file
-and hash is revalidated and every unconfirmed external action becomes blocked
-until reconciled.
+An in-flight `activeAction`/lock is stored by CI or the release runner, but it
+is not proof of success. After runner/service restart, every referenced file
+and hash is revalidated and the action enters `reconciling`. A matching receipt
+classifies it as not applied, applied-awaiting-typed-result, or unknown; unknown
+becomes `blocked` and is never assumed failed or successful.
 
 ## Permissions and offline behavior
 
@@ -249,25 +457,29 @@ keeps the stable state, records a failed action, and permits explicit Retry.
 
 ## Retry, cancellation, concurrency, and restart
 
-- Gate retries use a new operation ID and attach new evidence; failed/stale
-  evidence cannot be relabeled successful.
-- Cancelling a local build/validation before side effects complete aborts the
-  action and retains the previous stable state. Once CWS publication/canary is
-  externally visible, cancellation means modeled rollback, not local abort.
+- Gate retries name the failed operation and use a distinct new operation ID;
+  they recreate only that action kind and attach new evidence. When
+  `rollbackRequired`, only rollback may be retried.
+- Cancelling a local build/validation first enters action phase `cancelling`;
+  only `ACTION_CANCELLED` clears it. Once CWS publication/canary is externally
+  visible, cancellation is rejected and requires modeled rollback or receipt
+  reconciliation.
 - One release lock exists per `releaseId`; concurrent action returns typed busy
   and does not mutate evidence/state.
 - Rebuild, repack, manifest edit, source commit change, or metadata drift after
   validation invalidates downstream evidence and moves to `blocked`.
-- Runner/service restart revalidates the bundle. Unknown external outcome is
-  blocked until queried; it is never assumed failed or successful.
+- Runner/service restart revalidates the bundle and reduces through the three
+  explicit `ACTION_RECONCILED` outcomes. Unknown external outcome is blocked;
+  applied outcome still needs the original typed gate result.
 
 ## Terminal states and re-entry
 
 `production` is the successful terminal state for a candidate but permits the
 explicit rollback path. `rolled_back` is terminal for that candidate;
 `NEW_CANDIDATE` creates a new release ID and returns to `audited` only after a
-fresh audit. `blocked` is settled, not success; it re-enters solely through a
-fresh passing audit after blockers are resolved.
+complete fresh audit bound to the new ID/commit/version. `blocked` is settled,
+not success; it exits only through the action matching its provenance: fresh
+audit, matching gate retry success, or confirmed rollback.
 
 ## Forbidden transitions
 
@@ -278,6 +490,13 @@ fresh passing audit after blockers are resolved.
   permission justification, rollback artifact, or external proof.
 - Canary/production publication of rebuilt or repacked bytes.
 - `canary`/`production` to `rolled_back` before rollback confirmation.
+- Gate success/failure with no matching requested/running/reconciling action.
+- `CANARY_PASSED` without fresh evidence bound to the current artifact, or
+  production promotion while canary outcome is not `passed`.
+- Retrying with the failed operation ID, retrying canary while rollback is
+  required, or clearing an action before cancellation/reconciliation proof.
+- `rolled_back -> audited` by changing only a release ID or label; complete
+  fresh audit evidence for the new identity is mandatory.
 - Advancement from warnings, free text, branch name, tag, or mutable status flag.
 - Any implicit transition from an LLM assessment, narrative approval, or report prose.
 
@@ -294,6 +513,12 @@ fresh passing audit after blockers are resolved.
 7. Missing production configuration fails closed.
 8. Rollback never claims success before the known-good artifact is restored and verified.
 9. An LLM never decides a transition; authorized typed events plus guards do.
+10. Every gate has an explicit request and matching result protocol; one action
+    lock prevents concurrent or cross-kind acknowledgements.
+11. `CANARY_FAILED` retains canary provenance until matching confirmed rollback
+    reaches `rolled_back`.
+12. `NEW_CANDIDATE` atomically clears all prior downstream evidence and cannot
+    reach `audited` without a complete fresh audit.
 
 ## Review checklist
 
@@ -303,4 +528,6 @@ fresh passing audit after blockers are resolved.
 - [x] Offline and refused/missing external authorization cannot advance release.
 - [x] Retry, local cancellation, post-publication rollback, and concurrent action lock are defined.
 - [x] Runner/service restart and unknown external outcome force reconciliation.
+- [x] Package/Store/canary/promotion requests, canary evidence, cancel acknowledgements, and retry semantics are reducible.
+- [x] Confirmed rollback remains reachable after canary failure in `blocked`.
 - [x] Production/rollback terminal behavior and fresh-candidate re-entry are explicit.
