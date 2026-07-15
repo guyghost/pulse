@@ -17,6 +17,13 @@ import { countNewlyAddedExperiences } from '$lib/core/cv/experience-helpers';
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
+import {
+  createSerializedApplicationTrackingError,
+  type ApplicationTrackingIntent,
+  type Task5ApplicationTrackingErrorCode,
+} from '$lib/core/tracking/application-tracking-error';
+import { isMissionTrackingPayload } from '$lib/shell/messaging/schemas';
+import { isTerminalStatus } from '$lib/core/tracking/pipeline-summary';
 import { resolvePremiumFeatureFlag, shouldPremiumGate } from '$lib/core/features/flags';
 import {
   DEV_PREMIUM_FEATURE_STORAGE_KEY,
@@ -45,6 +52,17 @@ type RuntimeMessageListener = (
   sendResponse: (response?: unknown) => void
 ) => boolean | void;
 type SerializedMission = Omit<Mission, 'scrapedAt'> & { scrapedAt: string };
+
+function devTrackingFailure(
+  intent: ApplicationTrackingIntent,
+  missionId: string | null,
+  code: Task5ApplicationTrackingErrorCode
+): RuntimeMessage {
+  return {
+    type: 'TRACKING_FAILED',
+    payload: createSerializedApplicationTrackingError(intent, missionId, code),
+  };
+}
 
 function readDevStorage<T>(key: string, fallback: T): T {
   try {
@@ -224,7 +242,7 @@ function defaultDevTrackings(now: number): MissionTracking[] {
 
 function readDevTrackings(now: number): MissionTracking[] {
   const stored = readDevStorage<MissionTracking[] | null>(DEV_TRACKINGS_STORAGE_KEY, null);
-  return stored && stored.length > 0 ? stored : defaultDevTrackings(now);
+  return stored !== null ? stored : defaultDevTrackings(now);
 }
 
 function writeDevTrackings(trackings: MissionTracking[]): void {
@@ -682,18 +700,28 @@ function createChromeStubs() {
             const all = readDevTrackings(now);
             const existing =
               all.find((t) => t.missionId === p.missionId) ?? createTracking(p.missionId, now);
-            const updated = transitionStatus(existing, p.status, now, p.note ?? null) ?? existing;
+            const updated = transitionStatus(existing, p.status, now, p.note ?? null);
+            if (!updated) {
+              return devTrackingFailure('transition', p.missionId, 'INVALID_TRANSITION');
+            }
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
             return { type: 'TRACKING_UPDATED', payload: updated };
           }
           case 'UPDATE_TRACKING_DETAILS': {
             const p = message.payload as { missionId: string; nextActionAt?: string | null };
+            const nextActionAt = p.nextActionAt ?? null;
+            if (nextActionAt !== null && !Number.isFinite(Date.parse(nextActionAt))) {
+              return devTrackingFailure('details', p.missionId, 'INVALID_DETAILS');
+            }
             const now = Date.now();
             const all = readDevTrackings(now);
             const existing =
               all.find((t) => t.missionId === p.missionId) ?? createTracking(p.missionId, now);
-            const updated: MissionTracking = { ...existing, nextActionAt: p.nextActionAt ?? null };
+            if (nextActionAt !== null && isTerminalStatus(existing.currentStatus)) {
+              return devTrackingFailure('details', p.missionId, 'INVALID_DETAILS');
+            }
+            const updated: MissionTracking = { ...existing, nextActionAt };
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
             return { type: 'TRACKING_UPDATED', payload: updated };
@@ -703,12 +731,21 @@ function createChromeStubs() {
             const now = Date.now();
             const all = readDevTrackings(now);
             const without = all.filter((t) => t.missionId !== p.missionId);
-            if (p.tracking) {
+            if (p.tracking !== null) {
+              if (!isMissionTrackingPayload(p.tracking) || p.tracking.missionId !== p.missionId) {
+                return devTrackingFailure('restore', p.missionId, 'INVALID_RESTORE');
+              }
               writeDevTrackings([...without, p.tracking]);
-              return { type: 'TRACKING_RESTORED', payload: p.tracking };
+              return {
+                type: 'TRACKING_RESTORED',
+                payload: { missionId: p.missionId, tracking: p.tracking },
+              };
             }
             writeDevTrackings(without);
-            return { type: 'TRACKING_RESTORED', payload: null };
+            return {
+              type: 'TRACKING_RESTORED',
+              payload: { missionId: p.missionId, tracking: null },
+            };
           }
           case 'GENERATE_ASSET': {
             // Dev mode returns a realistic mock asset so the kit-generation UI

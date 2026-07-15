@@ -221,7 +221,7 @@
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import { getAlertPreferences } from '$lib/shell/facades/alert-preferences.facade';
-  import { showToastAction } from '$lib/shell/notifications/toast-service';
+  import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
 
   const {
@@ -242,23 +242,42 @@
   const emptyTrackings = new Map<string, MissionTracking>();
   let tracking = $state<TrackingStore | null>(null);
   let trackingLoadPromise: Promise<TrackingStore> | null = null;
+  let trackingBootstrapStarted = false;
 
   function loadTrackingStore(): Promise<TrackingStore> {
-    if (tracking) {
+    if (tracking?.state === 'loaded') {
       return Promise.resolve(tracking);
     }
 
-    trackingLoadPromise ??= import('$lib/state/tracking.svelte').then(({ createTrackingStore }) => {
-      if (tracking) {
-        return tracking;
-      }
-      const store = createTrackingStore();
-      tracking = store;
-      store.loadTrackings().catch(() => {});
-      return store;
-    });
+    if (trackingLoadPromise) {
+      return trackingLoadPromise;
+    }
 
+    const pending = (async (): Promise<TrackingStore> => {
+      let store = tracking;
+      if (!store) {
+        const { createTrackingStore } = await import('$lib/state/tracking.svelte');
+        store = tracking ?? createTrackingStore();
+        tracking = store;
+      }
+      await store.loadTrackings();
+      return store;
+    })();
+
+    trackingLoadPromise = pending.finally(() => {
+      trackingLoadPromise = null;
+    });
     return trackingLoadPromise;
+  }
+
+  function bootstrapTrackingStore(): void {
+    if (trackingBootstrapStarted) {
+      return;
+    }
+    trackingBootstrapStarted = true;
+    void loadTrackingStore().catch(async (cause: unknown) => {
+      await showToast(trackingFailureMessage(cause), 'error');
+    });
   }
 
   let VirtualMissionFeed: typeof import('../organisms/VirtualMissionFeed.svelte').default | null =
@@ -385,7 +404,7 @@
     requestAnimationFrame(() => {
       loadFeedContent();
       loadFeedChrome();
-      loadTrackingStore().catch(() => {});
+      bootstrapTrackingStore();
     });
   });
 
@@ -739,19 +758,43 @@
     return record ? getLastTransitionTime(record) : null;
   }
 
+  function trackingFailureMessage(cause: unknown): string {
+    return cause instanceof Error ? cause.message : 'Impossible de confirmer le suivi.';
+  }
+
   async function handleTrackingTransition(
     missionId: string,
     status: ApplicationStatus
   ): Promise<void> {
-    const trackingStore = await loadTrackingStore();
-    const previousTracking = cloneTrackingSnapshot(trackingStore.getTrackingForMission(missionId));
-    await trackingStore.transitionStatus(missionId, status);
-    showToastAction(`Statut: ${STATUS_LABELS[status]}`, 'success', {
-      label: 'Annuler',
-      onClick: () => {
-        void trackingStore.restoreTracking(missionId, previousTracking);
-      },
-    });
+    try {
+      const trackingStore = await loadTrackingStore();
+      const previousTracking = cloneTrackingSnapshot(
+        trackingStore.getTrackingForMission(missionId)
+      );
+      await trackingStore.transitionStatus(missionId, status);
+      showToastAction(`Statut: ${STATUS_LABELS[status]}`, 'success', {
+        label: 'Annuler',
+        onClick: () => {
+          void (async () => {
+            try {
+              await trackingStore.restoreTracking(missionId, previousTracking);
+            } catch (cause) {
+              await showToast(trackingFailureMessage(cause), 'error');
+            }
+          })();
+        },
+      });
+    } catch (cause) {
+      await showToast(trackingFailureMessage(cause), 'error');
+    }
+  }
+
+  async function retryTrackingLoad(): Promise<void> {
+    try {
+      await loadTrackingStore();
+    } catch (cause) {
+      await showToast(trackingFailureMessage(cause), 'error');
+    }
   }
 
   function handleInvestigationToggleCompare(): void {
@@ -1663,11 +1706,14 @@
     isHidden={investigationMission.id in page.hidden}
     trackingStatus={tracking?.getTrackingForMission(investigationMission.id)?.currentStatus ?? null}
     trackingUpdatedAt={getTrackingUpdatedAt(investigationMission.id)}
+    trackingState={tracking?.state ?? 'loading'}
+    trackingError={tracking?.error?.message ?? null}
     onClose={() => (investigationMission = null)}
     onOpenLink={handleOpenExternalUrl}
     onToggleCompare={handleInvestigationToggleCompare}
     onHide={handleInvestigationHide}
     onSelectForTracking={handleInvestigationSelectForTracking}
+    onRetryTracking={() => void retryTrackingLoad()}
   />
 {/if}
 

@@ -56,7 +56,11 @@ const mission: Mission = {
 const tracking: MissionTracking = {
   missionId: 'm1',
   currentStatus: 'application_prepared',
-  history: [{ from: null, to: 'detected', timestamp: 1, note: null }],
+  history: [
+    { from: null, to: 'detected', timestamp: 1, note: null },
+    { from: 'detected', to: 'selected', timestamp: 2, note: null },
+    { from: 'selected', to: 'application_prepared', timestamp: 3, note: null },
+  ],
   generatedAssetIds: [],
   userRating: null,
   notes: '',
@@ -74,6 +78,26 @@ function clickButton(target: HTMLElement, matcher: RegExp | string) {
   }) as HTMLButtonElement | undefined;
   expect(button, `button matching ${String(matcher)} should exist`).toBeTruthy();
   button!.click();
+}
+
+function persistenceFailure(intent: 'transition' | 'details' | 'restore') {
+  const messages = {
+    transition: 'Impossible d’enregistrer le nouveau statut.',
+    details: 'Impossible d’enregistrer les détails de suivi.',
+    restore: 'Impossible d’annuler la modification.',
+  } as const;
+  return {
+    type: 'TRACKING_FAILED',
+    payload: {
+      version: 1,
+      code: 'PERSIST_FAILED',
+      intent,
+      missionId: 'm1',
+      mutationId: null,
+      message: messages[intent],
+      recoverable: true,
+    },
+  };
 }
 
 describe('ApplicationsPage next-action toast', () => {
@@ -100,6 +124,78 @@ describe('ApplicationsPage next-action toast', () => {
 
   afterEach(() => {
     vi.clearAllMocks();
+  });
+
+  it('keeps load failure distinct from a successful empty pipeline', async () => {
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({
+          type: 'TRACKING_FAILED',
+          payload: {
+            version: 1,
+            code: 'LOAD_FAILED',
+            intent: 'load',
+            missionId: null,
+            mutationId: null,
+            message: 'Impossible de charger le suivi des candidatures.',
+            recoverable: true,
+          },
+        });
+      }
+      return Promise.resolve({ type: 'NOOP' });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    expect(getMissions).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledWith(
+      'Impossible de charger le suivi des candidatures.',
+      'error'
+    );
+    expect(target.textContent).toContain('Le pipeline candidatures ne peut pas être chargé');
+    expect(target.textContent).not.toContain('Aucune candidature active pour le moment');
+  });
+
+  it('settles an explicit retry when loading fails again', async () => {
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({
+          type: 'TRACKING_FAILED',
+          payload: {
+            version: 1,
+            code: 'LOAD_FAILED',
+            intent: 'load',
+            missionId: null,
+            mutationId: null,
+            message: 'Impossible de charger le suivi des candidatures.',
+            recoverable: true,
+          },
+        });
+      }
+      return Promise.resolve({ type: 'NOOP' });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    clickButton(target, 'Réessayer');
+    await flush();
+    await tick();
+
+    expect(sendMessage).toHaveBeenCalledTimes(2);
+    expect(getMissions).not.toHaveBeenCalled();
+    expect(showToast).toHaveBeenCalledTimes(2);
+    expect(showToast).toHaveBeenNthCalledWith(
+      2,
+      'Impossible de charger le suivi des candidatures.',
+      'error'
+    );
+    expect(target.textContent).toContain('Le pipeline candidatures ne peut pas être chargé');
   });
 
   it('shows a success toast when the next action is saved', async () => {
@@ -129,9 +225,7 @@ describe('ApplicationsPage next-action toast', () => {
     await flush();
 
     // After initial load succeeds, make the next-action persist call fail.
-    sendMessage.mockImplementationOnce(() =>
-      Promise.reject(new Error('Impossible d’enregistrer la prochaine action'))
-    );
+    sendMessage.mockImplementationOnce(() => Promise.resolve(persistenceFailure('details')));
 
     const input = target.querySelector('#application-next-action') as HTMLInputElement;
     input.value = '2026-07-01T09:00';
@@ -147,6 +241,255 @@ describe('ApplicationsPage next-action toast', () => {
       ([message, type]) => message === 'Prochaine action mise à jour' || type === 'success'
     );
     expect(saveCall, 'must not report success when persistence failed').toBeUndefined();
-    expect(showToast).toHaveBeenCalledWith('Impossible d’enregistrer la prochaine action', 'error');
+    expect(showToast).toHaveBeenCalledWith(
+      'Impossible d’enregistrer les détails de suivi.',
+      'error'
+    );
+  });
+
+  it('reports repeated identical detail failures as distinct outcomes', async () => {
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [tracking] });
+      }
+      if (message.type === 'GET_GENERATED_ASSETS') {
+        return Promise.resolve({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+      }
+      if (message.type === 'UPDATE_TRACKING_DETAILS') {
+        return Promise.resolve(persistenceFailure('details'));
+      }
+      return Promise.resolve({ type: 'NOOP' });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    const input = target.querySelector('#application-next-action') as HTMLInputElement;
+    input.value = '2026-07-01T09:00';
+    input.dispatchEvent(new Event('input', { bubbles: true }));
+    await tick();
+
+    clickButton(target, 'Enregistrer');
+    await flush();
+    clickButton(target, 'Enregistrer');
+    await flush();
+
+    expect(showToast).toHaveBeenCalledTimes(2);
+    expect(showToast).toHaveBeenNthCalledWith(
+      1,
+      'Impossible d’enregistrer les détails de suivi.',
+      'error'
+    );
+    expect(showToast).toHaveBeenNthCalledWith(
+      2,
+      'Impossible d’enregistrer les détails de suivi.',
+      'error'
+    );
+    expect(showToastAction).not.toHaveBeenCalled();
+    expect(showToast.mock.calls.some(([, type]) => type === 'success')).toBe(false);
+  });
+
+  it('shows one transition error and creates no success Undo action', async () => {
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [tracking] });
+      }
+      if (message.type === 'GET_GENERATED_ASSETS') {
+        return Promise.resolve({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+      }
+      if (message.type === 'UPDATE_TRACKING') {
+        return Promise.resolve(persistenceFailure('transition'));
+      }
+      return Promise.resolve({ type: 'NOOP' });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    clickButton(target, 'Candidaté');
+    await flush();
+    await tick();
+
+    expect(showToast).toHaveBeenCalledWith('Impossible d’enregistrer le nouveau statut.', 'error');
+    expect(showToastAction).not.toHaveBeenCalled();
+  });
+
+  it('restores the visible next-action input when clear persistence fails', async () => {
+    const withNextAction = { ...tracking, nextActionAt: '2026-07-01T07:00:00.000Z' };
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [withNextAction] });
+      }
+      if (message.type === 'GET_GENERATED_ASSETS') {
+        return Promise.resolve({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+      }
+      if (message.type === 'UPDATE_TRACKING_DETAILS') {
+        return Promise.resolve(persistenceFailure('details'));
+      }
+      return Promise.resolve({ type: 'NOOP' });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    const input = target.querySelector('#application-next-action') as HTMLInputElement;
+    expect(input.value).toBe('2026-07-01T09:00');
+    clickButton(target, 'Effacer');
+    await flush();
+    await tick();
+
+    expect(input.value).toBe('2026-07-01T09:00');
+    expect(showToast).toHaveBeenCalledWith(
+      'Impossible d’enregistrer les détails de suivi.',
+      'error'
+    );
+  });
+
+  it('handles a rejected Undo restore with an error toast', async () => {
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [tracking] });
+      }
+      if (message.type === 'GET_GENERATED_ASSETS') {
+        return Promise.resolve({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+      }
+      if (message.type === 'UPDATE_TRACKING') {
+        return Promise.resolve({
+          type: 'TRACKING_UPDATED',
+          payload: {
+            ...tracking,
+            currentStatus: 'applied',
+            history: [
+              ...tracking.history,
+              {
+                from: 'application_prepared',
+                to: 'applied',
+                timestamp: 4,
+                note: null,
+              },
+            ],
+          },
+        });
+      }
+      if (message.type === 'RESTORE_TRACKING') {
+        return Promise.resolve(persistenceFailure('restore'));
+      }
+      return Promise.resolve({ type: 'NOOP' });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    clickButton(target, 'Candidaté');
+    await flush();
+    const action = showToastAction.mock.calls.at(-1)?.[2] as { onClick: () => void } | undefined;
+    expect(action).toBeDefined();
+    action?.onClick();
+    await flush();
+
+    expect(showToast).toHaveBeenCalledWith('Impossible d’annuler la modification.', 'error');
+  });
+
+  it.each(['accepted', 'rejected', 'archived'] as const)(
+    'does not expose follow-up scheduling for terminal status %s',
+    async (currentStatus) => {
+      const terminalTracking: MissionTracking = {
+        ...tracking,
+        currentStatus,
+        history: [
+          ...tracking.history,
+          {
+            from: 'application_prepared',
+            to: currentStatus,
+            timestamp: 4,
+            note: null,
+          },
+        ],
+        nextActionAt: null,
+      };
+      sendMessage.mockImplementation((message: { type: string }) => {
+        if (message.type === 'GET_TRACKINGS') {
+          return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [terminalTracking] });
+        }
+        if (message.type === 'GET_GENERATED_ASSETS') {
+          return Promise.resolve({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+        }
+        return Promise.resolve({ type: 'NOOP' });
+      });
+      const target = document.createElement('div');
+      document.body.appendChild(target);
+      mount(ApplicationsPage, { target });
+      await tick();
+      await flush();
+
+      expect(target.querySelector('#application-next-action')).toBeNull();
+      expect(target.textContent).toContain('Le suivi de relance est terminé');
+    }
+  );
+
+  it('handles a tracking refresh failure after confirmed content generation', async () => {
+    let trackingLoads = 0;
+    sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_TRACKINGS') {
+        trackingLoads += 1;
+        if (trackingLoads === 1) {
+          return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [tracking] });
+        }
+        return Promise.resolve({
+          type: 'TRACKING_FAILED',
+          payload: {
+            version: 1,
+            code: 'LOAD_FAILED',
+            intent: 'load',
+            missionId: null,
+            mutationId: null,
+            message: 'Impossible de charger le suivi des candidatures.',
+            recoverable: true,
+          },
+        });
+      }
+      if (message.type === 'GET_GENERATED_ASSETS') {
+        return Promise.resolve({ type: 'GENERATED_ASSETS_RESULT', payload: [] });
+      }
+      if (message.type === 'GENERATE_ASSET') {
+        return Promise.resolve({
+          type: 'GENERATION_RESULT',
+          payload: {
+            asset: {
+              id: 'asset-1',
+              missionId: 'm1',
+              type: 'pitch',
+              content: 'Pitch confirmé',
+              createdAt: 4,
+              modelUsed: 'test',
+            },
+          },
+        });
+      }
+      return Promise.resolve({ type: 'NOOP' });
+    });
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    clickButton(target, 'Pitch candidature');
+    await flush();
+    await tick();
+
+    expect(showToast).toHaveBeenCalledWith('Contenu généré', 'success');
+    expect(showToast).toHaveBeenCalledWith(
+      'Impossible de charger le suivi des candidatures.',
+      'error'
+    );
   });
 });

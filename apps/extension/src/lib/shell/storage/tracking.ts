@@ -16,6 +16,14 @@ import { openDB } from './db';
 
 const TRACKING_STORE = 'mission_tracking';
 
+function normalizeStoredTrackingOrThrow(value: unknown): MissionTracking {
+  const tracking = normalizeStoredMissionTracking(value);
+  if (!tracking) {
+    throw new Error('Invalid stored mission tracking');
+  }
+  return tracking;
+}
+
 /**
  * Save (upsert) a tracking record.
  */
@@ -65,7 +73,15 @@ export async function getTracking(missionId: string): Promise<MissionTracking | 
 
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
-      resolve(normalizeStoredMissionTracking(request.result));
+      if (request.result === undefined) {
+        resolve(null);
+        return;
+      }
+      try {
+        resolve(normalizeStoredTrackingOrThrow(request.result));
+      } catch (error) {
+        reject(error);
+      }
     };
     request.onerror = () => reject(request.error);
   });
@@ -82,14 +98,15 @@ export async function getAllTrackings(): Promise<MissionTracking[]> {
 
   return new Promise((resolve, reject) => {
     request.onsuccess = () => {
-      resolve(
-        Array.isArray(request.result)
-          ? request.result.flatMap((item) => {
-              const tracking = normalizeStoredMissionTracking(item);
-              return tracking ? [tracking] : [];
-            })
-          : []
-      );
+      if (!Array.isArray(request.result)) {
+        reject(new Error('Invalid stored mission tracking collection'));
+        return;
+      }
+      try {
+        resolve(request.result.map(normalizeStoredTrackingOrThrow));
+      } catch (error) {
+        reject(error);
+      }
     };
     request.onerror = () => reject(request.error);
   });
@@ -152,8 +169,8 @@ export async function getTrackingsByStatus(status: ApplicationStatus): Promise<M
     const seen = new Set<string>();
     const out: MissionTracking[] = [];
     for (const raw of batches.flat()) {
-      const tracking = normalizeStoredMissionTracking(raw);
-      if (tracking && tracking.currentStatus === status && !seen.has(tracking.missionId)) {
+      const tracking = normalizeStoredTrackingOrThrow(raw);
+      if (tracking.currentStatus === status && !seen.has(tracking.missionId)) {
         seen.add(tracking.missionId);
         out.push(tracking);
       }

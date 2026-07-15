@@ -1,22 +1,13 @@
 import { canonicalizeLegacyApplicationStage, type ApplicationStage } from '@pulse/domain';
 import type { MissionTracking, StatusTransition } from '../types/tracking';
+import { isCanonicalMissionTracking } from './application-tracking-contract';
 
 function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null;
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function normalizeStage(value: unknown): ApplicationStage | null {
   return typeof value === 'string' ? canonicalizeLegacyApplicationStage(value) : null;
-}
-
-function normalizeStringArray(value: unknown): string[] {
-  return Array.isArray(value)
-    ? value.filter((item): item is string => typeof item === 'string')
-    : [];
-}
-
-function normalizeUserRating(value: unknown): number | null {
-  return typeof value === 'number' && value >= 1 && value <= 5 ? value : null;
 }
 
 function normalizeTransition(value: unknown): StatusTransition | null {
@@ -33,7 +24,8 @@ function normalizeTransition(value: unknown): StatusTransition | null {
     !to ||
     (value.from !== null && !from) ||
     typeof timestamp !== 'number' ||
-    !Number.isFinite(timestamp)
+    !Number.isFinite(timestamp) ||
+    (note !== undefined && note !== null && typeof note !== 'string')
   ) {
     return null;
   }
@@ -46,13 +38,20 @@ function normalizeTransition(value: unknown): StatusTransition | null {
   };
 }
 
-function normalizeHistory(value: unknown): StatusTransition[] {
-  return Array.isArray(value)
-    ? value.flatMap((item) => {
-        const transition = normalizeTransition(item);
-        return transition ? [transition] : [];
-      })
-    : [];
+function normalizeHistory(value: unknown): StatusTransition[] | null {
+  if (!Array.isArray(value)) {
+    return null;
+  }
+
+  const history: StatusTransition[] = [];
+  for (const item of value) {
+    const transition = normalizeTransition(item);
+    if (!transition) {
+      return null;
+    }
+    history.push(transition);
+  }
+  return history;
 }
 
 export function normalizeStoredMissionTracking(value: unknown): MissionTracking | null {
@@ -65,18 +64,50 @@ export function normalizeStoredMissionTracking(value: unknown): MissionTracking 
     return null;
   }
 
+  const history = normalizeHistory(value.history);
+  if (!history) {
+    return null;
+  }
+
+  const generatedAssetIds = value.generatedAssetIds === undefined ? [] : value.generatedAssetIds;
+  if (
+    !Array.isArray(generatedAssetIds) ||
+    !generatedAssetIds.every((item): item is string => typeof item === 'string')
+  ) {
+    return null;
+  }
+
+  const userRating = value.userRating === undefined ? null : value.userRating;
+  if (userRating !== null && typeof userRating !== 'number') {
+    return null;
+  }
+
+  const notes = value.notes === undefined ? '' : value.notes;
+  if (typeof notes !== 'string') {
+    return null;
+  }
+
+  if (
+    value.nextActionAt !== undefined &&
+    value.nextActionAt !== null &&
+    typeof value.nextActionAt !== 'string'
+  ) {
+    return null;
+  }
   const nextActionAt =
     typeof value.nextActionAt === 'string' || value.nextActionAt === null
       ? value.nextActionAt
       : null;
 
-  return {
+  const normalized: MissionTracking = {
     missionId: value.missionId,
     currentStatus,
-    history: normalizeHistory(value.history),
-    generatedAssetIds: normalizeStringArray(value.generatedAssetIds),
-    userRating: normalizeUserRating(value.userRating),
-    notes: typeof value.notes === 'string' ? value.notes : '',
+    history,
+    generatedAssetIds,
+    userRating,
+    notes,
     nextActionAt,
   };
+
+  return isCanonicalMissionTracking(normalized) ? normalized : null;
 }

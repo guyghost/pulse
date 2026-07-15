@@ -15,11 +15,14 @@
     isHidden = false,
     trackingStatus = null,
     trackingUpdatedAt = null,
+    trackingState = 'loading',
+    trackingError = null,
     onClose,
     onOpenLink,
     onToggleCompare,
     onHide,
     onSelectForTracking,
+    onRetryTracking,
   }: {
     mission: Mission;
     isCompared?: boolean;
@@ -27,11 +30,14 @@
     isHidden?: boolean;
     trackingStatus?: ApplicationStatus | null;
     trackingUpdatedAt?: number | null;
+    trackingState?: 'loading' | 'loaded' | 'error';
+    trackingError?: string | null;
     onClose?: () => void;
     onOpenLink?: (url: string) => void;
     onToggleCompare?: () => void;
     onHide?: () => void;
     onSelectForTracking?: () => void;
+    onRetryTracking?: () => void;
   } = $props();
 
   type MissionFact = {
@@ -129,11 +135,27 @@
       : []
   );
 
-  const canSelectForTracking = $derived(trackingStatus === null || trackingStatus === 'detected');
+  const trackingReady = $derived(trackingState === 'loaded');
+  const canSelectForTracking = $derived(
+    trackingReady && (trackingStatus === null || trackingStatus === 'detected')
+  );
+  const trackingBadgeLabel = $derived(
+    trackingState === 'error'
+      ? 'Suivi indisponible'
+      : trackingState === 'loading'
+        ? 'Chargement du suivi'
+        : trackingStatus
+          ? STATUS_LABELS[trackingStatus]
+          : 'Non suivie'
+  );
   const trackingActionLabel = $derived(
-    canSelectForTracking
-      ? 'Mettre en suivi'
-      : `Suivi: ${STATUS_LABELS[trackingStatus ?? 'detected']}`
+    trackingState === 'error'
+      ? 'Réessayer le suivi'
+      : trackingState === 'loading'
+        ? 'Chargement du suivi'
+        : canSelectForTracking
+          ? 'Mettre en suivi'
+          : `Suivi: ${STATUS_LABELS[trackingStatus ?? 'detected']}`
   );
   const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
 
@@ -168,6 +190,10 @@
   }
 
   function handleSelectForTracking(): void {
+    if (trackingState === 'error') {
+      onRetryTracking?.();
+      return;
+    }
     if (!canSelectForTracking) {
       return;
     }
@@ -270,9 +296,9 @@
                 <span
                   class="inline-flex rounded-lg border border-border-light bg-page-canvas px-2.5 py-1.5 text-[11px] font-medium text-text-subtle"
                 >
-                  {trackingStatus ? STATUS_LABELS[trackingStatus] : 'Non suivie'}
+                  {trackingBadgeLabel}
                 </span>
-                {#if trackingUpdatedLabel}
+                {#if trackingReady && trackingUpdatedLabel}
                   <p class="mt-1 text-[10px] text-text-muted">Modifié {trackingUpdatedLabel}</p>
                 {/if}
               </div>
@@ -283,7 +309,7 @@
                 type="button"
                 class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-sm font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
                 onclick={handleSelectForTracking}
-                disabled={!canSelectForTracking}
+                disabled={trackingState === 'loading' || (trackingReady && !canSelectForTracking)}
                 aria-label={trackingActionLabel}
               >
                 <Icon name="list-checks" size={14} />
@@ -319,6 +345,9 @@
                 {isHidden ? 'Restaurer' : 'Masquer'}
               </button>
             </div>
+            {#if trackingState === 'error' && trackingError}
+              <p class="mt-2 text-xs leading-5 text-status-red" role="status">{trackingError}</p>
+            {/if}
           </section>
         </div>
 

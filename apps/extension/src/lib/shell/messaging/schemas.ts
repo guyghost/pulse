@@ -11,6 +11,12 @@
  */
 
 import { z } from 'zod';
+import type { MissionTracking } from '../../core/types/tracking';
+import {
+  TASK5_APPLICATION_TRACKING_ERROR_CODES,
+  isSerializedApplicationTrackingError,
+} from '../../core/tracking/application-tracking-error';
+import { isCanonicalMissionTracking } from '../../core/tracking/application-tracking-contract';
 
 // ============================================================================
 // Helpers de validation réutilisables
@@ -388,7 +394,7 @@ const IsoDateTimeOrNullSchema = z
   .nullable();
 const MissionTrackingSchema = z
   .object({
-    missionId: z.string().max(256),
+    missionId: z.string().min(1).max(256),
     currentStatus: ApplicationStatusSchema,
     history: z.array(StatusTransitionSchema).min(1).max(200),
     generatedAssetIds: z.array(z.string().max(256)).max(100),
@@ -396,7 +402,29 @@ const MissionTrackingSchema = z
     notes: z.string().max(10_000),
     nextActionAt: IsoDateTimeOrNullSchema.optional(),
   })
-  .refine(maxBytes(40_000), { message: 'Mission tracking payload exceeds 40KB limit' });
+  .refine(maxBytes(40_000), { message: 'Mission tracking payload exceeds 40KB limit' })
+  .refine(isCanonicalMissionTracking, {
+    message: 'Mission tracking payload violates the Task 5 canonical contract',
+  });
+
+export function isMissionTrackingPayload(value: unknown): value is MissionTracking {
+  return MissionTrackingSchema.safeParse(value).success;
+}
+
+const SerializedApplicationTrackingErrorSchema = z
+  .object({
+    version: z.literal(1),
+    code: z.enum(TASK5_APPLICATION_TRACKING_ERROR_CODES),
+    intent: z.enum(['load', 'transition', 'details', 'restore']),
+    missionId: z.string().min(1).max(256).nullable(),
+    mutationId: z.null(),
+    message: z.string(),
+    recoverable: z.boolean(),
+  })
+  .strict()
+  .refine(isSerializedApplicationTrackingError, {
+    message: 'Tracking failure fields do not match the v1 contract',
+  });
 
 // ── Generation ───────────────────────────────────────────────────────────────
 
@@ -778,7 +806,7 @@ export const MessageSchemas = {
   UPDATE_TRACKING: z.object({
     type: z.literal('UPDATE_TRACKING'),
     payload: z.object({
-      missionId: z.string().max(256),
+      missionId: z.string().min(1).max(256),
       status: ApplicationStatusSchema,
       note: z.string().max(2048).optional(),
     }),
@@ -786,15 +814,15 @@ export const MessageSchemas = {
   UPDATE_TRACKING_DETAILS: z.object({
     type: z.literal('UPDATE_TRACKING_DETAILS'),
     payload: z.object({
-      missionId: z.string().max(256),
-      nextActionAt: IsoDateTimeOrNullSchema.optional(),
+      missionId: z.string().min(1).max(256),
+      nextActionAt: z.string().max(64).nullable().optional(),
     }),
   }),
   RESTORE_TRACKING: z.object({
     type: z.literal('RESTORE_TRACKING'),
     payload: z.object({
-      missionId: z.string().max(256),
-      tracking: MissionTrackingSchema.nullable(),
+      missionId: z.string().min(1).max(256),
+      tracking: z.unknown().refine(maxBytes(40_000)).nullable(),
     }),
   }),
   TRACKING_UPDATED: z.object({
@@ -803,13 +831,28 @@ export const MessageSchemas = {
   }),
   TRACKING_RESTORED: z.object({
     type: z.literal('TRACKING_RESTORED'),
-    payload: MissionTrackingSchema.nullable(),
+    payload: z
+      .object({
+        missionId: z.string().min(1).max(256),
+        tracking: MissionTrackingSchema.nullable(),
+      })
+      .strict()
+      .refine(({ missionId, tracking }) => tracking === null || tracking.missionId === missionId, {
+        message: 'Restored tracking identity mismatch',
+      }),
+  }),
+  TRACKING_FAILED: z.object({
+    type: z.literal('TRACKING_FAILED'),
+    payload: SerializedApplicationTrackingErrorSchema,
   }),
   GET_TRACKINGS: z.object({
     type: z.literal('GET_TRACKINGS'),
     payload: z.object({ status: ApplicationStatusSchema.optional() }).optional(),
   }),
-  TRACKINGS_RESULT: z.object({ type: z.literal('TRACKINGS_RESULT'), payload: z.unknown() }),
+  TRACKINGS_RESULT: z.object({
+    type: z.literal('TRACKINGS_RESULT'),
+    payload: z.array(MissionTrackingSchema).max(10_000),
+  }),
 
   // Generation
   GENERATE_ASSET: z.object({

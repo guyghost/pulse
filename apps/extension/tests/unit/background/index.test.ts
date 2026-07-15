@@ -119,6 +119,28 @@ const makeTracking = (overrides: Partial<MissionTracking> = {}): MissionTracking
   ...overrides,
 });
 
+function expectedTrackingFailure(
+  intent: 'load' | 'transition' | 'details' | 'restore',
+  missionId: string | null,
+  code:
+    'LOAD_FAILED' | 'PERSIST_FAILED' | 'INVALID_TRANSITION' | 'INVALID_DETAILS' | 'INVALID_RESTORE',
+  message: string,
+  recoverable: boolean
+) {
+  return {
+    type: 'TRACKING_FAILED',
+    payload: {
+      version: 1,
+      code,
+      intent,
+      missionId,
+      mutationId: null,
+      message,
+      recoverable,
+    },
+  };
+}
+
 function successfulScanImplementation(result: ScanResult) {
   return async (
     _signal?: AbortSignal,
@@ -2084,12 +2106,255 @@ describe('background auto-scan notifications', () => {
     expect(deleteTracking).toHaveBeenCalledWith('mission-2');
     expect(restoreResponse).toHaveBeenCalledWith({
       type: 'TRACKING_RESTORED',
-      payload: previousTracking,
+      payload: { missionId: 'mission-1', tracking: previousTracking },
     });
     expect(clearResponse).toHaveBeenCalledWith({
       type: 'TRACKING_RESTORED',
-      payload: null,
+      payload: { missionId: 'mission-2', tracking: null },
     });
+  });
+
+  describe('truthful tracking command settlement', () => {
+    it('reports a failed collection load instead of inventing an empty success', async () => {
+      const response = vi.fn();
+      getAllTrackings.mockRejectedValueOnce(new Error('indexeddb unavailable'));
+
+      expect(messageListener?.({ type: 'GET_TRACKINGS', payload: {} }, {}, response)).toBe(true);
+      await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+      expect(response).toHaveBeenCalledWith(
+        expectedTrackingFailure(
+          'load',
+          null,
+          'LOAD_FAILED',
+          'Impossible de charger le suivi des candidatures.',
+          true
+        )
+      );
+      expect(response).not.toHaveBeenCalledWith({ type: 'TRACKINGS_RESULT', payload: [] });
+    });
+
+    it('reports transition persistence failure without a fallback record', async () => {
+      const response = vi.fn();
+      const current = makeTracking({ currentStatus: 'selected' });
+      getTracking.mockResolvedValueOnce(current);
+      saveTracking.mockRejectedValueOnce(new Error('quota'));
+
+      messageListener?.(
+        { type: 'UPDATE_TRACKING', payload: { missionId: 'mission-1', status: 'applied' } },
+        {},
+        response
+      );
+      await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+      expect(response).toHaveBeenCalledWith(
+        expectedTrackingFailure(
+          'transition',
+          'mission-1',
+          'PERSIST_FAILED',
+          'Impossible d’enregistrer le nouveau statut.',
+          true
+        )
+      );
+      expect(response).not.toHaveBeenCalledWith(
+        expect.objectContaining({ type: 'TRACKING_UPDATED' })
+      );
+    });
+
+    it('rejects an invalid transition before persistence', async () => {
+      const response = vi.fn();
+      getTracking.mockResolvedValueOnce(makeTracking({ currentStatus: 'selected' }));
+
+      messageListener?.(
+        { type: 'UPDATE_TRACKING', payload: { missionId: 'mission-1', status: 'accepted' } },
+        {},
+        response
+      );
+      await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+      expect(saveTracking).not.toHaveBeenCalled();
+      expect(response).toHaveBeenCalledWith(
+        expectedTrackingFailure(
+          'transition',
+          'mission-1',
+          'INVALID_TRANSITION',
+          'Ce changement de statut n’est pas autorisé.',
+          false
+        )
+      );
+    });
+
+    it('reports details persistence failure without rereading a fallback', async () => {
+      const response = vi.fn();
+      getTracking.mockResolvedValueOnce(makeTracking());
+      saveTracking.mockRejectedValueOnce(new Error('transaction aborted'));
+
+      messageListener?.(
+        {
+          type: 'UPDATE_TRACKING_DETAILS',
+          payload: { missionId: 'mission-1', nextActionAt: '2026-07-15T10:00:00.000Z' },
+        },
+        {},
+        response
+      );
+      await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+      expect(getTracking).toHaveBeenCalledTimes(1);
+      expect(response).toHaveBeenCalledWith(
+        expectedTrackingFailure(
+          'details',
+          'mission-1',
+          'PERSIST_FAILED',
+          'Impossible d’enregistrer les détails de suivi.',
+          true
+        )
+      );
+    });
+
+    it('rejects invalid details before reading or writing', async () => {
+      const response = vi.fn();
+
+      messageListener?.(
+        {
+          type: 'UPDATE_TRACKING_DETAILS',
+          payload: { missionId: 'mission-1', nextActionAt: 'demain' },
+        },
+        {},
+        response
+      );
+      await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+      expect(getTracking).not.toHaveBeenCalled();
+      expect(saveTracking).not.toHaveBeenCalled();
+      expect(response).toHaveBeenCalledWith(
+        expectedTrackingFailure(
+          'details',
+          'mission-1',
+          'INVALID_DETAILS',
+          'Les détails de suivi sont invalides.',
+          false
+        )
+      );
+    });
+
+    it.each(['accepted', 'rejected', 'archived'] as const)(
+      'rejects a non-null follow-up for terminal status %s before persistence',
+      async (currentStatus) => {
+        const response = vi.fn();
+        getTracking.mockResolvedValueOnce(makeTracking({ currentStatus }));
+
+        messageListener?.(
+          {
+            type: 'UPDATE_TRACKING_DETAILS',
+            payload: { missionId: 'mission-1', nextActionAt: '2026-07-15T10:00:00.000Z' },
+          },
+          {},
+          response
+        );
+        await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+        expect(saveTracking).not.toHaveBeenCalled();
+        expect(response).toHaveBeenCalledWith(
+          expectedTrackingFailure(
+            'details',
+            'mission-1',
+            'INVALID_DETAILS',
+            'Les détails de suivi sont invalides.',
+            false
+          )
+        );
+      }
+    );
+
+    it('rejects a restore snapshot for another mission before I/O', async () => {
+      const response = vi.fn();
+
+      messageListener?.(
+        {
+          type: 'RESTORE_TRACKING',
+          payload: {
+            missionId: 'mission-1',
+            tracking: makeTracking({ missionId: 'mission-2' }),
+          },
+        },
+        {},
+        response
+      );
+      await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+      expect(saveTracking).not.toHaveBeenCalled();
+      expect(deleteTracking).not.toHaveBeenCalled();
+      expect(response).toHaveBeenCalledWith(
+        expectedTrackingFailure(
+          'restore',
+          'mission-1',
+          'INVALID_RESTORE',
+          'Cette annulation n’est pas valide.',
+          false
+        )
+      );
+    });
+
+    it('rejects an incomplete restore snapshot before I/O', async () => {
+      const response = vi.fn();
+
+      messageListener?.(
+        {
+          type: 'RESTORE_TRACKING',
+          payload: {
+            missionId: 'mission-1',
+            tracking: { missionId: 'mission-1', currentStatus: 'selected' },
+          },
+        },
+        {},
+        response
+      );
+      await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+      expect(saveTracking).not.toHaveBeenCalled();
+      expect(deleteTracking).not.toHaveBeenCalled();
+      expect(response).toHaveBeenCalledWith(
+        expectedTrackingFailure(
+          'restore',
+          'mission-1',
+          'INVALID_RESTORE',
+          'Cette annulation n’est pas valide.',
+          false
+        )
+      );
+    });
+
+    it.each([['put', makeTracking()] as const, ['delete', null] as const])(
+      'reports restore %s persistence failure without fallback success',
+      async (kind, snapshot) => {
+        const response = vi.fn();
+        if (kind === 'put') {
+          saveTracking.mockRejectedValueOnce(new Error('put failed'));
+        } else {
+          deleteTracking.mockRejectedValueOnce(new Error('delete failed'));
+        }
+
+        messageListener?.(
+          { type: 'RESTORE_TRACKING', payload: { missionId: 'mission-1', tracking: snapshot } },
+          {},
+          response
+        );
+        await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+        expect(response).toHaveBeenCalledWith(
+          expectedTrackingFailure(
+            'restore',
+            'mission-1',
+            'PERSIST_FAILED',
+            'Impossible d’annuler la modification.',
+            true
+          )
+        );
+        expect(response).not.toHaveBeenCalledWith(
+          expect.objectContaining({ type: 'TRACKING_RESTORED' })
+        );
+      }
+    );
   });
 
   it('routes feed local writes through the service worker shell', async () => {
@@ -2406,12 +2671,11 @@ describe('background auto-scan notifications', () => {
       });
     });
 
-    it('responds with the current tracking instead of throwing when persistence fails', async () => {
+    it('responds with a typed failure when details persistence fails', async () => {
       expect(messageListener).toBeTypeOf('function');
       const sendResponse = vi.fn();
       const existing = makeTracking({ missionId: 'mission-1', nextActionAt: null });
-      // getTracking resolves to `existing` both for the initial read and the catch fallback.
-      getTracking.mockResolvedValue(existing);
+      getTracking.mockResolvedValueOnce(existing);
       saveTracking.mockRejectedValueOnce(new Error('storage down'));
 
       await expect(
@@ -2429,10 +2693,16 @@ describe('background auto-scan notifications', () => {
       ).resolves.toBeUndefined();
 
       expect(saveTracking).toHaveBeenCalled();
-      expect(sendResponse).toHaveBeenCalledWith({
-        type: 'TRACKING_UPDATED',
-        payload: existing,
-      });
+      expect(getTracking).toHaveBeenCalledTimes(1);
+      expect(sendResponse).toHaveBeenCalledWith(
+        expectedTrackingFailure(
+          'details',
+          'mission-1',
+          'PERSIST_FAILED',
+          'Impossible d’enregistrer les détails de suivi.',
+          true
+        )
+      );
     });
   });
 

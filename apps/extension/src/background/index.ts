@@ -98,7 +98,12 @@ import {
 import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
 import { isTerminalStatus } from '../lib/core/tracking/pipeline-summary';
 import { getGeneratedAssetsForMission } from '../lib/shell/storage/generated-assets';
-import { validateMessage } from '../lib/shell/messaging/schemas';
+import { isMissionTrackingPayload, validateMessage } from '../lib/shell/messaging/schemas';
+import {
+  createSerializedApplicationTrackingError,
+  type ApplicationTrackingIntent,
+  type Task5ApplicationTrackingErrorCode,
+} from '../lib/core/tracking/application-tracking-error';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
 import { mergeCandidateProfileIntoUserProfile } from '../lib/core/profile-extractors/merge-candidate-profile';
@@ -113,6 +118,18 @@ if (import.meta.env.DEV) {
 }
 
 type LinkedInProfilePreviewMessage = Extract<BridgeMessage, { type: 'LINKEDIN_PROFILE_PREVIEWED' }>;
+type TrackingFailureMessage = Extract<BridgeMessage, { type: 'TRACKING_FAILED' }>;
+
+function trackingFailureMessage(
+  intent: ApplicationTrackingIntent,
+  missionId: string | null,
+  code: Task5ApplicationTrackingErrorCode
+): TrackingFailureMessage {
+  return {
+    type: 'TRACKING_FAILED',
+    payload: createSerializedApplicationTrackingError(intent, missionId, code),
+  };
+}
 
 function buildTJMAnalysis(
   history: TJMHistory,
@@ -1792,10 +1809,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
           const updated = transitionStatus(tracking, status, now, note ?? null);
           if (!updated) {
-            sendResponse({
-              type: 'TRACKING_UPDATED',
-              payload: tracking,
-            });
+            sendResponse(trackingFailureMessage('transition', missionId, 'INVALID_TRANSITION'));
             return;
           }
 
@@ -1808,18 +1822,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           sendResponse({ type: 'TRACKING_UPDATED', payload: persisted });
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING error:', err);
-          sendResponse({
-            type: 'TRACKING_UPDATED',
-            payload: {
-              missionId,
-              currentStatus: 'detected',
-              history: [],
-              generatedAssetIds: [],
-              userRating: null,
-              notes: '',
-              nextActionAt: null,
-            },
-          });
+          sendResponse(trackingFailureMessage('transition', missionId, 'PERSIST_FAILED'));
         }
       })();
       return true;
@@ -1831,29 +1834,31 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
       (async () => {
         try {
+          const normalizedNextActionAt = nextActionAt ?? null;
+          if (
+            normalizedNextActionAt !== null &&
+            !Number.isFinite(Date.parse(normalizedNextActionAt))
+          ) {
+            sendResponse(trackingFailureMessage('details', missionId, 'INVALID_DETAILS'));
+            return;
+          }
+
           let tracking = await getTracking(missionId);
           if (!tracking) {
             tracking = createTracking(missionId, now);
           }
 
-          const updated: MissionTracking = { ...tracking, nextActionAt: nextActionAt ?? null };
+          if (normalizedNextActionAt !== null && isTerminalStatus(tracking.currentStatus)) {
+            sendResponse(trackingFailureMessage('details', missionId, 'INVALID_DETAILS'));
+            return;
+          }
+
+          const updated: MissionTracking = { ...tracking, nextActionAt: normalizedNextActionAt };
           await saveTracking(updated);
           sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING_DETAILS error:', err);
-          const current = await getTracking(missionId).catch(() => null);
-          sendResponse({
-            type: 'TRACKING_UPDATED',
-            payload: current ?? {
-              missionId,
-              currentStatus: 'detected',
-              history: [],
-              generatedAssetIds: [],
-              userRating: null,
-              notes: '',
-              nextActionAt: null,
-            },
-          });
+          sendResponse(trackingFailureMessage('details', missionId, 'PERSIST_FAILED'));
         }
       })();
       return true;
@@ -1864,18 +1869,27 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
       (async () => {
         try {
-          if (tracking) {
+          if (tracking !== null) {
+            if (!isMissionTrackingPayload(tracking) || tracking.missionId !== missionId) {
+              sendResponse(trackingFailureMessage('restore', missionId, 'INVALID_RESTORE'));
+              return;
+            }
             await saveTracking(tracking);
-            sendResponse({ type: 'TRACKING_RESTORED', payload: tracking });
+            sendResponse({
+              type: 'TRACKING_RESTORED',
+              payload: { missionId, tracking },
+            });
             return;
           }
 
           await deleteTracking(missionId);
-          sendResponse({ type: 'TRACKING_RESTORED', payload: null });
+          sendResponse({
+            type: 'TRACKING_RESTORED',
+            payload: { missionId, tracking: null },
+          });
         } catch (err) {
           console.error('[MissionPulse] RESTORE_TRACKING error:', err);
-          const current = await getTracking(missionId).catch(() => null);
-          sendResponse({ type: 'TRACKING_RESTORED', payload: current });
+          sendResponse(trackingFailureMessage('restore', missionId, 'PERSIST_FAILED'));
         }
       })();
       return true;
@@ -1891,7 +1905,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         })
         .catch((err) => {
           console.error('[MissionPulse] GET_TRACKINGS error:', err);
-          sendResponse({ type: 'TRACKINGS_RESULT', payload: [] });
+          sendResponse(trackingFailureMessage('load', null, 'LOAD_FAILED'));
         });
       return true;
     }

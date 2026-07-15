@@ -20,6 +20,7 @@ import type { ToastType } from '../../state/toast.svelte';
 import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
 import type { AlertHistoryEntry } from '../../core/types/alert-history';
 import type { DeepLinkIntent } from '../../core/deep-link/deep-link-intent';
+import type { SerializedApplicationTrackingError } from '../../core/tracking/application-tracking-error';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -183,7 +184,11 @@ export type BridgeMessage =
       payload: { missionId: string; tracking: MissionTracking | null };
     }
   | { type: 'TRACKING_UPDATED'; payload: MissionTracking }
-  | { type: 'TRACKING_RESTORED'; payload: MissionTracking | null }
+  | {
+      type: 'TRACKING_RESTORED';
+      payload: { missionId: string; tracking: MissionTracking | null };
+    }
+  | { type: 'TRACKING_FAILED'; payload: SerializedApplicationTrackingError }
   | { type: 'GET_TRACKINGS'; payload?: { status?: ApplicationStatus } }
   | { type: 'TRACKINGS_RESULT'; payload: MissionTracking[] }
   // Generation

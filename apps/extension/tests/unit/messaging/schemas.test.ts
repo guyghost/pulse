@@ -699,12 +699,12 @@ describe('validateMessage — UPDATE_TRACKING_DETAILS', () => {
     expect(r.valid).toBe(true);
   });
 
-  it('rejette une date invalide', () => {
+  it('laisse une date bornée au handler pour une erreur métier typée', () => {
     const r = validateMessage({
       type: 'UPDATE_TRACKING_DETAILS',
       payload: { missionId: 'm1', nextActionAt: 'demain' },
     });
-    expect(r.valid).toBe(false);
+    expect(r.valid).toBe(true);
   });
 });
 
@@ -794,7 +794,7 @@ describe('validateMessage — RESTORE_TRACKING', () => {
     expect(r.valid).toBe(true);
   });
 
-  it('rejette un snapshot sans historique canonique', () => {
+  it('laisse un snapshot borné au handler pour une erreur métier typée', () => {
     const r = validateMessage({
       type: 'RESTORE_TRACKING',
       payload: {
@@ -811,8 +811,180 @@ describe('validateMessage — RESTORE_TRACKING', () => {
       },
     });
 
-    expect(r.valid).toBe(false);
+    expect(r.valid).toBe(true);
   });
+});
+
+// ============================================================================
+// TRACKING_FAILED / TRACKING_RESTORED — truthful v1 settlement contract
+// ============================================================================
+
+describe('validateMessage — tracking settlement v1', () => {
+  const loadFailure = {
+    type: 'TRACKING_FAILED',
+    payload: {
+      version: 1,
+      code: 'LOAD_FAILED',
+      intent: 'load',
+      missionId: null,
+      mutationId: null,
+      message: 'Impossible de charger le suivi des candidatures.',
+      recoverable: true,
+    },
+  } as const;
+
+  it('accepts the exact structured-clone-safe load failure', () => {
+    expect(validateMessage(loadFailure).valid).toBe(true);
+  });
+
+  it.each([
+    ['transition', 'Impossible d’enregistrer le nouveau statut.'],
+    ['details', 'Impossible d’enregistrer les détails de suivi.'],
+    ['restore', 'Impossible d’annuler la modification.'],
+  ] as const)('accepts PERSIST_FAILED for %s with exact identity', (intent, message) => {
+    expect(
+      validateMessage({
+        type: 'TRACKING_FAILED',
+        payload: {
+          version: 1,
+          code: 'PERSIST_FAILED',
+          intent,
+          missionId: 'mission-1',
+          mutationId: null,
+          message,
+          recoverable: true,
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it.each([
+    ['STALE_UNDO', 'restore'],
+    ['APPLICATION_BUSY', 'transition'],
+    ['CANCELLED', 'details'],
+    ['WORKER_RESTARTED', 'restore'],
+  ])('rejects reserved wire-v1 code %s', (code, intent) => {
+    expect(
+      validateMessage({
+        type: 'TRACKING_FAILED',
+        payload: {
+          ...loadFailure.payload,
+          code,
+          intent,
+          missionId: 'mission-1',
+        },
+      }).valid
+    ).toBe(false);
+  });
+
+  it.each([
+    { payload: { ...loadFailure.payload, version: 2 } },
+    { payload: { ...loadFailure.payload, missionId: 'mission-1' } },
+    { payload: { ...loadFailure.payload, mutationId: 'mutation-1' } },
+    { payload: { ...loadFailure.payload, recoverable: false } },
+    { payload: { ...loadFailure.payload, message: 'storage down' } },
+    {
+      payload: {
+        ...loadFailure.payload,
+        code: 'INVALID_TRANSITION',
+        intent: 'load',
+        recoverable: false,
+        message: 'Ce changement de statut n’est pas autorisé.',
+      },
+    },
+  ])('rejects invalid failure fields %#', ({ payload }) => {
+    expect(validateMessage({ type: 'TRACKING_FAILED', payload }).valid).toBe(false);
+  });
+
+  it('requires restore success identity even when the confirmed tracking is null', () => {
+    expect(
+      validateMessage({
+        type: 'TRACKING_RESTORED',
+        payload: { missionId: 'mission-1', tracking: null },
+      }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'TRACKING_RESTORED', payload: null }).valid).toBe(false);
+  });
+
+  it('rejects a restore success whose nested identity differs', () => {
+    expect(
+      validateMessage({
+        type: 'TRACKING_RESTORED',
+        payload: {
+          missionId: 'mission-1',
+          tracking: {
+            missionId: 'mission-2',
+            currentStatus: 'selected',
+            history: [{ from: null, to: 'detected', timestamp: 1, note: null }],
+            generatedAssetIds: [],
+            userRating: null,
+            notes: '',
+            nextActionAt: null,
+          },
+        },
+      }).valid
+    ).toBe(false);
+  });
+
+  it('validates TRACKINGS_RESULT as canonical records instead of unknown', () => {
+    expect(validateMessage({ type: 'TRACKINGS_RESULT', payload: {} }).valid).toBe(false);
+    expect(validateMessage({ type: 'TRACKINGS_RESULT', payload: [] }).valid).toBe(true);
+  });
+
+  it('rejects an empty mission identity before the tracking handler runs', () => {
+    expect(
+      validateMessage({
+        type: 'UPDATE_TRACKING',
+        payload: { missionId: '', status: 'selected' },
+      }).valid
+    ).toBe(false);
+  });
+
+  it.each(['TRACKING_UPDATED', 'TRACKINGS_RESULT', 'TRACKING_RESTORED'] as const)(
+    'rejects a %s record whose current status disagrees with its history',
+    (type) => {
+      const inconsistent = {
+        missionId: 'mission-1',
+        currentStatus: 'applied',
+        history: [{ from: null, to: 'selected', timestamp: 1, note: null }],
+        generatedAssetIds: [],
+        userRating: null,
+        notes: '',
+        nextActionAt: null,
+      };
+      const payload =
+        type === 'TRACKINGS_RESULT'
+          ? [inconsistent]
+          : type === 'TRACKING_RESTORED'
+            ? { missionId: 'mission-1', tracking: inconsistent }
+            : inconsistent;
+
+      expect(validateMessage({ type, payload }).valid).toBe(false);
+    }
+  );
+
+  it.each(['TRACKING_UPDATED', 'TRACKINGS_RESULT', 'TRACKING_RESTORED'] as const)(
+    'rejects a %s terminal record with a scheduled follow-up',
+    (type) => {
+      const inconsistent = {
+        missionId: 'mission-1',
+        currentStatus: 'accepted',
+        history: [{ from: 'offer', to: 'accepted', timestamp: 1, note: null }],
+        generatedAssetIds: [],
+        userRating: null,
+        notes: '',
+        nextActionAt: '2026-07-30T09:00:00.000Z',
+      };
+      const payload =
+        type === 'TRACKINGS_RESULT'
+          ? [inconsistent]
+          : type === 'TRACKING_RESTORED'
+            ? { missionId: 'mission-1', tracking: inconsistent }
+            : inconsistent;
+
+      expect(validateMessage({ type, payload }).valid).toBe(false);
+    }
+  );
 });
 
 // ============================================================================
