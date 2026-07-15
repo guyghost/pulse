@@ -321,7 +321,6 @@ function createChromeStubs() {
   let activeDevScan: {
     operationId: string;
     timers: ReturnType<typeof setTimeout>[];
-    resolve: (response: unknown) => void;
   } | null = null;
 
   const runtimeMessageListeners = new Set<RuntimeMessageListener>();
@@ -582,68 +581,68 @@ function createChromeStubs() {
           case 'CLEAR_FEED_TOUR_SEEN':
             storage.feed_tour_seen = false;
             return { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } };
-          case 'SCAN_START':
-            return new Promise((resolve) => {
-              const operationId = (message.payload as { operationId: string }).operationId;
-              if (activeDevScan) {
-                resolve({
-                  type: 'SCAN_BUSY',
-                  payload: {
-                    operationId,
-                    activeOperationId: activeDevScan.operationId,
-                  },
-                });
-                return;
-              }
-              const runtimeMissions = readDevStorage<Mission[]>(
-                DEV_MISSIONS_STORAGE_KEY,
-                mockMissions
-              ).map((m) => ({ ...m, scrapedAt: new Date() }));
-              const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
-              const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
-              const timers: ReturnType<typeof setTimeout>[] = [];
-              activeDevScan = { operationId, timers, resolve };
+          case 'SCAN_START': {
+            const operationId = (message.payload as { operationId: string }).operationId;
+            if (activeDevScan) {
+              return {
+                type: 'SCAN_BUSY',
+                payload: {
+                  operationId,
+                  activeOperationId: activeDevScan.operationId,
+                },
+              };
+            }
+            const runtimeMissions = readDevStorage<Mission[]>(
+              DEV_MISSIONS_STORAGE_KEY,
+              mockMissions
+            ).map((m) => ({ ...m, scrapedAt: new Date() }));
+            const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
+            const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
+            const timers: ReturnType<typeof setTimeout>[] = [];
+            activeDevScan = { operationId, timers };
 
-              groupedBySource.forEach(([connectorId, connectorMissions], index) => {
-                timers.push(
-                  setTimeout(
-                    () => {
-                      emitRuntimeMessage({
-                        type: 'SCAN_PARTIAL_RESULT',
-                        payload: {
-                          operationId,
-                          connectorId,
-                          connectorName: connectorDisplayName(connectorId),
-                          missions: connectorMissions,
-                        },
-                      });
-                    },
-                    250 + index * 250
-                  )
-                );
-              });
-
+            groupedBySource.forEach(([connectorId, connectorMissions], index) => {
               timers.push(
                 setTimeout(
                   () => {
-                    if (activeDevScan?.operationId !== operationId) {
-                      return;
-                    }
-                    activeDevScan = null;
-                    resolve({
-                      type: 'SCAN_COMPLETE',
-                      payload: { operationId, missions: bridgeMissions },
+                    emitRuntimeMessage({
+                      type: 'SCAN_PARTIAL_RESULT',
+                      payload: {
+                        operationId,
+                        connectorId,
+                        connectorName: connectorDisplayName(connectorId),
+                        missions: connectorMissions,
+                      },
                     });
-                    window.dispatchEvent(
-                      new CustomEvent('dev:missions', {
-                        detail: runtimeMissions,
-                      })
-                    );
                   },
-                  Math.max(800, 500 + groupedBySource.length * 250)
+                  250 + index * 250
                 )
               );
             });
+
+            timers.push(
+              setTimeout(
+                () => {
+                  if (activeDevScan?.operationId !== operationId) {
+                    return;
+                  }
+                  activeDevScan = null;
+                  emitRuntimeMessage({
+                    type: 'SCAN_COMPLETE',
+                    payload: { operationId, missions: bridgeMissions },
+                  });
+                  window.dispatchEvent(
+                    new CustomEvent('dev:missions', {
+                      detail: runtimeMissions,
+                    })
+                  );
+                },
+                Math.max(800, 500 + groupedBySource.length * 250)
+              )
+            );
+
+            return { type: 'SCAN_STARTED', payload: { operationId } };
+          }
           case 'SCAN_CANCEL': {
             const operationId = (message.payload as { operationId: string }).operationId;
             if (!activeDevScan || activeDevScan.operationId !== operationId) {
@@ -660,10 +659,11 @@ function createChromeStubs() {
               clearTimeout(timer);
             }
             const cancelled = { type: 'SCAN_CANCELLED', payload: { operationId } };
-            activeDevScan.resolve(cancelled);
             activeDevScan = null;
-            emitRuntimeMessage(cancelled);
-            return cancelled;
+            queueMicrotask(() => {
+              emitRuntimeMessage(cancelled);
+            });
+            return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
           }
           case 'GET_TRACKINGS': {
             const now = Date.now();

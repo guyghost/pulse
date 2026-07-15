@@ -15,6 +15,11 @@ export interface RetryConfig {
   backoffMultiplier?: number;
 }
 
+export interface ResultRetryLifecycleObserver {
+  onRetryableFailure?(error: AppError, attempt: number): void;
+  onRetryTimerFired?(attempt: number): void;
+}
+
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxAttempts: 3,
   baseDelayMs: 1000,
@@ -214,7 +219,8 @@ export async function fetchWithRetry(
 export async function withResultRetry<T>(
   fn: () => Promise<Result<T, AppError>>,
   config: Partial<RetryConfig> = {},
-  signal?: AbortSignal
+  signal?: AbortSignal,
+  lifecycle?: ResultRetryLifecycleObserver
 ): Promise<Result<T, AppError>> {
   const fullConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
 
@@ -239,10 +245,14 @@ export async function withResultRetry<T>(
       return result;
     }
 
+    lifecycle?.onRetryableFailure?.(result.error, attempt);
+
     // Calculate and wait for delay before retry
     const delay = calculateDelay(attempt, fullConfig);
 
     await abortableDelay(delay, signal);
+    throwIfAborted(signal);
+    lifecycle?.onRetryTimerFired?.(attempt);
   }
 
   // Should never reach here

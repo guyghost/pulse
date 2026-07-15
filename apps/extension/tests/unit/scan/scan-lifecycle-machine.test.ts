@@ -128,4 +128,60 @@ describe('scanLifecycleMachine', () => {
     expect(activeActor.getSnapshot().value).toBe('scanning');
     expect(activeActor.getSnapshot().context.operationId).toBe(OPERATION_ID);
   });
+
+  it('enters retrying directly when the live connector attempt fails retryably', () => {
+    const actor = startScanning();
+
+    actor.send({
+      type: 'CONNECTOR_FAILED',
+      operationId: OPERATION_ID,
+      connectorId: 'free-work',
+      error: { connectorId: 'free-work', code: 'NETWORK_ERROR', message: 'temporary' },
+      retryable: true,
+    });
+
+    expect(actor.getSnapshot().value).toBe('retrying');
+    expect(actor.getSnapshot().context.retryPendingConnectorIds).toEqual(['free-work']);
+    expect(actor.getSnapshot().context.retryCountByConnector['free-work']).toBe(1);
+  });
+
+  it('settles a live terminal connector failure and releases the modeled lease', () => {
+    const actor = startScanning();
+
+    actor.send({
+      type: 'CONNECTOR_FAILED',
+      operationId: OPERATION_ID,
+      connectorId: 'free-work',
+      error: { connectorId: 'free-work', code: 'SESSION', message: 'unauthorized' },
+      retryable: false,
+    });
+
+    expect(actor.getSnapshot().value).toBe('failed');
+    expect(actor.getSnapshot().status).toBe('done');
+    expect(actor.getSnapshot().context.activeLeaseOperationId).toBeNull();
+  });
+
+  it('settles an unexpected live runtime error as failed and releases the lease', () => {
+    const actor = startScanning();
+
+    actor.send({
+      type: 'RUNTIME_FAILED',
+      operationId: OPERATION_ID,
+      error: { code: 'OFFLINE', message: 'network disappeared' },
+    });
+
+    expect(actor.getSnapshot().value).toBe('failed');
+    expect(actor.getSnapshot().status).toBe('done');
+    expect(actor.getSnapshot().context.activeLeaseOperationId).toBeNull();
+  });
+
+  it('settles all unfinished connectors on a live offline event', () => {
+    const actor = startScanning();
+
+    actor.send({ type: 'NETWORK_OFFLINE', operationId: OPERATION_ID });
+
+    expect(actor.getSnapshot().value).toBe('failed');
+    expect(actor.getSnapshot().context.connectorResults['free-work']).toBe('failed');
+    expect(actor.getSnapshot().context.activeLeaseOperationId).toBeNull();
+  });
 });

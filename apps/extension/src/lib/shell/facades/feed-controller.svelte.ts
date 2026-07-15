@@ -172,14 +172,14 @@ function normalizeBridgeMissions(payload: unknown[]): Mission[] {
   return missions;
 }
 
-function isScanCompleteResponse(
+function isScanStartedResponse(
   response: unknown
-): response is { type: 'SCAN_COMPLETE'; payload: { operationId: string; missions: unknown[] } } {
-  if (!isRecord(response) || response.type !== 'SCAN_COMPLETE' || !isRecord(response.payload)) {
-    return false;
-  }
+): response is { type: 'SCAN_STARTED'; payload: { operationId: string } } {
   return (
-    typeof response.payload.operationId === 'string' && Array.isArray(response.payload.missions)
+    isRecord(response) &&
+    response.type === 'SCAN_STARTED' &&
+    isRecord(response.payload) &&
+    typeof response.payload.operationId === 'string'
   );
 }
 
@@ -195,12 +195,12 @@ function isScanErrorResponse(response: unknown): response is {
   return isRecord(payload) && typeof payload.operationId === 'string';
 }
 
-function isScanCancelledResponse(
+function isScanCancelRequestedResponse(
   response: unknown
-): response is { type: 'SCAN_CANCELLED'; payload: { operationId: string } } {
+): response is { type: 'SCAN_CANCEL_REQUESTED'; payload: { operationId: string } } {
   return (
     isRecord(response) &&
-    response.type === 'SCAN_CANCELLED' &&
+    response.type === 'SCAN_CANCEL_REQUESTED' &&
     isRecord(response.payload) &&
     typeof response.payload.operationId === 'string'
   );
@@ -321,6 +321,7 @@ export function createFeedController(feedStore: {
   let pendingScanMissions: Mission[] | null = null;
   let pendingScanKind: 'partial' | 'final' | null = null;
   let activeScanOperationId: string | null = null;
+  let terminalClaimedOperationId: string | null = null;
   let scanStartedCold = false;
 
   // Bridge message listener cleanup
@@ -359,6 +360,7 @@ export function createFeedController(feedStore: {
     isScanning = true;
     const operationId = crypto.randomUUID();
     activeScanOperationId = operationId;
+    terminalClaimedOperationId = null;
     connectorStatuses.clear();
     beginPartialScan();
     scanStartedCold = partialScanBaseMissions.length === 0;
@@ -373,16 +375,14 @@ export function createFeedController(feedStore: {
       if (activeScanOperationId !== operationId) {
         return;
       }
-      // Le SW renvoie SCAN_COMPLETE avec les missions traitées
-      if (isScanCompleteResponse(response) && response.payload.operationId === operationId) {
-        await handleScanComplete(normalizeBridgeMissions(response.payload.missions));
-      } else if (
-        isScanCancelledResponse(response) &&
-        response.payload.operationId === operationId
-      ) {
-        finishCancelledScan(operationId);
-      } else if (isScanBusyResponse(response) && response.payload.operationId === operationId) {
+      // Le canal request/response ne transporte que l'acceptation. Tous les
+      // terminaux arrivent ensuite par le listener runtime canonique.
+      if (isScanStartedResponse(response) && response.payload.operationId === operationId) {
+        return;
+      }
+      if (isScanBusyResponse(response) && response.payload.operationId === operationId) {
         feedStore.setError('Un scan est déjà en cours. Veuillez patienter.');
+        finishScanLifecycle(operationId);
       } else if (isScanErrorResponse(response) && response.payload.operationId === operationId) {
         const message =
           typeof response.payload.message === 'string'
@@ -390,8 +390,10 @@ export function createFeedController(feedStore: {
             : 'Erreur inattendue lors du scan.';
         const code = typeof response.payload.code === 'string' ? response.payload.code : 'UNKNOWN';
         feedStore.setError(humanizeScanError(message, code));
+        finishScanLifecycle(operationId);
       } else {
         await recoverFromUnsettledScanResponse(response);
+        finishScanLifecycle(operationId);
       }
     } catch (err) {
       if (activeScanOperationId !== operationId) {
@@ -401,7 +403,6 @@ export function createFeedController(feedStore: {
         console.error('[FeedController] startScan error:', err);
       }
       feedStore.setError(err instanceof Error ? err.message : 'Erreur inattendue lors du scan');
-    } finally {
       finishScanLifecycle(operationId);
     }
   }
@@ -417,8 +418,16 @@ export function createFeedController(feedStore: {
         type: 'SCAN_CANCEL',
         payload: { operationId },
       });
-      if (isScanCancelledResponse(response) && response.payload.operationId === operationId) {
-        finishCancelledScan(operationId);
+      if (isScanCancelRequestedResponse(response) && response.payload.operationId === operationId) {
+        return;
+      }
+      if (isScanErrorResponse(response) && response.payload.operationId === operationId) {
+        const message =
+          typeof response.payload.message === 'string'
+            ? response.payload.message
+            : "Impossible d'annuler le scan en cours.";
+        feedStore.setError(message);
+        finishScanLifecycle(operationId);
       }
     } catch (error) {
       if (activeScanOperationId === operationId) {
@@ -437,6 +446,14 @@ export function createFeedController(feedStore: {
     isScanning = false;
     connectorStatuses.clear();
     resetPartialScan();
+  }
+
+  function claimTerminal(operationId: string): boolean {
+    if (activeScanOperationId !== operationId || terminalClaimedOperationId === operationId) {
+      return false;
+    }
+    terminalClaimedOperationId = operationId;
+    return true;
   }
 
   function finishCancelledScan(operationId: string): void {
@@ -818,10 +835,7 @@ export function createFeedController(feedStore: {
         }
 
         // Résultat final du scan (auto-scan du background)
-        if (
-          message?.type === 'SCAN_COMPLETE' &&
-          message.payload.operationId === activeScanOperationId
-        ) {
+        if (message?.type === 'SCAN_COMPLETE' && claimTerminal(message.payload.operationId)) {
           const operationId = message.payload.operationId;
           handleScanComplete(normalizeBridgeMissions(message.payload.missions))
             .catch((err) => {
@@ -835,10 +849,7 @@ export function createFeedController(feedStore: {
             });
         }
 
-        if (
-          message?.type === 'SCAN_CANCELLED' &&
-          message.payload.operationId === activeScanOperationId
-        ) {
+        if (message?.type === 'SCAN_CANCELLED' && claimTerminal(message.payload.operationId)) {
           finishCancelledScan(message.payload.operationId);
         }
 
@@ -849,10 +860,7 @@ export function createFeedController(feedStore: {
         }
 
         // Erreur du scan (auto-scan du background)
-        if (
-          message?.type === 'SCAN_ERROR' &&
-          message.payload.operationId === activeScanOperationId
-        ) {
+        if (message?.type === 'SCAN_ERROR' && claimTerminal(message.payload.operationId)) {
           const { operationId, message: errorMsg, code } = message.payload;
           clearPendingScanUpdate();
           feedStore.setError(humanizeScanError(errorMsg, code));

@@ -1,6 +1,9 @@
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
+import type { AppError } from '../../../src/lib/core/errors/app-error';
+import type { ConnectorSearchContext } from '../../../src/lib/core/connectors/search-context';
 import type { PlatformConnector } from '../../../src/lib/shell/connectors/platform-connector';
+import type { CircuitRunLifecycleObserver } from '../../../src/lib/shell/health/circuit-breaker-runner';
 
 // ── Mocks ────────────────────────────────────────────────────────────────
 
@@ -122,6 +125,7 @@ import { getProfile, purgeOldMissions, saveMissions } from '../../../src/lib/she
 import { deduplicateMissionsDetailed } from '../../../src/lib/core/scoring/dedup';
 import { isOnline } from '../../../src/lib/shell/utils/connection-monitor';
 import { metricsCollector } from '../../../src/lib/shell/metrics/collector';
+import { runWithCircuitBreaker } from '../../../src/lib/shell/health/circuit-breaker-runner';
 
 // ── Helpers ──────────────────────────────────────────────────────────────
 
@@ -298,6 +302,67 @@ describe('scanner — runScan', () => {
         score: 50,
         scoreBreakdown: expect.objectContaining({ total: 50 }),
       })
+    );
+  });
+
+  it('emits retry lifecycle events live before the eventual connector success', async () => {
+    const missions = [makeMission()];
+    const connector = makeConnector('free-work', 'Free-Work', missions);
+    const lifecycleEvents: Array<{ type: string; retryable?: boolean }> = [];
+
+    (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work']));
+    (getConnector as Mock).mockResolvedValue(connector);
+    (getConnectors as Mock).mockResolvedValue([connector]);
+    (runWithCircuitBreaker as Mock).mockImplementationOnce(
+      async (
+        activeConnector: PlatformConnector,
+        now: number,
+        context?: ConnectorSearchContext,
+        signal?: AbortSignal,
+        lifecycle?: CircuitRunLifecycleObserver
+      ) => {
+        const retryableError: AppError = {
+          type: 'network',
+          message: 'Timeout transitoire',
+          recoverable: true,
+          retryable: true,
+          timestamp: now,
+        };
+        lifecycle?.onRetryableFailure?.(retryableError, 1);
+        lifecycle?.onRetryTimerFired?.(1);
+        const result = await activeConnector.fetchMissions(now, context, signal);
+        return {
+          status: 'executed' as const,
+          result,
+          snapshot: {
+            connectorId: activeConnector.id,
+            circuitState: 'closed' as const,
+            consecutiveFailures: 0,
+            totalFailures: 1,
+            totalSuccesses: 1,
+            lastSuccessAt: now,
+            lastFailureAt: now,
+            lastStateChangeAt: now,
+            recentLatenciesMs: [100],
+          },
+        };
+      }
+    );
+
+    await runScan(undefined, undefined, {
+      pageDelayMs: 0,
+      onLifecycleEvent: (event) => lifecycleEvents.push(event),
+    });
+
+    expect(lifecycleEvents.map((event) => event.type)).toEqual([
+      'CONNECTOR_STARTED',
+      'CONNECTOR_FAILED',
+      'RETRY_TIMER_FIRED',
+      'CONNECTOR_STARTED',
+      'CONNECTOR_SUCCEEDED',
+    ]);
+    expect(lifecycleEvents[1]).toEqual(
+      expect.objectContaining({ type: 'CONNECTOR_FAILED', retryable: true })
     );
   });
 

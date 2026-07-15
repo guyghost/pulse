@@ -715,12 +715,29 @@ export function withStore<T>(
  * Uses put() which is idempotent (insert or update).
  * Missions with the same ID are deduplicated before writing.
  */
-export async function saveMissions(missions: Mission[]): Promise<void> {
+function createTransactionAbortError(): DOMException {
+  return new DOMException('The IndexedDB transaction was aborted.', 'AbortError');
+}
+
+function throwIfTransactionAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw createTransactionAbortError();
+  }
+}
+
+export async function saveMissions(missions: Mission[], signal?: AbortSignal): Promise<void> {
+  throwIfTransactionAborted(signal);
   if (missions.length === 0) {
     return;
   }
 
   const db = await openDB();
+  try {
+    throwIfTransactionAborted(signal);
+  } catch (error) {
+    db.close();
+    throw error;
+  }
   const tx = db.transaction('missions', 'readwrite');
   const store = tx.objectStore('missions');
 
@@ -732,11 +749,44 @@ export async function saveMissions(missions: Mission[]): Promise<void> {
 
   const uniqueMissions = Array.from(missionMap.values());
 
-  for (const mission of uniqueMissions) {
-    store.put(mission);
-  }
-
   return new Promise((resolve, reject) => {
+    let settled = false;
+    const cleanup = (): void => {
+      signal?.removeEventListener('abort', onAbortRequested);
+      db.close();
+    };
+    const resolveOnce = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      resolve();
+    };
+    const rejectOnce = (error: unknown): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      cleanup();
+      reject(error);
+    };
+    const onAbortRequested = (): void => {
+      if (settled) {
+        return;
+      }
+      try {
+        tx.abort();
+      } catch (error) {
+        if (!(error instanceof DOMException && error.name === 'InvalidStateError')) {
+          rejectOnce(error);
+        }
+        // InvalidStateError means the transaction already committed or aborted;
+        // its terminal event remains the deterministic winner.
+      }
+    };
+
+    signal?.addEventListener('abort', onAbortRequested, { once: true });
     tx.oncomplete = () => {
       if (import.meta.env.DEV && uniqueMissions.length > 0) {
         const dedupedCount = missions.length - uniqueMissions.length;
@@ -746,9 +796,36 @@ export async function saveMissions(missions: Mission[]): Promise<void> {
           );
         }
       }
-      resolve();
+      resolveOnce();
     };
-    tx.onerror = () => reject(tx.error);
+    tx.onerror = () => {
+      // IndexedDB follows a request/transaction error with `abort`; wait for
+      // that event so callers observe rollback quiescence before rejection.
+    };
+    tx.onabort = () => {
+      rejectOnce(
+        signal?.aborted
+          ? createTransactionAbortError()
+          : (tx.error ?? createTransactionAbortError())
+      );
+    };
+
+    if (signal?.aborted) {
+      onAbortRequested();
+      return;
+    }
+
+    try {
+      for (const mission of uniqueMissions) {
+        store.put(mission);
+      }
+    } catch (error) {
+      try {
+        tx.abort();
+      } catch {
+        rejectOnce(error);
+      }
+    }
   });
 }
 
@@ -1081,7 +1158,7 @@ export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
   const index = store.index('scrapedAt');
 
   const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
-  const range = IDBKeyRange.upperBound(cutoff);
+  const range = IDBKeyRange.upperBound(new Date(cutoff));
 
   return new Promise((resolve, reject) => {
     const request = index.openCursor(range);
@@ -1093,9 +1170,6 @@ export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
         cursor.delete();
         purged++;
         cursor.continue();
-      } else {
-        // All done
-        resolve(purged);
       }
     };
 
@@ -1104,13 +1178,21 @@ export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
     };
 
     tx.oncomplete = () => {
+      db.close();
       if (purged > 0 && import.meta.env.DEV) {
         console.debug(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
       }
+      resolve(purged);
     };
 
     tx.onerror = () => {
+      db.close();
       reject(tx.error);
+    };
+
+    tx.onabort = () => {
+      db.close();
+      reject(tx.error ?? createTransactionAbortError());
     };
   });
 }

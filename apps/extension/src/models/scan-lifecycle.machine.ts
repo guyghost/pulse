@@ -1,4 +1,4 @@
-import { assign, setup } from 'xstate';
+import { assign, raise, setup } from 'xstate';
 import type { Mission } from '../lib/core/types/mission';
 
 export type ScanLifecycleState =
@@ -84,6 +84,7 @@ export type ScanLifecycleEvent =
   | { type: 'CONNECTORS_SETTLED'; operationId: string }
   | { type: 'PERSIST_SUCCEEDED'; operationId: string }
   | { type: 'PERSIST_FAILED'; operationId: string; error: ScanLifecycleError }
+  | { type: 'RUNTIME_FAILED'; operationId: string; error: ScanLifecycleError }
   | { type: 'CANCEL'; operationId: string }
   | { type: 'ABORT_CONFIRMED'; operationId: string }
   | { type: 'NETWORK_OFFLINE'; operationId: string }
@@ -108,6 +109,20 @@ function isConnectorUnsettled(context: ScanLifecycleContext, connectorId: string
 
 function without(values: readonly string[], value: string): string[] {
   return values.filter((item) => item !== value);
+}
+
+function operationIdFromEvent(event: ScanLifecycleEvent): string {
+  if (!isOperationEvent(event)) {
+    throw new Error(`Lifecycle event ${event.type} is not operation-scoped.`);
+  }
+  return event.operationId;
+}
+
+function connectorIdFromEvent(event: ScanLifecycleEvent): string {
+  if (!('connectorId' in event)) {
+    throw new Error(`Lifecycle event ${event.type} is not connector-scoped.`);
+  }
+  return event.connectorId;
 }
 
 function restoredContext(
@@ -192,7 +207,8 @@ const lifecycleSetup = setup({
       event.type === 'CONNECTORS_SETTLED' &&
       isMatchingOperation(context, event) &&
       context.connectorIds.length > 0 &&
-      context.connectorIds.every((id) => context.connectorResults[id] === 'failed'),
+      context.connectorIds.every((id) => context.connectorResults[id] === 'failed') &&
+      context.retryPendingConnectorIds.length === 0,
     allConnectorsSucceeded: ({ context, event }) =>
       event.type === 'PERSIST_SUCCEEDED' &&
       isMatchingOperation(context, event) &&
@@ -253,10 +269,19 @@ const lifecycleSetup = setup({
       };
     }),
     setFailure: assign(({ event }) => {
-      if (event.type !== 'START_FAILED' && event.type !== 'PERSIST_FAILED') {
+      if (
+        event.type !== 'START_FAILED' &&
+        event.type !== 'PERSIST_FAILED' &&
+        event.type !== 'RUNTIME_FAILED'
+      ) {
         return {};
       }
       return { error: event.error, activeLeaseOperationId: null };
+    }),
+    setOfflineFailure: assign({
+      networkOnline: false,
+      error: { code: 'OFFLINE', message: 'Connexion indisponible pendant le scan.' },
+      activeLeaseOperationId: null,
     }),
     markConnectorRunning: assign(({ context, event }) => {
       if (event.type !== 'CONNECTOR_STARTED') {
@@ -350,6 +375,7 @@ const lifecycleSetup = setup({
     }),
     markOnline: assign({ networkOnline: true }),
     beginPersistence: assign({ persistenceStarted: true }),
+    releaseLease: assign({ activeLeaseOperationId: null }),
     commitPersistence: assign({
       persistenceCommitted: true,
       activeLeaseOperationId: null,
@@ -361,25 +387,44 @@ const lifecycleSetup = setup({
         ? restoredContext(context, event.checkpoint)
         : {}
     ),
+    raiseRetryScheduled: raise(({ event }) => ({
+      type: 'RETRY_SCHEDULED',
+      operationId: operationIdFromEvent(event),
+      connectorId: connectorIdFromEvent(event),
+    })),
+    raiseConnectorsSettled: raise(({ event }) => ({
+      type: 'CONNECTORS_SETTLED',
+      operationId: operationIdFromEvent(event),
+    })),
   },
 });
 
 const activeConnectorTransitions = {
   CONNECTOR_STARTED: { guard: 'connectorUnsettled', actions: 'markConnectorRunning' },
-  CONNECTOR_SUCCEEDED: { guard: 'connectorUnsettled', actions: 'markConnectorSucceeded' },
+  CONNECTOR_SUCCEEDED: {
+    guard: 'connectorUnsettled',
+    actions: ['markConnectorSucceeded', 'raiseConnectorsSettled'],
+  },
   CONNECTOR_FAILED: [
-    { guard: 'retryAllowed', actions: 'recordRetryableFailure' },
-    { guard: 'terminalConnectorFailure', actions: 'settleConnectorFailure' },
+    { guard: 'retryAllowed', actions: ['recordRetryableFailure', 'raiseRetryScheduled'] },
+    {
+      guard: 'terminalConnectorFailure',
+      actions: ['settleConnectorFailure', 'raiseConnectorsSettled'],
+    },
   ],
-  NETWORK_OFFLINE: { guard: 'matchingOperation', actions: 'settleUnfinishedOffline' },
+  NETWORK_OFFLINE: {
+    guard: 'matchingOperation',
+    actions: ['settleUnfinishedOffline', 'raiseConnectorsSettled'],
+  },
   NETWORK_ONLINE: { guard: 'matchingOperation', actions: 'markOnline' },
+  RUNTIME_FAILED: { guard: 'matchingOperation', target: 'failed', actions: 'setFailure' },
   CONNECTORS_SETTLED: [
     {
       guard: 'allConnectorsSettledWithSuccess',
       target: 'persisting',
       actions: 'beginPersistence',
     },
-    { guard: 'allConnectorsFailed', target: 'failed' },
+    { guard: 'allConnectorsFailed', target: 'failed', actions: 'releaseLease' },
   ],
   CANCEL: { guard: 'matchingOperation', target: 'cancelling', actions: 'requestCancellation' },
 } as const;
@@ -432,7 +477,12 @@ export const scanLifecycleMachine = lifecycleSetup.createMachine({
           actions: 'initializeConnectors',
         },
         START_FAILED: { guard: 'matchingOperation', target: 'failed', actions: 'setFailure' },
-        NETWORK_OFFLINE: { guard: 'matchingOperation', target: 'failed' },
+        NETWORK_OFFLINE: {
+          guard: 'matchingOperation',
+          target: 'failed',
+          actions: 'setOfflineFailure',
+        },
+        RUNTIME_FAILED: { guard: 'matchingOperation', target: 'failed', actions: 'setFailure' },
         CANCEL: {
           guard: 'matchingOperation',
           target: 'cancelling',

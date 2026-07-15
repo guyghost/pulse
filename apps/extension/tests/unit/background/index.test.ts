@@ -2,6 +2,11 @@ import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
+import type {
+  ScanOptions,
+  ScanProgressInfo,
+  ScanResult,
+} from '../../../src/lib/shell/scan/scanner';
 
 const getSettings = vi.fn();
 const setSettings = vi.fn();
@@ -109,6 +114,22 @@ const makeTracking = (overrides: Partial<MissionTracking> = {}): MissionTracking
   nextActionAt: null,
   ...overrides,
 });
+
+function successfulScanImplementation(result: ScanResult) {
+  return async (
+    _signal?: AbortSignal,
+    _onProgress?: (info: ScanProgressInfo) => void,
+    options?: ScanOptions
+  ): Promise<ScanResult> => {
+    options?.onLifecycleEvent?.({ type: 'CONNECTOR_STARTED', connectorId: 'free-work' });
+    options?.onLifecycleEvent?.({
+      type: 'CONNECTOR_SUCCEEDED',
+      connectorId: 'free-work',
+      missions: result.missions,
+    });
+    return result;
+  };
+}
 
 vi.stubGlobal('chrome', {
   sidePanel: {
@@ -349,13 +370,18 @@ describe('background auto-scan notifications', () => {
     });
     getSeenIds.mockResolvedValue(['already-seen']);
     saveSeenIds.mockResolvedValue(undefined);
-    runScan.mockResolvedValue({
-      missions: [
-        makeMission({ id: 'mission-1', score: 92 }),
-        makeMission({ id: 'mission-2', score: 45 }),
-      ],
-      errors: [],
-    });
+    const missions = [
+      makeMission({ id: 'mission-1', score: 92 }),
+      makeMission({ id: 'mission-2', score: 45 }),
+    ];
+    runScan.mockImplementation(
+      successfulScanImplementation({
+        missions,
+        sourceMissions: missions,
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
     notifyHighScoreMissions.mockResolvedValue({
       shown: true,
       notifiedMissionIds: ['mission-1'],
@@ -416,13 +442,25 @@ describe('background auto-scan notifications', () => {
     expect(saveSeenIds).toHaveBeenCalledWith(['already-seen', 'mission-1']);
     expect(setNewMissionCount).toHaveBeenCalledWith(2);
     expect(setBadgeText).toHaveBeenCalledWith({ text: '2' });
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: 'MISSIONS_UPDATED',
+      payload: [
+        expect.objectContaining({ id: 'mission-1' }),
+        expect.objectContaining({ id: 'mission-2' }),
+      ],
+    });
   });
 
   it('clears badge and new mission count when all fetched missions are already seen', async () => {
-    runScan.mockResolvedValueOnce({
-      missions: [makeMission({ id: 'already-seen', score: 92 })],
-      errors: [],
-    });
+    const missions = [makeMission({ id: 'already-seen', score: 92 })];
+    runScan.mockImplementationOnce(
+      successfulScanImplementation({
+        missions,
+        sourceMissions: missions,
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
     notifyHighScoreMissions.mockResolvedValueOnce({ shown: false, notifiedMissionIds: [] });
 
     await alarmListener?.({ name: 'auto-scan' });
@@ -434,10 +472,14 @@ describe('background auto-scan notifications', () => {
   });
 
   it('clears badge and new mission count when scan returns no missions', async () => {
-    runScan.mockResolvedValueOnce({
-      missions: [],
-      errors: [],
-    });
+    runScan.mockImplementationOnce(
+      successfulScanImplementation({
+        missions: [],
+        sourceMissions: [],
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
 
     await alarmListener?.({ name: 'auto-scan' });
 
@@ -446,9 +488,13 @@ describe('background auto-scan notifications', () => {
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
   });
 
-  it('returns busy for a concurrent start and cancels only the matching operation once', async () => {
+  it('acknowledges start and cancel non-terminally, then broadcasts cancelled once after quiescence', async () => {
     expect(messageListener).toBeTypeOf('function');
     let activeSignal: AbortSignal | undefined;
+    let releaseAbortSettlement: (() => void) | undefined;
+    const abortSettled = new Promise<void>((resolve) => {
+      releaseAbortSettlement = resolve;
+    });
     runScan.mockImplementationOnce(
       (signal?: AbortSignal) =>
         new Promise((_resolve, reject) => {
@@ -456,12 +502,14 @@ describe('background auto-scan notifications', () => {
           signal?.addEventListener(
             'abort',
             () => {
-              reject(
-                Object.assign(new Error('Scan annulé'), {
-                  name: 'ScanError',
-                  code: 'CANCELLED',
-                })
-              );
+              void abortSettled.then(() => {
+                reject(
+                  Object.assign(new Error('Scan annulé'), {
+                    name: 'ScanError',
+                    code: 'CANCELLED',
+                  })
+                );
+              });
             },
             { once: true }
           );
@@ -473,16 +521,14 @@ describe('background auto-scan notifications', () => {
     const staleCancelResponse = vi.fn();
     const cancelResponse = vi.fn();
 
-    expect(
-      messageListener?.(
-        {
-          type: 'SCAN_START',
-          payload: { operationId: 'operation-active', trigger: 'manual' },
-        },
-        {},
-        activeResponse
-      )
-    ).toBe(true);
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-active', trigger: 'manual' },
+      },
+      {},
+      activeResponse
+    );
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(
@@ -524,14 +570,43 @@ describe('background auto-scan notifications', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(activeSignal?.aborted).toBe(true);
-    expect(cancelResponse).toHaveBeenCalledWith({
-      type: 'SCAN_CANCELLED',
-      payload: { operationId: 'operation-active' },
+    const terminalBeforeAbortSettlement = vi
+      .mocked(chrome.runtime.sendMessage)
+      .mock.calls.map(([message]) => message)
+      .filter(
+        (message) =>
+          typeof message === 'object' &&
+          message !== null &&
+          ['SCAN_COMPLETE', 'SCAN_ERROR', 'SCAN_CANCELLED'].includes(
+            (message as { type?: string }).type ?? ''
+          )
+      );
+
+    releaseAbortSettlement?.();
+    await vi.waitFor(() => {
+      expect(
+        vi
+          .mocked(chrome.runtime.sendMessage)
+          .mock.calls.some(
+            ([message]) =>
+              typeof message === 'object' &&
+              message !== null &&
+              (message as { type?: string }).type === 'SCAN_CANCELLED'
+          )
+      ).toBe(true);
     });
+
+    expect(activeResponse).toHaveBeenCalledTimes(1);
     expect(activeResponse).toHaveBeenCalledWith({
-      type: 'SCAN_CANCELLED',
+      type: 'SCAN_STARTED',
       payload: { operationId: 'operation-active' },
     });
+    expect(cancelResponse).toHaveBeenCalledTimes(1);
+    expect(cancelResponse).toHaveBeenCalledWith({
+      type: 'SCAN_CANCEL_REQUESTED',
+      payload: { operationId: 'operation-active' },
+    });
+    expect(terminalBeforeAbortSettlement).toEqual([]);
 
     const terminalBroadcasts = vi
       .mocked(chrome.runtime.sendMessage)
@@ -551,6 +626,97 @@ describe('background auto-scan notifications', () => {
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: 'SCAN_ERROR' })
     );
+  });
+
+  it('waits for the aborted mission transaction before cancelling and launches no post-commit effect', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let commitSignal: AbortSignal | undefined;
+    let releaseTransactionAbort: (() => void) | undefined;
+    const transactionAbortSettled = new Promise<void>((resolve) => {
+      releaseTransactionAbort = resolve;
+    });
+
+    const missions = [makeMission({ id: 'mission-pending-commit' })];
+    runScan.mockImplementationOnce(
+      successfulScanImplementation({
+        missions,
+        sourceMissions: missions,
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
+    saveMissions.mockImplementationOnce(
+      (_missions: Mission[], signal?: AbortSignal) =>
+        new Promise<void>((_resolve, reject) => {
+          commitSignal = signal;
+          void transactionAbortSettled.then(() => {
+            reject(new DOMException('The transaction was aborted.', 'AbortError'));
+          });
+        })
+    );
+
+    const startResponse = vi.fn();
+    const cancelResponse = vi.fn();
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-persisting', trigger: 'manual' },
+      },
+      {},
+      startResponse
+    );
+    await vi.waitFor(() => {
+      expect(saveMissions).toHaveBeenCalledTimes(1);
+    });
+
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-persisting' } },
+      {},
+      cancelResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+
+    const terminalsBeforeAbortSettlement = vi
+      .mocked(chrome.runtime.sendMessage)
+      .mock.calls.map(([message]) => message)
+      .filter(
+        (message) =>
+          typeof message === 'object' &&
+          message !== null &&
+          ['SCAN_COMPLETE', 'SCAN_ERROR', 'SCAN_CANCELLED'].includes(
+            (message as { type?: string }).type ?? ''
+          )
+      );
+
+    releaseTransactionAbort?.();
+    await vi.waitFor(() => {
+      expect(
+        vi
+          .mocked(chrome.runtime.sendMessage)
+          .mock.calls.filter(
+            ([message]) =>
+              typeof message === 'object' &&
+              message !== null &&
+              (message as { type?: string }).type === 'SCAN_CANCELLED'
+          )
+      ).toHaveLength(1);
+    });
+
+    expect(terminalsBeforeAbortSettlement).toEqual([]);
+    expect(commitSignal?.aborted).toBe(true);
+    expect(startResponse).toHaveBeenCalledWith({
+      type: 'SCAN_STARTED',
+      payload: { operationId: 'operation-persisting' },
+    });
+    expect(cancelResponse).toHaveBeenCalledWith({
+      type: 'SCAN_CANCEL_REQUESTED',
+      payload: { operationId: 'operation-persisting' },
+    });
+    expect(recordTJMFromMissions).not.toHaveBeenCalled();
+    expect(purgeOldMissions).not.toHaveBeenCalled();
+    expect(saveConnectorStatuses).not.toHaveBeenCalled();
+    expect(setNewMissionCount).not.toHaveBeenCalled();
+    expect(notifyHighScoreMissions).not.toHaveBeenCalled();
   });
 
   it('saves profiles through the service worker and rescored missions locally', async () => {

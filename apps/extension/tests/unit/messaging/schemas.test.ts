@@ -142,6 +142,20 @@ describe('validateMessage — scan progressif', () => {
     expect(validateMessage({ type: 'SCAN_CANCEL' }).valid).toBe(false);
   });
 
+  it('valide les ACK non terminaux avec le même operationId', () => {
+    expect(
+      validateMessage({ type: 'SCAN_STARTED', payload: { operationId: 'operation-1' } }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SCAN_CANCEL_REQUESTED',
+        payload: { operationId: 'operation-1' },
+      }).valid
+    ).toBe(true);
+    expect(validateMessage({ type: 'SCAN_STARTED' }).valid).toBe(false);
+    expect(validateMessage({ type: 'SCAN_CANCEL_REQUESTED' }).valid).toBe(false);
+  });
+
   it('accepte SCAN_PARTIAL_RESULT avec missions par connecteur', () => {
     expect(
       validateMessage({

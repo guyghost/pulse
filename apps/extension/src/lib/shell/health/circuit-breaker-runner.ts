@@ -30,6 +30,11 @@ export type CircuitRunResult =
   | { status: 'executed'; result: Result<Mission[], AppError>; snapshot: ConnectorHealthSnapshot }
   | { status: 'skipped'; snapshot: ConnectorHealthSnapshot; reason: 'circuit-open' };
 
+export interface CircuitRunLifecycleObserver {
+  onRetryableFailure?(error: AppError, attempt: number): void;
+  onRetryTimerFired?(attempt: number): void;
+}
+
 // ============================================================================
 // CircuitBreakerRunner
 // ============================================================================
@@ -52,6 +57,7 @@ export async function runWithCircuitBreaker(
   now: number,
   context?: ConnectorSearchContext,
   signal?: AbortSignal,
+  lifecycle?: CircuitRunLifecycleObserver,
   thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS
 ): Promise<CircuitRunResult> {
   const throwIfAborted = (): void => {
@@ -93,7 +99,8 @@ export async function runWithCircuitBreaker(
       baseDelayMs: 1000,
       maxDelayMs: 10_000,
     },
-    signal
+    signal,
+    lifecycle
   );
   throwIfAborted();
   const latencyMs = Math.round(performance.now() - startTime);

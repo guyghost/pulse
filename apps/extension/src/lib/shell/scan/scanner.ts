@@ -1,7 +1,7 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
-import type { AppError } from '../../core/errors/app-error';
+import { isRetryable, type AppError } from '../../core/errors/app-error';
 import { buildSearchContext } from '../../core/connectors/search-context';
 import { getConnectors, getConnector } from '../connectors/index';
 import { getSettings } from '../storage/chrome-storage';
@@ -100,6 +100,22 @@ export type ConnectorResultCallback = (info: {
   missions: Mission[];
 }) => void;
 
+export type ScanRuntimeEvent =
+  | { type: 'CONNECTOR_STARTED'; connectorId: string }
+  | {
+      type: 'CONNECTOR_SUCCEEDED';
+      connectorId: string;
+      missions: readonly Mission[];
+    }
+  | {
+      type: 'CONNECTOR_FAILED';
+      connectorId: string;
+      error: { connectorId: string; code: string; message: string };
+      retryable: boolean;
+    }
+  | { type: 'RETRY_TIMER_FIRED'; connectorId: string }
+  | { type: 'NETWORK_OFFLINE' };
+
 export interface ScanOptions {
   /** Délai entre les pages d'un même connecteur en ms (défaut: 500) */
   pageDelayMs?: number;
@@ -107,6 +123,8 @@ export interface ScanOptions {
   onDetailedProgress?: DetailedProgressCallback;
   /** Callback appelé quand un connecteur réussit, avant le résultat final global */
   onConnectorResult?: ConnectorResultCallback;
+  /** Événements runtime consommés en direct par l'acteur de cycle de vie. */
+  onLifecycleEvent?: (event: ScanRuntimeEvent) => void;
   /** Override explicite du profil utilisé pour le scan */
   profileOverride?: UserProfile;
 }
@@ -147,6 +165,9 @@ async function _runScanInternal(
   const scanStartTime = performance.now();
   const detailedProgress = options?.onDetailedProgress;
   const connectorStates: ConnectorScanState[] = [];
+  const emitLifecycle = (event: ScanRuntimeEvent): void => {
+    options?.onLifecycleEvent?.(event);
+  };
 
   function emitDetailed(
     phase: 'connecting' | 'scanning' | 'post-processing' | 'done',
@@ -159,6 +180,7 @@ async function _runScanInternal(
 
   // Vérifier la connexion avant de scanner
   if (!isOnline()) {
+    emitLifecycle({ type: 'NETWORK_OFFLINE' });
     throw new ScanError(
       'Aucune connexion internet. Le scan sera automatiquement relancé quand la connexion reviendra.',
       'OFFLINE'
@@ -198,6 +220,13 @@ async function _runScanInternal(
     throwIfScanCancelled(signal);
     if (!connector) {
       errors.push({ connectorId: id, message: 'Connecteur introuvable' });
+      emitLifecycle({ type: 'CONNECTOR_STARTED', connectorId: id });
+      emitLifecycle({
+        type: 'CONNECTOR_FAILED',
+        connectorId: id,
+        error: { connectorId: id, code: 'UNKNOWN_CONNECTOR', message: 'Connecteur introuvable' },
+        retryable: false,
+      });
     } else {
       validConnectorIds.push(id);
     }
@@ -214,6 +243,17 @@ async function _runScanInternal(
   for (const id of validConnectorIds) {
     if (!loadedIds.has(id)) {
       errors.push({ connectorId: id, message: 'Échec du chargement du connecteur' });
+      emitLifecycle({ type: 'CONNECTOR_STARTED', connectorId: id });
+      emitLifecycle({
+        type: 'CONNECTOR_FAILED',
+        connectorId: id,
+        error: {
+          connectorId: id,
+          code: 'CONNECTOR_LOAD_FAILED',
+          message: 'Échec du chargement du connecteur',
+        },
+        retryable: false,
+      });
     }
   }
 
@@ -282,6 +322,7 @@ async function _runScanInternal(
     index: number
   ): Promise<void> {
     throwIfScanCancelled(signal);
+    emitLifecycle({ type: 'CONNECTOR_STARTED', connectorId: connector.id });
 
     const stateIdx = connectorStates.findIndex((s) => s.connectorId === connector.id);
     onProgress?.({ current: index, total: connectors.length, connectorName: connector.name });
@@ -306,7 +347,41 @@ async function _runScanInternal(
 
     // --- Circuit Breaker ---
     // runWithCircuitBreaker gère : open → skip, half-open → probe, closed → execute
-    const circuitRun = await runWithCircuitBreaker(connector, now, connectorContext, signal);
+    const circuitRun = await runWithCircuitBreaker(connector, now, connectorContext, signal, {
+      onRetryableFailure: (error, attempt) => {
+        if (stateIdx >= 0) {
+          connectorStates[stateIdx] = {
+            ...connectorStates[stateIdx],
+            state: 'retrying',
+            error,
+            retryCount: attempt,
+          };
+        }
+        emitLifecycle({
+          type: 'CONNECTOR_FAILED',
+          connectorId: connector.id,
+          error: {
+            connectorId: connector.id,
+            code: error.type.toUpperCase(),
+            message: error.message,
+          },
+          retryable: true,
+        });
+        emitDetailed('scanning', index, connectors.length);
+      },
+      onRetryTimerFired: () => {
+        emitLifecycle({ type: 'RETRY_TIMER_FIRED', connectorId: connector.id });
+        emitLifecycle({ type: 'CONNECTOR_STARTED', connectorId: connector.id });
+        if (stateIdx >= 0) {
+          connectorStates[stateIdx] = {
+            ...connectorStates[stateIdx],
+            state: 'fetching',
+            error: null,
+          };
+        }
+        emitDetailed('scanning', index, connectors.length);
+      },
+    });
     throwIfScanCancelled(signal);
 
     // Sync alarme de sonde (schedule si open, cancel si closed/half-open)
@@ -355,6 +430,16 @@ async function _runScanInternal(
       if (stateIdx >= 0) {
         connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'error', error: null };
       }
+      emitLifecycle({
+        type: 'CONNECTOR_FAILED',
+        connectorId: connector.id,
+        error: {
+          connectorId: connector.id,
+          code: 'CIRCUIT_OPEN',
+          message: `Circuit ouvert — connecteur ${connector.name} temporairement désactivé`,
+        },
+        retryable: false,
+      });
       emitDetailed('scanning', index + 1, connectors.length);
       return;
     }
@@ -371,6 +456,16 @@ async function _runScanInternal(
 
     if (!result.ok) {
       errors.push({ connectorId: connector.id, message: result.error.message });
+      emitLifecycle({
+        type: 'CONNECTOR_FAILED',
+        connectorId: connector.id,
+        error: {
+          connectorId: connector.id,
+          code: result.error.type.toUpperCase(),
+          message: result.error.message,
+        },
+        retryable: isRetryable(result.error),
+      });
       trackParserHealth(connector.id, 0, now).catch(() => {});
       if (stateIdx >= 0) {
         connectorStates[stateIdx] = {
@@ -382,11 +477,17 @@ async function _runScanInternal(
     } else {
       trackParserHealth(connector.id, result.value.length, now).catch(() => {});
       connectorResults.push({ connectorId: connector.id, missions: result.value });
+      const deterministicMissions = buildDeterministicMissions(result.value, new Date(now));
+      emitLifecycle({
+        type: 'CONNECTOR_SUCCEEDED',
+        connectorId: connector.id,
+        missions: deterministicMissions,
+      });
       try {
         options?.onConnectorResult?.({
           connectorId: connector.id,
           connectorName: connector.name,
-          missions: buildDeterministicMissions(result.value, new Date(now)),
+          missions: deterministicMissions,
         });
       } catch {
         // Partial UI updates are best-effort; the final scan result remains canonical.
