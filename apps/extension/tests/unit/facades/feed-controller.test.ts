@@ -207,6 +207,81 @@ describe('feed controller facade', () => {
     controller.dispose();
   });
 
+  it('finishes the local intent on a non-terminal SCAN_START_REJECTED response', async () => {
+    stubChrome();
+    const feedStore = {
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        const operationId = message.payload?.operationId ?? '';
+        return {
+          type: 'SCAN_START_REJECTED',
+          payload: {
+            operationId,
+            code: 'CHECKPOINT_STORAGE',
+            message: 'Session storage indisponible.',
+          },
+        };
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    await controller.startScan();
+
+    expect(feedStore.setError).toHaveBeenCalledWith('Session storage indisponible.');
+    expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
+  it('finishes the local intent on a non-terminal SCAN_CANCEL_REJECTED response', async () => {
+    stubChrome();
+    let operationId = '';
+    const feedStore = {
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        operationId = message.payload?.operationId ?? operationId;
+        if (message.type === 'SCAN_START') {
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        }
+        return {
+          type: 'SCAN_CANCEL_REJECTED',
+          payload: {
+            operationId,
+            code: 'CHECKPOINT_STORAGE',
+            message: "Impossible d'annuler pendant la récupération.",
+          },
+        };
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    await controller.startScan();
+    await controller.stopScan();
+
+    expect(feedStore.setError).toHaveBeenCalledWith(
+      "Impossible d'annuler pendant la récupération."
+    );
+    expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
   it('finalizes local scan state when SCAN_COMPLETE arrives through the bridge listener', async () => {
     stubChrome();
     let bridgeListener: ((message: unknown) => void) | null = null;
@@ -320,6 +395,128 @@ describe('feed controller facade', () => {
     resolveStart?.({ type: 'SCAN_STARTED', payload: { operationId } });
     await startPromise;
     await flushPromises();
+    controller.dispose();
+  });
+
+  it('does not send cancel after a matching terminal is claimed during async finalization', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let operationId = '';
+    let resolveStatuses: (() => void) | null = null;
+    const feedStore = {
+      missions: [] as Mission[],
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        }
+        return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    feedDataMock.getConnectorStatuses.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStatuses = () => resolve([]);
+        })
+    );
+
+    await controller.startScan();
+    bridgeListener?.({
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [makeSerializedMission()] },
+    });
+    await flushPromises();
+
+    await controller.stopScan();
+    const scanCommandTypes = bridgeMock.sendMessage.mock.calls.map(
+      ([message]) => (message as { type: string }).type
+    );
+
+    expect(scanCommandTypes).not.toContain('SCAN_CANCEL');
+    expect(feedStore.setMissions).toHaveBeenCalledTimes(1);
+    expect(feedStore.setError).not.toHaveBeenCalled();
+
+    resolveStatuses?.();
+    await flushPromises();
+    expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
+  it('does not let a late cancel rejection overwrite a matching canonical terminal', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let resolveCancel: ((response: unknown) => void) | null = null;
+    let operationId = '';
+    const feedStore = {
+      missions: [] as Mission[],
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    bridgeMock.sendMessage.mockImplementation(
+      (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return Promise.resolve({ type: 'SCAN_STARTED', payload: { operationId } });
+        }
+        return new Promise((resolve) => {
+          resolveCancel = resolve;
+        });
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    await controller.startScan();
+    const stopPromise = controller.stopScan();
+    await flushPromises();
+
+    bridgeListener?.({
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [makeSerializedMission()] },
+    });
+    resolveCancel?.({
+      type: 'SCAN_CANCEL_REJECTED',
+      payload: {
+        operationId,
+        code: 'CHECKPOINT_CLEANUP_PENDING',
+        message: 'Le checkpoint terminal doit être récupéré.',
+      },
+    });
+    await stopPromise;
+    await flushPromises();
+
+    expect(feedStore.setMissions).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'mission-1' }),
+    ]);
+    expect(feedStore.setError).not.toHaveBeenCalled();
+    expect(controller.isScanning).toBe(false);
     controller.dispose();
   });
 

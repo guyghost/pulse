@@ -166,7 +166,7 @@ async function mockUserWithProfileAndSlowPartialScan(page: Page) {
         }
 
         chromeStub.runtime.sendMessage = async (msg: unknown) => {
-          const message = msg as { type?: string };
+          const message = msg as { type?: string; payload?: { operationId?: string } };
 
           if (message?.type === 'GET_PROFILE') {
             return {
@@ -182,10 +182,16 @@ async function mockUserWithProfileAndSlowPartialScan(page: Page) {
           }
 
           if (message?.type === 'SCAN_START') {
+            const operationId = message.payload?.operationId;
+            if (!operationId) {
+              return originalSendMessage(msg);
+            }
+
             window.setTimeout(() => {
               emitRuntimeMessage({
                 type: 'SCAN_PARTIAL_RESULT',
                 payload: {
+                  operationId,
                   connectorId: 'free-work',
                   connectorName: 'Free-Work',
                   missions: [partialMission],
@@ -193,11 +199,14 @@ async function mockUserWithProfileAndSlowPartialScan(page: Page) {
               });
             }, 150);
 
-            return new Promise((resolve) => {
-              window.setTimeout(() => {
-                resolve({ type: 'SCAN_COMPLETE', payload: [partialMission] });
-              }, 2500);
-            });
+            window.setTimeout(() => {
+              emitRuntimeMessage({
+                type: 'SCAN_COMPLETE',
+                payload: { operationId, missions: [partialMission] },
+              });
+            }, 2500);
+
+            return { type: 'SCAN_STARTED', payload: { operationId } };
           }
 
           return originalSendMessage(msg);

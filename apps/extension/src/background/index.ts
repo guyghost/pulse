@@ -36,7 +36,13 @@ import {
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
 import { createActor, type ActorRefFrom } from 'xstate';
-import { scanLifecycleMachine, type ScanTrigger } from '../models/scan-lifecycle.machine';
+import {
+  scanLifecycleMachine,
+  type ScanCheckpoint,
+  type ScanTerminalDecision,
+  type ScanTrigger,
+} from '../models/scan-lifecycle.machine';
+import { waitForScanRecovery } from './scan-recovery';
 import { rescoreStoredMissions } from '../lib/shell/scan/rescore';
 import { getConnectorIds, getConnectors } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
@@ -47,9 +53,11 @@ import {
 } from '../lib/shell/storage/connected-alert-preferences';
 import { getAlertHistory } from '../lib/shell/storage/alert-history';
 import {
+  clearScanCheckpoint,
   setNewMissionCount,
   resetNewMissionCount,
   consumeDeepLinkIntent,
+  saveScanCheckpoint,
 } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
@@ -230,13 +238,18 @@ type ScanTerminalMessage = Extract<
 type ScanExecutionMessage = ScanTerminalMessage | Extract<BridgeMessage, { type: 'SCAN_BUSY' }>;
 type ScanStartedMessage = Extract<BridgeMessage, { type: 'SCAN_STARTED' }>;
 type ScanCancelRequestedMessage = Extract<BridgeMessage, { type: 'SCAN_CANCEL_REQUESTED' }>;
+type ScanStartRejectedMessage = Extract<BridgeMessage, { type: 'SCAN_START_REJECTED' }>;
+type ScanCancelRejectedMessage = Extract<BridgeMessage, { type: 'SCAN_CANCEL_REJECTED' }>;
 
 interface ActiveScanOperation {
   operationId: string;
   trigger: ScanTrigger;
   controller: AbortController;
   actor: ScanLifecycleActor;
+  terminalMessage: ScanTerminalMessage | null;
   terminalBroadcasted: boolean;
+  checkpointTail: Promise<void>;
+  checkpointFailure: unknown | null;
 }
 
 interface ScanExecutionOutcome {
@@ -247,6 +260,7 @@ interface ScanExecutionOutcome {
 interface ExecuteScanOptions {
   pageDelayMs: number;
   profileOverride?: import('../lib/core/types/profile').UserProfile;
+  connectorIdsOverride?: readonly string[];
   emitProgress?: boolean;
   emitPartialResults?: boolean;
 }
@@ -256,10 +270,101 @@ type BeginScanResult =
   | {
       kind: 'started';
       operation: ActiveScanOperation;
-      completion: Promise<ScanExecutionOutcome>;
+      complete: () => Promise<ScanExecutionOutcome>;
     };
 
 let activeScanOperation: ActiveScanOperation | null = null;
+const settledScanOperationIds = new Set<string>();
+
+interface ScanAdmissionState {
+  operationId: string | null;
+  observed: Promise<void>;
+  failure: unknown | null;
+  retry: (() => Promise<void>) | null;
+  retrying: boolean;
+}
+
+class ScanCommandRejectedError extends Error {
+  constructor(
+    readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ScanCommandRejectedError';
+  }
+}
+
+let scanAdmissionState: ScanAdmissionState = {
+  operationId: null,
+  observed: Promise.resolve(),
+  failure: null,
+  retry: null,
+  retrying: false,
+};
+
+function installScanAdmissionBarrier(
+  work: Promise<unknown>,
+  operationId: string,
+  retry: () => Promise<void>
+): void {
+  const state: ScanAdmissionState = {
+    operationId,
+    observed: Promise.resolve(),
+    failure: null,
+    retry,
+    retrying: false,
+  };
+  state.observed = work.then(
+    () => undefined,
+    (error: unknown) => {
+      state.failure = error;
+    }
+  );
+  scanAdmissionState = state;
+}
+
+async function waitForScanAdmission(): Promise<void> {
+  const state = scanAdmissionState;
+  await state.observed;
+  if (state.failure && state.retry && !state.retrying) {
+    state.failure = null;
+    state.retrying = true;
+    state.observed = state.retry().then(
+      () => {
+        state.retrying = false;
+      },
+      (error: unknown) => {
+        state.failure = error;
+        state.retrying = false;
+      }
+    );
+  }
+  await state.observed;
+  if (state.failure) {
+    throw new ScanCommandRejectedError(
+      'CHECKPOINT_CLEANUP_PENDING',
+      `Le checkpoint terminal de ${state.operationId ?? 'l’opération précédente'} doit être récupéré.`
+    );
+  }
+}
+
+function rememberSettledScanOperation(operationId: string): void {
+  settledScanOperationIds.add(operationId);
+  if (settledScanOperationIds.size > 32) {
+    const oldestOperationId = settledScanOperationIds.values().next().value;
+    if (typeof oldestOperationId === 'string') {
+      settledScanOperationIds.delete(oldestOperationId);
+    }
+  }
+}
+
+async function waitForScanRecoveryAndRemember(): Promise<string | null> {
+  const recoveredOperationId = await waitForScanRecovery();
+  if (recoveredOperationId) {
+    rememberSettledScanOperation(recoveredOperationId);
+  }
+  return recoveredOperationId;
+}
 
 function isCancelledScan(error: unknown, signal: AbortSignal): boolean {
   return (
@@ -275,12 +380,98 @@ function assertOperationNotCancelled(operation: ActiveScanOperation): void {
   }
 }
 
-function broadcastTerminalOnce(operation: ActiveScanOperation, message: ScanTerminalMessage): void {
+function checkpointStorageError(error: unknown): { code: 'CHECKPOINT_STORAGE'; message: string } {
+  return {
+    code: 'CHECKPOINT_STORAGE',
+    message: error instanceof Error ? error.message : 'Le checkpoint du scan est indisponible.',
+  };
+}
+
+function scanCommandRejection(error: unknown): { code: string; message: string } {
+  if (error instanceof ScanCommandRejectedError) {
+    return { code: error.code, message: error.message };
+  }
+  return checkpointStorageError(error);
+}
+
+function checkpointState(operation: ActiveScanOperation): ScanCheckpoint['state'] {
+  const state = operation.actor.getSnapshot().value;
+  if (typeof state !== 'string' || state === 'idle' || state === 'busy') {
+    throw new Error(`Cannot checkpoint scan lifecycle state: ${String(state)}`);
+  }
+  return state;
+}
+
+function terminalDecisionFromMessage(message: ScanTerminalMessage): ScanTerminalDecision {
+  if (message.type === 'SCAN_COMPLETE') {
+    return { type: 'SCAN_COMPLETE', missionIds: message.payload.missions.map(({ id }) => id) };
+  }
+  if (message.type === 'SCAN_ERROR') {
+    return {
+      type: 'SCAN_ERROR',
+      code: message.payload.code,
+      message: message.payload.message,
+    };
+  }
+  return { type: 'SCAN_CANCELLED' };
+}
+
+function createScanCheckpoint(
+  operation: ActiveScanOperation,
+  terminal: ScanTerminalDecision | null = null
+): ScanCheckpoint {
+  const snapshot = operation.actor.getSnapshot();
+  return {
+    version: 1,
+    operationId: operation.operationId,
+    state: checkpointState(operation),
+    trigger: operation.trigger,
+    connectorResults: { ...snapshot.context.connectorResults },
+    cancellationRequested: snapshot.context.cancellationRequested,
+    terminal,
+  };
+}
+
+function queueLiveCheckpoint(operation: ActiveScanOperation): void {
+  const write = saveScanCheckpoint(createScanCheckpoint(operation));
+  operation.checkpointTail = write.then(
+    () => undefined,
+    (error: unknown) => {
+      operation.checkpointFailure ??= error;
+    }
+  );
+}
+
+async function awaitQueuedCheckpoints(operation: ActiveScanOperation): Promise<void> {
+  await operation.checkpointTail;
+  if (operation.checkpointFailure) {
+    const error = checkpointStorageError(operation.checkpointFailure);
+    throw new ScanError(error.message, error.code);
+  }
+}
+
+async function persistLiveCheckpoint(operation: ActiveScanOperation): Promise<void> {
+  await awaitQueuedCheckpoints(operation);
+  try {
+    await saveScanCheckpoint(createScanCheckpoint(operation));
+  } catch (error) {
+    operation.checkpointFailure = error;
+    const storageError = checkpointStorageError(error);
+    throw new ScanError(storageError.message, storageError.code);
+  }
+}
+
+async function broadcastTerminalOnce(
+  operation: ActiveScanOperation,
+  message: ScanTerminalMessage
+): Promise<void> {
   if (operation.terminalBroadcasted) {
     return;
   }
+  operation.terminalMessage = message;
   operation.terminalBroadcasted = true;
-  chrome.runtime.sendMessage(message).catch(() => {
+  rememberSettledScanOperation(operation.operationId);
+  await chrome.runtime.sendMessage(message).catch(() => {
     // Side panel not open, ignore
   });
 }
@@ -292,28 +483,77 @@ function releaseOperationRuntime(operation: ActiveScanOperation): void {
   operation.actor.stop();
 }
 
-function settleTerminalOperation(
+async function settleTerminalOperation(
   operation: ActiveScanOperation,
-  message: ScanTerminalMessage
-): ScanTerminalMessage {
-  releaseOperationRuntime(operation);
-  broadcastTerminalOnce(operation, message);
+  message: ScanTerminalMessage,
+  afterTerminal?: () => Promise<void>
+): Promise<ScanTerminalMessage> {
+  let afterTerminalCompleted = false;
+  let afterTerminalAttempt: Promise<void> | null = null;
+  const runAfterTerminalOnce = (): Promise<void> => {
+    if (!afterTerminal || afterTerminalCompleted) {
+      return Promise.resolve();
+    }
+    afterTerminalAttempt ??= afterTerminal().then(
+      () => {
+        afterTerminalCompleted = true;
+      },
+      (error: unknown) => {
+        afterTerminalAttempt = null;
+        throw error;
+      }
+    );
+    return afterTerminalAttempt;
+  };
+  const finalize = async (): Promise<void> => {
+    try {
+      await operation.checkpointTail;
+      await saveScanCheckpoint(
+        createScanCheckpoint(operation, terminalDecisionFromMessage(message))
+      );
+      await broadcastTerminalOnce(operation, message);
+      const cleared = await clearScanCheckpoint(operation.operationId);
+      if (!cleared) {
+        throw new Error(
+          `Terminal checkpoint ${operation.operationId} was not cleared conditionally.`
+        );
+      }
+    } finally {
+      releaseOperationRuntime(operation);
+    }
+    await runAfterTerminalOnce();
+  };
+  const finalization = finalize();
+  installScanAdmissionBarrier(finalization, operation.operationId, finalize);
+  await finalization;
   return message;
 }
 
-function requestCancellation(operation: ActiveScanOperation): ScanCancelRequestedMessage {
+async function requestCancellation(
+  operation: ActiveScanOperation
+): Promise<ScanCancelRequestedMessage> {
   const snapshot = operation.actor.getSnapshot();
   if (snapshot.status === 'active' && snapshot.value !== 'cancelling') {
     operation.actor.send({ type: 'CANCEL', operationId: operation.operationId });
   }
   operation.controller.abort();
+  if (operation.actor.getSnapshot().status === 'active') {
+    try {
+      await persistLiveCheckpoint(operation);
+    } catch {
+      // The terminal checkpoint is still attempted after scanner/transaction
+      // quiescence. This rejection is retained on the operation and observed.
+    }
+  }
   return {
     type: 'SCAN_CANCEL_REQUESTED',
     payload: { operationId: operation.operationId },
   };
 }
 
-function settleCancelledAfterQuiescence(operation: ActiveScanOperation): ScanTerminalMessage {
+async function settleCancelledAfterQuiescence(
+  operation: ActiveScanOperation
+): Promise<ScanTerminalMessage> {
   if (operation.actor.getSnapshot().value === 'cancelling') {
     operation.actor.send({ type: 'ABORT_CONFIRMED', operationId: operation.operationId });
   }
@@ -375,6 +615,9 @@ function forwardScanRuntimeEvent(
       operation.actor.send({ type: 'NETWORK_OFFLINE', operationId });
       break;
   }
+  if (operation.actor.getSnapshot().status === 'active') {
+    queueLiveCheckpoint(operation);
+  }
 }
 
 async function executeAcceptedScanOperation(
@@ -386,7 +629,9 @@ async function executeAcceptedScanOperation(
   try {
     const settings = await getSettings();
     assertOperationNotCancelled(operation);
-    const connectorIds = settings.enabledConnectors;
+    const connectorIds = options.connectorIdsOverride
+      ? [...options.connectorIdsOverride]
+      : settings.enabledConnectors;
     if (connectorIds.length === 0) {
       const error = { code: 'NO_CONNECTORS', message: 'Aucun connecteur actif.' };
       actor.send({ type: 'START_FAILED', operationId, error });
@@ -394,13 +639,15 @@ async function executeAcceptedScanOperation(
         type: 'SCAN_ERROR',
         payload: { operationId, ...error },
       };
-      return { message: settleTerminalOperation(operation, message), result: null };
+      return { message: await settleTerminalOperation(operation, message), result: null };
     }
 
     actor.send({ type: 'START_READY', operationId, connectorIds });
+    await persistLiveCheckpoint(operation);
     const result = await runScan(operation.controller.signal, undefined, {
       pageDelayMs: options.pageDelayMs,
       profileOverride: options.profileOverride,
+      connectorIdsOverride: connectorIds,
       onDetailedProgress: options.emitProgress
         ? (info) => {
             if (activeScanOperation?.operationId !== operationId) {
@@ -428,6 +675,7 @@ async function executeAcceptedScanOperation(
       },
     });
     assertOperationNotCancelled(operation);
+    await awaitQueuedCheckpoints(operation);
 
     if (actor.getSnapshot().value === 'failed') {
       const message: ScanTerminalMessage = {
@@ -438,12 +686,13 @@ async function executeAcceptedScanOperation(
           message: 'Tous les connecteurs ont échoué.',
         },
       };
-      return { message: settleTerminalOperation(operation, message), result };
+      return { message: await settleTerminalOperation(operation, message), result };
     }
     if (actor.getSnapshot().value !== 'persisting') {
       throw new Error(`Invalid scan lifecycle before persistence: ${actor.getSnapshot().value}`);
     }
 
+    await persistLiveCheckpoint(operation);
     await saveMissions(result.missions, operation.controller.signal);
     actor.send({ type: 'PERSIST_SUCCEEDED', operationId });
     const committedState = actor.getSnapshot().value;
@@ -451,33 +700,37 @@ async function executeAcceptedScanOperation(
       throw new Error(`Invalid scan lifecycle after persistence: ${committedState}`);
     }
 
-    // The canonical transaction won. Release the live lease and stop the final
-    // actor before any non-canonical post-commit projection runs.
-    releaseOperationRuntime(operation);
-
-    if (trigger === 'alarm') {
-      await chrome.runtime
-        .sendMessage({ type: 'MISSIONS_UPDATED', payload: result.missions })
-        .catch(() => {
-          // Side panel not open, durable missions remain committed.
-        });
-    }
-
-    try {
-      await persistPostCommitEffects(result);
-    } catch (error) {
-      console.warn('[MissionPulse] Post-commit scan effects failed:', error);
-    }
-
     const message: ScanTerminalMessage = {
       type: 'SCAN_COMPLETE',
       payload: { operationId, missions: result.missions },
     };
-    broadcastTerminalOnce(operation, message);
+    // Claim and publish the canonical terminal synchronously before any
+    // suspendable projection. The actor can be released after terminal clear,
+    // but scan admission remains fenced until every older projection settles
+    // so its badge/status writes cannot overtake a newer scan.
+    await settleTerminalOperation(operation, message, async () => {
+      if (trigger === 'alarm') {
+        await chrome.runtime
+          .sendMessage({ type: 'MISSIONS_UPDATED', payload: result.missions })
+          .catch(() => {
+            // Side panel not open, durable missions remain committed.
+          });
+      }
+
+      try {
+        await persistPostCommitEffects(result);
+      } catch (error) {
+        console.warn('[MissionPulse] Post-commit scan effects failed:', error);
+      }
+    });
+
     return { message, result };
   } catch (error) {
+    if (actor.getSnapshot().status === 'done') {
+      throw error;
+    }
     if (isCancelledScan(error, operation.controller.signal)) {
-      return { message: settleCancelledAfterQuiescence(operation), result: null };
+      return { message: await settleCancelledAfterQuiescence(operation), result: null };
     }
 
     const scanError = {
@@ -496,15 +749,17 @@ async function executeAcceptedScanOperation(
       type: 'SCAN_ERROR',
       payload: { operationId, ...scanError },
     };
-    return { message: settleTerminalOperation(operation, message), result: null };
+    return { message: await settleTerminalOperation(operation, message), result: null };
   }
 }
 
-function beginScanOperation(
+async function beginScanOperation(
   operationId: string,
   trigger: ScanTrigger,
   options: ExecuteScanOptions
-): BeginScanResult {
+): Promise<BeginScanResult> {
+  await waitForScanRecoveryAndRemember();
+  await waitForScanAdmission();
   if (activeScanOperation) {
     return { kind: 'busy', outcome: createBusyOutcome(operationId, trigger) };
   }
@@ -517,16 +772,36 @@ function beginScanOperation(
     trigger,
     controller: new AbortController(),
     actor,
+    terminalMessage: null,
     terminalBroadcasted: false,
+    checkpointTail: Promise.resolve(),
+    checkpointFailure: null,
   };
   actor.start();
   actor.send({ type: 'START', operationId, trigger });
   activeScanOperation = operation;
 
+  try {
+    await saveScanCheckpoint(createScanCheckpoint(operation));
+  } catch (error) {
+    const startFailure = checkpointStorageError(error);
+    if (actor.getSnapshot().value === 'starting') {
+      actor.send({ type: 'START_FAILED', operationId, error: startFailure });
+    }
+    releaseOperationRuntime(operation);
+    throw new ScanCommandRejectedError(startFailure.code, startFailure.message);
+  }
+
+  let completion: Promise<ScanExecutionOutcome> | null = null;
+  const complete = (): Promise<ScanExecutionOutcome> => {
+    completion ??= executeAcceptedScanOperation(operation, options);
+    return completion;
+  };
+
   return {
     kind: 'started',
     operation,
-    completion: executeAcceptedScanOperation(operation, options),
+    complete,
   };
 }
 
@@ -535,8 +810,8 @@ async function executeScanOperation(
   trigger: ScanTrigger,
   options: ExecuteScanOptions
 ): Promise<ScanExecutionOutcome> {
-  const begun = beginScanOperation(operationId, trigger, options);
-  return begun.kind === 'busy' ? begun.outcome : begun.completion;
+  const begun = await beginScanOperation(operationId, trigger, options);
+  return begun.kind === 'busy' ? begun.outcome : begun.complete();
 }
 
 /**
@@ -568,11 +843,11 @@ async function recheckConnectorHealth(
     : settings.enabledConnectors;
 
   await resetHealthSnapshot(connectorId);
-  await setSettings({ ...settings, enabledConnectors: [connectorId] });
 
   try {
     const outcome = await executeScanOperation(crypto.randomUUID(), 'manual', {
       pageDelayMs: 300,
+      connectorIdsOverride: [connectorId],
     });
     if (outcome.message.type === 'SCAN_BUSY') {
       throw new ScanError('Un scan est déjà en cours. Veuillez patienter.', 'MUTEX');
@@ -585,7 +860,9 @@ async function recheckConnectorHealth(
     }
     return outcome.result?.missions ?? [];
   } finally {
-    await setSettings({ ...settings, enabledConnectors: persistedEnabled });
+    if (enable) {
+      await setSettings({ ...settings, enabledConnectors: persistedEnabled });
+    }
   }
 }
 
@@ -1259,43 +1536,71 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     // ── Scan orchestration (panel → service worker) ──
 
     if (message.type === 'SCAN_START') {
-      const begun = beginScanOperation(message.payload.operationId, 'manual', {
+      void beginScanOperation(message.payload.operationId, 'manual', {
         pageDelayMs: 300,
         emitProgress: true,
         emitPartialResults: true,
-      });
-      if (begun.kind === 'busy') {
-        sendResponse(begun.outcome.message);
-        return false;
-      }
-      const acknowledgement: ScanStartedMessage = {
-        type: 'SCAN_STARTED',
-        payload: { operationId: message.payload.operationId },
-      };
-      sendResponse(acknowledgement);
-      void begun.completion.catch((error) => {
-        // executeAcceptedScanOperation owns terminal settlement. This catch is a
-        // last-resort boundary for an unexpected programming failure.
-        console.error('[MissionPulse] SCAN_START completion error:', error);
-      });
-      return false;
+      })
+        .then((begun) => {
+          if (begun.kind === 'busy') {
+            sendResponse(begun.outcome.message);
+            return;
+          }
+          const acknowledgement: ScanStartedMessage = {
+            type: 'SCAN_STARTED',
+            payload: { operationId: message.payload.operationId },
+          };
+          sendResponse(acknowledgement);
+          void begun.complete().catch((error) => {
+            // executeAcceptedScanOperation owns terminal settlement. This catch
+            // is a last-resort boundary for an unexpected programming failure.
+            console.error('[MissionPulse] SCAN_START completion error:', error);
+          });
+        })
+        .catch((error: unknown) => {
+          const rejection = scanCommandRejection(error);
+          const response: ScanStartRejectedMessage = {
+            type: 'SCAN_START_REJECTED',
+            payload: { operationId: message.payload.operationId, ...rejection },
+          };
+          sendResponse(response);
+        });
+      return true;
     }
 
     if (message.type === 'SCAN_CANCEL') {
-      const operation = activeScanOperation;
-      if (!operation || operation.operationId !== message.payload.operationId) {
-        sendResponse({
-          type: 'SCAN_ERROR',
-          payload: {
-            operationId: message.payload.operationId,
-            code: 'STALE_OPERATION',
-            message: 'Aucun scan actif ne correspond à cette opération.',
-          },
+      void (async (): Promise<ScanCancelRequestedMessage> => {
+        await waitForScanRecoveryAndRemember();
+        await waitForScanAdmission();
+        const operation = activeScanOperation;
+        if (
+          settledScanOperationIds.has(message.payload.operationId) ||
+          (operation?.operationId === message.payload.operationId &&
+            (operation.terminalMessage || operation.actor.getSnapshot().status === 'done'))
+        ) {
+          return {
+            type: 'SCAN_CANCEL_REQUESTED',
+            payload: { operationId: message.payload.operationId },
+          };
+        }
+        if (!operation || operation.operationId !== message.payload.operationId) {
+          throw new ScanCommandRejectedError(
+            'STALE_OPERATION',
+            'Aucun scan actif ne correspond à cette opération.'
+          );
+        }
+        return requestCancellation(operation);
+      })()
+        .then(sendResponse)
+        .catch((error: unknown) => {
+          const rejection = scanCommandRejection(error);
+          const response: ScanCancelRejectedMessage = {
+            type: 'SCAN_CANCEL_REJECTED',
+            payload: { operationId: message.payload.operationId, ...rejection },
+          };
+          sendResponse(response);
         });
-        return false;
-      }
-      sendResponse(requestCancellation(operation));
-      return false;
+      return true;
     }
 
     if (message.type === 'GET_CONNECTOR_HEALTH') {
@@ -1824,25 +2129,13 @@ chrome.runtime.onInstalled.addListener(async (details) => {
       );
     }
 
-    // Temporarily restrict scan to only connectors with active sessions
-    const previousEnabled = settings.enabledConnectors;
-    await setSettings({ ...settings, enabledConnectors: activeConnectorIds });
-
     // Run silent scan with an explicit default profile so missions are scored
     // even before the user completes onboarding.
-    let outcome: ScanExecutionOutcome;
-    try {
-      outcome = await executeScanOperation(crypto.randomUUID(), 'first_scan', {
-        pageDelayMs: 300,
-        profileOverride: createDefaultProfile(),
-      });
-    } finally {
-      // Restore previous connector list
-      await setSettings({
-        ...settings,
-        enabledConnectors: previousEnabled.length > 0 ? previousEnabled : activeConnectorIds,
-      });
-    }
+    const outcome = await executeScanOperation(crypto.randomUUID(), 'first_scan', {
+      pageDelayMs: 300,
+      profileOverride: createDefaultProfile(),
+      connectorIdsOverride: activeConnectorIds,
+    });
 
     if (outcome.message.type === 'SCAN_COMPLETE' && outcome.result?.missions.length) {
       await setFirstScanDone();

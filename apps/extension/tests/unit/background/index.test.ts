@@ -21,6 +21,9 @@ const setNewMissionCount = vi.fn();
 const resetNewMissionCount = vi.fn();
 const setDeepLinkIntent = vi.fn();
 const consumeDeepLinkIntent = vi.fn();
+const saveScanCheckpoint = vi.fn();
+const clearScanCheckpoint = vi.fn();
+const waitForScanRecovery = vi.fn();
 const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
 const getProfile = vi.fn();
@@ -275,6 +278,12 @@ vi.mock('../../../src/lib/shell/storage/session-storage', () => ({
   resetNewMissionCount,
   setDeepLinkIntent,
   consumeDeepLinkIntent,
+  saveScanCheckpoint,
+  clearScanCheckpoint,
+}));
+
+vi.mock('../../../src/background/scan-recovery', () => ({
+  waitForScanRecovery,
 }));
 
 vi.mock('../../../src/lib/shell/storage/tracking', () => ({
@@ -354,6 +363,7 @@ describe('background auto-scan notifications', () => {
     getFeedTourSeen.mockResolvedValue(false);
     setFeedTourSeen.mockResolvedValue(undefined);
     clearFeedTourSeen.mockResolvedValue(undefined);
+    waitForScanRecovery.mockResolvedValue(undefined);
     await import('../../../src/background/index.ts');
   });
 
@@ -393,6 +403,9 @@ describe('background auto-scan notifications', () => {
     resetNewMissionCount.mockResolvedValue(undefined);
     setDeepLinkIntent.mockResolvedValue(undefined);
     consumeDeepLinkIntent.mockResolvedValue(null);
+    saveScanCheckpoint.mockResolvedValue(undefined);
+    clearScanCheckpoint.mockResolvedValue(true);
+    waitForScanRecovery.mockResolvedValue(undefined);
     getConnectorStatuses.mockResolvedValue([]);
     getFavorites.mockResolvedValue({});
     saveFavorites.mockResolvedValue(undefined);
@@ -540,10 +553,12 @@ describe('background auto-scan notifications', () => {
         {},
         busyResponse
       )
-    ).toBe(false);
-    expect(busyResponse).toHaveBeenCalledWith({
-      type: 'SCAN_BUSY',
-      payload: { operationId: 'operation-rejected', activeOperationId: 'operation-active' },
+    ).toBe(true);
+    await vi.waitFor(() => {
+      expect(busyResponse).toHaveBeenCalledWith({
+        type: 'SCAN_BUSY',
+        payload: { operationId: 'operation-rejected', activeOperationId: 'operation-active' },
+      });
     });
     expect(runScan).toHaveBeenCalledTimes(1);
 
@@ -552,9 +567,12 @@ describe('background auto-scan notifications', () => {
       {},
       staleCancelResponse
     );
+    await vi.waitFor(() => {
+      expect(staleCancelResponse).toHaveBeenCalled();
+    });
     expect(activeSignal?.aborted).toBe(false);
     expect(staleCancelResponse).toHaveBeenCalledWith({
-      type: 'SCAN_ERROR',
+      type: 'SCAN_CANCEL_REJECTED',
       payload: {
         operationId: 'operation-rejected',
         code: 'STALE_OPERATION',
@@ -717,6 +735,401 @@ describe('background auto-scan notifications', () => {
     expect(saveConnectorStatuses).not.toHaveBeenCalled();
     expect(setNewMissionCount).not.toHaveBeenCalled();
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
+  });
+
+  it('publishes committed completion before deferred projections and makes late cancel a no-op', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let releaseProjection: (() => void) | undefined;
+    const projectionSettled = new Promise<void>((resolve) => {
+      releaseProjection = resolve;
+    });
+    recordTJMFromMissions.mockImplementationOnce(() => projectionSettled);
+    const missions = [makeMission({ id: 'mission-committed-before-projections' })];
+    runScan.mockImplementationOnce(
+      successfulScanImplementation({
+        missions,
+        sourceMissions: missions,
+        duplicateRelations: [],
+        errors: [],
+      })
+    );
+
+    const startResponse = vi.fn();
+    const cancelResponse = vi.fn();
+    const secondStartResponse = vi.fn();
+    const postProjectionCancelResponse = vi.fn();
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-committed', trigger: 'manual' },
+      },
+      {},
+      startResponse
+    );
+    await vi.waitFor(() => {
+      expect(recordTJMFromMissions).toHaveBeenCalledTimes(1);
+    });
+
+    const terminalsBeforeProjection = vi
+      .mocked(chrome.runtime.sendMessage)
+      .mock.calls.map(([message]) => message)
+      .filter(
+        (message) =>
+          typeof message === 'object' &&
+          message !== null &&
+          ['SCAN_COMPLETE', 'SCAN_ERROR', 'SCAN_CANCELLED'].includes(
+            (message as { type?: string }).type ?? ''
+          )
+      );
+
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-committed' } },
+      {},
+      cancelResponse
+    );
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-after-projections', trigger: 'manual' },
+      },
+      {},
+      secondStartResponse
+    );
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    const secondStartAcknowledgedBeforeProjection = secondStartResponse.mock.calls.length > 0;
+    const scanCallsBeforeProjection = runScan.mock.calls.length;
+    releaseProjection?.();
+    await vi.waitFor(() => {
+      expect(secondStartResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-after-projections' },
+      });
+      expect(runScan).toHaveBeenCalledTimes(2);
+    });
+    expect(saveConnectorStatuses).toHaveBeenCalled();
+    await vi.waitFor(() => {
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-after-projections');
+    });
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-committed' } },
+      {},
+      postProjectionCancelResponse
+    );
+    await vi.waitFor(() => {
+      expect(postProjectionCancelResponse).toHaveBeenCalled();
+    });
+
+    expect(startResponse).toHaveBeenCalledWith({
+      type: 'SCAN_STARTED',
+      payload: { operationId: 'operation-committed' },
+    });
+    expect(terminalsBeforeProjection).toEqual([
+      {
+        type: 'SCAN_COMPLETE',
+        payload: { operationId: 'operation-committed', missions },
+      },
+    ]);
+    const terminalCheckpointCallIndex = saveScanCheckpoint.mock.calls.findIndex(
+      ([checkpoint]) =>
+        checkpoint.operationId === 'operation-committed' &&
+        checkpoint.terminal?.type === 'SCAN_COMPLETE'
+    );
+    const terminalBroadcastCallIndex = vi
+      .mocked(chrome.runtime.sendMessage)
+      .mock.calls.findIndex(
+        ([message]) =>
+          typeof message === 'object' &&
+          message !== null &&
+          (message as { type?: string }).type === 'SCAN_COMPLETE'
+      );
+    expect(terminalCheckpointCallIndex).toBeGreaterThanOrEqual(0);
+    expect(terminalBroadcastCallIndex).toBeGreaterThanOrEqual(0);
+    expect(saveScanCheckpoint.mock.calls[terminalCheckpointCallIndex]?.[0]).toMatchObject({
+      state: 'completed',
+      terminal: {
+        type: 'SCAN_COMPLETE',
+        missionIds: ['mission-committed-before-projections'],
+      },
+    });
+    expect(saveScanCheckpoint.mock.invocationCallOrder[terminalCheckpointCallIndex]).toBeLessThan(
+      vi.mocked(chrome.runtime.sendMessage).mock.invocationCallOrder[terminalBroadcastCallIndex]
+    );
+    expect(
+      vi.mocked(chrome.runtime.sendMessage).mock.invocationCallOrder[terminalBroadcastCallIndex]
+    ).toBeLessThan(clearScanCheckpoint.mock.invocationCallOrder[0]);
+    expect(clearScanCheckpoint.mock.invocationCallOrder[0]).toBeLessThan(
+      recordTJMFromMissions.mock.invocationCallOrder[0]
+    );
+    expect(secondStartAcknowledgedBeforeProjection).toBe(false);
+    expect(scanCallsBeforeProjection).toBe(1);
+    expect(cancelResponse).toHaveBeenCalledWith({
+      type: 'SCAN_CANCEL_REQUESTED',
+      payload: { operationId: 'operation-committed' },
+    });
+    expect(postProjectionCancelResponse).toHaveBeenCalledWith({
+      type: 'SCAN_CANCEL_REQUESTED',
+      payload: { operationId: 'operation-committed' },
+    });
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_ERROR' })
+    );
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_CANCELLED' })
+    );
+    expect(purgeOldMissions).toHaveBeenCalled();
+  });
+
+  it('awaits the starting checkpoint before acknowledging or launching scanner work', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let releaseStartingCheckpoint: (() => void) | undefined;
+    let observeStartingCheckpoint: (() => void) | undefined;
+    const startingCheckpointObserved = new Promise<void>((resolve) => {
+      observeStartingCheckpoint = resolve;
+    });
+    saveScanCheckpoint.mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          observeStartingCheckpoint?.();
+          releaseStartingCheckpoint = resolve;
+        })
+    );
+    const sendResponse = vi.fn();
+
+    const listenerResult = messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-checkpointed-start', trigger: 'manual' },
+      },
+      {},
+      sendResponse
+    );
+    await startingCheckpointObserved;
+    await Promise.resolve();
+
+    expect(listenerResult).toBe(true);
+    expect(sendResponse).not.toHaveBeenCalled();
+    expect(runScan).not.toHaveBeenCalled();
+    expect(saveScanCheckpoint).toHaveBeenNthCalledWith(
+      1,
+      expect.objectContaining({
+        version: 1,
+        operationId: 'operation-checkpointed-start',
+        state: 'starting',
+        terminal: null,
+      })
+    );
+
+    releaseStartingCheckpoint?.();
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-checkpointed-start' },
+      });
+    });
+    await vi.waitFor(() => {
+      expect(runScan).toHaveBeenCalledTimes(1);
+    });
+    await vi.waitFor(() => {
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-checkpointed-start');
+    });
+  });
+
+  it('does not overwrite the recovered operation while a concurrent start awaits the bootstrap gate', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let releaseRecovery: (() => void) | undefined;
+    const recoveryGate = new Promise<void>((resolve) => {
+      releaseRecovery = resolve;
+    });
+    waitForScanRecovery.mockReturnValueOnce(recoveryGate);
+    const sendResponse = vi.fn();
+
+    const listenerResult = messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-after-recovery', trigger: 'manual' },
+      },
+      {},
+      sendResponse
+    );
+    await Promise.resolve();
+
+    expect(listenerResult).toBe(true);
+    expect(saveScanCheckpoint).not.toHaveBeenCalled();
+    expect(runScan).not.toHaveBeenCalled();
+    expect(sendResponse).not.toHaveBeenCalled();
+
+    releaseRecovery?.();
+    await vi.waitFor(() => {
+      expect(saveScanCheckpoint).toHaveBeenNthCalledWith(
+        1,
+        expect.objectContaining({
+          operationId: 'operation-after-recovery',
+          state: 'starting',
+        })
+      );
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-after-recovery' },
+      });
+    });
+    await vi.waitFor(() => {
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-after-recovery');
+    });
+  });
+
+  it('rejects a start non-terminally when its starting checkpoint cannot be stored', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    saveScanCheckpoint.mockRejectedValueOnce(new Error('session storage unavailable'));
+    const sendResponse = vi.fn();
+
+    const listenerResult = messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-checkpoint-failed', trigger: 'manual' },
+      },
+      {},
+      sendResponse
+    );
+
+    expect(listenerResult).toBe(true);
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'SCAN_START_REJECTED',
+        payload: {
+          operationId: 'operation-checkpoint-failed',
+          code: 'CHECKPOINT_STORAGE',
+          message: 'session storage unavailable',
+        },
+      });
+    });
+    expect(runScan).not.toHaveBeenCalled();
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_ERROR' })
+    );
+  });
+
+  it('retries bootstrap recovery after one rejected start command', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    waitForScanRecovery
+      .mockRejectedValueOnce(new Error('recovery read failed'))
+      .mockResolvedValueOnce(null);
+    const firstResponse = vi.fn();
+    const secondResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-recovery-first', trigger: 'manual' },
+      },
+      {},
+      firstResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(firstResponse).toHaveBeenCalledWith({
+        type: 'SCAN_START_REJECTED',
+        payload: {
+          operationId: 'operation-recovery-first',
+          code: 'CHECKPOINT_STORAGE',
+          message: 'recovery read failed',
+        },
+      });
+    });
+    expect(saveScanCheckpoint).not.toHaveBeenCalled();
+    expect(runScan).not.toHaveBeenCalled();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-recovery-second', trigger: 'manual' },
+      },
+      {},
+      secondResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(secondResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-recovery-second' },
+      });
+      expect(runScan).toHaveBeenCalledTimes(1);
+    });
+  });
+
+  it('waits for recovery before acknowledging a cancel for the recovered terminal id', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let releaseRecovery: ((operationId: string) => void) | undefined;
+    waitForScanRecovery.mockReturnValueOnce(
+      new Promise<string>((resolve) => {
+        releaseRecovery = resolve;
+      })
+    );
+    const sendResponse = vi.fn();
+
+    const handled = messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-recovered-terminal' } },
+      {},
+      sendResponse
+    );
+    await Promise.resolve();
+
+    expect(handled).toBe(true);
+    expect(sendResponse).not.toHaveBeenCalled();
+    releaseRecovery?.('operation-recovered-terminal');
+
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'SCAN_CANCEL_REQUESTED',
+        payload: { operationId: 'operation-recovered-terminal' },
+      });
+    });
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_ERROR' })
+    );
+  });
+
+  it('scopes a health recheck connector without mutating global settings', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+    runScan.mockImplementationOnce(
+      async (
+        _signal?: AbortSignal,
+        _onProgress?: (info: ScanProgressInfo) => void,
+        options?: ScanOptions
+      ) => {
+        const missions = [makeMission({ id: 'health-recheck-mission', source: 'lehibou' })];
+        options?.onLifecycleEvent?.({ type: 'CONNECTOR_STARTED', connectorId: 'lehibou' });
+        options?.onLifecycleEvent?.({
+          type: 'CONNECTOR_SUCCEEDED',
+          connectorId: 'lehibou',
+          missions,
+        });
+        return { missions, sourceMissions: missions, duplicateRelations: [], errors: [] };
+      }
+    );
+
+    const handled = messageListener?.(
+      {
+        type: 'RECHECK_CONNECTOR_HEALTH',
+        payload: { connectorId: 'lehibou', enable: false },
+      },
+      {},
+      sendResponse
+    );
+
+    expect(handled).toBe(true);
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalledWith({
+        type: 'CONNECTOR_HEALTH_RESULT',
+        payload: [],
+      });
+    });
+    expect(runScan).toHaveBeenCalledWith(
+      expect.any(AbortSignal),
+      undefined,
+      expect.objectContaining({ connectorIdsOverride: ['lehibou'] })
+    );
+    expect(setSettings).not.toHaveBeenCalled();
   });
 
   it('saves profiles through the service worker and rescored missions locally', async () => {
@@ -1613,5 +2026,265 @@ describe('background auto-scan notifications', () => {
         payload: existing,
       });
     });
+  });
+
+  it('retries idempotent terminal finalization before admitting the next start', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    clearScanCheckpoint.mockRejectedValueOnce(new Error('session remove failed'));
+    const firstResponse = vi.fn();
+    const secondResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-cleanup-blocker', trigger: 'manual' },
+      },
+      {},
+      firstResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(firstResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-cleanup-blocker' },
+      });
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-cleanup-blocker');
+    });
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-after-cleanup-failure', trigger: 'manual' },
+      },
+      {},
+      secondResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(secondResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-after-cleanup-failure' },
+      });
+      expect(runScan).toHaveBeenCalledTimes(2);
+    });
+    await vi.waitFor(() => {
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-after-cleanup-failure');
+      expect(purgeOldMissions).toHaveBeenCalledTimes(2);
+    });
+
+    const oldTerminalWrites = saveScanCheckpoint.mock.calls.filter(
+      ([checkpoint]) =>
+        checkpoint.operationId === 'operation-cleanup-blocker' && checkpoint.terminal !== null
+    );
+    const oldClearCalls = clearScanCheckpoint.mock.calls.filter(
+      ([operationId]) => operationId === 'operation-cleanup-blocker'
+    );
+    const newStartingWriteIndex = saveScanCheckpoint.mock.calls.findIndex(
+      ([checkpoint]) =>
+        checkpoint.operationId === 'operation-after-cleanup-failure' &&
+        checkpoint.state === 'starting'
+    );
+    const oldRetryClearIndex = clearScanCheckpoint.mock.calls.findLastIndex(
+      ([operationId]) => operationId === 'operation-cleanup-blocker'
+    );
+
+    expect(oldTerminalWrites).toHaveLength(2);
+    expect(oldClearCalls).toHaveLength(2);
+    expect(newStartingWriteIndex).toBeGreaterThanOrEqual(0);
+    expect(oldRetryClearIndex).toBeGreaterThanOrEqual(0);
+    expect(clearScanCheckpoint.mock.invocationCallOrder[oldRetryClearIndex]).toBeLessThan(
+      saveScanCheckpoint.mock.invocationCallOrder[newStartingWriteIndex]
+    );
+    expect(
+      vi
+        .mocked(chrome.runtime.sendMessage)
+        .mock.calls.filter(
+          ([message]) =>
+            typeof message === 'object' &&
+            message !== null &&
+            (message as { type?: string; payload?: { operationId?: string } }).type ===
+              'SCAN_COMPLETE' &&
+            (message as { payload?: { operationId?: string } }).payload?.operationId ===
+              'operation-cleanup-blocker'
+        )
+    ).toHaveLength(1);
+  });
+
+  it('retries a pre-broadcast terminal save before acknowledging late cancel as a no-op', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    let terminalSaveFailed = false;
+    saveScanCheckpoint.mockImplementation(async (checkpoint) => {
+      if (
+        checkpoint.operationId === 'operation-save-fail-once' &&
+        checkpoint.terminal !== null &&
+        !terminalSaveFailed
+      ) {
+        terminalSaveFailed = true;
+        throw new Error('terminal save failed once');
+      }
+    });
+    const startResponse = vi.fn();
+    const cancelResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-save-fail-once', trigger: 'manual' },
+      },
+      {},
+      startResponse
+    );
+    await vi.waitFor(() => {
+      expect(startResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-save-fail-once' },
+      });
+      expect(
+        saveScanCheckpoint.mock.calls.some(
+          ([checkpoint]) =>
+            checkpoint.operationId === 'operation-save-fail-once' && checkpoint.terminal !== null
+        )
+      ).toBe(true);
+    });
+
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-save-fail-once' } },
+      {},
+      cancelResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(cancelResponse).toHaveBeenCalledWith({
+        type: 'SCAN_CANCEL_REQUESTED',
+        payload: { operationId: 'operation-save-fail-once' },
+      });
+    });
+    expect(
+      vi
+        .mocked(chrome.runtime.sendMessage)
+        .mock.calls.filter(
+          ([message]) =>
+            typeof message === 'object' &&
+            message !== null &&
+            (message as { type?: string; payload?: { operationId?: string } }).type ===
+              'SCAN_COMPLETE' &&
+            (message as { payload?: { operationId?: string } }).payload?.operationId ===
+              'operation-save-fail-once'
+        )
+    ).toHaveLength(1);
+    expect(cancelResponse).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'SCAN_CANCEL_REJECTED' })
+    );
+  });
+
+  it('rejects a new start while terminal checkpoint cleanup keeps failing', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    clearScanCheckpoint.mockRejectedValue(new Error('session remove still failing'));
+    const firstResponse = vi.fn();
+    const secondResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-persistent-blocker', trigger: 'manual' },
+      },
+      {},
+      firstResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(firstResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-persistent-blocker' },
+      });
+      expect(clearScanCheckpoint).toHaveBeenCalledWith('operation-persistent-blocker');
+    });
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-still-blocked', trigger: 'manual' },
+      },
+      {},
+      secondResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(secondResponse).toHaveBeenCalledWith({
+        type: 'SCAN_START_REJECTED',
+        payload: {
+          operationId: 'operation-still-blocked',
+          code: 'CHECKPOINT_CLEANUP_PENDING',
+          message: 'Le checkpoint terminal de operation-persistent-blocker doit être récupéré.',
+        },
+      });
+    });
+    expect(
+      saveScanCheckpoint.mock.calls.some(
+        ([checkpoint]) => checkpoint.operationId === 'operation-still-blocked'
+      )
+    ).toBe(false);
+    expect(runScan).toHaveBeenCalledTimes(1);
+  });
+
+  it('rejects late cancel as cleanup-pending when pre-broadcast terminal save keeps failing', async () => {
+    vi.resetModules();
+    await import('../../../src/background/index.ts');
+    expect(messageListener).toBeTypeOf('function');
+    saveScanCheckpoint.mockImplementation(async (checkpoint) => {
+      if (checkpoint.operationId === 'operation-save-persistent' && checkpoint.terminal !== null) {
+        throw new Error('terminal save still failing');
+      }
+    });
+    const startResponse = vi.fn();
+    const cancelResponse = vi.fn();
+
+    messageListener?.(
+      {
+        type: 'SCAN_START',
+        payload: { operationId: 'operation-save-persistent', trigger: 'manual' },
+      },
+      {},
+      startResponse
+    );
+    await vi.waitFor(() => {
+      expect(startResponse).toHaveBeenCalledWith({
+        type: 'SCAN_STARTED',
+        payload: { operationId: 'operation-save-persistent' },
+      });
+      expect(
+        saveScanCheckpoint.mock.calls.some(
+          ([checkpoint]) =>
+            checkpoint.operationId === 'operation-save-persistent' && checkpoint.terminal !== null
+        )
+      ).toBe(true);
+    });
+
+    messageListener?.(
+      { type: 'SCAN_CANCEL', payload: { operationId: 'operation-save-persistent' } },
+      {},
+      cancelResponse
+    );
+
+    await vi.waitFor(() => {
+      expect(cancelResponse).toHaveBeenCalledWith({
+        type: 'SCAN_CANCEL_REJECTED',
+        payload: {
+          operationId: 'operation-save-persistent',
+          code: 'CHECKPOINT_CLEANUP_PENDING',
+          message: 'Le checkpoint terminal de operation-save-persistent doit être récupéré.',
+        },
+      });
+    });
+    expect(cancelResponse).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        payload: expect.objectContaining({ code: 'STALE_OPERATION' }),
+      })
+    );
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({
+        type: expect.stringMatching(/^SCAN_(?:COMPLETE|ERROR|CANCELLED)$/),
+      })
+    );
   });
 });

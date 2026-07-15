@@ -647,7 +647,7 @@ function createChromeStubs() {
             const operationId = (message.payload as { operationId: string }).operationId;
             if (!activeDevScan || activeDevScan.operationId !== operationId) {
               return {
-                type: 'SCAN_ERROR',
+                type: 'SCAN_CANCEL_REJECTED',
                 payload: {
                   operationId,
                   code: 'STALE_OPERATION',
@@ -660,9 +660,9 @@ function createChromeStubs() {
             }
             const cancelled = { type: 'SCAN_CANCELLED', payload: { operationId } };
             activeDevScan = null;
-            queueMicrotask(() => {
+            setTimeout(() => {
               emitRuntimeMessage(cancelled);
-            });
+            }, 0);
             return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
           }
           case 'GET_TRACKINGS': {

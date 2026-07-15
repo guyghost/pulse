@@ -183,16 +183,38 @@ function isScanStartedResponse(
   );
 }
 
-function isScanErrorResponse(response: unknown): response is {
-  type: 'SCAN_ERROR';
+function isScanStartRejectedResponse(response: unknown): response is {
+  type: 'SCAN_START_REJECTED';
   payload: { operationId: string; message: string; code: string };
 } {
-  if (!isRecord(response) || response.type !== 'SCAN_ERROR') {
+  if (!isRecord(response) || response.type !== 'SCAN_START_REJECTED') {
     return false;
   }
 
   const payload = response.payload;
-  return isRecord(payload) && typeof payload.operationId === 'string';
+  return (
+    isRecord(payload) &&
+    typeof payload.operationId === 'string' &&
+    typeof payload.message === 'string' &&
+    typeof payload.code === 'string'
+  );
+}
+
+function isScanCancelRejectedResponse(response: unknown): response is {
+  type: 'SCAN_CANCEL_REJECTED';
+  payload: { operationId: string; message: string; code: string };
+} {
+  if (!isRecord(response) || response.type !== 'SCAN_CANCEL_REJECTED') {
+    return false;
+  }
+
+  const payload = response.payload;
+  return (
+    isRecord(payload) &&
+    typeof payload.operationId === 'string' &&
+    typeof payload.message === 'string' &&
+    typeof payload.code === 'string'
+  );
 }
 
 function isScanCancelRequestedResponse(
@@ -383,13 +405,11 @@ export function createFeedController(feedStore: {
       if (isScanBusyResponse(response) && response.payload.operationId === operationId) {
         feedStore.setError('Un scan est déjà en cours. Veuillez patienter.');
         finishScanLifecycle(operationId);
-      } else if (isScanErrorResponse(response) && response.payload.operationId === operationId) {
-        const message =
-          typeof response.payload.message === 'string'
-            ? response.payload.message
-            : 'Erreur inattendue lors du scan.';
-        const code = typeof response.payload.code === 'string' ? response.payload.code : 'UNKNOWN';
-        feedStore.setError(humanizeScanError(message, code));
+      } else if (
+        isScanStartRejectedResponse(response) &&
+        response.payload.operationId === operationId
+      ) {
+        feedStore.setError(humanizeScanError(response.payload.message, response.payload.code));
         finishScanLifecycle(operationId);
       } else {
         await recoverFromUnsettledScanResponse(response);
@@ -409,7 +429,7 @@ export function createFeedController(feedStore: {
 
   async function stopScan(): Promise<void> {
     const operationId = activeScanOperationId;
-    if (!operationId) {
+    if (!operationId || terminalClaimedOperationId === operationId) {
       return;
     }
 
@@ -418,19 +438,18 @@ export function createFeedController(feedStore: {
         type: 'SCAN_CANCEL',
         payload: { operationId },
       });
+      if (activeScanOperationId !== operationId || terminalClaimedOperationId === operationId) {
+        return;
+      }
       if (isScanCancelRequestedResponse(response) && response.payload.operationId === operationId) {
         return;
       }
-      if (isScanErrorResponse(response) && response.payload.operationId === operationId) {
-        const message =
-          typeof response.payload.message === 'string'
-            ? response.payload.message
-            : "Impossible d'annuler le scan en cours.";
-        feedStore.setError(message);
+      if (isScanCancelRejectedResponse(response) && response.payload.operationId === operationId) {
+        feedStore.setError(response.payload.message);
         finishScanLifecycle(operationId);
       }
     } catch (error) {
-      if (activeScanOperationId === operationId) {
+      if (activeScanOperationId === operationId && terminalClaimedOperationId !== operationId) {
         feedStore.setError(
           error instanceof Error ? error.message : "Impossible d'annuler le scan en cours."
         );

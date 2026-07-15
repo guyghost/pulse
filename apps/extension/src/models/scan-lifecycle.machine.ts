@@ -27,12 +27,19 @@ export interface ScanLifecycleError {
   message: string;
 }
 
+export type ScanTerminalDecision =
+  | { type: 'SCAN_COMPLETE'; missionIds: readonly string[] }
+  | { type: 'SCAN_ERROR'; code: string; message: string }
+  | { type: 'SCAN_CANCELLED' };
+
 export interface ScanCheckpoint {
+  version: 1;
   operationId: string;
   state: Exclude<ScanLifecycleState, 'idle' | 'busy'>;
   trigger: ScanTrigger;
   connectorResults: Readonly<Record<string, 'pending' | 'running' | 'succeeded' | 'failed'>>;
   cancellationRequested: boolean;
+  terminal: ScanTerminalDecision | null;
 }
 
 export interface ScanLifecycleContext {

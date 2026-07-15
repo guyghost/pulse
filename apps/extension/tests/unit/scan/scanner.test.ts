@@ -118,7 +118,7 @@ if (typeof chrome === 'undefined') {
 
 // ── Imports (after mocks) ────────────────────────────────────────────────
 
-import { runScan, ScanError } from '../../../src/lib/shell/scan/scanner';
+import { isScanRunning, runScan, ScanError } from '../../../src/lib/shell/scan/scanner';
 import { getConnectors, getConnector } from '../../../src/lib/shell/connectors/index';
 import { getSettings } from '../../../src/lib/shell/storage/chrome-storage';
 import { getProfile, purgeOldMissions, saveMissions } from '../../../src/lib/shell/storage/db';
@@ -234,6 +234,28 @@ describe('scanner — runScan', () => {
     expect(result.errors).toHaveLength(0);
     expect(result.missions[0].id).toBe('mission-1');
     expect(result.missions[1].id).toBe('mission-2');
+  });
+
+  it('uses the admitted operation connector override instead of global settings', async () => {
+    const globalConnector = makeConnector('free-work', 'Free-Work', [makeMission()]);
+    const operationConnector = makeConnector('lehibou', 'LeHibou', [
+      makeMission({ id: 'operation-scoped-mission', source: 'lehibou' }),
+    ]);
+
+    (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work']));
+    (getConnector as Mock).mockImplementation(async (connectorId: string) =>
+      connectorId === 'lehibou' ? operationConnector : globalConnector
+    );
+    (getConnectors as Mock).mockResolvedValue([operationConnector]);
+
+    const result = await runScan(undefined, undefined, {
+      connectorIdsOverride: ['lehibou'],
+    });
+
+    expect(getConnectors).toHaveBeenCalledWith(['lehibou']);
+    expect(operationConnector.fetchMissions).toHaveBeenCalledTimes(1);
+    expect(globalConnector.fetchMissions).not.toHaveBeenCalled();
+    expect(result.missions.map(({ id }) => id)).toEqual(['operation-scoped-mission']);
   });
 
   it('scores missions with the default profile when no saved profile exists', async () => {
@@ -364,6 +386,157 @@ describe('scanner — runScan', () => {
     expect(lifecycleEvents[1]).toEqual(
       expect.objectContaining({ type: 'CONNECTOR_FAILED', retryable: true })
     );
+  });
+
+  it('retains the mutex and cancellation until every started connector cleanup settles', async () => {
+    const lifecycleEvents: string[] = [];
+    let releaseSecondCleanup: (() => void) | undefined;
+    let secondObservedAbort = false;
+    let observeFirstAbort: (() => void) | undefined;
+    const firstAbortObserved = new Promise<void>((resolve) => {
+      observeFirstAbort = resolve;
+    });
+    const firstConnector: PlatformConnector = {
+      ...makeConnector('free-work', 'Free-Work', []),
+      fetchMissions: vi.fn(
+        (_now: number, _context?: ConnectorSearchContext, signal?: AbortSignal) =>
+          new Promise((_resolve, reject) => {
+            signal?.addEventListener(
+              'abort',
+              () => {
+                observeFirstAbort?.();
+                reject(new DOMException('First connector aborted.', 'AbortError'));
+              },
+              { once: true }
+            );
+          })
+      ),
+    };
+    const secondConnector: PlatformConnector = {
+      ...makeConnector('lehibou', 'LeHibou', []),
+      fetchMissions: vi.fn(
+        (_now: number, _context?: ConnectorSearchContext, signal?: AbortSignal) =>
+          new Promise((resolve) => {
+            signal?.addEventListener(
+              'abort',
+              () => {
+                secondObservedAbort = true;
+              },
+              { once: true }
+            );
+            releaseSecondCleanup = () => resolve({ ok: true, value: [] });
+          })
+      ),
+    };
+
+    (getSettings as Mock)
+      .mockResolvedValueOnce(defaultSettings(['free-work', 'lehibou']))
+      .mockResolvedValue(defaultSettings([]));
+    (getConnector as Mock).mockImplementation(async (id: string) =>
+      id === 'free-work' ? firstConnector : secondConnector
+    );
+    (getConnectors as Mock).mockResolvedValue([firstConnector, secondConnector]);
+
+    const unhandledRejection = vi.fn();
+    process.on('unhandledRejection', unhandledRejection);
+    const controller = new AbortController();
+    let originalSettled = false;
+    const scanOutcome = runScan(controller.signal, undefined, {
+      pageDelayMs: 0,
+      onLifecycleEvent: (event) =>
+        lifecycleEvents.push(`${event.type}:${'connectorId' in event ? event.connectorId : '*'}`),
+    }).then(
+      () => {
+        originalSettled = true;
+        return 'resolved' as const;
+      },
+      (error: unknown) => {
+        originalSettled = true;
+        return error;
+      }
+    );
+
+    try {
+      await vi.waitFor(() => {
+        expect(firstConnector.fetchMissions).toHaveBeenCalledTimes(1);
+        expect(secondConnector.fetchMissions).toHaveBeenCalledTimes(1);
+      });
+      controller.abort();
+      await firstAbortObserved;
+      await new Promise((resolve) => setTimeout(resolve, 0));
+
+      const settledBeforeSecondCleanup = originalSettled;
+      const mutexWhileCleaning = await runScan().then(
+        () => null,
+        (error: unknown) => error
+      );
+
+      releaseSecondCleanup?.();
+      const originalOutcome = await scanOutcome;
+      await Promise.resolve();
+
+      expect(secondObservedAbort).toBe(true);
+      expect(settledBeforeSecondCleanup).toBe(false);
+      expect(isScanRunning()).toBe(false);
+      expect(mutexWhileCleaning).toMatchObject({ code: 'MUTEX' });
+      expect(originalOutcome).toMatchObject({ code: 'CANCELLED' });
+      expect(lifecycleEvents).not.toContain('CONNECTOR_SUCCEEDED:lehibou');
+      expect(unhandledRejection).not.toHaveBeenCalled();
+    } finally {
+      releaseSecondCleanup?.();
+      process.off('unhandledRejection', unhandledRejection);
+    }
+  });
+
+  it('preserves the first non-cancellation failure when abort arrives during pool cleanup', async () => {
+    let rejectFirst: ((error: Error) => void) | undefined;
+    let releaseSecond: (() => void) | undefined;
+    let observeSecondAbort: (() => void) | undefined;
+    const secondAbortObserved = new Promise<void>((resolve) => {
+      observeSecondAbort = resolve;
+    });
+    const firstConnector: PlatformConnector = {
+      ...makeConnector('free-work', 'Free-Work', []),
+      fetchMissions: vi.fn(
+        () =>
+          new Promise((_resolve, reject) => {
+            rejectFirst = reject;
+          })
+      ),
+    };
+    const secondConnector: PlatformConnector = {
+      ...makeConnector('lehibou', 'LeHibou', []),
+      fetchMissions: vi.fn(
+        (_now: number, _context?: ConnectorSearchContext, signal?: AbortSignal) =>
+          new Promise((resolve) => {
+            signal?.addEventListener('abort', () => observeSecondAbort?.(), { once: true });
+            releaseSecond = () => resolve({ ok: true, value: [] });
+          })
+      ),
+    };
+    (getSettings as Mock).mockResolvedValue(defaultSettings(['free-work', 'lehibou']));
+    (getConnector as Mock).mockImplementation(async (id: string) =>
+      id === 'free-work' ? firstConnector : secondConnector
+    );
+    (getConnectors as Mock).mockResolvedValue([firstConnector, secondConnector]);
+
+    const controller = new AbortController();
+    const outcome = runScan(controller.signal).then(
+      () => null,
+      (error: unknown) => error
+    );
+    await vi.waitFor(() => {
+      expect(firstConnector.fetchMissions).toHaveBeenCalledTimes(1);
+      expect(secondConnector.fetchMissions).toHaveBeenCalledTimes(1);
+    });
+    rejectFirst?.(new Error('primary connector crash'));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    controller.abort();
+    await secondAbortObserved;
+    releaseSecond?.();
+
+    await expect(outcome).resolves.toMatchObject({ message: 'primary connector crash' });
+    await expect(outcome).resolves.not.toMatchObject({ code: 'CANCELLED' });
   });
 
   // 2. Empty connectors

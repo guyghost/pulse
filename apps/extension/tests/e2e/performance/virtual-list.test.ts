@@ -8,7 +8,6 @@ import {
   allMissionsToggle,
   feedSearchInput,
   getDisplayedMissionCount,
-  ensureFeedVisible,
   injectMissions,
   missionCards,
   scanButton,
@@ -109,9 +108,14 @@ async function mockMultiBatchPartialScan(page: Page) {
         }
 
         chromeStub.runtime.sendMessage = async (msg: unknown) => {
-          const message = msg as { type?: string };
+          const message = msg as { type?: string; payload?: { operationId?: string } };
 
           if (message?.type !== 'SCAN_START') {
+            return originalSendMessage(msg);
+          }
+
+          const operationId = message.payload?.operationId;
+          if (!operationId) {
             return originalSendMessage(msg);
           }
 
@@ -127,6 +131,7 @@ async function mockMultiBatchPartialScan(page: Page) {
                 emitRuntimeMessage({
                   type: 'SCAN_PARTIAL_RESULT',
                   payload: {
+                    operationId,
                     connectorId: batch.connectorId,
                     connectorName: batch.connectorName,
                     missions: Array.from({ length: 20 }, (_, index) =>
@@ -139,21 +144,29 @@ async function mockMultiBatchPartialScan(page: Page) {
             );
           });
 
-          return new Promise((resolve) => {
-            window.setTimeout(() => {
-              resolve({
-                type: 'SCAN_COMPLETE',
-                payload: batches.flatMap((batch) =>
+          window.setTimeout(() => {
+            emitRuntimeMessage({
+              type: 'SCAN_COMPLETE',
+              payload: {
+                operationId,
+                missions: batches.flatMap((batch) =>
                   Array.from({ length: 20 }, (_, index) =>
                     makeMission(batch.offset + index, batch.connectorId)
                   )
                 ),
-              });
-            }, 900);
-          });
+              },
+            });
+          }, 900);
+
+          return { type: 'SCAN_STARTED', payload: { operationId } };
         };
       },
     });
+  });
+
+  await page.reload();
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+    timeout: 10000,
   });
 }
 
@@ -373,7 +386,6 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
 
   test('keeps feed stable while multiple partial scan batches arrive', async ({ page }) => {
     await mockMultiBatchPartialScan(page);
-    await ensureFeedVisible(page);
     await injectMissions(page, 120);
     await expectMissionCount(page, 120, 5000);
 

@@ -331,6 +331,16 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
     (window as unknown as Record<string, unknown>).__mockMissions = missionsData;
 
     let _chrome: unknown = undefined;
+    const runtimeListeners: Array<
+      (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void
+    > = [];
+
+    function emitRuntimeMessage(message: unknown): void {
+      for (const listener of runtimeListeners) {
+        listener(message, { id: 'e2e-scan-results' }, () => {});
+      }
+    }
+
     Object.defineProperty(window, 'chrome', {
       configurable: true,
       enumerable: true,
@@ -339,27 +349,76 @@ export async function mockScanResults(page: Page, missions: Mission[]) {
       },
       set(val) {
         _chrome = val;
-        if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-          const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-            msg: unknown
-          ) => Promise<unknown>;
-          (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-            type: string;
-            payload?: unknown;
-          }) => {
-            if (msg?.type === 'SCAN_START') {
-              const mockMissions = (window as unknown as Record<string, unknown>).__mockMissions;
-              return {
-                type: 'SCAN_COMPLETE',
-                payload: mockMissions,
-              };
+        const chromeStub = val as {
+          runtime?: {
+            sendMessage?: (msg: unknown) => Promise<unknown>;
+            onMessage?: {
+              addListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+              removeListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+            };
+          };
+        };
+        if (!chromeStub.runtime?.sendMessage) {
+          return;
+        }
+
+        const originalSendMessage = chromeStub.runtime.sendMessage.bind(chromeStub.runtime);
+        const originalAddListener = chromeStub.runtime.onMessage?.addListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+        const originalRemoveListener = chromeStub.runtime.onMessage?.removeListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+
+        if (chromeStub.runtime.onMessage) {
+          chromeStub.runtime.onMessage.addListener = (listener) => {
+            runtimeListeners.push(listener);
+            originalAddListener?.(listener);
+          };
+          chromeStub.runtime.onMessage.removeListener = (listener) => {
+            const index = runtimeListeners.indexOf(listener);
+            if (index >= 0) {
+              runtimeListeners.splice(index, 1);
             }
-            return origSend.call((val as Record<string, unknown>).runtime, msg);
+            originalRemoveListener?.(listener);
           };
         }
+
+        chromeStub.runtime.sendMessage = async (msg: unknown) => {
+          const message = msg as { type?: string; payload?: { operationId?: string } };
+          if (message.type !== 'SCAN_START' || !message.payload?.operationId) {
+            return originalSendMessage(msg);
+          }
+
+          const operationId = message.payload.operationId;
+          const mockMissions = (window as unknown as Record<string, unknown>).__mockMissions;
+          window.setTimeout(() => {
+            emitRuntimeMessage({
+              type: 'SCAN_COMPLETE',
+              payload: { operationId, missions: mockMissions },
+            });
+          }, 0);
+
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        };
       },
     });
   }, missions);
+
+  await page.reload();
+  await expectFeedReady(page);
 }
 
 /**
@@ -483,6 +542,16 @@ export async function mockConnectorFailure(
   await page.addInitScript(
     ({ connector, code }: { connector: string; code: number }) => {
       let _chrome: unknown = undefined;
+      const runtimeListeners: Array<
+        (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void
+      > = [];
+
+      function emitRuntimeMessage(message: unknown): void {
+        for (const listener of runtimeListeners) {
+          listener(message, { id: 'e2e-connector-failure' }, () => {});
+        }
+      }
+
       Object.defineProperty(window, 'chrome', {
         configurable: true,
         enumerable: true,
@@ -491,32 +560,81 @@ export async function mockConnectorFailure(
         },
         set(val) {
           _chrome = val;
-          if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-            const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown
-            ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-              type: string;
-              payload?: { connectorId?: string };
-            }) => {
-              if (msg?.type === 'SCAN_START' && msg?.payload?.connectorId === connector) {
-                return {
-                  type: 'SCAN_ERROR',
-                  payload: {
-                    connectorId: connector,
-                    error: `HTTP ${code}`,
-                    code,
-                  },
-                };
+          const chromeStub = val as {
+            runtime?: {
+              sendMessage?: (msg: unknown) => Promise<unknown>;
+              onMessage?: {
+                addListener?: (
+                  listener: (
+                    message: unknown,
+                    sender: unknown,
+                    sendResponse: (response?: unknown) => void
+                  ) => void
+                ) => void;
+                removeListener?: (
+                  listener: (
+                    message: unknown,
+                    sender: unknown,
+                    sendResponse: (response?: unknown) => void
+                  ) => void
+                ) => void;
+              };
+            };
+          };
+          if (!chromeStub.runtime?.sendMessage) {
+            return;
+          }
+
+          const originalSendMessage = chromeStub.runtime.sendMessage.bind(chromeStub.runtime);
+          const originalAddListener = chromeStub.runtime.onMessage?.addListener?.bind(
+            chromeStub.runtime.onMessage
+          );
+          const originalRemoveListener = chromeStub.runtime.onMessage?.removeListener?.bind(
+            chromeStub.runtime.onMessage
+          );
+
+          if (chromeStub.runtime.onMessage) {
+            chromeStub.runtime.onMessage.addListener = (listener) => {
+              runtimeListeners.push(listener);
+              originalAddListener?.(listener);
+            };
+            chromeStub.runtime.onMessage.removeListener = (listener) => {
+              const index = runtimeListeners.indexOf(listener);
+              if (index >= 0) {
+                runtimeListeners.splice(index, 1);
               }
-              return origSend.call((val as Record<string, unknown>).runtime, msg);
+              originalRemoveListener?.(listener);
             };
           }
+
+          chromeStub.runtime.sendMessage = async (msg: unknown) => {
+            const message = msg as { type?: string; payload?: { operationId?: string } };
+            if (message.type !== 'SCAN_START' || !message.payload?.operationId) {
+              return originalSendMessage(msg);
+            }
+
+            const operationId = message.payload.operationId;
+            window.setTimeout(() => {
+              emitRuntimeMessage({
+                type: 'SCAN_ERROR',
+                payload: {
+                  operationId,
+                  message: `Le connecteur ${connector} a échoué avec HTTP ${code}.`,
+                  code: `HTTP_${code}`,
+                },
+              });
+            }, 0);
+
+            return { type: 'SCAN_STARTED', payload: { operationId } };
+          };
         },
       });
     },
     { connector: connectorId, code: errorCode }
   );
+
+  await page.reload();
+  await expectFeedReady(page);
 }
 
 // ============================================================================

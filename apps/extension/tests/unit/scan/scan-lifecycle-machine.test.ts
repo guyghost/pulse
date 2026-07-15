@@ -2,6 +2,7 @@ import { createActor } from 'xstate';
 import { describe, expect, it } from 'vitest';
 import {
   scanLifecycleMachine,
+  type ScanCheckpoint,
   type ScanLifecycleInput,
 } from '../../../src/models/scan-lifecycle.machine';
 
@@ -32,6 +33,21 @@ function startScanning() {
   return actor;
 }
 
+function checkpoint(
+  state: ScanCheckpoint['state'],
+  terminal: ScanCheckpoint['terminal'] = null
+): ScanCheckpoint {
+  return {
+    version: 1,
+    operationId: OPERATION_ID,
+    state,
+    trigger: 'manual',
+    connectorResults: { 'free-work': state === 'starting' ? 'pending' : 'running' },
+    cancellationRequested: state === 'cancelling' || state === 'cancelled',
+    terminal,
+  };
+}
+
 describe('scanLifecycleMachine', () => {
   it('declares exactly the eleven approved lifecycle states', () => {
     expect(Object.keys(scanLifecycleMachine.config.states ?? {}).sort()).toEqual(
@@ -50,6 +66,60 @@ describe('scanLifecycleMachine', () => {
       ].sort()
     );
   });
+
+  it('recovers no checkpoint as idle', () => {
+    const actor = createLifecycleActor();
+
+    actor.send({ type: 'SERVICE_WORKER_RESTARTED', checkpoint: null });
+
+    expect(actor.getSnapshot().value).toBe('idle');
+    expect(actor.getSnapshot().context.operationId).toBeNull();
+  });
+
+  it.each(['starting', 'scanning', 'retrying', 'persisting'] as const)(
+    'classifies an interrupted %s checkpoint as WORKER_RESTARTED failure',
+    (state) => {
+      const actor = createLifecycleActor();
+
+      actor.send({ type: 'SERVICE_WORKER_RESTARTED', checkpoint: checkpoint(state) });
+
+      expect(actor.getSnapshot().value).toBe('failed');
+      expect(actor.getSnapshot().context.operationId).toBe(OPERATION_ID);
+      expect(actor.getSnapshot().context.error).toEqual({
+        code: 'WORKER_RESTARTED',
+        message: 'Le service worker a redémarré pendant le scan.',
+      });
+    }
+  );
+
+  it('classifies an interrupted cancelling checkpoint as cancelled', () => {
+    const actor = createLifecycleActor();
+
+    actor.send({ type: 'SERVICE_WORKER_RESTARTED', checkpoint: checkpoint('cancelling') });
+
+    expect(actor.getSnapshot().value).toBe('cancelled');
+    expect(actor.getSnapshot().context.operationId).toBe(OPERATION_ID);
+  });
+
+  it.each([
+    ['completed', { type: 'SCAN_COMPLETE', missionIds: ['mission-1'] }],
+    ['partial', { type: 'SCAN_COMPLETE', missionIds: ['mission-1'] }],
+    ['failed', { type: 'SCAN_ERROR', code: 'OFFLINE', message: 'offline' }],
+    ['cancelled', { type: 'SCAN_CANCELLED' }],
+  ] as const)(
+    'replays a terminal %s checkpoint into the same modeled terminal',
+    (state, terminal) => {
+      const actor = createLifecycleActor();
+
+      actor.send({
+        type: 'SERVICE_WORKER_RESTARTED',
+        checkpoint: checkpoint(state, terminal),
+      });
+
+      expect(actor.getSnapshot().value).toBe(state);
+      expect(actor.getSnapshot().status).toBe('done');
+    }
+  );
 
   it.each([
     ['starting', (actor: ReturnType<typeof createLifecycleActor>) => actor],

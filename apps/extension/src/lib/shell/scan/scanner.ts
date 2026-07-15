@@ -41,7 +41,8 @@ export function isScanRunning(): boolean {
 export class ScanError extends Error {
   constructor(
     message: string,
-    public readonly code: 'OFFLINE' | 'NETWORK_ERROR' | 'CANCELLED' | 'MUTEX' | 'UNKNOWN'
+    public readonly code:
+      'OFFLINE' | 'NETWORK_ERROR' | 'CANCELLED' | 'MUTEX' | 'CHECKPOINT_STORAGE' | 'UNKNOWN'
   ) {
     super(message);
     this.name = 'ScanError';
@@ -55,7 +56,9 @@ function throwIfScanCancelled(signal?: AbortSignal): void {
 }
 
 function isAbortError(error: unknown): boolean {
-  return error instanceof Error && error.name === 'AbortError';
+  return (
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
+  );
 }
 
 export interface ScanResult {
@@ -127,6 +130,8 @@ export interface ScanOptions {
   onLifecycleEvent?: (event: ScanRuntimeEvent) => void;
   /** Override explicite du profil utilisé pour le scan */
   profileOverride?: UserProfile;
+  /** Liste de connecteurs figée par l'opération admise (health/first scan). */
+  connectorIdsOverride?: readonly string[];
 }
 
 export async function runScan(
@@ -147,7 +152,7 @@ export async function runScan(
     throwIfScanCancelled(signal);
     return result;
   } catch (error) {
-    if (signal?.aborted || isAbortError(error)) {
+    if (isAbortError(error) || (error instanceof ScanError && error.code === 'CANCELLED')) {
       throw new ScanError('Scan annulé.', 'CANCELLED');
     }
     throw error;
@@ -189,7 +194,9 @@ async function _runScanInternal(
 
   const settings = await getSettings();
   throwIfScanCancelled(signal);
-  const enabledIds = settings.enabledConnectors;
+  const enabledIds = options?.connectorIdsOverride
+    ? [...options.connectorIdsOverride]
+    : settings.enabledConnectors;
   const errors: ScanResult['errors'] = [];
 
   try {
@@ -520,35 +527,51 @@ async function _runScanInternal(
     emitDetailed('scanning', index + 1, connectors.length);
   }
 
-  // Execute with concurrency pool
-  const pending: Promise<void>[] = [];
+  // Execute with a quiescent concurrency pool. Every started task is retained
+  // until settlement so one fast abort/error cannot release the scan mutex
+  // while another connector is still cleaning up.
+  const noFailure = Symbol('no-connector-failure');
+  let firstFailure: unknown | typeof noFailure = noFailure;
+  const activeTasks = new Set<Promise<void>>();
+  const startedTasks: Promise<void>[] = [];
   let nextIndex = 0;
 
-  while (nextIndex < connectors.length) {
-    throwIfScanCancelled(signal);
-
-    // Fill up to CONCURRENCY slots
-    while (pending.length < CONCURRENCY && nextIndex < connectors.length) {
-      const idx = nextIndex++;
-      const promise = fetchOneConnector(connectors[idx], idx).then(() => {
-        // Remove from pending when done
-        const pIdx = pending.indexOf(promise);
-        if (pIdx >= 0) {
-          pending.splice(pIdx, 1);
+  const shouldStopScheduling = (): boolean =>
+    firstFailure !== noFailure || signal?.aborted === true;
+  const startConnectorTask = (index: number): void => {
+    const task = fetchOneConnector(connectors[index], index)
+      .catch((error: unknown) => {
+        if (firstFailure === noFailure) {
+          firstFailure = error;
         }
+      })
+      .finally(() => {
+        activeTasks.delete(task);
       });
-      pending.push(promise);
+    activeTasks.add(task);
+    startedTasks.push(task);
+  };
+
+  while (nextIndex < connectors.length && !shouldStopScheduling()) {
+    // Fill up to CONCURRENCY slots
+    while (
+      activeTasks.size < CONCURRENCY &&
+      nextIndex < connectors.length &&
+      !shouldStopScheduling()
+    ) {
+      startConnectorTask(nextIndex);
+      nextIndex += 1;
     }
 
-    // Wait for at least one to finish before filling more
-    if (pending.length >= CONCURRENCY) {
-      await Promise.race(pending);
-      throwIfScanCancelled(signal);
+    if (activeTasks.size > 0) {
+      await Promise.race(activeTasks);
     }
   }
 
-  // Wait for all remaining
-  await Promise.all(pending);
+  await Promise.allSettled(startedTasks);
+  if (firstFailure !== noFailure) {
+    throw firstFailure;
+  }
   throwIfScanCancelled(signal);
   onProgress?.({ current: connectors.length, total: connectors.length, connectorName: '' });
   throwIfScanCancelled(signal);

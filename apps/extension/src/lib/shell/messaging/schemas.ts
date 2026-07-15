@@ -701,6 +701,14 @@ export const MessageSchemas = {
     type: z.literal('SCAN_STARTED'),
     payload: z.object({ operationId: ScanOperationIdSchema }),
   }),
+  SCAN_START_REJECTED: z.object({
+    type: z.literal('SCAN_START_REJECTED'),
+    payload: z.object({
+      operationId: ScanOperationIdSchema,
+      code: SafeString,
+      message: SafeString,
+    }),
+  }),
   SCAN_PROGRESS: z.object({
     type: z.literal('SCAN_PROGRESS'),
     payload: z.object({
@@ -739,6 +747,14 @@ export const MessageSchemas = {
   SCAN_CANCEL_REQUESTED: z.object({
     type: z.literal('SCAN_CANCEL_REQUESTED'),
     payload: z.object({ operationId: ScanOperationIdSchema }),
+  }),
+  SCAN_CANCEL_REJECTED: z.object({
+    type: z.literal('SCAN_CANCEL_REJECTED'),
+    payload: z.object({
+      operationId: ScanOperationIdSchema,
+      code: SafeString,
+      message: SafeString,
+    }),
   }),
   SCAN_CANCELLED: z.object({
     type: z.literal('SCAN_CANCELLED'),

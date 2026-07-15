@@ -156,6 +156,41 @@ describe('validateMessage — scan progressif', () => {
     expect(validateMessage({ type: 'SCAN_CANCEL_REQUESTED' }).valid).toBe(false);
   });
 
+  it('valide les rejets de commande non terminaux avec une erreur typée', () => {
+    expect(
+      validateMessage({
+        type: 'SCAN_START_REJECTED',
+        payload: {
+          operationId: 'operation-1',
+          code: 'CHECKPOINT_STORAGE',
+          message: 'Session storage indisponible.',
+        },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SCAN_CANCEL_REJECTED',
+        payload: {
+          operationId: 'operation-1',
+          code: 'STALE_OPERATION',
+          message: 'Aucun scan actif ne correspond à cette opération.',
+        },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SCAN_START_REJECTED',
+        payload: { operationId: 'operation-1', code: 'CHECKPOINT_STORAGE' },
+      }).valid
+    ).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SCAN_CANCEL_REJECTED',
+        payload: { operationId: 'operation-1', message: 'Erreur' },
+      }).valid
+    ).toBe(false);
+  });
+
   it('accepte SCAN_PARTIAL_RESULT avec missions par connecteur', () => {
     expect(
       validateMessage({
