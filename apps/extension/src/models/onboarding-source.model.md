@@ -48,6 +48,8 @@ interface SourceContext {
   consentOperationId: string | null;
   reconcileRequestId: string | null;
   reconcileReason: 'restart' | 'cancel_race' | null;
+  interruptedConnectorPhase: 'persisting' | 'checking' | null;
+  invalidatedConnectorOperationId: string | null;
   advancePending: boolean;
   failurePhase: 'persistence' | 'permission' | 'session' | 'offline' | 'consent' | null;
   error: string | null;
@@ -99,7 +101,7 @@ type OnboardingSourceEvent =
   | { type: 'CANCEL_CONFIRMED'; operationId: string }
   | { type: 'CANCEL_OUTCOME_UNKNOWN'; operationId: string; requestId: string }
   | { type: 'SKIP'; operationId: string }
-  | { type: 'SERVICE_WORKER_RESTARTED' }
+  | { type: 'SERVICE_WORKER_RESTARTED'; requestId: string }
   | {
       type: 'CONSENT_RECONCILED';
       requestId: string;
@@ -109,6 +111,7 @@ type OnboardingSourceEvent =
   | {
       type: 'HYDRATED';
       requestId: string;
+      nextOperationId: string;
       enabledConnectorIds: readonly ConnectorId[];
       scanConsent: boolean;
     };
@@ -119,17 +122,21 @@ type OnboardingSourceEvent =
 ```mermaid
 stateDiagram-v2
   [*] --> selecting: OPEN
-  selecting --> selecting: HYDRATED [matchingReconcile]
+  selecting --> selecting: HYDRATED [matchingReconcile && noInterruptedConnectorOperation]
+  selecting --> checking: HYDRATED [matchingReconcile && interruptedConnectorOperation && selectedPersisted] / relaunchCheckWithFreshOperation
+  selecting --> persisting: HYDRATED [matchingReconcile && interruptedConnectorOperation && selectedNotPersisted] / relaunchPersistenceWithFreshOperation
   selecting --> selecting: SELECT_SOURCE [included]
   selecting --> persisting: CONTINUE [selectedIncluded]
   persisting --> checking: PERSIST_SUCCEEDED [matchingOperation]
   persisting --> failed: PERSIST_FAILED [matchingOperation]
+  persisting --> selecting: SERVICE_WORKER_RESTARTED / invalidateOperationAndHydratePersistence
   checking --> checking: PERMISSION_GRANTED [matchingOperation]
   checking --> permission_denied: PERMISSION_REFUSED [matchingOperation]
   checking --> ready: SESSION_FOUND [matchingOperation]
   checking --> session_missing: SESSION_MISSING [matchingOperation]
   checking --> failed: CHECK_FAILED or NETWORK_OFFLINE [matchingOperation]
   checking --> selecting: SELECT_SOURCE [included] / invalidateOperation
+  checking --> selecting: SERVICE_WORKER_RESTARTED / invalidateOperationAndHydrateCheck
   ready --> confirming: CONFIRM_SOURCE [canConfirm]
   confirming --> ready: CONSENT_PERSISTED [matchingConsentOperation] / advanceWizardOnce
   confirming --> failed: CONSENT_FAILED [matchingConsentOperation]
@@ -137,8 +144,8 @@ stateDiagram-v2
   confirming --> cancelling: CANCEL [matchingConsentOperation]
   cancelling --> cancelled: CANCEL_CONFIRMED [matchingConsentOperation]
   cancelling --> reconciling: CANCEL_OUTCOME_UNKNOWN [matchingConsentOperation]
-  confirming --> reconciling: SERVICE_WORKER_RESTARTED
-  cancelling --> reconciling: SERVICE_WORKER_RESTARTED
+  confirming --> reconciling: SERVICE_WORKER_RESTARTED / beginConsentReconciliation
+  cancelling --> reconciling: SERVICE_WORKER_RESTARTED / beginConsentReconciliation
   reconciling --> ready: CONSENT_RECONCILED [matchingReconcile && consentPresent && restartRecovery]
   reconciling --> cancelled: CONSENT_RECONCILED [matchingReconcile && consentAbsent && cancelRecovery]
   reconciling --> failed: CONSENT_RECONCILED [matchingReconcile && consentAbsent && restartRecovery]
@@ -163,52 +170,60 @@ stateDiagram-v2
 
 ## Guards
 
-| Guard                      | Rule                                                                                                                                                         |
-| -------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
-| `included`                 | Connector ID occurs in the current build-filtered catalogue.                                                                                                 |
-| `selectedIncluded`         | Selection is non-null, included, and differs from no stale catalogue entry.                                                                                  |
-| `matchingOperation`        | Response operation ID equals the current operation ID.                                                                                                       |
-| `matchingConsentOperation` | Response operation ID equals `consentOperationId`; connector-check IDs cannot acknowledge consent.                                                           |
-| `matchingReconcile`        | Response request ID equals `reconcileRequestId`; older hydration/reconciliation reads are discarded.                                                         |
-| `userGesture`              | Optional permission request is directly caused by the user's Continue/Retry action.                                                                          |
-| `failedPersistence`        | `failurePhase === 'persistence'`.                                                                                                                            |
-| `failedCheck`              | Failure phase is permission, session, or offline.                                                                                                            |
-| `failedConsent`            | `failurePhase === 'consent'` and connector check facts remain valid.                                                                                         |
-| `canConfirm`               | State is `ready`, consent is false, selection is persisted/enabled, permission is granted/not required, session is present, and no consent operation exists. |
-| `restartRecovery`          | `reconcileReason === 'restart'`.                                                                                                                             |
-| `cancelRecovery`           | `reconcileReason === 'cancel_race'`.                                                                                                                         |
-| `consentPresent`           | Reconciled canonical `scanConsent === true`.                                                                                                                 |
-| `consentAbsent`            | Reconciled canonical `scanConsent === false`.                                                                                                                |
+| Guard                             | Rule                                                                                                                                                         |
+| --------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `included`                        | Connector ID occurs in the current build-filtered catalogue.                                                                                                 |
+| `selectedIncluded`                | Selection is non-null, included, and differs from no stale catalogue entry.                                                                                  |
+| `matchingOperation`               | Response operation ID equals the current operation ID.                                                                                                       |
+| `matchingConsentOperation`        | Response operation ID equals `consentOperationId`; connector-check IDs cannot acknowledge consent.                                                           |
+| `matchingReconcile`               | Response request ID equals `reconcileRequestId`; older hydration/reconciliation reads are discarded.                                                         |
+| `noInterruptedConnectorOperation` | `interruptedConnectorPhase === null`; hydration only refreshes canonical facts.                                                                              |
+| `interruptedConnectorOperation`   | Interrupted phase is `persisting` or `checking`, and `nextOperationId` is non-empty and differs from `invalidatedConnectorOperationId`.                      |
+| `selectedPersisted`               | Hydrated enabled IDs contain the still-included selected connector.                                                                                          |
+| `selectedNotPersisted`            | Hydrated enabled IDs do not contain the still-included selected connector.                                                                                   |
+| `userGesture`                     | Optional permission request is directly caused by the user's Continue/Retry action.                                                                          |
+| `failedPersistence`               | `failurePhase === 'persistence'`.                                                                                                                            |
+| `failedCheck`                     | Failure phase is permission, session, or offline.                                                                                                            |
+| `failedConsent`                   | `failurePhase === 'consent'` and connector check facts remain valid.                                                                                         |
+| `canConfirm`                      | State is `ready`, consent is false, selection is persisted/enabled, permission is granted/not required, session is present, and no consent operation exists. |
+| `restartRecovery`                 | `reconcileReason === 'restart'`.                                                                                                                             |
+| `cancelRecovery`                  | `reconcileReason === 'cancel_race'`.                                                                                                                         |
+| `consentPresent`                  | Reconciled canonical `scanConsent === true`.                                                                                                                 |
+| `consentAbsent`                   | Reconciled canonical `scanConsent === false`.                                                                                                                |
 
 ## Transition table
 
-| From                   | Event                      | Guard                    | To                                        | Effects                                                                              |
-| ---------------------- | -------------------------- | ------------------------ | ----------------------------------------- | ------------------------------------------------------------------------------------ |
-| `selecting`            | `SELECT_SOURCE`            | `included`               | `selecting`                               | Store candidate only; no persistence or permission prompt.                           |
-| `selecting`            | `CONTINUE`                 | `selectedIncluded`       | `persisting`                              | Snapshot previous settings; persist selected connector enabled.                      |
-| `persisting`           | `PERSIST_SUCCEEDED`        | `matchingOperation`      | `checking`                                | Commit enabled IDs; check/request host permission, then session through worker.      |
-| `persisting`           | `PERSIST_FAILED`           | `matchingOperation`      | `failed`                                  | Retain candidate, restore previous projection, expose retry.                         |
-| `checking`             | `PERMISSION_GRANTED`       | matching                 | `checking`                                | Continue deterministic session detection.                                            |
-| `checking`             | `PERMISSION_REFUSED`       | matching                 | `permission_denied`                       | Remain on source step; no scan and no success copy.                                  |
-| `checking`             | `SESSION_FOUND`            | matching                 | `ready`                                   | Store session and last-sync facts; enable source-step confirmation.                  |
-| `checking`             | `SESSION_MISSING`          | matching                 | `session_missing`                         | Remain on source step and offer open-platform/retry action.                          |
-| `checking`             | `CHECK_FAILED`             | matching                 | `failed`                                  | Store typed retryable technical error.                                               |
-| `checking`             | `NETWORK_OFFLINE`          | matching                 | `failed`                                  | Store `failurePhase='offline'`; preserve persisted selection.                        |
-| `ready`                | `CONFIRM_SOURCE`           | `canConfirm`             | `confirming`                              | Set `advancePending`, create consent operation, and persist consent; do not advance. |
-| `confirming`           | `CONSENT_PERSISTED`        | matching consent         | `ready`                                   | Set canonical consent true, clear operation, and advance the wizard exactly once.    |
-| `confirming`           | `CONSENT_FAILED`           | matching consent         | `failed`                                  | Set `failurePhase='consent'`; clear pending advancement and never claim consent.     |
-| confirming/reconciling | `CONFIRM_SOURCE`           | —                        | same                                      | Return typed `ONBOARDING_BUSY`; never start a second consent write.                  |
-| `confirming`           | `CANCEL`                   | matching consent         | `cancelling`                              | Request abort; retain the operation token until its outcome is known.                |
-| `cancelling`           | `CANCEL_CONFIRMED`         | matching consent         | `cancelled`                               | Clear pending advancement only after proof that consent did not commit.              |
-| `cancelling`           | `CANCEL_OUTCOME_UNKNOWN`   | matching consent         | `reconciling`                             | Read canonical consent with a fresh request ID and reason `cancel_race`.             |
-| confirming/cancelling  | `SERVICE_WORKER_RESTARTED` | —                        | `reconciling`                             | Read canonical consent with a fresh request ID and reason `restart`.                 |
-| `reconciling`          | `CONSENT_RECONCILED`       | matching, true, restart  | `ready`                                   | Accept canonical consent and advance once only when `advancePending` is true.        |
-| `reconciling`          | `CONSENT_RECONCILED`       | matching, false, restart | `failed`                                  | Set retryable consent failure; no advancement.                                       |
-| `reconciling`          | `CONSENT_RECONCILED`       | matching, false, cancel  | `cancelled`                               | Cancellation is now proven; clear pending advancement.                               |
-| `reconciling`          | `CONSENT_RECONCILED`       | matching, true, cancel   | `reconciling`                             | Request idempotent consent revocation and a fresh canonical read; never advance.     |
-| refusal/missing/failed | `RETRY`                    | matching phase           | `checking`, `persisting`, or `confirming` | New operation ID; repeat only the failed phase and dependencies.                     |
-| non-consent states     | `CANCEL`                   | matching/current attempt | `cancelled`                               | Abort request, invalidate operation ID, restore previous enabled IDs if needed.      |
-| `selecting`            | `SKIP`                     | —                        | `skipped`                                 | Persist no scan consent; preserve prior settings.                                    |
+| From                   | Event                      | Guard                           | To                                        | Effects                                                                                                                                             |
+| ---------------------- | -------------------------- | ------------------------------- | ----------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `selecting`            | `SELECT_SOURCE`            | `included`                      | `selecting`                               | Store candidate only; no persistence or permission prompt.                                                                                          |
+| `selecting`            | `HYDRATED`                 | no interrupted operation        | `selecting`                               | Replace canonical enabled IDs/consent only for the matching hydration request.                                                                      |
+| `selecting`            | `CONTINUE`                 | `selectedIncluded`              | `persisting`                              | Snapshot previous settings; persist selected connector enabled.                                                                                     |
+| `persisting`           | `PERSIST_SUCCEEDED`        | `matchingOperation`             | `checking`                                | Commit enabled IDs; check/request host permission, then session through worker.                                                                     |
+| `persisting`           | `PERSIST_FAILED`           | `matchingOperation`             | `failed`                                  | Retain candidate, restore previous projection, expose retry.                                                                                        |
+| persisting/checking    | `SERVICE_WORKER_RESTARTED` | —                               | `selecting`                               | Remember interrupted phase/old ID, clear `operationId`, store fresh hydration request ID, and read canonical settings.                              |
+| `selecting`            | `HYDRATED`                 | interrupted, selected persisted | `checking`                                | Apply canonical facts, assign `nextOperationId`, clear interrupted phase/invalidated ID, and relaunch permission/session check from its first step. |
+| `selecting`            | `HYDRATED`                 | interrupted, selected absent    | `persisting`                              | Apply canonical facts, assign `nextOperationId`, clear interrupted phase/invalidated ID, and idempotently repeat selected-connector persistence.    |
+| `checking`             | `PERMISSION_GRANTED`       | matching                        | `checking`                                | Continue deterministic session detection.                                                                                                           |
+| `checking`             | `PERMISSION_REFUSED`       | matching                        | `permission_denied`                       | Remain on source step; no scan and no success copy.                                                                                                 |
+| `checking`             | `SESSION_FOUND`            | matching                        | `ready`                                   | Store session and last-sync facts; enable source-step confirmation.                                                                                 |
+| `checking`             | `SESSION_MISSING`          | matching                        | `session_missing`                         | Remain on source step and offer open-platform/retry action.                                                                                         |
+| `checking`             | `CHECK_FAILED`             | matching                        | `failed`                                  | Store typed retryable technical error.                                                                                                              |
+| `checking`             | `NETWORK_OFFLINE`          | matching                        | `failed`                                  | Store `failurePhase='offline'`; preserve persisted selection.                                                                                       |
+| `ready`                | `CONFIRM_SOURCE`           | `canConfirm`                    | `confirming`                              | Set `advancePending`, create consent operation, and persist consent; do not advance.                                                                |
+| `confirming`           | `CONSENT_PERSISTED`        | matching consent                | `ready`                                   | Set canonical consent true, clear operation, and advance the wizard exactly once.                                                                   |
+| `confirming`           | `CONSENT_FAILED`           | matching consent                | `failed`                                  | Set `failurePhase='consent'`; clear pending advancement and never claim consent.                                                                    |
+| confirming/reconciling | `CONFIRM_SOURCE`           | —                               | same                                      | Return typed `ONBOARDING_BUSY`; never start a second consent write.                                                                                 |
+| `confirming`           | `CANCEL`                   | matching consent                | `cancelling`                              | Request abort; retain the operation token until its outcome is known.                                                                               |
+| `cancelling`           | `CANCEL_CONFIRMED`         | matching consent                | `cancelled`                               | Clear pending advancement only after proof that consent did not commit.                                                                             |
+| `cancelling`           | `CANCEL_OUTCOME_UNKNOWN`   | matching consent                | `reconciling`                             | Read canonical consent with a fresh request ID and reason `cancel_race`.                                                                            |
+| confirming/cancelling  | `SERVICE_WORKER_RESTARTED` | —                               | `reconciling`                             | Invalidate prior consent result and read canonical consent using the event's fresh request ID and reason `restart`.                                 |
+| `reconciling`          | `CONSENT_RECONCILED`       | matching, true, restart         | `ready`                                   | Accept canonical consent and advance once only when `advancePending` is true.                                                                       |
+| `reconciling`          | `CONSENT_RECONCILED`       | matching, false, restart        | `failed`                                  | Set retryable consent failure; no advancement.                                                                                                      |
+| `reconciling`          | `CONSENT_RECONCILED`       | matching, false, cancel         | `cancelled`                               | Cancellation is now proven; clear pending advancement.                                                                                              |
+| `reconciling`          | `CONSENT_RECONCILED`       | matching, true, cancel          | `reconciling`                             | Request idempotent consent revocation and a fresh canonical read; never advance.                                                                    |
+| refusal/missing/failed | `RETRY`                    | matching phase                  | `checking`, `persisting`, or `confirming` | New operation ID; repeat only the failed phase and dependencies.                                                                                    |
+| non-consent states     | `CANCEL`                   | matching/current attempt        | `cancelled`                               | Abort request, invalidate operation ID, restore previous enabled IDs if needed.                                                                     |
+| `selecting`            | `SKIP`                     | —                               | `skipped`                                 | Persist no scan consent; preserve prior settings.                                                                                                   |
 
 Settings uses the same `ConnectorCheckStatus` per included connector. Toggling
 an enabled connector reuses the persistence and check guards; Settings may
@@ -238,10 +253,14 @@ be read from persisted connector status. Candidate selection, operation ID,
 failure copy, and in-flight check are ephemeral.
 
 After a normal open, matching `HYDRATED` reloads canonical enabled IDs and
-consent. During `confirming`/`cancelling`, restart instead enters
-`reconciling`; only a matching `CONSENT_RECONCILED` canonical read can settle
-the write. A check that had no confirmed response restarts with a new operation
-ID; its old result cannot advance the source step.
+consent. A restart in `persisting`/`checking` first stores the interrupted
+phase, invalidates the old operation ID, and enters `selecting` only as the
+hydration state. Matching `HYDRATED` then assigns its injected
+`nextOperationId`: it relaunches checking when the selected connector is
+canonically enabled, or repeats persistence idempotently when it is absent.
+During `confirming`/`cancelling`, restart instead enters `reconciling`; only a
+matching `CONSENT_RECONCILED` canonical read can settle the write. No result for
+the invalidated operation ID can advance the source step.
 
 ## Permissions and offline behavior
 
@@ -270,7 +289,8 @@ recovery.
   the matching connector/operation may update its snapshot.
 - Service-worker restart triggers hydration/fresh check, or consent
   reconciliation when its outcome is unknown; no in-flight result is presumed
-  successful.
+  successful. Persisting/checking restart always uses the request ID carried by
+  `SERVICE_WORKER_RESTARTED` and the fresh operation ID carried by `HYDRATED`.
 
 ## Terminal states and re-entry
 
@@ -314,6 +334,9 @@ start a new check from any settled connector state.
    reconciled consent proof.
 10. Consent and connector-check operation IDs are distinct; neither can
     acknowledge the other.
+11. Restart invalidates the interrupted persistence/check operation before
+    hydration; only the matching read can install a fresh operation ID and
+    relaunch work.
 
 ## Review checklist
 
