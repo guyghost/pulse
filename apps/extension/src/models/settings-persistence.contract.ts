@@ -163,6 +163,27 @@ export interface SettingsHostPermissionContainsProofV1 {
 export const SETTINGS_ACTIVATION_MAX_LIFETIME_MS = 5 * 60 * 1000;
 export const MAX_SETTINGS_HANDLED_ACTIVATIONS_PER_WORKER = 4096;
 
+export interface SettingsActivationIssueV1 {
+  version: 1;
+  mutationId: string;
+  permissionCheckId: string;
+  activationId: string;
+  storageReservationId: string;
+  ttlMs: number;
+}
+
+export interface SettingsActivationTokenV1 {
+  version: 1;
+  dataEpoch: string;
+  workerEpoch: string;
+  mutationId: string;
+  permissionCheckId: string;
+  activationId: string;
+  storageReservationId: string;
+  issuedAtMs: number;
+  expiresAtMs: number;
+}
+
 interface SettingsActivationRegistryResultBaseV1 {
   version: 1;
   dataEpoch: string;
@@ -868,6 +889,24 @@ export const isUuidV4 = (value: unknown): value is string =>
   typeof value === 'string' && UUID_V4.test(value);
 
 /**
+ * Proves that epoch identities cannot be reused by mutation-scoped identities.
+ * Callers pass `null` when no worker epoch exists at that boundary.
+ */
+export function settingsIdentitiesAreDisjointFromEpochs(
+  dataEpoch: unknown,
+  originWorkerEpoch: unknown | null,
+  identityIds: readonly unknown[]
+): boolean {
+  const epochs = originWorkerEpoch === null ? [dataEpoch] : [dataEpoch, originWorkerEpoch];
+  return (
+    epochs.every(isUuidV4) &&
+    new Set(epochs).size === epochs.length &&
+    identityIds.every(isUuidV4) &&
+    identityIds.every((id) => !epochs.includes(id))
+  );
+}
+
+/**
  * Reads one exact JSON-shaped object without evaluating an accessor.
  *
  * Boundary decoders must consume the returned snapshot, never the untrusted
@@ -1144,7 +1183,8 @@ export function parseSettingsCommandDigest(value: unknown): DecodedSettingsComma
       parseSettingsDigest(tuple[4]) === null ||
       parseSettingsDigest(tuple[5]) === null ||
       parseOriginDigest(tuple[6]) === null ||
-      !validCorrelationIds(tuple[7], tuple[1])
+      !validCorrelationIds(tuple[7], tuple[1]) ||
+      !settingsIdentitiesAreDisjointFromEpochs(tuple[0], null, tuple[7] as unknown[])
     ) {
       return null;
     }
@@ -2745,6 +2785,7 @@ function parseSettingMutation(value: unknown, includedIds: string[]): SettingMut
     record.previousDigest !== settingsDigest(previousSettings) ||
     record.candidateDigest !== settingsDigest(candidateSettings) ||
     command === null ||
+    !settingsIdentitiesAreDisjointFromEpochs(command.dataEpoch, null, correlationIds) ||
     command.mutationId !== record.mutationId ||
     command.baseRevision !== record.baseRevision ||
     command.baseGeneration !== record.baseGeneration ||
@@ -2980,6 +3021,27 @@ export function parseSettingsPendingIntentV1(
   const phase = record.phase as SettingsPendingIntentPhase;
   const mutationCommand = parseSettingsCommandDigest(mutation.commandDigest);
   const requestId = record.requestId as string | null;
+  const pendingIdentityIds = [
+    ...mutation.correlationIds,
+    ...(mutation.storageReservationProof === null
+      ? []
+      : [mutation.storageReservationProof.gateLeaseId, mutation.storageReservationProof.proofId]),
+    ...(retryIntent === null
+      ? []
+      : [
+          retryIntent.failedMutationId,
+          retryIntent.mutationId,
+          retryIntent.permissionCheckId,
+          retryIntent.activationId,
+          retryIntent.activationResultId,
+          retryIntent.storageReservationId,
+          retryIntent.requestId,
+        ]),
+    ...(requestId === null ? [] : [requestId]),
+    ...(terminalSettlement === null
+      ? []
+      : [terminalSettlement.requestId, ...terminalSettlement.outcome.correlationIds]),
+  ];
   const commandIdentityValid = (() => {
     if (nextCommandType === 'RESERVE_SETTINGS_STORAGE') {
       return (
@@ -3039,6 +3101,11 @@ export function parseSettingsPendingIntentV1(
   if (
     mutationCommand === null ||
     mutationCommand.dataEpoch !== record.dataEpoch ||
+    !settingsIdentitiesAreDisjointFromEpochs(
+      record.dataEpoch,
+      record.originWorkerEpoch,
+      pendingIdentityIds
+    ) ||
     !record.nextCommandId.startsWith(PENDING_INTENT_COMMAND_PREFIX[nextCommandType]) ||
     PENDING_INTENT_PHASE_BY_COMMAND[nextCommandType] !== phase ||
     PENDING_INTENT_REQUEST_COMMANDS.has(nextCommandType) !== (record.requestId !== null) ||
@@ -3943,6 +4010,45 @@ function captureSettingsEventBoundary(value: unknown): CapturedBoundaryValue {
   }
 
   return capture(value, 0);
+}
+
+export interface SettingsShellEventBoundaryCapture {
+  readonly value: unknown;
+  readonly uuidIds: readonly string[];
+}
+
+/**
+ * Gives the Shell coordinator one stable descriptor snapshot to dispatch and
+ * an exact conservative identity inventory for that same immutable graph.
+ * This grants no machine capability; the controller still performs semantic
+ * normalization and its private ephemeral admission check.
+ */
+export function captureSettingsShellEventBoundary(
+  value: unknown
+): SettingsShellEventBoundaryCapture | null {
+  const captured = captureSettingsEventBoundary(value);
+  if (captured === INVALID_SETTINGS_EVENT_CAPTURE) {
+    return null;
+  }
+  const ids = new Set<string>();
+  const visit = (current: unknown): void => {
+    if (isUuidV4(current)) {
+      ids.add(current);
+      return;
+    }
+    if (Array.isArray(current)) {
+      current.forEach(visit);
+      return;
+    }
+    if (typeof current === 'object' && current !== null) {
+      Object.values(current).forEach(visit);
+    }
+  };
+  visit(captured);
+  return Object.freeze({
+    value: captured,
+    uuidIds: Object.freeze([...ids].sort()),
+  });
 }
 
 const SETTINGS_RAW_EVENT_KEYSETS = {

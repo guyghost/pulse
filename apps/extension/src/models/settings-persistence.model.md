@@ -1,6 +1,6 @@
 # Settings Persistence Workflow Model
 
-Status: **R0A/R0B/R0D executable model implemented; final independent reviews and hashes remain required before Shell work**.
+Status: **R0A/R0B/R0D executable model implemented; R0E Shell authority contracts reviewed, runtime cutover still incomplete**.
 
 The executable model is split by responsibility:
 
@@ -11,6 +11,51 @@ The executable model is split by responsibility:
 This document is normative for the Shell protocol that will eventually consume
 those pure model files. It is not a production implementation or a
 production-readiness proof.
+
+## R0E review record — 2026-07-16
+
+The Shell gap review covered the nominal path, malformed boundaries, retries,
+permission refusal, cancellation, worker restart, reset fencing, capacity
+exhaustion and ambiguous I/O. The following decisions are normative:
+
+1. The worker-local activation registry issues a detached token and consumes it
+   exactly once. Its clock and result-ID allocator are injected; it has no
+   eviction, fallback allocator or implicit ID synthesis.
+2. The extension-global storage reservation authority acquires and releases
+   reservations through the DatasetEpoch gate. Revalidation during an already
+   gated Settings write consumes the caller's exact live gate capability and
+   must not recursively acquire another Dataset lease.
+3. A negative `permissions.contains` result is not a terminal fact by itself.
+   The transaction repository repeats the contains-only check inside its live
+   gate and atomically appends the causal `not_committed` outcome before it may
+   return the correlated settled snapshot.
+4. `ABORT_SETTINGS_MUTATION` is a repository transaction. It either observes an
+   existing exact outcome, or atomically appends `cancelled`; it never infers
+   cancellation from the current settings value.
+5. An admitted mutation with neither journal nor outcome returns an exact
+   settled snapshot together with `kind:'outcome_missing'`. The executor emits
+   `RECONCILED` with that snapshot, allowing the model's existing fatal branch
+   to install `SETTINGS_OUTCOME_MISSING` without fabricating an outcome or an
+   alarm proof.
+6. Coordinator-generated recovery IDs use one bounded allocator source for at
+   most 128 attempts. Exhaustion emits no event and retains the exact command
+   for `resume()` or handoff. Every successfully admitted event is first
+   descriptor-captured into a detached graph; all UUIDs in that exact graph and
+   in the resulting public view are retained before a later allocation.
+
+Review conclusion: all five runtime gaps and the coordinator allocator gap are
+representable without an implicit transition. Implementation may proceed only
+against these contracts and the hostile tests derived from them.
+
+The 2026-07-16 writer inventory found direct `chrome.storage.local` mutations
+outside this authority in connector sync metadata, analytics, parser and
+connector health, alerts, profile/preferences caches, DB migration metadata,
+favorites/hidden/seen state, onboarding flags, semantic cache and TJM history.
+Until those writers are cut over, `allLocalWritersFenced:true` cannot be emitted
+honestly. The concrete authority therefore requires an exact writer-fence port
+and fails with `global_writer_cutover_incomplete` before allocating a proof when
+that port cannot prove the cutover. This remains a production blocker outside
+the bounded R0E repository implementation.
 
 ## Scope and authority
 
@@ -48,6 +93,18 @@ Typed events and pure guards do.
 `activationId`, `activationResultId`, `storageReservationId`, `transactionId`,
 `broadcastId`, `resetId`, and proof IDs are canonical lowercase UUID v4 strings.
 Uppercase UUIDs, other UUID versions, empty strings, and reused IDs are invalid.
+
+This uniqueness rule is structural and fail-closed at every durable boundary.
+For a mutation, the five base identities (`mutationId`, `permissionCheckId`,
+`activationId`, `activationResultId`, `storageReservationId`) plus any active
+`requestId` form its six-identity command set. Neither `dataEpoch` nor
+`originWorkerEpoch` may equal any member of that set, any prior failed-mutation
+identity retained by a retry, or each other. Consequently `command/v2`
+rejects a `dataEpoch` present in `baseCorrelationIds`; mutation and compare
+descriptors repeat that check; and the pending-intent decoder additionally
+rejects its `originWorkerEpoch` when it appears in mutation, retry, request,
+terminal-settlement, reservation-lease, or reservation-proof identities. No
+self-consistent digest may legitimize a crossed identity.
 
 The allocator never reuses an ID during one `dataEpoch`. A `mutationId` is the
 durable at-most-once identity and is unique by itself, not by
@@ -559,6 +616,28 @@ reserved terminal capacity until the mutation settles or the epoch authority
 revokes it during reset/restart recovery. No best-effort terminal write is
 allowed after a successful reservation.
 
+The concrete reservation authority exposes `acquire`, capability-bound
+`isActive`, `release`, and `assertWriteAllowed`. `acquire` runs inside
+`SettingsAtomicCommitGatePort.runExclusive(purpose:'reservation')`, proves reset
+journal absence and the exact global writer-fence capability, then reads
+`chrome.storage.local.getBytesInUse(null)` and
+`getBytesInUse('settings')`. The latter must equal the command projection's
+current Settings entry bytes. The grant equation is exact:
+
+```text
+quotaBytes - bytesInUse - requiredAdditionalBytes >= 65_536
+```
+
+Only one distinct Settings reservation may be active in the serialized
+coordinator; an exact repeat is idempotent and a crossed reuse fails closed.
+`isActive(proof, capability)` never nests a Dataset gate: it validates the
+proof against the active registry, the caller's live capability and fresh byte
+counts. `release` uses the reservation ID as its gated operation and is
+idempotent. Worker restart drops the in-memory registry, making old proofs
+inactive; recovery must reconcile rather than recreate them. Every Settings or
+non-Settings local writer must call the same authority capacity check so its
+post-write projection preserves the active reservation and system reserve.
+
 The uniqueness key is `mutationId` alone. A duplicate command with the same
 complete identity returns its recorded settlement after recovery. The same ID
 with a different command/value/base identity, or any historical correlation ID
@@ -729,6 +808,27 @@ typed signals: Settings never infers expiry or crossing from free text. Exact
 descriptor capture rejects inherited properties, symbols, accessors, sparse
 arrays, revoked proxies, mixed worker epochs and mixed correlation tuples before
 dispatch.
+
+The concrete Shell API is synchronous and worker-local:
+
+```ts
+interface SettingsActivationRegistry {
+  issue(input: SettingsActivationIssueV1): SettingsActivationTokenV1;
+  consume(token: unknown): SettingsActivationRegistryResultV1;
+}
+```
+
+`issue` reads the injected clock exactly once, accepts a safe integer `ttlMs`
+in `1..300000`, and returns a deeply frozen token bound to the registry's
+`dataEpoch` and `workerEpoch`. `consume` descriptor-captures the supplied token,
+reads the clock once, allocates one fresh result UUID, and burns that activation
+attempt whether it is consumed, expired or crossed. A second observation is
+`replayed`. Unknown or tuple-crossed tokens are rejection-only signals and can
+never authorize a mutation. The registry retains at most 4096 issued activation
+IDs and 4096 result IDs for the worker lifetime, without TTL cleanup or LRU.
+Invalid clocks, allocator throws, non-v4/colliding result IDs and either
+capacity exhaustion fail closed with a typed registry error; no fallback ID is
+invented.
 
 The controller keeps paired, append-only activation/result registries for its
 worker epoch, bounded to 4096 attempts without eviction. Every admitted result
