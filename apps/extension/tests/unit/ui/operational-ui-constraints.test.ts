@@ -471,6 +471,19 @@ describe('operational UI constraints', () => {
     expect(advancedIdx).toBeLessThan(presetsIdx);
   });
 
+  it('keeps the compact feed story aligned and unclipped at side-panel width', () => {
+    const storySource = readFileSync('src/ui/molecules/OperationalStoryCard.svelte', 'utf8');
+    const badgeSource = readFileSync('src/ui/atoms/OperationalStatusBadge.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+
+    expect(storySource).toContain('data-testid="operational-story-inline"');
+    expect(storySource).toContain('grid-cols-[auto_auto_minmax(0,1fr)]');
+    expect(storySource).toContain('<span class="min-w-0 truncate">{primaryActionLabel}</span>');
+    expect(badgeSource).toContain('whitespace-nowrap');
+    expect(feedSource).toContain('data-testid="feed-hero-card"');
+    expect(feedSource).toContain("'sticky top-0 z-20 rounded-b-2xl");
+  });
+
   it('keeps feed filters decision-oriented with business presets', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const stateSource = readFileSync('src/lib/state/feed-page.svelte.ts', 'utf8');

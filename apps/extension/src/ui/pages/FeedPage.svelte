@@ -996,7 +996,8 @@
            Hero card — greeting + filters unified
            ═══════════════════════════════════════════ -->
       <section
-        class="section-card-strong relative overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {feedChromeCompact
+        data-testid="feed-hero-card"
+        class="section-card-strong relative isolate overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {feedChromeCompact
           ? 'border-blueprint-blue/10 shadow-subtle-3'
           : ''}"
       >
@@ -1281,8 +1282,8 @@
         <!-- ── Search + Filter toolbar (condensed-sticky in compact mode) ── -->
         <div
           class="border-t border-border-light px-5 {page.heroCompact
-            ? 'sticky top-0 z-20 bg-surface-white/90 py-2 backdrop-blur-md'
-            : 'py-3'}"
+            ? 'sticky top-0 z-20 rounded-b-2xl bg-surface-white/90 py-2 backdrop-blur-md'
+            : 'rounded-b-2xl py-3'}"
         >
           <div class="sr-only" role="status" aria-live="polite" aria-atomic="true">
             {#if feedChromeBusy}Chargement des missions en cours{/if}

@@ -26,7 +26,7 @@
 </script>
 
 <span
-  class="inline-flex items-center rounded-md border px-2 py-1 text-[10px] font-medium {toneClass}"
+  class="inline-flex items-center whitespace-nowrap rounded-md border px-2 py-1 text-[10px] font-medium {toneClass}"
 >
   {label}
 </span>
