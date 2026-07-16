@@ -319,7 +319,12 @@ describe('ApplicationsPage next-action toast', () => {
   });
 
   it('restores the visible next-action input when clear persistence fails', async () => {
-    const withNextAction = { ...tracking, nextActionAt: '2026-07-01T07:00:00.000Z' };
+    const nextActionIso = '2026-07-01T07:00:00.000Z';
+    const ts = Date.parse(nextActionIso);
+    const expectedLocalInput = new Date(ts - new Date(ts).getTimezoneOffset() * 60_000)
+      .toISOString()
+      .slice(0, 16);
+    const withNextAction = { ...tracking, nextActionAt: nextActionIso };
     sendMessage.mockImplementation((message: { type: string }) => {
       if (message.type === 'GET_TRACKINGS') {
         return Promise.resolve({ type: 'TRACKINGS_RESULT', payload: [withNextAction] });
@@ -339,12 +344,12 @@ describe('ApplicationsPage next-action toast', () => {
     await flush();
 
     const input = target.querySelector('#application-next-action') as HTMLInputElement;
-    expect(input.value).toBe('2026-07-01T09:00');
+    expect(input.value).toBe(expectedLocalInput);
     clickButton(target, 'Effacer');
     await flush();
     await tick();
 
-    expect(input.value).toBe('2026-07-01T09:00');
+    expect(input.value).toBe(expectedLocalInput);
     expect(showToast).toHaveBeenCalledWith(
       'Impossible d’enregistrer les détails de suivi.',
       'error'
