@@ -32,6 +32,23 @@ const persistedSettings = {
   theme: 'system' as const,
 };
 
+const shippedConnectorCatalog = [
+  {
+    id: 'free-work' as const,
+    name: 'Free-Work',
+    icon: 'free-work.svg',
+    url: 'https://www.free-work.com',
+    hostPermissions: ['https://www.free-work.com/*'],
+  },
+  {
+    id: 'malt' as const,
+    name: 'Malt',
+    icon: 'malt.svg',
+    url: 'https://www.malt.fr',
+    hostPermissions: ['https://*.malt.fr/*'],
+  },
+] as const;
+
 function routeBridge(): void {
   bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
     if (message.type === 'RESET_LOCAL_DATA') {
@@ -250,6 +267,76 @@ describe('SettingsPageController — confirmed settings projection', () => {
     expect(controller.autoScan).toBe(false);
     expect(controller.settingsError).toBeNull();
     expect(toastMock.showToast).not.toHaveBeenCalledWith(expect.any(String), 'error');
+
+    controller.destroy();
+  });
+});
+
+describe('SettingsPageController — shipped connector catalogue', () => {
+  beforeEach(() => {
+    bridgeMock.sendMessage.mockReset();
+    toastMock.showToast.mockClear();
+  });
+
+  it('projects only connectors included in the current build', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_SETTINGS') {
+        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      }
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController({
+      connectorCatalog: shippedConnectorCatalog,
+    });
+    await controller.loadSettings();
+
+    expect(controller.connectorSources.map((source) => source.id)).toEqual(['free-work', 'malt']);
+    expect(controller.connectorSources.map((source) => source.name)).not.toContain('LeHibou');
+    expect(controller.connectorSources.find((source) => source.id === 'free-work')?.enabled).toBe(
+      true
+    );
+    expect(controller.connectorSources.find((source) => source.id === 'malt')?.enabled).toBe(false);
+
+    controller.destroy();
+  });
+
+  it('enables a shipped connector only after the settings write is confirmed', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'GET_SETTINGS') {
+        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      }
+      if (message.type === 'SAVE_SETTINGS') {
+        return Promise.resolve({
+          type: 'SETTINGS_SAVED',
+          payload: { saved: true, settings: message.payload },
+        });
+      }
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController({
+      connectorCatalog: shippedConnectorCatalog,
+    });
+    await controller.loadSettings();
+
+    await controller.toggleConnector('malt');
+
+    expect(controller.connectorSources.find((source) => source.id === 'malt')?.enabled).toBe(true);
+    const saveCall = bridgeMock.sendMessage.mock.calls.find(
+      (call) => call[0]?.type === 'SAVE_SETTINGS'
+    );
+    expect(saveCall?.[0]).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({ enabledConnectors: ['free-work', 'malt'] }),
+      })
+    );
 
     controller.destroy();
   });

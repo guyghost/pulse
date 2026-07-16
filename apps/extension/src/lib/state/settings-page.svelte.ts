@@ -41,6 +41,11 @@ import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
 import { getPremium } from '$lib/shell/facades/premium.facade';
 import {
+  getConnectorsMeta,
+  type ConnectorId,
+  type ConnectorMeta,
+} from '$lib/shell/connectors/meta';
+import {
   appendUniqueNormalized,
   normalizeDailyRate,
   normalizeProfileDraft,
@@ -51,6 +56,15 @@ import { createProfileStore, type ProfileStatus } from '$lib/state/profile.svelt
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
+  connectorCatalog?: readonly ConnectorMeta[];
+}
+
+export interface SettingsConnectorSource {
+  id: ConnectorId;
+  name: string;
+  icon: string;
+  url: string;
+  enabled: boolean;
 }
 
 /**
@@ -86,6 +100,7 @@ const exportFormatLabels: Record<ExportFormat, string> = {
 };
 
 export class SettingsPageController {
+  private readonly shippedConnectorCatalog: readonly ConnectorMeta[];
   private readonly unsubscribeProfileMessages = this.subscribeProfileMessages();
 
   private readonly profileActor = createProfileStore({
@@ -116,6 +131,7 @@ export class SettingsPageController {
   notifications = $state(true);
   autoScan = $state(true);
   theme = $state<'light' | 'dark' | 'system'>('system');
+  enabledConnectorIds = $state<ConnectorId[]>([]);
   isSavingSettings = $state(false);
   settingsError = $state<string | null>(null);
   lastScanAt = $state<number | null>(null);
@@ -143,7 +159,24 @@ export class SettingsPageController {
   backupError: ValidationError | null = $state(null);
   fileInput: HTMLInputElement | null = $state(null);
 
-  constructor(private readonly options: SettingsPageControllerOptions = {}) {}
+  constructor(private readonly options: SettingsPageControllerOptions = {}) {
+    this.shippedConnectorCatalog = (options.connectorCatalog ?? getConnectorsMeta()).map(
+      (connector) => ({
+        ...connector,
+        hostPermissions: [...connector.hostPermissions],
+      })
+    );
+  }
+
+  get connectorSources(): SettingsConnectorSource[] {
+    return this.shippedConnectorCatalog.map((connector) => ({
+      id: connector.id,
+      name: connector.name,
+      icon: connector.icon,
+      url: connector.url,
+      enabled: this.enabledConnectorIds.includes(connector.id),
+    }));
+  }
 
   private subscribeProfileMessages(): () => void {
     try {
@@ -228,6 +261,10 @@ export class SettingsPageController {
       this.autoScan = settings.autoScan;
       this.maxSemanticPerScan = settings.maxSemanticPerScan;
       this.theme = settings.theme;
+      const shippedIds = this.shippedConnectorCatalog.map((connector) => connector.id);
+      this.enabledConnectorIds = settings.enabledConnectors.filter((id): id is ConnectorId =>
+        shippedIds.includes(id as ConnectorId)
+      );
     } catch {
       // Hors contexte extension
     }
@@ -484,6 +521,26 @@ export class SettingsPageController {
       () => {
         this.theme = value;
         window.dispatchEvent(new CustomEvent('mp:theme-changed', { detail: value }));
+      }
+    );
+  }
+
+  async toggleConnector(connectorId: ConnectorId): Promise<void> {
+    if (!this.shippedConnectorCatalog.some((connector) => connector.id === connectorId)) {
+      return;
+    }
+
+    const enabled = this.enabledConnectorIds.includes(connectorId)
+      ? this.enabledConnectorIds.filter((id) => id !== connectorId)
+      : [...this.enabledConnectorIds, connectorId];
+    const nextConnectorIds = this.shippedConnectorCatalog
+      .map((connector) => connector.id)
+      .filter((id) => enabled.includes(id));
+
+    await this.persistSettings(
+      (settings) => ({ ...settings, enabledConnectors: nextConnectorIds }),
+      () => {
+        this.enabledConnectorIds = nextConnectorIds;
       }
     );
   }

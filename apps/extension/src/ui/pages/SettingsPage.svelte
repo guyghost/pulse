@@ -599,6 +599,68 @@
         onScanIntervalChange={handleScanIntervalChange}
       />
 
+      <div class="section-card space-y-3 rounded-xl p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold text-text-primary">
+              Sources incluses dans cette version
+            </p>
+            <p class="mt-1 text-[11px] leading-4 text-text-muted">
+              Seules les plateformes réellement livrées avec l’extension peuvent être activées.
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+          >
+            {settings.connectorSources.filter((source) => source.enabled).length}/{settings
+              .connectorSources.length} actives
+          </span>
+        </div>
+
+        <div
+          class="divide-y divide-border-light rounded-lg border border-border-light bg-surface-white"
+        >
+          {#each settings.connectorSources as source (source.id)}
+            <div class="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5">
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
+                >
+                  <Icon name="database" size={13} />
+                </span>
+                <span class="min-w-0">
+                  <span class="block truncate text-xs font-medium text-text-primary">
+                    {source.name}
+                  </span>
+                  <span class="mt-0.5 block text-[10px] text-text-muted">
+                    {source.enabled ? 'Incluse dans les prochains scans' : 'Scan désactivé'}
+                  </span>
+                </span>
+              </div>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={source.enabled}
+                aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
+                disabled={settings.isSavingSettings}
+                class="relative h-6 w-10 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-blueprint-blue/30 disabled:cursor-wait disabled:opacity-60 {source.enabled
+                  ? 'border-blueprint-blue bg-blueprint-blue'
+                  : 'border-disabled-gray bg-subtle-gray'}"
+                onclick={() => settings.toggleConnector(source.id)}
+              >
+                <span
+                  class="absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform {source.enabled
+                    ? 'translate-x-4.5'
+                    : 'translate-x-0.5'}"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            </div>
+          {/each}
+        </div>
+      </div>
+
       {#if settings.settingsError}
         <p
           class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-xs text-status-red"
