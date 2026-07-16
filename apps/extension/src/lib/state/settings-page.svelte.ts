@@ -116,6 +116,8 @@ export class SettingsPageController {
   notifications = $state(true);
   autoScan = $state(true);
   theme = $state<'light' | 'dark' | 'system'>('system');
+  isSavingSettings = $state(false);
+  settingsError = $state<string | null>(null);
   lastScanAt = $state<number | null>(null);
   scanHistorySourceCount = $state(0);
   scanHistoryMissionCount = $state(0);
@@ -448,43 +450,64 @@ export class SettingsPageController {
   }
 
   async updateScanInterval(value: number): Promise<void> {
-    this.scanInterval = value;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, scanIntervalMinutes: value });
-    } catch {
-      // Hors contexte extension
-    }
+    await this.persistSettings(
+      (settings) => ({ ...settings, scanIntervalMinutes: value }),
+      () => {
+        this.scanInterval = value;
+      }
+    );
   }
 
   async toggleNotifications(): Promise<void> {
-    this.notifications = !this.notifications;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, notifications: this.notifications });
-    } catch {
-      // Hors contexte extension
-    }
+    const nextValue = !this.notifications;
+    await this.persistSettings(
+      (settings) => ({ ...settings, notifications: nextValue }),
+      () => {
+        this.notifications = nextValue;
+      }
+    );
   }
 
   async toggleAutoScan(): Promise<void> {
-    this.autoScan = !this.autoScan;
-    try {
-      const settings = await getSettings();
-      await setSettings({ ...settings, autoScan: this.autoScan });
-    } catch {
-      // Hors contexte extension
-    }
+    const nextValue = !this.autoScan;
+    await this.persistSettings(
+      (settings) => ({ ...settings, autoScan: nextValue }),
+      () => {
+        this.autoScan = nextValue;
+      }
+    );
   }
 
   async updateTheme(value: 'light' | 'dark' | 'system'): Promise<void> {
-    this.theme = value;
-    window.dispatchEvent(new CustomEvent('mp:theme-changed', { detail: value }));
+    await this.persistSettings(
+      (settings) => ({ ...settings, theme: value }),
+      () => {
+        this.theme = value;
+        window.dispatchEvent(new CustomEvent('mp:theme-changed', { detail: value }));
+      }
+    );
+  }
+
+  private async persistSettings(
+    buildCandidate: (settings: AppSettings) => AppSettings,
+    projectConfirmed: () => void
+  ): Promise<void> {
+    if (this.isSavingSettings) {
+      return;
+    }
+
+    this.isSavingSettings = true;
+    this.settingsError = null;
     try {
       const settings = await getSettings();
-      await setSettings({ ...settings, theme: value });
+      await setSettings(buildCandidate(settings));
+      projectConfirmed();
     } catch {
-      // Hors contexte extension
+      const message = 'Impossible d’enregistrer les réglages';
+      this.settingsError = message;
+      await showToast(message, 'error');
+    } finally {
+      this.isSavingSettings = false;
     }
   }
 

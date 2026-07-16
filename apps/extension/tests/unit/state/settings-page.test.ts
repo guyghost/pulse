@@ -20,6 +20,18 @@ vi.mock('../../../src/lib/shell/notifications/toast-service', () => ({
 
 import { SettingsPageController } from '../../../src/lib/state/settings-page.svelte';
 
+const persistedSettings = {
+  scanIntervalMinutes: 30,
+  enabledConnectors: ['free-work'],
+  notifications: true,
+  autoScan: true,
+  maxSemanticPerScan: 10,
+  notificationScoreThreshold: 70,
+  respectRateLimits: true,
+  customDelayMs: 0,
+  theme: 'system' as const,
+};
+
 function routeBridge(): void {
   bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
     if (message.type === 'RESET_LOCAL_DATA') {
@@ -132,6 +144,112 @@ describe('SettingsPageController.saveProfile — availability preservation', () 
     expect((saveCall[0] as { payload: { availability: unknown } }).payload.availability).toEqual(
       existingAvailability
     );
+
+    controller.destroy();
+  });
+});
+
+describe('SettingsPageController — confirmed settings projection', () => {
+  beforeEach(() => {
+    bridgeMock.sendMessage.mockReset();
+    toastMock.showToast.mockClear();
+  });
+
+  it('keeps the confirmed auto-scan value when persistence fails', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_SETTINGS') {
+        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      }
+      if (message.type === 'SAVE_SETTINGS') {
+        return Promise.resolve({
+          type: 'SETTINGS_SAVED',
+          payload: { saved: false, settings: null },
+        });
+      }
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadSettings();
+
+    await controller.toggleAutoScan();
+
+    expect(controller.autoScan).toBe(true);
+    expect(controller.settingsError).toBe('Impossible d’enregistrer les réglages');
+    expect(toastMock.showToast).toHaveBeenCalledWith(
+      'Impossible d’enregistrer les réglages',
+      'error'
+    );
+
+    controller.destroy();
+  });
+
+  it('keeps every confirmed settings field unchanged after a failed write', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_SETTINGS') {
+        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      }
+      if (message.type === 'SAVE_SETTINGS') {
+        return Promise.resolve({
+          type: 'SETTINGS_SAVED',
+          payload: { saved: false, settings: null },
+        });
+      }
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadSettings();
+    const themeChanged = vi.fn();
+    window.addEventListener('mp:theme-changed', themeChanged);
+
+    await controller.updateScanInterval(60);
+    await controller.toggleNotifications();
+    await controller.updateTheme('dark');
+
+    expect(controller.scanInterval).toBe(30);
+    expect(controller.notifications).toBe(true);
+    expect(controller.theme).toBe('system');
+    expect(themeChanged).not.toHaveBeenCalled();
+
+    window.removeEventListener('mp:theme-changed', themeChanged);
+    controller.destroy();
+  });
+
+  it('projects the new auto-scan value only after persistence succeeds', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_SETTINGS') {
+        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      }
+      if (message.type === 'SAVE_SETTINGS') {
+        return Promise.resolve({
+          type: 'SETTINGS_SAVED',
+          payload: {
+            saved: true,
+            settings: { ...persistedSettings, autoScan: false },
+          },
+        });
+      }
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadSettings();
+
+    await controller.toggleAutoScan();
+
+    expect(controller.autoScan).toBe(false);
+    expect(controller.settingsError).toBeNull();
+    expect(toastMock.showToast).not.toHaveBeenCalledWith(expect.any(String), 'error');
 
     controller.destroy();
   });

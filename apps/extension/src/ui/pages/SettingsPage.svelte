@@ -598,6 +598,17 @@
         onToggleNotifications={() => settings.toggleNotifications()}
         onScanIntervalChange={handleScanIntervalChange}
       />
+
+      {#if settings.settingsError}
+        <p
+          class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-xs text-status-red"
+          role="alert"
+        >
+          {settings.settingsError}. La dernière configuration confirmée reste active.
+        </p>
+      {:else if settings.isSavingSettings}
+        <p class="px-1 text-[11px] text-text-muted" role="status">Enregistrement…</p>
+      {/if}
     </section>
 
     <section
