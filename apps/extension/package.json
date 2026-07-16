@@ -12,6 +12,8 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @pulse/ui build && playwright test",
+    "test:mv3": "pnpm --filter @pulse/ui build && pnpm build && pnpm verify-manifest dist/manifest.json --post-build && playwright test --config=playwright.mv3.config.ts",
+    "test:e2e:extension": "pnpm test:mv3",
     "test:e2e:full": "pnpm --filter @pulse/ui build && env -u CI playwright test",
     "test:regression": "vitest run tests/unit/regression/parser-regression.test.ts",
     "health-check": "tsx tests/health/run-health-checks.ts",

@@ -293,3 +293,45 @@ jobs:
           path: apps/extension/test-results/
           retention-days: 7
           if-no-files-found: ignore
+
+  test-mv3:
+    name: Packaged MV3 Tests
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    needs: test
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v7
+
+      - name: Enable Corepack
+        run: corepack enable
+
+      - name: Setup pnpm
+        uses: pnpm/action-setup@v6
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'pnpm'
+
+      - name: Install dependencies
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Chromium
+        run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
+
+      - name: Run packaged MV3 gate
+        run: pnpm --filter @pulse/extension test:mv3
+
+      - name: Upload MV3 Playwright evidence
+        uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: mv3-playwright-evidence
+          path: output/playwright/
+          retention-days: 7
+          if-no-files-found: error
