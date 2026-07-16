@@ -800,6 +800,7 @@ export const MessageSchemas = {
   MISSIONS_UPDATED: z.object({
     type: z.literal('MISSIONS_UPDATED'),
     payload: MissionsPayloadSchema,
+    projection: z.enum(['replace', 'cold-only']).optional(),
   }),
 
   // Tracking

@@ -4,6 +4,7 @@
   import type { ApplicationStatus } from '$lib/core/types/tracking';
   import { STATUS_LABELS } from '$lib/core/types/tracking';
   import { scoreToGrade } from '$lib/core/types/score';
+  import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
   import OperationalStoryCard, {
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
@@ -39,6 +40,15 @@
     onSelectForTracking?: () => void;
     onRetryTracking?: () => void;
   } = $props();
+
+  let modalRoot = $state<HTMLElement | null>(null);
+  let dialogElement = $state<HTMLElement | null>(null);
+
+  function handleClose(): void {
+    if (!requestModalClose(modalRoot, 'explicit')) {
+      onClose?.();
+    }
+  }
 
   type MissionFact = {
     label: string;
@@ -212,11 +222,26 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 bg-page-canvas" role="presentation">
+<div
+  bind:this={modalRoot}
+  use:modalFocus={{
+    surface: 'mission_investigation',
+    variant: 'investigation',
+    ownerScopePath: ['feed', 'mission_investigation'],
+    onBeforeClose: () => {
+      onClose?.();
+      return 'accepted';
+    },
+    onRejected: () => onClose?.(),
+  }}
+  class="fixed inset-0 z-50 bg-page-canvas"
+  role="presentation"
+>
   <div
+    bind:this={dialogElement}
     class="absolute inset-0 flex w-full flex-col bg-page-canvas"
     role="dialog"
-    aria-modal="true"
+    tabindex="-1"
     aria-label="Investigation mission"
   >
     <div
@@ -256,8 +281,9 @@
         <button
           type="button"
           class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
-          onclick={onClose}
+          onclick={handleClose}
           aria-label="Fermer l'investigation"
+          data-modal-close
         >
           <Icon name="x" size={18} />
         </button>

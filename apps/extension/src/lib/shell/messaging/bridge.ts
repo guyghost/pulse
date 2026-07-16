@@ -62,7 +62,11 @@ export interface ConnectorHealthPayload {
 }
 
 export type BridgeMessage =
-  | { type: 'MISSIONS_UPDATED'; payload: Mission[] }
+  | {
+      type: 'MISSIONS_UPDATED';
+      payload: Mission[];
+      projection?: 'replace' | 'cold-only';
+    }
   | { type: 'GET_FEED_MISSIONS' }
   | { type: 'FEED_MISSIONS_RESULT'; payload: Mission[] }
   | { type: 'GET_FEED_FAVORITES' }

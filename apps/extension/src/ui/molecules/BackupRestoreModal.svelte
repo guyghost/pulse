@@ -1,5 +1,11 @@
 <script lang="ts">
   import type { BackupData, ValidationError } from '$lib/core/backup/backup';
+  import {
+    clearPreparedModalBusinessClose,
+    modalFocus,
+    prepareModalBusinessClose,
+    requestModalClose,
+  } from '$lib/shell/ui/modal-focus';
   import { Button } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
 
@@ -15,7 +21,18 @@
   let isRestoring = $state(false);
   let confirmationText = $state('');
   let restoreError = $state<string | null>(null);
+  let modalRoot = $state<HTMLElement | null>(null);
+  let dialogElement = $state<HTMLElement | null>(null);
   const canConfirmRestore = $derived(Boolean(backup) && confirmationText === 'RESTAURER');
+  const focusVariant = $derived(
+    error ? 'backup_error' : backup ? 'backup_valid' : 'backup_validation_pending'
+  );
+
+  function handleCancel(): void {
+    if (!requestModalClose(modalRoot, 'explicit')) {
+      onCancel();
+    }
+  }
 
   // Wrap the confirm flow so isRestoring is always reset (finally), even when
   // the restore rejects. The modal stays open with an inline error for retry.
@@ -25,11 +42,18 @@
     }
     isRestoring = true;
     restoreError = null;
+    prepareModalBusinessClose(modalRoot);
     try {
       await onConfirm();
+      if (modalRoot?.isConnected) {
+        requestModalClose(modalRoot, 'business_success');
+      }
     } catch (err) {
       restoreError = err instanceof Error ? err.message : 'Erreur lors de la restauration';
     } finally {
+      if (modalRoot?.isConnected) {
+        clearPreparedModalBusinessClose(modalRoot);
+      }
       isRestoring = false;
     }
   }
@@ -58,11 +82,26 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm">
+<div
+  bind:this={modalRoot}
+  use:modalFocus={{
+    surface: 'backup_restore',
+    variant: focusVariant,
+    ownerScopePath: ['settings', 'backup_restore'],
+    busy: isRestoring,
+    onBeforeClose: () => {
+      onCancel();
+      return 'accepted';
+    },
+    onRejected: () => onCancel(),
+  }}
+  class="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-sm"
+>
   <div
+    bind:this={dialogElement}
     class="w-full max-w-md rounded-3xl border border-border-light bg-surface-white p-6 shadow-2xl"
     role="dialog"
-    aria-modal="true"
+    tabindex="-1"
     aria-labelledby="backup-restore-title"
   >
     <!-- Header -->
@@ -115,7 +154,7 @@
       </div>
 
       <div class="flex justify-end">
-        <Button variant="secondary" onclick={onCancel}>Fermer</Button>
+        <Button variant="secondary" onclick={handleCancel} data-modal-close>Fermer</Button>
       </div>
     {:else if backup}
       {@const stats = {
@@ -193,6 +232,7 @@
         placeholder="RESTAURER"
         bind:value={confirmationText}
         autocomplete="off"
+        data-modal-confirmation-input
       />
 
       {#if restoreError}
@@ -215,7 +255,7 @@
       {/if}
 
       <div class="flex gap-3">
-        <Button variant="ghost" onclick={onCancel}>Annuler</Button>
+        <Button variant="ghost" onclick={handleCancel} data-modal-cancel>Annuler</Button>
         <Button
           variant="primary"
           onclick={handleConfirm}
@@ -238,7 +278,7 @@
       </div>
 
       <div class="flex justify-end">
-        <Button variant="ghost" onclick={onCancel}>Annuler</Button>
+        <Button variant="ghost" onclick={handleCancel} data-modal-cancel>Annuler</Button>
       </div>
     {/if}
   </div>

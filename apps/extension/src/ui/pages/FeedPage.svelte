@@ -585,7 +585,7 @@
   const arrivalDrawerExpanded = $derived(
     page.arrivalStackState.value === 'open' ||
       page.arrivalStackState.value === 'refreshing' ||
-      page.arrivalStackState.value === 'refresh-error'
+      (page.arrivalStackState.value === 'refresh-error' && page.arrivalStackState.drawerOpen)
   );
   const missionFeedResetKey = $derived(
     `${page.missionListResetKey}::alert:${showAlertOnly ? 'alert' : 'all'}`
@@ -643,7 +643,7 @@
 
   function handleFeedStoryPrimaryAction(): void {
     if (page.error) {
-      controller.startScan();
+      handleMissionFeedScanAction();
       return;
     }
 
@@ -678,7 +678,7 @@
       return;
     }
 
-    controller.startScan();
+    handleMissionFeedScanAction();
   }
 
   function handleClearMissionFilters(): void {
@@ -703,21 +703,20 @@
   }
 
   function handleMissionFeedScanAction(): void {
-    if (page.isOffline || controller.isScanning || page.isLoading) {
+    const presentation = page.feedPresentation;
+    if (!presentation.actionEnabled || presentation.primaryAction === null) {
       return;
     }
-    controller.startScan();
+    if (presentation.primaryAction === 'cancel') {
+      void controller.stopScan();
+      return;
+    }
+    void controller.startScan();
   }
 
   async function handleApplyPendingMissions(): Promise<void> {
-    const transitionEffects = page.startArrivalRefresh();
-    if (!transitionEffects.some((effect) => effect.type === 'apply-pending')) {
-      return;
-    }
-
     try {
-      await controller.applyPendingMissions();
-      const completionEffects = page.completeArrivalRefresh();
+      const completionEffects = await page.refreshArrivals();
       await tick();
       if (
         completionEffects.some((effect) => effect.type === 'scroll-feed-start') &&
@@ -730,7 +729,6 @@
         });
       }
     } catch (err) {
-      page.failArrivalRefresh('Impossible d’actualiser la file. Réessayer.');
       if (import.meta.env.DEV) {
         console.warn('[FeedPage] apply pending missions failed:', err);
       }
@@ -952,7 +950,7 @@
   bind:this={feedScrollContainer}
   data-testid="feed-scroll-container"
   class="relative h-full overflow-y-auto"
-  use:pullToRefresh={{ onRefresh: () => controller.startScan(), threshold: 60 }}
+  use:pullToRefresh={{ onRefresh: () => handleMissionFeedScanAction(), threshold: 60 }}
   onscroll={handleMissionScroll}
 >
   {#if showMissionScrollCue}
@@ -1038,18 +1036,30 @@
                   </span>
                 {/if}
                 <Tooltip
-                  label={page.isOffline ? 'Scan indisponible hors ligne' : 'Lancer le scan'}
+                  label={page.feedPresentation.primaryAction === 'cancel'
+                    ? 'Stopper le scan'
+                    : page.isOffline
+                      ? 'Scan indisponible hors ligne'
+                      : 'Lancer le scan'}
                   description={page.isOffline
                     ? 'Pulse utilise les données en cache jusqu’au retour réseau.'
                     : 'Raccourci clavier: r. Relance les sources connectées.'}
                 >
                   <button
                     class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-primary transition-all duration-200 hover:bg-subtle-gray"
-                    onclick={() => controller.startScan()}
-                    disabled={controller.isScanning || feedIsColdLoading || page.isOffline}
-                    aria-label="Lancer le scan des missions"
+                    onclick={handleMissionFeedScanAction}
+                    disabled={!page.feedPresentation.actionEnabled}
+                    aria-label={page.feedPresentation.primaryAction === 'cancel'
+                      ? 'Stopper le scan en cours'
+                      : page.feedPresentation.primaryAction === 'retry'
+                        ? 'Réessayer le scan des missions'
+                        : 'Lancer le scan des missions'}
                   >
-                    <Icon name="play" size={12} class="ml-0.5" />
+                    <Icon
+                      name={page.feedPresentation.primaryAction === 'cancel' ? 'square' : 'play'}
+                      size={12}
+                      class={page.feedPresentation.primaryAction === 'cancel' ? '' : 'ml-0.5'}
+                    />
                   </button>
                 </Tooltip>
               </div>
@@ -1121,62 +1131,48 @@
                 class="absolute right-0 top-0 flex items-center gap-2"
                 class:flex-row-reverse={page.panelSide === 'left'}
               >
-                {#if feedChromeBusy}
+                {#if page.feedPresentation.primaryAction === 'cancel'}
                   <Tooltip
                     label="Stopper le scan"
                     description="Interrompt le scan en cours et conserve les données déjà chargées."
                   >
                     <button
                       class="soft-ring inline-flex h-9 w-9 items-center justify-center rounded-full border border-status-red/30 bg-status-red/10 text-status-red transition-all duration-200 hover:bg-status-red/15"
-                      onclick={() => controller.stopScan()}
+                      onclick={handleMissionFeedScanAction}
+                      disabled={!page.feedPresentation.actionEnabled}
                       aria-label="Stopper le scan en cours"
                     >
                       <Icon name="square" size={14} />
                     </button>
                   </Tooltip>
-                {/if}
-                <Tooltip
-                  label={feedChromeBusy
-                    ? 'Scan en cours'
-                    : page.isOffline
+                {:else}
+                  <Tooltip
+                    label={page.isOffline
                       ? 'Scan indisponible hors ligne'
-                      : 'Lancer le scan'}
-                  description={feedChromeBusy
-                    ? 'Pulse interroge les sources connectées.'
-                    : page.isOffline
+                      : page.feedPresentation.primaryAction === 'retry'
+                        ? 'Réessayer le scan'
+                        : 'Lancer le scan'}
+                    description={page.isOffline
                       ? 'Les données en cache restent disponibles.'
                       : 'Raccourci clavier: r. Relance la détection des missions.'}
-                >
-                  <button
-                    class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
-                    {feedChromeBusy
-                      ? 'border-blueprint-blue/20 bg-blueprint-blue/8'
-                      : page.isOffline
+                  >
+                    <button
+                      class="soft-ring relative inline-flex h-9 w-9 items-center justify-center rounded-full border transition-all duration-200
+                    {page.isOffline
                         ? 'border-border-light bg-subtle-gray text-text-muted cursor-not-allowed'
                         : 'border-border-light bg-surface-white text-text-primary hover:bg-subtle-gray'}"
-                    onclick={() => controller.startScan()}
-                    disabled={controller.isScanning || feedIsColdLoading || page.isOffline}
-                    aria-label={feedChromeBusy
-                      ? 'Scan en cours'
-                      : page.isOffline
+                      onclick={handleMissionFeedScanAction}
+                      disabled={!page.feedPresentation.actionEnabled}
+                      aria-label={page.isOffline
                         ? 'Scan indisponible hors ligne'
-                        : 'Lancer le scan des missions'}
-                  >
-                    {#if feedChromeBusy}
-                      <span class="absolute inset-0 flex items-center justify-center">
-                        <span
-                          class="radar-ping absolute h-8 w-8 rounded-full border border-blueprint-blue/40"
-                        ></span>
-                        <span
-                          class="radar-ping animation-delay-500 absolute h-5 w-5 rounded-full border border-blueprint-blue/60"
-                        ></span>
-                        <span class="h-2 w-2 rounded-full bg-blueprint-blue"></span>
-                      </span>
-                    {:else}
+                        : page.feedPresentation.primaryAction === 'retry'
+                          ? 'Réessayer le scan des missions'
+                          : 'Lancer le scan des missions'}
+                    >
                       <Icon name="play" size={14} class="ml-0.5" />
-                    {/if}
-                  </button>
-                </Tooltip>
+                    </button>
+                  </Tooltip>
+                {/if}
               </div>
             </div>
 
@@ -1674,9 +1670,11 @@
 
 {#if page.arrivalStackVisible && MissionArrivalStack}
   <MissionArrivalStack
-    count={controller.pendingMissionCount}
+    count={page.arrivalStackCount}
     missions={page.arrivalPreviewMissions}
     state={page.arrivalStackState.value}
+    visible={page.arrivalStackVisible}
+    expanded={page.arrivalStackState.drawerOpen}
     errorMessage={page.arrivalStackState.message}
     onOpen={page.openArrivalStack}
     onClose={page.closeArrivalStack}

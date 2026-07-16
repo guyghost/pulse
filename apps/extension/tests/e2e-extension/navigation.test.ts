@@ -102,3 +102,39 @@ test('all packaged tabs render on a cold visit and after a warm reload', async (
   expect(new URL(activeWorker.url()).hostname).toBe(extension.extensionId);
   expectNoRuntimeErrors(extension.diagnostics);
 });
+
+test('packaged shortcuts modal traps focus and restores its trigger', async ({ extension }) => {
+  await extension.seedStorage({
+    feed_tour_seen: true,
+    first_scan_done: true,
+    kbd_cheatsheet_tip_seen: true,
+    onboarding_completed: true,
+    premium_enabled: true,
+    profile_banner_dismissed: true,
+  });
+
+  const page = await extension.openSidePanel();
+  const trigger = page.getByRole('button', {
+    name: "Afficher l'aide des raccourcis clavier",
+    exact: true,
+  });
+  await expect(trigger).toBeVisible();
+  await trigger.click();
+
+  const dialog = page.getByRole('dialog', { name: 'Raccourcis clavier' });
+  const close = dialog.getByRole('button', { name: 'Fermer', exact: true });
+  const acknowledge = dialog.getByRole('button', { name: "J'ai compris", exact: true });
+  await expect(dialog).toBeVisible();
+  await expect(close).toBeFocused();
+  await expect(dialog).toHaveAttribute('aria-modal', 'true');
+
+  await page.keyboard.press('Shift+Tab');
+  await expect(acknowledge).toBeFocused();
+  await page.keyboard.press('Tab');
+  await expect(close).toBeFocused();
+
+  await page.keyboard.press('Escape');
+  await expect(dialog).toHaveCount(0);
+  await expect(trigger).toBeFocused();
+  expectNoRuntimeErrors(extension.diagnostics);
+});

@@ -4,6 +4,7 @@ import type { AppSettings } from '../../../src/lib/core/types/app-settings';
 
 const feedDataMock = vi.hoisted(() => ({
   getMissions: vi.fn(),
+  getSeenIds: vi.fn(),
   getConnectorStatuses: vi.fn(),
   getConnectorsMeta: vi.fn(),
   detectAllConnectorSessions: vi.fn(),
@@ -115,6 +116,7 @@ describe('feed controller facade', () => {
     vi.clearAllMocks();
 
     feedDataMock.getMissions.mockResolvedValue([makeMission()]);
+    feedDataMock.getSeenIds.mockResolvedValue([]);
     feedDataMock.getConnectorStatuses.mockResolvedValue([
       {
         connectorId: 'free-work',
@@ -279,6 +281,125 @@ describe('feed controller facade', () => {
       "Impossible d'annuler pendant la récupération."
     );
     expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
+  it('loads the exact canonical projection for the panel-local arrival actor', async () => {
+    stubChrome();
+    const currentMissions = [makeMission({ id: 'current-1' })];
+    const canonicalMissions = [makeMission({ id: 'canonical-1' })];
+    const feedStore = {
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+    feedDataMock.getMissions.mockResolvedValue([...currentMissions, ...canonicalMissions]);
+    feedDataMock.getSeenIds.mockResolvedValue(['current-1']);
+    bridgeMock.sendMessage.mockImplementation(async (message: { type: string }) => {
+      if (message.type === 'GET_CONNECTOR_HEALTH') {
+        return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+      }
+      return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+    });
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    await expect(controller.loadArrivalProjection(['current-1', 'canonical-1'])).resolves.toEqual({
+      missions: [currentMissions[0], canonicalMissions[0]],
+      orderedUnseenIds: ['canonical-1'],
+    });
+
+    expect(feedStore.setMissions).not.toHaveBeenCalled();
+    expect(currentMissions.map((mission) => mission.id)).toEqual(['current-1']);
+    controller.dispose();
+  });
+
+  it('keeps a warm feed stable when an alarm scan publishes a cold-only projection', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let currentMissions = [makeMission({ id: 'warm-existing' })];
+    let feedState: 'empty' | 'loaded' = 'loaded';
+    const feedStore = {
+      get state() {
+        return feedState;
+      },
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(),
+      setMissions: vi.fn((missions: Mission[]) => {
+        currentMissions = missions;
+        feedState = missions.length === 0 ? 'empty' : 'loaded';
+      }),
+      setError: vi.fn(),
+    };
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    feedDataMock.getMissions.mockImplementation(async () => currentMissions);
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    bridgeListener?.({
+      type: 'MISSIONS_UPDATED',
+      projection: 'cold-only',
+      payload: [makeSerializedMission({ id: 'alarm-new' })],
+    });
+    await flushPromises();
+
+    expect(feedStore.setMissions).not.toHaveBeenCalled();
+    expect(currentMissions.map((mission) => mission.id)).toEqual(['warm-existing']);
+    expect(feedState).toBe('loaded');
+    controller.dispose();
+  });
+
+  it('leaves cold-only hydration to the panel-local arrival actor', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let currentMissions: Mission[] = [];
+    let feedState: 'empty' | 'loaded' = 'empty';
+    const feedStore = {
+      get state() {
+        return feedState;
+      },
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(),
+      setMissions: vi.fn((missions: Mission[]) => {
+        currentMissions = missions;
+        feedState = missions.length === 0 ? 'empty' : 'loaded';
+      }),
+      setError: vi.fn(),
+    };
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    feedDataMock.getMissions.mockImplementation(() => new Promise<Mission[]>(() => {}));
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    bridgeListener?.({
+      type: 'MISSIONS_UPDATED',
+      projection: 'cold-only',
+      payload: [makeSerializedMission({ id: 'alarm-new' })],
+    });
+    await flushPromises();
+
+    expect(feedStore.setMissions).not.toHaveBeenCalled();
+    expect(currentMissions).toEqual([]);
+    expect(feedState).toBe('empty');
     controller.dispose();
   });
 
@@ -631,12 +752,7 @@ describe('feed controller facade', () => {
     await flushPromises();
 
     expect(controller.isScanning).toBe(false);
-    expect(controller.hasPendingMissions).toBe(true);
-    expect(currentMissions.map((mission) => mission.id)).toEqual(['old-lehibou', 'new-free-work']);
-
-    await controller.applyPendingMissions();
-    await flushPromises();
-
+    expect(controller.hasPendingMissions).toBe(false);
     expect(currentMissions.map((mission) => mission.id)).toEqual(['final-free-work']);
 
     resolveScan?.({ type: 'SCAN_STARTED', payload: { operationId } });
@@ -644,7 +760,7 @@ describe('feed controller facade', () => {
     controller.dispose();
   });
 
-  it('buffers final scan results over an existing feed without local deduplication', async () => {
+  it('directly replaces an existing feed with final manual scan results', async () => {
     stubChrome();
     let bridgeListener: ((message: unknown) => void) | null = null;
     let operationId = '';
@@ -661,13 +777,17 @@ describe('feed controller facade', () => {
       url: 'https://example.com/final-duplicate-b',
     });
     let currentMissions = [makeMission({ id: 'existing-feed' })];
+    let feedState: 'loaded' | 'loading' = 'loaded';
     const feedStore = {
       get missions() {
         return currentMissions;
       },
-      load: vi.fn(),
+      load: vi.fn(() => {
+        feedState = 'loading';
+      }),
       setMissions: vi.fn((missions: Mission[]) => {
         currentMissions = missions;
+        feedState = 'loaded';
       }),
       setError: vi.fn(),
     };
@@ -698,26 +818,21 @@ describe('feed controller facade', () => {
     vi.clearAllMocks();
 
     await controller.startScan();
+    expect(feedState).toBe('loading');
     bridgeListener?.({
       type: 'SCAN_COMPLETE',
       payload: { operationId, missions: [duplicateA, duplicateB] },
     });
     await flushPromises();
 
-    expect(currentMissions.map((mission) => mission.id)).toEqual(['existing-feed']);
-    expect(controller.hasPendingMissions).toBe(true);
-    expect(controller.pendingMissionCount).toBe(2);
-    expect(controller.pendingMissions.map((mission) => mission.id)).toEqual([
-      'final-duplicate-a',
-      'final-duplicate-b',
-    ]);
-
-    await controller.applyPendingMissions();
-
     expect(currentMissions.map((mission) => mission.id)).toEqual([
       'final-duplicate-a',
       'final-duplicate-b',
     ]);
+    expect(feedState).toBe('loaded');
+    expect(controller.ownedScan).toBeNull();
+    expect(controller.hasPendingMissions).toBe(false);
+    expect(controller.pendingMissionCount).toBe(0);
     expect(feedStore.setMissions).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'final-duplicate-a' }),
       expect.objectContaining({ id: 'final-duplicate-b' }),
@@ -775,6 +890,71 @@ describe('feed controller facade', () => {
     ]);
     expect(feedStore.setError).not.toHaveBeenCalled();
     expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
+  it('restores a warm catalogue to loaded before releasing a cancelled owned scan', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let operationId = '';
+    const originalMission = makeMission({ id: 'warm-existing' });
+    let currentMissions = [originalMission];
+    let feedState: 'loaded' | 'loading' = 'loaded';
+    const feedStore = {
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(() => {
+        feedState = 'loading';
+      }),
+      reset: vi.fn(() => {
+        currentMissions = [];
+      }),
+      setMissions: vi.fn((missions: Mission[]) => {
+        currentMissions = missions;
+        feedState = 'loaded';
+      }),
+      setError: vi.fn(),
+    };
+
+    feedDataMock.getMissions.mockImplementation(async () => currentMissions);
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        }
+        if (message.type === 'SCAN_CANCEL') {
+          return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
+        }
+        return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    await controller.startScan();
+    expect(feedState).toBe('loading');
+    expect(controller.ownedScan).toMatchObject({ operationId, state: 'scanning' });
+
+    await controller.stopScan();
+    expect(controller.ownedScan).toMatchObject({ operationId, state: 'cancelling' });
+    bridgeListener?.({ type: 'SCAN_CANCELLED', payload: { operationId } });
+    await flushPromises();
+
+    expect(feedState).toBe('loaded');
+    expect(controller.ownedScan).toBeNull();
+    expect(currentMissions).toEqual([originalMission]);
+    expect(feedStore.reset).not.toHaveBeenCalled();
     controller.dispose();
   });
 

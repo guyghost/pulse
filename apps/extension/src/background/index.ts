@@ -88,6 +88,7 @@ import {
   setProfileBannerDismissed,
 } from '../lib/shell/storage/first-scan';
 import { createDefaultProfile } from '../lib/core/profile/defaults';
+
 import {
   getTracking,
   saveTracking,
@@ -768,7 +769,11 @@ async function executeAcceptedScanOperation(
     await settleTerminalOperation(operation, message, async () => {
       if (trigger === 'alarm') {
         await chrome.runtime
-          .sendMessage({ type: 'MISSIONS_UPDATED', payload: result.missions })
+          .sendMessage({
+            type: 'MISSIONS_UPDATED',
+            projection: 'cold-only',
+            payload: result.missions,
+          })
           .catch(() => {
             // Side panel not open, durable missions remain committed.
           });

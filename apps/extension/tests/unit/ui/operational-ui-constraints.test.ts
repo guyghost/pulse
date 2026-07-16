@@ -138,9 +138,8 @@ describe('operational UI constraints', () => {
     const toastSource = readFileSync('src/ui/organisms/ToastContainer.svelte', 'utf8');
 
     expect(feedSource).toContain("import('../organisms/MissionArrivalStack.svelte')");
-    expect(feedSource).toContain('page.startArrivalRefresh()');
-    expect(feedSource).toContain('await controller.applyPendingMissions()');
-    expect(feedSource).toContain('page.completeArrivalRefresh()');
+    expect(feedSource).toContain('await page.refreshArrivals()');
+    expect(feedSource).not.toContain('await controller.applyPendingMissions()');
     expect(feedSource).toContain('stableQueueActive={page.stableQueueActive}');
     expect(feedSource).toContain('onMissionReadSignal={page.handleMissionReadSignal}');
     expect(feedSource).not.toContain('data-testid="pending-missions-banner"');

@@ -65,6 +65,7 @@ const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
 const clearChromeStorage = vi.fn(async () => undefined);
+const arrivalSessionStore: Record<string, unknown> = {};
 
 let alarmListener: ((alarm: { name: string }) => Promise<void>) | undefined;
 let messageListener:
@@ -195,6 +196,14 @@ vi.stubGlobal('chrome', {
       set: vi.fn(async () => undefined),
       remove: vi.fn(async () => undefined),
       clear: clearChromeStorage,
+    },
+    session: {
+      get: vi.fn(async (key: string) =>
+        key in arrivalSessionStore ? { [key]: arrivalSessionStore[key] } : {}
+      ),
+      set: vi.fn(async (values: Record<string, unknown>) => {
+        Object.assign(arrivalSessionStore, values);
+      }),
     },
     onChanged: {
       addListener: vi.fn(),
@@ -392,6 +401,9 @@ describe('background auto-scan notifications', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    for (const key of Object.keys(arrivalSessionStore)) {
+      delete arrivalSessionStore[key];
+    }
     clearChromeStorage.mockResolvedValue(undefined);
     getSettings.mockResolvedValue({
       scanIntervalMinutes: 30,
@@ -478,13 +490,20 @@ describe('background auto-scan notifications', () => {
     expect(saveSeenIds).toHaveBeenCalledWith(['already-seen', 'mission-1']);
     expect(setNewMissionCount).toHaveBeenCalledWith(2);
     expect(setBadgeText).toHaveBeenCalledWith({ text: '2' });
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-      type: 'MISSIONS_UPDATED',
-      payload: [
-        expect.objectContaining({ id: 'mission-1' }),
-        expect.objectContaining({ id: 'mission-2' }),
-      ],
-    });
+    const feedProjectionMessages = vi
+      .mocked(chrome.runtime.sendMessage)
+      .mock.calls.map(([message]) => message)
+      .filter((message) => (message as { type?: string }).type === 'MISSIONS_UPDATED');
+    expect(feedProjectionMessages).toEqual([
+      {
+        type: 'MISSIONS_UPDATED',
+        projection: 'cold-only',
+        payload: [
+          expect.objectContaining({ id: 'mission-1' }),
+          expect.objectContaining({ id: 'mission-2' }),
+        ],
+      },
+    ]);
   });
 
   it('clears badge and new mission count when all fetched missions are already seen', async () => {
