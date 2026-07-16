@@ -1,21 +1,43 @@
 # Release Readiness Workflow Model
 
 Authoritative fail-closed model for moving one MissionPulse release candidate
-from audit to production or rollback. State is derived from attached evidence,
-not from a mutable label or narrative approval.
+from audit to production or rollback. State is derived from typed, immutable
+evidence; a label, branch, tag, report, or narrative approval has no authority.
 
-## Scope and decisions
+## Scope and fixed candidate
 
-Only a ZIP whose extracted canonical tree digest equals the sealed `dist` tree
-loaded by the packaged MV3 harness is eligible for Chrome Web Store
-publication. Packaging must consume those tested bytes without rebuild or
-repack. Commit, committed version, built manifest, connector catalogue, public
-metadata, ZIP SHA-256, both tree digests, runtime evidence, Store configuration,
-and canary observations must refer to the same `releaseId` and artifact.
+The Task 12 packaging phase packages the exact `apps/extension/dist` bytes
+already exercised and sealed by the packaged MV3 gate. It is a
+**package-only** operation: install, build, version bump, manifest edit,
+connector re-resolution, and any write to the tested `dist` are forbidden
+after the seal. A command that can rebuild or delete `dist`, including the
+current `build:extension`, is not a packaging-phase interface.
 
-Missing, stale, contradictory, or unverifiable evidence is a blocker. External
-Store/canary work remains external until an authorized operator records proof;
-local checks cannot claim those gates complete.
+The authoritative seal must be created by one fresh, clean build -> local gate
+-> packaged MV3 gate after every in-scope production change is committed. The
+earlier Task 10/11 artifact is regression evidence only once Tasks 6-9 change
+source bytes; its historical digest cannot authorize the final ZIP. The
+package-only boundary begins only after the final gate emits the complete
+`TestedDistSeal`.
+
+All release tooling, workflow gates and source-controlled production
+documentation that can affect the candidate are committed before that clean
+build. The human-readable evidence report is generated only after packaging
+and may be committed separately as a downstream evidence commit. That later
+commit is never substituted for `CandidateSourceIdentity.sourceCommit` and
+does not authorize rebuilding or resealing the candidate.
+
+The current candidate version is `0.2.2`, matching the root package, extension
+package, source manifest, and tested manifest. Naming an archive or evidence
+document `0.2.3` cannot change that identity. A future `0.2.3` requires a
+committed bump, a clean unique build, the complete MV3 gate, and a new seal
+before packaging.
+
+Only a ZIP whose safely extracted canonical inventory equals the tested seal is
+eligible for Chrome Web Store work. Missing, stale, contradictory, unbound, or
+unverifiable evidence blocks the candidate. Store, canary, promotion, and
+rollback remain external gates until an authorized operator records their
+typed receipts.
 
 ## Exact state vocabulary
 
@@ -31,15 +53,360 @@ type ReleaseReadinessState =
   | 'rolled_back';
 ```
 
-No `ready`, `done`, `approved`, or prose-derived alias may substitute for one
-of these states.
+`rc_built` means “the unique build passed local and MV3 gates and its `dist` is
+sealed”; it does **not** mean that a ZIP exists. `package_validated` is the
+first state in which a ZIP has authority.
 
-## Context and evidence
+## Canonical inventory contract
+
+One implementation and algorithm version are shared by seal creation, source
+revalidation, snapshot validation, ZIP inspection, and extracted-tree
+validation.
 
 ```ts
+type CanonicalTreeAlgorithm = 'missionpulse-tree-sha256-v2';
+
+interface CanonicalFileEntry {
+  path: string; // normalized relative POSIX UTF-8 path
+  bytes: number;
+  sha256: string;
+  mode: '0644';
+}
+
+interface CanonicalTreeReceipt {
+  algorithm: CanonicalTreeAlgorithm;
+  fileCount: number;
+  treeSha256: string;
+  manifestSha256: string;
+  entries: readonly CanonicalFileEntry[];
+}
+```
+
+The `v2` algorithm applies these rules exactly:
+
+1. Traverse with `lstat`/no-follow semantics. Accept regular files only. Reject
+   symlinks, hard-link aliases, sockets, devices, FIFOs, sparse/accessor-like
+   filesystem surprises, and entries that change identity while opened.
+2. Paths are valid UTF-8, relative POSIX paths. Reject absolute paths,
+   backslashes, NUL, empty/`.`/`..` segments, non-canonical encodings,
+   duplicates, Unicode-normalization collisions, and case-fold collisions.
+3. Sort the UTF-8 path bytes in unsigned bytewise order, equivalent to
+   `LC_ALL=C`; `localeCompare` and ambient locale are forbidden.
+4. For each sorted file, hash
+   `path + NUL + decimalByteLength + NUL + fileSha256 + LF`, using SHA-256.
+   Metadata does not alter the content-tree digest, but non-canonical metadata
+   is rejected or normalized in the private snapshot before archiving.
+5. `manifest.json` is required and its byte digest is recorded separately.
+   The complete ordered entry list is part of every receipt.
+
+Any legacy harness digest may be recorded as compatibility evidence, but it is
+not substituted for `v2` and never authorizes a candidate after source changes.
+A `v2` seal may be added to exact unchanged tested bytes only when the legacy
+per-file inventory and digest match evidence emitted by that same final MV3
+run. Any inventory difference requires a new clean build and complete MV3 run,
+not a “reseal”.
+
+## Immutable evidence values
+
+```ts
+interface CandidateSourceIdentity {
+  releaseId: string;
+  sourceCommit: string;
+  gitObjectFormat: 'sha1' | 'sha256';
+  committedVersion: '0.2.2';
+  gitTreeObjectId: string;
+  worktreeCleanBeforeBuild: true;
+  worktreeCleanAfterMv3: true;
+  nodeVersion: string;
+  pnpmVersion: string;
+  lockfileSha256: string;
+  connectorConfigSha256: string;
+  includedConnectorIds: readonly string[];
+}
+
+interface LocalGateReceiptV1 {
+  version: 1;
+  receiptId: string;
+  releaseId: string;
+  sourceCommit: string;
+  gitTreeObjectId: string;
+  startedAt: string;
+  completedAt: string;
+  checks: {
+    format: 'passed';
+    lint: 'passed';
+    typecheck: 'passed';
+    unit: 'passed';
+    sourceManifest: 'passed';
+  };
+  commandInventorySha256: string;
+  reportBundleSha256: string;
+}
+
+interface PackagedMv3GateReceiptV1 {
+  version: 1;
+  receiptId: string;
+  releaseId: string;
+  sourceCommit: string;
+  buildId: string;
+  startedAt: string;
+  completedAt: string;
+  expectedScenarioInventorySha256: string;
+  executedScenarioIds: readonly string[];
+  passedScenarioCount: number;
+  skippedScenarioCount: 0;
+  failedScenarioCount: 0;
+  playwrightReportSha256: string;
+  runtimeDiagnosticFindingCount: 0;
+  treeBeforeLaunch: CanonicalTreeReceipt;
+  treeAfterSuite: CanonicalTreeReceipt;
+  manifestSha256: string;
+}
+
+interface TestedDistSeal {
+  sealId: string;
+  source: CandidateSourceIdentity;
+  distPath: 'apps/extension/dist';
+  manifestVersion: '0.2.2';
+  manifestConnectorIds: readonly string[];
+  manifestValidatedAt: string;
+  mv3CompletedAt: string;
+  localGate: LocalGateReceiptV1;
+  mv3Gate: PackagedMv3GateReceiptV1;
+  supportingEvidence: readonly EvidenceRef[];
+  legacyHarnessTreeSha256: string;
+  canonicalTree: CanonicalTreeReceipt;
+  forbiddenDevFindingCount: 0;
+}
+
+interface SnapshotReceipt {
+  snapshotId: string;
+  sealId: string;
+  releaseId: string;
+  worktreeCleanBeforePackage: true;
+  worktreeCleanAfterPackage: true;
+  sourceBefore: CanonicalTreeReceipt;
+  snapshot: CanonicalTreeReceipt;
+  sourceAfterCopy: CanonicalTreeReceipt;
+  sourceAfterArchive: CanonicalTreeReceipt;
+  lockHeldContinuously: true;
+  privateSnapshotReadOnly: true;
+  normalizedFileMode: '0644';
+  normalizedDirectoryMode: '0755';
+  normalizedTimestamp: '1980-01-01T00:00:00Z';
+}
+
+interface ZipEntryReceipt {
+  path: string;
+  uncompressedBytes: number;
+  compressedBytes: number; // exactly equal: STORE method, no compression
+  crc32: string;
+  compressionMethod: 'store';
+  generalPurposeBitFlag: '0x0800'; // UTF-8 names, no data descriptor
+  versionNeeded: '0x0014';
+  versionMadeBy: '0x0314'; // Unix, ZIP 2.0
+  externalAttributes: '0x81a40000'; // regular 0100644
+  mode: '0644';
+  timestamp: '1980-01-01T00:00:00Z';
+  extraFieldBytes: 0;
+  kind: 'regular_file';
+}
+
+interface ArtifactConsumptionReceipt {
+  receiptId: string;
+  releaseId: string;
+  sealId: string;
+  artifactSha256: string;
+  consumer: 'package_runner' | 'ci_upload' | 'ci_download' | 'cws_upload' | 'rollback';
+  verifiedAt: string;
+  expectedSha256Source: EvidenceRef;
+}
+
+interface ValidatedZipArtifact {
+  artifactId: string;
+  releaseId: string;
+  sealId: string;
+  sourceCommit: string;
+  version: '0.2.2';
+  archivePath: 'apps/extension/releases/missionpulse-0.2.2.zip';
+  archiveBytes: number;
+  archiveSha256: string;
+  checksumPath: 'apps/extension/releases/missionpulse-0.2.2.zip.sha256';
+  checksumVerified: true;
+  zipIntegrityVerified: true;
+  deterministicTwinSha256: string;
+  entries: readonly ZipEntryReceipt[];
+  snapshotReceipt: SnapshotReceipt;
+  extractedTree: CanonicalTreeReceipt;
+  extractedManifestVersion: '0.2.2';
+  extractedManifestValidated: true;
+  validationReceipt: EvidenceRef;
+  consumptionReceipts: readonly ArtifactConsumptionReceipt[];
+}
+```
+
+`sourceCommit` and `gitTreeObjectId` are the exact object IDs reported by Git
+for `HEAD` and `HEAD^{tree}` under the recorded `gitObjectFormat`; they are not
+mislabelled SHA-256 digests in a SHA-1 repository. Clean-worktree checks include
+all tracked and untracked entries reported by
+`git status --porcelain=v2 --untracked-files=all`. Ordinary ignored dependency,
+build and test-output roots do not make the Git worktree dirty. Release-specific
+ignored output paths are nevertheless inspected directly: the temporary and
+final ZIP, sidecar and receipt paths must satisfy the exact absence/freshness
+rules of the package protocol.
+
+`TestedDistSeal` and `ValidatedZipArtifact` are immutable, single-assignment
+values linked by both `releaseId` and `sealId`. The ZIP path/hash cannot appear
+in `rc_built`; loose strings supplied by an event are not a package proof.
+
+Historical Task 10/11 evidence is not final-candidate authority after later
+source changes. Even for unchanged bytes, it is acceptable only if it satisfies
+every field above. In particular, a digest without the exact source commit,
+committed version, toolchain/configuration identity, clean-worktree proof and
+complete scenario evidence cannot advance this model. Task 12 never invents
+that missing provenance.
+
+## Final candidate gate and seal protocol
+
+Seal creation and package creation are separate capabilities. The candidate
+gate may build exactly once; the package runner may never build. The candidate
+gate executes this closed protocol from a clean committed source:
+
+1. Capture the source/toolchain/configuration identity and require the release
+   output paths and prior seal path to be absent.
+2. Run the committed format, lint, TypeScript, unit and source-manifest checks.
+   Record their exact command inventory and content-addressed report bundle in
+   `LocalGateReceiptV1`; a narrative claim or exit-code-only event is invalid.
+3. Perform the unique UI/extension build, validate the built manifest and take
+   the canonical `treeBeforeLaunch` receipt. No later step may write `dist`.
+4. Run the complete packaged MV3 suite with an aggregated machine-readable
+   report. Its executed scenario IDs must exactly equal the committed expected
+   inventory; zero skipped, unexpected or failed scenarios are allowed. Per-test
+   fixture files or the last test's teardown receipt are not suite authority.
+5. Settle all runtime diagnostics and cleanup, then recompute
+   `treeAfterSuite`. Require exact tree/manifest equality, zero forbidden DEV
+   findings and zero runtime diagnostics.
+6. Recheck the clean source identity and emit `TestedDistSeal` atomically only
+   after both structured receipts validate. A failed/interrupted gate leaves no
+   seal. Rerunning requires deleting only failed temporary evidence and starts a
+   new build ID; it never blesses the prior `dist` by inspection alone.
+
+`passedScenarioCount` is a safe positive integer equal to
+`executedScenarioIds.length`; scenario IDs are unique, sorted canonical IDs.
+The expected-inventory digest, Playwright report digest, both canonical trees,
+manifest digest, source commit and build ID all belong to the same MV3 run.
+Once the seal exists, the candidate-gate capability is closed and only the
+package-only protocol below is permitted.
+
+## Package-only TOCTOU protocol
+
+The package runner owns one exclusive release lock from source verification
+through final source revalidation. A lock loss is terminal for that operation.
+The exact order is mandatory:
+
+1. Refuse any build/install/bump flag or command and refuse a source commit,
+   version, release ID, connector set, or worktree state different from the
+   seal. Revalidate the current `dist` with the shared `v2` implementation.
+2. Create a private empty snapshot directory with exclusive creation. While the
+   release lock is held, copy each sealed regular file with no-follow/open-file
+   identity checks. Refuse all unsupported entries.
+3. Recompute source before copy, snapshot after copy, and source after copy.
+   All inventories, file hashes, tree digests, counts, and manifest digests must
+   equal the seal. Normalize only the private snapshot to file mode `0644`,
+   directory mode `0755`, and timestamp `1980-01-01T00:00:00Z`; then remove
+   write permissions and retain no writable handle.
+4. Create the archive in a fresh private output directory. Both temporary and
+   final archive paths must be absent and opened with exclusive-create
+   semantics. An existing archive is an error; update-in-place is forbidden.
+5. Archive only the sorted regular-file list from the snapshot, under
+   `LC_ALL=C`, using ZIP method `STORE` (0) with compressed size equal to
+   uncompressed size. Local and central headers use the same sorted order,
+   UTF-8 flag `0x0800`, version-needed `0x0014`, version-made-by `0x0314`, no
+   data descriptor, ZIP64, directory entry, UID/GID, extra field, comment,
+   encryption, internal attribute or ambient metadata. Build a second
+   independent archive from the same snapshot and require equal SHA-256. The
+   writer encodes the fixed raw DOS date/time in UTC and external attribute
+   `0x81a40000` for Unix regular mode `0100644`; process timezone, compression
+   library and umask are not inputs.
+6. Verify ZIP integrity and inspect its central/local entries before extraction.
+   Reject absolute/traversal paths, duplicates, case/Unicode collisions,
+   symlinks, specials, unexpected directories, extra fields, ZIP64, header
+   flags/versions/method/attributes, modes/timestamps, encrypted entries,
+   inconsistent stored sizes/CRC, or an entry list different from the sealed
+   inventory.
+7. Extract through the validating extractor into a newly and exclusively
+   created empty directory. Never extract over an existing path. Recompute the
+   `v2` tree receipt and manifest digest with the same implementation, then run
+   post-build manifest validation against expected version `0.2.2` on the
+   extracted manifest.
+8. Recompute the private snapshot and locked source after archive creation.
+   Every receipt must still equal the seal. Any drift before, during, or after
+   copy/archive invalidates the operation and the snapshot; it is never blindly
+   retried with the same seal.
+9. Hash the validated temporary archive, write the UTF-8 sidecar as exactly
+   `<64 lowercase hex>  missionpulse-0.2.2.zip\n`, verify it, atomically rename
+   both to their previously absent final paths, and verify again. Emit
+   `ValidatedZipArtifact` only after all comparisons pass, then release the
+   lock.
+
+The required equality is:
+
+```text
+seal.canonicalTree
+  == sourceBefore
+  == snapshot
+  == sourceAfterCopy
+  == extractedTree
+  == sourceAfterArchive
+
+seal.manifestSha256 == extractedTree.manifestSha256
+seal.manifestVersion == extractedManifestVersion == 0.2.2
+archiveSha256 == deterministicTwinSha256 == verified sidecar SHA-256
+```
+
+## Actions, context, and events
+
+```ts
+interface EvidenceRef {
+  evidenceId: string;
+  kind: string;
+  sha256: string;
+  immutableUri: string;
+  recordedAt: string;
+}
+
+interface ReleaseBlocker {
+  blockerId: string;
+  severity: 'P0' | 'P1';
+  code: string;
+  openedBy: EvidenceRef;
+  closedBy: EvidenceRef | null;
+}
+
+interface CompleteAuditEvidence {
+  ref: EvidenceRef;
+  releaseId: string;
+  sourceCommit: string;
+  committedVersion: '0.2.2';
+  coveredGates: readonly (
+    | 'workflows'
+    | 'security'
+    | 'permissions'
+    | 'metadata'
+    | 'ci'
+    | 'runtime'
+    | 'artifact_provenance'
+    | 'cws'
+    | 'canary'
+    | 'rollback'
+  )[];
+  openP0Count: 0;
+  openP1Count: 0;
+}
+
 type ReleaseActionKind =
   | 'audit'
-  | 'build'
+  | 'seal_build'
   | 'validate_package'
   | 'validate_store'
   | 'publish_canary'
@@ -64,35 +431,27 @@ interface FailedReleaseAction {
   retryable: boolean;
 }
 
-interface CompleteAuditEvidence {
-  ref: EvidenceRef;
+interface ReleaseGateError {
+  code: ReleaseGateErrorCode;
   releaseId: string;
-  sourceCommit: string;
-  committedVersion: string;
-  auditedAt: string;
-  coveredGates: readonly (
-    'workflows' | 'security' | 'permissions' | 'metadata' | 'ci' | 'runtime' | 'rollback'
-  )[];
-  openP0Count: 0;
-  openP1Count: 0;
+  operationId: string;
+  action: ReleaseActionKind;
+  stage: string;
+  occurredAt: string;
+  retryable: boolean;
+  expectedEvidence: EvidenceRef | null;
+  observedEvidence: EvidenceRef | null;
 }
 
 interface ReleaseReadinessContext {
   releaseId: string;
   state: ReleaseReadinessState;
-  sourceCommit: string;
-  committedVersion: string;
-  artifactPath: string | null;
-  artifactSha256: string | null;
-  testedDistTreeDigest: string | null;
-  zipExtractedTreeDigest: string | null;
-  manifestVersion: string | null;
-  manifestConnectorIds: readonly string[];
+  source: CandidateSourceIdentity;
+  testedDistSeal: TestedDistSeal | null;
+  validatedZipArtifact: ValidatedZipArtifact | null;
   auditedAt: string;
   p0Blockers: readonly ReleaseBlocker[];
   p1Blockers: readonly ReleaseBlocker[];
-  localGateEvidence: readonly EvidenceRef[];
-  mv3ScenarioEvidence: readonly EvidenceRef[];
   storeEvidence: readonly EvidenceRef[];
   canaryEvidence: readonly EvidenceRef[];
   canaryOutcome: 'not_started' | 'running' | 'passed' | 'failed';
@@ -103,94 +462,24 @@ interface ReleaseReadinessContext {
   resumeFrom: ReleaseReadinessState | null;
   error: ReleaseGateError | null;
 }
-```
 
-Every action is requested before it starts and remains orthogonal to the eight
-readiness states. `ReleaseGateError` records action kind, failed operation ID,
-and retryability. Secrets are never part of evidence.
-
-## Events
-
-```ts
 type ReleaseReadinessEvent =
-  | { type: 'AUDIT_RECORDED'; releaseId: string; evidence: EvidenceRef }
+  | { type: 'AUDIT_RECORDED'; releaseId: string; evidence: CompleteAuditEvidence }
   | {
       type: 'BLOCKERS_FOUND';
       releaseId: string;
       operationId: string;
       blockers: readonly ReleaseBlocker[];
     }
-  | {
-      type: 'AUDIT_REQUESTED';
-      releaseId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-    }
-  | { type: 'AUDIT_PASSED'; releaseId: string; operationId: string; evidence: EvidenceRef }
-  | {
-      type: 'BUILD_REQUESTED';
-      releaseId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-    }
-  | {
-      type: 'PACKAGE_VALIDATION_REQUESTED';
-      releaseId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-    }
-  | {
-      type: 'STORE_VALIDATION_REQUESTED';
-      releaseId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-    }
-  | {
-      type: 'CANARY_PUBLICATION_REQUESTED';
-      releaseId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-    }
-  | {
-      type: 'CANARY_OBSERVATION_REQUESTED';
-      releaseId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-    }
-  | {
-      type: 'PRODUCTION_PROMOTION_REQUESTED';
-      releaseId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-    }
+  | { type: 'ACTION_REQUESTED'; releaseId: string; action: ReleaseAction }
   | { type: 'ACTION_STARTED'; releaseId: string; operationId: string; startedAt: string }
-  | {
-      type: 'RC_BUILD_SUCCEEDED';
-      releaseId: string;
-      operationId: string;
-      commit: string;
-      version: string;
-      artifactPath: string;
-      sha256: string;
-      manifestVersion: string;
-      connectorIds: readonly string[];
-    }
-  | { type: 'RC_BUILD_FAILED'; releaseId: string; operationId: string; error: ReleaseGateError }
+  | { type: 'RC_DIST_SEALED'; releaseId: string; operationId: string; seal: TestedDistSeal }
+  | { type: 'RC_SEAL_FAILED'; releaseId: string; operationId: string; error: ReleaseGateError }
   | {
       type: 'PACKAGE_VALIDATION_SUCCEEDED';
       releaseId: string;
       operationId: string;
-      sha256: string;
-      testedDistTreeDigest: string;
-      zipExtractedTreeDigest: string;
-      evidence: readonly EvidenceRef[];
+      artifact: ValidatedZipArtifact;
     }
   | {
       type: 'PACKAGE_VALIDATION_FAILED';
@@ -214,14 +503,8 @@ type ReleaseReadinessEvent =
       type: 'CANARY_STARTED';
       releaseId: string;
       operationId: string;
-      artifactSha256: string;
+      receipt: ArtifactConsumptionReceipt;
       evidence: EvidenceRef;
-    }
-  | {
-      type: 'CANARY_PUBLICATION_FAILED';
-      releaseId: string;
-      operationId: string;
-      error: ReleaseGateError;
     }
   | {
       type: 'CANARY_PASSED';
@@ -241,32 +524,18 @@ type ReleaseReadinessEvent =
       type: 'PRODUCTION_PROMOTED';
       releaseId: string;
       operationId: string;
-      artifactSha256: string;
+      receipt: ArtifactConsumptionReceipt;
       evidence: EvidenceRef;
-    }
-  | {
-      type: 'PRODUCTION_PROMOTION_FAILED';
-      releaseId: string;
-      operationId: string;
-      error: ReleaseGateError;
-    }
-  | {
-      type: 'ROLLBACK_REQUESTED';
-      releaseId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-      reason: string;
     }
   | {
       type: 'ROLLBACK_SUCCEEDED';
       releaseId: string;
       operationId: string;
-      restoredSha256: string;
+      receipt: ArtifactConsumptionReceipt;
       evidence: EvidenceRef;
     }
-  | { type: 'ROLLBACK_FAILED'; releaseId: string; operationId: string; error: ReleaseGateError }
-  | { type: 'EVIDENCE_INVALIDATED'; releaseId: string; reason: string }
+  | { type: 'TYPED_ACTION_FAILED'; releaseId: string; operationId: string; error: ReleaseGateError }
+  | { type: 'EVIDENCE_INVALIDATED'; releaseId: string; error: ReleaseGateError }
   | { type: 'CANCEL_ACTION'; releaseId: string; operationId: string }
   | { type: 'ACTION_CANCELLED'; releaseId: string; operationId: string }
   | {
@@ -275,14 +544,7 @@ type ReleaseReadinessEvent =
       operationId: string;
       error: ReleaseGateError;
     }
-  | {
-      type: 'RETRY_GATE';
-      releaseId: string;
-      failedOperationId: string;
-      operationId: string;
-      actorId: string;
-      requestedAt: string;
-    }
+  | { type: 'RETRY_GATE'; releaseId: string; failedOperationId: string; action: ReleaseAction }
   | { type: 'SERVICE_RESTARTED'; releaseId: string }
   | {
       type: 'ACTION_RECONCILED';
@@ -294,46 +556,75 @@ type ReleaseReadinessEvent =
   | {
       type: 'NEW_CANDIDATE';
       previousReleaseId: string;
-      releaseId: string;
-      sourceCommit: string;
-      committedVersion: string;
+      source: CandidateSourceIdentity;
       audit: CompleteAuditEvidence;
     };
 ```
+
+All event payloads are descriptor-snapshotted, schema-validated, and frozen at
+the Shell boundary before Core reduction. Success events carry structured
+receipts, never caller-asserted digest strings.
+
+## Typed failures
+
+```ts
+type ReleaseGateErrorCode =
+  | 'RELEASE_BUSY'
+  | 'SOURCE_WORKTREE_DIRTY'
+  | 'SOURCE_COMMIT_MISMATCH'
+  | 'VERSION_MISMATCH'
+  | 'TOOLCHAIN_OR_CONFIG_MISMATCH'
+  | 'TESTED_DIST_SEAL_MISSING'
+  | 'DIST_SEAL_MISMATCH'
+  | 'REBUILD_AFTER_SEAL_FORBIDDEN'
+  | 'RELEASE_LOCK_UNAVAILABLE'
+  | 'RELEASE_LOCK_LOST'
+  | 'UNSUPPORTED_INVENTORY_ENTRY'
+  | 'UNSAFE_OR_COLLIDING_PATH'
+  | 'SOURCE_DRIFT_DURING_COPY'
+  | 'SNAPSHOT_DIVERGED'
+  | 'SNAPSHOT_NOT_IMMUTABLE'
+  | 'ARCHIVE_ALREADY_EXISTS'
+  | 'ARCHIVE_NON_CANONICAL'
+  | 'ARCHIVE_NON_DETERMINISTIC'
+  | 'ZIP_INTEGRITY_FAILED'
+  | 'ZIP_ENTRY_POLICY_FAILED'
+  | 'SAFE_EXTRACTION_FAILED'
+  | 'EXTRACTED_TREE_DIVERGED'
+  | 'EXTRACTED_MANIFEST_DIVERGED'
+  | 'EXTRACTED_VERSION_DIVERGED'
+  | 'SOURCE_DRIFT_AFTER_ARCHIVE'
+  | 'CHECKSUM_SIDECAR_DIVERGED'
+  | 'CONSUMER_CHECKSUM_DIVERGED'
+  | 'STORE_EVIDENCE_INCOMPLETE'
+  | 'CWS_CREDENTIALS_INCOMPLETE'
+  | 'EXTERNAL_OUTCOME_UNKNOWN';
+```
+
+Every error includes `releaseId`, `operationId`, action kind, stage, timestamp,
+retryability, expected identity, and observed non-secret evidence. A drift,
+unknown external outcome, or checksum mismatch is not retryable on the same
+seal/artifact.
 
 ## Statechart
 
 ```mermaid
 stateDiagram-v2
   [*] --> audited: AUDIT_RECORDED
-  audited --> audited: AUDIT_REQUESTED [noActiveAction] / requestAudit
-  audited --> audited: AUDIT_PASSED [matchingReleaseAndAction] / archiveAuditPassAndClearAction
-  audited --> audited: BUILD_REQUESTED / requestBuild
-  audited --> rc_built: RC_BUILD_SUCCEEDED [auditClear && artifactIdentified]
-  audited --> blocked: BLOCKERS_FOUND [matchingReleaseAndAction] / archiveAuditWithBlockers
-  audited --> blocked: RC_BUILD_FAILED
-  blocked --> blocked: AUDIT_REQUESTED or RETRY_GATE / requestAction
-  blocked --> blocked: BLOCKERS_FOUND [matchingReleaseAndAction] / retainAuditBlockers
-  blocked --> audited: AUDIT_PASSED [matchingReleaseAndAction && allBlockersResolved]
-  rc_built --> rc_built: PACKAGE_VALIDATION_REQUESTED / requestPackageValidation
-  rc_built --> package_validated: PACKAGE_VALIDATION_SUCCEEDED [exactArtifact]
+  audited --> blocked: BLOCKERS_FOUND
+  audited --> rc_built: RC_DIST_SEALED [auditClear && exactTestedSeal]
+  audited --> blocked: RC_SEAL_FAILED
+  rc_built --> package_validated: PACKAGE_VALIDATION_SUCCEEDED [validatedArtifactMatchesSeal]
   rc_built --> blocked: PACKAGE_VALIDATION_FAILED
-  package_validated --> package_validated: STORE_VALIDATION_REQUESTED / requestStoreValidation
   package_validated --> store_ready: STORE_VALIDATION_SUCCEEDED [storeEvidenceComplete]
   package_validated --> blocked: STORE_VALIDATION_FAILED
-  store_ready --> store_ready: CANARY_PUBLICATION_REQUESTED / requestCanaryPublication
-  store_ready --> canary: CANARY_STARTED [sameArtifact && authorized]
-  canary --> canary: CANARY_OBSERVATION_REQUESTED / requestCanaryObservation
-  canary --> canary: CANARY_PASSED [matchingReleaseAndAction && sameArtifact] / attachCanaryEvidence
-  canary --> canary: PRODUCTION_PROMOTION_REQUESTED [canaryPassed] / requestPromotion
-  canary --> production: PRODUCTION_PROMOTED [matchingReleaseAndAction && canaryPassed && sameArtifact]
-  canary --> canary: ROLLBACK_REQUESTED [authorized] / requestRollback
-  production --> production: ROLLBACK_REQUESTED [authorized] / requestRollback
-  canary --> rolled_back: ROLLBACK_SUCCEEDED [matchingReleaseAndAction]
-  production --> rolled_back: ROLLBACK_SUCCEEDED [matchingReleaseAndAction]
-  canary --> blocked: CANARY_FAILED [matchingReleaseAndAction] / archiveCanaryObservationAndRequireRollback
-  blocked --> blocked: ROLLBACK_REQUESTED [rollbackProvenance] / requestRollback
-  blocked --> rolled_back: ROLLBACK_SUCCEEDED [rollbackProvenance && matchingReleaseAndAction]
+  store_ready --> canary: CANARY_STARTED [authorized && checksumAtConsumption]
+  canary --> canary: CANARY_PASSED [sameArtifact]
+  canary --> blocked: CANARY_FAILED
+  canary --> production: PRODUCTION_PROMOTED [canaryPassed && checksumAtConsumption]
+  canary --> rolled_back: ROLLBACK_SUCCEEDED [rollbackProvenance && checksumAtConsumption]
+  production --> rolled_back: ROLLBACK_SUCCEEDED [rollbackProvenance && checksumAtConsumption]
+  blocked --> rolled_back: ROLLBACK_SUCCEEDED [rollbackRequired && checksumAtConsumption]
   rolled_back --> audited: NEW_CANDIDATE [completeFreshAudit]
   audited --> blocked: EVIDENCE_INVALIDATED
   rc_built --> blocked: EVIDENCE_INVALIDATED
@@ -341,216 +632,152 @@ stateDiagram-v2
   store_ready --> blocked: EVIDENCE_INVALIDATED
 ```
 
-Build/validation/publish/rollback actions run while the last stable state
-remains visible in `state`; `activeAction` records the in-flight action. Only a
-typed guarded success or external milestone (`CANARY_STARTED`) advances the
-state; request, start, cancel, retry, and reconciliation events do not
-optimistically advance it.
+Requests, starts, cancellation, retries, and reconciliation mutate only
+`activeAction`; they never advance the stable readiness state. Every typed
+success/failure requires the matching release, operation, action kind, and a
+running or reconciling action.
 
 ## Guards
 
-| Guard                      | Rule                                                                                                                                                     |
-| -------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `matchingReleaseAndAction` | Release ID, operation ID, and expected action kind match current context/active action.                                                                  |
-| `settleableAction`         | Matching action phase is `running` or `reconciling`; a result cannot settle a merely requested or cancelling action.                                     |
-| `noActiveAction`           | No action lock exists; otherwise request returns typed `RELEASE_BUSY` without mutation.                                                                  |
-| `legalActionSource`        | Requested kind is allowed from the current state, or from `blocked` with matching `resumeFrom`/failed-action provenance.                                 |
-| `allBlockersResolved`      | Zero open P0 and P1 blockers, each closure linked to fresh evidence.                                                                                     |
-| `auditClear`               | Audit covers workflows, security, permissions, metadata, CI, runtime, and rollback; no P0/P1.                                                            |
-| `artifactIdentified`       | ZIP exists and commit/version/manifest/SHA-256 are non-empty and mutually consistent.                                                                    |
-| `exactArtifact`            | ZIP SHA matches; canonical digest of the harness-tested `dist` equals the extracted ZIP tree; packaging performed no intervening rebuild/repack.         |
-| `localGateComplete`        | Format, lint, typecheck, unit/integration tests, build, post-build manifest validation, and packaged MV3 tests passed.                                   |
-| `storeEvidenceComplete`    | CWS config and rollback proof are complete; `release-surface-alignment.model.md` is `aligned` for this artifact.                                         |
-| `canaryPassed`             | Fresh typed pass evidence is attached for this release/artifact, duration/sample completed, no stop threshold crossed, and rollback rehearsal evidenced. |
-| `authorized`               | Named human/operator is permitted for the external Store action; required credentials exist.                                                             |
-| `sameArtifact`             | Event SHA equals candidate SHA and no rebuild/repack occurred after validation.                                                                          |
-| `rollbackProvenance`       | Current state is canary/production, or state is `blocked` with `rollbackRequired` and `resumeFrom` equal to canary/production.                           |
-| `cancellableAction`        | Action has no externally visible/committed side effect; canary publication, promotion, and rollback after external receipt are not locally cancellable.  |
-| `retryableFailedAction`    | `failedOperationId` matches `lastFailedAction`, error is retryable, rollback is not required, and the new operation ID differs.                          |
-| `completeFreshAudit`       | Previous ID matches current candidate; new ID differs; audit is fresh, complete, bound to new ID/commit/version, and has zero P0/P1.                     |
+| Guard                          | Rule                                                                                                                                                                                                                                                                     |
+| ------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| `auditClear`                   | Audit covers workflows, security, permissions, metadata, CI, runtime, artifact provenance, CWS, canary, and rollback; no open P0/P1.                                                                                                                                     |
+| `exactTestedSeal`              | Seal identity equals candidate source/release/version/config/toolchain; structured local gates passed; aggregated MV3 IDs equal the committed inventory with zero skip/failure/diagnostic; pre/post trees and manifest equal; the worktree was clean at both boundaries. |
+| `validatedArtifactMatchesSeal` | Structured artifact links the exact release/seal/commit/version; all source/snapshot/extraction receipts equal the seal; archive twin and sidecar checks pass.                                                                                                           |
+| `storeEvidenceComplete`        | Listing, privacy, permissions, rollback artifact, all four CWS credentials, and release-surface alignment are proven for the validated ZIP.                                                                                                                              |
+| `sameArtifact`                 | Release ID, seal ID, artifact ID, version, source commit, and SHA-256 all equal the validated artifact.                                                                                                                                                                  |
+| `checksumAtConsumption`        | A fresh consumer receipt recomputed the SHA-256 from bytes immediately after upload/download or immediately before CWS/rollback use and matched the sidecar/validated artifact.                                                                                          |
+| `authorized`                   | The named human/operator is permitted for the external action; credentials are referenced by presence only, never recorded.                                                                                                                                              |
+| `canaryPassed`                 | Fresh, measured canary evidence for this exact artifact crossed no stop threshold and includes rollback rehearsal.                                                                                                                                                       |
+| `noActiveAction`               | One release lock/action only; a concurrent request returns `RELEASE_BUSY` without mutation.                                                                                                                                                                              |
+| `completeFreshAudit`           | New release ID/source/version differ as required, audit is fresh/complete, and all old artifact evidence is atomically cleared.                                                                                                                                          |
 
-## Transition table
+## Transition effects
 
-`S*` below means either stable state `S`, or `blocked` with
-`resumeFrom === S` while a matching retry/reconciliation action is active.
+| Transition                                          | Required effect                                                                                                                                           |
+| --------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `AUDIT_RECORDED -> audited`                         | Record exact candidate source, audit scope, owners, and timestamps.                                                                                       |
+| `RC_DIST_SEALED -> rc_built`                        | Attach the immutable tested seal only. ZIP path/hash remain absent.                                                                                       |
+| `PACKAGE_VALIDATION_SUCCEEDED -> package_validated` | Attach the single `ValidatedZipArtifact`; consume its package-runner checksum receipt; clear package action.                                              |
+| `STORE_VALIDATION_SUCCEEDED -> store_ready`         | Prove dashboard metadata, all four credentials, privacy/permission alignment, rollback target, and the exact artifact SHA. No upload/publish is inferred. |
+| `CANARY_STARTED -> canary`                          | Recompute the downloaded/upload candidate SHA immediately at use; attach CWS canary receipt.                                                              |
+| `CANARY_PASSED`                                     | Attach observation evidence; retain the same artifact identity.                                                                                           |
+| `PRODUCTION_PROMOTED -> production`                 | Recompute SHA immediately before promotion/use and attach external receipt. Never rebuild/repack.                                                         |
+| `ROLLBACK_SUCCEEDED -> rolled_back`                 | Verify known-good bytes at consumption, restoration, and health receipt before claiming rollback.                                                         |
+| any typed failure                                   | Preserve source state in `resumeFrom`, record provenance/error, clear only the matching action, and block when evidence may be unsafe.                    |
+| `EVIDENCE_INVALIDATED -> blocked`                   | Invalidate the seal/artifact and every downstream Store/canary proof.                                                                                     |
 
-| From                                            | Event                            | Guard                                                 | To                  | Required evidence/effects                                                                                                                                            |
-| ----------------------------------------------- | -------------------------------- | ----------------------------------------------------- | ------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| initial                                         | `AUDIT_RECORDED`                 | complete audit                                        | `audited`           | Record exact commit, version, findings, owner, and timestamp.                                                                                                        |
-| audited/blocked                                 | `AUDIT_REQUESTED`                | no action, legal source                               | same                | Create requested `audit` action; no blocker is cleared yet.                                                                                                          |
-| audited/blocked                                 | `BLOCKERS_FOUND`                 | matching audit release/operation/action               | `blocked`           | Attach remaining/new blockers, archive the matching audit as failed, and clear the action while preserving source provenance.                                        |
-| `audited`                                       | `AUDIT_PASSED`                   | matching audit release/operation/action               | `audited`           | Attach fresh passing audit evidence, update `auditedAt`, archive the action as passed, and clear `activeAction`/error.                                               |
-| `audited`                                       | `BUILD_REQUESTED`                | no action, audit clear                                | `audited`           | Create requested `build` action.                                                                                                                                     |
-| `rc_built`                                      | `PACKAGE_VALIDATION_REQUESTED`   | no action, artifact identified                        | `rc_built`          | Create requested `validate_package` action for the exact hash.                                                                                                       |
-| `package_validated`                             | `STORE_VALIDATION_REQUESTED`     | no action, exact artifact                             | `package_validated` | Create requested `validate_store` action.                                                                                                                            |
-| `store_ready`                                   | `CANARY_PUBLICATION_REQUESTED`   | no action, authorized                                 | `store_ready`       | Create requested `publish_canary` action for the exact hash.                                                                                                         |
-| `canary`                                        | `CANARY_OBSERVATION_REQUESTED`   | no action, outcome running                            | `canary`            | Create requested `observe_canary` action and measured window.                                                                                                        |
-| `canary`                                        | `PRODUCTION_PROMOTION_REQUESTED` | no action, `canaryPassed`                             | `canary`            | Create requested `promote_production` action.                                                                                                                        |
-| canary/production/rollback-provenance `blocked` | `ROLLBACK_REQUESTED`             | no action, authorized, provenance                     | same                | Create requested `rollback` action; never claim restoration yet.                                                                                                     |
-| any stable source                               | `ACTION_STARTED`                 | matching requested action                             | same                | Change only action phase to `running`; attach no gate evidence.                                                                                                      |
-| `blocked`                                       | `AUDIT_PASSED`                   | matching audit, all resolved                          | `audited`           | Attach fresh closure/audit evidence; clear action/error/resume and invalidate all later-stage evidence.                                                              |
-| `audited*`                                      | `RC_BUILD_SUCCEEDED`             | matching build, audit clear, identified               | `rc_built`          | Record ZIP path/hash/manifest/catalogue; clear action/error/resume.                                                                                                  |
-| `rc_built*`                                     | `PACKAGE_VALIDATION_SUCCEEDED`   | matching package action, exact artifact, local gates  | `package_validated` | Attach MV3 evidence for the sealed `dist`, ZIP SHA, extracted-ZIP tree digest, and their exact digest equality.                                                      |
-| `package_validated*`                            | `STORE_VALIDATION_SUCCEEDED`     | matching Store action, complete evidence              | `store_ready`       | Attach listing/privacy/permissions/configuration evidence.                                                                                                           |
-| `store_ready*`                                  | `CANARY_STARTED`                 | matching publication, same artifact, authorized       | `canary`            | Attach publication receipt, set `canaryOutcome='running'`, clear publication action.                                                                                 |
-| `canary*`                                       | `CANARY_PASSED`                  | matching observation, same artifact                   | `canary`            | Append typed pass evidence, set outcome `passed`, and clear action.                                                                                                  |
-| `canary*`                                       | `CANARY_FAILED`                  | matching observation                                  | `blocked`           | Append threshold evidence, archive the observation action as failed, clear `activeAction`, set outcome `failed`, `resumeFrom='canary'`, and `rollbackRequired=true`. |
-| `canary*`                                       | `PRODUCTION_PROMOTED`            | matching promotion, canary passed, same artifact      | `production`        | Attach receipt, clear action/error/resume; never rebuild/repack.                                                                                                     |
-| canary/production/provenance `blocked`          | `ROLLBACK_SUCCEEDED`             | matching rollback, authorized, restored hash verified | `rolled_back`       | Attach restoration/health proof and clear `rollbackRequired`, action, and error.                                                                                     |
-| build/package/Store/promotion action source     | matching typed failure           | matching action                                       | `blocked`           | Preserve logical source in `resumeFrom`, record failed kind/operation/retryability, clear action, and attach error evidence.                                         |
-| canary/production                               | `ROLLBACK_FAILED`                | matching rollback                                     | `blocked`           | Preserve source in `resumeFrom`, set `rollbackRequired=true`, clear action, and attach failure evidence.                                                             |
-| rollback-provenance `blocked`                   | `ROLLBACK_FAILED`                | matching rollback                                     | `blocked`           | Preserve original canary/production `resumeFrom` and `rollbackRequired`; attach failure and permit only rollback retry.                                              |
-| any stable source                               | `CANCEL_ACTION`                  | matching cancellable action                           | same                | Set action phase `cancelling`; do not clear lock or evidence.                                                                                                        |
-| any stable source                               | `ACTION_CANCELLED`               | matching cancelling action                            | same                | Clear only the action; retain prior stable state/evidence.                                                                                                           |
-| any stable source                               | `ACTION_CANCEL_FAILED`           | matching cancelling action                            | same                | Set action phase `reconciling`; keep lock and record error.                                                                                                          |
-| `blocked`                                       | `RETRY_GATE`                     | retryable failed action, fresh operation              | `blocked`           | Recreate the same action kind with `retryOfOperationId`; preserve `resumeFrom`.                                                                                      |
-| any stable source                               | `SERVICE_RESTARTED`              | active action                                         | same                | Set phase `reconciling`, preserve operation/provenance, and query durable/external receipts.                                                                         |
-| any stable source                               | `SERVICE_RESTARTED`              | no active action                                      | same                | Revalidate the full evidence bundle; raise `EVIDENCE_INVALIDATED` if any proof drifted.                                                                              |
-| any stable source                               | `ACTION_RECONCILED(not_applied)` | matching reconciling action, receipt                  | same                | Clear action; retain stable state and allow a fresh request.                                                                                                         |
-| any stable source                               | `ACTION_RECONCILED(applied)`     | matching reconciling action, receipt                  | same                | Return phase to `running`; require the matching typed success/failure event to settle.                                                                               |
-| any stable source                               | `ACTION_RECONCILED(unknown)`     | matching reconciling action                           | `blocked`           | Preserve local source; for unknown publish/promote/rollback set canary/production provenance and `rollbackRequired`; clear action and forbid blind retry.            |
-| any pre-release state                           | `EVIDENCE_INVALIDATED`           | matching release                                      | `blocked`           | Record drift reason, source state, and invalidate all downstream evidence.                                                                                           |
-| `rolled_back`                                   | `NEW_CANDIDATE`                  | `completeFreshAudit`                                  | `audited`           | Atomically replace identity/audit and clear all artifact, Store, canary, rollback, action, error, and resume evidence.                                               |
+## Release workflow and CWS consumption gate
 
-`CANARY_FAILED` makes confirmed rollback reachable from `blocked`: a matching
-`ROLLBACK_REQUESTED` creates the action there, and its matching
-`ROLLBACK_SUCCEEDED` alone reaches `rolled_back`. Until that acknowledgement,
-the candidate remains `blocked` with `rollbackRequired=true`; Retry cannot
-re-run canary observation or bypass rollback.
+CI/release automation must either create the unique final build and seal in one
+clean job after all release-source changes, or consume that already archived
+`TestedDistSeal`. After that seal, the job is package-only. A historical or
+separate `test-mv3` job that built another commit or another `dist` cannot
+authorize the release ZIP.
 
-Archiving `CANARY_FAILED` stores the completed observation operation in the
-release audit trail and sets `activeAction=null`. The subsequent
-`ROLLBACK_REQUESTED` can therefore satisfy `noActiveAction`; it never overwrites
-the observation lock implicitly.
+The package job publishes together, as immutable outputs:
 
-The generic failure row is an exhaustive shorthand:
-`RC_BUILD_FAILED -> build`, `PACKAGE_VALIDATION_FAILED -> validate_package`,
-`STORE_VALIDATION_FAILED -> validate_store`, and
-`CANARY_PUBLICATION_FAILED -> publish_canary`, and
-`PRODUCTION_PROMOTION_FAILED -> promote_production`. `CANARY_FAILED` and
-`ROLLBACK_FAILED` use their dedicated rows. A failure without the matching
-kind/release/operation is stale and cannot mutate context.
+- `releaseId`, `sealId`, source commit, version, toolchain/config digests;
+- tested/snapshot/extracted canonical receipts and manifest digests;
+- ZIP path, size, SHA-256, checksum sidecar, entry receipt, and validation JSON;
+- the structured local/MV3 receipts, expected scenario-inventory digest and
+  their supporting content-addressed reports.
 
-Every typed success/failure row also requires `settleableAction`; requests must
-first receive `ACTION_STARTED`, while an applied reconciliation may restore the
-phase to `running`. A result received while action phase is `requested` or
-`cancelling` is stale and cannot advance or block the candidate.
+The source-controlled runner and workflow definitions used to produce those
+outputs must already belong to `sourceCommit`. A later evidence-only commit may
+reference the immutable receipts and their original source commit, but cannot
+change any receipt identity or become the candidate source retroactively.
 
-## Side effects and ownership
+An upload step recomputes the checksum and emits a `ci_upload` receipt. A later
+job downloads the ZIP, sidecar, seal, and validation receipt as one bundle,
+recomputes the checksum, and emits `ci_download`. The CWS boundary recomputes it
+again immediately before use and emits `cws_upload`. A missing or mismatched
+receipt blocks; no stable publication job may bypass `package_validated`,
+`store_ready`, authorized canary, observation, and promotion transitions.
 
-- **Core/model:** pure guards over immutable evidence references and artifact
-  identity. It cannot build, publish, read secrets, or approve a release.
-- **Local/CI Shell:** executes gates, builds the candidate, hashes bytes,
-  validates the post-build manifest, stores logs/traces/screenshots, and emits
-  typed results.
-- **Authorized release operator:** performs CWS dashboard, canary, promotion,
-  and rollback actions and records external receipts.
-- **Documentation:** `docs/release/<version>-rc-evidence.md` summarizes evidence
-  without converting missing external proof into completion.
+The workflow checks the presence of `CHROME_EXTENSION_ID`,
+`CHROME_CLIENT_ID`, `CHROME_CLIENT_SECRET`, and `CHROME_REFRESH_TOKEN` without
+persisting their values. Automatic direct stable publication from a tag is
+forbidden; the workflow may request/record modeled external actions only.
 
-## Persistence boundary
+## Retry, cancellation, restart, and persistence
 
-Release state is recomputed from the committed evidence bundle plus immutable
-CI/artifact/external references. The candidate ZIP is retained byte-for-byte;
-its SHA-256 and source commit are durable identifiers. Secrets, cookie values,
-and access tokens are never written into the bundle.
-
-An in-flight `activeAction`/lock is stored by CI or the release runner, but it
-is not proof of success. After runner/service restart, every referenced file
-and hash is revalidated and the action enters `reconciling`. A matching receipt
-classifies it as not applied, applied-awaiting-typed-result, or unknown; unknown
-becomes `blocked` and is never assumed failed or successful.
-
-## Permissions and offline behavior
-
-Local audit/build checks use repository permissions only. Store validation,
-canary, production, and rollback require an authorized operator, network, 2FA,
-and all four CWS credentials: `CHROME_EXTENSION_ID`, `CHROME_CLIENT_ID`,
-`CHROME_CLIENT_SECRET`, and `CHROME_REFRESH_TOKEN`. Missing/refused permissions
-or credentials transition to/remain `blocked`; they are never warnings in
-production mode.
-
-Offline local checks may be recorded, but no state at or beyond `store_ready`
-can advance without fresh online external proof. A transient network failure
-keeps the stable state, records a failed action, and permits explicit Retry.
-
-## Retry, cancellation, concurrency, and restart
-
-- Gate retries name the failed operation and use a distinct new operation ID;
-  they recreate only that action kind and attach new evidence. When
-  `rollbackRequired`, only rollback may be retried.
-- Cancelling a local build/validation first enters action phase `cancelling`;
-  only `ACTION_CANCELLED` clears it. Once CWS publication/canary is externally
-  visible, cancellation is rejected and requires modeled rollback or receipt
-  reconciliation.
-- One release lock exists per `releaseId`; concurrent action returns typed busy
-  and does not mutate evidence/state.
-- Rebuild, repack, manifest edit, source commit change, or metadata drift after
-  validation invalidates downstream evidence and moves to `blocked`.
-- Runner/service restart revalidates the bundle and reduces through the three
-  explicit `ACTION_RECONCILED` outcomes. Unknown external outcome is blocked;
-  applied outcome still needs the original typed gate result.
-
-## Terminal states and re-entry
-
-`production` is the successful terminal state for a candidate but permits the
-explicit rollback path. `rolled_back` is terminal for that candidate;
-`NEW_CANDIDATE` creates a new release ID and returns to `audited` only after a
-complete fresh audit bound to the new ID/commit/version. `blocked` is settled,
-not success; it exits only through the action matching its provenance: fresh
-audit, matching gate retry success, or confirmed rollback.
+- Local package cancellation retains the lock until cleanup acknowledgement;
+  it never leaves a partial final archive.
+- A drift or checksum error destroys the private snapshot/output, invalidates
+  the seal for that operation, and requires explicit investigation/new
+  candidate proof. Blind retry with the same snapshot is forbidden.
+- Runner restart enters reconciliation, verifies the lock/receipts and all
+  referenced bytes, then emits `not_applied`, `applied`, or `unknown`.
+  `unknown` becomes `blocked`; it is never inferred as success or failure.
+- Release state is recomputed from committed model evidence plus immutable CI,
+  artifact, and external references. Secrets and mutable dashboard labels are
+  never evidence.
 
 ## Forbidden transitions
 
-- `audited`/`blocked` directly to package, Store, canary, or production states.
-- `rc_built` to later states when hash/version/manifest/commit disagree.
-- `package_validated` based on dev-stub Playwright instead of packaged MV3.
-- `store_ready` with missing credentials, dashboard fields, metadata alignment,
-  permission justification, rollback artifact, or external proof.
-- Packaging the ZIP by rebuilding after the MV3 harness, digest inequality
-  between the tested `dist` and extracted ZIP, or canary/production publication
-  of rebuilt or repacked bytes.
-- `canary`/`production` to `rolled_back` before rollback confirmation.
-- Gate success/failure with no matching requested/running/reconciling action.
-- `CANARY_PASSED` without fresh evidence bound to the current artifact, or
-  production promotion while canary outcome is not `passed`.
-- Retrying with the failed operation ID, retrying canary while rollback is
-  required, or clearing an action before cancellation/reconciliation proof.
-- `rolled_back -> audited` by changing only a release ID or label; complete
-  fresh audit evidence for the new identity is mandatory.
-- Advancement from warnings, free text, branch name, tag, or mutable status flag.
-- Any implicit transition from an LLM assessment, narrative approval, or report prose.
+- MV3 green on `dist A` followed by rebuild/delete/install/version bump and ZIP
+  from `dist B`.
+- Seal creation from a per-test/last-test fixture file, an exit code without the
+  aggregated report, or a suite with missing, skipped, duplicate or unexpected
+  scenario IDs.
+- `rc_built` carrying a ZIP path/hash, or `package_validated` consuming loose
+  digest strings instead of `ValidatedZipArtifact`.
+- Packaging from a mutable/unlocked source, following/ignoring a symlink, or
+  archiving an existing ZIP in update mode.
+- Locale-dependent ordering, compression, ZIP64, ambient mode/mtime/UID/GID,
+  noncanonical flags/versions/attributes, nonzero extra fields, or an archive
+  whose independent twin has another SHA-256.
+- Validation without fresh safe extraction, exact tree/manifest/count equality,
+  post-build manifest validation, and expected version `0.2.2`.
+- Renaming `0.2.2` bytes as `0.2.3`, or binding them to another commit/release.
+- Upload, CWS use, production promotion, or rollback without a fresh checksum
+  receipt at that consumption boundary.
+- Store readiness with fewer than all four credentials or missing external
+  evidence; direct automatic stable publication that bypasses canary.
+- Any advancement from warnings, free text, an LLM assessment, or narrative
+  approval.
 
 ## Invariants
 
 1. State vocabulary is exactly the eight values declared above.
-2. Every advance has same-release, same-artifact, fresh attached evidence.
+2. Every advancement is bound to one release ID, seal ID, source commit,
+   committed version, connector resolution, manifest, and immutable artifact.
 3. Zero unresolved P0/P1 is required at and beyond `rc_built`.
-4. `package_validated` means real MV3 scenarios passed on a sealed `dist` tree,
-   the candidate ZIP passed post-build validation, and the canonical digest of
-   that tested tree equals the digest recomputed after extracting the ZIP.
-5. `store_ready`, `canary`, and `production` require explicit external proof.
-6. The committed version, tag/release source commit, manifest, listing, privacy
-   disclosures, landing claims, host permissions, cache-policy evidence, and
-   ZIP satisfy `release-surface-alignment.model.md` for the same artifact.
-7. Missing production configuration fails closed.
-8. Rollback never claims success before the known-good artifact is restored and verified.
-9. An LLM never decides a transition; authorized typed events plus guards do.
-10. Every gate has an explicit request and matching result protocol; one action
-    lock prevents concurrent or cross-kind acknowledgements.
-11. `CANARY_FAILED` retains canary provenance until matching confirmed rollback
-    reaches `rolled_back`.
-12. `NEW_CANDIDATE` atomically clears all prior downstream evidence and cannot
-    reach `audited` without a complete fresh audit.
+4. `rc_built` owns the tested `dist` seal and no ZIP authority.
+5. `package_validated` means package-only under a continuous lock; regular-only
+   canonical inventory; immutable normalized snapshot; deterministic STORE-only ZIP;
+   fresh safe extraction; equal tree/count/manifest/version; and verified
+   checksum sidecar.
+6. The source, snapshot, extracted tree, manifest, and current version are
+   exactly equal as specified; a rebuild cannot repair a mismatch.
+7. Every consumer verifies the ZIP SHA from bytes immediately at its boundary.
+8. `store_ready`, `canary`, and `production` require explicit external proof
+   for this exact artifact and all four CWS credential presences.
+9. Rollback never claims success before known-good bytes and restored health are
+   verified.
+10. An LLM never decides a transition; typed events and deterministic guards do.
+11. One action/lock prevents concurrent or cross-operation acknowledgement.
+12. `NEW_CANDIDATE` atomically clears every prior seal, artifact, Store, canary,
+    rollback, receipt, action, and error reference.
+13. Release tooling is committed before the candidate build; a later
+    evidence-only commit is downstream metadata and never changes the sealed
+    `sourceCommit`.
+14. A seal requires structured local and aggregated suite receipts from one
+    build ID; per-test output, skipped/missing scenarios or exit-code-only claims
+    have zero authority.
 
-## Review checklist
+## Model review matrix
 
-- [x] Nominal `audited -> rc_built -> package_validated -> store_ready -> canary -> production` flow is explicit.
-- [x] Audit, blocker remediation, build, exact-package validation, Store, canary, production, and rollback are explicit.
-- [x] Build/test/manifest/config/metadata/permission failures fail closed.
-- [x] Offline and refused/missing external authorization cannot advance release.
-- [x] Retry, local cancellation, post-publication rollback, and concurrent action lock are defined.
-- [x] Runner/service restart and unknown external outcome force reconciliation.
-- [x] Package/Store/canary/promotion requests, canary evidence, cancel acknowledgements, and retry semantics are reducible.
-- [x] Confirmed rollback remains reachable after canary failure in `blocked`.
-- [x] Production/rollback terminal behavior and fresh-candidate re-entry are explicit.
+- [x] Nominal audit → seal → deterministic package → Store → canary → production is explicit.
+- [x] Rebuild after seal is unrepresentable as success and fails typed.
+- [x] Source commit/version/toolchain/config/worktree provenance is part of the seal.
+- [x] Lock, no-follow copy, source-before/after and immutable snapshot close TOCTOU.
+- [x] Bytewise ordering, fixed modes/timestamps, absent archive, twin build and no extra fields are explicit.
+- [x] ZIP integrity, hostile entry policy, fresh extraction, manifest validation and exact digest equality are explicit.
+- [x] Sidecar and package/upload/download/CWS/rollback checksum receipts are explicit.
+- [x] Store/canary/promotion remain external typed gates and direct stable publication is forbidden.
+- [x] Current candidate is `0.2.2`; a future version requires a complete new sealed candidate.
+- [x] The final seal is produced only after all in-scope source changes; historical Task 10/11 bytes cannot authorize a later candidate.
+- [x] Candidate/tooling and evidence commits are ordered without circularly changing the sealed source commit.
+- [x] The complete expected MV3 scenario inventory, zero skips/failures/diagnostics and unchanged pre/post suite tree are sealed structurally.

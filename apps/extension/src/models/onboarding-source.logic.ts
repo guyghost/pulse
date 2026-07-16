@@ -14,6 +14,7 @@ import {
   consentPersistenceMatches,
   dataEpochInvalidationMatches,
   isOnboardingSourceUuidV4,
+  onboardingOperationCorrelationIds,
   operationIdsAreFresh,
   rememberCorrelationIds,
   rehydratedSelectionIsPersisted,
@@ -397,7 +398,10 @@ export function createOnboardingSourceSetup(
         const ids = eventIds(event);
         const operation = settingsOperation(context, 'selection', ids);
         return {
-          consumedCorrelationIds: rememberCorrelationIds(context, Object.values(ids)),
+          consumedCorrelationIds: rememberCorrelationIds(
+            context,
+            onboardingOperationCorrelationIds(ids)
+          ),
           activeOperation: {
             purpose: 'selection' as const,
             ids: { ...ids },
@@ -415,7 +419,10 @@ export function createOnboardingSourceSetup(
         const ids = eventIds(event);
         const operation = settingsOperation(context, 'skip_auto_scan', ids);
         return {
-          consumedCorrelationIds: rememberCorrelationIds(context, Object.values(ids)),
+          consumedCorrelationIds: rememberCorrelationIds(
+            context,
+            onboardingOperationCorrelationIds(ids)
+          ),
           activeOperation: {
             purpose: 'skip_auto_scan' as const,
             ids: { ...ids },
@@ -430,7 +437,10 @@ export function createOnboardingSourceSetup(
       beginSkipCompletion: assign(({ context, event }) => {
         const ids = eventIds(event);
         return {
-          consumedCorrelationIds: rememberCorrelationIds(context, Object.values(ids)),
+          consumedCorrelationIds: rememberCorrelationIds(
+            context,
+            onboardingOperationCorrelationIds(ids)
+          ),
           activeOperation: { purpose: 'skip_completion' as const, operationId: ids.operationId },
           recovery: null,
           failure: null,
@@ -455,7 +465,10 @@ export function createOnboardingSourceSetup(
       beginCheckFromIds: assign(({ context, event }) => {
         const ids = eventIds(event);
         return {
-          consumedCorrelationIds: rememberCorrelationIds(context, Object.values(ids)),
+          consumedCorrelationIds: rememberCorrelationIds(
+            context,
+            onboardingOperationCorrelationIds(ids)
+          ),
           activeOperation: { purpose: 'check' as const, operationId: ids.operationId },
           permission: 'unknown' as const,
           session: 'unknown' as const,
@@ -601,7 +614,10 @@ export function createOnboardingSourceSetup(
       beginConsentPersistence: assign(({ context, event }) => {
         const ids = eventIds(event);
         return {
-          consumedCorrelationIds: rememberCorrelationIds(context, Object.values(ids)),
+          consumedCorrelationIds: rememberCorrelationIds(
+            context,
+            onboardingOperationCorrelationIds(ids)
+          ),
           activeOperation: { purpose: 'consent' as const, operationId: ids.operationId },
           recovery: null,
           failure: null,
@@ -611,7 +627,10 @@ export function createOnboardingSourceSetup(
       completeWithExistingConsent: assign(({ context, event }) => {
         const ids = eventIds(event);
         return {
-          consumedCorrelationIds: rememberCorrelationIds(context, Object.values(ids)),
+          consumedCorrelationIds: rememberCorrelationIds(
+            context,
+            onboardingOperationCorrelationIds(ids)
+          ),
           activeOperation: null,
           recovery: null,
           failure: null,
@@ -646,7 +665,10 @@ export function createOnboardingSourceSetup(
       completeSkipFromRetry: assign(({ context, event }) => {
         const ids = eventIds(event);
         return {
-          consumedCorrelationIds: rememberCorrelationIds(context, Object.values(ids)),
+          consumedCorrelationIds: rememberCorrelationIds(
+            context,
+            onboardingOperationCorrelationIds(ids)
+          ),
           activeOperation: null,
           recovery: null,
           failure: null,
@@ -954,7 +976,10 @@ export function createOnboardingSourceSetup(
         const reason = context.recovery?.reason ?? 'selecting';
         const command = recoveryCommand(context, ids.operationId);
         return {
-          consumedCorrelationIds: rememberCorrelationIds(context, Object.values(ids)),
+          consumedCorrelationIds: rememberCorrelationIds(
+            context,
+            onboardingOperationCorrelationIds(ids)
+          ),
           recovery: {
             reason,
             requestId: ids.operationId,

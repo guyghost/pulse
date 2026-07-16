@@ -13,6 +13,12 @@ of truth, `local-data-reset-epoch.contract.ts`, which both Reset and Settings
 import. Shell observes machine state and performs effects; none of these pure
 files calls Chrome, IndexedDB, timers, clocks, UUID generation or a LLM.
 
+Every Reset-owned durable Dataset write composes with
+`dataset-write-capability.model.md`. Reset does not receive an ordinary
+business lease and does not own a second lock; its claims, one-shot writes,
+fence acquisition and epoch installation all linearize on the single
+`DatasetEpochAuthority` FIFO.
+
 ## Objective
 
 A successful reset leaves exactly one fresh, internally consistent local
@@ -64,6 +70,13 @@ that case the fence invalidates every pre-reset actor/request globally rather
 than matching one readable epoch. Retry after a partial reset retains the same
 `resetId` and `nextDataEpoch`; it never creates a second dataset identity. A
 completely new reset intent creates new IDs.
+
+The trusted Shell additionally injects a capability-only execution
+`attemptId` and uses the authority's captured `workerEpoch`. They are not new
+journal fields. Every explicit retry and worker restart receives a fresh
+attempt ID; every durable reset identity above remains unchanged. The exact
+capability command ID is
+`local-data-reset/<active-state>/<resetId>/<attemptId>`.
 
 The dataset authority fence request repeats the exact `resetId`,
 `previousDataEpoch` and `nextDataEpoch` from this intent. Taking its FIFO
@@ -472,6 +485,78 @@ acknowledgement or recipient count. Any other API rejection is
 `BROADCAST_FAILED/postcommit_broadcast`. The adapter may not classify arbitrary
 errors as no-receiver by substring fallback.
 
+## Pre-admission capability composition
+
+Reset claims only the exact active write-bearing state. A claim repeats the
+durable `resetId` as `workflowId`, the ephemeral execution `attemptId`, the
+authority `workerEpoch`, the exact state-derived command ID, the stage-specific
+nullable epoch, `authorityRevision`, `fenceRevision` and an ordered bounded
+write plan. The scope is completed before the machine receives the event that
+can leave that state.
+
+The stage-to-write mapping is closed:
+
+| Exact Reset state         | Ordered Dataset writes, each with a fresh one-shot capability                                                                                                                                      |
+| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `journaling`              | initial exact journal put                                                                                                                                                                          |
+| `fencing`                 | checkpoint journal phase `fenced`, after the dedicated `acquireResetFence` resolves                                                                                                                |
+| `checkpointingQuiescence` | checkpoint journal phase `quiesced`                                                                                                                                                                |
+| `closingDatabase`         | checkpoint journal phase `handles_closed`; handle close itself is not a durable Dataset write                                                                                                      |
+| `deletingDatabase`        | delete `missionpulse`, then checkpoint `database_deleted` with a second capability                                                                                                                 |
+| `clearingSession`         | one `chrome.storage.session.clear()`, then checkpoint `session_cleared` with a second capability                                                                                                   |
+| `clearingLocal`           | one bounded selective `chrome.storage.local.remove(keys)` excluding the journal, then checkpoint `local_cleared` with a second capability                                                          |
+| `reinitializing`          | DB6/metadata/empty-store transaction, generation-zero `SettingsEnvelopeV2` write/read-back, marker-3 write/read-back, then journal checkpoint `database_reinitialized`: four distinct capabilities |
+| `aligningSettings`        | one capability for every exact Settings envelope/journal/outcome write in the shared recovery plan, then a distinct journal checkpoint `settings_aligned`                                          |
+| `writingReceipt`          | latest-only receipt put; its strict read-back is read-only                                                                                                                                         |
+| `checkpointingCommit`     | checkpoint journal phase `committed`                                                                                                                                                               |
+| `clearingJournal`         | remove the exact reserved journal; strict absence read-back precedes scope completion                                                                                                              |
+
+`preflightingCompletion`, `reacquiringFence`, `routingRestart`, `quiescing`,
+`broadcastingReadiness` and `broadcastingCommitted` perform no Dataset write
+and create no empty/dummy claim. Broadcast and alarm operations retain their
+own strict delivery/effect proofs; they cannot be smuggled into a storage token.
+
+The authority epoch bound to a Reset claim is exact:
+
+- `journaling` observes the current admitted epoch when normal admission is
+  open, or the authority's nullable/pending epoch while startup is closed;
+- after fence ownership and through `clearingLocal`, it equals the reset
+  request's `previousDataEpoch`, including literal `null`;
+- from `reinitializing` through `clearingJournal`, it equals `nextDataEpoch`.
+
+The initial journal scope is completed before `acquireResetFence` is enqueued.
+Fence acquisition is the dedicated authority method, not a capability write.
+Once it linearizes, it increments authority/fence revisions, revokes every old
+lease/capability and admits only same-reset `reset_owned` claims. A commit ahead
+of the fence settles first; a commit behind it invokes zero callback.
+
+The `reinitializing` plan has four non-collapsible durable boundaries. In
+particular, marker 3 cannot be written before the complete generation-zero
+Settings V2 envelope has been strictly read back. A port-wide Reset token, one
+token shared by DB/Settings/marker, or one token shared by a physical effect and
+its journal checkpoint is forbidden.
+
+`clearingJournal` consumes its one-shot capability before calling remove,
+strictly proves absence, completes its scope, and only then lets the dedicated
+authority epoch-install/opening sequence proceed. Neither the capability nor
+the reset fence token is a success receipt. `reset:true` still requires the
+workflow's complete terminal proof.
+
+On any effect rejection, the capability stays consumed and the scope is
+completed as revoked before `STEP_FAILED`. Retry uses the same durable Reset
+identities but a fresh attempt, claim, write and capability IDs. On worker
+restart, a fresh worker/attempt pair rebuilds the plan from the journal. Old
+exact-object tokens are absent from the new bounded registries and cannot be
+accepted.
+
+Reset, startup failure fencing, command/state/attempt/epoch drift, scope
+completion and authority/fence revision change revoke every outstanding token.
+A worker mismatch rejects, and a new worker does not possess the old
+exact-object registry. A late callback therefore performs zero write. Registry
+exhaustion, allocator throw/reentrancy/collision, token clone/substitution or a
+second mutex is a typed fail-closed error; none falls back to ordinary leases,
+raw Chrome/IndexedDB calls or a production no-op gate.
+
 ## Quiescence contract
 
 `quiesced` requires all of these independent facts:
@@ -777,6 +862,24 @@ comparison to “unknown means allowed”.
     admission until journal removal.
 26. A restored durable phase always has `fenceAcquired:false` until correlated
     `BOOT_FENCE_ACQUIRED`.
+27. Every Reset Dataset write in the closed mapping has one fresh capability;
+    no capability covers a whole state, port or multi-write effect.
+28. Reset claims, capability issuance/commit/completion, ordinary commits,
+    reset fence and epoch installation share the authority's one FIFO.
+29. Each capability is consumed before callback invocation/await and can never
+    be replayed after rejection, completion or restart.
+30. Reset cleanup capabilities bind exact nullable `previousDataEpoch`; rebuild
+    and terminal capabilities bind exact `nextDataEpoch`.
+31. Reinitialization uses four ordered capabilities: DB6 transaction, complete
+    Settings V2 generation-zero write/read-back, marker-3 write/read-back and
+    `database_reinitialized` checkpoint.
+32. A state-success or `STEP_FAILED` event is not sent while that state's scope
+    remains active; completion/révocation precedes the event.
+33. Reset/failure fence and command/state/attempt/epoch/revision drift make
+    every losing late callback execute zero durable effect; a new worker does
+    not possess the old exact-object registry.
+34. Capability registries are bounded without eviction, and no exhaustion,
+    allocator or validation error enables a lease/raw/no-op fallback.
 
 ## Forbidden transitions
 
@@ -821,6 +924,14 @@ comparison to “unknown means allowed”.
 - old-epoch event changing new-epoch state.
 - refreshing an old operation with a new epoch/lease instead of rejecting it.
 - reset coordinator calling a raw tracking writer or remote dashboard path.
+- one Reset capability reused for two writes, a port-wide Reset capability, or
+  a physical-effect capability reused for its journal checkpoint.
+- marker 3 before strict generation-zero Settings V2 read-back, or any of the
+  four reinitialization boundaries sharing a token.
+- ordinary lease, raw Chrome/IDB writer, second mutex or production no-op gate
+  used because a pre-admission capability is missing/rejected.
+- state/command transition published before its active scope is completed or
+  revoked.
 - malformed or wrong-step `STEP_FAILED` changing state.
 - redefining or weakening `LocalDataResetEpochEventV1` in Reset, Settings or an
   adapter instead of using the neutral shared parser; Settings-specific fence
@@ -893,6 +1004,22 @@ comparison to “unknown means allowed”.
   profile callback and cache writer all perform zero post-reset write;
 - lease revocation between calculation and commit fails final in-gate
   revalidation and performs zero durable write;
+- ordinary lease before admission is rejected, while an exact same-reset claim
+  and exact next write capability are admitted only in the modeled state;
+- substitute claim/reset/stage/command/attempt/worker/nullable epoch,
+  authority/fence revision, write ID or capability ID independently and assert
+  zero callback;
+- every two-write Reset state receives two distinct one-shot capabilities;
+  double consume, cross-write/cross-state reuse, completion-before-callback and
+  old-worker replay all perform zero write;
+- execute commit/Reset and commit/failure-fence in both FIFO orders; only the
+  operation ahead of the fence may enter its durable callback;
+- allocator reentrance into same write, another write, completion, Reset and
+  failure fence; allocator throw/invalid UUID/collision; exact bounded registry
+  exhaustion with no eviction or fallback;
+- crash after DB6 transaction, generation-zero Settings read-back, marker-3
+  read-back and reinitialization checkpoint; recover with fresh capability IDs
+  and no early admission;
 - exhaustive phase/error contracts accept cross-cutting `JOURNAL_FAILED`, accept
   exact `RECEIPT_FAILED/receipt` and `PROTOCOL_ERROR/receipt` only at
   `settings_aligned`, otherwise accept `PROTOCOL_ERROR` only at the current
@@ -948,3 +1075,5 @@ comparison to “unknown means allowed”.
 - remote connected-dashboard deletion;
 - UI wording and visual design beyond truthful pending/blocked/failure/success
   projection.
+- implementation of the pre-admission capability contracts, authority methods
+  or Shell adapter before their independent model review.

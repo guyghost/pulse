@@ -15,7 +15,9 @@ export type CanonicalRelation = 'previous' | 'candidate' | 'other' | 'unknown';
 export type SettingsOperation =
   | 'load'
   | 'mutate'
-  | 'permission'
+  | 'activation'
+  | 'permission_check'
+  | 'pending_intent'
   | 'rebase'
   | 'save'
   | 'effect'
@@ -26,7 +28,9 @@ export type SettingsErrorCode =
   | 'SETTINGS_LOAD_FAILED'
   | 'SETTINGS_INVALID'
   | 'SETTINGS_BUSY'
-  | 'SETTINGS_PERMISSION_REFUSED'
+  | 'SETTINGS_ACTIVATION_REJECTED'
+  | 'SETTINGS_ACTIVATION_CAPACITY_EXHAUSTED'
+  | 'SETTINGS_HOST_PERMISSION_MISSING'
   | 'SETTINGS_STORAGE_FAILED'
   | 'SETTINGS_CONFLICT'
   | 'SETTINGS_RUNTIME_EFFECT_FAILED'
@@ -144,16 +148,44 @@ export interface SettingsJournalProofV1 {
   envelope: SettingsEnvelopeV2;
 }
 
-export interface SettingsPermissionProofV1 {
+export interface SettingsHostPermissionContainsProofV1 {
   version: 1;
   dataEpoch: string;
   mutationId: string;
-  permissionRequestId: string;
+  permissionCheckId: string;
   activationId: string;
+  activationResultId: string;
   originDigest: string;
   verifiedOrigins: string[];
   containsVerified: true;
 }
+
+export const SETTINGS_ACTIVATION_MAX_LIFETIME_MS = 5 * 60 * 1000;
+export const MAX_SETTINGS_HANDLED_ACTIVATIONS_PER_WORKER = 4096;
+
+interface SettingsActivationRegistryResultBaseV1 {
+  version: 1;
+  dataEpoch: string;
+  workerEpoch: string;
+  mutationId: string;
+  permissionCheckId: string;
+  activationId: string;
+  storageReservationId: string;
+  issuedAtMs: number;
+  expiresAtMs: number;
+  observedAtMs: number;
+  resultId: string;
+}
+
+export type SettingsActivationRegistryResultV1 =
+  | (SettingsActivationRegistryResultBaseV1 & {
+      kind: 'SETTINGS_ACTIVATION_CONSUMED';
+      oneShotConsumed: true;
+    })
+  | (SettingsActivationRegistryResultBaseV1 & {
+      kind: 'SETTINGS_ACTIVATION_REJECTED';
+      reason: 'expired' | 'replayed' | 'crossed';
+    });
 
 export interface SettingsMutationByteProjectionV1 {
   version: 1;
@@ -248,16 +280,18 @@ export type SettingsStorageDecodeResult =
 export type SettingValue = AppSettings[PersistentSettingKey];
 export type TransactionPhase =
   | 'saved'
+  | 'persisting_intent'
   | 'reserving'
-  | 'permission'
+  | 'permission_check'
   | 'rebasing'
   | 'writing'
   | 'compensating'
   | 'cancelling'
   | 'reconciling'
+  | 'clearing_intent'
   | 'failed';
 export type ReconcileReason =
-  | 'permission_unknown'
+  | 'permission_check_unknown'
   | 'save_failed'
   | 'conflict'
   | 'compensation_unknown'
@@ -279,12 +313,13 @@ export interface SettingMutation {
   commandDigest: string;
   correlationIds: string[];
   mutationId: string;
-  permissionRequestId: string;
+  permissionCheckId: string;
   activationId: string;
+  activationResultId: string;
   requiredOrigins: string[];
   baseRevision: number;
   baseGeneration: number;
-  permissionProof: SettingsPermissionProofV1 | null;
+  permissionProof: SettingsHostPermissionContainsProofV1 | null;
   storageReservationId: string;
   storageReservationProof: SettingsGlobalStorageReservationProofV1 | null;
 }
@@ -292,10 +327,111 @@ export interface SettingMutation {
 export interface RetryIntent {
   failedMutationId: string;
   mutationId: string;
-  permissionRequestId: string;
+  permissionCheckId: string;
   activationId: string;
+  activationResultId: string;
   storageReservationId: string;
   requestId: string;
+}
+
+export type SettingsPendingIntentPhase =
+  | 'reserving'
+  | 'permission_check'
+  | 'rebasing'
+  | 'writing'
+  | 'compensating'
+  | 'cancelling'
+  | 'reconciling'
+  | 'clearing_intent';
+
+export type SettingsPendingIntentNextCommandType =
+  | 'RESERVE_SETTINGS_STORAGE'
+  | 'VERIFY_SETTINGS_HOST_PERMISSIONS'
+  | 'COMPARE_AND_SETTLE_SETTINGS'
+  | 'RECOVER_SETTINGS_TRANSACTION'
+  | 'REBASE_SETTINGS_MUTATION'
+  | 'ABORT_SETTINGS_MUTATION'
+  | 'RECONCILE_SETTINGS'
+  | 'CLEAR_SETTINGS_PENDING_INTENT';
+
+export interface SettingsTerminalSettlementV1 {
+  version: 1;
+  dataEpoch: string;
+  mutationId: string;
+  requestId: string;
+  commandId: string;
+  outcome: SettingsMutationOutcomeV1;
+  error: SettingsPersistenceError | null;
+}
+
+export interface SettingsPendingIntentV1 {
+  version: 1;
+  storageKey: 'missionpulse.settingsPendingIntent.v1';
+  dataEpoch: string;
+  originWorkerEpoch: string;
+  intentRevision: number;
+  mutation: SettingMutation;
+  retryIntent: RetryIntent | null;
+  phase: SettingsPendingIntentPhase;
+  nextCommandType: SettingsPendingIntentNextCommandType;
+  nextCommandId: string;
+  requestId: string | null;
+  terminalSettlement: SettingsTerminalSettlementV1 | null;
+  intentDigest: string;
+}
+
+export interface SettingsColdStartRecoverySeedV1 {
+  version: 1;
+  dataEpoch: string;
+  recoveryWorkerEpoch: string;
+  recoveryRequestId: string;
+  pendingIntent: SettingsPendingIntentV1;
+  envelope: SettingsEnvelopeV2;
+}
+
+export interface SettingsPendingIntentPersistedProofV1 {
+  version: 1;
+  kind: 'SETTINGS_PENDING_INTENT_PERSISTED';
+  storageArea: 'session';
+  storageKey: 'missionpulse.settingsPendingIntent.v1';
+  dataEpoch: string;
+  mutationId: string;
+  originWorkerEpoch: string;
+  intentRevision: number;
+  intentDigest: string;
+  commandId: string;
+  proofId: string;
+  readBackVerified: true;
+}
+
+export interface SettingsPendingIntentClearedProofV1 {
+  version: 1;
+  kind: 'SETTINGS_PENDING_INTENT_CLEARED';
+  storageArea: 'session';
+  storageKey: 'missionpulse.settingsPendingIntent.v1';
+  dataEpoch: string;
+  mutationId: string;
+  originWorkerEpoch: string;
+  intentRevision: number;
+  intentDigest: string;
+  commandId: string;
+  proofId: string;
+  absenceReadBackVerified: true;
+}
+
+export interface SettingsPendingIntentAbsentProofV1 {
+  version: 1;
+  kind: 'SETTINGS_PENDING_INTENT_ABSENT';
+  storageArea: 'session';
+  storageKey: 'missionpulse.settingsPendingIntent.v1';
+  dataEpoch: string;
+  mutationId: string;
+  originWorkerEpoch: string;
+  intentRevision: 1;
+  intentDigest: string;
+  commandId: string;
+  proofId: string;
+  absenceReadBackVerified: true;
 }
 
 export type PendingSettingsReset = LocalDataResetEpochEventV1;
@@ -306,6 +442,27 @@ export interface SettingsResetCorrelationV1 {
 }
 
 export type SettingsPersistenceCommand =
+  | {
+      type: 'PERSIST_SETTINGS_PENDING_INTENT';
+      commandId: string;
+      dataEpoch: string;
+      storageArea: 'session';
+      storageKey: 'missionpulse.settingsPendingIntent.v1';
+      intentRevision: number;
+      intentDigest: string;
+      pendingIntent: SettingsPendingIntentV1;
+    }
+  | {
+      type: 'CLEAR_SETTINGS_PENDING_INTENT';
+      commandId: string;
+      dataEpoch: string;
+      storageArea: 'session';
+      storageKey: 'missionpulse.settingsPendingIntent.v1';
+      mutationId: string;
+      originWorkerEpoch: string;
+      intentRevision: number;
+      intentDigest: string;
+    }
   | {
       type: 'RECOVER_AND_LOAD_SETTINGS';
       commandId: string;
@@ -328,7 +485,7 @@ export type SettingsPersistenceCommand =
       byteProjection: SettingsMutationByteProjectionV1;
     }
   | {
-      type: 'REQUEST_SETTINGS_PERMISSION';
+      type: 'VERIFY_SETTINGS_HOST_PERMISSIONS';
       commandId: string;
       dataEpoch: string;
       mutationId: string;
@@ -338,8 +495,9 @@ export type SettingsPersistenceCommand =
       previousDigest: string;
       candidateDigest: string;
       correlationIds: string[];
-      permissionRequestId: string;
+      permissionCheckId: string;
       activationId: string;
+      activationResultId: string;
       origins: string[];
       originDigest: string;
       storageReservationProof: SettingsGlobalStorageReservationProofV1;
@@ -357,7 +515,7 @@ export type SettingsPersistenceCommand =
       correlationIds: string[];
       previousSettings: AppSettings;
       candidateSettings: AppSettings;
-      permissionProof: SettingsPermissionProofV1 | null;
+      permissionProof: SettingsHostPermissionContainsProofV1 | null;
       expectedAlarm: AutoScanAlarmExpectationV1;
       storageReservationProof: SettingsGlobalStorageReservationProofV1;
     }
@@ -414,17 +572,29 @@ export type SettingsPersistenceCommand =
 
 export interface SettingsPersistenceInput {
   dataEpoch: string;
+  workerEpoch: string;
   defaultSettings: AppSettings;
   includedConnectorIds: string[];
   permissionOriginsByConnectorId: Record<string, string[]>;
   initialLoadRequestId: string;
+  coldStartSeed: unknown | null;
 }
+
+export type SettingsDeferredPersistenceCommand = Exclude<
+  SettingsPersistenceCommand,
+  | { type: 'PERSIST_SETTINGS_PENDING_INTENT' }
+  | { type: 'CLEAR_SETTINGS_PENDING_INTENT' }
+  | { type: 'RECOVER_AND_LOAD_SETTINGS' }
+>;
 
 export interface SettingsPersistenceContext {
   dataEpoch: string;
+  workerEpoch: string;
   defaultSettings: AppSettings;
   includedConnectorIds: string[];
   permissionOriginsByConnectorId: Record<string, string[]>;
+  coldStartSeedProvided: boolean;
+  coldStartSeed: SettingsColdStartRecoverySeedV1 | null;
   loadStatus: 'loading' | 'reset_pending' | 'ready' | 'error';
   loadRequestId: string;
   phase: TransactionPhase;
@@ -435,6 +605,13 @@ export interface SettingsPersistenceContext {
   canonicalKnowledge: CanonicalKnowledge;
   canonicalRelation: CanonicalRelation;
   retryIntent: RetryIntent | null;
+  handledActivationIds: string[];
+  handledActivationResultIds: string[];
+  pendingIntent: SettingsPendingIntentV1 | null;
+  deferredCommand: SettingsDeferredPersistenceCommand | null;
+  pendingTerminalSettlement: SettingsTerminalSettlementV1 | null;
+  pendingTerminalTarget: 'saved' | 'failed' | 'reset_pending' | 'reset_loading' | null;
+  terminalSettlement: SettingsTerminalSettlementV1 | null;
   pendingReset: PendingSettingsReset | null;
   reconcileRequestId: string | null;
   reconcileReason: ReconcileReason | null;
@@ -464,9 +641,10 @@ export type SettingsPersistenceRawEvent =
   | (EpochScoped & {
       type: 'MUTATE';
       mutationId: string;
-      permissionRequestId: string;
+      permissionCheckId: string;
       activationId: string;
       storageReservationId: string;
+      activationResult: SettingsActivationRegistryResultV1;
       key: PersistentSettingKey;
       candidate: unknown;
     })
@@ -482,18 +660,18 @@ export type SettingsPersistenceRawEvent =
       error: SettingsPersistenceError;
     })
   | (MutationScoped & {
-      type: 'PERMISSION_GRANTED';
+      type: 'HOST_PERMISSIONS_VERIFIED';
       commandId: string;
-      proof: SettingsPermissionProofV1;
+      proof: SettingsHostPermissionContainsProofV1;
     })
   | (MutationScoped & {
-      type: 'PERMISSION_REFUSED';
+      type: 'HOST_PERMISSIONS_MISSING';
       commandId: string;
       snapshot: SettingsSnapshotV1;
       error: SettingsPersistenceError;
     })
   | (MutationScoped & {
-      type: 'PERMISSION_OUTCOME_UNKNOWN';
+      type: 'HOST_PERMISSIONS_OUTCOME_UNKNOWN';
       commandId: string;
       nextRequestId: string;
       error: SettingsPersistenceError;
@@ -529,9 +707,10 @@ export type SettingsPersistenceRawEvent =
       type: 'RETRY';
       failedMutationId: string;
       mutationId: string;
-      permissionRequestId: string;
+      permissionCheckId: string;
       activationId: string;
       storageReservationId: string;
+      activationResult: SettingsActivationRegistryResultV1;
       requestId: string;
     })
   | (MutationScoped & {
@@ -581,6 +760,32 @@ export type SettingsPersistenceRawEvent =
       error: SettingsPersistenceError;
     })
   | (EpochScoped & { type: 'RETRY_RECONCILIATION'; requestId: string })
+  | (MutationScoped & {
+      type: 'SETTINGS_PENDING_INTENT_PERSISTED';
+      commandId: string;
+      proof: SettingsPendingIntentPersistedProofV1;
+    })
+  | (MutationScoped & {
+      type: 'SETTINGS_PENDING_INTENT_CLEARED';
+      commandId: string;
+      proof: SettingsPendingIntentClearedProofV1;
+    })
+  | (MutationScoped & {
+      type: 'SETTINGS_PENDING_INTENT_PERSIST_FAILED';
+      commandId: string;
+      proof: SettingsPendingIntentAbsentProofV1;
+      error: SettingsPersistenceError;
+    })
+  | (MutationScoped & {
+      type: 'SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN';
+      commandId: string;
+      error: SettingsPersistenceError;
+    })
+  | (MutationScoped & {
+      type: 'SETTINGS_PENDING_INTENT_CLEAR_OUTCOME_UNKNOWN';
+      commandId: string;
+      error: SettingsPersistenceError;
+    })
   | (EpochScoped & {
       type: 'CANONICAL_UPDATED';
       broadcastId: string;
@@ -644,6 +849,8 @@ export const MAX_SETTINGS_DIGEST_BYTES = 1_024;
 export const MAX_SETTINGS_COMMAND_DIGEST_BYTES = 4_096;
 export const MAX_SETTINGS_CORRELATION_IDS = 32;
 export const SETTINGS_STORAGE_KEY = 'settings' as const;
+export const SETTINGS_PENDING_INTENT_STORAGE_KEY = 'missionpulse.settingsPendingIntent.v1' as const;
+export const MAX_SETTINGS_PENDING_INTENT_ENCODED_BYTES = 262_144;
 export const LOCAL_DATA_RESET_RECEIPT_STORAGE_KEY =
   'missionpulse.localDataResetReceipt.v1' as const;
 export const LOCAL_DATA_RESET_RECEIPT_RESERVE_BYTES = 8_192;
@@ -960,7 +1167,17 @@ export function parseSettingsCommandDigest(value: unknown): DecodedSettingsComma
 export const isBoundedSettingsCommandDigest = (value: string): boolean =>
   parseSettingsCommandDigest(value) !== null;
 export const commandId = (
-  kind: 'load' | 'reserve' | 'permission' | 'write' | 'recover' | 'rebase' | 'abort' | 'reconcile',
+  kind:
+    | 'load'
+    | 'persist_intent'
+    | 'clear_intent'
+    | 'reserve'
+    | 'permission_check'
+    | 'write'
+    | 'recover'
+    | 'rebase'
+    | 'abort'
+    | 'reconcile',
   id: string
 ): string => `settings/${kind}/${id}`;
 
@@ -969,26 +1186,141 @@ export function isSettingsCommandId(value: unknown): value is string {
     return false;
   }
   const match =
-    /^settings\/(load|reserve|permission|write|recover|rebase|abort|reconcile)\/(.+)$/.exec(value);
+    /^settings\/(load|persist_intent|clear_intent|reserve|permission_check|write|recover|rebase|abort|reconcile)\/(.+)$/.exec(
+      value
+    );
   return match !== null && isUuidV4(match[2]);
 }
 
-export function parseSettingsPermissionProof(
+export function parseSettingsActivationRegistryResultV1(
+  value: unknown,
+  expected: {
+    dataEpoch: string;
+    workerEpoch: string;
+    mutationId: string;
+    permissionCheckId: string;
+    activationId: string;
+    storageReservationId: string;
+  }
+): SettingsActivationRegistryResultV1 | null {
+  const consumed = readStrictJsonRecord(value, [
+    'version',
+    'kind',
+    'dataEpoch',
+    'workerEpoch',
+    'mutationId',
+    'permissionCheckId',
+    'activationId',
+    'storageReservationId',
+    'issuedAtMs',
+    'expiresAtMs',
+    'observedAtMs',
+    'resultId',
+    'oneShotConsumed',
+  ]);
+  const rejected = readStrictJsonRecord(value, [
+    'version',
+    'kind',
+    'dataEpoch',
+    'workerEpoch',
+    'mutationId',
+    'permissionCheckId',
+    'activationId',
+    'storageReservationId',
+    'issuedAtMs',
+    'expiresAtMs',
+    'observedAtMs',
+    'resultId',
+    'reason',
+  ]);
+  const record = consumed ?? rejected;
+  if (record === null) {
+    return null;
+  }
+  const identityIds = [
+    record.mutationId,
+    record.permissionCheckId,
+    record.activationId,
+    record.storageReservationId,
+    record.resultId,
+  ];
+  if (
+    record.version !== 1 ||
+    record.dataEpoch !== expected.dataEpoch ||
+    record.workerEpoch !== expected.workerEpoch ||
+    record.mutationId !== expected.mutationId ||
+    record.permissionCheckId !== expected.permissionCheckId ||
+    record.activationId !== expected.activationId ||
+    record.storageReservationId !== expected.storageReservationId ||
+    !isUuidV4(record.dataEpoch) ||
+    !isUuidV4(record.workerEpoch) ||
+    !identityIds.every(isUuidV4) ||
+    new Set(identityIds).size !== identityIds.length ||
+    identityIds.includes(record.dataEpoch) ||
+    identityIds.includes(record.workerEpoch) ||
+    record.dataEpoch === record.workerEpoch ||
+    !isSafeNonNegativeInteger(record.issuedAtMs) ||
+    !isSafeNonNegativeInteger(record.expiresAtMs) ||
+    !isSafeNonNegativeInteger(record.observedAtMs) ||
+    Number(record.expiresAtMs) <= Number(record.issuedAtMs) ||
+    Number(record.expiresAtMs) - Number(record.issuedAtMs) > SETTINGS_ACTIVATION_MAX_LIFETIME_MS ||
+    Number(record.observedAtMs) < Number(record.issuedAtMs)
+  ) {
+    return null;
+  }
+  const base = {
+    version: 1 as const,
+    dataEpoch: expected.dataEpoch,
+    workerEpoch: expected.workerEpoch,
+    mutationId: expected.mutationId,
+    permissionCheckId: expected.permissionCheckId,
+    activationId: expected.activationId,
+    storageReservationId: expected.storageReservationId,
+    issuedAtMs: Number(record.issuedAtMs),
+    expiresAtMs: Number(record.expiresAtMs),
+    observedAtMs: Number(record.observedAtMs),
+    resultId: record.resultId as string,
+  };
+  if (consumed !== null) {
+    return consumed.kind === 'SETTINGS_ACTIVATION_CONSUMED' &&
+      consumed.oneShotConsumed === true &&
+      Number(consumed.observedAtMs) <= Number(consumed.expiresAtMs)
+      ? { ...base, kind: 'SETTINGS_ACTIVATION_CONSUMED', oneShotConsumed: true }
+      : null;
+  }
+  const reason = rejected?.reason;
+  if (
+    rejected?.kind !== 'SETTINGS_ACTIVATION_REJECTED' ||
+    !['expired', 'replayed', 'crossed'].includes(String(reason)) ||
+    (reason === 'expired' && Number(rejected.observedAtMs) <= Number(rejected.expiresAtMs))
+  ) {
+    return null;
+  }
+  return {
+    ...base,
+    kind: 'SETTINGS_ACTIVATION_REJECTED',
+    reason: reason as 'expired' | 'replayed' | 'crossed',
+  };
+}
+
+export function parseSettingsHostPermissionContainsProofV1(
   value: unknown,
   expected: {
     dataEpoch: string;
     mutationId: string;
-    permissionRequestId: string;
+    permissionCheckId: string;
     activationId: string;
+    activationResultId: string;
     origins: string[];
   }
-): SettingsPermissionProofV1 | null {
+): SettingsHostPermissionContainsProofV1 | null {
   const record = readStrictJsonRecord(value, [
     'version',
     'dataEpoch',
     'mutationId',
-    'permissionRequestId',
+    'permissionCheckId',
     'activationId',
+    'activationResultId',
     'originDigest',
     'verifiedOrigins',
     'containsVerified',
@@ -1003,12 +1335,20 @@ export function parseSettingsPermissionProof(
     record.version !== 1 ||
     record.dataEpoch !== expected.dataEpoch ||
     record.mutationId !== expected.mutationId ||
-    record.permissionRequestId !== expected.permissionRequestId ||
+    record.permissionCheckId !== expected.permissionCheckId ||
     record.activationId !== expected.activationId ||
+    record.activationResultId !== expected.activationResultId ||
     !isUuidV4(record.dataEpoch) ||
     !isUuidV4(record.mutationId) ||
-    !isUuidV4(record.permissionRequestId) ||
+    !isUuidV4(record.permissionCheckId) ||
     !isUuidV4(record.activationId) ||
+    !isUuidV4(record.activationResultId) ||
+    new Set([
+      record.mutationId,
+      record.permissionCheckId,
+      record.activationId,
+      record.activationResultId,
+    ]).size !== 4 ||
     record.containsVerified !== true ||
     !verifiedOrigins.every((origin): origin is string => typeof origin === 'string') ||
     new Set(verifiedOrigins).size !== verifiedOrigins.length ||
@@ -1023,25 +1363,27 @@ export function parseSettingsPermissionProof(
     version: 1,
     dataEpoch: expected.dataEpoch,
     mutationId: expected.mutationId,
-    permissionRequestId: expected.permissionRequestId,
+    permissionCheckId: expected.permissionCheckId,
     activationId: expected.activationId,
+    activationResultId: expected.activationResultId,
     originDigest: record.originDigest,
     verifiedOrigins: [...verifiedOrigins],
     containsVerified: true,
   };
 }
 
-export function isSettingsPermissionProof(
+export function isSettingsHostPermissionContainsProofV1(
   value: unknown,
   expected: {
     dataEpoch: string;
     mutationId: string;
-    permissionRequestId: string;
+    permissionCheckId: string;
     activationId: string;
+    activationResultId: string;
     origins: string[];
   }
-): value is SettingsPermissionProofV1 {
-  return parseSettingsPermissionProof(value, expected) !== null;
+): value is SettingsHostPermissionContainsProofV1 {
+  return parseSettingsHostPermissionContainsProofV1(value, expected) !== null;
 }
 
 export function parseStrictSettings(value: unknown, includedIds: string[]): AppSettings | null {
@@ -1475,6 +1817,7 @@ export function parseSettingsGlobalStorageReservationProof(
     record.kind !== 'CHROME_LOCAL_SETTINGS_RESERVATION' ||
     record.storageArea !== 'local' ||
     record.settingsKey !== SETTINGS_STORAGE_KEY ||
+    record.dataEpoch !== parseSettingsCommandDigest(mutation.commandDigest)?.dataEpoch ||
     record.dataEpoch !== dataEpoch ||
     record.mutationId !== mutation.mutationId ||
     record.commandDigest !== mutation.commandDigest ||
@@ -1484,6 +1827,10 @@ export function parseSettingsGlobalStorageReservationProof(
     !isUuidV4(record.gateLeaseId) ||
     !isUuidV4(record.proofId) ||
     new Set([record.gateLeaseId, record.proofId, record.reservationId]).size !== 3 ||
+    record.gateLeaseId === dataEpoch ||
+    record.proofId === dataEpoch ||
+    mutation.correlationIds.includes(record.gateLeaseId) ||
+    mutation.correlationIds.includes(record.proofId) ||
     record.currentSettingsEntryBytes !== projection.currentSettingsEntryBytes ||
     record.reservedSettingsEntryBytes !== projection.reservedSettingsEntryBytes ||
     record.requiredAdditionalBytes !== requiredAdditionalBytes ||
@@ -2101,6 +2448,842 @@ export function isSettingsEnvelopeV2(
   return parseSettingsEnvelopeV2(value, dataEpoch, includedIds) !== null;
 }
 
+const PENDING_INTENT_PHASES = new Set<SettingsPendingIntentPhase>([
+  'reserving',
+  'permission_check',
+  'rebasing',
+  'writing',
+  'compensating',
+  'cancelling',
+  'reconciling',
+  'clearing_intent',
+]);
+
+const PENDING_INTENT_COMMAND_PREFIX = {
+  RESERVE_SETTINGS_STORAGE: 'settings/reserve/',
+  VERIFY_SETTINGS_HOST_PERMISSIONS: 'settings/permission_check/',
+  COMPARE_AND_SETTLE_SETTINGS: 'settings/write/',
+  RECOVER_SETTINGS_TRANSACTION: 'settings/recover/',
+  REBASE_SETTINGS_MUTATION: 'settings/rebase/',
+  ABORT_SETTINGS_MUTATION: 'settings/abort/',
+  RECONCILE_SETTINGS: 'settings/reconcile/',
+  CLEAR_SETTINGS_PENDING_INTENT: 'settings/clear_intent/',
+} as const satisfies Record<SettingsPendingIntentNextCommandType, string>;
+
+const PENDING_INTENT_PHASE_BY_COMMAND = {
+  RESERVE_SETTINGS_STORAGE: 'reserving',
+  VERIFY_SETTINGS_HOST_PERMISSIONS: 'permission_check',
+  COMPARE_AND_SETTLE_SETTINGS: 'writing',
+  RECOVER_SETTINGS_TRANSACTION: 'compensating',
+  REBASE_SETTINGS_MUTATION: 'rebasing',
+  ABORT_SETTINGS_MUTATION: 'cancelling',
+  RECONCILE_SETTINGS: 'reconciling',
+  CLEAR_SETTINGS_PENDING_INTENT: 'clearing_intent',
+} as const satisfies Record<SettingsPendingIntentNextCommandType, SettingsPendingIntentPhase>;
+
+const PENDING_INTENT_REQUEST_COMMANDS = new Set<SettingsPendingIntentNextCommandType>([
+  'RECOVER_SETTINGS_TRANSACTION',
+  'REBASE_SETTINGS_MUTATION',
+  'ABORT_SETTINGS_MUTATION',
+  'RECONCILE_SETTINGS',
+  'CLEAR_SETTINGS_PENDING_INTENT',
+]);
+
+function cloneSettingValue(value: SettingValue): SettingValue {
+  return Array.isArray(value) ? [...value] : value;
+}
+
+export function cloneSettingMutation(mutation: SettingMutation): SettingMutation {
+  return {
+    ...mutation,
+    previousSettings: cloneSettings(mutation.previousSettings),
+    candidateSettings: cloneSettings(mutation.candidateSettings),
+    previous: cloneSettingValue(mutation.previous),
+    candidate: cloneSettingValue(mutation.candidate),
+    correlationIds: [...mutation.correlationIds],
+    requiredOrigins: [...mutation.requiredOrigins],
+    permissionProof:
+      mutation.permissionProof === null
+        ? null
+        : {
+            ...mutation.permissionProof,
+            verifiedOrigins: [...mutation.permissionProof.verifiedOrigins],
+          },
+    storageReservationProof:
+      mutation.storageReservationProof === null ? null : { ...mutation.storageReservationProof },
+  };
+}
+
+export function cloneSettingsTerminalSettlementV1(
+  settlement: SettingsTerminalSettlementV1
+): SettingsTerminalSettlementV1 {
+  return {
+    ...settlement,
+    outcome: { ...settlement.outcome, correlationIds: [...settlement.outcome.correlationIds] },
+    error: settlement.error === null ? null : { ...settlement.error },
+  };
+}
+
+function pendingIntentDigestTuple(input: Omit<SettingsPendingIntentV1, 'intentDigest'>): unknown[] {
+  const mutation = input.mutation;
+  return [
+    input.version,
+    input.storageKey,
+    input.dataEpoch,
+    input.originWorkerEpoch,
+    input.intentRevision,
+    {
+      ...cloneSettingMutation(mutation),
+      previousSettings: canonicalSettingsTuple(mutation.previousSettings),
+      candidateSettings: canonicalSettingsTuple(mutation.candidateSettings),
+    },
+    input.retryIntent ? { ...input.retryIntent } : null,
+    input.phase,
+    input.nextCommandType,
+    input.nextCommandId,
+    input.requestId,
+    input.terminalSettlement ? cloneSettingsTerminalSettlementV1(input.terminalSettlement) : null,
+  ];
+}
+
+export function settingsPendingIntentDigest(
+  input: Omit<SettingsPendingIntentV1, 'intentDigest'>
+): string {
+  return `pending/v1:${JSON.stringify(pendingIntentDigestTuple(input))}`;
+}
+
+export function createSettingsPendingIntentV1(
+  input: Omit<SettingsPendingIntentV1, 'version' | 'storageKey' | 'intentDigest'>
+): SettingsPendingIntentV1 {
+  const base: Omit<SettingsPendingIntentV1, 'intentDigest'> = {
+    version: 1,
+    storageKey: SETTINGS_PENDING_INTENT_STORAGE_KEY,
+    dataEpoch: input.dataEpoch,
+    originWorkerEpoch: input.originWorkerEpoch,
+    intentRevision: input.intentRevision,
+    mutation: cloneSettingMutation(input.mutation),
+    retryIntent: input.retryIntent ? { ...input.retryIntent } : null,
+    phase: input.phase,
+    nextCommandType: input.nextCommandType,
+    nextCommandId: input.nextCommandId,
+    requestId: input.requestId,
+    terminalSettlement:
+      input.terminalSettlement === null
+        ? null
+        : cloneSettingsTerminalSettlementV1(input.terminalSettlement),
+  };
+  return { ...base, intentDigest: settingsPendingIntentDigest(base) };
+}
+
+export function cloneSettingsPendingIntentV1(
+  pendingIntent: SettingsPendingIntentV1
+): SettingsPendingIntentV1 {
+  return createSettingsPendingIntentV1({
+    dataEpoch: pendingIntent.dataEpoch,
+    originWorkerEpoch: pendingIntent.originWorkerEpoch,
+    intentRevision: pendingIntent.intentRevision,
+    mutation: pendingIntent.mutation,
+    retryIntent: pendingIntent.retryIntent,
+    phase: pendingIntent.phase,
+    nextCommandType: pendingIntent.nextCommandType,
+    nextCommandId: pendingIntent.nextCommandId,
+    requestId: pendingIntent.requestId,
+    terminalSettlement: pendingIntent.terminalSettlement,
+  });
+}
+
+function parsePendingReservationProof(
+  value: unknown,
+  mutation: SettingMutation,
+  dataEpoch: string
+): SettingsGlobalStorageReservationProofV1 | null {
+  const record = readStrictJsonRecord(value, [
+    'version',
+    'kind',
+    'storageArea',
+    'settingsKey',
+    'dataEpoch',
+    'mutationId',
+    'commandDigest',
+    'baseRevision',
+    'baseGeneration',
+    'reservationId',
+    'gateLeaseId',
+    'proofId',
+    'quotaBytes',
+    'bytesInUse',
+    'currentSettingsEntryBytes',
+    'reservedSettingsEntryBytes',
+    'requiredAdditionalBytes',
+    'systemReserveBytes',
+    'resetReceiptReserveBytes',
+    'availableAfterReservationBytes',
+    'reservationActive',
+    'allLocalWritersFenced',
+    'resetJournalAbsent',
+  ]);
+  const numericKeys = [
+    'quotaBytes',
+    'bytesInUse',
+    'currentSettingsEntryBytes',
+    'reservedSettingsEntryBytes',
+    'requiredAdditionalBytes',
+    'systemReserveBytes',
+    'resetReceiptReserveBytes',
+    'availableAfterReservationBytes',
+  ] as const;
+  const command = parseSettingsCommandDigest(mutation.commandDigest);
+  if (
+    record === null ||
+    command === null ||
+    record.version !== 1 ||
+    record.kind !== 'CHROME_LOCAL_SETTINGS_RESERVATION' ||
+    record.storageArea !== 'local' ||
+    record.settingsKey !== SETTINGS_STORAGE_KEY ||
+    record.dataEpoch !== dataEpoch ||
+    record.dataEpoch !== command.dataEpoch ||
+    record.mutationId !== mutation.mutationId ||
+    record.commandDigest !== mutation.commandDigest ||
+    record.baseRevision !== mutation.baseRevision ||
+    record.baseGeneration !== mutation.baseGeneration ||
+    record.reservationId !== mutation.storageReservationId ||
+    !isUuidV4(record.dataEpoch) ||
+    !isUuidV4(record.gateLeaseId) ||
+    !isUuidV4(record.proofId) ||
+    !numericKeys.every((key) => isSafeNonNegativeInteger(record[key])) ||
+    record.reservationActive !== true ||
+    record.allLocalWritersFenced !== true ||
+    record.resetJournalAbsent !== true
+  ) {
+    return null;
+  }
+  const quotaBytes = Number(record.quotaBytes);
+  const bytesInUse = Number(record.bytesInUse);
+  const currentSettingsEntryBytes = Number(record.currentSettingsEntryBytes);
+  const reservedSettingsEntryBytes = Number(record.reservedSettingsEntryBytes);
+  const requiredAdditionalBytes = Number(record.requiredAdditionalBytes);
+  const availableAfterReservationBytes = Number(record.availableAfterReservationBytes);
+  if (
+    requiredAdditionalBytes !==
+      Math.max(0, reservedSettingsEntryBytes - currentSettingsEntryBytes) ||
+    record.systemReserveBytes !== SETTINGS_GLOBAL_SYSTEM_RESERVE_BYTES ||
+    record.resetReceiptReserveBytes !== LOCAL_DATA_RESET_RECEIPT_RESERVE_BYTES ||
+    quotaBytes < bytesInUse + requiredAdditionalBytes ||
+    availableAfterReservationBytes !== quotaBytes - bytesInUse - requiredAdditionalBytes ||
+    availableAfterReservationBytes < SETTINGS_GLOBAL_SYSTEM_RESERVE_BYTES ||
+    record.gateLeaseId === record.proofId ||
+    record.gateLeaseId === dataEpoch ||
+    record.proofId === dataEpoch ||
+    mutation.correlationIds.includes(record.gateLeaseId) ||
+    mutation.correlationIds.includes(record.proofId)
+  ) {
+    return null;
+  }
+  return { ...(record as unknown as SettingsGlobalStorageReservationProofV1) };
+}
+
+function parseSettingMutation(value: unknown, includedIds: string[]): SettingMutation | null {
+  const record = readStrictJsonRecord(value, [
+    'key',
+    'previousSettings',
+    'candidateSettings',
+    'previous',
+    'candidate',
+    'previousDigest',
+    'candidateDigest',
+    'commandDigest',
+    'correlationIds',
+    'mutationId',
+    'permissionCheckId',
+    'activationId',
+    'activationResultId',
+    'requiredOrigins',
+    'baseRevision',
+    'baseGeneration',
+    'permissionProof',
+    'storageReservationId',
+    'storageReservationProof',
+  ]);
+  const previousSettings = parseStrictSettings(record?.previousSettings, includedIds);
+  const candidateSettings = parseStrictSettings(record?.candidateSettings, includedIds);
+  const correlationIds = parseCorrelationIds(record?.correlationIds, record?.mutationId as string);
+  const origins = readStrictJsonArray(record?.requiredOrigins);
+  const command = parseSettingsCommandDigest(record?.commandDigest);
+  const identityIds = [
+    record?.mutationId,
+    record?.permissionCheckId,
+    record?.activationId,
+    record?.activationResultId,
+    record?.storageReservationId,
+  ];
+  if (
+    record === null ||
+    previousSettings === null ||
+    candidateSettings === null ||
+    sameSettings(previousSettings, candidateSettings) ||
+    correlationIds === null ||
+    origins === null ||
+    !origins.every(
+      (origin): origin is string =>
+        typeof origin === 'string' && origin.length > 0 && origin.length <= 2048
+    ) ||
+    new Set(origins).size !== origins.length ||
+    ![...origins].sort().every((origin, index) => origin === origins[index]) ||
+    !['autoScan', 'scanIntervalMinutes', 'notifications', 'theme', 'enabledConnectors'].includes(
+      String(record.key)
+    ) ||
+    !isUuidV4(record.mutationId) ||
+    !isUuidV4(record.permissionCheckId) ||
+    !isUuidV4(record.activationId) ||
+    !isUuidV4(record.activationResultId) ||
+    !isUuidV4(record.storageReservationId) ||
+    new Set(identityIds).size !== 5 ||
+    !Number.isSafeInteger(record.baseRevision) ||
+    Number(record.baseRevision) < 0 ||
+    !Number.isSafeInteger(record.baseGeneration) ||
+    Number(record.baseGeneration) < 0 ||
+    record.previousDigest !== settingsDigest(previousSettings) ||
+    record.candidateDigest !== settingsDigest(candidateSettings) ||
+    command === null ||
+    command.mutationId !== record.mutationId ||
+    command.baseRevision !== record.baseRevision ||
+    command.baseGeneration !== record.baseGeneration ||
+    command.previousDigest !== record.previousDigest ||
+    command.candidateDigest !== record.candidateDigest ||
+    command.originDigest !== originDigest(origins as string[]) ||
+    !identityIds.every((id) => correlationIds.includes(id as string)) ||
+    !identityIds.every((id) => command.baseCorrelationIds.includes(id as string)) ||
+    ![5, 7].includes(command.baseCorrelationIds.length) ||
+    !command.baseCorrelationIds.every((id) => correlationIds.includes(id))
+  ) {
+    return null;
+  }
+  const key = record.key as PersistentSettingKey;
+  const previous =
+    key === 'enabledConnectors' ? [...previousSettings.enabledConnectors] : previousSettings[key];
+  const candidate =
+    key === 'enabledConnectors' ? [...candidateSettings.enabledConnectors] : candidateSettings[key];
+  if (
+    JSON.stringify(record.previous) !== JSON.stringify(previous) ||
+    JSON.stringify(record.candidate) !== JSON.stringify(candidate)
+  ) {
+    return null;
+  }
+  const baseMutation: SettingMutation = {
+    key,
+    previousSettings,
+    candidateSettings,
+    previous,
+    candidate,
+    previousDigest: record.previousDigest as string,
+    candidateDigest: record.candidateDigest as string,
+    commandDigest: record.commandDigest as string,
+    correlationIds,
+    mutationId: record.mutationId,
+    permissionCheckId: record.permissionCheckId,
+    activationId: record.activationId,
+    activationResultId: record.activationResultId,
+    requiredOrigins: [...(origins as string[])],
+    baseRevision: Number(record.baseRevision),
+    baseGeneration: Number(record.baseGeneration),
+    permissionProof: null,
+    storageReservationId: record.storageReservationId,
+    storageReservationProof: null,
+  };
+  const permissionProof =
+    record.permissionProof === null
+      ? null
+      : parseSettingsHostPermissionContainsProofV1(record.permissionProof, {
+          dataEpoch: command.dataEpoch,
+          mutationId: baseMutation.mutationId,
+          permissionCheckId: baseMutation.permissionCheckId,
+          activationId: baseMutation.activationId,
+          activationResultId: baseMutation.activationResultId,
+          origins: baseMutation.requiredOrigins,
+        });
+  const storageReservationProof =
+    record.storageReservationProof === null
+      ? null
+      : parsePendingReservationProof(
+          record.storageReservationProof,
+          baseMutation,
+          command.dataEpoch
+        );
+  if (
+    (record.permissionProof !== null && permissionProof === null) ||
+    (record.storageReservationProof !== null && storageReservationProof === null)
+  ) {
+    return null;
+  }
+  return { ...baseMutation, permissionProof, storageReservationProof };
+}
+
+function parseRetryIntent(value: unknown): RetryIntent | null {
+  const record = readStrictJsonRecord(value, [
+    'failedMutationId',
+    'mutationId',
+    'permissionCheckId',
+    'activationId',
+    'activationResultId',
+    'storageReservationId',
+    'requestId',
+  ]);
+  if (
+    record === null ||
+    ![
+      record.failedMutationId,
+      record.mutationId,
+      record.permissionCheckId,
+      record.activationId,
+      record.activationResultId,
+      record.storageReservationId,
+      record.requestId,
+    ].every(isUuidV4) ||
+    new Set(Object.values(record)).size !== 7
+  ) {
+    return null;
+  }
+  return record as unknown as RetryIntent;
+}
+
+function outcomeMatchesMutation(
+  outcome: SettingsMutationOutcomeV1,
+  mutation: SettingMutation
+): boolean {
+  return (
+    outcome.mutationId === mutation.mutationId &&
+    outcome.commandDigest === mutation.commandDigest &&
+    outcome.previousDigest === mutation.previousDigest &&
+    outcome.candidateDigest === mutation.candidateDigest &&
+    outcome.baseRevision === mutation.baseRevision &&
+    outcome.baseGeneration === mutation.baseGeneration
+  );
+}
+
+export function parseSettingsTerminalSettlementV1(
+  value: unknown,
+  mutation: SettingMutation
+): SettingsTerminalSettlementV1 | null {
+  const record = readStrictJsonRecord(value, [
+    'version',
+    'dataEpoch',
+    'mutationId',
+    'requestId',
+    'commandId',
+    'outcome',
+    'error',
+  ]);
+  const outcomeRecord = readStrictJsonRecord(record?.outcome, [
+    'version',
+    'dataEpoch',
+    'mutationId',
+    'commandDigest',
+    'previousDigest',
+    'candidateDigest',
+    'baseRevision',
+    'baseGeneration',
+    'settledRevision',
+    'settledGeneration',
+    'correlationIds',
+    'outcome',
+  ]);
+  if (
+    record === null ||
+    outcomeRecord === null ||
+    record.version !== 1 ||
+    record.dataEpoch !== outcomeRecord.dataEpoch ||
+    record.mutationId !== mutation.mutationId ||
+    !isUuidV4(record.dataEpoch) ||
+    !isUuidV4(record.requestId) ||
+    !isSettingsCommandId(record.commandId) ||
+    !Number.isSafeInteger(outcomeRecord.settledRevision) ||
+    !Number.isSafeInteger(outcomeRecord.settledGeneration)
+  ) {
+    return null;
+  }
+  const outcome = parseOutcome(
+    record.outcome,
+    record.dataEpoch,
+    Number(outcomeRecord.settledRevision),
+    Number(outcomeRecord.settledGeneration)
+  );
+  const error = record.error === null ? null : parseExactSettingsError(record.error);
+  if (
+    outcome === null ||
+    !outcomeMatchesMutation(outcome, mutation) ||
+    !outcome.correlationIds.includes(record.requestId) ||
+    (record.error !== null && error === null)
+  ) {
+    return null;
+  }
+  return {
+    version: 1,
+    dataEpoch: record.dataEpoch,
+    mutationId: mutation.mutationId,
+    requestId: record.requestId,
+    commandId: record.commandId,
+    outcome,
+    error,
+  };
+}
+
+export function parseSettingsPendingIntentV1(
+  value: unknown,
+  includedIds: string[]
+): SettingsPendingIntentV1 | null {
+  const record = readStrictJsonRecord(value, [
+    'version',
+    'storageKey',
+    'dataEpoch',
+    'originWorkerEpoch',
+    'intentRevision',
+    'mutation',
+    'retryIntent',
+    'phase',
+    'nextCommandType',
+    'nextCommandId',
+    'requestId',
+    'terminalSettlement',
+    'intentDigest',
+  ]);
+  const mutation = parseSettingMutation(record?.mutation, includedIds);
+  const retryIntent = record?.retryIntent === null ? null : parseRetryIntent(record?.retryIntent);
+  const terminalSettlement =
+    mutation === null || record?.terminalSettlement === null
+      ? null
+      : parseSettingsTerminalSettlementV1(record?.terminalSettlement, mutation);
+  if (
+    record === null ||
+    mutation === null ||
+    record.version !== 1 ||
+    record.storageKey !== SETTINGS_PENDING_INTENT_STORAGE_KEY ||
+    !isUuidV4(record.dataEpoch) ||
+    !isUuidV4(record.originWorkerEpoch) ||
+    !Number.isSafeInteger(record.intentRevision) ||
+    Number(record.intentRevision) < 1 ||
+    Number(record.intentRevision) >= Number.MAX_SAFE_INTEGER ||
+    typeof record.phase !== 'string' ||
+    !PENDING_INTENT_PHASES.has(record.phase as SettingsPendingIntentPhase) ||
+    typeof record.nextCommandType !== 'string' ||
+    !Object.prototype.hasOwnProperty.call(PENDING_INTENT_COMMAND_PREFIX, record.nextCommandType) ||
+    !isSettingsCommandId(record.nextCommandId) ||
+    (record.retryIntent === null ? retryIntent !== null : retryIntent === null) ||
+    (record.terminalSettlement === null
+      ? terminalSettlement !== null
+      : terminalSettlement === null) ||
+    (record.requestId !== null && !isUuidV4(record.requestId)) ||
+    typeof record.intentDigest !== 'string'
+  ) {
+    return null;
+  }
+  const nextCommandType = record.nextCommandType as SettingsPendingIntentNextCommandType;
+  const phase = record.phase as SettingsPendingIntentPhase;
+  const mutationCommand = parseSettingsCommandDigest(mutation.commandDigest);
+  const requestId = record.requestId as string | null;
+  const commandIdentityValid = (() => {
+    if (nextCommandType === 'RESERVE_SETTINGS_STORAGE') {
+      return (
+        retryIntent === null &&
+        mutation.storageReservationProof === null &&
+        record.nextCommandId === commandId('reserve', mutation.storageReservationId)
+      );
+    }
+    if (nextCommandType === 'VERIFY_SETTINGS_HOST_PERMISSIONS') {
+      return (
+        retryIntent === null &&
+        mutation.storageReservationProof !== null &&
+        mutation.permissionProof === null &&
+        mutation.requiredOrigins.length > 0 &&
+        record.nextCommandId === commandId('permission_check', mutation.permissionCheckId)
+      );
+    }
+    if (nextCommandType === 'COMPARE_AND_SETTLE_SETTINGS') {
+      return (
+        retryIntent === null &&
+        mutation.storageReservationProof !== null &&
+        (mutation.requiredOrigins.length === 0 || mutation.permissionProof !== null) &&
+        record.nextCommandId === commandId('write', mutation.mutationId)
+      );
+    }
+    if (nextCommandType === 'REBASE_SETTINGS_MUTATION') {
+      return (
+        retryIntent !== null &&
+        retryIntent.failedMutationId === mutation.mutationId &&
+        requestId === retryIntent.requestId &&
+        record.nextCommandId === commandId('rebase', retryIntent.requestId)
+      );
+    }
+    if (nextCommandType === 'CLEAR_SETTINGS_PENDING_INTENT') {
+      return (
+        retryIntent === null &&
+        terminalSettlement !== null &&
+        requestId === terminalSettlement.requestId &&
+        record.nextCommandId === commandId('clear_intent', terminalSettlement.requestId)
+      );
+    }
+    const kind =
+      nextCommandType === 'RECOVER_SETTINGS_TRANSACTION'
+        ? 'recover'
+        : nextCommandType === 'ABORT_SETTINGS_MUTATION'
+          ? 'abort'
+          : 'reconcile';
+    return (
+      retryIntent === null &&
+      requestId !== null &&
+      (nextCommandType !== 'RECOVER_SETTINGS_TRANSACTION' ||
+        mutation.storageReservationProof !== null) &&
+      mutation.correlationIds.includes(requestId) &&
+      record.nextCommandId === commandId(kind, requestId)
+    );
+  })();
+  if (
+    mutationCommand === null ||
+    mutationCommand.dataEpoch !== record.dataEpoch ||
+    !record.nextCommandId.startsWith(PENDING_INTENT_COMMAND_PREFIX[nextCommandType]) ||
+    PENDING_INTENT_PHASE_BY_COMMAND[nextCommandType] !== phase ||
+    PENDING_INTENT_REQUEST_COMMANDS.has(nextCommandType) !== (record.requestId !== null) ||
+    !commandIdentityValid
+  ) {
+    return null;
+  }
+  const parsed = createSettingsPendingIntentV1({
+    dataEpoch: record.dataEpoch,
+    originWorkerEpoch: record.originWorkerEpoch,
+    intentRevision: Number(record.intentRevision),
+    mutation,
+    retryIntent,
+    phase,
+    nextCommandType,
+    nextCommandId: record.nextCommandId,
+    requestId: record.requestId as string | null,
+    terminalSettlement,
+  });
+  return parsed.intentDigest === record.intentDigest &&
+    utf8ByteLength(JSON.stringify(parsed)) <= MAX_SETTINGS_PENDING_INTENT_ENCODED_BYTES
+    ? parsed
+    : null;
+}
+
+export function parseSettingsColdStartRecoverySeedV1(
+  value: unknown,
+  includedIds: string[]
+): SettingsColdStartRecoverySeedV1 | null {
+  const record = readStrictJsonRecord(value, [
+    'version',
+    'dataEpoch',
+    'recoveryWorkerEpoch',
+    'recoveryRequestId',
+    'pendingIntent',
+    'envelope',
+  ]);
+  const pendingIntent = parseSettingsPendingIntentV1(record?.pendingIntent, includedIds);
+  const envelope =
+    typeof record?.dataEpoch === 'string'
+      ? parseSettingsEnvelopeV2(record.envelope, record.dataEpoch, includedIds)
+      : null;
+  if (
+    record === null ||
+    record.version !== 1 ||
+    pendingIntent === null ||
+    envelope === null ||
+    record.dataEpoch !== pendingIntent.dataEpoch ||
+    !isUuidV4(record.recoveryWorkerEpoch) ||
+    !isUuidV4(record.recoveryRequestId)
+  ) {
+    return null;
+  }
+  const mutation = pendingIntent.mutation;
+  const journal = envelope.journal;
+  const outcome = envelope.outcomes.find((item) => item.mutationId === mutation.mutationId) ?? null;
+  const preexistingIds = new Set<string>([
+    record.dataEpoch,
+    pendingIntent.originWorkerEpoch,
+    mutation.mutationId,
+    mutation.permissionCheckId,
+    mutation.activationId,
+    mutation.activationResultId,
+    mutation.storageReservationId,
+    ...mutation.correlationIds,
+    ...(mutation.storageReservationProof
+      ? [mutation.storageReservationProof.gateLeaseId, mutation.storageReservationProof.proofId]
+      : []),
+    ...(pendingIntent.retryIntent
+      ? [
+          pendingIntent.retryIntent.mutationId,
+          pendingIntent.retryIntent.permissionCheckId,
+          pendingIntent.retryIntent.activationId,
+          pendingIntent.retryIntent.activationResultId,
+          pendingIntent.retryIntent.storageReservationId,
+          pendingIntent.retryIntent.requestId,
+        ]
+      : []),
+    ...(pendingIntent.terminalSettlement
+      ? [
+          pendingIntent.terminalSettlement.requestId,
+          ...pendingIntent.terminalSettlement.outcome.correlationIds,
+        ]
+      : []),
+    ...(journal ? [journal.transactionId, ...journal.correlationIds] : []),
+    ...envelope.outcomes.flatMap((item) => item.correlationIds),
+  ]);
+  if (
+    record.recoveryWorkerEpoch === record.recoveryRequestId ||
+    preexistingIds.has(record.recoveryWorkerEpoch) ||
+    preexistingIds.has(record.recoveryRequestId) ||
+    (journal !== null &&
+      (journal.mutationId !== mutation.mutationId ||
+        journal.commandDigest !== mutation.commandDigest ||
+        journal.previousDigest !== mutation.previousDigest ||
+        journal.candidateDigest !== mutation.candidateDigest ||
+        journal.baseRevision !== mutation.baseRevision ||
+        journal.baseGeneration !== mutation.baseGeneration)) ||
+    (outcome !== null && !outcomeMatchesMutation(outcome, mutation)) ||
+    (pendingIntent.terminalSettlement !== null &&
+      (outcome === null ||
+        pendingIntent.terminalSettlement.outcome.outcome !== outcome.outcome ||
+        pendingIntent.terminalSettlement.outcome.settledGeneration !==
+          outcome.settledGeneration)) ||
+    envelope.revision < mutation.baseRevision ||
+    envelope.generation < mutation.baseGeneration ||
+    (journal === null &&
+      outcome === null &&
+      envelope.revision === mutation.baseRevision &&
+      settingsDigest(envelope.settings) !== mutation.previousDigest)
+  ) {
+    return null;
+  }
+  return {
+    version: 1,
+    dataEpoch: record.dataEpoch,
+    recoveryWorkerEpoch: record.recoveryWorkerEpoch,
+    recoveryRequestId: record.recoveryRequestId,
+    pendingIntent,
+    envelope,
+  };
+}
+
+export function parseSettingsPendingIntentPersistedProofV1(
+  value: unknown,
+  context: SettingsPersistenceContext
+): SettingsPendingIntentPersistedProofV1 | null {
+  const command = context.command;
+  const record = readStrictJsonRecord(value, [
+    'version',
+    'kind',
+    'storageArea',
+    'storageKey',
+    'dataEpoch',
+    'mutationId',
+    'originWorkerEpoch',
+    'intentRevision',
+    'intentDigest',
+    'commandId',
+    'proofId',
+    'readBackVerified',
+  ]);
+  if (
+    command?.type !== 'PERSIST_SETTINGS_PENDING_INTENT' ||
+    record === null ||
+    record.version !== 1 ||
+    record.kind !== 'SETTINGS_PENDING_INTENT_PERSISTED' ||
+    record.storageArea !== 'session' ||
+    record.storageKey !== SETTINGS_PENDING_INTENT_STORAGE_KEY ||
+    record.dataEpoch !== command.dataEpoch ||
+    record.mutationId !== command.pendingIntent.mutation.mutationId ||
+    record.originWorkerEpoch !== command.pendingIntent.originWorkerEpoch ||
+    record.intentRevision !== command.intentRevision ||
+    record.intentDigest !== command.intentDigest ||
+    record.commandId !== command.commandId ||
+    !isUuidV4(record.proofId) ||
+    record.readBackVerified !== true
+  ) {
+    return null;
+  }
+  return { ...(record as unknown as SettingsPendingIntentPersistedProofV1) };
+}
+
+export function parseSettingsPendingIntentAbsentProofV1(
+  value: unknown,
+  context: SettingsPersistenceContext
+): SettingsPendingIntentAbsentProofV1 | null {
+  const command = context.command;
+  const record = readStrictJsonRecord(value, [
+    'version',
+    'kind',
+    'storageArea',
+    'storageKey',
+    'dataEpoch',
+    'mutationId',
+    'originWorkerEpoch',
+    'intentRevision',
+    'intentDigest',
+    'commandId',
+    'proofId',
+    'absenceReadBackVerified',
+  ]);
+  if (
+    command?.type !== 'PERSIST_SETTINGS_PENDING_INTENT' ||
+    command.intentRevision !== 1 ||
+    command.pendingIntent.mutation.storageReservationProof !== null ||
+    record === null ||
+    record.version !== 1 ||
+    record.kind !== 'SETTINGS_PENDING_INTENT_ABSENT' ||
+    record.storageArea !== 'session' ||
+    record.storageKey !== SETTINGS_PENDING_INTENT_STORAGE_KEY ||
+    record.dataEpoch !== command.dataEpoch ||
+    record.mutationId !== command.pendingIntent.mutation.mutationId ||
+    record.originWorkerEpoch !== command.pendingIntent.originWorkerEpoch ||
+    record.intentRevision !== 1 ||
+    record.intentDigest !== command.intentDigest ||
+    record.commandId !== command.commandId ||
+    !isUuidV4(record.proofId) ||
+    record.absenceReadBackVerified !== true
+  ) {
+    return null;
+  }
+  return { ...(record as unknown as SettingsPendingIntentAbsentProofV1) };
+}
+
+export function parseSettingsPendingIntentClearedProofV1(
+  value: unknown,
+  context: SettingsPersistenceContext
+): SettingsPendingIntentClearedProofV1 | null {
+  const command = context.command;
+  const record = readStrictJsonRecord(value, [
+    'version',
+    'kind',
+    'storageArea',
+    'storageKey',
+    'dataEpoch',
+    'mutationId',
+    'originWorkerEpoch',
+    'intentRevision',
+    'intentDigest',
+    'commandId',
+    'proofId',
+    'absenceReadBackVerified',
+  ]);
+  if (
+    command?.type !== 'CLEAR_SETTINGS_PENDING_INTENT' ||
+    record === null ||
+    record.version !== 1 ||
+    record.kind !== 'SETTINGS_PENDING_INTENT_CLEARED' ||
+    record.storageArea !== 'session' ||
+    record.storageKey !== SETTINGS_PENDING_INTENT_STORAGE_KEY ||
+    record.dataEpoch !== command.dataEpoch ||
+    record.mutationId !== command.mutationId ||
+    record.originWorkerEpoch !== command.originWorkerEpoch ||
+    record.intentRevision !== command.intentRevision ||
+    record.intentDigest !== command.intentDigest ||
+    record.commandId !== command.commandId ||
+    !isUuidV4(record.proofId) ||
+    record.absenceReadBackVerified !== true
+  ) {
+    return null;
+  }
+  return { ...(record as unknown as SettingsPendingIntentClearedProofV1) };
+}
+
 export function parseSettledSettingsSnapshot(
   value: unknown,
   dataEpoch: string,
@@ -2269,8 +3452,36 @@ const ERROR_CONTRACTS: ErrorContract[] = [
     canonicalKnowledge: 'known',
   },
   {
-    code: 'SETTINGS_PERMISSION_REFUSED',
-    operation: 'permission',
+    code: 'SETTINGS_ACTIVATION_REJECTED',
+    operation: 'activation',
+    recoverable: true,
+    mutationOutcome: 'previous',
+    canonicalKnowledge: 'known',
+  },
+  {
+    code: 'SETTINGS_ACTIVATION_CAPACITY_EXHAUSTED',
+    operation: 'activation',
+    recoverable: false,
+    mutationOutcome: 'previous',
+    canonicalKnowledge: 'known',
+  },
+  {
+    code: 'SETTINGS_HOST_PERMISSION_MISSING',
+    operation: 'permission_check',
+    recoverable: true,
+    mutationOutcome: 'previous',
+    canonicalKnowledge: 'known',
+  },
+  {
+    code: 'SETTINGS_STORAGE_FAILED',
+    operation: 'permission_check',
+    recoverable: true,
+    mutationOutcome: 'unknown',
+    canonicalKnowledge: 'unknown',
+  },
+  {
+    code: 'SETTINGS_STORAGE_FAILED',
+    operation: 'pending_intent',
     recoverable: true,
     mutationOutcome: 'previous',
     canonicalKnowledge: 'known',
@@ -2278,13 +3489,6 @@ const ERROR_CONTRACTS: ErrorContract[] = [
   {
     code: 'SETTINGS_STORAGE_FAILED',
     operation: 'load',
-    recoverable: true,
-    mutationOutcome: 'unknown',
-    canonicalKnowledge: 'unknown',
-  },
-  {
-    code: 'SETTINGS_STORAGE_FAILED',
-    operation: 'permission',
     recoverable: true,
     mutationOutcome: 'unknown',
     canonicalKnowledge: 'unknown',
@@ -2326,7 +3530,7 @@ const ERROR_CONTRACTS: ErrorContract[] = [
   },
   {
     code: 'SETTINGS_CONFLICT',
-    operation: 'permission',
+    operation: 'permission_check',
     recoverable: true,
     mutationOutcome: 'previous',
     canonicalKnowledge: 'unknown',
@@ -2375,7 +3579,14 @@ const ERROR_CONTRACTS: ErrorContract[] = [
   },
   {
     code: 'SETTINGS_TRANSPORT_ERROR',
-    operation: 'permission',
+    operation: 'pending_intent',
+    recoverable: true,
+    mutationOutcome: 'unknown',
+    canonicalKnowledge: 'known',
+  },
+  {
+    code: 'SETTINGS_TRANSPORT_ERROR',
+    operation: 'permission_check',
     recoverable: true,
     mutationOutcome: 'unknown',
     canonicalKnowledge: 'unknown',
@@ -2559,10 +3770,14 @@ export const makeError = (contract: ErrorContract, message: string): SettingsPer
 
 export function contractFor(
   code: SettingsErrorCode,
-  outcome?: MutationOutcomeKnowledge
+  outcome?: MutationOutcomeKnowledge,
+  operation?: SettingsOperation
 ): ErrorContract {
   const contract = ERROR_CONTRACTS.find(
-    (item) => item.code === code && (outcome === undefined || item.mutationOutcome === outcome)
+    (item) =>
+      item.code === code &&
+      (outcome === undefined || item.mutationOutcome === outcome) &&
+      (operation === undefined || item.operation === operation)
   );
   if (!contract) {
     throw new Error(`Missing settings error contract: ${code}`);
@@ -2573,9 +3788,24 @@ export function contractFor(
 export function inputIsValid(context: SettingsPersistenceContext): boolean {
   const ids = context.includedConnectorIds;
   const keys = Object.keys(context.permissionOriginsByConnectorId).sort();
+  const activationIds = context.handledActivationIds;
+  const activationResultIds = context.handledActivationResultIds;
   return (
     isUuidV4(context.dataEpoch) &&
+    isUuidV4(context.workerEpoch) &&
     isUuidV4(context.loadRequestId) &&
+    (context.coldStartSeedProvided
+      ? context.coldStartSeed !== null &&
+        context.coldStartSeed.dataEpoch === context.dataEpoch &&
+        context.coldStartSeed.recoveryWorkerEpoch === context.workerEpoch
+      : context.coldStartSeed === null) &&
+    activationIds.length === activationResultIds.length &&
+    activationIds.length <= MAX_SETTINGS_HANDLED_ACTIVATIONS_PER_WORKER &&
+    activationIds.every(isUuidV4) &&
+    activationResultIds.every(isUuidV4) &&
+    new Set(activationIds).size === activationIds.length &&
+    new Set(activationResultIds).size === activationResultIds.length &&
+    !activationIds.some((id) => activationResultIds.includes(id)) &&
     ids.length > 0 &&
     new Set(ids).size === ids.length &&
     [...ids].sort().every((id, index) => id === ids[index]) &&
@@ -2724,18 +3954,19 @@ const SETTINGS_RAW_EVENT_KEYSETS = {
       'type',
       'dataEpoch',
       'mutationId',
-      'permissionRequestId',
+      'permissionCheckId',
       'activationId',
       'storageReservationId',
+      'activationResult',
       'key',
       'candidate',
     ],
   ],
   STORAGE_RESERVATION_GRANTED: [['type', 'dataEpoch', 'mutationId', 'commandId', 'proof']],
   STORAGE_RESERVATION_DENIED: [['type', 'dataEpoch', 'mutationId', 'commandId', 'denial', 'error']],
-  PERMISSION_GRANTED: [['type', 'dataEpoch', 'mutationId', 'commandId', 'proof']],
-  PERMISSION_REFUSED: [['type', 'dataEpoch', 'mutationId', 'commandId', 'snapshot', 'error']],
-  PERMISSION_OUTCOME_UNKNOWN: [
+  HOST_PERMISSIONS_VERIFIED: [['type', 'dataEpoch', 'mutationId', 'commandId', 'proof']],
+  HOST_PERMISSIONS_MISSING: [['type', 'dataEpoch', 'mutationId', 'commandId', 'snapshot', 'error']],
+  HOST_PERMISSIONS_OUTCOME_UNKNOWN: [
     ['type', 'dataEpoch', 'mutationId', 'commandId', 'nextRequestId', 'error'],
   ],
   SAVE_SUCCEEDED: [['type', 'dataEpoch', 'mutationId', 'commandId', 'snapshot']],
@@ -2755,9 +3986,10 @@ const SETTINGS_RAW_EVENT_KEYSETS = {
       'dataEpoch',
       'failedMutationId',
       'mutationId',
-      'permissionRequestId',
+      'permissionCheckId',
       'activationId',
       'storageReservationId',
+      'activationResult',
       'requestId',
     ],
   ],
@@ -2776,6 +4008,17 @@ const SETTINGS_RAW_EVENT_KEYSETS = {
   RECONCILED: [['type', 'dataEpoch', 'requestId', 'commandId', 'snapshot']],
   RECONCILE_FAILED: [['type', 'dataEpoch', 'requestId', 'commandId', 'error']],
   RETRY_RECONCILIATION: [['type', 'dataEpoch', 'requestId']],
+  SETTINGS_PENDING_INTENT_PERSISTED: [['type', 'dataEpoch', 'mutationId', 'commandId', 'proof']],
+  SETTINGS_PENDING_INTENT_CLEARED: [['type', 'dataEpoch', 'mutationId', 'commandId', 'proof']],
+  SETTINGS_PENDING_INTENT_PERSIST_FAILED: [
+    ['type', 'dataEpoch', 'mutationId', 'commandId', 'proof', 'error'],
+  ],
+  SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN: [
+    ['type', 'dataEpoch', 'mutationId', 'commandId', 'error'],
+  ],
+  SETTINGS_PENDING_INTENT_CLEAR_OUTCOME_UNKNOWN: [
+    ['type', 'dataEpoch', 'mutationId', 'commandId', 'error'],
+  ],
   CANONICAL_UPDATED: [['type', 'dataEpoch', 'broadcastId', 'snapshot', 'nextRequestId']],
   RESET_EPOCH_READY_TO_COMMIT: [['type', 'payload']],
   RESET_EPOCH_COMMITTED: [
@@ -2787,6 +4030,7 @@ const SETTINGS_RAW_EVENT_KEYSETS = {
 const SETTINGS_EVENT_NON_STRING_FIELDS = new Set([
   'type',
   'candidate',
+  'activationResult',
   'payload',
   'snapshot',
   'proof',
@@ -2827,7 +4071,7 @@ function deepFreezeNormalizedEventValue(value: unknown): void {
 
 const SNAPSHOT_EVENT_TYPES = new Set<SettingsPersistenceRawEvent['type']>([
   'LOAD_SUCCEEDED',
-  'PERMISSION_REFUSED',
+  'HOST_PERMISSIONS_MISSING',
   'SAVE_SUCCEEDED',
   'COMPENSATION_SUCCEEDED',
   'RETRY_READY',
@@ -2839,8 +4083,8 @@ const SNAPSHOT_EVENT_TYPES = new Set<SettingsPersistenceRawEvent['type']>([
 const ERROR_EVENT_TYPES = new Set<SettingsPersistenceRawEvent['type']>([
   'LOAD_FAILED',
   'STORAGE_RESERVATION_DENIED',
-  'PERMISSION_REFUSED',
-  'PERMISSION_OUTCOME_UNKNOWN',
+  'HOST_PERMISSIONS_MISSING',
+  'HOST_PERMISSIONS_OUTCOME_UNKNOWN',
   'SAVE_FAILED',
   'RUNTIME_EFFECT_FAILED',
   'COMPENSATION_FAILED',
@@ -2848,6 +4092,9 @@ const ERROR_EVENT_TYPES = new Set<SettingsPersistenceRawEvent['type']>([
   'CANCEL_OUTCOME_UNKNOWN',
   'PROTOCOL_UNCERTAIN',
   'RECONCILE_FAILED',
+  'SETTINGS_PENDING_INTENT_PERSIST_FAILED',
+  'SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN',
+  'SETTINGS_PENDING_INTENT_CLEAR_OUTCOME_UNKNOWN',
 ]);
 
 /**
@@ -2910,6 +4157,21 @@ export function normalizeSettingsPersistenceEvent(
   }
   normalized.type = `${SETTINGS_CAPTURED_EVENT_PREFIX}${type}`;
 
+  if (type === 'MUTATE' || type === 'RETRY') {
+    const activationResult = parseSettingsActivationRegistryResultV1(record.activationResult, {
+      dataEpoch: String(record.dataEpoch),
+      workerEpoch: context.workerEpoch,
+      mutationId: String(record.mutationId),
+      permissionCheckId: String(record.permissionCheckId),
+      activationId: String(record.activationId),
+      storageReservationId: String(record.storageReservationId),
+    });
+    if (activationResult === null) {
+      return null;
+    }
+    normalized.activationResult = activationResult;
+  }
+
   if (SNAPSHOT_EVENT_TYPES.has(type)) {
     const dataEpoch = record.dataEpoch;
     if (typeof dataEpoch !== 'string') {
@@ -2963,19 +4225,35 @@ export function normalizeSettingsPersistenceEvent(
       }
       normalized.denial = denial;
     }
-  } else if (type === 'PERMISSION_GRANTED') {
+  } else if (type === 'HOST_PERMISSIONS_VERIFIED') {
     const mutation = context.mutation;
     const command = context.command;
-    if (mutation === null || command?.type !== 'REQUEST_SETTINGS_PERMISSION') {
+    if (mutation === null || command?.type !== 'VERIFY_SETTINGS_HOST_PERMISSIONS') {
       return null;
     }
-    const proof = parseSettingsPermissionProof(record.proof, {
+    const proof = parseSettingsHostPermissionContainsProofV1(record.proof, {
       dataEpoch: context.dataEpoch,
       mutationId: mutation.mutationId,
-      permissionRequestId: command.permissionRequestId,
+      permissionCheckId: command.permissionCheckId,
       activationId: command.activationId,
+      activationResultId: command.activationResultId,
       origins: command.origins,
     });
+    if (proof === null) {
+      return null;
+    }
+    normalized.proof = proof;
+  } else if (
+    type === 'SETTINGS_PENDING_INTENT_PERSISTED' ||
+    type === 'SETTINGS_PENDING_INTENT_CLEARED' ||
+    type === 'SETTINGS_PENDING_INTENT_PERSIST_FAILED'
+  ) {
+    const proof =
+      type === 'SETTINGS_PENDING_INTENT_PERSISTED'
+        ? parseSettingsPendingIntentPersistedProofV1(record.proof, context)
+        : type === 'SETTINGS_PENDING_INTENT_CLEARED'
+          ? parseSettingsPendingIntentClearedProofV1(record.proof, context)
+          : parseSettingsPendingIntentAbsentProofV1(record.proof, context);
     if (proof === null) {
       return null;
     }

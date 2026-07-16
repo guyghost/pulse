@@ -88,8 +88,9 @@ Les identités suivantes ne sont jamais confondues :
 
 - `attemptId` identifie l'instance d'onboarding ;
 - `dataEpoch` clôture tous les writes et preuves durables ;
+- `workerEpoch` lie le résultat one-shot au worker courant ;
 - `operationId` corrèle l'orchestration onboarding ;
-- `mutationId`, `permissionRequestId`, `activationId` et
+- `mutationId`, `permissionRequestId`, `activationId`, `activationResultId` et
   `storageReservationId` corrèlent la transaction Settings ;
 - `requestId` corrèle annulation et relecture après restart.
 
@@ -105,11 +106,13 @@ requête.
 Tous les IDs opérationnels sont des UUID v4 **lowercase**, selon le validateur
 Settings partagé. Dès qu'un événement accepté consomme ou invalide une
 corrélation, son ID reste dans `consumedCorrelationIds`; ni échec, ni refus,
-ni changement de source, ni restart ne l'efface. `RETRY` consomme ses cinq IDs,
+ni changement de source, ni restart ne l'efface. `RETRY` consomme ses six IDs,
 même si une phase n'en utilise qu'un.
 
-Le registre est borné à 256 IDs et n'évince jamais un ancien ID. La projection
-publie `correlationCapacityRemaining`. Si une opération de cinq IDs ou une
+Le registre est borné à 307 IDs (51 opérations complètes de six IDs, puis un
+ID terminal) et n'évince jamais un ancien ID. La projection publie
+`correlationCapacityRemaining`. Si une opération de six IDs — résultat typé du
+registre d'activation inclus — ou une
 requête d'un ID dépasse la capacité restante, son dispatch est rejeté
 `invalid_event`; seule la création explicite d'un nouvel acteur avec un nouvel
 `attemptId` ouvre une nouvelle capacité. Un Retry ne recycle jamais le registre.
@@ -155,8 +158,8 @@ par snapshot :
 
 | Commande                             | Effet attendu du Shell                                                                                                                                  |
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `DISPATCH_SETTINGS_SELECTION`        | `MUTATE(enabledConnectors)` + attente exacte candidate/digests/base/origins/corrélations.                                                               |
-| `DISPATCH_SETTINGS_SKIP_AUTO_SCAN`   | `MUTATE(autoScan,false)` + même attente causale avant toute fin `skipped`.                                                                              |
+| `DISPATCH_SETTINGS_SELECTION`        | `MUTATE(enabledConnectors)` + résultat d'activation worker-bound et attente exacte candidate/digests/base/origins/corrélations.                         |
+| `DISPATCH_SETTINGS_SKIP_AUTO_SCAN`   | `MUTATE(autoScan,false)` + même résultat one-shot et attente causale avant toute fin `skipped`.                                                         |
 | `CHECK_CONNECTOR_PERMISSION`         | Sous `dataEpoch`, vérifier/demander uniquement les origins du connecteur sélectionné.                                                                   |
 | `CHECK_CONNECTOR_SESSION`            | Sous `dataEpoch`, vérifier la session sans lire ni persister de credential.                                                                             |
 | `PERSIST_ONBOARDING_COMPLETED`       | Sous lease `dataEpoch`, écrire `onboarding_completed=true`, revalider le lease et produire la preuve.                                                   |
@@ -245,7 +248,7 @@ l'ancien epoch inactive.
 - À l'émission Settings, le modèle fige une
   `OnboardingSettingsTransactionExpectationV1` : epoch, purpose, operation,
   mutation, base revision/generation, previous/candidate digests, origin digest,
-  quatre corrélations de base triées, command digest, candidate Settings exact,
+  cinq corrélations de base triées, command digest, candidate Settings exact,
   snapshot request et command IDs.
 - Un settlement Settings exige cette attente champ par champ. Le snapshot doit
   être le résultat immédiat `settings/write/{mutationId}`, à `base+1/base+2`,
@@ -275,9 +278,9 @@ l'ancien epoch inactive.
   `DATA_EPOCH_INVALIDATED(E1,E2)`. Une preuve tardive E1 est rejetée, le terminal
   reste `cancelled` et aucun `ADVANCE_ONBOARDING` E1 n'est émis.
 - Refus de permission, session absente et offline ne déclenchent aucun retry
-  automatique. `RETRY` apporte cinq nouvelles identités jamais consommées;
+  automatique. `RETRY` apporte six nouvelles identités jamais consommées;
   réutiliser même un seul ancien operation/mutation/permission/activation/
-  reservation ID rejette tout l'événement. Un résultat tardif ne peut donc pas
+  activation-result/reservation ID rejette tout l'événement. Un résultat tardif ne peut donc pas
   matcher une tentative ultérieure.
 - Une course Cancel qui révèle `onboarding_completed=true` émet d'abord
   `CLEAR_ONBOARDING_COMPLETED`; le terminal attend la confirmation de clear.

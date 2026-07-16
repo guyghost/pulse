@@ -1,6 +1,6 @@
 # Settings Persistence Workflow Model
 
-Status: **MODEL revised after Task 6 Review 7 — implementation remains forbidden until an independent re-review approves it**.
+Status: **R0A/R0B/R0D executable model implemented; final independent reviews and hashes remain required before Shell work**.
 
 The executable model is split by responsibility:
 
@@ -44,10 +44,10 @@ Typed events and pure guards do.
 
 ## Epochs, IDs, and correlation
 
-`dataEpoch`, `mutationId`, `requestId`, `permissionRequestId`, `activationId`,
-`transactionId`, `broadcastId`, `resetId`, and proof IDs are canonical lowercase
-UUID v4 strings. Uppercase UUIDs, other UUID versions, empty strings, and reused
-IDs are invalid.
+`dataEpoch`, `workerEpoch`, `mutationId`, `requestId`, `permissionCheckId`,
+`activationId`, `activationResultId`, `storageReservationId`, `transactionId`,
+`broadcastId`, `resetId`, and proof IDs are canonical lowercase UUID v4 strings.
+Uppercase UUIDs, other UUID versions, empty strings, and reused IDs are invalid.
 
 The allocator never reuses an ID during one `dataEpoch`. A `mutationId` is the
 durable at-most-once identity and is unique by itself, not by
@@ -56,10 +56,11 @@ protocol violation. Every terminal mutation ID remains in the append-only
 outcome ledger for the whole epoch.
 
 Each admitted mutation carries a sorted, unique `correlationIds` set (maximum
-32 UUIDs). It starts with mutation, permission, and activation IDs and acquires
-rebase, recovery, cancellation, and reconciliation request IDs before the
-corresponding command is emitted. The journal and terminal outcome retain those
-IDs, so a request ID already present in current or historical durable state
+32 UUIDs). It starts with mutation, permission, activation, activation-result
+and reservation IDs and acquires rebase, recovery, cancellation, and
+reconciliation request IDs before the corresponding command is emitted. The
+journal and terminal outcome retain those IDs, so a request ID already present
+in current or historical durable state
 cannot be reused as a later mutation/retry identity. Every response must match
 the command object currently stored in machine context, not merely a
 self-consistent event tuple.
@@ -67,8 +68,125 @@ self-consistent event tuple.
 Command IDs are deterministic and bounded:
 
 ```text
-settings/<load|reserve|permission|write|recover|rebase|abort|reconcile>/<lowercase UUID v4>
+settings/<load|persist_intent|clear_intent|reserve|permission_check|write|recover|rebase|abort|reconcile>/<lowercase UUID v4>
 ```
+
+For `PERSIST_SETTINGS_PENDING_INTENT`, the UUID suffix is the exact identity of
+the deferred command stored by that revision. Distinct revisions therefore
+have distinct command IDs; an ambiguous retry of the same physical revision
+retains the same command ID byte-for-byte. Every deferred identity is fresh
+within the epoch before it may become a pending revision.
+
+## Durable pending intent and cold-controller recovery
+
+The model owns one strict `SettingsPendingIntentV1` record under the logical key
+`missionpulse.settingsPendingIntent.v1`. The eventual Shell may store that record
+only in session-scoped extension storage; the model itself performs no I/O. It
+emits exactly two storage-boundary commands:
+
+- `PERSIST_SETTINGS_PENDING_INTENT`, followed only by an exact
+  `SETTINGS_PENDING_INTENT_PERSISTED` proof with `readBackVerified:true`;
+- `CLEAR_SETTINGS_PENDING_INTENT`, followed only by an exact
+  `SETTINGS_PENDING_INTENT_CLEARED` proof with
+  `absenceReadBackVerified:true`.
+
+The pending record contains the complete mutation, original worker epoch,
+monotone safe-integer `intentRevision`, retry identity when present, exact phase,
+next command type and ID, request ID when the command is request-scoped, proofs
+already obtained, and a canonical bounded digest over every field. Exact keys,
+ordinary JSON descriptors, UUIDs, base revisions/generations, settings digests,
+origin digest, correlation IDs, command prefixes and record digest are all
+validated. No missing field is reconstructed from a value that merely looks
+equivalent.
+
+An ambiguous persist/read-back emits
+`SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN`; the state and exact command
+identity remain unchanged so the executor can retry idempotently. Only revision
+1 may fail before admission, and only an exact
+`SETTINGS_PENDING_INTENT_ABSENT` proof with absence read-back may produce the
+typed recoverable `SETTINGS_STORAGE_FAILED/pending_intent` terminal. No
+reservation, permission check or Settings write has occurred in that branch.
+
+`MUTATE` enters `persistingIntent`. Until the exact persist/read-back proof is
+admitted, reservation is impossible. Every causal rotation creates the next
+intent revision and returns to `persistingIntent` before reservation,
+host-permission verification, write, rebase, recovery, abort or reconciliation.
+The deferred command is private context and cannot become the public command
+until the matching durable proof arrives.
+
+| Current durable identity  | Event / decision                               | Required intermediate state     | Command allowed only after proof                       |
+| ------------------------- | ---------------------------------------------- | ------------------------------- | ------------------------------------------------------ |
+| none                      | valid non-no-op mutation                       | `persistingIntent`, revision 1  | `RESERVE_SETTINGS_STORAGE`                             |
+| reservation identity      | exact reservation proof                        | `persistingIntent`, revision +1 | contains-only verification or candidate write          |
+| permission-check identity | exact contains proof                           | `persistingIntent`, revision +1 | candidate write                                        |
+| any active identity       | Cancel / retry / recovery / reconcile rotation | `persistingIntent`, revision +1 | matching abort, rebase, recovery or reconcile command  |
+| terminal causal outcome   | exact settled snapshot                         | `clearingIntent`                | no further transactional command; clear only           |
+| admitted outcome missing  | exact reconciled snapshot with no causal entry | `failed`, pending intent intact | no command; explicit reset may clear the durable fence |
+
+Terminal publication is two-phase. A causal terminal outcome is first retained
+as `pendingTerminalSettlement` while the public view remains
+`terminalSettlement:null`, `saveStatus:'saving'`, and editing remains disabled.
+Only exact removal plus absence read-back publishes the cloned, deeply frozen
+`SettingsTerminalSettlementV1` and enters `saved` or `failed`. A stale revision,
+digest, worker epoch, mutation ID, command ID or proof ID cannot clear the
+record. An ambiguous cleanup may only retry the same idempotent clear; it never
+replays the candidate or changes the durable outcome.
+
+`SettingsTerminalSettlementV1` contains the exact mutation, request and command
+identity, the complete ledger outcome and its optional exact error. External
+canonical convergence, an equal candidate from another mutation, broadcast,
+reload, or reset never fabricates caller-specific settlement.
+
+At controller creation, a non-null cold-start input must parse as an exact
+`SettingsColdStartRecoverySeedV1`. It binds the serialized pending record,
+recovery worker epoch, fresh recovery request ID and same-epoch envelope. The
+new worker and recovery request must differ from each other and from the data
+epoch, origin worker, mutation/retry/correlation identities, proof/lease IDs,
+journal transaction/correlations and ledger correlations. Journal/outcome
+identity must match mutation bases and digests. A stored reservation proof is
+accepted only when its epoch equals the command and seed epoch and its bounded
+capacity arithmetic is internally exact. An accessor, inherited property,
+symbol, wrong epoch, stale digest, reused identity, foreign outcome or divergent
+journal fails closed in `modelError`.
+
+A valid cold controller first enters `persistingIntent`. It removes every old
+reservation proof/lease from the recovered mutation, appends the injected
+recovery request, increments `intentRevision`, and persists/read-backs that
+exact `nextCommandType:'RECONCILE_SETTINGS'` record. Only then may it enter
+`reconciling` with `RECONCILE_SETTINGS(reason:'worker_restart')`. It never emits
+reservation, permission verification or `COMPARE_AND_SETTLE_SETTINGS` from the
+seed and never replays the candidate. A crash before this rotation read-back
+leaves the previous durable revision authoritative for worker C. An exhausted
+revision fails closed before emitting a record that the cold parser cannot
+accept. Recovery may converge the global snapshot, but caller-specific
+publication still requires the exact outcome and pending-intent cleanup.
+
+### Crash-window matrix
+
+| Crash window                                             | Durable observation by worker B        | Only legal B behavior                                  |
+| -------------------------------------------------------- | -------------------------------------- | ------------------------------------------------------ |
+| before first session write                               | no exact record                        | no mutation admission and no caller terminal           |
+| after write, before read-back                            | unacknowledged record                  | validate/recover; never reserve from A's memory        |
+| after read-back, before deferred command                 | exact revision                         | reconcile that identity; never replay candidate write  |
+| after an in-memory causal rotation, before its read-back | previous exact revision                | resume previous durable identity, not newer memory IDs |
+| after terminal outcome, before clear                     | outcome plus pending record            | reconcile outcome, then cleanup only                   |
+| after remove, before absence read-back                   | clear outcome unknown                  | retry exact clear idempotently; no public terminal yet |
+| after absence read-back, before observer publication     | no pending record plus durable outcome | publish at most the exact causal terminal; no effects  |
+
+The journal crash matrix is also executable against two distinct controller
+instances. For each of: before candidate journal, `effects_pending`, candidate
+alarm before outcome, `compensation_pending`,
+`compensation_effects_pending`, previous alarm before outcome, and durable
+outcome before acknowledgement, worker A is stopped and all references are
+dropped. Serialized worker B may emit only the durable recovery rotation,
+reconcile and cleanup commands. It must reach exactly one causal
+`not_committed`, `committed` or `compensated` ledger outcome and may emit zero
+reservation, permission-check or candidate-write commands.
+
+Absence of session storage after a full browser restart does not identify a
+caller. Startup recovery may settle or fence the local journal and ledger, but
+must not invent a toast, Promise resolution or candidate replay for a vanished
+caller.
 
 Every response echoes `dataEpoch`, `commandId`, and the command's request or
 mutation ID. A matching-ID malformed transaction response becomes
@@ -93,13 +211,15 @@ type SettingsPersistencePublicState =
   | 'loading'
   | 'loadError'
   | 'saved'
+  | 'persistingIntent'
   | 'reserving'
-  | 'permission'
+  | 'permissionCheck'
   | 'rebasing'
   | 'writing'
   | 'compensating'
   | 'cancelling'
   | 'reconciling'
+  | 'clearingIntent'
   | 'failed';
 
 interface SettingsPersistencePublicView {
@@ -115,6 +235,7 @@ interface SettingsPersistencePublicView {
   readonly error: DeepReadonly<SettingsPersistenceError> | null;
   readonly lastRejection: DeepReadonly<SettingsPersistenceError> | null;
   readonly runtimeEffectError: DeepReadonly<SettingsPersistenceError> | null;
+  readonly terminalSettlement: DeepReadonly<SettingsTerminalSettlementV1> | null;
 }
 ```
 
@@ -186,10 +307,12 @@ The bridge wrapper is exactly `{type,payload,resetFenceProof?}`; `payload`
 passes the shared neutral parser inside the single event normalizer before a
 guard may inspect the returned immutable payload.
 
-`RESET_EPOCH_READY_TO_COMMIT` invalidates the complete old projection and every
-in-flight identity, stores the full payload in `pendingReset`, enters
-`resetPending` with `loadStatus:'reset_pending'`, and emits **no command**. In
-particular, it never starts a Load while the reset journal is pre-commit.
+`RESET_EPOCH_READY_TO_COMMIT` invalidates the old projection, stores the full
+payload in `pendingReset`, and sets `loadStatus:'reset_pending'`. With no durable
+Settings intent it enters `resetPending` and emits no command. With an active
+intent it first enters `clearingIntent`, clears the exact old-epoch record, and
+enters `resetPending` only after absence read-back. It never starts a Load while
+the reset journal is pre-commit.
 
 Only a byte-for-byte matching `RESET_EPOCH_COMMITTED` may leave that state. A
 panel opened between broadcasts may accept `committed` without prior readiness
@@ -202,6 +325,8 @@ the stable `settingsBootstrapRequestId` plus
 duplicate committed event during that Load neither rotates the request ID nor
 emits a second command. The actor retains its previous `dataEpoch` until the
 settled E2 Load succeeds; only that terminal proof installs `nextDataEpoch`.
+If committed reset arrives directly while an old intent exists, the same exact
+clear/absence gate runs before that stable Load command is exposed.
 Ordinary Load and fresh-ID restart requests cannot replace the committed reset
 Load. A restart may only reissue the same bootstrap command in both `loading`
 and `loadError`.
@@ -402,7 +527,7 @@ immediately before every journal/outcome write. Count exhaustion, byte
 exhaustion, or insufficient headroom fails closed with
 `SETTINGS_LEDGER_QUOTA_EXHAUSTED`; editing remains frozen until explicit reset.
 
-Envelope headroom is only the inner bound. Before permission or write, every
+Envelope headroom is only the inner bound. Before permission check or write, every
 non-no-op mutation enters `reserving` and emits `RESERVE_SETTINGS_STORAGE`.
 Under the central DatasetEpoch gate, the Shell measures the complete physical
 `chrome.storage.local` area (keys plus serialized values), rechecks the exact
@@ -410,7 +535,7 @@ projected `settings` entry, and registers one active reservation bound to epoch,
 mutation, command digest, both base counters, reservation ID, and gate lease.
 An accepted `SettingsGlobalStorageReservationProofV1` proves that the remaining
 global bytes cover the worst journal/settlement entry plus the 65,536-byte
-system reserve. Every later permission/write/recovery/abort/reconcile command
+system reserve. Every later permission-check/write/recovery/abort/reconcile command
 carries that proof, and the gate revalidates that its authority reservation is
 still active before any write.
 
@@ -446,14 +571,34 @@ digests (`command`, `previous`, `candidate`) to match. Value equality cannot
 manufacture an outcome. Under the queue/generation gate, reconciliation first
 returns a matching outcome, otherwise recovers a matching journal. If neither
 exists and the original write was provably never durably admitted, it atomically
-appends `not_committed` at the next generation; all late permission/write/abort
+appends `not_committed` at the next generation; all late permission-check/write/abort
 commands check that outcome first and become terminal no-ops. This covers
 permission ambiguity, restart, rebase failure, and cancellation before
 admission without inventing causality. Only after that recovery-or-fence
 procedure proves that an admitted mutation has lost both journal and outcome may
 the machine produce non-recoverable `SETTINGS_OUTCOME_MISSING`. It never
-attributes success or failure from the current value. Only explicit reset may
-leave that fail-closed state.
+attributes success or failure from the current value. This branch does not enter
+`clearingIntent`, does not emit `CLEAR_SETTINGS_PENDING_INTENT`, and does not
+publish a terminal settlement. It keeps the exact last read-back-verified
+`SettingsPendingIntentV1` in session storage as the durable corruption fence,
+while the in-memory controller enters commandless `failed` with
+`SETTINGS_OUTCOME_MISSING`. A new worker must reload that strict pending record,
+rotate it durably with its fresh worker/request identities, and reconcile again;
+it can never bootstrap to `saved` merely because the previous worker died. Only
+an exact explicit reset transition may clear this pending fence, after which the
+normal reset absence proof and committed bootstrap gates still apply.
+
+While that exact fatal context is installed — non-null pending intent and
+mutation, `SETTINGS_OUTCOME_MISSING/reconcile/recoverable:false`, and no command
+— it is contextually immutable. `RETRY`, `MUTATE`, `DISMISS_ERROR`, and every
+late transactional callback are absorbed without action: no activation or
+activation-result identity is consumed, no rejection/error field changes, no
+command is exposed, and every detached public snapshot remains deeply equal to
+the fatal snapshot. In particular, the fatal guard for `RETRY` is evaluated
+before replay, capacity, rejected-activation, valid-retry, consumed-invalid and
+fallback branches. Only the exact reset protocol may mutate this context. After
+its E2 Load settles, an activation result issued for E1 remains invalid by
+epoch, while a fresh E2 activation may start a new mutation normally.
 
 ## Durable journal and recovery barrier
 
@@ -563,41 +708,75 @@ validated snapshot and converges through the monotonic broadcast protocol.
 Connector permissions are a pre-write proof, not a post-write effect. The old
 fictitious `NOTIFICATION_POLICY` and `THEME_PROJECTION` effects are removed.
 
+## Activation registry contract
+
+`MUTATE` and `RETRY` do not accept a bare UI gesture flag. They require one
+exact `SettingsActivationRegistryResultV1` emitted by the worker-local
+activation registry. The result binds, as one indivisible tuple, `dataEpoch`,
+`workerEpoch`, mutation, permission-check, activation and reservation IDs, plus
+a distinct `activationResultId`. Its issuance/observation timestamps are safe
+non-negative integers, its lifetime is at most five minutes, and the consumed
+form must be observed no later than expiry.
+
+The registry returns either `SETTINGS_ACTIVATION_CONSUMED/oneShotConsumed:true`
+or the closed rejection reasons `expired | replayed | crossed`. Both forms are
+typed signals: Settings never infers expiry or crossing from free text. Exact
+descriptor capture rejects inherited properties, symbols, accessors, sparse
+arrays, revoked proxies, mixed worker epochs and mixed correlation tuples before
+dispatch.
+
+The controller keeps paired, append-only activation/result registries for its
+worker epoch, bounded to 4096 attempts without eviction. Every admitted result
+is consumed exactly once, including no-op, excluded/invalid candidates,
+revision/generation/ledger exhaustion and rejected retry attempts. Reuse of
+either identity is `SETTINGS_ACTIVATION_REJECTED`; reaching capacity is the
+fatal `SETTINGS_ACTIVATION_CAPACITY_EXHAUSTED` and requires a fresh worker. A
+consumed identity is durably included in the mutation command digest,
+pending-intent recovery seed, journal and outcome. Therefore a crash, retry,
+Cancel or late contains result cannot transfer it to another mutation.
+
 ## Permission proof and policy
 
 The model input requires an exact, deeply copied map: its sorted keys equal the
 included connector catalogue, and every value is a sorted, unique, non-empty
-origin list. Enabling connectors requests only the newly required origin set.
+origin list. Enabling connectors checks only the newly required origin set.
 
-`REQUEST_SETTINGS_PERMISSION` carries the full mutation identity,
-`permissionRequestId`, `activationId`, exact sorted origins, and their digest.
-The Shell associates `activationId` with the initiating direct user gesture,
-requests exactly those origins, then calls `chrome.permissions.contains` for
-that same set. `PERMISSION_GRANTED` is accepted only with an exact
-`SettingsPermissionProofV1` that echoes every ID/digest and has
-`containsVerified: true` plus the exact sorted verified origins.
+`VERIFY_SETTINGS_HOST_PERMISSIONS` carries the full mutation identity,
+`permissionCheckId`, `activationId`, `activationResultId`, exact sorted origins,
+origin digest and storage-reservation proof. `activationId` remains a causal
+one-shot identity for the initiating UI intent; it is not transferable browser
+activation and does not authorize a prompt.
 
-The permission result is serialized through the settings coordinator. A
-refusal appends `not_committed`; an ambiguous permission response reconciles.
-Already-granted origins still require positive `contains` verification. A
-permission granted just before Cancel, conflict, or worker loss is deliberately
-retained: automatic revocation could remove a pre-existing/shared grant and is
-not a safe compensation. Settings state remains causally settled independently.
+The only allowed browser observation is a contains-only check over mandatory
+host origins. There is no interactive request command, port, dormant branch or
+fallback in this protocol. `HOST_PERMISSIONS_VERIFIED` is accepted only with
+an exact `SettingsHostPermissionContainsProofV1` that echoes every identity and
+digest, contains the exact sorted origins, and has `containsVerified:true`.
+
+A negative contains result must already be durably settled as
+`not_committed`; `HOST_PERMISSIONS_MISSING` then enters pending-intent cleanup
+with `SETTINGS_HOST_PERMISSION_MISSING/permission_check` and can never emit a
+candidate write. A thrown or otherwise ambiguous contains observation emits
+`HOST_PERMISSIONS_OUTCOME_UNKNOWN`, rotates and persists a fresh reconcile
+request, and never prompts. Future optional permission UX requires a distinct
+model and review.
 
 ## Commands and Shell obligations
 
 The pure machine emits one immutable command; it performs no I/O.
 
-| Command                        | Shell obligation                                                                                              |
-| ------------------------------ | ------------------------------------------------------------------------------------------------------------- |
-| `RECOVER_AND_LOAD_SETTINGS`    | Strict decode/migrate, journal recovery, reset join/absence proof, alarm alignment, settled snapshot          |
-| `RESERVE_SETTINGS_STORAGE`     | Under DatasetEpoch gate, reserve exact global local-storage headroom or return the typed pre-admission denial |
-| `REQUEST_SETTINGS_PERMISSION`  | Serialize identity, prove direct activation, request exact origins, verify `contains`, settle refusal durably |
-| `COMPARE_AND_SETTLE_SETTINGS`  | Validate full identity/proof, deduplicate, CAS whole settings, journal effect, settle outcome                 |
-| `RECOVER_SETTINGS_TRANSACTION` | Resume durable compensation/effect work and return its terminal proof                                         |
-| `REBASE_SETTINGS_MUTATION`     | Pass the recovery barrier, read latest settled canonical, and reapply no write                                |
-| `ABORT_SETTINGS_MUTATION`      | Serialize against permission/write/recovery and append `cancelled` only if this mutation cannot commit        |
-| `RECONCILE_SETTINGS`           | Recover, fence the mutation, return its exact ledger outcome plus latest settled canonical                    |
+| Command                            | Shell obligation                                                                                              |
+| ---------------------------------- | ------------------------------------------------------------------------------------------------------------- |
+| `PERSIST_SETTINGS_PENDING_INTENT`  | Set the exact session record, read it back, and return only the matching persisted proof                      |
+| `CLEAR_SETTINGS_PENDING_INTENT`    | Remove that exact session identity, prove absence by read-back, and never change its outcome                  |
+| `RECOVER_AND_LOAD_SETTINGS`        | Strict decode/migrate, journal recovery, reset join/absence proof, alarm alignment, settled snapshot          |
+| `RESERVE_SETTINGS_STORAGE`         | Under DatasetEpoch gate, reserve exact global local-storage headroom or return the typed pre-admission denial |
+| `VERIFY_SETTINGS_HOST_PERMISSIONS` | Execute mandatory-host contains-only verification; never open an interactive permission prompt                |
+| `COMPARE_AND_SETTLE_SETTINGS`      | Validate full identity/proof, deduplicate, CAS whole settings, journal effect, settle outcome                 |
+| `RECOVER_SETTINGS_TRANSACTION`     | Resume durable compensation/effect work and return its terminal proof                                         |
+| `REBASE_SETTINGS_MUTATION`         | Pass the recovery barrier, read latest settled canonical, and reapply no write                                |
+| `ABORT_SETTINGS_MUTATION`          | Serialize against permission check/write/recovery and append `cancelled` only if this mutation cannot commit  |
+| `RECONCILE_SETTINGS`               | Recover, fence the mutation, return its exact ledger outcome plus latest settled canonical                    |
 
 Every mutation-settling command carries `mutationId`, command digest,
 `baseRevision`, `baseGeneration`, both settings digests, and the exact sorted
@@ -642,9 +821,9 @@ forces reconciliation. No error action guesses from the old panel snapshot.
 The statechart states are:
 
 ```text
-boot | modelError | resetPending | loading | loadError | saved | reserving |
-permission | rebasing | writing | compensating | cancelling | reconciling |
-failed
+boot | modelError | resetPending | loading | loadError | saved |
+persistingIntent | reserving | permissionCheck | rebasing | writing |
+compensating | cancelling | reconciling | clearingIntent | failed
 ```
 
 The context deliberately separates:
@@ -657,6 +836,12 @@ The context deliberately separates:
   current value compares, without claiming causality;
 - `reconcileReason` — why recovery was entered;
 - immutable `retryIntent` — only reserved IDs before `RETRY_READY`;
+- strict `pendingIntent` plus private `deferredCommand` — the durable identity
+  and the next command blocked behind exact read-back;
+- private `pendingTerminalSettlement` and target — never projected before
+  exact absence read-back;
+- public `terminalSettlement` — cloned/frozen caller-specific settlement only
+  after cleanup;
 - `runtimeEffectError` — the original user-visible runtime failure retained
   through compensation/restart/reconciliation;
 - full `pendingReset` — stable reset and bootstrap correlation.
@@ -674,27 +859,34 @@ stateDiagram-v2
   loading --> saved: LOAD_SUCCEEDED [settled proof]
   loading --> loadError: LOAD_FAILED
   loadError --> loading: LOAD / stable reset or fresh normal restart
-  saved --> reserving: MUTATE [valid non-no-op]
-  reserving --> permission: STORAGE_RESERVATION_GRANTED [origins required]
-  reserving --> writing: STORAGE_RESERVATION_GRANTED [no origins]
-  reserving --> failed: STORAGE_RESERVATION_DENIED [typed pre-admission]
-  permission --> writing: PERMISSION_GRANTED [exact proof]
-  permission --> failed: PERMISSION_REFUSED [not_committed outcome]
-  failed --> rebasing: RETRY [fresh IDs]
-  rebasing --> reserving: RETRY_READY [rebuilt identity]
-  rebasing --> reconciling: PROTOCOL_UNCERTAIN [matching retry command]
-  writing --> saved: SAVE_SUCCEEDED [committed outcome + settled proof]
-  writing --> compensating: RUNTIME_EFFECT_FAILED [durable compensation_pending]
-  compensating --> failed: COMPENSATION_SUCCEEDED [compensated outcome]
-  permission --> cancelling: CANCEL
-  rebasing --> saved: CANCEL [discard RetryIntent; nothing admitted]
-  writing --> cancelling: CANCEL
-  cancelling --> saved: CANCEL_CONFIRMED [cancelled outcome]
-  cancelling --> reconciling: CANCEL_OUTCOME_UNKNOWN
-  writing --> reconciling: SAVE_FAILED
-  reconciling --> saved: RECONCILED [committed or cancelled outcome]
-  reconciling --> failed: RECONCILED [not_committed, compensated, superseded, or missing]
-  reconciling --> reconciling: RECONCILE_FAILED / RETRY_RECONCILIATION
+  saved --> persistingIntent: MUTATE [valid non-no-op]
+  persistingIntent --> reserving: PERSISTED [next reserve]
+  reserving --> persistingIntent: STORAGE_RESERVATION_GRANTED [rotate]
+  persistingIntent --> permissionCheck: PERSISTED [next contains-only check]
+  persistingIntent --> writing: PERSISTED [next candidate write]
+  permissionCheck --> persistingIntent: HOST_PERMISSIONS_VERIFIED [rotate]
+  permissionCheck --> clearingIntent: HOST_PERMISSIONS_MISSING [not_committed]
+  permissionCheck --> persistingIntent: HOST_PERMISSIONS_OUTCOME_UNKNOWN [reconcile rotation]
+  failed --> persistingIntent: RETRY [recoverable failure; fresh IDs and rebase rotation]
+  persistingIntent --> rebasing: PERSISTED [next rebase]
+  rebasing --> persistingIntent: RETRY_READY [rebuilt identity]
+  writing --> clearingIntent: SAVE_SUCCEEDED [committed outcome]
+  writing --> persistingIntent: RUNTIME_EFFECT_FAILED [recovery rotation]
+  persistingIntent --> compensating: PERSISTED [next recovery]
+  compensating --> clearingIntent: COMPENSATION_SUCCEEDED [compensated outcome]
+  permissionCheck --> persistingIntent: CANCEL [abort rotation]
+  writing --> persistingIntent: CANCEL [abort rotation]
+  persistingIntent --> cancelling: PERSISTED [next abort]
+  cancelling --> clearingIntent: CANCEL_CONFIRMED [cancelled outcome]
+  cancelling --> persistingIntent: CANCEL_OUTCOME_UNKNOWN [reconcile rotation]
+  writing --> persistingIntent: SAVE_FAILED [reconcile rotation]
+  persistingIntent --> reconciling: PERSISTED [next reconcile]
+  reconciling --> clearingIntent: RECONCILED [exact terminal outcome]
+  reconciling --> failed: RECONCILED [outcome missing; retain durable pending fence]
+  failed --> failed: RETRY / MUTATE / DISMISS / late callback [outcome missing; no action]
+  clearingIntent --> saved: CLEARED [exact absence, saved target]
+  clearingIntent --> failed: CLEARED [exact absence, failed target]
+  reconciling --> reconciling: RECONCILE_FAILED
 ```
 
 A no-op remains `saved` and issues no command. Mutations during a nonterminal
@@ -706,15 +898,17 @@ correlated recovery Load and can never enter commandless `reconciling`.
 
 ## Retry and exact cancellation
 
-Retry allocates a fresh mutation ID, permission request ID, activation ID,
-storage reservation ID, and rebase request ID into an immutable `RetryIntent`;
-the failed mutation object
+Retry allocates a fresh mutation ID, permission check ID, activation ID,
+activation-result ID, storage reservation ID, and rebase request ID into an
+immutable `RetryIntent`. It must first consume the exact worker-bound activation
+result; rejected results and invalid verified batches are consumed without
+emitting a rebase command. The failed mutation object
 and all of its base/digests remain unchanged while rebasing. `RETRY_READY` must
 match the current rebase command and a settled snapshot. Only then does the
 model construct a complete new `SettingMutation` from that exact snapshot,
 reapply only the retained field candidate, recompute permissions and every
 digest, and run numeric/byte admission again. The rebuilt mutation always
-returns to `reserving` before permission or write. No field from the failed
+returns to `persistingIntent` before reservation, permission check or write. No field from the failed
 attempt is spread into the new identity. It never writes against the failed
 base.
 
@@ -725,9 +919,9 @@ reconciles the retained prior failed mutation with the fresh recovery request.
 A stale prior-mutation ID or late rebase response is ignored and cannot replace
 that recovery command.
 
-Cancel before `RETRY_READY` discards only `RetryIntent` and returns to the
-settled snapshot; no abort is sent because the new mutation was never admitted.
-Late `RETRY_READY` is ignored. Once permission/write begins, Cancel instead
+Cancel before `RETRY_READY` clears the persisted rebase intent, then returns to
+the settled snapshot; no abort is sent because the new mutation was never admitted.
+Late `RETRY_READY` is ignored. Once permission-check/write begins, Cancel instead
 uses the durable handshake below.
 
 Cancel is a durable handshake. `ABORT_SETTINGS_MUTATION` serializes against the
@@ -768,30 +962,32 @@ write serialization is not treated as a broadcast substitute.
 Every error is an exact seven-key V1 object. `message` is bounded display/debug
 text and never controls a transition. The decoder accepts only these tuples:
 
-| Code                                      | Operation(s)                                                                | Recoverable | Mutation outcome      | Canonical knowledge |
-| ----------------------------------------- | --------------------------------------------------------------------------- | ----------- | --------------------- | ------------------- |
-| `SETTINGS_LOAD_FAILED`                    | `load`, `rebase`                                                            | yes         | unknown               | unknown             |
-| `SETTINGS_INVALID`                        | `load`                                                                      | no          | unknown               | unknown             |
-| `SETTINGS_INVALID`                        | `mutate`                                                                    | yes         | previous              | known               |
-| `SETTINGS_BUSY`                           | `mutate`                                                                    | yes         | unknown               | known               |
-| `SETTINGS_PERMISSION_REFUSED`             | `permission`                                                                | yes         | previous              | known               |
-| `SETTINGS_STORAGE_FAILED`                 | `load`, `permission`, `rebase`, `save`, `compensate`, `cancel`, `reconcile` | yes         | unknown               | unknown             |
-| `SETTINGS_CONFLICT`                       | `permission`, `save`                                                        | yes         | previous              | unknown             |
-| `SETTINGS_RUNTIME_EFFECT_FAILED`          | `effect`                                                                    | yes         | candidate             | known               |
-| `SETTINGS_RUNTIME_EFFECT_FAILED`          | `compensate`                                                                | yes         | previous              | known               |
-| `SETTINGS_COMPENSATION_FAILED`            | `compensate`                                                                | yes         | unknown               | unknown             |
-| `SETTINGS_RECONCILE_FAILED`               | `reconcile`                                                                 | yes         | unknown               | unknown             |
-| `SETTINGS_TRANSPORT_ERROR`                | `load`, `permission`, `rebase`, `save`, `compensate`, `cancel`, `reconcile` | yes         | unknown               | unknown             |
-| `SETTINGS_PROTOCOL_ERROR`                 | `load`, `reconcile`                                                         | yes         | unknown               | unknown             |
-| `SETTINGS_WORKER_RESTARTED`               | `reconcile`                                                                 | yes         | unknown               | unknown             |
-| `SETTINGS_RESET_IN_PROGRESS`              | `load`                                                                      | yes         | unknown               | unknown             |
-| `SETTINGS_NOT_COMMITTED`                  | `reconcile`                                                                 | yes         | previous              | known               |
-| `SETTINGS_SUPERSEDED`                     | `reconcile`                                                                 | yes         | previous or candidate | known               |
-| `SETTINGS_OUTCOME_MISSING`                | `reconcile`                                                                 | no          | unknown               | known               |
-| `SETTINGS_LEDGER_QUOTA_EXHAUSTED`         | `mutate`                                                                    | no          | previous              | known               |
-| `SETTINGS_GLOBAL_STORAGE_QUOTA_EXHAUSTED` | `mutate`                                                                    | yes         | previous              | known               |
-| `SETTINGS_GENERATION_EXHAUSTED`           | `save`                                                                      | no          | previous              | known               |
-| `SETTINGS_REVISION_EXHAUSTED`             | `save`                                                                      | no          | previous              | known               |
+| Code                                      | Operation(s)                                                                      | Recoverable | Mutation outcome      | Canonical knowledge |
+| ----------------------------------------- | --------------------------------------------------------------------------------- | ----------- | --------------------- | ------------------- |
+| `SETTINGS_LOAD_FAILED`                    | `load`, `rebase`                                                                  | yes         | unknown               | unknown             |
+| `SETTINGS_INVALID`                        | `load`                                                                            | no          | unknown               | unknown             |
+| `SETTINGS_INVALID`                        | `mutate`                                                                          | yes         | previous              | known               |
+| `SETTINGS_BUSY`                           | `mutate`                                                                          | yes         | unknown               | known               |
+| `SETTINGS_HOST_PERMISSION_MISSING`        | `permission_check`                                                                | yes         | previous              | known               |
+| `SETTINGS_STORAGE_FAILED`                 | `pending_intent`                                                                  | yes         | previous              | known               |
+| `SETTINGS_STORAGE_FAILED`                 | `load`, `permission_check`, `rebase`, `save`, `compensate`, `cancel`, `reconcile` | yes         | unknown               | unknown             |
+| `SETTINGS_CONFLICT`                       | `permission_check`, `save`                                                        | yes         | previous              | unknown             |
+| `SETTINGS_RUNTIME_EFFECT_FAILED`          | `effect`                                                                          | yes         | candidate             | known               |
+| `SETTINGS_RUNTIME_EFFECT_FAILED`          | `compensate`                                                                      | yes         | previous              | known               |
+| `SETTINGS_COMPENSATION_FAILED`            | `compensate`                                                                      | yes         | unknown               | unknown             |
+| `SETTINGS_RECONCILE_FAILED`               | `reconcile`                                                                       | yes         | unknown               | unknown             |
+| `SETTINGS_TRANSPORT_ERROR`                | `pending_intent`                                                                  | yes         | unknown               | known               |
+| `SETTINGS_TRANSPORT_ERROR`                | `load`, `permission_check`, `rebase`, `save`, `compensate`, `cancel`, `reconcile` | yes         | unknown               | unknown             |
+| `SETTINGS_PROTOCOL_ERROR`                 | `load`, `reconcile`                                                               | yes         | unknown               | unknown             |
+| `SETTINGS_WORKER_RESTARTED`               | `reconcile`                                                                       | yes         | unknown               | unknown             |
+| `SETTINGS_RESET_IN_PROGRESS`              | `load`                                                                            | yes         | unknown               | unknown             |
+| `SETTINGS_NOT_COMMITTED`                  | `reconcile`                                                                       | yes         | previous              | known               |
+| `SETTINGS_SUPERSEDED`                     | `reconcile`                                                                       | yes         | previous or candidate | known               |
+| `SETTINGS_OUTCOME_MISSING`                | `reconcile`                                                                       | no          | unknown               | known               |
+| `SETTINGS_LEDGER_QUOTA_EXHAUSTED`         | `mutate`                                                                          | no          | previous              | known               |
+| `SETTINGS_GLOBAL_STORAGE_QUOTA_EXHAUSTED` | `mutate`                                                                          | yes         | previous              | known               |
+| `SETTINGS_GENERATION_EXHAUSTED`           | `save`                                                                            | no          | previous              | known               |
+| `SETTINGS_REVISION_EXHAUSTED`             | `save`                                                                            | no          | previous              | known               |
 
 Phase guards also constrain allowed codes and operations, so sharing a code
 across operations does not broaden acceptance. `PROTOCOL_UNCERTAIN` while
@@ -820,7 +1016,7 @@ exist because cancellation is a positive durable outcome, not an error label.
   or full outcome ledger disables editing.
 
 Inputs are deep-copied at construction: default settings, connector IDs, the
-permission map object, and each origin array. External mutation cannot alter a
+permission-origin map object, and each origin array. External mutation cannot alter a
 guard without an event. Every adopted snapshot is recursively copied, including
 settings, journal, outcome correlation arrays, and alarm proof; later mutation
 of an event object cannot alter canonical context. Successful Load, Dismiss,
@@ -844,7 +1040,7 @@ The core invariants are:
 9. Every envelope mutation increments generation exactly once; overflow is
    impossible by pre-admission reservation.
 10. Every non-no-op mutation acquires and retains exact extension-global local
-    storage capacity under the DatasetEpoch gate before permission or write.
+    storage capacity under the DatasetEpoch gate before permission check or write.
 11. Reset readiness emits no Load; only exact committed correlation starts one,
     and actor epoch changes only after its settled terminal Load.
 12. Same-reset `SETTINGS_RESET_IN_PROGRESS`, ordinary Load replacement, and
@@ -878,14 +1074,39 @@ The core invariants are:
 23. No public reference can construct another actor from the private machine or
     wrap a shared guard to steal and consume an event during its ephemeral
     WeakSet membership window.
+24. A non-no-op mutation cannot emit reservation before exact pending-intent
+    set plus read-back; every later causal command rotation obeys the same gate.
+25. `intentRevision` is a monotone safe integer within one pending lifecycle;
+    every emitted revision remains parseable, and stale/gapped identity,
+    digest, epoch or proof cannot advance the machine.
+26. A fresh worker durably rotates a strict cold seed before reconciliation;
+    it strips old leases and never emits a candidate write, reservation or
+    permission check from recovered memory.
+27. A caller-specific terminal stays private during `clearingIntent` and is
+    published only after exact remove plus absence read-back.
+28. External convergence may update the global canonical projection but never
+    creates `terminalSettlement` for a mutation that this controller did not
+    causally settle.
+29. Mandatory host permissions use contains-only verification. The model has
+    no interactive request command or fallback, and a negative proof produces
+    durable `not_committed` plus zero candidate write.
+30. The public terminal graph is detached, JSON-only and deeply frozen exactly
+    like every other public-view field.
+31. `SETTINGS_OUTCOME_MISSING` retains the exact durable pending intent, emits
+    no clear command or terminal settlement, survives worker recreation, and
+    can lose that fence only through the explicit reset/absence protocol. Its
+    fatal context is action-free for retry, mutate, dismiss and late callbacks;
+    no activation registry or public field changes before reset.
 
 Forbidden transitions include `loading -> saved` without recovery proof,
 `writing -> saved` without `committed`, `cancelling -> saved` without
 `cancelled`, conflict/Dismiss to stale `saved`, value-equality attribution,
 journal eviction, old-epoch acceptance, readiness-triggered Load, committed
 payload mismatch, direct-null committed without exact fence proof,
-equal-generation divergence into commandless reconciliation, and any mutation
-from a frozen fatal state.
+equal-generation divergence into commandless reconciliation, reservation or
+write before pending-intent read-back, terminal publication before absence
+read-back, cold-seed candidate replay, an interactive permission request, and
+any mutation from a frozen fatal state.
 
 ## Review finding closure matrix
 
@@ -898,7 +1119,7 @@ from a frozen fatal state.
 | I2      | Explicit candidate/previous/other relation, durable outcome, and stored reconciliation reason produce exact terminal knowledge.                                           |
 | I3      | Exact V2/V1/bare schemas, one permitted pre-theme default, legacy-only connector migration, safe revisions, atomic cutover, and V2-only policy are specified and decoded. |
 | I4      | Lowercase UUID v4 freshness, deterministic command IDs, exact response correlation, durable mutation deduplication, and idempotent read/recovery commands are modeled.    |
-| I5      | Exact catalogue-origin input, gesture correlation, origin digest, positive `permissions.contains` proof, and orphan-permission retention are explicit.                    |
+| I5      | Exact catalogue-origin input, causal activation ID, origin digest, positive contains-only proof, and zero interactive request branch are explicit.                        |
 | I6      | Only the exact auto-scan alarm is transactional; notification/theme pseudo-effects are removed; proof and multi-panel theme convergence are typed.                        |
 | I7      | One exhaustive error tuple decoder, phase-specific operation checks, reconciliation rotation, and no orphan `SETTINGS_CANCELLED` code.                                    |
 | I8      | Worker restart rotates both initial/error Load and active transaction recovery with fresh IDs.                                                                            |
@@ -916,7 +1137,7 @@ Review 2 closure:
 | R2.2    | Durable `cancelled` wins under every reconciliation reason, including worker restart.                                                                          |
 | R2.3    | Exact UTF-8 envelope budget, 64 KiB headroom, bounded digests/correlations, and in-gate preflight replace count-only quota.                                    |
 | R2.4    | Monotone generation covers metadata/outcome changes and drives CAS, proof, reconciliation, and broadcast convergence.                                          |
-| R2.5    | Retry permission origins are recomputed against the installed rebase snapshot.                                                                                 |
+| R2.5    | Retry permission-check origins are recomputed against the installed rebase snapshot.                                                                           |
 | R2.6    | Recovery/cancel IDs enter durable correlation sets; current-command matching and historical collision checks are explicit.                                     |
 | R2.7    | Reconciliation appends causal `not_committed` when no write was admitted; missing outcome is fatal only after recovery/fencing.                                |
 | R2.8    | Outcome decoding binds command, bases, digests, settlement counters, correlations, and exact alarm shape.                                                      |
@@ -970,7 +1191,19 @@ Review 7 closure:
 | C1-R7   | Native XState snapshots and subscriptions never cross the façade. Each read/notification is an explicit detached deeply frozen domain DTO; machine, context, commands, `_nodes`, methods, collections and serialization aliases remain private, so no rogue actor can steal the live WeakSet capability. |
 | I1-R7   | Observer throws and hostile mutation/reflection are isolated; other observers and atomic-dispatch cleanup continue. Reentrant observer dispatch, unsubscribe and idempotent stop have explicit terminal behavior.                                                                                        |
 
-## Required verification before implementation
+R0A/R0B/R0D closure prepared for final independent review:
+
+| Finding | Model correction                                                                                                                      |
+| ------- | ------------------------------------------------------------------------------------------------------------------------------------- |
+| R0A-1   | Strict session pending intent, canonical digest and exact set/read-back gate every first admission and causal rotation.               |
+| R0A-2   | Cold seed validation binds worker epochs, mutation, envelope, journal/ledger and recovery request; worker B can reconcile only.       |
+| R0A-3   | Exact clear plus absence read-back is mandatory after terminal outcome; crash windows forbid effect replay.                           |
+| R0B-1   | Caller-specific terminal settlement remains private during cleanup and becomes a detached frozen public DTO only afterward.           |
+| R0B-2   | External/global convergence cannot resolve a local caller without the exact mutation outcome and cleanup proof.                       |
+| R0D-1   | Mandatory host permission handling is contains-only with `permissionCheckId`; no interactive request command or fallback exists.      |
+| R0D-2   | Positive, negative and ambiguous contains outcomes respectively rotate to write, settle `not_committed`, or rotate to reconciliation. |
+
+## Required verification before R0 approval and Shell implementation
 
 Independent re-review must trace the Markdown, contract, logic, and statechart
 together. The later implementation phase must first add RED tests for:
@@ -1006,7 +1239,7 @@ together. The later implementation phase must first add RED tests for:
   proofs; changing-descriptor Proxies must prove one capture per source field,
   zero `get` reads, reset fence A never installing payload B, and Load snapshot
   A never becoming snapshot B between guard and action; a mechanical inventory
-  must cover all 29 captured event types and every transition branch, while
+  must cover all 34 captured event types and every transition branch, while
   direct forged `SETTINGS_CAPTURED/*` values, clones, pre-normalized values,
   delayed C/B values and replays remain inert outside atomic dispatch; one
   genuine controller dispatch must remain accepted; send-throw cleanup must
@@ -1024,7 +1257,19 @@ together. The later implementation phase must first add RED tests for:
   consume the live normalized event cross-actor;
   observer throw must not suppress another observer or capability cleanup;
   observer-triggered nested dispatch, idempotent unsubscribe and idempotent
-  stop must follow the explicit controller results.
+  stop must follow the explicit controller results;
+- first-intent set/read-back, every persisted causal rotation, stale/gapped
+  proofs, terminal-before-clear, clear-before-absence, strict cold controller B
+  after controller A is destroyed, an exact no-outcome reconciliation that
+  destroys B then recreates C from the retained pending record without ever
+  reaching `saved` before reset, deep snapshot immutability under valid retry,
+  mutate, dismiss and late callbacks, E2 reset completion, rejection of old-E1
+  activation results and admission of a fresh E2 activation, zero candidate
+  replay, and frozen terminal settlement;
+- contains-only positive proof, negative durable `not_committed`, ambiguous
+  reconciliation, crossed activation/check/origin identities, retry freshness,
+  cancellation and a structural scan proving no interactive Settings
+  permission protocol remains.
 
-Only after that review approves the model may production code or behavior tests
-for Task 6 be implemented.
+Only after two independent reviews approve the exact final hashes may Shell or
+runtime implementation for Task 6 begin.

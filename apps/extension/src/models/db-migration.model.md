@@ -143,6 +143,63 @@ epoch and authority revision. It holds the gate until the IDB transaction or
 Chrome-storage Promise settles. There is no async gap between revalidation and
 commit admission.
 
+Before ordinary admission, the same object and same FIFO expose the four
+operations modeled by `dataset-write-capability.model.md`:
+
+```ts
+beginPreAdmissionCommand(claim);
+issuePreAdmissionCapability(scopeToken, writeId);
+commitPreAdmission(capability, writeId, durableEffect);
+completePreAdmissionCommand(scopeToken);
+```
+
+They are not a second authority. `issueLease/commit`, these four operations,
+`acquireResetFence`, `installResetEpoch` and `fenceFailure` all use the one
+existing `runWithGate` queue. A second mutex in a Chrome-local gate, DB adapter,
+Startup port or Reset adapter is an architecture failure.
+
+The strict command claim binds owner/workflow, stage, command, execution
+attempt, worker epoch, stage-specific nullable data epoch, authority revision,
+fence revision and one ordered bounded write plan. Each plan entry has a fresh
+write ID. Its capability repeats every correlation plus its own fresh ID and
+ordinal. The authority snapshot exposes `fenceRevision`; it advances whenever
+completion, revocation, stage/command/attempt/epoch drift, Reset, Reset epoch
+installation or startup failure fencing invalidates a scope. Worker mismatch
+rejects, while worker termination destroys that worker's exact-object registry.
+
+`dataEpoch:null` is accepted only when `closed_startup` has no retained epoch.
+It is an exact authority fact, not a wildcard. Reset cleanup binds exact
+nullable `previousDataEpoch`; Reset rebuild/terminal writes bind exact
+`nextDataEpoch`. Once an epoch is retained, null or a foreign epoch is rejected
+inside the FIFO before the durable callback.
+
+Every capability is an exact-object, one-shot token consumed before callback
+invocation and before any `await`. The FIFO remains held until that Promise
+settles. A Reset/failure fence ahead of a commit revokes it and invokes zero
+callback; a commit already ahead of the fence is allowed to settle. Completion
+revokes every unconsumed token before the workflow changes command/stage.
+
+Claim and capability registries are worker-local, bounded and never evict or
+reuse replay evidence. Allocator reentrancy, throws, invalid IDs and collisions
+follow the same fail-closed retained-ID discipline as lease allocation. Unlike
+the synchronous ordinary lease allocator, capability allocation is already at
+a FIFO position: a reentrant authority operation queues behind it, the outer
+fresh capability becomes canonical, and a same-write reentrant caller later
+receives that object by identity. Reentrant Reset/completion/failure fence then
+revokes it before every later commit. No raw JavaScript value escapes.
+Registry exhaustion is typed and does not enable a raw/no-op fallback.
+
+The gate therefore has two and only two routes:
+
+```text
+open business admission -> ordinary issueLease/commit
+startup/reset declared write -> exact pre-admission claim/capability/commit
+```
+
+An ordinary lease before admission remains `ADMISSION_CLOSED`. A missing
+capability API, permissive optional adapter, direct raw write, second lock or
+`try one route then the other` fallback is invalid configuration.
+
 Every unknown dependency bag, scope, opening proof, Reset request and
 failure-fence command is captured once from exact own enumerable data
 descriptors into a detached DTO. The dependency bag admits exactly the required
@@ -213,6 +270,15 @@ selective clear removes the old receipt before writing its own latest-only value
 This adds one bounded Chrome-storage key, accounted for by the Settings global
 system quota reserve. It adds no IndexedDB object store, `tracking_meta` field,
 `DB_VERSION` or `APP_DATA_VERSION`; DB/meta remain DB6/data3/schemaVersion 1.
+
+Reset uses the same pre-admission authority path for every write in the closed
+mapping of `local-data-reset.model.md`: journal/checkpoints, database delete,
+session clear, selective local remove, DB6 reinitialization, complete Settings
+generation-zero write, marker 3, Settings alignment writes, receipt and final
+journal removal. A physical Reset effect and its journal checkpoint always use
+different capabilities. Reinitialization specifically uses four ordered
+capabilities: DB6 transaction, Settings V2 write/read-back, marker-3
+write/read-back, then `database_reinitialized` checkpoint.
 
 Chrome-local settings repeat the epoch to close revision ABA across reset. The
 single normative authority is `SettingsEnvelopeV2` exported by
@@ -354,22 +420,51 @@ the migration never stringifies, changes the key or overwrites proof. Every
 non-colliding invalid legacy row is quarantined regardless of the generic 10%
 reject-ratio policy.
 
+### Exact capability saga: transaction, Settings, marker 3
+
+`MIGRATE_DATA` declares exactly three ordered writes under one active Startup
+command scope:
+
+1. `startup.data.tracking_v3_transaction`: the complete IndexedDB transaction
+   above. Its capability remains consumed while the authority FIFO awaits
+   `tx.oncomplete`; marker 2 remains durable.
+2. `startup.data.settings_v2_wrap`: only after transaction completion, write
+   the complete shared `SettingsEnvelopeV2` with the same migration epoch and
+   strictly read it back. Marker 2 still remains durable.
+3. `startup.data.marker3_write`: only after the Settings read-back, write
+   `APP_DATA_VERSION = 3` and strictly read marker 3 back.
+
+These are three distinct write IDs and three distinct one-shot capabilities.
+No capability covers the whole `MIGRATE_DATA` port, and none can be reused for
+the next boundary. The port completes its command scope before emitting its
+success proof. The following `WRAP_SETTINGS_ENVELOPE` Startup command performs
+the model's additional strict read-back under `allow_migration` or `v2_only`;
+it is read-only and cannot repeat write 2.
+
+When the authority has no retained canonical epoch at claim time, the claim and
+all three capabilities carry literal `dataEpoch:null`; this is not a wildcard.
+The transaction and Settings validators still bind their durable payloads to
+the same injected/persisted migration epoch. After Reset installation, an exact
+retained pending epoch is used instead of null.
+
 ### Crash and retry proof
 
-| Crash point                               | Durable result                                 | Retry behavior                                                      |
-| ----------------------------------------- | ---------------------------------------------- | ------------------------------------------------------------------- |
-| before/inside data-v3 transaction         | data-v2 tracking set and marker 2              | full transaction reruns                                             |
-| transaction abort                         | no metadata/envelope/quarantine partial commit | full transaction reruns                                             |
-| after transaction, before settings/marker | canonical rows + metadata, marker still 2      | rows no-op; complete settings envelope/marker retry with same epoch |
-| after marker write                        | DB6/data3                                      | no-op verification/startup recovery                                 |
+| Crash point                                | Durable result                                  | Retry behavior                                                                                                    |
+| ------------------------------------------ | ----------------------------------------------- | ----------------------------------------------------------------------------------------------------------------- |
+| before/inside data-v3 transaction          | data-v2 tracking set and marker 2               | full transaction reruns                                                                                           |
+| transaction abort                          | no metadata/envelope/quarantine partial commit  | full transaction reruns                                                                                           |
+| after transaction, before settings/marker  | canonical rows + metadata, marker still 2       | new worker/attempt and fresh capabilities; rows read back as no-op, then complete Settings/marker with same epoch |
+| after Settings V2 read-back, before marker | canonical rows + complete Settings V2, marker 2 | new worker/attempt and fresh capabilities; strict read-backs precede marker 3                                     |
+| after marker write/read-back               | DB6/data3                                       | no-op verification/startup recovery; old tokens are never reused                                                  |
 
 The `APP_DATA_VERSION = 3` marker is written only after `tx.oncomplete` and
 successful shared-contract validation/read-back of the complete
 `SettingsEnvelopeV2` with the same epoch, never from inside the cursor callback.
 The read-back proves exact keys, valid settings, journal/ledger validity and
 their causal consistency. A settings or marker-write failure leaves marker 2
-and is a retryable migration failure; the completed IDB conversion is an
-idempotent no-op on retry.
+and is a retryable migration failure; its capability remains consumed. Retry
+uses fresh claim/write/capability identities and the completed IDB conversion
+is accepted only through strict idempotent read-back.
 
 ## Validation and corruption policy
 
@@ -444,6 +539,14 @@ checking reset journal
   -> ready
   -> on a fresh late caller, publish only its newly correlated bootstrap
 ```
+
+Every write-bearing Startup command begins the exact bounded claim described by
+`dataset-write-capability.model.md`, consumes one capability per write, and
+completes/revokes the scope before publishing its result event. Read-only stages
+create no dummy claim. `OPEN_EPOCH_ADMISSION` additionally requires no active
+pre-admission scope or outstanding capability. After it opens, all business
+writers switch exclusively to ordinary leases; there is no overlap/fallback
+window between the two routes.
 
 Reset journal detection preempts every other stage and transfers ownership to
 the reset workflow. No opener, actor, scan, settings/profile mutation or cache
@@ -685,6 +788,28 @@ decides its durable result.
     dependency bags produce `INVALID_CONFIGURATION`, and every value thrown by
     `allocateLeaseId` produces `INVALID_LEASE_ID`; neither boundary leaks a raw
     JavaScript exception or creates an outer binding.
+32. Ordinary leases remain impossible before `OPEN_EPOCH_ADMISSION`; every
+    modeled Startup/Reset write instead carries its exact command claim and
+    one-shot capability.
+33. Ordinary commits, pre-admission claim/issue/commit/complete, Reset and
+    failure fence linearize on one `DatasetEpochAuthority` FIFO.
+34. Capability consumption precedes durable callback invocation and await; a
+    consumed/revoked token is never replayable.
+35. Command, stage, attempt, worker, nullable epoch, authority revision and
+    fence revision are revalidated inside the FIFO before every pre-admission
+    write.
+36. Data-v3 IDB transaction, complete Settings V2 wrap/read-back and marker-3
+    write/read-back use three ordered, distinct capabilities.
+37. Reset DB6 transaction, generation-zero Settings V2 write/read-back,
+    marker-3 write/read-back and reinitialization checkpoint use four ordered,
+    distinct capabilities.
+38. Reset/failure fence wins against every later queued capability; an earlier
+    entered durable callback settles first and the FIFO never invents
+    cancellation.
+39. Claim/capability registries are bounded without eviction; allocator
+    reentrancy, throw, collision or exhaustion never enables raw/no-op fallback.
+40. Worker restart changes worker/attempt and rebuilds fresh claims/write IDs;
+    only durable read-back, never an old memory token, proves progress.
 
 ## Review checklist before implementation
 
@@ -727,6 +852,23 @@ decides its durable result.
 - an allocator that throws `Error`, `undefined` or another primitive yields
   typed `INVALID_LEASE_ID`, while a revoked/accessor dependency bag yields typed
   `INVALID_CONFIGURATION` without executing a getter; no raw exception escapes;
+- ordinary lease pre-admission fails before allocation; an exact supported
+  Startup/Reset claim and its exact next capability succeed only on the shared
+  FIFO;
+- substitute claim, command, stage, attempt, worker, nullable epoch,
+  authority/fence revision, write or capability ID independently; every case
+  rejects before callback;
+- multi-write commands allocate distinct one-shot tokens; double consume,
+  cross-write/cross-command reuse, complete-before-callback and old-worker
+  replay perform zero write;
+- exercise capability allocator reentrancy into same write, another ordinal,
+  completion, Reset and failure fence, plus throw/invalid UUID/collision and
+  exact registry exhaustion without eviction;
+- exercise commit/Reset and commit/failure-fence in both FIFO orders and assert
+  only the earlier position can enter its durable callback;
+- crash/restart after data-v3 transaction, Settings V2 read-back and marker-3
+  read-back uses fresh claim/write/capability IDs and never opens admission
+  early;
 - revoked Proxies at the scope, opening-proof, lease, Reset-request,
   failure-command and nested-failure boundaries yield their exact typed
   Authority validation errors, never a raw exception or state change;
@@ -761,3 +903,5 @@ second migration, deletion or schema write.
 - cross-device backup/restore;
 - changes to the application-tracking state machine beyond consuming the
   barrier and epoch contract.
+- executable pre-admission capability contracts/methods and Shell wiring until
+  `dataset-write-capability.model.md` receives independent approval.

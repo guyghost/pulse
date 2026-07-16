@@ -7,6 +7,10 @@ Source de vérité exécutable du démarrage DatasetEpoch. Ce modèle complète
 - `dataset-startup.logic.ts` : guards, actions et commandes pures ;
 - `dataset-startup.machine.ts` : machine XState v5 et façade sûre.
 
+Les écritures pré-admission de ces commandes se composent avec
+`dataset-write-capability.model.md`. Cette composition est normative même tant
+que son contrat exécutable et son adapter Shell restent non implémentés.
+
 Le modèle orchestre. Il n'ouvre pas IndexedDB, ne lit pas Chrome Storage, ne
 crée pas d'alarme et n'ouvre pas lui-même l'autorité DatasetEpoch. Une future
 Shell exécutera la commande pure exposée par le contexte puis renverra une
@@ -26,6 +30,11 @@ dans cet ordre :
 7. l'ouverture de l'autorité DatasetEpoch ;
 8. la publication d'un batch borné de bootstraps corrélés pour les callers
    joints.
+
+Toute frontière durable des étapes 2 à 6 qui écrit réellement passe par une
+capability one-shot de la commande active, sous la FIFO unique de
+`DatasetEpochAuthority`. Cette capability n'ouvre pas l'admission et ne peut
+jamais être remplacée par une lease métier.
 
 Après cette première publication, `ready` continue à servir les callers tardifs
 par une nouvelle commande de publication strictement corrélée à leur
@@ -195,6 +204,58 @@ La récupération Settings emploie le command ID partagé :
 settings/recover/<settingsRecoveryRequestId>
 ```
 
+## Composition pré-admission avec l'autorité
+
+Le contrôleur Shell forme un `DatasetPreAdmissionCommandClaimV1` uniquement
+pour une commande qui contient au moins une écriture Dataset. Le claim répète
+exactement :
+
+- `workflowId === attemptId` et le `workerEpoch` actifs ;
+- `stage: startup:<stage>` et le command ID déterministe courant ;
+- le `dataEpoch` observé par l'autorité, littéralement `null` lorsque
+  `closed_startup` n'en retient pas encore ;
+- `authorityRevision` et `fenceRevision` relues ;
+- un plan ordonné de write IDs UUID frais.
+
+Le mapping est fermé :
+
+| Commande Startup             | Plan capability exact                                                                                                                             |
+| ---------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `UPGRADE_STRUCTURE`          | une capability `startup.structure.db6_upgrade_transaction` couvrant uniquement la transaction version-change DB6                                  |
+| `MIGRATE_DATA`               | trois capabilities distinctes et ordonnées : transaction IDB tracking data-v3, wrap/strict read-back Settings V2, write/strict read-back marker 3 |
+| `RECOVER_PREPARED_LEDGERS`   | une capability pour l'unique transaction atomique seulement si des ledgers doivent être écrits ; le chemin zéro ledger reste read-only            |
+| `RECOVER_SETTINGS_AND_ALARM` | une capability fraîche par write d'enveloppe/journal/outcome du plan Settings partagé ; aucun token global pour le port                           |
+
+`READ_RESET_GATE`, `PREFLIGHT_RESET_REQUEST`, `READ_VERSIONS`,
+`VERIFY_CRITICAL_AND_EPOCH`, `WRAP_SETTINGS_ENVELOPE`,
+`OPEN_EPOCH_ADMISSION`, `PUBLISH_BOOTSTRAPS` et
+`FENCE_STARTUP_FAILURE` ne créent aucun claim d'écriture. Après la saga
+`MIGRATE_DATA`, `WRAP_SETTINGS_ENVELOPE` est le read-back strict supplémentaire
+avec la policy déterminée par le marker ; refaire le write du wrap dans cette
+commande est interdit.
+
+Pour chaque plan :
+
+1. `beginPreAdmissionCommand` enregistre le claim sous la FIFO existante ;
+2. chaque write acquiert sa capability exacte puis appelle
+   `commitPreAdmission` ;
+3. la capability est consommée avant invocation/await de l'effet durable ;
+4. `completePreAdmissionCommand` révoque les tokens restants et précède
+   obligatoirement l'event de succès ou d'échec qui change le stage.
+
+Un Reset en file, un failure fence, un changement de command/stage/attempt,
+une révision ou un epoch différent révoque le scope. La FIFO seule décide : un
+commit déjà linéarisé termine avant le fence ; un commit placé après le fence
+exécute zéro callback. Un callback tardif ne peut ni réémettre une capability
+consommée, ni obtenir l'epoch courant à la place de celui de son claim.
+
+`OPEN_EPOCH_ADMISSION` est refusé tant qu'un scope Startup est actif ou qu'une
+capability de sa commande n'est pas terminale. Après son succès, le chemin
+pré-admission est fermé et les writers métier utilisent exclusivement
+`issueLease/commit`. Une absence d'API capability est une configuration
+invalide, jamais un signal pour appeler directement IndexedDB/Chrome Storage
+ou une gate no-op.
+
 ## Gate Reset avant tout opener
 
 `READ_RESET_GATE` déclare `allowsDatabaseOpen:false`. Aucun autre état n'est
@@ -235,6 +296,22 @@ automatique. Le prochain essai commence de nouveau au gate Reset et relit les
 versions durables. Une transaction crashée est donc résolue par les faits
 stockés, pas par un snapshot mémoire présumé.
 
+Pour data-v3, `MIGRATE_DATA` est une saga, pas une unique transaction
+cross-storage. Son ordre durable est exactement :
+
+1. transaction IDB `mission_tracking + tracking_meta + quarantine` complète,
+   sous sa capability ; marker 2 reste durable ;
+2. write puis read-back strict du `SettingsEnvelopeV2` complet avec le même
+   epoch, sous une deuxième capability ; marker 2 reste durable ;
+3. write puis read-back de `APP_DATA_VERSION = 3`, sous une troisième
+   capability.
+
+Le port ne peut produire `DATA_COMMITTED` qu'après ces trois preuves et après
+completion du scope. Un crash à chacune des frontières laisse l'admission
+fermée ; le prochain worker relit les faits, utilise un nouveau worker/attempt,
+de nouveaux write/capability IDs et reprend idempotemment. Aucun token mémoire
+de l'ancien worker n'est une preuve de commit.
+
 ## Epoch canonique et validation critique
 
 `VERIFICATION_PASSED` encapsule la preuve d'autorité partagée DB6/data3 :
@@ -259,7 +336,10 @@ La politique du décodeur dépend du marker observé à l'entrée :
 `SETTINGS_ENVELOPE_WRAPPED` doit relire un `SettingsEnvelopeV2` strict avec le
 même epoch et marker 3. Le modèle réutilise le parseur partagé, y compris le
 journal, les outcomes, la génération et les connecteurs. Cette étape prouve la
-forme durable ; elle ne prouve pas encore l'effet alarme ni la readiness.
+forme durable ; elle ne prouve pas encore l'effet alarme ni la readiness. Le
+write de wrap ayant déjà eu lieu dans `MIGRATE_DATA` quand une migration était
+nécessaire, cette commande est strictement read-only et ne demande aucune
+capability.
 
 ## Prepared ledgers
 
@@ -316,6 +396,10 @@ d'un snapshot.
 - porter `destructiveEffectPerformed:false` ;
 - utiliser un message non vide et borné.
 
+Lorsqu'une commande possédait un scope pré-admission, la Shell le complète en
+disposition révoquée avant d'envoyer `STEP_FAILED`. Un effet durable rejeté a
+déjà consommé sa capability ; le retry ne peut jamais la rejouer.
+
 Avant `ADMISSION_OPENED`, tous les waiters de la tentative observent le même
 échec et la machine rejoint directement `failed`. Après `ADMISSION_OPENED`, le
 même événement conserve d'abord l'erreur originale et rejoint
@@ -354,6 +438,7 @@ reset ID.
 La transition terminale :
 
 - remplace la commande courante par `TRANSFER_RESET_OWNERSHIP` ;
+- révoque sous la FIFO le scope/capabilities Startup encore actifs ;
 - n'ouvre pas l'admission ;
 - n'accepte plus de résultat tardif ;
 - laisse au workflow Reset la prise du gate et la révocation des leases.
@@ -376,6 +461,11 @@ Les événements de l'ancien acteur échouent la corrélation worker/attempt. Le
 transactions ou journaux durablement committed sont retrouvés par les lectures
 idempotentes du nouveau démarrage. Les prepared ledgers d'un ancien worker et
 le journal Settings sont réglés avant toute admission.
+
+Les registres capability sont worker-locaux, bornés et sans éviction. Un
+redémarrage crée un nouveau `workerEpoch`; il reconstruit un plan avec des
+claim/write/capability IDs frais. Une capability exacte de l'ancien worker
+échoue donc même si une callback tardive conserve ses champs visibles.
 
 Il n'existe pas de faux événement `SERVICE_WORKER_RESTARTED` envoyé à un acteur
 qui aurait survécu : un worker mort ne reçoit pas d'événement.
@@ -456,6 +546,22 @@ accessor échoue fermé.
     borné est conservé, jamais l'historique complet des callers.
 23. Une longueur inconnue supérieure au maximum est rejetée avant allocation,
     `ownKeys` ou boucle.
+24. Toute écriture avant admission possède un claim de la commande active et
+    une capability distincte consommée avant l'effet ; une ordinary lease reste
+    refusée.
+25. Claim, issue, commit, completion, ordinary commit, Reset et failure fence
+    partagent la FIFO unique de `DatasetEpochAuthority`.
+26. `MIGRATE_DATA` possède exactement trois frontières capability ordonnées :
+    transaction IDB, wrap/read-back Settings V2, marker-3 write/read-back.
+27. `WRAP_SETTINGS_ENVELOPE` est read-only après cette saga et ne peut écrire
+    une seconde fois l'enveloppe.
+28. Aucun event ne change le stage tant que le scope de la commande précédente
+    reste actif ; completion/révocation précède l'event.
+29. Reset, failure fence, drift de stage/command/attempt/epoch ou de révision
+    rend toute callback perdante incapable d'entrer dans son effet ; un worker
+    différent ne possède pas le registre exact-object de l'ancien.
+30. Les registres capability sont bornés, sans éviction ni fallback ; leur
+    exhaustion est un échec typé et non une permission de write direct.
 
 ## Scénarios de Review
 
@@ -482,6 +588,16 @@ accessor échoue fermé.
 - échec de publication initiale ou tardive après admission -> commande fence,
   aucun retry avant preuve zéro lease ; fence ambigu -> bloqué ;
 - crash à chaque étape -> nouveau worker, nouveau gate, convergence durable ;
+- ordinary lease pré-admission refusée ; substitution de claim, stage,
+  command, attempt, worker, epoch nullable, authority/fence revision, write ou
+  capability refusée avant callback ;
+- deux writes d'une commande utilisent deux capabilities distinctes ; double
+  consume, callback après completion et token cross-command/cross-worker
+  produisent zéro write ;
+- matrice FIFO commit/Reset/failure-fence dans les deux ordres, allocator
+  reentrant/throw/collision et exhaustion des registres sans éviction ;
+- crash après transaction IDB data-v3, après read-back Settings V2 et après
+  marker 3 : reprise avec IDs frais, jamais de lease/admission anticipée ;
 - event avec getter, clé extra ou objet muté -> `invalid_event` ; tableau Proxy
   avec trap `get` -> zéro lecture, Proxy révoqué/trou/extra/accessor rejeté ;
   longueur 65 rejetée avant `ownKeys`.
@@ -490,6 +606,7 @@ accessor échoue fermé.
 
 - implémentation de `startup-barrier.ts` et de ses Promises ;
 - ouverture réelle d'IndexedDB ou de DatasetEpochAuthority ;
+- implémentation des contrats/méthodes capability pré-admission ;
 - migration DB6/data3 et cutover des writers ;
 - implémentation Settings/alarm et prepared-ledger recovery ;
 - quiescence, suppression et réinitialisation possédées par Reset ;

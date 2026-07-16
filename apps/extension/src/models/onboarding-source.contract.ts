@@ -6,6 +6,7 @@ import {
   isUuidV4,
   normalizeCorrelationIds,
   originDigest,
+  parseSettingsActivationRegistryResultV1,
   parseSettingsCommandDigest,
   parseSettledSettingsSnapshot,
   readStrictJsonRecord,
@@ -13,12 +14,13 @@ import {
   settingsCommandDigest,
   settingsDigest,
   type SettingsPersistenceRawEvent,
+  type SettingsActivationRegistryResultV1,
   type SettingsSnapshotV1,
 } from './settings-persistence.contract';
 
 export const ONBOARDING_SOURCE_MODEL_VERSION = 1 as const;
 export const ONBOARDING_SOURCE_ERROR_MAX_CHARS = 500;
-export const ONBOARDING_SOURCE_MAX_CONSUMED_CORRELATIONS = 256;
+export const ONBOARDING_SOURCE_MAX_CONSUMED_CORRELATIONS = 307;
 const ONBOARDING_SOURCE_MAX_CAPTURE_ARRAY_LENGTH = 4096;
 const ONBOARDING_SOURCE_MAX_CAPTURE_OBJECT_KEYS = 64;
 const ONBOARDING_SOURCE_MAX_CAPTURE_NODES = 262_144;
@@ -86,6 +88,7 @@ export interface OnboardingSourceOperationIds {
   permissionRequestId: string;
   activationId: string;
   storageReservationId: string;
+  activationResult: SettingsActivationRegistryResultV1;
 }
 
 export interface OnboardingSettingsTransactionExpectationV1 {
@@ -256,6 +259,7 @@ export type OnboardingSourceCommand =
 export interface OnboardingSourceInput {
   attemptId: string;
   dataEpoch: string;
+  workerEpoch: string;
   connectorCatalog: readonly ConnectorMeta[];
   settingsSnapshot: unknown;
   onboardingCompleted: boolean;
@@ -265,6 +269,7 @@ export interface OnboardingSourceInput {
 export interface ParsedOnboardingSourceInput {
   attemptId: string;
   dataEpoch: string;
+  workerEpoch: string;
   connectorCatalog: ConnectorMeta[];
   settingsSnapshot: SettingsSnapshotV1;
   onboardingCompleted: boolean;
@@ -274,6 +279,7 @@ export interface ParsedOnboardingSourceInput {
 export interface OnboardingSourceContext {
   attemptId: string;
   dataEpoch: string;
+  workerEpoch: string;
   connectorCatalog: ConnectorMeta[];
   includedConnectorIds: ConnectorId[];
   initialSettings: AppSettings;
@@ -529,6 +535,7 @@ export function parseOnboardingSourceInput(value: unknown): ParsedOnboardingSour
       : readExactRecord(captured, [
           'attemptId',
           'dataEpoch',
+          'workerEpoch',
           'connectorCatalog',
           'settingsSnapshot',
           'onboardingCompleted',
@@ -538,7 +545,8 @@ export function parseOnboardingSourceInput(value: unknown): ParsedOnboardingSour
     record === null ||
     !isOnboardingSourceUuidV4(record.attemptId) ||
     !isOnboardingSourceUuidV4(record.dataEpoch) ||
-    record.attemptId === record.dataEpoch ||
+    !isOnboardingSourceUuidV4(record.workerEpoch) ||
+    new Set([record.attemptId, record.dataEpoch, record.workerEpoch]).size !== 3 ||
     typeof record.onboardingCompleted !== 'boolean' ||
     record.onboardingCompletionDataEpoch !== record.dataEpoch
   ) {
@@ -560,6 +568,7 @@ export function parseOnboardingSourceInput(value: unknown): ParsedOnboardingSour
   return {
     attemptId: record.attemptId,
     dataEpoch: record.dataEpoch,
+    workerEpoch: record.workerEpoch,
     connectorCatalog: catalog,
     settingsSnapshot: snapshot,
     onboardingCompleted: record.onboardingCompleted,
@@ -574,6 +583,7 @@ export function initialOnboardingSourceContext(
   return {
     attemptId: input.attemptId,
     dataEpoch: input.dataEpoch,
+    workerEpoch: input.workerEpoch,
     connectorCatalog: input.connectorCatalog.map(cloneConnectorMeta),
     includedConnectorIds: input.connectorCatalog.map((item) => item.id),
     initialSettings: cloneSettings(settings),
@@ -600,7 +610,7 @@ function activeCorrelationIds(context: OnboardingSourceContext): string[] {
     return [];
   }
   if (operation.purpose === 'selection' || operation.purpose === 'skip_auto_scan') {
-    return Object.values(operation.ids);
+    return onboardingOperationCorrelationIds(operation.ids);
   }
   if (operation.purpose === 'cancel_settings') {
     return [operation.operationId, operation.mutationId, operation.requestId];
@@ -609,6 +619,17 @@ function activeCorrelationIds(context: OnboardingSourceContext): string[] {
     return [operation.operationId, operation.requestId];
   }
   return [operation.operationId];
+}
+
+export function onboardingOperationCorrelationIds(ids: OnboardingSourceOperationIds): string[] {
+  return [
+    ids.operationId,
+    ids.mutationId,
+    ids.permissionRequestId,
+    ids.activationId,
+    ids.activationResult.resultId,
+    ids.storageReservationId,
+  ];
 }
 
 export function correlationIdsAreFresh(
@@ -665,11 +686,11 @@ export function operationIdsAreFresh(
   value: unknown,
   reservedFollowUpIds = 0
 ): value is OnboardingSourceOperationIds {
-  const parsed = parseOperationIds(value);
+  const parsed = parseOperationIds(value, context);
   if (parsed === null) {
     return false;
   }
-  const values = Object.values(parsed);
+  const values = onboardingOperationCorrelationIds(parsed);
   return (
     correlationIdsAreFresh(context, values) &&
     correlationIdsHaveCapacity(context, values, reservedFollowUpIds)
@@ -723,9 +744,10 @@ export function settingsMutationEvent(
     type: 'MUTATE',
     dataEpoch: context.dataEpoch,
     mutationId: ids.mutationId,
-    permissionRequestId: ids.permissionRequestId,
+    permissionCheckId: ids.permissionRequestId,
     activationId: ids.activationId,
     storageReservationId: ids.storageReservationId,
+    activationResult: ids.activationResult,
     key: purpose === 'selection' ? 'enabledConnectors' : 'autoScan',
     candidate: purpose === 'selection' ? candidateEnabledConnectorIds(context) : false,
   };
@@ -1254,7 +1276,10 @@ function captureBoundary(value: unknown): unknown | typeof INVALID_CAPTURE {
   return capture(value, 0);
 }
 
-function parseOperationIds(value: unknown): OnboardingSourceOperationIds | null {
+function parseOperationIds(
+  value: unknown,
+  context: OnboardingSourceContext
+): OnboardingSourceOperationIds | null {
   const captured = captureBoundary(value);
   const record =
     captured === INVALID_CAPTURE
@@ -1265,6 +1290,7 @@ function parseOperationIds(value: unknown): OnboardingSourceOperationIds | null 
           'permissionRequestId',
           'activationId',
           'storageReservationId',
+          'activationResult',
         ]);
   if (record === null) {
     return null;
@@ -1279,12 +1305,24 @@ function parseOperationIds(value: unknown): OnboardingSourceOperationIds | null 
   if (!ids.every(isOnboardingSourceUuidV4) || new Set(ids).size !== ids.length) {
     return null;
   }
+  const activationResult = parseSettingsActivationRegistryResultV1(record.activationResult, {
+    dataEpoch: context.dataEpoch,
+    workerEpoch: context.workerEpoch,
+    mutationId: record.mutationId as string,
+    permissionCheckId: record.permissionRequestId as string,
+    activationId: record.activationId as string,
+    storageReservationId: record.storageReservationId as string,
+  });
+  if (activationResult?.kind !== 'SETTINGS_ACTIVATION_CONSUMED') {
+    return null;
+  }
   return {
     operationId: record.operationId as string,
     mutationId: record.mutationId as string,
     permissionRequestId: record.permissionRequestId as string,
     activationId: record.activationId as string,
     storageReservationId: record.storageReservationId as string,
+    activationResult,
   };
 }
 
@@ -1326,7 +1364,7 @@ export function normalizeOnboardingSourceEvent(
     type === 'SKIP'
   ) {
     const record = readExactRecord(captured, ['type', 'ids']);
-    const ids = parseOperationIds(record?.ids);
+    const ids = parseOperationIds(record?.ids, context);
     event =
       record !== null &&
       ids !== null &&

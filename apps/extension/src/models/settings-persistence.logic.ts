@@ -1,11 +1,17 @@
 import { assign, setup } from 'xstate';
 import type { AppSettings, ThemePreference } from '../lib/core/types/app-settings';
 import {
+  MAX_SETTINGS_HANDLED_ACTIVATIONS_PER_WORKER,
   MAX_SETTINGS_CORRELATION_IDS,
+  SETTINGS_PENDING_INTENT_STORAGE_KEY,
+  cloneSettingMutation,
+  cloneSettingsPendingIntentV1,
+  cloneSettingsTerminalSettlementV1,
   cloneSettings,
   cloneSettingsSnapshot,
   commandId,
   contractFor,
+  createSettingsPendingIntentV1,
   expectedAlarm,
   hasSettingsMutationHeadroom,
   inputIsValid,
@@ -27,16 +33,20 @@ import {
   type MutationOutcomeKnowledge,
   type PersistentSettingKey,
   type ReconcileReason,
+  type RetryIntent,
   type SettingMutation,
   type SettingValue,
   type SettingsErrorCode,
   type SettingsMutationOutcomeV1,
+  type SettingsDeferredPersistenceCommand,
+  type SettingsPendingIntentPhase,
   type SettingsPersistenceCommand,
   type SettingsPersistenceContext,
   type SettingsPersistenceError,
   type SettingsPersistenceEvent,
   type SettingsPersistenceInput,
   type SettingsSnapshotV1,
+  type SettingsTerminalSettlementV1,
   type LocalDataResetEpochEventV1,
 } from './settings-persistence.contract';
 
@@ -98,6 +108,8 @@ const requiredOrigins = (context: SettingsPersistenceContext, candidate: AppSett
 function contextCorrelationIds(context: SettingsPersistenceContext): Set<string> {
   const ids = new Set<string>([
     context.loadRequestId,
+    ...context.handledActivationIds,
+    ...context.handledActivationResultIds,
     ...(context.reconcileRequestId ? [context.reconcileRequestId] : []),
     ...(context.canonical ? settingsEnvelopeCorrelationIds(context.canonical.envelope) : []),
     ...(context.mutation?.correlationIds ?? []),
@@ -105,8 +117,9 @@ function contextCorrelationIds(context: SettingsPersistenceContext): Set<string>
       ? [
           context.retryIntent.failedMutationId,
           context.retryIntent.mutationId,
-          context.retryIntent.permissionRequestId,
+          context.retryIntent.permissionCheckId,
           context.retryIntent.activationId,
+          context.retryIntent.activationResultId,
           context.retryIntent.storageReservationId,
           context.retryIntent.requestId,
         ]
@@ -116,6 +129,54 @@ function contextCorrelationIds(context: SettingsPersistenceContext): Set<string>
       : []),
   ]);
   return ids;
+}
+
+type ActivationAttemptEvent = Extract<
+  SettingsPersistenceEvent,
+  { type: 'SETTINGS_CAPTURED/MUTATE' | 'SETTINGS_CAPTURED/RETRY' }
+>;
+
+function activationAlreadyHandled(
+  context: SettingsPersistenceContext,
+  event: ActivationAttemptEvent
+): boolean {
+  return (
+    context.handledActivationIds.includes(event.activationId) ||
+    context.handledActivationResultIds.includes(event.activationResult.resultId)
+  );
+}
+
+function canRecordActivation(context: SettingsPersistenceContext): boolean {
+  return (
+    context.handledActivationIds.length < MAX_SETTINGS_HANDLED_ACTIVATIONS_PER_WORKER &&
+    context.handledActivationResultIds.length < MAX_SETTINGS_HANDLED_ACTIVATIONS_PER_WORKER &&
+    context.handledActivationIds.length === context.handledActivationResultIds.length
+  );
+}
+
+function appendHandledActivation(
+  context: SettingsPersistenceContext,
+  event: ActivationAttemptEvent
+): string[] {
+  return [...context.handledActivationIds, event.activationId];
+}
+
+function appendHandledActivationResult(
+  context: SettingsPersistenceContext,
+  event: ActivationAttemptEvent
+): string[] {
+  return [...context.handledActivationResultIds, event.activationResult.resultId];
+}
+
+function verifiedActivationAttempt(
+  context: SettingsPersistenceContext,
+  event: ActivationAttemptEvent
+): boolean {
+  return (
+    event.activationResult.kind === 'SETTINGS_ACTIVATION_CONSUMED' &&
+    !activationAlreadyHandled(context, event) &&
+    canRecordActivation(context)
+  );
 }
 
 function areFreshCorrelationIds(
@@ -191,23 +252,24 @@ function validMutationRequest(
   event: Extract<SettingsPersistenceEvent, { type: 'SETTINGS_CAPTURED/MUTATE' }>
 ): boolean {
   return (
+    verifiedActivationAttempt(context, event) &&
     event.dataEpoch === context.dataEpoch &&
     context.loadStatus === 'ready' &&
     context.canonicalKnowledge === 'known' &&
     context.canonical !== null &&
     isUuidV4(event.mutationId) &&
-    isUuidV4(event.permissionRequestId) &&
+    isUuidV4(event.permissionCheckId) &&
     isUuidV4(event.activationId) &&
     isUuidV4(event.storageReservationId) &&
     new Set([
       event.mutationId,
-      event.permissionRequestId,
+      event.permissionCheckId,
       event.activationId,
       event.storageReservationId,
     ]).size === 4 &&
     areFreshCorrelationIds(context, [
       event.mutationId,
-      event.permissionRequestId,
+      event.permissionCheckId,
       event.activationId,
       event.storageReservationId,
     ]) &&
@@ -379,8 +441,8 @@ const permissionCommand = (
 ): SettingsPersistenceCommand | null =>
   mutation.storageReservationProof
     ? {
-        type: 'REQUEST_SETTINGS_PERMISSION',
-        commandId: commandId('permission', mutation.permissionRequestId),
+        type: 'VERIFY_SETTINGS_HOST_PERMISSIONS',
+        commandId: commandId('permission_check', mutation.permissionCheckId),
         dataEpoch: context.dataEpoch,
         mutationId: mutation.mutationId,
         commandDigest: mutation.commandDigest,
@@ -389,8 +451,9 @@ const permissionCommand = (
         previousDigest: mutation.previousDigest,
         candidateDigest: mutation.candidateDigest,
         correlationIds: [...mutation.correlationIds],
-        permissionRequestId: mutation.permissionRequestId,
+        permissionCheckId: mutation.permissionCheckId,
         activationId: mutation.activationId,
+        activationResultId: mutation.activationResultId,
         origins: [...mutation.requiredOrigins],
         originDigest: originDigest(mutation.requiredOrigins),
         storageReservationProof: { ...mutation.storageReservationProof },
@@ -426,6 +489,153 @@ const writeCommand = (
       }
     : null;
 
+const PENDING_PHASE_BY_COMMAND = {
+  RESERVE_SETTINGS_STORAGE: 'reserving',
+  VERIFY_SETTINGS_HOST_PERMISSIONS: 'permission_check',
+  COMPARE_AND_SETTLE_SETTINGS: 'writing',
+  RECOVER_SETTINGS_TRANSACTION: 'compensating',
+  REBASE_SETTINGS_MUTATION: 'rebasing',
+  ABORT_SETTINGS_MUTATION: 'cancelling',
+  RECONCILE_SETTINGS: 'reconciling',
+} as const satisfies Record<SettingsDeferredPersistenceCommand['type'], SettingsPendingIntentPhase>;
+
+function pendingCommandRequestId(command: SettingsDeferredPersistenceCommand): string | null {
+  return 'requestId' in command ? command.requestId : null;
+}
+
+function persistPendingIntentPatch(
+  context: SettingsPersistenceContext,
+  mutation: SettingMutation,
+  deferredCommand: SettingsDeferredPersistenceCommand,
+  retryIntent: RetryIntent | null = context.retryIntent
+): Partial<SettingsPersistenceContext> {
+  const priorRevision = context.pendingIntent?.intentRevision ?? 0;
+  if (
+    !Number.isSafeInteger(priorRevision) ||
+    priorRevision < 0 ||
+    priorRevision >= Number.MAX_SAFE_INTEGER - 1
+  ) {
+    const error = makeError(
+      contractFor('SETTINGS_REVISION_EXHAUSTED'),
+      'La révision du pending intent ne peut plus avancer de manière sûre.'
+    );
+    return {
+      phase: 'failed',
+      canonicalKnowledge: 'unknown',
+      error,
+      lastRejection: error,
+      command: null,
+    };
+  }
+
+  const pendingIntent = createSettingsPendingIntentV1({
+    dataEpoch: context.dataEpoch,
+    originWorkerEpoch: context.pendingIntent?.originWorkerEpoch ?? context.workerEpoch,
+    intentRevision: priorRevision + 1,
+    mutation,
+    retryIntent,
+    phase: PENDING_PHASE_BY_COMMAND[deferredCommand.type],
+    nextCommandType: deferredCommand.type,
+    nextCommandId: deferredCommand.commandId,
+    requestId: pendingCommandRequestId(deferredCommand),
+    terminalSettlement: null,
+  });
+  const deferredIdentity = deferredCommand.commandId.slice(
+    deferredCommand.commandId.lastIndexOf('/') + 1
+  );
+  if (!isUuidV4(deferredIdentity)) {
+    const error = makeError(
+      contractFor('SETTINGS_PROTOCOL_ERROR'),
+      "L'identité de la commande différée est invalide."
+    );
+    return {
+      phase: 'failed',
+      canonicalKnowledge: 'unknown',
+      error,
+      lastRejection: error,
+      command: null,
+    };
+  }
+  const persistCommandId = commandId('persist_intent', deferredIdentity);
+
+  return {
+    phase: 'persisting_intent',
+    mutation: cloneSettingMutation(mutation),
+    retryIntent: retryIntent ? { ...retryIntent } : null,
+    pendingIntent,
+    deferredCommand,
+    pendingTerminalSettlement: null,
+    pendingTerminalTarget: null,
+    terminalSettlement: null,
+    command: {
+      type: 'PERSIST_SETTINGS_PENDING_INTENT',
+      commandId: persistCommandId,
+      dataEpoch: context.dataEpoch,
+      storageArea: 'session',
+      storageKey: SETTINGS_PENDING_INTENT_STORAGE_KEY,
+      intentRevision: pendingIntent.intentRevision,
+      intentDigest: pendingIntent.intentDigest,
+      pendingIntent: cloneSettingsPendingIntentV1(pendingIntent),
+    },
+  };
+}
+
+function clearPendingIntentPatch(
+  context: SettingsPersistenceContext,
+  base: Partial<SettingsPersistenceContext>,
+  target: NonNullable<SettingsPersistenceContext['pendingTerminalTarget']>,
+  settlement: SettingsTerminalSettlementV1 | null
+): Partial<SettingsPersistenceContext> {
+  const pendingIntent = context.pendingIntent;
+  const mutation = context.mutation;
+  if (pendingIntent === null || mutation === null) {
+    return base;
+  }
+  const clearId = settlement?.requestId ?? mutation.mutationId;
+  return {
+    ...base,
+    phase: 'clearing_intent',
+    pendingTerminalSettlement:
+      settlement === null ? null : cloneSettingsTerminalSettlementV1(settlement),
+    pendingTerminalTarget: target,
+    terminalSettlement: null,
+    deferredCommand: null,
+    command: {
+      type: 'CLEAR_SETTINGS_PENDING_INTENT',
+      commandId: commandId('clear_intent', clearId),
+      dataEpoch: context.dataEpoch,
+      storageArea: 'session',
+      storageKey: SETTINGS_PENDING_INTENT_STORAGE_KEY,
+      mutationId: mutation.mutationId,
+      originWorkerEpoch: pendingIntent.originWorkerEpoch,
+      intentRevision: pendingIntent.intentRevision,
+      intentDigest: pendingIntent.intentDigest,
+    },
+  };
+}
+
+function terminalSettlement(
+  context: SettingsPersistenceContext,
+  snapshot: SettingsSnapshotV1,
+  requestId: string,
+  commandIdValue: string,
+  error: SettingsPersistenceError | null
+): SettingsTerminalSettlementV1 | null {
+  const mutation = context.mutation;
+  const outcome = mutation ? outcomeFor(snapshot, mutation) : null;
+  return mutation && outcome
+    ? {
+        version: 1,
+        dataEpoch: context.dataEpoch,
+        mutationId: mutation.mutationId,
+        requestId,
+        commandId: commandIdValue,
+        outcome: { ...outcome, correlationIds: [...outcome.correlationIds] },
+        error: error === null ? null : { ...error },
+      }
+    : null;
+}
+
 const withCorrelationIds = (mutation: SettingMutation, ...ids: string[]): SettingMutation => ({
   ...mutation,
   correlationIds: normalizeCorrelationIds([...mutation.correlationIds, ...ids]),
@@ -447,8 +657,9 @@ function mutationForEvent(
   const candidateDigest = settingsDigest(candidateSettings);
   const baseCorrelationIds = normalizeCorrelationIds([
     event.mutationId,
-    event.permissionRequestId,
+    event.permissionCheckId,
     event.activationId,
+    event.activationResult.resultId,
     event.storageReservationId,
   ]);
   return {
@@ -471,8 +682,9 @@ function mutationForEvent(
     ),
     correlationIds: baseCorrelationIds,
     mutationId: event.mutationId,
-    permissionRequestId: event.permissionRequestId,
+    permissionCheckId: event.permissionCheckId,
     activationId: event.activationId,
+    activationResultId: event.activationResult.resultId,
     requiredOrigins: origins,
     baseRevision: canonical.envelope.revision,
     baseGeneration: canonical.envelope.generation,
@@ -491,16 +703,19 @@ function beginMutation(
     return {};
   }
 
+  const reserve = reservationCommand(context, mutation);
+  if (reserve === null || reserve.type !== 'RESERVE_SETTINGS_STORAGE') {
+    return {};
+  }
+
   return {
-    phase: 'reserving',
     projected: cloneSettings(mutation.candidateSettings),
-    mutation,
     mutationOutcome: 'unknown',
     canonicalRelation: 'previous',
     error: null,
     runtimeEffectError: null,
     lastRejection: null,
-    command: reservationCommand(context, mutation),
+    ...persistPendingIntentPatch(context, mutation, reserve, null),
   };
 }
 
@@ -513,33 +728,42 @@ function reconcilePatch(
   if (!context.mutation) {
     return {};
   }
-  const mutation = withCorrelationIds(context.mutation, requestId);
+  const retryCorrelationIds = context.retryIntent
+    ? [
+        context.retryIntent.mutationId,
+        context.retryIntent.permissionCheckId,
+        context.retryIntent.activationId,
+        context.retryIntent.activationResultId,
+        context.retryIntent.storageReservationId,
+        context.retryIntent.requestId,
+      ]
+    : [];
+  const mutation = withCorrelationIds(context.mutation, ...retryCorrelationIds, requestId);
+  const reconcileCommand: SettingsDeferredPersistenceCommand = {
+    type: 'RECONCILE_SETTINGS',
+    commandId: commandId('reconcile', requestId),
+    dataEpoch: context.dataEpoch,
+    requestId,
+    mutationId: mutation.mutationId,
+    commandDigest: mutation.commandDigest,
+    baseRevision: mutation.baseRevision,
+    baseGeneration: mutation.baseGeneration,
+    previousDigest: mutation.previousDigest,
+    candidateDigest: mutation.candidateDigest,
+    correlationIds: [...mutation.correlationIds],
+    storageReservationProof: mutation.storageReservationProof
+      ? { ...mutation.storageReservationProof }
+      : null,
+    reason,
+  };
 
   return {
-    phase: 'reconciling',
     canonicalKnowledge: 'unknown',
-    mutation,
     reconcileRequestId: requestId,
     reconcileReason: reason,
     retryIntent: null,
     error,
-    command: {
-      type: 'RECONCILE_SETTINGS',
-      commandId: commandId('reconcile', requestId),
-      dataEpoch: context.dataEpoch,
-      requestId,
-      mutationId: mutation.mutationId,
-      commandDigest: mutation.commandDigest,
-      baseRevision: mutation.baseRevision,
-      baseGeneration: mutation.baseGeneration,
-      previousDigest: mutation.previousDigest,
-      candidateDigest: mutation.candidateDigest,
-      correlationIds: [...mutation.correlationIds],
-      storageReservationProof: mutation.storageReservationProof
-        ? { ...mutation.storageReservationProof }
-        : null,
-      reason,
-    },
+    ...persistPendingIntentPatch(context, mutation, reconcileCommand, null),
   };
 }
 
@@ -625,16 +849,6 @@ function terminalFailure(
   };
 }
 
-function terminalFailureFromUnknownSnapshot(
-  context: SettingsPersistenceContext,
-  value: SettingsSnapshotV1
-): Partial<SettingsPersistenceContext> {
-  const snapshot = parsedActionSnapshot(context, value);
-  return snapshot && context.mutation
-    ? terminalFailure(context, snapshot, outcomeFor(snapshot, context.mutation))
-    : {};
-}
-
 function retryBase(
   context: SettingsPersistenceContext,
   event: Extract<SettingsPersistenceEvent, { type: 'SETTINGS_CAPTURED/RETRY_READY' }>
@@ -690,9 +904,11 @@ function buildRetryMutation(
   const baseRevision = base.snapshot.envelope.revision;
   const baseGeneration = base.snapshot.envelope.generation;
   const baseCorrelationIds = normalizeCorrelationIds([
+    retryIntent.failedMutationId,
     retryIntent.mutationId,
-    retryIntent.permissionRequestId,
+    retryIntent.permissionCheckId,
     retryIntent.activationId,
+    retryIntent.activationResultId,
     retryIntent.storageReservationId,
     retryIntent.requestId,
   ]);
@@ -716,8 +932,9 @@ function buildRetryMutation(
     ),
     correlationIds: baseCorrelationIds,
     mutationId: retryIntent.mutationId,
-    permissionRequestId: retryIntent.permissionRequestId,
+    permissionCheckId: retryIntent.permissionCheckId,
     activationId: retryIntent.activationId,
+    activationResultId: retryIntent.activationResultId,
     requiredOrigins: [...origins],
     baseRevision,
     baseGeneration,
@@ -780,6 +997,114 @@ function pendingResetMatches(
   );
 }
 
+function persistedIntentTargets(
+  context: SettingsPersistenceContext,
+  event: SettingsPersistenceEvent,
+  commandType: SettingsDeferredPersistenceCommand['type']
+): boolean {
+  return (
+    event.type === 'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_PERSISTED' &&
+    context.command?.type === 'PERSIST_SETTINGS_PENDING_INTENT' &&
+    context.pendingIntent !== null &&
+    context.deferredCommand?.type === commandType &&
+    event.dataEpoch === context.dataEpoch &&
+    event.mutationId === context.pendingIntent.mutation.mutationId &&
+    event.commandId === context.command.commandId
+  );
+}
+
+function clearedIntentTargets(
+  context: SettingsPersistenceContext,
+  event: SettingsPersistenceEvent,
+  target: NonNullable<SettingsPersistenceContext['pendingTerminalTarget']>
+): boolean {
+  return (
+    event.type === 'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_CLEARED' &&
+    context.command?.type === 'CLEAR_SETTINGS_PENDING_INTENT' &&
+    context.pendingIntent !== null &&
+    context.pendingTerminalTarget === target &&
+    event.dataEpoch === context.dataEpoch &&
+    event.mutationId === context.pendingIntent.mutation.mutationId &&
+    event.commandId === context.command.commandId
+  );
+}
+
+function clearCurrentPendingIntentForReset(
+  context: SettingsPersistenceContext,
+  pendingReset: LocalDataResetEpochEventV1,
+  target: 'reset_pending' | 'reset_loading'
+): Partial<SettingsPersistenceContext> {
+  if (context.pendingIntent === null || context.mutation === null) {
+    return {};
+  }
+  return clearPendingIntentPatch(
+    context,
+    {
+      loadStatus: target === 'reset_pending' ? 'reset_pending' : 'loading',
+      projected: cloneSettings(context.defaultSettings),
+      canonicalKnowledge: 'unknown',
+      canonicalRelation: 'unknown',
+      retryIntent: null,
+      pendingReset: { ...pendingReset },
+      reconcileRequestId: null,
+      reconcileReason: null,
+      runtimeEffectError: null,
+      error: null,
+      lastRejection: null,
+    },
+    target,
+    null
+  );
+}
+
+function coldStartReconcilePatch(
+  context: SettingsPersistenceContext
+): Partial<SettingsPersistenceContext> {
+  const seed = context.coldStartSeed;
+  if (seed === null) {
+    return {};
+  }
+  const mutation = withCorrelationIds(
+    {
+      ...seed.pendingIntent.mutation,
+      storageReservationProof: null,
+    },
+    seed.recoveryRequestId
+  );
+  const reconcileCommand: SettingsDeferredPersistenceCommand = {
+    type: 'RECONCILE_SETTINGS',
+    commandId: commandId('reconcile', seed.recoveryRequestId),
+    dataEpoch: context.dataEpoch,
+    requestId: seed.recoveryRequestId,
+    mutationId: mutation.mutationId,
+    commandDigest: mutation.commandDigest,
+    baseRevision: mutation.baseRevision,
+    baseGeneration: mutation.baseGeneration,
+    previousDigest: mutation.previousDigest,
+    candidateDigest: mutation.candidateDigest,
+    correlationIds: [...mutation.correlationIds],
+    storageReservationProof: null,
+    reason: 'worker_restart',
+  };
+  const durableRotation = persistPendingIntentPatch(context, mutation, reconcileCommand, null);
+  return {
+    loadStatus: 'ready',
+    canonical: null,
+    projected: cloneSettings(seed.envelope.settings),
+    mutationOutcome: 'unknown',
+    canonicalKnowledge: 'unknown',
+    canonicalRelation: 'unknown',
+    reconcileRequestId: seed.recoveryRequestId,
+    reconcileReason: 'worker_restart',
+    runtimeEffectError: null,
+    error: makeError(
+      contractFor('SETTINGS_WORKER_RESTARTED'),
+      'Un pending intent durable exige une réconciliation après cold start.'
+    ),
+    ...durableRotation,
+  };
+}
+
 /** Internal statechart factory; runtime consumers use the controller façade. */
 export function createSettingsPersistenceSetup(
   isAdmittedEvent: (event: SettingsPersistenceEvent) => boolean
@@ -793,6 +1118,92 @@ export function createSettingsPersistenceSetup(
     guards: {
       admittedEvent: ({ event }) => isAdmittedEvent(event),
       validInput: ({ context }) => inputIsValid(context),
+      validColdStart: ({ context }) =>
+        inputIsValid(context) &&
+        context.coldStartSeed !== null &&
+        context.coldStartSeed.pendingIntent.intentRevision < Number.MAX_SAFE_INTEGER - 1,
+      exhaustedColdStart: ({ context }) =>
+        inputIsValid(context) &&
+        context.coldStartSeed !== null &&
+        context.coldStartSeed.pendingIntent.intentRevision >= Number.MAX_SAFE_INTEGER - 1,
+      handledActivationReplay: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/MUTATE' &&
+        event.dataEpoch === context.dataEpoch &&
+        activationAlreadyHandled(context, event),
+      activationCapacityExhausted: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/MUTATE' &&
+        event.dataEpoch === context.dataEpoch &&
+        !activationAlreadyHandled(context, event) &&
+        !canRecordActivation(context),
+      activationRejected: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/MUTATE' &&
+        event.dataEpoch === context.dataEpoch &&
+        context.loadStatus === 'ready' &&
+        context.canonicalKnowledge === 'known' &&
+        !activationAlreadyHandled(context, event) &&
+        canRecordActivation(context) &&
+        event.activationResult.kind === 'SETTINGS_ACTIVATION_REJECTED',
+      handledRetryActivationReplay: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/RETRY' &&
+        event.dataEpoch === context.dataEpoch &&
+        activationAlreadyHandled(context, event),
+      retryActivationCapacityExhausted: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/RETRY' &&
+        event.dataEpoch === context.dataEpoch &&
+        !activationAlreadyHandled(context, event) &&
+        !canRecordActivation(context),
+      retryActivationRejected: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/RETRY' &&
+        event.dataEpoch === context.dataEpoch &&
+        !activationAlreadyHandled(context, event) &&
+        canRecordActivation(context) &&
+        event.activationResult.kind === 'SETTINGS_ACTIVATION_REJECTED',
+      verifiedRetryActivation: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/RETRY' &&
+        event.dataEpoch === context.dataEpoch &&
+        verifiedActivationAttempt(context, event),
+      persistedToReserving: ({ context, event }) =>
+        persistedIntentTargets(context, event, 'RESERVE_SETTINGS_STORAGE'),
+      persistedToPermissionCheck: ({ context, event }) =>
+        persistedIntentTargets(context, event, 'VERIFY_SETTINGS_HOST_PERMISSIONS'),
+      persistedToWriting: ({ context, event }) =>
+        persistedIntentTargets(context, event, 'COMPARE_AND_SETTLE_SETTINGS'),
+      persistedToCompensating: ({ context, event }) =>
+        persistedIntentTargets(context, event, 'RECOVER_SETTINGS_TRANSACTION'),
+      persistedToRebasing: ({ context, event }) =>
+        persistedIntentTargets(context, event, 'REBASE_SETTINGS_MUTATION'),
+      persistedToCancelling: ({ context, event }) =>
+        persistedIntentTargets(context, event, 'ABORT_SETTINGS_MUTATION'),
+      persistedToReconciling: ({ context, event }) =>
+        persistedIntentTargets(context, event, 'RECONCILE_SETTINGS'),
+      pendingIntentPersistFailed: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_PERSIST_FAILED' &&
+        context.command?.type === 'PERSIST_SETTINGS_PENDING_INTENT' &&
+        context.command.intentRevision === 1 &&
+        event.dataEpoch === context.dataEpoch &&
+        event.mutationId === context.command.pendingIntent.mutation.mutationId &&
+        event.commandId === context.command.commandId &&
+        errorMatches(event.error, ['SETTINGS_STORAGE_FAILED'], ['pending_intent']),
+      pendingIntentPersistUnknown: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN' &&
+        context.command?.type === 'PERSIST_SETTINGS_PENDING_INTENT' &&
+        event.dataEpoch === context.dataEpoch &&
+        event.mutationId === context.command.pendingIntent.mutation.mutationId &&
+        event.commandId === context.command.commandId &&
+        errorMatches(event.error, ['SETTINGS_TRANSPORT_ERROR'], ['pending_intent']),
+      clearedToSaved: ({ context, event }) => clearedIntentTargets(context, event, 'saved'),
+      clearedToFailed: ({ context, event }) => clearedIntentTargets(context, event, 'failed'),
+      clearedToResetPending: ({ context, event }) =>
+        clearedIntentTargets(context, event, 'reset_pending'),
+      clearedToResetLoading: ({ context, event }) =>
+        clearedIntentTargets(context, event, 'reset_loading'),
+      pendingIntentClearUnknown: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_CLEAR_OUTCOME_UNKNOWN' &&
+        context.command?.type === 'CLEAR_SETTINGS_PENDING_INTENT' &&
+        event.dataEpoch === context.dataEpoch &&
+        event.mutationId === context.command.mutationId &&
+        event.commandId === context.command.commandId &&
+        errorMatches(event.error, ['SETTINGS_TRANSPORT_ERROR'], ['pending_intent']),
       validLoadRequest: ({ context, event }) =>
         event.type === 'SETTINGS_CAPTURED/LOAD' &&
         context.pendingReset?.stage !== 'committed' &&
@@ -898,6 +1309,13 @@ export function createSettingsPersistenceSetup(
           mutation !== null && hasSettingsMutationHeadroom(context.canonical.envelope, mutation)
         );
       },
+      invalidVerifiedMutation: ({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/MUTATE' &&
+        event.dataEpoch === context.dataEpoch &&
+        context.loadStatus === 'ready' &&
+        context.canonicalKnowledge === 'known' &&
+        verifiedActivationAttempt(context, event) &&
+        !validMutationRequest(context, event),
       ledgerFull: ({ context, event }) => {
         if (
           event.type !== 'SETTINGS_CAPTURED/MUTATE' ||
@@ -956,33 +1374,33 @@ export function createSettingsPersistenceSetup(
           errorMatches(event.error, ['SETTINGS_GLOBAL_STORAGE_QUOTA_EXHAUSTED'], ['mutate'])
         );
       },
-      permissionGranted: ({ context, event }) => {
-        if (event.type !== 'SETTINGS_CAPTURED/PERMISSION_GRANTED' || !context.mutation) {
+      hostPermissionsVerified: ({ context, event }) => {
+        if (event.type !== 'SETTINGS_CAPTURED/HOST_PERMISSIONS_VERIFIED' || !context.mutation) {
           return false;
         }
-        const command = currentCommandOfType(context, 'REQUEST_SETTINGS_PERMISSION');
+        const command = currentCommandOfType(context, 'VERIFY_SETTINGS_HOST_PERMISSIONS');
         return (
           event.dataEpoch === context.dataEpoch &&
           command !== null &&
           commandMatchesMutation(command, context.mutation) &&
-          command.permissionRequestId === context.mutation.permissionRequestId &&
+          command.permissionCheckId === context.mutation.permissionCheckId &&
           command.activationId === context.mutation.activationId &&
           event.mutationId === command.mutationId &&
           event.commandId === command.commandId
         );
       },
-      permissionRefused: ({ context, event }) => {
-        if (event.type !== 'SETTINGS_CAPTURED/PERMISSION_REFUSED' || !context.mutation) {
+      hostPermissionsMissing: ({ context, event }) => {
+        if (event.type !== 'SETTINGS_CAPTURED/HOST_PERMISSIONS_MISSING' || !context.mutation) {
           return false;
         }
-        const command = currentCommandOfType(context, 'REQUEST_SETTINGS_PERMISSION');
+        const command = currentCommandOfType(context, 'VERIFY_SETTINGS_HOST_PERMISSIONS');
         const snapshot =
           command === null
             ? null
             : parsedSnapshotMatchingCommand(
                 context,
                 event.snapshot,
-                command.permissionRequestId,
+                command.permissionCheckId,
                 command.commandId
               );
         const outcome = snapshot ? outcomeFor(snapshot, context.mutation) : null;
@@ -993,16 +1411,19 @@ export function createSettingsPersistenceSetup(
           event.mutationId === command.mutationId &&
           event.commandId === command.commandId &&
           snapshot !== null &&
-          errorMatches(event.error, ['SETTINGS_PERMISSION_REFUSED'], ['permission']) &&
+          errorMatches(event.error, ['SETTINGS_HOST_PERMISSION_MISSING'], ['permission_check']) &&
           outcome?.outcome === 'not_committed' &&
-          outcome.correlationIds.includes(command.permissionRequestId)
+          outcome.correlationIds.includes(command.permissionCheckId)
         );
       },
-      permissionUnknown: ({ context, event }) => {
-        if (event.type !== 'SETTINGS_CAPTURED/PERMISSION_OUTCOME_UNKNOWN' || !context.mutation) {
+      hostPermissionsUnknown: ({ context, event }) => {
+        if (
+          event.type !== 'SETTINGS_CAPTURED/HOST_PERMISSIONS_OUTCOME_UNKNOWN' ||
+          !context.mutation
+        ) {
           return false;
         }
-        const command = currentCommandOfType(context, 'REQUEST_SETTINGS_PERMISSION');
+        const command = currentCommandOfType(context, 'VERIFY_SETTINGS_HOST_PERMISSIONS');
         return (
           event.dataEpoch === context.dataEpoch &&
           command !== null &&
@@ -1014,7 +1435,7 @@ export function createSettingsPersistenceSetup(
           errorMatches(
             event.error,
             ['SETTINGS_CONFLICT', 'SETTINGS_TRANSPORT_ERROR', 'SETTINGS_STORAGE_FAILED'],
-            ['permission']
+            ['permission_check']
           )
         );
       },
@@ -1135,28 +1556,40 @@ export function createSettingsPersistenceSetup(
       validRetry: ({ context, event }) =>
         event.type === 'SETTINGS_CAPTURED/RETRY' &&
         event.dataEpoch === context.dataEpoch &&
+        verifiedActivationAttempt(context, event) &&
         context.canonicalKnowledge === 'known' &&
         context.mutation?.mutationId === event.failedMutationId &&
         context.error?.recoverable === true &&
         areFreshCorrelationIds(context, [
           event.mutationId,
-          event.permissionRequestId,
+          event.permissionCheckId,
           event.activationId,
+          event.activationResult.resultId,
           event.storageReservationId,
           event.requestId,
         ]) &&
+        canAppendCorrelationIds(
+          context.mutation,
+          event.mutationId,
+          event.permissionCheckId,
+          event.activationId,
+          event.activationResult.resultId,
+          event.storageReservationId,
+          event.requestId
+        ) &&
         context.canonical !== null &&
         !context.canonical.envelope.outcomes.some(
           (outcome) => outcome.mutationId === event.mutationId
         ) &&
         new Set([
           event.mutationId,
-          event.permissionRequestId,
+          event.permissionCheckId,
           event.activationId,
+          event.activationResult.resultId,
           event.storageReservationId,
           event.requestId,
           event.failedMutationId,
-        ]).size === 6,
+        ]).size === 7,
       retryNoOp: ({ context, event }) => {
         if (
           event.type !== 'SETTINGS_CAPTURED/RETRY_READY' ||
@@ -1248,7 +1681,16 @@ export function createSettingsPersistenceSetup(
           command.requestId === event.requestId &&
           command.commandId === event.commandId &&
           areFreshCorrelationIds(context, [event.nextRequestId]) &&
-          canAppendCorrelationIds(context.mutation, event.nextRequestId) &&
+          canAppendCorrelationIds(
+            context.mutation,
+            context.retryIntent.mutationId,
+            context.retryIntent.permissionCheckId,
+            context.retryIntent.activationId,
+            context.retryIntent.activationResultId,
+            context.retryIntent.storageReservationId,
+            context.retryIntent.requestId,
+            event.nextRequestId
+          ) &&
           errorMatches(
             event.error,
             ['SETTINGS_LOAD_FAILED', 'SETTINGS_STORAGE_FAILED', 'SETTINGS_TRANSPORT_ERROR'],
@@ -1368,7 +1810,16 @@ export function createSettingsPersistenceSetup(
           command.mutationId === context.retryIntent.mutationId &&
           command.requestId === context.retryIntent.requestId &&
           areFreshCorrelationIds(context, [event.nextRequestId]) &&
-          canAppendCorrelationIds(context.mutation, event.nextRequestId) &&
+          canAppendCorrelationIds(
+            context.mutation,
+            context.retryIntent.mutationId,
+            context.retryIntent.permissionCheckId,
+            context.retryIntent.activationId,
+            context.retryIntent.activationResultId,
+            context.retryIntent.storageReservationId,
+            context.retryIntent.requestId,
+            event.nextRequestId
+          ) &&
           errorMatches(event.error, ['SETTINGS_PROTOCOL_ERROR'], ['reconcile'])
         );
       },
@@ -1492,6 +1943,18 @@ export function createSettingsPersistenceSetup(
         context.command === null &&
         areFreshCorrelationIds(context, [event.requestId]) &&
         canAppendCorrelationIds(context.mutation, event.requestId),
+      immutableOutcomeMissingFatal: ({ context, event }) =>
+        (event.type === 'SETTINGS_CAPTURED/MUTATE' || event.type === 'SETTINGS_CAPTURED/RETRY') &&
+        context.phase === 'failed' &&
+        context.pendingIntent !== null &&
+        context.mutation !== null &&
+        context.pendingIntent.mutation.mutationId === context.mutation.mutationId &&
+        context.error?.code === 'SETTINGS_OUTCOME_MISSING' &&
+        context.error.operation === 'reconcile' &&
+        context.error.recoverable === false &&
+        context.error.mutationOutcome === 'unknown' &&
+        context.error.canonicalKnowledge === 'known' &&
+        context.command === null,
       fatalFailure: ({ context, event }) =>
         event.type === 'SETTINGS_CAPTURED/MUTATE' && context.error?.recoverable === false,
       dismissible: ({ context, event }) =>
@@ -1574,6 +2037,45 @@ export function createSettingsPersistenceSetup(
             settingsEnvelopeDigest(context.canonical.envelope)
         );
       },
+      resetReadyWithPendingIntent: ({ context, event }) => {
+        if (
+          event.type !== 'SETTINGS_CAPTURED/RESET_EPOCH_READY_TO_COMMIT' ||
+          !inputIsValid(context) ||
+          context.pendingIntent === null ||
+          context.mutation === null
+        ) {
+          return false;
+        }
+        const payload = normalizedResetPayloadForEvent(event);
+        return (
+          payload !== null &&
+          payload.nextDataEpoch !== context.dataEpoch &&
+          (payload.previousDataEpoch === null || payload.previousDataEpoch === context.dataEpoch) &&
+          context.pendingReset === null &&
+          areFreshCorrelationIds(context, [payload.resetId, payload.settingsBootstrapRequestId])
+        );
+      },
+      resetCommittedWithPendingIntent: ({ context, event }) => {
+        if (
+          event.type !== 'SETTINGS_CAPTURED/RESET_EPOCH_COMMITTED' ||
+          !inputIsValid(context) ||
+          context.pendingIntent === null ||
+          context.mutation === null
+        ) {
+          return false;
+        }
+        const payload = normalizedResetPayloadForEvent(event);
+        return (
+          payload !== null &&
+          context.pendingReset === null &&
+          payload.nextDataEpoch !== context.dataEpoch &&
+          (payload.previousDataEpoch === null
+            ? event.resetFenceProof !== undefined
+            : payload.previousDataEpoch === context.dataEpoch &&
+              event.resetFenceProof === undefined) &&
+          areFreshCorrelationIds(context, [payload.resetId, payload.settingsBootstrapRequestId])
+        );
+      },
       duplicateResetReady: ({ context, event }) => {
         if (event.type !== 'SETTINGS_CAPTURED/RESET_EPOCH_READY_TO_COMMIT') {
           return false;
@@ -1594,6 +2096,7 @@ export function createSettingsPersistenceSetup(
           payload.nextDataEpoch !== context.dataEpoch &&
           (payload.previousDataEpoch === null || payload.previousDataEpoch === context.dataEpoch) &&
           context.pendingReset === null &&
+          context.pendingIntent === null &&
           areFreshCorrelationIds(context, [payload.resetId, payload.settingsBootstrapRequestId])
         );
       },
@@ -1616,6 +2119,9 @@ export function createSettingsPersistenceSetup(
         if (payload === null) {
           return false;
         }
+        if (context.pendingIntent !== null) {
+          return false;
+        }
         if (context.pendingReset?.stage === 'ready_to_commit') {
           return (
             event.resetFenceProof === undefined &&
@@ -1634,6 +2140,114 @@ export function createSettingsPersistenceSetup(
       },
     },
     actions: {
+      startColdReconciliation: assign(({ context }) => coldStartReconcilePatch(context)),
+      activatePersistedIntent: assign(({ context }) =>
+        context.deferredCommand === null
+          ? {}
+          : {
+              phase: PENDING_PHASE_BY_COMMAND[context.deferredCommand.type],
+              command: context.deferredCommand,
+              deferredCommand: null,
+              lastRejection: null,
+            }
+      ),
+      settlePendingIntentPersistFailure: assign(({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_PERSIST_FAILED'
+          ? {
+              phase: 'failed' as const,
+              projected: cloneSettings(canonicalSettings(context)),
+              mutationOutcome: 'previous' as const,
+              canonicalRelation: 'previous' as const,
+              pendingIntent: null,
+              deferredCommand: null,
+              pendingTerminalSettlement: null,
+              pendingTerminalTarget: null,
+              terminalSettlement: null,
+              runtimeEffectError: null,
+              error: event.error,
+              lastRejection: event.error,
+              command: null,
+            }
+          : {}
+      ),
+      retainPendingIntentCommand: assign(({ event }) =>
+        event.type === 'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN' ||
+        event.type === 'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_CLEAR_OUTCOME_UNKNOWN'
+          ? { lastRejection: event.error }
+          : {}
+      ),
+      publishClearedTerminal: assign(({ context }) => {
+        const target = context.pendingTerminalTarget;
+        if (target !== 'saved' && target !== 'failed') {
+          return {};
+        }
+        return {
+          phase: target,
+          mutation: target === 'saved' ? null : context.mutation,
+          pendingIntent: null,
+          deferredCommand: null,
+          pendingTerminalSettlement: null,
+          pendingTerminalTarget: null,
+          terminalSettlement:
+            context.pendingTerminalSettlement === null
+              ? null
+              : cloneSettingsTerminalSettlementV1(context.pendingTerminalSettlement),
+          retryIntent: null,
+          reconcileRequestId: null,
+          reconcileReason: null,
+          runtimeEffectError: null,
+          lastRejection: null,
+          command: null,
+        };
+      }),
+      prepareReadyResetClear: assign(({ context, event }) => {
+        if (event.type !== 'SETTINGS_CAPTURED/RESET_EPOCH_READY_TO_COMMIT') {
+          return {};
+        }
+        const payload = normalizedResetPayloadForEvent(event);
+        return payload ? clearCurrentPendingIntentForReset(context, payload, 'reset_pending') : {};
+      }),
+      prepareCommittedResetClear: assign(({ context, event }) => {
+        if (event.type !== 'SETTINGS_CAPTURED/RESET_EPOCH_COMMITTED') {
+          return {};
+        }
+        const payload = normalizedResetPayloadForEvent(event);
+        return payload ? clearCurrentPendingIntentForReset(context, payload, 'reset_loading') : {};
+      }),
+      publishClearedResetReady: assign(() => ({
+        phase: 'saved' as const,
+        canonical: null,
+        mutation: null,
+        mutationOutcome: 'unknown' as const,
+        pendingIntent: null,
+        deferredCommand: null,
+        pendingTerminalSettlement: null,
+        pendingTerminalTarget: null,
+        terminalSettlement: null,
+        command: null,
+      })),
+      publishClearedResetLoad: assign(({ context }) => {
+        const pending = context.pendingReset;
+        return pending?.stage === 'committed'
+          ? {
+              loadStatus: 'loading' as const,
+              loadRequestId: pending.settingsBootstrapRequestId,
+              phase: 'saved' as const,
+              canonical: null,
+              mutation: null,
+              mutationOutcome: 'unknown' as const,
+              pendingIntent: null,
+              deferredCommand: null,
+              pendingTerminalSettlement: null,
+              pendingTerminalTarget: null,
+              terminalSettlement: null,
+              command: loadCommand(pending.nextDataEpoch, pending.settingsBootstrapRequestId, {
+                resetId: pending.resetId,
+                nextDataEpoch: pending.nextDataEpoch,
+              }),
+            }
+          : {};
+      }),
       startInitialLoad: assign(({ context }) => ({
         loadStatus: 'loading' as const,
         command: loadCommand(context.dataEpoch, context.loadRequestId),
@@ -1642,6 +2256,16 @@ export function createSettingsPersistenceSetup(
         loadStatus: 'error' as const,
         canonicalKnowledge: 'unknown' as const,
         error: makeError(contractFor('SETTINGS_INVALID'), 'Entrées du modèle settings invalides.'),
+        command: null,
+      })),
+      failColdStartRevision: assign(() => ({
+        loadStatus: 'error' as const,
+        phase: 'failed' as const,
+        canonicalKnowledge: 'unknown' as const,
+        error: makeError(
+          contractFor('SETTINGS_REVISION_EXHAUSTED'),
+          'La reprise du pending intent ne peut pas produire une révision durable sûre.'
+        ),
         command: null,
       })),
       startLoad: assign(({ context, event }) =>
@@ -1719,19 +2343,97 @@ export function createSettingsPersistenceSetup(
         lastRejection: null,
         command: null,
       })),
-      settleNoOp: assign(({ context }) => ({
-        phase: 'saved' as const,
-        projected: cloneSettings(canonicalSettings(context)),
-        mutation: null,
-        mutationOutcome: 'previous' as const,
-        canonicalRelation: 'previous' as const,
-        runtimeEffectError: null,
-        error: null,
-        lastRejection: null,
+      settleNoOp: assign(({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/MUTATE'
+          ? {
+              phase: 'saved' as const,
+              projected: cloneSettings(canonicalSettings(context)),
+              mutation: null,
+              mutationOutcome: 'previous' as const,
+              canonicalRelation: 'previous' as const,
+              handledActivationIds: appendHandledActivation(context, event),
+              handledActivationResultIds: appendHandledActivationResult(context, event),
+              runtimeEffectError: null,
+              error: null,
+              lastRejection: null,
+              command: null,
+            }
+          : {}
+      ),
+      beginReservation: assign(({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/MUTATE'
+          ? {
+              ...beginMutation(context, event),
+              handledActivationIds: appendHandledActivation(context, event),
+              handledActivationResultIds: appendHandledActivationResult(context, event),
+            }
+          : {}
+      ),
+      rejectActivationReplay: assign(() => ({
+        lastRejection: makeError(
+          contractFor('SETTINGS_ACTIVATION_REJECTED'),
+          'Cette activation de réglage a déjà été traitée par ce worker.'
+        ),
         command: null,
       })),
-      beginReservation: assign(({ context, event }) =>
-        event.type === 'SETTINGS_CAPTURED/MUTATE' ? beginMutation(context, event) : {}
+      settleActivationRejection: assign(({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/MUTATE'
+          ? {
+              handledActivationIds: appendHandledActivation(context, event),
+              handledActivationResultIds: appendHandledActivationResult(context, event),
+              lastRejection: makeError(
+                contractFor('SETTINGS_ACTIVATION_REJECTED'),
+                `Activation de réglage rejetée: ${event.activationResult.kind === 'SETTINGS_ACTIVATION_REJECTED' ? event.activationResult.reason : 'invalid'}.`
+              ),
+              command: null,
+            }
+          : {}
+      ),
+      settleRetryActivationRejection: assign(({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/RETRY'
+          ? {
+              handledActivationIds: appendHandledActivation(context, event),
+              handledActivationResultIds: appendHandledActivationResult(context, event),
+              lastRejection: makeError(
+                contractFor('SETTINGS_ACTIVATION_REJECTED'),
+                `Activation de retry rejetée: ${event.activationResult.kind === 'SETTINGS_ACTIVATION_REJECTED' ? event.activationResult.reason : 'invalid'}.`
+              ),
+              command: null,
+            }
+          : {}
+      ),
+      rejectActivationCapacity: assign(() => {
+        const error = makeError(
+          contractFor('SETTINGS_ACTIVATION_CAPACITY_EXHAUSTED'),
+          "Le registre d'activations de ce worker est saturé; un nouveau worker est requis."
+        );
+        return { phase: 'failed' as const, error, lastRejection: error, command: null };
+      }),
+      rejectInvalidConsumed: assign(({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/MUTATE'
+          ? {
+              handledActivationIds: appendHandledActivation(context, event),
+              handledActivationResultIds: appendHandledActivationResult(context, event),
+              lastRejection: makeError(
+                contractFor('SETTINGS_INVALID', 'previous'),
+                'Réglage ou identifiants invalides.'
+              ),
+              command: null,
+            }
+          : {}
+      ),
+      rejectInvalidRetryConsumed: assign(({ context, event }) =>
+        event.type === 'SETTINGS_CAPTURED/RETRY'
+          ? {
+              handledActivationIds: appendHandledActivation(context, event),
+              handledActivationResultIds: appendHandledActivationResult(context, event),
+              lastRejection: makeError(
+                contractFor('SETTINGS_INVALID', 'previous'),
+                'Retry ou identifiants invalides.'
+              ),
+              command: null,
+            }
+          : {}
       ),
       rejectInvalid: assign(() => ({
         lastRejection: makeError(
@@ -1739,26 +2441,65 @@ export function createSettingsPersistenceSetup(
           'Réglage ou identifiants invalides.'
         ),
       })),
-      rejectLedgerFull: assign(() => {
+      rejectLedgerFull: assign(({ context, event }) => {
         const error = makeError(
           contractFor('SETTINGS_LEDGER_QUOTA_EXHAUSTED'),
           'Le budget durable settings de cet epoch est épuisé; un reset explicite est requis.'
         );
-        return { phase: 'failed' as const, error, lastRejection: error, command: null };
+        return {
+          phase: 'failed' as const,
+          handledActivationIds:
+            event.type === 'SETTINGS_CAPTURED/MUTATE'
+              ? appendHandledActivation(context, event)
+              : context.handledActivationIds,
+          handledActivationResultIds:
+            event.type === 'SETTINGS_CAPTURED/MUTATE'
+              ? appendHandledActivationResult(context, event)
+              : context.handledActivationResultIds,
+          error,
+          lastRejection: error,
+          command: null,
+        };
       }),
-      rejectRevisionExhausted: assign(() => {
+      rejectRevisionExhausted: assign(({ context, event }) => {
         const error = makeError(
           contractFor('SETTINGS_REVISION_EXHAUSTED'),
           'La révision settings ne peut plus avancer sans dépasser la limite sûre.'
         );
-        return { phase: 'failed' as const, error, lastRejection: error, command: null };
+        return {
+          phase: 'failed' as const,
+          handledActivationIds:
+            event.type === 'SETTINGS_CAPTURED/MUTATE'
+              ? appendHandledActivation(context, event)
+              : context.handledActivationIds,
+          handledActivationResultIds:
+            event.type === 'SETTINGS_CAPTURED/MUTATE'
+              ? appendHandledActivationResult(context, event)
+              : context.handledActivationResultIds,
+          error,
+          lastRejection: error,
+          command: null,
+        };
       }),
-      rejectGenerationExhausted: assign(() => {
+      rejectGenerationExhausted: assign(({ context, event }) => {
         const error = makeError(
           contractFor('SETTINGS_GENERATION_EXHAUSTED'),
           'La génération settings ne peut plus réserver les quatre écritures transactionnelles.'
         );
-        return { phase: 'failed' as const, error, lastRejection: error, command: null };
+        return {
+          phase: 'failed' as const,
+          handledActivationIds:
+            event.type === 'SETTINGS_CAPTURED/MUTATE'
+              ? appendHandledActivation(context, event)
+              : context.handledActivationIds,
+          handledActivationResultIds:
+            event.type === 'SETTINGS_CAPTURED/MUTATE'
+              ? appendHandledActivationResult(context, event)
+              : context.handledActivationResultIds,
+          error,
+          lastRejection: error,
+          command: null,
+        };
       }),
       rejectBusy: assign(() => ({
         lastRejection: makeError(
@@ -1774,11 +2515,10 @@ export function createSettingsPersistenceSetup(
           ...context.mutation,
           storageReservationProof: event.proof,
         };
-        return {
-          phase: 'permission' as const,
-          mutation,
-          command: permissionCommand(context, mutation),
-        };
+        const verify = permissionCommand(context, mutation);
+        return verify?.type === 'VERIFY_SETTINGS_HOST_PERMISSIONS'
+          ? persistPendingIntentPatch(context, mutation, verify)
+          : {};
       }),
       installReservationWrite: assign(({ context, event }) => {
         if (event.type !== 'SETTINGS_CAPTURED/STORAGE_RESERVATION_GRANTED' || !context.mutation) {
@@ -1788,11 +2528,10 @@ export function createSettingsPersistenceSetup(
           ...context.mutation,
           storageReservationProof: event.proof,
         };
-        return {
-          phase: 'writing' as const,
-          mutation,
-          command: writeCommand(context, mutation),
-        };
+        const write = writeCommand(context, mutation);
+        return write?.type === 'COMPARE_AND_SETTLE_SETTINGS'
+          ? persistPendingIntentPatch(context, mutation, write)
+          : {};
       }),
       rejectGlobalStorageQuota: assign(({ context, event }) => {
         if (event.type !== 'SETTINGS_CAPTURED/STORAGE_RESERVATION_DENIED' || !context.mutation) {
@@ -1802,8 +2541,7 @@ export function createSettingsPersistenceSetup(
         if (error === null) {
           return {};
         }
-        return {
-          phase: 'failed' as const,
+        const base = {
           projected: cloneSettings(canonicalSettings(context)),
           mutationOutcome: 'previous' as const,
           canonicalRelation: 'previous' as const,
@@ -1811,41 +2549,58 @@ export function createSettingsPersistenceSetup(
           runtimeEffectError: null,
           error,
           lastRejection: error,
-          command: null,
         };
+        return clearPendingIntentPatch(context, base, 'failed', null);
       }),
       installPermission: assign(({ context, event }) => {
-        if (event.type !== 'SETTINGS_CAPTURED/PERMISSION_GRANTED' || !context.mutation) {
+        if (event.type !== 'SETTINGS_CAPTURED/HOST_PERMISSIONS_VERIFIED' || !context.mutation) {
           return {};
         }
         const mutation = { ...context.mutation, permissionProof: event.proof };
-        return {
-          phase: 'writing' as const,
-          mutation,
-          runtimeEffectError: null,
-          command: writeCommand(context, mutation),
-        };
+        const write = writeCommand(context, mutation);
+        return write?.type === 'COMPARE_AND_SETTLE_SETTINGS'
+          ? {
+              runtimeEffectError: null,
+              ...persistPendingIntentPatch(context, mutation, write),
+            }
+          : {};
       }),
       settlePermissionRefusal: assign(({ context, event }) => {
-        if (event.type !== 'SETTINGS_CAPTURED/PERMISSION_REFUSED' || !context.mutation) {
+        if (event.type !== 'SETTINGS_CAPTURED/HOST_PERMISSIONS_MISSING' || !context.mutation) {
           return {};
         }
         const error = parsedEventError(event.error);
         if (error === null) {
           return {};
         }
-        return {
-          ...terminalFailureFromUnknownSnapshot(context, event.snapshot),
+        const snapshot = parsedActionSnapshot(context, event.snapshot);
+        if (snapshot === null) {
+          return {};
+        }
+        const base = {
+          ...terminalFailure(context, snapshot, outcomeFor(snapshot, context.mutation)),
           error,
         };
+        return clearPendingIntentPatch(
+          context,
+          base,
+          'failed',
+          terminalSettlement(
+            context,
+            snapshot,
+            context.mutation.permissionCheckId,
+            event.commandId,
+            error
+          )
+        );
       }),
       reconcilePermission: assign(({ context, event }) => {
         const error =
-          event.type === 'SETTINGS_CAPTURED/PERMISSION_OUTCOME_UNKNOWN'
+          event.type === 'SETTINGS_CAPTURED/HOST_PERMISSIONS_OUTCOME_UNKNOWN'
             ? parsedEventError(event.error)
             : null;
-        return event.type === 'SETTINGS_CAPTURED/PERMISSION_OUTCOME_UNKNOWN' && error
-          ? reconcilePatch(context, event.nextRequestId, 'permission_unknown', error)
+        return event.type === 'SETTINGS_CAPTURED/HOST_PERMISSIONS_OUTCOME_UNKNOWN' && error
+          ? reconcilePatch(context, event.nextRequestId, 'permission_check_unknown', error)
           : {};
       }),
       commitSave: assign(({ context, event }) => {
@@ -1853,21 +2608,27 @@ export function createSettingsPersistenceSetup(
           event.type === 'SETTINGS_CAPTURED/SAVE_SUCCEEDED'
             ? parsedActionSnapshot(context, event.snapshot)
             : null;
-        return event.type === 'SETTINGS_CAPTURED/SAVE_SUCCEEDED' && snapshot
-          ? {
-              ...adoptSnapshot(context, snapshot),
-              phase: 'saved' as const,
-              mutation: null,
-              mutationOutcome: 'candidate' as const,
-              canonicalRelation: 'candidate' as const,
-              retryIntent: null,
-              reconcileRequestId: null,
-              reconcileReason: null,
-              runtimeEffectError: null,
-              error: null,
-              command: null,
-            }
-          : {};
+        if (event.type !== 'SETTINGS_CAPTURED/SAVE_SUCCEEDED' || snapshot === null) {
+          return {};
+        }
+        const settlement = terminalSettlement(
+          context,
+          snapshot,
+          event.mutationId,
+          event.commandId,
+          null
+        );
+        const base = {
+          ...adoptSnapshot(context, snapshot),
+          mutationOutcome: 'candidate' as const,
+          canonicalRelation: 'candidate' as const,
+          retryIntent: null,
+          reconcileRequestId: null,
+          reconcileReason: null,
+          runtimeEffectError: null,
+          error: null,
+        };
+        return clearPendingIntentPatch(context, base, 'saved', settlement);
       }),
       reconcileSave: assign(({ context, event }) => {
         const error =
@@ -1895,32 +2656,52 @@ export function createSettingsPersistenceSetup(
           return {};
         }
         const mutation = withCorrelationIds(context.mutation, event.recoveryRequestId);
+        const recoverCommand: SettingsDeferredPersistenceCommand = {
+          type: 'RECOVER_SETTINGS_TRANSACTION' as const,
+          commandId: commandId('recover', event.recoveryRequestId),
+          dataEpoch: context.dataEpoch,
+          requestId: event.recoveryRequestId,
+          mutationId: mutation.mutationId,
+          commandDigest: mutation.commandDigest,
+          baseRevision: mutation.baseRevision,
+          baseGeneration: mutation.baseGeneration,
+          previousDigest: mutation.previousDigest,
+          candidateDigest: mutation.candidateDigest,
+          correlationIds: [...mutation.correlationIds],
+          storageReservationProof: { ...storageReservationProof },
+        };
         return {
-          phase: 'compensating' as const,
-          mutation,
           runtimeEffectError: error,
           error,
-          command: {
-            type: 'RECOVER_SETTINGS_TRANSACTION' as const,
-            commandId: commandId('recover', event.recoveryRequestId),
-            dataEpoch: context.dataEpoch,
-            requestId: event.recoveryRequestId,
-            mutationId: mutation.mutationId,
-            commandDigest: mutation.commandDigest,
-            baseRevision: mutation.baseRevision,
-            baseGeneration: mutation.baseGeneration,
-            previousDigest: mutation.previousDigest,
-            candidateDigest: mutation.candidateDigest,
-            correlationIds: [...mutation.correlationIds],
-            storageReservationProof: { ...storageReservationProof },
-          },
+          ...persistPendingIntentPatch(context, mutation, recoverCommand),
         };
       }),
-      settleCompensation: assign(({ context, event }) =>
-        event.type === 'SETTINGS_CAPTURED/COMPENSATION_SUCCEEDED' && context.mutation
-          ? terminalFailureFromUnknownSnapshot(context, event.snapshot)
-          : {}
-      ),
+      settleCompensation: assign(({ context, event }) => {
+        const snapshot =
+          event.type === 'SETTINGS_CAPTURED/COMPENSATION_SUCCEEDED'
+            ? parsedActionSnapshot(context, event.snapshot)
+            : null;
+        if (
+          event.type !== 'SETTINGS_CAPTURED/COMPENSATION_SUCCEEDED' ||
+          context.mutation === null ||
+          snapshot === null
+        ) {
+          return {};
+        }
+        const base = terminalFailure(context, snapshot, outcomeFor(snapshot, context.mutation));
+        return clearPendingIntentPatch(
+          context,
+          base,
+          'failed',
+          terminalSettlement(
+            context,
+            snapshot,
+            event.requestId,
+            event.commandId,
+            context.runtimeEffectError
+          )
+        );
+      }),
       reconcileCompensation: assign(({ context, event }) => {
         const error =
           event.type === 'SETTINGS_CAPTURED/COMPENSATION_FAILED'
@@ -1937,39 +2718,43 @@ export function createSettingsPersistenceSetup(
         const retryIntent = {
           failedMutationId: event.failedMutationId,
           mutationId: event.mutationId,
-          permissionRequestId: event.permissionRequestId,
+          permissionCheckId: event.permissionCheckId,
           activationId: event.activationId,
+          activationResultId: event.activationResult.resultId,
           storageReservationId: event.storageReservationId,
           requestId: event.requestId,
         };
+        const rebaseCommand: SettingsDeferredPersistenceCommand = {
+          type: 'REBASE_SETTINGS_MUTATION' as const,
+          commandId: commandId('rebase', event.requestId),
+          dataEpoch: context.dataEpoch,
+          requestId: event.requestId,
+          mutationId: event.mutationId,
+        };
         return {
-          phase: 'rebasing' as const,
-          retryIntent,
           error: null,
-          command: {
-            type: 'REBASE_SETTINGS_MUTATION' as const,
-            commandId: commandId('rebase', event.requestId),
-            dataEpoch: context.dataEpoch,
-            requestId: event.requestId,
-            mutationId: event.mutationId,
-          },
+          handledActivationIds: appendHandledActivation(context, event),
+          handledActivationResultIds: appendHandledActivationResult(context, event),
+          ...persistPendingIntentPatch(context, context.mutation, rebaseCommand, retryIntent),
         };
       }),
       settleRetryNoOp: assign(({ context, event }) => {
         const base =
           event.type === 'SETTINGS_CAPTURED/RETRY_READY' ? retryBase(context, event) : null;
         return event.type === 'SETTINGS_CAPTURED/RETRY_READY' && base
-          ? {
-              ...adoptSnapshot(context, base.snapshot),
-              phase: 'saved' as const,
-              mutation: null,
-              mutationOutcome: 'previous' as const,
-              canonicalRelation: 'candidate' as const,
-              retryIntent: null,
-              runtimeEffectError: null,
-              error: null,
-              command: null,
-            }
+          ? clearPendingIntentPatch(
+              context,
+              {
+                ...adoptSnapshot(context, base.snapshot),
+                mutationOutcome: 'previous' as const,
+                canonicalRelation: 'candidate' as const,
+                retryIntent: null,
+                runtimeEffectError: null,
+                error: null,
+              },
+              'saved',
+              null
+            )
           : {};
       }),
       installRetryReservation: assign(({ context, event }) => {
@@ -1981,15 +2766,17 @@ export function createSettingsPersistenceSetup(
           return {};
         }
         const rebasedContext = { ...context, canonical: base.snapshot };
+        const reserve = reservationCommand(rebasedContext, mutation);
+        if (reserve?.type !== 'RESERVE_SETTINGS_STORAGE') {
+          return {};
+        }
         return {
           ...adoptSnapshot(context, base.snapshot),
-          phase: 'reserving' as const,
           projected: cloneSettings(base.candidate),
-          mutation,
           canonicalRelation: 'previous' as const,
           retryIntent: null,
           runtimeEffectError: null,
-          command: reservationCommand(rebasedContext, mutation),
+          ...persistPendingIntentPatch(context, mutation, reserve, null),
         };
       }),
       rejectRetryLedgerFull: assign(({ context, event }) => {
@@ -2004,15 +2791,18 @@ export function createSettingsPersistenceSetup(
           contractFor('SETTINGS_LEDGER_QUOTA_EXHAUSTED'),
           'Le budget durable settings ne peut pas admettre ce retry.'
         );
-        return {
-          ...adoptSnapshot(context, base.snapshot),
-          phase: 'failed' as const,
-          retryIntent: null,
-          runtimeEffectError: null,
-          error,
-          lastRejection: error,
-          command: null,
-        };
+        return clearPendingIntentPatch(
+          context,
+          {
+            ...adoptSnapshot(context, base.snapshot),
+            retryIntent: null,
+            runtimeEffectError: null,
+            error,
+            lastRejection: error,
+          },
+          'failed',
+          null
+        );
       }),
       rejectRetryRevisionExhausted: assign(({ context, event }) => {
         if (event.type !== 'SETTINGS_CAPTURED/RETRY_READY') {
@@ -2026,15 +2816,18 @@ export function createSettingsPersistenceSetup(
           contractFor('SETTINGS_REVISION_EXHAUSTED'),
           'La base rechargée ne réserve pas deux révisions sûres.'
         );
-        return {
-          ...adoptSnapshot(context, base.snapshot),
-          phase: 'failed' as const,
-          retryIntent: null,
-          runtimeEffectError: null,
-          error,
-          lastRejection: error,
-          command: null,
-        };
+        return clearPendingIntentPatch(
+          context,
+          {
+            ...adoptSnapshot(context, base.snapshot),
+            retryIntent: null,
+            runtimeEffectError: null,
+            error,
+            lastRejection: error,
+          },
+          'failed',
+          null
+        );
       }),
       rejectRetryGenerationExhausted: assign(({ context, event }) => {
         if (event.type !== 'SETTINGS_CAPTURED/RETRY_READY') {
@@ -2048,15 +2841,18 @@ export function createSettingsPersistenceSetup(
           contractFor('SETTINGS_GENERATION_EXHAUSTED'),
           'La base rechargée ne réserve pas quatre générations transactionnelles sûres.'
         );
-        return {
-          ...adoptSnapshot(context, base.snapshot),
-          phase: 'failed' as const,
-          retryIntent: null,
-          runtimeEffectError: null,
-          error,
-          lastRejection: error,
-          command: null,
-        };
+        return clearPendingIntentPatch(
+          context,
+          {
+            ...adoptSnapshot(context, base.snapshot),
+            retryIntent: null,
+            runtimeEffectError: null,
+            error,
+            lastRejection: error,
+          },
+          'failed',
+          null
+        );
       }),
       reconcileRebase: assign(({ context, event }) => {
         const error =
@@ -2075,59 +2871,63 @@ export function createSettingsPersistenceSetup(
           : {};
       }),
       cancelRetryIntent: assign(({ context }) => ({
-        phase: 'saved' as const,
-        projected: cloneSettings(canonicalSettings(context)),
-        mutation: null,
-        mutationOutcome: 'unknown' as const,
-        canonicalRelation: 'unknown' as const,
-        retryIntent: null,
-        runtimeEffectError: null,
-        error: null,
-        command: null,
+        ...clearPendingIntentPatch(
+          context,
+          {
+            projected: cloneSettings(canonicalSettings(context)),
+            mutationOutcome: 'unknown' as const,
+            canonicalRelation: 'unknown' as const,
+            retryIntent: null,
+            runtimeEffectError: null,
+            error: null,
+          },
+          'saved',
+          null
+        ),
       })),
       beginCancel: assign(({ context, event }) => {
         if (event.type !== 'SETTINGS_CAPTURED/CANCEL' || !context.mutation) {
           return {};
         }
         const mutation = withCorrelationIds(context.mutation, event.requestId);
-        return {
-          phase: 'cancelling' as const,
-          mutation,
-          command: {
-            type: 'ABORT_SETTINGS_MUTATION' as const,
-            commandId: commandId('abort', event.requestId),
-            dataEpoch: context.dataEpoch,
-            requestId: event.requestId,
-            mutationId: mutation.mutationId,
-            commandDigest: mutation.commandDigest,
-            baseRevision: mutation.baseRevision,
-            baseGeneration: mutation.baseGeneration,
-            previousDigest: mutation.previousDigest,
-            candidateDigest: mutation.candidateDigest,
-            correlationIds: [...mutation.correlationIds],
-            storageReservationProof: mutation.storageReservationProof
-              ? { ...mutation.storageReservationProof }
-              : null,
-          },
+        const abortCommand: SettingsDeferredPersistenceCommand = {
+          type: 'ABORT_SETTINGS_MUTATION' as const,
+          commandId: commandId('abort', event.requestId),
+          dataEpoch: context.dataEpoch,
+          requestId: event.requestId,
+          mutationId: mutation.mutationId,
+          commandDigest: mutation.commandDigest,
+          baseRevision: mutation.baseRevision,
+          baseGeneration: mutation.baseGeneration,
+          previousDigest: mutation.previousDigest,
+          candidateDigest: mutation.candidateDigest,
+          correlationIds: [...mutation.correlationIds],
+          storageReservationProof: mutation.storageReservationProof
+            ? { ...mutation.storageReservationProof }
+            : null,
         };
+        return persistPendingIntentPatch(context, mutation, abortCommand);
       }),
       confirmCancel: assign(({ context, event }) => {
         const snapshot =
           event.type === 'SETTINGS_CAPTURED/CANCEL_CONFIRMED'
             ? parsedActionSnapshot(context, event.snapshot)
             : null;
-        return event.type === 'SETTINGS_CAPTURED/CANCEL_CONFIRMED' && snapshot
-          ? {
-              ...adoptSnapshot(context, snapshot),
-              phase: 'saved' as const,
-              mutation: null,
-              mutationOutcome: 'previous' as const,
-              canonicalRelation: 'unknown' as const,
-              runtimeEffectError: null,
-              error: null,
-              command: null,
-            }
-          : {};
+        if (event.type !== 'SETTINGS_CAPTURED/CANCEL_CONFIRMED' || snapshot === null) {
+          return {};
+        }
+        return clearPendingIntentPatch(
+          context,
+          {
+            ...adoptSnapshot(context, snapshot),
+            mutationOutcome: 'previous' as const,
+            canonicalRelation: 'unknown' as const,
+            runtimeEffectError: null,
+            error: null,
+          },
+          'saved',
+          terminalSettlement(context, snapshot, event.requestId, event.commandId, null)
+        );
       }),
       reconcileCancel: assign(({ context, event }) => {
         const error =
@@ -2162,46 +2962,84 @@ export function createSettingsPersistenceSetup(
           event.type === 'SETTINGS_CAPTURED/RECONCILED'
             ? parsedActionSnapshot(context, event.snapshot)
             : null;
-        return event.type === 'SETTINGS_CAPTURED/RECONCILED' && snapshot
-          ? {
-              ...adoptSnapshot(context, snapshot),
-              phase: 'saved' as const,
-              mutation: null,
-              mutationOutcome: 'candidate' as const,
-              canonicalRelation: 'candidate' as const,
-              reconcileRequestId: null,
-              reconcileReason: null,
-              runtimeEffectError: null,
-              error: null,
-              command: null,
-            }
-          : {};
+        if (event.type !== 'SETTINGS_CAPTURED/RECONCILED' || snapshot === null) {
+          return {};
+        }
+        return clearPendingIntentPatch(
+          context,
+          {
+            ...adoptSnapshot(context, snapshot),
+            mutationOutcome: 'candidate' as const,
+            canonicalRelation: 'candidate' as const,
+            reconcileRequestId: null,
+            reconcileReason: null,
+            runtimeEffectError: null,
+            error: null,
+          },
+          'saved',
+          terminalSettlement(context, snapshot, event.requestId, event.commandId, null)
+        );
       }),
       settleReconciledCancel: assign(({ context, event }) => {
         const snapshot =
           event.type === 'SETTINGS_CAPTURED/RECONCILED'
             ? parsedActionSnapshot(context, event.snapshot)
             : null;
-        return event.type === 'SETTINGS_CAPTURED/RECONCILED' && snapshot
-          ? {
-              ...adoptSnapshot(context, snapshot),
-              phase: 'saved' as const,
-              mutation: null,
-              mutationOutcome: 'previous' as const,
-              canonicalRelation: 'unknown' as const,
-              reconcileRequestId: null,
-              reconcileReason: null,
-              runtimeEffectError: null,
-              error: null,
-              command: null,
-            }
-          : {};
+        if (event.type !== 'SETTINGS_CAPTURED/RECONCILED' || snapshot === null) {
+          return {};
+        }
+        return clearPendingIntentPatch(
+          context,
+          {
+            ...adoptSnapshot(context, snapshot),
+            mutationOutcome: 'previous' as const,
+            canonicalRelation: 'unknown' as const,
+            reconcileRequestId: null,
+            reconcileReason: null,
+            runtimeEffectError: null,
+            error: null,
+          },
+          'saved',
+          terminalSettlement(context, snapshot, event.requestId, event.commandId, null)
+        );
       }),
-      settleReconciledFailure: assign(({ context, event }) =>
-        event.type === 'SETTINGS_CAPTURED/RECONCILED' && context.mutation
-          ? terminalFailureFromUnknownSnapshot(context, event.snapshot)
-          : {}
-      ),
+      settleReconciledFailure: assign(({ context, event }) => {
+        const snapshot =
+          event.type === 'SETTINGS_CAPTURED/RECONCILED'
+            ? parsedActionSnapshot(context, event.snapshot)
+            : null;
+        if (
+          event.type !== 'SETTINGS_CAPTURED/RECONCILED' ||
+          context.mutation === null ||
+          snapshot === null
+        ) {
+          return {};
+        }
+        const outcome = outcomeFor(snapshot, context.mutation);
+        const base = terminalFailure(context, snapshot, outcome);
+        if (outcome === null) {
+          return {
+            ...base,
+            deferredCommand: null,
+            pendingTerminalSettlement: null,
+            pendingTerminalTarget: null,
+            terminalSettlement: null,
+            command: null,
+          };
+        }
+        return clearPendingIntentPatch(
+          context,
+          base,
+          'failed',
+          terminalSettlement(
+            context,
+            snapshot,
+            event.requestId,
+            event.commandId,
+            base.error ?? null
+          )
+        );
+      }),
       failReconcile: assign(({ event }) => {
         const error =
           event.type === 'SETTINGS_CAPTURED/RECONCILE_FAILED'

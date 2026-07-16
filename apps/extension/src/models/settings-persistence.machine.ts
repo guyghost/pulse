@@ -5,6 +5,7 @@ import {
   clonePermissionMap,
   cloneSettings,
   normalizeSettingsPersistenceEvent,
+  parseSettingsColdStartRecoverySeedV1,
   settingsGenerationHasMutationCapacity,
   settingsRevisionHasMutationCapacity,
   type SaveStatus,
@@ -13,12 +14,28 @@ import {
   type SettingsPersistenceError,
   type SettingsPersistenceEvent,
   type SettingsPersistenceInput,
+  type SettingsTerminalSettlementV1,
 } from './settings-persistence.contract';
 import { createSettingsPersistenceSetup } from './settings-persistence.logic';
 
 export * from './settings-persistence.contract';
 
 const mutateTransitions = [
+  {
+    guard: and(['admittedEvent', 'handledActivationReplay']),
+    target: 'saved',
+    actions: 'rejectActivationReplay',
+  },
+  {
+    guard: and(['admittedEvent', 'activationCapacityExhausted']),
+    target: 'failed',
+    actions: 'rejectActivationCapacity',
+  },
+  {
+    guard: and(['admittedEvent', 'activationRejected']),
+    target: 'saved',
+    actions: 'settleActivationRejection',
+  },
   { guard: and(['admittedEvent', 'noOp']), target: 'saved', actions: 'settleNoOp' },
   {
     guard: and(['admittedEvent', 'revisionExhausted']),
@@ -33,40 +50,72 @@ const mutateTransitions = [
   { guard: and(['admittedEvent', 'ledgerFull']), target: 'failed', actions: 'rejectLedgerFull' },
   {
     guard: and(['admittedEvent', 'validMutation']),
-    target: 'reserving',
+    target: 'persistingIntent',
     actions: 'beginReservation',
+  },
+  {
+    guard: and(['admittedEvent', 'invalidVerifiedMutation']),
+    target: 'saved',
+    actions: 'rejectInvalidConsumed',
   },
   { guard: 'admittedEvent', actions: 'rejectInvalid' },
 ] as const;
 
 const restartReconcile = {
   guard: and(['admittedEvent', 'validRestart']),
-  target: 'reconciling',
+  target: 'persistingIntent',
   actions: 'reconcileRestart',
 } as const;
 
 const protocolReconcile = {
   guard: and(['admittedEvent', 'protocolUnknown']),
-  target: 'reconciling',
+  target: 'persistingIntent',
   actions: 'reconcileProtocol',
 } as const;
 
 const activeExternal = [
   {
     guard: and(['admittedEvent', 'newerBroadcast']),
-    target: 'reconciling',
+    target: 'persistingIntent',
     actions: 'reconcileExternal',
   },
   {
     guard: and(['admittedEvent', 'divergentEqualBroadcastWithMutation']),
-    target: 'reconciling',
+    target: 'persistingIntent',
     actions: 'reconcileExternal',
   },
 ] as const;
 
 const failedMutateTransitions = [
+  { guard: and(['admittedEvent', 'immutableOutcomeMissingFatal']) },
   { guard: and(['admittedEvent', 'fatalFailure']) },
   ...mutateTransitions,
+] as const;
+
+const failedRetryTransitions = [
+  { guard: and(['admittedEvent', 'immutableOutcomeMissingFatal']) },
+  {
+    guard: and(['admittedEvent', 'handledRetryActivationReplay']),
+    actions: 'rejectActivationReplay',
+  },
+  {
+    guard: and(['admittedEvent', 'retryActivationCapacityExhausted']),
+    actions: 'rejectActivationCapacity',
+  },
+  {
+    guard: and(['admittedEvent', 'retryActivationRejected']),
+    actions: 'settleRetryActivationRejection',
+  },
+  {
+    guard: and(['admittedEvent', 'validRetry']),
+    target: 'persistingIntent',
+    actions: 'beginRetry',
+  },
+  {
+    guard: and(['admittedEvent', 'verifiedRetryActivation']),
+    actions: 'rejectInvalidRetryConsumed',
+  },
+  { guard: 'admittedEvent', actions: 'rejectInvalid' },
 ] as const;
 
 const ACTIVE_SETTINGS_DISPATCH_EVENTS = new WeakSet<object>();
@@ -77,32 +126,53 @@ const settingsPersistenceSetup = createSettingsPersistenceSetup((event: Settings
 const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
   id: 'settingsPersistence',
   initial: 'boot',
-  context: ({ input }) => ({
-    dataEpoch: input.dataEpoch,
-    defaultSettings: cloneSettings(input.defaultSettings),
-    includedConnectorIds: [...input.includedConnectorIds],
-    permissionOriginsByConnectorId: clonePermissionMap(input.permissionOriginsByConnectorId),
-    loadStatus: 'loading',
-    loadRequestId: input.initialLoadRequestId,
-    phase: 'saved',
-    canonical: null,
-    projected: cloneSettings(input.defaultSettings),
-    mutation: null,
-    mutationOutcome: 'unknown',
-    canonicalKnowledge: 'unknown',
-    canonicalRelation: 'unknown',
-    retryIntent: null,
-    pendingReset: null,
-    reconcileRequestId: null,
-    reconcileReason: null,
-    runtimeEffectError: null,
-    error: null,
-    lastRejection: null,
-    command: null,
-  }),
+  context: ({ input }) => {
+    const coldStartSeed =
+      input.coldStartSeed === null
+        ? null
+        : parseSettingsColdStartRecoverySeedV1(input.coldStartSeed, input.includedConnectorIds);
+    return {
+      dataEpoch: input.dataEpoch,
+      workerEpoch: input.workerEpoch,
+      defaultSettings: cloneSettings(input.defaultSettings),
+      includedConnectorIds: [...input.includedConnectorIds],
+      permissionOriginsByConnectorId: clonePermissionMap(input.permissionOriginsByConnectorId),
+      coldStartSeedProvided: input.coldStartSeed !== null,
+      coldStartSeed,
+      loadStatus: 'loading',
+      loadRequestId: input.initialLoadRequestId,
+      phase: 'saved',
+      canonical: null,
+      projected: cloneSettings(input.defaultSettings),
+      mutation: null,
+      mutationOutcome: 'unknown',
+      canonicalKnowledge: 'unknown',
+      canonicalRelation: 'unknown',
+      retryIntent: null,
+      handledActivationIds: [],
+      handledActivationResultIds: [],
+      pendingIntent: coldStartSeed?.pendingIntent ?? null,
+      deferredCommand: null,
+      pendingTerminalSettlement: null,
+      pendingTerminalTarget: null,
+      terminalSettlement: null,
+      pendingReset: null,
+      reconcileRequestId: null,
+      reconcileReason: null,
+      runtimeEffectError: null,
+      error: null,
+      lastRejection: null,
+      command: null,
+    };
+  },
   on: {
     'SETTINGS_CAPTURED/RESET_EPOCH_READY_TO_COMMIT': [
       { guard: and(['admittedEvent', 'duplicateResetReady']) },
+      {
+        guard: and(['admittedEvent', 'resetReadyWithPendingIntent']),
+        target: '.clearingIntent',
+        actions: 'prepareReadyResetClear',
+      },
       {
         guard: and(['admittedEvent', 'resetReady']),
         target: '.resetPending',
@@ -111,6 +181,11 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
     ],
     'SETTINGS_CAPTURED/RESET_EPOCH_COMMITTED': [
       { guard: and(['admittedEvent', 'duplicateResetCommitted']) },
+      {
+        guard: and(['admittedEvent', 'resetCommittedWithPendingIntent']),
+        target: '.clearingIntent',
+        actions: 'prepareCommittedResetClear',
+      },
       {
         guard: and(['admittedEvent', 'resetCommitted']),
         target: '.loading',
@@ -122,6 +197,16 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
   states: {
     boot: {
       always: [
+        {
+          guard: 'exhaustedColdStart',
+          target: 'modelError',
+          actions: 'failColdStartRevision',
+        },
+        {
+          guard: 'validColdStart',
+          target: 'persistingIntent',
+          actions: 'startColdReconciliation',
+        },
         { guard: 'validInput', target: 'loading', actions: 'startInitialLoad' },
         { target: 'modelError', actions: 'failInput' },
       ],
@@ -201,23 +286,73 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
         },
       },
     },
+    persistingIntent: {
+      on: {
+        'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_PERSIST_FAILED': {
+          guard: and(['admittedEvent', 'pendingIntentPersistFailed']),
+          target: 'failed',
+          actions: 'settlePendingIntentPersistFailure',
+        },
+        'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_PERSIST_OUTCOME_UNKNOWN': {
+          guard: and(['admittedEvent', 'pendingIntentPersistUnknown']),
+          actions: 'retainPendingIntentCommand',
+        },
+        'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_PERSISTED': [
+          {
+            guard: and(['admittedEvent', 'persistedToReserving']),
+            target: 'reserving',
+            actions: 'activatePersistedIntent',
+          },
+          {
+            guard: and(['admittedEvent', 'persistedToPermissionCheck']),
+            target: 'permissionCheck',
+            actions: 'activatePersistedIntent',
+          },
+          {
+            guard: and(['admittedEvent', 'persistedToWriting']),
+            target: 'writing',
+            actions: 'activatePersistedIntent',
+          },
+          {
+            guard: and(['admittedEvent', 'persistedToCompensating']),
+            target: 'compensating',
+            actions: 'activatePersistedIntent',
+          },
+          {
+            guard: and(['admittedEvent', 'persistedToRebasing']),
+            target: 'rebasing',
+            actions: 'activatePersistedIntent',
+          },
+          {
+            guard: and(['admittedEvent', 'persistedToCancelling']),
+            target: 'cancelling',
+            actions: 'activatePersistedIntent',
+          },
+          {
+            guard: and(['admittedEvent', 'persistedToReconciling']),
+            target: 'reconciling',
+            actions: 'activatePersistedIntent',
+          },
+        ],
+      },
+    },
     reserving: {
       on: {
         'SETTINGS_CAPTURED/STORAGE_RESERVATION_GRANTED': [
           {
             guard: and(['admittedEvent', 'reservationGrantedNeedsPermission']),
-            target: 'permission',
+            target: 'persistingIntent',
             actions: 'installReservationPermission',
           },
           {
             guard: and(['admittedEvent', 'reservationGrantedReadyToWrite']),
-            target: 'writing',
+            target: 'persistingIntent',
             actions: 'installReservationWrite',
           },
         ],
         'SETTINGS_CAPTURED/STORAGE_RESERVATION_DENIED': {
           guard: and(['admittedEvent', 'reservationDenied']),
-          target: 'failed',
+          target: 'clearingIntent',
           actions: 'rejectGlobalStorageQuota',
         },
         'SETTINGS_CAPTURED/CANONICAL_UPDATED': activeExternal,
@@ -225,26 +360,26 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
         'SETTINGS_CAPTURED/PROTOCOL_UNCERTAIN': protocolReconcile,
       },
     },
-    permission: {
+    permissionCheck: {
       on: {
-        'SETTINGS_CAPTURED/PERMISSION_GRANTED': {
-          guard: and(['admittedEvent', 'permissionGranted']),
-          target: 'writing',
+        'SETTINGS_CAPTURED/HOST_PERMISSIONS_VERIFIED': {
+          guard: and(['admittedEvent', 'hostPermissionsVerified']),
+          target: 'persistingIntent',
           actions: 'installPermission',
         },
-        'SETTINGS_CAPTURED/PERMISSION_REFUSED': {
-          guard: and(['admittedEvent', 'permissionRefused']),
-          target: 'failed',
+        'SETTINGS_CAPTURED/HOST_PERMISSIONS_MISSING': {
+          guard: and(['admittedEvent', 'hostPermissionsMissing']),
+          target: 'clearingIntent',
           actions: 'settlePermissionRefusal',
         },
-        'SETTINGS_CAPTURED/PERMISSION_OUTCOME_UNKNOWN': {
-          guard: and(['admittedEvent', 'permissionUnknown']),
-          target: 'reconciling',
+        'SETTINGS_CAPTURED/HOST_PERMISSIONS_OUTCOME_UNKNOWN': {
+          guard: and(['admittedEvent', 'hostPermissionsUnknown']),
+          target: 'persistingIntent',
           actions: 'reconcilePermission',
         },
         'SETTINGS_CAPTURED/CANCEL': {
           guard: and(['admittedEvent', 'validCancel']),
-          target: 'cancelling',
+          target: 'persistingIntent',
           actions: 'beginCancel',
         },
         'SETTINGS_CAPTURED/CANONICAL_UPDATED': activeExternal,
@@ -257,45 +392,45 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
         'SETTINGS_CAPTURED/RETRY_READY': [
           {
             guard: and(['admittedEvent', 'retryNoOp']),
-            target: 'saved',
+            target: 'clearingIntent',
             actions: 'settleRetryNoOp',
           },
           {
             guard: and(['admittedEvent', 'retryRevisionExhausted']),
-            target: 'failed',
+            target: 'clearingIntent',
             actions: 'rejectRetryRevisionExhausted',
           },
           {
             guard: and(['admittedEvent', 'retryGenerationExhausted']),
-            target: 'failed',
+            target: 'clearingIntent',
             actions: 'rejectRetryGenerationExhausted',
           },
           {
             guard: and(['admittedEvent', 'retryLedgerFull']),
-            target: 'failed',
+            target: 'clearingIntent',
             actions: 'rejectRetryLedgerFull',
           },
           {
             guard: and(['admittedEvent', 'retryReady']),
-            target: 'reserving',
+            target: 'persistingIntent',
             actions: 'installRetryReservation',
           },
         ],
         'SETTINGS_CAPTURED/RETRY_FAILED': {
           guard: and(['admittedEvent', 'retryFailed']),
-          target: 'reconciling',
+          target: 'persistingIntent',
           actions: 'reconcileRebase',
         },
         'SETTINGS_CAPTURED/CANCEL': {
           guard: and(['admittedEvent', 'validRetryCancel']),
-          target: 'saved',
+          target: 'clearingIntent',
           actions: 'cancelRetryIntent',
         },
         'SETTINGS_CAPTURED/CANONICAL_UPDATED': activeExternal,
         'SETTINGS_CAPTURED/SERVICE_WORKER_RESTARTED': restartReconcile,
         'SETTINGS_CAPTURED/PROTOCOL_UNCERTAIN': {
           guard: and(['admittedEvent', 'rebaseProtocolUnknown']),
-          target: 'reconciling',
+          target: 'persistingIntent',
           actions: 'reconcileRebaseProtocol',
         },
       },
@@ -304,22 +439,22 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
       on: {
         'SETTINGS_CAPTURED/SAVE_SUCCEEDED': {
           guard: and(['admittedEvent', 'saveSucceeded']),
-          target: 'saved',
+          target: 'clearingIntent',
           actions: 'commitSave',
         },
         'SETTINGS_CAPTURED/SAVE_FAILED': {
           guard: and(['admittedEvent', 'saveFailed']),
-          target: 'reconciling',
+          target: 'persistingIntent',
           actions: 'reconcileSave',
         },
         'SETTINGS_CAPTURED/RUNTIME_EFFECT_FAILED': {
           guard: and(['admittedEvent', 'effectFailed']),
-          target: 'compensating',
+          target: 'persistingIntent',
           actions: 'beginCompensation',
         },
         'SETTINGS_CAPTURED/CANCEL': {
           guard: and(['admittedEvent', 'validCancel']),
-          target: 'cancelling',
+          target: 'persistingIntent',
           actions: 'beginCancel',
         },
         'SETTINGS_CAPTURED/CANONICAL_UPDATED': activeExternal,
@@ -331,12 +466,12 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
       on: {
         'SETTINGS_CAPTURED/COMPENSATION_SUCCEEDED': {
           guard: and(['admittedEvent', 'compensationSucceeded']),
-          target: 'failed',
+          target: 'clearingIntent',
           actions: 'settleCompensation',
         },
         'SETTINGS_CAPTURED/COMPENSATION_FAILED': {
           guard: and(['admittedEvent', 'compensationFailed']),
-          target: 'reconciling',
+          target: 'persistingIntent',
           actions: 'reconcileCompensation',
         },
         'SETTINGS_CAPTURED/CANONICAL_UPDATED': activeExternal,
@@ -348,12 +483,12 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
       on: {
         'SETTINGS_CAPTURED/CANCEL_CONFIRMED': {
           guard: and(['admittedEvent', 'cancelConfirmed']),
-          target: 'saved',
+          target: 'clearingIntent',
           actions: 'confirmCancel',
         },
         'SETTINGS_CAPTURED/CANCEL_OUTCOME_UNKNOWN': {
           guard: and(['admittedEvent', 'cancelUnknown']),
-          target: 'reconciling',
+          target: 'persistingIntent',
           actions: 'reconcileCancel',
         },
         'SETTINGS_CAPTURED/CANONICAL_UPDATED': activeExternal,
@@ -366,17 +501,17 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
         'SETTINGS_CAPTURED/RECONCILED': [
           {
             guard: and(['admittedEvent', 'reconciledCandidate']),
-            target: 'saved',
+            target: 'clearingIntent',
             actions: 'settleReconciledCandidate',
           },
           {
             guard: and(['admittedEvent', 'reconciledCancelled']),
-            target: 'saved',
+            target: 'clearingIntent',
             actions: 'settleReconciledCancel',
           },
           {
             guard: and(['admittedEvent', 'reconciledSettledFailure']),
-            target: 'failed',
+            target: 'clearingIntent',
             actions: 'settleReconciledFailure',
           },
           {
@@ -391,27 +526,56 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
         },
         'SETTINGS_CAPTURED/RETRY_RECONCILIATION': {
           guard: and(['admittedEvent', 'retryReconcile']),
+          target: 'persistingIntent',
           actions: 'retryReconcile',
         },
         'SETTINGS_CAPTURED/CANONICAL_UPDATED': activeExternal,
         'SETTINGS_CAPTURED/SERVICE_WORKER_RESTARTED': {
           guard: and(['admittedEvent', 'validRestart']),
+          target: 'persistingIntent',
           actions: 'reconcileRestart',
         },
         'SETTINGS_CAPTURED/PROTOCOL_UNCERTAIN': {
           guard: and(['admittedEvent', 'protocolUnknown']),
+          target: 'persistingIntent',
           actions: 'reconcileProtocol',
         },
+      },
+    },
+    clearingIntent: {
+      on: {
+        'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_CLEAR_OUTCOME_UNKNOWN': {
+          guard: and(['admittedEvent', 'pendingIntentClearUnknown']),
+          actions: 'retainPendingIntentCommand',
+        },
+        'SETTINGS_CAPTURED/SETTINGS_PENDING_INTENT_CLEARED': [
+          {
+            guard: and(['admittedEvent', 'clearedToSaved']),
+            target: 'saved',
+            actions: 'publishClearedTerminal',
+          },
+          {
+            guard: and(['admittedEvent', 'clearedToFailed']),
+            target: 'failed',
+            actions: 'publishClearedTerminal',
+          },
+          {
+            guard: and(['admittedEvent', 'clearedToResetPending']),
+            target: 'resetPending',
+            actions: 'publishClearedResetReady',
+          },
+          {
+            guard: and(['admittedEvent', 'clearedToResetLoading']),
+            target: 'loading',
+            actions: 'publishClearedResetLoad',
+          },
+        ],
       },
     },
     failed: {
       on: {
         'SETTINGS_CAPTURED/MUTATE': failedMutateTransitions,
-        'SETTINGS_CAPTURED/RETRY': {
-          guard: and(['admittedEvent', 'validRetry']),
-          target: 'rebasing',
-          actions: 'beginRetry',
-        },
+        'SETTINGS_CAPTURED/RETRY': failedRetryTransitions,
         'SETTINGS_CAPTURED/DISMISS_ERROR': {
           guard: and(['admittedEvent', 'dismissible']),
           target: 'saved',
@@ -426,7 +590,7 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
           },
           {
             guard: and(['admittedEvent', 'divergentEqualBroadcastWithMutation']),
-            target: 'reconciling',
+            target: 'persistingIntent',
             actions: 'reconcileExternal',
           },
         ],
@@ -461,13 +625,15 @@ export type SettingsPersistencePublicState =
   | 'loading'
   | 'loadError'
   | 'saved'
+  | 'persistingIntent'
   | 'reserving'
-  | 'permission'
+  | 'permissionCheck'
   | 'rebasing'
   | 'writing'
   | 'compensating'
   | 'cancelling'
   | 'reconciling'
+  | 'clearingIntent'
   | 'failed';
 
 export interface SettingsPersistencePublicView {
@@ -483,6 +649,7 @@ export interface SettingsPersistencePublicView {
   readonly error: SettingsPersistenceReadonly<SettingsPersistenceError> | null;
   readonly lastRejection: SettingsPersistenceReadonly<SettingsPersistenceError> | null;
   readonly runtimeEffectError: SettingsPersistenceReadonly<SettingsPersistenceError> | null;
+  readonly terminalSettlement: SettingsPersistenceReadonly<SettingsTerminalSettlementV1> | null;
 }
 
 export interface SettingsPersistenceSubscription {
@@ -512,13 +679,15 @@ const SETTINGS_PERSISTENCE_PUBLIC_STATES = [
   'loading',
   'loadError',
   'saved',
+  'persistingIntent',
   'reserving',
-  'permission',
+  'permissionCheck',
   'rebasing',
   'writing',
   'compensating',
   'cancelling',
   'reconciling',
+  'clearingIntent',
   'failed',
 ] as const satisfies readonly SettingsPersistencePublicState[];
 
@@ -597,6 +766,8 @@ function projectSettingsPersistencePublicView(
     lastRejection: context.lastRejection === null ? null : publicDomainCopy(context.lastRejection),
     runtimeEffectError:
       context.runtimeEffectError === null ? null : publicDomainCopy(context.runtimeEffectError),
+    terminalSettlement:
+      context.terminalSettlement === null ? null : publicDomainCopy(context.terminalSettlement),
   });
 }
 

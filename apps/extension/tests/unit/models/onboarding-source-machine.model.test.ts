@@ -29,6 +29,7 @@ const uuid = (suffix: number): string =>
 const ATTEMPT_ID = uuid(1);
 const DATA_EPOCH = uuid(2);
 const NEXT_DATA_EPOCH = uuid(3);
+const WORKER_EPOCH = uuid(4);
 
 const CONNECTOR_CATALOG: ConnectorMeta[] = [
   {
@@ -119,6 +120,7 @@ function createController(settings: AppSettings = DEFAULT_SETTINGS): OnboardingS
   return createOnboardingSourceController({
     attemptId: ATTEMPT_ID,
     dataEpoch: DATA_EPOCH,
+    workerEpoch: WORKER_EPOCH,
     connectorCatalog: CONNECTOR_CATALOG,
     settingsSnapshot: settingsSnapshot(
       envelope(settings),
@@ -132,12 +134,30 @@ function createController(settings: AppSettings = DEFAULT_SETTINGS): OnboardingS
 }
 
 function operationIds(base: number): OnboardingSourceOperationIds {
-  return {
+  const ids = {
     operationId: uuid(base),
     mutationId: uuid(base + 1),
     permissionRequestId: uuid(base + 2),
     activationId: uuid(base + 3),
     storageReservationId: uuid(base + 4),
+  };
+  return {
+    ...ids,
+    activationResult: {
+      version: 1,
+      kind: 'SETTINGS_ACTIVATION_CONSUMED',
+      dataEpoch: DATA_EPOCH,
+      workerEpoch: WORKER_EPOCH,
+      mutationId: ids.mutationId,
+      permissionCheckId: ids.permissionRequestId,
+      activationId: ids.activationId,
+      storageReservationId: ids.storageReservationId,
+      issuedAtMs: 1_000,
+      expiresAtMs: 301_000,
+      observedAtMs: 2_000,
+      resultId: uuid(base + 100_000),
+      oneShotConsumed: true,
+    },
   };
 }
 
@@ -310,6 +330,7 @@ describe('Onboarding source executable model', () => {
     expect(controller.getSnapshot().state).toBe('persisting');
 
     const settingsCommand = commandOfType(controller, 'DISPATCH_SETTINGS_SELECTION');
+    expect(settingsCommand.event.permissionCheckId).toBe(selectionIds.permissionRequestId);
     const commandBeforeForgery = controller.getSnapshot().command;
     dispatchSettlement(
       controller,
@@ -602,7 +623,7 @@ describe('Onboarding source executable model', () => {
 
     const exhausted = createController();
     const exhaustedBase = fillPermissionBatches(exhausted, 50, 3_000);
-    expect(exhausted.getSnapshot().correlationCapacityRemaining).toBe(6);
+    expect(exhausted.getSnapshot().correlationCapacityRemaining).toBe(7);
     expectDispatched(exhausted, { type: 'SELECT_SOURCE', connectorId: 'lehibou' });
     const finalSelection = operationIds(exhaustedBase);
     expectDispatched(exhausted, { type: 'CONTINUE', ids: finalSelection });
@@ -722,6 +743,7 @@ describe('Onboarding source executable model', () => {
       parseOnboardingSourceInput({
         attemptId: ATTEMPT_ID,
         dataEpoch: DATA_EPOCH,
+        workerEpoch: WORKER_EPOCH,
         connectorCatalog: hugeCatalog,
         settingsSnapshot: settingsSnapshot(
           envelope(),

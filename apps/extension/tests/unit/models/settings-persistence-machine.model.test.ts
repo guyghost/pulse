@@ -5,6 +5,7 @@ import { describe, expect, it } from 'vitest';
 
 import type { AppSettings } from '../../../src/lib/core/types/app-settings';
 import {
+  SETTINGS_PENDING_INTENT_STORAGE_KEY,
   commandId,
   contractFor,
   expectedAlarm,
@@ -29,6 +30,7 @@ const uuid = (suffix: number): string =>
   `10000000-0000-4000-8000-${String(suffix).padStart(12, '0')}`;
 
 const DATA_EPOCH = uuid(1);
+const WORKER_EPOCH = uuid(999);
 const DEFAULT_SETTINGS: AppSettings = {
   scanIntervalMinutes: 30,
   enabledConnectors: ['free-work'],
@@ -51,10 +53,12 @@ function createController(
 ): SettingsPersistenceController {
   return createSettingsPersistenceController({
     dataEpoch,
+    workerEpoch: WORKER_EPOCH,
     defaultSettings: DEFAULT_SETTINGS,
     includedConnectorIds: INCLUDED_CONNECTORS,
     permissionOriginsByConnectorId: PERMISSION_ORIGINS,
     initialLoadRequestId,
+    coldStartSeed: null,
   });
 }
 
@@ -68,6 +72,64 @@ function commandOfType<T extends PublicCommand['type']>(
     throw new Error(`Expected ${type} command`);
   }
   return command as Extract<PublicCommand, { type: T }>;
+}
+
+function acknowledgePendingIntentPersist(
+  controller: SettingsPersistenceController,
+  proofId: string
+): void {
+  const command = commandOfType(controller, 'PERSIST_SETTINGS_PENDING_INTENT');
+  expect(
+    controller.dispatch({
+      type: 'SETTINGS_PENDING_INTENT_PERSISTED',
+      dataEpoch: command.dataEpoch,
+      mutationId: command.pendingIntent.mutation.mutationId,
+      commandId: command.commandId,
+      proof: {
+        version: 1,
+        kind: 'SETTINGS_PENDING_INTENT_PERSISTED',
+        storageArea: 'session',
+        storageKey: SETTINGS_PENDING_INTENT_STORAGE_KEY,
+        dataEpoch: command.dataEpoch,
+        mutationId: command.pendingIntent.mutation.mutationId,
+        originWorkerEpoch: command.pendingIntent.originWorkerEpoch,
+        intentRevision: command.intentRevision,
+        intentDigest: command.intentDigest,
+        commandId: command.commandId,
+        proofId,
+        readBackVerified: true,
+      },
+    })
+  ).toEqual({ status: 'dispatched' });
+}
+
+function acknowledgePendingIntentClear(
+  controller: SettingsPersistenceController,
+  proofId: string
+): void {
+  const command = commandOfType(controller, 'CLEAR_SETTINGS_PENDING_INTENT');
+  expect(
+    controller.dispatch({
+      type: 'SETTINGS_PENDING_INTENT_CLEARED',
+      dataEpoch: command.dataEpoch,
+      mutationId: command.mutationId,
+      commandId: command.commandId,
+      proof: {
+        version: 1,
+        kind: 'SETTINGS_PENDING_INTENT_CLEARED',
+        storageArea: 'session',
+        storageKey: SETTINGS_PENDING_INTENT_STORAGE_KEY,
+        dataEpoch: command.dataEpoch,
+        mutationId: command.mutationId,
+        originWorkerEpoch: command.originWorkerEpoch,
+        intentRevision: command.intentRevision,
+        intentDigest: command.intentDigest,
+        commandId: command.commandId,
+        proofId,
+        absenceReadBackVerified: true,
+      },
+    })
+  ).toEqual({ status: 'dispatched' });
 }
 
 function envelope(
@@ -137,17 +199,37 @@ function finishLoad(
 
 interface MutationIds {
   mutationId: string;
-  permissionRequestId: string;
+  permissionCheckId: string;
   activationId: string;
   storageReservationId: string;
+  activationResultId: string;
 }
 
 function mutationIds(base: number): MutationIds {
   return {
     mutationId: uuid(base),
-    permissionRequestId: uuid(base + 1),
+    permissionCheckId: uuid(base + 1),
     activationId: uuid(base + 2),
     storageReservationId: uuid(base + 3),
+    activationResultId: uuid(base + 100_000),
+  };
+}
+
+function consumedActivationResult(ids: MutationIds) {
+  return {
+    version: 1 as const,
+    kind: 'SETTINGS_ACTIVATION_CONSUMED' as const,
+    dataEpoch: DATA_EPOCH,
+    workerEpoch: WORKER_EPOCH,
+    mutationId: ids.mutationId,
+    permissionCheckId: ids.permissionCheckId,
+    activationId: ids.activationId,
+    storageReservationId: ids.storageReservationId,
+    issuedAtMs: 1_000,
+    expiresAtMs: 301_000,
+    observedAtMs: 2_000,
+    resultId: ids.activationResultId,
+    oneShotConsumed: true as const,
   };
 }
 
@@ -160,11 +242,16 @@ function beginThemeMutation(
     controller.dispatch({
       type: 'MUTATE',
       dataEpoch: DATA_EPOCH,
-      ...ids,
+      mutationId: ids.mutationId,
+      permissionCheckId: ids.permissionCheckId,
+      activationId: ids.activationId,
+      storageReservationId: ids.storageReservationId,
+      activationResult: consumedActivationResult(ids),
       key: 'theme',
       candidate,
     })
   ).toEqual({ status: 'dispatched' });
+  acknowledgePendingIntentPersist(controller, uuid(800));
   expect(controller.getSnapshot().state).toBe('reserving');
   return commandOfType(controller, 'RESERVE_SETTINGS_STORAGE');
 }
@@ -250,6 +337,7 @@ function grantReservation(
       proof: reservationProof(command, uuid(idsBase), uuid(idsBase + 1)),
     })
   ).toEqual({ status: 'dispatched' });
+  acknowledgePendingIntentPersist(controller, uuid(idsBase + 2));
   expect(controller.getSnapshot().state).toBe('writing');
   return commandOfType(controller, 'COMPARE_AND_SETTLE_SETTINGS');
 }
@@ -282,11 +370,14 @@ function normalizationContext(dataEpoch = DATA_EPOCH): SettingsPersistenceContex
   const loadRequestId = uuid(700);
   return {
     dataEpoch,
+    workerEpoch: WORKER_EPOCH,
     defaultSettings: { ...DEFAULT_SETTINGS, enabledConnectors: [...INCLUDED_CONNECTORS] },
     includedConnectorIds: [...INCLUDED_CONNECTORS],
     permissionOriginsByConnectorId: {
       'free-work': [...PERMISSION_ORIGINS['free-work']],
     },
+    coldStartSeedProvided: false,
+    coldStartSeed: null,
     loadStatus: 'loading',
     loadRequestId,
     phase: 'saved',
@@ -297,6 +388,13 @@ function normalizationContext(dataEpoch = DATA_EPOCH): SettingsPersistenceContex
     canonicalKnowledge: 'unknown',
     canonicalRelation: 'unknown',
     retryIntent: null,
+    handledActivationIds: [],
+    handledActivationResultIds: [],
+    pendingIntent: null,
+    deferredCommand: null,
+    pendingTerminalSettlement: null,
+    pendingTerminalTarget: null,
+    terminalSettlement: null,
     pendingReset: null,
     reconcileRequestId: null,
     reconcileReason: null,
@@ -326,6 +424,7 @@ const PUBLIC_VIEW_KEYS = [
   'runtimeEffectError',
   'saveStatus',
   'state',
+  'terminalSettlement',
 ];
 
 const FORBIDDEN_PUBLIC_KEYS = new Set([
@@ -742,10 +841,10 @@ describe('settings persistence atomic admission', () => {
     expect(controller.getSnapshot().command?.requestId).toBe(uuid(84));
   });
 
-  it('keeps all 29 captured event types and 95 branches provenance-first', () => {
+  it('keeps all 34 captured event types and every branch provenance-first', () => {
     const inventory = settingsTransitionInventory();
-    expect(inventory.eventTypes.size).toBe(29);
-    expect(inventory.branches).toBe(95);
+    expect(inventory.eventTypes.size).toBe(34);
+    expect(inventory.branches).toBe(124);
     expect(inventory.provenanceFailures).toEqual([]);
   });
 });
@@ -806,6 +905,7 @@ describe('settings persistence model traces', () => {
         snapshot: snapshot(committedEnvelope, ids.mutationId, write.commandId, uuid(119)),
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentClear(controller, uuid(120));
     expect(controller.getSnapshot()).toMatchObject({
       state: 'saved',
       saveStatus: 'saved',
@@ -833,6 +933,7 @@ describe('settings persistence model traces', () => {
         error: quotaError,
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentClear(proceed, uuid(135));
     expect(proceed.getSnapshot()).toMatchObject({
       state: 'failed',
       error: { code: 'SETTINGS_GLOBAL_STORAGE_QUOTA_EXHAUSTED' },
@@ -845,10 +946,15 @@ describe('settings persistence model traces', () => {
         type: 'RETRY',
         dataEpoch: DATA_EPOCH,
         failedMutationId: failedIds.mutationId,
-        ...retryIds,
+        mutationId: retryIds.mutationId,
+        permissionCheckId: retryIds.permissionCheckId,
+        activationId: retryIds.activationId,
+        storageReservationId: retryIds.storageReservationId,
+        activationResult: consumedActivationResult(retryIds),
         requestId: retryRequestId,
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentPersist(proceed, uuid(136));
     const rebase = commandOfType(proceed, 'REBASE_SETTINGS_MUTATION');
     expect(
       proceed.dispatch({
@@ -860,6 +966,7 @@ describe('settings persistence model traces', () => {
         snapshot: snapshot(envelope(DATA_EPOCH), retryRequestId, rebase.commandId, uuid(134)),
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentPersist(proceed, uuid(137));
     expect(proceed.getSnapshot().state).toBe('reserving');
     expect(commandOfType(proceed, 'RESERVE_SETTINGS_STORAGE').mutationId).toBe(retryIds.mutationId);
 
@@ -877,16 +984,22 @@ describe('settings persistence model traces', () => {
         error: quotaError,
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentClear(cancel, uuid(155));
     const cancelledRetryIds = mutationIds(149);
     expect(
       cancel.dispatch({
         type: 'RETRY',
         dataEpoch: DATA_EPOCH,
         failedMutationId: cancelFailedIds.mutationId,
-        ...cancelledRetryIds,
+        mutationId: cancelledRetryIds.mutationId,
+        permissionCheckId: cancelledRetryIds.permissionCheckId,
+        activationId: cancelledRetryIds.activationId,
+        storageReservationId: cancelledRetryIds.storageReservationId,
+        activationResult: consumedActivationResult(cancelledRetryIds),
         requestId: uuid(153),
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentPersist(cancel, uuid(156));
     expect(
       cancel.dispatch({
         type: 'CANCEL',
@@ -895,6 +1008,7 @@ describe('settings persistence model traces', () => {
         requestId: uuid(154),
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentClear(cancel, uuid(157));
     expect(cancel.getSnapshot()).toMatchObject({ state: 'saved', error: null });
   });
 
@@ -913,6 +1027,7 @@ describe('settings persistence model traces', () => {
         requestId: cancelRequestId,
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentPersist(controller, uuid(171));
     const abort = commandOfType(controller, 'ABORT_SETTINGS_MUTATION');
     const cancelledOutcome = outcomeFor(
       abort,
@@ -937,6 +1052,7 @@ describe('settings persistence model traces', () => {
         snapshot: snapshot(cancelledEnvelope, cancelRequestId, abort.commandId, uuid(170)),
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentClear(controller, uuid(172));
     expect(controller.getSnapshot()).toMatchObject({
       state: 'saved',
       projectedSettings: { theme: 'system' },
@@ -969,6 +1085,7 @@ describe('settings persistence model traces', () => {
         requestId: uuid(192),
       })
     ).toEqual({ status: 'dispatched' });
+    acknowledgePendingIntentPersist(active, uuid(193));
     expect(active.getSnapshot().state).toBe('reconciling');
     expect(commandOfType(active, 'RECONCILE_SETTINGS')).toMatchObject({
       requestId: uuid(192),
