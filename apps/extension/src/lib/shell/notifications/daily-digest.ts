@@ -32,6 +32,15 @@ export const DIGEST_HOUR = 9;
 /** Maximum missions to include in the digest. */
 export const DIGEST_MAX_RESULTS = 3;
 
+export class DailyDigestAlarmReconciliationError extends Error {
+  readonly code = 'DIGEST_ALARM_READBACK_MISMATCH' as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'DailyDigestAlarmReconciliationError';
+  }
+}
+
 /**
  * Compute the epoch timestamp of the next digest fire time.
  *
@@ -64,10 +73,20 @@ export function nextDigestTime(now: Date = new Date()): number {
  *
  * Call during service worker initialization and when settings change.
  */
-export function scheduleDailyDigestAlarm(): void {
-  chrome.alarms.create(DIGEST_ALARM_NAME, {
-    when: nextDigestTime(),
-  });
+export async function scheduleDailyDigestAlarm(now: Date = new Date()): Promise<void> {
+  const expectedWhen = nextDigestTime(now);
+  await chrome.alarms.create(DIGEST_ALARM_NAME, { when: expectedWhen });
+  const readBack = await chrome.alarms.get(DIGEST_ALARM_NAME);
+  if (
+    readBack?.name !== DIGEST_ALARM_NAME ||
+    readBack.scheduledTime !== expectedWhen ||
+    readBack.periodInMinutes !== undefined
+  ) {
+    await chrome.alarms.clear(DIGEST_ALARM_NAME).catch(() => false);
+    throw new DailyDigestAlarmReconciliationError(
+      'Daily digest alarm could not be verified after creation.'
+    );
+  }
 }
 
 export interface DigestResult {

@@ -44,7 +44,7 @@ import {
 } from '../models/scan-lifecycle.machine';
 import { waitForScanRecovery } from './scan-recovery';
 import { rescoreStoredMissions } from '../lib/shell/scan/rescore';
-import { getConnectorIds, getConnectors } from '../lib/shell/connectors/index';
+import { getConnectorIds } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { getFavorites, saveFavorites, getHidden, saveHidden } from '../lib/shell/storage/favorites';
 import {
@@ -70,7 +70,11 @@ import {
   DIGEST_ALARM_NAME,
 } from '../lib/shell/notifications/daily-digest';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
-import { getAllHealthSnapshots, resetHealthSnapshot } from '../lib/shell/storage/connector-health';
+import {
+  getAllHealthSnapshots,
+  readHealthSnapshotsForProbeReconciliation,
+  resetHealthSnapshot,
+} from '../lib/shell/storage/connector-health';
 import { collectDiagnosticExport } from '../lib/shell/diagnostics/collect-diagnostic-export';
 import { getAllParserHealth } from '../lib/shell/scan/parser-health';
 import {
@@ -82,12 +86,17 @@ import {
   getOnboardingCompleted,
   getProfileBannerDismissed,
   setFeedTourSeen,
-  setFirstScanDone,
   setKbdCheatsheetTipSeen,
   setOnboardingCompleted,
   setProfileBannerDismissed,
 } from '../lib/shell/storage/first-scan';
-import { createDefaultProfile } from '../lib/core/profile/defaults';
+import {
+  connectorIdFromAlarm,
+  isProbeAlarm,
+  reconcileProbeAlarmsLocally,
+  syncProbeAlarm,
+} from '../lib/shell/health/probe-scheduler';
+import { automaticScanConsentAuthorized } from '../models/background-scheduling.contract';
 
 import {
   getTracking,
@@ -2084,9 +2093,15 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 const ALARM_NAME = 'auto-scan';
 
 async function setupAlarm() {
-  const settings = await getSettings();
-  await chrome.alarms.clearAll();
-  if (settings.autoScan) {
+  const connectorIds = getConnectorIds();
+  const now = Date.now();
+  const [settings, onboardingCompleted, healthRead] = await Promise.all([
+    getSettings(),
+    getOnboardingCompleted(),
+    readHealthSnapshotsForProbeReconciliation(connectorIds, now),
+  ]);
+  await chrome.alarms.clear(ALARM_NAME);
+  if (automaticScanConsentAuthorized({ onboardingCompleted, autoScan: settings.autoScan })) {
     chrome.alarms.create(ALARM_NAME, {
       periodInMinutes: settings.scanIntervalMinutes,
     });
@@ -2096,7 +2111,12 @@ async function setupAlarm() {
   }
   // Daily digest fires independently of auto-scan — it pushes the top unseen
   // missions once per day even if the user never opens the panel.
-  scheduleDailyDigestAlarm();
+  await scheduleDailyDigestAlarm();
+  if (healthRead.status === 'available') {
+    await reconcileProbeAlarmsLocally(connectorIds, healthRead.snapshots, undefined, now);
+  } else {
+    console.warn(`[MissionPulse] Probe reconciliation skipped: health proof ${healthRead.reason}.`);
+  }
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
@@ -2104,14 +2124,67 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (import.meta.env.DEV) {
       console.debug('[MissionPulse] Daily digest triggered');
     }
-    await sendDailyDigest();
-    // Reschedule the next fire. The alarm is one-shot (no periodInMinutes) so
-    // that recomputing DIGEST_HOUR in local time keeps it stable across DST.
-    scheduleDailyDigestAlarm();
+    try {
+      await sendDailyDigest();
+    } catch (error) {
+      console.error('[MissionPulse] Daily digest error:', error);
+    } finally {
+      // Reschedule even when delivery or storage rejects. The alarm is
+      // one-shot, so a missing finally would silently stop future digests.
+      await scheduleDailyDigestAlarm();
+    }
+    return;
+  }
+
+  if (isProbeAlarm(alarm.name)) {
+    const connectorId = connectorIdFromAlarm(alarm.name);
+    if (
+      connectorId === null ||
+      !getConnectorIds().some((includedId) => includedId === connectorId)
+    ) {
+      return;
+    }
+    try {
+      await executeScanOperation(crypto.randomUUID(), 'alarm', {
+        pageDelayMs: 500,
+        connectorIdsOverride: [connectorId],
+        emitProgress: true,
+      });
+    } catch (err) {
+      console.error(`[MissionPulse] Probe ${connectorId} error:`, err);
+    } finally {
+      // Final Chrome-local convergence. The durable actor/ledger and crash
+      // handoff remain explicitly tracked by background-scheduling.model.md.
+      try {
+        const healthRead = await readHealthSnapshotsForProbeReconciliation(
+          [connectorId],
+          Date.now()
+        );
+        const snapshot =
+          healthRead.status === 'available' ? healthRead.snapshots.get(connectorId) : undefined;
+        if (snapshot?.connectorId === connectorId) {
+          await syncProbeAlarm(snapshot);
+        } else {
+          const reason = healthRead.status === 'unavailable' ? healthRead.reason : 'identity';
+          console.warn(
+            `[MissionPulse] Probe ${connectorId} reconciliation skipped: health proof ${reason}.`
+          );
+        }
+      } catch (error) {
+        console.error(`[MissionPulse] Probe ${connectorId} reconciliation error:`, error);
+      }
+    }
     return;
   }
 
   if (alarm.name !== ALARM_NAME) {
+    return;
+  }
+  const [settings, onboardingCompleted] = await Promise.all([
+    getSettings(),
+    getOnboardingCompleted(),
+  ]);
+  if (!automaticScanConsentAuthorized({ onboardingCompleted, autoScan: settings.autoScan })) {
     return;
   }
   if (import.meta.env.DEV) {
@@ -2121,6 +2194,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     const operationId = crypto.randomUUID();
     await executeScanOperation(operationId, 'alarm', {
       pageDelayMs: 500,
+      connectorIdsOverride: settings.enabledConnectors,
       emitProgress: true,
     });
   } catch (err) {
@@ -2130,13 +2204,17 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
 
 // Re-setup alarm when settings change
 chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.settings) {
-    setupAlarm();
+  if (area === 'local' && (changes.settings || changes.onboarding_completed)) {
+    void setupAlarm().catch((error) => {
+      console.error('[MissionPulse] Alarm reconciliation failed:', error);
+    });
   }
 });
 
 // Initial setup
-setupAlarm();
+void setupAlarm().catch((error) => {
+  console.error('[MissionPulse] Initial alarm reconciliation failed:', error);
+});
 
 // ── Cold-start migration guard ───────────────────────────────────────────────
 // MV3 service workers restart on every event. `onInstalled` only fires on
@@ -2155,10 +2233,6 @@ void runMigrations()
     console.warn('[MissionPulse] Cold-start migration guard error:', err);
   });
 
-// ── First-install silent scan ──────────────────────────────────────────────────
-// On fresh install: detect active platform sessions in parallel.
-// If any found, run a silent scan with a default profile so the user
-// lands directly on a populated feed — no wizard required.
 chrome.runtime.onInstalled.addListener(async (details) => {
   // On every install/update: run the DB migration orchestrator FIRST, so
   // the schema is reconciled before any read/write happens. Safe to call
@@ -2191,64 +2265,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 
   if (import.meta.env.DEV) {
-    console.debug('[MissionPulse] Fresh install — starting zero-config first scan');
-  }
-
-  try {
-    // Already done? (shouldn't happen on fresh install, but guard anyway)
-    const alreadyDone = await getFirstScanDone();
-    if (alreadyDone) {
-      return;
-    }
-
-    // Detect active sessions across all connectors in parallel
-    const settings = await getSettings();
-    const allConnectors = await getConnectors(settings.enabledConnectors);
-    const now = Date.now();
-    const sessionResults = await Promise.allSettled(allConnectors.map((c) => c.detectSession(now)));
-
-    const activeConnectorIds: string[] = allConnectors
-      .filter((_c, i) => {
-        const r = sessionResults[i];
-        return r.status === 'fulfilled' && r.value.ok && r.value.value === true;
-      })
-      .map((c) => c.id);
-
-    if (activeConnectorIds.length === 0) {
-      // No sessions — user will go through normal onboarding
-      if (import.meta.env.DEV) {
-        console.debug('[MissionPulse] No active sessions found on install, skipping first scan');
-      }
-      return;
-    }
-
-    if (import.meta.env.DEV) {
-      console.debug(
-        `[MissionPulse] Found ${activeConnectorIds.length} active session(s):`,
-        activeConnectorIds
-      );
-    }
-
-    // Run silent scan with an explicit default profile so missions are scored
-    // even before the user completes onboarding.
-    const outcome = await executeScanOperation(crypto.randomUUID(), 'first_scan', {
-      pageDelayMs: 300,
-      profileOverride: createDefaultProfile(),
-      connectorIdsOverride: activeConnectorIds,
-    });
-
-    if (outcome.message.type === 'SCAN_COMPLETE' && outcome.result?.missions.length) {
-      await setFirstScanDone();
-
-      if (import.meta.env.DEV) {
-        console.debug(
-          `[MissionPulse] First scan complete: ${outcome.result.missions.length} missions`
-        );
-      }
-    }
-  } catch (err) {
-    // First scan failure is non-critical — user sees normal onboarding
-    console.warn('[MissionPulse] First scan on install failed:', err);
+    console.debug('[MissionPulse] Fresh install — awaiting explicit onboarding consent');
   }
 });
 

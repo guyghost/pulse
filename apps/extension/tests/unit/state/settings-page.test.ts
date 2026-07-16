@@ -20,6 +20,8 @@ vi.mock('../../../src/lib/shell/notifications/toast-service', () => ({
 
 import { SettingsPageController } from '../../../src/lib/state/settings-page.svelte';
 
+const RESET_AVAILABLE = { status: 'available' as const, reason: null };
+
 const persistedSettings = {
   scanIntervalMinutes: 30,
   enabledConnectors: ['free-work'],
@@ -70,7 +72,10 @@ describe('SettingsPageController.resetAll — SET-02 failure surfacing', () => {
 
   it('surfaces a reset failure instead of swallowing it (empty catch)', async () => {
     const onNavigateToOnboarding = vi.fn();
-    const controller = new SettingsPageController({ onNavigateToOnboarding });
+    const controller = new SettingsPageController({
+      onNavigateToOnboarding,
+      resetAvailability: RESET_AVAILABLE,
+    });
     controller.showResetConfirm = true;
 
     await controller.resetAll();
@@ -100,7 +105,10 @@ describe('SettingsPageController.resetAll — SET-02 failure surfacing', () => {
     });
 
     const onNavigateToOnboarding = vi.fn();
-    const controller = new SettingsPageController({ onNavigateToOnboarding });
+    const controller = new SettingsPageController({
+      onNavigateToOnboarding,
+      resetAvailability: RESET_AVAILABLE,
+    });
     controller.showResetConfirm = true;
 
     await controller.resetAll();
@@ -108,6 +116,22 @@ describe('SettingsPageController.resetAll — SET-02 failure surfacing', () => {
     expect(controller.resetError).toBeNull();
     expect(controller.showResetConfirm).toBe(false);
     expect(onNavigateToOnboarding).toHaveBeenCalledTimes(1);
+
+    controller.destroy();
+  });
+
+  it('emits no reset command while the model-owned runtime capability is unavailable', async () => {
+    const onNavigateToOnboarding = vi.fn();
+    const controller = new SettingsPageController({ onNavigateToOnboarding });
+    controller.showResetConfirm = true;
+
+    await controller.resetAll();
+
+    expect(bridgeMock.sendMessage).not.toHaveBeenCalledWith({ type: 'RESET_LOCAL_DATA' });
+    expect(controller.resetError).toBe(
+      'Réinitialisation indisponible : coordination de sécurité en cours de finalisation.'
+    );
+    expect(onNavigateToOnboarding).not.toHaveBeenCalled();
 
     controller.destroy();
   });

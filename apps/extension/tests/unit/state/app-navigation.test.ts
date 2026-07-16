@@ -122,4 +122,41 @@ describe('createAppNavigation bootstrap recovery', () => {
     await navigation.retryBootstrap();
     expect(getProfile).toHaveBeenCalledOnce();
   });
+
+  it('does not leave onboarding when the durable completion flag is not saved', async () => {
+    getFirstScanDone.mockResolvedValueOnce(false);
+    setOnboardingCompleted.mockRejectedValueOnce(new Error('saved: false'));
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    expect(navigation.currentPage).toBe('onboarding');
+
+    await expect(navigation.completeOnboarding()).resolves.toBe(false);
+
+    expect(navigation.currentPage).toBe('onboarding');
+    expect(navigation.hasCompletedOnboarding).toBe(false);
+    expect(saveProfile).not.toHaveBeenCalled();
+  });
+
+  it('projects feed only after the durable onboarding completion write settles', async () => {
+    getFirstScanDone.mockResolvedValueOnce(false);
+    const completionWrite = deferred<void>();
+    setOnboardingCompleted.mockReturnValueOnce(completionWrite.promise);
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    const completion = navigation.completeOnboarding();
+    await Promise.resolve();
+    expect(navigation.currentPage).toBe('onboarding');
+
+    completionWrite.resolve();
+    await expect(completion).resolves.toBe(true);
+
+    expect(navigation.currentPage).toBe('feed');
+    expect(navigation.hasCompletedOnboarding).toBe(true);
+  });
 });

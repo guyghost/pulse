@@ -166,21 +166,14 @@ test.describe('Settings Flow', () => {
     await expect(page.getByText('Missions / scan')).toBeVisible();
   });
 
-  test('danger zone shows reset button', async ({ page }) => {
+  test('does not advertise reset while the safe runtime capability is unavailable', async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
 
-    await expect(page.getByText('Zone dangereuse')).toBeVisible();
-    await expect(page.getByText('Réinitialiser tout')).toBeVisible();
-  });
-
-  test('clicking reset shows confirmation dialog', async ({ page }) => {
-    await page.getByRole('button', { name: 'Settings' }).click();
-
-    await page.getByText('Réinitialiser tout').click();
-    await expect(page.getByText('Suppression irréversible')).toBeVisible();
-    await expect(page.getByText('Annuler')).toBeVisible();
-    await page.getByText('Annuler').click();
-    await expect(page.getByText('Suppression irréversible')).not.toBeVisible();
+    await expect(page.getByText('Zone dangereuse')).toHaveCount(0);
+    await expect(page.getByText('Réinitialiser tout')).toHaveCount(0);
+    await expect(page.getByText('Réinitialisation indisponible')).toHaveCount(0);
   });
 
   test('settings page remains accessible after navigation', async ({ page }) => {

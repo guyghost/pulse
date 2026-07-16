@@ -240,6 +240,28 @@ issuance fails with typed `INVALID_LEASE_ID`; no raw value escapes and no outer
 lease ID or binding is retained. The sentinel ends with the synchronous call;
 unrelated external FIFO work remains enqueueable.
 
+The ordinary post-admission registries are bounded at the same worker-local
+limits reserved by Background Scheduling:
+
+```text
+MAX_RETAINED_ORDINARY_OPERATIONS_PER_WORKER = 4096
+MAX_RETAINED_ORDINARY_LEASE_IDS_PER_WORKER = 32768
+```
+
+The operation registry retains every canonical operation binding, including
+revoked bindings. The lease-ID registry retains every valid fresh allocator
+result, including an ID burned by a rejected allocator-reentrancy attempt.
+Neither registry evicts, truncates or recycles evidence. An exact canonical
+operation is looked up before capacity admission and may still return its one
+existing lease; a new operation at the operation bound invokes zero allocator
+and terminates with `OPERATION_CAPACITY_EXHAUSTED`. A new allocation at the
+lease-ID bound invokes zero allocator and terminates with
+`CORRELATION_CAPACITY_EXHAUSTED`. Either exhaustion revokes every ordinary
+lease, clears live opening/Reset proofs and permanently moves this authority
+instance to `fenced_failure`; only a fresh worker authority can reopen capacity.
+The thrown Authority error preserves the exact capacity code while the closed
+snapshot carries the bounded non-retryable authority-fence diagnostic.
+
 Reset acquires the same gate first, closes admission, increments authority
 revision and revokes every lease before quiescence. A queued old callback can
 therefore neither commit with its old lease nor obtain a fresh lease for its old

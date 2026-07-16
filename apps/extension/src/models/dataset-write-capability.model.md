@@ -1247,6 +1247,7 @@ success.
 
 - implementation of the authority methods or executable contracts/machines;
 - changing DB5/data2 production activation before the coordinated cutover;
-- ordinary post-admission write leases and quota reservation policy;
+- consumer quota reservation policy beyond the hard ordinary-authority bounds
+  defined by `db-migration.model.md`;
 - UI status or error wording;
 - any LLM-driven admission, retry or state transition.

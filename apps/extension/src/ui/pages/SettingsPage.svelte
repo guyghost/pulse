@@ -1120,17 +1120,21 @@
         </div>
       </div>
 
-      <DangerZone
-        showResetConfirm={settings.showResetConfirm}
-        onShowConfirm={() => {
-          settings.showResetConfirm = true;
-        }}
-        onCancelConfirm={() => {
-          settings.showResetConfirm = false;
-        }}
-        onConfirmReset={() => settings.resetAll()}
-        onCreateBackup={handleCreateBackup}
-      />
+      {#if settings.localDataResetAvailability.status === 'available'}
+        <DangerZone
+          showResetConfirm={settings.showResetConfirm}
+          resetAvailability={settings.localDataResetAvailability}
+          resetError={settings.resetError}
+          onShowConfirm={() => {
+            settings.showResetConfirm = true;
+          }}
+          onCancelConfirm={() => {
+            settings.showResetConfirm = false;
+          }}
+          onConfirmReset={() => settings.resetAll()}
+          onCreateBackup={handleCreateBackup}
+        />
+      {/if}
     </section>
   </div>
 </div>

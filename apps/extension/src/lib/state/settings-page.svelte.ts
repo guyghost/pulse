@@ -53,10 +53,15 @@ import {
   withProfileDefaults,
 } from '$lib/core/profile/normalize-profile';
 import { createProfileStore, type ProfileStatus } from '$lib/state/profile.svelte';
+import {
+  LOCAL_DATA_RESET_RUNTIME_AVAILABILITY,
+  type LocalDataResetRuntimeAvailability,
+} from '../../models/local-data-reset-availability.contract';
 
 interface SettingsPageControllerOptions {
   onNavigateToOnboarding?: () => void;
   connectorCatalog?: readonly ConnectorMeta[];
+  resetAvailability?: LocalDataResetRuntimeAvailability;
 }
 
 export interface SettingsConnectorSource {
@@ -101,6 +106,7 @@ const exportFormatLabels: Record<ExportFormat, string> = {
 
 export class SettingsPageController {
   private readonly shippedConnectorCatalog: readonly ConnectorMeta[];
+  private readonly resetAvailability: LocalDataResetRuntimeAvailability;
   private readonly unsubscribeProfileMessages = this.subscribeProfileMessages();
 
   private readonly profileActor = createProfileStore({
@@ -166,6 +172,11 @@ export class SettingsPageController {
         hostPermissions: [...connector.hostPermissions],
       })
     );
+    this.resetAvailability = options.resetAvailability ?? LOCAL_DATA_RESET_RUNTIME_AVAILABILITY;
+  }
+
+  get localDataResetAvailability(): LocalDataResetRuntimeAvailability {
+    return this.resetAvailability;
   }
 
   get connectorSources(): SettingsConnectorSource[] {
@@ -580,6 +591,10 @@ export class SettingsPageController {
 
   async resetAll(): Promise<void> {
     this.resetError = null;
+    if (this.resetAvailability.status === 'unavailable') {
+      this.resetError = this.resetAvailability.reason;
+      return;
+    }
     try {
       const response = await sendMessage({ type: 'RESET_LOCAL_DATA' });
       if (response.type !== 'LOCAL_DATA_RESET' || !response.payload.reset) {

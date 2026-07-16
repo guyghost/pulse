@@ -10,6 +10,9 @@ import {
 
 const UUID_V4_PATTERN = /^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/;
 
+export const MAX_RETAINED_ORDINARY_OPERATIONS_PER_WORKER = 4_096;
+export const MAX_RETAINED_ORDINARY_LEASE_IDS_PER_WORKER = 32_768;
+
 export interface DatasetMutationScopeV2 {
   version: 2;
   operationId: string;
@@ -75,6 +78,9 @@ export type DatasetEpochAuthorityErrorCode =
   | 'INVALID_OPENING_PROOF'
   | 'INVALID_LEASE_ID'
   | 'LEASE_ID_COLLISION'
+  | 'AUTHORITY_REENTRANCY_FORBIDDEN'
+  | 'OPERATION_CAPACITY_EXHAUSTED'
+  | 'CORRELATION_CAPACITY_EXHAUSTED'
   | 'ADMISSION_CLOSED'
   | 'FOREIGN_EPOCH'
   | 'OPERATION_REBOUND'
@@ -411,6 +417,23 @@ export function createDatasetEpochAuthority(
   let pendingResetRequest: ResetAuthorityRequestV1 | null = null;
   let pendingResetPromise: Promise<ResetAuthorityTokenV1> | null = null;
   let pendingNextDataEpoch: string | null = null;
+  let leaseAllocationInProgress = false;
+  let leaseAllocationReentrancyDetected = false;
+
+  function authorityReentrancyError(): DatasetEpochAuthorityError {
+    return new DatasetEpochAuthorityError(
+      'AUTHORITY_REENTRANCY_FORBIDDEN',
+      'Dataset authority cannot be entered from the lease ID allocator.'
+    );
+  }
+
+  function rejectAllocatorReentrancy(): void {
+    if (!leaseAllocationInProgress) {
+      return;
+    }
+    leaseAllocationReentrancyDetected = true;
+    throw authorityReentrancyError();
+  }
 
   function runWithGate<T>(effect: () => T | Promise<T>): Promise<T> {
     const result = gateTail.then(effect, effect);
@@ -425,6 +448,24 @@ export function createDatasetEpochAuthority(
     for (const binding of operations.values()) {
       binding.revoked = true;
     }
+  }
+
+  function fenceCapacityExhaustion(
+    code: 'OPERATION_CAPACITY_EXHAUSTED' | 'CORRELATION_CAPACITY_EXHAUSTED',
+    message: string
+  ): never {
+    revokeAllLeases();
+    activeOpeningProof = null;
+    activeResetToken = null;
+    pendingResetRequest = null;
+    pendingResetPromise = null;
+    pendingNextDataEpoch = null;
+    admission = Object.freeze({
+      status: 'fenced_failure' as const,
+      authorityRevision: admission.authorityRevision,
+      failure: authorityFenceFailure(message),
+    });
+    throw new DatasetEpochAuthorityError(code, message);
   }
 
   function admittedDataEpoch(): string | null {
@@ -481,9 +522,11 @@ export function createDatasetEpochAuthority(
 
   return Object.freeze({
     snapshot(): DatasetAuthorityAdmission {
+      rejectAllocatorReentrancy();
       return admission;
     },
     openAdmission(rawProof: OpeningAdmissionProofV1): void {
+      rejectAllocatorReentrancy();
       const proof = parseOpeningProof(rawProof, workerEpoch, admission.authorityRevision);
       if (
         proof === null ||
@@ -504,6 +547,7 @@ export function createDatasetEpochAuthority(
       pendingNextDataEpoch = null;
     },
     issueLease(rawScope: DatasetMutationScopeV2): DatasetWriteLeaseV1 {
+      rejectAllocatorReentrancy();
       const parsedScope = parseScope(rawScope);
       if (parsedScope === null) {
         throw new DatasetEpochAuthorityError('INVALID_SCOPE', 'Dataset mutation scope is invalid.');
@@ -521,12 +565,40 @@ export function createDatasetEpochAuthority(
           'Dataset mutation scope targets a foreign epoch.'
         );
       }
+      if (operations.size >= MAX_RETAINED_ORDINARY_OPERATIONS_PER_WORKER) {
+        fenceCapacityExhaustion(
+          'OPERATION_CAPACITY_EXHAUSTED',
+          'Dataset ordinary operation capacity is exhausted for this worker.'
+        );
+      }
+      if (leaseIds.size >= MAX_RETAINED_ORDINARY_LEASE_IDS_PER_WORKER) {
+        fenceCapacityExhaustion(
+          'CORRELATION_CAPACITY_EXHAUSTED',
+          'Dataset ordinary lease correlation capacity is exhausted for this worker.'
+        );
+      }
       const admittedDataEpoch = admission.dataEpoch;
       const admittedAuthorityRevision = admission.authorityRevision;
       let leaseId: unknown;
+      let allocationFailed = false;
+      leaseAllocationInProgress = true;
+      leaseAllocationReentrancyDetected = false;
       try {
         leaseId = allocateLeaseId();
       } catch {
+        allocationFailed = true;
+      } finally {
+        leaseAllocationInProgress = false;
+      }
+      const reentrancyDetected = leaseAllocationReentrancyDetected;
+      leaseAllocationReentrancyDetected = false;
+      if (reentrancyDetected) {
+        if (isUuidV4(leaseId)) {
+          leaseIds.add(leaseId);
+        }
+        throw authorityReentrancyError();
+      }
+      if (allocationFailed) {
         throw new DatasetEpochAuthorityError('INVALID_LEASE_ID', 'Allocated lease ID is invalid.');
       }
       if (!isUuidV4(leaseId)) {
@@ -568,6 +640,7 @@ export function createDatasetEpochAuthority(
       operationId: string,
       durableEffect: () => Promise<T>
     ): Promise<T> {
+      rejectAllocatorReentrancy();
       if (typeof durableEffect !== 'function') {
         throw new DatasetEpochAuthorityError(
           'INVALID_DURABLE_EFFECT',
@@ -624,6 +697,7 @@ export function createDatasetEpochAuthority(
       });
     },
     acquireResetFence(rawRequest: ResetAuthorityRequestV1): Promise<ResetAuthorityTokenV1> {
+      rejectAllocatorReentrancy();
       const request = parseResetRequest(rawRequest, workerEpoch);
       if (request === null) {
         return Promise.reject(
@@ -744,6 +818,7 @@ export function createDatasetEpochAuthority(
       return resetPromise;
     },
     installResetEpoch(rawToken: ResetAuthorityTokenV1): Promise<void> {
+      rejectAllocatorReentrancy();
       return runWithGate(() => {
         if (
           rawToken !== activeResetToken ||
@@ -771,6 +846,7 @@ export function createDatasetEpochAuthority(
     fenceFailure(
       rawCommand: DatasetStartupFailureFenceCommandV1
     ): Promise<DatasetStartupFailureFenceProofV1> {
+      rejectAllocatorReentrancy();
       const command = parseFailureFenceCommand(rawCommand, workerEpoch);
       if (command === null) {
         return Promise.reject(

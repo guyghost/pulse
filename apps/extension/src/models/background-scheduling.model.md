@@ -17,6 +17,20 @@ Les callbacks navigateur et les I/O produisent des signaux typés. Les machines
 ci-dessous décident des transitions. Ni texte libre, ni toast, ni LLM ne peut
 ouvrir une admission ou fabriquer une preuve.
 
+## Statut du pont runtime local
+
+Le runtime actuel applique déjà un durcissement local borné : création attendue
+puis read-back exact des alarmes probe et digest, et convergence des probes
+seulement après une lecture health stricte. Cette lecture distingue l'absence
+valide de la corruption et de l'erreur I/O, exige l'identité clé/snapshot et
+l'appartenance au build avant toute mutation, au démarrage comme après chaque
+fire. Ce pont réduit les dérives ordinaires de `chrome.alarms`, mais **ne vaut
+pas** implémentation complète du présent modèle. Un crash du service worker
+entre la persistance health et l'effet alarm, ou avant son résultat durable,
+reste sans actor/ledger, receipt, journal bootstrap et handoff Reset. La
+conformité complète et toute preuve de reprise après crash restent donc bloquées
+jusqu'au câblage de ces ports model-owned.
+
 ## Contrats canoniques réutilisés sans projection destructive
 
 Les types suivants sont consommés tels quels ; le modèle background ne les

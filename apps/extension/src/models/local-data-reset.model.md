@@ -1548,6 +1548,50 @@ comparison to “unknown means allowed”.
   `JOURNAL_FAILED/journal` at `committed`; wrong/extra payload changes neither
   reset phase nor Settings actor.
 
+## Runtime availability projection
+
+The destructive UI projects an explicit runtime capability, never an optimistic
+button. Until the executable Reset actor has all model-owned ports wired — the
+Dataset authority, Startup Barrier join, writer quiescence, journal/receipt,
+Settings recovery and background handoff — the only valid projection is:
+
+```ts
+{
+  status: 'unavailable',
+  reason: 'Réinitialisation indisponible : coordination de sécurité en cours de finalisation.'
+}
+```
+
+In that state the production UI does not render the destructive entry point and
+emits no `RESET_LOCAL_DATA` command. An unavailable capability is a release-scope
+fact, not a disabled feature teaser: the Settings tab must not advertise an
+unfinished destructive workflow. Development diagnostics may expose the reason
+outside the user-facing Settings surface, but they still cannot emit the reset
+command. If capability becomes unavailable after a confirmation has already
+opened, the confirmation controls disappear and the same unavailable projection
+wins. A failed command that was legitimately started while available remains
+visible as an inline alert; it never closes the confirmation, navigates to
+onboarding or presents success. Only installation of the complete executable
+port set may change this contract to `available` and make the entry point
+renderable.
+
+The executable source of this current projection is
+`local-data-reset-availability.contract.ts`. UI wording may evolve, but the
+unavailable/hidden/no-command and truthful-error invariants may not.
+
+| Runtime capability | Existing confirmation                    | Production Settings surface                | Admitted effect                  |
+| ------------------ | ---------------------------------------- | ------------------------------------------ | -------------------------------- |
+| `unavailable`      | no                                       | no Reset entry point                       | none                             |
+| `unavailable`      | yes, from a prior `available` projection | confirmation is removed immediately        | none                             |
+| `available`        | no                                       | Reset entry point may render               | none until explicit confirmation |
+| `available`        | yes and exact confirmation satisfied     | confirmation remains visible while pending | model-owned Reset command only   |
+
+Review result: nominal availability, capability revocation, stale confirmation,
+retry/error display, and command admission are explicit. No text, disabled
+button state, or stale UI boolean authorizes a destructive transition. The
+background handler remains fail-closed even when an untrusted caller fabricates
+`RESET_LOCAL_DATA` while the capability is unavailable.
+
 ## Out of scope
 
 - selective export/restore of reset data;

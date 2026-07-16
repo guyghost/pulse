@@ -150,12 +150,21 @@ export function createAppNavigation() {
     currentPage = page;
   }
 
-  function completeOnboarding() {
+  async function completeOnboarding(): Promise<boolean> {
     if (disposed) {
-      return;
+      return false;
     }
 
-    setOnboardingCompleted().catch(() => {});
+    try {
+      await setOnboardingCompleted();
+    } catch {
+      // The canonical flag writer is the truth. A `saved:false` response must
+      // never be projected as a completed onboarding transition.
+      return false;
+    }
+    if (disposed) {
+      return false;
+    }
 
     if (profile === null) {
       void import('$lib/core/profile/normalize-profile')
@@ -174,6 +183,7 @@ export function createAppNavigation() {
     transitionDirection = 1;
     previousPageIndex = PAGE_INDEX.feed;
     currentPage = 'feed';
+    return true;
   }
 
   function resetToOnboarding() {

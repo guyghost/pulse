@@ -27,6 +27,8 @@ const clearScanCheckpoint = vi.fn();
 const waitForScanRecovery = vi.fn();
 const notifyHighScoreMissions = vi.fn();
 const setupNotificationClickHandler = vi.fn();
+const sendDailyDigest = vi.fn();
+const scheduleDailyDigestAlarm = vi.fn();
 const getProfile = vi.fn();
 const saveProfile = vi.fn();
 const getMissions = vi.fn();
@@ -46,6 +48,7 @@ const getGeneratedAssetsForMission = vi.fn();
 const saveGeneratedAsset = vi.fn();
 const generateAsset = vi.fn();
 const getAllHealthSnapshots = vi.fn();
+const readHealthSnapshotsForProbeReconciliation = vi.fn();
 const resetHealthSnapshot = vi.fn();
 const loadTJMHistory = vi.fn();
 const recordTJMFromMissions = vi.fn();
@@ -61,13 +64,19 @@ const clearOnboardingCompleted = vi.fn();
 const getFeedTourSeen = vi.fn();
 const setFeedTourSeen = vi.fn();
 const clearFeedTourSeen = vi.fn();
+const getKbdCheatsheetTipSeen = vi.fn();
+const setKbdCheatsheetTipSeen = vi.fn();
 const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
 const clearChromeStorage = vi.fn(async () => undefined);
 const arrivalSessionStore: Record<string, unknown> = {};
+const backgroundAlarms = new Map<string, chrome.alarms.AlarmCreateInfo>();
 
 let alarmListener: ((alarm: { name: string }) => Promise<void>) | undefined;
+let installedListener: ((details: chrome.runtime.InstalledDetails) => Promise<void>) | undefined;
+let storageChangeListener:
+  ((changes: Record<string, chrome.storage.StorageChange>, area: string) => void) | undefined;
 let messageListener:
   | ((
       message: unknown,
@@ -94,6 +103,41 @@ const makeMission = (overrides: Partial<Mission> = {}): Mission => ({
   semanticReason: null,
   ...overrides,
 });
+
+const SHIPPED_CONNECTOR_IDS = [
+  'free-work',
+  'lehibou',
+  'hiway',
+  'collective',
+  'cherry-pick',
+  'malt',
+] as const;
+
+function makeStrictHealthRead(overrides: ReadonlyMap<string, Record<string, unknown>> = new Map()) {
+  return {
+    status: 'available' as const,
+    source: 'absent' as const,
+    snapshots: new Map(
+      SHIPPED_CONNECTOR_IDS.map(
+        (connectorId) =>
+          [
+            connectorId,
+            overrides.get(connectorId) ?? {
+              connectorId,
+              circuitState: 'closed',
+              consecutiveFailures: 0,
+              totalFailures: 0,
+              totalSuccesses: 0,
+              lastSuccessAt: null,
+              lastFailureAt: null,
+              lastStateChangeAt: 0,
+              recentLatenciesMs: [],
+            },
+          ] as const
+      )
+    ),
+  };
+}
 
 const profile: UserProfile = {
   firstName: 'Guy',
@@ -177,13 +221,41 @@ vi.stubGlobal('chrome', {
       ),
     },
     onInstalled: {
-      addListener: vi.fn(),
+      addListener: vi.fn(
+        (listener: (details: chrome.runtime.InstalledDetails) => Promise<void>) => {
+          installedListener = listener;
+        }
+      ),
     },
     sendMessage: vi.fn(async () => undefined),
   },
   alarms: {
     clearAll: vi.fn(async () => true),
-    create: vi.fn(),
+    clear: vi.fn(async (name: string) => {
+      backgroundAlarms.delete(name);
+      return true;
+    }),
+    create: vi.fn((name: string, info: chrome.alarms.AlarmCreateInfo) => {
+      backgroundAlarms.set(name, info);
+    }),
+    get: vi.fn(async (name: string) => {
+      const info = backgroundAlarms.get(name);
+      if (!info) {
+        return undefined;
+      }
+      return {
+        name,
+        scheduledTime: info.when ?? Date.now() + (info.delayInMinutes ?? 0) * 60 * 1000,
+        periodInMinutes: info.periodInMinutes,
+      };
+    }),
+    getAll: vi.fn(async () =>
+      [...backgroundAlarms.entries()].map(([name, info]) => ({
+        name,
+        scheduledTime: info.when ?? Date.now() + (info.delayInMinutes ?? 0) * 60 * 1000,
+        periodInMinutes: info.periodInMinutes,
+      }))
+    ),
     onAlarm: {
       addListener: vi.fn((listener: (alarm: { name: string }) => Promise<void>) => {
         alarmListener = listener;
@@ -206,7 +278,13 @@ vi.stubGlobal('chrome', {
       }),
     },
     onChanged: {
-      addListener: vi.fn(),
+      addListener: vi.fn(
+        (
+          listener: (changes: Record<string, chrome.storage.StorageChange>, area: string) => void
+        ) => {
+          storageChangeListener = listener;
+        }
+      ),
     },
   },
   declarativeNetRequest: {
@@ -337,6 +415,7 @@ vi.mock('../../../src/lib/shell/ai/mission-generator', () => ({
 
 vi.mock('../../../src/lib/shell/storage/connector-health', () => ({
   getAllHealthSnapshots,
+  readHealthSnapshotsForProbeReconciliation,
   resetHealthSnapshot,
 }));
 
@@ -348,6 +427,12 @@ vi.mock('../../../src/lib/shell/storage/tjm-history', () => ({
 vi.mock('../../../src/lib/shell/notifications/notify-missions', () => ({
   notifyHighScoreMissions,
   setupNotificationClickHandler,
+}));
+
+vi.mock('../../../src/lib/shell/notifications/daily-digest', () => ({
+  DIGEST_ALARM_NAME: 'daily-digest',
+  sendDailyDigest,
+  scheduleDailyDigestAlarm,
 }));
 
 vi.mock('../../../src/lib/shell/profile/profile-page-verification', () => ({
@@ -369,10 +454,21 @@ vi.mock('../../../src/lib/shell/storage/first-scan', () => ({
   getFeedTourSeen,
   setFeedTourSeen,
   clearFeedTourSeen,
+  getKbdCheatsheetTipSeen,
+  setKbdCheatsheetTipSeen,
 }));
 
 describe('background auto-scan notifications', () => {
   beforeAll(async () => {
+    sendDailyDigest.mockResolvedValue({ sent: false, missionIds: [] });
+    scheduleDailyDigestAlarm.mockImplementation(async () => {
+      const when = Date.now() + 60_000;
+      await chrome.alarms.create('daily-digest', { when });
+      const readBack = await chrome.alarms.get('daily-digest');
+      if (readBack?.scheduledTime !== when || readBack.periodInMinutes !== undefined) {
+        throw new Error('digest alarm read-back mismatch');
+      }
+    });
     getSettings.mockResolvedValue({
       scanIntervalMinutes: 30,
       enabledConnectors: ['free-work'],
@@ -390,17 +486,23 @@ describe('background auto-scan notifications', () => {
     getProfileBannerDismissed.mockResolvedValue(false);
     setProfileBannerDismissed.mockResolvedValue(undefined);
     getOnboardingCompleted.mockResolvedValue(true);
+    getAllHealthSnapshots.mockResolvedValue(new Map());
+    readHealthSnapshotsForProbeReconciliation.mockResolvedValue(makeStrictHealthRead());
     setOnboardingCompleted.mockResolvedValue(undefined);
     clearOnboardingCompleted.mockResolvedValue(undefined);
     getFeedTourSeen.mockResolvedValue(false);
     setFeedTourSeen.mockResolvedValue(undefined);
     clearFeedTourSeen.mockResolvedValue(undefined);
+    getKbdCheatsheetTipSeen.mockResolvedValue(false);
+    setKbdCheatsheetTipSeen.mockResolvedValue(undefined);
     waitForScanRecovery.mockResolvedValue(undefined);
     await import('../../../src/background/index.ts');
   });
 
   beforeEach(() => {
     vi.clearAllMocks();
+    backgroundAlarms.clear();
+    sendDailyDigest.mockResolvedValue({ sent: false, missionIds: [] });
     for (const key of Object.keys(arrivalSessionStore)) {
       delete arrivalSessionStore[key];
     }
@@ -458,6 +560,9 @@ describe('background auto-scan notifications', () => {
     clearOnboardingCompleted.mockResolvedValue(undefined);
     getFeedTourSeen.mockResolvedValue(false);
     setFeedTourSeen.mockResolvedValue(undefined);
+    clearFeedTourSeen.mockResolvedValue(undefined);
+    getKbdCheatsheetTipSeen.mockResolvedValue(false);
+    setKbdCheatsheetTipSeen.mockResolvedValue(undefined);
     getProfile.mockResolvedValue(null);
     saveProfile.mockResolvedValue(undefined);
     getTracking.mockResolvedValue(null);
@@ -468,6 +573,7 @@ describe('background auto-scan notifications', () => {
     saveGeneratedAsset.mockResolvedValue(undefined);
     generateAsset.mockResolvedValue(null);
     getAllHealthSnapshots.mockResolvedValue(new Map());
+    readHealthSnapshotsForProbeReconciliation.mockResolvedValue(makeStrictHealthRead());
     loadTJMHistory.mockResolvedValue({ records: [] });
     verifyProfilePage.mockResolvedValue({
       read: { status: 'available', finalUrl: 'https://www.linkedin.com/in/example/' },
@@ -477,6 +583,173 @@ describe('background auto-scan notifications', () => {
     rescoreStoredMissions.mockResolvedValue([makeMission({ id: 'rescored-1', score: 96 })]);
     resetLocalData.mockResolvedValue(undefined);
   });
+
+  it('never starts a first scan from a fresh install event', async () => {
+    expect(installedListener).toBeTypeOf('function');
+
+    await installedListener?.({ reason: 'install' } as chrome.runtime.InstalledDetails);
+
+    expect(getSettings).not.toHaveBeenCalled();
+    expect(runScan).not.toHaveBeenCalled();
+  });
+
+  it('reconciles only the owned auto-scan alarm and never clears other alarms', async () => {
+    expect(storageChangeListener).toBeTypeOf('function');
+
+    storageChangeListener?.({ settings: { newValue: { autoScan: true } } }, 'local');
+
+    await vi.waitFor(() => {
+      expect(chrome.alarms.clear).toHaveBeenCalledWith('auto-scan');
+    });
+    expect(chrome.alarms.clearAll).not.toHaveBeenCalled();
+    expect(chrome.alarms.create).toHaveBeenCalledWith('auto-scan', {
+      periodInMinutes: 30,
+    });
+    expect(chrome.alarms.create).toHaveBeenCalledWith(
+      'daily-digest',
+      expect.objectContaining({ when: expect.any(Number) })
+    );
+  });
+
+  it('reconciles auto-scan when onboarding consent changes', async () => {
+    expect(storageChangeListener).toBeTypeOf('function');
+
+    storageChangeListener?.({ onboarding_completed: { oldValue: false, newValue: true } }, 'local');
+
+    await vi.waitFor(() => {
+      expect(chrome.alarms.clear).toHaveBeenCalledWith('auto-scan');
+    });
+    expect(chrome.alarms.create).toHaveBeenCalledWith('auto-scan', {
+      periodInMinutes: 30,
+    });
+  });
+
+  it.each([
+    {
+      label: 'onboarding is incomplete',
+      onboardingCompleted: false,
+      autoScan: true,
+    },
+    {
+      label: 'auto-scan is disabled',
+      onboardingCompleted: true,
+      autoScan: false,
+    },
+  ])('rejects an auto-scan alarm when $label', async ({ onboardingCompleted, autoScan }) => {
+    getOnboardingCompleted.mockResolvedValueOnce(onboardingCompleted);
+    getSettings.mockResolvedValueOnce({
+      scanIntervalMinutes: 30,
+      enabledConnectors: ['free-work'],
+      notifications: true,
+      autoScan,
+      maxSemanticPerScan: 10,
+      notificationScoreThreshold: 70,
+    });
+
+    await alarmListener?.({ name: 'auto-scan' });
+
+    expect(runScan).not.toHaveBeenCalled();
+  });
+
+  it('routes a valid probe alarm to the matching connector only', async () => {
+    await alarmListener?.({ name: 'probe:free-work' });
+
+    expect(runScan).toHaveBeenCalledWith(
+      expect.any(AbortSignal),
+      undefined,
+      expect.objectContaining({ connectorIdsOverride: ['free-work'] })
+    );
+  });
+
+  it('reschedules the digest from finally when digest delivery rejects', async () => {
+    sendDailyDigest.mockRejectedValueOnce(new Error('digest storage unavailable'));
+
+    await expect(alarmListener?.({ name: 'daily-digest' })).resolves.toBeUndefined();
+
+    expect(sendDailyDigest).toHaveBeenCalledOnce();
+    expect(scheduleDailyDigestAlarm).toHaveBeenCalledOnce();
+  });
+
+  it('exposes a digest reschedule rejection instead of completing falsely', async () => {
+    scheduleDailyDigestAlarm.mockRejectedValueOnce(new Error('digest alarm create rejected'));
+
+    await expect(alarmListener?.({ name: 'daily-digest' })).rejects.toThrow(
+      'digest alarm create rejected'
+    );
+
+    expect(sendDailyDigest).toHaveBeenCalledOnce();
+    expect(scheduleDailyDigestAlarm).toHaveBeenCalledOnce();
+  });
+
+  it('reconciles the fired probe alarm from the final persisted health snapshot', async () => {
+    runScan.mockRejectedValueOnce(new Error('probe scan failed'));
+    readHealthSnapshotsForProbeReconciliation.mockResolvedValueOnce(
+      makeStrictHealthRead(
+        new Map([
+          [
+            'free-work',
+            {
+              connectorId: 'free-work',
+              circuitState: 'open',
+              consecutiveFailures: 3,
+              totalFailures: 3,
+              totalSuccesses: 0,
+              lastSuccessAt: null,
+              lastFailureAt: 1_000,
+              lastStateChangeAt: 1_000,
+              recentLatenciesMs: [],
+            },
+          ],
+        ])
+      )
+    );
+
+    await expect(alarmListener?.({ name: 'probe:free-work' })).resolves.toBeUndefined();
+
+    expect(chrome.alarms.create).toHaveBeenCalledWith('probe:free-work', {
+      when: expect.any(Number),
+    });
+    expect(chrome.alarms.get).toHaveBeenCalledWith('probe:free-work');
+  });
+
+  it('performs no probe alarm mutation when the strict health read is unavailable', async () => {
+    runScan.mockRejectedValueOnce(new Error('probe scan failed'));
+    readHealthSnapshotsForProbeReconciliation.mockResolvedValueOnce({
+      status: 'unavailable',
+      reason: 'io_error',
+    });
+
+    await expect(alarmListener?.({ name: 'probe:free-work' })).resolves.toBeUndefined();
+
+    expect(chrome.alarms.create).not.toHaveBeenCalledWith('probe:free-work', expect.any(Object));
+    expect(chrome.alarms.clear).not.toHaveBeenCalledWith('probe:free-work');
+    expect(chrome.alarms.get).not.toHaveBeenCalledWith('probe:free-work');
+  });
+
+  it('does not reconcile stored probes when startup health proof is corrupt', async () => {
+    backgroundAlarms.set('probe:free-work', { when: Date.now() + 60_000 });
+    readHealthSnapshotsForProbeReconciliation.mockResolvedValueOnce({
+      status: 'unavailable',
+      reason: 'corrupt',
+    });
+
+    storageChangeListener?.({ settings: { newValue: { autoScan: true } } }, 'local');
+    await vi.waitFor(() => {
+      expect(readHealthSnapshotsForProbeReconciliation).toHaveBeenCalled();
+    });
+
+    expect(chrome.alarms.clear).not.toHaveBeenCalledWith('probe:free-work');
+    expect(backgroundAlarms.has('probe:free-work')).toBe(true);
+  });
+
+  it.each(['probe:', 'probe:not-shipped'])(
+    'ignores malformed or excluded probe alarm %s',
+    async (name) => {
+      await alarmListener?.({ name });
+
+      expect(runScan).not.toHaveBeenCalled();
+    }
+  );
 
   it('persists notified mission ids so they are not alerted again on the next scan', async () => {
     expect(alarmListener).toBeTypeOf('function');
@@ -2559,9 +2832,78 @@ describe('background auto-scan notifications', () => {
     });
   });
 
-  it('resets local extension data from the service worker shell', async () => {
+  it('reports onboarding saved:false when the canonical flag writer rejects', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();
+    setOnboardingCompleted.mockRejectedValueOnce(new Error('storage write failed'));
+
+    expect(messageListener?.({ type: 'SET_ONBOARDING_COMPLETED' }, {}, sendResponse)).toBe(true);
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalled();
+    });
+
+    expect(sendResponse).toHaveBeenCalledWith({
+      type: 'ONBOARDING_COMPLETED_SET',
+      payload: { saved: false },
+    });
+  });
+
+  it.each([
+    {
+      label: 'profile banner set',
+      message: { type: 'SET_PROFILE_BANNER_DISMISSED' },
+      reject: setProfileBannerDismissed,
+      expected: {
+        type: 'PROFILE_BANNER_DISMISSED_SET',
+        payload: { saved: false },
+      },
+    },
+    {
+      label: 'onboarding clear',
+      message: { type: 'CLEAR_ONBOARDING_COMPLETED' },
+      reject: clearOnboardingCompleted,
+      expected: {
+        type: 'ONBOARDING_COMPLETED_CLEARED',
+        payload: { cleared: false },
+      },
+    },
+    {
+      label: 'feed tour set',
+      message: { type: 'SET_FEED_TOUR_SEEN' },
+      reject: setFeedTourSeen,
+      expected: { type: 'FEED_TOUR_SEEN_SET', payload: { saved: false } },
+    },
+    {
+      label: 'feed tour clear',
+      message: { type: 'CLEAR_FEED_TOUR_SEEN' },
+      reject: clearFeedTourSeen,
+      expected: { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: false } },
+    },
+    {
+      label: 'keyboard tip set',
+      message: { type: 'SET_KBD_CHEATSHEET_TIP_SEEN' },
+      reject: setKbdCheatsheetTipSeen,
+      expected: { type: 'KBD_CHEATSHEET_TIP_SEEN_SET', payload: { saved: false } },
+    },
+  ])('reports a truthful false result when $label persistence rejects', async (scenario) => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+    scenario.reject.mockRejectedValueOnce(new Error('storage write failed'));
+
+    expect(messageListener?.(scenario.message, {}, sendResponse)).toBe(true);
+    await vi.waitFor(() => {
+      expect(sendResponse).toHaveBeenCalled();
+    });
+
+    expect(sendResponse).toHaveBeenCalledWith(scenario.expected);
+  });
+
+  it('reports a fail-closed local reset without inventing a success', async () => {
+    expect(messageListener).toBeTypeOf('function');
+    const sendResponse = vi.fn();
+    resetLocalData.mockRejectedValueOnce(
+      new Error('La réinitialisation model-owned n’est pas disponible.')
+    );
 
     const handled = messageListener?.({ type: 'RESET_LOCAL_DATA' }, {}, sendResponse);
     await new Promise((resolve) => setTimeout(resolve, 20));
@@ -2570,7 +2912,10 @@ describe('background auto-scan notifications', () => {
     expect(resetLocalData).toHaveBeenCalled();
     expect(sendResponse).toHaveBeenCalledWith({
       type: 'LOCAL_DATA_RESET',
-      payload: { reset: true },
+      payload: {
+        reset: false,
+        reason: 'La réinitialisation model-owned n’est pas disponible.',
+      },
     });
   });
 

@@ -702,6 +702,10 @@ describe('operational UI constraints', () => {
     expect(source).toContain('function handleConfirmReset()');
     expect(source).toContain('scrollIntoView');
     expect(source).toContain('disabled={!canConfirmReset}');
+    expect(source).toContain("resetAvailability.status === 'unavailable'");
+    expect(source).toContain('disabled={resetUnavailable}');
+    expect(source).toContain('role="alert"');
+    expect(source).toContain('{resetError}');
     expect(source).toContain('onCreateBackup');
     expect(source).toContain('Créer une sauvegarde avant suppression');
     expect(source).toContain('Suppression irréversible');
@@ -711,6 +715,11 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Après suppression : relancer l’onboarding');
     expect(source).toContain('Tapez SUPPRIMER pour confirmer');
     expect(settingsSource).toContain('onCreateBackup={handleCreateBackup}');
+    expect(settingsSource).toContain(
+      "{#if settings.localDataResetAvailability.status === 'available'}"
+    );
+    expect(settingsSource).toContain('resetAvailability={settings.localDataResetAvailability}');
+    expect(settingsSource).toContain('resetError={settings.resetError}');
     expect(source).not.toContain('Confirmer la suppression');
   });
 

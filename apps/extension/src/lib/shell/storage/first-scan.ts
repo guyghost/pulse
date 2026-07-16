@@ -24,11 +24,7 @@ export async function getFirstScanDone(): Promise<boolean> {
 }
 
 export async function setFirstScanDone(): Promise<void> {
-  try {
-    await chrome.storage.local.set({ [KEY_FIRST_SCAN]: true });
-  } catch {
-    // Non-critical
-  }
+  await chrome.storage.local.set({ [KEY_FIRST_SCAN]: true });
 }
 
 export async function getProfileBannerDismissed(): Promise<boolean> {
@@ -41,11 +37,7 @@ export async function getProfileBannerDismissed(): Promise<boolean> {
 }
 
 export async function setProfileBannerDismissed(): Promise<void> {
-  try {
-    await chrome.storage.local.set({ [KEY_BANNER_DISMISSED]: true });
-  } catch {
-    // Non-critical
-  }
+  await chrome.storage.local.set({ [KEY_BANNER_DISMISSED]: true });
 }
 
 export async function getOnboardingCompleted(): Promise<boolean> {
@@ -58,19 +50,11 @@ export async function getOnboardingCompleted(): Promise<boolean> {
 }
 
 export async function setOnboardingCompleted(): Promise<void> {
-  try {
-    await chrome.storage.local.set({ [KEY_ONBOARDING_COMPLETED]: true });
-  } catch {
-    // Non-critical
-  }
+  await chrome.storage.local.set({ [KEY_ONBOARDING_COMPLETED]: true });
 }
 
 export async function clearOnboardingCompleted(): Promise<void> {
-  try {
-    await chrome.storage.local.remove(KEY_ONBOARDING_COMPLETED);
-  } catch {
-    // Non-critical
-  }
+  await chrome.storage.local.remove(KEY_ONBOARDING_COMPLETED);
 }
 
 export async function getFeedTourSeen(): Promise<boolean> {
@@ -83,19 +67,11 @@ export async function getFeedTourSeen(): Promise<boolean> {
 }
 
 export async function setFeedTourSeen(): Promise<void> {
-  try {
-    await chrome.storage.local.set({ [KEY_FEED_TOUR_SEEN]: true });
-  } catch {
-    // Non-critical
-  }
+  await chrome.storage.local.set({ [KEY_FEED_TOUR_SEEN]: true });
 }
 
 export async function clearFeedTourSeen(): Promise<void> {
-  try {
-    await chrome.storage.local.remove(KEY_FEED_TOUR_SEEN);
-  } catch {
-    // Non-critical
-  }
+  await chrome.storage.local.remove(KEY_FEED_TOUR_SEEN);
 }
 
 export async function getKbdCheatsheetTipSeen(): Promise<boolean> {
@@ -108,9 +84,5 @@ export async function getKbdCheatsheetTipSeen(): Promise<boolean> {
 }
 
 export async function setKbdCheatsheetTipSeen(): Promise<void> {
-  try {
-    await chrome.storage.local.set({ [KEY_KBD_CHEATSHEET_TIP_SEEN]: true });
-  } catch {
-    // Non-critical
-  }
+  await chrome.storage.local.set({ [KEY_KBD_CHEATSHEET_TIP_SEEN]: true });
 }

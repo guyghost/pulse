@@ -381,102 +381,293 @@ describe('dataset epoch authority', () => {
     }
   );
 
-  // implementation gate: remove `.fails` when the Shell rejects allocator reentrance.
-  it.fails(
-    'rejects reset reentrance from allocateLeaseId before anything enters the FIFO',
-    async () => {
-      const operationId = uuid(24);
-      const resetOperationId = uuid(25);
-      const nextDataEpoch = uuid(26);
-      const burnedLeaseId = uuid(123);
-      const request = resetRequest(resetOperationId, nextDataEpoch);
-      let allocations = 0;
-      let resetPromise: ReturnType<
-        ReturnType<typeof createDatasetEpochAuthority>['acquireResetFence']
-      > | null = null;
-      let reentrantError: unknown;
-      let outerError: unknown;
-      const authority = createDatasetEpochAuthority({
-        workerEpoch: WORKER_EPOCH,
-        allocateLeaseId: () => {
-          allocations += 1;
-          try {
-            resetPromise = authority.acquireResetFence(request);
-          } catch (error) {
-            reentrantError = error;
-          }
-          return burnedLeaseId;
-        },
-      });
-      authority.openAdmission(openingProof());
+  it('rejects reset reentrance from allocateLeaseId before anything enters the FIFO', async () => {
+    const operationId = uuid(24);
+    const resetOperationId = uuid(25);
+    const nextDataEpoch = uuid(26);
+    const burnedLeaseId = uuid(123);
+    const request = resetRequest(resetOperationId, nextDataEpoch);
+    let allocations = 0;
+    let resetPromise: ReturnType<
+      ReturnType<typeof createDatasetEpochAuthority>['acquireResetFence']
+    > | null = null;
+    let reentrantError: unknown;
+    let outerError: unknown;
+    const authority = createDatasetEpochAuthority({
+      workerEpoch: WORKER_EPOCH,
+      allocateLeaseId: () => {
+        allocations += 1;
+        try {
+          resetPromise = authority.acquireResetFence(request);
+        } catch (error) {
+          reentrantError = error;
+        }
+        return burnedLeaseId;
+      },
+    });
+    authority.openAdmission(openingProof());
 
+    try {
+      authority.issueLease(scope(operationId));
+    } catch (error) {
+      outerError = error;
+    }
+
+    // Let the current implementation settle any incorrectly enqueued reset so
+    // this RED contract never leaves a dangling promise behind.
+    if (resetPromise !== null) {
+      await resetPromise.catch(() => undefined);
+    }
+
+    expect(authorityErrorCode(reentrantError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+    expect(authorityErrorCode(outerError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+    expect(resetPromise).toBeNull();
+    expect(allocations).toBe(1);
+    expect(authority.snapshot()).toEqual({
+      status: 'open',
+      dataEpoch: DATA_EPOCH,
+      authorityRevision: 0,
+    });
+  });
+
+  it('rejects same-operation reentrance from allocateLeaseId before a nested allocation', () => {
+    const operationId = uuid(228);
+    const burnedOuterLeaseId = uuid(231);
+    let allocations = 0;
+    let innerLease: DatasetWriteLeaseV1 | undefined;
+    let outerLease: DatasetWriteLeaseV1 | undefined;
+    let reentrantError: unknown;
+    let outerError: unknown;
+    const authority = createDatasetEpochAuthority({
+      workerEpoch: WORKER_EPOCH,
+      allocateLeaseId: () => {
+        allocations += 1;
+        try {
+          innerLease = authority.issueLease(scope(operationId));
+        } catch (error) {
+          reentrantError = error;
+        }
+        return burnedOuterLeaseId;
+      },
+    });
+    authority.openAdmission(openingProof());
+
+    try {
+      outerLease = authority.issueLease(scope(operationId));
+    } catch (error) {
+      outerError = error;
+    }
+
+    expect(authorityErrorCode(reentrantError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+    expect(authorityErrorCode(outerError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+    expect(innerLease).toBeUndefined();
+    expect(outerLease).toBeUndefined();
+    expect(allocations).toBe(1);
+    expect(authority.snapshot()).toEqual({
+      status: 'open',
+      dataEpoch: DATA_EPOCH,
+      authorityRevision: 0,
+    });
+  });
+
+  it('burns a valid allocator UUID after a latched reentrancy violation', () => {
+    const firstOperationId = uuid(232);
+    const secondOperationId = uuid(233);
+    const burnedLeaseId = uuid(234);
+    let allocations = 0;
+    const authority = createDatasetEpochAuthority({
+      workerEpoch: WORKER_EPOCH,
+      allocateLeaseId: () => {
+        allocations += 1;
+        if (allocations === 1) {
+          try {
+            authority.issueLease(scope(uuid(235)));
+          } catch {
+            // Hostile allocator catches the inner rejection.
+          }
+        }
+        return burnedLeaseId;
+      },
+    });
+    authority.openAdmission(openingProof());
+
+    expectAuthorityError(
+      () => authority.issueLease(scope(firstOperationId)),
+      'AUTHORITY_REENTRANCY_FORBIDDEN'
+    );
+    expectAuthorityError(
+      () => authority.issueLease(scope(secondOperationId)),
+      'LEASE_ID_COLLISION'
+    );
+    expect(allocations).toBe(2);
+  });
+
+  it('rejects a reentrant authority snapshot from the lease allocator', () => {
+    const operationId = uuid(236);
+    let innerError: unknown;
+    const authority = createDatasetEpochAuthority({
+      workerEpoch: WORKER_EPOCH,
+      allocateLeaseId: () => {
+        try {
+          authority.snapshot();
+        } catch (error) {
+          innerError = error;
+        }
+        return uuid(237);
+      },
+    });
+    authority.openAdmission(openingProof());
+
+    expectAuthorityError(
+      () => authority.issueLease(scope(operationId)),
+      'AUTHORITY_REENTRANCY_FORBIDDEN'
+    );
+    expect(authorityErrorCode(innerError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+  });
+
+  it.each([
+    {
+      api: 'openAdmission',
+      invoke: (authority: ReturnType<typeof createDatasetEpochAuthority>) =>
+        authority.openAdmission(openingProof()),
+    },
+    {
+      api: 'commit',
+      invoke: (authority: ReturnType<typeof createDatasetEpochAuthority>) =>
+        authority.commit(
+          {
+            version: 1,
+            leaseId: uuid(240),
+            operationId: uuid(241),
+            dataEpoch: DATA_EPOCH,
+            authorityRevision: 0,
+          },
+          uuid(241),
+          async () => undefined
+        ),
+    },
+    {
+      api: 'installResetEpoch',
+      invoke: (authority: ReturnType<typeof createDatasetEpochAuthority>) =>
+        authority.installResetEpoch({
+          version: 1,
+          workerEpoch: WORKER_EPOCH,
+          resetOperationId: uuid(242),
+          previousDataEpoch: DATA_EPOCH,
+          nextDataEpoch: uuid(243),
+          authorityRevision: 1,
+        }),
+    },
+    {
+      api: 'fenceFailure',
+      invoke: (authority: ReturnType<typeof createDatasetEpochAuthority>) =>
+        authority.fenceFailure(failureFenceCommand()),
+    },
+  ])('rejects $api reentrance synchronously from the lease allocator', ({ invoke }) => {
+    let innerError: unknown;
+    const operationId = uuid(244);
+    const authority = createDatasetEpochAuthority({
+      workerEpoch: WORKER_EPOCH,
+      allocateLeaseId: () => {
+        try {
+          void invoke(authority);
+        } catch (error) {
+          innerError = error;
+        }
+        return uuid(245);
+      },
+    });
+    authority.openAdmission(openingProof());
+
+    expectAuthorityError(
+      () => authority.issueLease(scope(operationId)),
+      'AUTHORITY_REENTRANCY_FORBIDDEN'
+    );
+    expect(authorityErrorCode(innerError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+    expect(authority.snapshot()).toEqual({
+      status: 'open',
+      dataEpoch: DATA_EPOCH,
+      authorityRevision: 0,
+    });
+  });
+
+  it('fails closed without allocating after 4,096 retained ordinary operations', async () => {
+    let allocations = 0;
+    const authority = createDatasetEpochAuthority({
+      workerEpoch: WORKER_EPOCH,
+      allocateLeaseId: () => uuid(100_000 + ++allocations),
+    });
+    authority.openAdmission(openingProof());
+
+    let canonicalLease: DatasetWriteLeaseV1 | null = null;
+    for (let index = 0; index < 4_096; index += 1) {
+      const lease = authority.issueLease(scope(uuid(200_000 + index)));
+      canonicalLease ??= lease;
+    }
+    expect(allocations).toBe(4_096);
+    expect(authority.issueLease(scope(uuid(200_000)))).toBe(canonicalLease);
+
+    expectAuthorityError(
+      () => authority.issueLease(scope(uuid(300_000))),
+      'OPERATION_CAPACITY_EXHAUSTED'
+    );
+    expect(allocations).toBe(4_096);
+    expect(authority.snapshot()).toMatchObject({
+      status: 'fenced_failure',
+      authorityRevision: 0,
+      failure: { code: 'AUTHORITY_FENCE_FAILED', retryable: false },
+    });
+
+    let writes = 0;
+    await expect(
+      authority.commit(canonicalLease!, canonicalLease!.operationId, async () => {
+        writes += 1;
+      })
+    ).rejects.toMatchObject({ code: 'LEASE_REVOKED' });
+    expect(writes).toBe(0);
+  });
+
+  it('fails closed before allocation after 32,768 retained fresh lease IDs', () => {
+    let allocations = 0;
+    let reentrancyRejections = 0;
+    const operationId = uuid(400_000);
+    const authority = createDatasetEpochAuthority({
+      workerEpoch: WORKER_EPOCH,
+      allocateLeaseId: () => {
+        allocations += 1;
+        try {
+          authority.snapshot();
+        } catch {
+          // Every valid result is intentionally burned by allocator reentrancy.
+        }
+        return uuid(500_000 + allocations);
+      },
+    });
+    authority.openAdmission(openingProof());
+
+    for (let index = 0; index < 32_768; index += 1) {
       try {
         authority.issueLease(scope(operationId));
       } catch (error) {
-        outerError = error;
+        if (authorityErrorCode(error) === 'AUTHORITY_REENTRANCY_FORBIDDEN') {
+          reentrancyRejections += 1;
+        }
       }
-
-      // Let the current implementation settle any incorrectly enqueued reset so
-      // this RED contract never leaves a dangling promise behind.
-      if (resetPromise !== null) {
-        await resetPromise.catch(() => undefined);
-      }
-
-      expect(authorityErrorCode(reentrantError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
-      expect(authorityErrorCode(outerError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
-      expect(resetPromise).toBeNull();
-      expect(allocations).toBe(1);
-      expect(authority.snapshot()).toEqual({
-        status: 'open',
-        dataEpoch: DATA_EPOCH,
-        authorityRevision: 0,
-      });
     }
-  );
+    expect(allocations).toBe(32_768);
+    expect(reentrancyRejections).toBe(32_768);
 
-  // implementation gate: remove `.fails` when the Shell rejects allocator reentrance.
-  it.fails(
-    'rejects same-operation reentrance from allocateLeaseId before a nested allocation',
-    () => {
-      const operationId = uuid(228);
-      const burnedOuterLeaseId = uuid(231);
-      let allocations = 0;
-      let innerLease: DatasetWriteLeaseV1 | undefined;
-      let outerLease: DatasetWriteLeaseV1 | undefined;
-      let reentrantError: unknown;
-      let outerError: unknown;
-      const authority = createDatasetEpochAuthority({
-        workerEpoch: WORKER_EPOCH,
-        allocateLeaseId: () => {
-          allocations += 1;
-          try {
-            innerLease = authority.issueLease(scope(operationId));
-          } catch (error) {
-            reentrantError = error;
-          }
-          return burnedOuterLeaseId;
-        },
-      });
-      authority.openAdmission(openingProof());
-
-      try {
-        outerLease = authority.issueLease(scope(operationId));
-      } catch (error) {
-        outerError = error;
-      }
-
-      expect(authorityErrorCode(reentrantError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
-      expect(authorityErrorCode(outerError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
-      expect(innerLease).toBeUndefined();
-      expect(outerLease).toBeUndefined();
-      expect(allocations).toBe(1);
-      expect(authority.snapshot()).toEqual({
-        status: 'open',
-        dataEpoch: DATA_EPOCH,
-        authorityRevision: 0,
-      });
-    }
-  );
+    expectAuthorityError(
+      () => authority.issueLease(scope(operationId)),
+      'CORRELATION_CAPACITY_EXHAUSTED'
+    );
+    expect(allocations).toBe(32_768);
+    expect(authority.snapshot()).toMatchObject({
+      status: 'fenced_failure',
+      authorityRevision: 0,
+      failure: { code: 'AUTHORITY_FENCE_FAILED', retryable: false },
+    });
+  });
 
   it('binds one operation to one epoch and returns no fresh duplicate lease', () => {
     let allocations = 0;

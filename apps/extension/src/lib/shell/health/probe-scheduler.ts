@@ -10,12 +10,29 @@
 
 import type { ConnectorHealthSnapshot, HealthThresholds } from '../../core/types/health';
 import { DEFAULT_HEALTH_THRESHOLDS } from '../../core/types/health';
+import { INCLUDED_CONNECTOR_IDS } from '../connectors/build-config';
 
 // ============================================================================
 // Alarm naming convention
 // ============================================================================
 
 const PROBE_ALARM_PREFIX = 'probe:';
+const MAX_DISCOVERED_PROBE_ALARMS_PER_RECONCILIATION = 256;
+
+export type ProbeAlarmReconciliationErrorCode =
+  'PROBE_ALARM_READBACK_MISMATCH' | 'PROBE_HEALTH_PROOF_UNAVAILABLE';
+
+export class ProbeAlarmReconciliationError extends Error {
+  constructor(
+    message: string,
+    readonly code: ProbeAlarmReconciliationErrorCode = 'PROBE_ALARM_READBACK_MISMATCH'
+  ) {
+    super(message);
+    this.name = 'ProbeAlarmReconciliationError';
+  }
+}
+
+const BUILD_INCLUDED_CONNECTOR_IDS = new Set<string>(INCLUDED_CONNECTOR_IDS);
 
 export function probeAlarmName(connectorId: string): string {
   return `${PROBE_ALARM_PREFIX}${connectorId}`;
@@ -25,8 +42,12 @@ export function isProbeAlarm(alarmName: string): boolean {
   return alarmName.startsWith(PROBE_ALARM_PREFIX);
 }
 
-export function connectorIdFromAlarm(alarmName: string): string {
-  return alarmName.slice(PROBE_ALARM_PREFIX.length);
+export function connectorIdFromAlarm(alarmName: string): string | null {
+  if (!isProbeAlarm(alarmName)) {
+    return null;
+  }
+  const connectorId = alarmName.slice(PROBE_ALARM_PREFIX.length);
+  return connectorId.length > 0 ? connectorId : null;
 }
 
 // ============================================================================
@@ -42,26 +63,31 @@ export function connectorIdFromAlarm(alarmName: string): string {
  */
 export async function scheduleProbe(
   connectorId: string,
-  thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS
+  thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
+  nowMs: number = Date.now()
 ): Promise<void> {
   const name = probeAlarmName(connectorId);
-  const delayInMinutes = thresholds.probeIntervalMs / (60 * 1000);
+  const expectedWhenMs = nowMs + thresholds.probeIntervalMs;
 
-  try {
-    // Supprimer l'ancienne alarme si elle existe (idempotence)
-    await chrome.alarms.clear(name);
-    // Créer une alarme one-shot (pas périodique)
-    chrome.alarms.create(name, { delayInMinutes });
+  // Supprimer l'ancienne alarme si elle existe (idempotence), puis prouver
+  // localement la création one-shot exacte. Le ledger/actor durable reste un
+  // contrat séparé documenté dans background-scheduling.model.md.
+  await chrome.alarms.clear(name);
+  await chrome.alarms.create(name, { when: expectedWhenMs });
+  const readBack = await chrome.alarms.get(name);
+  if (
+    readBack?.name !== name ||
+    readBack.scheduledTime !== expectedWhenMs ||
+    readBack.periodInMinutes !== undefined
+  ) {
+    await chrome.alarms.clear(name).catch(() => false);
+    throw new ProbeAlarmReconciliationError(
+      `Probe alarm ${name} could not be verified after creation.`
+    );
+  }
 
-    if (import.meta.env.DEV) {
-      console.debug(`[ProbeScheduler] Probe scheduled for ${connectorId} in ${delayInMinutes}min`);
-    }
-  } catch {
-    // Non-critical — le circuit breaker fonctionne sans l'alarme
-    // (shouldAttemptProbe vérifie les timestamps, ce qui sert de fallback)
-    if (import.meta.env.DEV) {
-      console.warn(`[ProbeScheduler] Failed to schedule probe for ${connectorId}`);
-    }
+  if (import.meta.env.DEV) {
+    console.debug(`[ProbeScheduler] Probe scheduled for ${connectorId} at ${expectedWhenMs}`);
   }
 }
 
@@ -71,14 +97,17 @@ export async function scheduleProbe(
  * @param connectorId  ID du connecteur
  */
 export async function cancelProbe(connectorId: string): Promise<void> {
-  try {
-    await chrome.alarms.clear(probeAlarmName(connectorId));
+  const name = probeAlarmName(connectorId);
+  await chrome.alarms.clear(name);
+  const readBack = await chrome.alarms.get(name);
+  if (readBack !== undefined) {
+    throw new ProbeAlarmReconciliationError(
+      `Probe alarm ${name} is still present after cancellation.`
+    );
+  }
 
-    if (import.meta.env.DEV) {
-      console.debug(`[ProbeScheduler] Probe cancelled for ${connectorId}`);
-    }
-  } catch {
-    // Non-critical
+  if (import.meta.env.DEV) {
+    console.debug(`[ProbeScheduler] Probe cancelled for ${connectorId}`);
   }
 }
 
@@ -89,9 +118,84 @@ export async function cancelAllProbes(): Promise<void> {
   try {
     const alarms = await chrome.alarms.getAll();
     const probeAlarms = alarms.filter((a) => isProbeAlarm(a.name));
-    await Promise.all(probeAlarms.map((a) => chrome.alarms.clear(a.name)));
+    await Promise.all(
+      probeAlarms.map((alarm) => {
+        const connectorId = connectorIdFromAlarm(alarm.name);
+        return connectorId === null
+          ? chrome.alarms.clear(alarm.name).then(() => undefined)
+          : cancelProbe(connectorId);
+      })
+    );
   } catch {
     // Non-critical
+  }
+}
+
+/**
+ * Converges the Chrome-local probe alarms from the last persisted health
+ * snapshots. This closes the ordinary service-worker start/settings gap, but
+ * deliberately does not claim the durable actor/ledger crash guarantees of the
+ * full background scheduling model.
+ */
+export async function reconcileProbeAlarmsLocally(
+  includedConnectorIds: readonly string[],
+  snapshots: ReadonlyMap<string, ConnectorHealthSnapshot>,
+  thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
+  nowMs: number = Date.now()
+): Promise<void> {
+  const included = new Set(includedConnectorIds);
+
+  // A health snapshot is authority for exactly one build-included connector.
+  // Validate the complete proof before discovering or mutating any alarm so a
+  // corrupt/misaligned map cannot be projected as a healthy closed circuit.
+  if (snapshots.size !== included.size) {
+    throw new ProbeAlarmReconciliationError(
+      'Probe health proof does not cover the included connector set exactly.',
+      'PROBE_HEALTH_PROOF_UNAVAILABLE'
+    );
+  }
+  for (const connectorId of included) {
+    const snapshot = snapshots.get(connectorId);
+    if (
+      !BUILD_INCLUDED_CONNECTOR_IDS.has(connectorId) ||
+      snapshot === undefined ||
+      snapshot.connectorId !== connectorId
+    ) {
+      throw new ProbeAlarmReconciliationError(
+        `Probe health proof is unavailable for build connector ${connectorId}.`,
+        'PROBE_HEALTH_PROOF_UNAVAILABLE'
+      );
+    }
+  }
+
+  const alarms = await chrome.alarms.getAll();
+  const probeAlarms = alarms.filter((alarm) => isProbeAlarm(alarm.name));
+  if (probeAlarms.length > MAX_DISCOVERED_PROBE_ALARMS_PER_RECONCILIATION) {
+    throw new ProbeAlarmReconciliationError(
+      'Probe alarm discovery capacity is exhausted; no partial reconciliation was applied.'
+    );
+  }
+
+  for (const alarm of probeAlarms) {
+    const connectorId = connectorIdFromAlarm(alarm.name);
+    if (connectorId === null || !included.has(connectorId)) {
+      await chrome.alarms.clear(alarm.name);
+      const readBack = await chrome.alarms.get(alarm.name);
+      if (readBack !== undefined) {
+        throw new ProbeAlarmReconciliationError(
+          `Excluded probe alarm ${alarm.name} is still present after cleanup.`
+        );
+      }
+    }
+  }
+
+  for (const connectorId of [...included].sort()) {
+    const snapshot = snapshots.get(connectorId);
+    if (snapshot?.circuitState === 'open') {
+      await scheduleProbe(connectorId, thresholds, nowMs);
+    } else {
+      await cancelProbe(connectorId);
+    }
   }
 }
 
@@ -112,10 +216,18 @@ export async function cancelAllProbes(): Promise<void> {
  */
 export async function syncProbeAlarm(
   snapshot: ConnectorHealthSnapshot,
-  thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS
+  thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS,
+  nowMs: number = Date.now()
 ): Promise<void> {
+  if (!BUILD_INCLUDED_CONNECTOR_IDS.has(snapshot.connectorId)) {
+    throw new ProbeAlarmReconciliationError(
+      `Probe health proof references connector ${snapshot.connectorId}, which is not shipped in this build.`,
+      'PROBE_HEALTH_PROOF_UNAVAILABLE'
+    );
+  }
+
   if (snapshot.circuitState === 'open') {
-    await scheduleProbe(snapshot.connectorId, thresholds);
+    await scheduleProbe(snapshot.connectorId, thresholds, nowMs);
   } else {
     await cancelProbe(snapshot.connectorId);
   }

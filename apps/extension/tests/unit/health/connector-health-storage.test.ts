@@ -28,6 +28,7 @@ import {
   getHealthSnapshot,
   saveHealthSnapshot,
   getAllHealthSnapshots,
+  readHealthSnapshotsForProbeReconciliation,
   resetHealthSnapshot,
   clearAllHealthSnapshots,
 } from '../../../src/lib/shell/storage/connector-health';
@@ -147,6 +148,55 @@ describe('getAllHealthSnapshots', () => {
     const map = await getAllHealthSnapshots(['freework', 'lehibou'], T0);
     expect(map.get('freework')?.circuitState).toBe('open');
     expect(map.get('lehibou')?.circuitState).toBe('closed');
+  });
+});
+
+describe('readHealthSnapshotsForProbeReconciliation', () => {
+  beforeEach(() => {
+    for (const key of Object.keys(mockStorageData)) {
+      delete mockStorageData[key];
+    }
+    vi.clearAllMocks();
+  });
+
+  it('distingue une absence valide et produit des snapshots initiaux corrélés', async () => {
+    const result = await readHealthSnapshotsForProbeReconciliation(['free-work', 'lehibou'], T0);
+
+    expect(result.status).toBe('available');
+    if (result.status === 'available') {
+      expect(result.source).toBe('absent');
+      expect(result.snapshots.get('free-work')?.connectorId).toBe('free-work');
+      expect(result.snapshots.get('lehibou')?.connectorId).toBe('lehibou');
+    }
+  });
+
+  it('rend une corruption explicite au lieu de la projeter comme une absence', async () => {
+    mockStorageData['connector_health_snapshots'] = { 'free-work': { invalid: true } };
+
+    await expect(readHealthSnapshotsForProbeReconciliation(['free-work'], T0)).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'corrupt',
+    });
+  });
+
+  it('rend une erreur I/O explicite au lieu de la projeter comme une absence', async () => {
+    mockStorage.get.mockRejectedValueOnce(new Error('storage unavailable'));
+
+    await expect(readHealthSnapshotsForProbeReconciliation(['free-work'], T0)).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'io_error',
+    });
+  });
+
+  it('refuse une clé qui ne correspond pas au connectorId du snapshot', async () => {
+    mockStorageData['connector_health_snapshots'] = {
+      'free-work': makeSnapshot('lehibou', { circuitState: 'open' }),
+    };
+
+    await expect(readHealthSnapshotsForProbeReconciliation(['free-work'], T0)).resolves.toEqual({
+      status: 'unavailable',
+      reason: 'corrupt',
+    });
   });
 });
 
