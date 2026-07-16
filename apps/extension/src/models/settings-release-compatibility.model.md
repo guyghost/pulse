@@ -1,6 +1,9 @@
 # Settings Release Compatibility Model
 
-Status: independently reviewed and approved on 2026-07-16.
+Status: independently reviewed and approved on 2026-07-16, including the
+historical-catalogue registry revision at content hash
+`9aceac90e02c09da73bb4f3e146da5fb13d250df41d1021a51059d614846c705`.
+Any semantic change requires a new independent review.
 
 Source of truth for the bounded Settings and onboarding-consent workflow shipped
 while Dataset DB6/data3 and the Settings V2 global-writer cutover remain
@@ -47,7 +50,7 @@ interface SettingsReleaseEnvelopeV1 {
   revision: number; // durable terminal-settlement version
   generation: number; // every proved envelope replacement
   scanAckThrough: number; // greatest retired scan identity, starts at zero
-  catalogFingerprint: string; // current build catalogue contract digest
+  catalogFingerprint: string; // admitted historical/current digest during boot; current in ready
   legacyRetirement: 'pending_removal' | 'retired';
   confirmed: {
     settings: AppSettings;
@@ -156,10 +159,69 @@ revision, so the request returns conflict and cannot replay.
 
 ## Canonical settings and migration
 
-`AppSettings` has exactly the nine current keys and their strict documented
-bounds. `enabledConnectors` is unique, catalogue-ordered and contains only IDs
-shipped in this build. The build also preserves a reviewed
-`RECOGNIZED_CONNECTOR_IDS` history for retired connectors and computes
+```ts
+type ConnectorCatalogueTupleV1 = readonly [
+  connectorId: string,
+  included: boolean,
+  sortedHostPermissions: readonly string[],
+];
+
+interface ConnectorCatalogueHistoryV1 {
+  schema: 'missionpulse.connector-catalogue-history';
+  version: 1;
+  catalogues: readonly {
+    catalogFingerprint: string; // exact lower-case SHA-256 derived below
+    tuples: readonly ConnectorCatalogueTupleV1[];
+  }[];
+}
+
+declare function decodeCatalogueSettings(
+  raw: unknown,
+  tuples: readonly ConnectorCatalogueTupleV1[]
+): AppSettings | null;
+```
+
+The committed, versioned `ConnectorCatalogueHistoryV1` registry is the only
+authority for decoding a non-current envelope fingerprint. Its catalogue
+entries are nonempty, unique by fingerprint, immutable and append-only across
+released versions; the current catalogue is present exactly once. Each tuple
+array is unique and ordered by canonical connector ID, each permission array is
+unique and sorted, and every fingerprint is independently recomputed from its
+exact tuples by the formula below. A duplicate, malformed, mismatched or unknown
+fingerprint blocks before legacy-key normalization, pending/outbox recovery,
+scan query/admission, alarm mutation or broadcast. Environment, storage and
+runtime input cannot add a history entry.
+
+The release gate compares the candidate registry to the exact registry blob in
+the immediately preceding released source. If the previous array has length
+`N`, the candidate length is at least `N` and, for every index below `N`, JCS of
+the complete candidate entry must equal JCS of the complete previous entry
+byte-for-byte at the same index. No old entry or tuple may be removed, rewritten
+or reordered; new entries may be appended only at indices `N...`. A first
+release requires an explicit empty predecessor receipt. Runtime storage cannot
+satisfy or bypass this source-history gate.
+
+For a recognized historical fingerprint, all values retained in that envelope
+and any still-present legacy settings key are decoded and normalized against
+that exact historical tuple array first. Only the later catalogue-migration
+transition may project the historically valid confirmed value into the current
+catalogue. `RECOGNIZED_CONNECTOR_IDS` is therefore the union of IDs in this
+committed registry, never an unversioned hand-maintained allowlist; recognition
+alone does not authorize an unknown fingerprint.
+
+`decodeCatalogueSettings` is a pure strict decoder parameterized by exactly one
+registry tuple array. It accepts the nine `AppSettings` keys and their documented
+bounds only when `enabledConnectors` is unique, ordered by that tuple array and
+contains only its `included:true` connector IDs. It never consults the current
+build catalogue implicitly. An envelope may therefore hold a valid historical
+settings value while boot/recovery is in `catalog_migration_mode`; its pending,
+confirmed, outcome, outbox and scan values must all decode under the same
+fingerprint. The invariant “connectors shipped in this build” begins only after
+the catalogue-projection transition. Every public `ready` snapshot and every
+new mutation then uses the current catalogue fingerprint and current tuple
+decoder; a historical fingerprint or value can never reach `ready`.
+
+The current build computes
 `catalogFingerprint` from the versioned ordered tuples
 `[connectorId,included,sortedHostPermissions]`. Unknown IDs never enter a
 migration. The fingerprint is the lower-case SHA-256 of the UTF-8 bytes of
@@ -777,9 +839,11 @@ explicit. No transition depends on an LLM or free text.
   fires and the reserved retry-control latch;
 - exact create/get/clear/get alarm order, permission rechecks, idempotent scan
   token replay and the 10-second admission deadline;
-- current and historical catalogue fingerprint migration, including an unknown
-  retired ID failure, old pending/outbox suppression and query-only retirement
-  of old scan leases;
+- current and historical catalogue fingerprint migration, including exact
+  registry self-hashes, exact last-release prefix preservation, an unknown
+  fingerprint, an unknown retired ID, a valid removed-connector legacy key
+  during `pending_removal`, rejection of any historical fingerprint in `ready`,
+  old pending/outbox suppression and query-only retirement of old scan leases;
 - every branch-specific counter boundary at exactly sufficient and one-short
   capacity before any external effect;
 - static proof of no `permissions.request`, `alarms.clearAll`, permissive
