@@ -4,13 +4,14 @@ import type { UserProfile } from '../../core/types/profile';
 import { UserProfileSchema } from '../../core/types/schemas';
 import { parseMission, parseUserProfile } from '../../core/types/type-guards';
 import { clearSemanticCache } from './semantic-cache';
+import { createDbHandleRegistry } from './db-handle-registry';
+import { createDbOpener } from './db-opener';
 import {
   dataMigrationsFor,
   structuralMigrationsFor,
   type DataMigrationDeps,
 } from './migration-registry';
 import {
-  BACKUP_MAX_BYTES,
   MIGRATION_KEYS,
   QUARANTINE_REJECT_RATIO,
   type MigrationError,
@@ -62,21 +63,39 @@ export const DB_VERSION = 5;
 export const APP_DATA_VERSION = 2;
 
 // ============================================================================
-// Single opener with versionchange + blocked handling
+// Tracked single opener (non-cutover DB5/data2 adapter)
 // ============================================================================
 
-const OPEN_BLOCKED_RETRIES = 3;
-const OPEN_BLOCKED_BACKOFF_MS = 250;
+const OPEN_BLOCKED_TIMEOUT_MS = 750;
 
-let inFlightOpen: Promise<IDBDatabase> | null = null;
+// Deliberately dormant until LocalDataReset and StartupBarrier cut over
+// atomically. A null provider is tracking-only and proves no reset readiness.
+const dbHandleRegistry = createDbHandleRegistry({ getActiveResetToken: () => null });
+const dbOpener = createDbOpener({
+  registry: dbHandleRegistry,
+  databaseName: DB_NAME,
+  targetVersion: DB_VERSION,
+  allocateOwnerId: () => crypto.randomUUID(),
+  openRequest: (name, version) =>
+    version === undefined ? indexedDB.open(name) : indexedDB.open(name, version),
+  scheduleBlockedTimeout: (effect, delayMs) => setTimeout(effect, delayMs),
+  cancelBlockedTimeout: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
+  blockedTimeoutMs: OPEN_BLOCKED_TIMEOUT_MS,
+  applyStructuralUpgrade: (request, event) => {
+    const migrations = structuralMigrationsFor(event.oldVersion);
+    for (const migration of migrations) {
+      migration(request.result);
+    }
+  },
+});
 
 /**
  * Opens the MissionPulse database at `DB_VERSION`. THE ONLY OPENER in the
  * extension (see db-migration.model.md invariant 1).
  *
- * - Sets `db.onversionchange = () => db.close()` so upgrades from other
- *   contexts are not blocked.
- * - Retries on `onblocked` with a backoff.
+ * The tracked opener reserves before the native request, registers before
+ * delivery, closes on versionchange through the registry and never retries a
+ * blocked request automatically.
  *
  * NOTE: callers that need to detect a downgrade (stored version > DB_VERSION)
  * must call `probeStoredDbVersion()` first. `openDB()` itself throws
@@ -84,52 +103,15 @@ let inFlightOpen: Promise<IDBDatabase> | null = null;
  * that case.
  */
 export function openDB(): Promise<IDBDatabase> {
-  if (inFlightOpen) {
-    return inFlightOpen;
-  }
-
-  inFlightOpen = openDBWithRetry(0).finally(() => {
-    inFlightOpen = null;
-  });
-
-  return inFlightOpen;
+  return dbOpener.openBusiness();
 }
 
-function openDBWithRetry(attempt: number): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+function openStartupDB(): Promise<IDBDatabase> {
+  return dbOpener.openStartup();
+}
 
-    request.onupgradeneeded = (event) => {
-      const db = request.result;
-      const oldVersion = event.oldVersion;
-      // Throwing aborts the upgrade transaction (IDB atomicity guarantees
-      // no partial schema is committed).
-      const migrations = structuralMigrationsFor(oldVersion);
-      for (const migration of migrations) {
-        migration(db);
-      }
-    };
-
-    request.onsuccess = () => {
-      const db = request.result;
-      db.onversionchange = () => {
-        db.close();
-      };
-      resolve(db);
-    };
-
-    request.onerror = () => reject(request.error);
-
-    request.onblocked = () => {
-      if (attempt + 1 < OPEN_BLOCKED_RETRIES) {
-        setTimeout(() => {
-          resolve(openDBWithRetry(attempt + 1));
-        }, OPEN_BLOCKED_BACKOFF_MS);
-      } else {
-        reject(new Error('IndexedDB open blocked after retries'));
-      }
-    };
-  });
+export function releaseDB(db: IDBDatabase): void {
+  dbOpener.release(db);
 }
 
 /**
@@ -154,20 +136,7 @@ export async function probeStoredDbVersion(): Promise<number> {
     }
   }
 
-  return new Promise<number>((resolve) => {
-    const request = indexedDB.open(DB_NAME);
-    request.onsuccess = () => {
-      const version = request.result.version;
-      request.result.close();
-      resolve(version);
-    };
-    request.onerror = () => resolve(0);
-    request.onupgradeneeded = () => {
-      // DB did not exist; the unversioned open creates it at version 1.
-      // For our purposes that means "no prior data of interest".
-      request.result.close();
-    };
-  });
+  return dbOpener.probeStoredVersion();
 }
 
 // ============================================================================
@@ -316,7 +285,7 @@ export function runMigrations(): Promise<MigrationResult> {
   return migrationInProgress;
 }
 
-async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult> {
+async function runMigrationLoop(versionRaceAttempt: number): Promise<MigrationResult> {
   setState('checking');
 
   const storedDbVersion = await probeStoredDbVersion();
@@ -343,21 +312,17 @@ async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult>
   // Open with version. May throw on structural failure or corruption.
   let db: IDBDatabase;
   try {
-    db = await openDB();
+    db = await openStartupDB();
   } catch (err) {
     if (isVersionError(err)) {
       // Race: another context upgraded beneath us. Re-probe and retry once.
-      if (repairAttempt === 0) {
+      if (versionRaceAttempt === 0) {
         return runMigrationLoop(1);
       }
       setState('downgrade', {
         lastError: { code: 'downgrade', message: 'VersionError during open' },
       });
       return { ok: false, code: 'downgrade', message: 'VersionError during open' };
-    }
-    // Corrupt DB → repair.
-    if (repairAttempt === 0) {
-      return runCorruptRepair(err);
     }
     const message = err instanceof Error ? err.message : String(err);
     setState('failed', {
@@ -386,7 +351,7 @@ async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult>
       await runDataMigrations(fromDataVersion, db);
       await writeStoredDataVersion(APP_DATA_VERSION);
     } catch (err) {
-      db.close();
+      releaseDB(db);
       const code: MigrationErrorCode = isQuotaError(err) ? 'quota' : 'data_throw';
       const message = err instanceof Error ? err.message : String(err);
       setState('failed', { lastError: { code, message } });
@@ -403,7 +368,7 @@ async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult>
   if (migrationApplied) {
     setState('verifying');
     const verifyResult = await verifyStores(db);
-    db.close();
+    releaseDB(db);
 
     if (verifyResult.quarantineNeeded) {
       setState('quarantine');
@@ -416,7 +381,7 @@ async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult>
       }
     }
   } else {
-    db.close();
+    releaseDB(db);
   }
 
   await chrome.storage.local.remove(MIGRATION_KEYS.downgrade);
@@ -535,7 +500,7 @@ function readAllFromStore(db: IDBDatabase, store: string): Promise<unknown[]> {
 }
 
 async function quarantineInvalidRecords(invalidByStore: Record<string, unknown[]>): Promise<void> {
-  const db = await openDB();
+  const db = await openStartupDB();
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(['quarantine', ...Object.keys(invalidByStore)], 'readwrite');
@@ -565,107 +530,7 @@ async function quarantineInvalidRecords(invalidByStore: Record<string, unknown[]
       tx.onabort = () => reject(tx.error ?? new Error('Quarantine tx aborted'));
     });
   } finally {
-    db.close();
-  }
-}
-
-async function runCorruptRepair(cause: unknown): Promise<MigrationResult> {
-  setState('corruptRepair', {
-    lastError: {
-      code: 'corrupt',
-      message: cause instanceof Error ? cause.message : 'openDB rejected',
-    },
-  });
-
-  // Best-effort backup (whole-records-only, capped at BACKUP_MAX_BYTES).
-  await backupBeforeDestruction();
-
-  await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(DB_NAME);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error('deleteDatabase blocked'));
-  });
-
-  // Re-run the full path. repairAttempt === 1 here; a second failure is terminal.
-  return runMigrationLoop(1);
-}
-
-async function backupBeforeDestruction(): Promise<void> {
-  let db: IDBDatabase;
-  try {
-    // Open without version to avoid re-triggering an upgrade on a broken DB.
-    db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  } catch {
-    // Cannot even open — record an empty backup so the UI knows we tried.
-    await chrome.storage.local.set({
-      [MIGRATION_KEYS.backup]: { partial: true, stores: {}, error: 'open_failed' },
-    });
-    return;
-  }
-
-  const stores: Record<string, { count: number; truncated?: boolean }> = {};
-  const serialized: Record<string, unknown[]> = {};
-  let totalBytes = 0;
-  let overflowed = false;
-  const encoder = new TextEncoder();
-
-  try {
-    for (const storeName of Array.from(db.objectStoreNames)) {
-      if (overflowed) {
-        break;
-      }
-      const records = await readAllFromStore(db, storeName);
-      const kept: unknown[] = [];
-      for (const record of records) {
-        let chunk: string;
-        try {
-          chunk = JSON.stringify(record);
-        } catch {
-          // Skip records that cannot be serialized (circular refs, etc.)
-          continue;
-        }
-        const byteLength = encoder.encode(chunk).byteLength;
-        if (totalBytes + byteLength > BACKUP_MAX_BYTES) {
-          overflowed = true;
-          break;
-        }
-        totalBytes += byteLength;
-        kept.push(record);
-      }
-      serialized[storeName] = kept;
-      stores[storeName] = {
-        count: kept.length,
-        truncated: overflowed || kept.length < records.length,
-      };
-    }
-  } finally {
-    db.close();
-  }
-
-  try {
-    await chrome.storage.local.set({
-      [MIGRATION_KEYS.backup]: {
-        partial: overflowed,
-        stores,
-        data: serialized,
-        savedAt: Date.now(),
-      },
-    });
-  } catch {
-    // Quota during backup write — drop the heavy `data` and keep the manifest.
-    await chrome.storage.local.set({
-      [MIGRATION_KEYS.backup]: {
-        partial: true,
-        stores,
-        error: 'quota_exceeded',
-        savedAt: Date.now(),
-      },
-    });
+    releaseDB(db);
   }
 }
 
@@ -694,15 +559,15 @@ export function withStore<T>(
       };
       request.onerror = () => reject(request.error);
       tx.oncomplete = () => {
-        db.close();
+        releaseDB(db);
         resolve(result as T);
       };
       tx.onerror = () => {
-        db.close();
+        releaseDB(db);
         reject(tx.error);
       };
       tx.onabort = () => {
-        db.close();
+        releaseDB(db);
         reject(tx.error);
       };
     });
@@ -735,7 +600,7 @@ export async function saveMissions(missions: Mission[], signal?: AbortSignal): P
   try {
     throwIfTransactionAborted(signal);
   } catch (error) {
-    db.close();
+    releaseDB(db);
     throw error;
   }
   const tx = db.transaction('missions', 'readwrite');
@@ -753,7 +618,7 @@ export async function saveMissions(missions: Mission[], signal?: AbortSignal): P
     let settled = false;
     const cleanup = (): void => {
       signal?.removeEventListener('abort', onAbortRequested);
-      db.close();
+      releaseDB(db);
     };
     const resolveOnce = (): void => {
       if (settled) {
@@ -1178,7 +1043,7 @@ export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
     };
 
     tx.oncomplete = () => {
-      db.close();
+      releaseDB(db);
       if (purged > 0 && import.meta.env.DEV) {
         console.debug(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
       }
@@ -1186,12 +1051,12 @@ export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
     };
 
     tx.onerror = () => {
-      db.close();
+      releaseDB(db);
       reject(tx.error);
     };
 
     tx.onabort = () => {
-      db.close();
+      releaseDB(db);
       reject(tx.error ?? createTransactionAbortError());
     };
   });
