@@ -124,18 +124,38 @@ interface RegistryEntry {
 }
 
 interface ModalRegistryContext {
+  registryNonce: string;
   registryRevision: number;
+  deliveryOrdinalHighWatermark: number;
+  normalDeliverySlotsRemaining: number;
+  controlDeliverySlotsRemaining: number;
   stack: readonly RegistryEntry[];
   consumedRegistrationIds: readonly string[];
   consumedDeliveryIds: readonly string[];
   teardown: {
     teardownId: string;
-    scopeId: string;
+    scopePath: readonly string[];
     affectedRegistrationIds: readonly string[];
   } | null;
   restorationSettlement: {
     receiptId: string;
-    exposedRegistrationId: string | null;
+    deliveryId: string;
+    acknowledgementToken: string;
+    exposedRegistrationId: string;
+    registryRevision: number;
+    preparationId: string;
+    phase: 'preparing' | 'awaiting-survivor-ack';
+  } | null;
+  exposureSettlement: {
+    deliveryId: string;
+    acknowledgementToken: string;
+    cause:
+      | { value: 'owner_unmount'; receiptId: string; teardownId: null }
+      | { value: 'ancestor_teardown'; receiptId: null; teardownId: string };
+    exposedRegistrationId: string;
+    registryRevision: number;
+    preparationId: string;
+    phase: 'preparing' | 'awaiting-survivor-ack';
   } | null;
 }
 
@@ -157,31 +177,157 @@ interface RegistryRemovalReceipt {
   topmostNotification: 'after_restore' | 'without_restore' | 'suppressed';
   teardownId: string | null;
 }
+
+interface RegistryRegistrationCancellationReceipt {
+  receiptId: string;
+  registrationId: string;
+  instanceId: string;
+  ownerScopePath: readonly string[];
+  registryRevision: number;
+  disposition: 'cancelled_before_append';
+}
+
+interface RegistryRegistrationRejectionReceipt {
+  receiptId: string;
+  registrationId: string;
+  instanceId: string;
+  ownerScopePath: readonly string[];
+  registryRevision: number;
+  reason: 'DUPLICATE_ID' | 'TEARDOWN_ACTIVE' | 'CAPACITY_EXHAUSTED';
+  disposition: 'rejected_tombstoned';
+  authorityRevoked: true;
+}
+
+interface RegistryNormalRemovalRejectionReceipt {
+  receiptId: string;
+  registrationId: string;
+  registryRevision: number;
+  reason: 'DELIVERY_CAPACITY_EXHAUSTED';
+  disposition: 'not_removed';
+}
+
+interface RegistryDeliveryAcknowledgement {
+  version: 1;
+  deliveryId: string;
+  acknowledgementToken: string;
+  preparationId: string;
+  exposedRegistrationId: string;
+  registryRevision: number;
+  survivorOutcome: 'interactive_ready' | 'deferred_close_requested';
+}
+
+interface RegistryDeliveryFailure {
+  version: 1;
+  deliveryId: string;
+  acknowledgementToken: string;
+  preparationId: string;
+  exposedRegistrationId: string;
+  registryRevision: number;
+  reason:
+    | 'SURVIVOR_REDUCTION_REJECTED'
+    | 'PROJECTION_FAILED'
+    | 'FOCUS_FAILED'
+    | 'DEFERRED_CLOSE_EFFECT_FAILED'
+    | 'ACK_TIMEOUT';
+}
+
+type ModalRegistryState = 'ready' | 'settling_restoration' | 'settling_exposure' | 'disposed';
+
+declare const modalOwnerAuthorityBrand: unique symbol;
+
+interface ModalOwnerAuthority {
+  readonly [modalOwnerAuthorityBrand]: true;
+}
+
+type ModalRegistryOwnerCommand =
+  | {
+      type: 'REGISTER';
+      entry: RegistryEntry;
+      authority: ModalOwnerAuthority;
+    }
+  | {
+      type: 'REMOVE_OWNER';
+      registrationId: string;
+      instanceId: string;
+      ownerScopePath: readonly string[];
+      authority: ModalOwnerAuthority;
+    };
+
+type ModalRegistrySettlementEvent =
+  | { type: 'DELIVERY_ACKNOWLEDGED'; acknowledgement: RegistryDeliveryAcknowledgement }
+  | { type: 'DELIVERY_FAILED'; failure: RegistryDeliveryFailure }
+  | {
+      type: 'DELIVERY_ACK_TIMEOUT';
+      failure: RegistryDeliveryFailure & { reason: 'ACK_TIMEOUT' };
+    };
 ```
 
 The registry accepts at most 16 simultaneous live entries and 4,096 total
-registration IDs plus 4,096 restoration/exposure delivery IDs during one panel
-registry lifetime. Those consumed ledgers never evict; exhaustion is a typed
-`CAPACITY_EXHAUSTED` rejection. A fresh panel document creates a new registry
-only after all old actions/listeners are disposed. Thus removing an entry never
-authorizes reuse of its registration ID, and a stale receipt/delivery cannot
-bind a later modal instance.
+registration IDs during one panel registry lifetime. Registration evidence
+never evicts; exhaustion permanently closes the registration gate for that
+registry lifetime. A fresh panel document creates a new registry only after all
+old actions/listeners are disposed. Thus removing or rejecting an entry never
+authorizes reuse of its registration ID.
 
-The complete registry initial state is revision `-1`, an empty stack, empty
-consumed-ID ledgers, and null teardown/restoration settlement. The first
+Delivery capacity is partitioned at registry construction into 4,032 normal
+slots and a pre-reserved 64-slot control lane used only by non-cancellable
+owner/ancestor teardown. `registryNonce` is a fresh canonical UUID and every
+allocated delivery is:
+
+```text
+deliveryId = registryNonce + ":delivery:" + decimal(deliveryOrdinal)
+preparationId = deliveryId + ":prepare"
+acknowledgementToken = deliveryId + ":ack"
+```
+
+The safe ordinal is allocated by the registry as
+`deliveryOrdinalHighWatermark + 1`; the selected lane is decremented and the ID
+is appended to the non-evicting 4,096-entry consumed ledger before any stack
+mutation. An ID remains consumed after success, failure or timeout. Normal
+capacity exhaustion rejects a cancellable normal removal without mutation.
+Control-lane exhaustion cannot cancel owner unmount or ancestor teardown: in
+the same atomic registry transaction it performs the mandatory removal, keeps
+every survivor inert, disposes the registry and its keyboard listener, and
+dispatches typed disposal to all surviving bindings. No state exists in which
+suppression has occurred but exposure capacity is undecided.
+
+Every owner and teardown boundary calls the same
+`parseCanonicalScopePath(unknown)` function. It accepts only a plain array of
+1–32 strings. Each segment is normalized with Unicode NFC, then rejected if it
+is empty, exceeds 128 UTF-16 code units, or contains any Unicode `White_Space`,
+`General_Category=Cc` or `General_Category=Cf` code point, including bidi
+controls and zero-width format characters. The result is a deeply frozen
+canonical array. Registration binding, `REGISTER`, `REMOVE_OWNER` and
+`ANCESTOR_TEARDOWN_STARTED` compare only those canonical segments. Prefix
+comparison is segment by segment; a string prefix such as `feed/1` never
+matches `feed/10`. Invalid, non-canonical-on-revalidation or oversized paths
+are rejected before registry mutation.
+
+```ts
+declare function parseCanonicalScopePath(input: unknown): readonly string[];
+```
+
+The complete registry initial state is `ready` at revision `-1`, delivery
+high-water `0`, 4,032 normal slots, 64 control slots, an empty stack, empty
+consumed-ID ledgers, and null teardown/restoration/exposure settlement.
+Restoration and exposure settlements are mutually exclusive. The first
 successful registration publishes revision `0`. Every later stack mutation
 strictly increments the safe revision; read-only snapshots may repeat it.
 
 Registry transitions are total:
 
-| Registry event                                 | Guard and atomic result                                                                                                                                                                 |
-| ---------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `REGISTER(entry)`                              | all IDs fresh and no affected teardown; append once, increment revision, broadcast position snapshot                                                                                    |
-| `REMOVE_NORMAL(registrationId, token)`         | exact owner-acknowledged removal capability; remove once and return a `normal_close` receipt with position at the removal linearization point                                           |
-| `RESTORATION_SETTLED(receiptId, outcome)`      | exact pending normal-topmost receipt; outcome is `restored` or `skipped`; only now enqueue the causally linked `TOPMOST_RESTORED`                                                       |
-| `REMOVE_OWNER(registrationId, scopeId)`        | exact mounted owner; remove once, return `owner_unmount`, suppress trigger restoration and, when topmost exposed a survivor, enqueue one fresh correlated `TOPMOST_EXPOSED` delivery    |
-| `ANCESTOR_TEARDOWN_STARTED(teardownId, scope)` | select every entry whose `ownerScopePath` has the normalized scope path as an exact segment prefix, remove the complete set in one registry transaction, then issue suppressed receipts |
-| stale/duplicate register or remove             | typed rejection; stack and revision unchanged                                                                                                                                           |
+| Registry event                                               | Guard and atomic result                                                                                                                                                                                                                                                                                                                |
+| ------------------------------------------------------------ | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `REGISTER(entry, authority)`                                 | exact Shell authority bound to the canonical tuple, all IDs fresh and no affected teardown; append once, increment revision, broadcast position snapshot. Any rejection first revokes that authority and tombstones the proposed ID (or confirms its existing tombstone), then returns an authenticated rejection receipt              |
+| `REMOVE_NORMAL(registrationId, token)`                       | exact owner-acknowledged removal capability; if topmost removal would expose a survivor, reserve one normal delivery ID before mutation or return `not_removed`; after reservation remove once, return the receipt and enter `settling_restoration`                                                                                    |
+| `RESTORATION_SETTLED(receiptId, outcome, preparationId)`     | exact preparing normal-topmost settlement; outcome is `restored` or `skipped`; enqueue the causally linked `TOPMOST_RESTORED`, change phase to `awaiting-survivor-ack`, and remain locked                                                                                                                                              |
+| `REMOVE_OWNER(registrationId, instanceId, scope, authority)` | exact authority and canonical tuple; pre-reserve control delivery when an appended topmost removal will expose a survivor, then remove once. A pre-append winner tombstones the ID and revokes authority. If control capacity is unavailable, perform removal and fail-closed disposal atomically; otherwise enter `settling_exposure` |
+| `ANCESTOR_TEARDOWN_STARTED(teardownId, scope)`               | validate the canonical path and compute the complete affected set/survivor; pre-reserve one control delivery if final exposure is required; atomically remove the set and issue suppressed receipts. With capacity enter one final `settling_exposure`; without it atomically keep survivors inert and dispose the registry            |
+| `EXPOSURE_PREPARED(deliveryId, preparationId, facts)`        | exact preparing cause, exposed registration and post-removal revision; accept facts captured only after the exact dialog was projected interactive, enqueue one causally bound `TOPMOST_EXPOSED`, change phase to `awaiting-survivor-ack`, and remain locked                                                                           |
+| `DELIVERY_ACKNOWLEDGED(ack)`                                 | exact active delivery/token/preparation/exposed registration/revision and typed survivor outcome; only after the survivor reduction and its ordered projection/focus/deferred-close effects succeeded, consume the ACK, clear settlement and return to `ready`                                                                         |
+| `DELIVERY_FAILED(failure)` / `DELIVERY_ACK_TIMEOUT(failure)` | exact active settlement correlation; atomically project every binding inert/hidden, disable keyboard dispatch, clear live stack and settlements, enter terminal `disposed`, and dispatch `REGISTRY_DISPOSED`; a stale failure/timeout is a no-op                                                                                       |
+| command or keyboard input while settling                     | serialized behind the active settlement, including the interval after delivery enqueue and before ACK; no `REGISTER`, Tab, Escape, remove or teardown mutation interleaves                                                                                                                                                             |
+| stale/duplicate register, remove, delivery or ACK            | typed rejection/no-op; stack and revision unchanged                                                                                                                                                                                                                                                                                    |
 
 The atomic receipt, not an earlier close request or acknowledgement, is the
 authority for `wasTopmostAtRemoval`. Therefore a new modal registered between
@@ -189,23 +335,98 @@ close request, owner acknowledgement and DOM removal makes the old instance a
 background removal: it unregisters without restoring focus and without waking
 another instance.
 
-For a normal topmost removal, the action first attempts the permitted trigger
-restoration, then the registry emits one `TOPMOST_RESTORED` to the exposed
-registration. A normal background removal emits no such event. Owner unmount
-never restores a trigger; it may expose a surviving registration only through
-one correlated `TOPMOST_EXPOSED` delivery after the `without_restore` removal
-transaction. Ancestor teardown removes all
-affected registrations atomically and emits no intermediate
-`TOPMOST_RESTORED`. Thus a Backup in `busy_success_pending` cannot wake while
-its ancestor stack is being destroyed.
+`ModalOwnerAuthority` and `ModalRegistryOwnerCommand` belong only to the Shell
+registry adapter; despite being documented here, neither type is imported into
+Pure Core. The trusted modal binding factory creates the opaque authority and a
+private `WeakMap<ModalOwnerAuthority, CanonicalOwnerBinding>` authenticates it
+by object identity. Before either command can be queued, the factory binds the
+authority once to the exact `(instanceId, registrationId,
+parseCanonicalScopePath(ownerScopePath))` tuple.
+
+Core's pure `register-modal` effect contains only `RegistryEntry`. The shared
+Svelte action, which already owns the local authority, enriches that effect into
+the typed Shell `REGISTER(entry, authority)` command. Unmount emits the typed
+Shell `REMOVE_OWNER` command directly; it is not a Core event/effect. Neither
+path accepts authority from component props, serialized data or a string. If
+`REMOVE_OWNER` wins registry serialization before append, the authenticated
+pending binding creates the cancellation tombstone. The later `REGISTER` for
+that exact tuple is rejected; crossed authority cannot create the tombstone or
+revive the consumed ID.
+
+A rejected `REGISTER` executes its security settlement before returning: the
+registry deletes the rejected authority from the private `WeakMap`, appends a
+fresh proposed registration ID to the consumed ledger (or observes that a
+duplicate is already consumed), and returns a
+`RegistryRegistrationRejectionReceipt`. If registration capacity is already
+closed, the permanent closed gate is the tombstone for every later proposed ID.
+Only that exact receipt may drive the action instance to `disposed`. Binding
+disposal and listener removal happen before `onOpenAborted`; a missing or
+throwing callback can be reported but cannot restore authority, reuse the ID or
+keep the action outside `disposed`.
+
+For a normal topmost removal, the registry's trusted DOM coordinator first
+projects the exact `exposedRegistrationId` interactive while every other live
+registration remains inert. This preparation and the synchronous restoration
+attempt run inside the serialized restoration settlement: no keyboard event or
+registry command can interleave. When an exposed registration exists, the
+trigger is restorable only if it is contained by that exact exposed dialog;
+otherwise restoration is `skipped`. The registry then emits one
+`TOPMOST_RESTORED(restored|skipped)` to the exposed registration. A skipped
+delivery carries a fresh normalized recovery capture; a restored delivery
+carries `recoveryFacts=null` and cannot move focus again. A normal background
+removal emits no such event.
+
+Owner unmount and ancestor teardown never restore a trigger. After their atomic
+removal transaction, the registry computes the single surviving topmost entry.
+If one exists and the removal changed which entry is topmost, it enters
+`settling_exposure`; otherwise it emits no exposure. Ancestor teardown emits
+all affected receipts with `topmostNotification='suppressed'` and
+`exposedRegistrationId=null` before this step and never wakes an entry between
+removals. Its one final exposure is causally bound to `teardownId`; owner
+unmount exposure is bound to its removal `receiptId`.
+
+Inside `settling_exposure`, registry commands and keyboard dispatch are held.
+The coordinator first verifies the exact exposed registration and post-removal
+revision, then projects only that dialog interactive while every other live
+dialog stays inert. Only after this projection may it capture normalized
+recovery facts; capturing a dialog while it is inert/hidden is invalid. It
+returns `EXPOSURE_PREPARED` with the exact preparation ID, and the registry
+enqueues exactly one `TOPMOST_EXPOSED` but remains locked in
+`awaiting-survivor-ack`. The receiving Core reduction accepts the prepared
+projection, applies its recovery focus and, for `busy_success_pending`, invokes
+the deferred owner-close effect. Only after those ordered effects succeed does
+the shared action return the exact `RegistryDeliveryAcknowledgement`; only its
+reduction releases keyboard and queued registry work. This sequence also
+applies when the survivor is
+`busy_success_pending`: it receives the one final causal exposure and may then
+request its deferred business close. An affected Backup is disposed by its
+suppressed teardown receipt and never wakes during destruction.
 
 For a normal topmost receipt the registry enters a typed
-`settling_restoration(receiptId)` substate. The Shell performs the synchronous
-focus attempt and immediately returns `RESTORATION_SETTLED(restored|skipped)`;
-only that transition enqueues `TOPMOST_RESTORED`. Registry commands are
-serialized behind this settlement, so a later `REGISTER` cannot interleave. A
+`settling_restoration(receiptId)` substate. The trusted coordinator prepares
+the exact exposed binding, performs the synchronous focus attempt and
+immediately returns `RESTORATION_SETTLED(restored|skipped)`; only that
+transition enqueues the corresponding one-shot delivery and moves to
+`awaiting-survivor-ack`; it does not release the settlement. The prepared
+binding must match the receipt's exposed registration and post-removal
+revision. Registry commands and keyboard dispatch remain serialized until the
+exact survivor ACK, so a later `REGISTER`, Tab or Escape cannot interleave. A
 registration already ahead of the closing instance is reflected by
 `wasTopmostAtRemoval=false` and receives no restoration effect.
+
+The parallel `settling_exposure(exposureId)` substate is mandatory for owner
+unmount and final ancestor-teardown exposure. The exact ordering is
+`atomic removal -> interactive projection -> recovery capture -> one-shot
+delivery -> survivor reduction -> ordered projection/focus/deferred-close
+effects -> exact ACK -> release keyboard`. No recovery parser is asked to
+validate facts from an inert dialog, and no ordinary position snapshot can
+bypass the settlement.
+
+The registry arms an ACK supervisor when it enqueues either delivery. The
+supervisor can emit only the exact active `DELIVERY_ACK_TIMEOUT` tuple. A
+survivor reduction rejection or any ordered effect failure emits the same tuple
+as `DELIVERY_FAILED` with its typed reason. Both paths atomically fail closed to
+terminal registry disposal; they never unlock a partially exposed survivor.
 
 ## Normalized DOM facts and Core decisions
 
@@ -302,13 +523,17 @@ type ModalFocusEvent =
     }
   | {
       type: 'OPEN_REJECTED';
-      reason: 'INVALID_SURFACE_VARIANT' | 'INVALID_ID' | 'CROSSED_SESSION' | 'CAPACITY_EXHAUSTED';
+      reason:
+        | 'INVALID_SURFACE_VARIANT'
+        | 'INVALID_ID'
+        | 'INVALID_SCOPE'
+        | 'CROSSED_SESSION'
+        | 'CAPACITY_EXHAUSTED';
     }
   | { type: 'REGISTRY_REGISTERED'; registrationId: string; snapshot: RegistrySnapshot }
   | {
       type: 'REGISTRY_REGISTRATION_REJECTED';
-      registrationId: string;
-      reason: 'DUPLICATE_ID' | 'INVALID_SCOPE' | 'TEARDOWN_ACTIVE' | 'CAPACITY_EXHAUSTED';
+      receipt: RegistryRegistrationRejectionReceipt;
     }
   | {
       type: 'REGISTRY_POSITION_CHANGED';
@@ -344,18 +569,26 @@ type ModalFocusEvent =
   | {
       type: 'TOPMOST_RESTORED';
       restorationId: string;
+      acknowledgementToken: string;
+      preparationId: string;
+      exposedRegistrationId: string;
       receiptId: string;
       snapshot: RegistrySnapshot;
-      nextDomRequestId: string;
+      outcome: 'restored' | 'skipped';
+      recoveryFacts: InitialFocusFacts | null;
     }
-  | {
+  | ({
       type: 'TOPMOST_EXPOSED';
       exposureId: string;
-      receiptId: string;
-      cause: 'owner_unmount';
+      acknowledgementToken: string;
+      preparationId: string;
+      exposedRegistrationId: string;
       snapshot: RegistrySnapshot;
-      nextDomRequestId: string;
-    }
+      recoveryFacts: InitialFocusFacts;
+    } & (
+      | { cause: 'owner_unmount'; receiptId: string; teardownId: null }
+      | { cause: 'ancestor_teardown'; receiptId: null; teardownId: string }
+    ))
   | { type: 'OWNER_CLOSE_ACKNOWLEDGED'; requestId: string; removalToken: string }
   | {
       type: 'OWNER_CLOSE_REJECTED';
@@ -368,14 +601,27 @@ type ModalFocusEvent =
       removalToken: string;
       receipt: RegistryRemovalReceipt;
     }
-  | { type: 'PARENT_UNMOUNTED'; receipt: RegistryRemovalReceipt | null }
-  | { type: 'ANCESTOR_TEARDOWN_RECEIPT'; receipt: RegistryRemovalReceipt };
+  | {
+      type: 'REGISTRY_NORMAL_REMOVAL_REJECTED';
+      requestId: string;
+      receipt: RegistryNormalRemovalRejectionReceipt;
+    }
+  | {
+      type: 'PARENT_UNMOUNTED';
+      receipt: RegistryRemovalReceipt | RegistryRegistrationCancellationReceipt | null;
+    }
+  | { type: 'ANCESTOR_TEARDOWN_RECEIPT'; receipt: RegistryRemovalReceipt }
+  | {
+      type: 'REGISTRY_DISPOSED';
+      reason: 'CONTROL_DELIVERY_CAPACITY_EXHAUSTED' | RegistryDeliveryFailure['reason'];
+    };
 ```
 
-Only the registry actor can create registry snapshots and removal receipts. The
-event boundary validates monotone registry revisions and exact registration,
-receipt, teardown, request and removal-token correlations. A caller-supplied
-boolean such as `isTopmost` is forbidden.
+Only the registry actor can create registry snapshots, removal/rejection
+receipts, delivery reservations and acknowledgement tokens. The event boundary
+validates monotone registry revisions and exact registration, receipt,
+delivery, preparation, acknowledgement, teardown, request and removal-token
+correlations. A caller-supplied boolean such as `isTopmost` is forbidden.
 
 Equal registry revisions are allowed for several facts captured from the same
 stack state; a lower revision is stale. For keyboard events, the shared listener
@@ -385,10 +631,23 @@ decision in one JavaScript task before another registry command can run. For
 callback cannot replay a previously topmost observation after nesting changes.
 
 `restorationId` and `exposureId` are registry-allocated one-shot delivery IDs.
-Each is bound to the removal receipt ID, the exact exposed registration and the
-post-removal registry revision before enqueue. The consumed-delivery ledger is
-updated atomically; crossed, duplicate or capacity-exhausted delivery events are
-typed no-ops and can never release a deferred business close.
+Each is bound to its exact cause, exposed registration, preparation and
+post-removal registry revision before enqueue: restoration and owner exposure
+bind a removal receipt ID, while ancestor exposure binds the completed teardown
+ID and requires `receiptId=null`. For a restoration delivery,
+`recoveryFacts` is null exactly when the coordinator proved `restored`; it is a
+fresh valid capture exactly when the outcome is `skipped`. An exposure delivery
+always carries a fresh valid post-preparation capture because teardown exposure
+never restores focus. The consumed-delivery ledger is updated atomically;
+crossed, duplicate, malformed or capacity-exhausted delivery events are typed
+no-ops and can never release a deferred business close.
+
+The delivery also carries its exact `acknowledgementToken`, `preparationId`,
+exposed registration and registry revision. Enqueue consumes the delivery ID
+but does not complete settlement. Only a matching
+`RegistryDeliveryAcknowledgement` after the receiver's ordered effect barrier
+unlocks it. Duplicate/crossed ACKs and stale timeout/failure tuples are no-ops;
+the matching timeout/failure takes the registry only to fail-closed `disposed`.
 
 Every event carrying `CloseRequestIdentity` first passes through the pure close
 identity gate, before any state/topmost/business guard. A valid fresh identity
@@ -402,6 +661,11 @@ Core outputs only typed effects:
 ```ts
 type ModalFocusEffect =
   | { type: 'register-modal'; entry: RegistryEntry }
+  | {
+      type: 'abort-modal-open';
+      instanceId: string;
+      reason: 'input_rejected' | 'registry_rejected';
+    }
   | { type: 'request-dom-capture'; registrationId: string; domRequestId: string }
   | {
       type: 'project-modal';
@@ -413,6 +677,11 @@ type ModalFocusEffect =
   | { type: 'apply-initial-focus'; captureId: string; targetId: string }
   | { type: 'apply-tab-decision'; captureId: string; decision: TabDecision }
   | { type: 'request-owner-close'; requestId: string; reason: ModalCloseReason }
+  | {
+      type: 'complete-topmost-delivery';
+      acknowledgement: RegistryDeliveryAcknowledgement;
+      ordering: 'after_projection_focus_and_optional_deferred_close';
+    }
   | {
       type: 'restore-trigger';
       receiptId: string;
@@ -433,6 +702,11 @@ type ModalFocusEffect =
 
 Effects contain no callback result or caller-selected focus policy. Each
 command/result is correlated by the IDs shown above.
+`complete-topmost-delivery` is an ordered effect barrier, not permission to ACK
+early: the action sends its payload to the registry only after all preceding
+Core-selected projection/focus effects and any deferred owner-close invocation
+return successfully. It sends the exact correlated `DELIVERY_FAILED` instead
+if one fails.
 
 ## Statechart
 
@@ -440,9 +714,9 @@ command/result is correlated by the IDs shown above.
 stateDiagram-v2
   [*] --> closed
   closed --> registering: OPEN [validSurfaceVariantAndFreshIds] / register
-  closed --> closed: OPEN_REJECTED / reportTypedInputError
+  closed --> disposed: OPEN_REJECTED / abortOpenAndReportTypedInputError
   registering --> opening_waiting_dom: REGISTRY_REGISTERED [matching] / projectInertAndRequestDom
-  registering --> disposed: REGISTRY_REGISTRATION_REJECTED [matching] / reportConfigurationError
+  registering --> disposed: REGISTRY_REGISTRATION_REJECTED [matchingRevokedTombstoneReceipt] / disposeBindingThenAbortAndReport
 
   opening_waiting_dom --> open: DOM_READY [matching && topmostNow] / projectModalAndFocusCoreTarget
   opening_waiting_dom --> opening_background: DOM_READY [matching && !topmostNow] / remainInert
@@ -451,9 +725,9 @@ stateDiagram-v2
   opening_waiting_dom --> closing: ESCAPE [freshConsumed && topmostNow] / requestOwnerClose
   opening_waiting_dom --> closing: EXPLICIT_CLOSE [freshConsumed && topmostNow] / requestOwnerClose
 
-  opening_background --> opening_waiting_dom: TOPMOST_RESTORED [matchingNormalReceipt && topmostNow] / requestFreshDom
-  opening_background --> opening_waiting_dom: TOPMOST_EXPOSED [matchingOwnerUnmountReceipt && topmostNow] / requestFreshDom
-  opening_background --> opening_waiting_dom: REGISTRY_POSITION_CHANGED [matching && topmostWithoutRestore] / requestFreshDom
+  opening_background --> open: TOPMOST_RESTORED [matchingNormalReceipt && topmostNow && restored] / acceptPreparedProjectionThenAck
+  opening_background --> open: TOPMOST_RESTORED [matchingNormalReceipt && topmostNow && skipped && validRecoveryFacts] / applyRecoveryFocusThenAck
+  opening_background --> open: TOPMOST_EXPOSED [matchingOwnerOrTeardownCause && topmostNow && validPostPreparationFacts] / applyRecoveryFocusThenAck
   opening_background --> opening_background: TAB / applyCoreIgnoreDecision
   opening_background --> opening_background: ESCAPE, EXPLICIT_CLOSE / consumeWithoutOwnerCallback
 
@@ -469,14 +743,16 @@ stateDiagram-v2
   busy --> busy: ESCAPE, EXPLICIT_CLOSE / consumeWithoutOwnerCallback
 
   busy_success_pending --> busy_success_pending: TAB / applyCoreTabDecision
-  busy_success_pending --> closing: TOPMOST_RESTORED [matchingNormalReceipt && topmostNow && hasDeferredClose] / requestDeferredOwnerClose
-  busy_success_pending --> closing: TOPMOST_EXPOSED [matchingOwnerUnmountReceipt && topmostNow && hasDeferredClose] / requestDeferredOwnerClose
+  busy_success_pending --> closing: TOPMOST_RESTORED [matchingNormalReceipt && topmostNow && restored && hasDeferredClose] / acceptProjectionRequestDeferredCloseThenAck
+  busy_success_pending --> closing: TOPMOST_RESTORED [matchingNormalReceipt && topmostNow && skipped && validRecoveryFacts && hasDeferredClose] / focusRequestDeferredCloseThenAck
+  busy_success_pending --> closing: TOPMOST_EXPOSED [matchingOwnerOrTeardownCause && topmostNow && validPostPreparationFacts && hasDeferredClose] / focusRequestDeferredCloseThenAck
   busy_success_pending --> busy_success_pending: ESCAPE, EXPLICIT_CLOSE / consumeWithoutOwnerCallback
 
   closing --> closing: TAB / applyCoreTabDecision
   closing --> closing: OWNER_CLOSE_ACKNOWLEDGED [matchingUnacknowledged] / storeRemovalToken
   closing --> opening_waiting_dom: OWNER_CLOSE_REJECTED [matching && resumeOpening] / retainConsumedIdAndRequestFreshDom
   closing --> open: OWNER_CLOSE_REJECTED [matching && resumeOpen] / retainConsumedId
+  closing --> open: REGISTRY_NORMAL_REMOVAL_REJECTED [matchingNotRemoved] / retainConsumedIdAndReportCapacity
   closing --> disposed: DIALOG_REMOVED [acknowledgedNormalReceipt] / settleRemovalByPosition
 
   registering --> disposed: PARENT_UNMOUNTED / settleUnmountReceipt
@@ -493,8 +769,40 @@ stateDiagram-v2
   busy --> disposed: ANCESTOR_TEARDOWN_RECEIPT / settleSuppressedTeardownReceipt
   busy_success_pending --> disposed: ANCESTOR_TEARDOWN_RECEIPT / settleSuppressedTeardownReceipt
   closing --> disposed: ANCESTOR_TEARDOWN_RECEIPT / settleSuppressedTeardownReceipt
+  registering --> disposed: REGISTRY_DISPOSED / disposeBindingFailClosed
+  opening_waiting_dom --> disposed: REGISTRY_DISPOSED / disposeBindingFailClosed
+  opening_background --> disposed: REGISTRY_DISPOSED / disposeBindingFailClosed
+  open --> disposed: REGISTRY_DISPOSED / disposeBindingFailClosed
+  busy --> disposed: REGISTRY_DISPOSED / disposeBindingFailClosed
+  busy_success_pending --> disposed: REGISTRY_DISPOSED / disposeBindingFailClosed
+  closing --> disposed: REGISTRY_DISPOSED / disposeBindingFailClosed
   closed --> disposed: PARENT_UNMOUNTED
 ```
+
+The registry actor serializes restoration and exposure independently of each
+modal's business state:
+
+```mermaid
+stateDiagram-v2
+  [*] --> ready
+  ready --> settling_restoration: REMOVE_NORMAL [topmostRemoved && survivor && normalDeliveryReserved]
+  ready --> ready: REMOVE_NORMAL [deliveryCapacityExhausted] / rejectWithoutMutation
+  settling_restoration --> settling_restoration: RESTORATION_SETTLED / enqueueAndAwaitAck
+  settling_restoration --> ready: DELIVERY_ACKNOWLEDGED [exactAck] / releaseSerializedWork
+  settling_restoration --> disposed: DELIVERY_FAILED_or_ACK_TIMEOUT [exact] / projectAllInertAndDispose
+  ready --> settling_exposure: REMOVE_OWNER [topmostChanged && survivor && controlDeliveryReserved]
+  ready --> settling_exposure: ANCESTOR_TEARDOWN_STARTED [atomicSetRemoved && survivor && controlDeliveryReserved]
+  ready --> disposed: REMOVE_OWNER_or_ANCESTOR_TEARDOWN [controlCapacityExhausted] / atomicRemoveProjectAllInertAndDispose
+  settling_exposure --> settling_exposure: EXPOSURE_PREPARED [exactProjectionRevision && postProjectionFacts] / enqueueAndAwaitAck
+  settling_exposure --> ready: DELIVERY_ACKNOWLEDGED [exactAck] / releaseSerializedWork
+  settling_exposure --> disposed: DELIVERY_FAILED_or_ACK_TIMEOUT [exact] / projectAllInertAndDispose
+```
+
+No registry command or keyboard dispatch crosses either settling state,
+including either `awaiting-survivor-ack` phase. For an
+ancestor transaction, the `ready -> settling_exposure` edge occurs only after
+the entire affected set and all suppressed receipts have been committed; there
+is no edge per affected registration.
 
 All unlisted or stale events are explicit no-ops. A fresh registry snapshot is
 stored before deriving the modal projection. Registering a newer topmost entry
@@ -502,27 +810,46 @@ causes every prior entry to project inert/background immediately.
 
 The following cross-cutting transitions preserve the current business state:
 
-| Event / condition                                          | Core transition/effect                                                                                                       |
-| ---------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------------------------- |
-| fresh `REGISTRY_POSITION_CHANGED`, instance not topmost    | ready states retain business state and become inert; `opening_waiting_dom` invalidates its DOM request and enters background |
-| fresh `REGISTRY_POSITION_CHANGED`, topmost without restore | ready states project interactive; an `opening_background` state requests a fresh correlated DOM capture                      |
-| matching normal `TOPMOST_RESTORED` in `open`/`busy`        | retain state and project interactive; trigger focus was already settled by the causative removal                             |
-| matching owner-unmount `TOPMOST_EXPOSED` in `open`/`busy`  | retain state and project interactive without trigger restoration; consume the unique exposure delivery                       |
-| matching `DOM_FACTS_INVALIDATED`                           | retain business state, consume `nextDomRequestId`; when topmost request a fresh capture, otherwise wait for topmost          |
-| matching recovery `DOM_READY` in an already-ready state    | if topmost, apply the new Core initial-focus target; if background, remain inert and consume no focus effect                 |
+| Event / condition                                       | Core transition/effect                                                                                                                                            |
+| ------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| fresh `REGISTRY_POSITION_CHANGED`, instance not topmost | ready states retain business state and become inert; `opening_waiting_dom` invalidates its DOM request and enters background                                      |
+| fresh `REGISTRY_POSITION_CHANGED`, instance is topmost  | never exposes a background instance; retain inert projection until a causally matched restoration/exposure delivery                                               |
+| matching normal `TOPMOST_RESTORED(restored)`            | retain business state and accept the registry-prepared interactive projection; do not move focus again                                                            |
+| matching normal `TOPMOST_RESTORED(skipped)`             | retain business state, consume the unique delivery, project interactive and apply Core recovery focus from the attached facts                                     |
+| matching owner/ancestor `TOPMOST_EXPOSED`               | retain business state, consume the unique final delivery, accept the prepared interactive projection and apply Core recovery focus from its post-projection facts |
+| matching `DOM_FACTS_INVALIDATED`                        | retain business state, consume `nextDomRequestId`; when topmost request a fresh capture, otherwise wait for topmost                                               |
+| matching recovery `DOM_READY` in an already-ready state | if topmost, apply the new Core initial-focus target; if background, remain inert and consume no focus effect                                                      |
 
 `busy_success_pending` is the one exception to state preservation on a causal
-topmost delivery: normal `TOPMOST_RESTORED` or owner-unmount
-`TOPMOST_EXPOSED` enters `closing` and requests its stored business close.
-An ordinary position event cannot synthesize that transition, and ancestor
-teardown emits neither delivery.
+topmost delivery: normal `TOPMOST_RESTORED`, owner-unmount `TOPMOST_EXPOSED` or
+final ancestor-teardown `TOPMOST_EXPOSED` first accepts restored focus or
+applies Core recovery focus, then enters `closing` and requests its stored
+business close in the same reduction.
+An ordinary position event cannot synthesize that transition. Ancestor teardown
+emits no intermediate delivery and at most one final exposure delivery to the
+survivor outside its removed scope.
 
 `PARENT_UNMOUNTED` is a registry settlement, not a second unregister command.
-Its non-null receipt must have `cause='owner_unmount'` and exact registration.
-A null receipt is valid only while `registering` and proves that the registry
-serialized the owner cancellation before append, so no late registration can
-leak. `ANCESTOR_TEARDOWN_RECEIPT` requires the exact active teardown ID,
+An appended registration requires a `RegistryRemovalReceipt` with
+`cause='owner_unmount'` and exact registration. An unmount racing registration
+requires the exact authenticated `cancelled_before_append` receipt, including
+the current instance and exact normalized owner scope; the registry consumes
+that registration ID before returning it, so a queued late `REGISTER` is
+rejected. A null receipt is valid only while `closed`, where no registration
+command was ever emitted. Every other active state requires one of those exact
+non-null receipts.
+`ANCESTOR_TEARDOWN_RECEIPT` requires the exact active teardown ID,
 `cause='ancestor_teardown'` and `topmostNotification='suppressed'`.
+
+An input or registry rejection happens before the instance can become an
+interactive modal. For a registry rejection, the authenticated receipt proves
+authority revocation and registration tombstoning before Core enters
+`disposed`; the action then removes its binding/listeners and projects the
+dialog `inert`, `aria-hidden=true`, `aria-modal=false` before invoking
+`onOpenAborted`. Input rejection follows the same visual/disposal ordering but
+has no registry authority to revoke. A throwing or missing callback is reported
+after disposal and cannot change it; no rejected registration may remain
+visible, registered, authoritative or reusable.
 
 ## Executable opening policy
 
@@ -544,11 +871,13 @@ Core target. If a nested modal is already topmost, the event moves the instance
 to `opening_background` without focus.
 
 A later normal removal of the nested modal sends `TOPMOST_RESTORED` only after
-its restoration step. An opening-background instance then consumes a fresh
-`nextDomRequestId` and waits for a new `DOM_READY`; it never reuses facts from
-the earlier tick. Late readiness for the old request ID is stale. Escape during
-topmost opening follows the normal close handshake; Tab is prevented and
-deferred. Neither key can leak to page content.
+its restoration step. A restored trigger is already inside the causally exposed
+dialog, so an opening-background instance becomes `open` without moving focus a
+second time. If restoration was skipped, the delivery carries a fresh normalized
+capture made after exposure and Core chooses the recovery target. Facts from the
+earlier opening tick are never reused. Escape during topmost opening follows the
+normal close handshake; Tab is prevented and deferred. Neither key can leak to
+page content.
 
 ## Causal close and removal handshake
 
@@ -558,18 +887,33 @@ deferred. Neither key can leak to page content.
 3. The owner either rejects or acknowledges with a fresh removal token before
    changing visibility. Rejection clears the handshake but not the identity
    high-water mark or audit ledger.
-4. The registry atomically removes the exact registration and emits a removal
-   receipt containing its position and cause at that instant.
+4. If the removal would expose a survivor, the registry reserves the applicable
+   normal/control delivery identity before atomically removing the exact
+   registration. A cancellable normal close is rejected without mutation when
+   reservation fails; non-cancellable teardown fails closed atomically.
 5. A matching `normal_close` receipt from a topmost removal may restore the
-   still-valid trigger; a background normal removal unregisters without focus
-   movement. Owner/ancestor teardown never restores.
+   still-valid trigger after the exact exposed dialog has been prepared
+   interactive. With an exposed modal, containment by that dialog is mandatory;
+   otherwise restoration is skipped and Core applies recovery focus. A
+   background normal removal unregisters without focus movement.
+   Owner/ancestor teardown never restores.
 6. `TOPMOST_RESTORED`, when allowed, is delivered only after restoration and
    carries the causative receipt ID. Duplicate receipts, removal tokens,
-   acknowledgements and restoration events are stale no-ops. Owner unmount uses
-   the distinct one-shot `TOPMOST_EXPOSED` receipt and never claims restoration.
+   acknowledgements and restoration events are stale no-ops. Owner unmount and
+   completed ancestor teardown use the distinct one-shot `TOPMOST_EXPOSED`
+   delivery after serialized interactive preparation and never claim
+   restoration.
+7. The registry remains locked after delivery enqueue. Only the exact ACK sent
+   after survivor reduction, projection/focus and any deferred-close invocation
+   releases it. Matching failure/timeout disposes fail closed; Tab, Escape and
+   `REGISTER` cannot interleave.
 
-A trigger is restorable only while connected, enabled, non-inert and in the same
-live document. No fallback is guessed when it is invalid.
+A trigger is restorable only while connected, enabled, non-inert after the
+registry-owned preparation, and in the same live document. When a modal is
+exposed, the trigger must also be contained by its exact dialog binding. No
+Shell-selected fallback is guessed: `skipped`, owner-unmount exposure and final
+ancestor exposure carry fresh post-preparation facts, and Core chooses the
+recovery target.
 
 ## Backup busy settlement
 
@@ -578,9 +922,11 @@ matching operation returns to `open`. Success carries a fresh close identity;
 that identity is consumed even for stale or background input. Matching success
 requests a business close immediately when topmost. Otherwise it stores the
 identity in `busy_success_pending`; a causally matched normal
-`TOPMOST_RESTORED` or owner-unmount `TOPMOST_EXPOSED` for this registration can
-consume the deferred value and invoke the owner once. Ancestor teardown can do
-neither. Comparison, Investigation and Shortcuts Help never enter busy.
+`TOPMOST_RESTORED`, owner-unmount `TOPMOST_EXPOSED`, or final
+ancestor-teardown `TOPMOST_EXPOSED` for this surviving registration can consume
+the deferred value and invoke the owner once. An affected registration is
+disposed by its suppressed teardown receipt and cannot consume the deferred
+value. Comparison, Investigation and Shortcuts Help never enter busy.
 
 ## Initial focus policy
 
@@ -646,8 +992,9 @@ ownership; a modal topmost listener consumes Escape before non-modal routing.
 - **Shared Svelte action:** DOM queries and capture-table construction,
   registry transport, focus calls, attribute/inert application and execution of
   the exact Core decision.
-- **Components:** provide typed surface, variant, scope, dialog, trigger and
-  owner callback. They add no Escape/Tab/focus or `aria-modal` path.
+- **Components:** provide typed surface, variant, scope, dialog, trigger, normal
+  close callback and fail-closed open-abort callback. They add no
+  Escape/Tab/focus or `aria-modal` path.
 
 No storage, Chrome API, timestamp, button copy or LLM participates.
 
@@ -666,24 +1013,57 @@ No storage, Chrome API, timestamp, button copy or LLM participates.
 6. Every registration is removed exactly once. Restoration depends on position
    at atomic removal, not position at request or acknowledgement.
 7. Background removal, owner unmount and ancestor teardown never restore a
-   trigger. Ancestor teardown emits no intermediate topmost wake-up.
+   trigger. Ancestor teardown emits no intermediate topmost wake-up and at most
+   one final exposure for the single surviving topmost registration.
 8. Every valid close identity is one-shot and retained across rejection,
    blocking and stale business events; an invalid or replayed ID invokes no owner.
 9. Owner close callback runs at most once per canonical request ID.
 10. Only Backup enters busy, and only its matching operation settles it.
-11. A non-topmost Backup success waits for a causal normal-restoration or
-    owner-unmount exposure receipt and cannot wake during ancestor teardown.
+11. A non-topmost Backup success waits for a causal normal-restoration,
+    owner-unmount exposure or final ancestor-teardown exposure. If affected by
+    teardown it is disposed; if it survives as final topmost, it accepts focus
+    and requests the deferred close exactly once.
 12. Keyboard Shortcuts Help participates in the same registry and has no second
     Escape, Tab, focus or `aria-modal` authority.
 13. The arrival drawer remains non-modal and cannot contend for registry
     ownership.
-14. Registry live/consumed capacities are explicit and never evict replay
-    evidence within a panel lifetime.
-15. Disposed is terminal; no DOM handle, free text or LLM signal enters Core.
+14. Delivery capacity is reserved and consumed before any removal that needs a
+    survivor delivery. Normal exhaustion causes no mutation; reserved-control
+    exhaustion performs non-cancellable removal plus inert terminal registry
+    disposal atomically.
+15. A registering unmount requires an authenticated cancellation/removal
+    receipt; nullable input can never prove that an enqueued registration was
+    fenced, and a crossed owner authority can never create its tombstone.
+16. A registry rejection revokes its Shell authority and tombstones the
+    registration ID before the instance enters `disposed`. Missing/throwing
+    abort callbacks cannot reverse disposal, revocation or tombstoning.
+17. `ModalOwnerAuthority` exists only in the Shell command layer and is checked
+    by private `WeakMap` identity against the exact canonical tuple. Core never
+    receives or manufactures it; both register and pre-append owner removal are
+    therefore implementably authenticated.
+18. Every owner/teardown path uses the same NFC/control/whitespace-rejecting,
+    bounded canonical scope parser before binding or comparison.
+19. An ordinary position snapshot can make a modal background but can never
+    re-expose it. Re-exposure is authorized only by a one-shot
+    normal-restoration or final owner/ancestor exposure delivery.
+20. A nested normal close prepares the exact exposed dialog before attempting
+    restoration. A skipped restoration or final owner/ancestor exposure always
+    applies a fresh Core-selected recovery focus before the exposed modal
+    accepts keyboard input.
+21. Restoration/exposure remains serialized through delivery enqueue, survivor
+    reduction, projection/focus, optional deferred-close invocation and the
+    exact ACK. Tab, Escape, `REGISTER` and teardown cannot interleave.
+22. A matching delivery failure or ACK timeout never unlocks partial state; it
+    projects all bindings inert and disposes the registry. Crossed/duplicate
+    ACK, failure and timeout tuples are no-ops.
+23. Disposed is terminal; no DOM handle, free text or LLM signal enters Core.
 
 ## Mandatory review matrix
 
 - every surface/variant pair, invalid pair and no-focusable fallback;
+- invalid `OPEN`, duplicate/invalid/capacity registration rejection, throwing
+  or missing open-abort callback, and proof that each registry-rejected surface
+  is disposed with authority revoked and registration ID tombstoned first;
 - nested `OPEN` before the first `DOM_READY`, Tab/Escape during opening, late
   background readiness, then fresh readiness after topmost restoration;
 - forward/backward wrap, one item, dynamic disable/remove, focus outside and
@@ -692,18 +1072,41 @@ No storage, Chrome API, timestamp, button copy or LLM participates.
   after owner reject; bounded-ledger eviction with high-water replay rejection;
 - new topmost registered between close request, acknowledgement and
   `DIALOG_REMOVED`, proving background removal does not restore;
-- normal nested topmost removal, invalid trigger and ordered restoration before
-  `TOPMOST_RESTORED`;
+- normal nested topmost removal with trigger inside/outside the exposed dialog,
+  invalid trigger, prepared projection, restored versus skipped outcome, and
+  proof that an ordinary position snapshot cannot expose the background modal;
 - multi-registration ancestor teardown containing a Backup
-  `busy_success_pending`, proving zero transient wake-up/restoration;
-- nested owner unmount exposing a Backup `busy_success_pending`, proving one
-  deferred close without a false trigger-restoration claim;
+  `busy_success_pending`, proving zero transient wake-up/restoration for
+  affected entries, followed by exactly one final exposure for a surviving
+  outside-scope topmost (including a surviving `busy_success_pending` case);
+- nested owner unmount exposing a ready modal and a Backup
+  `busy_success_pending`, proving fresh Core recovery focus and one deferred
+  close without a false trigger-restoration claim;
 - Backup busy failure, cancellation, success, stale operation result and busy
   event rejected on every non-Backup surface;
 - Shortcuts Help above Comparison and Investigation, then each inverse order,
   proving one `aria-modal`, Tab and Escape owner;
-- unmount during registering/opening/open/busy/closing and duplicate removal
-  receipts; teardown leaves no listener or registry entry;
+- unmount during closed/registering before and after append/opening/open/busy/
+  closing, null receipt accepted only for closed, crossed cancellation receipt,
+  crossed owner authority, late register after a cancellation tombstone, and
+  duplicate removal receipts; teardown leaves no listener or registry entry;
+- Shell authority enrichment for `REGISTER`, pre-append authenticated
+  `REMOVE_OWNER`, attempted authority serialization/prop injection, mismatched
+  instance/registration/scope tuple and proof that Core effects contain no
+  opaque authority;
+- canonical scope parsing with NFC-equivalent segments, Unicode whitespace,
+  Cc/Cf and bidi/zero-width controls, empty/129-unit/33-segment bounds, plus
+  exact segment-prefix cases such as `feed/1` versus `feed/10`;
+- owner and ancestor exposure ordering, proving the exact survivor is projected
+  interactive before capture, no inert capture is accepted, keyboard/REGISTER
+  cannot interleave before exact post-effects ACK, and duplicate/crossed ACK is
+  a no-op;
+- restored/skipped/exposed survivor ACK after ordinary focus and after
+  `busy_success_pending` deferred close, plus reduction/projection/focus/close
+  failure and exact/stale ACK timeout, proving total fail-closed disposal;
+- delivery capacity at the last normal and last reserved-control slot: normal
+  exhaustion leaves the stack unchanged, while owner/ancestor exhaustion
+  atomically removes, keeps every survivor inert and disposes the registry;
 - Feed arrival drawer open below each modal, proving it remains non-modal.
 
 Implementation is forbidden until an independent reviewer approves this model

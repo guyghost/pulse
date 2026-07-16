@@ -374,6 +374,39 @@ function containsProof(
 }
 
 describe('settings mandatory host permission model', () => {
+  it('rejects an activation result id reused from the initial load correlation', () => {
+    const current = controller();
+    const ids = {
+      mutationId: uuid(90),
+      permissionCheckId: uuid(91),
+      activationId: uuid(92),
+      storageReservationId: uuid(93),
+    };
+
+    expect(
+      current.dispatch({
+        type: 'MUTATE',
+        dataEpoch: DATA_EPOCH,
+        ...ids,
+        activationResult: consumedActivation(
+          ids.mutationId,
+          ids.permissionCheckId,
+          ids.activationId,
+          ids.storageReservationId,
+          uuid(10)
+        ),
+        key: 'theme',
+        candidate: 'dark',
+      })
+    ).toEqual({ status: 'dispatched' });
+    expect(current.getSnapshot()).toMatchObject({
+      state: 'saved',
+      projectedSettings: { theme: 'system' },
+      command: null,
+      lastRejection: { code: 'SETTINGS_INVALID', operation: 'mutate' },
+    });
+  });
+
   it('consumes a verified activation even for a no-op and rejects replay with fresh mutation IDs', () => {
     const current = controller();
     const first = {
@@ -557,6 +590,9 @@ describe('settings mandatory host permission model', () => {
       'src/models/settings-persistence.contract.ts',
       'src/models/settings-persistence.logic.ts',
       'src/models/settings-persistence.machine.ts',
+      'src/models/onboarding-source.contract.ts',
+      'src/models/onboarding-source.logic.ts',
+      'src/models/onboarding-source.machine.ts',
     ];
     const source = sourceFiles
       .map((path) => readFileSync(resolve(process.cwd(), path), 'utf8'))
@@ -567,6 +603,8 @@ describe('settings mandatory host permission model', () => {
     expect(source).not.toContain('PERMISSION_REFUSED');
     expect(source).not.toContain('PERMISSION_OUTCOME_UNKNOWN');
     expect(source).not.toContain('permissions.request');
+    expect(source).not.toContain('permissionRequestId');
+    expect(source).not.toContain('userGesture');
   });
 
   it('persists the reservation rotation before issuing the contains-only command', () => {

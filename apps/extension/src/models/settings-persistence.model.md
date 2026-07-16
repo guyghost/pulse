@@ -590,15 +590,20 @@ normal reset absence proof and committed bootstrap gates still apply.
 
 While that exact fatal context is installed — non-null pending intent and
 mutation, `SETTINGS_OUTCOME_MISSING/reconcile/recoverable:false`, and no command
-— it is contextually immutable. `RETRY`, `MUTATE`, `DISMISS_ERROR`, and every
-late transactional callback are absorbed without action: no activation or
-activation-result identity is consumed, no rejection/error field changes, no
-command is exposed, and every detached public snapshot remains deeply equal to
-the fatal snapshot. In particular, the fatal guard for `RETRY` is evaluated
-before replay, capacity, rejected-activation, valid-retry, consumed-invalid and
-fallback branches. Only the exact reset protocol may mutate this context. After
-its E2 Load settles, an activation result issued for E1 remains invalid by
-epoch, while a fresh E2 activation may start a new mutation normally.
+— it is contextually immutable. `RETRY`, `MUTATE`, `DISMISS_ERROR`, every late
+transactional callback, `CANONICAL_UPDATED`, and `SERVICE_WORKER_RESTARTED` on
+that same controller are absorbed without action: no activation or
+activation-result identity is consumed, no canonical projection,
+rejection/error field or correlation changes, no command is exposed, and every
+detached public snapshot remains deeply equal to the fatal snapshot. In
+particular, the fatal guards are evaluated before replay, capacity,
+rejected-activation, valid-retry, consumed-invalid, broadcast, restart and
+fallback branches. Only the exact reset protocol may mutate this controller.
+A genuinely new worker still creates a new controller from the strict durable
+pending seed, rotates that seed and reconciles it; a restart event cannot thaw
+the already-fatal controller. After its E2 Load settles, an activation result
+issued for E1 remains invalid by epoch, while a fresh E2 activation may start a
+new mutation normally.
 
 ## Durable journal and recovery barrier
 
@@ -1095,8 +1100,9 @@ The core invariants are:
 31. `SETTINGS_OUTCOME_MISSING` retains the exact durable pending intent, emits
     no clear command or terminal settlement, survives worker recreation, and
     can lose that fence only through the explicit reset/absence protocol. Its
-    fatal context is action-free for retry, mutate, dismiss and late callbacks;
-    no activation registry or public field changes before reset.
+    fatal context is action-free for retry, mutate, dismiss, late callbacks,
+    `CANONICAL_UPDATED` and `SERVICE_WORKER_RESTARTED`; no activation registry
+    or public field changes before reset.
 
 Forbidden transitions include `loading -> saved` without recovery proof,
 `writing -> saved` without `committed`, `cancelling -> saved` without

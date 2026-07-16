@@ -6,6 +6,7 @@ import {
   createOnboardingSourceController,
   isOnboardingSourceUuidV4,
   parseOnboardingCompletionProof,
+  parseOnboardingPermissionContainsProof,
   parseOnboardingSourceError,
   parseOnboardingSourceInput,
   type OnboardingSourceCommand,
@@ -17,11 +18,13 @@ import {
 import {
   commandId as settingsCommandId,
   expectedAlarm,
+  originDigest,
   settingsDigest,
   type SettingsEnvelopeV2,
   type SettingsMutationOutcomeV1,
   type SettingsSnapshotV1,
 } from '../../../src/models/settings-persistence.contract';
+import { createSettingsPersistenceController } from '../../../src/models/settings-persistence.machine';
 
 const uuid = (suffix: number): string =>
   `70000000-0000-4000-8000-${suffix.toString(16).padStart(12, '0')}`;
@@ -44,7 +47,7 @@ const CONNECTOR_CATALOG: ConnectorMeta[] = [
     name: 'LeHibou',
     icon: 'lehibou',
     url: 'https://www.lehibou.com',
-    hostPermissions: ['https://www.lehibou.com/*'],
+    hostPermissions: ['https://www.lehibou.com/*', 'https://api.lehibou.com/*'],
   },
 ];
 
@@ -137,7 +140,7 @@ function operationIds(base: number): OnboardingSourceOperationIds {
   const ids = {
     operationId: uuid(base),
     mutationId: uuid(base + 1),
-    permissionRequestId: uuid(base + 2),
+    permissionCheckId: uuid(base + 2),
     activationId: uuid(base + 3),
     storageReservationId: uuid(base + 4),
   };
@@ -149,7 +152,7 @@ function operationIds(base: number): OnboardingSourceOperationIds {
       dataEpoch: DATA_EPOCH,
       workerEpoch: WORKER_EPOCH,
       mutationId: ids.mutationId,
-      permissionCheckId: ids.permissionRequestId,
+      permissionCheckId: ids.permissionCheckId,
       activationId: ids.activationId,
       storageReservationId: ids.storageReservationId,
       issuedAtMs: 1_000,
@@ -171,6 +174,28 @@ function commandOfType<T extends OnboardingSourceCommand['type']>(
     throw new Error(`Expected ${type} command`);
   }
   return command as CommandOfType<T>;
+}
+
+function permissionContainsProof(
+  command: CommandOfType<'CHECK_CONNECTOR_PERMISSION'>,
+  containsResult: boolean
+) {
+  return {
+    version: 1 as const,
+    kind: containsResult
+      ? ('ONBOARDING_PERMISSION_CONTAINS_PRESENT' as const)
+      : ('ONBOARDING_PERMISSION_CONTAINS_MISSING' as const),
+    observation: 'contains_only' as const,
+    workerEpoch: command.workerEpoch,
+    dataEpoch: command.dataEpoch,
+    operationId: command.operationId,
+    commandId: command.commandId,
+    checkId: command.checkId,
+    connectorId: command.connectorId,
+    checkedOrigins: [...command.origins],
+    originDigest: command.originDigest,
+    containsResult,
+  };
 }
 
 function expectDispatched(controller: OnboardingSourceController, event: unknown): void {
@@ -250,17 +275,17 @@ function drivePersistedSourceToReady(
   expectDispatched(controller, { type: 'CONTINUE', ids });
   const permission = commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION');
   expectDispatched(controller, {
-    type: 'PERMISSION_GRANTED',
-    dataEpoch: DATA_EPOCH,
-    operationId: permission.operationId,
-    connectorId: permission.connectorId,
-    required: true,
+    type: 'PERMISSION_CONTAINS_PRESENT',
+    proof: permissionContainsProof(permission, true),
   });
   const session = commandOfType(controller, 'CHECK_CONNECTOR_SESSION');
   expectDispatched(controller, {
     type: 'SESSION_FOUND',
-    dataEpoch: DATA_EPOCH,
+    workerEpoch: session.workerEpoch,
+    dataEpoch: session.dataEpoch,
     operationId: session.operationId,
+    commandId: session.commandId,
+    checkId: session.checkId,
     connectorId: session.connectorId,
     lastSync: '2026-07-16T00:00:00.000Z',
   });
@@ -274,6 +299,7 @@ interface RecoveryEventOverrides {
   proofDataEpoch?: string;
   proofRequestId?: string;
   proofCommandId?: string;
+  nextCheckId?: string;
 }
 
 function recoveryEvent(
@@ -288,6 +314,7 @@ function recoveryEvent(
     dataEpoch: DATA_EPOCH,
     requestId: overrides.requestId ?? command.requestId,
     nextOperationId,
+    nextCheckId: overrides.nextCheckId ?? uuid(999_999),
     snapshot: settingsSnapshot(envelope(), snapshotRequestId, snapshotCommandId, uuid(900_002)),
     completionReadProof: {
       version: 1,
@@ -311,10 +338,8 @@ function fillPermissionBatches(
     expectDispatched(controller, index === 0 ? { type: 'CONTINUE', ids } : { type: 'RETRY', ids });
     const permission = commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION');
     expectDispatched(controller, {
-      type: 'PERMISSION_REFUSED',
-      dataEpoch: DATA_EPOCH,
-      operationId: permission.operationId,
-      connectorId: permission.connectorId,
+      type: 'PERMISSION_CONTAINS_MISSING',
+      proof: permissionContainsProof(permission, false),
     });
     base += 5;
   }
@@ -330,7 +355,7 @@ describe('Onboarding source executable model', () => {
     expect(controller.getSnapshot().state).toBe('persisting');
 
     const settingsCommand = commandOfType(controller, 'DISPATCH_SETTINGS_SELECTION');
-    expect(settingsCommand.event.permissionCheckId).toBe(selectionIds.permissionRequestId);
+    expect(settingsCommand.event.permissionCheckId).toBe(selectionIds.permissionCheckId);
     const commandBeforeForgery = controller.getSnapshot().command;
     dispatchSettlement(
       controller,
@@ -342,18 +367,37 @@ describe('Onboarding source executable model', () => {
 
     dispatchSettlement(controller, settingsCommand);
     const permission = commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION');
-    expectDispatched(controller, {
-      type: 'PERMISSION_GRANTED',
-      dataEpoch: DATA_EPOCH,
+    expect(permission).toMatchObject({
+      workerEpoch: WORKER_EPOCH,
+      checkId: selectionIds.permissionCheckId,
+      observation: 'contains_only',
+      origins: ['https://api.lehibou.com/*', 'https://www.lehibou.com/*'],
+      originDigest: originDigest(['https://api.lehibou.com/*', 'https://www.lehibou.com/*']),
+    });
+    const beforeEarlySession = controller.getSnapshot();
+    expectRejected(controller, {
+      type: 'SESSION_FOUND',
+      workerEpoch: permission.workerEpoch,
+      dataEpoch: permission.dataEpoch,
       operationId: permission.operationId,
+      commandId: permission.commandId,
+      checkId: permission.checkId,
       connectorId: 'lehibou',
-      required: true,
+      lastSync: null,
+    });
+    expect(controller.getSnapshot()).toStrictEqual(beforeEarlySession);
+    expectDispatched(controller, {
+      type: 'PERMISSION_CONTAINS_PRESENT',
+      proof: permissionContainsProof(permission, true),
     });
     const session = commandOfType(controller, 'CHECK_CONNECTOR_SESSION');
     expectDispatched(controller, {
       type: 'SESSION_FOUND',
-      dataEpoch: DATA_EPOCH,
+      workerEpoch: session.workerEpoch,
+      dataEpoch: session.dataEpoch,
       operationId: session.operationId,
+      commandId: session.commandId,
+      checkId: session.checkId,
       connectorId: 'lehibou',
       lastSync: null,
     });
@@ -375,6 +419,185 @@ describe('Onboarding source executable model', () => {
     expect(final.persistedEnabledConnectorIds).toContain('lehibou');
     expect(final.automaticScanAuthorized).toBe(true);
     expect(commandOfType(controller, 'ADVANCE_ONBOARDING').completionKind).toBe('confirmed_source');
+  });
+
+  it('emits the same five-identity correlation set and command digest as the executable Settings model', () => {
+    const onboarding = createController();
+    expectDispatched(onboarding, { type: 'SELECT_SOURCE', connectorId: 'lehibou' });
+    const ids = operationIds(225);
+    expectDispatched(onboarding, { type: 'CONTINUE', ids });
+    const onboardingCommand = commandOfType(onboarding, 'DISPATCH_SETTINGS_SELECTION');
+
+    const settings = createSettingsPersistenceController({
+      dataEpoch: DATA_EPOCH,
+      workerEpoch: WORKER_EPOCH,
+      defaultSettings: DEFAULT_SETTINGS,
+      includedConnectorIds: CONNECTOR_CATALOG.map((connector) => connector.id),
+      permissionOriginsByConnectorId: Object.fromEntries(
+        CONNECTOR_CATALOG.map((connector) => [connector.id, [...connector.hostPermissions].sort()])
+      ),
+      initialLoadRequestId: uuid(240),
+      coldStartSeed: null,
+    });
+    const load = settings.getSnapshot().command;
+    expect(load?.type).toBe('RECOVER_AND_LOAD_SETTINGS');
+    if (load?.type !== 'RECOVER_AND_LOAD_SETTINGS') {
+      throw new Error('Expected Settings load command');
+    }
+    expect(
+      settings.dispatch({
+        type: 'LOAD_SUCCEEDED',
+        dataEpoch: DATA_EPOCH,
+        requestId: load.requestId,
+        commandId: load.commandId,
+        snapshot: settingsSnapshot(envelope(), load.requestId, load.commandId, uuid(241)),
+      })
+    ).toEqual({ status: 'dispatched' });
+    expect(settings.dispatch(onboardingCommand.event)).toEqual({ status: 'dispatched' });
+    const persist = settings.getSnapshot().command;
+    expect(persist?.type).toBe('PERSIST_SETTINGS_PENDING_INTENT');
+    if (persist?.type !== 'PERSIST_SETTINGS_PENDING_INTENT') {
+      throw new Error('Expected Settings pending-intent command');
+    }
+
+    const settingsMutation = persist.pendingIntent.mutation;
+    expect(onboardingCommand.expectation.baseCorrelationIds).toEqual(
+      settingsMutation.correlationIds
+    );
+    expect(onboardingCommand.expectation.baseCorrelationIds).toContain(
+      ids.activationResult.resultId
+    );
+    expect(onboardingCommand.expectation.commandDigest).toBe(settingsMutation.commandDigest);
+  });
+
+  it('accepts only the exact correlated contains result and keeps positive and negative proofs distinct', () => {
+    const controller = createController({
+      ...DEFAULT_SETTINGS,
+      enabledConnectors: ['free-work', 'lehibou'],
+    });
+    expectDispatched(controller, { type: 'SELECT_SOURCE', connectorId: 'lehibou' });
+    expectDispatched(controller, { type: 'CONTINUE', ids: operationIds(250) });
+    const command = commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION');
+    const present = permissionContainsProof(command, true);
+    const missing = permissionContainsProof(command, false);
+    const expected = {
+      workerEpoch: command.workerEpoch,
+      dataEpoch: command.dataEpoch,
+      operationId: command.operationId,
+      commandId: command.commandId,
+      checkId: command.checkId,
+      connectorId: command.connectorId,
+      origins: command.origins,
+    };
+
+    expect(parseOnboardingPermissionContainsProof(present, expected, true)).toEqual(present);
+    expect(parseOnboardingPermissionContainsProof(missing, expected, false)).toEqual(missing);
+    expect(parseOnboardingPermissionContainsProof(missing, expected, true)).toBeNull();
+    expect(
+      parseOnboardingPermissionContainsProof(
+        { ...present, commandId: 'onboarding-source/permission/forged' },
+        expected,
+        true
+      )
+    ).toBeNull();
+    expect(
+      parseOnboardingPermissionContainsProof(
+        { ...present, checkedOrigins: [...present.checkedOrigins].reverse() },
+        expected,
+        true
+      )
+    ).toBeNull();
+
+    expectRejected(controller, {
+      type: 'PERMISSION_CONTAINS_PRESENT',
+      proof: { ...present, originDigest: originDigest(['https://forged.example/*']) },
+    });
+    expect(commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION')).toEqual(command);
+    expectRejected(controller, { type: 'PERMISSION_CONTAINS_PRESENT', proof: missing });
+    expect(commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION')).toEqual(command);
+
+    expectDispatched(controller, { type: 'PERMISSION_CONTAINS_MISSING', proof: missing });
+    expect(controller.getSnapshot()).toMatchObject({
+      state: 'permission_denied',
+      permission: 'denied',
+      session: 'unknown',
+      command: null,
+    });
+  });
+
+  it('rejects legacy, late and crossed permission callbacks while the session check is active', () => {
+    const controller = createController();
+    expectDispatched(controller, { type: 'SELECT_SOURCE', connectorId: 'free-work' });
+    expectDispatched(controller, { type: 'CONTINUE', ids: operationIds(275) });
+    const permission = commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION');
+    expectDispatched(controller, {
+      type: 'PERMISSION_CONTAINS_PRESENT',
+      proof: permissionContainsProof(permission, true),
+    });
+    const session = commandOfType(controller, 'CHECK_CONNECTOR_SESSION');
+    const sessionSnapshot = controller.getSnapshot();
+    const permissionError = {
+      version: 1 as const,
+      code: 'PERMISSION_CHECK_FAILED' as const,
+      phase: 'permission' as const,
+      message: 'Late permission callback',
+      retryable: true,
+    };
+
+    expectRejected(controller, {
+      type: 'CHECK_FAILED',
+      dataEpoch: DATA_EPOCH,
+      operationId: permission.operationId,
+      connectorId: permission.connectorId,
+      error: permissionError,
+    });
+    expect(controller.getSnapshot()).toStrictEqual(sessionSnapshot);
+
+    expectRejected(controller, {
+      type: 'CHECK_FAILED',
+      workerEpoch: permission.workerEpoch,
+      dataEpoch: permission.dataEpoch,
+      operationId: permission.operationId,
+      commandId: permission.commandId,
+      checkId: permission.checkId,
+      connectorId: permission.connectorId,
+      checkPhase: 'permission',
+      error: permissionError,
+    });
+    expectRejected(controller, {
+      type: 'SESSION_FOUND',
+      workerEpoch: permission.workerEpoch,
+      dataEpoch: permission.dataEpoch,
+      operationId: permission.operationId,
+      commandId: permission.commandId,
+      checkId: permission.checkId,
+      connectorId: permission.connectorId,
+      lastSync: null,
+    });
+    expectRejected(controller, {
+      type: 'CHECK_FAILED',
+      workerEpoch: session.workerEpoch,
+      dataEpoch: session.dataEpoch,
+      operationId: session.operationId,
+      commandId: session.commandId,
+      checkId: session.checkId,
+      connectorId: session.connectorId,
+      checkPhase: 'session',
+      error: permissionError,
+    });
+    expect(controller.getSnapshot()).toStrictEqual(sessionSnapshot);
+
+    expectDispatched(controller, {
+      type: 'SESSION_FOUND',
+      workerEpoch: session.workerEpoch,
+      dataEpoch: session.dataEpoch,
+      operationId: session.operationId,
+      commandId: session.commandId,
+      checkId: session.checkId,
+      connectorId: session.connectorId,
+      lastSync: null,
+    });
+    expect(controller.getSnapshot().state).toBe('ready');
   });
 
   it('persists SKIP in two phases before entering the safe terminal state', () => {
@@ -437,6 +660,7 @@ describe('Onboarding source executable model', () => {
       { proofRequestId: requestB },
       { proofCommandId: `onboarding-source/recovery/${requestB}` },
       { proofDataEpoch: NEXT_DATA_EPOCH },
+      { nextCheckId: nextOperationId },
     ];
 
     for (const mismatch of mismatches) {
@@ -451,7 +675,7 @@ describe('Onboarding source executable model', () => {
     expectDispatched(controller, recoveryEvent(command, nextOperationId));
     expect(controller.getSnapshot()).toMatchObject({
       state: 'selecting',
-      correlationCapacityRemaining: capacity - 1,
+      correlationCapacityRemaining: capacity - 2,
     });
   });
 
@@ -489,11 +713,10 @@ describe('Onboarding source executable model', () => {
     expectDispatched(controller, { type: 'SELECT_SOURCE', connectorId: 'free-work' });
     const firstIds = operationIds(600);
     expectDispatched(controller, { type: 'CONTINUE', ids: firstIds });
+    const firstPermission = commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION');
     expectDispatched(controller, {
-      type: 'PERMISSION_REFUSED',
-      dataEpoch: DATA_EPOCH,
-      operationId: firstIds.operationId,
-      connectorId: 'free-work',
+      type: 'PERMISSION_CONTAINS_MISSING',
+      proof: permissionContainsProof(firstPermission, false),
     });
 
     expectRejected(controller, { type: 'RETRY', ids: firstIds });
@@ -506,29 +729,21 @@ describe('Onboarding source executable model', () => {
     const retryCommand = commandOfType(controller, 'CHECK_CONNECTOR_PERMISSION');
     const commandBeforeStale = controller.getSnapshot().command;
 
-    expectDispatched(controller, {
-      type: 'PERMISSION_GRANTED',
-      dataEpoch: DATA_EPOCH,
-      operationId: firstIds.operationId,
-      connectorId: 'free-work',
-      required: true,
+    expectRejected(controller, {
+      type: 'PERMISSION_CONTAINS_PRESENT',
+      proof: permissionContainsProof(firstPermission, true),
     });
     expect(controller.getSnapshot().command).toEqual(commandBeforeStale);
     expectRejected(controller, {
-      type: 'PERMISSION_GRANTED',
-      operationId: retryCommand.operationId,
-      connectorId: 'free-work',
-      required: true,
+      type: 'PERMISSION_CONTAINS_PRESENT',
+      proof: { ...permissionContainsProof(retryCommand, true), dataEpoch: undefined },
     });
     expectDispatched(controller, {
-      type: 'PERMISSION_GRANTED',
-      dataEpoch: DATA_EPOCH,
-      operationId: retryCommand.operationId,
-      connectorId: 'free-work',
-      required: true,
+      type: 'PERMISSION_CONTAINS_PRESENT',
+      proof: permissionContainsProof(retryCommand, true),
     });
     const session = commandOfType(controller, 'CHECK_CONNECTOR_SESSION');
-    expectDispatched(controller, {
+    expectRejected(controller, {
       type: 'SESSION_FOUND',
       dataEpoch: DATA_EPOCH,
       operationId: firstIds.operationId,
@@ -538,8 +753,11 @@ describe('Onboarding source executable model', () => {
     expect(controller.getSnapshot().state).toBe('checking');
     expectDispatched(controller, {
       type: 'SESSION_FOUND',
-      dataEpoch: DATA_EPOCH,
+      workerEpoch: session.workerEpoch,
+      dataEpoch: session.dataEpoch,
       operationId: session.operationId,
+      commandId: session.commandId,
+      checkId: session.checkId,
       connectorId: 'free-work',
       lastSync: null,
     });

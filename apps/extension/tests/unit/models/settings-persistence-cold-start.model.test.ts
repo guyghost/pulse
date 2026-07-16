@@ -3,6 +3,7 @@ import { describe, expect, it } from 'vitest';
 import type { AppSettings } from '../../../src/lib/core/types/app-settings';
 import {
   SETTINGS_PENDING_INTENT_STORAGE_KEY,
+  commandId,
   contractFor,
   createSettingsPendingIntentV1,
   expectedAlarm,
@@ -900,6 +901,33 @@ describe('settings cold controller seed', () => {
           reconcileC.commandId,
           uuid(314)
         ),
+      })
+    ).toEqual({ status: 'dispatched' });
+    expect(controllerC.getSnapshot()).toStrictEqual(fatalSnapshot);
+
+    const broadcastRequestId = uuid(315);
+    const broadcastCommandId = commandId('load', broadcastRequestId);
+    expect(
+      controllerC.dispatch({
+        type: 'CANONICAL_UPDATED',
+        dataEpoch: DATA_EPOCH,
+        broadcastId: uuid(316),
+        snapshot: snapshot(
+          envelope({ ...DEFAULT_SETTINGS, theme: 'light' }, 1, 1),
+          broadcastRequestId,
+          broadcastCommandId,
+          uuid(317)
+        ),
+        nextRequestId: uuid(318),
+      })
+    ).toEqual({ status: 'dispatched' });
+    expect(controllerC.getSnapshot()).toStrictEqual(fatalSnapshot);
+
+    expect(
+      controllerC.dispatch({
+        type: 'SERVICE_WORKER_RESTARTED',
+        dataEpoch: DATA_EPOCH,
+        requestId: uuid(319),
       })
     ).toEqual({ status: 'dispatched' });
     expect(controllerC.getSnapshot()).toStrictEqual(fatalSnapshot);

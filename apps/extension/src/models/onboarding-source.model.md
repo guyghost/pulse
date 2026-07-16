@@ -15,7 +15,7 @@ Ce modèle n'est pas encore branché au runtime de l'extension.
 
 1. Le Shell injecte le catalogue exact de `getConnectorsMeta()`, donc déjà
    filtré par `INCLUDED_CONNECTOR_IDS`. Un connecteur absent ne peut être
-   sélectionné, persisté, vérifié ni demandé en permission.
+   sélectionné, persisté ni vérifié en permission.
 2. Une source est durable seulement après une mutation transactionnelle
    Settings de `AppSettings.enabledConnectors` et un settlement causalement
    égal à l'attente exacte émise par le modèle.
@@ -29,8 +29,10 @@ Ce modèle n'est pas encore branché au runtime de l'extension.
    `onboarding_completed=true`, avant d'émettre l'avancement terminal `skipped`.
 6. L'autorisation effective d'un scan automatique est toujours la conjonction
    `onboardingCompleted && canonicalSettings.autoScan`.
-7. Permission et session sont des faits distincts. La session n'est vérifiée
-   qu'après une permission `granted` ou `not_required`.
+7. Permission et session sont des faits distincts. La seule observation de
+   permission autorisée est `chrome.permissions.contains({origins})`; le modèle
+   n'expose aucun geste, prompt ni chemin `permissions.request`. La session
+   n'est vérifiée qu'après une preuve positive contains-only exacte.
 8. Tout writer de donnée mutable conserve un lease `dataEpoch` et le revalide
    avant l'écriture puis avant son acknowledgement. Le texte, un LLM ou le
    Shell ne choisissent jamais une transition.
@@ -44,6 +46,7 @@ Ce modèle n'est pas encore branché au runtime de l'extension.
 interface OnboardingSourceInput {
   attemptId: string; // UUID v4 injecté
   dataEpoch: string; // epoch canonique courant
+  workerEpoch: string; // lease du service worker qui émet les checks
   connectorCatalog: readonly ConnectorMeta[]; // getConnectorsMeta()
   settingsSnapshot: unknown; // SettingsSnapshotV1 settled exact
   onboardingCompleted: boolean; // valeur de onboarding_completed
@@ -61,9 +64,9 @@ au catalogue injecté, ou si `onboardingCompletionDataEpoch !== dataEpoch`.
 | --------------------- | ------------------- | --------------------------------------------------------------------- |
 | `selecting`           | `selecting`         | Aucun effet en vol; la sélection locale peut changer.                 |
 | `persisting`          | `persisting`        | Mutation Settings `enabledConnectors` en vol.                         |
-| `checking.permission` | `checking`          | Vérification/demande des host permissions.                            |
+| `checking.permission` | `checking`          | Observation contains-only des host permissions.                       |
 | `checking.session`    | `checking`          | Détection de session après permission admise.                         |
-| `permission_denied`   | `permission_denied` | Refus utilisateur explicite, retentable manuellement.                 |
+| `permission_denied`   | `permission_denied` | Permission absente/révoquée, retentable manuellement.                 |
 | `session_missing`     | `session_missing`   | Permission valide mais aucune session détectée.                       |
 | `ready`               | `ready`             | Source persistée, permission valide et session présente.              |
 | `consenting`          | `consenting`        | Persistance epoch-bound de `onboarding_completed=true` après confirm. |
@@ -90,8 +93,9 @@ Les identités suivantes ne sont jamais confondues :
 - `dataEpoch` clôture tous les writes et preuves durables ;
 - `workerEpoch` lie le résultat one-shot au worker courant ;
 - `operationId` corrèle l'orchestration onboarding ;
-- `mutationId`, `permissionRequestId`, `activationId`, `activationResultId` et
-  `storageReservationId` corrèlent la transaction Settings ;
+- `mutationId`, `permissionCheckId`, `activationId`, `activationResultId` et
+  `storageReservationId` corrèlent la transaction Settings et sont tous inclus
+  dans `baseCorrelationIds` puis dans `commandDigest` ;
 - `requestId` corrèle annulation et relecture après restart.
 
 Une récupération conserve aussi l'identité de la commande de relecture
@@ -116,11 +120,12 @@ registre d'activation inclus — ou une
 requête d'un ID dépasse la capacité restante, son dispatch est rejeté
 `invalid_event`; seule la création explicite d'un nouvel acteur avec un nouvel
 `attemptId` ouvre une nouvelle capacité. Un Retry ne recycle jamais le registre.
-L'admission réserve aussi les corrélations de suivi obligatoires : un ID de
-relecture après restart ou Retry de récupération, et deux IDs avant
-l'annulation d'un write (requête de récupération puis opération de relecture)
-si son résultat devient inconnu. Le modèle rejette l'événement avant d'entrer
-dans une voie qui ne pourrait pas accepter son acknowledgement obligatoire.
+L'admission réserve aussi les corrélations de suivi obligatoires : deux IDs
+(`nextOperationId`, `nextCheckId`) après restart ou Retry de récupération, et
+trois IDs avant l'annulation d'un write (requête de récupération puis les deux
+IDs de relecture) si son résultat devient inconnu. Le modèle rejette l'événement
+avant d'entrer dans une voie qui ne pourrait pas accepter son acknowledgement
+obligatoire.
 Un `CANCEL` immédiat terminal n'a aucun follow-up à réserver, mais son
 `requestId` frais consomme néanmoins une place du même registre monotone avant
 le passage à `cancelled`. Sa projection terminale reflète donc exactement la
@@ -132,7 +137,7 @@ capacité restante et un cancel sans place disponible est refusé.
 | ---------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Choix                  | `SELECT_SOURCE`, `CONTINUE`, `CONFIRM_SOURCE`, `SKIP`                                                                                                     |
 | Settings               | `SETTINGS_TRANSACTION_SETTLED/FAILED` avec epoch, purpose et `commandDigest` exacts                                                                       |
-| Permission/session     | `PERMISSION_GRANTED/REFUSED`, `SESSION_FOUND/MISSING`, `CHECK_FAILED`, `NETWORK_OFFLINE`                                                                  |
+| Permission/session     | `PERMISSION_CONTAINS_PRESENT/MISSING`, `SESSION_FOUND/MISSING`, `CHECK_FAILED` avec identité de commande/check et phase exactes                           |
 | Fin durable du wizard  | `ONBOARDING_COMPLETION_PERSISTED/FAILED` avec `dataEpoch` et preuve corrélée                                                                              |
 | Retry/Cancel           | `RETRY`, `CANCEL`, confirmations ou outcome unknown d'annulation Settings/fin du wizard                                                                   |
 | Restart/réconciliation | `SERVICE_WORKER_RESTARTED`, `CANONICAL_STATE_REHYDRATED` avec snapshot Settings et preuve du marqueur causalement exacts, `ONBOARDING_COMPLETION_CLEARED` |
@@ -160,7 +165,7 @@ par snapshot :
 | ------------------------------------ | ------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `DISPATCH_SETTINGS_SELECTION`        | `MUTATE(enabledConnectors)` + résultat d'activation worker-bound et attente exacte candidate/digests/base/origins/corrélations.                         |
 | `DISPATCH_SETTINGS_SKIP_AUTO_SCAN`   | `MUTATE(autoScan,false)` + même résultat one-shot et attente causale avant toute fin `skipped`.                                                         |
-| `CHECK_CONNECTOR_PERMISSION`         | Sous `dataEpoch`, vérifier/demander uniquement les origins du connecteur sélectionné.                                                                   |
+| `CHECK_CONNECTOR_PERMISSION`         | Exécuter uniquement `chrome.permissions.contains({origins})`; la commande porte `observation='contains_only'` et n'autorise aucun prompt interactif.    |
 | `CHECK_CONNECTOR_SESSION`            | Sous `dataEpoch`, vérifier la session sans lire ni persister de credential.                                                                             |
 | `PERSIST_ONBOARDING_COMPLETED`       | Sous lease `dataEpoch`, écrire `onboarding_completed=true`, revalider le lease et produire la preuve.                                                   |
 | `DISPATCH_SETTINGS_CANCEL`           | Annuler la mutation Settings avec les IDs et l'epoch exacts.                                                                                            |
@@ -181,11 +186,11 @@ stateDiagram-v2
   selecting --> checking: CONTINUE [source incluse déjà persistée]
   persisting --> checking: SETTINGS settled [commit corrélé]
   persisting --> failed: Settings failure/offline
-  checking --> checking: PERMISSION_GRANTED / checkSession
-  checking --> permission_denied: PERMISSION_REFUSED
-  checking --> ready: SESSION_FOUND [permission admise]
-  checking --> session_missing: SESSION_MISSING [permission admise]
-  checking --> failed: CHECK_FAILED/offline
+  checking --> checking: PERMISSION_CONTAINS_PRESENT [preuve exacte] / checkSession
+  checking --> permission_denied: PERMISSION_CONTAINS_MISSING [preuve exacte]
+  checking --> ready: SESSION_FOUND [contains positif admis]
+  checking --> session_missing: SESSION_MISSING [contains positif admis]
+  checking --> failed: CHECK_FAILED [phase/identités exactes, offline inclus]
   permission_denied --> checking: RETRY [nouveaux IDs]
   session_missing --> checking: RETRY [nouveaux IDs]
   ready --> consenting: CONFIRM_SOURCE [marqueur absent]
@@ -256,6 +261,19 @@ l'ancien epoch inactive.
   le même command digest décodable, les mêmes digests/base/origins et toutes les
   corrélations émises. Un snapshot Settings valide d'une autre mutation reste
   inerte.
+- `CHECK_CONNECTOR_PERMISSION` porte `workerEpoch`, `dataEpoch`, l'opération,
+  son `commandId`, le `checkId` égal au `permissionCheckId` injecté, le
+  connecteur, les origins triées exactes et leur `originDigest`.
+  `PERMISSION_CONTAINS_PRESENT` et `PERMISSION_CONTAINS_MISSING` portent deux
+  preuves de kind distinct, chacune répétant exactement ces champs et le
+  résultat booléen corrélé de `chrome.permissions.contains`.
+  `CHECK_CONNECTOR_SESSION`, `SESSION_FOUND/MISSING` et `CHECK_FAILED` répètent
+  le même tuple `(workerEpoch, dataEpoch, operationId, commandId, checkId,
+connectorId)` ; l'erreur ajoute une `checkPhase` égale au sous-état courant.
+  Une origin ou identité croisée, un callback de permission tardif pendant la
+  session, un résultat contradictoire ou une erreur de phase différente est
+  rejeté avant XState. Aucun `SESSION_FOUND/MISSING` ne peut avancer tant que la
+  preuve positive n'a pas été acceptée.
 - `ready` implique source persistée, permission admise et session présente; il
   ne termine pas le wizard.
 - `CONFIRM_SOURCE` conserve `autoScan`. Le terminal `completed` exige le
@@ -265,7 +283,9 @@ l'ancien epoch inactive.
   `autoScan=false`. Le write de fin du wizard ne commence qu'après son commit.
   `skipped` et son `ADVANCE_ONBOARDING` sont impossibles avant les deux faits.
 - Un restart invalide l'opération en vol, relit les deux autorités canoniques et
-  route selon `recovery.reason`. Pour un skip interrompu, `autoScan=false` avec
+  route selon `recovery.reason`. La réponse fournit un `nextOperationId` et un
+  `nextCheckId` frais et distincts avant toute reprise de vérification. Pour un
+  skip interrompu, `autoScan=false` avec
   marqueur absent réémet uniquement le write de fin; les deux faits présents
   terminent; `autoScan=true` échoue sans avancement.
 - `CANONICAL_STATE_REHYDRATED` est admis seulement si son `requestId` de tête,
@@ -273,11 +293,12 @@ l'ancien epoch inactive.
   `onboarding_completed` correspondent tous aux identités exactes retenues par
   la récupération active. Un mélange A/B, un ancien résultat ou une preuve
   d'une autre commande reste en `recovering`, n'émet aucune commande, ne
-  consomme pas `nextOperationId` et ne peut décider aucune branche.
+  consomme ni `nextOperationId` ni `nextCheckId` et ne peut décider aucune
+  branche.
 - Un reset entre write et acknowledgement envoie
   `DATA_EPOCH_INVALIDATED(E1,E2)`. Une preuve tardive E1 est rejetée, le terminal
   reste `cancelled` et aucun `ADVANCE_ONBOARDING` E1 n'est émis.
-- Refus de permission, session absente et offline ne déclenchent aucun retry
+- Permission contains absente, session absente et offline ne déclenchent aucun retry
   automatique. `RETRY` apporte six nouvelles identités jamais consommées;
   réutiliser même un seul ancien operation/mutation/permission/activation/
   activation-result/reservation ID rejette tout l'événement. Un résultat tardif ne peut donc pas
@@ -285,7 +306,7 @@ l'ancien epoch inactive.
 - Une course Cancel qui révèle `onboarding_completed=true` émet d'abord
   `CLEAR_ONBOARDING_COMPLETED`; le terminal attend la confirmation de clear.
 - Tout `CANCEL` accepté est enregistré dans `consumedCorrelationIds`. Les
-  voies avec write actif réservent leurs deux follow-ups ; le cancel immédiat
+  voies avec write actif réservent leurs trois follow-ups ; le cancel immédiat
   terminal applique la même admission de capacité avec zéro follow-up.
 
 ## Façade exécutable sûre
@@ -312,7 +333,12 @@ sont idempotents; un dispatch depuis un callback de transition est rejeté
 ## Transitions interdites
 
 - Utiliser un connecteur absent du catalogue build-filtered.
-- Vérifier une session avant permission `granted` ou `not_required`.
+- Vérifier une session avant admission de la preuve positive `granted`.
+- Accepter un résultat ou une erreur permission/session sans `workerEpoch`,
+  `dataEpoch`, opération, commande, check, connecteur et phase exacts.
+- Ouvrir un prompt de permission, exposer `userGesture`, appeler
+  `chrome.permissions.request`, ou accepter un booléen de permission sans preuve
+  contains-only exacte.
 - Atteindre `ready` avant commit Settings corrélé et session présente.
 - Atteindre `completed` sans `CONFIRM_SOURCE` explicite dans ce parcours.
 - Assimiler `onboarding_completed` à `autoScan` ou au consentement source seul.
@@ -339,12 +365,13 @@ sont idempotents; un dispatch depuis un callback de transition est rejeté
    wizard prouvée et `completionKind === 'skipped'` pour l'avancement.
 5. `automaticScanAuthorized === onboardingCompleted && autoScanEnabled`.
 6. Aucun writer mutable ne peut publier un succès après révocation de son epoch.
-7. Tout résultat asynchrone porte et vérifie le `dataEpoch` courant.
+7. Tout résultat asynchrone porte et vérifie le `dataEpoch` courant ; les checks
+   portent aussi le `workerEpoch` courant.
 8. Aucun ID consommé n'est réutilisable dans la même tentative; la capacité
    bornée n'effectue aucune éviction. Cela inclut chaque `requestId` de CANCEL,
    y compris le terminal immédiat.
 9. Un connecteur exclu n'atteint aucune commande Shell.
-10. Permission refusée et session absente restent deux états distincts.
+10. Permission contains absente et session absente restent deux états distincts.
 11. Aucun cookie, credential, I/O, horloge, UUID généré ou LLM n'existe dans le
     modèle.
 12. Toute transition autorisée est nommée, gardée et corrélée; aucune transition
@@ -352,3 +379,8 @@ sont idempotents; un dispatch depuis un callback de transition est rejeté
 13. Une relecture canonique est une preuve atomiquement corrélée : request de
     tête, snapshot Settings, lecture du marqueur et commande attendue partagent
     l'epoch et les identités exactes retenues avant l'I/O.
+14. Toute admission de permission est une preuve contains-only exacte liée au
+    worker, à l'epoch, l'opération, la commande, au `checkId`, au connecteur, aux
+    origins triées, à leur digest et au résultat; aucun chemin interactif
+    n'existe. Les résultats et erreurs de session vérifient le même tuple et la
+    phase courante.

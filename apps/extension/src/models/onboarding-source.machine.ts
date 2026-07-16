@@ -193,29 +193,24 @@ const onboardingSourceMachine = onboardingSourceSetup.createMachine({
         SELECT_SOURCE: selectSource,
         CANCEL: cancelImmediately,
         SERVICE_WORKER_RESTARTED: restartChecking,
-        CHECK_FAILED: {
-          guard: and(['admittedEvent', 'matchingCheck']),
-          target: '#onboardingSourceFailed',
-          actions: 'failCheck',
-        },
-        NETWORK_OFFLINE: {
-          guard: and(['admittedEvent', 'matchingCheck']),
-          target: '#onboardingSourceFailed',
-          actions: 'failCheckOffline',
-        },
       },
       states: {
         permission: {
           on: {
-            PERMISSION_GRANTED: {
-              guard: and(['admittedEvent', 'matchingCheck']),
+            PERMISSION_CONTAINS_PRESENT: {
+              guard: and(['admittedEvent', 'matchingPermissionContains']),
               target: 'session',
               actions: 'markPermissionAndCheckSession',
             },
-            PERMISSION_REFUSED: {
-              guard: and(['admittedEvent', 'matchingCheck']),
+            PERMISSION_CONTAINS_MISSING: {
+              guard: and(['admittedEvent', 'matchingPermissionContains']),
               target: '#onboardingSourcePermissionDenied',
               actions: 'markPermissionDenied',
+            },
+            CHECK_FAILED: {
+              guard: and(['admittedEvent', 'matchingCheck']),
+              target: '#onboardingSourceFailed',
+              actions: 'failCheck',
             },
           },
         },
@@ -230,6 +225,11 @@ const onboardingSourceMachine = onboardingSourceSetup.createMachine({
               guard: and(['admittedEvent', 'matchingCheck', 'sessionAllowed']),
               target: '#onboardingSourceSessionMissing',
               actions: 'markSessionMissing',
+            },
+            CHECK_FAILED: {
+              guard: and(['admittedEvent', 'matchingCheck']),
+              target: '#onboardingSourceFailed',
+              actions: 'failCheck',
             },
           },
         },

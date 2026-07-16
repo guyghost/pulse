@@ -15,7 +15,9 @@ import {
   dataEpochInvalidationMatches,
   isOnboardingSourceUuidV4,
   onboardingOperationCorrelationIds,
+  onboardingPermissionOriginDigest,
   operationIdsAreFresh,
+  permissionContainsEventMatches,
   rememberCorrelationIds,
   rehydratedSelectionIsPersisted,
   rehydrationMatches,
@@ -70,30 +72,38 @@ function selectedConnector(context: OnboardingSourceContext) {
 
 function permissionCommand(
   context: OnboardingSourceContext,
-  operationId: string
+  operationId: string,
+  checkId: string
 ): OnboardingSourceCommand {
+  const origins = selectedConnectorOrigins(context);
   return {
     version: ONBOARDING_SOURCE_MODEL_VERSION,
     type: 'CHECK_CONNECTOR_PERMISSION',
     commandId: commandId('permission', operationId),
+    workerEpoch: context.workerEpoch,
     dataEpoch: context.dataEpoch,
     operationId,
+    checkId,
     connectorId: selectedConnector(context),
-    origins: selectedConnectorOrigins(context),
-    userGesture: true,
+    origins,
+    originDigest: onboardingPermissionOriginDigest(origins),
+    observation: 'contains_only',
   };
 }
 
 function sessionCommand(
   context: OnboardingSourceContext,
-  operationId: string
+  operationId: string,
+  checkId: string
 ): OnboardingSourceCommand {
   return {
     version: ONBOARDING_SOURCE_MODEL_VERSION,
     type: 'CHECK_CONNECTOR_SESSION',
     commandId: commandId('session', operationId),
+    workerEpoch: context.workerEpoch,
     dataEpoch: context.dataEpoch,
     operationId,
+    checkId,
     connectorId: selectedConnector(context),
   };
 }
@@ -277,7 +287,7 @@ export function createOnboardingSourceSetup(
         operationIdsAreFresh(
           context,
           event.ids,
-          event.type === 'RETRY' && context.recovery !== null ? 1 : 0
+          event.type === 'RETRY' && context.recovery !== null ? 2 : 0
         ),
       selectedIncluded: ({ context }) => selectedConnectorIsIncluded(context),
       selectionPersisted: ({ context }) => selectedConnectorIsPersisted(context),
@@ -299,6 +309,8 @@ export function createOnboardingSourceSetup(
       matchingSkipCompletionFailure: ({ context, event }) =>
         skipCompletionFailureMatches(context, event),
       matchingCheck: ({ context, event }) => checkEventMatches(context, event),
+      matchingPermissionContains: ({ context, event }) =>
+        permissionContainsEventMatches(context, event),
       matchingActiveOperation: ({ context, event }) => activeOperationMatches(context, event),
       sessionAllowed: ({ context }) => sessionCheckAllowed(context),
       consentAlreadyPersisted: ({ context }) => context.onboardingCompleted,
@@ -321,7 +333,7 @@ export function createOnboardingSourceSetup(
         event.requestId === context.activeOperation.requestId &&
         (event.type !== 'CONSENT_CANCEL_OUTCOME_UNKNOWN' ||
           (correlationIdsAreFresh(context, [event.nextRequestId]) &&
-            correlationIdsHaveCapacity(context, [event.nextRequestId], 1))),
+            correlationIdsHaveCapacity(context, [event.nextRequestId], 2))),
       matchingRehydration: ({ context, event }) => rehydrationMatches(context, event),
       recoverySelecting: ({ context }) => context.recovery?.reason === 'selecting',
       recoveryCancelSettings: ({ context }) => context.recovery?.reason === 'cancel_settings',
@@ -351,7 +363,7 @@ export function createOnboardingSourceSetup(
       freshRestart: ({ context, event }) =>
         event.type === 'SERVICE_WORKER_RESTARTED' &&
         event.dataEpoch === context.dataEpoch &&
-        requestIdIsFresh(context, event.requestId, 1),
+        requestIdIsFresh(context, event.requestId, 2),
       matchingRecoveryOffline: ({ context, event }) =>
         event.type === 'NETWORK_OFFLINE' &&
         event.dataEpoch === context.dataEpoch &&
@@ -469,35 +481,47 @@ export function createOnboardingSourceSetup(
             context,
             onboardingOperationCorrelationIds(ids)
           ),
-          activeOperation: { purpose: 'check' as const, operationId: ids.operationId },
+          activeOperation: {
+            purpose: 'check' as const,
+            operationId: ids.operationId,
+            checkId: ids.permissionCheckId,
+          },
           permission: 'unknown' as const,
           session: 'unknown' as const,
           lastSync: null,
           recovery: null,
           failure: null,
-          command: permissionCommand(context, ids.operationId),
+          command: permissionCommand(context, ids.operationId, ids.permissionCheckId),
         };
       }),
-      adoptSelectionAndBeginCheck: assign(({ context, event }) =>
-        event.type === 'SETTINGS_TRANSACTION_SETTLED'
+      adoptSelectionAndBeginCheck: assign(({ context, event }) => {
+        const checkId =
+          context.activeOperation?.purpose === 'selection'
+            ? context.activeOperation.ids.permissionCheckId
+            : null;
+        return event.type === 'SETTINGS_TRANSACTION_SETTLED' && checkId !== null
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              activeOperation: { purpose: 'check' as const, operationId: event.operationId },
+              activeOperation: {
+                purpose: 'check' as const,
+                operationId: event.operationId,
+                checkId,
+              },
               permission: 'unknown' as const,
               session: 'unknown' as const,
               lastSync: null,
               recovery: null,
               failure: null,
-              command: permissionCommand(context, event.operationId),
+              command: permissionCommand(context, event.operationId, checkId),
             }
-          : {}
-      ),
+          : {};
+      }),
       markPermissionAndCheckSession: assign(({ context, event }) =>
-        event.type === 'PERMISSION_GRANTED'
+        event.type === 'PERMISSION_CONTAINS_PRESENT'
           ? {
-              permission: event.required ? ('granted' as const) : ('not_required' as const),
+              permission: 'granted' as const,
               session: 'unknown' as const,
-              command: sessionCommand(context, event.operationId),
+              command: sessionCommand(context, event.proof.operationId, event.proof.checkId),
             }
           : {}
       ),
@@ -567,12 +591,6 @@ export function createOnboardingSourceSetup(
             }
           : {}
       ),
-      failCheckOffline: assign(() => ({
-        activeOperation: null,
-        recovery: null,
-        command: null,
-        failure: failure('NETWORK_OFFLINE', 'offline', 'Le réseau est indisponible.'),
-      })),
       failSelectionOffline: assign(() => ({
         activeOperation: null,
         recovery: null,
@@ -816,7 +834,10 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED'
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: event.completionReadProof.onboardingCompleted,
               activeOperation: null,
               recovery: null,
@@ -829,17 +850,21 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED'
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: event.completionReadProof.onboardingCompleted,
               activeOperation: {
                 purpose: 'check' as const,
                 operationId: event.nextOperationId,
+                checkId: event.nextCheckId,
               },
               recovery: null,
               permission: 'unknown' as const,
               session: 'unknown' as const,
               lastSync: null,
-              command: permissionCommand(context, event.nextOperationId),
+              command: permissionCommand(context, event.nextOperationId, event.nextCheckId),
               failure: null,
             }
           : {}
@@ -848,7 +873,10 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED'
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: true,
               activeOperation: null,
               recovery: null,
@@ -866,7 +894,10 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED'
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: true,
               activeOperation: null,
               recovery: null,
@@ -884,7 +915,10 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED'
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: false,
               activeOperation: {
                 purpose: 'skip_completion' as const,
@@ -900,7 +934,10 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED'
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: event.completionReadProof.onboardingCompleted,
               activeOperation: null,
               recovery: null,
@@ -917,7 +954,10 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED'
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: false,
               activeOperation: null,
               recovery: null,
@@ -934,7 +974,10 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED'
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: event.completionReadProof.onboardingCompleted,
               activeOperation: null,
               recovery: null,
@@ -951,7 +994,10 @@ export function createOnboardingSourceSetup(
         event.type === 'CANONICAL_STATE_REHYDRATED' && context.recovery !== null
           ? {
               ...adoptSettingsSnapshot(event.snapshot),
-              consumedCorrelationIds: rememberCorrelationIds(context, [event.nextOperationId]),
+              consumedCorrelationIds: rememberCorrelationIds(context, [
+                event.nextOperationId,
+                event.nextCheckId,
+              ]),
               onboardingCompleted: true,
               command: {
                 version: ONBOARDING_SOURCE_MODEL_VERSION,

@@ -582,6 +582,7 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
           actions: 'dismiss',
         },
         'SETTINGS_CAPTURED/CANONICAL_UPDATED': [
+          { guard: and(['admittedEvent', 'immutableOutcomeMissingFatal']) },
           { guard: and(['admittedEvent', 'newerBroadcast']), actions: 'adoptExternal' },
           {
             guard: and(['admittedEvent', 'divergentEqualBroadcastWithoutMutation']),
@@ -595,6 +596,7 @@ const settingsPersistenceMachine = settingsPersistenceSetup.createMachine({
           },
         ],
         'SETTINGS_CAPTURED/SERVICE_WORKER_RESTARTED': [
+          { guard: and(['admittedEvent', 'immutableOutcomeMissingFatal']) },
           {
             guard: and(['admittedEvent', 'restartWithoutMutation']),
             target: 'loading',

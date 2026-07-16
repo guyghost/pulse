@@ -44,7 +44,7 @@ export type OnboardingSourceState =
 export type ConnectorCheckStatus =
   'checking' | 'ready' | 'permission_denied' | 'session_missing' | 'failed';
 
-export type OnboardingPermission = 'unknown' | 'not_required' | 'granted' | 'denied';
+export type OnboardingPermission = 'unknown' | 'granted' | 'denied';
 export type OnboardingSession = 'unknown' | 'present' | 'missing';
 export type OnboardingSettingsPurpose = 'selection' | 'skip_auto_scan';
 export type OnboardingFailurePhase =
@@ -85,11 +85,44 @@ export interface OnboardingSourceError {
 export interface OnboardingSourceOperationIds {
   operationId: string;
   mutationId: string;
-  permissionRequestId: string;
+  permissionCheckId: string;
   activationId: string;
   storageReservationId: string;
   activationResult: SettingsActivationRegistryResultV1;
 }
+
+export interface OnboardingPermissionContainsPresentProofV1 {
+  version: typeof ONBOARDING_SOURCE_MODEL_VERSION;
+  kind: 'ONBOARDING_PERMISSION_CONTAINS_PRESENT';
+  observation: 'contains_only';
+  workerEpoch: string;
+  dataEpoch: string;
+  operationId: string;
+  commandId: string;
+  checkId: string;
+  connectorId: ConnectorId;
+  checkedOrigins: string[];
+  originDigest: string;
+  containsResult: true;
+}
+
+export interface OnboardingPermissionContainsMissingProofV1 {
+  version: typeof ONBOARDING_SOURCE_MODEL_VERSION;
+  kind: 'ONBOARDING_PERMISSION_CONTAINS_MISSING';
+  observation: 'contains_only';
+  workerEpoch: string;
+  dataEpoch: string;
+  operationId: string;
+  commandId: string;
+  checkId: string;
+  connectorId: ConnectorId;
+  checkedOrigins: string[];
+  originDigest: string;
+  containsResult: false;
+}
+
+export type OnboardingPermissionContainsProofV1 =
+  OnboardingPermissionContainsPresentProofV1 | OnboardingPermissionContainsMissingProofV1;
 
 export interface OnboardingSettingsTransactionExpectationV1 {
   version: typeof ONBOARDING_SOURCE_MODEL_VERSION;
@@ -123,6 +156,7 @@ export type OnboardingSourceActiveOperation =
   | {
       purpose: 'check';
       operationId: string;
+      checkId: string;
     }
   | {
       purpose: 'consent';
@@ -191,18 +225,23 @@ export type OnboardingSourceCommand =
       version: typeof ONBOARDING_SOURCE_MODEL_VERSION;
       type: 'CHECK_CONNECTOR_PERMISSION';
       commandId: string;
+      workerEpoch: string;
       dataEpoch: string;
       operationId: string;
+      checkId: string;
       connectorId: ConnectorId;
       origins: string[];
-      userGesture: true;
+      originDigest: string;
+      observation: 'contains_only';
     }
   | {
       version: typeof ONBOARDING_SOURCE_MODEL_VERSION;
       type: 'CHECK_CONNECTOR_SESSION';
       commandId: string;
+      workerEpoch: string;
       dataEpoch: string;
       operationId: string;
+      checkId: string;
       connectorId: ConnectorId;
     }
   | {
@@ -320,37 +359,36 @@ export type OnboardingSourceEvent =
       commandDigest: string;
       error: OnboardingSourceError;
     }
-  | {
-      type: 'PERMISSION_GRANTED';
-      dataEpoch: string;
-      operationId: string;
-      connectorId: ConnectorId;
-      required: boolean;
-    }
-  | {
-      type: 'PERMISSION_REFUSED';
-      dataEpoch: string;
-      operationId: string;
-      connectorId: ConnectorId;
-    }
+  | { type: 'PERMISSION_CONTAINS_PRESENT'; proof: OnboardingPermissionContainsPresentProofV1 }
+  | { type: 'PERMISSION_CONTAINS_MISSING'; proof: OnboardingPermissionContainsMissingProofV1 }
   | {
       type: 'SESSION_FOUND';
+      workerEpoch: string;
       dataEpoch: string;
       operationId: string;
+      commandId: string;
+      checkId: string;
       connectorId: ConnectorId;
       lastSync: string | null;
     }
   | {
       type: 'SESSION_MISSING';
+      workerEpoch: string;
       dataEpoch: string;
       operationId: string;
+      commandId: string;
+      checkId: string;
       connectorId: ConnectorId;
     }
   | {
       type: 'CHECK_FAILED';
+      workerEpoch: string;
       dataEpoch: string;
       operationId: string;
+      commandId: string;
+      checkId: string;
       connectorId: ConnectorId;
+      checkPhase: 'permission' | 'session';
       error: OnboardingSourceError;
     }
   | { type: 'NETWORK_OFFLINE'; dataEpoch: string; operationId: string }
@@ -404,6 +442,7 @@ export type OnboardingSourceEvent =
       dataEpoch: string;
       requestId: string;
       nextOperationId: string;
+      nextCheckId: string;
       snapshot: SettingsSnapshotV1;
       completionReadProof: OnboardingCompletionReadProofV1;
     }
@@ -618,6 +657,9 @@ function activeCorrelationIds(context: OnboardingSourceContext): string[] {
   if (operation.purpose === 'cancel_consent') {
     return [operation.operationId, operation.requestId];
   }
+  if (operation.purpose === 'check') {
+    return [operation.operationId, operation.checkId];
+  }
   return [operation.operationId];
 }
 
@@ -625,7 +667,7 @@ export function onboardingOperationCorrelationIds(ids: OnboardingSourceOperation
   return [
     ids.operationId,
     ids.mutationId,
-    ids.permissionRequestId,
+    ids.permissionCheckId,
     ids.activationId,
     ids.activationResult.resultId,
     ids.storageReservationId,
@@ -703,7 +745,7 @@ export function cancellationCorrelationReserve(context: OnboardingSourceContext)
     purpose === 'skip_auto_scan' ||
     purpose === 'consent' ||
     purpose === 'skip_completion'
-    ? 2
+    ? 3
     : 0;
 }
 
@@ -723,7 +765,11 @@ export function selectedConnectorIsPersisted(context: OnboardingSourceContext): 
 
 export function selectedConnectorOrigins(context: OnboardingSourceContext): string[] {
   const selected = context.connectorCatalog.find((item) => item.id === context.selectedConnectorId);
-  return selected === undefined ? [] : [...selected.hostPermissions];
+  return selected === undefined ? [] : [...new Set(selected.hostPermissions)].sort();
+}
+
+export function onboardingPermissionOriginDigest(origins: readonly string[]): string {
+  return originDigest([...origins]);
 }
 
 export function candidateEnabledConnectorIds(context: OnboardingSourceContext): ConnectorId[] {
@@ -744,7 +790,7 @@ export function settingsMutationEvent(
     type: 'MUTATE',
     dataEpoch: context.dataEpoch,
     mutationId: ids.mutationId,
-    permissionCheckId: ids.permissionRequestId,
+    permissionCheckId: ids.permissionCheckId,
     activationId: ids.activationId,
     storageReservationId: ids.storageReservationId,
     activationResult: ids.activationResult,
@@ -775,8 +821,9 @@ export function settingsTransactionExpectation(
   const candidateDigest = settingsDigest(candidateSettings);
   const baseCorrelationIds = normalizeCorrelationIds([
     ids.mutationId,
-    ids.permissionRequestId,
+    ids.permissionCheckId,
     ids.activationId,
+    ids.activationResult.resultId,
     ids.storageReservationId,
   ]);
   const expectedOriginDigest = originDigest(
@@ -935,6 +982,112 @@ export function parseOnboardingCompletionProof(
     : null;
 }
 
+interface OnboardingPermissionContainsExpectation {
+  workerEpoch: string;
+  dataEpoch: string;
+  operationId: string;
+  commandId: string;
+  checkId: string;
+  connectorId: ConnectorId;
+  origins: readonly string[];
+}
+
+export function parseOnboardingPermissionContainsProof(
+  value: unknown,
+  expected: OnboardingPermissionContainsExpectation,
+  expectedContainsResult: true
+): OnboardingPermissionContainsPresentProofV1 | null;
+export function parseOnboardingPermissionContainsProof(
+  value: unknown,
+  expected: OnboardingPermissionContainsExpectation,
+  expectedContainsResult: false
+): OnboardingPermissionContainsMissingProofV1 | null;
+export function parseOnboardingPermissionContainsProof(
+  value: unknown,
+  expected: OnboardingPermissionContainsExpectation,
+  expectedContainsResult: boolean
+): OnboardingPermissionContainsProofV1 | null {
+  const captured = captureBoundary(value);
+  const record =
+    captured === INVALID_CAPTURE
+      ? null
+      : readExactRecord(captured, [
+          'version',
+          'kind',
+          'observation',
+          'workerEpoch',
+          'dataEpoch',
+          'operationId',
+          'commandId',
+          'checkId',
+          'connectorId',
+          'checkedOrigins',
+          'originDigest',
+          'containsResult',
+        ]);
+  const expectedOrigins = [...new Set(expected.origins)].sort();
+  const checkedOrigins =
+    record !== null &&
+    Array.isArray(record.checkedOrigins) &&
+    record.checkedOrigins.every((item): item is string => typeof item === 'string')
+      ? [...record.checkedOrigins]
+      : null;
+  const expectedKind = expectedContainsResult
+    ? 'ONBOARDING_PERMISSION_CONTAINS_PRESENT'
+    : 'ONBOARDING_PERMISSION_CONTAINS_MISSING';
+  if (
+    record === null ||
+    checkedOrigins === null ||
+    expectedOrigins.length === 0 ||
+    expected.origins.length !== expectedOrigins.length ||
+    expected.origins.some((origin, index) => origin !== expectedOrigins[index]) ||
+    checkedOrigins.length !== expectedOrigins.length ||
+    checkedOrigins.some((origin, index) => origin !== expectedOrigins[index]) ||
+    record.version !== ONBOARDING_SOURCE_MODEL_VERSION ||
+    record.kind !== expectedKind ||
+    record.observation !== 'contains_only' ||
+    record.workerEpoch !== expected.workerEpoch ||
+    record.dataEpoch !== expected.dataEpoch ||
+    record.operationId !== expected.operationId ||
+    record.commandId !== expected.commandId ||
+    record.checkId !== expected.checkId ||
+    record.connectorId !== expected.connectorId ||
+    record.originDigest !== originDigest(expectedOrigins) ||
+    record.containsResult !== expectedContainsResult
+  ) {
+    return null;
+  }
+  return expectedContainsResult
+    ? {
+        version: ONBOARDING_SOURCE_MODEL_VERSION,
+        kind: 'ONBOARDING_PERMISSION_CONTAINS_PRESENT',
+        observation: 'contains_only',
+        workerEpoch: expected.workerEpoch,
+        dataEpoch: expected.dataEpoch,
+        operationId: expected.operationId,
+        commandId: expected.commandId,
+        checkId: expected.checkId,
+        connectorId: expected.connectorId,
+        checkedOrigins,
+        originDigest: record.originDigest as string,
+        containsResult: true,
+      }
+    : {
+        version: ONBOARDING_SOURCE_MODEL_VERSION,
+        kind: 'ONBOARDING_PERMISSION_CONTAINS_MISSING',
+        observation: 'contains_only',
+        workerEpoch: expected.workerEpoch,
+        dataEpoch: expected.dataEpoch,
+        operationId: expected.operationId,
+        commandId: expected.commandId,
+        checkId: expected.checkId,
+        connectorId: expected.connectorId,
+        checkedOrigins,
+        originDigest: record.originDigest as string,
+        containsResult: false,
+      };
+}
+
 export function consentPersistenceMatches(
   context: OnboardingSourceContext,
   event: OnboardingSourceEvent
@@ -999,20 +1152,78 @@ export function checkEventMatches(
   context: OnboardingSourceContext,
   event: OnboardingSourceEvent
 ): boolean {
-  if (context.activeOperation?.purpose !== 'check' || context.selectedConnectorId === null) {
+  const command = context.command;
+  if (
+    context.activeOperation?.purpose !== 'check' ||
+    context.selectedConnectorId === null ||
+    (command?.type !== 'CHECK_CONNECTOR_PERMISSION' &&
+      command?.type !== 'CHECK_CONNECTOR_SESSION') ||
+    (event.type !== 'SESSION_FOUND' &&
+      event.type !== 'SESSION_MISSING' &&
+      event.type !== 'CHECK_FAILED')
+  ) {
     return false;
   }
-  return (
-    'operationId' in event &&
-    'dataEpoch' in event &&
+  const phase = command.type === 'CHECK_CONNECTOR_PERMISSION' ? 'permission' : 'session';
+  const identityMatches =
+    event.workerEpoch === context.workerEpoch &&
+    event.workerEpoch === command.workerEpoch &&
     event.dataEpoch === context.dataEpoch &&
+    event.dataEpoch === command.dataEpoch &&
     event.operationId === context.activeOperation.operationId &&
-    (!('connectorId' in event) || event.connectorId === context.selectedConnectorId)
+    event.operationId === command.operationId &&
+    event.commandId === command.commandId &&
+    event.checkId === context.activeOperation.checkId &&
+    event.checkId === command.checkId &&
+    event.connectorId === context.selectedConnectorId &&
+    event.connectorId === command.connectorId;
+  if (!identityMatches) {
+    return false;
+  }
+  return event.type === 'CHECK_FAILED'
+    ? event.checkPhase === phase && (event.error.phase === phase || event.error.phase === 'offline')
+    : command.type === 'CHECK_CONNECTOR_SESSION';
+}
+
+function sameCheckOrigins(left: readonly string[], right: readonly string[]): boolean {
+  return left.length === right.length && left.every((origin, index) => origin === right[index]);
+}
+
+export function permissionContainsEventMatches(
+  context: OnboardingSourceContext,
+  event: OnboardingSourceEvent
+): boolean {
+  const command = context.command;
+  if (
+    context.activeOperation?.purpose !== 'check' ||
+    command?.type !== 'CHECK_CONNECTOR_PERMISSION' ||
+    (event.type !== 'PERMISSION_CONTAINS_PRESENT' && event.type !== 'PERMISSION_CONTAINS_MISSING')
+  ) {
+    return false;
+  }
+  const proof = event.proof;
+  const containsResult = event.type === 'PERMISSION_CONTAINS_PRESENT';
+  return (
+    proof.workerEpoch === context.workerEpoch &&
+    proof.workerEpoch === command.workerEpoch &&
+    proof.dataEpoch === context.dataEpoch &&
+    proof.dataEpoch === command.dataEpoch &&
+    proof.operationId === context.activeOperation.operationId &&
+    proof.operationId === command.operationId &&
+    proof.commandId === command.commandId &&
+    proof.checkId === context.activeOperation.checkId &&
+    proof.checkId === command.checkId &&
+    proof.connectorId === context.selectedConnectorId &&
+    proof.connectorId === command.connectorId &&
+    proof.observation === command.observation &&
+    proof.originDigest === command.originDigest &&
+    proof.containsResult === containsResult &&
+    sameCheckOrigins(proof.checkedOrigins, command.origins)
   );
 }
 
 export function sessionCheckAllowed(context: OnboardingSourceContext): boolean {
-  return context.permission === 'granted' || context.permission === 'not_required';
+  return context.permission === 'granted';
 }
 
 export function cancellationMatches(
@@ -1033,7 +1244,7 @@ export function cancellationMatches(
     baseMatches &&
     (event.type !== 'SETTINGS_CANCEL_OUTCOME_UNKNOWN' ||
       (correlationIdsAreFresh(context, [event.nextRequestId]) &&
-        correlationIdsHaveCapacity(context, [event.nextRequestId], 1)))
+        correlationIdsHaveCapacity(context, [event.nextRequestId], 2)))
   );
 }
 
@@ -1053,8 +1264,9 @@ export function rehydrationMatches(
     event.completionReadProof.requestId === context.recovery.requestId &&
     event.completionReadProof.commandId === context.recovery.commandId &&
     event.snapshot.envelope.generation >= context.settingsGeneration &&
-    correlationIdsAreFresh(context, [event.nextOperationId]) &&
-    correlationIdsHaveCapacity(context, [event.nextOperationId])
+    event.nextOperationId !== event.nextCheckId &&
+    correlationIdsAreFresh(context, [event.nextOperationId, event.nextCheckId]) &&
+    correlationIdsHaveCapacity(context, [event.nextOperationId, event.nextCheckId])
   );
 }
 
@@ -1287,7 +1499,7 @@ function parseOperationIds(
       : readExactRecord(captured, [
           'operationId',
           'mutationId',
-          'permissionRequestId',
+          'permissionCheckId',
           'activationId',
           'storageReservationId',
           'activationResult',
@@ -1298,7 +1510,7 @@ function parseOperationIds(
   const ids = [
     record.operationId,
     record.mutationId,
-    record.permissionRequestId,
+    record.permissionCheckId,
     record.activationId,
     record.storageReservationId,
   ];
@@ -1309,7 +1521,7 @@ function parseOperationIds(
     dataEpoch: context.dataEpoch,
     workerEpoch: context.workerEpoch,
     mutationId: record.mutationId as string,
-    permissionCheckId: record.permissionRequestId as string,
+    permissionCheckId: record.permissionCheckId as string,
     activationId: record.activationId as string,
     storageReservationId: record.storageReservationId as string,
   });
@@ -1319,7 +1531,7 @@ function parseOperationIds(
   return {
     operationId: record.operationId as string,
     mutationId: record.mutationId as string,
-    permissionRequestId: record.permissionRequestId as string,
+    permissionCheckId: record.permissionCheckId as string,
     activationId: record.activationId as string,
     storageReservationId: record.storageReservationId as string,
     activationResult,
@@ -1368,7 +1580,7 @@ export function normalizeOnboardingSourceEvent(
     event =
       record !== null &&
       ids !== null &&
-      operationIdsAreFresh(context, ids, type === 'RETRY' && context.recovery !== null ? 1 : 0)
+      operationIdsAreFresh(context, ids, type === 'RETRY' && context.recovery !== null ? 2 : 0)
         ? { type, ids }
         : null;
   } else if (type === 'SETTINGS_TRANSACTION_SETTLED') {
@@ -1457,94 +1669,139 @@ export function normalizeOnboardingSourceEvent(
       (error.phase === 'consent' || error.phase === 'skip')
         ? { type, dataEpoch: context.dataEpoch, operationId: record.operationId, error }
         : null;
-  } else if (type === 'PERMISSION_GRANTED') {
+  } else if (type === 'PERMISSION_CONTAINS_PRESENT' || type === 'PERMISSION_CONTAINS_MISSING') {
+    const record = readExactRecord(captured, ['type', 'proof']);
+    const command = context.command?.type === 'CHECK_CONNECTOR_PERMISSION' ? context.command : null;
+    const expected =
+      command === null
+        ? null
+        : {
+            workerEpoch: command.workerEpoch,
+            dataEpoch: command.dataEpoch,
+            operationId: command.operationId,
+            commandId: command.commandId,
+            checkId: command.checkId,
+            connectorId: command.connectorId,
+            origins: command.origins,
+          };
+    if (record !== null && expected !== null) {
+      if (type === 'PERMISSION_CONTAINS_PRESENT') {
+        const proof = parseOnboardingPermissionContainsProof(record.proof, expected, true);
+        event = proof === null ? null : { type, proof };
+      } else {
+        const proof = parseOnboardingPermissionContainsProof(record.proof, expected, false);
+        event = proof === null ? null : { type, proof };
+      }
+    }
+  } else if (type === 'SESSION_MISSING') {
     const record = readExactRecord(captured, [
       'type',
+      'workerEpoch',
       'dataEpoch',
       'operationId',
+      'commandId',
+      'checkId',
       'connectorId',
-      'required',
     ]);
     const id = connectorId(record?.connectorId);
-    event =
+    const candidate: OnboardingSourceEvent | null =
       record !== null &&
+      isOnboardingSourceUuidV4(record.workerEpoch) &&
       record.dataEpoch === context.dataEpoch &&
       isOnboardingSourceUuidV4(record.operationId) &&
-      id !== null &&
-      typeof record.required === 'boolean'
+      typeof record.commandId === 'string' &&
+      isOnboardingSourceUuidV4(record.checkId) &&
+      id !== null
         ? {
             type,
+            workerEpoch: record.workerEpoch,
             dataEpoch: context.dataEpoch,
             operationId: record.operationId,
+            commandId: record.commandId,
+            checkId: record.checkId,
             connectorId: id,
-            required: record.required,
           }
         : null;
-  } else if (type === 'PERMISSION_REFUSED' || type === 'SESSION_MISSING') {
-    const record = readExactRecord(captured, ['type', 'dataEpoch', 'operationId', 'connectorId']);
-    const id = connectorId(record?.connectorId);
-    event =
-      record !== null &&
-      record.dataEpoch === context.dataEpoch &&
-      isOnboardingSourceUuidV4(record.operationId) &&
-      id !== null
-        ? { type, dataEpoch: context.dataEpoch, operationId: record.operationId, connectorId: id }
-        : null;
+    event = candidate !== null && checkEventMatches(context, candidate) ? candidate : null;
   } else if (type === 'SESSION_FOUND') {
     const record = readExactRecord(captured, [
       'type',
+      'workerEpoch',
       'dataEpoch',
       'operationId',
+      'commandId',
+      'checkId',
       'connectorId',
       'lastSync',
     ]);
     const id = connectorId(record?.connectorId);
     const lastSync = record?.lastSync;
-    event =
+    const candidate: OnboardingSourceEvent | null =
       record !== null &&
+      isOnboardingSourceUuidV4(record.workerEpoch) &&
       record.dataEpoch === context.dataEpoch &&
       isOnboardingSourceUuidV4(record.operationId) &&
+      typeof record.commandId === 'string' &&
+      isOnboardingSourceUuidV4(record.checkId) &&
       id !== null &&
       (lastSync === null ||
         (typeof lastSync === 'string' && lastSync.length > 0 && lastSync.length <= 64))
         ? {
             type,
+            workerEpoch: record.workerEpoch,
             dataEpoch: context.dataEpoch,
             operationId: record.operationId,
+            commandId: record.commandId,
+            checkId: record.checkId,
             connectorId: id,
             lastSync,
           }
         : null;
+    event = candidate !== null && checkEventMatches(context, candidate) ? candidate : null;
   } else if (type === 'CHECK_FAILED') {
     const record = readExactRecord(captured, [
       'type',
+      'workerEpoch',
       'dataEpoch',
       'operationId',
+      'commandId',
+      'checkId',
       'connectorId',
+      'checkPhase',
       'error',
     ]);
     const id = connectorId(record?.connectorId);
     const error = parseOnboardingSourceError(record?.error);
-    event =
+    const candidate: OnboardingSourceEvent | null =
       record !== null &&
+      isOnboardingSourceUuidV4(record.workerEpoch) &&
       record.dataEpoch === context.dataEpoch &&
       isOnboardingSourceUuidV4(record.operationId) &&
+      typeof record.commandId === 'string' &&
+      isOnboardingSourceUuidV4(record.checkId) &&
       id !== null &&
       error !== null &&
-      (error.phase === 'permission' || error.phase === 'session')
+      (record.checkPhase === 'permission' || record.checkPhase === 'session')
         ? {
             type,
+            workerEpoch: record.workerEpoch,
             dataEpoch: context.dataEpoch,
             operationId: record.operationId,
+            commandId: record.commandId,
+            checkId: record.checkId,
             connectorId: id,
+            checkPhase: record.checkPhase,
             error,
           }
         : null;
+    event = candidate !== null && checkEventMatches(context, candidate) ? candidate : null;
   } else if (type === 'NETWORK_OFFLINE') {
     const record = readExactRecord(captured, ['type', 'dataEpoch', 'operationId']);
     event =
       record !== null &&
       record.dataEpoch === context.dataEpoch &&
+      context.command?.type !== 'CHECK_CONNECTOR_PERMISSION' &&
+      context.command?.type !== 'CHECK_CONNECTOR_SESSION' &&
       isOnboardingSourceUuidV4(record.operationId)
         ? { type, dataEpoch: context.dataEpoch, operationId: record.operationId }
         : null;
@@ -1603,7 +1860,7 @@ export function normalizeOnboardingSourceEvent(
       isOnboardingSourceUuidV4(record.nextRequestId) &&
       record.nextRequestId !== record.requestId &&
       correlationIdsAreFresh(context, [record.nextRequestId]) &&
-      correlationIdsHaveCapacity(context, [record.nextRequestId], 1)
+      correlationIdsHaveCapacity(context, [record.nextRequestId], 2)
         ? {
             type,
             dataEpoch: context.dataEpoch,
@@ -1643,7 +1900,7 @@ export function normalizeOnboardingSourceEvent(
       isOnboardingSourceUuidV4(record.nextRequestId) &&
       record.requestId !== record.nextRequestId &&
       correlationIdsAreFresh(context, [record.nextRequestId]) &&
-      correlationIdsHaveCapacity(context, [record.nextRequestId], 1)
+      correlationIdsHaveCapacity(context, [record.nextRequestId], 2)
         ? {
             type,
             dataEpoch: context.dataEpoch,
@@ -1658,6 +1915,7 @@ export function normalizeOnboardingSourceEvent(
       'dataEpoch',
       'requestId',
       'nextOperationId',
+      'nextCheckId',
       'snapshot',
       'completionReadProof',
     ]);
@@ -1677,8 +1935,9 @@ export function normalizeOnboardingSourceEvent(
       isOnboardingSourceUuidV4(record.requestId) &&
       recovery !== null &&
       record.requestId === recovery.requestId &&
-      correlationIdsAreFresh(context, [record.nextOperationId]) &&
-      correlationIdsHaveCapacity(context, [record.nextOperationId]) &&
+      record.nextOperationId !== record.nextCheckId &&
+      correlationIdsAreFresh(context, [record.nextOperationId, record.nextCheckId]) &&
+      correlationIdsHaveCapacity(context, [record.nextOperationId, record.nextCheckId]) &&
       snapshot !== null &&
       snapshot.requestId === recovery.snapshotRequestId &&
       snapshot.commandId === recovery.snapshotCommandId &&
@@ -1688,6 +1947,7 @@ export function normalizeOnboardingSourceEvent(
             dataEpoch: context.dataEpoch,
             requestId: record.requestId,
             nextOperationId: record.nextOperationId as string,
+            nextCheckId: record.nextCheckId as string,
             snapshot,
             completionReadProof,
           }

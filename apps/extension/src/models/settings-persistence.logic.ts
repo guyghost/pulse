@@ -265,12 +265,14 @@ function validMutationRequest(
       event.mutationId,
       event.permissionCheckId,
       event.activationId,
+      event.activationResult.resultId,
       event.storageReservationId,
-    ]).size === 4 &&
+    ]).size === 5 &&
     areFreshCorrelationIds(context, [
       event.mutationId,
       event.permissionCheckId,
       event.activationId,
+      event.activationResult.resultId,
       event.storageReservationId,
     ]) &&
     !context.canonical.envelope.outcomes.some(
@@ -1944,7 +1946,10 @@ export function createSettingsPersistenceSetup(
         areFreshCorrelationIds(context, [event.requestId]) &&
         canAppendCorrelationIds(context.mutation, event.requestId),
       immutableOutcomeMissingFatal: ({ context, event }) =>
-        (event.type === 'SETTINGS_CAPTURED/MUTATE' || event.type === 'SETTINGS_CAPTURED/RETRY') &&
+        (event.type === 'SETTINGS_CAPTURED/MUTATE' ||
+          event.type === 'SETTINGS_CAPTURED/RETRY' ||
+          event.type === 'SETTINGS_CAPTURED/CANONICAL_UPDATED' ||
+          event.type === 'SETTINGS_CAPTURED/SERVICE_WORKER_RESTARTED') &&
         context.phase === 'failed' &&
         context.pendingIntent !== null &&
         context.mutation !== null &&

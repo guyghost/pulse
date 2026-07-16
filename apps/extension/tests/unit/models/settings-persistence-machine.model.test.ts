@@ -844,7 +844,7 @@ describe('settings persistence atomic admission', () => {
   it('keeps all 34 captured event types and every branch provenance-first', () => {
     const inventory = settingsTransitionInventory();
     expect(inventory.eventTypes.size).toBe(34);
-    expect(inventory.branches).toBe(124);
+    expect(inventory.branches).toBe(128);
     expect(inventory.provenanceFailures).toEqual([]);
   });
 });
