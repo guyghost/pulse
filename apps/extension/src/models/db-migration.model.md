@@ -143,17 +143,19 @@ epoch and authority revision. It holds the gate until the IDB transaction or
 Chrome-storage Promise settles. There is no async gap between revalidation and
 commit admission.
 
-Before ordinary admission, the same object and same FIFO expose the four
+Before ordinary admission, the same object and same FIFO expose the six
 operations modeled by `dataset-write-capability.model.md`:
 
 ```ts
 beginPreAdmissionCommand(claim);
 issuePreAdmissionCapability(scopeToken, writeId);
-commitPreAdmission(capability, writeId, durableEffect);
+commitPreAdmission(capability, writeId, exactDurableLeafToken);
 completePreAdmissionCommand(scopeToken);
+reserveResetPreAdmission(request, exactAuthorityReadLeafToken);
+rehydrateResetPreAdmission(journalIdentity, exactAuthorityReadLeafToken);
 ```
 
-They are not a second authority. `issueLease/commit`, these four operations,
+They are not a second authority. `issueLease/commit`, these six operations,
 `acquireResetFence`, `installResetEpoch` and `fenceFailure` all use the one
 existing `runWithGate` queue. A second mutex in a Chrome-local gate, DB adapter,
 Startup port or Reset adapter is an architecture failure.
@@ -171,22 +173,30 @@ rejects, while worker termination destroys that worker's exact-object registry.
 It is an exact authority fact, not a wildcard. Reset cleanup binds exact
 nullable `previousDataEpoch`; Reset rebuild/terminal writes bind exact
 `nextDataEpoch`. Once an epoch is retained, null or a foreign epoch is rejected
-inside the FIFO before the durable callback.
+inside the FIFO before the durable adapter.
 
-Every capability is an exact-object, one-shot token consumed before callback
-invocation and before any `await`. The FIFO remains held until that Promise
-settles. A Reset/failure fence ahead of a commit revokes it and invokes zero
-callback; a commit already ahead of the fence is allowed to settle. Completion
-revokes every unconsumed token before the workflow changes command/stage.
+Every capability is an exact-object, one-shot token consumed before invocation
+of its registered durable adapter and before any `await`. Callers provide an
+exact data-only leaf token, never an async function. A closed build-time mapping
+resolves that token to the only adapter for the write kind; adapter modules
+cannot import or receive the authority, workflow controllers, public Settings
+or messaging. The FIFO remains held until that adapter Promise settles. A
+Reset/failure fence ahead of a commit revokes it and invokes zero adapter; a
+commit already ahead of the fence is allowed to settle. An external fence
+arriving while an adapter is pending obtains the next FIFO ticket and waits; it
+is not rejected as adapter reentrance. Completion revokes every unconsumed token
+before the workflow changes command/stage.
 
-Claim and capability registries are worker-local, bounded and never evict or
-reuse replay evidence. Allocator reentrancy, throws, invalid IDs and collisions
-follow the same fail-closed retained-ID discipline as lease allocation. Unlike
-the synchronous ordinary lease allocator, capability allocation is already at
-a FIFO position: a reentrant authority operation queues behind it, the outer
-fresh capability becomes canonical, and a same-write reentrant caller later
-receives that object by identity. Reentrant Reset/completion/failure fence then
-revokes it before every later commit. No raw JavaScript value escapes.
+Claim, capability and leaf-operation registries are worker-local, bounded and
+never evict or reuse replay evidence. The capability allocator is synchronous,
+receives no authority reference and cannot return a Promise. A dispatch-depth
+sentinel applies only to that allocator call stack: any authority call attempted
+from it is rejected **before enqueue** with
+`AUTHORITY_REENTRANCY_FORBIDDEN`, latches failure of the outer allocation and
+burns a valid returned UUID. Hostile allocator code cannot catch the inner error
+and turn the outer issue into success. The sentinel is cleared before returning
+to the event loop, so unrelated external FIFO calls remain enqueueable. Throws,
+invalid IDs and collisions remain typed; no raw JavaScript value escapes.
 Registry exhaustion is typed and does not enable a raw/no-op fallback.
 
 The gate therefore has two and only two routes:
@@ -214,24 +224,21 @@ Proxy therefore becomes the command's typed Authority validation error —
 source after capture. Its validated `workerEpoch` and allocator are likewise
 captured once at factory creation without executing a dependency getter.
 
-`allocateLeaseId` is an injected but reentrant seam. Lease issuance captures the
-exact open admission epoch and revision before calling it. After the allocator
-returns, a valid fresh UUID is retained permanently for worker-lifetime
-uniqueness, then admission status, epoch and revision are revalidated before
-any lease or operation binding is created. The operation binding is then
-revalidated too: if an exact active binding appeared through reentrance, the
-outer fresh UUID stays burned and the already-issued canonical lease is
-returned by identity; the outer call never replaces that binding. A rebound or
-revoked binding follows the existing typed `OPERATION_REBOUND` or
-`LEASE_REVOKED` result. If the allocator synchronously queues Reset or otherwise
-changes any captured admission identity, issuance fails with typed
-`ADMISSION_CLOSED`: no outer lease or binding is created, while the allocated
-lease ID stays burned. Allocator collision also fails closed before an outer
-operation binding and no retained ID is ever recycled, including after
-revocation. If the allocator throws any JavaScript value, including a non-Error,
-the outer issuance fails with typed `INVALID_LEASE_ID`; no raw value escapes and
-no outer lease ID or binding is retained. Any separately completed reentrant
-authority command keeps its own modeled result.
+`allocateLeaseId` is an injected synchronous seam guarded by the allocator-only
+dispatch-depth sentinel. Lease issuance captures the exact open admission epoch
+and revision before calling it. Any public authority call attempted from that
+same allocator stack fails synchronously with
+`AUTHORITY_REENTRANCY_FORBIDDEN` **before enqueue** and latches the outer issue
+as failed even if hostile allocator code catches the inner exception. Therefore
+no inner lease, Reset ticket, operation binding or authority mutation can occur.
+After the allocator returns, a valid fresh UUID is retained permanently for
+worker-lifetime uniqueness, then the latch, admission status, epoch and revision
+are revalidated before any lease or binding. Allocator collision also fails
+closed and no retained ID is ever recycled, including after revocation. If the
+allocator throws any other JavaScript value, including a non-Error, the outer
+issuance fails with typed `INVALID_LEASE_ID`; no raw value escapes and no outer
+lease ID or binding is retained. The sentinel ends with the synchronous call;
+unrelated external FIFO work remains enqueueable.
 
 Reset acquires the same gate first, closes admission, increments authority
 revision and revokes every lease before quiescence. A queued old callback can
@@ -257,7 +264,41 @@ equals the request's previous epoch and differs from its supplied next epoch. If
 the canonical epoch already equals the same request's next epoch, preflight may
 recognize clear-before-response only when the exact receipt matches every
 original ID/epoch, `requestedAt` and committed phase, plus current DB6/data3
-authority. It performs no second gate acquisition or destruction.
+authority. It performs no second destruction or live reset-fence acquisition,
+but completion still requires the exact idempotent epoch-install/admission-open
+proof.
+
+The `reset_pending` owner records total initial-journal status
+`absent_proven | outcome_unknown | durable_proven`. Only exact durability may
+acquire `reset_owned`; unknown permits only the same-A FIFO resolver, while B
+remains rejected. Durable failure and retry metadata use only the model's exact
+failure/retry checkpoint capabilities. After strict journal removal, the
+dedicated `installResetEpochAndOpen` authority operation is the sole route to
+normal admission; failure keeps admission closed and retries no destructive
+effect.
+
+That view comes only from the exact registered
+`dataset-reset/preflight-authority-read/v1` adapter while the outer FIFO position
+is held. It first inventories IndexedDB; an absent `missionpulse` database is not
+opened. A present database is opened without a target version, inspected only
+through `readonly` transactions, and its temporary central-registry handle is
+closed/unregistered in `finally` before settlement. `onupgradeneeded` aborts and
+returns `RESET_PREFLIGHT_OPEN_WOULD_UPGRADE`. The adapter performs no structure,
+data, marker, Settings or repair write and exposes no IDB object. This is the
+sole controlled pre-version opener; ordinary migration/openers remain denied.
+
+If a new worker finds a strict Reset journal, it cannot clone the dead worker's
+reservation. `rehydrateResetPreAdmission` rereads the complete journal, receipt
+and phase-compatible physical DB authority with the distinct registered
+rehydration read adapter at one FIFO position. It rejects Reset B, a foreign
+receipt, a readable third epoch and physical state beyond the exact effect-ahead
+matrix. For `handoff_adopted` and `handoff_cleared`, it also rejects a current
+worker epoch equal to the durable source worker epoch. It then installs
+`reset_pending` and returns a new exact-object
+reservation bound to the current `workerEpoch` and revisions. Only
+`acquireResetFence` with that replacement may revoke leases/install
+`reset_owned`; no resumed Reset effect or `BOOT_FENCE_ACQUIRED` precedes it.
+Exact duplicate rehydration returns that same current-worker object.
 
 The receipt is the bounded Chrome-local system key
 `missionpulse.localDataResetReceipt.v1`. Reset writes and strictly reads it back
@@ -278,7 +319,9 @@ generation-zero write, marker 3, Settings alignment writes, receipt and final
 journal removal. A physical Reset effect and its journal checkpoint always use
 different capabilities. Reinitialization specifically uses four ordered
 capabilities: DB6 transaction, Settings V2 write/read-back, marker-3
-write/read-back, then `database_reinitialized` checkpoint.
+write/read-back, then `database_reinitialized` checkpoint. Every capability has
+one exact matching data-only leaf token resolved by the closed adapter table;
+the Reset port cannot pass an arbitrary async function.
 
 Chrome-local settings repeat the epoch to close revision ABA across reset. The
 single normative authority is `SettingsEnvelopeV2` exported by
@@ -524,6 +567,7 @@ through the service-worker bridge; it never opens IndexedDB directly.
 ```text
 checking reset journal
   -> if absent, service a pending reset request's read-only preflight
+       -> use the sole FIFO-held readonly preflight opener; close before result
        -> recognize exact post-clear completion, or
        -> admit only exact fresh request to reset journaling, or
        -> continue normal startup when no reset request is pending
@@ -542,21 +586,30 @@ checking reset journal
 
 Every write-bearing Startup command begins the exact bounded claim described by
 `dataset-write-capability.model.md`, consumes one capability per write, and
-completes/revokes the scope before publishing its result event. Read-only stages
-create no dummy claim. `OPEN_EPOCH_ADMISSION` additionally requires no active
-pre-admission scope or outstanding capability. After it opens, all business
-writers switch exclusively to ordinary leases; there is no overlap/fallback
-window between the two routes.
+supplies one exact registered data-only leaf token per write, then completes/
+revokes the scope before publishing its result event. Read-only stages create no
+dummy claim. `OPEN_EPOCH_ADMISSION` additionally requires no active
+pre-admission scope or outstanding capability/leaf operation. After it opens,
+all business writers switch exclusively to ordinary leases; there is no
+overlap/fallback window between the two routes.
 
 Reset journal detection preempts every other stage and transfers ownership to
 the reset workflow. No opener, actor, scan, settings/profile mutation or cache
 writer can enter between migration success and prepared-ledger settlement,
 settings verification/recovery and epoch-authority publication.
 
+On a new worker, that transfer first rehydrates a replacement exact-object Reset
+reservation from the strict journal under the FIFO and then reacquires the live
+fence. The journal is durable identity, not the token itself. Reset B and every
+clone/old-worker token remain invalid, and no phase resumes before the current-
+worker fence proof.
+
 Journal absence is not completion by itself. On replay of an original reset
 request after clear, the barrier exposes a read-only proof to the reset actor and
 does not begin ordinary migration/admission concurrently. Exact next epoch,
-matching latest receipt and DB6/data3 authority return recognized completion;
+matching latest receipt and DB6/data3 authority return recognized post-clear
+authority; Reset must still obtain the exact idempotent
+`installResetEpochAndOpen` proof before completion/success;
 exact previous-epoch proof returns fresh admission; every third epoch,
 mismatched receipt or malformed proof fails closed. A physical read failure is
 explicitly retryable, with no automatic loop and no journal written.
@@ -777,24 +830,22 @@ decides its durable result.
 28. Startup pending IDs and retained bootstraps are each bounded to 64; every
     successful publication purges pending IDs and replaces, rather than appends
     to, the last published batch.
-29. Lease allocation is reentrant-safe: a Reset queued from the allocator can
-    burn the returned fresh UUID but creates no lease or operation binding, and
-    that operation may bind only to a different lease ID after the next epoch is
-    installed and admitted.
-30. Same-operation allocation reentrance never overwrites a binding: the outer
-    fresh UUID is burned and the exact active inner lease remains the sole
-    canonical lease returned to both callers.
+29. Lease allocation rejects any authority reentrance synchronously before
+    enqueue, latches the outer issue and creates no Reset ticket, inner lease or
+    operation binding; a valid returned UUID remains burned.
+30. Same-operation allocation reentrance cannot create a canonical inner lease,
+    and catching its inner error cannot turn the outer issue into success.
 31. Factory and allocator boundaries are fail-closed: revoked/accessor
     dependency bags produce `INVALID_CONFIGURATION`, and every value thrown by
     `allocateLeaseId` produces `INVALID_LEASE_ID`; neither boundary leaks a raw
     JavaScript exception or creates an outer binding.
 32. Ordinary leases remain impossible before `OPEN_EPOCH_ADMISSION`; every
     modeled Startup/Reset write instead carries its exact command claim and
-    one-shot capability.
+    one-shot capability plus its matching registered leaf token.
 33. Ordinary commits, pre-admission claim/issue/commit/complete, Reset and
     failure fence linearize on one `DatasetEpochAuthority` FIFO.
-34. Capability consumption precedes durable callback invocation and await; a
-    consumed/revoked token is never replayable.
+34. Capability consumption precedes durable adapter invocation and await; a
+    consumed/revoked capability or leaf token is never replayable.
 35. Command, stage, attempt, worker, nullable epoch, authority revision and
     fence revision are revalidated inside the FIFO before every pre-admission
     write.
@@ -804,12 +855,24 @@ decides its durable result.
     marker-3 write/read-back and reinitialization checkpoint use four ordered,
     distinct capabilities.
 38. Reset/failure fence wins against every later queued capability; an earlier
-    entered durable callback settles first and the FIFO never invents
-    cancellation.
-39. Claim/capability registries are bounded without eviction; allocator
-    reentrancy, throw, collision or exhaustion never enables raw/no-op fallback.
-40. Worker restart changes worker/attempt and rebuilds fresh claims/write IDs;
-    only durable read-back, never an old memory token, proves progress.
+    entered durable adapter settles first and the FIFO never invents
+    cancellation. An external fence arriving during its Promise waits at the
+    next ticket and is not rejected as reentrant.
+39. Claim/capability/leaf registries are bounded without eviction. Capability-
+    allocator reentrancy is rejected before enqueue and latches outer failure;
+    throw, collision or exhaustion never enables raw/no-op fallback.
+40. Worker restart changes worker/attempt and rebuilds fresh claims/write/leaf
+    IDs. A journaled Reset additionally receives a new current-worker exact-
+    object reservation through strict FIFO rehydration before live fence
+    acquisition; only durable read-back, never an old memory token, proves
+    progress.
+41. The Reset authority preflight opener is readonly and FIFO-held: it never
+    opens an absent DB, never supplies a target version, aborts
+    `onupgradeneeded`, performs no upgrade/migration/write and proves handle
+    closure before settlement.
+42. The leaf adapter table is closed at build time. Adapter modules receive no
+    authority/controller/public Settings/messaging path, and Settings writes
+    preserve the only lock order DatasetEpoch outer -> Settings/system inner.
 
 ## Review checklist before implementation
 
@@ -825,15 +888,23 @@ decides its durable result.
 - reset: every journal phase, including `committed`, preempts migration and no
   old/new epoch is admitted until reset finalization;
 - reset replay after journal clear: same original next epoch plus exact
-  terminal receipt and DB6/data3 authority returns recognized success with no
-  gate, journal, delete, clear, reinitialize or broadcast, including after
-  same-epoch data/Settings/alarm writes; foreign epoch or mismatched receipt
-  fails closed;
+  terminal receipt and DB6/data3 authority returns recognized post-clear
+  authority, then exact idempotent admission-open proof returns success with no
+  journal, delete, clear, reinitialize or broadcast, including after same-epoch
+  data/Settings/alarm writes; open failure stays closed/recoverable, and foreign
+  epoch or mismatched receipt fails closed;
 - receipt ordering: bounded system quota covers latest-only put/read-back;
   failure is retryable, conflict is fail-closed, crash before checkpoint repeats
   receipt idempotently, and journal clear never precedes the exact receipt;
 - fresh reset admission: canonical epoch must equal previous and differ from
   next; physical preflight failure is explicit-retry only and writes no journal;
+- Reset preflight absent DB performs no open; present DB opens without target
+  version, uses readonly transactions, aborts `onupgradeneeded`, proves handle
+  close/unregister on every outcome and performs zero schema/data/marker write;
+- crash with Reset A journaled at every phase: a new worker rehydrates one fresh
+  exact-object A reservation, exact duplicate joins it, B/clone/dead-worker/
+  third-epoch/foreign-receipt/phase-incompatible facts fail without state change,
+  and no phase resumes before live fence acquisition;
 - permission/quota/marker failure: no false `ready` result;
 - concurrent callers: one attempt, one prepared recovery and one Settings
   recovery pass, same epoch result;
@@ -842,33 +913,40 @@ decides its durable result.
   profile write and cache callback all perform zero writes after epoch change;
 - a writer whose lease is revoked between computation and commit fails the
   final in-gate revalidation without opening its durable transaction;
-- an allocator that synchronously queues Reset during `issueLease` leaves the
-  authority `reset_pending`, returns no lease, creates no operation binding and
-  permanently retains the allocated UUID; after installing/admitting the next
-  epoch, the same operation ID can bind only through a different fresh UUID;
-- an allocator that synchronously issues the same operation returns one exact
-  canonical lease to both callers, never overwrites the inner binding and burns
-  the unused outer UUID for worker lifetime;
+- an allocator that synchronously calls Reset during `issueLease` receives
+  `AUTHORITY_REENTRANCY_FORBIDDEN` before enqueue; the violation is latched on
+  the outer issue, no reset ticket/reservation or operation binding is created,
+  admission remains unchanged and a valid returned UUID is burned for worker
+  lifetime;
+- an allocator that synchronously issues the same or another operation receives
+  the same reject-before-enqueue result; no inner canonical lease can exist and
+  the outer issue fails even if the allocator catches the inner exception;
 - an allocator that throws `Error`, `undefined` or another primitive yields
   typed `INVALID_LEASE_ID`, while a revoked/accessor dependency bag yields typed
   `INVALID_CONFIGURATION` without executing a getter; no raw exception escapes;
 - ordinary lease pre-admission fails before allocation; an exact supported
-  Startup/Reset claim and its exact next capability succeed only on the shared
-  FIFO;
+  Startup/Reset claim and its exact next capability/registered leaf token
+  succeed only on the shared FIFO;
 - substitute claim, command, stage, attempt, worker, nullable epoch,
-  authority/fence revision, write or capability ID independently; every case
-  rejects before callback;
-- multi-write commands allocate distinct one-shot tokens; double consume,
-  cross-write/cross-command reuse, complete-before-callback and old-worker
-  replay perform zero write;
+  authority/fence revision, write, capability, leaf-operation or adapter ID
+  independently; every case rejects before adapter invocation;
+- multi-write commands allocate distinct capability and leaf tokens; double
+  consume, cross-write/cross-command reuse, complete-before-commit and old-
+  worker replay perform zero write;
 - exercise capability allocator reentrancy into same write, another ordinal,
-  completion, Reset and failure fence, plus throw/invalid UUID/collision and
-  exact registry exhaustion without eviction;
+  completion, Reset and failure fence: every inner authority call rejects before
+  enqueue, latches outer failure and burns a valid returned UUID; also cover
+  throw/invalid UUID/collision and exact registry exhaustion without eviction;
 - exercise commit/Reset and commit/failure-fence in both FIFO orders and assert
-  only the earlier position can enter its durable callback;
+  only the earlier position can enter its durable adapter; enqueue an external
+  Reset during a pending adapter Promise and prove it waits at the next ticket
+  without reentrancy rejection or deadlock;
 - crash/restart after data-v3 transaction, Settings V2 read-back and marker-3
-  read-back uses fresh claim/write/capability IDs and never opens admission
+  read-back uses fresh claim/write/capability/leaf IDs and never opens admission
   early;
+- architecture checks reject runtime adapter injection and prove every
+  allowlisted leaf module lacks authority/controller/public Settings/messaging
+  imports; Settings leaves acquire DatasetEpoch before the inner system gate;
 - revoked Proxies at the scope, opening-proof, lease, Reset-request,
   failure-command and nested-failure boundaries yield their exact typed
   Authority validation errors, never a raw exception or state change;
@@ -890,11 +968,14 @@ Assert no lease/admission/bootstrap before `SETTINGS_RECOVERY_PASSED`; crash and
 explicitly retry at every system Settings-journal phase; require settled shared
 envelope plus exact alarm proof before `openingAdmission` and `ready`. A reset
 journal at every phase, especially `committed`, must route `resetOwned` without
-starting a concurrent migration or returning ordinary failure. After a crash
+starting a concurrent migration or returning ordinary failure: on a new worker,
+strictly rehydrate Reset A's current-worker reservation, reject Reset B and
+acquire its live fence first. After a crash
 between journal clear and response, replay the original reset request and prove
-recognized completion from canonical next epoch plus exact latest-only receipt
-and DB6/data3 authority, after injecting legitimate E2 writes; assert zero
-second migration, deletion or schema write.
+recognized post-clear authority from canonical next epoch plus exact latest-only
+receipt and DB6/data3 proof, then exact idempotent admission opening, after
+injecting legitimate E2 writes; assert zero second migration, deletion or
+schema write and zero success before admission proof.
 
 ## Out of scope
 

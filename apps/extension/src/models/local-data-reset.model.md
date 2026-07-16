@@ -34,14 +34,17 @@ dataset:
   matching auto-scan alarm proof;
 - one latest-only terminal receipt for the exact reset request, retained after
   journal clear;
+- no residual `missionpulse.backgroundSchedulingHandoff.v1` after its exact
+  adoption, cleanup read-back and reset-journal checkpoint;
 - no tracking envelopes, mutation ledgers or outbox rows;
 - every pre-reset actor, request, response and broadcast permanently unable to
   mutate the new dataset.
 
 Reset success is durable fact, not UI optimism. On the executing path,
-`reset:true` is forbidden until the journal has been removed after every
-prerequisite succeeds. A replay after clear may return success only through the
-strict post-clear recognition proof below.
+`reset:true` is forbidden until the journal has been removed **and** exact
+next-epoch admission has been installed/opened after every prerequisite
+succeeds. A replay after clear may return success only after strict post-clear
+recognition and the same idempotent admission-open proof below.
 
 ## Identities and injected inputs
 
@@ -94,14 +97,22 @@ to the reset request/journal and reset-owned Settings command only.
 ## Read-only preflight and post-clear recognition
 
 Every valid `RESET_REQUESTED` first enters `preflightingCompletion`, before the
-ten-phase journal and before any fence, clear, close, delete or write. Shell
-performs one read-only, exact-key proof under the serialized dataset authority.
+twelve-phase journal and before any fence, clear, close, delete or write. Shell
+performs one read-only, exact-key proof under the serialized dataset authority
+through the registered
+`dataset-reset/preflight-authority-read/v1` leaf token. The closed adapter is the
+only pre-version opener: it inventories first, never opens an absent DB, opens a
+present DB without a target version, uses only `readonly` transactions, aborts
+`onupgradeneeded`, and closes/unregisters its temporary handle in `finally`
+before settling. It performs zero schema creation, upgrade, migration, repair or
+durable mutation.
+
 The reset actor accepts exactly one of two outcomes:
 
-- `fresh`: reserved reset journal absent, canonical current epoch exactly
+- `fresh`: reserved reset journal and handoff sidecar both absent, canonical current epoch exactly
   `previousDataEpoch` (including `null`), and `nextDataEpoch` different from the
   current epoch. Only this result may enter `journaling`.
-- `already_completed`: reserved reset journal absent, canonical current epoch
+- `already_completed`: reserved reset journal and handoff sidecar both absent, canonical current epoch
   exactly `nextDataEpoch`, and the latest-only terminal receipt exactly matches
   the original reset ID, previous/next epochs, both Settings IDs, `requestedAt`
   and `phase:'committed'`. The current authority proof additionally requires
@@ -121,18 +132,32 @@ The durable receipt lives at
 to the latest reset only, remains after the response, and is removed by the next
 reset's selective local clear before that reset writes its own receipt.
 Recognition performs zero second destruction, zero fence acquisition and zero
-journal write, and completes with diagnostic
-`completionDisposition:'recognized'`. The receipt adds one bounded
+journal write. It sets `completionDisposition:'recognized'` and enters
+`openingEpochAdmission`; it does not complete until exact next-epoch admission
+is proven open. The receipt adds one bounded
 Chrome-storage system key but no DB store, `tracking_meta` field, DB-version or
 data-version change.
 
 ## Durable journal
 
-Before admission closes or any destructive effect begins, Shell writes this
-strict record to reserved key `missionpulse.localDataReset.v1` in
-`chrome.storage.local`:
+Fresh preflight first reserves A as `reset_pending`, which closes **new lease
+issuance only** and preserves FIFO order for commits already ahead of it. Under
+that exact reservation, and before live fence ownership or any destructive
+effect, Shell writes this strict record to reserved key
+`missionpulse.localDataReset.v1` in `chrome.storage.local`:
 
 ```ts
+interface BackgroundSchedulingHandoffCapabilityManifestEntryV1 {
+  kind: 'sidecar_initialize' | 'slot_materialize' | 'sidecar_cleanup';
+  controlAttemptIndex: 0 | 1 | 2 | 3 | null;
+  transitionIndex: number;
+  casAttempt: 0 | 1 | 2;
+  commandId: string;
+  resultId: string;
+  capabilityId: string;
+  bundleDigest: string;
+}
+
 type LocalDataResetPhase =
   | 'journaled'
   | 'fenced'
@@ -143,7 +168,9 @@ type LocalDataResetPhase =
   | 'local_cleared'
   | 'database_reinitialized'
   | 'settings_aligned'
-  | 'committed';
+  | 'committed'
+  | 'handoff_adopted'
+  | 'handoff_cleared';
 
 interface LocalDataResetJournalV1 {
   schemaVersion: 1;
@@ -153,6 +180,30 @@ interface LocalDataResetJournalV1 {
   settingsRecoveryRequestId: string;
   settingsBootstrapRequestId: string;
   phase: LocalDataResetPhase;
+  backgroundSchedulingHandoff: {
+    schemaVersion: 1;
+    storageKey: 'missionpulse.backgroundSchedulingHandoff.v1';
+    sidecarId: string;
+    handoffId: string;
+    resetId: string;
+    checkpointRevision: number;
+    slotCount: number;
+    payloadDigest: string;
+    sourceControlLaneId: string;
+    sourceControlLaneAttemptIndex: 0 | 1 | 2 | 3;
+    sourceWorkerEpoch: string;
+    capabilityManifestDigest: string;
+    cleanupRecovery: {
+      version: 1;
+      manifestDigest: string;
+      bundles: readonly [
+        BackgroundSchedulingHandoffCapabilityManifestEntryV1,
+        BackgroundSchedulingHandoffCapabilityManifestEntryV1,
+        BackgroundSchedulingHandoffCapabilityManifestEntryV1,
+      ];
+    };
+    sidecarEncodedBytes: number;
+  } | null;
   requestedAt: number;
   retryCount: number;
   lastError: {
@@ -165,6 +216,18 @@ interface LocalDataResetJournalV1 {
 }
 ```
 
+`backgroundSchedulingHandoff` est strictement null aux phases
+`journaled|fenced`, puis non-null de `quiesced` à `handoff_cleared`. Le payload
+ne vit jamais dans le journal : sa référence id/digest pointe vers le sidecar
+local exact, fermé avant checkpoint, borné à 131 slots et 1 048 576 octets UTF-8
+pour sa forme canonique complète. Le contrat sidecar est
+défini sans import circulaire dans `local-data-reset.contract.ts` et le modèle
+scheduling produit exactement cette forme.
+La référence conserve aussi la provenance lane/attempt/worker, le digest du manifest
+canonique 1 584+3 et les trois entrées cleanup exactes nécessaires à une reprise
+après suppression du sidecar. Ces bundles sont une preuve durable, pas des
+tokens objets transférables entre workers.
+
 Each durable phase-changing effect is followed by a journal checkpoint before
 the machine advances past that phase. Readiness and terminal-receipt read-back
 are ordered prerequisites of the single `committed` checkpoint and repeat
@@ -173,12 +236,108 @@ checkpoint write fails, the previous phase remains authoritative; retry repeats
 the effect idempotently. The journal is never put in `chrome.storage.session`
 because that store is deliberately cleared mid-workflow.
 
-The journal key is excluded from selective local clearing and is removed as the
-last durable prerequisite. A corrupt journal is fail-closed: reset and normal
+The journal and handoff-sidecar keys are the only two keys excluded from
+selective local clearing. The sidecar is removed with strict absence read-back
+only after adoption and checkpoint `handoff_cleared`; the journal is removed
+next, before the separate admission-open authority boundary. A
+corrupt journal is fail-closed: reset and normal
 startup stay fenced, the bytes are preserved, and diagnostics require explicit
 support/recovery. Code must not guess a phase or generate another epoch.
 Journal and nested-error objects reject unknown or missing keys. Error messages
 must contain 1..500 UTF-16 code units, which bounds persisted diagnostics.
+
+### Background scheduling handoff sidecar
+
+The only durable handoff payload key is
+`missionpulse.backgroundSchedulingHandoff.v1` in `chrome.storage.local`. Its
+outer record is exact: schema/key/payload-schema literals, canonical
+sidecar/handoff/reset/worker identities, previous epoch, safe checkpoint
+revision, a 131-bit bitmap and matching popcount, three lowercase SHA-256
+digests, exact canonical payload byte count and one closed JSON payload object.
+That payload contains the preallocated `sidecarId`, reset/handoff/worker/epoch,
+the control lane and Reset attempt, the canonical 1,587-entry capability manifest
+and its digest, the irreversible mailbox-close sequence and policy, a sorted
+0..64 connector order, an exact dense array of 131 closed alarm slots and the
+strict writer plus journal-at-quiescence proof. Every present slot has a unique mailbox sequence
+strictly below the close sequence; a late terminal is at or above it. Unknown
+keys, non-JSON values, sparse arrays,
+accessors, custom prototypes, oversized bytes, digest drift, bitmap drift,
+cross-swapped nested content or a reference that does not match every sidecar
+identity/bound fails closed. The parser reconstructs canonical key order and
+recalculates SHA-256 for payload, writer transfer and journal proof; it derives
+bitmap/popcount from slots instead of trusting outer fields.
+
+Scheduling first closes the handoff at one total mailbox marker. Callbacks
+ordered before it are coalesced into the immutable 131-slot target; callbacks
+after it receive an exact `RESET_HANDOFF_CLOSED` terminal with zero ID/write and
+their next schedule belongs to E2 reconciliation. Scheduling initializes the
+sidecar with the complete target, its digest, `materializationCursor:0` and the
+exact next one-shot
+`casCursor { controlAttemptIndex, transitionIndex, casAttempt }`, then advances
+only that durable target prefix. A definitive failure persists and rereads the
+next CAS cursor before retry; an unknown result is resolved by the current
+bundle IDs and never causes reuse or skip. Its dedicated
+Reset control lane preallocates a fresh `sidecarId`, propagated unchanged to the
+lane, all CAS/cleanup bundles, capabilities, sidecar and reference, plus three fresh
+capability bundles for initialization and every one of the 131 slots across all
+four control attempts: 1,584 CAS bundles total, plus three cleanup bundles.
+Mailbox closure ends external
+allocation and target mutation, but the internal checkpoint executor may still
+consume only those already-reserved entries needed to materialize the immutable
+target before exposing the reference. It cannot allocate, substitute the
+lane/attempt/manifest or write a non-target slot. Once a bit is present, a duplicate is
+coalesced to that canonical slot with zero sidecar write and zero ID consumed.
+Initialization has revision 0; each present slot materialized from the frozen target
+increments exactly once. Every accepted checkpoint therefore satisfies
+`checkpointRevision === popcount(slotBitmap) === slotCount`, including the
+0-slot, 1-slot and 131-slot cases.
+If capacity, CAS or read-back fails before session clear, Reset remains before
+clear and erases nothing. The handoff never reopens and no post-checkpoint slot
+mutation is admissible, so the Reset reference cannot become stale. After
+session clear, the sidecar is durable and stays preserved through restart,
+local clear and adoption.
+
+`payloadEncodedBytes` is the exact UTF-8 length of canonical payload JSON and is
+bounded to 786 432. `sidecarEncodedBytes` lives in the Reset reference and is the
+exact UTF-8 length of the complete canonical sidecar object; it is recomputed
+and bounded to 1 048 576 before any proof is accepted. These names are not aliases
+and neither limit can substitute for the other.
+
+The reset journal references the sidecar only by the exact
+`BackgroundSchedulingHandoffReferenceV1`; it never embeds or owns the payload.
+The checkpoint event additionally carries frozen lane/attempt/worker,
+sidecar/handoff, the full ordered 1,584+3 manifest and frozen-target digest. Its parser
+recalculates every bundle digest and both aggregate digests, then rejects a
+cross-lane/cross-attempt/cross-worker swap against the expectation retained from
+the exact fence authority, even when the foreign proof is internally coherent.
+`SESSION_CLEARED` proves the same sidecar after `chrome.storage.session.clear()`.
+`LOCAL_CLEARED` proves the closed preserved-key tuple
+`[missionpulse.localDataReset.v1,
+missionpulse.backgroundSchedulingHandoff.v1]` and rereads both authorities.
+After committed broadcast, the scheduler restores/adopts the exact sidecar and
+checkpoints `handoff_adopted`; adoption does not delete it. A distinct cleanup
+capability removes only that key, proves strict absence, checkpoints
+`handoff_cleared`, and only then permits reset-journal removal.
+If the worker restarts in `handoff_adopted` or `handoff_cleared`, its current
+worker epoch must differ from the durable source worker epoch or rehydration is
+rejected before fence acquisition. In `handoff_adopted`, the authority returns one exact
+command/result-correlated replacement-lane receipt. It carries three fresh
+cleanup token objects bound to that receipt, lane and current worker, using the
+same sidecar/handoff/manifest IDs and digests; every old-worker token object and
+every DTO copy are invalid. Cleanup attempt 0, 1 or 2 may return `removed` or
+`already_absent`. If the durable phase is already `handoff_cleared`, recovery
+does not issue tokens or repeat deletion and proceeds directly to journal clear.
+
+The `reset_pending` reservation carries a total journal status:
+`absent_proven | outcome_unknown | durable_proven`. Initial put/read-back may
+acquire the live fence only after exact same-reset read-back changes it to
+`durable_proven`. Exact absence after a failed put remains `absent_proven` and A
+may retry with fresh execution IDs. If neither durability nor absence can be
+read back, A enters `resolvingInitialJournal`; only the same-A registered
+resolver may reread, idempotently put-if-absent and prove one outcome. Reset B
+remains rejected. Timeout, thrown error or worker death never means absent: a
+new worker either finds a strict journal and rehydrates A, or proves strict
+absence and requires fresh preflight.
 
 `origin: 'workflow_step'` follows the strict phase matrix: `lastError.step`
 must match the next step implied by `phase`, except the cross-cutting
@@ -248,19 +407,54 @@ Service-worker startup reads the journal before opening IndexedDB or registering
 business handlers. Journal presence installs an outer boot deny-gate, but a
 durable phase never proves that the new worker owns a live fence. The machine
 restores every valid journal with `fenceAcquired:false` and enters
-`reacquiringFence`. Shell may emit correlated
-`BOOT_FENCE_ACQUIRED { resetId }` only after the epoch authority, handlers and
-openers of this worker are fenced. Only then may the machine route by durable
+`reacquiringFence`. The Shell first calls
+`rehydrateResetPreAdmission(strictJournalIdentity,
+exactRehydrationAuthorityReadLeafToken)` under the DatasetEpoch FIFO. That
+operation rereads the journal and phase-compatible physical authority, rejects
+a third epoch/foreign receipt/Reset B, installs `reset_pending`, and returns a
+new exact-object reservation bound to the current `workerEpoch`. It never clones
+the dead worker's reservation. Shell then calls `acquireResetFence` with that
+replacement and the same journal proof; this advances revisions, revokes old
+leases/capabilities and installs `reset_owned`. Shell may emit correlated
+`BOOT_FENCE_ACQUIRED { resetId, proof }` only with the exact registered proof
+returned by both operations and after handlers
+and openers of this worker are fenced. Only then may the machine route by durable
 phase or expose `blocked`/`failed`. Therefore no destructive resume effect can
 start between crash recovery and live-fence proof.
 
-If that live reacquisition fails, Shell first checkpoints the unchanged durable
-phase with `lastError = { code:'FENCE_FAILED', step:'fence',
-origin:'boot_fence_reacquisition', retryable:true, ... }`, then emits the same
-strict `STEP_FAILED`. The machine enters `failed`. This journal reparses for all
-ten phases, so another worker wakeup again reacquires the outer live deny-gate,
-routes to `failed` and waits for a same-reset `RETRY`; it never becomes corrupt
-or resumes a phase effect automatically.
+The rehydration phase matrix accepts only the exact physical effect that may be
+one boundary ahead of its durable checkpoint: old/null authority through early
+phases, possible absence after handle close, absence after deletion/session
+clear, one exact ordered prefix of DB6/next-empty -> generation-zero Settings ->
+marker 3 at `local_cleared`, exact next DB6/data3 after reinitialization, and the
+exact receipt at `committed`. La matrice est totale : `handoff_adopted` exige
+DB6/data3 au next epoch, le receipt terminal exact, la référence/sidecar encore
+présents et le checkpoint d'adoption exact ; `handoff_cleared` exige les mêmes
+autorités DB/receipt, la référence exacte, l'absence du sidecar relue et le
+checkpoint de clear. Every other physical fact fails closed without
+authority mutation.
+
+If that live reacquisition fails, correlated `STEP_FAILED` first enters
+`checkpointingFailure` while the same current-worker A reservation remains
+`reset_pending`. Only the exact
+`reset.journal.checkpoint_failure` capability may persist the unchanged phase
+and retry count with `lastError = { code:'FENCE_FAILED', step:'fence',
+origin:'boot_fence_reacquisition', retryable:true, ... }`. Strict read-back then
+emits `FAILURE_CHECKPOINTED` and enters `failed`. Failure of this checkpoint
+enters `failureCheckpointBlocked`, performs no recursive error write and keeps
+the boot gate closed. This journal reparses for all twelve phases, so another
+worker wakeup again reacquires the outer live deny-gate, routes to `failed` and
+waits for a same-reset `RETRY`; it never becomes corrupt or resumes a phase
+effect automatically.
+
+Fresh execution separates the authority transition from its journal
+checkpoint: `acquiringFence` calls `acquireResetFence`, then
+`checkpointingFence` writes phase `fenced`. A restored phase `journaled` has
+already acquired the current worker's live fence before
+`BOOT_FENCE_ACQUIRED`; it routes directly to `checkpointingFence` and never
+calls `acquireResetFence` a second time. Exact duplicate acquisition may return
+the canonical current-worker proof, but the statechart does not rely on a
+duplicate call.
 
 Closing a side panel or losing the initiating message port does not cancel a
 journaled reset. There is no cancellation transition after `RESET_JOURNALED`.
@@ -419,25 +613,39 @@ The only successful order is:
 
 0. **Preflight.** Read and strictly validate the reserved-journal absence,
    canonical epoch and either fresh-admission or post-clear terminal proof. A
-   recognized completion ends here; a fresh proof alone may continue. This
-   step is read-only and is not an eleventh durable phase.
-1. **Journal.** Persist phase `journaled` with stable IDs and epochs.
-2. **Fence.** Acquire reset admission, invalidate old epoch ownership, stop
-   startup-barrier retry, then checkpoint `fenced`.
-3. **Quiesce.** Cancel or settle the active scan; stop tracking actors; await any
-   active migration transaction; stop outbox work. Checkpoint `quiesced` only
-   when all four proofs are true.
-4. **Close handles.** Close every connection in the central DB-handle registry,
+   recognized completion routes to step 15 only; a fresh proof atomically
+   installs same-A `reset_pending`. This step is read-only and is not an
+   eleventh durable phase.
+1. **Journal.** Put/read back phase `journaled` with stable IDs and epochs. An
+   unknown write/read-back outcome remains `reset_pending` in
+   `resolvingInitialJournal` until the same-A resolver proves exact durability
+   or exact absence; it never falls through to failure or fence acquisition.
+2. **Acquire fence.** From `durable_proven`, acquire reset ownership, invalidate
+   old epoch ownership and stop startup-barrier retry.
+3. **Checkpoint fence.** With that live proof, checkpoint `fenced`. A restored
+   `journaled` phase whose boot fence is already acquired starts here, not at
+   step 2.
+4. **Quiesce and checkpoint handoff.** Cancel or settle the active scan; stop
+   tracking actors; await any active migration transaction; stop outbox work.
+   Scheduling first processes one total mailbox-close marker: callbacks before
+   it are in the frozen target, callbacks after it receive the closed terminal.
+   It must then CAS/read back the exact immutable local sidecar, recompute all
+   canonical facts and return the reference carrying the lane-preallocated
+   `sidecarId`. Checkpoint `quiesced` only when all five proofs are true.
+5. **Close handles.** Close every connection in the central DB-handle registry,
    prevent new non-reset openers, then checkpoint `handles_closed`.
-5. **Delete database.** Await `indexedDB.deleteDatabase('missionpulse')` success,
+6. **Delete database.** Await `indexedDB.deleteDatabase('missionpulse')` success,
    then checkpoint `database_deleted`.
-6. **Clear session.** Run `chrome.storage.session.clear()` after all sanctioned
-   session writers are quiescent, then checkpoint `session_cleared`.
-7. **Clear local selectively.** Snapshot all local keys and remove every key
-   except `missionpulse.localDataReset.v1`. No writer may create a concurrent
-   key while fenced. This removes any previous latest-only terminal receipt.
-   Checkpoint `local_cleared` in the preserved journal.
-8. **Reinitialize.** Reset-owned open creates/verifies exact DB6 schema, creates
+7. **Clear session.** Run `chrome.storage.session.clear()` after all sanctioned
+   session writers are quiescent, reread the exact local sidecar, then checkpoint
+   `session_cleared`. Missing/crossed sidecar proof is not success.
+8. **Clear local selectively.** Snapshot all local keys and remove every key
+   except exactly `missionpulse.localDataReset.v1` and
+   `missionpulse.backgroundSchedulingHandoff.v1`. No writer may create a
+   concurrent key while fenced. Reread the same journal/sidecar reference and
+   sidecar; this removes any previous latest-only terminal receipt. Checkpoint
+   `local_cleared` in the preserved journal.
+9. **Reinitialize.** Reset-owned open creates/verifies exact DB6 schema, creates
    strict metadata with the journal's `nextDataEpoch`, verifies empty tracking,
    ledger and outbox stores, writes the shared-contract `SettingsEnvelopeV2`
    with validated defaults, the same epoch, revision 0, generation 0,
@@ -445,24 +653,40 @@ The only successful order is:
    strict validators and writes `APP_DATA_VERSION = 3`. Re-running is a no-op
    only for the exact epoch/envelope/empty-store proof. Normal lease admission
    remains closed. Checkpoint `database_reinitialized`.
-9. **Align Settings.** Execute the reset-owned recovery above, prove the exact
-   alarm and settled envelope, then checkpoint `settings_aligned`.
-10. **Broadcast readiness.** Dispatch exact stage `ready_to_commit`; it is a
+10. **Align Settings.** Execute the reset-owned recovery above, prove the exact
+    alarm and settled envelope, then checkpoint `settings_aligned`.
+11. **Broadcast readiness.** Dispatch exact stage `ready_to_commit`; it is a
     pre-commit invalidation, never reset success and never a Load trigger.
-11. **Write and read back terminal receipt.** Under the same global fence and
+12. **Write and read back terminal receipt.** Under the same global fence and
     system storage gate, put the exact latest-only
     `missionpulse.localDataResetReceipt.v1`, then reread and strictly parse every
     ID, epoch, `requestedAt` and `phase:'committed'`. Receipt storage is included
     in the bounded Settings/system quota reserve. A matching existing receipt is
     an idempotent success; a different receipt is a protocol conflict.
-12. **Checkpoint commit.** Persist phase `committed` only after exact readiness
+13. **Checkpoint commit.** Persist phase `committed` only after exact readiness
     acceptance and receipt read-back. This durable cutover implies the Settings
     proof; the journal remains solely to replay final notification.
-13. **Broadcast committed.** Dispatch the same generation body with stage
+14. **Broadcast committed.** Dispatch the same generation body with stage
     `committed`. A panel may now issue its single correlated, joining Load.
-14. **Clear journal.** Remove `missionpulse.localDataReset.v1`; open the new
-    epoch authority and transition to `completed` only after removal succeeds.
-    Only then may Shell return
+15. **Adopt handoff.** Restore the sidecar after restart when needed, atomically
+    move its exact 0..131 slots into the new scheduling ingress, reread adoption
+    and checkpoint `handoff_adopted`. The sidecar remains present.
+16. **Clear handoff sidecar.** On the original worker, consume the next exact
+    cleanup capability. After restart, first create a fresh replacement
+    lane/worker, invalidate old-worker token objects and reissue all three exact
+    cleanup entries from the journal reference. Consume attempt 0, 1 or 2,
+    remove only `missionpulse.backgroundSchedulingHandoff.v1` or accept its
+    exact prior absence, strictly prove absence and checkpoint
+    `handoff_cleared` in the reset journal.
+17. **Clear journal.** Remove `missionpulse.localDataReset.v1`, strictly prove
+    absence and retain the exact removal/receipt/DB proof. This does not
+    complete Reset.
+18. **Install and open epoch admission.** In `openingEpochAdmission`, call the
+    dedicated FIFO `installResetEpochAndOpen` operation. Exact success or an
+    exact already-open duplicate yields `RESET_EPOCH_ADMISSION_OPENED` and only
+    then transitions to `completed`. Failure enters
+    `postClearAdmissionFailed` with admission closed; retry repeats only this
+    authority operation. Only after the opened proof may Shell return
     `LOCAL_DATA_RESET_RESULT { reset: true, dataEpoch: nextDataEpoch }`.
 
 Both broadcast success events echo the complete attempted payload plus
@@ -475,7 +699,7 @@ readiness and rewrites/rereads the identical receipt idempotently; a crash at
 phase `committed` repeats the committed event before clear. There is
 deliberately no `readiness_broadcasted` journal phase and no additional
 `receipt_written` journal phase: the receipt is durable in its separate bounded
-key, while the journal retains exactly ten phases.
+key, while the journal retains exactly twelve phases.
 
 Broadcast success means that Chrome accepted that exact dispatch attempt. The
 adapter separately normalizes only Chrome's canonical "receiving end does not
@@ -491,30 +715,43 @@ Reset claims only the exact active write-bearing state. A claim repeats the
 durable `resetId` as `workflowId`, the ephemeral execution `attemptId`, the
 authority `workerEpoch`, the exact state-derived command ID, the stage-specific
 nullable epoch, `authorityRevision`, `fenceRevision` and an ordered bounded
-write plan. The scope is completed before the machine receives the event that
-can leave that state.
+write plan. Each write also receives one exact data-only leaf token from the
+closed adapter mapped to its `writeKind`; `commitPreAdmission` accepts that token
+and no caller callback. The scope is completed before the machine receives the
+event that can leave that state.
 
 The stage-to-write mapping is closed:
 
-| Exact Reset state         | Ordered Dataset writes, each with a fresh one-shot capability                                                                                                                                      |
-| ------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `journaling`              | initial exact journal put                                                                                                                                                                          |
-| `fencing`                 | checkpoint journal phase `fenced`, after the dedicated `acquireResetFence` resolves                                                                                                                |
-| `checkpointingQuiescence` | checkpoint journal phase `quiesced`                                                                                                                                                                |
-| `closingDatabase`         | checkpoint journal phase `handles_closed`; handle close itself is not a durable Dataset write                                                                                                      |
-| `deletingDatabase`        | delete `missionpulse`, then checkpoint `database_deleted` with a second capability                                                                                                                 |
-| `clearingSession`         | one `chrome.storage.session.clear()`, then checkpoint `session_cleared` with a second capability                                                                                                   |
-| `clearingLocal`           | one bounded selective `chrome.storage.local.remove(keys)` excluding the journal, then checkpoint `local_cleared` with a second capability                                                          |
-| `reinitializing`          | DB6/metadata/empty-store transaction, generation-zero `SettingsEnvelopeV2` write/read-back, marker-3 write/read-back, then journal checkpoint `database_reinitialized`: four distinct capabilities |
-| `aligningSettings`        | one capability for every exact Settings envelope/journal/outcome write in the shared recovery plan, then a distinct journal checkpoint `settings_aligned`                                          |
-| `writingReceipt`          | latest-only receipt put; its strict read-back is read-only                                                                                                                                         |
-| `checkpointingCommit`     | checkpoint journal phase `committed`                                                                                                                                                               |
-| `clearingJournal`         | remove the exact reserved journal; strict absence read-back precedes scope completion                                                                                                              |
+| Exact Reset state           | Ordered Dataset writes, each with a fresh one-shot capability                                                                                                                                      |
+| --------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `journaling`                | initial exact journal put                                                                                                                                                                          |
+| `resolvingInitialJournal`   | same-A exact outcome resolver put/read-back; only from `journalStatus:'outcome_unknown'`                                                                                                           |
+| `acquiringFence`            | none; dedicated `acquireResetFence` authority operation                                                                                                                                            |
+| `checkpointingFence`        | checkpoint journal phase `fenced`, after the current-worker live fence proof                                                                                                                       |
+| `checkpointingQuiescence`   | checkpoint journal phase `quiesced` with exact sidecar reference after closed CAS/read-back                                                                                                        |
+| `closingDatabase`           | checkpoint journal phase `handles_closed`; handle close itself is not a durable Dataset write                                                                                                      |
+| `deletingDatabase`          | delete `missionpulse`, then checkpoint `database_deleted` with a second capability                                                                                                                 |
+| `clearingSession`           | one `chrome.storage.session.clear()`, then checkpoint `session_cleared` with a second capability                                                                                                   |
+| `clearingLocal`             | one bounded selective remove excluding exactly journal+sidecar, then checkpoint `local_cleared` with a second capability                                                                           |
+| `reinitializing`            | DB6/metadata/empty-store transaction, generation-zero `SettingsEnvelopeV2` write/read-back, marker-3 write/read-back, then journal checkpoint `database_reinitialized`: four distinct capabilities |
+| `aligningSettings`          | one capability for every exact Settings envelope/journal/outcome write in the shared recovery plan, then a distinct journal checkpoint `settings_aligned`                                          |
+| `writingReceipt`            | latest-only receipt put; its strict read-back is read-only                                                                                                                                         |
+| `checkpointingCommit`       | checkpoint journal phase `committed`                                                                                                                                                               |
+| `adoptingBackgroundHandoff` | read/restore/adopt sidecar, then checkpoint `handoff_adopted`; adoption itself is read-only and retains the sidecar                                                                                |
+| `clearingBackgroundHandoff` | original lane or replacement lane reissues/uses exact cleanup tuple; remove/prove exact sidecar absent, then distinct journal checkpoint `handoff_cleared`                                         |
+| `clearingJournal`           | remove the exact reserved journal; strict absence read-back precedes scope completion                                                                                                              |
+| `checkpointingFailure`      | persist exact unchanged phase/retry count and exact pending `lastError`; strict read-back precedes `blocked`/`failed`                                                                              |
+| `checkpointingRetry`        | persist exact unchanged phase, `retryCount + 1`, `lastError:null`; strict read-back precedes recovery                                                                                              |
+| `openingEpochAdmission`     | none; dedicated `installResetEpochAndOpen` authority operation                                                                                                                                     |
+| `postClearAdmissionFailed`  | none; journal absent, volatile diagnostic only                                                                                                                                                     |
 
-`preflightingCompletion`, `reacquiringFence`, `routingRestart`, `quiescing`,
-`broadcastingReadiness` and `broadcastingCommitted` perform no Dataset write
-and create no empty/dummy claim. Broadcast and alarm operations retain their
-own strict delivery/effect proofs; they cannot be smuggled into a storage token.
+`preflightingCompletion`, `reacquiringFence`, `routingRestart`,
+`acquiringFence`, `quiescing`, `broadcastingReadiness`,
+`broadcastingCommitted`, the read/adopt half of `adoptingBackgroundHandoff`,
+`openingEpochAdmission` and
+`postClearAdmissionFailed` perform no Dataset write and create no empty/dummy
+claim. Broadcast and alarm operations retain their own strict delivery/effect
+proofs; they cannot be smuggled into a storage token.
 
 The authority epoch bound to a Reset claim is exact:
 
@@ -524,11 +761,15 @@ The authority epoch bound to a Reset claim is exact:
   request's `previousDataEpoch`, including literal `null`;
 - from `reinitializing` through `clearingJournal`, it equals `nextDataEpoch`.
 
-The initial journal scope is completed before `acquireResetFence` is enqueued.
+The initial journal or outcome-resolution scope is completed with
+`journalStatus:'durable_proven'` before `acquireResetFence` is enqueued.
 Fence acquisition is the dedicated authority method, not a capability write.
 Once it linearizes, it increments authority/fence revisions, revokes every old
 lease/capability and admits only same-reset `reset_owned` claims. A commit ahead
-of the fence settles first; a commit behind it invokes zero callback.
+of the fence settles first; a commit behind it invokes zero adapter. A Reset or
+failure fence arriving externally while a durable adapter Promise is pending
+receives the next FIFO ticket and waits; it is not rejected by an async-global
+reentrancy flag.
 
 The `reinitializing` plan has four non-collapsible durable boundaries. In
 particular, marker 3 cannot be written before the complete generation-zero
@@ -543,16 +784,28 @@ the reset fence token is a success receipt. `reset:true` still requires the
 workflow's complete terminal proof.
 
 On any effect rejection, the capability stays consumed and the scope is
-completed as revoked before `STEP_FAILED`. Retry uses the same durable Reset
-identities but a fresh attempt, claim, write and capability IDs. On worker
-restart, a fresh worker/attempt pair rebuilds the plan from the journal. Old
-exact-object tokens are absent from the new bounded registries and cannot be
-accepted.
+completed as revoked before correlated `STEP_FAILED`. If a strict journal
+exists, that event captures `pendingFailure` and enters
+`checkpointingFailure`; the actor cannot expose `blocked`/`failed` until the
+exact `lastError` checkpoint is strictly read back. Failure of this checkpoint
+enters `failureCheckpointBlocked`, writes no recursive error, and may only retry
+the same checkpoint with fresh execution IDs. Before the journal exists,
+preflight diagnostics are context-only.
+
+`RETRY` from `blocked`/`failed` similarly enters `checkpointingRetry`; only the
+exact journal read-back with unchanged phase, `retryCount + 1` and
+`lastError:null` permits recovery/fence reacquisition. A retry-checkpoint failure
+enters `retryCheckpointBlocked` and starts no effect. Retry otherwise uses the
+same durable Reset identities but fresh attempt, claim, write, capability and
+leaf-operation IDs. On worker restart, a fresh worker/attempt pair rehydrates a
+current-worker Reset reservation from the strict journal before rebuilding the
+plan. Old reservation, capability and leaf exact-object tokens are absent from
+the new bounded registries and cannot be accepted.
 
 Reset, startup failure fencing, command/state/attempt/epoch drift, scope
 completion and authority/fence revision change revoke every outstanding token.
 A worker mismatch rejects, and a new worker does not possess the old
-exact-object registry. A late callback therefore performs zero write. Registry
+exact-object registry. A late commit therefore performs zero write. Registry
 exhaustion, allocator throw/reentrancy/collision, token clone/substitution or a
 second mutex is a typed fail-closed error; none falls back to ordinary leases,
 raw Chrome/IndexedDB calls or a production no-op gate.
@@ -575,10 +828,12 @@ Cancellation is not proof until the underlying writer has settled. A timeout is
 
 ```text
 idle -> preflightingCompletion
-preflightingCompletion -- post-clear exact proof --> completed (recognized)
+preflightingCompletion -- post-clear exact proof --> openingEpochAdmission (recognized)
 preflightingCompletion -- fresh exact proof ------> journaling
-journaling
-  -> fencing
+journaling -- durable outcome unknown ------------> resolvingInitialJournal
+journaling|resolvingInitialJournal -- exact durable journal --> acquiringFence
+acquiringFence -- RESET_FENCE_AUTHORITY_ACQUIRED --> checkpointingFence
+checkpointingFence
   -> quiescing
   -> checkpointingQuiescence
   -> closingDatabase
@@ -591,47 +846,68 @@ journaling
   -> writingReceipt
   -> checkpointingCommit
   -> broadcastingCommitted
+  -> adoptingBackgroundHandoff
+  -> clearingBackgroundHandoff
   -> clearingJournal
-  -> completed
+  -> openingEpochAdmission
+  -> completed [RESET_EPOCH_ADMISSION_OPENED]
 
-any active state -- retryable BLOCKED failure --> blocked
-any active state -- other effect failure ------> failed
-blocked|failed -- RETRY [live fence] -----------> recovering
-blocked|failed -- RETRY [fence lost] -----------> reacquiringFence
+any journaled active state -- valid failure ----> checkpointingFailure
+checkpointingFailure -- exact read-back --------> blocked|failed
+checkpointingFailure -- checkpoint failure -----> failureCheckpointBlocked
+blocked|failed -- RETRY -------------------------> checkpointingRetry
+checkpointingRetry -- exact read-back [live fence] --> recovering
+checkpointingRetry -- exact read-back [fence lost] --> reacquiringFence
+checkpointingRetry -- checkpoint failure ---------> retryCheckpointBlocked
+openingEpochAdmission -- open failure ------------> postClearAdmissionFailed
+postClearAdmissionFailed -- RETRY -----------------> openingEpochAdmission
 
 idle -- SERVICE_WORKER_RESTARTED(valid journal) --> reacquiringFence
 reacquiringFence -- BOOT_FENCE_ACQUIRED ----------> routingRestart
-routingRestart -- lastError null -----------------> recovering
+routingRestart -- journaled + lastError null -----> checkpointingFence
+routingRestart -- later phase + lastError null ---> recovering
 routingRestart -- lastError BLOCKED --------------> blocked
 routingRestart -- other lastError ----------------> failed
 recovering -- journal.phase ----------------------> exact idempotent resume state
 ```
 
-`completed` is terminal for one reset actor. `blocked` and `failed` are
-non-terminal and never imply admission reopening when a journal exists.
+`completed` is terminal for one reset actor. `blocked`, `failed`, both
+checkpoint-blocked states and `postClearAdmissionFailed` are non-terminal.
+Only `openingEpochAdmission` may reopen admission, and only after journal
+absence plus exact receipt/DB/authority proof.
 
 ### States and Shell commands
 
-| State                     | Shell effect allowed                                                                            | Success event                                            |
-| ------------------------- | ----------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
-| `preflightingCompletion`  | read-only journal/receipt/canonical epoch/DB6-data3 authority proof; no write or fence          | `RESET_PREFLIGHT_FRESH` \| `RESET_COMPLETION_RECOGNIZED` |
-| `reacquiringFence`        | acquire live boot/epoch fence; no resume effect                                                 | `BOOT_FENCE_ACQUIRED`                                    |
-| `routingRestart`          | none; pure route by parsed journal classification                                               | automatic                                                |
-| `journaling`              | write initial journal                                                                           | `RESET_JOURNALED`                                        |
-| `fencing`                 | install admission fence and checkpoint                                                          | `FENCE_ACQUIRED`                                         |
-| `quiescing`               | coordinate four dependencies                                                                    | four `*_QUIESCED` events                                 |
-| `checkpointingQuiescence` | persist phase `quiesced`                                                                        | `QUIESCENCE_CHECKPOINTED`                                |
-| `closingDatabase`         | close central handle registry, checkpoint                                                       | `DB_HANDLES_CLOSED`                                      |
-| `deletingDatabase`        | delete DB, checkpoint                                                                           | `DATABASE_DELETED`                                       |
-| `clearingSession`         | clear session, checkpoint                                                                       | `SESSION_CLEARED`                                        |
-| `clearingLocal`           | remove every non-journal local key, checkpoint                                                  | `LOCAL_CLEARED`                                          |
-| `reinitializing`          | create/verify exact DB6/data3, epoch authority and initial generation-zero envelope; checkpoint | `DATABASE_REINITIALIZED`                                 |
-| `aligningSettings`        | run reset-owned Settings recovery; checkpoint proof as `settings_aligned`                       | `SETTINGS_ALIGNED`                                       |
-| `broadcastingReadiness`   | emit exact non-success `ready_to_commit` event                                                  | `RESET_READY_BROADCASTED`                                |
-| `writingReceipt`          | put and strictly read back exact latest-only receipt under fence/system quota gate              | `RESET_RECEIPT_WRITTEN`                                  |
-| `checkpointingCommit`     | persist phase `committed` after readiness plus exact receipt read-back                          | `RESET_COMMIT_CHECKPOINTED`                              |
-| `broadcastingCommitted`   | emit exact replayable `committed` event while journal remains                                   | `RESET_COMMITTED_BROADCASTED`                            |
-| `clearingJournal`         | remove reserved journal and open epoch authority                                                | `JOURNAL_CLEARED`                                        |
+| State                       | Shell effect allowed                                                                                                    | Success event                                            |
+| --------------------------- | ----------------------------------------------------------------------------------------------------------------------- | -------------------------------------------------------- |
+| `preflightingCompletion`    | read-only journal/receipt/canonical epoch/DB6-data3 authority proof; no write or fence                                  | `RESET_PREFLIGHT_FRESH` \| `RESET_COMPLETION_RECOGNIZED` |
+| `reacquiringFence`          | rehydrate current-worker reservation with readonly authority leaf, then acquire live boot/epoch fence; no resume effect | `BOOT_FENCE_ACQUIRED`                                    |
+| `routingRestart`            | none; pure route by parsed journal classification                                                                       | automatic                                                |
+| `journaling`                | write initial journal                                                                                                   | `RESET_JOURNALED`                                        |
+| `resolvingInitialJournal`   | same-A total resolution of an unknown initial put/read-back outcome                                                     | `RESET_JOURNAL_OUTCOME_RESOLVED`                         |
+| `acquiringFence`            | dedicated authority acquisition; no Dataset capability write                                                            | `RESET_FENCE_AUTHORITY_ACQUIRED`                         |
+| `checkpointingFence`        | persist exact phase `fenced` after live authority proof                                                                 | `FENCE_CHECKPOINTED`                                     |
+| `quiescing`                 | coordinate four dependencies                                                                                            | four `*_QUIESCED` events                                 |
+| `checkpointingQuiescence`   | persist phase `quiesced` plus exact handoff sidecar reference after its CAS/read-back                                   | `QUIESCENCE_CHECKPOINTED`                                |
+| `closingDatabase`           | close central handle registry, checkpoint                                                                               | `DB_HANDLES_CLOSED`                                      |
+| `deletingDatabase`          | delete DB, checkpoint                                                                                                   | `DATABASE_DELETED`                                       |
+| `clearingSession`           | clear session, reread exact local sidecar, checkpoint                                                                   | `SESSION_CLEARED`                                        |
+| `clearingLocal`             | remove every key outside exact journal+sidecar allowlist, reread both, checkpoint                                       | `LOCAL_CLEARED`                                          |
+| `reinitializing`            | create/verify exact DB6/data3, epoch authority and initial generation-zero envelope; checkpoint                         | `DATABASE_REINITIALIZED`                                 |
+| `aligningSettings`          | run reset-owned Settings recovery; checkpoint proof as `settings_aligned`                                               | `SETTINGS_ALIGNED`                                       |
+| `broadcastingReadiness`     | emit exact non-success `ready_to_commit` event                                                                          | `RESET_READY_BROADCASTED`                                |
+| `writingReceipt`            | put and strictly read back exact latest-only receipt under fence/system quota gate                                      | `RESET_RECEIPT_WRITTEN`                                  |
+| `checkpointingCommit`       | persist phase `committed` after readiness plus exact receipt read-back                                                  | `RESET_COMMIT_CHECKPOINTED`                              |
+| `broadcastingCommitted`     | emit exact replayable `committed` event while journal remains                                                           | `RESET_COMMITTED_BROADCASTED`                            |
+| `adoptingBackgroundHandoff` | restore/adopt exact referenced sidecar, retain it and checkpoint `handoff_adopted`                                      | `BACKGROUND_SCHEDULING_HANDOFF_ADOPTED`                  |
+| `clearingBackgroundHandoff` | original or replacement lane uses exact durable cleanup tuple, proves absence and checkpoints `handoff_cleared`         | `BACKGROUND_SCHEDULING_HANDOFF_CLEARED`                  |
+| `clearingJournal`           | remove reserved journal, strict absence read-back and retain exact removal proof                                        | `JOURNAL_CLEARED`                                        |
+| `checkpointingFailure`      | persist/read back exact pending error with unchanged phase/retry count                                                  | `FAILURE_CHECKPOINTED`                                   |
+| `failureCheckpointBlocked`  | none; volatile diagnostic, journal unchanged; explicit retry only                                                       | `RETRY_FAILURE_CHECKPOINT`                               |
+| `checkpointingRetry`        | persist/read back unchanged phase, incremented retry count and cleared error                                            | `RETRY_CHECKPOINTED`                                     |
+| `retryCheckpointBlocked`    | none; volatile diagnostic, journal unchanged; explicit retry only                                                       | `RETRY_RETRY_CHECKPOINT`                                 |
+| `openingEpochAdmission`     | idempotently install next epoch and open admission from exact removal/recognition proof                                 | `RESET_EPOCH_ADMISSION_OPENED`                           |
+| `postClearAdmissionFailed`  | none; volatile post-clear diagnostic; explicit same-reset retry only                                                    | `RETRY`                                                  |
 
 Every success event is emitted only after its effect and required checkpoint
 complete. Async events include the current reset identity where they cross an
@@ -639,24 +915,52 @@ external boundary; stale identity/epoch events are ignored.
 
 ### Recovery routing
 
-| Last durable phase           | Resume state                                  | Why repeat is safe                                    |
-| ---------------------------- | --------------------------------------------- | ----------------------------------------------------- |
-| no journal / preflight error | `preflightingCompletion` after explicit retry | proof is reread; no destructive effect was admitted   |
-| `journaled`                  | `fencing`                                     | installing the same reset fence is idempotent         |
-| `fenced`                     | `quiescing`                                   | cancel/stop/await operations are idempotent           |
-| `quiesced`                   | `closingDatabase`                             | closing an already-closed handle is a no-op           |
-| `handles_closed`             | `deletingDatabase`                            | deleting a missing DB succeeds                        |
-| `database_deleted`           | `clearingSession`                             | clearing session repeatedly succeeds                  |
-| `session_cleared`            | `clearingLocal`                               | journal is excluded; removing missing keys succeeds   |
-| `local_cleared`              | `reinitializing`                              | exact matching fresh DB/epoch is verified as no-op    |
-| `database_reinitialized`     | `aligningSettings`                            | shared recovery resumes its durable Settings journal  |
-| `settings_aligned`           | `broadcastingReadiness`                       | readiness and receipt write/read may repeat safely    |
-| `committed`                  | `broadcastingCommitted`                       | exact committed event may repeat before journal clear |
+| Last durable phase           | Resume state                                  | Why repeat is safe                                                              |
+| ---------------------------- | --------------------------------------------- | ------------------------------------------------------------------------------- |
+| no journal / preflight error | `preflightingCompletion` after explicit retry | proof is reread; no destructive effect was admitted                             |
+| `journaled`                  | `checkpointingFence`                          | boot already acquired this worker's live fence                                  |
+| `fenced`                     | `quiescing`                                   | cancel/stop/await operations are idempotent                                     |
+| `quiesced`                   | `closingDatabase`                             | closing an already-closed handle is a no-op                                     |
+| `handles_closed`             | `deletingDatabase`                            | deleting a missing DB succeeds                                                  |
+| `database_deleted`           | `clearingSession`                             | clearing session repeatedly succeeds                                            |
+| `session_cleared`            | `clearingLocal`                               | journal is excluded; removing missing keys succeeds                             |
+| `local_cleared`              | `reinitializing`                              | exact matching fresh DB/epoch is verified as no-op                              |
+| `database_reinitialized`     | `aligningSettings`                            | shared recovery resumes its durable Settings journal                            |
+| `settings_aligned`           | `broadcastingReadiness`                       | readiness and receipt write/read may repeat safely                              |
+| `committed`                  | `broadcastingCommitted`                       | exact committed event may repeat before journal clear                           |
+| `handoff_adopted`            | `clearingBackgroundHandoff`                   | authority receipt issues three current-worker cleanup tokens; old/copy invalid  |
+| `handoff_cleared`            | `clearingJournal`                             | absence checkpoint skips token issuance/delete and resumes journal idempotently |
+
+For `handoff_adopted`, rehydration first rejects equality between the current
+and source worker epochs, then validates the source lane/worker,
+sidecar/handoff and manifest digest held by the reference. The authority returns
+one registered command/result receipt for the replacement lane and current
+worker, with three fresh tokens bound to that receipt and to the durable source
+bundles. The clear proof selects exactly one matching attempt. A DTO copy, a
+manifest/sidecar swap, another worker or an old-worker token is invalid. For
+`handoff_cleared`, the current worker must still be fresh, but the
+durable absence checkpoint is sufficient: recovery emits neither a replacement
+lane nor a delete and routes directly to `clearingJournal`.
+The volatile context flag
+`backgroundSchedulingCleanupReplacementRequired` is `false` on the original
+adoption path, becomes `true` only when a new worker restores durable phase
+`handoff_adopted`, and returns to `false` at `handoff_cleared`. The clear guard
+passes it to the strict parser: an original-lane proof is therefore rejected
+after restart, while a fabricated replacement receipt/token is rejected on the
+non-restarted path. `LocalDataResetMachineInput.workerEpoch` is copied into the
+context and the clear parser requires both `executingWorkerEpoch` and the
+replacement receipt/token worker epoch to equal that current worker exactly; naming a
+different fresh worker is not sufficient.
 
 On worker restart, every strict phase waits in `reacquiringFence`; neither the
 phase nor `SERVICE_WORKER_RESTARTED` proves a live JavaScript fence.
-`BOOT_FENCE_ACQUIRED` from another reset ID is ignored. A fence failure enters
-`failed` and preserves the journal and outer boot deny-gate. Every cold start
+Rehydration must first return the exact current-worker reservation for the
+journal's Reset A; a duplicate returns that same object, while Reset B, a clone,
+foreign receipt or phase-incompatible physical authority performs no state
+change. `BOOT_FENCE_ACQUIRED` from another reset ID is ignored. A fence failure
+enters `checkpointingFailure`, and only an exact failure-checkpoint read-back
+may enter `failed`; checkpoint failure remains fail-closed with the journal and
+outer boot deny-gate preserved. Every cold start
 still attempts this safety-fence acquisition automatically; that attempt may
 only restore the live admission barrier and route back to `failed`. It is not
 retry authority and cannot resume a workflow effect. Only an explicit
@@ -674,11 +978,14 @@ and automatically routes from the acquired boot fence to `recovering`.
 non-retryable error routes to `failed`. No effect restarts from either state
 until a same-reset `RETRY`; non-retryable errors have no retry transition.
 
-A restart after successful journal clear has no journal to restore and returns
-to `idle`. Replaying the original request then runs the same read-only preflight;
-the canonical next epoch plus exact latest-only receipt and DB6/data3 authority
-recognize completion even if legitimate E2 writes followed the reset. Journal
-absence alone never resumes destruction and never proves success.
+A restart after successful journal clear has no journal to restore. Admission
+remains closed unless an exact prior opened proof is already canonical.
+Replaying the original request then runs the same read-only preflight; the
+canonical next epoch plus exact latest-only receipt and DB6/data3 authority
+recognize the post-clear boundary even if legitimate E2 writes followed the
+reset, then `installResetEpochAndOpen` proves/open admission idempotently.
+Journal absence alone never resumes destruction, opens admission or proves
+success.
 
 ## Failure and retry contract
 
@@ -698,6 +1005,9 @@ type LocalDataResetErrorCode =
   | 'SETTINGS_ALIGNMENT_FAILED'
   | 'BROADCAST_FAILED'
   | 'RECEIPT_FAILED'
+  | 'HANDOFF_ADOPTION_FAILED'
+  | 'HANDOFF_CLEANUP_FAILED'
+  | 'ADMISSION_OPEN_FAILED'
   | 'PROTOCOL_ERROR';
 ```
 
@@ -721,6 +1031,9 @@ The accepted error matrix is exact:
 | `BROADCAST_FAILED`          | `readiness_broadcast`                     | `settings_aligned`       | `workflow_step`            | `true`      |
 | `RECEIPT_FAILED`            | `receipt`                                 | `settings_aligned`       | `workflow_step`            | `true`      |
 | `BROADCAST_FAILED`          | `postcommit_broadcast`                    | `committed`              | `workflow_step`            | `true`      |
+| `HANDOFF_ADOPTION_FAILED`   | `handoff_adoption`                        | `committed`              | `workflow_step`            | `true`      |
+| `HANDOFF_CLEANUP_FAILED`    | `handoff_cleanup`                         | `handoff_adopted`        | `workflow_step`            | `true`      |
+| `ADMISSION_OPEN_FAILED`     | `post_clear_admission`                    | journal absent + receipt | context-only               | `true`      |
 | `PROTOCOL_ERROR`            | current expected non-journal step         | unchanged                | `workflow_step`            | `false`     |
 
 The machine records both `expectedStep` and `expectedErrorOrigin` on entry to
@@ -730,12 +1043,21 @@ contract is ignored and cannot drive a transition. `JOURNAL_FAILED` is the sole
 cross-cutting workflow-step error because every checkpointing state writes the
 journal; the machine records that capability separately, so `JOURNAL_FAILED`
 is rejected in non-checkpointing states such as `quiescing` and either broadcast.
-Boot-fence origin is accepted only while `reacquiringFence` expects it.
+Boot-fence origin is accepted only while `reacquiringFence` expects it. For a
+valid journal, accepted `STEP_FAILED` never writes or enters a presentation
+state directly: it enters `checkpointingFailure`, and strict same-journal
+read-back is the sole transition to `blocked`/`failed`.
 
 `PREFLIGHT_FAILED` and `PROTOCOL_ERROR/preflight` are context-only because no
-journal exists yet; neither may be encoded into a ten-phase journal. They retain
+journal exists yet; neither may be encoded into a twelve-phase journal. They retain
 the request identities in actor context for diagnostic projection and, only for
 the retryable physical failure, explicit retry.
+
+`ADMISSION_OPEN_FAILED/post_clear_admission` is also context-only because the
+journal has already been strictly removed. It retains exact receipt/removal/DB
+proof in actor context, keeps authority closed and permits only an explicit
+retry of `installResetEpochAndOpen`. It is never persisted by recreating the
+journal.
 
 `RECEIPT_FAILED/receipt` and `PROTOCOL_ERROR/receipt` are the only additional
 errors consistent with durable phase `settings_aligned`: readiness has no
@@ -747,8 +1069,10 @@ exact-key or correlation conflict is non-retryable.
   another context uses `BLOCKED` and state `blocked`.
 - Quota, permission/API, transaction, validation and journal checkpoint errors
   use the exact step-specific code and state `failed`.
-- `RETRY` is explicit, increments diagnostics and resumes from the last durable
-  phase. There is no automatic destructive retry loop.
+- `RETRY` is explicit. With a valid journal it first enters
+  `checkpointingRetry`; strict read-back of unchanged phase,
+  `retryCount + 1` and `lastError:null` is required before recovery. There is no
+  automatic destructive retry loop.
 - A clear-journal failure keeps phase `committed`; explicit retry first
   rebroadcasts the exact committed payload and then retries clear.
 - A receipt failure keeps phase `settings_aligned`; explicit retry repeats
@@ -818,7 +1142,8 @@ comparison to “unknown means allowed”.
    `canonicalDataEpoch === nextDataEpoch`, a different previous epoch, the exact
    original-request terminal receipt and current DB6/data3 authority proof.
 4. Recognition writes no journal, acquires no fence and repeats no destructive
-   effect; `completionDisposition` distinguishes it from normal execution.
+   effect; `completionDisposition` distinguishes it from normal execution, but
+   both paths still require exact admission-open proof before completion.
 5. The latest-only receipt is written/read under the live fence after exact
    Settings/alarm proof and readiness, but before the journal's committed
    checkpoint; journal absence plus matching receipt therefore proves the prior
@@ -830,8 +1155,8 @@ comparison to “unknown means allowed”.
 9. `quiesced` means all four dependency proofs, not merely cancellation requests.
 10. Every known DB handle closes before deletion; no non-reset opener races it.
 11. A blocked delete preserves the old phase, journal and fence.
-12. Session clears before local; local clearing preserves only the journal and
-    removes the previous latest-only receipt.
+12. Session clears before local; local clearing preserves exactly the reset
+    journal and background handoff sidecar, and removes the previous receipt.
 13. Fresh DB metadata and initial shared `SettingsEnvelopeV2` use the journal's
     next epoch; tracking stores are empty, Settings revision/generation are both
     0, `journal` is null and `outcomes` is empty.
@@ -843,15 +1168,18 @@ comparison to “unknown means allowed”.
 17. Phase `committed` implies Settings alignment, accepted exact readiness and
     strict terminal-receipt read-back under the bounded system quota reserve; no
     committed event is emitted before this checkpoint.
-18. On the executing path, the journal remains until the exact committed event
-    is accepted; its removal is that path's final durable prerequisite to
+18. On the executing path, the journal remains until the exact committed event,
+    sidecar adoption, sidecar absence read-back and `handoff_cleared` checkpoint
+    are accepted; removal yields a durable recovery proof, then a separate
+    idempotent authority operation must install/open the next epoch before
     `completed`, while the bounded receipt remains for replay.
 19. A correlated Load seeing the same `committed` journal joins finalization and
     never returns `SETTINGS_RESET_IN_PROGRESS` for that journal.
 20. `reset:true` implies database deleted, session/local cleared, DB6/data3
     reinitialized, exact Settings/alarm proof, readiness, terminal receipt,
-    committed checkpoint, committed broadcast and journal removal, either
-    executed now or proven by the strict post-clear recognition preflight.
+    committed checkpoint, committed broadcast, journal removal and exact
+    next-epoch admission-open proof, either executed now or proven by the strict
+    post-clear recognition path.
 21. Any partial or blocked outcome implies `reset:false` and is retryable only as
     declared by its error.
 22. Retry and worker restart retain all IDs/epochs and never resurrect old data.
@@ -859,15 +1187,18 @@ comparison to “unknown means allowed”.
 24. Every mutative message carries the bootstrap epoch; every internal writer
     revalidates its revocable lease inside the commit gate.
 25. Reset revokes every old lease before quiescence and does not open new-epoch
-    admission until journal removal.
+    admission until strict journal removal plus receipt/DB/authority proof.
 26. A restored durable phase always has `fenceAcquired:false` until correlated
-    `BOOT_FENCE_ACQUIRED`.
+    `BOOT_FENCE_ACQUIRED`; before that event, strict FIFO rehydration has created
+    a current-worker replacement reservation and `acquireResetFence` has consumed
+    it.
 27. Every Reset Dataset write in the closed mapping has one fresh capability;
-    no capability covers a whole state, port or multi-write effect.
+    it also has one exact matching leaf token from the closed adapter table, and
+    no capability/leaf covers a whole state, port or multi-write effect.
 28. Reset claims, capability issuance/commit/completion, ordinary commits,
     reset fence and epoch installation share the authority's one FIFO.
-29. Each capability is consumed before callback invocation/await and can never
-    be replayed after rejection, completion or restart.
+29. Each capability is consumed before registered adapter invocation/await and
+    can never be replayed after rejection, completion or restart.
 30. Reset cleanup capabilities bind exact nullable `previousDataEpoch`; rebuild
     and terminal capabilities bind exact `nextDataEpoch`.
 31. Reinitialization uses four ordered capabilities: DB6 transaction, complete
@@ -876,14 +1207,74 @@ comparison to “unknown means allowed”.
 32. A state-success or `STEP_FAILED` event is not sent while that state's scope
     remains active; completion/révocation precedes the event.
 33. Reset/failure fence and command/state/attempt/epoch/revision drift make
-    every losing late callback execute zero durable effect; a new worker does
+    every losing late commit execute zero durable effect; a new worker does
     not possess the old exact-object registry.
 34. Capability registries are bounded without eviction, and no exhaustion,
     allocator or validation error enables a lease/raw/no-op fallback.
+35. Fresh/recognition preflight is the only pre-version IDB opener: absent DB
+    means no open, present DB uses no target version and readonly transactions,
+    `onupgradeneeded` aborts, and all outcomes prove temporary-handle closure.
+36. Journal restoration never clones an old reservation. The phase-compatible
+    reread and `reset_pending` replacement creation are one FIFO operation bound
+    to the current worker; Reset B and every third epoch/foreign receipt fail
+    without authority mutation.
+37. Durable/read adapters are a closed build-time mapping with data-only exact
+    tokens and no authority/controller/public Settings import. External Reset or
+    failure-fence calls remain enqueueable while an adapter Promise is pending.
+38. `reset_pending` has one total journal status. `outcome_unknown` permits only
+    same-A resolution; Reset B and fence acquisition are rejected.
+39. Fresh and restored phase-`journaled` paths acquire one live fence per worker:
+    boot acquisition routes directly to `checkpointingFence`, never back through
+    `acquiringFence`.
+40. Every durable `lastError`/`retryCount` mutation uses the exact failure/retry
+    capability and strict journal read-back. Checkpoint failure cannot recurse or
+    resume an effect.
+41. Journal removal never completes Reset. Admission-open failure preserves the
+    receipt/removal/DB proof, keeps admission closed and retries only the
+    idempotent authority operation.
+42. The only handoff payload key is
+    `missionpulse.backgroundSchedulingHandoff.v1`; the reset journal carries
+    only its exact id/digest reference and never the payload.
+43. The handoff closes irreversibly at one mailbox sequence before checkpoint.
+    Callbacks before it are in the 131-slot target; callbacks after it receive
+    `RESET_HANDOFF_CLOSED`, allocate no ID, write nothing and cannot stale the
+    journal reference. Internal checkpointing may still consume only the exact
+    preallocated entries needed to materialize that frozen target.
+44. CAS/capacity/read-back failure before session clear erases nothing. After
+    session clear the sidecar survives restart and exact local clear.
+45. Adoption retains the sidecar. Only a distinct cleanup capability plus
+    strict absence read-back and journal checkpoint permits journal removal.
+46. A fresh or recognized preflight requires both reset journal and handoff
+    sidecar absent; orphan sidecar bytes fail closed.
+47. The lane preallocates one fresh distinct `sidecarId` before ordinary work;
+    all 1 584 CAS bundles, three cleanup bundles, capabilities, sidecar, payload
+    and reference carry that exact identity.
+48. The closed payload parser recalculates payload/writer/journal SHA-256,
+    verifies the durable frozen target/cursor prefix and derives bitmap/count
+    from its dense 131 slots. Non-JSON, corruption,
+    cross-swap or outer-field drift fails closed.
+49. Canonical payload bytes are independently bounded to 786432; complete
+    canonical sidecar bytes are recomputed, bounded to 1048576 and repeated as
+    `reference.sidecarEncodedBytes`.
+50. `BACKGROUND_SCHEDULING_HANDOFF_CHECKPOINTED` freezes lane, attempt, worker,
+    sidecar, handoff, manifest 1 584+3 and frozen-target digest. All 1 587 bundle digests
+    and aggregate digests are recalculated; the trusted fence expectation rejects
+    even an internally coherent same-reset/same-epoch foreign lane.
+51. Sidecar initialization durably stores target/digest/cursor at revision 0.
+    Every present slot materialized increments once, so revision, bitmap popcount and slot count are identical
+    for every accepted 0..131-slot sidecar.
+52. The journal reference retains the exact three cleanup entries. A replacement
+    worker uses an authority-issued command/result receipt and three worker-bound
+    tokens; old objects, copied DTOs and foreign-worker receipts are invalid.
+53. Recovery from `handoff_adopted` performs replacement cleanup and the absence
+    checkpoint idempotently; recovery from `handoff_cleared` emits no delete or
+    token and proceeds directly to journal removal.
 
 ## Forbidden transitions
 
 - `idle -> journaling` without exact fresh preflight.
+- treating `reset_pending + outcome_unknown` as absent, durable, failed or
+  available to Reset B; acquiring the fence before `durable_proven`.
 - treating a malformed/conflicting preflight, a different canonical epoch,
   missing/mismatched receipt, divergent DB6/data3 authority or extra key as
   either fresh admission or recognized completion; current E2 data is not
@@ -894,6 +1285,20 @@ comparison to “unknown means allowed”.
 - delete success inferred from `onblocked`, timeout, request dispatch or absence
   of an immediate error.
 - clearing the journal via bulk `chrome.storage.local.clear()`.
+- local clear with any preserved-key set other than the exact reset-journal +
+  handoff-sidecar tuple, or treating an orphan/mismatched sidecar as absent.
+- session clear before exact sidecar CAS/read-back/reference checkpoint, or
+  after CAS capacity/write failure.
+- allocating an ID or writing the sidecar for a slot already present, exceeding
+  three CAS bundles for one transition, or using a non-allowlisted capability.
+- accepting a checkpoint while the handoff is still open, mutating the frozen
+  target or admitting an external slot after its mailbox-close marker, consuming
+  an internal bundle for a non-target slot, silently dropping a late callback,
+  or recheckpointing a different reference after `quiesced`.
+- allocating `sidecarId` on first write, omitting it from any CAS/cleanup
+  capability, or cross-swapping a lane/bundle/sidecar/reference identity.
+- trusting serialized text, caller-provided digest/bitmap/count/byte length, or
+  accepting non-JSON/sparse/custom payload content without canonical reparse.
 - generating a new next epoch during retry/recovery.
 - reinitialization no-op when metadata epoch differs or tracking stores are not
   empty.
@@ -904,6 +1309,12 @@ comparison to “unknown means allowed”.
 - checkpointing `committed` before matching terminal receipt read-back.
 - committed broadcast before durable phase `committed`.
 - journal clear before exact committed broadcast acceptance.
+- sidecar deletion before exact adoption, deletion without the original exact
+  cleanup capability or a fully proven replacement tuple/absence read-back,
+  old-worker token reuse, or journal clear before `handoff_cleared`.
+- completing or returning `reset:true` after journal removal but before exact
+  `RESET_EPOCH_ADMISSION_OPENED`; repeating destruction after a post-clear open
+  failure.
 - deleting the latest receipt after success instead of retaining it until the
   next reset's selective local clear.
 - returning `SETTINGS_RESET_IN_PROGRESS` to the same-reset correlated Load in
@@ -911,7 +1322,15 @@ comparison to “unknown means allowed”.
 - reopening admission from `blocked` or `failed` while the journal exists.
 - routing a restored phase or emitting a resume effect before
   `BOOT_FENCE_ACQUIRED` for the same reset ID.
+- routing restored phase `journaled` back through `acquiringFence` after the
+  boot operation already acquired the current-worker live fence.
+- reacquiring a restored fence from a cloned/dead-worker reservation or directly
+  from journal fields without strict FIFO rehydration into a current-worker
+  exact-object reservation.
 - automatically retrying a persisted non-null `lastError` on worker wakeup.
+- entering `blocked`/`failed` before exact failure-checkpoint read-back, or
+  resuming after `RETRY` before exact retry-checkpoint read-back; writing a
+  recursive error when either checkpoint fails.
 - persisting boot reacquisition failure as a phase-step error without exact
   `origin:'boot_fence_reacquisition'`, or accepting that origin for any error
   other than retryable `FENCE_FAILED/fence`.
@@ -930,6 +1349,12 @@ comparison to “unknown means allowed”.
   four reinitialization boundaries sharing a token.
 - ordinary lease, raw Chrome/IDB writer, second mutex or production no-op gate
   used because a pre-admission capability is missing/rejected.
+- caller-provided async durable/preflight callback, runtime adapter injection,
+  adapter import/reference to authority/controller/public Settings, or treating
+  an external FIFO caller as adapter reentrance.
+- preflight opening an absent DB, supplying a target version, accepting
+  `onupgradeneeded`, using a readwrite transaction, leaking its temporary handle
+  or settling before close/unregister proof.
 - state/command transition published before its active scope is completed or
   revoked.
 - malformed or wrong-step `STEP_FAILED` changing state.
@@ -943,7 +1368,7 @@ comparison to “unknown means allowed”.
 - malformed request is ignored without a journal or fence;
 - every valid request enters `preflightingCompletion`; an exact fresh proof is
   the only route to `journaling`, while an exact post-clear proof reaches
-  recognized completion with no journal/fence/destructive command;
+  recognized `openingEpochAdmission` with no journal/fence/destructive command;
 - post-clear recognition rejects a foreign canonical epoch, wrong DB/data/schema
   authority, missing/mismatched/latest receipt, wrong requestedAt/ID/epoch/
   phase, missing/extra key and non-canonical/colliding UUID; it still recognizes
@@ -952,6 +1377,10 @@ comparison to “unknown means allowed”.
   `nextDataEpoch === canonicalDataEpoch`; physical read failure is retryable at
   `PREFLIGHT_FAILED/preflight`, while a protocol conflict is non-retryable and
   neither path writes a journal;
+- absent-DB preflight performs no `indexedDB.open`; present-DB preflight uses no
+  target version and readonly transactions, aborts `onupgradeneeded`, and proves
+  handle close/unregister on success, blocked, versionchange, parse and storage
+  failure with zero schema/migration/marker write;
 - shared wire differential matrix accepts exact `ready_to_commit` and
   `committed`, including nullable previous epoch, and identically rejects
   uppercase UUIDs, reset/next/bootstrap/previous collisions, wrong stage,
@@ -961,16 +1390,55 @@ comparison to “unknown means allowed”.
   rejected accessor is never invoked, while frozen and null-prototype exact
   data records remain valid;
 - journal write failure performs no destruction;
+- initial journal adapter returns exact durable, exact absence and unknown
+  outcome: only durable proceeds to fence, absence retries A with fresh IDs,
+  unknown remains in same-A resolution, and B is rejected in every case;
 - every accepted code/step/retryability pair transitions as specified and every
   malformed/wrong-state error is ignored;
+- for `reset_pending` and `reset_owned`, every accepted failure first enters
+  `checkpointingFailure`; exact read-back alone exposes `blocked`/`failed`.
+  Failure of that checkpoint writes nothing recursively. Every explicit retry
+  similarly waits for exact `retryCount + 1`/`lastError:null` read-back;
 - scan/tracking/migration/outbox quiescence must all be proven;
+- the fifth quiescence proof is the exact sidecar/reference read-back; four
+  dependency proofs alone stay in `quiescing` and cannot clear session;
+- exact sidecar parser accepts canonical 0/1/131 slots and rejects foreign
+  key/schema, non-JSON, payload/writer/journal digest drift,
+  bitmap/count/payload-size/full-sidecar-size drift, cross-swaps, unknown fields
+  and oversized payload/sidecar;
+- exact checkpoint provenance carries lane, attempt, source worker,
+  sidecar/handoff, ordered 1 584+3 manifest and frozen-target digest; each bundle and both
+  aggregate digests are recalculated, and a same-reset/same-epoch cross-lane
+  provenance swap is rejected;
+- initialize then fill all 131 slots with at most three fresh bundles per
+  transition; persist the exact full CAS cursor before consumption and its
+  successor after a definitive failure, crash after `0:37:0`, and prove the
+  restored next bundle is exactly `0:37:1` without reuse or skip; revisions are
+  exactly 0/1/131 for 0/1/131 present slots; repeated
+  present-slot callbacks consume zero ID/write; capacity or twelfth CAS failure
+  keeps Reset before clear with session/local untouched;
+- mailbox-close race in both orders: preceding callback is in the frozen digest,
+  following callback receives exact `RESET_HANDOFF_CLOSED` with zero allocation;
+  internal checkpointing may consume only preallocated entries for the frozen
+  target, and neither path can mutate the reference after `quiesced`;
+- lane allocates one unique sidecar ID before work admission; every CAS and
+  cleanup bundle/proof carries it, and any substituted or first-write ID fails;
 - blocked DB deletion retains journal, fence and `reset:false`, then explicit
   retry resumes at deletion;
 - crash after every durable phase resumes at the table's exact state;
+- crash independently in `handoff_adopted` before cleanup attempts 0, 1 and 2:
+  a fresh lane/worker reissues the exact durable three-entry tuple, every old
+  worker token and tuple/manifest/sidecar substitution is rejected, and exact
+  removed/already-absent proceeds through `handoff_cleared` to journal clear;
+  crash in `handoff_cleared` performs no further token issuance or delete;
 - every restored phase remains in `reacquiringFence` until matching
-  `BOOT_FENCE_ACQUIRED`; another reset ID and fence failure produce no resume
-  effect;
-- for each of the ten phases, boot-fence failure persists with its explicit
+  `BOOT_FENCE_ACQUIRED`; first rehydrate a new exact-object reservation for A in
+  the current worker, prove exact duplicate identity, reject B/clone/old worker/
+  third epoch/foreign receipt and every phase-incompatible physical fact, then
+  acquire the live fence; failure produces no resume effect;
+- restored `journaled` observes exactly one current-worker fence acquisition and
+  routes from `BOOT_FENCE_ACQUIRED` directly to `checkpointingFence`;
+- for each of the twelve phases, boot-fence failure persists with its explicit
   origin, reparses strictly, survives a second restart as `failed`, ignores a
   foreign reset ID and permits only automatic safety-fence reacquisition before
   same-reset `RETRY`; no durable workflow effect resumes before that retry;
@@ -980,6 +1448,8 @@ comparison to “unknown means allowed”.
 - restart with non-retryable journal error remains fenced/failed, while a
   phase/error mismatch is classified as a corrupt journal;
 - crash after local clear but before reinitialize preserves journal/epoch;
+- crash after session clear and after local clear restores the same sidecar by
+  id/digest; exact local allowlist preserves only reset journal + sidecar;
 - reinitialize retry accepts exact matching empty DB and rejects wrong epoch or
   non-empty tracking stores;
 - legacy, missing/new-install and reset settings all produce the exact shared
@@ -996,7 +1466,15 @@ comparison to “unknown means allowed”.
 - crash after receipt but before checkpoint restores phase `settings_aligned`,
   repeats readiness and the exact receipt operation, then checkpoints once;
 - journal removal failure remains phase `committed`; retry rebroadcasts the
-  exact committed payload before clear;
+  exact committed payload before adoption;
+- adoption mismatch/failed read-back leaves sidecar present and journal phase
+  committed; exact adoption checkpoints `handoff_adopted` but still preserves
+  the key; cleanup failure retains it; only absence read-back checkpoints
+  `handoff_cleared` and allows journal removal;
+- fail and crash after strict journal removal but before admission-open proof:
+  authority stays closed, no success response is emitted, and retry/cold
+  recognition opens idempotently from receipt/removal/DB proof without repeating
+  any destructive effect;
 - only completed returns `reset:true` and the next epoch;
 - two panels discard old effects and converge through fresh bridge bootstrap;
 - late old-epoch messages and stale reset events perform zero writes;
@@ -1005,15 +1483,18 @@ comparison to “unknown means allowed”.
 - lease revocation between calculation and commit fails final in-gate
   revalidation and performs zero durable write;
 - ordinary lease before admission is rejected, while an exact same-reset claim
-  and exact next write capability are admitted only in the modeled state;
+  and exact next write capability/leaf token are admitted only in the modeled
+  state;
 - substitute claim/reset/stage/command/attempt/worker/nullable epoch,
-  authority/fence revision, write ID or capability ID independently and assert
-  zero callback;
+  authority/fence revision, write ID, capability ID, leaf operation ID or
+  adapter ID independently and assert zero adapter invocation;
 - every two-write Reset state receives two distinct one-shot capabilities;
-  double consume, cross-write/cross-state reuse, completion-before-callback and
-  old-worker replay all perform zero write;
+  double consume, cross-write/cross-state reuse, completion-before-commit and
+  old-worker leaf replay all perform zero write;
 - execute commit/Reset and commit/failure-fence in both FIFO orders; only the
-  operation ahead of the fence may enter its durable callback;
+  operation ahead of the fence may enter its durable adapter; enqueue an
+  external Reset during a pending adapter Promise and prove it waits behind the
+  effect without `AUTHORITY_REENTRANCY_FORBIDDEN` or deadlock;
 - allocator reentrance into same write, another write, completion, Reset and
   failure fence; allocator throw/invalid UUID/collision; exact bounded registry
   exhaustion with no eviction or fallback;

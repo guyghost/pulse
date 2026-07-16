@@ -44,6 +44,14 @@ function expectAuthorityError(run: () => unknown, code: DatasetEpochAuthorityErr
   expect(caught).toMatchObject({ code });
 }
 
+function authorityErrorCode(error: unknown): string | null {
+  if (typeof error !== 'object' || error === null || !('code' in error)) {
+    return null;
+  }
+
+  return typeof error.code === 'string' ? error.code : null;
+}
+
 async function expectAuthorityRejection(
   promise: Promise<unknown>,
   code: DatasetEpochAuthorityErrorCode
@@ -373,106 +381,102 @@ describe('dataset epoch authority', () => {
     }
   );
 
-  it('burns a reentrant allocation but creates no lease or operation binding after reset queues', async () => {
-    const operationId = uuid(24);
-    const resetOperationId = uuid(25);
-    const nextDataEpoch = uuid(26);
-    const burnedLeaseId = uuid(123);
-    const recoveredLeaseId = uuid(124);
-    const request = resetRequest(resetOperationId, nextDataEpoch);
-    let allocations = 0;
-    let resetPromise: ReturnType<
-      ReturnType<typeof createDatasetEpochAuthority>['acquireResetFence']
-    > | null = null;
-    const authority = createDatasetEpochAuthority({
-      workerEpoch: WORKER_EPOCH,
-      allocateLeaseId: () => {
-        allocations += 1;
-        if (allocations === 1) {
-          resetPromise = authority.acquireResetFence(request);
+  // implementation gate: remove `.fails` when the Shell rejects allocator reentrance.
+  it.fails(
+    'rejects reset reentrance from allocateLeaseId before anything enters the FIFO',
+    async () => {
+      const operationId = uuid(24);
+      const resetOperationId = uuid(25);
+      const nextDataEpoch = uuid(26);
+      const burnedLeaseId = uuid(123);
+      const request = resetRequest(resetOperationId, nextDataEpoch);
+      let allocations = 0;
+      let resetPromise: ReturnType<
+        ReturnType<typeof createDatasetEpochAuthority>['acquireResetFence']
+      > | null = null;
+      let reentrantError: unknown;
+      let outerError: unknown;
+      const authority = createDatasetEpochAuthority({
+        workerEpoch: WORKER_EPOCH,
+        allocateLeaseId: () => {
+          allocations += 1;
+          try {
+            resetPromise = authority.acquireResetFence(request);
+          } catch (error) {
+            reentrantError = error;
+          }
           return burnedLeaseId;
-        }
-        return allocations === 2 ? burnedLeaseId : recoveredLeaseId;
-      },
-    });
-    authority.openAdmission(openingProof());
+        },
+      });
+      authority.openAdmission(openingProof());
 
-    expectAuthorityError(() => authority.issueLease(scope(operationId)), 'ADMISSION_CLOSED');
-    expect(allocations).toBe(1);
-    expect(authority.snapshot()).toEqual({
-      status: 'reset_pending',
-      resetOperationId,
-      previousDataEpoch: DATA_EPOCH,
-      nextDataEpoch,
-      authorityRevision: 0,
-    });
+      try {
+        authority.issueLease(scope(operationId));
+      } catch (error) {
+        outerError = error;
+      }
 
-    expect(resetPromise).not.toBeNull();
-    const resetToken = await resetPromise!;
-    await authority.installResetEpoch(resetToken);
-    authority.openAdmission({
-      ...openingProof(nextDataEpoch, 1),
-      attemptId: uuid(27),
-      proofId: uuid(28),
-    });
+      // Let the current implementation settle any incorrectly enqueued reset so
+      // this RED contract never leaves a dangling promise behind.
+      if (resetPromise !== null) {
+        await resetPromise.catch(() => undefined);
+      }
 
-    expectAuthorityError(
-      () => authority.issueLease(scope(operationId, nextDataEpoch)),
-      'LEASE_ID_COLLISION'
-    );
-    const recoveredLease = authority.issueLease(scope(operationId, nextDataEpoch));
-    expect(recoveredLease).toMatchObject({
-      leaseId: recoveredLeaseId,
-      operationId,
-      dataEpoch: nextDataEpoch,
-      authorityRevision: 1,
-    });
-    expect(allocations).toBe(3);
-  });
+      expect(authorityErrorCode(reentrantError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+      expect(authorityErrorCode(outerError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+      expect(resetPromise).toBeNull();
+      expect(allocations).toBe(1);
+      expect(authority.snapshot()).toEqual({
+        status: 'open',
+        dataEpoch: DATA_EPOCH,
+        authorityRevision: 0,
+      });
+    }
+  );
 
-  it('keeps the inner canonical lease when allocation reenters the same operation', async () => {
-    const operationId = uuid(228);
-    const secondOperationId = uuid(229);
-    const innerLeaseId = uuid(230);
-    const burnedOuterLeaseId = uuid(231);
-    const recoveredLeaseId = uuid(232);
-    let allocations = 0;
-    let innerLease: DatasetWriteLeaseV1 | undefined;
-    const authority = createDatasetEpochAuthority({
-      workerEpoch: WORKER_EPOCH,
-      allocateLeaseId: () => {
-        allocations += 1;
-        if (allocations === 1) {
-          innerLease = authority.issueLease(scope(operationId));
+  // implementation gate: remove `.fails` when the Shell rejects allocator reentrance.
+  it.fails(
+    'rejects same-operation reentrance from allocateLeaseId before a nested allocation',
+    () => {
+      const operationId = uuid(228);
+      const burnedOuterLeaseId = uuid(231);
+      let allocations = 0;
+      let innerLease: DatasetWriteLeaseV1 | undefined;
+      let outerLease: DatasetWriteLeaseV1 | undefined;
+      let reentrantError: unknown;
+      let outerError: unknown;
+      const authority = createDatasetEpochAuthority({
+        workerEpoch: WORKER_EPOCH,
+        allocateLeaseId: () => {
+          allocations += 1;
+          try {
+            innerLease = authority.issueLease(scope(operationId));
+          } catch (error) {
+            reentrantError = error;
+          }
           return burnedOuterLeaseId;
-        }
-        if (allocations === 2) {
-          return innerLeaseId;
-        }
-        return allocations === 3 ? burnedOuterLeaseId : recoveredLeaseId;
-      },
-    });
-    authority.openAdmission(openingProof());
+        },
+      });
+      authority.openAdmission(openingProof());
 
-    const outerLease = authority.issueLease(scope(operationId));
+      try {
+        outerLease = authority.issueLease(scope(operationId));
+      } catch (error) {
+        outerError = error;
+      }
 
-    expect(innerLease).toBeDefined();
-    expect(outerLease).toBe(innerLease);
-    expect(outerLease.leaseId).toBe(innerLeaseId);
-    expect(authority.issueLease(scope(operationId))).toBe(innerLease);
-    expect(allocations).toBe(2);
-    await expect(authority.commit(outerLease, operationId, async () => 'canonical')).resolves.toBe(
-      'canonical'
-    );
-
-    expectAuthorityError(
-      () => authority.issueLease(scope(secondOperationId)),
-      'LEASE_ID_COLLISION'
-    );
-    const recoveredLease = authority.issueLease(scope(secondOperationId));
-    expect(recoveredLease.leaseId).toBe(recoveredLeaseId);
-    expect(allocations).toBe(4);
-  });
+      expect(authorityErrorCode(reentrantError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+      expect(authorityErrorCode(outerError)).toBe('AUTHORITY_REENTRANCY_FORBIDDEN');
+      expect(innerLease).toBeUndefined();
+      expect(outerLease).toBeUndefined();
+      expect(allocations).toBe(1);
+      expect(authority.snapshot()).toEqual({
+        status: 'open',
+        dataEpoch: DATA_EPOCH,
+        authorityRevision: 0,
+      });
+    }
+  );
 
   it('binds one operation to one epoch and returns no fresh duplicate lease', () => {
     let allocations = 0;

@@ -8,7 +8,12 @@ import {
   type StartupBarrierPortContext,
   type StartupBarrierPorts,
 } from '../../../src/lib/shell/storage/startup-barrier';
-import type { LocalDataResetPhase } from '../../../src/models/local-data-reset.contract';
+import {
+  BACKGROUND_SCHEDULING_HANDOFF_KEY,
+  LOCAL_DATA_RESET_JOURNAL_KEY,
+  backgroundSchedulingHandoffBundleDigest,
+  type LocalDataResetPhase,
+} from '../../../src/models/local-data-reset.contract';
 import { settingsDigest } from '../../../src/models/settings-persistence.contract';
 
 const workerEpoch = '00000000-0000-4000-8000-000000000001';
@@ -29,8 +34,58 @@ const retryRequestId = '00000000-0000-4000-8000-00000000000f';
 const retrySettingsRequestId = '00000000-0000-4000-8000-000000000010';
 const foreignId = '00000000-0000-4000-8000-000000000011';
 const thirdRequestId = '00000000-0000-4000-8000-000000000012';
+const resetHandoffSidecarId = '00000000-0000-4000-8000-000000000013';
+const resetHandoffId = '00000000-0000-4000-8000-000000000014';
+const resetHandoffLaneId = '00000000-0000-4000-8000-000000000015';
+const resetHandoffWorkerEpoch = '00000000-0000-4000-8000-000000000016';
+const resetHandoffManifestDigest = 'd'.repeat(64);
+
+function resetCleanupRecovery() {
+  return {
+    version: 1,
+    manifestDigest: resetHandoffManifestDigest,
+    bundles: ([0, 1, 2] as const).map((casAttempt) => {
+      const commandId = `00000000-0000-4000-8000-00000000002${casAttempt}`;
+      const resultId = `00000000-0000-4000-8000-00000000003${casAttempt}`;
+      const capabilityId = `00000000-0000-4000-8000-00000000004${casAttempt}`;
+      return {
+        kind: 'sidecar_cleanup' as const,
+        controlAttemptIndex: null,
+        transitionIndex: 132,
+        casAttempt,
+        commandId,
+        resultId,
+        capabilityId,
+        bundleDigest: backgroundSchedulingHandoffBundleDigest({
+          sidecarId: resetHandoffSidecarId,
+          handoffId: resetHandoffId,
+          kind: 'sidecar_cleanup',
+          controlAttemptIndex: null,
+          transitionIndex: 132,
+          casAttempt,
+          commandId,
+          resultId,
+          capabilityId,
+        }),
+      };
+    }),
+  };
+}
 
 type MutablePorts = { -readonly [Key in keyof StartupBarrierPorts]: StartupBarrierPorts[Key] };
+
+function resetGateClearedProof() {
+  return {
+    version: 1,
+    storageArea: 'chrome.storage.local' as const,
+    inspectedKeys: [LOCAL_DATA_RESET_JOURNAL_KEY, BACKGROUND_SCHEDULING_HANDOFF_KEY],
+    absentKeys: [LOCAL_DATA_RESET_JOURNAL_KEY, BACKGROUND_SCHEDULING_HANDOFF_KEY],
+    resetJournalAbsent: true as const,
+    orphanHandoffSidecarAbsent: true as const,
+    linkedAllowlistExact: true as const,
+    readBackVerified: true as const,
+  };
+}
 
 const settings: AppSettings = {
   scanIntervalMinutes: 30,
@@ -85,6 +140,24 @@ function commandEvent(
 }
 
 function resetJournal(phase: LocalDataResetPhase) {
+  const backgroundSchedulingHandoff = ['journaled', 'fenced'].includes(phase)
+    ? null
+    : {
+        schemaVersion: 1 as const,
+        storageKey: BACKGROUND_SCHEDULING_HANDOFF_KEY,
+        sidecarId: resetHandoffSidecarId,
+        handoffId: resetHandoffId,
+        resetId,
+        checkpointRevision: 0,
+        slotCount: 0,
+        payloadDigest: 'a'.repeat(64),
+        sourceControlLaneId: resetHandoffLaneId,
+        sourceControlLaneAttemptIndex: 0 as const,
+        sourceWorkerEpoch: resetHandoffWorkerEpoch,
+        capabilityManifestDigest: resetHandoffManifestDigest,
+        cleanupRecovery: resetCleanupRecovery(),
+        sidecarEncodedBytes: 24,
+      };
   return {
     schemaVersion: 1,
     resetId,
@@ -93,6 +166,7 @@ function resetJournal(phase: LocalDataResetPhase) {
     settingsRecoveryRequestId: resetSettingsRequestId,
     settingsBootstrapRequestId: resetBootstrapRequestId,
     phase,
+    backgroundSchedulingHandoff,
     requestedAt: 1,
     retryCount: 0,
     lastError: null,
@@ -147,7 +221,7 @@ function nominalPorts(order: string[] = []): MutablePorts {
   return {
     readResetGate: async (command) => {
       order.push('reset_gate');
-      return commandEvent(command, 'RESET_GATE_CLEARED');
+      return commandEvent(command, 'RESET_GATE_CLEARED', { proof: resetGateClearedProof() });
     },
     preflightResetRequest: async (command) => {
       order.push('reset_preflight');
@@ -162,6 +236,7 @@ function nominalPorts(order: string[] = []): MutablePorts {
           settingsBootstrapRequestId: command.request.settingsBootstrapRequestId,
           requestedAt: command.request.requestedAt,
           resetJournalAbsent: true,
+          backgroundSchedulingHandoffAbsent: true,
           canonicalDataEpoch: command.request.previousDataEpoch,
         },
       });
@@ -410,6 +485,22 @@ describe('startup barrier', () => {
     await expect(readiness).rejects.toBeInstanceOf(StartupBarrierError);
   });
 
+  it('rejects a cleared gate proof that does not prove the orphan handoff absent', async () => {
+    const order: string[] = [];
+    const ports = nominalPorts(order);
+    ports.readResetGate = async (command) => {
+      order.push('reset_gate');
+      return commandEvent(command, 'RESET_GATE_CLEARED', {
+        proof: { ...resetGateClearedProof(), orphanHandoffSidecarAbsent: false },
+      });
+    };
+    const barrier = createNominalBarrier(ports);
+    await expect(
+      barrier.ensureReady({ requestId, settingsRecoveryRequestId })
+    ).rejects.toBeInstanceOf(StartupBarrierError);
+    expect(order).toEqual(['reset_gate']);
+  });
+
   const resetPhases: LocalDataResetPhase[] = [
     'journaled',
     'fenced',
@@ -421,6 +512,8 @@ describe('startup barrier', () => {
     'database_reinitialized',
     'settings_aligned',
     'committed',
+    'handoff_adopted',
+    'handoff_cleared',
   ];
 
   it.each(resetPhases)(
@@ -484,6 +577,7 @@ describe('startup barrier', () => {
           settingsBootstrapRequestId: resetBootstrapRequestId,
           requestedAt: 1,
           resetJournalAbsent: true,
+          backgroundSchedulingHandoffAbsent: true,
           canonicalDataEpoch: nextDataEpoch,
           receipt: {
             schemaVersion: 1,
@@ -1278,7 +1372,7 @@ describe('startup barrier', () => {
       });
       entered.resolve();
       await release.promise;
-      return commandEvent(command, 'RESET_GATE_CLEARED');
+      return commandEvent(command, 'RESET_GATE_CLEARED', { proof: resetGateClearedProof() });
     };
     const barrier = createNominalBarrier(ports);
     barrierRef.current = barrier;
@@ -1319,7 +1413,7 @@ describe('startup barrier', () => {
       });
       startupEntered.resolve();
       await releaseStartup.promise;
-      return commandEvent(command, 'RESET_GATE_CLEARED');
+      return commandEvent(command, 'RESET_GATE_CLEARED', { proof: resetGateClearedProof() });
     };
     let transfers = 0;
     let transferAborts = 0;

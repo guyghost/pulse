@@ -2,17 +2,28 @@ import { assign, setup } from 'xstate';
 
 import {
   commitCheckpointAllowed,
+  handoffReferenceFromCheckpointEvent,
   initialLocalDataResetContext,
   isFailureAllowedForStep,
   localDataResetCompletionProven,
   matchesFreshResetPreflight,
+  matchesBackgroundSchedulingHandoffAdoption,
+  matchesBackgroundSchedulingHandoffCheckpoint,
+  matchesBackgroundSchedulingHandoffClear,
+  matchesAdmissionOpened,
+  matchesFailureCheckpoint,
   matchesPostClearResetCompletion,
+  matchesRetryCheckpoint,
   matchesReset,
   matchesReinitializedSettingsEnvelope,
   matchesResetEpochBroadcast,
+  matchesResetFenceAuthority,
   matchesResetReceiptWrite,
+  matchesSessionClear,
+  matchesLocalClear,
   matchesSettingsAlignment,
   resetExpectation as expectation,
+  resetFenceAuthorityPatch,
   restartClassification,
   restartHasKind,
   recognizedPostClearCompletionPatch,
@@ -39,10 +50,25 @@ const localDataResetSetup = setup({
       return kind === 'resume' || kind === 'blocked' || kind === 'failed';
     },
     matchingReset: ({ context, event }) => matchesReset(context, event),
+    matchingResetFenceAuthority: ({ context, event }) => matchesResetFenceAuthority(context, event),
     matchingFreshPreflight: ({ context, event }) => matchesFreshResetPreflight(context, event),
     matchingPostClearCompletion: ({ context, event }) =>
       matchesPostClearResetCompletion(context, event),
+    matchingAdmissionOpened: ({ context, event }) => matchesAdmissionOpened(context, event),
+    matchingHandoffCheckpoint: ({ context, event }) =>
+      matchesBackgroundSchedulingHandoffCheckpoint(context, event),
+    matchingSessionClear: ({ context, event }) => matchesSessionClear(context, event),
+    matchingLocalClear: ({ context, event }) => matchesLocalClear(context, event),
+    matchingHandoffAdoption: ({ context, event }) =>
+      matchesBackgroundSchedulingHandoffAdoption(context, event),
+    matchingHandoffClear: ({ context, event }) =>
+      matchesBackgroundSchedulingHandoffClear(context, event),
+    matchingFailureCheckpoint: ({ context, event }) => matchesFailureCheckpoint(context, event),
+    matchingBlockingFailureCheckpoint: ({ context, event }) =>
+      context.pendingFailure?.code === 'BLOCKED' && matchesFailureCheckpoint(context, event),
+    matchingRetryCheckpoint: ({ context, event }) => matchesRetryCheckpoint(context, event),
     blockingFailure: ({ context, event }) =>
+      !context.journalPersisted &&
       event.type === 'STEP_FAILED' &&
       matchesReset(context, event) &&
       isFailureAllowedForStep(
@@ -53,6 +79,7 @@ const localDataResetSetup = setup({
       ) &&
       event.error.code === 'BLOCKED',
     matchingFailure: ({ context, event }) =>
+      !context.journalPersisted &&
       event.type === 'STEP_FAILED' &&
       matchesReset(context, event) &&
       isFailureAllowedForStep(
@@ -61,11 +88,23 @@ const localDataResetSetup = setup({
         context.journalCheckpointExpected,
         event.error
       ),
+    journaledFailure: ({ context, event }) =>
+      context.journalPersisted &&
+      event.type === 'STEP_FAILED' &&
+      matchesReset(context, event) &&
+      isFailureAllowedForStep(
+        context.expectedStep,
+        context.expectedErrorOrigin,
+        context.journalCheckpointExpected,
+        event.error
+      ),
+    pendingFailureBlocks: ({ context }) => context.pendingFailure?.code === 'BLOCKED',
     allDependenciesQuiescent: ({ context }) =>
       context.scanQuiescent &&
       context.trackingQuiescent &&
       context.migrationQuiescent &&
-      context.outboxQuiescent,
+      context.outboxQuiescent &&
+      context.backgroundSchedulingHandoffCheckpointed,
     matchingReinitializedEpoch: ({ context, event }) =>
       matchesReinitializedSettingsEnvelope(context, event),
     matchingSettingsAlignment: ({ context, event }) => matchesSettingsAlignment(context, event),
@@ -96,10 +135,25 @@ const localDataResetSetup = setup({
       context.error?.retryable === true &&
       context.phase !== 'none' &&
       (!context.journalPersisted || context.fenceAcquired),
+    retryHasJournal: ({ context, event }) =>
+      event.type === 'RETRY' &&
+      matchesReset(context, event) &&
+      context.error?.retryable === true &&
+      context.journalPersisted,
+    retryPostClearAdmission: ({ context, event }) =>
+      event.type === 'RETRY' &&
+      matchesReset(context, event) &&
+      context.error?.retryable === true &&
+      !context.journalPersisted &&
+      context.phase === 'committed',
+    checkpointedRetryNeedsFence: ({ context }) =>
+      context.journalPersisted && !context.fenceAcquired,
+    checkpointedRetryCanRecover: ({ context }) =>
+      context.phase !== 'none' && (!context.journalPersisted || context.fenceAcquired),
     restartShouldResume: ({ context }) => context.restartDisposition === 'resume',
     restartShouldBlock: ({ context }) => context.restartDisposition === 'blocked',
     restartShouldFail: ({ context }) => context.restartDisposition === 'failed',
-    resumeAtFencing: ({ context }) => context.phase === 'journaled',
+    resumeAtFenceCheckpoint: ({ context }) => context.phase === 'journaled',
     resumeAtQuiescing: ({ context }) => context.phase === 'fenced',
     resumeAtClosingDatabase: ({ context }) => context.phase === 'quiesced',
     resumeAtDeletingDatabase: ({ context }) => context.phase === 'handles_closed',
@@ -109,6 +163,8 @@ const localDataResetSetup = setup({
     resumeAtAligningSettings: ({ context }) => context.phase === 'database_reinitialized',
     resumeAtBroadcastingReadiness: ({ context }) => context.phase === 'settings_aligned',
     resumeAtBroadcastingCommitted: ({ context }) => context.phase === 'committed',
+    resumeAtClearingBackgroundHandoff: ({ context }) => context.phase === 'handoff_adopted',
+    resumeAtClearingJournal: ({ context }) => context.phase === 'handoff_cleared',
   },
   actions: {
     initializeReset: assign(({ context, event }) =>
@@ -136,13 +192,30 @@ const localDataResetSetup = setup({
         retryable: false,
       },
     })),
-    markJournaled: assign(() => ({ journalPersisted: true, phase: 'journaled' as const })),
-    markFenced: assign(() => ({ fenceAcquired: true, phase: 'fenced' as const })),
-    markBootFenceAcquired: assign(() => ({ fenceAcquired: true })),
+    markFreshReservation: assign(() => ({ journalOutcome: 'absent_proven' as const })),
+    markJournalOutcomeUnknown: assign(() => ({ journalOutcome: 'outcome_unknown' as const })),
+    markJournalAbsent: assign(() => ({ journalOutcome: 'absent_proven' as const })),
+    markJournaled: assign(() => ({
+      journalPersisted: true,
+      journalOutcome: 'durable_proven' as const,
+      phase: 'journaled' as const,
+    })),
+    markLiveFenceAcquired: assign(({ context, event }) => resetFenceAuthorityPatch(context, event)),
+    markFenced: assign(() => ({ phase: 'fenced' as const })),
+    markBootFenceAcquired: assign(({ context, event }) => resetFenceAuthorityPatch(context, event)),
     markScanQuiescent: assign(() => ({ scanQuiescent: true })),
     markTrackingQuiescent: assign(() => ({ trackingQuiescent: true })),
     markMigrationQuiescent: assign(() => ({ migrationQuiescent: true })),
     markOutboxQuiescent: assign(() => ({ outboxQuiescent: true })),
+    markHandoffCheckpointed: assign(({ context, event }) => {
+      const reference = handoffReferenceFromCheckpointEvent(context, event);
+      return reference === null
+        ? {}
+        : {
+            backgroundSchedulingHandoffCheckpointed: true,
+            backgroundSchedulingHandoff: reference,
+          };
+    }),
     markQuiesced: assign(() => ({ phase: 'quiesced' as const })),
     markHandlesClosed: assign(() => ({
       databaseHandlesClosed: true,
@@ -176,7 +249,37 @@ const localDataResetSetup = setup({
     markCommittedBroadcasted: assign(({ event }) =>
       event.type === 'RESET_COMMITTED_BROADCASTED' ? { postCommitDelivery: event.delivery } : {}
     ),
+    markHandoffAdopted: assign(({ context }) => {
+      const replacementRequired =
+        context.backgroundSchedulingHandoff !== null &&
+        context.backgroundSchedulingHandoff.sourceWorkerEpoch !== context.workerEpoch;
+      return {
+        backgroundSchedulingHandoffAdopted: true,
+        backgroundSchedulingCleanupReplacementRequired: replacementRequired,
+        backgroundSchedulingCleanupReplacementReceipt: replacementRequired
+          ? context.backgroundSchedulingCleanupReplacementReceipt
+          : null,
+        phase: 'handoff_adopted' as const,
+      };
+    }),
+    markHandoffCleared: assign(() => ({
+      backgroundSchedulingHandoffCleared: true,
+      backgroundSchedulingCleanupReplacementRequired: false,
+      backgroundSchedulingCleanupReplacementReceipt: null,
+      phase: 'handoff_cleared' as const,
+    })),
     markCompletionRecognized: assign(() => recognizedPostClearCompletionPatch()),
+    markJournalCleared: assign(() => ({
+      journalPersisted: false,
+      journalOutcome: 'none' as const,
+    })),
+    rememberPendingFailure: assign(({ event }) =>
+      event.type === 'STEP_FAILED' ? { pendingFailure: { ...event.error } } : {}
+    ),
+    commitPendingFailure: assign(({ context }) => ({
+      error: context.pendingFailure === null ? null : { ...context.pendingFailure },
+      pendingFailure: null,
+    })),
     rememberFailure: assign(({ event }) =>
       event.type === 'STEP_FAILED' ? { error: { ...event.error } } : {}
     ),
@@ -186,6 +289,7 @@ const localDataResetSetup = setup({
       postCommitDelivery: null,
       restartDisposition: 'resume' as const,
       error: null,
+      pendingFailure: null,
     })),
     expectJournal: assign(() => expectation('journal', true)),
     expectPreflight: assign(() => expectation('preflight', false)),
@@ -202,16 +306,20 @@ const localDataResetSetup = setup({
     expectReadinessBroadcast: assign(() => expectation('readiness_broadcast', false)),
     expectReceipt: assign(() => expectation('receipt', false)),
     expectPostCommitBroadcast: assign(() => expectation('postcommit_broadcast', false)),
+    expectHandoffAdoption: assign(() => expectation('handoff_adoption', true)),
+    expectHandoffCleanup: assign(() => expectation('handoff_cleanup', true)),
+    expectAdmissionOpen: assign(() => expectation('post_clear_admission', false)),
     clearExpectedStep: assign(() => expectation(null, false)),
-    finishReset: assign(() => ({
-      journalPersisted: false,
+    finishReset: assign(({ context }) => ({
       fenceAcquired: false,
+      admissionOpen: true,
       restartDisposition: null,
       expectedStep: null,
       expectedErrorOrigin: null,
       journalCheckpointExpected: false,
-      completionDisposition: 'executed' as const,
+      completionDisposition: context.completionDisposition ?? ('executed' as const),
       error: null,
+      pendingFailure: null,
     })),
   },
 });
@@ -262,6 +370,11 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
       on: {
         STEP_FAILED: [
           {
+            guard: 'journaledFailure',
+            target: '#localDataResetCheckpointingFailure',
+            actions: 'rememberPendingFailure',
+          },
+          {
             guard: 'blockingFailure',
             target: '#localDataResetBlocked',
             actions: 'rememberFailure',
@@ -281,10 +394,11 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
             RESET_PREFLIGHT_FRESH: {
               guard: 'matchingFreshPreflight',
               target: 'journaling',
+              actions: 'markFreshReservation',
             },
             RESET_COMPLETION_RECOGNIZED: {
               guard: 'matchingPostClearCompletion',
-              target: '#localDataResetCompleted',
+              target: 'openingEpochAdmission',
               actions: 'markCompletionRecognized',
             },
           },
@@ -294,7 +408,7 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
           entry: 'expectLiveFence',
           on: {
             BOOT_FENCE_ACQUIRED: {
-              guard: 'matchingReset',
+              guard: 'matchingResetFenceAuthority',
               target: 'routingRestart',
               actions: 'markBootFenceAcquired',
             },
@@ -314,15 +428,44 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
           on: {
             RESET_JOURNALED: {
               guard: 'matchingReset',
-              target: 'fencing',
+              target: 'acquiringFence',
               actions: 'markJournaled',
+            },
+            RESET_JOURNAL_OUTCOME_UNKNOWN: {
+              guard: 'matchingReset',
+              target: 'resolvingInitialJournal',
+              actions: 'markJournalOutcomeUnknown',
             },
           },
         },
-        fencing: {
+        resolvingInitialJournal: {
+          entry: 'expectJournal',
+          on: {
+            RESET_JOURNALED: {
+              guard: 'matchingReset',
+              target: 'acquiringFence',
+              actions: 'markJournaled',
+            },
+            RESET_JOURNAL_ABSENCE_PROVEN: {
+              guard: 'matchingReset',
+              target: 'journaling',
+              actions: 'markJournalAbsent',
+            },
+          },
+        },
+        acquiringFence: {
+          on: {
+            RESET_FENCE_AUTHORITY_ACQUIRED: {
+              guard: 'matchingResetFenceAuthority',
+              target: 'checkpointingFence',
+              actions: 'markLiveFenceAcquired',
+            },
+          },
+        },
+        checkpointingFence: {
           entry: 'expectFenceCheckpoint',
           on: {
-            FENCE_ACQUIRED: {
+            FENCE_CHECKPOINTED: {
               guard: 'matchingReset',
               target: 'quiescing',
               actions: 'markFenced',
@@ -337,6 +480,10 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
             TRACKING_QUIESCED: { guard: 'matchingReset', actions: 'markTrackingQuiescent' },
             MIGRATION_QUIESCED: { guard: 'matchingReset', actions: 'markMigrationQuiescent' },
             OUTBOX_QUIESCED: { guard: 'matchingReset', actions: 'markOutboxQuiescent' },
+            BACKGROUND_SCHEDULING_HANDOFF_CHECKPOINTED: {
+              guard: 'matchingHandoffCheckpoint',
+              actions: 'markHandoffCheckpointed',
+            },
           },
         },
         checkpointingQuiescence: {
@@ -373,7 +520,7 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
           entry: 'expectSession',
           on: {
             SESSION_CLEARED: {
-              guard: 'matchingReset',
+              guard: 'matchingSessionClear',
               target: 'clearingLocal',
               actions: 'markSessionCleared',
             },
@@ -383,7 +530,7 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
           entry: 'expectLocal',
           on: {
             LOCAL_CLEARED: {
-              guard: 'matchingReset',
+              guard: 'matchingLocalClear',
               target: 'reinitializing',
               actions: 'markLocalCleared',
             },
@@ -444,8 +591,28 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
           on: {
             RESET_COMMITTED_BROADCASTED: {
               guard: 'matchingCommittedEcho',
-              target: 'clearingJournal',
+              target: 'adoptingBackgroundHandoff',
               actions: 'markCommittedBroadcasted',
+            },
+          },
+        },
+        adoptingBackgroundHandoff: {
+          entry: 'expectHandoffAdoption',
+          on: {
+            BACKGROUND_SCHEDULING_HANDOFF_ADOPTED: {
+              guard: 'matchingHandoffAdoption',
+              target: 'clearingBackgroundHandoff',
+              actions: 'markHandoffAdopted',
+            },
+          },
+        },
+        clearingBackgroundHandoff: {
+          entry: 'expectHandoffCleanup',
+          on: {
+            BACKGROUND_SCHEDULING_HANDOFF_CLEARED: {
+              guard: 'matchingHandoffClear',
+              target: 'clearingJournal',
+              actions: 'markHandoffCleared',
             },
           },
         },
@@ -454,16 +621,99 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
           on: {
             JOURNAL_CLEARED: {
               guard: 'completionProven',
+              target: 'openingEpochAdmission',
+              actions: 'markJournalCleared',
+            },
+          },
+        },
+        openingEpochAdmission: {
+          entry: 'expectAdmissionOpen',
+          on: {
+            RESET_EPOCH_ADMISSION_OPENED: {
+              guard: 'matchingAdmissionOpened',
               target: '#localDataResetCompleted',
               actions: 'finishReset',
             },
+            STEP_FAILED: {
+              guard: 'matchingFailure',
+              target: 'postClearAdmissionFailed',
+              actions: 'rememberFailure',
+            },
           },
+        },
+        postClearAdmissionFailed: {
+          on: {
+            RETRY: {
+              guard: 'retryPostClearAdmission',
+              target: 'openingEpochAdmission',
+              actions: 'prepareRetry',
+            },
+          },
+        },
+        checkpointingFailure: {
+          id: 'localDataResetCheckpointingFailure',
+          entry: 'expectJournal',
+          on: {
+            FAILURE_CHECKPOINTED: [
+              {
+                guard: 'matchingBlockingFailureCheckpoint',
+                target: '#localDataResetBlocked',
+                actions: 'commitPendingFailure',
+              },
+              {
+                guard: 'matchingFailureCheckpoint',
+                target: '#localDataResetFailed',
+                actions: 'commitPendingFailure',
+              },
+            ],
+            FAILURE_CHECKPOINT_FAILED: {
+              guard: 'matchingReset',
+              target: 'failureCheckpointBlocked',
+            },
+          },
+        },
+        failureCheckpointBlocked: {
+          on: {
+            RETRY_FAILURE_CHECKPOINT: {
+              guard: 'matchingReset',
+              target: 'checkpointingFailure',
+            },
+          },
+        },
+        checkpointingRetry: {
+          id: 'localDataResetCheckpointingRetry',
+          entry: 'expectJournal',
+          on: {
+            RETRY_CHECKPOINTED: {
+              guard: 'matchingRetryCheckpoint',
+              target: 'routingCheckpointedRetry',
+              actions: 'prepareRetry',
+            },
+            RETRY_CHECKPOINT_FAILED: {
+              guard: 'matchingReset',
+              target: 'retryCheckpointBlocked',
+            },
+          },
+        },
+        retryCheckpointBlocked: {
+          on: {
+            RETRY_RETRY_CHECKPOINT: {
+              guard: 'matchingReset',
+              target: 'checkpointingRetry',
+            },
+          },
+        },
+        routingCheckpointedRetry: {
+          always: [
+            { guard: 'checkpointedRetryNeedsFence', target: 'reacquiringFence' },
+            { guard: 'checkpointedRetryCanRecover', target: 'recovering' },
+          ],
         },
         recovering: {
           id: 'localDataResetRecovering',
           entry: 'clearExpectedStep',
           always: [
-            { guard: 'resumeAtFencing', target: 'fencing' },
+            { guard: 'resumeAtFenceCheckpoint', target: 'checkpointingFence' },
             { guard: 'resumeAtQuiescing', target: 'quiescing' },
             { guard: 'resumeAtClosingDatabase', target: 'closingDatabase' },
             { guard: 'resumeAtDeletingDatabase', target: 'deletingDatabase' },
@@ -473,17 +723,38 @@ export const localDataResetMachine = localDataResetSetup.createMachine({
             { guard: 'resumeAtAligningSettings', target: 'aligningSettings' },
             { guard: 'resumeAtBroadcastingReadiness', target: 'broadcastingReadiness' },
             { guard: 'resumeAtBroadcastingCommitted', target: 'broadcastingCommitted' },
+            {
+              guard: 'resumeAtClearingBackgroundHandoff',
+              target: 'clearingBackgroundHandoff',
+            },
+            { guard: 'resumeAtClearingJournal', target: 'clearingJournal' },
           ],
         },
       },
     },
     blocked: {
       id: 'localDataResetBlocked',
-      on: { RETRY: retryTransitions },
+      on: {
+        RETRY: [
+          {
+            guard: 'retryHasJournal',
+            target: '#localDataResetCheckpointingRetry',
+          },
+          ...retryTransitions,
+        ],
+      },
     },
     failed: {
       id: 'localDataResetFailed',
-      on: { RETRY: retryTransitions },
+      on: {
+        RETRY: [
+          {
+            guard: 'retryHasJournal',
+            target: '#localDataResetCheckpointingRetry',
+          },
+          ...retryTransitions,
+        ],
+      },
     },
     completed: {
       id: 'localDataResetCompleted',

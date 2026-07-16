@@ -166,20 +166,20 @@ aux waiters ; la machine rend ce résultat déterministe et corrélé.
 
 Le contexte contient au plus une commande attendue :
 
-| État                      | Commande                     | Ouvre IDB ?           |
-| ------------------------- | ---------------------------- | --------------------- |
-| checkingResetJournal      | `READ_RESET_GATE`            | non                   |
-| preflightingReset         | `PREFLIGHT_RESET_REQUEST`    | non                   |
-| readingVersions           | `READ_VERSIONS`              | oui, après gate Reset |
-| upgradingStructure        | `UPGRADE_STRUCTURE`          | oui                   |
-| migratingData             | `MIGRATE_DATA`               | oui                   |
-| verifyingCriticalAndEpoch | `VERIFY_CRITICAL_AND_EPOCH`  | oui                   |
-| wrappingSettingsEnvelope  | `WRAP_SETTINGS_ENVELOPE`     | non                   |
-| recoveringPreparedLedgers | `RECOVER_PREPARED_LEDGERS`   | oui                   |
-| recoveringSettings        | `RECOVER_SETTINGS_AND_ALARM` | non                   |
-| openingAdmission          | `OPEN_EPOCH_ADMISSION`       | non                   |
-| publishingBootstrap       | `PUBLISH_BOOTSTRAPS`         | non                   |
-| fencingFailure            | `FENCE_STARTUP_FAILURE`      | non                   |
+| État                      | Commande                     | Ouvre IDB ?                             |
+| ------------------------- | ---------------------------- | --------------------------------------- |
+| checkingResetJournal      | `READ_RESET_GATE`            | non                                     |
+| preflightingReset         | `PREFLIGHT_RESET_REQUEST`    | oui, opener read-only réservé sous FIFO |
+| readingVersions           | `READ_VERSIONS`              | oui, après gate Reset                   |
+| upgradingStructure        | `UPGRADE_STRUCTURE`          | oui                                     |
+| migratingData             | `MIGRATE_DATA`               | oui                                     |
+| verifyingCriticalAndEpoch | `VERIFY_CRITICAL_AND_EPOCH`  | oui                                     |
+| wrappingSettingsEnvelope  | `WRAP_SETTINGS_ENVELOPE`     | non                                     |
+| recoveringPreparedLedgers | `RECOVER_PREPARED_LEDGERS`   | oui                                     |
+| recoveringSettings        | `RECOVER_SETTINGS_AND_ALARM` | non                                     |
+| openingAdmission          | `OPEN_EPOCH_ADMISSION`       | non                                     |
+| publishingBootstrap       | `PUBLISH_BOOTSTRAPS`         | non                                     |
+| fencingFailure            | `FENCE_STARTUP_FAILURE`      | non                                     |
 
 Chaque commande de workflow porte `destructiveRepairAllowed:false`. La somme
 des commandes ne contient ni `DELETE_DATABASE`, ni `CLEAR_STORAGE`, ni backup
@@ -237,17 +237,20 @@ commande est interdit.
 Pour chaque plan :
 
 1. `beginPreAdmissionCommand` enregistre le claim sous la FIFO existante ;
-2. chaque write acquiert sa capability exacte puis appelle
-   `commitPreAdmission` ;
-3. la capability est consommée avant invocation/await de l'effet durable ;
+2. chaque write acquiert sa capability exacte et son leaf token exact préparé
+   par l'adapter allowlisté correspondant, puis appelle
+   `commitPreAdmission` sans callback fourni par la commande ;
+3. la capability est consommée avant invocation/await de l'adapter durable ;
 4. `completePreAdmissionCommand` révoque les tokens restants et précède
    obligatoirement l'event de succès ou d'échec qui change le stage.
 
 Un Reset en file, un failure fence, un changement de command/stage/attempt,
 une révision ou un epoch différent révoque le scope. La FIFO seule décide : un
 commit déjà linéarisé termine avant le fence ; un commit placé après le fence
-exécute zéro callback. Un callback tardif ne peut ni réémettre une capability
-consommée, ni obtenir l'epoch courant à la place de celui de son claim.
+exécute zéro adapter. Un commit tardif ne peut ni réémettre une capability
+consommée, ni obtenir l'epoch courant à la place de celui de son claim. Un Reset
+externe arrivé pendant la Promise d'un adapter obtient la position FIFO suivante
+et attend son règlement ; il n'est jamais rejeté comme une réentrance interne.
 
 `OPEN_EPOCH_ADMISSION` est refusé tant qu'un scope Startup est actif ou qu'une
 capability de sa commande n'est pas terminale. Après son succès, le chemin
@@ -258,21 +261,60 @@ ou une gate no-op.
 
 ## Gate Reset avant tout opener
 
-`READ_RESET_GATE` déclare `allowsDatabaseOpen:false`. Aucun autre état n'est
-atteignable avant l'un des résultats suivants :
+`READ_RESET_GATE` déclare `allowsDatabaseOpen:false`. Aucun opener de migration,
+de writer ou de handler métier n'est atteignable avant l'un des résultats
+suivants :
 
 - `RESET_JOURNAL_FOUND` : un journal strict de n'importe quelle phase, y
   compris `committed`, transfère immédiatement la propriété au Reset ;
 - `RESET_REQUEST_PENDING` : la tentative effectue le preflight read-only avant
   toute version/migration ;
-- `RESET_GATE_CLEARED` : seul résultat autorisant `READ_VERSIONS`.
+- `RESET_GATE_CLEARED` : seul résultat autorisant `READ_VERSIONS`, avec preuve
+  locale exacte que `missionpulse.localDataReset.v1` et
+  `missionpulse.backgroundSchedulingHandoff.v1` sont toutes deux absentes. La
+  preuve inventorie l'allowlist Reset complète, répète les deux clés dans leur
+  ordre canonique, atteste `orphanHandoffSidecarAbsent:true` et un read-back
+  strict. Un sidecar orphelin, une clé liée supplémentaire, un tableau sparse ou
+  une simple absence du journal bloque le gate.
 
 Un preflight `fresh` ou une completion post-clear reconnue ne redémarre pas le
 démarrage ordinaire. Les deux transfèrent au workflow Reset, afin qu'aucune
-migration/admission ne concurrence sa réponse ou son journal.
+migration/admission ne concurrence sa réponse ou son journal. La reconnaissance
+post-clear n'est pas encore un succès : Reset doit obtenir la preuve exacte et
+idempotente `installResetEpochAndOpen` avant `completed`/`reset:true`; un échec
+laisse l'admission fermée et ne répète aucun effet destructif.
+
+`PREFLIGHT_RESET_REQUEST` constitue l'unique exception d'ouverture avant
+`READ_VERSIONS`. Elle appelle
+`reserveResetPreAdmission(request, exactAuthorityReadLeafToken)` sous la FIFO
+DatasetEpoch. Son adapter fermé vérifie d'abord l'inventaire IndexedDB ; une DB
+absente n'est pas ouverte. Une DB présente est ouverte sans version cible,
+uniquement avec des transactions `readonly`, puis le handle temporaire est fermé
+et désenregistré en `finally` avant règlement. `onupgradeneeded` est aborté et
+devient `RESET_PREFLIGHT_OPEN_WOULD_UPGRADE` : aucun store, index, marker,
+envelope ou row n'est créé/migré/réparé. Cette lecture contrôlée peut donc
+prouver l'epoch canonique et la completion DB6/data3 sans ouvrir les openers
+ordinaires ni autoriser une écriture.
 
 Un journal malformé n'est jamais interprété comme absent. La Shell doit renvoyer
 un `STEP_FAILED` `RESET_JOURNAL_INVALID`, non retryable et non destructif.
+
+Lorsqu'un journal strict est trouvé au cold start, le transfert ne fabrique pas
+un ancien token Reset. Le workflow Reset entre `reacquiringFence`; sous la même
+FIFO, `rehydrateResetPreAdmission` relit le journal et l'autorité physique avec
+l'adapter read-only fermé, installe une nouvelle réservation exact-object liée
+au `workerEpoch` courant, puis `acquireResetFence` la transforme en
+`reset_owned`. La preuve exacte retient l'attente fiable
+lane/attempt/source-worker/sidecar/handoff issue de l'autorité physique, et non
+du futur proof de checkpoint. La matrice couvre aussi les deux phases terminales
+du handoff : `handoff_adopted` exige DB next-epoch + receipt exact + sidecar
+référencé encore présent + checkpoint d'adoption ; `handoff_cleared` exige les
+mêmes autorités DB/receipt + absence du sidecar et checkpoint de clear. Une
+reprise de l'une ou l'autre phase rejette un `workerEpoch` courant égal au
+`sourceWorkerEpoch` durable. Une
+reprise de cleanup par un nouveau worker transporte le receipt command/result
+d'autorité et ses trois tokens liés à ce worker. Aucun effet de phase ne reprend avant cette preuve ; une demande
+Reset B reste refusée.
 
 ## Versions et migration non destructive
 
@@ -464,8 +506,11 @@ le journal Settings sont réglés avant toute admission.
 
 Les registres capability sont worker-locaux, bornés et sans éviction. Un
 redémarrage crée un nouveau `workerEpoch`; il reconstruit un plan avec des
-claim/write/capability IDs frais. Une capability exacte de l'ancien worker
-échoue donc même si une callback tardive conserve ses champs visibles.
+claim/write/capability/leaf-operation IDs frais. Une capability ou un leaf token
+exact de l'ancien worker échoue donc même si une continuation tardive conserve
+ses champs visibles. Si le gate initial trouve un journal Reset, la nouvelle
+réservation d'autorité vient uniquement de la réhydratation FIFO stricte ; elle
+ne clone jamais le token du worker mort.
 
 Il n'existe pas de faux événement `SERVICE_WORKER_RESTARTED` envoyé à un acteur
 qui aurait survécu : un worker mort ne reçoit pas d'événement.
@@ -547,8 +592,8 @@ accessor échoue fermé.
 23. Une longueur inconnue supérieure au maximum est rejetée avant allocation,
     `ownKeys` ou boucle.
 24. Toute écriture avant admission possède un claim de la commande active et
-    une capability distincte consommée avant l'effet ; une ordinary lease reste
-    refusée.
+    une capability et un leaf token exacts distincts, consommés/admis avant
+    l'adapter ; une ordinary lease reste refusée.
 25. Claim, issue, commit, completion, ordinary commit, Reset et failure fence
     partagent la FIFO unique de `DatasetEpochAuthority`.
 26. `MIGRATE_DATA` possède exactement trois frontières capability ordonnées :
@@ -558,10 +603,22 @@ accessor échoue fermé.
 28. Aucun event ne change le stage tant que le scope de la commande précédente
     reste actif ; completion/révocation précède l'event.
 29. Reset, failure fence, drift de stage/command/attempt/epoch ou de révision
-    rend toute callback perdante incapable d'entrer dans son effet ; un worker
+    rend tout adapter perdant incapable d'entrer dans son effet ; un worker
     différent ne possède pas le registre exact-object de l'ancien.
 30. Les registres capability sont bornés, sans éviction ni fallback ; leur
     exhaustion est un échec typé et non une permission de write direct.
+31. `PREFLIGHT_RESET_REQUEST` est le seul opener pré-versions : il est readonly,
+    sous FIFO, sans version cible, abort sur `onupgradeneeded` et prouve la
+    fermeture de son handle avant tout résultat.
+32. Un journal Reset restauré produit une nouvelle réservation exact-object
+    liée au worker courant par réhydratation FIFO, puis une fence live ; aucun
+    effet de reprise ni Reset B ne précède cette preuve.
+33. Les effets pré-admission utilisent uniquement des leaf tokens data-only
+    enregistrés par la table d'adapters fermée. Aucun callback async de la Shell
+    ni chemin authority/controller n'entre dans un adapter.
+34. `RESET_GATE_CLEARED` prouve l'absence simultanée du journal et du sidecar
+    handoff sur l'allowlist exacte avant toute émission de `READ_VERSIONS` ; un
+    sidecar orphelin n'est jamais traité comme un gate libre.
 
 ## Scénarios de Review
 
@@ -574,8 +631,13 @@ accessor échoue fermé.
 - DB7 ou data4 -> downgrade terminal sans write ;
 - échec/open blocked à chaque étape -> failed, zéro auto-retry ;
 - retry explicite -> nouvel attempt, reset gate relu ;
+- journal absent mais sidecar handoff orphelin présent, allowlist incomplète,
+  supplémentaire ou réordonnée -> `RESET_GATE_CLEARED` rejeté et zéro
+  `READ_VERSIONS` ; absence exacte des deux clés avance ;
 - journal Reset dans chaque phase -> resetOwned avant opener ;
-- demande Reset journal absent -> preflight puis transfert ;
+- demande Reset journal absent -> preflight readonly sous FIFO, fermeture du
+  handle, puis transfert ; DB absente sans open et `onupgradeneeded` aborté sans
+  write ;
 - reset preempt entre chaque paire d'étapes -> aucun stage suivant ;
 - preuve Settings stale sur chaque identité -> aucune admission ;
 - Settings reset in progress -> resetOwned ;
@@ -588,14 +650,20 @@ accessor échoue fermé.
 - échec de publication initiale ou tardive après admission -> commande fence,
   aucun retry avant preuve zéro lease ; fence ambigu -> bloqué ;
 - crash à chaque étape -> nouveau worker, nouveau gate, convergence durable ;
+- journal Reset à chaque phase sur un nouveau worker -> réhydratation A avec
+  token current-worker, rejet de B, fence live avant reprise ; effet physique
+  juste avant checkpoint accepté seulement par la matrice, troisième epoch
+  rejeté ;
 - ordinary lease pré-admission refusée ; substitution de claim, stage,
   command, attempt, worker, epoch nullable, authority/fence revision, write ou
-  capability refusée avant callback ;
+  capability/leaf token refusée avant adapter ;
 - deux writes d'une commande utilisent deux capabilities distinctes ; double
-  consume, callback après completion et token cross-command/cross-worker
+  consume, commit après completion et token cross-command/cross-worker
   produisent zéro write ;
 - matrice FIFO commit/Reset/failure-fence dans les deux ordres, allocator
-  reentrant/throw/collision et exhaustion des registres sans éviction ;
+  reentrant/throw/collision et exhaustion des registres sans éviction ; Reset
+  externe pendant une leaf Promise attend derrière elle sans rejet de
+  réentrance ;
 - crash après transaction IDB data-v3, après read-back Settings V2 et après
   marker 3 : reprise avec IDs frais, jamais de lease/admission anticipée ;
 - event avec getter, clé extra ou objet muté -> `invalid_event` ; tableau Proxy

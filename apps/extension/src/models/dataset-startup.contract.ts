@@ -1,5 +1,8 @@
 import type { AppSettings } from '../lib/core/types/app-settings';
 import {
+  BACKGROUND_SCHEDULING_HANDOFF_KEY,
+  LOCAL_DATA_RESET_JOURNAL_KEY,
+  LOCAL_DATA_RESET_LOCAL_CLEAR_PRESERVED_KEYS,
   isLocalDataResetUuidV4,
   parseLocalDataResetFreshPreflightProof,
   parseLocalDataResetJournal,
@@ -28,6 +31,17 @@ export const DATASET_STARTUP_TARGET_DB_VERSION = 6 as const;
 export const DATASET_STARTUP_TARGET_DATA_VERSION = 3 as const;
 export const DATASET_STARTUP_ERROR_MESSAGE_MAX_CHARS = 500;
 export const DATASET_STARTUP_MAX_BOOTSTRAPS_PER_PUBLICATION = 64 as const;
+
+export interface DatasetStartupResetGateClearedProofV1 {
+  version: typeof DATASET_STARTUP_MODEL_VERSION;
+  storageArea: 'chrome.storage.local';
+  inspectedKeys: [typeof LOCAL_DATA_RESET_JOURNAL_KEY, typeof BACKGROUND_SCHEDULING_HANDOFF_KEY];
+  absentKeys: [typeof LOCAL_DATA_RESET_JOURNAL_KEY, typeof BACKGROUND_SCHEDULING_HANDOFF_KEY];
+  resetJournalAbsent: true;
+  orphanHandoffSidecarAbsent: true;
+  linkedAllowlistExact: true;
+  readBackVerified: true;
+}
 
 export type DatasetStartupPendingResetRequest = Extract<
   LocalDataResetEvent,
@@ -371,7 +385,10 @@ export type DatasetStartupEvent =
       requestId: string;
       settingsRecoveryRequestId: string;
     })
-  | (CommandResultEvent & { type: 'RESET_GATE_CLEARED' })
+  | (CommandResultEvent & {
+      type: 'RESET_GATE_CLEARED';
+      proof: DatasetStartupResetGateClearedProofV1;
+    })
   | (CommandResultEvent & {
       type: 'RESET_REQUEST_PENDING';
       request: DatasetStartupPendingResetRequest;
@@ -1307,6 +1324,52 @@ function parseCommandRecord(
   return parseAttemptRecord(value, type, ['commandId', ...extraKeys]);
 }
 
+export function parseDatasetStartupResetGateClearedProof(
+  value: unknown
+): DatasetStartupResetGateClearedProofV1 | null {
+  const record = readExactDataRecord(value, [
+    'version',
+    'storageArea',
+    'inspectedKeys',
+    'absentKeys',
+    'resetJournalAbsent',
+    'orphanHandoffSidecarAbsent',
+    'linkedAllowlistExact',
+    'readBackVerified',
+  ]);
+  const inspectedKeys = record === null ? null : readExactDataArray(record.inspectedKeys, 2);
+  const absentKeys = record === null ? null : readExactDataArray(record.absentKeys, 2);
+  if (
+    record === null ||
+    inspectedKeys === null ||
+    absentKeys === null ||
+    inspectedKeys.length !== 2 ||
+    absentKeys.length !== 2 ||
+    record.version !== DATASET_STARTUP_MODEL_VERSION ||
+    record.storageArea !== 'chrome.storage.local' ||
+    inspectedKeys[0] !== LOCAL_DATA_RESET_LOCAL_CLEAR_PRESERVED_KEYS[0] ||
+    inspectedKeys[1] !== LOCAL_DATA_RESET_LOCAL_CLEAR_PRESERVED_KEYS[1] ||
+    absentKeys[0] !== LOCAL_DATA_RESET_LOCAL_CLEAR_PRESERVED_KEYS[0] ||
+    absentKeys[1] !== LOCAL_DATA_RESET_LOCAL_CLEAR_PRESERVED_KEYS[1] ||
+    record.resetJournalAbsent !== true ||
+    record.orphanHandoffSidecarAbsent !== true ||
+    record.linkedAllowlistExact !== true ||
+    record.readBackVerified !== true
+  ) {
+    return null;
+  }
+  return {
+    version: DATASET_STARTUP_MODEL_VERSION,
+    storageArea: 'chrome.storage.local',
+    inspectedKeys: [...LOCAL_DATA_RESET_LOCAL_CLEAR_PRESERVED_KEYS],
+    absentKeys: [...LOCAL_DATA_RESET_LOCAL_CLEAR_PRESERVED_KEYS],
+    resetJournalAbsent: true,
+    orphanHandoffSidecarAbsent: true,
+    linkedAllowlistExact: true,
+    readBackVerified: true,
+  };
+}
+
 function normalizeStart(
   rawEvent: unknown,
   context: DatasetStartupContext,
@@ -1391,13 +1454,15 @@ export function normalizeDatasetStartupEvent(
   }
 
   if (type === 'RESET_GATE_CLEARED') {
-    const record = parseCommandRecord(rawEvent, type, []);
-    return record !== null && commandMatches(context, record)
+    const record = parseCommandRecord(rawEvent, type, ['proof']);
+    const proof = record === null ? null : parseDatasetStartupResetGateClearedProof(record.proof);
+    return record !== null && proof !== null && commandMatches(context, record)
       ? {
           type: 'RESET_GATE_CLEARED',
           attemptId: requiredAttemptId(context),
           workerEpoch: context.workerEpoch,
           commandId: requiredCommandId(context),
+          proof,
         }
       : null;
   }

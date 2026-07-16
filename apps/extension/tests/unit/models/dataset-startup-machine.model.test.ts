@@ -11,6 +11,10 @@ import {
   type DatasetStartupContext,
   type DatasetStartupSnapshot,
 } from '../../../src/models/dataset-startup.machine';
+import {
+  BACKGROUND_SCHEDULING_HANDOFF_KEY,
+  LOCAL_DATA_RESET_JOURNAL_KEY,
+} from '../../../src/models/local-data-reset.contract';
 import { settingsDigest } from '../../../src/models/settings-persistence.contract';
 
 const workerEpoch = '00000000-0000-4000-8000-000000000001';
@@ -25,6 +29,19 @@ const retryAttemptId = '00000000-0000-4000-8000-000000000009';
 const retryRequestId = '00000000-0000-4000-8000-00000000000a';
 const retrySettingsRequestId = '00000000-0000-4000-8000-00000000000b';
 const resetId = '00000000-0000-4000-8000-00000000000c';
+
+function resetGateClearedProof() {
+  return {
+    version: 1,
+    storageArea: 'chrome.storage.local' as const,
+    inspectedKeys: [LOCAL_DATA_RESET_JOURNAL_KEY, BACKGROUND_SCHEDULING_HANDOFF_KEY],
+    absentKeys: [LOCAL_DATA_RESET_JOURNAL_KEY, BACKGROUND_SCHEDULING_HANDOFF_KEY],
+    resetJournalAbsent: true as const,
+    orphanHandoffSidecarAbsent: true as const,
+    linkedAllowlistExact: true as const,
+    readBackVerified: true as const,
+  };
+}
 
 const settings: AppSettings = {
   scanIntervalMinutes: 30,
@@ -141,7 +158,7 @@ function driveReady(controller: DatasetStartupController): void {
       settingsRecoveryRequestId,
     })
   ).toEqual({ status: 'dispatched' });
-  sendResult(controller, 'RESET_GATE_CLEARED');
+  sendResult(controller, 'RESET_GATE_CLEARED', { proof: resetGateClearedProof() });
   sendResult(controller, 'VERSIONS_READ', {
     versions: {
       version: 1,
@@ -252,6 +269,62 @@ function driveReady(controller: DatasetStartupController): void {
 }
 
 describe('Dataset startup executable model', () => {
+  it('blocks READ_VERSIONS until the reset gate proves the exact allowlist and orphan absence', () => {
+    const controller = createDatasetStartupController({
+      workerEpoch,
+      defaultSettings: settings,
+      includedConnectorIds: ['free-work'],
+    });
+    expect(
+      controller.dispatch({
+        type: 'START',
+        attemptId,
+        workerEpoch,
+        requestId,
+        settingsRecoveryRequestId,
+      })
+    ).toEqual({ status: 'dispatched' });
+    expect(current(controller).command?.type).toBe('READ_RESET_GATE');
+    expect(
+      controller.dispatch({
+        type: 'RESET_GATE_CLEARED',
+        attemptId,
+        workerEpoch,
+        commandId: commandId(controller),
+        proof: { ...resetGateClearedProof(), orphanHandoffSidecarAbsent: false },
+      })
+    ).toEqual({ status: 'rejected', reason: 'invalid_event' });
+    expect(current(controller).command?.type).toBe('READ_RESET_GATE');
+    for (const invalidProof of [
+      {
+        ...resetGateClearedProof(),
+        inspectedKeys: [BACKGROUND_SCHEDULING_HANDOFF_KEY, LOCAL_DATA_RESET_JOURNAL_KEY],
+      },
+      {
+        ...resetGateClearedProof(),
+        absentKeys: [
+          LOCAL_DATA_RESET_JOURNAL_KEY,
+          BACKGROUND_SCHEDULING_HANDOFF_KEY,
+          'foreign.key',
+        ],
+      },
+      { ...resetGateClearedProof(), linkedAllowlistExact: false },
+    ]) {
+      expect(
+        controller.dispatch({
+          type: 'RESET_GATE_CLEARED',
+          attemptId,
+          workerEpoch,
+          commandId: commandId(controller),
+          proof: invalidProof,
+        })
+      ).toEqual({ status: 'rejected', reason: 'invalid_event' });
+      expect(current(controller).command?.type).toBe('READ_RESET_GATE');
+    }
+    sendResult(controller, 'RESET_GATE_CLEARED', { proof: resetGateClearedProof() });
+    expect(current(controller).command?.type).toBe('READ_VERSIONS');
+  });
+
   it('does not execute a hostile array get trap', () => {
     let getReads = 0;
     const bootstraps = new Proxy(publicationProof([requestId]).bootstraps, {
