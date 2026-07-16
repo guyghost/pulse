@@ -213,13 +213,13 @@ worker/attempt pair and cannot accept a token from the dead worker.
 `dataEpoch` is the authority's stage-specific observed dataset epoch at claim
 linearization, not an epoch silently copied from a payload:
 
-| Authority/owner position                                               | Exact claim `dataEpoch`                             |
-| ---------------------------------------------------------------------- | --------------------------------------------------- |
-| Startup `closed_startup`, authority has not retained a canonical epoch | `null`                                              |
-| Startup `closed_startup` after Reset installed a pending next epoch    | that exact pending next epoch                       |
+| Authority/owner position                                               | Exact claim `dataEpoch`                              |
+| ---------------------------------------------------------------------- | ---------------------------------------------------- |
+| Startup `closed_startup`, authority has not retained a canonical epoch | `null`                                               |
+| Startup `closed_startup` after Reset installed a pending next epoch    | that exact pending next epoch                        |
 | Reset `journaling` under its exact `reset_pending` reservation         | exact reserved `previousDataEpoch`, including `null` |
-| Reset cleanup through `clearingLocal` under `reset_owned`              | exact `previousDataEpoch`, including literal `null` |
-| Reset `reinitializing` through `clearingJournal`                       | exact `nextDataEpoch`                               |
+| Reset cleanup through `clearingLocal` under `reset_owned`              | exact `previousDataEpoch`, including literal `null`  |
+| Reset `reinitializing` through `clearingJournal`                       | exact `nextDataEpoch`                                |
 
 When the authority has no epoch, only literal `null` is valid. Supplying the
 command's target epoch instead is `DATA_EPOCH_MISMATCH`. Conversely, once the
@@ -328,7 +328,7 @@ FIFO, never a capability callback.
 
 | Reset state               | Ordered capability writes                                                                                                                                                                 |
 | ------------------------- | ----------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `journaling`              | `reset.journal.initial_put` as exact put-if-absent plus strict read-back under the same Reset reservation                                                                                |
+| `journaling`              | `reset.journal.initial_put` as exact put-if-absent plus strict read-back under the same Reset reservation                                                                                 |
 | `fencing`                 | `reset.journal.checkpoint_fenced` after `acquireResetFence` resolves                                                                                                                      |
 | `checkpointingQuiescence` | `reset.journal.checkpoint_quiesced`                                                                                                                                                       |
 | `closingDatabase`         | `reset.journal.checkpoint_handles_closed`; closing handles itself is not a durable Dataset write                                                                                          |
@@ -575,11 +575,11 @@ performing an unmodeled write afterward.
 
 ## Allowed authority states
 
-| Owner/stage                                               | Required authority state                                                                                    |
-| --------------------------------------------------------- | ----------------------------------------------------------------------------------------------------------- |
-| Startup mutating stage                                    | `closed_startup`; never `open`, `reset_pending`, `reset_owned` or `fenced_failure`                          |
+| Owner/stage                                               | Required authority state                                                                |
+| --------------------------------------------------------- | --------------------------------------------------------------------------------------- |
+| Startup mutating stage                                    | `closed_startup`; never `open`, `reset_pending`, `reset_owned` or `fenced_failure`      |
 | Reset `journaling`                                        | `reset_pending` with the exact canonical reservation returned by atomic fresh preflight |
-| Reset after `acquireResetFence` through `clearingJournal` | `reset_owned` for that same reservation/reset ID/epochs                                |
+| Reset after `acquireResetFence` through `clearingJournal` | `reset_owned` for that same reservation/reset ID/epochs                                 |
 
 Once `OPEN_EPOCH_ADMISSION` succeeds, startup pre-admission claims are
 forbidden and business writes use only `issueLease/commit`. A fresh Reset first
