@@ -31,7 +31,7 @@ describe('landing account dashboard operational UI', () => {
   });
 
   it('implements the freelance acquisition wedge on the public landing', () => {
-    expect(homeSource).toContain('5 plateformes');
+    expect(homeSource).toContain('4 plateformes');
     expect(homeSource).toContain('1 feed scoré');
     expect(homeSource).toContain('Zéro doublon');
     expect(homeSource).toContain('Développeurs 3+ ans');

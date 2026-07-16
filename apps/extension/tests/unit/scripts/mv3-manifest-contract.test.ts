@@ -2,7 +2,6 @@ import { describe, expect, it } from 'vitest';
 import {
   assertPackagedManifestPermissionContract,
   getExpectedHostPermissions,
-  NON_CONNECTOR_HOST_PERMISSIONS,
   EXPECTED_OPTIONAL_HOST_PERMISSIONS,
   EXPECTED_PERMISSIONS,
 } from '../../mv3/manifest-contract';
@@ -20,19 +19,19 @@ describe('packaged MV3 manifest permission contract', () => {
     expect(() => assertPackagedManifestPermissionContract(validManifest())).not.toThrow();
   });
 
-  it('derives connector hosts from file/env resolution while preserving explicit feature hosts', () => {
+  it('derives the exact mandatory hosts from connector file/env resolution', () => {
     expect(
       getExpectedHostPermissions({
         config: { include: ['free-work'] },
         env: {},
       })
-    ).toEqual(['https://www.free-work.com/*', ...NON_CONNECTOR_HOST_PERMISSIONS]);
+    ).toEqual(['https://www.free-work.com/*']);
     expect(
       getExpectedHostPermissions({
         config: { include: ['free-work'] },
         env: { CONNECTORS_INCLUDE: 'lehibou' },
       })
-    ).toEqual(['https://*.lehibou.com/*', ...NON_CONNECTOR_HOST_PERMISSIONS]);
+    ).toEqual(['https://*.lehibou.com/*']);
     expect(
       getExpectedHostPermissions({
         config: {},

@@ -6,11 +6,12 @@ not from a mutable label or narrative approval.
 
 ## Scope and decisions
 
-The exact ZIP installed in packaged MV3 tests is the only candidate eligible
-for Chrome Web Store publication. Commit, committed version, built manifest,
-connector catalogue, public metadata, ZIP SHA-256, runtime evidence, Store
-configuration, and canary observations must refer to the same `releaseId` and
-artifact.
+Only a ZIP whose extracted canonical tree digest equals the sealed `dist` tree
+loaded by the packaged MV3 harness is eligible for Chrome Web Store
+publication. Packaging must consume those tested bytes without rebuild or
+repack. Commit, committed version, built manifest, connector catalogue, public
+metadata, ZIP SHA-256, both tree digests, runtime evidence, Store configuration,
+and canary observations must refer to the same `releaseId` and artifact.
 
 Missing, stale, contradictory, or unverifiable evidence is a blocker. External
 Store/canary work remains external until an authorized operator records proof;
@@ -83,6 +84,8 @@ interface ReleaseReadinessContext {
   committedVersion: string;
   artifactPath: string | null;
   artifactSha256: string | null;
+  testedDistTreeDigest: string | null;
+  zipExtractedTreeDigest: string | null;
   manifestVersion: string | null;
   manifestConnectorIds: readonly string[];
   auditedAt: string;
@@ -185,6 +188,8 @@ type ReleaseReadinessEvent =
       releaseId: string;
       operationId: string;
       sha256: string;
+      testedDistTreeDigest: string;
+      zipExtractedTreeDigest: string;
       evidence: readonly EvidenceRef[];
     }
   | {
@@ -353,9 +358,9 @@ optimistically advance it.
 | `allBlockersResolved`      | Zero open P0 and P1 blockers, each closure linked to fresh evidence.                                                                                     |
 | `auditClear`               | Audit covers workflows, security, permissions, metadata, CI, runtime, and rollback; no P0/P1.                                                            |
 | `artifactIdentified`       | ZIP exists and commit/version/manifest/SHA-256 are non-empty and mutually consistent.                                                                    |
-| `exactArtifact`            | Validated/installed ZIP SHA equals `artifactSha256`; post-build manifest and committed version match.                                                    |
+| `exactArtifact`            | ZIP SHA matches; canonical digest of the harness-tested `dist` equals the extracted ZIP tree; packaging performed no intervening rebuild/repack.         |
 | `localGateComplete`        | Format, lint, typecheck, unit/integration tests, build, post-build manifest validation, and packaged MV3 tests passed.                                   |
-| `storeEvidenceComplete`    | CWS credentials/config, listing, privacy disclosures, minimal permissions, package metadata, and rollback artifact are verified.                         |
+| `storeEvidenceComplete`    | CWS config and rollback proof are complete; `release-surface-alignment.model.md` is `aligned` for this artifact.                                         |
 | `canaryPassed`             | Fresh typed pass evidence is attached for this release/artifact, duration/sample completed, no stop threshold crossed, and rollback rehearsal evidenced. |
 | `authorized`               | Named human/operator is permitted for the external Store action; required credentials exist.                                                             |
 | `sameArtifact`             | Event SHA equals candidate SHA and no rebuild/repack occurred after validation.                                                                          |
@@ -385,7 +390,7 @@ optimistically advance it.
 | any stable source                               | `ACTION_STARTED`                 | matching requested action                             | same                | Change only action phase to `running`; attach no gate evidence.                                                                                                      |
 | `blocked`                                       | `AUDIT_PASSED`                   | matching audit, all resolved                          | `audited`           | Attach fresh closure/audit evidence; clear action/error/resume and invalidate all later-stage evidence.                                                              |
 | `audited*`                                      | `RC_BUILD_SUCCEEDED`             | matching build, audit clear, identified               | `rc_built`          | Record ZIP path/hash/manifest/catalogue; clear action/error/resume.                                                                                                  |
-| `rc_built*`                                     | `PACKAGE_VALIDATION_SUCCEEDED`   | matching package action, exact artifact, local gates  | `package_validated` | Attach packaged MV3 evidence for the exact ZIP.                                                                                                                      |
+| `rc_built*`                                     | `PACKAGE_VALIDATION_SUCCEEDED`   | matching package action, exact artifact, local gates  | `package_validated` | Attach MV3 evidence for the sealed `dist`, ZIP SHA, extracted-ZIP tree digest, and their exact digest equality.                                                      |
 | `package_validated*`                            | `STORE_VALIDATION_SUCCEEDED`     | matching Store action, complete evidence              | `store_ready`       | Attach listing/privacy/permissions/configuration evidence.                                                                                                           |
 | `store_ready*`                                  | `CANARY_STARTED`                 | matching publication, same artifact, authorized       | `canary`            | Attach publication receipt, set `canaryOutcome='running'`, clear publication action.                                                                                 |
 | `canary*`                                       | `CANARY_PASSED`                  | matching observation, same artifact                   | `canary`            | Append typed pass evidence, set outcome `passed`, and clear action.                                                                                                  |
@@ -502,7 +507,9 @@ audit, matching gate retry success, or confirmed rollback.
 - `package_validated` based on dev-stub Playwright instead of packaged MV3.
 - `store_ready` with missing credentials, dashboard fields, metadata alignment,
   permission justification, rollback artifact, or external proof.
-- Canary/production publication of rebuilt or repacked bytes.
+- Packaging the ZIP by rebuilding after the MV3 harness, digest inequality
+  between the tested `dist` and extracted ZIP, or canary/production publication
+  of rebuilt or repacked bytes.
 - `canary`/`production` to `rolled_back` before rollback confirmation.
 - Gate success/failure with no matching requested/running/reconciling action.
 - `CANARY_PASSED` without fresh evidence bound to the current artifact, or
@@ -519,11 +526,13 @@ audit, matching gate retry success, or confirmed rollback.
 1. State vocabulary is exactly the eight values declared above.
 2. Every advance has same-release, same-artifact, fresh attached evidence.
 3. Zero unresolved P0/P1 is required at and beyond `rc_built`.
-4. `package_validated` means the exact ZIP hash passed post-build validation and
-   real packaged MV3 scenarios.
+4. `package_validated` means real MV3 scenarios passed on a sealed `dist` tree,
+   the candidate ZIP passed post-build validation, and the canonical digest of
+   that tested tree equals the digest recomputed after extracting the ZIP.
 5. `store_ready`, `canary`, and `production` require explicit external proof.
-6. The committed version, tag/release source commit, manifest, listing, and ZIP
-   describe the same product/connectors.
+6. The committed version, tag/release source commit, manifest, listing, privacy
+   disclosures, landing claims, host permissions, cache-policy evidence, and
+   ZIP satisfy `release-surface-alignment.model.md` for the same artifact.
 7. Missing production configuration fails closed.
 8. Rollback never claims success before the known-good artifact is restored and verified.
 9. An LLM never decides a transition; authorized typed events plus guards do.

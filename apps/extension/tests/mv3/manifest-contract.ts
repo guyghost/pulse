@@ -18,9 +18,6 @@ export const EXPECTED_PERMISSIONS = [
   'activeTab',
 ] as const;
 
-/** Feature-owned hosts that do not belong to any connector catalog entry. */
-export const NON_CONNECTOR_HOST_PERMISSIONS = ['https://missionpulse.app/*'] as const;
-
 export const EXPECTED_OPTIONAL_HOST_PERMISSIONS = ['https://www.linkedin.com/*'] as const;
 
 export interface ManifestPermissionSurface {
@@ -80,7 +77,7 @@ export function getExpectedHostPermissions(options: ExpectedHostPermissionOption
     }
     return [...matches[0].hostPermissions];
   });
-  const expected = [...connectorHosts, ...NON_CONNECTOR_HOST_PERMISSIONS];
+  const expected = connectorHosts;
   if (new Set(expected).size !== expected.length) {
     throw new Error('Derived host permission contract contains duplicate patterns.');
   }
