@@ -205,7 +205,9 @@ test.describe('Feed tracking failure settlement', () => {
     const dialog = await openTrackingAction(page);
 
     await expect(
-      dialog.getByText('Impossible de charger le suivi des candidatures.', { exact: true })
+      dialog
+        .locator('p[role="status"]')
+        .filter({ hasText: 'Impossible de charger le suivi des candidatures.' })
     ).toBeVisible();
     await expect(dialog.getByText('Suivi indisponible', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Non suivie', { exact: true })).toHaveCount(0);
@@ -263,7 +265,32 @@ test.describe('Feed tracking failure settlement', () => {
     await expect(page.getByText('Statut: Sélectionnée', { exact: true })).toBeVisible();
     await expect(dialog.getByText('Sélectionnée', { exact: true })).toBeVisible();
 
-    await page.getByRole('button', { name: 'Annuler', exact: true }).click();
+    const renderer = page.locator('[data-modal-feedback-renderer]');
+    const undo = page.getByRole('button', { name: 'Annuler', exact: true });
+    await expect(renderer).toHaveCount(1);
+    await expect(dialog.locator('[data-modal-feedback-renderer]')).toHaveCount(1);
+    await expect(
+      page.locator('[data-feedback-application-host] > [data-modal-feedback-renderer]')
+    ).toHaveCount(0);
+    await expect(dialog.getByRole('button', { name: 'Annuler', exact: true })).toBeVisible();
+    expect(
+      await undo.evaluate((button) => {
+        const bounds = button.getBoundingClientRect();
+        const hit = document.elementFromPoint(
+          bounds.left + bounds.width / 2,
+          bounds.top + bounds.height / 2
+        );
+        return hit === button || button.contains(hit);
+      })
+    ).toBe(true);
+    const dismissToast = dialog.getByRole('button', { name: 'Fermer la notification' });
+    await undo.focus();
+    await expect(undo).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(dismissToast).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(undo).toBeFocused();
+    await undo.press('Enter');
 
     await expect(
       page.getByText('Impossible d’annuler la modification.', { exact: true })

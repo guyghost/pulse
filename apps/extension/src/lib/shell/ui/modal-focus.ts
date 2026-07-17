@@ -25,6 +25,14 @@ export type ModalRejectionReason =
   | 'DUPLICATE_DIALOG'
   | 'INVALID_UPDATE';
 
+export type ModalFeedbackRejectionReason =
+  'INVALID_FEEDBACK_STAGING' | 'DUPLICATE_FEEDBACK_BINDING' | 'FEEDBACK_ACTIVATION_FAILED';
+
+export interface ModalFeedbackOptions {
+  onAccepted?: (renderer: HTMLElement) => void | (() => void);
+  onRejected?: (reason: ModalFeedbackRejectionReason) => void;
+}
+
 export interface ModalFocusOptions {
   surface: ModalSurface;
   variant: ModalFocusVariant;
@@ -46,6 +54,38 @@ export interface ModalRegistry {
 
 interface PrivateHandle extends ModalHandle {
   readonly registryToken: object;
+}
+
+interface PrivateFeedbackHandle {
+  readonly ordinal: number;
+  readonly registryToken: object;
+}
+
+type ModalFeedbackLaneState = 'application-hosted' | 'modal-hosted' | 'topmost-removal-frozen';
+
+type ModalFeedbackTarget =
+  | { kind: 'application'; host: HTMLElement }
+  | { kind: 'modal'; handle: PrivateHandle; dialog: HTMLElement };
+
+interface ModalFeedbackAttempt {
+  readonly identity: object;
+  readonly renderer: HTMLElement;
+  readonly applicationHost: HTMLElement | null;
+  state: 'staging' | 'accepted' | 'rejected' | 'destroyed';
+  handle: PrivateFeedbackHandle | null;
+  onAccepted: (() => void | (() => void)) | undefined;
+  onRejected: ((reason: ModalFeedbackRejectionReason) => void) | undefined;
+}
+
+interface ModalFeedbackBinding {
+  handle: PrivateFeedbackHandle;
+  applicationHost: HTMLElement;
+  renderer: HTMLElement;
+  state: ModalFeedbackLaneState;
+  target: ModalFeedbackTarget;
+  attempt: ModalFeedbackAttempt;
+  deactivate: (() => void) | null;
+  destroyRequested: boolean;
 }
 
 interface ModalEntry {
@@ -70,7 +110,9 @@ interface ModalEntry {
 interface RegistryInternal extends ModalRegistry {
   token: object;
   nextOrdinal: number;
+  nextFeedbackOrdinal: number;
   entries: ModalEntry[];
+  feedbackBinding: ModalFeedbackBinding | null;
   commandQueue: Array<() => void>;
   dispatching: boolean;
   pendingRemoval: Set<PrivateHandle>;
@@ -94,6 +136,7 @@ const FOCUSABLE_SELECTOR = [
 
 let registries = new WeakMap<Document, RegistryInternal>();
 const entryByNode = new WeakMap<HTMLElement, { registry: RegistryInternal; entry: ModalEntry }>();
+const feedbackAttempts = new WeakSet<object>();
 
 function reportAsync(error: unknown): void {
   queueMicrotask(() => {
@@ -120,6 +163,17 @@ function safeReject(
   }
 }
 
+function safeFeedbackReject(
+  callback: ((reason: ModalFeedbackRejectionReason) => void) | undefined,
+  reason: ModalFeedbackRejectionReason
+): void {
+  try {
+    callback?.(reason);
+  } catch (error) {
+    reportAsync(error);
+  }
+}
+
 function projectRejectedRoot(root: HTMLElement): void {
   root.inert = true;
   root.tabIndex = -1;
@@ -128,6 +182,16 @@ function projectRejectedRoot(root: HTMLElement): void {
 
 function nodesOverlap(left: Node, right: Node): boolean {
   return left === right || left.contains(right) || right.contains(left);
+}
+
+function feedbackTargetsEqual(left: ModalFeedbackTarget, right: ModalFeedbackTarget): boolean {
+  if (left.kind !== right.kind) {
+    return false;
+  }
+  return left.kind === 'application'
+    ? left.host === (right as Extract<ModalFeedbackTarget, { kind: 'application' }>).host
+    : left.handle === (right as Extract<ModalFeedbackTarget, { kind: 'modal' }>).handle &&
+        left.dialog === (right as Extract<ModalFeedbackTarget, { kind: 'modal' }>).dialog;
 }
 
 function candidateRootIsDisjoint(registry: RegistryInternal, root: HTMLElement): boolean {
@@ -186,7 +250,9 @@ export function createModalRegistry(
     documentFallback,
     token: {},
     nextOrdinal: 0,
+    nextFeedbackOrdinal: 0,
     entries: [],
+    feedbackBinding: null,
     commandQueue: [],
     dispatching: false,
     pendingRemoval: new Set(),
@@ -232,6 +298,9 @@ function registryFor(document: Document): RegistryInternal {
   const current = registries.get(document);
   if (current) {
     if (!current.overlayRoot.isConnected) {
+      if (current.feedbackBinding) {
+        deactivateFeedbackBinding(current, current.feedbackBinding);
+      }
       for (const entry of current.entries) {
         entry.state = 'disposed';
         entryByNode.delete(entry.root);
@@ -270,6 +339,202 @@ function enqueue(registry: RegistryInternal, command: () => void): void {
 
 function liveTopmost(registry: RegistryInternal): ModalEntry | null {
   return registry.entries.at(-1) ?? null;
+}
+
+function deriveFeedbackTarget(
+  registry: RegistryInternal,
+  applicationHost: HTMLElement
+): { state: ModalFeedbackLaneState; target: ModalFeedbackTarget } {
+  const topmost = liveTopmost(registry);
+  if (!topmost) {
+    return {
+      state: 'application-hosted',
+      target: { kind: 'application', host: applicationHost },
+    };
+  }
+  return {
+    state: topmost.pendingRemoval ? 'topmost-removal-frozen' : 'modal-hosted',
+    target: { kind: 'modal', handle: topmost.handle, dialog: topmost.dialog },
+  };
+}
+
+function feedbackTargetParent(target: ModalFeedbackTarget): HTMLElement {
+  return target.kind === 'application' ? target.host : target.dialog;
+}
+
+function syncFeedbackPlacement(registry: RegistryInternal): void {
+  const binding = registry.feedbackBinding;
+  if (!binding) {
+    return;
+  }
+  const next = deriveFeedbackTarget(registry, binding.applicationHost);
+  if (!feedbackTargetsEqual(binding.target, next.target)) {
+    feedbackTargetParent(next.target).appendChild(binding.renderer);
+  }
+  binding.state = next.state;
+  binding.target = next.target;
+}
+
+function feedbackStagingIsNeutral(
+  registry: RegistryInternal,
+  attempt: ModalFeedbackAttempt
+): attempt is ModalFeedbackAttempt & { applicationHost: HTMLElement } {
+  const host = attempt.applicationHost;
+  const renderer = attempt.renderer;
+  if (
+    !feedbackAttempts.has(attempt.identity) ||
+    attempt.state !== 'staging' ||
+    !host ||
+    host === renderer ||
+    host.ownerDocument !== registry.document ||
+    renderer.ownerDocument !== registry.document ||
+    !host.isConnected ||
+    !renderer.isConnected ||
+    renderer.parentElement !== host ||
+    renderer.childNodes.length !== 0 ||
+    nodesOverlap(host, registry.overlayRoot) ||
+    nodesOverlap(host, registry.documentFallback) ||
+    renderer.hasAttribute('data-modal-feedback-host') ||
+    renderer.hasAttribute('data-modal-feedback-renderer') ||
+    renderer.hasAttribute('role') ||
+    renderer.hasAttribute('aria-live') ||
+    renderer.hasAttribute('aria-atomic') ||
+    renderer.hasAttribute('aria-relevant')
+  ) {
+    return false;
+  }
+  const binding = registry.feedbackBinding;
+  if (binding) {
+    if (
+      host !== binding.applicationHost ||
+      !host.hasAttribute('data-modal-feedback-host') ||
+      nodesOverlap(renderer, binding.renderer)
+    ) {
+      return false;
+    }
+  } else if (host.hasAttribute('data-modal-feedback-host')) {
+    return false;
+  }
+  return registry.entries.every(
+    (entry) =>
+      !nodesOverlap(host, entry.root) &&
+      !nodesOverlap(host, entry.dialog) &&
+      !nodesOverlap(renderer, entry.root) &&
+      !nodesOverlap(renderer, entry.dialog)
+  );
+}
+
+function disposeFeedbackAttempt(
+  attempt: ModalFeedbackAttempt,
+  reason: ModalFeedbackRejectionReason
+): void {
+  attempt.renderer.replaceChildren();
+  attempt.renderer.removeAttribute('data-modal-feedback-renderer');
+  attempt.renderer.removeAttribute('role');
+  attempt.renderer.removeAttribute('aria-live');
+  attempt.renderer.removeAttribute('aria-atomic');
+  attempt.renderer.removeAttribute('aria-relevant');
+  attempt.renderer.remove();
+  attempt.state = 'rejected';
+  safeFeedbackReject(attempt.onRejected, reason);
+}
+
+function deactivateFeedbackBinding(
+  registry: RegistryInternal,
+  binding: ModalFeedbackBinding
+): void {
+  if (registry.feedbackBinding !== binding) {
+    return;
+  }
+  try {
+    binding.deactivate?.();
+  } catch (error) {
+    reportAsync(error);
+  }
+  binding.deactivate = null;
+  binding.renderer.removeAttribute('data-modal-feedback-renderer');
+  binding.renderer.removeAttribute('role');
+  binding.renderer.removeAttribute('aria-live');
+  binding.renderer.removeAttribute('aria-atomic');
+  binding.renderer.removeAttribute('aria-relevant');
+  binding.renderer.remove();
+  binding.applicationHost.removeAttribute('data-modal-feedback-host');
+  binding.attempt.state = 'destroyed';
+  registry.feedbackBinding = null;
+}
+
+function bindFeedbackAttempt(registry: RegistryInternal, attempt: ModalFeedbackAttempt): void {
+  if (!feedbackStagingIsNeutral(registry, attempt)) {
+    disposeFeedbackAttempt(attempt, 'INVALID_FEEDBACK_STAGING');
+    return;
+  }
+  if (registry.feedbackBinding) {
+    disposeFeedbackAttempt(attempt, 'DUPLICATE_FEEDBACK_BINDING');
+    return;
+  }
+
+  registry.nextFeedbackOrdinal += 1;
+  const handle: PrivateFeedbackHandle = {
+    ordinal: registry.nextFeedbackOrdinal,
+    registryToken: registry.token,
+  };
+  const placement = deriveFeedbackTarget(registry, attempt.applicationHost);
+  let deactivate: (() => void) | null = null;
+  try {
+    feedbackTargetParent(placement.target).appendChild(attempt.renderer);
+    attempt.applicationHost.setAttribute('data-modal-feedback-host', '');
+    attempt.renderer.setAttribute('data-modal-feedback-renderer', '');
+    attempt.renderer.setAttribute('role', 'status');
+    attempt.renderer.setAttribute('aria-live', 'polite');
+    attempt.renderer.setAttribute('aria-atomic', 'true');
+    attempt.renderer.setAttribute('aria-relevant', 'additions text');
+    const activation = attempt.onAccepted?.();
+    if (activation !== undefined && typeof activation !== 'function') {
+      throw new Error('INVALID_FEEDBACK_ACTIVATION_RESULT');
+    }
+    deactivate = activation ?? null;
+    const binding: ModalFeedbackBinding = {
+      handle,
+      applicationHost: attempt.applicationHost,
+      renderer: attempt.renderer,
+      state: placement.state,
+      target: placement.target,
+      attempt,
+      deactivate,
+      destroyRequested: false,
+    };
+    registry.feedbackBinding = binding;
+    attempt.handle = handle;
+    attempt.state = 'accepted';
+  } catch {
+    try {
+      deactivate?.();
+    } catch {
+      // Rollback continues and owns the staging DOM even if activation cleanup fails.
+    }
+    attempt.applicationHost.removeAttribute('data-modal-feedback-host');
+    attempt.renderer.removeAttribute('data-modal-feedback-renderer');
+    attempt.renderer.removeAttribute('role');
+    attempt.renderer.removeAttribute('aria-live');
+    attempt.renderer.removeAttribute('aria-atomic');
+    attempt.renderer.removeAttribute('aria-relevant');
+    attempt.handle = null;
+    disposeFeedbackAttempt(attempt, 'FEEDBACK_ACTIVATION_FAILED');
+  }
+}
+
+function requestFeedbackDestroy(registry: RegistryInternal, handle: PrivateFeedbackHandle): void {
+  enqueue(registry, () => {
+    const binding = registry.feedbackBinding;
+    if (!binding || binding.handle !== handle || handle.registryToken !== registry.token) {
+      return;
+    }
+    if (registry.entries.length > 0) {
+      binding.destroyRequested = true;
+      return;
+    }
+    deactivateFeedbackBinding(registry, binding);
+  });
 }
 
 function setEntryProjection(entry: ModalEntry, interactive: boolean, stackIndex: number): void {
@@ -510,6 +775,7 @@ function freezeRemoval(registry: RegistryInternal, entry: ModalEntry): void {
   }
   entry.pendingRemoval = true;
   registry.pendingRemoval.add(entry.handle);
+  syncFeedbackPlacement(registry);
   project(registry);
   scheduleFlush(registry);
 }
@@ -533,6 +799,7 @@ function flushRemovals(registry: RegistryInternal): void {
     entryByNode.delete(entry.dialog);
   }
   registry.entries = registry.entries.filter((entry) => !frozen.has(entry.handle));
+  syncFeedbackPlacement(registry);
   for (const entry of removedEntries) {
     entry.root.remove();
   }
@@ -564,6 +831,9 @@ function flushRemovals(registry: RegistryInternal): void {
   }
   registry.teardownPaths = [];
   removeKeyboard(registry);
+  if (registry.entries.length === 0 && registry.feedbackBinding?.destroyRequested) {
+    deactivateFeedbackBinding(registry, registry.feedbackBinding);
+  }
 }
 
 function notifyEntryRejection(entry: ModalEntry, reason: ModalRejectionReason): void {
@@ -666,6 +936,7 @@ function register(
   entryByNode.set(root, { registry, entry });
   entryByNode.set(dialog, { registry, entry });
   installKeyboard(registry);
+  syncFeedbackPlacement(registry);
   project(registry);
   return entry;
 }
@@ -777,6 +1048,68 @@ export function modalFocus(root: HTMLElement, initialOptions: ModalFocusOptions)
       enqueue(registry, () => freezeRemoval(registry, accepted));
     },
   };
+}
+
+export function modalFeedback(
+  applicationHost: HTMLElement,
+  initialOptions: ModalFeedbackOptions = {}
+) {
+  let options = initialOptions;
+  const renderer = applicationHost.ownerDocument.createElement('div');
+  applicationHost.appendChild(renderer);
+  const attempt: ModalFeedbackAttempt = {
+    identity: {},
+    renderer,
+    applicationHost,
+    state: 'staging',
+    handle: null,
+    onAccepted: () => options.onAccepted?.(renderer),
+    onRejected: (reason) => options.onRejected?.(reason),
+  };
+  feedbackAttempts.add(attempt.identity);
+  const registry = registryFor(renderer.ownerDocument);
+  enqueue(registry, () => bindFeedbackAttempt(registry, attempt));
+
+  return {
+    update(nextOptions: ModalFeedbackOptions = {}) {
+      options = nextOptions;
+    },
+    destroy() {
+      if (attempt.handle) {
+        requestFeedbackDestroy(registry, attempt.handle);
+      }
+    },
+  };
+}
+
+export function invalidateModalFeedbackFocus(node: HTMLElement): void {
+  const registry = registries.get(node.ownerDocument);
+  const binding = registry?.feedbackBinding;
+  const topmost = registry ? liveTopmost(registry) : null;
+  const active = node.ownerDocument.activeElement;
+  if (
+    !registry ||
+    !binding ||
+    !topmost ||
+    topmost.pendingRemoval ||
+    !binding.renderer.contains(node) ||
+    !(active instanceof HTMLElement) ||
+    (active !== node && !node.contains(active))
+  ) {
+    return;
+  }
+  const expectedHandle = topmost.handle;
+  queueMicrotask(() => {
+    enqueue(registry, () => {
+      const current = liveTopmost(registry);
+      if (!current || current.handle !== expectedHandle || current.pendingRemoval) {
+        return;
+      }
+      if (!focusInitial(current)) {
+        focusElement(current.dialog);
+      }
+    });
+  });
 }
 
 export function requestModalClose(node: HTMLElement | null, reason: ModalCloseReason): boolean {

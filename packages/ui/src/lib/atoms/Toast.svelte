@@ -10,12 +10,14 @@
     type = 'info',
     class: className = '',
     dismissLabel = 'Fermer la notification',
+    announce = true,
     onDismiss,
   }: {
     message: string;
     type?: ToastType;
     class?: string;
     dismissLabel?: string;
+    announce?: boolean;
     onDismiss?: () => void;
   } = $props();
 
@@ -39,7 +41,7 @@
     type
   ]} {className}"
   transition:fly={{ y: 20, duration: 250 }}
-  role="alert"
+  role={announce ? 'alert' : undefined}
 >
   <Icon name={iconMap[type]} size={16} />
   <p class="flex-1 text-xs font-medium">{message}</p>
