@@ -1,3 +1,80 @@
+<script module lang="ts">
+  import type {
+    FocusExitRequest,
+    FocusExitResult,
+  } from '../../models/cv-experience-card-accessibility.machine';
+
+  function focusConnected(element: HTMLElement | null): boolean {
+    if (
+      element === null ||
+      !element.isConnected ||
+      element.matches(':disabled') ||
+      element.getAttribute('aria-disabled') === 'true'
+    ) {
+      return false;
+    }
+    try {
+      element.focus();
+      return document.activeElement === element;
+    } catch {
+      return false;
+    }
+  }
+
+  /** Synchronous, closed parent port required by the reviewed accessibility model. */
+  export function focusExperienceExitTarget(
+    root: HTMLElement,
+    request: FocusExitRequest
+  ): FocusExitResult {
+    const articles = Array.from(root.querySelectorAll<HTMLElement>('[data-cv-experience-article]'))
+      .map((element, renderedIndex) => ({
+        element,
+        experienceId: element.dataset.experienceId ?? '',
+        positionIndex: Number(element.dataset.positionIndex),
+        renderedIndex,
+      }))
+      .filter((candidate) => Number.isSafeInteger(candidate.positionIndex))
+      .sort(
+        (left, right) =>
+          left.positionIndex - right.positionIndex || left.renderedIndex - right.renderedIndex
+      );
+
+    const currentIndex = articles.findIndex(
+      (candidate) => candidate.experienceId === request.experienceId
+    );
+    const next =
+      currentIndex >= 0
+        ? articles
+            .slice(currentIndex + 1)
+            .find((candidate) => candidate.experienceId !== request.experienceId)
+        : articles.find((candidate) => candidate.positionIndex > request.positionIndex);
+    if (focusConnected(next?.element ?? null)) {
+      return 'next_experience_article';
+    }
+
+    const previous =
+      currentIndex >= 0
+        ? articles
+            .slice(0, currentIndex)
+            .reverse()
+            .find((candidate) => candidate.experienceId !== request.experienceId)
+        : [...articles]
+            .reverse()
+            .find((candidate) => candidate.positionIndex < request.positionIndex);
+    if (focusConnected(previous?.element ?? null)) {
+      return 'previous_experience_article';
+    }
+
+    if (focusConnected(root.querySelector<HTMLElement>('[data-cv-add-experience]'))) {
+      return 'add_experience_button';
+    }
+    if (focusConnected(root.querySelector<HTMLElement>('[data-cv-heading]'))) {
+      return 'cv_heading';
+    }
+    return null;
+  }
+</script>
+
 <script lang="ts">
   import { fly } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
@@ -8,6 +85,7 @@
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
 
   const { store }: { store: CvExperienceStore } = $props();
+  let feedRoot = $state<HTMLElement | null>(null);
 
   function blankExperience(): Experience {
     return {
@@ -44,12 +122,18 @@
   function handleSave(experience: Experience) {
     store.saveExperience(experience);
   }
+
+  function handleFocusExitRequest(request: FocusExitRequest): FocusExitResult {
+    return feedRoot === null ? null : focusExperienceExitTarget(feedRoot, request);
+  }
 </script>
 
-<div class="flex flex-col gap-3">
+<div bind:this={feedRoot} class="flex flex-col gap-3">
   <div class="flex items-center justify-between gap-3">
     <div class="flex items-baseline gap-2">
-      <h2 class="text-sm font-semibold text-text-primary">Expériences</h2>
+      <h2 tabindex="-1" data-cv-heading class="text-sm font-semibold text-text-primary">
+        Expériences
+      </h2>
       <span class="text-[11px] text-text-muted">
         {store.experiences.length}
         {store.experiences.length > 1 ? 'entrées' : 'entrée'}
@@ -58,8 +142,10 @@
     <Button
       variant="secondary"
       size="sm"
+      aria-label="Ajouter une expérience"
       onclick={() => store.newExperience()}
       disabled={isAdding || isEditing || store.isSyncing}
+      data-cv-add-experience
     >
       <Icon name="file-plus" size={14} />
       Ajouter
@@ -74,8 +160,8 @@
           <Skeleton width="55%" height="0.95rem" />
           <Skeleton width="35%" height="0.75rem" />
           <div class="flex gap-2">
-            <Skeleton width="3rem" height="1rem" rounded="full" />
-            <Skeleton width="4rem" height="1rem" rounded="full" />
+            <Skeleton width="3rem" height="1rem" variant="circle" />
+            <Skeleton width="4rem" height="1rem" variant="circle" />
           </div>
         </div>
       {/each}
@@ -126,6 +212,7 @@
           draft={store.draft}
           onSave={handleSave}
           onCancelEdit={() => store.cancelEdit()}
+          onFocusExitRequest={handleFocusExitRequest}
         />
       </div>
     {/if}
@@ -141,6 +228,7 @@
           onDelete={() => store.deleteExperience(experience.id)}
           onSave={handleSave}
           onCancelEdit={() => store.cancelEdit()}
+          onFocusExitRequest={handleFocusExitRequest}
         />
       </div>
     {/each}
