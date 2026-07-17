@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import type { ApplicationPipelineSummary } from '$lib/core/tracking/pipeline-summary';
 
   const {
@@ -16,7 +16,7 @@
   type PipelineInsightCard = {
     label: string;
     value: string | number;
-    icon: string;
+    icon: IconName;
     stateLabel: string;
     hint: string;
     severity: 'success' | 'attention' | 'incident' | 'neutral';

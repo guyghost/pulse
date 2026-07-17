@@ -23,7 +23,6 @@ export interface DbOpener {
 }
 
 export function createDbOpener(deps: DbOpenerDependencies): DbOpener {
-  let inFlightTargetOpen: Promise<IDBDatabase> | null = null;
   let inFlightProbe: Promise<number> | null = null;
 
   function open(kind: 'business' | 'startup', version?: number): Promise<IDBDatabase> {
@@ -102,16 +101,7 @@ export function createDbOpener(deps: DbOpenerDependencies): DbOpener {
   }
 
   function openTarget(kind: 'business' | 'startup'): Promise<IDBDatabase> {
-    if (inFlightTargetOpen !== null) {
-      return inFlightTargetOpen;
-    }
-    const guarded = open(kind, deps.targetVersion).finally(() => {
-      if (inFlightTargetOpen === guarded) {
-        inFlightTargetOpen = null;
-      }
-    });
-    inFlightTargetOpen = guarded;
-    return guarded;
+    return open(kind, deps.targetVersion);
   }
 
   function probeStoredVersion(): Promise<number> {

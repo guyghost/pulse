@@ -33,6 +33,11 @@ baseTest.describe('Full User Journey', () => {
       firstName: 'Jean',
       jobTitle: 'Développeur React Senior',
     });
+    await page.waitForFunction(
+      () => window.localStorage.getItem('__missionpulse_e2e_saved_profile') !== null,
+      undefined,
+      { timeout: 10000 }
+    );
 
     await expectFeedReady(page);
 

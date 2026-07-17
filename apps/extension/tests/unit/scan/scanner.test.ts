@@ -5,6 +5,8 @@ import type { ConnectorSearchContext } from '../../../src/lib/core/connectors/se
 import type { PlatformConnector } from '../../../src/lib/shell/connectors/platform-connector';
 import type { CircuitRunLifecycleObserver } from '../../../src/lib/shell/health/circuit-breaker-runner';
 
+const getSettingsMock = vi.hoisted(() => vi.fn());
+
 // ── Mocks ────────────────────────────────────────────────────────────────
 
 vi.mock('../../../src/lib/shell/connectors/index', () => ({
@@ -13,7 +15,16 @@ vi.mock('../../../src/lib/shell/connectors/index', () => ({
 }));
 
 vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
-  getSettings: vi.fn(),
+  getSettings: getSettingsMock,
+}));
+
+vi.mock('../../../src/lib/shell/settings-release/settings-release-reader', () => ({
+  readSettingsReleaseSnapshot: vi.fn(async () => ({
+    settings: await getSettingsMock(),
+    onboardingCompleted: true,
+    revision: 0,
+    generation: 0,
+  })),
 }));
 
 vi.mock('../../../src/lib/shell/storage/db', () => ({

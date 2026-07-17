@@ -13,6 +13,13 @@ blob-report/
 *.mobileprovision
 *.local
 output/
+apps/extension/releases/
+apps/extension/release-input/
+consumer-input/
+consumer-extracted/
+consumer-check-before-upload/
+package-artifact.json
+*.journal.jsonl
 .superset/
 test-results/
 coverage/

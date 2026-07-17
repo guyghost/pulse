@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import ConnectionIndicator from '../ui/atoms/ConnectionIndicator.svelte';
   import ToastContainer from '../ui/organisms/ToastContainer.svelte';
   import OperationalEmptyState from '../ui/molecules/OperationalEmptyState.svelte';
@@ -7,7 +7,11 @@
   import { cubicOut } from 'svelte/easing';
   import type { LogEntry } from '../dev/bridge-logger';
   import type { ToastType } from '$lib/state/toast.svelte.ts';
-  import { initToastService, showToast } from '../lib/shell/notifications/toast-service';
+  import {
+    initToastService,
+    showToast,
+    stopToastService,
+  } from '../lib/shell/notifications/toast-service';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import {
     createAppNavigation,
@@ -162,6 +166,7 @@
       pageRequestSequence += 1;
       inFlightPageLoads.clear();
       nav.dispose();
+      stopToastService();
     };
   });
 
@@ -440,7 +445,7 @@
               onclick={() => nav.navigate(item.page)}
             >
               <span class="shrink-0 transition-transform duration-200 ease-out">
-                <Icon name={item.icon} size={feedNavCompact || denseNav ? 13 : 16} />
+                <Icon name={item.icon as IconName} size={feedNavCompact || denseNav ? 13 : 16} />
               </span>
               <span
                 class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out {(feedNavCompact &&

@@ -76,6 +76,11 @@ import {
   type MissionDwellSignal,
 } from '$lib/core/feed/mission-arrival-queue';
 import {
+  createArrivalPreviewCacheState,
+  transitionArrivalPreviewCache,
+  type ArrivalPreviewCacheSource,
+} from '$lib/core/feed/arrival-preview-cache';
+import {
   createMissionArrivalActor,
   type MissionArrivalActorEvent,
 } from '$lib/shell/arrival/mission-arrival-actor';
@@ -265,9 +270,10 @@ export function createFeedPageState(
       arrivalObservedEffects = [...arrivalObservedEffects, effect];
     },
   });
-  let arrivalPreviewCatalog = $state<Record<string, Mission>>(
-    Object.fromEntries(controller.pendingMissions.map((mission) => [mission.id, mission]))
+  let arrivalPreviewCacheState = $state.raw(
+    createArrivalPreviewCacheState(controller.pendingMissions)
   );
+  const arrivalPreviewCatalog = $derived(arrivalPreviewCacheState.byId);
 
   // ============================================================
   // Focus lens — driven by the notification deep-link intent.
@@ -732,23 +738,24 @@ export function createFeedPageState(
     dispatchArrival({ type: 'DWELL_ELAPSED', missionId, now: signal.at });
   }
 
-  function rememberArrivalPreviews(pendingMissions: readonly Mission[]): void {
-    if (pendingMissions.length === 0) {
-      return;
-    }
-    arrivalPreviewCatalog = {
-      ...arrivalPreviewCatalog,
-      ...Object.fromEntries(pendingMissions.map((mission) => [mission.id, mission])),
-    };
+  function rememberArrivalPreviews(
+    pendingMissions: readonly Mission[],
+    source: ArrivalPreviewCacheSource
+  ): void {
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'PREVIEW_OBJECTS_OBSERVED',
+      source,
+      missions: pendingMissions,
+    });
   }
 
   function receiveAlarmMissions(alarmMissions: readonly Mission[]): void {
-    rememberArrivalPreviews(alarmMissions);
+    rememberArrivalPreviews(alarmMissions, 'alarm-ingress');
     arrivalActor.publishAlarm(alarmMissions);
   }
 
   function openArrivalStack(): void {
-    rememberArrivalPreviews(controller.pendingMissions);
+    rememberArrivalPreviews(controller.pendingMissions, 'facade-pending-snapshot');
     dispatchArrival({ type: 'OPEN_STACK' });
   }
 
@@ -765,14 +772,15 @@ export function createFeedPageState(
     );
     await arrivalActor.whenIdle();
     const effects = arrivalObservedEffects.slice(effectOffset);
-    if (getMissionArrivalStackView(arrivalQueueState).count === 0) {
-      arrivalPreviewCatalog = {};
-    }
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'APPLY_CYCLE_SETTLED',
+      hasRemainingPreviewMembership: getMissionArrivalStackView(arrivalQueueState).count > 0,
+    });
     return effects;
   }
 
   async function bootstrapArrivalActor(): Promise<void> {
-    rememberArrivalPreviews(controller.pendingMissions);
+    rememberArrivalPreviews(controller.pendingMissions, 'facade-pending-snapshot');
     arrivalActor.synchronizePresentation({
       feedState: feedStore.state,
       ownedScan: controller.ownedScan,
@@ -1167,7 +1175,10 @@ export function createFeedPageState(
     });
 
     $effect(() => {
-      rememberArrivalPreviews(controller.pendingMissions);
+      const pendingMissions = controller.pendingMissions;
+      untrack(() => {
+        rememberArrivalPreviews(pendingMissions, 'facade-pending-snapshot');
+      });
     });
 
     $effect(() => {
@@ -1405,7 +1416,10 @@ export function createFeedPageState(
     hideUndo.dispose();
     viewDeleteUndo.dispose();
     arrivalActor.dispose();
-    arrivalPreviewCatalog = {};
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'PREVIEW_CACHE_DISPOSED',
+      reason: 'feed-unmounted',
+    });
   }
 
   // ============================================================

@@ -266,6 +266,227 @@ describe('validateMessage — settings bridge', () => {
   });
 });
 
+describe('validateMessage — settings release protocol', () => {
+  const releaseSnapshot = {
+    settings: validSettings,
+    onboardingCompleted: true,
+    revision: 4,
+    generation: 7,
+  };
+  const requestId = '93000000-0000-4000-8000-000000000001';
+  const commandId = 'settings-release:92000000-0000-4000-8000-000000000001:5:command';
+
+  it('requires lower-case RFC 4122 v4 request IDs', () => {
+    for (const invalidRequestId of [
+      'A3000000-0000-4000-8000-000000000001',
+      '93000000-0000-1000-8000-000000000001',
+      '93000000-0000-4000-7000-000000000001',
+    ]) {
+      expect(
+        validateMessage({
+          type: 'MUTATE_SETTINGS_RELEASE',
+          payload: {
+            kind: 'set_consent',
+            requestId: invalidRequestId,
+            baseRevision: 4,
+            targetConsent: true,
+          },
+        }).valid
+      ).toBe(false);
+    }
+  });
+
+  it('requires strict catalogue-ordered unique connector IDs in intents and snapshots', () => {
+    for (const enabledConnectors of [
+      ['lehibou', 'free-work'],
+      ['free-work', 'free-work'],
+      ['unknown-source'],
+    ]) {
+      expect(
+        validateMessage({
+          type: 'MUTATE_SETTINGS_RELEASE',
+          payload: {
+            kind: 'save_settings',
+            requestId,
+            baseRevision: 4,
+            settings: { ...validSettings, enabledConnectors },
+          },
+        }).valid
+      ).toBe(false);
+      expect(
+        validateMessage({
+          type: 'SETTINGS_RELEASE_RESULT',
+          payload: {
+            status: 'confirmed',
+            snapshot: {
+              ...releaseSnapshot,
+              settings: { ...validSettings, enabledConnectors },
+            },
+          },
+        }).valid
+      ).toBe(false);
+    }
+  });
+
+  it('valide les lectures confirmées, indisponibles et rejetées par la file', () => {
+    expect(validateMessage({ type: 'GET_SETTINGS_RELEASE' }).valid).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: { status: 'confirmed', snapshot: releaseSnapshot },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: { status: 'unavailable', reason: 'actor_blocked', snapshot: null },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: {
+          status: 'transport_rejected',
+          reason: 'queue_full',
+          commandType: 'read',
+          correlationId: null,
+          snapshot: null,
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette les champs supplémentaires et les métadonnées de lecture manquantes', () => {
+    expect(validateMessage({ type: 'GET_SETTINGS_RELEASE', payload: {} }).valid).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: {
+          status: 'confirmed',
+          snapshot: { ...releaseSnapshot, source: 'legacy' },
+        },
+      }).valid
+    ).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: {
+          status: 'transport_rejected',
+          reason: 'queue_full',
+          commandType: 'read',
+          snapshot: null,
+        },
+      }).valid
+    ).toBe(false);
+  });
+
+  it('valide une intention et son règlement corrélé', () => {
+    expect(
+      validateMessage({
+        type: 'MUTATE_SETTINGS_RELEASE',
+        payload: {
+          kind: 'set_consent',
+          requestId,
+          baseRevision: 4,
+          targetConsent: true,
+        },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+        payload: {
+          status: 'settled',
+          outcome: {
+            commandId,
+            requestId,
+            intentDigest: 'a'.repeat(64),
+            kind: 'set_consent',
+            settledRevision: 4,
+            settledGeneration: 7,
+            snapshot: releaseSnapshot,
+            status: 'committed',
+            reason: 'committed',
+          },
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('rejette une intention enrichie et un rejet de file non corrélé', () => {
+    expect(
+      validateMessage({
+        type: 'MUTATE_SETTINGS_RELEASE',
+        payload: {
+          kind: 'clear_consent',
+          requestId,
+          baseRevision: 4,
+          targetConsent: false,
+          origin: 'sidepanel',
+        },
+      }).valid
+    ).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+        payload: {
+          status: 'transport_rejected',
+          reason: 'queue_full',
+          commandType: 'mutation',
+          snapshot: null,
+        },
+      }).valid
+    ).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+        payload: {
+          status: 'transport_rejected',
+          reason: 'queue_full',
+          commandType: 'mutation',
+          correlationId: requestId,
+          snapshot: null,
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it('valide le contrôle de reprise et refuse tout payload implicite', () => {
+    expect(validateMessage({ type: 'RETRY_SETTINGS_RELEASE' }).valid).toBe(true);
+    expect(validateMessage({ type: 'RETRY_SETTINGS_RELEASE', payload: null }).valid).toBe(false);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RETRY_RESULT',
+        payload: { status: 'retry_accepted', snapshot: null },
+      }).valid
+    ).toBe(true);
+    expect(
+      validateMessage({
+        type: 'SETTINGS_RELEASE_RETRY_RESULT',
+        payload: { status: 'retry_accepted', snapshot: null, retryAfterMs: 100 },
+      }).valid
+    ).toBe(false);
+  });
+
+  it('valide un broadcast strict et rejette les métadonnées étrangères', () => {
+    const broadcast = {
+      type: 'SETTINGS_RELEASE_UPDATED',
+      payload: {
+        snapshot: releaseSnapshot,
+        commandId,
+        broadcastId: `${commandId}:broadcast`,
+      },
+    };
+    expect(validateMessage(broadcast).valid).toBe(true);
+    expect(
+      validateMessage({
+        ...broadcast,
+        payload: { ...broadcast.payload, revision: releaseSnapshot.revision },
+      }).valid
+    ).toBe(false);
+  });
+});
+
 // ============================================================================
 // IMPORT_LINKEDIN_PROFILE
 // ============================================================================
@@ -637,6 +858,30 @@ describe('validateMessage — feed local data bridge', () => {
         ],
       }).valid
     ).toBe(true);
+  });
+});
+
+describe('validateMessage — connector recheck settlement', () => {
+  it('accepte les axes scan et activation distincts', () => {
+    expect(
+      validateMessage({
+        type: 'CONNECTOR_RECHECK_RESULT',
+        payload: {
+          snapshots: [],
+          scan: 'failed',
+          activation: 'already_confirmed',
+        },
+      }).valid
+    ).toBe(true);
+  });
+
+  it("rejette l'ancien résultat ambigu de santé", () => {
+    expect(
+      validateMessage({
+        type: 'CONNECTOR_RECHECK_RESULT',
+        payload: [],
+      }).valid
+    ).toBe(false);
   });
 });
 

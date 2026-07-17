@@ -3,10 +3,14 @@ import type { UserProfile } from '../../core/types/profile';
 import { scoreMission } from '../../core/scoring/relevance';
 import { buildScoreBreakdown, computeFinalBreakdown } from '../../core/scoring/final-score';
 import { getMissions, saveMissions } from '../storage/db';
-import { getSettings } from '../storage/chrome-storage';
 import { scoreMissionsSemantic } from '../ai/semantic-scorer';
+import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
+import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
-export async function rescoreStoredMissions(profile: UserProfile): Promise<Mission[]> {
+export async function rescoreStoredMissions(
+  profile: UserProfile,
+  admittedSnapshot?: SettingsReleaseSnapshot
+): Promise<Mission[]> {
   const missions = await getMissions();
   if (missions.length === 0) {
     return [];
@@ -25,7 +29,7 @@ export async function rescoreStoredMissions(profile: UserProfile): Promise<Missi
   });
 
   try {
-    const settings = await getSettings();
+    const settings = (admittedSnapshot ?? (await readSettingsReleaseSnapshot())).settings;
     const semanticResults = await scoreMissionsSemantic(
       rescored,
       profile,

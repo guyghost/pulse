@@ -31,7 +31,7 @@
     isHidden?: boolean;
     trackingStatus?: ApplicationStatus | null;
     trackingUpdatedAt?: number | null;
-    trackingState?: 'loading' | 'loaded' | 'error';
+    trackingState?: 'idle' | 'loading' | 'loaded' | 'error';
     trackingError?: string | null;
     onClose?: () => void;
     onOpenLink?: (url: string) => void;

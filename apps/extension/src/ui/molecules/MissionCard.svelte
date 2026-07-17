@@ -239,7 +239,10 @@
       <div class="flex flex-wrap items-center gap-1.5">
         <Badge label={mission.source} variant="source" />
         {#if trackingStatus}
-          <Badge label={STATUS_LABELS[trackingStatus]} variant={STATUS_VARIANTS[trackingStatus]} />
+          <Badge
+            label={STATUS_LABELS[trackingStatus]}
+            variant={STATUS_VARIANTS[trackingStatus] as 'source'}
+          />
           {#if trackingUpdatedLabel}
             <span
               class="inline-flex items-center rounded-full bg-page-canvas px-2 py-0.5 text-[10px] font-medium text-text-muted"

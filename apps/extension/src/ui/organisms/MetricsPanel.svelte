@@ -1,6 +1,6 @@
 <script lang="ts">
   import { SvelteMap } from 'svelte/reactivity';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import { metricsCollector, getWebVitals } from '../../lib/shell/metrics';
   import type { Metric } from '../../lib/core/metrics/types';
 
@@ -12,7 +12,7 @@
     value: string;
     state: string;
     hint: string;
-    icon: string;
+    icon: IconName;
     tone: DiagnosticTone;
   };
 

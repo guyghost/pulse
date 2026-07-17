@@ -1,6 +1,7 @@
 {
   "extends": "@pulse/tsconfig/svelte.json",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "paths": {
       "$lib/*": ["./src/lib/*"]
     }

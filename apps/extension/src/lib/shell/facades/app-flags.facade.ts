@@ -1,4 +1,5 @@
 import { sendMessage } from '../messaging/bridge';
+import { getSettingsReleaseSnapshot, setOnboardingConsentRelease } from './settings-release.facade';
 
 export async function getFirstScanDone(): Promise<boolean> {
   const response = await sendMessage({ type: 'GET_FIRST_SCAN_DONE' });
@@ -18,22 +19,15 @@ export async function setProfileBannerDismissed(): Promise<void> {
 }
 
 export async function getOnboardingCompleted(): Promise<boolean> {
-  const response = await sendMessage({ type: 'GET_ONBOARDING_COMPLETED' });
-  return response.type === 'ONBOARDING_COMPLETED_RESULT' ? response.payload : false;
+  return (await getSettingsReleaseSnapshot()).onboardingCompleted;
 }
 
 export async function setOnboardingCompleted(): Promise<void> {
-  const response = await sendMessage({ type: 'SET_ONBOARDING_COMPLETED' });
-  if (response.type !== 'ONBOARDING_COMPLETED_SET' || !response.payload.saved) {
-    throw new Error('Onboarding flag save failed.');
-  }
+  await setOnboardingConsentRelease(true);
 }
 
 export async function clearOnboardingCompleted(): Promise<void> {
-  const response = await sendMessage({ type: 'CLEAR_ONBOARDING_COMPLETED' });
-  if (response.type !== 'ONBOARDING_COMPLETED_CLEARED' || !response.payload.cleared) {
-    throw new Error('Onboarding flag clear failed.');
-  }
+  await setOnboardingConsentRelease(false);
 }
 
 export async function getFeedTourSeen(): Promise<boolean> {

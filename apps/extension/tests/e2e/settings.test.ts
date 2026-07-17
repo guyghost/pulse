@@ -207,6 +207,8 @@ test.describe('Settings Flow', () => {
 
     await expect(page.getByText('Sauvegarde').first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('Créer une sauvegarde')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Restaurer' })).toBeVisible();
+    await expect(page.getByText('Import', { exact: true })).toBeVisible();
+    await expect(page.getByText('Non proposé', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Restaurer' })).toHaveCount(0);
   });
 });

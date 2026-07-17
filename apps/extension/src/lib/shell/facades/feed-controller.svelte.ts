@@ -18,7 +18,8 @@ import type { FeedState, OwnedActiveScan } from '$lib/core/feed/mission-arrival-
 import type { FeedProjectionResult } from '$lib/shell/arrival/mission-arrival-actor';
 import { sendMessage, subscribeMessages } from '../messaging/bridge';
 import { getMissions, getConnectorStatuses, getSeenIds } from './feed-data.facade';
-import { getSettings, setSettings } from './settings.facade';
+import { getSettings, setSettingsConfirmed } from './settings.facade';
+import { CANONICAL_INCLUDED_CONNECTOR_IDS } from '../connectors/build-config';
 
 /**
  * Converts scan error codes into user-friendly French messages.
@@ -755,16 +756,25 @@ export function createFeedController(feedStore: {
   // ============================================================
 
   async function handleToggleConnector(id: string): Promise<void> {
-    if (enabledConnectorIds.has(id)) {
-      enabledConnectorIds.delete(id);
-    } else {
-      enabledConnectorIds.add(id);
+    if (!CANONICAL_INCLUDED_CONNECTOR_IDS.some((connectorId) => connectorId === id)) {
+      return;
     }
     try {
       const settings = await getSettings();
-      await setSettings({ ...settings, enabledConnectors: [...enabledConnectorIds] });
+      const wasEnabled = settings.enabledConnectors.some((connectorId) => connectorId === id);
+      const enabledConnectors = CANONICAL_INCLUDED_CONNECTOR_IDS.filter((connectorId) => {
+        if (connectorId === id) {
+          return !wasEnabled;
+        }
+        return settings.enabledConnectors.some((enabledId) => enabledId === connectorId);
+      });
+      const confirmed = await setSettingsConfirmed({ ...settings, enabledConnectors });
+      enabledConnectorIds.clear();
+      for (const connectorId of confirmed.enabledConnectors) {
+        enabledConnectorIds.add(connectorId);
+      }
     } catch {
-      /* Non-critical: settings persistence */
+      // The confirmed projection remains untouched on a typed protocol failure.
     }
   }
 
@@ -802,14 +812,22 @@ export function createFeedController(feedStore: {
         type: 'RECHECK_CONNECTOR_HEALTH',
         payload: { connectorId: id, enable },
       });
-      if (response.type === 'CONNECTOR_HEALTH_RESULT' && Array.isArray(response.payload)) {
+      if (response.type === 'CONNECTOR_RECHECK_RESULT') {
         healthSnapshots.clear();
-        for (const snapshot of response.payload) {
+        for (const snapshot of response.payload.snapshots) {
           healthSnapshots.set(snapshot.connectorId, snapshot);
         }
-      }
-      if (enable) {
-        enabledConnectorIds.add(id);
+        if (
+          enable &&
+          (response.payload.activation === 'committed' ||
+            response.payload.activation === 'already_confirmed')
+        ) {
+          const settings = await getSettings();
+          enabledConnectorIds.clear();
+          for (const connectorId of settings.enabledConnectors) {
+            enabledConnectorIds.add(connectorId);
+          }
+        }
       }
     } catch (err) {
       feedStore.setError(

@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
   import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
 
   const {
     missions,
@@ -29,7 +29,7 @@
   type DecisionEvidence = {
     label: string;
     value: string;
-    icon: string;
+    icon: IconName;
     severity: 'success' | 'attention' | 'neutral';
   };
 

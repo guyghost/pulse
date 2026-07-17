@@ -146,9 +146,9 @@
         <Skeleton width="58%" height="1.15rem" />
         <Skeleton width="34%" height="0.8rem" />
         <div class="flex gap-2">
-          <Skeleton width="3rem" height="1.25rem" rounded="full" />
-          <Skeleton width="4rem" height="1.25rem" rounded="full" />
-          <Skeleton width="3.5rem" height="1.25rem" rounded="full" />
+          <Skeleton width="3rem" height="1.25rem" variant="circle" />
+          <Skeleton width="4rem" height="1.25rem" variant="circle" />
+          <Skeleton width="3.5rem" height="1.25rem" variant="circle" />
         </div>
         <Skeleton width="100%" height="3rem" />
       </div>

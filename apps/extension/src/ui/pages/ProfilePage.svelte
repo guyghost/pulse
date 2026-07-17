@@ -142,9 +142,6 @@
   }
 
   function profileImpactIcon(item: ProfileImpactItem): IconName {
-    if (item.id === 'stack') {
-      return 'layers';
-    }
     if (item.id === 'tjm-min' || item.id === 'tjm-max') {
       return 'badge-euro';
     }
@@ -153,9 +150,6 @@
     }
     if (item.id === 'location') {
       return 'target';
-    }
-    if (item.id === 'search-keywords') {
-      return 'search';
     }
     if (item.id === 'job-title') {
       return 'briefcase';
@@ -224,7 +218,7 @@
         statusLabel={profileStory.statusLabel}
         evidence={profileStory.evidence}
         primaryActionLabel={profileStory.primaryActionLabel}
-        primaryActionIcon={profileStory.primaryActionIcon}
+        primaryActionIcon={profileStory.primaryActionIcon as IconName}
         onPrimaryAction={() => {
           if (settings.isSavingProfile) {
             return;

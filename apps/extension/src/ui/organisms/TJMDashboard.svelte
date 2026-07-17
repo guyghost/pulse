@@ -42,7 +42,7 @@
   const levels: Array<{
     key: 'junior' | 'confirmed' | 'senior';
     label: string;
-    icon: string;
+    icon: IconName;
   }> = [
     { key: 'junior', label: 'Junior', icon: 'zap' },
     { key: 'confirmed', label: 'Confirmé', icon: 'shield' },

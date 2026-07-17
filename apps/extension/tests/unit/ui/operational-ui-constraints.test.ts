@@ -136,6 +136,7 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const stackSource = readFileSync('src/ui/organisms/MissionArrivalStack.svelte', 'utf8');
     const toastSource = readFileSync('src/ui/organisms/ToastContainer.svelte', 'utf8');
+    const toastCollectionSource = readFileSync('src/ui/organisms/ToastCollection.svelte', 'utf8');
 
     expect(feedSource).toContain("import('../organisms/MissionArrivalStack.svelte')");
     expect(feedSource).toContain('await page.refreshArrivals()');
@@ -148,7 +149,8 @@ describe('operational UI constraints', () => {
     expect(stackSource).toContain('data-testid="arrival-stack-layer"');
     expect(stackSource).toContain('@media (prefers-reduced-motion: reduce)');
     expect(stackSource).not.toContain('backdrop');
-    expect(toastSource).toContain('bottom-[var(--toast-bottom-offset,4rem)]');
+    expect(toastSource).toContain('use:modalFeedback');
+    expect(toastCollectionSource).toContain('bottom-[var(--toast-bottom-offset,4rem)]');
   });
 
   it('guides users from the feed summary to missions below the fold', () => {

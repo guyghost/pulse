@@ -1,9 +1,36 @@
 # Settings Release Compatibility Model
 
-Status: independently reviewed and approved on 2026-07-16, including the
-historical-catalogue registry revision at content hash
-`9aceac90e02c09da73bb4f3e146da5fb13d250df41d1021a51059d614846c705`.
-Any semantic change requires a new independent review.
+Status: **approved on 2026-07-16** following the independent PASS of the exact
+first-release catalogue candidate and empty-predecessor receipt described
+below. Approval is limited to those exact canonical forms and digests.
+
+Commit `6400c8ce093a858bb31ab6a1735bb18cab29bd6f` described
+`9aceac90e02c09da73bb4f3e146da5fb13d250df41d1021a51059d614846c705`
+as a historical registry content hash, but that commit contains no registry
+blob that materializes the claim; the model blob itself has SHA-256
+`fe6594112529da4bbfd44f7aa8d899cf3e0ba24f9b9bef35f147e4f6943864ad`.
+The `9ace...` value is therefore an unverified legacy claim. It is neither
+requalified nor used as an authorizing digest, review receipt or ancestry
+proof. The independent PASS did not review or authorize `9ace...`.
+
+The approved first-release inputs are source-controlled independently from the
+runtime registry:
+
+- the exact empty predecessor object is in
+  `tests/fixtures/settings-release/connector-catalogue-history.predecessor.v1.json`
+  with
+  `predecessorJcsSha256=1033ecb4dd9e23ca70a0ebae009663ab2196397526b6a7cce8333653f80be0b9`;
+- the exact candidate snapshot is in
+  `tests/fixtures/settings-release/connector-catalogue-history.candidate.v1.json`
+  with
+  `registryJcsSha256=9a81cff62e4d3f270e64e0fa98934535c49da6689a64a395dddf8d9191670334`;
+
+These hashes prove only the exact forms and self-consistency of the empty
+first-release predecessor and current candidate. An empty predecessor cannot
+prove approved ancestry. Extra keys invalidate either receipt. Independent
+review of this exact model and candidate returned PASS on 2026-07-16 and
+authorizes this exact first-release pair only; it does not create, infer or
+retroactively approve any predecessor ancestry.
 
 Source of truth for the bounded Settings and onboarding-consent workflow shipped
 while Dataset DB6/data3 and the Settings V2 global-writer cutover remain
@@ -185,9 +212,12 @@ The committed, versioned `ConnectorCatalogueHistoryV1` registry is the only
 authority for decoding a non-current envelope fingerprint. Its catalogue
 entries are nonempty, unique by fingerprint, immutable and append-only across
 released versions; the current catalogue is present exactly once. Each tuple
-array is unique and ordered by canonical connector ID, each permission array is
-unique and sorted, and every fingerprint is independently recomputed from its
-exact tuples by the formula below. A duplicate, malformed, mismatched or unknown
+array is unique and ordered by strictly increasing connector ID using raw
+UTF-8/ASCII lexical comparison (`left < right`), so the present order is
+`cherry-pick, collective, free-work, hiway, lehibou, malt`. Each permission
+array is unique and sorted by the same comparison, and every fingerprint is
+independently recomputed from its exact tuples by the formula below. A duplicate,
+malformed, mismatched or unknown
 fingerprint blocks before legacy-key normalization, pending/outbox recovery,
 scan query/admission, alarm mutation or broadcast. Environment, storage and
 runtime input cannot add a history entry.

@@ -181,6 +181,24 @@ async function mockUserWithProfileAndSlowPartialScan(page: Page) {
             };
           }
 
+          if (message?.type === 'GET_PERSISTED_CONNECTOR_STATUSES') {
+            const syncedAt = Date.now();
+            return {
+              type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
+              payload: [
+                {
+                  connectorId: 'free-work',
+                  connectorName: 'Free-Work',
+                  lastState: 'done',
+                  missionsCount: 10,
+                  error: null,
+                  lastSyncAt: syncedAt,
+                  lastSuccessAt: syncedAt,
+                },
+              ],
+            };
+          }
+
           if (message?.type === 'SCAN_START') {
             const operationId = message.payload?.operationId;
             if (!operationId) {
@@ -411,45 +429,37 @@ test.describe('Feed', () => {
     await expectMissionCount(page, 5, 2000);
   });
 
-  test('partial scan missions stay buffered and become interactive after applying them', async ({
+  test('manual partial results become interactive only after the terminal projection', async ({
     page,
   }) => {
     await mockUserWithProfileAndSlowPartialScan(page);
     await page.goto(SIDE_PANEL);
 
     await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
-    await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
+    await expect(missionCards(page)).toHaveCount(10, { timeout: 5000 });
+    await expect(scanButton(page)).toHaveAccessibleName('Lancer le scan des missions');
+    await expect(scanButton(page)).toBeEnabled();
 
     await scanButton(page).click();
 
     const arrivalStack = page.getByTestId('mission-arrival-stack');
-    await expect(arrivalStack).toBeVisible({ timeout: 1000 });
+    await expect(arrivalStack).not.toBeVisible();
     await expect(page.getByText('Partial Scan Action Test')).not.toBeVisible();
     await expect(page.getByText('Collecte...')).toBeVisible();
 
-    const stackTrigger = arrivalStack.getByRole('button', {
-      name: 'Ouvrir les 1 nouvelle mission arrivée',
-    });
-    await stackTrigger.click();
-    await expect(page.getByTestId('arrival-drawer-heading')).toBeFocused();
-    await expect(page.getByTestId('arrival-preview')).toContainText('Partial Scan Action Test');
-
-    await page.keyboard.press('Escape');
-    await expect(stackTrigger).toBeFocused();
-    await stackTrigger.click();
-
-    await arrivalStack.getByRole('button', { name: 'Actualiser la file avec la mission' }).click();
-
     const partialCard = missionCards(page).filter({ hasText: 'Partial Scan Action Test' });
-    await expect(partialCard).toBeVisible();
+    await expect(partialCard).toBeVisible({ timeout: 10000 });
+    await expect(missionCards(page)).toHaveCount(1);
+    await expect(scanButton(page)).toHaveAccessibleName('Lancer le scan des missions');
     await expect(arrivalStack).not.toBeVisible();
 
     const investigateButton = partialCard.getByRole('button', { name: 'Investiguer →' });
     await expect(investigateButton).toBeEnabled();
     await investigateButton.click();
 
-    await expect(page.getByRole('dialog', { name: 'Investigation mission' })).toBeVisible();
-    await expect(page.getByText('Collecte...')).toBeVisible();
+    const investigation = page.getByRole('dialog', { name: 'Investigation mission' });
+    await expect(investigation).toBeVisible();
+    await expect(investigation).toContainText('Partial Scan Action Test');
   });
 
   test('keeps the active new-mission queue stable while visible cards become seen', async ({

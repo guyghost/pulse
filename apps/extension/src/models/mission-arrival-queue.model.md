@@ -1,7 +1,9 @@
 # Mission Arrival Queue and Feed Presentation Model
 
-Status: **MODEL — ready for independent cold review; implementation forbidden
-until approval**.
+Status: **MODEL REVISION 3 — APPROVED FOR IMPLEMENTATION**.
+
+Independent cold review: **APPROVED** on 2026-07-16 for behaviour hash
+`01d08395fd5cf7446b36032493d414deb0f543415b4537007e811ce3a0fe8e4d`.
 
 This model owns three Feed behaviours:
 
@@ -129,8 +131,13 @@ than implicitly redefining scope.
 
 After an alarm scan commits IndexedDB, the service worker publishes a
 `projection: 'cold-only'` message with mission objects. The panel's synchronous
-ingress maps those objects to pure candidates and retains the objects only for
-the duration of that ingress turn.
+ingress maps those objects to pure candidates. The actor/Feed-commit adapter
+retains canonical commit inputs only for the duration of that ingress turn. In
+the same turn, the Shell may separately project those typed objects into the
+non-authoritative preview cache defined below. A cached preview object can
+render an actor-authorized ID, but can never authorize or supply a Feed write;
+Apply still resolves its complete canonical candidate through the service
+worker.
 
 ```ts
 interface ArrivalCandidate {
@@ -459,6 +466,71 @@ synchronous authorized write completes first by the same serialization rule.
 Re-enabling a source does not resurrect filtered publications. Those missions
 appear only in a later publication or `smartLoad()`.
 
+## Reactive preview-cache convergence
+
+The Panel Shell may retain a local `id -> Mission` preview catalogue so an
+opened arrival stack can keep rendering the exact mission objects received
+before a later facade snapshot changes. This catalogue is a presentation cache,
+not actor state and not durable authority.
+
+```ts
+type PreviewCacheState =
+  | { lifecycle: 'active'; byId: Readonly<Record<string, Mission>> }
+  | { lifecycle: 'disposed'; byId: Readonly<Record<string, never>> };
+
+type PreviewCacheEvent =
+  | {
+      type: 'PREVIEW_OBJECTS_OBSERVED';
+      source: 'facade-pending-snapshot' | 'alarm-ingress';
+      missions: readonly Mission[];
+    }
+  | { type: 'APPLY_CYCLE_SETTLED'; hasRemainingPreviewMembership: boolean }
+  | { type: 'PREVIEW_CACHE_DISPOSED'; reason: 'feed-unmounted' | 'panel-closed' };
+```
+
+The initial state is active with an empty map. A complete `pendingMissions`
+snapshot from the Feed facade emits `PREVIEW_OBJECTS_OBSERVED` with
+`source='facade-pending-snapshot'`. The synchronous `cold-only` listener emits
+the same event with `source='alarm-ingress'` before discarding its commit input.
+Both sources have identical cache semantics; the source exists for audit and
+tests only.
+
+```ts
+declare function transitionPreviewCache(
+  state: PreviewCacheState,
+  event: PreviewCacheEvent
+): PreviewCacheState;
+```
+
+| Current state / event                                                        | Exact result                                                                                               |
+| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| Active / observed empty list                                                 | Exact no-op; an empty observation does not erase frozen open-stack previews                               |
+| Active / observed missing ID or changed canonical mission object             | Merge only those incoming entries, preserving every unrelated cached entry                                |
+| Active / every observed ID already maps to its identical object              | Exact no-op; preserve the existing cache identity                                                          |
+| Active / Apply settled with remaining preview membership                     | Exact no-op; actor membership alone controls which cached entries can render                              |
+| Active / Apply settled without remaining preview membership                  | Clear once                                                                                                 |
+| Active / Feed unmount or panel close                                          | Clear and enter terminal `disposed`                                                                        |
+| Disposed / every event, including late alarm, facade observation or Apply ACK | Exact no-op; remain disposed with an empty map                                                              |
+
+The Svelte synchronization effect tracks only the facade snapshot. Cache
+comparison and mutation execute outside dependency collection (or through an
+equivalent pure compare-and-merge boundary), so the effect never subscribes to
+the cache it may write. Creating a fresh array wrapper around the same facade
+snapshot is not a factual preview change. Re-observing identical mission
+objects cannot allocate a fresh cache object or schedule another effect turn.
+
+`APPLY_CYCLE_SETTLED` is projected only after `whenIdle()` settles the exact
+current actor's Apply/Retry command. Its boolean is derived from that actor's
+post-settlement stack membership, never from the cache. Feed unmount or panel
+close disposes the cache in the same Page cleanup that disposes the actor; the
+terminal cache guard makes every async late settlement harmless.
+
+Malformed missions cannot enter this path because the typed facade owns the
+snapshot. A future untrusted ingress must validate before dispatching this
+projection event. Preview-cache failure never authorizes an actor transition,
+a Feed write or durable persistence; missing preview objects remain omitted
+from the view as already specified by the stack projection.
+
 `isArrivalStackRenderable(state)` is true only for active, exact loaded
 presentation with non-empty currently eligible membership. Applying renders
 its frozen eligible count/previews, may announce a separate `latest` count and
@@ -554,6 +626,12 @@ but can never reuse its `seenOpId` in the same actor or deliver it to a new one.
 12. Dispose abandons UI pending but never modifies the durable catalogue.
 13. No session storage, journal, reconciliation, epoch, free text or LLM output
     participates.
+14. Preview-cache synchronization converges: facade snapshots and alarm ingress
+    are explicit non-authoritative inputs, identical entries preserve cache
+    identity, and no reactive effect subscribes to state that it rewrites.
+15. Preview-cache Apply settlement is projected from the current actor's
+    post-settlement membership; Feed/panel disposal clears it terminally and
+    every late cache event is an exact no-op.
 
 ## Mandatory review matrix
 
@@ -585,6 +663,12 @@ but can never reuse its `seenOpId` in the same actor or deliver it to a new one.
 - manual Start/Retry direct replacement and zero tray event;
 - architecture proof of no panel IndexedDB import, session buffer or reset
   event;
+- non-empty preview snapshot followed by the same array wrapper and by a fresh
+  wrapper over identical mission objects; each must settle without a second
+  cache allocation or reactive update-depth failure;
+- facade and alarm preview addition/update, empty snapshot, Apply settlement
+  with/without remaining membership, terminal disposal and every crossed/late
+  event after disposal;
 - non-modal focus, reduced motion and missing preview object behaviour.
 
 ## Task 9 mapping

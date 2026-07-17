@@ -4,7 +4,6 @@ import type { ConnectorSearchContext } from '../../core/connectors/search-contex
 import { isRetryable, type AppError } from '../../core/errors/app-error';
 import { buildSearchContext } from '../../core/connectors/search-context';
 import { getConnectors, getConnector } from '../connectors/index';
-import { getSettings } from '../storage/chrome-storage';
 import { getProfile } from '../storage/db';
 import {
   deduplicateMissionsDetailed,
@@ -24,6 +23,8 @@ import { isOnline } from '../utils/connection-monitor';
 import { trackParserHealth } from './parser-health';
 import { runWithCircuitBreaker } from '../health/circuit-breaker-runner';
 import { syncProbeAlarm } from '../health/probe-scheduler';
+import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
+import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
 /** Mutex pour empêcher les scans concurrents */
 let scanInProgress = false;
@@ -132,6 +133,8 @@ export interface ScanOptions {
   profileOverride?: UserProfile;
   /** Liste de connecteurs figée par l'opération admise (health/first scan). */
   connectorIdsOverride?: readonly string[];
+  /** Snapshot Settings immuable admis avec l'opération. */
+  settingsSnapshot?: SettingsReleaseSnapshot;
 }
 
 export async function runScan(
@@ -192,7 +195,8 @@ async function _runScanInternal(
     );
   }
 
-  const settings = await getSettings();
+  const settingsSnapshot = options?.settingsSnapshot ?? (await readSettingsReleaseSnapshot());
+  const settings = settingsSnapshot.settings;
   throwIfScanCancelled(signal);
   const enabledIds = options?.connectorIdsOverride
     ? [...options.connectorIdsOverride]

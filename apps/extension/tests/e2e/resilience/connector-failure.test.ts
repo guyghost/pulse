@@ -361,15 +361,7 @@ test.describe('Connector Resilience', () => {
         terminalObserved: true,
       });
 
-    const arrivalStack = page.getByTestId('mission-arrival-stack');
-    await expect(arrivalStack).toBeVisible({ timeout: 3000 });
-    await arrivalStack.getByRole('button', { name: /Ouvrir (?:la|les \d+) nouvelle/ }).click();
-    await expect(
-      page.getByTestId('arrival-preview').filter({ hasText: missionTitle })
-    ).toBeVisible();
-    await arrivalStack
-      .getByRole('button', { name: /Actualiser la file avec (?:la mission|les \d+ missions)/ })
-      .click();
+    await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
     await expect(page.getByText(missionTitle, { exact: true })).toBeVisible({ timeout: 10000 });
   });
 
@@ -443,18 +435,11 @@ test.describe('Connector Resilience', () => {
       )
       .toBe(true);
 
-    const arrivalStack = page.getByTestId('mission-arrival-stack');
-    await expect(arrivalStack).toBeVisible({ timeout: 2000 });
-    await arrivalStack.getByRole('button', { name: /Ouvrir (?:la|les \d+) nouvelle/ }).click();
-    await expect(
-      page.getByTestId('arrival-preview').filter({ hasText: uniqueMissionTitle })
-    ).toBeVisible();
-
+    await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
+    await expect(page.getByText(uniqueMissionTitle, { exact: true })).toBeVisible({
+      timeout: 5000,
+    });
     await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
-    await arrivalStack
-      .getByRole('button', { name: /Actualiser la file avec (?:la mission|les \d+ missions)/ })
-      .click();
-    await expect(page.getByText(uniqueMissionTitle, { exact: true })).toBeVisible();
   });
 
   test('handles network timeout gracefully', async ({ page }) => {
@@ -510,14 +495,7 @@ test.describe('Connector Resilience', () => {
     // Relancer le scan
     await scanButton(page).click();
 
-    const arrivalStack = page.getByTestId('mission-arrival-stack');
-    await expect(arrivalStack).toBeVisible({ timeout: 3000 });
-    await arrivalStack
-      .getByRole('button', { name: /Ouvrir les 1 nouvelle mission arrivée/ })
-      .click();
-    await expect(page.getByTestId('arrival-preview')).toContainText('Mission après retry');
-    await arrivalStack.getByRole('button', { name: 'Actualiser la file avec la mission' }).click();
-
+    await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
     await expect(page.getByText('Mission après retry', { exact: true })).toBeVisible({
       timeout: 10000,
     });

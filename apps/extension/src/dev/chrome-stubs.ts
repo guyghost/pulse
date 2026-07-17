@@ -29,6 +29,8 @@ import {
   DEV_PREMIUM_FEATURE_STORAGE_KEY,
   DEV_PREMIUM_ENABLED_STORAGE_KEY,
 } from '$lib/state/features.svelte';
+import type { AppSettings } from '$lib/core/types/app-settings';
+import type { SettingsReleaseMutationIntent } from '$lib/shell/settings-release/settings-release.contract';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
@@ -316,6 +318,18 @@ const storage: Record<string, unknown> = {
   tjm_history: generateMockTJMHistory(),
 };
 
+let settingsReleaseRevision = 0;
+let settingsReleaseGeneration = 0;
+
+function devSettingsReleaseSnapshot() {
+  return {
+    settings: structuredClone(storage.settings as AppSettings),
+    onboardingCompleted: storage.onboarding_completed === true,
+    revision: settingsReleaseRevision,
+    generation: settingsReleaseGeneration,
+  };
+}
+
 function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
   const storedHealth = readDevStorage<ConnectorHealthSnapshot[] | null>(
     DEV_HEALTH_STORAGE_KEY,
@@ -364,6 +378,70 @@ function createChromeStubs() {
         console.log('[Chrome Stub] sendMessage:', message.type);
 
         switch (message.type) {
+          case 'GET_SETTINGS_RELEASE':
+            return {
+              type: 'SETTINGS_RELEASE_RESULT',
+              payload: { status: 'confirmed', snapshot: devSettingsReleaseSnapshot() },
+            };
+          case 'MUTATE_SETTINGS_RELEASE': {
+            const intent = message.payload as SettingsReleaseMutationIntent;
+            const current = devSettingsReleaseSnapshot();
+            if (intent.baseRevision !== current.revision) {
+              return {
+                type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+                payload: {
+                  status: 'not_admitted',
+                  requestId: intent.requestId,
+                  commandId: null,
+                  reason: 'conflict',
+                  snapshot: current,
+                },
+              };
+            }
+            const candidateSettings =
+              intent.kind === 'save_settings' ? intent.settings : current.settings;
+            const candidateConsent =
+              intent.kind === 'save_settings' ? current.onboardingCompleted : intent.targetConsent;
+            if (
+              JSON.stringify(candidateSettings) === JSON.stringify(current.settings) &&
+              candidateConsent === current.onboardingCompleted
+            ) {
+              return {
+                type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+                payload: {
+                  status: 'not_admitted',
+                  requestId: intent.requestId,
+                  commandId: null,
+                  reason: 'already_confirmed',
+                  snapshot: current,
+                },
+              };
+            }
+            storage.settings = structuredClone(candidateSettings);
+            storage.onboarding_completed = candidateConsent;
+            writeDevStorage(DEV_ONBOARDING_COMPLETED_KEY, candidateConsent);
+            settingsReleaseRevision += 1;
+            settingsReleaseGeneration += 1;
+            const snapshot = devSettingsReleaseSnapshot();
+            const commandId = `settings-release:92000000-0000-4000-8000-000000000001:${settingsReleaseRevision}:command`;
+            return {
+              type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+              payload: {
+                status: 'settled',
+                outcome: {
+                  commandId,
+                  requestId: intent.requestId,
+                  intentDigest: '0'.repeat(64),
+                  kind: intent.kind,
+                  settledRevision: snapshot.revision,
+                  settledGeneration: snapshot.generation,
+                  snapshot,
+                  status: 'committed',
+                  reason: 'committed',
+                },
+              },
+            };
+          }
           case 'GET_SETTINGS':
             return { type: 'SETTINGS_RESULT', payload: storage.settings };
           case 'SAVE_SETTINGS':

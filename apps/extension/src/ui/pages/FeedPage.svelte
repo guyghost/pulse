@@ -1,5 +1,5 @@
 <script module lang="ts">
-  import type { IconName } from '@pulse/ui';
+  import type { IconName as FeedIconName } from '@pulse/ui';
   import type { OperationalEvidence } from '../molecules/OperationalStoryCard.svelte';
 
   export type FeedStorySeverity = 'critical' | 'incident' | 'attention' | 'success' | 'neutral';
@@ -11,7 +11,7 @@
     description: string;
     evidence: OperationalEvidence[];
     primaryActionLabel: string;
-    primaryActionIcon: IconName;
+    primaryActionIcon: FeedIconName;
   }
 
   export interface FeedStoryInput {

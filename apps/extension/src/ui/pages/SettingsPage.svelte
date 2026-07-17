@@ -3,7 +3,6 @@
   import { Button } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import type { IconName } from '@pulse/ui';
-  import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import ScanSettings from '../organisms/ScanSettings.svelte';
   import DangerZone from '../organisms/DangerZone.svelte';
   import type { Mission } from '$lib/core/types/mission';
@@ -154,24 +153,9 @@
     await showToast('Sauvegarde créée', 'success');
   }
 
-  async function handleRestoreBackup() {
-    const result = await settings.restoreBackup();
-    if (!result.ok) {
-      await showToast(result.error, 'error');
-      return;
-    }
-    await settings.load();
-    await showToast('Sauvegarde restaurée', 'success');
-  }
-
   async function handleScanIntervalChange(event: Event) {
     const value = Number.parseInt((event.target as HTMLInputElement).value, 10);
     await settings.updateScanInterval(value);
-  }
-
-  async function handleFileSelect(event: Event) {
-    const input = event.target as HTMLInputElement;
-    await settings.handleFileSelect(input.files?.[0]);
   }
 
   async function handleSaveAlertPreferences(nextPreferences: ConnectedAlertPreferences) {
@@ -287,10 +271,10 @@
         severity: favoriteExportCount > 0 ? 'success' : 'neutral',
       },
       {
-        label: 'Restore',
-        value: 'Confirmé',
+        label: 'Import',
+        value: 'Non proposé',
         icon: 'shield-check',
-        severity: 'success',
+        severity: 'neutral',
       },
     ];
 
@@ -298,9 +282,8 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Préparation requise',
-        title: 'La sauvegarde serait trop pauvre pour restaurer un espace utile',
-        description:
-          'Complétez au moins le profil ou la stack avant de créer un point de restauration.',
+        title: 'La sauvegarde serait trop pauvre pour être utile',
+        description: 'Complétez au moins le profil ou la stack avant de créer une archive locale.',
         evidence,
         primaryActionLabel: 'Compléter le profil',
         primaryActionIcon: 'user',
@@ -310,9 +293,9 @@
     return {
       severity: 'success' as const,
       statusLabel: 'Sauvegardable',
-      title: 'Un point de restauration local peut être créé',
+      title: 'Une archive locale peut être créée',
       description:
-        'La sauvegarde capture profil, réglages, favoris et missions masquées. La restauration reste confirmée avant écriture.',
+        'La sauvegarde capture profil, réglages, favoris et missions masquées. L’import reste désactivé tant que sa transaction multi-stockage n’est pas prouvée.',
       evidence,
       primaryActionLabel: 'Créer une sauvegarde',
       primaryActionIcon: 'download',
@@ -520,7 +503,7 @@
         statusLabel={settingsStory.statusLabel}
         evidence={settingsStory.evidence}
         primaryActionLabel={settingsStory.primaryActionLabel}
-        primaryActionIcon={settingsStory.primaryActionIcon}
+        primaryActionIcon={settingsStory.primaryActionIcon as IconName}
         onPrimaryAction={handleSettingsStoryAction}
       />
     </div>
@@ -848,7 +831,7 @@
           statusLabel={aiStory.statusLabel}
           evidence={aiStory.evidence}
           primaryActionLabel={aiStory.primaryActionLabel}
-          primaryActionIcon={aiStory.primaryActionIcon}
+          primaryActionIcon={aiStory.primaryActionIcon as IconName}
           onPrimaryAction={() => settings.openAiHelp()}
         />
         <div class="grid grid-cols-2 gap-2">
@@ -907,7 +890,7 @@
         <div>
           <p class="eyebrow text-text-muted">Données</p>
           <h3 id="settings-data-title" class="mt-1 text-sm font-semibold text-text-primary">
-            Sorties, restauration et nettoyage
+            Sorties et nettoyage
           </h3>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
             Les actions qui modifient ou exportent l’espace local sont regroupées ici.
@@ -929,7 +912,7 @@
                 : 'border-border-light bg-page-canvas text-text-primary hover:bg-subtle-gray'}"
               onclick={() => settings.updateTheme(option.id as 'light' | 'dark' | 'system')}
             >
-              <Icon name={option.icon} size={14} />
+              <Icon name={option.icon as IconName} size={14} />
               {option.label}
             </button>
           {/each}
@@ -952,7 +935,7 @@
           statusLabel={exportStory.statusLabel}
           evidence={exportStory.evidence}
           primaryActionLabel={exportStory.primaryActionLabel}
-          primaryActionIcon={exportStory.primaryActionIcon}
+          primaryActionIcon={exportStory.primaryActionIcon as IconName}
           onPrimaryAction={handleExportStoryAction}
         />
         <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
@@ -1021,7 +1004,7 @@
             aria-live="polite"
           >
             <div class="flex items-start gap-2">
-              <Icon name="check-circle-2" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+              <Icon name="check-circle" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
               <div class="min-w-0">
                 <p class="text-xs font-medium text-text-primary">Export prêt à partager</p>
                 <p class="mt-0.5 text-[11px] leading-4 text-text-subtle">
@@ -1037,7 +1020,7 @@
         <div>
           <h3 class="text-sm font-medium text-text-primary">Sauvegarde</h3>
           <p class="mt-1 text-xs text-text-subtle">
-            Sauvegarder ou restaurer vos données (profil, paramètres, favoris).
+            Exporter une archive de vos données (profil, paramètres, favoris).
           </p>
         </div>
         <OperationalStoryCard
@@ -1049,23 +1032,12 @@
           statusLabel={backupStory.statusLabel}
           evidence={backupStory.evidence}
           primaryActionLabel={null}
-          primaryActionIcon={backupStory.primaryActionIcon}
+          primaryActionIcon={backupStory.primaryActionIcon as IconName}
         />
         <div class="flex flex-wrap gap-2">
           <Button variant="secondary" onclick={handleCreateBackup}>
             <Icon name="download" size={14} class="mr-1" />
             Créer une sauvegarde
-          </Button>
-          <input
-            type="file"
-            accept=".pulse-backup,.json"
-            class="hidden"
-            onchange={handleFileSelect}
-            bind:this={settings.fileInput}
-          />
-          <Button variant="ghost" onclick={() => settings.triggerFileSelect()}>
-            <Icon name="upload" size={14} class="mr-1" />
-            Restaurer
           </Button>
         </div>
       </div>
@@ -1138,12 +1110,3 @@
     </section>
   </div>
 </div>
-
-{#if settings.showBackupModal}
-  <BackupRestoreModal
-    backup={settings.pendingBackup}
-    error={settings.backupError}
-    onConfirm={handleRestoreBackup}
-    onCancel={() => settings.cancelRestore()}
-  />
-{/if}

@@ -21,6 +21,12 @@ import type { ConnectedAlertPreferences } from '../../core/types/alert-preferenc
 import type { AlertHistoryEntry } from '../../core/types/alert-history';
 import type { DeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 import type { SerializedApplicationTrackingError } from '../../core/tracking/application-tracking-error';
+import type {
+  SettingsReleaseMutationIntent,
+  SettingsReleaseMutationResult,
+  SettingsReleaseReadResult,
+  SettingsReleaseSnapshot,
+} from '../settings-release/settings-release.contract';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -132,6 +138,26 @@ export type BridgeMessage =
   | { type: 'SAVE_SETTINGS'; payload: AppSettings }
   | { type: 'SETTINGS_SAVED'; payload: { saved: boolean; settings: AppSettings | null } }
   | { type: 'SETTINGS_UPDATED'; payload: AppSettings }
+  | { type: 'GET_SETTINGS_RELEASE' }
+  | { type: 'SETTINGS_RELEASE_RESULT'; payload: SettingsReleaseReadResult }
+  | { type: 'MUTATE_SETTINGS_RELEASE'; payload: SettingsReleaseMutationIntent }
+  | { type: 'SETTINGS_RELEASE_MUTATION_RESULT'; payload: SettingsReleaseMutationResult }
+  | { type: 'RETRY_SETTINGS_RELEASE' }
+  | {
+      type: 'SETTINGS_RELEASE_RETRY_RESULT';
+      payload: {
+        status: 'retry_accepted' | 'retry_already_queued' | 'retry_not_applicable';
+        snapshot: null;
+      };
+    }
+  | {
+      type: 'SETTINGS_RELEASE_UPDATED';
+      payload: {
+        snapshot: SettingsReleaseSnapshot;
+        commandId: string;
+        broadcastId: string;
+      };
+    }
   | { type: 'GET_PROFILE' }
   | { type: 'PROFILE_RESULT'; payload: UserProfile | null }
   | { type: 'SAVE_PROFILE'; payload: UserProfile }
@@ -213,6 +239,14 @@ export type BridgeMessage =
   | {
       type: 'RECHECK_CONNECTOR_HEALTH';
       payload: { connectorId: string; enable?: boolean };
+    }
+  | {
+      type: 'CONNECTOR_RECHECK_RESULT';
+      payload: {
+        snapshots: ConnectorHealthSnapshot[];
+        scan: 'completed' | 'failed';
+        activation: 'not_requested' | 'committed' | 'already_confirmed' | 'failed';
+      };
     }
   | { type: 'CONNECTOR_HEALTH_UPDATED'; payload: ConnectorHealthPayload }
   | {

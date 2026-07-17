@@ -27,8 +27,6 @@
 <script lang="ts">
   import { Chip } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
-  import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import type { SeniorityLevel } from '$lib/core/types/profile';
   import type { SavedFeedView } from '$lib/core/types/feed-view';
   import Tooltip from '../atoms/Tooltip.svelte';
 

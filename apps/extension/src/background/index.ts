@@ -21,13 +21,10 @@ import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
 import { resolvePremiumFeatureFlag, shouldPremiumGate } from '../lib/core/features/flags';
 import {
-  DEFAULT_SETTINGS,
   getFeedSavedViews,
   getFeedSortBy,
-  getSettings,
   setFeedSavedViews,
   setFeedSortBy,
-  setSettings,
 } from '../lib/shell/storage/chrome-storage';
 import {
   runScan,
@@ -44,7 +41,7 @@ import {
 } from '../models/scan-lifecycle.machine';
 import { waitForScanRecovery } from './scan-recovery';
 import { rescoreStoredMissions } from '../lib/shell/scan/rescore';
-import { getConnectorIds } from '../lib/shell/connectors/index';
+import { getConnectorIds, getConnectorsMeta } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { getFavorites, saveFavorites, getHidden, saveHidden } from '../lib/shell/storage/favorites';
 import {
@@ -79,15 +76,12 @@ import { collectDiagnosticExport } from '../lib/shell/diagnostics/collect-diagno
 import { getAllParserHealth } from '../lib/shell/scan/parser-health';
 import {
   clearFeedTourSeen,
-  clearOnboardingCompleted,
   getFeedTourSeen,
   getFirstScanDone,
   getKbdCheatsheetTipSeen,
-  getOnboardingCompleted,
   getProfileBannerDismissed,
   setFeedTourSeen,
   setKbdCheatsheetTipSeen,
-  setOnboardingCompleted,
   setProfileBannerDismissed,
 } from '../lib/shell/storage/first-scan';
 import {
@@ -96,8 +90,6 @@ import {
   reconcileProbeAlarmsLocally,
   syncProbeAlarm,
 } from '../lib/shell/health/probe-scheduler';
-import { automaticScanConsentAuthorized } from '../models/background-scheduling.contract';
-
 import {
   getTracking,
   saveTracking,
@@ -122,6 +114,13 @@ import { verifyProfilePage } from '../lib/shell/profile/profile-page-verificatio
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
 import { loadTJMHistory, recordTJMFromMissions } from '../lib/shell/storage/tjm-history';
 import { clearConnectorDynamicRules } from '../lib/shell/connectors/cookie-rules';
+import { createSettingsReleaseCoordinator } from '../lib/shell/settings-release/settings-release.coordinator';
+import { createChromeSettingsReleasePorts } from '../lib/shell/settings-release/chrome-settings-release-ports';
+import {
+  createChromeScanLedgerStorage,
+  createSettingsReleaseScanLedgerPort,
+} from '../lib/shell/settings-release/settings-release-scan-ledger';
+import { installSettingsReleaseSnapshotReader } from '../lib/shell/settings-release/settings-release-reader';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -288,6 +287,7 @@ interface ExecuteScanOptions {
   pageDelayMs: number;
   profileOverride?: import('../lib/core/types/profile').UserProfile;
   connectorIdsOverride?: readonly string[];
+  settingsSnapshot?: import('../lib/shell/settings-release/settings-release.contract').SettingsReleaseSnapshot;
   emitProgress?: boolean;
   emitPartialResults?: boolean;
 }
@@ -694,7 +694,8 @@ async function executeAcceptedScanOperation(
   const { actor, operationId, trigger } = operation;
 
   try {
-    const settings = await getSettings();
+    const settingsSnapshot = options.settingsSnapshot ?? (await requireSettingsReleaseSnapshot());
+    const settings = settingsSnapshot.settings;
     assertOperationNotCancelled(operation);
     const connectorIds = options.connectorIdsOverride
       ? [...options.connectorIdsOverride]
@@ -715,6 +716,7 @@ async function executeAcceptedScanOperation(
       pageDelayMs: options.pageDelayMs,
       profileOverride: options.profileOverride,
       connectorIdsOverride: connectorIds,
+      settingsSnapshot,
       onDetailedProgress: options.emitProgress
         ? (info) => {
             if (activeScanOperation?.operationId !== operationId) {
@@ -789,7 +791,7 @@ async function executeAcceptedScanOperation(
       }
 
       try {
-        await persistPostCommitEffects(result);
+        await persistPostCommitEffects(result, settingsSnapshot);
       } catch (error) {
         console.warn('[MissionPulse] Post-commit scan effects failed:', error);
       }
@@ -930,18 +932,46 @@ async function loadConnectorHealthSnapshots() {
   return [...snapshots.values()];
 }
 
+async function enableConnectorThroughSettingsRelease(
+  connectorId: string
+): Promise<'committed' | 'already_confirmed'> {
+  const latest = await requireSettingsReleaseSnapshot();
+  const enabled = new Set([...latest.settings.enabledConnectors, connectorId]);
+  const enabledConnectors = getConnectorIds()
+    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+    .filter((id) => enabled.has(id));
+  if (!enabledConnectors.some((id) => id === connectorId)) {
+    throw new Error('Connector activation target is not shipped.');
+  }
+  const result = await settingsReleaseCoordinator.mutate({
+    kind: 'save_settings',
+    requestId: crypto.randomUUID(),
+    baseRevision: latest.revision,
+    settings: { ...latest.settings, enabledConnectors },
+  });
+  if (result.status === 'settled' && result.outcome.status === 'committed') {
+    return 'committed';
+  }
+  if (result.status === 'not_admitted' && result.reason === 'already_confirmed') {
+    return 'already_confirmed';
+  }
+  throw new Error('Connector activation was not committed.');
+}
+
+interface ConnectorRecheckOutcome {
+  missions: import('../lib/core/types/mission').Mission[];
+  scan: 'completed' | 'failed';
+  activation: 'not_requested' | 'committed' | 'already_confirmed' | 'failed';
+}
+
 async function recheckConnectorHealth(
   connectorId: string,
   enable = false
-): Promise<import('../lib/core/types/mission').Mission[]> {
-  const settings = await getSettings();
-  const persistedEnabled = enable
-    ? Array.from(new Set([...settings.enabledConnectors, connectorId]))
-    : settings.enabledConnectors;
-
-  await resetHealthSnapshot(connectorId);
-
+): Promise<ConnectorRecheckOutcome> {
+  let missions: import('../lib/core/types/mission').Mission[] = [];
+  let scan: ConnectorRecheckOutcome['scan'] = 'completed';
   try {
+    await resetHealthSnapshot(connectorId);
     const outcome = await executeScanOperation(crypto.randomUUID(), 'manual', {
       pageDelayMs: 300,
       connectorIdsOverride: [connectorId],
@@ -955,16 +985,28 @@ async function recheckConnectorHealth(
     if (outcome.message.type === 'SCAN_CANCELLED') {
       throw new ScanError('Scan annulé.', 'CANCELLED');
     }
-    return outcome.result?.missions ?? [];
-  } finally {
-    if (enable) {
-      await setSettings({ ...settings, enabledConnectors: persistedEnabled });
+    missions = outcome.result?.missions ?? [];
+  } catch (error) {
+    scan = 'failed';
+    console.warn('[MissionPulse] connector health recheck failed:', error);
+  }
+
+  let activation: ConnectorRecheckOutcome['activation'] = 'not_requested';
+  if (enable) {
+    try {
+      activation = await enableConnectorThroughSettingsRelease(connectorId);
+    } catch (error) {
+      activation = 'failed';
+      console.warn('[MissionPulse] connector activation failed:', error);
     }
   }
+
+  return { missions, scan, activation };
 }
 
 async function persistPostCommitEffects(
-  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>
+  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>,
+  settingsSnapshot: import('../lib/shell/settings-release/settings-release.contract').SettingsReleaseSnapshot
 ): Promise<void> {
   const { missions, errors } = result;
   const now = Date.now();
@@ -1035,7 +1077,7 @@ async function persistPostCommitEffects(
     // notifyHighScoreMissions persists its focus intent before showing Chrome's
     // notification, so a fast click cannot race ahead of that write.
     if (newCount > 0) {
-      const notification = await notifyHighScoreMissions(newMissions);
+      const notification = await notifyHighScoreMissions(newMissions, settingsSnapshot);
       if (notification.shown && notification.notifiedMissionIds.length > 0) {
         await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
       }
@@ -1044,6 +1086,63 @@ async function persistPostCommitEffects(
     // Badge and notification projections are non-critical after commit.
   }
 }
+
+const settingsReleaseScanPort = createSettingsReleaseScanLedgerPort({
+  storage: createChromeScanLedgerStorage(),
+  permission: {
+    async containsForSnapshot(snapshot) {
+      const enabled = new Set(snapshot.settings.enabledConnectors);
+      const origins = [
+        ...new Set(
+          getConnectorsMeta()
+            .filter((connector) => enabled.has(connector.id))
+            .flatMap((connector) => connector.hostPermissions)
+        ),
+      ].sort();
+      if (origins.length === 0) {
+        return true;
+      }
+      return chrome.permissions.contains({ origins });
+    },
+  },
+  scan: {
+    async start(operationId, snapshot) {
+      const begun = await beginScanOperation(operationId, 'alarm', {
+        pageDelayMs: 500,
+        connectorIdsOverride: snapshot.settings.enabledConnectors,
+        settingsSnapshot: snapshot,
+        emitProgress: true,
+      });
+      if (begun.kind === 'busy') {
+        const activeOperationId =
+          begun.outcome.message.type === 'SCAN_BUSY'
+            ? begun.outcome.message.payload.activeOperationId
+            : operationId;
+        return { status: 'busy', activeOperationId };
+      }
+      void begun.complete().catch((error) => {
+        console.error('[MissionPulse] Admitted auto-scan completion error:', error);
+      });
+      return { status: 'accepted' };
+    },
+  },
+});
+
+const settingsReleaseCoordinator = createSettingsReleaseCoordinator(
+  createChromeSettingsReleasePorts(settingsReleaseScanPort)
+);
+
+async function requireSettingsReleaseSnapshot() {
+  const result = await settingsReleaseCoordinator.read();
+  if (result.status !== 'confirmed') {
+    throw new Error(`Settings release snapshot unavailable: ${result.reason}`);
+  }
+  return result.snapshot;
+}
+installSettingsReleaseSnapshotReader(requireSettingsReleaseSnapshot);
+void settingsReleaseCoordinator.boot().catch((error) => {
+  console.error('[MissionPulse] Settings release boot failed:', error);
+});
 
 // Message handler — profile management + scan orchestration
 chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse) => {
@@ -1064,8 +1163,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     return false;
   }
 
-  // Cast validé — le message a passé les schémas Zod
-  const message = rawMessage as BridgeMessage;
+  // Consume the detached object returned by the strict decoder. Keeping the
+  // caller-owned reference here would let it drift after validation while an
+  // async Settings FIFO head is waiting to run.
+  const message = validation.message as BridgeMessage;
 
   // ── Error boundary global ─────────────────────────────────────────────────
   // Chaque branche a son propre try/catch mais cette enveloppe protège contre
@@ -1084,7 +1185,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           await saveProfile(message.payload);
 
           try {
-            const rescored = await rescoreStoredMissions(message.payload);
+            const rescored = await rescoreStoredMissions(
+              message.payload,
+              await requireSettingsReleaseSnapshot()
+            );
             await chrome.runtime.sendMessage({ type: 'MISSIONS_UPDATED', payload: rescored });
           } catch (err) {
             if (import.meta.env.DEV) {
@@ -1107,34 +1211,59 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
-    if (message.type === 'GET_SETTINGS') {
-      getSettings()
-        .then((settings) => {
-          sendResponse({ type: 'SETTINGS_RESULT', payload: settings });
+    if (
+      message.type === 'GET_SETTINGS_RELEASE' ||
+      message.type === 'GET_SETTINGS' ||
+      message.type === 'GET_ONBOARDING_COMPLETED'
+    ) {
+      settingsReleaseCoordinator
+        .read()
+        .then((result) => {
+          sendResponse({ type: 'SETTINGS_RELEASE_RESULT', payload: result });
         })
         .catch((err) => {
-          console.warn('[MissionPulse] GET_SETTINGS error:', err);
-          sendResponse({ type: 'SETTINGS_RESULT', payload: DEFAULT_SETTINGS });
+          console.warn('[MissionPulse] GET_SETTINGS_RELEASE error:', err);
+          sendResponse({
+            type: 'SETTINGS_RELEASE_RESULT',
+            payload: { status: 'unavailable', reason: 'actor_blocked', snapshot: null },
+          });
         });
       return true;
     }
 
-    if (message.type === 'SAVE_SETTINGS') {
-      setSettings(message.payload)
-        .then(() => {
-          chrome.runtime
-            .sendMessage({ type: 'SETTINGS_UPDATED', payload: message.payload })
-            .catch(() => {
-              // Side panel may be closed.
-            });
+    if (message.type === 'RETRY_SETTINGS_RELEASE') {
+      settingsReleaseCoordinator
+        .retry()
+        .then((result) => {
+          sendResponse({ type: 'SETTINGS_RELEASE_RETRY_RESULT', payload: result });
+        })
+        .catch(() => {
           sendResponse({
-            type: 'SETTINGS_SAVED',
-            payload: { saved: true, settings: message.payload },
+            type: 'SETTINGS_RELEASE_RETRY_RESULT',
+            payload: { status: 'retry_not_applicable', snapshot: null },
           });
+        });
+      return true;
+    }
+
+    if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+      settingsReleaseCoordinator
+        .mutate(message.payload)
+        .then((result) => {
+          sendResponse({ type: 'SETTINGS_RELEASE_MUTATION_RESULT', payload: result });
         })
         .catch((err) => {
-          console.warn('[MissionPulse] SAVE_SETTINGS error:', err);
-          sendResponse({ type: 'SETTINGS_SAVED', payload: { saved: false, settings: null } });
+          console.warn('[MissionPulse] MUTATE_SETTINGS_RELEASE error:', err);
+          sendResponse({
+            type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+            payload: {
+              status: 'blocked',
+              requestId: message.payload.requestId,
+              commandId: null,
+              reason: 'actor_blocked',
+              snapshot: null,
+            },
+          });
         });
       return true;
     }
@@ -1426,42 +1555,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
-    if (message.type === 'GET_ONBOARDING_COMPLETED') {
-      getOnboardingCompleted()
-        .then((completed) => {
-          sendResponse({ type: 'ONBOARDING_COMPLETED_RESULT', payload: completed });
-        })
-        .catch((err) => {
-          console.warn('[MissionPulse] GET_ONBOARDING_COMPLETED error:', err);
-          sendResponse({ type: 'ONBOARDING_COMPLETED_RESULT', payload: false });
-        });
-      return true;
-    }
-
-    if (message.type === 'SET_ONBOARDING_COMPLETED') {
-      setOnboardingCompleted()
-        .then(() => {
-          sendResponse({ type: 'ONBOARDING_COMPLETED_SET', payload: { saved: true } });
-        })
-        .catch((err) => {
-          console.warn('[MissionPulse] SET_ONBOARDING_COMPLETED error:', err);
-          sendResponse({ type: 'ONBOARDING_COMPLETED_SET', payload: { saved: false } });
-        });
-      return true;
-    }
-
-    if (message.type === 'CLEAR_ONBOARDING_COMPLETED') {
-      clearOnboardingCompleted()
-        .then(() => {
-          sendResponse({ type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: true } });
-        })
-        .catch((err) => {
-          console.warn('[MissionPulse] CLEAR_ONBOARDING_COMPLETED error:', err);
-          sendResponse({ type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: false } });
-        });
-      return true;
-    }
-
     if (message.type === 'GET_FEED_TOUR_SEEN') {
       getFeedTourSeen()
         .then((seen) => {
@@ -1730,14 +1823,38 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     if (message.type === 'RECHECK_CONNECTOR_HEALTH') {
       const { connectorId, enable = false } = message.payload;
       recheckConnectorHealth(connectorId, enable)
-        .then(async () => {
-          const snapshots = await loadConnectorHealthSnapshots();
-          sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: snapshots });
+        .then(async (outcome) => {
+          let snapshots: Awaited<ReturnType<typeof loadConnectorHealthSnapshots>> = [];
+          try {
+            snapshots = await loadConnectorHealthSnapshots();
+          } catch (error) {
+            console.warn('[MissionPulse] connector health snapshot refresh failed:', error);
+          }
+          sendResponse({
+            type: 'CONNECTOR_RECHECK_RESULT',
+            payload: {
+              snapshots,
+              scan: outcome.scan,
+              activation: outcome.activation,
+            },
+          });
         })
         .catch(async (err) => {
           console.warn('[MissionPulse] RECHECK_CONNECTOR_HEALTH error:', err);
-          const snapshots = await loadConnectorHealthSnapshots();
-          sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: snapshots });
+          let snapshots: Awaited<ReturnType<typeof loadConnectorHealthSnapshots>> = [];
+          try {
+            snapshots = await loadConnectorHealthSnapshots();
+          } catch (error) {
+            console.warn('[MissionPulse] connector health snapshot fallback failed:', error);
+          }
+          sendResponse({
+            type: 'CONNECTOR_RECHECK_RESULT',
+            payload: {
+              snapshots,
+              scan: 'failed',
+              activation: enable ? 'failed' : 'not_requested',
+            },
+          });
         });
       return true;
     }
@@ -2092,23 +2209,13 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
 const ALARM_NAME = 'auto-scan';
 
-async function setupAlarm() {
+async function setupBackgroundSchedules() {
   const connectorIds = getConnectorIds();
   const now = Date.now();
-  const [settings, onboardingCompleted, healthRead] = await Promise.all([
-    getSettings(),
-    getOnboardingCompleted(),
+  const [, healthRead] = await Promise.all([
+    settingsReleaseCoordinator.boot(),
     readHealthSnapshotsForProbeReconciliation(connectorIds, now),
   ]);
-  await chrome.alarms.clear(ALARM_NAME);
-  if (automaticScanConsentAuthorized({ onboardingCompleted, autoScan: settings.autoScan })) {
-    chrome.alarms.create(ALARM_NAME, {
-      periodInMinutes: settings.scanIntervalMinutes,
-    });
-    if (import.meta.env.DEV) {
-      console.debug(`[MissionPulse] Auto-scan alarm set: every ${settings.scanIntervalMinutes}min`);
-    }
-  }
   // Daily digest fires independently of auto-scan — it pushes the top unseen
   // missions once per day even if the user never opens the panel.
   await scheduleDailyDigestAlarm();
@@ -2125,7 +2232,7 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
       console.debug('[MissionPulse] Daily digest triggered');
     }
     try {
-      await sendDailyDigest();
+      await sendDailyDigest(await requireSettingsReleaseSnapshot());
     } catch (error) {
       console.error('[MissionPulse] Daily digest error:', error);
     } finally {
@@ -2180,40 +2287,22 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
   if (alarm.name !== ALARM_NAME) {
     return;
   }
-  const [settings, onboardingCompleted] = await Promise.all([
-    getSettings(),
-    getOnboardingCompleted(),
-  ]);
-  if (!automaticScanConsentAuthorized({ onboardingCompleted, autoScan: settings.autoScan })) {
-    return;
-  }
   if (import.meta.env.DEV) {
     console.debug('[MissionPulse] Auto-scan triggered');
   }
   try {
-    const operationId = crypto.randomUUID();
-    await executeScanOperation(operationId, 'alarm', {
-      pageDelayMs: 500,
-      connectorIdsOverride: settings.enabledConnectors,
-      emitProgress: true,
-    });
+    const disposition = await settingsReleaseCoordinator.admitAutoScan(alarm.scheduledTime);
+    if (disposition.status === 'blocked') {
+      console.error(`[MissionPulse] Auto-scan admission blocked: ${disposition.reason}`);
+    }
   } catch (err) {
     console.error('[MissionPulse] Auto-scan error:', err);
   }
 });
 
-// Re-setup alarm when settings change
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && (changes.settings || changes.onboarding_completed)) {
-    void setupAlarm().catch((error) => {
-      console.error('[MissionPulse] Alarm reconciliation failed:', error);
-    });
-  }
-});
-
 // Initial setup
-void setupAlarm().catch((error) => {
-  console.error('[MissionPulse] Initial alarm reconciliation failed:', error);
+void setupBackgroundSchedules().catch((error) => {
+  console.error('[MissionPulse] Initial schedule reconciliation failed:', error);
 });
 
 // ── Cold-start migration guard ───────────────────────────────────────────────
@@ -2277,7 +2366,7 @@ chrome.action.onUserSettingsChanged?.addListener(async (change) => {
   if (import.meta.env.DEV) {
     console.debug('[MissionPulse] Extension pinned to toolbar');
   }
-  const settings = await getSettings();
+  const settings = (await requireSettingsReleaseSnapshot()).settings;
   if (!settings.autoScan && settings.notifications) {
     try {
       await chrome.notifications.create('suggest-auto-scan', {

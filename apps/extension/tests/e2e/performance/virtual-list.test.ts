@@ -110,6 +110,56 @@ async function mockMultiBatchPartialScan(page: Page) {
         chromeStub.runtime.sendMessage = async (msg: unknown) => {
           const message = msg as { type?: string; payload?: { operationId?: string } };
 
+          if (message?.type === 'GET_SETTINGS_RELEASE') {
+            const response = (await originalSendMessage(msg)) as {
+              type?: string;
+              payload?: {
+                status?: string;
+                snapshot?: {
+                  settings?: Record<string, unknown>;
+                  [key: string]: unknown;
+                };
+                [key: string]: unknown;
+              };
+            };
+            if (
+              response.type === 'SETTINGS_RELEASE_RESULT' &&
+              response.payload?.status === 'confirmed' &&
+              response.payload.snapshot?.settings
+            ) {
+              return {
+                ...response,
+                payload: {
+                  ...response.payload,
+                  snapshot: {
+                    ...response.payload.snapshot,
+                    settings: {
+                      ...response.payload.snapshot.settings,
+                      enabledConnectors: ['free-work', 'lehibou', 'hiway'],
+                    },
+                  },
+                },
+              };
+            }
+            return response;
+          }
+
+          if (message?.type === 'GET_SETTINGS') {
+            const response = (await originalSendMessage(msg)) as {
+              type?: string;
+              payload?: Record<string, unknown>;
+            };
+            return response.type === 'SETTINGS_RESULT' && response.payload
+              ? {
+                  ...response,
+                  payload: {
+                    ...response.payload,
+                    enabledConnectors: ['free-work', 'lehibou', 'hiway'],
+                  },
+                }
+              : response;
+          }
+
           if (message?.type !== 'SCAN_START') {
             return originalSendMessage(msg);
           }
@@ -392,21 +442,14 @@ test.describe('Performance - Virtual List', { tag: '@slow' }, () => {
     await scanButton(page).click();
 
     const arrivalStack = page.getByTestId('mission-arrival-stack');
-    await expect(arrivalStack).toBeVisible({ timeout: 2000 });
+    await expect(arrivalStack).not.toBeVisible();
     await expectMissionCount(page, 120, 1000);
-    await expect(arrivalStack.locator('[data-testid="arrival-stack-layer"]')).toHaveCount(3);
 
     const searchInput = feedSearchInput(page);
     await searchInput.fill('React');
     await expect(searchInput).toHaveValue('React');
-    await arrivalStack
-      .getByRole('button', { name: /Ouvrir les \d+ nouvelles missions arrivées/ })
-      .click();
-    await expect(arrivalStack.locator('[data-testid="arrival-preview"]')).toHaveCount(3);
-    await expect(
-      arrivalStack.getByRole('button', { name: /Actualiser la file avec les \d+ missions/ })
-    ).toBeEnabled();
-    await expectMissionCount(page, 120, 1000);
+    await expectMissionCount(page, 60, 5000);
+    await expect(arrivalStack).not.toBeVisible();
   });
 
   test('maintains scroll position when filtering', async ({ page }) => {

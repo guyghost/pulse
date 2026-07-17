@@ -17,12 +17,31 @@ import {
   isSerializedApplicationTrackingError,
 } from '../../core/tracking/application-tracking-error';
 import { isCanonicalMissionTracking } from '../../core/tracking/application-tracking-contract';
+import { CANONICAL_INCLUDED_CONNECTOR_IDS } from '../connectors/build-config';
 
 // ============================================================================
 // Helpers de validation réutilisables
 // ============================================================================
 
 const SafeString = z.string().max(4096);
+const ReleaseUuidSchema = z
+  .string()
+  .regex(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/);
+
+const CanonicalEnabledConnectorIdsSchema = z
+  .array(z.string().min(1).max(120))
+  .max(50)
+  .refine((ids) => {
+    if (new Set(ids).size !== ids.length) {
+      return false;
+    }
+    const indexes = ids.map((id) =>
+      CANONICAL_INCLUDED_CONNECTOR_IDS.findIndex((connectorId) => connectorId === id)
+    );
+    return indexes.every(
+      (index, position) => index >= 0 && (position === 0 || indexes[position - 1] < index)
+    );
+  }, 'Enabled connector IDs must be unique and follow the shipped catalogue order');
 
 /** Valide qu'un objet sérialisé ne dépasse pas N octets */
 function maxBytes(maxB: number) {
@@ -220,7 +239,7 @@ const PersistedConnectorStatusSchema = z
 const AppSettingsSchema = z
   .object({
     scanIntervalMinutes: z.number().int().min(1).max(1440),
-    enabledConnectors: z.array(z.string().min(1).max(120)).max(50),
+    enabledConnectors: CanonicalEnabledConnectorIdsSchema,
     notifications: z.boolean(),
     autoScan: z.boolean(),
     maxSemanticPerScan: z.number().int().min(0).max(100),
@@ -230,6 +249,137 @@ const AppSettingsSchema = z
     theme: z.enum(['light', 'dark', 'system']),
   })
   .strict();
+
+const SettingsReleaseSnapshotSchema = z
+  .object({
+    settings: AppSettingsSchema,
+    onboardingCompleted: z.boolean(),
+    revision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+    generation: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+  })
+  .strict();
+
+const SettingsReleaseReadResultSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('confirmed'), snapshot: SettingsReleaseSnapshotSchema }).strict(),
+  z
+    .object({
+      status: z.literal('unavailable'),
+      reason: z.enum(['actor_blocked', 'storage_ambiguous']),
+      snapshot: z.null(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('transport_rejected'),
+      reason: z.literal('queue_full'),
+      commandType: z.literal('read'),
+      correlationId: z.null(),
+      snapshot: z.null(),
+    })
+    .strict(),
+]);
+
+const SettingsReleaseIntentSchema = z.discriminatedUnion('kind', [
+  z
+    .object({
+      kind: z.literal('save_settings'),
+      requestId: ReleaseUuidSchema,
+      baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+      settings: AppSettingsSchema,
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('set_consent'),
+      requestId: ReleaseUuidSchema,
+      baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+      targetConsent: z.literal(true),
+    })
+    .strict(),
+  z
+    .object({
+      kind: z.literal('clear_consent'),
+      requestId: ReleaseUuidSchema,
+      baseRevision: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER),
+      targetConsent: z.literal(false),
+    })
+    .strict(),
+]);
+
+const SettingsReleaseOutcomeBaseSchema = z.object({
+  commandId: z.string().min(1).max(180),
+  requestId: ReleaseUuidSchema,
+  intentDigest: z.string().regex(/^[0-9a-f]{64}$/),
+  kind: z.enum(['save_settings', 'set_consent', 'clear_consent']),
+  settledRevision: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  settledGeneration: z.number().int().min(1).max(Number.MAX_SAFE_INTEGER),
+  snapshot: SettingsReleaseSnapshotSchema,
+});
+
+const SettingsReleaseOutcomeSchema = z.discriminatedUnion('status', [
+  SettingsReleaseOutcomeBaseSchema.extend({
+    status: z.literal('committed'),
+    reason: z.enum(['committed', 'recovered_candidate']),
+  }).strict(),
+  SettingsReleaseOutcomeBaseSchema.extend({
+    status: z.literal('not_committed'),
+    reason: z.enum([
+      'permission_missing',
+      'permission_unknown',
+      'storage_failed',
+      'recovered_previous',
+    ]),
+  }).strict(),
+  SettingsReleaseOutcomeBaseSchema.extend({
+    status: z.literal('compensated'),
+    reason: z.enum(['permission_lost', 'effect_compensated']),
+  }).strict(),
+]);
+
+const SettingsReleaseMutationResultSchema = z.discriminatedUnion('status', [
+  z.object({ status: z.literal('settled'), outcome: SettingsReleaseOutcomeSchema }).strict(),
+  z
+    .object({
+      status: z.literal('not_admitted'),
+      requestId: ReleaseUuidSchema,
+      commandId: z.null(),
+      reason: z.enum([
+        'already_confirmed',
+        'conflict',
+        'permission_missing',
+        'permission_unknown',
+        'storage_failed',
+      ]),
+      snapshot: SettingsReleaseSnapshotSchema,
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('blocked'),
+      requestId: ReleaseUuidSchema,
+      commandId: z.string().min(1).max(180).nullable(),
+      reason: z.enum([
+        'identity_exhausted',
+        'request_identity_conflict',
+        'actor_blocked',
+        'storage_ambiguous',
+        'effect_ambiguous',
+        'broadcast_ambiguous',
+        'scan_admission_unknown',
+      ]),
+      snapshot: z.null(),
+    })
+    .strict(),
+  z
+    .object({
+      status: z.literal('transport_rejected'),
+      reason: z.literal('queue_full'),
+      commandType: z.literal('mutation'),
+      correlationId: ReleaseUuidSchema,
+      snapshot: z.null(),
+    })
+    .strict(),
+]);
 
 // ── Profile ──────────────────────────────────────────────────────────────────
 
@@ -658,6 +808,49 @@ export const MessageSchemas = {
     type: z.literal('SETTINGS_UPDATED'),
     payload: AppSettingsSchema,
   }),
+  GET_SETTINGS_RELEASE: z.object({ type: z.literal('GET_SETTINGS_RELEASE') }).strict(),
+  SETTINGS_RELEASE_RESULT: z
+    .object({
+      type: z.literal('SETTINGS_RELEASE_RESULT'),
+      payload: SettingsReleaseReadResultSchema,
+    })
+    .strict(),
+  MUTATE_SETTINGS_RELEASE: z
+    .object({
+      type: z.literal('MUTATE_SETTINGS_RELEASE'),
+      payload: SettingsReleaseIntentSchema,
+    })
+    .strict(),
+  SETTINGS_RELEASE_MUTATION_RESULT: z
+    .object({
+      type: z.literal('SETTINGS_RELEASE_MUTATION_RESULT'),
+      payload: SettingsReleaseMutationResultSchema,
+    })
+    .strict(),
+  RETRY_SETTINGS_RELEASE: z.object({ type: z.literal('RETRY_SETTINGS_RELEASE') }).strict(),
+  SETTINGS_RELEASE_RETRY_RESULT: z
+    .object({
+      type: z.literal('SETTINGS_RELEASE_RETRY_RESULT'),
+      payload: z
+        .object({
+          status: z.enum(['retry_accepted', 'retry_already_queued', 'retry_not_applicable']),
+          snapshot: z.null(),
+        })
+        .strict(),
+    })
+    .strict(),
+  SETTINGS_RELEASE_UPDATED: z
+    .object({
+      type: z.literal('SETTINGS_RELEASE_UPDATED'),
+      payload: z
+        .object({
+          snapshot: SettingsReleaseSnapshotSchema,
+          commandId: z.string().min(1).max(180),
+          broadcastId: z.string().min(1).max(220),
+        })
+        .strict(),
+    })
+    .strict(),
   // Profile
   GET_PROFILE: z.object({ type: z.literal('GET_PROFILE') }),
   PROFILE_RESULT: z.object({ type: z.literal('PROFILE_RESULT'), payload: z.unknown() }),
@@ -906,6 +1099,14 @@ export const MessageSchemas = {
     payload: z.object({
       connectorId: z.string(),
       enable: z.boolean().optional(),
+    }),
+  }),
+  CONNECTOR_RECHECK_RESULT: z.object({
+    type: z.literal('CONNECTOR_RECHECK_RESULT'),
+    payload: z.object({
+      snapshots: z.array(ConnectorHealthSnapshotSchema),
+      scan: z.enum(['completed', 'failed']),
+      activation: z.enum(['not_requested', 'committed', 'already_confirmed', 'failed']),
     }),
   }),
   CONNECTOR_HEALTH_UPDATED: z.object({

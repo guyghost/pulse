@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import type { Mission } from '$lib/core/types/mission';
   import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
   import { GENERATION_TYPE_ICONS, GENERATION_TYPE_LABELS } from '$lib/core/types/generation';
@@ -63,6 +63,7 @@
   let loadError = $state<string | null>(null);
 
   const generationTypes: GenerationType[] = ['pitch', 'cover-message', 'cv-summary'];
+  const generationTypeIcons = GENERATION_TYPE_ICONS as Record<GenerationType, IconName>;
 
   type TrackedMission = {
     mission: Mission;
@@ -551,7 +552,7 @@
         statusLabel={applicationStory.statusLabel}
         evidence={applicationStory.evidence}
         primaryActionLabel={applicationStory.primaryActionLabel}
-        primaryActionIcon={applicationStory.primaryActionIcon}
+        primaryActionIcon={applicationStory.primaryActionIcon as IconName}
         onPrimaryAction={handleApplicationStoryAction}
       />
     </div>
@@ -879,7 +880,7 @@
                   onclick={() => generate(type)}
                   disabled={generatingType !== null}
                 >
-                  <Icon name={GENERATION_TYPE_ICONS[type]} size={14} class="text-blueprint-blue" />
+                  <Icon name={generationTypeIcons[type]} size={14} class="text-blueprint-blue" />
                   {generatingType === type ? 'Génération...' : GENERATION_TYPE_LABELS[type]}
                 </button>
               {/each}
@@ -896,9 +897,9 @@
               proofLabel="Contenus générés"
               proofValue="0"
               primaryActionLabel="Générer un pitch"
-              primaryActionIcon={GENERATION_TYPE_ICONS.pitch}
+              primaryActionIcon={generationTypeIcons.pitch}
               secondaryActionLabel="Générer le message"
-              secondaryActionIcon={GENERATION_TYPE_ICONS['cover-message']}
+              secondaryActionIcon={generationTypeIcons['cover-message']}
               onPrimaryAction={() => generate('pitch')}
               onSecondaryAction={() => generate('cover-message')}
             />
@@ -909,7 +910,7 @@
               <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-2">
                   <Icon
-                    name={GENERATION_TYPE_ICONS[asset.type]}
+                    name={generationTypeIcons[asset.type]}
                     size={14}
                     class="text-blueprint-blue"
                   />

@@ -13,6 +13,7 @@ const feedDataMock = vi.hoisted(() => ({
 const settingsMock = vi.hoisted(() => ({
   getSettings: vi.fn(),
   setSettings: vi.fn(),
+  setSettingsConfirmed: vi.fn(),
 }));
 
 const connectorsMock = vi.hoisted(() => ({
@@ -132,6 +133,7 @@ describe('feed controller facade', () => {
     feedDataMock.detectAllConnectorSessions.mockResolvedValue([]);
     settingsMock.getSettings.mockResolvedValue(settings);
     settingsMock.setSettings.mockResolvedValue(undefined);
+    settingsMock.setSettingsConfirmed.mockImplementation(async (candidate) => candidate);
     connectorsMock.getConnectors.mockResolvedValue([]);
     bridgeMock.sendMessage.mockImplementation(async (message: { type: string }) => {
       if (message.type === 'GET_CONNECTOR_HEALTH') {
@@ -170,6 +172,85 @@ describe('feed controller facade', () => {
     // Should NOT start a scan because persistedStatuses show a recent sync (5 min ago)
     expect(messageTypes).not.toContain('SCAN_START');
     expect(storageGet).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+
+  it('orders an enabled connector by the shipped catalogue and projects only after confirmation', async () => {
+    stubChrome();
+    settingsMock.getSettings.mockResolvedValue({ ...settings, enabledConnectors: ['malt'] });
+    let confirm!: (value: AppSettings) => void;
+    settingsMock.setSettingsConfirmed.mockImplementationOnce(
+      (candidate: AppSettings) =>
+        new Promise<AppSettings>((resolve) => {
+          confirm = () => resolve(candidate);
+        })
+    );
+    const controller = createFeedController({
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    });
+    await flushPromises();
+
+    const toggling = controller.handleToggleConnector('free-work');
+    await flushPromises();
+    expect([...controller.enabledConnectorIds]).toEqual(['malt']);
+    expect(settingsMock.setSettingsConfirmed).toHaveBeenCalledWith(
+      expect.objectContaining({ enabledConnectors: ['free-work', 'malt'] })
+    );
+
+    confirm({ ...settings, enabledConnectors: ['free-work', 'malt'] });
+    await toggling;
+    expect([...controller.enabledConnectorIds]).toEqual(['free-work', 'malt']);
+    controller.dispose();
+  });
+
+  it('keeps the confirmed connector projection when the typed Settings mutation rejects', async () => {
+    stubChrome();
+    settingsMock.getSettings.mockResolvedValue({ ...settings, enabledConnectors: ['free-work'] });
+    settingsMock.setSettingsConfirmed.mockRejectedValueOnce(
+      Object.assign(new Error('permission_missing'), {
+        result: { status: 'not_admitted', reason: 'permission_missing' },
+      })
+    );
+    const controller = createFeedController({
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    });
+    await flushPromises();
+
+    await controller.handleToggleConnector('malt');
+
+    expect([...controller.enabledConnectorIds]).toEqual(['free-work']);
+    controller.dispose();
+  });
+
+  it('never projects an enable-and-recheck request unless background confirms activation', async () => {
+    stubChrome();
+    settingsMock.getSettings.mockResolvedValue({ ...settings, enabledConnectors: ['free-work'] });
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_CONNECTOR_HEALTH') {
+        return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+      }
+      if (message.type === 'RECHECK_CONNECTOR_HEALTH') {
+        return Promise.resolve({
+          type: 'CONNECTOR_RECHECK_RESULT',
+          payload: { snapshots: [], scan: 'completed', activation: 'failed' },
+        });
+      }
+      return Promise.resolve({ type: 'SCAN_COMPLETE', payload: [] });
+    });
+    const controller = createFeedController({
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    });
+    await flushPromises();
+
+    await controller.recheckConnector('malt', true);
+
+    expect([...controller.enabledConnectorIds]).toEqual(['free-work']);
     controller.dispose();
   });
 

@@ -1,5 +1,6 @@
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
+import type { AppSettings } from '../../../src/lib/core/types/app-settings';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 import type {
@@ -8,6 +9,11 @@ import type {
   ScanResult,
 } from '../../../src/lib/shell/scan/scanner';
 import type { ScanCheckpoint } from '../../../src/models/scan-lifecycle.machine';
+import type {
+  SettingsReleaseMutationResult,
+  SettingsReleaseReadResult,
+  SettingsReleaseSnapshot,
+} from '../../../src/lib/shell/settings-release/settings-release.contract';
 
 const getSettings = vi.fn();
 const setSettings = vi.fn();
@@ -70,13 +76,12 @@ const setBadgeText = vi.fn(async () => undefined);
 const setBadgeBackgroundColor = vi.fn(async () => undefined);
 const setBadgeTextColor = vi.fn(async () => undefined);
 const clearChromeStorage = vi.fn(async () => undefined);
+const chromeLocalStore: Record<string, unknown> = {};
 const arrivalSessionStore: Record<string, unknown> = {};
 const backgroundAlarms = new Map<string, chrome.alarms.AlarmCreateInfo>();
 
-let alarmListener: ((alarm: { name: string }) => Promise<void>) | undefined;
+let alarmListener: ((alarm: { name: string; scheduledTime?: number }) => Promise<void>) | undefined;
 let installedListener: ((details: chrome.runtime.InstalledDetails) => Promise<void>) | undefined;
-let storageChangeListener:
-  ((changes: Record<string, chrome.storage.StorageChange>, area: string) => void) | undefined;
 let messageListener:
   | ((
       message: unknown,
@@ -112,6 +117,22 @@ const SHIPPED_CONNECTOR_IDS = [
   'cherry-pick',
   'malt',
 ] as const;
+
+const RELEASE_SETTINGS = {
+  scanIntervalMinutes: 30,
+  enabledConnectors: ['free-work'],
+  notifications: true,
+  autoScan: true,
+  maxSemanticPerScan: 10,
+  notificationScoreThreshold: 70,
+  respectRateLimits: true,
+  customDelayMs: 0,
+  theme: 'system' as const,
+};
+
+function cloneStorageValue<T>(value: T): T {
+  return structuredClone(value);
+}
 
 function makeStrictHealthRead(overrides: ReadonlyMap<string, Record<string, unknown>> = new Map()) {
   return {
@@ -202,6 +223,65 @@ function successfulScanImplementation(result: ScanResult) {
   };
 }
 
+let settingsReleaseRequestSequence = 0;
+
+function nextSettingsReleaseRequestId(): string {
+  settingsReleaseRequestSequence += 1;
+  return `93000000-0000-4000-8000-${String(settingsReleaseRequestSequence).padStart(12, '0')}`;
+}
+
+async function dispatchBackgroundMessage<T>(message: unknown): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    if (!messageListener) {
+      reject(new Error('Background message listener is unavailable.'));
+      return;
+    }
+    const handled = messageListener(message, {}, (response) => resolve(response as T));
+    if (handled !== true) {
+      reject(new Error('Background message was not admitted asynchronously.'));
+    }
+  });
+}
+
+async function readSettingsRelease(): Promise<SettingsReleaseSnapshot> {
+  const response = await dispatchBackgroundMessage<{
+    type: 'SETTINGS_RELEASE_RESULT';
+    payload: SettingsReleaseReadResult;
+  }>({ type: 'GET_SETTINGS_RELEASE' });
+  if (response.type !== 'SETTINGS_RELEASE_RESULT' || response.payload.status !== 'confirmed') {
+    throw new Error('Settings release snapshot is not confirmed.');
+  }
+  return response.payload.snapshot;
+}
+
+async function mutateSettingsRelease(
+  buildIntent: (snapshot: SettingsReleaseSnapshot) =>
+    | {
+        kind: 'save_settings';
+        settings: AppSettings;
+      }
+    | { kind: 'set_consent'; targetConsent: true }
+    | { kind: 'clear_consent'; targetConsent: false }
+): Promise<SettingsReleaseMutationResult> {
+  const snapshot = await readSettingsRelease();
+  const intent = buildIntent(snapshot);
+  const response = await dispatchBackgroundMessage<{
+    type: 'SETTINGS_RELEASE_MUTATION_RESULT';
+    payload: SettingsReleaseMutationResult;
+  }>({
+    type: 'MUTATE_SETTINGS_RELEASE',
+    payload: {
+      ...intent,
+      requestId: nextSettingsReleaseRequestId(),
+      baseRevision: snapshot.revision,
+    },
+  });
+  if (response.type !== 'SETTINGS_RELEASE_MUTATION_RESULT') {
+    throw new Error('Unexpected Settings release response.');
+  }
+  return response.payload;
+}
+
 vi.stubGlobal('chrome', {
   sidePanel: {
     setPanelBehavior: vi.fn(),
@@ -228,6 +308,9 @@ vi.stubGlobal('chrome', {
       ),
     },
     sendMessage: vi.fn(async () => undefined),
+  },
+  permissions: {
+    contains: vi.fn(async () => true),
   },
   alarms: {
     clearAll: vi.fn(async () => true),
@@ -257,16 +340,51 @@ vi.stubGlobal('chrome', {
       }))
     ),
     onAlarm: {
-      addListener: vi.fn((listener: (alarm: { name: string }) => Promise<void>) => {
-        alarmListener = listener;
-      }),
+      addListener: vi.fn(
+        (listener: (alarm: { name: string; scheduledTime?: number }) => Promise<void>) => {
+          alarmListener = listener;
+        }
+      ),
     },
   },
   storage: {
     local: {
-      get: vi.fn(async () => ({})),
-      set: vi.fn(async () => undefined),
-      remove: vi.fn(async () => undefined),
+      get: vi.fn(async (keys?: string | string[] | Record<string, unknown> | null) => {
+        if (keys === undefined || keys === null) {
+          return cloneStorageValue(chromeLocalStore);
+        }
+        const result: Record<string, unknown> = {};
+        if (typeof keys === 'string') {
+          if (Object.prototype.hasOwnProperty.call(chromeLocalStore, keys)) {
+            result[keys] = cloneStorageValue(chromeLocalStore[keys]);
+          }
+          return result;
+        }
+        if (Array.isArray(keys)) {
+          for (const key of keys) {
+            if (Object.prototype.hasOwnProperty.call(chromeLocalStore, key)) {
+              result[key] = cloneStorageValue(chromeLocalStore[key]);
+            }
+          }
+          return result;
+        }
+        for (const [key, fallback] of Object.entries(keys)) {
+          result[key] = Object.prototype.hasOwnProperty.call(chromeLocalStore, key)
+            ? cloneStorageValue(chromeLocalStore[key])
+            : cloneStorageValue(fallback);
+        }
+        return result;
+      }),
+      set: vi.fn(async (values: Record<string, unknown>) => {
+        for (const [key, value] of Object.entries(values)) {
+          chromeLocalStore[key] = cloneStorageValue(value);
+        }
+      }),
+      remove: vi.fn(async (keys: string | string[]) => {
+        for (const key of typeof keys === 'string' ? [keys] : keys) {
+          delete chromeLocalStore[key];
+        }
+      }),
       clear: clearChromeStorage,
     },
     session: {
@@ -278,13 +396,7 @@ vi.stubGlobal('chrome', {
       }),
     },
     onChanged: {
-      addListener: vi.fn(
-        (
-          listener: (changes: Record<string, chrome.storage.StorageChange>, area: string) => void
-        ) => {
-          storageChangeListener = listener;
-        }
-      ),
+      addListener: vi.fn(),
     },
   },
   declarativeNetRequest: {
@@ -460,6 +572,8 @@ vi.mock('../../../src/lib/shell/storage/first-scan', () => ({
 
 describe('background auto-scan notifications', () => {
   beforeAll(async () => {
+    chromeLocalStore.settings = cloneStorageValue(RELEASE_SETTINGS);
+    chromeLocalStore.onboarding_completed = true;
     sendDailyDigest.mockResolvedValue({ sent: false, missionIds: [] });
     scheduleDailyDigestAlarm.mockImplementation(async () => {
       const when = Date.now() + 60_000;
@@ -497,6 +611,16 @@ describe('background auto-scan notifications', () => {
     setKbdCheatsheetTipSeen.mockResolvedValue(undefined);
     waitForScanRecovery.mockResolvedValue(undefined);
     await import('../../../src/background/index.ts');
+    const releaseReady = vi.fn();
+    messageListener?.({ type: 'GET_SETTINGS_RELEASE' }, {}, releaseReady);
+    await vi.waitFor(() => {
+      expect(releaseReady).toHaveBeenCalledWith(
+        expect.objectContaining({
+          type: 'SETTINGS_RELEASE_RESULT',
+          payload: expect.objectContaining({ status: 'confirmed' }),
+        })
+      );
+    });
   });
 
   beforeEach(() => {
@@ -594,31 +718,45 @@ describe('background auto-scan notifications', () => {
   });
 
   it('reconciles only the owned auto-scan alarm and never clears other alarms', async () => {
-    expect(storageChangeListener).toBeTypeOf('function');
-
-    storageChangeListener?.({ settings: { newValue: { autoScan: true } } }, 'local');
-
-    await vi.waitFor(() => {
-      expect(chrome.alarms.clear).toHaveBeenCalledWith('auto-scan');
-    });
-    expect(chrome.alarms.clearAll).not.toHaveBeenCalled();
-    expect(chrome.alarms.create).toHaveBeenCalledWith('auto-scan', {
-      periodInMinutes: 30,
-    });
-    expect(chrome.alarms.create).toHaveBeenCalledWith(
-      'daily-digest',
-      expect.objectContaining({ when: expect.any(Number) })
-    );
+    backgroundAlarms.set('daily-digest', { when: Date.now() + 60_000 });
+    backgroundAlarms.set('auto-scan', { periodInMinutes: 30 });
+    const changed = await mutateSettingsRelease((snapshot) => ({
+      kind: 'save_settings',
+      settings: { ...snapshot.settings, scanIntervalMinutes: 45 },
+    }));
+    try {
+      expect(changed).toMatchObject({
+        status: 'settled',
+        outcome: { status: 'committed' },
+      });
+      expect(chrome.alarms.clear).not.toHaveBeenCalledWith('daily-digest');
+      expect(chrome.alarms.clearAll).not.toHaveBeenCalled();
+      expect(chrome.alarms.create).toHaveBeenCalledWith('auto-scan', {
+        periodInMinutes: 45,
+      });
+      expect(backgroundAlarms.has('daily-digest')).toBe(true);
+    } finally {
+      await mutateSettingsRelease((snapshot) => ({
+        kind: 'save_settings',
+        settings: { ...snapshot.settings, scanIntervalMinutes: 30 },
+      }));
+    }
   });
 
   it('reconciles auto-scan when onboarding consent changes', async () => {
-    expect(storageChangeListener).toBeTypeOf('function');
+    const cleared = await mutateSettingsRelease(() => ({
+      kind: 'clear_consent',
+      targetConsent: false,
+    }));
+    expect(cleared).toMatchObject({ status: 'settled', outcome: { status: 'committed' } });
+    expect(backgroundAlarms.has('auto-scan')).toBe(false);
 
-    storageChangeListener?.({ onboarding_completed: { oldValue: false, newValue: true } }, 'local');
-
-    await vi.waitFor(() => {
-      expect(chrome.alarms.clear).toHaveBeenCalledWith('auto-scan');
-    });
+    vi.mocked(chrome.alarms.create).mockClear();
+    const restored = await mutateSettingsRelease(() => ({
+      kind: 'set_consent',
+      targetConsent: true,
+    }));
+    expect(restored).toMatchObject({ status: 'settled', outcome: { status: 'committed' } });
     expect(chrome.alarms.create).toHaveBeenCalledWith('auto-scan', {
       periodInMinutes: 30,
     });
@@ -636,19 +774,28 @@ describe('background auto-scan notifications', () => {
       autoScan: false,
     },
   ])('rejects an auto-scan alarm when $label', async ({ onboardingCompleted, autoScan }) => {
-    getOnboardingCompleted.mockResolvedValueOnce(onboardingCompleted);
-    getSettings.mockResolvedValueOnce({
-      scanIntervalMinutes: 30,
-      enabledConnectors: ['free-work'],
-      notifications: true,
-      autoScan,
-      maxSemanticPerScan: 10,
-      notificationScoreThreshold: 70,
-    });
+    if (!onboardingCompleted) {
+      await mutateSettingsRelease(() => ({ kind: 'clear_consent', targetConsent: false }));
+    } else if (!autoScan) {
+      await mutateSettingsRelease((snapshot) => ({
+        kind: 'save_settings',
+        settings: { ...snapshot.settings, autoScan: false },
+      }));
+    }
 
-    await alarmListener?.({ name: 'auto-scan' });
-
-    expect(runScan).not.toHaveBeenCalled();
+    try {
+      await alarmListener?.({ name: 'auto-scan', scheduledTime: 1779436800000 });
+      expect(runScan).not.toHaveBeenCalled();
+    } finally {
+      if (!onboardingCompleted) {
+        await mutateSettingsRelease(() => ({ kind: 'set_consent', targetConsent: true }));
+      } else if (!autoScan) {
+        await mutateSettingsRelease((snapshot) => ({
+          kind: 'save_settings',
+          settings: { ...snapshot.settings, autoScan: true },
+        }));
+      }
+    }
   });
 
   it('routes a valid probe alarm to the matching connector only', async () => {
@@ -726,20 +873,20 @@ describe('background auto-scan notifications', () => {
     expect(chrome.alarms.get).not.toHaveBeenCalledWith('probe:free-work');
   });
 
-  it('does not reconcile stored probes when startup health proof is corrupt', async () => {
+  it('does not mutate stored probe alarms while the Settings actor reconciles auto-scan', async () => {
     backgroundAlarms.set('probe:free-work', { when: Date.now() + 60_000 });
-    readHealthSnapshotsForProbeReconciliation.mockResolvedValueOnce({
-      status: 'unavailable',
-      reason: 'corrupt',
-    });
-
-    storageChangeListener?.({ settings: { newValue: { autoScan: true } } }, 'local');
-    await vi.waitFor(() => {
-      expect(readHealthSnapshotsForProbeReconciliation).toHaveBeenCalled();
-    });
+    await mutateSettingsRelease((snapshot) => ({
+      kind: 'save_settings',
+      settings: { ...snapshot.settings, scanIntervalMinutes: 45 },
+    }));
 
     expect(chrome.alarms.clear).not.toHaveBeenCalledWith('probe:free-work');
     expect(backgroundAlarms.has('probe:free-work')).toBe(true);
+
+    await mutateSettingsRelease((snapshot) => ({
+      kind: 'save_settings',
+      settings: { ...snapshot.settings, scanIntervalMinutes: 30 },
+    }));
   });
 
   it.each(['probe:', 'probe:not-shipped'])(
@@ -753,16 +900,22 @@ describe('background auto-scan notifications', () => {
 
   it('persists notified mission ids so they are not alerted again on the next scan', async () => {
     expect(alarmListener).toBeTypeOf('function');
+    const releaseSnapshot = await readSettingsRelease();
 
-    await alarmListener?.({ name: 'auto-scan' });
+    await alarmListener?.({ name: 'auto-scan', scheduledTime: 1779436800001 });
 
-    expect(notifyHighScoreMissions).toHaveBeenCalledWith([
-      expect.objectContaining({ id: 'mission-1' }),
-      expect.objectContaining({ id: 'mission-2' }),
-    ]);
-    expect(saveSeenIds).toHaveBeenCalledWith(['already-seen', 'mission-1']);
-    expect(setNewMissionCount).toHaveBeenCalledWith(2);
-    expect(setBadgeText).toHaveBeenCalledWith({ text: '2' });
+    await vi.waitFor(() => {
+      expect(notifyHighScoreMissions).toHaveBeenCalledWith(
+        [
+          expect.objectContaining({ id: 'mission-1' }),
+          expect.objectContaining({ id: 'mission-2' }),
+        ],
+        releaseSnapshot
+      );
+      expect(saveSeenIds).toHaveBeenCalledWith(['already-seen', 'mission-1']);
+      expect(setNewMissionCount).toHaveBeenCalledWith(2);
+      expect(setBadgeText).toHaveBeenCalledWith({ text: '2' });
+    });
     const feedProjectionMessages = vi
       .mocked(chrome.runtime.sendMessage)
       .mock.calls.map(([message]) => message)
@@ -791,10 +944,12 @@ describe('background auto-scan notifications', () => {
     );
     notifyHighScoreMissions.mockResolvedValueOnce({ shown: false, notifiedMissionIds: [] });
 
-    await alarmListener?.({ name: 'auto-scan' });
+    await alarmListener?.({ name: 'auto-scan', scheduledTime: 1779436800002 });
 
-    expect(setNewMissionCount).toHaveBeenCalledWith(0);
-    expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
+    await vi.waitFor(() => {
+      expect(setNewMissionCount).toHaveBeenCalledWith(0);
+      expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
+    });
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
     expect(saveSeenIds).not.toHaveBeenCalled();
   });
@@ -809,10 +964,12 @@ describe('background auto-scan notifications', () => {
       })
     );
 
-    await alarmListener?.({ name: 'auto-scan' });
+    await alarmListener?.({ name: 'auto-scan', scheduledTime: 1779436800003 });
 
-    expect(setNewMissionCount).toHaveBeenCalledWith(0);
-    expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
+    await vi.waitFor(() => {
+      expect(setNewMissionCount).toHaveBeenCalledWith(0);
+      expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
+    });
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
   });
 
@@ -1842,8 +1999,8 @@ describe('background auto-scan notifications', () => {
     expect(handled).toBe(true);
     await vi.waitFor(() => {
       expect(sendResponse).toHaveBeenCalledWith({
-        type: 'CONNECTOR_HEALTH_RESULT',
-        payload: [],
+        type: 'CONNECTOR_RECHECK_RESULT',
+        payload: { snapshots: [], scan: 'completed', activation: 'not_requested' },
       });
     });
     expect(runScan).toHaveBeenCalledWith(
@@ -1854,16 +2011,71 @@ describe('background auto-scan notifications', () => {
     expect(setSettings).not.toHaveBeenCalled();
   });
 
+  it('reports canonical connector activation and treats already-confirmed as success', async () => {
+    const before = await readSettingsRelease();
+    const connectorId = SHIPPED_CONNECTOR_IDS.find(
+      (id) => !before.settings.enabledConnectors.some((enabledId) => enabledId === id)
+    );
+    if (!connectorId) {
+      throw new Error('The test requires one disabled shipped connector.');
+    }
+    getAllHealthSnapshots.mockRejectedValueOnce(new Error('health storage unavailable'));
+
+    const first = await dispatchBackgroundMessage<{
+      type: 'CONNECTOR_RECHECK_RESULT';
+      payload: { snapshots: unknown[]; scan: string; activation: string };
+    }>({
+      type: 'RECHECK_CONNECTOR_HEALTH',
+      payload: { connectorId, enable: true },
+    });
+    expect(first).toMatchObject({
+      type: 'CONNECTOR_RECHECK_RESULT',
+      payload: { snapshots: [], activation: 'committed' },
+    });
+    expect(['completed', 'failed']).toContain(first.payload.scan);
+
+    const after = await readSettingsRelease();
+    const expectedOrder = SHIPPED_CONNECTOR_IDS.filter(
+      (id) =>
+        id === connectorId ||
+        before.settings.enabledConnectors.some((enabledId) => enabledId === id)
+    );
+    expect(after.settings.enabledConnectors).toEqual(expectedOrder);
+
+    const repeated = await dispatchBackgroundMessage<{
+      type: 'CONNECTOR_RECHECK_RESULT';
+      payload: { snapshots: unknown[]; scan: string; activation: string };
+    }>({
+      type: 'RECHECK_CONNECTOR_HEALTH',
+      payload: { connectorId, enable: true },
+    });
+    expect(repeated).toMatchObject({
+      type: 'CONNECTOR_RECHECK_RESULT',
+      payload: { snapshots: [], activation: 'already_confirmed' },
+    });
+    expect(['completed', 'failed']).toContain(repeated.payload.scan);
+
+    const restored = await mutateSettingsRelease(() => ({
+      kind: 'save_settings',
+      settings: before.settings,
+    }));
+    expect(restored).toMatchObject({
+      status: 'settled',
+      outcome: { status: 'committed', snapshot: { settings: before.settings } },
+    });
+  });
+
   it('saves profiles through the service worker and rescored missions locally', async () => {
     expect(messageListener).toBeTypeOf('function');
     const sendResponse = vi.fn();
+    const releaseSnapshot = await readSettingsRelease();
 
     const handled = messageListener?.({ type: 'SAVE_PROFILE', payload: profile }, {}, sendResponse);
-    await new Promise((resolve) => setTimeout(resolve, 0));
+    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
 
     expect(handled).toBe(true);
     expect(saveProfile).toHaveBeenCalledWith(profile);
-    expect(rescoreStoredMissions).toHaveBeenCalledWith(profile);
+    expect(rescoreStoredMissions).toHaveBeenCalledWith(profile, releaseSnapshot);
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
       type: 'MISSIONS_UPDATED',
       payload: [expect.objectContaining({ id: 'rescored-1', score: 96 })],
@@ -2107,38 +2319,61 @@ describe('background auto-scan notifications', () => {
     });
   });
 
-  it('routes settings through the service worker shell', async () => {
+  it('routes Settings through the release protocol and keeps legacy reads read-only', async () => {
     expect(messageListener).toBeTypeOf('function');
+    const previous = await readSettingsRelease();
     const settings = {
-      scanIntervalMinutes: 45,
-      enabledConnectors: ['free-work'],
+      ...previous.settings,
+      scanIntervalMinutes: previous.settings.scanIntervalMinutes === 45 ? 30 : 45,
       notifications: false,
-      autoScan: true,
       maxSemanticPerScan: 5,
       notificationScoreThreshold: 80,
-      respectRateLimits: true,
       customDelayMs: 1000,
       theme: 'dark' as const,
     };
     const getResponse = vi.fn();
-    const saveResponse = vi.fn();
-    getSettings.mockResolvedValueOnce(settings);
+    const onboardingResponse = vi.fn();
+    const legacyWriteResponse = vi.fn();
 
     expect(messageListener?.({ type: 'GET_SETTINGS' }, {}, getResponse)).toBe(true);
-    expect(messageListener?.({ type: 'SAVE_SETTINGS', payload: settings }, {}, saveResponse)).toBe(
+    expect(messageListener?.({ type: 'GET_ONBOARDING_COMPLETED' }, {}, onboardingResponse)).toBe(
       true
     );
-    await new Promise((resolve) => setTimeout(resolve, 0));
-
-    expect(getResponse).toHaveBeenCalledWith({ type: 'SETTINGS_RESULT', payload: settings });
-    expect(setSettings).toHaveBeenCalledWith(settings);
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
-      type: 'SETTINGS_UPDATED',
-      payload: settings,
+    await vi.waitFor(() => {
+      expect(getResponse).toHaveBeenCalledWith({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: { status: 'confirmed', snapshot: previous },
+      });
+      expect(onboardingResponse).toHaveBeenCalledWith({
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: { status: 'confirmed', snapshot: previous },
+      });
     });
-    expect(saveResponse).toHaveBeenCalledWith({
-      type: 'SETTINGS_SAVED',
-      payload: { saved: true, settings },
+
+    const saved = await mutateSettingsRelease(() => ({ kind: 'save_settings', settings }));
+    expect(saved).toMatchObject({
+      status: 'settled',
+      outcome: {
+        status: 'committed',
+        kind: 'save_settings',
+        snapshot: { settings },
+      },
+    });
+
+    expect(
+      messageListener?.({ type: 'SAVE_SETTINGS', payload: settings }, {}, legacyWriteResponse)
+    ).toBeUndefined();
+    await Promise.resolve();
+    expect(legacyWriteResponse).not.toHaveBeenCalled();
+    expect(setSettings).not.toHaveBeenCalled();
+
+    const restored = await mutateSettingsRelease(() => ({
+      kind: 'save_settings',
+      settings: previous.settings,
+    }));
+    expect(restored).toMatchObject({
+      status: 'settled',
+      outcome: { status: 'committed', snapshot: { settings: previous.settings } },
     });
   });
 
@@ -2756,8 +2991,9 @@ describe('background auto-scan notifications', () => {
     });
   });
 
-  it('routes side panel app flags through the service worker shell', async () => {
+  it('routes side panel flags while onboarding consent stays model-owned', async () => {
     expect(messageListener).toBeTypeOf('function');
+    const releaseSnapshot = await readSettingsRelease();
     const firstScanResponse = vi.fn();
     const bannerReadResponse = vi.fn();
     const bannerWriteResponse = vi.fn();
@@ -2770,7 +3006,6 @@ describe('background auto-scan notifications', () => {
 
     getFirstScanDone.mockResolvedValueOnce(true);
     getProfileBannerDismissed.mockResolvedValueOnce(false);
-    getOnboardingCompleted.mockResolvedValueOnce(true);
     getFeedTourSeen.mockResolvedValueOnce(false);
 
     expect(messageListener?.({ type: 'GET_FIRST_SCAN_DONE' }, {}, firstScanResponse)).toBe(true);
@@ -2785,10 +3020,10 @@ describe('background auto-scan notifications', () => {
     ).toBe(true);
     expect(
       messageListener?.({ type: 'SET_ONBOARDING_COMPLETED' }, {}, onboardingWriteResponse)
-    ).toBe(true);
+    ).toBeUndefined();
     expect(
       messageListener?.({ type: 'CLEAR_ONBOARDING_COMPLETED' }, {}, onboardingClearResponse)
-    ).toBe(true);
+    ).toBeUndefined();
     expect(messageListener?.({ type: 'GET_FEED_TOUR_SEEN' }, {}, tourReadResponse)).toBe(true);
     expect(messageListener?.({ type: 'SET_FEED_TOUR_SEEN' }, {}, tourWriteResponse)).toBe(true);
     expect(messageListener?.({ type: 'CLEAR_FEED_TOUR_SEEN' }, {}, tourClearResponse)).toBe(true);
@@ -2807,17 +3042,13 @@ describe('background auto-scan notifications', () => {
       payload: { saved: true },
     });
     expect(onboardingReadResponse).toHaveBeenCalledWith({
-      type: 'ONBOARDING_COMPLETED_RESULT',
-      payload: true,
+      type: 'SETTINGS_RELEASE_RESULT',
+      payload: { status: 'confirmed', snapshot: releaseSnapshot },
     });
-    expect(onboardingWriteResponse).toHaveBeenCalledWith({
-      type: 'ONBOARDING_COMPLETED_SET',
-      payload: { saved: true },
-    });
-    expect(onboardingClearResponse).toHaveBeenCalledWith({
-      type: 'ONBOARDING_COMPLETED_CLEARED',
-      payload: { cleared: true },
-    });
+    expect(onboardingWriteResponse).not.toHaveBeenCalled();
+    expect(onboardingClearResponse).not.toHaveBeenCalled();
+    expect(setOnboardingCompleted).not.toHaveBeenCalled();
+    expect(clearOnboardingCompleted).not.toHaveBeenCalled();
     expect(tourReadResponse).toHaveBeenCalledWith({
       type: 'FEED_TOUR_SEEN_RESULT',
       payload: false,
@@ -2830,22 +3061,126 @@ describe('background auto-scan notifications', () => {
       type: 'FEED_TOUR_SEEN_CLEARED',
       payload: { cleared: true },
     });
+
+    const cleared = await mutateSettingsRelease(() => ({
+      kind: 'clear_consent',
+      targetConsent: false,
+    }));
+    expect(cleared).toMatchObject({ status: 'settled', outcome: { status: 'committed' } });
+    const restored = await mutateSettingsRelease(() => ({
+      kind: 'set_consent',
+      targetConsent: true,
+    }));
+    expect(restored).toMatchObject({ status: 'settled', outcome: { status: 'committed' } });
   });
 
-  it('reports onboarding saved:false when the canonical flag writer rejects', async () => {
+  it('reports a truthful release non-admission when canonical storage rejects', async () => {
     expect(messageListener).toBeTypeOf('function');
+    const snapshot = await readSettingsRelease();
+    const requestId = nextSettingsReleaseRequestId();
+    vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(new Error('storage write failed'));
+
+    const response = await dispatchBackgroundMessage<{
+      type: 'SETTINGS_RELEASE_MUTATION_RESULT';
+      payload: SettingsReleaseMutationResult;
+    }>({
+      type: 'MUTATE_SETTINGS_RELEASE',
+      payload: {
+        kind: 'save_settings',
+        requestId,
+        baseRevision: snapshot.revision,
+        settings: { ...snapshot.settings, notifications: !snapshot.settings.notifications },
+      },
+    });
+
+    expect(response).toEqual({
+      type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+      payload: {
+        status: 'not_admitted',
+        requestId,
+        commandId: null,
+        reason: 'storage_failed',
+        snapshot,
+      },
+    });
+  });
+
+  it('executes the detached validated Settings payload instead of the caller-owned object', async () => {
+    const snapshot = await readSettingsRelease();
+    const requestId = nextSettingsReleaseRequestId();
+    const rawMessage = {
+      type: 'MUTATE_SETTINGS_RELEASE',
+      payload: {
+        kind: 'save_settings',
+        requestId,
+        baseRevision: snapshot.revision,
+        settings: { ...snapshot.settings, notifications: !snapshot.settings.notifications },
+      },
+    };
+    const response = new Promise<{
+      type: 'SETTINGS_RELEASE_MUTATION_RESULT';
+      payload: SettingsReleaseMutationResult;
+    }>((resolve, reject) => {
+      if (!messageListener) {
+        reject(new Error('Background message listener is unavailable.'));
+        return;
+      }
+      const handled = messageListener(rawMessage, {}, (value) =>
+        resolve(
+          value as {
+            type: 'SETTINGS_RELEASE_MUTATION_RESULT';
+            payload: SettingsReleaseMutationResult;
+          }
+        )
+      );
+      if (handled !== true) {
+        reject(new Error('Settings mutation was not admitted asynchronously.'));
+      }
+    });
+
+    rawMessage.payload.settings.notifications = snapshot.settings.notifications;
+    rawMessage.payload.settings.enabledConnectors = ['lehibou', 'free-work'];
+
+    await expect(response).resolves.toMatchObject({
+      type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+      payload: {
+        status: 'settled',
+        outcome: {
+          status: 'committed',
+          snapshot: { settings: { notifications: !snapshot.settings.notifications } },
+        },
+      },
+    });
+  });
+
+  it('returns a typed validation error for a non-canonical connector enable request', async () => {
+    const snapshot = await readSettingsRelease();
     const sendResponse = vi.fn();
-    setOnboardingCompleted.mockRejectedValueOnce(new Error('storage write failed'));
+    const handled = messageListener?.(
+      {
+        type: 'MUTATE_SETTINGS_RELEASE',
+        payload: {
+          kind: 'save_settings',
+          requestId: nextSettingsReleaseRequestId(),
+          baseRevision: snapshot.revision,
+          settings: { ...snapshot.settings, enabledConnectors: ['lehibou', 'free-work'] },
+        },
+      },
+      {},
+      sendResponse
+    );
 
-    expect(messageListener?.({ type: 'SET_ONBOARDING_COMPLETED' }, {}, sendResponse)).toBe(true);
-    await vi.waitFor(() => {
-      expect(sendResponse).toHaveBeenCalled();
-    });
-
+    expect(handled).toBe(false);
     expect(sendResponse).toHaveBeenCalledWith({
-      type: 'ONBOARDING_COMPLETED_SET',
-      payload: { saved: false },
+      success: false,
+      error: {
+        code: 'VALIDATION_ERROR',
+        message: expect.stringContaining('catalogue order'),
+      },
     });
+    expect((await readSettingsRelease()).settings.enabledConnectors).toEqual(
+      snapshot.settings.enabledConnectors
+    );
   });
 
   it.each([
@@ -2856,15 +3191,6 @@ describe('background auto-scan notifications', () => {
       expected: {
         type: 'PROFILE_BANNER_DISMISSED_SET',
         payload: { saved: false },
-      },
-    },
-    {
-      label: 'onboarding clear',
-      message: { type: 'CLEAR_ONBOARDING_COMPLETED' },
-      reject: clearOnboardingCompleted,
-      expected: {
-        type: 'ONBOARDING_COMPLETED_CLEARED',
-        payload: { cleared: false },
       },
     },
     {

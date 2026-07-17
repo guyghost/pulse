@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
   import type { ExportFormat } from '$lib/core/export/mission-export';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
 
   interface Props {
     missions: Mission[];
@@ -15,7 +15,7 @@
   let includeDescription = $state(true);
   let dateFormat: 'iso' | 'locale' | 'relative' = $state('locale');
 
-  const formats: { id: ExportFormat; label: string; icon: string }[] = [
+  const formats: { id: ExportFormat; label: string; icon: IconName }[] = [
     { id: 'json', label: 'JSON', icon: 'file-json' },
     { id: 'csv', label: 'CSV', icon: 'file-spreadsheet' },
     { id: 'markdown', label: 'Markdown', icon: 'file-text' },

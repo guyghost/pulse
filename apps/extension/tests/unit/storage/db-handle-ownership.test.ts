@@ -10,6 +10,10 @@ import {
   type DbHandleRegistry,
 } from '../../../src/lib/shell/storage/db-handle-registry';
 import { createDbOpener } from '../../../src/lib/shell/storage/db-opener';
+import {
+  createDatasetEpochAuthority,
+  type ResetAuthorityTokenV1,
+} from '../../../src/lib/shell/storage/dataset-epoch-authority';
 
 const uuid = (suffix: number): string =>
   `50000000-0000-4000-8000-${String(suffix).padStart(12, '0')}`;
@@ -69,6 +73,19 @@ function controlledOpenRequest(): ControlledOpenRequest {
       request.onerror?.({} as Event);
     },
   };
+}
+
+async function resetToken(resetOperationId: string): Promise<ResetAuthorityTokenV1> {
+  const authority = createDatasetEpochAuthority({
+    workerEpoch: uuid(900),
+    allocateLeaseId: () => uuid(901),
+  });
+  return authority.acquireResetFence({
+    version: 1,
+    resetOperationId,
+    previousDataEpoch: null,
+    nextDataEpoch: uuid(902),
+  });
 }
 
 function instrumentRegistry(registry: DbHandleRegistry, events: string[]): DbHandleRegistry {
@@ -139,7 +156,7 @@ describe('DB handle ownership adapter', () => {
     expect(database.closeCalls()).toBe(1);
   });
 
-  it('joins concurrent target-version callers to one permit and one IDB request', async () => {
+  it('gives concurrent target-version callers independently owned handles', async () => {
     const requests = [controlledOpenRequest(), controlledOpenRequest()];
     let allocations = 0;
     let openCalls = 0;
@@ -159,15 +176,123 @@ describe('DB handle ownership adapter', () => {
     const first = opener.openBusiness();
     const second = opener.openBusiness();
 
-    expect(second).toBe(first);
-    expect(allocations).toBe(1);
-    expect(openCalls).toBe(1);
-    expect(registry.snapshot()).toMatchObject({ reservationCount: 1, handleCount: 0 });
+    expect(second).not.toBe(first);
+    expect(allocations).toBe(2);
+    expect(openCalls).toBe(2);
+    expect(registry.snapshot()).toMatchObject({ reservationCount: 2, handleCount: 0 });
 
-    const database = fakeDatabase();
-    requests[0]!.succeed(database.db);
-    await expect(Promise.all([first, second])).resolves.toEqual([database.db, database.db]);
-    opener.release(database.db);
+    const firstDatabase = fakeDatabase();
+    const secondDatabase = fakeDatabase();
+    requests[0]!.succeed(firstDatabase.db);
+    requests[1]!.succeed(secondDatabase.db);
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      firstDatabase.db,
+      secondDatabase.db,
+    ]);
+
+    opener.release(firstDatabase.db);
+    expect(firstDatabase.closeCalls()).toBe(1);
+    expect(secondDatabase.closeCalls()).toBe(0);
+    expect(registry.snapshot()).toMatchObject({ reservationCount: 0, handleCount: 1 });
+
+    opener.release(secondDatabase.db);
+    expect(secondDatabase.closeCalls()).toBe(1);
+    expect(registry.snapshot()).toMatchObject({ reservationCount: 0, handleCount: 0 });
+  });
+
+  it('drains two real opener reservations across a reset fence with late success and failure', async () => {
+    const requests = [controlledOpenRequest(), controlledOpenRequest()];
+    const token = await resetToken(uuid(903));
+    let activeToken: ResetAuthorityTokenV1 | null = null;
+    let openCalls = 0;
+    let allocations = 0;
+    const registry = createDbHandleRegistry({ getActiveResetToken: () => activeToken });
+    const opener = createDbOpener({
+      registry,
+      databaseName: 'missionpulse',
+      targetVersion: 5,
+      allocateOwnerId: () => uuid(910 + ++allocations),
+      openRequest: () => requests[openCalls++]!.request,
+      scheduleBlockedTimeout: (effect, delayMs) => setTimeout(effect, delayMs),
+      cancelBlockedTimeout: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
+      blockedTimeoutMs: 750,
+      applyStructuralUpgrade: vi.fn(),
+    });
+
+    const first = opener.openBusiness();
+    const second = opener.openBusiness();
+    const firstRejected = expect(first).rejects.toMatchObject({
+      code: 'OPEN_RESERVATION_INVALIDATED',
+    });
+    const nativeFailure = new DOMException('Late native failure.', 'UnknownError');
+    const secondRejected = expect(second).rejects.toBe(nativeFailure);
+    expect(registry.snapshot()).toMatchObject({ reservationCount: 2, tombstoneCount: 0 });
+
+    activeToken = token;
+    expect(() => registry.enterResetFence(token)).toThrowError(
+      expect.objectContaining({ code: 'REGISTRY_NOT_QUIESCENT' })
+    );
+    expect(registry.snapshot()).toMatchObject({
+      reservationCount: 0,
+      tombstoneCount: 2,
+      handleCount: 0,
+    });
+
+    const lateDatabase = fakeDatabase();
+    requests[0]!.succeed(lateDatabase.db);
+    await firstRejected;
+    expect(lateDatabase.closeCalls()).toBe(1);
+    expect(registry.snapshot()).toMatchObject({ tombstoneCount: 1, handleCount: 0 });
+
+    requests[1]!.fail(nativeFailure);
+    await secondRejected;
+    expect(registry.snapshot()).toMatchObject({
+      reservationCount: 0,
+      tombstoneCount: 0,
+      handleCount: 0,
+    });
+    expect(registry.enterResetFence(token)).toMatchObject({
+      status: 'handles_closed',
+      reservationCount: 0,
+      tombstoneCount: 0,
+      handleCount: 0,
+    });
+  });
+
+  it('never lends one startup handle to a concurrent business owner', async () => {
+    const requests = [controlledOpenRequest(), controlledOpenRequest()];
+    let allocations = 0;
+    let openCalls = 0;
+    const registry = createDbHandleRegistry({ getActiveResetToken: () => null });
+    const opener = createDbOpener({
+      registry,
+      databaseName: 'missionpulse',
+      targetVersion: 5,
+      allocateOwnerId: () => uuid(15 + ++allocations),
+      openRequest: () => requests[openCalls++]!.request,
+      scheduleBlockedTimeout: (effect, delayMs) => setTimeout(effect, delayMs),
+      cancelBlockedTimeout: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
+      blockedTimeoutMs: 750,
+      applyStructuralUpgrade: vi.fn(),
+    });
+
+    const startup = opener.openStartup();
+    const business = opener.openBusiness();
+    expect({ allocations, openCalls }).toEqual({ allocations: 2, openCalls: 2 });
+
+    const startupDatabase = fakeDatabase();
+    const businessDatabase = fakeDatabase();
+    requests[0]!.succeed(startupDatabase.db);
+    requests[1]!.succeed(businessDatabase.db);
+    await expect(startup).resolves.toBe(startupDatabase.db);
+    await expect(business).resolves.toBe(businessDatabase.db);
+
+    opener.release(businessDatabase.db);
+    expect(businessDatabase.closeCalls()).toBe(1);
+    expect(startupDatabase.closeCalls()).toBe(0);
+
+    opener.release(startupDatabase.db);
+    expect(startupDatabase.closeCalls()).toBe(1);
   });
 
   it('times out one blocked open without creating an automatic retry', async () => {

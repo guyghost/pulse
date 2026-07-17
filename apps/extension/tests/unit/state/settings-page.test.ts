@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 const bridgeMock = vi.hoisted(() => ({
   sendMessage: vi.fn(),
+  listeners: [] as Array<(message: unknown) => void>,
 }));
 
 const toastMock = vi.hoisted(() => ({
@@ -10,7 +11,12 @@ const toastMock = vi.hoisted(() => ({
 
 vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
   sendMessage: bridgeMock.sendMessage,
-  subscribeMessages: () => () => {},
+  subscribeMessages: (listener: (message: unknown) => void) => {
+    bridgeMock.listeners.push(listener);
+    return () => {
+      bridgeMock.listeners = bridgeMock.listeners.filter((candidate) => candidate !== listener);
+    };
+  },
 }));
 
 vi.mock('../../../src/lib/shell/notifications/toast-service', () => ({
@@ -19,6 +25,7 @@ vi.mock('../../../src/lib/shell/notifications/toast-service', () => ({
 }));
 
 import { SettingsPageController } from '../../../src/lib/state/settings-page.svelte';
+import { resetSettingsReleaseFacadeForTests } from '../../../src/lib/shell/facades/settings-release.facade';
 
 const RESET_AVAILABLE = { status: 'available' as const, reason: null };
 
@@ -33,6 +40,44 @@ const persistedSettings = {
   customDelayMs: 0,
   theme: 'system' as const,
 };
+
+function confirmedSettings(settings = persistedSettings, revision = 0, generation = revision) {
+  return {
+    type: 'SETTINGS_RELEASE_RESULT',
+    payload: {
+      status: 'confirmed',
+      snapshot: { settings, onboardingCompleted: true, revision, generation },
+    },
+  };
+}
+
+function committedSettings(message: {
+  payload: { requestId: string; kind: string; settings?: typeof persistedSettings };
+}) {
+  const settings = message.payload.settings ?? persistedSettings;
+  return {
+    type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+    payload: {
+      status: 'settled',
+      outcome: {
+        commandId: 'settings-release:92000000-0000-4000-8000-000000000001:1:command',
+        requestId: message.payload.requestId,
+        intentDigest: '0'.repeat(64),
+        kind: message.payload.kind,
+        settledRevision: 1,
+        settledGeneration: 1,
+        snapshot: { settings, onboardingCompleted: true, revision: 1, generation: 1 },
+        status: 'committed',
+        reason: 'committed',
+      },
+    },
+  };
+}
+
+beforeEach(() => {
+  resetSettingsReleaseFacadeForTests();
+  bridgeMock.listeners = [];
+});
 
 const shippedConnectorCatalog = [
   {
@@ -198,13 +243,19 @@ describe('SettingsPageController — confirmed settings projection', () => {
 
   it('keeps the confirmed auto-scan value when persistence fails', async () => {
     bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
-      if (message.type === 'GET_SETTINGS') {
-        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
       }
-      if (message.type === 'SAVE_SETTINGS') {
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
         return Promise.resolve({
-          type: 'SETTINGS_SAVED',
-          payload: { saved: false, settings: null },
+          type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+          payload: {
+            status: 'blocked',
+            requestId: (message as { payload: { requestId: string } }).payload.requestId,
+            commandId: null,
+            reason: 'actor_blocked',
+            snapshot: null,
+          },
         });
       }
       if (message.type === 'GET_PROFILE') {
@@ -230,13 +281,19 @@ describe('SettingsPageController — confirmed settings projection', () => {
 
   it('keeps every confirmed settings field unchanged after a failed write', async () => {
     bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
-      if (message.type === 'GET_SETTINGS') {
-        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
       }
-      if (message.type === 'SAVE_SETTINGS') {
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
         return Promise.resolve({
-          type: 'SETTINGS_SAVED',
-          payload: { saved: false, settings: null },
+          type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+          payload: {
+            status: 'blocked',
+            requestId: (message as { payload: { requestId: string } }).payload.requestId,
+            commandId: null,
+            reason: 'actor_blocked',
+            snapshot: null,
+          },
         });
       }
       if (message.type === 'GET_PROFILE') {
@@ -264,18 +321,14 @@ describe('SettingsPageController — confirmed settings projection', () => {
   });
 
   it('projects the new auto-scan value only after persistence succeeds', async () => {
-    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
-      if (message.type === 'GET_SETTINGS') {
-        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
       }
-      if (message.type === 'SAVE_SETTINGS') {
-        return Promise.resolve({
-          type: 'SETTINGS_SAVED',
-          payload: {
-            saved: true,
-            settings: { ...persistedSettings, autoScan: false },
-          },
-        });
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+        return Promise.resolve(
+          committedSettings(message as Parameters<typeof committedSettings>[0])
+        );
       }
       if (message.type === 'GET_PROFILE') {
         return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
@@ -294,6 +347,44 @@ describe('SettingsPageController — confirmed settings projection', () => {
 
     controller.destroy();
   });
+
+  it('converges to a newer validated broadcast without a local optimistic write', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
+      }
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+    const controller = new SettingsPageController({ connectorCatalog: shippedConnectorCatalog });
+    await controller.loadSettings();
+
+    for (const listener of [...bridgeMock.listeners]) {
+      listener({
+        type: 'SETTINGS_RELEASE_UPDATED',
+        payload: {
+          snapshot: {
+            settings: {
+              ...persistedSettings,
+              enabledConnectors: ['free-work', 'malt'],
+              theme: 'dark',
+            },
+            onboardingCompleted: true,
+            revision: 2,
+            generation: 2,
+          },
+          commandId: 'settings-release:92000000-0000-4000-8000-000000000001:2:command',
+          broadcastId: 'settings-release:92000000-0000-4000-8000-000000000001:2:command:broadcast',
+        },
+      });
+    }
+
+    expect(controller.theme).toBe('dark');
+    expect(controller.enabledConnectorIds).toEqual(['free-work', 'malt']);
+    controller.destroy();
+  });
 });
 
 describe('SettingsPageController — shipped connector catalogue', () => {
@@ -304,8 +395,8 @@ describe('SettingsPageController — shipped connector catalogue', () => {
 
   it('projects only connectors included in the current build', async () => {
     bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
-      if (message.type === 'GET_SETTINGS') {
-        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
       }
       if (message.type === 'GET_PROFILE') {
         return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
@@ -330,14 +421,13 @@ describe('SettingsPageController — shipped connector catalogue', () => {
 
   it('enables a shipped connector only after the settings write is confirmed', async () => {
     bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
-      if (message.type === 'GET_SETTINGS') {
-        return Promise.resolve({ type: 'SETTINGS_RESULT', payload: persistedSettings });
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        return Promise.resolve(confirmedSettings());
       }
-      if (message.type === 'SAVE_SETTINGS') {
-        return Promise.resolve({
-          type: 'SETTINGS_SAVED',
-          payload: { saved: true, settings: message.payload },
-        });
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+        return Promise.resolve(
+          committedSettings(message as Parameters<typeof committedSettings>[0])
+        );
       }
       if (message.type === 'GET_PROFILE') {
         return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
@@ -354,14 +444,66 @@ describe('SettingsPageController — shipped connector catalogue', () => {
 
     expect(controller.connectorSources.find((source) => source.id === 'malt')?.enabled).toBe(true);
     const saveCall = bridgeMock.sendMessage.mock.calls.find(
-      (call) => call[0]?.type === 'SAVE_SETTINGS'
+      (call) => call[0]?.type === 'MUTATE_SETTINGS_RELEASE'
     );
     expect(saveCall?.[0]).toEqual(
       expect.objectContaining({
-        payload: expect.objectContaining({ enabledConnectors: ['free-work', 'malt'] }),
+        payload: expect.objectContaining({
+          settings: expect.objectContaining({ enabledConnectors: ['free-work', 'malt'] }),
+        }),
       })
     );
 
+    controller.destroy();
+  });
+
+  it('rebases a connector toggle on the newest canonical snapshot before saving', async () => {
+    let reads = 0;
+    const newestSettings = {
+      ...persistedSettings,
+      enabledConnectors: ['free-work', 'malt'],
+      theme: 'dark' as const,
+    };
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'GET_SETTINGS_RELEASE') {
+        reads += 1;
+        return Promise.resolve(
+          reads === 1 ? confirmedSettings() : confirmedSettings(newestSettings, 1, 1)
+        );
+      }
+      if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+        const committed = committedSettings(message as Parameters<typeof committedSettings>[0]);
+        committed.payload.outcome.settledRevision = 2;
+        committed.payload.outcome.settledGeneration = 2;
+        committed.payload.outcome.snapshot.revision = 2;
+        committed.payload.outcome.snapshot.generation = 2;
+        return Promise.resolve(committed);
+      }
+      if (message.type === 'GET_PROFILE') {
+        return Promise.resolve({ type: 'PROFILE_RESULT', payload: null });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+    const controller = new SettingsPageController({ connectorCatalog: shippedConnectorCatalog });
+    await controller.loadSettings();
+
+    await controller.toggleConnector('malt');
+
+    const saveCall = bridgeMock.sendMessage.mock.calls.find(
+      (call) => call[0]?.type === 'MUTATE_SETTINGS_RELEASE'
+    );
+    expect(saveCall?.[0]).toEqual(
+      expect.objectContaining({
+        payload: expect.objectContaining({
+          baseRevision: 1,
+          settings: expect.objectContaining({
+            enabledConnectors: ['free-work'],
+            theme: 'dark',
+          }),
+        }),
+      })
+    );
+    expect(controller.enabledConnectorIds).toEqual(['free-work']);
     controller.destroy();
   });
 });

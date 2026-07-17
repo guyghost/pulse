@@ -1,0 +1,18 @@
+[
+  {
+    "id": "malt-health-malt-001",
+    "title": "Architecte plateforme cloud",
+    "client": "Client Malt",
+    "stack": ["Kubernetes", "TypeScript"],
+    "tjm": 780,
+    "location": "Paris",
+    "remote": "hybrid",
+    "duration": "6 mois",
+    "url": "https://www.malt.fr/fr/mission/architecte-plateforme-cloud",
+    "source": "malt",
+    "scrapedAt": "2026-07-01T12:00:00.000Z",
+    "startDate": "2026-07-20",
+    "seniority": null,
+    "publishedAt": "2026-06-30T08:30:00.000Z"
+  }
+]

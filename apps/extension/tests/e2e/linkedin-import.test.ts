@@ -158,13 +158,13 @@ test.describe('LinkedIn profile import flow', () => {
     await page.getByRole('button', { name: 'Importer LinkedIn' }).click();
 
     await expect(page.getByText('2 expériences LinkedIn importées avec succès.')).toBeVisible();
-    const freelanceExperience = page.getByRole('button', {
-      name: /Lead Frontend · Atelier Nova/,
+    const freelanceExperience = page.getByRole('article', {
+      name: 'Expérience Lead Frontend chez Atelier Nova',
     });
     await expect(freelanceExperience).toBeVisible();
     await expect(freelanceExperience.getByText('Freelance', { exact: true })).toBeVisible();
     await expect(
-      page.getByRole('button', { name: /Product Engineer · Studio Kanso/ })
+      page.getByRole('article', { name: 'Expérience Product Engineer chez Studio Kanso' })
     ).toBeVisible();
   });
 
@@ -185,10 +185,12 @@ test.describe('LinkedIn profile import flow', () => {
       page.getByText('Vos expériences LinkedIn sont déjà présentes dans votre CV.', { exact: true })
     ).toBeVisible();
     await expect(page.getByText('5 entrées', { exact: true })).toBeVisible();
-    await expect(page.getByRole('button', { name: /Lead Frontend · Atelier Nova/ })).toHaveCount(1);
-    await expect(page.getByRole('button', { name: /Product Engineer · Studio Kanso/ })).toHaveCount(
-      1
-    );
+    await expect(
+      page.getByRole('article', { name: 'Expérience Lead Frontend chez Atelier Nova' })
+    ).toHaveCount(1);
+    await expect(
+      page.getByRole('article', { name: 'Expérience Product Engineer chez Studio Kanso' })
+    ).toHaveCount(1);
   });
 
   test('shows a truthful empty-profile outcome without scroll instructions', async ({ page }) => {

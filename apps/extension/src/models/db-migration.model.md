@@ -4,6 +4,20 @@ Source of truth for the IndexedDB lifecycle and the applicative data migration
 of MissionPulse. This model is the Task 5b contract. It supersedes the former
 DB4/data1 description and must be reviewed before implementation.
 
+Status: **Task 5b target, dormant at the release boundary.** The tracked opener
+and independent handle ownership are implemented today. The Startup Barrier is
+not active: `runMigrations()` deduplicates only its own migration callers,
+business `openDB()` callers do not await it, and the background launch remains
+fire-and-forget. Sections that describe admission, leases, publication or
+startup readiness are therefore target behavior, not a claim about the current
+runtime. Every current business owner must still release its independently
+delivered handle on success, error, abort and synchronous setup failure. The
+current migration startup owner installs one release-once guard immediately
+after `openStartupDB()` succeeds. That owner covers stored-data-version reads,
+data migration, verification, quarantine decision and every terminal/error
+exit. It may release before opening the independent quarantine handle, but the
+outer `finally` remains authoritative and a second release is forbidden.
+
 The migration subsystem is Shell code. It may call pure parsers and canonical
 builders from Core; Core never imports IndexedDB, Chrome APIs, clocks or UUID
 generation. No LLM output can choose a migration transition or repair.
@@ -805,9 +819,16 @@ decides its durable result.
 8. The data marker advances only after its migration transaction completes.
 9. A DB6/data2 retry reuses the metadata epoch and performs no second semantic
    conversion.
-10. One central opener owns every IndexedDB handle and closes it on
-    `versionchange` and reset.
-11. Startup readiness means migration, validation, epoch load, old prepared
+10. One central opener currently owns every IndexedDB handle and closes it on
+    `versionchange` and reset. Each delivered handle belongs to exactly one
+    reserved owner: startup and business callers never receive the same
+    `IDBDatabase` object, and two independent business callers never share one
+    delivered handle. Releasing one owner therefore cannot close a connection
+    still used by another workflow. The future Task 5b Startup Barrier will
+    deduplicate complete startup attempts above the opener; it is dormant.
+    `runMigrations()` currently deduplicates migration callers only and is not a
+    business-admission barrier.
+11. Task 5b startup readiness means migration, validation, epoch load, old prepared
     settlement, Settings journal recovery and exact alarm proof all succeeded.
 12. `{ ok: false }`, blocked open and downgrade can never become readiness.
 13. Failure does not poison future explicit retry. It cannot open admission;

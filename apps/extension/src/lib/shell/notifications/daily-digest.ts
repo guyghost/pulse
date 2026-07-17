@@ -11,7 +11,6 @@
 import type { Mission } from '../../core/types/mission';
 import { getMissions } from '../storage/db';
 import { getSeenIds, saveSeenIds } from '../storage/seen-missions';
-import { getSettings } from '../storage/chrome-storage';
 import { getConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { recordAlertHistoryEntry } from '../storage/alert-history';
 import { filterSmartNotifications } from '../../core/scoring/smart-notification';
@@ -19,6 +18,8 @@ import { markAsSeen } from '../../core/seen/mark-seen';
 import { createDeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 import { clearDeepLinkIntent, setDeepLinkIntent } from '../storage/session-storage';
 import { isMutedUntilActive } from './notify-missions';
+import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
+import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
 /** Chrome alarm name for the daily digest. */
 export const DIGEST_ALARM_NAME = 'daily-digest';
@@ -104,11 +105,13 @@ export interface DigestResult {
  * No-op if notifications are disabled, connected alerts are disabled,
  * or no qualifying missions exist.
  */
-export async function sendDailyDigest(): Promise<DigestResult> {
+export async function sendDailyDigest(
+  admittedSnapshot?: SettingsReleaseSnapshot
+): Promise<DigestResult> {
   // Guard: global notifications must be enabled
   let settings;
   try {
-    settings = await getSettings();
+    settings = (admittedSnapshot ?? (await readSettingsReleaseSnapshot())).settings;
   } catch {
     return { sent: false, missionIds: [] };
   }

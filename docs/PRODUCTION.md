@@ -1,6 +1,6 @@
 # MissionPulse — Production Deployment Checklist
 
-Last verified: 2026-06-30 (monorepo `pnpm build`, `pnpm typecheck`, `pnpm lint`, `pnpm test` pass locally).
+Procedure updated: 2026-07-16. A fresh clean candidate seal is still required before any production claim.
 
 ## Architecture overview
 
@@ -24,9 +24,24 @@ pnpm deploy:preflight
 
 `deploy:preflight` runs format, lint, typecheck, test, build, manifest verify, env documentation checks, and dev-artifact scan.
 
-CI (`.github/workflows/ci.yml`) runs lint, format, typecheck, test, build, manifest verify, and E2E on PRs.
+CI (`.github/workflows/ci.yml`) runs lint, format, typecheck, test, build, manifest verification and browser gates. Its uploaded `dist/` is explicitly unsealed inspection evidence, not a Store package.
 
-Extension releases (`.github/workflows/release.yml`) tag `v*.*.*`, bump version, build, GitHub Release, optional Chrome Web Store publish.
+Extension packaging (`.github/workflows/release.yml`) is manual and consumes an already archived seal plus the exact tested `dist/`. It packages and independently re-verifies those bytes, then stops at `package_validated`. It neither changes versions nor submits to Chrome Web Store.
+
+### Santé planifiée des connecteurs
+
+`connector-health.yml` exécute les fixtures des six connecteurs, sans réseau de plateforme ni session
+navigateur. Permissions : `health-capture` a `contents: read`; `issue-writer` a `actions: read`,
+`contents: read`, `issues: write`; `conclusion` a `contents: read`. Seul l'acteur issue admis reçoit
+le token. L'evidence courante est l'unique `connector-health-evidence.v1.json` de l'artifact
+`connector-health-report`, conservé 14 jours.
+
+Le workflow fixe Node `22.23.1`, pnpm `10.32.1`, le graphe gelé et les actions par SHA. Il lie le
+dépôt, la ref de branche par défaut, le SHA et le workflow, mais `contents: read` ne peut pas prouver
+la protection de branche : ce contrôle reste hors bande. Le nettoyage PGID ne revendique que le
+groupe contrôlé, pas le confinement de code committé malveillant. Après
+`CONCLUSION_ACTOR_STARTED`, seuls `passed`, `failed_recorded` et `failed_unreported` existent. Avant
+ce marqueur, `pre_actor_bootstrap_interrupted` signifie rouge sans terminal ni revendication.
 
 ---
 
@@ -135,31 +150,58 @@ supabase db push --workdir apps/landing
 
 ### Build artifact
 
+The candidate version must already be committed consistently in the root package, extension package and source manifest. Never bump it inside a release workflow. On the exact clean commit, run the complete local/build/packaged-MV3 gate and seal its immutable evidence:
+
 ```bash
-pnpm --filter @pulse/extension build
-pnpm --filter @pulse/extension verify-manifest dist/manifest.json
-cd apps/extension/dist && zip -r ../missionpulse-0.2.2.zip .
+pnpm --filter @pulse/extension release:seal-candidate -- \
+  --input output/playwright/mv3-evidence/final-gate-input.json \
+  --dist apps/extension/dist \
+  --output output/playwright/mv3-evidence/tested-dist-seal.json
 ```
+
+The input must bind the exact clean commit, committed version, Node/pnpm versions, lockfile, connector configuration, effective built manifest, complete nonempty committed MV3 scenario inventory, aggregate report, zero skips/failures/runtime diagnostics, and identical tree receipts before and after browser exercise. A per-test file is not aggregate evidence.
+
+After the seal exists, the flow is package-only. Do not install, build, bump, resolve connectors, delete or rewrite `dist`:
+
+```bash
+pnpm --filter @pulse/extension package:sealed -- \
+  --seal output/playwright/mv3-evidence/tested-dist-seal.json \
+  --dist apps/extension/dist \
+  --releases apps/extension/releases \
+  --artifact-id artifact-0.2.2-<commit> \
+  --journal-id journal-0.2.2-<commit>
+
+pnpm --filter @pulse/extension verify:release-artifact -- \
+  --bundle apps/extension/releases/v0.2.2 \
+  --zip apps/extension/releases/v0.2.2/missionpulse.zip \
+  --checksum apps/extension/releases/v0.2.2/missionpulse.zip.sha256 \
+  --validation apps/extension/releases/v0.2.2/validation.json \
+  --extract-fresh /tmp/missionpulse-0.2.2-consumer-check
+```
+
+The accepted bundle contains exactly the immutable ownership marker, canonical STORE ZIP, exact checksum sidecar and JCS validation record. Recompute the ZIP SHA-256 after every upload/download and immediately before any Store handoff.
 
 ### Release automation
 
-Tag `v0.2.3` (semver) → `release.yml` bumps version, builds, creates GitHub Release, uploads ZIP.
+Start `release.yml` manually with the source commit/version and the exact Actions run/artifact that archived `tested-dist-seal.json` with its tested `dist/`. The workflow invokes the same package-only runner and verifies the downloaded artifact in a separate job. Its maximum state is `package_validated`.
 
-### CWS secrets (GitHub Actions)
+### Chrome Web Store boundary
+
+There is no automatic provider publication. Store readiness requires a structured, authorized receipt covering listing completeness, privacy disclosure, permission justification, all four credential-presence checks, and a known-good rollback target. Credentials remain in the operator/provider secret store and must never enter local evidence:
 
 - `CHROME_EXTENSION_ID`
 - `CHROME_CLIENT_ID`
 - `CHROME_CLIENT_SECRET`
 - `CHROME_REFRESH_TOKEN`
 
-Pre-release versions (`x.y.z-alpha`) skip CWS publish.
+Submission, observation, production promotion and rollback are external receipt-driven transitions. A green local package does not claim any of them.
 
 ### Manifest checklist
 
 - Version aligned with `package.json` (currently `0.2.2`)
 - `minimum_chrome_version`: `114`
 - Permissions: sidePanel, storage, cookies, alarms, notifications, declarativeNetRequest, scripting, activeTab
-- Host permissions: mission platforms + Supabase + `missionpulse.app`
+- Host permissions: shipped mission connectors + the configured Supabase project only
 - LinkedIn: `optional_host_permissions` only
 
 ### Dev code tree-shaking
