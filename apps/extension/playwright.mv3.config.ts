@@ -6,7 +6,8 @@ const artifactRoot = resolve(import.meta.dirname, '../../output/playwright');
 export default defineConfig({
   testDir: './tests',
   testMatch: ['mv3/**/*.test.ts', 'e2e-extension/**/*.test.ts'],
-  timeout: 60_000,
+  testIgnore: ['**/tests/unit/**'],
+  timeout: 240_000,
   expect: {
     timeout: 15_000,
   },

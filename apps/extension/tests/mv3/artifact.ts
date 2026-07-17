@@ -1,6 +1,12 @@
-import { createHash } from 'node:crypto';
-import { readdir, readFile } from 'node:fs/promises';
-import { join, relative, sep } from 'node:path';
+import { constants as fsConstants } from 'node:fs';
+import { open } from 'node:fs/promises';
+import { join } from 'node:path';
+
+import {
+  canonicalReceiptsEqual,
+  inspectCanonicalTree,
+  type CanonicalTreeReceiptV2,
+} from '../../scripts/canonical-artifact';
 
 export interface PackagedArtifactFileEvidence {
   readonly path: string;
@@ -14,8 +20,11 @@ export interface ForbiddenDevFinding {
 }
 
 export interface PackagedArtifactEvidence {
-  readonly algorithm: 'sha256';
+  readonly algorithm: 'missionpulse-tree-sha256-v2';
+  readonly fileCount: number;
   readonly treeSha256: string;
+  readonly manifestSha256: string;
+  readonly entries: CanonicalTreeReceiptV2['entries'];
   readonly files: readonly PackagedArtifactFileEvidence[];
   readonly forbiddenDevFindings: readonly ForbiddenDevFinding[];
 }
@@ -30,57 +39,36 @@ const FORBIDDEN_DEV_SIGNATURES = [
   'src/dev/',
 ] as const;
 
-async function collectFiles(root: string, directory: string): Promise<string[]> {
-  const entries = await readdir(directory, { withFileTypes: true });
-  const files: string[] = [];
-  for (const entry of entries.sort((left, right) => left.name.localeCompare(right.name))) {
-    const absolutePath = join(directory, entry.name);
-    if (entry.isDirectory()) {
-      files.push(...(await collectFiles(root, absolutePath)));
-      continue;
-    }
-    if (!entry.isFile()) {
-      throw new Error(
-        `Packaged MV3 artifact contains unsupported entry ${relative(root, absolutePath)}`
-      );
-    }
-    files.push(absolutePath);
-  }
-  return files;
-}
-
-function sha256(bytes: Uint8Array): string {
-  return createHash('sha256').update(bytes).digest('hex');
-}
-
 export async function inspectPackagedArtifact(root: string): Promise<PackagedArtifactEvidence> {
-  const absoluteFiles = await collectFiles(root, root);
+  const treeBeforeRead = await inspectCanonicalTree(root);
   const files: PackagedArtifactFileEvidence[] = [];
   const forbiddenDevFindings: ForbiddenDevFinding[] = [];
-  const tree = createHash('sha256');
 
-  for (const absolutePath of absoluteFiles) {
-    const path = relative(root, absolutePath).split(sep).join('/');
-    const bytes = await readFile(absolutePath);
-    const fileSha256 = sha256(bytes);
-    files.push({ path, bytes: bytes.byteLength, sha256: fileSha256 });
-    tree.update(path, 'utf8');
-    tree.update('\0');
-    tree.update(String(bytes.byteLength), 'utf8');
-    tree.update('\0');
-    tree.update(fileSha256, 'utf8');
-    tree.update('\n');
+  for (const entry of treeBeforeRead.entries) {
+    const absolutePath = join(root, ...entry.path.split('/'));
+    const handle = await open(absolutePath, fsConstants.O_RDONLY | (fsConstants.O_NOFOLLOW ?? 0));
+    let bytes: Buffer;
+    try {
+      bytes = await handle.readFile();
+    } finally {
+      await handle.close();
+    }
+    files.push({ path: entry.path, bytes: entry.bytes, sha256: entry.sha256 });
 
     for (const signature of FORBIDDEN_DEV_SIGNATURES) {
       if (bytes.includes(Buffer.from(signature))) {
-        forbiddenDevFindings.push({ path, signature });
+        forbiddenDevFindings.push({ path: entry.path, signature });
       }
     }
   }
 
+  const treeAfterRead = await inspectCanonicalTree(root);
+  if (!canonicalReceiptsEqual(treeBeforeRead, treeAfterRead)) {
+    throw new Error('Packaged MV3 artifact changed during canonical DEV-signature inspection.');
+  }
+
   return {
-    algorithm: 'sha256',
-    treeSha256: tree.digest('hex'),
+    ...treeBeforeRead,
     files,
     forbiddenDevFindings,
   };
@@ -90,7 +78,21 @@ export function assertArtifactUnchanged(
   before: PackagedArtifactEvidence,
   after: PackagedArtifactEvidence
 ): void {
-  if (before.treeSha256 !== after.treeSha256) {
+  const beforeTree: CanonicalTreeReceiptV2 = {
+    algorithm: before.algorithm,
+    fileCount: before.fileCount,
+    treeSha256: before.treeSha256,
+    manifestSha256: before.manifestSha256,
+    entries: before.entries,
+  };
+  const afterTree: CanonicalTreeReceiptV2 = {
+    algorithm: after.algorithm,
+    fileCount: after.fileCount,
+    treeSha256: after.treeSha256,
+    manifestSha256: after.manifestSha256,
+    entries: after.entries,
+  };
+  if (!canonicalReceiptsEqual(beforeTree, afterTree)) {
     throw new Error(
       `Packaged MV3 artifact changed during the test: ${before.treeSha256} -> ${after.treeSha256}`
     );

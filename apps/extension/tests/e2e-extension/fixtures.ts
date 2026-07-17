@@ -1,15 +1,8 @@
-import {
-  chromium,
-  expect,
-  test as base,
-  type BrowserContext,
-  type ConsoleMessage,
-  type Page,
-  type Worker,
-} from '@playwright/test';
-import { access, mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
-import { join, resolve } from 'node:path';
+import { expect, test as base, type ConsoleMessage, type Page } from '@playwright/test';
+import { access, mkdir, readFile, writeFile } from 'node:fs/promises';
+import { resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+
 import {
   assertArtifactUnchanged,
   assertNoForbiddenDevArtifacts,
@@ -21,21 +14,23 @@ import {
   createRuntimeDiagnostics,
   recordConsoleDiagnostic,
   recordPageError,
+  recordWorkerException,
   snapshotRuntimeDiagnostics,
   type RuntimeDiagnosticsSnapshot,
 } from '../mv3/diagnostics';
-import { assertPackagedManifestPermissionContract } from '../mv3/manifest-contract';
+import type { RestartReceiptV1 } from '../mv3/harness/contracts';
 import {
-  ServiceWorkerBootstrapObserver,
-  waitForBrowserCdpWebSocket,
-} from '../mv3/service-worker-bootstrap';
+  Mv3HarnessController,
+  type DetachedWorkerIdentity,
+} from '../mv3/harness/mv3-harness-controller';
+import type { PlaywrightDiagnostic } from '../mv3/harness/playwright-owner';
+import { assertPackagedManifestPermissionContract } from '../mv3/manifest-contract';
 
 const extensionRoot = resolve(fileURLToPath(new URL('../..', import.meta.url)));
 const distPath = resolve(extensionRoot, 'dist');
 const artifactRoot = resolve(extensionRoot, '../../output/playwright');
 const profileRoot = resolve(artifactRoot, 'extension-profiles');
 const evidenceRoot = resolve(artifactRoot, 'mv3-evidence');
-const serviceWorkerTimeoutMs = 20_000;
 let suiteArtifact: PackagedArtifactEvidence | undefined;
 
 export interface PackagedManifest {
@@ -53,15 +48,19 @@ export interface PackagedManifest {
 }
 
 export interface ExtensionHarness {
-  context: BrowserContext;
   readonly diagnostics: RuntimeDiagnosticsSnapshot;
-  extensionId: string;
-  manifest: PackagedManifest;
-  sidePanelUrl: string;
+  readonly extensionId: string;
+  readonly manifest: PackagedManifest;
+  readonly sidePanelUrl: string;
+  evaluateInRestartedServiceWorker: <T>(
+    receipt: RestartReceiptV1,
+    expression: string
+  ) => Promise<T>;
+  evaluateInServiceWorker: <T>(expression: string) => Promise<T>;
   openSidePanel: () => Promise<Page>;
-  restartServiceWorkerForProbe: (probeExpression?: string) => Promise<Worker>;
+  restartServiceWorkerForProbe: (probeExpression?: string) => Promise<RestartReceiptV1>;
   seedStorage: (values: Record<string, unknown>) => Promise<void>;
-  waitForServiceWorker: (wakePage?: Page) => Promise<Worker>;
+  waitForServiceWorker: (wakePage?: Page) => Promise<DetachedWorkerIdentity>;
 }
 
 interface ExtensionFixtures {
@@ -82,15 +81,11 @@ async function settleRuntimeDiagnostics(): Promise<void> {
   await new Promise<void>((resolvePromise) => setTimeout(resolvePromise, 100));
 }
 
-function isExtensionWorker(worker: Worker, extensionId?: string): boolean {
+function diagnosticText(diagnostic: PlaywrightDiagnostic): string {
   try {
-    const url = new URL(worker.url());
-    return (
-      url.protocol === 'chrome-extension:' &&
-      (extensionId === undefined || url.hostname === extensionId)
-    );
+    return JSON.stringify(diagnostic.params);
   } catch {
-    return false;
+    return diagnostic.method;
   }
 }
 
@@ -113,10 +108,6 @@ export const test = base.extend<ExtensionFixtures>({
     assertNoForbiddenDevArtifacts(artifactBefore);
     const manifest = JSON.parse(await readFile(manifestPath, 'utf8')) as PackagedManifest;
     assertPackagedManifestPermissionContract(manifest);
-    const sidePanelPath = manifest.side_panel?.default_path;
-    if (!sidePanelPath) {
-      throw new Error('Packaged manifest does not declare side_panel.default_path.');
-    }
 
     await mkdir(evidenceRoot, { recursive: true });
     await writeFile(
@@ -125,205 +116,47 @@ export const test = base.extend<ExtensionFixtures>({
       'utf8'
     );
 
-    await mkdir(profileRoot, { recursive: true });
-    const userDataDir = await mkdtemp(join(profileRoot, `worker-${testInfo.workerIndex}-`));
     const diagnostics = createRuntimeDiagnostics();
-
-    const context = await chromium
-      .launchPersistentContext(userDataDir, {
-        channel: 'chromium',
-        headless: process.env.PLAYWRIGHT_EXTENSION_HEADLESS !== 'false',
-        viewport: { width: 420, height: 900 },
-        serviceWorkers: 'allow',
-        args: [
-          `--disable-extensions-except=${distPath}`,
-          `--load-extension=${distPath}`,
-          '--remote-debugging-port=0',
-          '--no-default-browser-check',
-          '--no-first-run',
-        ],
-      })
-      .catch(async (error: unknown) => {
-        try {
-          await rm(userDataDir, {
-            force: true,
-            recursive: true,
-            maxRetries: 3,
-            retryDelay: 100,
-          });
-        } catch (cleanupError) {
-          throw new AggregateError(
-            [error, cleanupError],
-            'Packaged MV3 browser launch and profile cleanup both failed.'
-          );
+    const controller = await Mv3HarnessController.start({
+      artifactSha256: artifactBefore.treeSha256,
+      distPath,
+      headless: process.env.PLAYWRIGHT_EXTENSION_HEADLESS !== 'false',
+      manifest,
+      onPlaywrightDiagnostic: (diagnostic) => {
+        const message = diagnosticText(diagnostic);
+        if (diagnostic.method === 'Runtime.consoleAPICalled') {
+          const level =
+            typeof diagnostic.params.type === 'string' ? diagnostic.params.type : 'warning';
+          recordConsoleDiagnostic(diagnostics, 'service_worker', level, message);
+          return;
         }
-        throw error;
-      });
-    const setup = await (async () => {
-      let observer: ServiceWorkerBootstrapObserver | undefined;
-      try {
-        const browserCdpWebSocket = await waitForBrowserCdpWebSocket(userDataDir);
-        const instrumentedPages = new WeakSet<Page>();
-        const instrumentedWorkers = new WeakSet<Worker>();
-
-        const instrumentPage = (page: Page): void => {
-          if (instrumentedPages.has(page)) {
-            return;
-          }
-          instrumentedPages.add(page);
-          page.on('pageerror', (error) =>
-            recordPageError(diagnostics, error.stack ?? error.message)
-          );
-          page.on('console', (message) => {
-            recordConsoleDiagnostic(
-              diagnostics,
-              'page',
-              message.type(),
-              formatConsoleMessage(message)
-            );
-          });
-        };
-
-        const instrumentWorker = (worker: Worker): void => {
-          if (instrumentedWorkers.has(worker)) {
-            return;
-          }
-          instrumentedWorkers.add(worker);
-          worker.on('console', (message) => {
-            recordConsoleDiagnostic(
-              diagnostics,
-              'service_worker',
-              message.type(),
-              formatConsoleMessage(message)
-            );
-          });
-        };
-
-        context.on('page', instrumentPage);
-        context.on('serviceworker', instrumentWorker);
-        context.pages().forEach(instrumentPage);
-        context.serviceWorkers().forEach(instrumentWorker);
-
-        const firstWorker =
-          context.serviceWorkers().find((worker) => isExtensionWorker(worker)) ??
-          (await context.waitForEvent('serviceworker', {
-            predicate: (worker) => isExtensionWorker(worker),
-            timeout: serviceWorkerTimeoutMs,
-          }));
-        instrumentWorker(firstWorker);
-
-        const extensionId = new URL(firstWorker.url()).hostname;
-        const normalizedSidePanelPath = sidePanelPath.replace(/^\/+/, '');
-        const sidePanelUrl = `chrome-extension://${extensionId}/${normalizedSidePanelPath}`;
-        const controlPage =
-          context.pages().find((page) => page.url() === 'about:blank') ?? (await context.newPage());
-
-        observer = new ServiceWorkerBootstrapObserver({
-          context,
-          controlPage,
-          diagnostics,
-          extensionId,
-          instrumentWorker,
-          webSocketUrl: browserCdpWebSocket,
-        });
-        await observer.start();
-        const currentWorker = await observer.restart(firstWorker);
-        instrumentWorker(currentWorker);
-
-        for (const page of context.pages()) {
-          if (page !== controlPage && page.url() === 'about:blank') {
-            await page.close();
-          }
+        if (
+          diagnostic.method === 'Runtime.exceptionThrown' ||
+          diagnostic.method === 'ServiceWorker.workerErrorReported'
+        ) {
+          recordWorkerException(diagnostics, message);
         }
+      },
+      onProtocolFailure: (error) => recordWorkerException(diagnostics, error.message),
+      profileRoot,
+    });
 
-        return {
-          bootstrapObserver: observer,
-          currentWorker,
-          extensionId,
-          instrumentPage,
-          instrumentWorker,
-          sidePanelUrl,
-        };
-      } catch (error) {
-        const cleanupErrors: unknown[] = [];
-        await observer?.stop().catch((cleanupError: unknown) => cleanupErrors.push(cleanupError));
-        await context.close().catch((cleanupError: unknown) => cleanupErrors.push(cleanupError));
-        await rm(userDataDir, {
-          force: true,
-          recursive: true,
-          maxRetries: 3,
-          retryDelay: 100,
-        }).catch((cleanupError: unknown) => cleanupErrors.push(cleanupError));
-        if (cleanupErrors.length > 0) {
-          throw new AggregateError(
-            [error, ...cleanupErrors],
-            'Packaged MV3 fixture setup and its cleanup both failed.'
-          );
-        }
-        throw error;
+    const instrumentedPages = new WeakSet<Page>();
+    const instrumentPage = (page: Page): void => {
+      if (instrumentedPages.has(page)) {
+        return;
       }
-    })();
-    const { bootstrapObserver, extensionId, instrumentPage, instrumentWorker, sidePanelUrl } =
-      setup;
-    let currentWorker = setup.currentWorker;
-
-    const waitForServiceWorker = async (wakePage?: Page): Promise<Worker> => {
-      if (context.serviceWorkers().includes(currentWorker)) {
-        instrumentWorker(currentWorker);
-        return currentWorker;
-      }
-      const activeWorker = context
-        .serviceWorkers()
-        .find((worker) => isExtensionWorker(worker, extensionId));
-      if (activeWorker) {
-        instrumentWorker(activeWorker);
-        currentWorker = activeWorker;
-        return activeWorker;
-      }
-
-      const workerPromise = context.waitForEvent('serviceworker', {
-        predicate: (worker) => isExtensionWorker(worker, extensionId),
-        timeout: serviceWorkerTimeoutMs,
+      instrumentedPages.add(page);
+      page.on('pageerror', (error) => recordPageError(diagnostics, error.stack ?? error.message));
+      page.on('console', (message) => {
+        recordConsoleDiagnostic(diagnostics, 'page', message.type(), formatConsoleMessage(message));
       });
-      const extensionPage =
-        wakePage ??
-        context.pages().find((page) => page.url().startsWith(`chrome-extension://${extensionId}/`));
-      if (!extensionPage) {
-        throw new Error('Cannot wake the packaged service worker without an extension page.');
-      }
-
-      await extensionPage.evaluate(async () => {
-        await chrome.runtime.sendMessage({ type: 'GET_PREMIUM_STATUS' });
-      });
-      const worker = await workerPromise;
-      instrumentWorker(worker);
-      currentWorker = worker;
-      return worker;
-    };
-
-    const restartServiceWorkerForProbe = async (probeExpression?: string): Promise<Worker> => {
-      currentWorker = await bootstrapObserver.restart(
-        await waitForServiceWorker(),
-        probeExpression
-      );
-      return currentWorker;
     };
 
     const openSidePanel = async (): Promise<Page> => {
-      // Headless Chromium does not expose Chrome's side-panel chrome itself.
-      // Loading the manifest's exact built default_path exercises the same
-      // packaged extension document without involving Vite or DEV stubs.
-      const page = await context.newPage();
+      const page = await controller.openSidePanel();
       instrumentPage(page);
-      await page.goto(sidePanelUrl, { waitUntil: 'domcontentloaded' });
       return page;
-    };
-
-    const seedStorage = async (values: Record<string, unknown>): Promise<void> => {
-      const worker = await waitForServiceWorker();
-      await worker.evaluate(async (entries) => {
-        await chrome.storage.local.set(entries);
-      }, values);
     };
 
     await testInfo.attach('packaged-manifest', {
@@ -338,23 +171,27 @@ export const test = base.extend<ExtensionFixtures>({
     let testError: unknown;
     try {
       await use({
-        context,
         get diagnostics() {
           return snapshotRuntimeDiagnostics(diagnostics);
         },
-        extensionId,
+        extensionId: controller.extensionId,
+        evaluateInRestartedServiceWorker: (receipt, expression) =>
+          controller.evaluateInRestartedServiceWorker(receipt, expression),
+        evaluateInServiceWorker: (expression) => controller.evaluateInServiceWorker(expression),
         manifest,
         openSidePanel,
-        restartServiceWorkerForProbe,
-        seedStorage,
-        sidePanelUrl,
-        waitForServiceWorker,
+        restartServiceWorkerForProbe: (probeExpression) =>
+          controller.restartServiceWorkerForProbe(probeExpression),
+        seedStorage: (values) => controller.seedStorage(values),
+        sidePanelUrl: controller.sidePanelUrl,
+        waitForServiceWorker: async () => controller.currentWorker(),
       });
     } catch (error) {
       testError = error;
     }
 
     let gateError: unknown;
+    let finishedNormally = false;
     try {
       await settleRuntimeDiagnostics();
       const artifactAfter = await inspectPackagedArtifact(distPath);
@@ -378,41 +215,37 @@ export const test = base.extend<ExtensionFixtures>({
       });
       assertArtifactUnchanged(artifactBefore, artifactAfter);
       assertNoForbiddenDevArtifacts(artifactAfter);
-      assertNoRuntimeDiagnostics(diagnostics);
+      const diagnosticsSnapshot = snapshotRuntimeDiagnostics(diagnostics);
+      const diagnosticsAccepted = !hasRuntimeDiagnostics(diagnosticsSnapshot);
+      if (testError === undefined) {
+        await controller.finish({
+          artifactAfterSha256: artifactAfter.treeSha256,
+          diagnosticsAccepted,
+        });
+        finishedNormally = true;
+      }
+      assertNoRuntimeDiagnostics(diagnosticsSnapshot);
     } catch (error) {
       gateError = error;
     } finally {
       const cleanupErrors: unknown[] = [];
-      if (hasRuntimeDiagnostics(diagnostics)) {
+      if (hasRuntimeDiagnostics(snapshotRuntimeDiagnostics(diagnostics))) {
         await testInfo
           .attach('runtime-diagnostics', {
             body: JSON.stringify(diagnostics, null, 2),
             contentType: 'application/json',
           })
-          .catch((cleanupError: unknown) => cleanupErrors.push(cleanupError));
+          .catch((error: unknown) => cleanupErrors.push(error));
       }
-      await bootstrapObserver
-        .stop()
-        .catch((cleanupError: unknown) => cleanupErrors.push(cleanupError));
-      await context.close().catch((cleanupError: unknown) => cleanupErrors.push(cleanupError));
-      await rm(userDataDir, {
-        force: true,
-        recursive: true,
-        maxRetries: 3,
-        retryDelay: 100,
-      }).catch((cleanupError: unknown) => cleanupErrors.push(cleanupError));
+      if (!finishedNormally) {
+        await controller.abort().catch((error: unknown) => cleanupErrors.push(error));
+      }
       if (cleanupErrors.length > 0) {
-        const cleanupError = new AggregateError(
-          cleanupErrors,
-          'Packaged MV3 fixture cleanup failed.'
-        );
+        const cleanupError = new AggregateError(cleanupErrors, 'Packaged MV3 cleanup failed.');
         gateError =
           gateError === undefined
             ? cleanupError
-            : new AggregateError(
-                [gateError, cleanupError],
-                'Packaged MV3 gate and cleanup both failed.'
-              );
+            : new AggregateError([gateError, cleanupError], 'MV3 gate and cleanup both failed.');
       }
     }
 

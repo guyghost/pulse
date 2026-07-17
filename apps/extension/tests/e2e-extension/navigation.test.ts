@@ -47,94 +47,139 @@ async function traverseAllTabs(page: Page): Promise<void> {
   }
 }
 
-test('cold boot shows the packaged onboarding without DEV stubs', async ({ extension }) => {
-  const page = await extension.openSidePanel();
+test(
+  'cold boot shows the packaged onboarding without DEV stubs',
+  { annotation: { type: 'scenario-id', description: 'navigation.cold-onboarding' } },
+  async ({ extension }) => {
+    const page = await extension.openSidePanel();
 
-  await expect(page).toHaveURL(extension.sidePanelUrl);
-  await expect(page.getByTestId('page-onboarding')).toBeVisible();
-  await expect(page.getByText('Premier lancement', { exact: true })).toBeVisible();
-  await assertNoBlankOrLoadError(page);
+    await expect(page).toHaveURL(extension.sidePanelUrl);
+    await expect(page.getByTestId('page-onboarding')).toBeVisible();
+    await expect(page.getByText('Premier lancement', { exact: true })).toBeVisible();
+    await assertNoBlankOrLoadError(page);
 
-  const devState = await page.evaluate(() => ({
-    devPanelReadyGlobal: '__devPanelReady' in window,
-    devPanelVisible: document.body.textContent?.includes('DEV PANEL') ?? false,
-    devStorageKeys: Object.keys(window.localStorage).filter((key) =>
-      key.startsWith('__missionpulse_dev_')
-    ),
-  }));
-  expect(devState).toEqual({
-    devPanelReadyGlobal: false,
-    devPanelVisible: false,
-    devStorageKeys: [],
-  });
-  expectNoRuntimeErrors(extension.diagnostics);
-});
+    const devState = await page.evaluate(() => ({
+      devPanelReadyGlobal: '__devPanelReady' in window,
+      devPanelVisible: document.body.textContent?.includes('DEV PANEL') ?? false,
+      devStorageKeys: Object.keys(window.localStorage).filter((key) =>
+        key.startsWith('__missionpulse_dev_')
+      ),
+    }));
+    expect(devState).toEqual({
+      devPanelReadyGlobal: false,
+      devPanelVisible: false,
+      devStorageKeys: [],
+    });
+    expectNoRuntimeErrors(extension.diagnostics);
+  }
+);
 
-test('all packaged tabs render on a cold visit and after a warm reload', async ({ extension }) => {
-  await extension.seedStorage({
-    feed_tour_seen: true,
-    first_scan_done: true,
-    kbd_cheatsheet_tip_seen: true,
-    onboarding_completed: true,
-    premium_enabled: true,
-    profile_banner_dismissed: true,
-  });
+test(
+  'all packaged tabs render on a cold visit and after a warm reload',
+  { annotation: { type: 'scenario-id', description: 'navigation.all-tabs' } },
+  async ({ extension }) => {
+    await extension.seedStorage({
+      feed_tour_seen: true,
+      first_scan_done: true,
+      kbd_cheatsheet_tip_seen: true,
+      onboarding_completed: true,
+      premium_enabled: true,
+      profile_banner_dismissed: true,
+    });
 
-  const page = await extension.openSidePanel();
-  const persistedBootstrap = await page.evaluate(async () => {
-    const [onboarding, firstScan] = await Promise.all([
-      chrome.runtime.sendMessage({ type: 'GET_ONBOARDING_COMPLETED' }),
-      chrome.runtime.sendMessage({ type: 'GET_FIRST_SCAN_DONE' }),
-    ]);
-    return { firstScan, onboarding };
-  });
-  expect(persistedBootstrap).toEqual({
-    firstScan: { type: 'FIRST_SCAN_DONE_RESULT', payload: true },
-    onboarding: { type: 'ONBOARDING_COMPLETED_RESULT', payload: true },
-  });
+    const page = await extension.openSidePanel();
+    const consentResult = await page.evaluate(async () => {
+      const read = await chrome.runtime.sendMessage({ type: 'GET_SETTINGS_RELEASE' });
+      if (read?.type !== 'SETTINGS_RELEASE_RESULT' || read.payload?.status !== 'confirmed') {
+        throw new Error('Settings release snapshot is unavailable.');
+      }
+      if (read.payload.snapshot.onboardingCompleted) {
+        return { status: 'already_confirmed' };
+      }
+      return chrome.runtime.sendMessage({
+        type: 'MUTATE_SETTINGS_RELEASE',
+        payload: {
+          kind: 'set_consent',
+          requestId: crypto.randomUUID(),
+          baseRevision: read.payload.snapshot.revision,
+          targetConsent: true,
+        },
+      });
+    });
+    expect(consentResult).toMatchObject(
+      'type' in consentResult
+        ? {
+            type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+            payload: {
+              status: 'settled',
+              outcome: { kind: 'set_consent', status: 'committed' },
+            },
+          }
+        : { status: 'already_confirmed' }
+    );
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    const persistedBootstrap = await page.evaluate(async () => {
+      const [settingsRelease, firstScan] = await Promise.all([
+        chrome.runtime.sendMessage({ type: 'GET_SETTINGS_RELEASE' }),
+        chrome.runtime.sendMessage({ type: 'GET_FIRST_SCAN_DONE' }),
+      ]);
+      return { firstScan, settingsRelease };
+    });
+    expect(persistedBootstrap).toMatchObject({
+      firstScan: { type: 'FIRST_SCAN_DONE_RESULT', payload: true },
+      settingsRelease: {
+        type: 'SETTINGS_RELEASE_RESULT',
+        payload: { status: 'confirmed', snapshot: { onboardingCompleted: true } },
+      },
+    });
 
-  await traverseAllTabs(page);
-  expectNoRuntimeErrors(extension.diagnostics);
+    await traverseAllTabs(page);
+    expectNoRuntimeErrors(extension.diagnostics);
 
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await traverseAllTabs(page);
-  const activeWorker = await extension.waitForServiceWorker(page);
-  expect(new URL(activeWorker.url()).hostname).toBe(extension.extensionId);
-  expectNoRuntimeErrors(extension.diagnostics);
-});
+    await page.reload({ waitUntil: 'domcontentloaded' });
+    await traverseAllTabs(page);
+    const activeWorker = await extension.waitForServiceWorker(page);
+    expect(new URL(activeWorker.url()).hostname).toBe(extension.extensionId);
+    expectNoRuntimeErrors(extension.diagnostics);
+  }
+);
 
-test('packaged shortcuts modal traps focus and restores its trigger', async ({ extension }) => {
-  await extension.seedStorage({
-    feed_tour_seen: true,
-    first_scan_done: true,
-    kbd_cheatsheet_tip_seen: true,
-    onboarding_completed: true,
-    premium_enabled: true,
-    profile_banner_dismissed: true,
-  });
+test(
+  'packaged shortcuts modal traps focus and restores its trigger',
+  { annotation: { type: 'scenario-id', description: 'navigation.shortcuts-focus' } },
+  async ({ extension }) => {
+    await extension.seedStorage({
+      feed_tour_seen: true,
+      first_scan_done: true,
+      kbd_cheatsheet_tip_seen: true,
+      onboarding_completed: true,
+      premium_enabled: true,
+      profile_banner_dismissed: true,
+    });
 
-  const page = await extension.openSidePanel();
-  const trigger = page.getByRole('button', {
-    name: "Afficher l'aide des raccourcis clavier",
-    exact: true,
-  });
-  await expect(trigger).toBeVisible();
-  await trigger.click();
+    const page = await extension.openSidePanel();
+    const trigger = page.getByRole('button', {
+      name: "Afficher l'aide des raccourcis clavier",
+      exact: true,
+    });
+    await expect(trigger).toBeVisible();
+    await trigger.click();
 
-  const dialog = page.getByRole('dialog', { name: 'Raccourcis clavier' });
-  const close = dialog.getByRole('button', { name: 'Fermer', exact: true });
-  const acknowledge = dialog.getByRole('button', { name: "J'ai compris", exact: true });
-  await expect(dialog).toBeVisible();
-  await expect(close).toBeFocused();
-  await expect(dialog).toHaveAttribute('aria-modal', 'true');
+    const dialog = page.getByRole('dialog', { name: 'Raccourcis clavier' });
+    const close = dialog.getByRole('button', { name: 'Fermer', exact: true });
+    const acknowledge = dialog.getByRole('button', { name: "J'ai compris", exact: true });
+    await expect(dialog).toBeVisible();
+    await expect(close).toBeFocused();
+    await expect(dialog).toHaveAttribute('aria-modal', 'true');
 
-  await page.keyboard.press('Shift+Tab');
-  await expect(acknowledge).toBeFocused();
-  await page.keyboard.press('Tab');
-  await expect(close).toBeFocused();
+    await page.keyboard.press('Shift+Tab');
+    await expect(acknowledge).toBeFocused();
+    await page.keyboard.press('Tab');
+    await expect(close).toBeFocused();
 
-  await page.keyboard.press('Escape');
-  await expect(dialog).toHaveCount(0);
-  await expect(trigger).toBeFocused();
-  expectNoRuntimeErrors(extension.diagnostics);
-});
+    await page.keyboard.press('Escape');
+    await expect(dialog).toHaveCount(0);
+    await expect(trigger).toBeFocused();
+    expectNoRuntimeErrors(extension.diagnostics);
+  }
+);
