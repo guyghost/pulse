@@ -1,19 +1,19 @@
 # CV experience card accessibility model
 
-Status: **MODEL REVISION 5 — pending independent review; implementation forbidden until approval**.
+Status: **MODEL REVISION 6 — pending independent review; implementation forbidden until approval**.
 
-Pending behavior SHA-256: `976efad5aaef51859ec7795d4c291eb461c05edf90eaf086b034ab2d2fa659a1`.
+Pending behavior SHA-256: `d9fbcd1c8af1d806692cefe19c7e877d82a6c1807da6a64c48eaedd402dc9b98`.
 
 The normalized behavior hash is SHA-256 of the complete raw UTF-8/LF bytes of
 this file after replacing only the value between backticks on the
 `Pending behavior SHA-256` line with the literal
 `__PENDING_BEHAVIOR_SHA256__`. No other normalization is permitted.
 
-Revision 5 closes the revision-4 final review. It gives stale callback
-settlements an explicit non-UI transition, consumes accepted settlement records
-idempotently, makes current-role end-date validation focusable, and expands RED
-coverage for hostile payload/callback boundaries. It preserves every other
-revision-4 closure and the exact packaged A3 contract.
+Revision 6 closes the revision-5 post-review finding. It replaces the phantom
+focus-exit output with one explicit synchronous Svelte callback port, decodes
+its availability/reference, confines every invalid port outcome, and makes ID
+release plus terminal removal unconditional through nested `finally` effects.
+It preserves every other revision-5 closure and the exact packaged A3 contract.
 
 ## Objective and boundary
 
@@ -54,6 +54,7 @@ type ExperienceAccessibilitySignature = readonly [
   hasOnDelete: boolean,
   hasOnSave: boolean,
   hasOnCancelEdit: boolean,
+  hasOnFocusExitRequest: boolean,
 ];
 ```
 
@@ -64,7 +65,7 @@ delimiter concatenation, object identity or a hash. `draftId` is exactly
 `typeof callback === 'function'`. Callback function identity is not a state
 guard. Input decoding is single-event and ordered: a tuple difference emits
 `EXPERIENCE_INPUT_CHANGED`, which already carries the latest references; when
-the tuple is equal, the adapter compares the four callback references with
+the tuple is equal, the adapter compares the five callback references with
 `Object.is`, and one or more differences emit exactly one
 `CALLBACK_REFERENCE_CHANGED { nextExperience, nextDraft, nextCallbacks }`.
 Only when tuple and callback references are equal may other snapshot differences
@@ -102,7 +103,9 @@ order:
 
 Within rules 3 and 4, a change is `capabilityOnly` exactly when
 `id/title/company/description/skills/isEditing/draftId` are equal and at least
-one of `isBusy/hasOnEdit/hasOnDelete/hasOnSave/hasOnCancelEdit` differs. A
+one of
+`isBusy/hasOnEdit/hasOnDelete/hasOnSave/hasOnCancelEdit/hasOnFocusExitRequest`
+differs. A
 `capabilityOnly` change derives `INTERACTION_CAPABILITY_CHANGED` instead of
 `EDIT_INPUT_REPLACED`/`DISPLAY_INPUT_REPLACED`, retains the current machine
 state and expansion, replaces the capability snapshot and reconciles controls.
@@ -333,7 +336,7 @@ context:
   ownedExperience: immutable Experience
   ownedDraft: immutable Experience | null
   inputSignature: ExperienceAccessibilitySignature
-  callbackReferences: latest onEdit/onDelete/onSave/onCancelEdit
+  callbackReferences: latest onEdit/onDelete/onSave/onCancelEdit/onFocusExitRequest
   identityLease: unvalidated | reserved | rejected | released
   identityDiagnostic: immutable diagnostic | null
   nextInvocationId: positive integer
@@ -395,6 +398,57 @@ allowed display state, reserved identity, then `hasDetails`. Mutation intents
 check allowed state, `isBusy=false`, matching `hasOn*`, and valid draft ownership
 when editing; save validates its payload last. Exactly one accepted effect or
 one typed rejection results—never both.
+
+### Synchronous focus-exit callback port
+
+The Svelte 5 component declares this explicit optional callback prop:
+
+```ts
+type FocusExitResult =
+  | 'next_experience_article'
+  | 'previous_experience_article'
+  | 'add_experience_button'
+  | 'cv_heading'
+  | null;
+
+interface FocusExitRequest {
+  readonly experienceId: string;
+  readonly positionIndex: number;
+  readonly orderedTargets: readonly [
+    'next_experience_article',
+    'previous_experience_article',
+    'add_experience_button',
+    'cv_heading',
+  ];
+}
+
+onFocusExitRequest?: (request: FocusExitRequest) => FocusExitResult;
+```
+
+The component creates and freezes the request and its target tuple. The parent
+tries only those targets in that exact order, synchronously focuses the first
+connected target, and returns its exact enum. It returns `null` only when none
+exists. The return is a focus-effect receipt, never state authority; its text,
+absence or failure cannot select a card transition and no LLM participates.
+
+The port is deliberately not routed through asynchronous callback confinement.
+When destruction owns focus, the component snapshots the latest decoded
+reference and calls it at most once inside `try`. Validation is closed:
+
+- absent port -> `FOCUS_EXIT_PORT_MISSING`;
+- synchronous throw -> `FOCUS_EXIT_PORT_THROW`;
+- one of the four exact strings -> valid receipt;
+- `null` -> `FOCUS_EXIT_TARGET_MISSING`;
+- object/function: read `.then` once with `Reflect.get` inside `try`; callable
+  `then` -> `FOCUS_EXIT_ASYNC_RETURN`, getter throw ->
+  `FOCUS_EXIT_RESULT_INSPECTION_FAILED`, otherwise
+  `INVALID_FOCUS_EXIT_RESULT`;
+- every other return -> `INVALID_FOCUS_EXIT_RESULT`.
+
+No focus-exit object is passed to `Promise.resolve`, awaited, subscribed or
+assimilated. Every failure is reported once for that destruction attempt and
+confined; it cannot throw past the port or prevent cleanup. If the card does not
+own focus, the port is not called and absence is not an error.
 
 ### Parent callback confinement
 
@@ -476,7 +530,7 @@ throw/reject can escape or produce false success.
 | any live                                | correlated `PARENT_CALLBACK_FULFILLED` or `PARENT_CALLBACK_FAILED`, exact record match and `consumed=false` | same                   | mark record consumed and insert its one diagnostic; never project success                                                |
 | any live                                | `PARENT_CALLBACK_FULFILLED` or `PARENT_CALLBACK_FAILED`, unknown, mismatched or already consumed            | same                   | `STALE_CALLBACK_SETTLEMENT`; exact no-op, no record/diagnostic/callback/DOM/focus effect                                 |
 | any live                                | any UI event/state/guard pair not accepted above                                                            | same                   | typed rejection; exact no-op with no callback, focus or snapshot effect                                                  |
-| any live                                | `COMPONENT_DESTROYED`                                                                                       | `terminal`             | delegate owned focus, release an owned reserved ID exactly once, then remove the subtree                                 |
+| any live                                | `COMPONENT_DESTROYED`                                                                                       | `terminal`             | nested cleanup: confine synchronous focus port; finally attempt lease release; finally terminal/remove                   |
 | `terminal`                              | any, including late callback settlement                                                                     | `terminal`             | consume/ignore; no callback, timer, registry, DOM or focus effect                                                        |
 
 Closed-world event audit for these exact bytes is exhaustive:
@@ -635,15 +689,37 @@ occurs exactly once using this priority: destruction target; edit/replacement/
 unavailable target; capability-only target. Callback settlement never moves
 focus.
 
-For destruction, the component emits one synchronous
-`FOCUS_EXIT_REQUESTED { experienceId, positionIndex }` only if it owns focus.
-The parent owns the target and selects the first connected target in this exact
-order: next experience article by ascending rendered position, previous
-experience article, `Ajouter une expérience`, then the CV page heading with
-`tabindex=-1`. The parent focuses it after removal in the same update or the
-immediately following microtask. Falling through to `document.body`, guessing a
-CSS selector, or leaving focus on a disconnected node is a contract failure.
-No focus event from one card may change another card's expansion.
+Adding, removing or replacing `onFocusExitRequest` while the card remains live
+does not move focus; the latest decoded reference is the only one consulted at
+destruction. When destruction owns focus, that port asks the parent to select
+the first connected target in this exact order: next experience article by
+ascending rendered position, previous experience article, `Ajouter une
+expérience`, then the CV page heading with `tabindex=-1`. Falling through to
+`document.body`, guessing a CSS selector, or leaving focus on a disconnected
+node yields the confined missing-target diagnostic. No focus result can change
+this or another card's expansion.
+
+Destruction is one non-interruptible nested cleanup effect:
+
+```text
+try:
+  if card owns focus: invoke/validate latest onFocusExitRequest once
+catch:
+  confine focus-port failure (never rethrow)
+finally:
+  try:
+    release_details_id when this owner holds a reserved lease
+    confine release mismatch/throw (never rethrow)
+  finally:
+    enter terminal
+    remove the card subtree
+```
+
+Focus-port absence, throw, thenable, invalid result, missing target, diagnostic
+report failure or release failure cannot skip the inner `finally`. Lease release
+is attempted regardless of every focus outcome, and terminal/removal occurs
+regardless of every release outcome. The focus port is synchronous and never
+extends destruction past the current cleanup turn.
 
 ## Semantic convergence and animation
 
@@ -678,7 +754,9 @@ forward_parent_cancel_intent
 confine_parent_callback_result
 record_callback_diagnostic
 focus_owned_target
-request_parent_focus_exit
+invoke_sync_focus_exit_port
+validate_sync_focus_exit_result
+run_nested_destroy_cleanup
 report_contract_failure
 ```
 
@@ -690,6 +768,7 @@ DRAFT_OWNER_MISMATCH        draft.id !== experience.id
 INVALID_DETAILS_ID          suffix/full ID violates exact regex or bounds
 DETAILS_ID_COLLISION        two live instances publish the same detailsId
 DETAILS_ID_RELEASE_MISMATCH reserved destroy no longer owns the registry entry
+DETAILS_ID_RELEASE_FAILED   registry release effect throws unexpectedly
 FOREIGN_TOGGLE_OWNER        event owner differs from mounted instance suffix
 TOGGLE_UNAVAILABLE          toggle event received outside display states
 EVENT_NOT_ALLOWED           UI event/state/guard pair absent from the accepted table
@@ -701,7 +780,13 @@ PARENT_CALLBACK_THROW       accepted callback throws synchronously
 PARENT_CALLBACK_REJECTED    accepted callback rejects asynchronously
 INVALID_CALLBACK_RESULT     primitive/null return or assimilation fulfills non-undefined
 STALE_CALLBACK_SETTLEMENT   settlement is unknown, mismatched or already consumed
+FOCUS_EXIT_PORT_MISSING     focused destruction has no callback reference
+FOCUS_EXIT_PORT_THROW       focus callback throws synchronously
+FOCUS_EXIT_ASYNC_RETURN     focus callback returns an object/function with callable then
+FOCUS_EXIT_RESULT_INSPECTION_FAILED reading returned object.then throws
+INVALID_FOCUS_EXIT_RESULT   focus callback return is outside exact enum/null
 FOCUS_EXIT_TARGET_MISSING   parent cannot supply any ordered destruction target
+CONTRACT_DIAGNOSTIC_FAILED  diagnostic reporting throws during destroy cleanup
 ```
 
 `STALE_EDIT_INTENT`, `MUTATION_INTENT_BUSY`, `INTENT_HANDLER_MISSING`,
@@ -713,6 +798,28 @@ invoke an LLM or mutate an input. Contract failures are deterministic
 diagnostics; visible free-form error copy never selects recovery. Callback and
 release failures are confined and consumed as specified; none can escape the
 component boundary.
+
+Every `FOCUS_EXIT_*`, `INVALID_FOCUS_EXIT_RESULT` and
+`CONTRACT_DIAGNOSTIC_FAILED` outcome is confined inside the outer destroy
+`try/catch`; every `DETAILS_ID_RELEASE_*` outcome is confined inside the inner
+`try/finally`. None can cancel lease-release attempt, terminal entry or subtree
+removal.
+
+### Closed output audit
+
+| Output family                             | Sole authorized port/effect                                                                                |
+| ----------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
+| card/toggle/region/edit DOM               | named projection/mount/unmount effects                                                                     |
+| edit/delete/save/cancel parent intent     | latest four business callbacks through asynchronous callback confinement                                   |
+| focus retained/delegated inside live card | owned element refs through `focus_owned_target`                                                            |
+| focus leaving destroyed card              | latest explicit `onFocusExitRequest` through the synchronous closed port; no event/promise/LLM alternative |
+| identity ownership                        | document-scoped `reserve_details_id` / `release_details_id` with owner token                               |
+| diagnostics                               | `report_contract_failure` / callback diagnostic records; failures confined and never transition authority  |
+| destruction                               | one nested cleanup effect ending in terminal/removal                                                       |
+
+There is no `FOCUS_EXIT_REQUESTED` event, implicit dispatcher, global lookup or
+free-form output. Every external callback availability/reference is decoded in
+the input signature/reference path, and no output outside this table is legal.
 
 ## Invariants
 
@@ -734,7 +841,8 @@ component boundary.
 7. Edit, delete, save, cancel, busy and foreign-card events never toggle the
    current card or any other card.
 8. A removed focused node has exactly one bounded deterministic focus target;
-   destruction focus is parent-owned.
+   destruction focus is parent-owned through the latest synchronous
+   `onFocusExitRequest` reference.
 9. Visible text queries, DOM ancestry outside the named article, card order,
    CSS state, animation callbacks, timers, storage, network results and LLM
    output never decide a transition.
@@ -747,9 +855,10 @@ component boundary.
 12. Every unauthorized UI event is a typed exact no-op. An allowed parent
     callback is transferred exactly once and only from its accepted state/guard
     pair.
-13. Busy/callback availability is part of the exact input signature. Removing
-    or disabling the focused control delegates focus once; callback reference
-    replacement or capability addition moves nothing.
+13. Busy and all five callback-availability values are part of the exact input
+    signature. Removing/disabling a focused control delegates once; focus-port
+    availability/reference change alone and every capability addition move
+    nothing.
 14. A save handler receives only the validated, explicitly merged immutable
     candidate; all non-form draft fields are preserved and no payload spread,
     generated ID or generated time is permitted.
@@ -762,10 +871,16 @@ component boundary.
 17. A correlated settlement is accepted only while its exact record is
     unconsumed, atomically consumes it and inserts one diagnostic. Unknown,
     mismatched and replayed settlement events are stale exact no-ops.
+18. Focus-exit return values never decide state. The port is called at most once
+    only for focused destruction, is never awaited/assimilated, and every
+    absent/throw/thenable/invalid/null outcome is typed and confined.
+19. `COMPONENT_DESTROYED` always attempts owned lease release in `finally` and
+    always enters `terminal`/removes the subtree in nested `finally`, regardless
+    of focus-port, diagnostic, release-mismatch or release-throw outcomes.
 
 ## Preserved packaged checkpoint A3 contract
 
-Revision 5 preserves and strengthens the exact packaged A3 contract. After the
+Revision 6 preserves and strengthens the exact packaged A3 contract. After the
 saved experience is reloaded, the packaged scenario can resolve only:
 
 ```text
@@ -784,7 +899,7 @@ instance keeps the exact controlled ID across the action.
 ## Independent review and RED scenarios
 
 Implementation remains forbidden until an independent reviewer recomputes the
-hash and approves these exact revision-5 bytes. Implementation must then begin
+hash and approves these exact revision-6 bytes. Implementation must then begin
 with failing tests for:
 
 1. the exact packaged A3 article, collapsed toggle, bounded controlled ID,
@@ -846,8 +961,22 @@ with failing tests for:
     producing `STALE_CALLBACK_SETTLEMENT` exact no-ops with no double record;
 24. identity reservation success/idempotence/collision, one diagnostic per
     rejected instance with exact key fields, winner preservation, owner release
-    on destroy and release-owner mismatch never deleting a foreign entry.
+    on destroy and release-owner mismatch never deleting a foreign entry;
+25. `hasOnFocusExitRequest` and its reference entering the closed decoder;
+    availability removal/addition and reference replacement move no live focus,
+    and focused destroy calls only the latest reference once;
+26. focused destruction with absent port, synchronous throw and `null` result
+    producing respectively missing/throw/missing-target diagnostics while still
+    releasing the owner lease and reaching terminal/removal;
+27. focus port returning a thenable, invalid primitive/object and an object with
+    hostile throwing `then` getter producing their exact confined errors with no
+    `Promise.resolve`, await or subscription;
+28. release-owner mismatch, release throw and diagnostic-report throw each
+    proving nested cleanup still attempts release exactly once where owned,
+    never deletes a foreign lease, and always reaches terminal/removal; plus
+    unfocused destroy proving the focus port is never called.
 
 Verification requires focused component tests, transition/invariant tests,
-identity-registry and callback-confinement tests, TypeScript/Svelte checks and
-the packaged A3 checkpoint using only the accessible contract above.
+identity-registry, callback-confinement and parent focus-port tests,
+TypeScript/Svelte checks and the packaged A3 checkpoint using only the
+accessible contract above.
