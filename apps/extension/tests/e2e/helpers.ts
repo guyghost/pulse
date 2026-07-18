@@ -19,7 +19,7 @@ export function navButton(page: Page, name: string): Locator {
 }
 
 export function missionCards(page: Page): Locator {
-  return page.locator('[data-testid="mission-feed"] [role="button"][tabindex="0"]');
+  return page.getByTestId('mission-feed').getByRole('article');
 }
 
 export function favoritesToggle(page: Page): Locator {

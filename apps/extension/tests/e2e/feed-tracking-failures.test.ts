@@ -174,7 +174,7 @@ async function openTrackingAction(page: Page): Promise<ReturnType<Page['getByRol
 
   const card = page
     .getByTestId('mission-feed')
-    .locator('[role="button"][tabindex="0"]')
+    .getByRole('article')
     .filter({ hasText: mission.title });
   await expect(card).toBeVisible({ timeout: 10_000 });
   await card.getByRole('button', { name: /Investiguer/ }).click();
