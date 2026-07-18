@@ -5,6 +5,7 @@ import { fileURLToPath } from 'url';
 import { parse as parseYaml } from 'yaml';
 import { isValidSemver } from '../../../scripts/bump-version.ts';
 import { jcsCanonicalize } from '../../../scripts/canonical-artifact.ts';
+import { RELEASE_HOST_GATE_PLAN_V1 } from '../../../scripts/release-runtime/host-gate-plan.ts';
 import { validateSchema, validateVersionConsistency } from '../../../scripts/verify-manifest.ts';
 
 /**
@@ -322,26 +323,37 @@ describe('Release validation — fail-closed artifact contracts', () => {
       .join('\n');
 
     expect(runs).toContain('pnpm install --frozen-lockfile');
-    expect(runs).toMatch(/format:check/);
-    expect(runs).toMatch(/lint/);
-    expect(runs).toMatch(/typecheck/);
-    expect(runs).toMatch(/vitest run/);
-    expect(runs.match(/\b(?:turbo )?build\b/g) ?? []).toHaveLength(1);
-    expect(runs).toContain('PLAYWRIGHT_JSON_OUTPUT_FILE');
-    expect(runs).toContain('scenarios.v1.json');
-    expect(runs).toContain('create-release-gate-input.ts');
-    expect(runs).toContain('seal-tested-dist.ts');
+    expect(runs).toContain('build-sealed-candidate-transport.ts');
+    expect(RELEASE_HOST_GATE_PLAN_V1.map(({ id }) => id)).toEqual([
+      'format',
+      'lint',
+      'typecheck',
+      'unit',
+      'verify-source-manifest',
+      'build-ui',
+      'build-extension',
+      'verify-built-manifest-before-mv3',
+      'playwright-packaged-mv3',
+      'verify-built-manifest-after-mv3',
+    ]);
+    expect(RELEASE_HOST_GATE_PLAN_V1.filter(({ producesDist }) => producesDist)).toEqual([
+      expect.objectContaining({ id: 'build-extension' }),
+    ]);
+    expect(RELEASE_HOST_GATE_PLAN_V1[8]?.args).toContain('--reporter=json');
     expect(runs).not.toContain('test:mv3');
 
-    const upload = steps.find((step) => step.uses === 'actions/upload-artifact@v7');
+    const upload = steps.find(
+      (step) => step.uses === 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+    );
     expect(upload).toMatchObject({
       with: {
         name: 'missionpulse-sealed-candidate',
-        'if-no-files-found': 'error',
+        archive: false,
+        overwrite: false,
       },
     });
-    expect(jcsCanonicalize((upload as { with: Record<string, unknown> }).with.path)).toContain(
-      'tested-dist-seal.json'
+    expect(jcsCanonicalize((upload as { with: Record<string, unknown> }).with.path)).toBe(
+      '"${{ steps.build.outputs.transport-path }}"'
     );
   });
 

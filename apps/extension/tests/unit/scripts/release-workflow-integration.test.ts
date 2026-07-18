@@ -34,6 +34,23 @@ describe('release workflow integration — actual committed policy', () => {
     expect(() => inspectPrivilegedWorkflow(bytes)).not.toThrow();
   });
 
+  it.each([
+    [
+      'candidate-shaped diagnostic name',
+      'missionpulse-mv3-evidence-${{ github.run_id }}-${{ github.run_attempt }}',
+      'missionpulse-sealed-candidate',
+    ],
+    ['wider diagnostic path', 'path: output/playwright/', 'path: output/'],
+    ['longer diagnostic retention', 'retention-days: 14', 'retention-days: 30'],
+    ['mutable diagnostic overwrite', 'overwrite: false', 'overwrite: true'],
+  ])('rejects a %s', (_label, expected, hostile) => {
+    const source = readFileSync(CI_WORKFLOW_PATH, 'utf8');
+    expect(source).toContain(expected);
+    expect(() => inspectPrivilegedWorkflow(Buffer.from(source.replace(expected, hostile)))).toThrow(
+      /diagnostic|upload|policy/i
+    );
+  });
+
   it('uses only the reviewed full-SHA action inventory across every CI job', () => {
     const workflow = record(parseYaml(readFileSync(CI_WORKFLOW_PATH, 'utf8')), 'workflow');
     const jobs = record(workflow.jobs, 'jobs');

@@ -8,6 +8,10 @@ const MAX_WORKFLOW_BLOB_BYTES = 262_144;
 const MAX_PRIVILEGED_WORKFLOW_USES = 32;
 const OFFICIAL_ATTEST_SHA = 'f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6';
 const OFFICIAL_UPLOAD_SHA = '043fb46d1a93c77aae656e7c1c64a875d1fc6a0a';
+const MV3_DIAGNOSTIC_JOB_ID = 'test-mv3';
+const MV3_DIAGNOSTIC_STEP_ID = 'upload-mv3-evidence';
+const MV3_DIAGNOSTIC_NAME =
+  'missionpulse-mv3-evidence-${{ github.run_id }}-${{ github.run_attempt }}';
 const VERIFY_UPLOAD_DIGEST_RUN = `[[ "$CAPTURED_TRANSPORT_SHA256" =~ ^[0-9a-f]{64}$ ]]
 [[ "$UPLOADED_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]
 [[ "$UPLOADED_ARTIFACT_SHA256" == "$CAPTURED_TRANSPORT_SHA256" ]]
@@ -267,6 +271,46 @@ function validateOfficialReleaseActions(
   }
 }
 
+function validateMv3DiagnosticUpload(
+  jobId: string,
+  step: Readonly<Record<string, unknown>>,
+  action: PinnedPrivilegedWorkflowUseV1
+): void {
+  if (
+    jobId !== MV3_DIAGNOSTIC_JOB_ID ||
+    action.repository !== 'actions/upload-artifact' ||
+    action.actionPath !== null ||
+    action.commitSha !== OFFICIAL_UPLOAD_SHA ||
+    step.id !== MV3_DIAGNOSTIC_STEP_ID ||
+    step.name !== 'Upload MV3 Playwright evidence' ||
+    step.if !== 'always()' ||
+    'continue-on-error' in step
+  ) {
+    throw new ReleaseWorkflowPolicyError(
+      `Privileged attestation/upload action is forbidden in ${jobId}.`
+    );
+  }
+  if (!exactKeys(step, ['id', 'name', 'if', 'uses', 'with'])) {
+    throw new ReleaseWorkflowPolicyError(
+      'The MV3 diagnostic upload step has unsupported capabilities.'
+    );
+  }
+  const inputs = plainRecord(step.with, 'MV3 diagnostic upload inputs');
+  if (
+    !exactKeys(inputs, ['name', 'path', 'if-no-files-found', 'overwrite', 'retention-days']) ||
+    inputs.name !== MV3_DIAGNOSTIC_NAME ||
+    inputs.path !== 'output/playwright/' ||
+    inputs['if-no-files-found'] !== 'error' ||
+    inputs.overwrite !== false ||
+    inputs['retention-days'] !== 14 ||
+    'archive' in inputs
+  ) {
+    throw new ReleaseWorkflowPolicyError(
+      'The MV3 diagnostic upload must match the exact bounded diagnostic-only policy.'
+    );
+  }
+}
+
 function actionProjection(stepId: string, usesLiteral: string): PinnedPrivilegedWorkflowUseV1 {
   if (usesLiteral.includes('${{')) {
     throw new ReleaseWorkflowPolicyError(`Step ${stepId} uses an expression instead of a SHA40.`);
@@ -344,6 +388,7 @@ export function inspectPrivilegedWorkflow(
   const parsed = document.toJS({ maxAliasCount: 0 }) as unknown;
   const workflow = plainRecord(parsed, 'workflow');
   const jobs = plainRecord(workflow.jobs, 'workflow jobs');
+  let mv3DiagnosticUploadCount = 0;
   if (workflow.permissions !== undefined) {
     const workflowPermissions = plainRecord(workflow.permissions, 'workflow permissions');
     if (
@@ -397,17 +442,23 @@ export function inspectPrivilegedWorkflow(
         }
         if (hasUses) {
           const action = actionProjection(stepId, step.uses as string);
-          if (
-            action.repository === 'actions/attest' ||
-            action.repository === 'actions/upload-artifact'
-          ) {
+          if (action.repository === 'actions/attest') {
             throw new ReleaseWorkflowPolicyError(
               `Privileged attestation/upload action is forbidden in ${jobId}.`
             );
           }
+          if (action.repository === 'actions/upload-artifact') {
+            validateMv3DiagnosticUpload(jobId, step, action);
+            mv3DiagnosticUploadCount += 1;
+          }
         }
       }
     }
+  }
+  if (MV3_DIAGNOSTIC_JOB_ID in jobs && mv3DiagnosticUploadCount !== 1) {
+    throw new ReleaseWorkflowPolicyError(
+      'The test-mv3 job must contain exactly one admitted diagnostic-only upload.'
+    );
   }
   const job = plainRecord(jobs['seal-candidate'], 'seal-candidate job');
   if ('needs' in job) {
