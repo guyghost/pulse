@@ -202,6 +202,7 @@
   } from '$lib/core/types/tracking';
   import { pullToRefresh } from '../actions/pull-to-refresh';
   import { onDestroy, tick } from 'svelte';
+  import { SvelteSet } from 'svelte/reactivity';
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
   import SearchInput from '../molecules/SearchInput.svelte';
@@ -241,6 +242,7 @@
   type TrackingStore = ReturnType<typeof import('$lib/state/tracking.svelte').createTrackingStore>;
   const emptyTrackings = new Map<string, MissionTracking>();
   let tracking = $state<TrackingStore | null>(null);
+  const trackingPendingMissionIds = new SvelteSet<string>();
   let trackingLoadPromise: Promise<TrackingStore> | null = null;
   let trackingBootstrapStarted = false;
 
@@ -764,6 +766,11 @@
     missionId: string,
     status: ApplicationStatus
   ): Promise<void> {
+    if (trackingPendingMissionIds.has(missionId)) {
+      return;
+    }
+
+    trackingPendingMissionIds.add(missionId);
     try {
       const trackingStore = await loadTrackingStore();
       const previousTracking = cloneTrackingSnapshot(
@@ -784,6 +791,8 @@
       });
     } catch (cause) {
       await showToast(trackingFailureMessage(cause), 'error');
+    } finally {
+      trackingPendingMissionIds.delete(missionId);
     }
   }
 
@@ -1610,9 +1619,11 @@
           error={page.error}
           seenIds={page.seenIds}
           favorites={page.favorites}
+          favoritePendingIds={page.favoritePendingIds}
           hidden={page.hidden}
           comparisonMissionIds={page.comparisonMissionIds}
           trackingByMissionId={tracking?.trackings ?? emptyTrackings}
+          statusPendingMissionIds={trackingPendingMissionIds}
           sortBy={page.sortBy}
           resetKey={missionFeedResetKey}
           filterActive={page.filterActive || showAlertOnly}

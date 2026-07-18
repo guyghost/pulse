@@ -16,9 +16,11 @@
     error = null,
     seenIds = [],
     favorites = {},
+    favoritePendingIds = new Set<string>(),
     hidden = {},
     comparisonMissionIds = [],
     trackingByMissionId = new Map<string, MissionTracking>(),
+    statusPendingMissionIds = new Set<string>(),
     sortBy = 'score',
     resetKey = '',
     filterActive = false,
@@ -42,9 +44,11 @@
     error?: string | null;
     seenIds?: string[];
     favorites?: Record<string, number>;
+    favoritePendingIds?: Set<string>;
     hidden?: Record<string, number>;
     comparisonMissionIds?: string[];
     trackingByMissionId?: Map<string, MissionTracking>;
+    statusPendingMissionIds?: Set<string>;
     sortBy?: 'score' | 'date' | 'tjm';
     resetKey?: string;
     filterActive?: boolean;
@@ -218,11 +222,13 @@
           {mission}
           isSeen={seenSet.has(mission.id)}
           isFavorite={mission.id in (favorites ?? {})}
+          isFavoritePending={favoritePendingIds.has(mission.id)}
           isHidden={mission.id in (hidden ?? {})}
           isCompared={comparedIds.has(mission.id)}
           compareDisabled={comparisonLimitReached && !comparedIds.has(mission.id)}
           trackingStatus={missionTracking?.currentStatus ?? null}
           trackingUpdatedAt={missionTracking ? getLastTransitionTime(missionTracking) : null}
+          isStatusTransitionPending={statusPendingMissionIds.has(mission.id)}
           tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
           showSeenStatus={stableQueueActive}
           onReadSignal={(signal) => {

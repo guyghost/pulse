@@ -45,7 +45,7 @@ import {
 } from '$lib/shell/facades/feed-data.facade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
-import { showToastAction } from '$lib/shell/notifications/toast-service';
+import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
 import { createUndoController, type UndoController } from '$lib/shell/undo/undo-controller';
 import {
   buildProfileImpactItems,
@@ -249,6 +249,7 @@ export function createFeedPageState(
   // Internal state (not directly bound)
   let seenIds = $state<string[]>([]);
   let favorites = $state<Record<string, number>>({});
+  const favoritePendingIds = new SvelteSet<string>();
   let hidden = $state<Record<string, number>>({});
   let pendingSeenIds = new SvelteSet<string>();
   let seenFlushTimer: ReturnType<typeof setTimeout> | null = null;
@@ -823,19 +824,40 @@ export function createFeedPageState(
     scheduleSeenFlush();
   }
 
-  function handleToggleFavorite(id: string): void {
+  async function handleToggleFavorite(id: string): Promise<void> {
+    if (favoritePendingIds.has(id)) {
+      return;
+    }
+
     const previous = { ...favorites };
-    const wasFavorite = id in favorites;
+    const wasFavorite = id in previous;
     const updated = toggleFavorite(favorites, id, Date.now());
-    favorites = updated;
-    saveFavorites(favorites).catch(() => {});
-    showToastAction(wasFavorite ? 'Favori retiré' : 'Mission ajoutée aux favoris', 'success', {
-      label: 'Annuler',
-      onClick: () => {
-        favorites = previous;
-        saveFavorites(previous).catch(() => {});
-      },
-    });
+    favoritePendingIds.add(id);
+
+    try {
+      await saveFavorites(updated);
+      favorites = updated;
+      showToastAction(wasFavorite ? 'Favori retiré' : 'Mission ajoutée aux favoris', 'success', {
+        label: 'Annuler',
+        onClick: () => {
+          void (async () => {
+            favoritePendingIds.add(id);
+            try {
+              await saveFavorites(previous);
+              favorites = previous;
+            } catch {
+              void showToast('Impossible d’annuler le changement de favori', 'error');
+            } finally {
+              favoritePendingIds.delete(id);
+            }
+          })();
+        },
+      });
+    } catch {
+      void showToast('Impossible de confirmer le favori', 'error');
+    } finally {
+      favoritePendingIds.delete(id);
+    }
   }
 
   function handleHide(id: string): void {
@@ -1515,6 +1537,9 @@ export function createFeedPageState(
     },
     get favorites() {
       return favorites;
+    },
+    get favoritePendingIds() {
+      return favoritePendingIds;
     },
     get hidden() {
       return hidden;

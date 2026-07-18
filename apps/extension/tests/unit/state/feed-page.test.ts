@@ -210,6 +210,7 @@ describe('feed page state', () => {
     feedDataMock.saveSeenIds.mockResolvedValue(undefined);
     feedDataMock.getSeenIds.mockResolvedValue([]);
     feedDataMock.getFavorites.mockResolvedValue({});
+    feedDataMock.saveFavorites.mockResolvedValue(undefined);
     feedDataMock.getHidden.mockResolvedValue({});
     feedDataMock.getProfile.mockResolvedValue(null);
     feedDataMock.resetNewMissionCount.mockResolvedValue(undefined);
@@ -218,6 +219,28 @@ describe('feed page state', () => {
     feedDataMock.setFeedSavedViews.mockResolvedValue(undefined);
     feedDataMock.consumeDeepLinkIntent.mockResolvedValue(null);
     feedDataMock.subscribeToNotificationClicked.mockReturnValue(() => {});
+  });
+
+  it('confirme un favori seulement après son accusé de persistance', async () => {
+    let confirmPersistence: (() => void) | null = null;
+    feedDataMock.saveFavorites.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          confirmPersistence = resolve;
+        })
+    );
+    const page = createFeedPageState(createFeedStore(), makeController());
+
+    const pending = page.handleToggleFavorite('mission-1');
+
+    expect(page.favoritePendingIds.has('mission-1')).toBe(true);
+    expect(page.favorites).not.toHaveProperty('mission-1');
+
+    confirmPersistence?.();
+    await pending;
+
+    expect(page.favoritePendingIds.has('mission-1')).toBe(false);
+    expect(page.favorites).toHaveProperty('mission-1');
   });
 
   it('counts source filter pills from the same missions shown by source filtering', () => {

@@ -61,12 +61,106 @@ describe('MissionCard', () => {
 
   it('affiche le TJM quand il est present', async () => {
     const target = mountCard();
-    // Expand the card to reveal TJM details
-    const card = target.querySelector('[role="button"]') as HTMLElement;
-    card?.click();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
     await tick();
     expect(target.textContent).toContain('650');
     expect(target.textContent).toMatch(/650.*\/j/);
+  });
+
+  it('expose une carte article non interactive avec un nom stable', async () => {
+    const target = mountCard();
+    await tick();
+
+    const articles = target.querySelectorAll(
+      'article[aria-label="Mission Developpeur fullstack TypeScript chez Acme Corp"]'
+    );
+    expect(articles).toHaveLength(1);
+    expect(articles[0].getAttribute('role')).not.toBe('button');
+    expect(articles[0].hasAttribute('tabindex')).toBe(false);
+  });
+
+  it('contrôle les détails avec un identifiant borné et une région nommée', async () => {
+    const target = mountCard({ mission: makeMission({ id: '123/mission très longue' }) });
+    await tick();
+
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    const detailsId = disclosure.getAttribute('aria-controls') ?? '';
+
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false');
+    expect(detailsId).toMatch(/^mission-details-[A-Za-z][A-Za-z0-9-]{0,63}$/);
+    expect(detailsId.length).toBeGreaterThanOrEqual(17);
+    expect(detailsId.length).toBeLessThanOrEqual(80);
+    expect(document.querySelectorAll(`#${detailsId}`)).toHaveLength(0);
+
+    disclosure.click();
+    await tick();
+
+    expect(disclosure.getAttribute('aria-label')).toBe(
+      'Masquer les détails de la mission Developpeur fullstack TypeScript'
+    );
+    expect(disclosure.getAttribute('aria-expanded')).toBe('true');
+    const region = target.querySelector(`#${detailsId}`);
+    expect(region?.getAttribute('role')).toBe('region');
+    expect(region?.getAttribute('aria-label')).toBe(
+      'Détails de la mission Developpeur fullstack TypeScript'
+    );
+  });
+
+  it('évite les collisions entre identifiants de mission normalisés', async () => {
+    const first = mountCard({ mission: makeMission({ id: 'mission/a' }) });
+    const second = mountCard({ mission: makeMission({ id: 'mission a' }) });
+    await tick();
+
+    const firstId = first
+      .querySelector('button[aria-controls^="mission-details-"]')
+      ?.getAttribute('aria-controls');
+    const secondId = second
+      .querySelector('button[aria-controls^="mission-details-"]')
+      ?.getAttribute('aria-controls');
+
+    expect(firstId).not.toBe(secondId);
+  });
+
+  it('expose le statut courant et les transitions dans un groupe nommé', async () => {
+    const onStatusTransition = vi.fn();
+    const target = mountCard({ trackingStatus: 'detected', onStatusTransition });
+    await tick();
+
+    const group = target.querySelector(
+      '[role="group"][aria-label="Statut de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLElement;
+    expect(group).not.toBeNull();
+    expect(
+      group.querySelector('[role="status"][aria-label="Statut actuel : Détectée"]')
+    ).not.toBeNull();
+
+    const transition = group.querySelector(
+      'button[aria-label="Passer le statut à Sélectionnée"]'
+    ) as HTMLButtonElement;
+    transition.click();
+    expect(onStatusTransition).toHaveBeenCalledWith('selected');
+  });
+
+  it('fige les transitions pendant leur confirmation', async () => {
+    const target = mountCard({
+      trackingStatus: 'detected',
+      isStatusTransitionPending: true,
+      onStatusTransition: vi.fn(),
+    });
+    await tick();
+
+    const group = target.querySelector(
+      '[role="group"][aria-label="Statut de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLElement;
+    expect(group.getAttribute('aria-busy')).toBe('true');
+    expect(Array.from(group.querySelectorAll('button')).every((button) => button.disabled)).toBe(
+      true
+    );
   });
 
   it("n'affiche pas le TJM quand il est null", async () => {
@@ -127,6 +221,17 @@ describe('MissionCard', () => {
       'button[aria-label="Retirer la mission des favoris"]'
     ) as HTMLButtonElement;
     expect(starredBtn).not.toBeNull();
+  });
+
+  it("conserve l'état favori confirmé pendant la persistance", async () => {
+    const target = mountCard({ isFavorite: false, isFavoritePending: true });
+    await tick();
+
+    const favoriteButton = target.querySelector(
+      'button[aria-label="Ajouter la mission aux favoris"]'
+    ) as HTMLButtonElement;
+    expect(favoriteButton.getAttribute('aria-pressed')).toBe('false');
+    expect(favoriteButton.disabled).toBe(true);
   });
 
   it("affiche l'etat non-favori par defaut", async () => {
