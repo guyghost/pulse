@@ -26,6 +26,15 @@ const analysis: TJMAnalysis = {
       sampleCount: 5,
       trend: 'up',
     },
+    {
+      region: 'lyon',
+      label: 'Lyon',
+      average: 650,
+      min: 550,
+      max: 750,
+      sampleCount: 4,
+      trend: 'stable',
+    },
   ],
 };
 
@@ -78,5 +87,40 @@ describe('TJMDashboard inverted target validation (TJM-02)', () => {
 
     expect(rendered).toContain('Votre positionnement');
     expect(rendered).not.toContain('Fourchette invalide');
+  });
+
+  it('expose les régions dans une structure sémantique stable', async () => {
+    const target = mountDashboard();
+    await tick();
+
+    const regions = target.querySelectorAll('section[aria-label="TJM par région"]');
+    expect(regions).toHaveLength(1);
+    expect(regions[0].querySelectorAll(':scope > h3')).toHaveLength(1);
+    expect(regions[0].querySelector(':scope > h3')?.textContent?.trim()).toBe('TJM par région');
+
+    const list = regions[0].querySelector('ul[aria-label="Régions analysées"]');
+    const items = list?.querySelectorAll(':scope > li') ?? [];
+    expect(items).toHaveLength(2);
+    expect(Array.from(items, (item) => item.querySelector('h4')?.textContent?.trim())).toEqual([
+      'Île-de-France',
+      'Lyon',
+    ]);
+  });
+
+  it('limite la liste sémantique aux résultats de l’analyse filtrée', async () => {
+    const filteredAnalysis: TJMAnalysis = {
+      ...analysis,
+      dataPoints: 2,
+      regionInsights: [analysis.regionInsights![0]],
+    };
+    const target = mountDashboard({ analysis: filteredAnalysis });
+    await tick();
+
+    const list = target.querySelector(
+      'section[aria-label="TJM par région"] ul[aria-label="Régions analysées"]'
+    );
+    const headings = list?.querySelectorAll(':scope > li h4') ?? [];
+    expect(headings).toHaveLength(1);
+    expect(headings[0].textContent?.trim()).toBe('Île-de-France');
   });
 });

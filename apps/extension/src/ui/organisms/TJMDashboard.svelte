@@ -442,19 +442,19 @@
 
     <!-- Region insights -->
     {#if analysis.regionInsights && analysis.regionInsights.length > 0}
-      <div class="section-card rounded-xl p-5">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
+      <section class="section-card rounded-xl p-5" aria-label="TJM par région">
+        <h3 class="mb-4 text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
           TJM par région
-        </p>
-        <div class="space-y-3">
+        </h3>
+        <ul class="space-y-3" aria-label="Régions analysées">
           {#each analysis.regionInsights.slice(0, 8) as region, i (i)}
             {@const barWidth = Math.max(
               15,
               Math.round((region.average / (analysis.regionInsights[0]?.average || 1)) * 100)
             )}
-            <div>
+            <li>
               <div class="flex items-center justify-between">
-                <span class="truncate text-xs text-text-primary">{region.label}</span>
+                <h4 class="truncate text-xs text-text-primary">{region.label}</h4>
                 <div class="flex shrink-0 items-center gap-2 pl-3">
                   <span class="text-[10px] font-mono text-text-muted"
                     >{region.min}–{region.max}€</span
@@ -475,10 +475,10 @@
                   style:width="{barWidth}%"
                 ></div>
               </div>
-            </div>
+            </li>
           {/each}
-        </div>
-      </div>
+        </ul>
+      </section>
     {/if}
   {:else}
     <div class="space-y-3">
