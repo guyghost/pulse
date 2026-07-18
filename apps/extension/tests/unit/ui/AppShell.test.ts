@@ -222,6 +222,22 @@ describe('App shell recovery', () => {
     await flushShell();
   });
 
+  it('annonce uniquement la page de navigation active', async () => {
+    const target = mountApp(createImporters());
+    await flushShell();
+
+    const feed = target.querySelector('button[aria-label="Feed"]') as HTMLButtonElement;
+    const profile = target.querySelector('button[aria-label="Profil"]') as HTMLButtonElement;
+    expect(feed.getAttribute('aria-current')).toBe('page');
+    expect(profile.hasAttribute('aria-current')).toBe(false);
+
+    profile.click();
+    await flushShell();
+
+    expect(feed.hasAttribute('aria-current')).toBe(false);
+    expect(profile.getAttribute('aria-current')).toBe('page');
+  });
+
   it('does not import a protected page while its Premium route is locked', async () => {
     featureState.premiumFeatureActive = true;
     const importers = createImporters();

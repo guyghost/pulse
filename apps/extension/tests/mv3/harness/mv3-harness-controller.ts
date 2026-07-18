@@ -464,9 +464,12 @@ export class Mv3HarnessController {
 
   async seedStorage(values: Readonly<Record<string, unknown>>): Promise<void> {
     const serialized = JSON.stringify(values);
-    await this.evaluateInServiceWorker(
-      `chrome.storage.local.set(${serialized}).then(() => undefined)`
+    const confirmed = await this.evaluateInServiceWorker<boolean>(
+      `chrome.storage.local.set(${serialized}).then(() => true)`
     );
+    if (confirmed !== true) {
+      throw new Error('Service-worker storage seed was not confirmed.');
+    }
   }
 
   async restartServiceWorkerForProbe(probeExpression?: string): Promise<RestartReceiptV1> {
