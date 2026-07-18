@@ -1,1 +1,18 @@
-{"connectors":[{"hostPermissions":["https://app.cherry-pick.io/*"],"id":"cherry-pick"},{"hostPermissions":["https://*.collective.work/*"],"id":"collective"},{"hostPermissions":["https://www.free-work.com/*"],"id":"free-work"},{"hostPermissions":["https://hiway-missions.fr/*","https://jhgjtlkfewuiiofxfrvh.supabase.co/*"],"id":"hiway"},{"hostPermissions":["https://*.lehibou.com/*"],"id":"lehibou"},{"hostPermissions":["https://*.malt.fr/*","https://*.malt.io/*"],"id":"malt"}],"schema":"missionpulse.connector-authorities","version":1}
+{
+  "connectors": [
+    { "hostPermissions": ["https://app.cherry-pick.io/*"], "id": "cherry-pick" },
+    { "hostPermissions": ["https://*.collective.work/*"], "id": "collective" },
+    { "hostPermissions": ["https://www.free-work.com/*"], "id": "free-work" },
+    {
+      "hostPermissions": [
+        "https://hiway-missions.fr/*",
+        "https://jhgjtlkfewuiiofxfrvh.supabase.co/*"
+      ],
+      "id": "hiway"
+    },
+    { "hostPermissions": ["https://*.lehibou.com/*"], "id": "lehibou" },
+    { "hostPermissions": ["https://*.malt.fr/*", "https://*.malt.io/*"], "id": "malt" }
+  ],
+  "schema": "missionpulse.connector-authorities",
+  "version": 1
+}

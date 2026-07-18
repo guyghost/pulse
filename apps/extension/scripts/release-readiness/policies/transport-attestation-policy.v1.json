@@ -1,1 +1,10 @@
-{"oidcIssuer":"https://token.actions.githubusercontent.com","predicateType":"https://slsa.dev/provenance/v1","provider":"github-artifact-attestations","schema":"missionpulse.github-transport-attestation-policy-source","sourceRef":"refs/heads/main","sourceRepository":"guyghost/pulse","version":1,"workflowPath":".github/workflows/ci.yml"}
+{
+  "oidcIssuer": "https://token.actions.githubusercontent.com",
+  "predicateType": "https://slsa.dev/provenance/v1",
+  "provider": "github-artifact-attestations",
+  "schema": "missionpulse.github-transport-attestation-policy-source",
+  "sourceRef": "refs/heads/main",
+  "sourceRepository": "guyghost/pulse",
+  "version": 1,
+  "workflowPath": ".github/workflows/ci.yml"
+}

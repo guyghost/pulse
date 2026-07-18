@@ -502,15 +502,15 @@ declare function transitionPreviewCache(
 ): PreviewCacheState;
 ```
 
-| Current state / event                                                        | Exact result                                                                                               |
-| ---------------------------------------------------------------------------- | ---------------------------------------------------------------------------------------------------------- |
-| Active / observed empty list                                                 | Exact no-op; an empty observation does not erase frozen open-stack previews                               |
-| Active / observed missing ID or changed canonical mission object             | Merge only those incoming entries, preserving every unrelated cached entry                                |
-| Active / every observed ID already maps to its identical object              | Exact no-op; preserve the existing cache identity                                                          |
-| Active / Apply settled with remaining preview membership                     | Exact no-op; actor membership alone controls which cached entries can render                              |
-| Active / Apply settled without remaining preview membership                  | Clear once                                                                                                 |
-| Active / Feed unmount or panel close                                          | Clear and enter terminal `disposed`                                                                        |
-| Disposed / every event, including late alarm, facade observation or Apply ACK | Exact no-op; remain disposed with an empty map                                                              |
+| Current state / event                                                         | Exact result                                                                 |
+| ----------------------------------------------------------------------------- | ---------------------------------------------------------------------------- |
+| Active / observed empty list                                                  | Exact no-op; an empty observation does not erase frozen open-stack previews  |
+| Active / observed missing ID or changed canonical mission object              | Merge only those incoming entries, preserving every unrelated cached entry   |
+| Active / every observed ID already maps to its identical object               | Exact no-op; preserve the existing cache identity                            |
+| Active / Apply settled with remaining preview membership                      | Exact no-op; actor membership alone controls which cached entries can render |
+| Active / Apply settled without remaining preview membership                   | Clear once                                                                   |
+| Active / Feed unmount or panel close                                          | Clear and enter terminal `disposed`                                          |
+| Disposed / every event, including late alarm, facade observation or Apply ACK | Exact no-op; remain disposed with an empty map                               |
 
 The Svelte synchronization effect tracks only the facade snapshot. Cache
 comparison and mutation execute outside dependency collection (or through an

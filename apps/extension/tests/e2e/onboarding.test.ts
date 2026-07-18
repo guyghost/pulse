@@ -18,7 +18,9 @@ test.describe('Onboarding', () => {
     await page.locator('#ob-location').fill('Paris');
     await expect(page.getByRole('button', { name: 'Sauvegarder mon profil' })).toBeEnabled();
     await page.getByRole('button', { name: 'Sauvegarder mon profil' }).click();
-    await page.waitForFunction(() => window.localStorage.getItem('__missionpulse_e2e_saved_profile'));
+    await page.waitForFunction(() =>
+      window.localStorage.getItem('__missionpulse_e2e_saved_profile')
+    );
 
     await expectFeedReady(page);
     await expect(page.locator('#ob-firstname')).not.toBeVisible();
