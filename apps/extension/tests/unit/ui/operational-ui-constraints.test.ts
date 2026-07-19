@@ -530,7 +530,7 @@ describe('operational UI constraints', () => {
     expect(cardSource).toContain('aria-expanded={scoreDetailsOpen}');
     expect(cardSource).toContain('aria-controls={scoreDetailsId}');
     expect(cardSource.indexOf('Pourquoi ce score ?')).toBeLessThan(
-      cardSource.indexOf('<!-- Detail grid -->')
+      cardSource.indexOf('<!-- Inline details controlled by the scoped disclosure. -->')
     );
     expect(drawerSource.indexOf('Transformer la décision')).toBeLessThan(
       drawerSource.indexOf('Détails techniques')
