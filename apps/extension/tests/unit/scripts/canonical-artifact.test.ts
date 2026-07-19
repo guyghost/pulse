@@ -185,7 +185,7 @@ describe('canonical artifact tree v2', () => {
   it('pins the scanner protocol, script digest and descriptor paths on macOS/Linux', () => {
     expect(RELEASE_DESCRIPTOR_SCANNER).toMatchObject({
       protocol: 'missionpulse.descriptor-scanner.v1',
-      pythonVersion: '3.14.6',
+      pythonVersion: '3.14.5',
       scriptSha256: expect.stringMatching(/^[a-f0-9]{64}$/),
     });
     expect(scannerScriptDescriptorPath('darwin')).toBe('/dev/fd/4');

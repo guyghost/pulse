@@ -50,7 +50,7 @@ export const DEFAULT_CANONICAL_TREE_LIMITS: CanonicalTreeLimits = Object.freeze(
 
 export const RELEASE_DESCRIPTOR_SCANNER = Object.freeze({
   protocol: 'missionpulse.descriptor-scanner.v1',
-  pythonVersion: '3.14.6',
+  pythonVersion: '3.14.5',
   scriptSha256: 'e440610e7d2c490a7ebb1b70746ae2a9c243eccd7e4e845f95262ef3e4794c1a',
   timeoutMs: 30_000,
 });

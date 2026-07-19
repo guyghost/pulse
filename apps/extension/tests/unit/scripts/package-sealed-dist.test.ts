@@ -121,7 +121,7 @@ async function sealedFixture() {
       sourceCommit: 'a'.repeat(40),
       nodeVersion: process.versions.node,
       pnpmVersion: '10.32.1',
-      pythonVersion: '3.14.6',
+      pythonVersion: '3.14.5',
       descriptorScannerProtocol: 'missionpulse.descriptor-scanner.v1',
       descriptorScannerSha256: 'e440610e7d2c490a7ebb1b70746ae2a9c243eccd7e4e845f95262ef3e4794c1a',
       startedAt: '2026-07-16T08:01:00.000Z',
