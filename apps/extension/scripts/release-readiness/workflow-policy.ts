@@ -19,6 +19,7 @@ const VERIFY_UPLOAD_DIGEST_RUN = `[[ "$CAPTURED_TRANSPORT_SHA256" =~ ^[0-9a-f]{6
 const REVIEWED_ACTION_PINS = new Map<string, string>([
   ['actions/checkout', 'de0fac2e4500dabe0009e67214ff5f5447ce83dd'],
   ['actions/setup-node', '48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e'],
+  ['actions/setup-python', 'ece7cb06caefa5fff74198d8649806c4678c61a1'],
   ['pnpm/action-setup', '0e279bb959325dab635dd2c09392533439d90093'],
   ['actions/attest', OFFICIAL_ATTEST_SHA],
   ['actions/upload-artifact', OFFICIAL_UPLOAD_SHA],
