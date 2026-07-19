@@ -17,7 +17,7 @@ concurrency:
 env:
   NODE_VERSION: '22.23.1'
   PNPM_VERSION: '10.32.1'
-  PYTHON_VERSION: '3.14.5'
+  PYTHON_VERSION: '3.14.6'
 
 jobs:
   quality:
@@ -44,6 +44,16 @@ jobs:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
+      - id: setup-python
+        name: Install pinned Python
+        uses: actions/setup-python@v6
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - id: expose-pinned-python
+        name: Expose pinned Python executable
+        run: echo "PULSE_RELEASE_PYTHON=$(command -v python3)" >> "$GITHUB_ENV"
+
       - id: verify-toolchain
         name: Verify the committed package manager authority
         run: |
@@ -55,6 +65,10 @@ jobs:
       - id: install
         name: Install exact committed dependencies
         run: pnpm install --frozen-lockfile
+
+      - id: install-browser
+        name: Install Chromium
+        run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
 
       - id: format
         name: Check formatting
