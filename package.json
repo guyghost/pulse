@@ -61,6 +61,6 @@
     "lint-staged": "^17.0.8",
     "simple-git-hooks": "^2.13.1",
     "supabase": "^2.109.0",
-    "turbo": "^2.10.3"
+    "turbo": "^2.10.5"
   }
 }
