@@ -171,6 +171,16 @@ jobs:
           test "$(node --version)" = "v${NODE_VERSION}"
           test "$(pnpm --version)" = "${PNPM_VERSION}"
 
+      - id: setup-python
+        name: Install pinned Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - id: expose-pinned-python
+        name: Expose pinned Python executable
+        run: echo "PULSE_RELEASE_PYTHON=$(command -v python3)" >> "$GITHUB_ENV"
+
       - id: install
         name: Install exact committed dependencies
         run: pnpm install --frozen-lockfile
