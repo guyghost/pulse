@@ -9,41 +9,120 @@ import type { MissionTracking } from '$lib/core/types/tracking';
 import { SvelteMap } from 'svelte/reactivity';
 import type { ApplicationStatus } from '$lib/core/types/tracking';
 import { STATUS_LABELS } from '$lib/core/types/tracking';
-import { sendMessage } from '$lib/shell/messaging/bridge';
+import { sendMessage, type BridgeMessage } from '$lib/shell/messaging/bridge';
+import { validateMessage } from '$lib/shell/messaging/schemas';
+import {
+  ApplicationTrackingError,
+  createApplicationTrackingError,
+  isSerializedApplicationTrackingError,
+  type ApplicationTrackingIntent,
+} from '$lib/core/tracking/application-tracking-error';
 
 export type TrackingState = 'idle' | 'loading' | 'loaded' | 'error';
 
 export function createTrackingStore() {
   let state = $state<TrackingState>('idle');
   const trackings = new SvelteMap<string, MissionTracking>();
-  let error = $state<string | null>(null);
+  let error = $state<ApplicationTrackingError | null>(null);
+  let requiresCanonicalLoad = $state(false);
+
+  function protocolError(
+    intent: ApplicationTrackingIntent,
+    missionId: string | null
+  ): ApplicationTrackingError {
+    return createApplicationTrackingError(intent, missionId, 'PROTOCOL_ERROR');
+  }
+
+  async function requestTracking(
+    message: BridgeMessage,
+    intent: ApplicationTrackingIntent,
+    missionId: string | null
+  ): Promise<BridgeMessage> {
+    let rawResponse: unknown;
+    try {
+      rawResponse = await sendMessage(message);
+    } catch {
+      throw createApplicationTrackingError(intent, missionId, 'TRANSPORT_ERROR');
+    }
+
+    const validation = validateMessage(rawResponse);
+    if (!validation.valid || typeof rawResponse !== 'object' || rawResponse === null) {
+      throw protocolError(intent, missionId);
+    }
+
+    const response = rawResponse as BridgeMessage;
+    if (response.type === 'TRACKING_FAILED') {
+      if (
+        !isSerializedApplicationTrackingError(response.payload) ||
+        response.payload.intent !== intent ||
+        response.payload.missionId !== missionId
+      ) {
+        throw protocolError(intent, missionId);
+      }
+      throw new ApplicationTrackingError(response.payload);
+    }
+
+    return response;
+  }
+
+  function normalizeFailure(
+    cause: unknown,
+    intent: ApplicationTrackingIntent,
+    missionId: string | null
+  ): ApplicationTrackingError {
+    return cause instanceof ApplicationTrackingError ? cause : protocolError(intent, missionId);
+  }
+
+  function rememberFailure(failure: ApplicationTrackingError): void {
+    error = failure;
+    if (failure.code === 'TRANSPORT_ERROR' || failure.code === 'PROTOCOL_ERROR') {
+      requiresCanonicalLoad = true;
+      state = 'error';
+    }
+  }
+
+  function assertMutationCanStart(
+    intent: Exclude<ApplicationTrackingIntent, 'load'>,
+    missionId: string
+  ): void {
+    if (requiresCanonicalLoad) {
+      throw protocolError(intent, missionId);
+    }
+  }
 
   /**
    * Load tracking records from the service worker bridge.
    */
-  async function loadTrackings(): Promise<void> {
+  async function loadTrackings(): Promise<readonly MissionTracking[]> {
     state = 'loading';
     error = null;
 
     try {
-      const response = await sendMessage({
-        type: 'GET_TRACKINGS',
-        payload: {},
-      });
+      const response = await requestTracking(
+        {
+          type: 'GET_TRACKINGS',
+          payload: {},
+        },
+        'load',
+        null
+      );
 
-      if (response.type === 'TRACKINGS_RESULT' && Array.isArray(response.payload)) {
-        trackings.clear();
-        for (const t of response.payload) {
-          trackings.set(t.missionId, t);
-        }
-        state = 'loaded';
-      } else {
-        error = 'Failed to load tracking data';
-        state = 'error';
+      if (response.type !== 'TRACKINGS_RESULT') {
+        throw protocolError('load', null);
       }
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to load tracking data';
+      const confirmed = response.payload;
+      trackings.clear();
+      for (const tracking of confirmed) {
+        trackings.set(tracking.missionId, tracking);
+      }
+      requiresCanonicalLoad = false;
+      state = 'loaded';
+      return confirmed;
+    } catch (cause) {
+      const failure = normalizeFailure(cause, 'load', null);
+      rememberFailure(failure);
       state = 'error';
+      throw failure;
     }
   }
 
@@ -54,63 +133,92 @@ export function createTrackingStore() {
     missionId: string,
     newStatus: ApplicationStatus,
     note?: string
-  ): Promise<void> {
+  ): Promise<MissionTracking> {
+    error = null;
     try {
-      const response = await sendMessage({
-        type: 'UPDATE_TRACKING',
-        payload: { missionId, status: newStatus, note },
-      });
+      assertMutationCanStart('transition', missionId);
+      const response = await requestTracking(
+        {
+          type: 'UPDATE_TRACKING',
+          payload: { missionId, status: newStatus, note },
+        },
+        'transition',
+        missionId
+      );
 
-      if (response.type === 'TRACKING_UPDATED' && response.payload) {
-        const updated = response.payload;
-        trackings.set(updated.missionId, updated);
-      } else {
-        error = 'Failed to update tracking';
+      if (response.type !== 'TRACKING_UPDATED' || response.payload.missionId !== missionId) {
+        throw protocolError('transition', missionId);
       }
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to update tracking';
+      trackings.set(missionId, response.payload);
+      return response.payload;
+    } catch (cause) {
+      const failure = normalizeFailure(cause, 'transition', missionId);
+      rememberFailure(failure);
+      throw failure;
     }
   }
 
-  async function updateNextActionAt(missionId: string, nextActionAt: string | null): Promise<void> {
+  async function updateNextActionAt(
+    missionId: string,
+    nextActionAt: string | null
+  ): Promise<MissionTracking> {
+    error = null;
     try {
-      const response = await sendMessage({
-        type: 'UPDATE_TRACKING_DETAILS',
-        payload: { missionId, nextActionAt },
-      });
+      assertMutationCanStart('details', missionId);
+      const response = await requestTracking(
+        {
+          type: 'UPDATE_TRACKING_DETAILS',
+          payload: { missionId, nextActionAt },
+        },
+        'details',
+        missionId
+      );
 
-      if (response.type === 'TRACKING_UPDATED' && response.payload) {
-        const updated = response.payload;
-        trackings.set(updated.missionId, updated);
-      } else {
-        error = 'Failed to update next action';
+      if (response.type !== 'TRACKING_UPDATED' || response.payload.missionId !== missionId) {
+        throw protocolError('details', missionId);
       }
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to update next action';
+      trackings.set(missionId, response.payload);
+      return response.payload;
+    } catch (cause) {
+      const failure = normalizeFailure(cause, 'details', missionId);
+      rememberFailure(failure);
+      throw failure;
     }
   }
 
   async function restoreTracking(
     missionId: string,
     previousTracking: MissionTracking | null
-  ): Promise<void> {
+  ): Promise<MissionTracking | null> {
+    error = null;
     try {
-      const response = await sendMessage({
-        type: 'RESTORE_TRACKING',
-        payload: { missionId, tracking: previousTracking },
-      });
+      assertMutationCanStart('restore', missionId);
+      const response = await requestTracking(
+        {
+          type: 'RESTORE_TRACKING',
+          payload: { missionId, tracking: previousTracking },
+        },
+        'restore',
+        missionId
+      );
 
-      if (response.type === 'TRACKING_RESTORED') {
-        if (response.payload) {
-          trackings.set(response.payload.missionId, response.payload);
-        } else {
-          trackings.delete(missionId);
-        }
-      } else {
-        error = 'Failed to restore tracking';
+      if (
+        response.type !== 'TRACKING_RESTORED' ||
+        response.payload.missionId !== missionId ||
+        (response.payload.tracking !== null && response.payload.tracking.missionId !== missionId)
+      ) {
+        throw protocolError('restore', missionId);
       }
-    } catch (err) {
-      error = err instanceof Error ? err.message : 'Failed to restore tracking';
+      if (response.payload.tracking) {
+        trackings.set(missionId, response.payload.tracking);
+      } else {
+        trackings.delete(missionId);
+      }
+      return response.payload.tracking;
+    } catch (cause) {
+      const failure = normalizeFailure(cause, 'restore', missionId);
+      rememberFailure(failure);
+      throw failure;
     }
   }
 
@@ -141,6 +249,9 @@ export function createTrackingStore() {
     },
     get error() {
       return error;
+    },
+    get requiresCanonicalLoad() {
+      return requiresCanonicalLoad;
     },
     loadTrackings,
     transitionStatus,

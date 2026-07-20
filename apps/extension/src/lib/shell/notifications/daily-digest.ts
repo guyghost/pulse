@@ -11,7 +11,6 @@
 import type { Mission } from '../../core/types/mission';
 import { getMissions } from '../storage/db';
 import { getSeenIds, saveSeenIds } from '../storage/seen-missions';
-import { getSettings } from '../storage/chrome-storage';
 import { getConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { recordAlertHistoryEntry } from '../storage/alert-history';
 import { filterSmartNotifications } from '../../core/scoring/smart-notification';
@@ -19,6 +18,8 @@ import { markAsSeen } from '../../core/seen/mark-seen';
 import { createDeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 import { clearDeepLinkIntent, setDeepLinkIntent } from '../storage/session-storage';
 import { isMutedUntilActive } from './notify-missions';
+import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
+import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
 /** Chrome alarm name for the daily digest. */
 export const DIGEST_ALARM_NAME = 'daily-digest';
@@ -31,6 +32,15 @@ export const DIGEST_HOUR = 9;
 
 /** Maximum missions to include in the digest. */
 export const DIGEST_MAX_RESULTS = 3;
+
+export class DailyDigestAlarmReconciliationError extends Error {
+  readonly code = 'DIGEST_ALARM_READBACK_MISMATCH' as const;
+
+  constructor(message: string) {
+    super(message);
+    this.name = 'DailyDigestAlarmReconciliationError';
+  }
+}
 
 /**
  * Compute the epoch timestamp of the next digest fire time.
@@ -64,10 +74,20 @@ export function nextDigestTime(now: Date = new Date()): number {
  *
  * Call during service worker initialization and when settings change.
  */
-export function scheduleDailyDigestAlarm(): void {
-  chrome.alarms.create(DIGEST_ALARM_NAME, {
-    when: nextDigestTime(),
-  });
+export async function scheduleDailyDigestAlarm(now: Date = new Date()): Promise<void> {
+  const expectedWhen = nextDigestTime(now);
+  await chrome.alarms.create(DIGEST_ALARM_NAME, { when: expectedWhen });
+  const readBack = await chrome.alarms.get(DIGEST_ALARM_NAME);
+  if (
+    readBack?.name !== DIGEST_ALARM_NAME ||
+    readBack.scheduledTime !== expectedWhen ||
+    readBack.periodInMinutes !== undefined
+  ) {
+    await chrome.alarms.clear(DIGEST_ALARM_NAME).catch(() => false);
+    throw new DailyDigestAlarmReconciliationError(
+      'Daily digest alarm could not be verified after creation.'
+    );
+  }
 }
 
 export interface DigestResult {
@@ -85,11 +105,13 @@ export interface DigestResult {
  * No-op if notifications are disabled, connected alerts are disabled,
  * or no qualifying missions exist.
  */
-export async function sendDailyDigest(): Promise<DigestResult> {
+export async function sendDailyDigest(
+  admittedSnapshot?: SettingsReleaseSnapshot
+): Promise<DigestResult> {
   // Guard: global notifications must be enabled
   let settings;
   try {
-    settings = await getSettings();
+    settings = (admittedSnapshot ?? (await readSettingsReleaseSnapshot())).settings;
   } catch {
     return { sent: false, missionIds: [] };
   }

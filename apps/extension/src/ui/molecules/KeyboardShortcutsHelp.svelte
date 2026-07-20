@@ -1,6 +1,7 @@
 <script lang="ts">
   import { SvelteMap } from 'svelte/reactivity';
   import { Icon } from '@pulse/ui';
+  import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
   import {
     getRegisteredShortcuts,
     formatShortcut,
@@ -8,8 +9,8 @@
   } from '$lib/shell/utils/keyboard-shortcuts';
 
   let { isOpen = $bindable(false) }: { isOpen?: boolean } = $props();
+  let modalRoot = $state<HTMLDivElement | undefined>(undefined);
   let dialogElement = $state<HTMLDivElement | undefined>(undefined);
-  let closeButton = $state<HTMLButtonElement | undefined>(undefined);
 
   // Group shortcuts by category. $derived.by evaluates the function so the
   // value is the grouped array (reactive to any $state/$derived read inside),
@@ -48,52 +49,33 @@
     isOpen = false;
   }
 
-  function handleKeydown(e: KeyboardEvent) {
-    e.stopPropagation();
-
-    if (e.key === 'Escape') {
-      e.preventDefault();
+  function handleExplicitClose(): void {
+    if (!requestModalClose(modalRoot ?? null, 'explicit')) {
       closeModal();
-      return;
-    }
-
-    if (e.key !== 'Tab' || !dialogElement) {
-      return;
-    }
-
-    const focusableElements = Array.from(
-      dialogElement.querySelectorAll<HTMLButtonElement>('button:not(:disabled)')
-    );
-    const firstFocusable = focusableElements[0];
-    const lastFocusable = focusableElements.at(-1);
-
-    if (!firstFocusable || !lastFocusable) {
-      return;
-    }
-
-    if (e.shiftKey && document.activeElement === firstFocusable) {
-      e.preventDefault();
-      lastFocusable.focus();
-    } else if (!e.shiftKey && document.activeElement === lastFocusable) {
-      e.preventDefault();
-      firstFocusable.focus();
     }
   }
-
-  $effect(() => {
-    if (isOpen) {
-      closeButton?.focus();
-    }
-  });
 </script>
 
 {#if isOpen}
-  <div class="absolute inset-0 z-50 flex items-center justify-center p-3">
+  <div
+    bind:this={modalRoot}
+    use:modalFocus={{
+      surface: 'keyboard_shortcuts_help',
+      variant: 'shortcuts_help',
+      ownerScopePath: ['feed', 'keyboard_shortcuts_help'],
+      onBeforeClose: () => {
+        closeModal();
+        return 'accepted';
+      },
+      onRejected: closeModal,
+    }}
+    class="absolute inset-0 z-50 flex items-center justify-center p-3"
+  >
     <button
       type="button"
       class="absolute inset-0 bg-black/45 backdrop-blur-sm"
       data-testid="shortcuts-help-scrim"
-      onclick={closeModal}
+      onclick={handleExplicitClose}
       aria-label="Fermer l'aide des raccourcis"
     ></button>
 
@@ -101,11 +83,9 @@
       bind:this={dialogElement}
       class="relative flex max-h-full w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border-light bg-surface-white shadow-xl"
       role="dialog"
-      aria-modal="true"
       aria-labelledby="shortcuts-title"
       aria-describedby="shortcuts-description"
       tabindex="-1"
-      onkeydown={handleKeydown}
     >
       <!-- Header -->
       <header class="shrink-0 border-b border-border-light px-4 py-4">
@@ -130,11 +110,11 @@
             </div>
           </div>
           <button
-            bind:this={closeButton}
             type="button"
             class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-lg border border-border-light text-text-muted transition-colors hover:bg-page-canvas hover:text-text-primary"
-            onclick={closeModal}
+            onclick={handleExplicitClose}
             aria-label="Fermer"
+            data-modal-close
           >
             <Icon name="x" size={16} />
           </button>
@@ -184,7 +164,8 @@
           <button
             type="button"
             class="shrink-0 rounded-lg bg-blueprint-blue px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-blueprint-blue/90"
-            onclick={closeModal}
+            onclick={handleExplicitClose}
+            data-modal-acknowledgement
           >
             J'ai compris
           </button>

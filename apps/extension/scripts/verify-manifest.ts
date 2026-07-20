@@ -10,8 +10,9 @@
  * Options:
  *   --expected-version <semver>  Fail if manifest version doesn't match (used in CI release)
  *   --post-build                 Run post-build checks on a filtered dist/manifest.json:
- *                                no excluded-connector patterns leak through, and every
- *                                shipped connector's declared host_permissions are present.
+ *                                no unowned or excluded-connector patterns leak through,
+ *                                and every shipped connector's declared host_permissions
+ *                                is present.
  *                                Without it, runs the source-manifest full-catalog coverage
  *                                check instead.
  *
@@ -192,11 +193,10 @@ export const validateHostPermissionCoverage = (
 };
 
 /**
- * Validates least-privilege: no host_permission pattern in the manifest is
- * owned by a connector NOT in `shippedConnectors`. Use on a FILTERED build
- * output (dist/manifest.json) to confirm excluded connectors left no patterns
- * behind. Patterns not owned by ANY connector in `allConnectors` (infra like
- * Supabase) are always allowed.
+ * Validates least-privilege: every mandatory host_permission must be owned by
+ * exactly one catalogued connector and that connector must belong to
+ * `shippedConnectors`. Use with the full catalog for the source manifest and
+ * with the resolved subset for a filtered build output.
  */
 export const validateNoExcludedConnectorPatterns = (
   manifest: Pick<ManifestV3, 'host_permissions'>,
@@ -204,22 +204,38 @@ export const validateNoExcludedConnectorPatterns = (
   shippedConnectors: readonly HostPermissionConnector[]
 ): { valid: true } | { valid: false; errors: string[] } => {
   const hostPermissions = manifest.host_permissions ?? [];
-  const shippedPatterns = new Set<string>(shippedConnectors.flatMap((c) => c.hostPermissions));
-  const allOwnedPatterns = new Set<string>(allConnectors.flatMap((c) => c.hostPermissions));
+  const shippedConnectorIds = new Set(shippedConnectors.map(({ id }) => id));
+  const ownersByPattern = new Map<string, HostPermissionConnector[]>();
+  for (const connector of allConnectors) {
+    for (const pattern of connector.hostPermissions) {
+      const owners = ownersByPattern.get(pattern) ?? [];
+      owners.push(connector);
+      ownersByPattern.set(pattern, owners);
+    }
+  }
   const errors: string[] = [];
 
   for (const pattern of hostPermissions) {
-    // Pattern not owned by any connector (infra) — always fine.
-    if (!allOwnedPatterns.has(pattern)) {
+    const owners = ownersByPattern.get(pattern) ?? [];
+    if (owners.length === 0) {
+      errors.push(
+        `host_permission "${pattern}" has no connector ownership claim — least-privilege violation`
+      );
       continue;
     }
-    // Owned by a shipped connector — fine.
-    if (shippedPatterns.has(pattern)) {
+    if (owners.length !== 1) {
+      errors.push(
+        `host_permission "${pattern}" must have exactly one connector ownership claim; found ${owners.length}: ${owners
+          .map(({ name }) => name)
+          .join(', ')}`
+      );
       continue;
     }
-    // Owned by a connector, but that connector is not shipped — leak.
+    if (shippedConnectorIds.has(owners[0].id)) {
+      continue;
+    }
     errors.push(
-      `host_permission "${pattern}" is owned by an excluded connector — least-privilege violation`
+      `host_permission "${pattern}" is owned by excluded connector ${owners[0].name} — least-privilege violation`
     );
   }
 
@@ -352,9 +368,9 @@ export const main = (): void => {
   }));
 
   if (postBuild) {
-    // Post-build (dist/manifest.json): enforce least-privilege. No pattern
-    // owned by an excluded connector may survive the filter, and every
-    // shipped connector's declared patterns must be present.
+    // Post-build (dist/manifest.json): enforce least-privilege. No unowned
+    // pattern or pattern owned by an excluded connector may survive the
+    // filter, and every shipped connector pattern must be present.
     const configPath = resolve(projectRoot, 'connectors.config.json');
     const connectorConfig: ConnectorConfig = existsSync(configPath)
       ? (() => {
@@ -379,7 +395,7 @@ export const main = (): void => {
       shippedConnectors
     );
     if (!excludedResult.valid) {
-      console.error('❌ Excluded connector patterns leaked into built manifest:\n');
+      console.error('❌ Unowned or excluded host patterns leaked into built manifest:\n');
       excludedResult.errors.forEach((error) => console.error(`  - ${error}`));
       process.exit(1);
     }
@@ -397,8 +413,19 @@ export const main = (): void => {
     console.log('✅ Shipped connector host_permissions coverage check passed');
   } else {
     // Source manifest (src/manifest.json): must cover the FULL catalog so any
-    // build subset can find its patterns. Guards against forgetting to add
-    // host_permissions when a connector is registered.
+    // build subset can find its patterns, and may not contain an unowned host.
+    const ownershipResult = validateNoExcludedConnectorPatterns(
+      schemaResult.data,
+      allConnectors,
+      allConnectors
+    );
+    if (!ownershipResult.valid) {
+      console.error('❌ Source manifest contains unowned host_permissions:\n');
+      ownershipResult.errors.forEach((error) => console.error(`  - ${error}`));
+      process.exit(1);
+    }
+    console.log('✅ Source host_permissions ownership check passed');
+
     const coverageResult = validateHostPermissionCoverage(schemaResult.data, allConnectors);
     if (!coverageResult.valid) {
       console.error('❌ Source manifest missing connector host_permissions:\n');

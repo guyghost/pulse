@@ -422,8 +422,16 @@ function installExtensionChromeStub(context, options = {}) {
             type: 'GENERATION_RESULT',
             payload: { ok: false, error: 'PERF_HARNESS_DISABLED' },
           };
-        case 'SCAN_START':
-          return { type: 'SCAN_COMPLETE', payload: state.missions };
+        case 'SCAN_START': {
+          const operationId = message.payload?.operationId;
+          setTimeout(() => {
+            emit({
+              type: 'SCAN_COMPLETE',
+              payload: { operationId, missions: state.missions },
+            });
+          }, 0);
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        }
         case 'RESET_NEW_MISSION_COUNT':
           return { type: 'NEW_MISSION_COUNT_RESET', payload: { reset: true } };
         case 'CLEAR_EXTENSION_BADGE':

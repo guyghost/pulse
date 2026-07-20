@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { ConnectorStatus as ConnectorStatusType } from '$lib/core/types/connector-status';
   import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import { getConnectorErrorCopy } from '../copy/connector-error-copy';
 
   const {
@@ -59,7 +59,14 @@
     return `il y a ${Math.floor(hours / 24)}j`;
   });
 
-  const stateConfig = $derived.by(() => {
+  type ConnectorStateConfig = {
+    icon: IconName;
+    color: string;
+    label: string;
+    spin: boolean;
+  };
+
+  const stateConfig = $derived.by<ConnectorStateConfig>(() => {
     switch (connectorState) {
       case 'pending':
         return { icon: 'loader', color: 'text-text-muted', label: 'En attente', spin: false };

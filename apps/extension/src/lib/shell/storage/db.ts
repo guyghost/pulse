@@ -4,13 +4,14 @@ import type { UserProfile } from '../../core/types/profile';
 import { UserProfileSchema } from '../../core/types/schemas';
 import { parseMission, parseUserProfile } from '../../core/types/type-guards';
 import { clearSemanticCache } from './semantic-cache';
+import { createDbHandleRegistry } from './db-handle-registry';
+import { createDbOpener } from './db-opener';
 import {
   dataMigrationsFor,
   structuralMigrationsFor,
   type DataMigrationDeps,
 } from './migration-registry';
 import {
-  BACKUP_MAX_BYTES,
   MIGRATION_KEYS,
   QUARANTINE_REJECT_RATIO,
   type MigrationError,
@@ -62,21 +63,39 @@ export const DB_VERSION = 5;
 export const APP_DATA_VERSION = 2;
 
 // ============================================================================
-// Single opener with versionchange + blocked handling
+// Tracked single opener (non-cutover DB5/data2 adapter)
 // ============================================================================
 
-const OPEN_BLOCKED_RETRIES = 3;
-const OPEN_BLOCKED_BACKOFF_MS = 250;
+const OPEN_BLOCKED_TIMEOUT_MS = 750;
 
-let inFlightOpen: Promise<IDBDatabase> | null = null;
+// Deliberately dormant until LocalDataReset and StartupBarrier cut over
+// atomically. A null provider is tracking-only and proves no reset readiness.
+const dbHandleRegistry = createDbHandleRegistry({ getActiveResetToken: () => null });
+const dbOpener = createDbOpener({
+  registry: dbHandleRegistry,
+  databaseName: DB_NAME,
+  targetVersion: DB_VERSION,
+  allocateOwnerId: () => crypto.randomUUID(),
+  openRequest: (name, version) =>
+    version === undefined ? indexedDB.open(name) : indexedDB.open(name, version),
+  scheduleBlockedTimeout: (effect, delayMs) => setTimeout(effect, delayMs),
+  cancelBlockedTimeout: (timer) => clearTimeout(timer as ReturnType<typeof setTimeout>),
+  blockedTimeoutMs: OPEN_BLOCKED_TIMEOUT_MS,
+  applyStructuralUpgrade: (request, event) => {
+    const migrations = structuralMigrationsFor(event.oldVersion);
+    for (const migration of migrations) {
+      migration(request.result);
+    }
+  },
+});
 
 /**
  * Opens the MissionPulse database at `DB_VERSION`. THE ONLY OPENER in the
  * extension (see db-migration.model.md invariant 1).
  *
- * - Sets `db.onversionchange = () => db.close()` so upgrades from other
- *   contexts are not blocked.
- * - Retries on `onblocked` with a backoff.
+ * The tracked opener reserves before the native request, registers before
+ * delivery, closes on versionchange through the registry and never retries a
+ * blocked request automatically.
  *
  * NOTE: callers that need to detect a downgrade (stored version > DB_VERSION)
  * must call `probeStoredDbVersion()` first. `openDB()` itself throws
@@ -84,52 +103,24 @@ let inFlightOpen: Promise<IDBDatabase> | null = null;
  * that case.
  */
 export function openDB(): Promise<IDBDatabase> {
-  if (inFlightOpen) {
-    return inFlightOpen;
-  }
-
-  inFlightOpen = openDBWithRetry(0).finally(() => {
-    inFlightOpen = null;
-  });
-
-  return inFlightOpen;
+  return dbOpener.openBusiness();
 }
 
-function openDBWithRetry(attempt: number): Promise<IDBDatabase> {
-  return new Promise((resolve, reject) => {
-    const request = indexedDB.open(DB_NAME, DB_VERSION);
+function openStartupDB(): Promise<IDBDatabase> {
+  return dbOpener.openStartup();
+}
 
-    request.onupgradeneeded = (event) => {
-      const db = request.result;
-      const oldVersion = event.oldVersion;
-      // Throwing aborts the upgrade transaction (IDB atomicity guarantees
-      // no partial schema is committed).
-      const migrations = structuralMigrationsFor(oldVersion);
-      for (const migration of migrations) {
-        migration(db);
-      }
-    };
+export function releaseDB(db: IDBDatabase): void {
+  dbOpener.release(db);
+}
 
-    request.onsuccess = () => {
-      const db = request.result;
-      db.onversionchange = () => {
-        db.close();
-      };
-      resolve(db);
-    };
-
-    request.onerror = () => reject(request.error);
-
-    request.onblocked = () => {
-      if (attempt + 1 < OPEN_BLOCKED_RETRIES) {
-        setTimeout(() => {
-          resolve(openDBWithRetry(attempt + 1));
-        }, OPEN_BLOCKED_BACKOFF_MS);
-      } else {
-        reject(new Error('IndexedDB open blocked after retries'));
-      }
-    };
-  });
+async function withDbHandle<T>(use: (db: IDBDatabase) => T | Promise<T>): Promise<T> {
+  const db = await openDB();
+  try {
+    return await use(db);
+  } finally {
+    releaseDB(db);
+  }
 }
 
 /**
@@ -154,20 +145,7 @@ export async function probeStoredDbVersion(): Promise<number> {
     }
   }
 
-  return new Promise<number>((resolve) => {
-    const request = indexedDB.open(DB_NAME);
-    request.onsuccess = () => {
-      const version = request.result.version;
-      request.result.close();
-      resolve(version);
-    };
-    request.onerror = () => resolve(0);
-    request.onupgradeneeded = () => {
-      // DB did not exist; the unversioned open creates it at version 1.
-      // For our purposes that means "no prior data of interest".
-      request.result.close();
-    };
-  });
+  return dbOpener.probeStoredVersion();
 }
 
 // ============================================================================
@@ -316,7 +294,7 @@ export function runMigrations(): Promise<MigrationResult> {
   return migrationInProgress;
 }
 
-async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult> {
+async function runMigrationLoop(versionRaceAttempt: number): Promise<MigrationResult> {
   setState('checking');
 
   const storedDbVersion = await probeStoredDbVersion();
@@ -343,21 +321,17 @@ async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult>
   // Open with version. May throw on structural failure or corruption.
   let db: IDBDatabase;
   try {
-    db = await openDB();
+    db = await openStartupDB();
   } catch (err) {
     if (isVersionError(err)) {
       // Race: another context upgraded beneath us. Re-probe and retry once.
-      if (repairAttempt === 0) {
+      if (versionRaceAttempt === 0) {
         return runMigrationLoop(1);
       }
       setState('downgrade', {
         lastError: { code: 'downgrade', message: 'VersionError during open' },
       });
       return { ok: false, code: 'downgrade', message: 'VersionError during open' };
-    }
-    // Corrupt DB → repair.
-    if (repairAttempt === 0) {
-      return runCorruptRepair(err);
     }
     const message = err instanceof Error ? err.message : String(err);
     setState('failed', {
@@ -366,72 +340,84 @@ async function runMigrationLoop(repairAttempt: number): Promise<MigrationResult>
     return { ok: false, code: 'corrupt', message };
   }
 
-  const fromDbVersion = storedDbVersion;
-  const storedDataVersion = await readStoredDataVersion();
-  const fromDataVersion = storedDataVersion ?? 0;
-
-  setState('readVersions', { storedDbVersion: fromDbVersion, storedDataVersion });
-
-  const structuralPending = fromDbVersion < DB_VERSION;
-  const dataPending = fromDataVersion < APP_DATA_VERSION;
-
-  if (structuralPending) {
-    // Already applied during openDB()'s onupgradeneeded; just reflect the state.
-    setState('migratingStruct');
-  }
-
-  if (dataPending) {
-    setState('migratingData');
-    try {
-      await runDataMigrations(fromDataVersion, db);
-      await writeStoredDataVersion(APP_DATA_VERSION);
-    } catch (err) {
-      db.close();
-      const code: MigrationErrorCode = isQuotaError(err) ? 'quota' : 'data_throw';
-      const message = err instanceof Error ? err.message : String(err);
-      setState('failed', { lastError: { code, message } });
-      return { ok: false, code, message };
+  let startupDbReleased = false;
+  const releaseStartupDbOnce = (): void => {
+    if (startupDbReleased) {
+      return;
     }
-  }
+    startupDbReleased = true;
+    releaseDB(db);
+  };
 
-  // Post-migration integrity sweep. Only runs when a structural or data
-  // migration was actually applied this session (the realistic corruption
-  // window: schema/data drift). On steady-state cold starts — both versions
-  // current — the O(n) scan is skipped; day-to-day corruption is still
-  // caught lazily by the runtime parse-on-read guard (`trackRuntimeReject`).
-  const migrationApplied = structuralPending || dataPending;
-  if (migrationApplied) {
-    setState('verifying');
-    const verifyResult = await verifyStores(db);
-    db.close();
+  try {
+    const fromDbVersion = storedDbVersion;
+    const storedDataVersion = await readStoredDataVersion();
+    const fromDataVersion = storedDataVersion ?? 0;
 
-    if (verifyResult.quarantineNeeded) {
-      setState('quarantine');
+    setState('readVersions', { storedDbVersion: fromDbVersion, storedDataVersion });
+
+    const structuralPending = fromDbVersion < DB_VERSION;
+    const dataPending = fromDataVersion < APP_DATA_VERSION;
+
+    if (structuralPending) {
+      // Already applied during openDB()'s onupgradeneeded; just reflect the state.
+      setState('migratingStruct');
+    }
+
+    if (dataPending) {
+      setState('migratingData');
       try {
-        await quarantineInvalidRecords(verifyResult.invalidByStore);
+        await runDataMigrations(fromDataVersion, db);
+        await writeStoredDataVersion(APP_DATA_VERSION);
       } catch (err) {
+        const code: MigrationErrorCode = isQuotaError(err) ? 'quota' : 'data_throw';
         const message = err instanceof Error ? err.message : String(err);
-        setState('failed', { lastError: { code: 'data_throw', message } });
-        return { ok: false, code: 'data_throw', message };
+        setState('failed', { lastError: { code, message } });
+        return { ok: false, code, message };
       }
     }
-  } else {
-    db.close();
+
+    // Post-migration integrity sweep. Only runs when a structural or data
+    // migration was actually applied this session (the realistic corruption
+    // window: schema/data drift). On steady-state cold starts — both versions
+    // current — the O(n) scan is skipped; day-to-day corruption is still
+    // caught lazily by the runtime parse-on-read guard (`trackRuntimeReject`).
+    const migrationApplied = structuralPending || dataPending;
+    if (migrationApplied) {
+      setState('verifying');
+      const verifyResult = await verifyStores(db);
+
+      if (verifyResult.quarantineNeeded) {
+        // Quarantine owns a separate tracked startup handle. Close this
+        // migration owner's handle before opening that independent owner.
+        releaseStartupDbOnce();
+        setState('quarantine');
+        try {
+          await quarantineInvalidRecords(verifyResult.invalidByStore);
+        } catch (err) {
+          const message = err instanceof Error ? err.message : String(err);
+          setState('failed', { lastError: { code: 'data_throw', message } });
+          return { ok: false, code: 'data_throw', message };
+        }
+      }
+    }
+
+    await chrome.storage.local.remove(MIGRATION_KEYS.downgrade);
+
+    setState('idle', {
+      storedDbVersion: DB_VERSION,
+      storedDataVersion: APP_DATA_VERSION,
+      lastError: null,
+    });
+
+    return {
+      ok: true,
+      from: { db: fromDbVersion || null, data: storedDataVersion },
+      to: { db: DB_VERSION, data: APP_DATA_VERSION },
+    };
+  } finally {
+    releaseStartupDbOnce();
   }
-
-  await chrome.storage.local.remove(MIGRATION_KEYS.downgrade);
-
-  setState('idle', {
-    storedDbVersion: DB_VERSION,
-    storedDataVersion: APP_DATA_VERSION,
-    lastError: null,
-  });
-
-  return {
-    ok: true,
-    from: { db: fromDbVersion || null, data: storedDataVersion },
-    to: { db: DB_VERSION, data: APP_DATA_VERSION },
-  };
 }
 
 async function runDataMigrations(fromVersion: number, db: IDBDatabase): Promise<void> {
@@ -535,7 +521,7 @@ function readAllFromStore(db: IDBDatabase, store: string): Promise<unknown[]> {
 }
 
 async function quarantineInvalidRecords(invalidByStore: Record<string, unknown[]>): Promise<void> {
-  const db = await openDB();
+  const db = await openStartupDB();
   try {
     await new Promise<void>((resolve, reject) => {
       const tx = db.transaction(['quarantine', ...Object.keys(invalidByStore)], 'readwrite');
@@ -565,107 +551,7 @@ async function quarantineInvalidRecords(invalidByStore: Record<string, unknown[]
       tx.onabort = () => reject(tx.error ?? new Error('Quarantine tx aborted'));
     });
   } finally {
-    db.close();
-  }
-}
-
-async function runCorruptRepair(cause: unknown): Promise<MigrationResult> {
-  setState('corruptRepair', {
-    lastError: {
-      code: 'corrupt',
-      message: cause instanceof Error ? cause.message : 'openDB rejected',
-    },
-  });
-
-  // Best-effort backup (whole-records-only, capped at BACKUP_MAX_BYTES).
-  await backupBeforeDestruction();
-
-  await new Promise<void>((resolve, reject) => {
-    const request = indexedDB.deleteDatabase(DB_NAME);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error('deleteDatabase blocked'));
-  });
-
-  // Re-run the full path. repairAttempt === 1 here; a second failure is terminal.
-  return runMigrationLoop(1);
-}
-
-async function backupBeforeDestruction(): Promise<void> {
-  let db: IDBDatabase;
-  try {
-    // Open without version to avoid re-triggering an upgrade on a broken DB.
-    db = await new Promise<IDBDatabase>((resolve, reject) => {
-      const request = indexedDB.open(DB_NAME);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  } catch {
-    // Cannot even open — record an empty backup so the UI knows we tried.
-    await chrome.storage.local.set({
-      [MIGRATION_KEYS.backup]: { partial: true, stores: {}, error: 'open_failed' },
-    });
-    return;
-  }
-
-  const stores: Record<string, { count: number; truncated?: boolean }> = {};
-  const serialized: Record<string, unknown[]> = {};
-  let totalBytes = 0;
-  let overflowed = false;
-  const encoder = new TextEncoder();
-
-  try {
-    for (const storeName of Array.from(db.objectStoreNames)) {
-      if (overflowed) {
-        break;
-      }
-      const records = await readAllFromStore(db, storeName);
-      const kept: unknown[] = [];
-      for (const record of records) {
-        let chunk: string;
-        try {
-          chunk = JSON.stringify(record);
-        } catch {
-          // Skip records that cannot be serialized (circular refs, etc.)
-          continue;
-        }
-        const byteLength = encoder.encode(chunk).byteLength;
-        if (totalBytes + byteLength > BACKUP_MAX_BYTES) {
-          overflowed = true;
-          break;
-        }
-        totalBytes += byteLength;
-        kept.push(record);
-      }
-      serialized[storeName] = kept;
-      stores[storeName] = {
-        count: kept.length,
-        truncated: overflowed || kept.length < records.length,
-      };
-    }
-  } finally {
-    db.close();
-  }
-
-  try {
-    await chrome.storage.local.set({
-      [MIGRATION_KEYS.backup]: {
-        partial: overflowed,
-        stores,
-        data: serialized,
-        savedAt: Date.now(),
-      },
-    });
-  } catch {
-    // Quota during backup write — drop the heavy `data` and keep the manifest.
-    await chrome.storage.local.set({
-      [MIGRATION_KEYS.backup]: {
-        partial: true,
-        stores,
-        error: 'quota_exceeded',
-        savedAt: Date.now(),
-      },
-    });
+    releaseDB(db);
   }
 }
 
@@ -683,27 +569,32 @@ export function withStore<T>(
   mode: IDBTransactionMode,
   fn: (store: IDBObjectStore) => IDBRequest
 ): Promise<T> {
-  return openDB().then((db) => {
+  return withDbHandle((db) => {
     return new Promise<T>((resolve, reject) => {
-      const tx = db.transaction(storeName, mode);
-      const store = tx.objectStore(storeName);
+      let tx: IDBTransaction;
+      let request: IDBRequest;
+      try {
+        tx = db.transaction(storeName, mode);
+        const store = tx.objectStore(storeName);
+        request = fn(store);
+      } catch (error) {
+        reject(error);
+        return;
+      }
       let result: T | undefined;
-      const request = fn(store);
+      let requestError: unknown;
       request.onsuccess = () => {
         result = request.result as T;
       };
-      request.onerror = () => reject(request.error);
-      tx.oncomplete = () => {
-        db.close();
-        resolve(result as T);
+      request.onerror = () => {
+        requestError = request.error;
       };
+      tx.oncomplete = () => resolve(result as T);
       tx.onerror = () => {
-        db.close();
-        reject(tx.error);
+        requestError ??= tx.error;
       };
       tx.onabort = () => {
-        db.close();
-        reject(tx.error);
+        reject(requestError ?? tx.error ?? createTransactionAbortError());
       };
     });
   });
@@ -715,40 +606,112 @@ export function withStore<T>(
  * Uses put() which is idempotent (insert or update).
  * Missions with the same ID are deduplicated before writing.
  */
-export async function saveMissions(missions: Mission[]): Promise<void> {
+function createTransactionAbortError(): DOMException {
+  return new DOMException('The IndexedDB transaction was aborted.', 'AbortError');
+}
+
+function throwIfTransactionAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw createTransactionAbortError();
+  }
+}
+
+export async function saveMissions(missions: Mission[], signal?: AbortSignal): Promise<void> {
+  throwIfTransactionAborted(signal);
   if (missions.length === 0) {
     return;
   }
 
-  const db = await openDB();
-  const tx = db.transaction('missions', 'readwrite');
-  const store = tx.objectStore('missions');
+  return withDbHandle((db) => {
+    throwIfTransactionAborted(signal);
+    const tx = db.transaction('missions', 'readwrite');
+    const store = tx.objectStore('missions');
 
-  // Deduplicate by ID before writing
-  const missionMap = new Map<string, Mission>();
-  for (const mission of missions) {
-    missionMap.set(mission.id, mission);
-  }
+    // Deduplicate by ID before writing
+    const missionMap = new Map<string, Mission>();
+    for (const mission of missions) {
+      missionMap.set(mission.id, mission);
+    }
 
-  const uniqueMissions = Array.from(missionMap.values());
+    const uniqueMissions = Array.from(missionMap.values());
 
-  for (const mission of uniqueMissions) {
-    store.put(mission);
-  }
+    return new Promise((resolve, reject) => {
+      let settled = false;
+      const cleanup = (): void => {
+        signal?.removeEventListener('abort', onAbortRequested);
+      };
+      const resolveOnce = (): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        resolve();
+      };
+      const rejectOnce = (error: unknown): void => {
+        if (settled) {
+          return;
+        }
+        settled = true;
+        cleanup();
+        reject(error);
+      };
+      const onAbortRequested = (): void => {
+        if (settled) {
+          return;
+        }
+        try {
+          tx.abort();
+        } catch (error) {
+          if (!(error instanceof DOMException && error.name === 'InvalidStateError')) {
+            rejectOnce(error);
+          }
+          // InvalidStateError means the transaction already committed or aborted;
+          // its terminal event remains the deterministic winner.
+        }
+      };
 
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => {
-      if (import.meta.env.DEV && uniqueMissions.length > 0) {
-        const dedupedCount = missions.length - uniqueMissions.length;
-        if (dedupedCount > 0) {
-          console.debug(
-            `[DB] Saved ${uniqueMissions.length} missions (${dedupedCount} duplicates deduped)`
-          );
+      signal?.addEventListener('abort', onAbortRequested, { once: true });
+      tx.oncomplete = () => {
+        if (import.meta.env.DEV && uniqueMissions.length > 0) {
+          const dedupedCount = missions.length - uniqueMissions.length;
+          if (dedupedCount > 0) {
+            console.debug(
+              `[DB] Saved ${uniqueMissions.length} missions (${dedupedCount} duplicates deduped)`
+            );
+          }
+        }
+        resolveOnce();
+      };
+      tx.onerror = () => {
+        // IndexedDB follows a request/transaction error with `abort`; wait for
+        // that event so callers observe rollback quiescence before rejection.
+      };
+      tx.onabort = () => {
+        rejectOnce(
+          signal?.aborted
+            ? createTransactionAbortError()
+            : (tx.error ?? createTransactionAbortError())
+        );
+      };
+
+      if (signal?.aborted) {
+        onAbortRequested();
+        return;
+      }
+
+      try {
+        for (const mission of uniqueMissions) {
+          store.put(mission);
+        }
+      } catch (error) {
+        try {
+          tx.abort();
+        } catch {
+          rejectOnce(error);
         }
       }
-      resolve();
-    };
-    tx.onerror = () => reject(tx.error);
+    });
   });
 }
 
@@ -779,29 +742,30 @@ export async function getMissionCount(): Promise<number> {
  * Efficient filtered query that doesn't load all missions.
  */
 export async function getMissionsBySource(source: MissionSource): Promise<Mission[]> {
-  const db = await openDB();
-  const tx = db.transaction('missions', 'readonly');
-  const store = tx.objectStore('missions');
-  const index = store.index('source');
+  return withDbHandle((db) => {
+    const tx = db.transaction('missions', 'readonly');
+    const store = tx.objectStore('missions');
+    const index = store.index('source');
 
-  return new Promise((resolve, reject) => {
-    const request = index.getAll(source);
-    request.onsuccess = () => {
-      const rawMissions = request.result as unknown[];
-      const validMissions: Mission[] = [];
+    return new Promise((resolve, reject) => {
+      const request = index.getAll(source);
+      request.onsuccess = () => {
+        const rawMissions = request.result as unknown[];
+        const validMissions: Mission[] = [];
 
-      for (const raw of rawMissions) {
-        const mission = parseMission(raw, deserializeStoredDate);
-        if (mission) {
-          validMissions.push(mission);
-        } else {
-          trackRuntimeReject(raw);
+        for (const raw of rawMissions) {
+          const mission = parseMission(raw, deserializeStoredDate);
+          if (mission) {
+            validMissions.push(mission);
+          } else {
+            trackRuntimeReject(raw);
+          }
         }
-      }
 
-      resolve(validMissions);
-    };
-    request.onerror = () => reject(request.error);
+        resolve(validMissions);
+      };
+      request.onerror = () => reject(request.error);
+    });
   });
 }
 
@@ -811,32 +775,33 @@ export async function getMissionsBySource(source: MissionSource): Promise<Missio
  * @param maxAgeDays Maximum age in days
  */
 export async function getRecentMissions(maxAgeDays: number): Promise<Mission[]> {
-  const db = await openDB();
-  const tx = db.transaction('missions', 'readonly');
-  const store = tx.objectStore('missions');
-  const index = store.index('scrapedAt');
+  return withDbHandle((db) => {
+    const tx = db.transaction('missions', 'readonly');
+    const store = tx.objectStore('missions');
+    const index = store.index('scrapedAt');
 
-  const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
-  const range = IDBKeyRange.lowerBound(cutoff);
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    const range = IDBKeyRange.lowerBound(cutoff);
 
-  return new Promise((resolve, reject) => {
-    const request = index.getAll(range);
-    request.onsuccess = () => {
-      const rawMissions = request.result as unknown[];
-      const validMissions: Mission[] = [];
+    return new Promise((resolve, reject) => {
+      const request = index.getAll(range);
+      request.onsuccess = () => {
+        const rawMissions = request.result as unknown[];
+        const validMissions: Mission[] = [];
 
-      for (const raw of rawMissions) {
-        const mission = parseMission(raw, deserializeStoredDate);
-        if (mission) {
-          validMissions.push(mission);
-        } else {
-          trackRuntimeReject(raw);
+        for (const raw of rawMissions) {
+          const mission = parseMission(raw, deserializeStoredDate);
+          if (mission) {
+            validMissions.push(mission);
+          } else {
+            trackRuntimeReject(raw);
+          }
         }
-      }
 
-      resolve(validMissions);
-    };
-    request.onerror = () => reject(request.error);
+        resolve(validMissions);
+      };
+      request.onerror = () => reject(request.error);
+    });
   });
 }
 
@@ -861,61 +826,61 @@ export async function getMissionsPaginated(
   options: PaginatedQueryOptions
 ): Promise<PaginatedMissions> {
   const { page, pageSize, sortBy = 'date', filterSource } = options;
+  return withDbHandle(async (db) => {
+    const tx = db.transaction('missions', 'readonly');
+    const store = tx.objectStore('missions');
 
-  const db = await openDB();
-  const tx = db.transaction('missions', 'readonly');
-  const store = tx.objectStore('missions');
-
-  // Get total count first
-  const totalRequest = store.count();
-  const totalCount = await new Promise<number>((resolve, reject) => {
-    totalRequest.onsuccess = () => resolve(totalRequest.result);
-    totalRequest.onerror = () => reject(totalRequest.error);
-  });
-
-  // Fetch all missions (we need to sort in memory for score/tjm)
-  // For date sorting with source filter, we can use index
-  let rawMissions: unknown[];
-
-  if (filterSource) {
-    const index = store.index('source');
-    rawMissions = await new Promise<unknown[]>((resolve, reject) => {
-      const request = index.getAll(filterSource);
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
+    // Get total count first
+    const totalRequest = store.count();
+    const totalCount = await new Promise<number>((resolve, reject) => {
+      totalRequest.onsuccess = () => resolve(totalRequest.result);
+      totalRequest.onerror = () => reject(totalRequest.error);
     });
-  } else {
-    rawMissions = await new Promise<unknown[]>((resolve, reject) => {
-      const request = store.getAll();
-      request.onsuccess = () => resolve(request.result);
-      request.onerror = () => reject(request.error);
-    });
-  }
 
-  // Parse and validate missions
-  const validMissions: Mission[] = [];
-  for (const raw of rawMissions) {
-    const mission = parseMission(raw, deserializeStoredDate);
-    if (mission) {
-      validMissions.push(mission);
+    // Fetch all missions (we need to sort in memory for score/tjm)
+    // For date sorting with source filter, we can use index
+    let rawMissions: unknown[];
+
+    if (filterSource) {
+      const index = store.index('source');
+      rawMissions = await new Promise<unknown[]>((resolve, reject) => {
+        const request = index.getAll(filterSource);
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
     } else {
-      trackRuntimeReject(raw);
+      rawMissions = await new Promise<unknown[]>((resolve, reject) => {
+        const request = store.getAll();
+        request.onsuccess = () => resolve(request.result);
+        request.onerror = () => reject(request.error);
+      });
     }
-  }
 
-  // Sort missions
-  const sortedMissions = sortMissions(validMissions, sortBy);
+    // Parse and validate missions
+    const validMissions: Mission[] = [];
+    for (const raw of rawMissions) {
+      const mission = parseMission(raw, deserializeStoredDate);
+      if (mission) {
+        validMissions.push(mission);
+      } else {
+        trackRuntimeReject(raw);
+      }
+    }
 
-  // Paginate
-  const startIndex = page * pageSize;
-  const paginatedMissions = sortedMissions.slice(startIndex, startIndex + pageSize);
-  const hasMore = startIndex + pageSize < sortedMissions.length;
+    // Sort missions
+    const sortedMissions = sortMissions(validMissions, sortBy);
 
-  return {
-    missions: paginatedMissions,
-    total: filterSource ? sortedMissions.length : totalCount,
-    hasMore,
-  };
+    // Paginate
+    const startIndex = page * pageSize;
+    const paginatedMissions = sortedMissions.slice(startIndex, startIndex + pageSize);
+    const hasMore = startIndex + pageSize < sortedMissions.length;
+
+    return {
+      missions: paginatedMissions,
+      total: filterSource ? sortedMissions.length : totalCount,
+      hasMore,
+    };
+  });
 }
 
 // sortMissions is imported from core/scoring/sort-missions.ts (FC&IS compliant)
@@ -930,35 +895,37 @@ export async function upsertMissions(newMissions: Mission[]): Promise<number> {
     return 0;
   }
 
-  const db = await openDB();
-  const tx = db.transaction('missions', 'readwrite');
-  const store = tx.objectStore('missions');
+  return withDbHandle((db) => {
+    const tx = db.transaction('missions', 'readwrite');
+    const store = tx.objectStore('missions');
 
-  // Deduplicate by ID
-  const missionMap = new Map<string, Mission>();
-  for (const mission of newMissions) {
-    missionMap.set(mission.id, mission);
-  }
-
-  const uniqueMissions = Array.from(missionMap.values());
-  let writtenCount = 0;
-
-  return new Promise((resolve, reject) => {
-    for (const mission of uniqueMissions) {
-      store.put(mission);
-      writtenCount++;
+    // Deduplicate by ID
+    const missionMap = new Map<string, Mission>();
+    for (const mission of newMissions) {
+      missionMap.set(mission.id, mission);
     }
 
-    tx.oncomplete = () => {
-      if (import.meta.env.DEV && writtenCount > 0) {
-        console.debug(
-          `[DB] Upserted ${writtenCount} missions (${newMissions.length - uniqueMissions.length} duplicates deduped)`
-        );
-      }
-      resolve(writtenCount);
-    };
+    const uniqueMissions = Array.from(missionMap.values());
+    let writtenCount = 0;
 
-    tx.onerror = () => reject(tx.error);
+    return new Promise((resolve, reject) => {
+      for (const mission of uniqueMissions) {
+        store.put(mission);
+        writtenCount++;
+      }
+
+      tx.oncomplete = () => {
+        if (import.meta.env.DEV && writtenCount > 0) {
+          console.debug(
+            `[DB] Upserted ${writtenCount} missions (${newMissions.length - uniqueMissions.length} duplicates deduped)`
+          );
+        }
+        resolve(writtenCount);
+      };
+
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? createTransactionAbortError());
+    });
   });
 }
 
@@ -1047,15 +1014,17 @@ export async function getProfile(): Promise<UserProfile | null> {
 
 // Connector Statuses
 export async function saveConnectorStatuses(statuses: PersistedConnectorStatus[]): Promise<void> {
-  const db = await openDB();
-  const tx = db.transaction('connector_status', 'readwrite');
-  const store = tx.objectStore('connector_status');
-  for (const status of statuses) {
-    store.put(status);
-  }
-  return new Promise((resolve, reject) => {
-    tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error);
+  return withDbHandle((db) => {
+    const tx = db.transaction('connector_status', 'readwrite');
+    const store = tx.objectStore('connector_status');
+    for (const status of statuses) {
+      store.put(status);
+    }
+    return new Promise((resolve, reject) => {
+      tx.oncomplete = () => resolve();
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? createTransactionAbortError());
+    });
   });
 }
 
@@ -1075,42 +1044,40 @@ export async function clearConnectorStatuses(): Promise<void> {
  * @returns Number of missions purged
  */
 export async function purgeOldMissions(maxAgeDays = 90): Promise<number> {
-  const db = await openDB();
-  const tx = db.transaction('missions', 'readwrite');
-  const store = tx.objectStore('missions');
-  const index = store.index('scrapedAt');
+  return withDbHandle((db) => {
+    const tx = db.transaction('missions', 'readwrite');
+    const store = tx.objectStore('missions');
+    const index = store.index('scrapedAt');
 
-  const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
-  const range = IDBKeyRange.upperBound(cutoff);
+    const cutoff = Date.now() - maxAgeDays * 24 * 60 * 60 * 1000;
+    const range = IDBKeyRange.upperBound(new Date(cutoff));
 
-  return new Promise((resolve, reject) => {
-    const request = index.openCursor(range);
-    let purged = 0;
+    return new Promise((resolve, reject) => {
+      const request = index.openCursor(range);
+      let purged = 0;
 
-    request.onsuccess = () => {
-      const cursor = request.result;
-      if (cursor) {
-        cursor.delete();
-        purged++;
-        cursor.continue();
-      } else {
-        // All done
+      request.onsuccess = () => {
+        const cursor = request.result;
+        if (cursor) {
+          cursor.delete();
+          purged++;
+          cursor.continue();
+        }
+      };
+
+      request.onerror = () => {
+        reject(request.error);
+      };
+
+      tx.oncomplete = () => {
+        if (purged > 0 && import.meta.env.DEV) {
+          console.debug(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
+        }
         resolve(purged);
-      }
-    };
+      };
 
-    request.onerror = () => {
-      reject(request.error);
-    };
-
-    tx.oncomplete = () => {
-      if (purged > 0 && import.meta.env.DEV) {
-        console.debug(`[DB] Purged ${purged} missions older than ${maxAgeDays} days`);
-      }
-    };
-
-    tx.onerror = () => {
-      reject(tx.error);
-    };
+      tx.onerror = () => reject(tx.error);
+      tx.onabort = () => reject(tx.error ?? createTransactionAbortError());
+    });
   });
 }

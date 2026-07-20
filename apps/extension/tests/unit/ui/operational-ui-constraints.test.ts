@@ -136,11 +136,11 @@ describe('operational UI constraints', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const stackSource = readFileSync('src/ui/organisms/MissionArrivalStack.svelte', 'utf8');
     const toastSource = readFileSync('src/ui/organisms/ToastContainer.svelte', 'utf8');
+    const toastCollectionSource = readFileSync('src/ui/organisms/ToastCollection.svelte', 'utf8');
 
     expect(feedSource).toContain("import('../organisms/MissionArrivalStack.svelte')");
-    expect(feedSource).toContain('page.startArrivalRefresh()');
-    expect(feedSource).toContain('await controller.applyPendingMissions()');
-    expect(feedSource).toContain('page.completeArrivalRefresh()');
+    expect(feedSource).toContain('await page.refreshArrivals()');
+    expect(feedSource).not.toContain('await controller.applyPendingMissions()');
     expect(feedSource).toContain('stableQueueActive={page.stableQueueActive}');
     expect(feedSource).toContain('onMissionReadSignal={page.handleMissionReadSignal}');
     expect(feedSource).not.toContain('data-testid="pending-missions-banner"');
@@ -149,7 +149,8 @@ describe('operational UI constraints', () => {
     expect(stackSource).toContain('data-testid="arrival-stack-layer"');
     expect(stackSource).toContain('@media (prefers-reduced-motion: reduce)');
     expect(stackSource).not.toContain('backdrop');
-    expect(toastSource).toContain('bottom-[var(--toast-bottom-offset,4rem)]');
+    expect(toastSource).toContain('use:modalFeedback');
+    expect(toastCollectionSource).toContain('bottom-[var(--toast-bottom-offset,4rem)]');
   });
 
   it('guides users from the feed summary to missions below the fold', () => {
@@ -471,6 +472,19 @@ describe('operational UI constraints', () => {
     expect(advancedIdx).toBeLessThan(presetsIdx);
   });
 
+  it('keeps the compact feed story aligned and unclipped at side-panel width', () => {
+    const storySource = readFileSync('src/ui/molecules/OperationalStoryCard.svelte', 'utf8');
+    const badgeSource = readFileSync('src/ui/atoms/OperationalStatusBadge.svelte', 'utf8');
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+
+    expect(storySource).toContain('data-testid="operational-story-inline"');
+    expect(storySource).toContain('grid-cols-[auto_auto_minmax(0,1fr)]');
+    expect(storySource).toContain('<span class="min-w-0 truncate">{primaryActionLabel}</span>');
+    expect(badgeSource).toContain('whitespace-nowrap');
+    expect(feedSource).toContain('data-testid="feed-hero-card"');
+    expect(feedSource).toContain("'sticky top-0 z-20 rounded-b-2xl");
+  });
+
   it('keeps feed filters decision-oriented with business presets', () => {
     const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
     const stateSource = readFileSync('src/lib/state/feed-page.svelte.ts', 'utf8');
@@ -516,7 +530,7 @@ describe('operational UI constraints', () => {
     expect(cardSource).toContain('aria-expanded={scoreDetailsOpen}');
     expect(cardSource).toContain('aria-controls={scoreDetailsId}');
     expect(cardSource.indexOf('Pourquoi ce score ?')).toBeLessThan(
-      cardSource.indexOf('<!-- Detail grid -->')
+      cardSource.indexOf('<!-- Inline details controlled by the scoped disclosure. -->')
     );
     expect(drawerSource.indexOf('Transformer la décision')).toBeLessThan(
       drawerSource.indexOf('Détails techniques')
@@ -690,6 +704,10 @@ describe('operational UI constraints', () => {
     expect(source).toContain('function handleConfirmReset()');
     expect(source).toContain('scrollIntoView');
     expect(source).toContain('disabled={!canConfirmReset}');
+    expect(source).toContain("resetAvailability.status === 'unavailable'");
+    expect(source).toContain('disabled={resetUnavailable}');
+    expect(source).toContain('role="alert"');
+    expect(source).toContain('{resetError}');
     expect(source).toContain('onCreateBackup');
     expect(source).toContain('Créer une sauvegarde avant suppression');
     expect(source).toContain('Suppression irréversible');
@@ -699,6 +717,11 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Après suppression : relancer l’onboarding');
     expect(source).toContain('Tapez SUPPRIMER pour confirmer');
     expect(settingsSource).toContain('onCreateBackup={handleCreateBackup}');
+    expect(settingsSource).toContain(
+      "{#if settings.localDataResetAvailability.status === 'available'}"
+    );
+    expect(settingsSource).toContain('resetAvailability={settings.localDataResetAvailability}');
+    expect(settingsSource).toContain('resetError={settings.resetError}');
     expect(source).not.toContain('Confirmer la suppression');
   });
 

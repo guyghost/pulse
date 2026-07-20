@@ -12,10 +12,12 @@
     "test:watch": "vitest",
     "test:coverage": "vitest run --coverage",
     "test:e2e": "pnpm --filter @pulse/ui build && playwright test",
+    "test:mv3": "pnpm --filter @pulse/ui build && pnpm build && pnpm verify-manifest dist/manifest.json --post-build && playwright test --config=playwright.mv3.config.ts",
+    "test:e2e:extension": "pnpm test:mv3",
     "test:e2e:full": "pnpm --filter @pulse/ui build && env -u CI playwright test",
     "test:regression": "vitest run tests/unit/regression/parser-regression.test.ts",
-    "health-check": "tsx tests/health/run-health-checks.ts",
-    "health-check:json": "HEALTH_CHECK_JSON=1 tsx tests/health/run-health-checks.ts --json",
+    "health-check": "MISSIONPULSE_CONNECTOR_HEALTH_FIXTURE_ONLY=1 node --import tsx tests/health/run-health-checks.ts",
+    "health-check:json": "MISSIONPULSE_CONNECTOR_HEALTH_FIXTURE_ONLY=1 node --import tsx tests/health/run-health-checks.ts --json",
     "lint": "eslint . --ext .ts,.svelte",
     "lint:fix": "eslint . --ext .ts,.svelte --fix",
     "format": "prettier --write .",
@@ -23,7 +25,10 @@
     "typecheck": "tsc --noEmit",
     "verify-manifest": "tsx scripts/verify-manifest.ts",
     "bump-version": "tsx scripts/bump-version.ts",
-    "build:extension": "bash scripts/build-extension.sh"
+    "build:extension": "bash scripts/build-extension.sh",
+    "release:seal-candidate": "tsx scripts/seal-tested-dist.ts",
+    "package:sealed": "tsx scripts/package-sealed-dist.ts",
+    "verify:release-artifact": "tsx scripts/verify-release-artifact.ts"
   },
   "dependencies": {
     "@pulse/domain": "workspace:*",
@@ -31,6 +36,7 @@
     "@supabase/supabase-js": "^2.110.0",
     "lucide-svelte": "^1.0.1",
     "svelte": "^5.56.4",
+    "xstate": "^5.32.5",
     "zod": "^3.23.0"
   },
   "devDependencies": {
@@ -55,6 +61,7 @@
     "typescript": "^5.7.0",
     "typescript-eslint": "^8.62.1",
     "vite": "^8.1.4",
-    "vitest": "^3.2.6"
+    "vitest": "^3.2.6",
+    "yaml": "^2.9.0"
   }
 }

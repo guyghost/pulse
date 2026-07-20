@@ -10,15 +10,43 @@ import {
 import { createPromptSession, isPromptApiAvailable } from './capabilities';
 import { getCachedSemanticScores, cacheSemanticScores } from '../storage/semantic-cache';
 import type { AILanguageModelSession } from './chrome-ai';
+import { abortableDelay } from '../utils/retry-strategy';
 
 const TIMEOUT_MS = 5000;
 const RETRY_DELAYS_MS = [500, 1000] as const;
 const MAX_RETRIES = RETRY_DELAYS_MS.length;
 
-/**
- * Sleep for a given number of milliseconds.
- */
-const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new DOMException('The operation was aborted.', 'AbortError');
+  }
+}
+
+function promptWithCancellation(
+  session: AILanguageModelSession,
+  prompt: string,
+  signal?: AbortSignal
+): Promise<string> {
+  throwIfAborted(signal);
+  return new Promise((resolve, reject) => {
+    const cleanup = (): void => {
+      clearTimeout(timeout);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const settle = (callback: () => void): void => {
+      cleanup();
+      callback();
+    };
+    const onAbort = (): void =>
+      settle(() => reject(new DOMException('The operation was aborted.', 'AbortError')));
+    const timeout = setTimeout(() => settle(() => reject(new Error('timeout'))), TIMEOUT_MS);
+    signal?.addEventListener('abort', onAbort, { once: true });
+    session.prompt(prompt).then(
+      (value) => settle(() => resolve(value)),
+      (error: unknown) => settle(() => reject(error))
+    );
+  });
+}
 
 /**
  * Score a single mission using an existing AI session with retry logic.
@@ -27,25 +55,23 @@ const sleep = (ms: number): Promise<void> => new Promise((resolve) => setTimeout
 const scoreSingleMission = async (
   mission: Mission,
   profile: UserProfile,
-  session: AILanguageModelSession
+  session: AILanguageModelSession,
+  signal?: AbortSignal
 ): Promise<SemanticResult | null> => {
   let lastError: Error | null = null;
 
   for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
     try {
+      throwIfAborted(signal);
       const prompt = buildScoringPrompt(mission, profile);
-
-      const response = await Promise.race<string>([
-        session.prompt(prompt),
-        new Promise<never>((_, reject) =>
-          setTimeout(() => reject(new Error('timeout')), TIMEOUT_MS)
-        ),
-      ]);
+      const response = await promptWithCancellation(session, prompt, signal);
+      throwIfAborted(signal);
 
       const parsed = parseSemanticResult(response);
       return parsed;
     } catch (error) {
       lastError = error instanceof Error ? error : new Error(String(error));
+      throwIfAborted(signal);
 
       if (import.meta.env.DEV) {
         console.warn(
@@ -57,7 +83,7 @@ const scoreSingleMission = async (
 
       // Wait before retry (except on last attempt)
       if (attempt < MAX_RETRIES) {
-        await sleep(RETRY_DELAYS_MS[attempt]);
+        await abortableDelay(RETRY_DELAYS_MS[attempt], signal);
       }
     }
   }
@@ -90,11 +116,14 @@ const scoreSingleMission = async (
 export const scoreMissionsSemantic = async (
   missions: Mission[],
   profile: UserProfile,
-  maxPerScan = 10
+  maxPerScan = 10,
+  signal?: AbortSignal
 ): Promise<Map<string, SemanticResult>> => {
+  throwIfAborted(signal);
   const results = new Map<string, SemanticResult>();
 
   const availability = await isPromptApiAvailable();
+  throwIfAborted(signal);
   if (availability === 'no') {
     return results;
   }
@@ -108,7 +137,9 @@ export const scoreMissionsSemantic = async (
   let cachedResults = new Map<string, SemanticResult>();
   try {
     cachedResults = await getCachedSemanticScores(missionIds, profile);
+    throwIfAborted(signal);
   } catch {
+    throwIfAborted(signal);
     // Cache unavailable, continue without it
   }
 
@@ -132,9 +163,10 @@ export const scoreMissionsSemantic = async (
 
   try {
     session = await createPromptSession();
+    throwIfAborted(signal);
 
     for (const mission of batch) {
-      const result = await scoreSingleMission(mission, profile, session);
+      const result = await scoreSingleMission(mission, profile, session, signal);
       if (result) {
         newResults.set(mission.id, result);
         results.set(mission.id, result);
@@ -146,9 +178,12 @@ export const scoreMissionsSemantic = async (
 
   // Step 4: Cache newly computed scores
   if (newResults.size > 0) {
+    throwIfAborted(signal);
     try {
       await cacheSemanticScores(newResults, profile);
+      throwIfAborted(signal);
     } catch {
+      throwIfAborted(signal);
       // Cache write failed, scores are still returned
     }
   }

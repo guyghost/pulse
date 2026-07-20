@@ -10,6 +10,7 @@ import {
   validateNoExcludedConnectorPatterns,
   registrableDomainOf,
 } from '../../../scripts/verify-manifest.ts';
+import { resolveIncludedConnectors } from '../../../scripts/resolve-connectors.ts';
 import { getAllConnectorsMeta } from '../../../src/lib/shell/connectors/meta';
 
 // ── Minimal valid manifest fixture ──────────────────────────────────
@@ -403,6 +404,16 @@ describe('parseArgs', () => {
       postBuild: true,
     });
   });
+
+  it('should bind post-build validation to the exact expected artifact version', () => {
+    expect(
+      parseArgs(['dist/manifest.json', '--post-build', '--expected-version', '1.2.3'])
+    ).toEqual({
+      manifestPath: 'dist/manifest.json',
+      expectedVersion: '1.2.3',
+      postBuild: true,
+    });
+  });
 });
 
 describe('validateLinkedInProfileImportPermissions', () => {
@@ -434,6 +445,82 @@ describe('validateLinkedInProfileImportPermissions', () => {
         ])
       );
     }
+  });
+
+  it('keeps LinkedIn optional instead of conflating it with mandatory connector hosts', () => {
+    const manifest = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'src/manifest.json'), 'utf-8')
+    ) as {
+      host_permissions?: string[];
+      optional_host_permissions?: string[];
+    };
+
+    expect(manifest.host_permissions ?? []).not.toContain('https://www.linkedin.com/*');
+    expect(manifest.optional_host_permissions).toEqual(['https://www.linkedin.com/*']);
+  });
+});
+
+describe('production release surfaces', () => {
+  const repoRoot = resolve(process.cwd(), '..', '..');
+  const allConnectors = getAllConnectorsMeta();
+  const connectorConfig = JSON.parse(
+    readFileSync(resolve(process.cwd(), 'connectors.config.json'), 'utf-8')
+  ) as { include?: string[]; exclude?: string[] };
+  const resolution = resolveIncludedConnectors({
+    allIds: allConnectors.map(({ id }) => id),
+    config: connectorConfig,
+    env: {},
+  });
+  const shippedConnectorNames = allConnectors
+    .filter(({ id }) => resolution.included.includes(id))
+    .map(({ name }) => name);
+  const knownConnectorNames = allConnectors.map(({ name }) => name);
+  const releaseSurfaces = [
+    ['Chrome Web Store listing', resolve(repoRoot, 'docs/store-listing.md')],
+    ['repository privacy policy', resolve(repoRoot, 'docs/privacy-policy.md')],
+    ['landing privacy page', resolve(repoRoot, 'apps/landing/src/routes/privacy/+page.svelte')],
+    ['landing homepage', resolve(repoRoot, 'apps/landing/src/routes/+page.svelte')],
+  ] as const;
+
+  it('derives the expected four-connector disclosure from the production build config', () => {
+    expect(resolution.included).toEqual(['free-work', 'lehibou', 'hiway', 'cherry-pick']);
+    expect(shippedConnectorNames).toEqual(['Free-Work', 'LeHibou', 'Hiway', 'Cherry Pick']);
+  });
+
+  it.each(releaseSurfaces)('%s names exactly the connectors shipped in production', (_, path) => {
+    const content = readFileSync(path, 'utf-8');
+    const disclosedNames = knownConnectorNames.filter((name) => content.includes(name));
+
+    expect(disclosedNames).toEqual(shippedConnectorNames);
+  });
+
+  it('uses the exact production connector count in count-bearing public copy', () => {
+    const storeListing = readFileSync(resolve(repoRoot, 'docs/store-listing.md'), 'utf-8');
+    const landingHomepage = readFileSync(
+      resolve(repoRoot, 'apps/landing/src/routes/+page.svelte'),
+      'utf-8'
+    );
+    const countBearingCopy = `${storeListing}\n${landingHomepage}`;
+
+    expect(countBearingCopy).not.toMatch(/\b5 (?:plateformes|connecteurs)\b/i);
+    expect(countBearingCopy).toMatch(/\b4 plateformes\b/i);
+  });
+
+  it('contains no incomplete privacy placeholder and exposes the canonical privacy contact', () => {
+    const privacyPolicy = readFileSync(resolve(repoRoot, 'docs/privacy-policy.md'), 'utf-8');
+
+    expect(privacyPolicy).not.toContain('[a completer]');
+    expect(privacyPolicy).toContain('privacy@missionpulse.app');
+  });
+
+  it('discloses the user-triggered LinkedIn permission surface in the Store listing', () => {
+    const storeListing = readFileSync(resolve(repoRoot, 'docs/store-listing.md'), 'utf-8');
+
+    expect(storeListing).toContain('`scripting`');
+    expect(storeListing).toContain('`activeTab`');
+    expect(storeListing).toContain('`optional_host_permissions`');
+    expect(storeListing).toContain('`https://www.linkedin.com/*`');
+    expect(storeListing).toMatch(/LinkedIn.*geste utilisateur/i);
   });
 });
 
@@ -525,14 +612,13 @@ describe('validateNoExcludedConnectorPatterns', () => {
     hostPermissions: c.hostPermissions,
   }));
 
-  it('passes when manifest only contains shipped connector patterns + infra', () => {
-    // Ship everything except malt; manifest has no malt patterns.
+  it('passes when manifest only contains shipped connector patterns', () => {
+    // Ship everything except malt; manifest has no malt or unowned patterns.
     const shipped = ALL.filter((c) => c.id !== 'malt');
     const maltPatterns = ALL.find((c) => c.id === 'malt')!.hostPermissions;
-    const manifestPatterns = [
-      ...shipped.flatMap((c) => c.hostPermissions),
-      'https://supabase.co/*', // infra — not owned by any connector
-    ].filter((p) => !maltPatterns.includes(p));
+    const manifestPatterns = shipped
+      .flatMap((c) => c.hostPermissions)
+      .filter((p) => !maltPatterns.includes(p));
 
     const result = validateNoExcludedConnectorPatterns(
       { host_permissions: manifestPatterns },
@@ -556,13 +642,78 @@ describe('validateNoExcludedConnectorPatterns', () => {
     }
   });
 
-  it('allows unowned infra patterns (Supabase, missionpulse.app)', () => {
+  it('rejects mandatory host patterns with no connector ownership claim', () => {
     const result = validateNoExcludedConnectorPatterns(
       { host_permissions: ['https://supabase.co/*', 'https://missionpulse.app/*'] },
       ALL,
       []
     );
-    expect(result.valid).toBe(true);
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors).toEqual(
+        expect.arrayContaining([
+          expect.stringContaining('https://supabase.co/*'),
+          expect.stringContaining('https://missionpulse.app/*'),
+        ])
+      );
+    }
+  });
+
+  it('keeps the owned Hiway Supabase host while rejecting MissionPulse as unused', () => {
+    const hiway = ALL.find(({ id }) => id === 'hiway');
+    expect(hiway).toBeDefined();
+
+    const result = validateNoExcludedConnectorPatterns(
+      {
+        host_permissions: [...(hiway?.hostPermissions ?? []), 'https://missionpulse.app/*'],
+      },
+      ALL,
+      hiway ? [hiway] : []
+    );
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors).toEqual([expect.stringContaining('https://missionpulse.app/*')]);
+    }
+  });
+
+  it('keeps the source manifest free of unused MissionPulse host access', () => {
+    const manifest = JSON.parse(
+      readFileSync(resolve(process.cwd(), 'src/manifest.json'), 'utf-8')
+    ) as { host_permissions?: string[] };
+
+    expect(manifest.host_permissions ?? []).not.toContain('https://missionpulse.app/*');
+  });
+
+  it('rejects a mandatory host pattern claimed by more than one connector', () => {
+    const sharedPattern = 'https://shared.example/*';
+    const duplicateOwners = [
+      {
+        id: 'first',
+        name: 'First',
+        url: 'https://first.example',
+        hostPermissions: [sharedPattern],
+      },
+      {
+        id: 'second',
+        name: 'Second',
+        url: 'https://second.example',
+        hostPermissions: [sharedPattern],
+      },
+    ];
+
+    const result = validateNoExcludedConnectorPatterns(
+      { host_permissions: [sharedPattern] },
+      duplicateOwners,
+      duplicateOwners
+    );
+
+    expect(result.valid).toBe(false);
+    if (!result.valid) {
+      expect(result.errors).toEqual([
+        expect.stringMatching(/shared\.example.*exactly one.*First.*Second/i),
+      ]);
+    }
   });
 });
 

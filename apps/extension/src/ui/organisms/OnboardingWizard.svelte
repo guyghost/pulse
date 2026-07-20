@@ -21,7 +21,13 @@
     description: string;
   };
 
+  type OnboardingSourceOption = {
+    id: string;
+    name: string;
+  };
+
   const {
+    sources,
     onComplete,
     onSkip,
     onUpdateProfile,
@@ -33,6 +39,7 @@
     isSavingAlertPreferences = false,
     onSaveAlertPreferences,
   }: {
+    sources: readonly OnboardingSourceOption[];
     onComplete?: (profile: UserProfile) => void;
     onSkip?: () => void;
     onUpdateProfile?: (profile: Partial<UserProfile>) => void;
@@ -58,8 +65,10 @@
   let tjm = $state(600);
   let currentStep = $state<OnboardingStepId>('understand');
   let alertThreshold = $state(80);
-  let selectedSource = $state('Free-Work');
+  let selectedSourceId = $state<string | null>(null);
   let loadedAlertRevision = $state(-1);
+
+  const selectedSource = $derived(sources.find((source) => source.id === selectedSourceId) ?? null);
 
   const onboardingSteps: OnboardingStep[] = [
     {
@@ -153,6 +162,13 @@
     }
     alertThreshold = alertPreferences.scoreThreshold;
     loadedAlertRevision = alertPreferences.revision;
+  });
+
+  $effect(() => {
+    if (selectedSourceId !== null && sources.some((source) => source.id === selectedSourceId)) {
+      return;
+    }
+    selectedSourceId = sources[0]?.id ?? null;
   });
 
   async function saveAlertAndContinue() {
@@ -275,25 +291,26 @@
         Pulse utilisera vos sessions navigateur existantes. Aucun identifiant n’est stocké.
       </p>
       <div class="mt-3 grid grid-cols-2 gap-2">
-        {#each ['Free-Work', 'LeHibou', 'Hiway', 'Collective'] as source (source)}
+        {#each sources as source (source.id)}
           <button
             type="button"
-            class="rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors {selectedSource ===
-            source
+            class="rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors {selectedSourceId ===
+            source.id
               ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
               : 'border-border-light bg-page-canvas text-text-primary'}"
-            onclick={() => (selectedSource = source)}
+            onclick={() => (selectedSourceId = source.id)}
           >
-            {source}
+            {source.name}
           </button>
         {/each}
       </div>
       <button
         class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white"
         type="button"
+        disabled={selectedSource === null}
         onclick={goNext}
       >
-        Continuer avec {selectedSource}
+        Continuer avec {selectedSource?.name ?? 'une source'}
         <Icon name="arrow-right" size={13} />
       </button>
     </section>
@@ -366,8 +383,8 @@
         <div>
           <p class="text-sm font-semibold text-text-primary">Action recommandée après le scan</p>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
-            Commencer par les missions {alertThreshold}+ issues de {selectedSource}, puis vérifier
-            les sources qui n’ont rien remonté.
+            Commencer par les missions {alertThreshold}+ issues de {selectedSource?.name ??
+              'la source choisie'}, puis vérifier les sources qui n’ont rien remonté.
           </p>
         </div>
       </div>

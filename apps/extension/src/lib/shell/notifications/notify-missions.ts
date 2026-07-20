@@ -1,14 +1,15 @@
 import type { Mission } from '../../core/types/mission';
-import type { AppSettings } from '../storage/chrome-storage';
+import type { AppSettings } from '../../core/types/app-settings';
 import { filterNotifiableMissions } from '../../core/scoring/notification-filter';
 import { filterSmartNotifications } from '../../core/scoring/smart-notification';
 import { canNotify } from '../../core/scoring/notification-rate-limit';
-import { getSettings } from '../storage/chrome-storage';
 import { getConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { getSeenIds } from '../storage/seen-missions';
 import { recordAlertHistoryEntry } from '../storage/alert-history';
 import { createDeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 import { setDeepLinkIntent, clearDeepLinkIntent } from '../storage/session-storage';
+import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
+import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
 // ---------------------------------------------------------------------------
 // Rate limit state (in-memory, reset on service worker restart)
@@ -87,7 +88,10 @@ export interface NotificationResult {
  * @param missions - All missions from the scan
  * @returns Whether a notification was shown, and which mission IDs were included
  */
-export const notifyHighScoreMissions = async (missions: Mission[]): Promise<NotificationResult> => {
+export const notifyHighScoreMissions = async (
+  missions: Mission[],
+  admittedSnapshot?: SettingsReleaseSnapshot
+): Promise<NotificationResult> => {
   if (missions.length === 0) {
     return { shown: false, notifiedMissionIds: [] };
   }
@@ -95,7 +99,7 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
   // Check if notifications are enabled
   let settings: AppSettings;
   try {
-    settings = await getSettings();
+    settings = (admittedSnapshot ?? (await readSettingsReleaseSnapshot())).settings;
   } catch {
     return { shown: false, notifiedMissionIds: [] };
   }

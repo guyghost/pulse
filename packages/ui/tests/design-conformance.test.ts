@@ -45,4 +45,12 @@ describe('Design system conformance', () => {
       );
     }
   });
+
+  it('lets a composite own the single live region while preserving standalone Toast alerts', () => {
+    const toast = readAtom('Toast.svelte');
+
+    expect(toast).toContain('announce = true');
+    expect(toast).toContain('announce?: boolean');
+    expect(toast).toContain("role={announce ? 'alert' : undefined}");
+  });
 });

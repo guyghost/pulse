@@ -77,6 +77,7 @@ test.describe('TJM page', () => {
     const nav = page.getByRole('navigation', { name: 'Main navigation' });
     await nav.getByRole('button', { name: 'TJM' }).click();
     await expect(nav.getByRole('button', { name: 'TJM' })).toHaveAttribute('aria-current', 'page');
+    await page.getByRole('button', { name: "Rafraîchir l'analyse TJM" }).click();
     // Empty state renders an OperationalEmptyState + a "Alimenter le radar TJM" setup section.
     await expect(page.getByText('Aucune tendance TJM exploitable')).toBeVisible();
     await expect(page.getByText('Alimenter le radar TJM')).toBeVisible();

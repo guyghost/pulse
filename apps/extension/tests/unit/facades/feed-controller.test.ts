@@ -4,6 +4,7 @@ import type { AppSettings } from '../../../src/lib/core/types/app-settings';
 
 const feedDataMock = vi.hoisted(() => ({
   getMissions: vi.fn(),
+  getSeenIds: vi.fn(),
   getConnectorStatuses: vi.fn(),
   getConnectorsMeta: vi.fn(),
   detectAllConnectorSessions: vi.fn(),
@@ -12,6 +13,7 @@ const feedDataMock = vi.hoisted(() => ({
 const settingsMock = vi.hoisted(() => ({
   getSettings: vi.fn(),
   setSettings: vi.fn(),
+  setSettingsConfirmed: vi.fn(),
 }));
 
 const connectorsMock = vi.hoisted(() => ({
@@ -115,6 +117,7 @@ describe('feed controller facade', () => {
     vi.clearAllMocks();
 
     feedDataMock.getMissions.mockResolvedValue([makeMission()]);
+    feedDataMock.getSeenIds.mockResolvedValue([]);
     feedDataMock.getConnectorStatuses.mockResolvedValue([
       {
         connectorId: 'free-work',
@@ -130,6 +133,7 @@ describe('feed controller facade', () => {
     feedDataMock.detectAllConnectorSessions.mockResolvedValue([]);
     settingsMock.getSettings.mockResolvedValue(settings);
     settingsMock.setSettings.mockResolvedValue(undefined);
+    settingsMock.setSettingsConfirmed.mockImplementation(async (candidate) => candidate);
     connectorsMock.getConnectors.mockResolvedValue([]);
     bridgeMock.sendMessage.mockImplementation(async (message: { type: string }) => {
       if (message.type === 'GET_CONNECTOR_HEALTH') {
@@ -171,6 +175,85 @@ describe('feed controller facade', () => {
     controller.dispose();
   });
 
+  it('orders an enabled connector by the shipped catalogue and projects only after confirmation', async () => {
+    stubChrome();
+    settingsMock.getSettings.mockResolvedValue({ ...settings, enabledConnectors: ['malt'] });
+    let confirm!: (value: AppSettings) => void;
+    settingsMock.setSettingsConfirmed.mockImplementationOnce(
+      (candidate: AppSettings) =>
+        new Promise<AppSettings>((resolve) => {
+          confirm = () => resolve(candidate);
+        })
+    );
+    const controller = createFeedController({
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    });
+    await flushPromises();
+
+    const toggling = controller.handleToggleConnector('free-work');
+    await flushPromises();
+    expect([...controller.enabledConnectorIds]).toEqual(['malt']);
+    expect(settingsMock.setSettingsConfirmed).toHaveBeenCalledWith(
+      expect.objectContaining({ enabledConnectors: ['free-work', 'malt'] })
+    );
+
+    confirm({ ...settings, enabledConnectors: ['free-work', 'malt'] });
+    await toggling;
+    expect([...controller.enabledConnectorIds]).toEqual(['free-work', 'malt']);
+    controller.dispose();
+  });
+
+  it('keeps the confirmed connector projection when the typed Settings mutation rejects', async () => {
+    stubChrome();
+    settingsMock.getSettings.mockResolvedValue({ ...settings, enabledConnectors: ['free-work'] });
+    settingsMock.setSettingsConfirmed.mockRejectedValueOnce(
+      Object.assign(new Error('permission_missing'), {
+        result: { status: 'not_admitted', reason: 'permission_missing' },
+      })
+    );
+    const controller = createFeedController({
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    });
+    await flushPromises();
+
+    await controller.handleToggleConnector('malt');
+
+    expect([...controller.enabledConnectorIds]).toEqual(['free-work']);
+    controller.dispose();
+  });
+
+  it('never projects an enable-and-recheck request unless background confirms activation', async () => {
+    stubChrome();
+    settingsMock.getSettings.mockResolvedValue({ ...settings, enabledConnectors: ['free-work'] });
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'GET_CONNECTOR_HEALTH') {
+        return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+      }
+      if (message.type === 'RECHECK_CONNECTOR_HEALTH') {
+        return Promise.resolve({
+          type: 'CONNECTOR_RECHECK_RESULT',
+          payload: { snapshots: [], scan: 'completed', activation: 'failed' },
+        });
+      }
+      return Promise.resolve({ type: 'SCAN_COMPLETE', payload: [] });
+    });
+    const controller = createFeedController({
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    });
+    await flushPromises();
+
+    await controller.recheckConnector('malt', true);
+
+    expect([...controller.enabledConnectorIds]).toEqual(['free-work']);
+    controller.dispose();
+  });
+
   it('recovers from a legacy scan status response without leaving the feed loading', async () => {
     stubChrome();
     const feedStore = {
@@ -207,11 +290,205 @@ describe('feed controller facade', () => {
     controller.dispose();
   });
 
+  it('finishes the local intent on a non-terminal SCAN_START_REJECTED response', async () => {
+    stubChrome();
+    const feedStore = {
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        const operationId = message.payload?.operationId ?? '';
+        return {
+          type: 'SCAN_START_REJECTED',
+          payload: {
+            operationId,
+            code: 'CHECKPOINT_STORAGE',
+            message: 'Session storage indisponible.',
+          },
+        };
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    await controller.startScan();
+
+    expect(feedStore.setError).toHaveBeenCalledWith('Session storage indisponible.');
+    expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
+  it('finishes the local intent on a non-terminal SCAN_CANCEL_REJECTED response', async () => {
+    stubChrome();
+    let operationId = '';
+    const feedStore = {
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        operationId = message.payload?.operationId ?? operationId;
+        if (message.type === 'SCAN_START') {
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        }
+        return {
+          type: 'SCAN_CANCEL_REJECTED',
+          payload: {
+            operationId,
+            code: 'CHECKPOINT_STORAGE',
+            message: "Impossible d'annuler pendant la récupération.",
+          },
+        };
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    await controller.startScan();
+    await controller.stopScan();
+
+    expect(feedStore.setError).toHaveBeenCalledWith(
+      "Impossible d'annuler pendant la récupération."
+    );
+    expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
+  it('loads the exact canonical projection for the panel-local arrival actor', async () => {
+    stubChrome();
+    const currentMissions = [makeMission({ id: 'current-1' })];
+    const canonicalMissions = [makeMission({ id: 'canonical-1' })];
+    const feedStore = {
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+    feedDataMock.getMissions.mockResolvedValue([...currentMissions, ...canonicalMissions]);
+    feedDataMock.getSeenIds.mockResolvedValue(['current-1']);
+    bridgeMock.sendMessage.mockImplementation(async (message: { type: string }) => {
+      if (message.type === 'GET_CONNECTOR_HEALTH') {
+        return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+      }
+      return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+    });
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    await expect(controller.loadArrivalProjection(['current-1', 'canonical-1'])).resolves.toEqual({
+      missions: [currentMissions[0], canonicalMissions[0]],
+      orderedUnseenIds: ['canonical-1'],
+    });
+
+    expect(feedStore.setMissions).not.toHaveBeenCalled();
+    expect(currentMissions.map((mission) => mission.id)).toEqual(['current-1']);
+    controller.dispose();
+  });
+
+  it('keeps a warm feed stable when an alarm scan publishes a cold-only projection', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let currentMissions = [makeMission({ id: 'warm-existing' })];
+    let feedState: 'empty' | 'loaded' = 'loaded';
+    const feedStore = {
+      get state() {
+        return feedState;
+      },
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(),
+      setMissions: vi.fn((missions: Mission[]) => {
+        currentMissions = missions;
+        feedState = missions.length === 0 ? 'empty' : 'loaded';
+      }),
+      setError: vi.fn(),
+    };
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    feedDataMock.getMissions.mockImplementation(async () => currentMissions);
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    bridgeListener?.({
+      type: 'MISSIONS_UPDATED',
+      projection: 'cold-only',
+      payload: [makeSerializedMission({ id: 'alarm-new' })],
+    });
+    await flushPromises();
+
+    expect(feedStore.setMissions).not.toHaveBeenCalled();
+    expect(currentMissions.map((mission) => mission.id)).toEqual(['warm-existing']);
+    expect(feedState).toBe('loaded');
+    controller.dispose();
+  });
+
+  it('leaves cold-only hydration to the panel-local arrival actor', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let currentMissions: Mission[] = [];
+    let feedState: 'empty' | 'loaded' = 'empty';
+    const feedStore = {
+      get state() {
+        return feedState;
+      },
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(),
+      setMissions: vi.fn((missions: Mission[]) => {
+        currentMissions = missions;
+        feedState = missions.length === 0 ? 'empty' : 'loaded';
+      }),
+      setError: vi.fn(),
+    };
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    feedDataMock.getMissions.mockImplementation(() => new Promise<Mission[]>(() => {}));
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    bridgeListener?.({
+      type: 'MISSIONS_UPDATED',
+      projection: 'cold-only',
+      payload: [makeSerializedMission({ id: 'alarm-new' })],
+    });
+    await flushPromises();
+
+    expect(feedStore.setMissions).not.toHaveBeenCalled();
+    expect(currentMissions).toEqual([]);
+    expect(feedState).toBe('empty');
+    controller.dispose();
+  });
+
   it('finalizes local scan state when SCAN_COMPLETE arrives through the bridge listener', async () => {
     stubChrome();
     let bridgeListener: ((message: unknown) => void) | null = null;
-    let resolveScan: ((response: { type: 'SCAN_COMPLETE'; payload: Mission[] }) => void) | null =
-      null;
+    let resolveScan: ((response: unknown) => void) | null = null;
+    let operationId = '';
     const feedStore = {
       load: vi.fn(),
       setMissions: vi.fn(),
@@ -222,17 +499,20 @@ describe('feed controller facade', () => {
       bridgeListener = handler;
       return vi.fn();
     });
-    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
-      if (message.type === 'GET_CONNECTOR_HEALTH') {
-        return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+    bridgeMock.sendMessage.mockImplementation(
+      (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return new Promise((resolve) => {
+            resolveScan = resolve;
+          });
+        }
+        return Promise.resolve({ type: 'SCAN_COMPLETE', payload: [] });
       }
-      if (message.type === 'SCAN_START') {
-        return new Promise((resolve) => {
-          resolveScan = resolve;
-        });
-      }
-      return Promise.resolve({ type: 'SCAN_COMPLETE', payload: [] });
-    });
+    );
 
     const controller = createFeedController(feedStore);
     await flushPromises();
@@ -242,7 +522,10 @@ describe('feed controller facade', () => {
     await flushPromises();
     expect(controller.isScanning).toBe(true);
 
-    bridgeListener?.({ type: 'SCAN_COMPLETE', payload: [makeMission()] });
+    bridgeListener?.({
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [makeMission()] },
+    });
     await flushPromises();
 
     expect(controller.isScanning).toBe(false);
@@ -250,16 +533,200 @@ describe('feed controller facade', () => {
       expect.objectContaining({ id: 'mission-1' }),
     ]);
 
-    resolveScan?.({ type: 'SCAN_COMPLETE', payload: [makeMission()] });
+    resolveScan?.({ type: 'SCAN_STARTED', payload: { operationId } });
     await startPromise;
+    controller.dispose();
+  });
+
+  it('claims a matching terminal synchronously before awaiting final projections', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let resolveStart: ((response: unknown) => void) | null = null;
+    let resolveStatuses: (() => void) | null = null;
+    let operationId = '';
+    const feedStore = {
+      missions: [] as Mission[],
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    bridgeMock.sendMessage.mockImplementation(
+      (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return new Promise((resolve) => {
+            resolveStart = resolve;
+          });
+        }
+        return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    feedDataMock.getConnectorStatuses.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStatuses = () => resolve([]);
+        })
+    );
+
+    const startPromise = controller.startScan();
+    await flushPromises();
+    const terminal = {
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [makeSerializedMission()] },
+    };
+
+    bridgeListener?.(terminal);
+    bridgeListener?.(terminal);
+    await flushPromises();
+
+    expect(feedStore.setMissions).toHaveBeenCalledTimes(1);
+
+    resolveStatuses?.();
+    resolveStart?.({ type: 'SCAN_STARTED', payload: { operationId } });
+    await startPromise;
+    await flushPromises();
+    controller.dispose();
+  });
+
+  it('does not send cancel after a matching terminal is claimed during async finalization', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let operationId = '';
+    let resolveStatuses: (() => void) | null = null;
+    const feedStore = {
+      missions: [] as Mission[],
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        }
+        return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    feedDataMock.getConnectorStatuses.mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          resolveStatuses = () => resolve([]);
+        })
+    );
+
+    await controller.startScan();
+    bridgeListener?.({
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [makeSerializedMission()] },
+    });
+    await flushPromises();
+
+    await controller.stopScan();
+    const scanCommandTypes = bridgeMock.sendMessage.mock.calls.map(
+      ([message]) => (message as { type: string }).type
+    );
+
+    expect(scanCommandTypes).not.toContain('SCAN_CANCEL');
+    expect(feedStore.setMissions).toHaveBeenCalledTimes(1);
+    expect(feedStore.setError).not.toHaveBeenCalled();
+
+    resolveStatuses?.();
+    await flushPromises();
+    expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
+  it('does not let a late cancel rejection overwrite a matching canonical terminal', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let resolveCancel: ((response: unknown) => void) | null = null;
+    let operationId = '';
+    const feedStore = {
+      missions: [] as Mission[],
+      load: vi.fn(),
+      setMissions: vi.fn(),
+      setError: vi.fn(),
+    };
+
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    bridgeMock.sendMessage.mockImplementation(
+      (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return Promise.resolve({ type: 'SCAN_STARTED', payload: { operationId } });
+        }
+        return new Promise((resolve) => {
+          resolveCancel = resolve;
+        });
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+    await controller.startScan();
+    const stopPromise = controller.stopScan();
+    await flushPromises();
+
+    bridgeListener?.({
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [makeSerializedMission()] },
+    });
+    resolveCancel?.({
+      type: 'SCAN_CANCEL_REJECTED',
+      payload: {
+        operationId,
+        code: 'CHECKPOINT_CLEANUP_PENDING',
+        message: 'Le checkpoint terminal doit être récupéré.',
+      },
+    });
+    await stopPromise;
+    await flushPromises();
+
+    expect(feedStore.setMissions).toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'mission-1' }),
+    ]);
+    expect(feedStore.setError).not.toHaveBeenCalled();
+    expect(controller.isScanning).toBe(false);
     controller.dispose();
   });
 
   it('buffers SCAN_PARTIAL_RESULT until pending missions are explicitly applied', async () => {
     stubChrome();
     let bridgeListener: ((message: unknown) => void) | null = null;
-    let resolveScan: ((response: { type: 'SCAN_COMPLETE'; payload: Mission[] }) => void) | null =
-      null;
+    let resolveScan: ((response: unknown) => void) | null = null;
+    let operationId = '';
     const previousFreeWork = makeMission({
       id: 'old-free-work',
       title: 'Old Free-Work',
@@ -300,17 +767,20 @@ describe('feed controller facade', () => {
       bridgeListener = handler;
       return vi.fn();
     });
-    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
-      if (message.type === 'GET_CONNECTOR_HEALTH') {
-        return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+    bridgeMock.sendMessage.mockImplementation(
+      (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return new Promise((resolve) => {
+            resolveScan = resolve;
+          });
+        }
+        return Promise.resolve({ type: 'SCAN_COMPLETE', payload: [] });
       }
-      if (message.type === 'SCAN_START') {
-        return new Promise((resolve) => {
-          resolveScan = resolve;
-        });
-      }
-      return Promise.resolve({ type: 'SCAN_COMPLETE', payload: [] });
-    });
+    );
 
     const controller = createFeedController(feedStore);
     await flushPromises();
@@ -322,6 +792,7 @@ describe('feed controller facade', () => {
     bridgeListener?.({
       type: 'SCAN_PARTIAL_RESULT',
       payload: {
+        operationId,
         connectorId: 'free-work',
         connectorName: 'Free-Work',
         missions: [makeSerializedMission(partialFreeWork)],
@@ -347,33 +818,33 @@ describe('feed controller facade', () => {
 
     bridgeListener?.({
       type: 'SCAN_COMPLETE',
-      payload: [
-        makeSerializedMission({
-          id: 'final-free-work',
-          title: 'Final Free-Work',
-          source: 'free-work',
-          url: 'https://example.com/final-free-work',
-        }),
-      ],
+      payload: {
+        operationId,
+        missions: [
+          makeSerializedMission({
+            id: 'final-free-work',
+            title: 'Final Free-Work',
+            source: 'free-work',
+            url: 'https://example.com/final-free-work',
+          }),
+        ],
+      },
     });
     await flushPromises();
 
     expect(controller.isScanning).toBe(false);
-    expect(controller.hasPendingMissions).toBe(true);
-    expect(currentMissions.map((mission) => mission.id)).toEqual(['old-lehibou', 'new-free-work']);
-
-    await controller.applyPendingMissions();
-    await flushPromises();
-
+    expect(controller.hasPendingMissions).toBe(false);
     expect(currentMissions.map((mission) => mission.id)).toEqual(['final-free-work']);
 
-    resolveScan?.({ type: 'SCAN_COMPLETE', payload: currentMissions });
+    resolveScan?.({ type: 'SCAN_STARTED', payload: { operationId } });
     await startPromise;
     controller.dispose();
   });
 
-  it('buffers final scan results over an existing feed without local deduplication', async () => {
+  it('directly replaces an existing feed with final manual scan results', async () => {
     stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let operationId = '';
     const duplicateA = makeSerializedMission({
       id: 'final-duplicate-a',
       title: 'Final Duplicate',
@@ -387,51 +858,62 @@ describe('feed controller facade', () => {
       url: 'https://example.com/final-duplicate-b',
     });
     let currentMissions = [makeMission({ id: 'existing-feed' })];
+    let feedState: 'loaded' | 'loading' = 'loaded';
     const feedStore = {
       get missions() {
         return currentMissions;
       },
-      load: vi.fn(),
+      load: vi.fn(() => {
+        feedState = 'loading';
+      }),
       setMissions: vi.fn((missions: Mission[]) => {
         currentMissions = missions;
+        feedState = 'loaded';
       }),
       setError: vi.fn(),
     };
     feedDataMock.getMissions.mockImplementation(async () => currentMissions);
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
 
-    bridgeMock.sendMessage.mockImplementation(async (message: { type: string }) => {
-      if (message.type === 'GET_CONNECTOR_HEALTH') {
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return {
+            type: 'SCAN_STARTED',
+            payload: { operationId },
+          };
+        }
         return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
       }
-      if (message.type === 'SCAN_START') {
-        return {
-          type: 'SCAN_COMPLETE',
-          payload: [duplicateA, duplicateB],
-        };
-      }
-      return { type: 'SCAN_COMPLETE', payload: [] };
-    });
+    );
 
     const controller = createFeedController(feedStore);
     await flushPromises();
     vi.clearAllMocks();
 
     await controller.startScan();
-
-    expect(currentMissions.map((mission) => mission.id)).toEqual(['existing-feed']);
-    expect(controller.hasPendingMissions).toBe(true);
-    expect(controller.pendingMissionCount).toBe(2);
-    expect(controller.pendingMissions.map((mission) => mission.id)).toEqual([
-      'final-duplicate-a',
-      'final-duplicate-b',
-    ]);
-
-    await controller.applyPendingMissions();
+    expect(feedState).toBe('loading');
+    bridgeListener?.({
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [duplicateA, duplicateB] },
+    });
+    await flushPromises();
 
     expect(currentMissions.map((mission) => mission.id)).toEqual([
       'final-duplicate-a',
       'final-duplicate-b',
     ]);
+    expect(feedState).toBe('loaded');
+    expect(controller.ownedScan).toBeNull();
+    expect(controller.hasPendingMissions).toBe(false);
+    expect(controller.pendingMissionCount).toBe(0);
     expect(feedStore.setMissions).toHaveBeenCalledWith([
       expect.objectContaining({ id: 'final-duplicate-a' }),
       expect.objectContaining({ id: 'final-duplicate-b' }),
@@ -442,30 +924,44 @@ describe('feed controller facade', () => {
 
   it('normalizes Chrome-serialized scan missions before updating feed state', async () => {
     stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let operationId = '';
     const feedStore = {
       load: vi.fn(),
       setMissions: vi.fn(),
       setError: vi.fn(),
     };
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
 
-    bridgeMock.sendMessage.mockImplementation(async (message: { type: string }) => {
-      if (message.type === 'GET_CONNECTOR_HEALTH') {
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return {
+            type: 'SCAN_STARTED',
+            payload: { operationId },
+          };
+        }
         return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
       }
-      if (message.type === 'SCAN_START') {
-        return {
-          type: 'SCAN_COMPLETE',
-          payload: [makeSerializedMission()],
-        };
-      }
-      return { type: 'SCAN_COMPLETE', payload: [] };
-    });
+    );
 
     const controller = createFeedController(feedStore);
     await flushPromises();
     vi.clearAllMocks();
 
     await controller.startScan();
+    bridgeListener?.({
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [makeSerializedMission()] },
+    });
+    await flushPromises();
 
     expect(feedStore.setMissions).toHaveBeenCalledWith([
       expect.objectContaining({
@@ -475,6 +971,166 @@ describe('feed controller facade', () => {
     ]);
     expect(feedStore.setError).not.toHaveBeenCalled();
     expect(controller.isScanning).toBe(false);
+    controller.dispose();
+  });
+
+  it('restores a warm catalogue to loaded before releasing a cancelled owned scan', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let operationId = '';
+    const originalMission = makeMission({ id: 'warm-existing' });
+    let currentMissions = [originalMission];
+    let feedState: 'loaded' | 'loading' = 'loaded';
+    const feedStore = {
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(() => {
+        feedState = 'loading';
+      }),
+      reset: vi.fn(() => {
+        currentMissions = [];
+      }),
+      setMissions: vi.fn((missions: Mission[]) => {
+        currentMissions = missions;
+        feedState = 'loaded';
+      }),
+      setError: vi.fn(),
+    };
+
+    feedDataMock.getMissions.mockImplementation(async () => currentMissions);
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    bridgeMock.sendMessage.mockImplementation(
+      async (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        }
+        if (message.type === 'SCAN_CANCEL') {
+          return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
+        }
+        return { type: 'CONNECTOR_HEALTH_RESULT', payload: [] };
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    await controller.startScan();
+    expect(feedState).toBe('loading');
+    expect(controller.ownedScan).toMatchObject({ operationId, state: 'scanning' });
+
+    await controller.stopScan();
+    expect(controller.ownedScan).toMatchObject({ operationId, state: 'cancelling' });
+    bridgeListener?.({ type: 'SCAN_CANCELLED', payload: { operationId } });
+    await flushPromises();
+
+    expect(feedState).toBe('loaded');
+    expect(controller.ownedScan).toBeNull();
+    expect(currentMissions).toEqual([originalMission]);
+    expect(feedStore.reset).not.toHaveBeenCalled();
+    controller.dispose();
+  });
+
+  it('waits for the matching cancellation ACK, clears a cold feed, and ignores late results', async () => {
+    stubChrome();
+    let bridgeListener: ((message: unknown) => void) | null = null;
+    let resolveCancel: ((response: unknown) => void) | null = null;
+    let operationId = '';
+    let currentMissions: Mission[] = [];
+    const feedStore = {
+      get missions() {
+        return currentMissions;
+      },
+      load: vi.fn(),
+      reset: vi.fn(() => {
+        currentMissions = [];
+      }),
+      setMissions: vi.fn((missions: Mission[]) => {
+        currentMissions = missions;
+      }),
+      setError: vi.fn(),
+    };
+
+    feedDataMock.getMissions.mockImplementation(async () => currentMissions);
+    bridgeMock.subscribeMessages.mockImplementation((handler: (message: unknown) => void) => {
+      bridgeListener = handler;
+      return vi.fn();
+    });
+    bridgeMock.sendMessage.mockImplementation(
+      (message: { type: string; payload?: { operationId?: string } }) => {
+        if (message.type === 'GET_CONNECTOR_HEALTH') {
+          return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+        }
+        if (message.type === 'SCAN_START') {
+          operationId = message.payload?.operationId ?? '';
+          return Promise.resolve({ type: 'SCAN_STARTED', payload: { operationId } });
+        }
+        if (message.type === 'SCAN_CANCEL') {
+          expect(message.payload?.operationId).toBe(operationId);
+          return new Promise((resolve) => {
+            resolveCancel = resolve;
+          });
+        }
+        return Promise.resolve({ type: 'CONNECTOR_HEALTH_RESULT', payload: [] });
+      }
+    );
+
+    const controller = createFeedController(feedStore);
+    await flushPromises();
+    vi.clearAllMocks();
+
+    const startPromise = controller.startScan();
+    await flushPromises();
+    expect(operationId).not.toBe('');
+    expect(controller.isScanning).toBe(true);
+
+    bridgeListener?.({
+      type: 'SCAN_PARTIAL_RESULT',
+      payload: {
+        operationId,
+        connectorId: 'free-work',
+        connectorName: 'Free-Work',
+        missions: [makeSerializedMission({ id: 'partial-before-cancel' })],
+      },
+    });
+    expect(controller.hasPendingMissions).toBe(true);
+
+    const stopPromise = Promise.resolve(controller.stopScan());
+    await flushPromises();
+    expect(controller.isScanning).toBe(true);
+
+    resolveCancel?.({ type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } });
+    await stopPromise;
+
+    expect(controller.isScanning).toBe(true);
+    bridgeListener?.({ type: 'SCAN_CANCELLED', payload: { operationId } });
+    await flushPromises();
+
+    expect(controller.isScanning).toBe(false);
+    expect(controller.hasPendingMissions).toBe(false);
+    expect(controller.pendingMissions).toEqual([]);
+    expect(feedStore.reset).toHaveBeenCalledTimes(1);
+
+    const lateMission = makeSerializedMission({ id: 'late-after-cancel' });
+    bridgeListener?.({
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: [lateMission] },
+    });
+    await startPromise;
+    await flushPromises();
+
+    expect(feedStore.setMissions).not.toHaveBeenCalledWith([
+      expect.objectContaining({ id: 'late-after-cancel' }),
+    ]);
+    expect(currentMissions).toEqual([]);
     controller.dispose();
   });
 });

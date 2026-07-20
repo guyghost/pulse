@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import type { Mission } from '$lib/core/types/mission';
   import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
   import { GENERATION_TYPE_ICONS, GENERATION_TYPE_LABELS } from '$lib/core/types/generation';
@@ -63,6 +63,7 @@
   let loadError = $state<string | null>(null);
 
   const generationTypes: GenerationType[] = ['pitch', 'cover-message', 'cv-summary'];
+  const generationTypeIcons = GENERATION_TYPE_ICONS as Record<GenerationType, IconName>;
 
   type TrackedMission = {
     mission: Mission;
@@ -115,6 +116,7 @@
   );
 
   const selectedStatus = $derived<ApplicationStatus>(selectedTracking?.currentStatus ?? 'detected');
+  const selectedFollowUpTerminal = $derived(isTerminalStatus(selectedStatus));
   const nextStatuses = $derived<ApplicationStatus[]>(VALID_TRANSITIONS[selectedStatus] ?? []);
   const selectedDecisionHistory = $derived.by(() =>
     selectedTracking ? selectedTracking.history.slice().reverse().slice(0, 4) : []
@@ -172,6 +174,18 @@
         severity: pipelineSummary.preparedNotApplied > 0 ? 'attention' : 'neutral',
       },
     ];
+
+    if (loadError) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Indisponible',
+        title: 'Le pipeline candidatures ne peut pas être chargé',
+        description: loadError,
+        evidence,
+        primaryActionLabel: 'Réessayer',
+        primaryActionIcon: 'refresh-cw',
+      };
+    }
 
     if (pipelineSummary.dueFollowUps > 0) {
       return {
@@ -324,6 +338,10 @@
   }
 
   function handleApplicationStoryAction(): void {
+    if (loadError) {
+      void loadApplications();
+      return;
+    }
     if (recommendedTrackedMission) {
       void selectMission(recommendedTrackedMission.mission.id);
       return;
@@ -353,6 +371,10 @@
     return 'Dossier actif: continuez par la dernière mission suivie avant de créer un nouveau dossier.';
   }
 
+  function trackingFailureMessage(cause: unknown): string {
+    return cause instanceof Error ? cause.message : 'Impossible de confirmer le suivi.';
+  }
+
   async function transitionTo(status: ApplicationStatus): Promise<void> {
     if (!selectedMission) {
       return;
@@ -365,11 +387,22 @@
           generatedAssetIds: [...selectedTracking.generatedAssetIds],
         }
       : null;
-    await tracking.transitionStatus(missionId, status);
+    try {
+      await tracking.transitionStatus(missionId, status);
+    } catch (cause) {
+      await showToast(trackingFailureMessage(cause), 'error');
+      return;
+    }
     showToastAction(`Statut: ${STATUS_LABELS[status]}`, 'success', {
       label: 'Annuler',
       onClick: () => {
-        void tracking.restoreTracking(missionId, previousTracking);
+        void (async () => {
+          try {
+            await tracking.restoreTracking(missionId, previousTracking);
+          } catch (cause) {
+            await showToast(trackingFailureMessage(cause), 'error');
+          }
+        })();
       },
     });
   }
@@ -388,29 +421,29 @@
   }
 
   async function saveNextAction(): Promise<void> {
-    if (!selectedMission) {
+    if (!selectedMission || selectedFollowUpTerminal) {
       return;
     }
 
-    const errorBefore = tracking.error;
-    await tracking.updateNextActionAt(selectedMission.id, dateTimeLocalToIso(nextActionInput));
-    if (tracking.error && tracking.error !== errorBefore) {
-      await showToast(tracking.error, 'error');
+    try {
+      await tracking.updateNextActionAt(selectedMission.id, dateTimeLocalToIso(nextActionInput));
+    } catch (cause) {
+      await showToast(trackingFailureMessage(cause), 'error');
       return;
     }
     await showToast('Prochaine action mise à jour', 'success');
   }
 
   async function clearNextAction(): Promise<void> {
-    if (!selectedMission) {
+    if (!selectedMission || selectedFollowUpTerminal) {
       return;
     }
 
-    nextActionInput = '';
-    const errorBefore = tracking.error;
-    await tracking.updateNextActionAt(selectedMission.id, null);
-    if (tracking.error && tracking.error !== errorBefore) {
-      await showToast(tracking.error, 'error');
+    try {
+      await tracking.updateNextActionAt(selectedMission.id, null);
+      nextActionInput = '';
+    } catch (cause) {
+      await showToast(trackingFailureMessage(cause), 'error');
       return;
     }
     await showToast('Prochaine action effacée', 'success');
@@ -444,8 +477,12 @@
         response.payload.asset,
         ...assets.filter((asset) => asset.id !== response.payload.asset?.id),
       ];
-      await tracking.loadTrackings();
       await showToast('Contenu généré', 'success');
+      try {
+        await tracking.loadTrackings();
+      } catch (cause) {
+        await showToast(trackingFailureMessage(cause), 'error');
+      }
     } finally {
       generatingType = null;
     }
@@ -459,20 +496,22 @@
   async function loadApplications(): Promise<void> {
     isLoading = true;
     loadError = null;
-    await tracking.loadTrackings();
-    missions = await getMissions();
-    selectedMissionId = missions[0]?.id ?? null;
-    if (selectedMissionId) {
-      await loadAssets(selectedMissionId);
+    try {
+      await tracking.loadTrackings();
+      missions = await getMissions();
+      selectedMissionId = missions[0]?.id ?? null;
+      if (selectedMissionId) {
+        await loadAssets(selectedMissionId);
+      }
+    } catch (cause) {
+      loadError = trackingFailureMessage(cause);
+      await showToast(loadError, 'error');
+    } finally {
+      isLoading = false;
     }
-    isLoading = false;
   }
 
-  loadApplications().catch(async () => {
-    isLoading = false;
-    loadError = 'Impossible de charger les candidatures';
-    await showToast('Impossible de charger les candidatures', 'error');
-  });
+  void loadApplications();
 </script>
 
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
@@ -513,7 +552,7 @@
         statusLabel={applicationStory.statusLabel}
         evidence={applicationStory.evidence}
         primaryActionLabel={applicationStory.primaryActionLabel}
-        primaryActionIcon={applicationStory.primaryActionIcon}
+        primaryActionIcon={applicationStory.primaryActionIcon as IconName}
         onPrimaryAction={handleApplicationStoryAction}
       />
     </div>
@@ -743,37 +782,43 @@
             </div>
 
             <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3">
-              <label
-                for="application-next-action"
-                class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted"
-              >
-                Prochaine action
-              </label>
-              <div class="mt-2 flex flex-wrap gap-2">
-                <input
-                  id="application-next-action"
-                  type="datetime-local"
-                  class="min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
-                  bind:value={nextActionInput}
-                  aria-label="Prochaine action"
-                />
-                <button
-                  class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
-                  onclick={saveNextAction}
+              {#if selectedFollowUpTerminal}
+                <p class="text-xs leading-5 text-text-subtle">
+                  Le suivi de relance est terminé pour ce statut.
+                </p>
+              {:else}
+                <label
+                  for="application-next-action"
+                  class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted"
                 >
-                  <Icon name="save" size={12} />
-                  Enregistrer
-                </button>
-                {#if selectedTracking?.nextActionAt}
+                  Prochaine action
+                </label>
+                <div class="mt-2 flex flex-wrap gap-2">
+                  <input
+                    id="application-next-action"
+                    type="datetime-local"
+                    class="min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+                    bind:value={nextActionInput}
+                    aria-label="Prochaine action"
+                  />
                   <button
-                    class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
-                    onclick={clearNextAction}
+                    class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+                    onclick={saveNextAction}
                   >
-                    <Icon name="x" size={12} />
-                    Effacer
+                    <Icon name="save" size={12} />
+                    Enregistrer
                   </button>
-                {/if}
-              </div>
+                  {#if selectedTracking?.nextActionAt}
+                    <button
+                      class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
+                      onclick={clearNextAction}
+                    >
+                      <Icon name="x" size={12} />
+                      Effacer
+                    </button>
+                  {/if}
+                </div>
+              {/if}
             </div>
 
             {#if selectedDecisionHistory.length > 0}
@@ -835,7 +880,7 @@
                   onclick={() => generate(type)}
                   disabled={generatingType !== null}
                 >
-                  <Icon name={GENERATION_TYPE_ICONS[type]} size={14} class="text-blueprint-blue" />
+                  <Icon name={generationTypeIcons[type]} size={14} class="text-blueprint-blue" />
                   {generatingType === type ? 'Génération...' : GENERATION_TYPE_LABELS[type]}
                 </button>
               {/each}
@@ -852,9 +897,9 @@
               proofLabel="Contenus générés"
               proofValue="0"
               primaryActionLabel="Générer un pitch"
-              primaryActionIcon={GENERATION_TYPE_ICONS.pitch}
+              primaryActionIcon={generationTypeIcons.pitch}
               secondaryActionLabel="Générer le message"
-              secondaryActionIcon={GENERATION_TYPE_ICONS['cover-message']}
+              secondaryActionIcon={generationTypeIcons['cover-message']}
               onPrimaryAction={() => generate('pitch')}
               onSecondaryAction={() => generate('cover-message')}
             />
@@ -865,7 +910,7 @@
               <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-2">
                   <Icon
-                    name={GENERATION_TYPE_ICONS[asset.type]}
+                    name={generationTypeIcons[asset.type]}
                     size={14}
                     class="text-blueprint-blue"
                   />

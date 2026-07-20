@@ -95,36 +95,31 @@
 </script>
 
 {#if resolvedVariant === 'inline'}
-  <!-- Single-row status strip: icon + title/status + inline action. No evidence, no description. -->
+  <!-- Compact decision strip: icon + stable status + flexible action. -->
   <section
-    class="flex items-center gap-2.5 rounded-lg border px-3 py-2 transition-colors {containerClass}"
+    data-testid="operational-story-inline"
+    aria-label={eyebrow ? `${eyebrow} : ${title}` : title}
+    class="grid grid-cols-[auto_auto_minmax(0,1fr)] items-center gap-2 rounded-xl border px-3 py-2 transition-colors {containerClass}"
   >
     <div class="flex h-7 w-7 shrink-0 items-center justify-center rounded-md {iconClass}">
       <Icon name={iconName} size={13} />
     </div>
-    <div class="flex min-w-0 flex-1 items-center gap-2">
-      {#if eyebrow}
-        <span
-          class="truncate text-[10px] font-semibold uppercase tracking-[0.14em] text-text-muted"
-        >
-          {eyebrow}
-        </span>
-        <span class="text-text-muted/40" aria-hidden="true">·</span>
-      {/if}
+    {#if statusLabel}
+      <OperationalStatusBadge label={statusLabel} {severity} />
+    {:else}
       <p class="truncate text-xs font-medium text-text-primary">{title}</p>
-      {#if statusLabel}
-        <OperationalStatusBadge label={statusLabel} {severity} />
-      {/if}
-    </div>
+    {/if}
     {#if primaryActionLabel}
       <button
-        class="inline-flex shrink-0 items-center gap-1.5 rounded-md px-2 py-1 text-xs font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
+        class="inline-flex min-w-0 items-center justify-between gap-2 rounded-lg px-2 py-1.5 text-xs font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
         onclick={onPrimaryAction}
         type="button"
       >
-        {primaryActionLabel}
-        <Icon name={primaryActionIcon} size={12} />
+        <span class="min-w-0 truncate">{primaryActionLabel}</span>
+        <Icon name={primaryActionIcon} size={12} class="shrink-0" />
       </button>
+    {:else if statusLabel}
+      <p class="min-w-0 truncate text-xs font-medium text-text-primary">{title}</p>
     {/if}
   </section>
 {:else}

@@ -39,6 +39,18 @@ describe('MissionArrivalStack', () => {
     document.body.innerHTML = '';
   });
 
+  it('renders no tray when the Core projection marks arrivals incompatible', async () => {
+    const target = mountStack({
+      count: 3,
+      missions: [makeMission(1)],
+      state: 'collapsed',
+      visible: false,
+    });
+    await tick();
+
+    expect(target.querySelector('[data-testid="mission-arrival-stack"]')).toBeNull();
+  });
+
   it('renders a bounded collapsed stack with an accessible count', async () => {
     const onOpen = vi.fn();
     const target = mountStack({

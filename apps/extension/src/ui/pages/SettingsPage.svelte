@@ -3,7 +3,6 @@
   import { Button } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import type { IconName } from '@pulse/ui';
-  import BackupRestoreModal from '../molecules/BackupRestoreModal.svelte';
   import ScanSettings from '../organisms/ScanSettings.svelte';
   import DangerZone from '../organisms/DangerZone.svelte';
   import type { Mission } from '$lib/core/types/mission';
@@ -16,6 +15,7 @@
   } from '../molecules/OperationalStoryCard.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import AlertBuilderCard from '../molecules/AlertBuilderCard.svelte';
+  import ThemeSelector from '../molecules/ThemeSelector.svelte';
   import { DEFAULT_CONNECTED_ALERT_PREFERENCES } from '$lib/core/types/alert-preferences';
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import {
@@ -154,24 +154,9 @@
     await showToast('Sauvegarde créée', 'success');
   }
 
-  async function handleRestoreBackup() {
-    const result = await settings.restoreBackup();
-    if (!result.ok) {
-      await showToast(result.error, 'error');
-      return;
-    }
-    await settings.load();
-    await showToast('Sauvegarde restaurée', 'success');
-  }
-
   async function handleScanIntervalChange(event: Event) {
     const value = Number.parseInt((event.target as HTMLInputElement).value, 10);
     await settings.updateScanInterval(value);
-  }
-
-  async function handleFileSelect(event: Event) {
-    const input = event.target as HTMLInputElement;
-    await settings.handleFileSelect(input.files?.[0]);
   }
 
   async function handleSaveAlertPreferences(nextPreferences: ConnectedAlertPreferences) {
@@ -287,10 +272,10 @@
         severity: favoriteExportCount > 0 ? 'success' : 'neutral',
       },
       {
-        label: 'Restore',
-        value: 'Confirmé',
+        label: 'Import',
+        value: 'Non proposé',
         icon: 'shield-check',
-        severity: 'success',
+        severity: 'neutral',
       },
     ];
 
@@ -298,9 +283,8 @@
       return {
         severity: 'attention' as const,
         statusLabel: 'Préparation requise',
-        title: 'La sauvegarde serait trop pauvre pour restaurer un espace utile',
-        description:
-          'Complétez au moins le profil ou la stack avant de créer un point de restauration.',
+        title: 'La sauvegarde serait trop pauvre pour être utile',
+        description: 'Complétez au moins le profil ou la stack avant de créer une archive locale.',
         evidence,
         primaryActionLabel: 'Compléter le profil',
         primaryActionIcon: 'user',
@@ -310,9 +294,9 @@
     return {
       severity: 'success' as const,
       statusLabel: 'Sauvegardable',
-      title: 'Un point de restauration local peut être créé',
+      title: 'Une archive locale peut être créée',
       description:
-        'La sauvegarde capture profil, réglages, favoris et missions masquées. La restauration reste confirmée avant écriture.',
+        'La sauvegarde capture profil, réglages, favoris et missions masquées. L’import reste désactivé tant que sa transaction multi-stockage n’est pas prouvée.',
       evidence,
       primaryActionLabel: 'Créer une sauvegarde',
       primaryActionIcon: 'download',
@@ -520,7 +504,7 @@
         statusLabel={settingsStory.statusLabel}
         evidence={settingsStory.evidence}
         primaryActionLabel={settingsStory.primaryActionLabel}
-        primaryActionIcon={settingsStory.primaryActionIcon}
+        primaryActionIcon={settingsStory.primaryActionIcon as IconName}
         onPrimaryAction={handleSettingsStoryAction}
       />
     </div>
@@ -598,6 +582,79 @@
         onToggleNotifications={() => settings.toggleNotifications()}
         onScanIntervalChange={handleScanIntervalChange}
       />
+
+      <div class="section-card space-y-3 rounded-xl p-4">
+        <div class="flex items-start justify-between gap-3">
+          <div>
+            <p class="text-xs font-semibold text-text-primary">
+              Sources incluses dans cette version
+            </p>
+            <p class="mt-1 text-[11px] leading-4 text-text-muted">
+              Seules les plateformes réellement livrées avec l’extension peuvent être activées.
+            </p>
+          </div>
+          <span
+            class="shrink-0 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+          >
+            {settings.connectorSources.filter((source) => source.enabled).length}/{settings
+              .connectorSources.length} actives
+          </span>
+        </div>
+
+        <div
+          class="divide-y divide-border-light rounded-lg border border-border-light bg-surface-white"
+        >
+          {#each settings.connectorSources as source (source.id)}
+            <div class="flex min-h-14 items-center justify-between gap-3 px-3 py-2.5">
+              <div class="flex min-w-0 items-center gap-2.5">
+                <span
+                  class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6 text-blueprint-blue"
+                >
+                  <Icon name="database" size={13} />
+                </span>
+                <span class="min-w-0">
+                  <span class="block truncate text-xs font-medium text-text-primary">
+                    {source.name}
+                  </span>
+                  <span class="mt-0.5 block text-[10px] text-text-muted">
+                    {source.enabled ? 'Incluse dans les prochains scans' : 'Scan désactivé'}
+                  </span>
+                </span>
+              </div>
+
+              <button
+                type="button"
+                role="switch"
+                aria-checked={source.enabled}
+                aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
+                disabled={settings.isSavingSettings}
+                class="relative h-6 w-10 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-blueprint-blue/30 disabled:cursor-wait disabled:opacity-60 {source.enabled
+                  ? 'border-blueprint-blue bg-blueprint-blue'
+                  : 'border-disabled-gray bg-subtle-gray'}"
+                onclick={() => settings.toggleConnector(source.id)}
+              >
+                <span
+                  class="absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform {source.enabled
+                    ? 'translate-x-4.5'
+                    : 'translate-x-0.5'}"
+                  aria-hidden="true"
+                ></span>
+              </button>
+            </div>
+          {/each}
+        </div>
+      </div>
+
+      {#if settings.settingsError}
+        <p
+          class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-xs text-status-red"
+          role="alert"
+        >
+          {settings.settingsError}. La dernière configuration confirmée reste active.
+        </p>
+      {:else if settings.isSavingSettings}
+        <p class="px-1 text-[11px] text-text-muted" role="status">Enregistrement…</p>
+      {/if}
     </section>
 
     <section
@@ -775,7 +832,7 @@
           statusLabel={aiStory.statusLabel}
           evidence={aiStory.evidence}
           primaryActionLabel={aiStory.primaryActionLabel}
-          primaryActionIcon={aiStory.primaryActionIcon}
+          primaryActionIcon={aiStory.primaryActionIcon as IconName}
           onPrimaryAction={() => settings.openAiHelp()}
         />
         <div class="grid grid-cols-2 gap-2">
@@ -834,7 +891,7 @@
         <div>
           <p class="eyebrow text-text-muted">Données</p>
           <h3 id="settings-data-title" class="mt-1 text-sm font-semibold text-text-primary">
-            Sorties, restauration et nettoyage
+            Sorties et nettoyage
           </h3>
           <p class="mt-1 text-xs leading-5 text-text-subtle">
             Les actions qui modifient ou exportent l’espace local sont regroupées ici.
@@ -847,20 +904,11 @@
           <h3 class="text-sm font-medium text-text-primary">Apparence</h3>
           <p class="mt-1 text-xs text-text-subtle">Choisir le thème de l'interface.</p>
         </div>
-        <div class="flex gap-2">
-          {#each [{ id: 'light', label: 'Clair', icon: 'sun' }, { id: 'dark', label: 'Sombre', icon: 'moon' }, { id: 'system', label: 'Système', icon: 'monitor' }] as option (option.id)}
-            <button
-              class="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors
-                {settings.theme === option.id
-                ? 'border-blueprint-blue bg-blueprint-blue/10 text-blueprint-blue'
-                : 'border-border-light bg-page-canvas text-text-primary hover:bg-subtle-gray'}"
-              onclick={() => settings.updateTheme(option.id as 'light' | 'dark' | 'system')}
-            >
-              <Icon name={option.icon} size={14} />
-              {option.label}
-            </button>
-          {/each}
-        </div>
+        <ThemeSelector
+          theme={settings.theme}
+          busy={settings.isSavingSettings}
+          onSelect={(theme) => void settings.updateTheme(theme)}
+        />
       </div>
 
       <div class="section-card rounded-xl p-5 space-y-4">
@@ -879,7 +927,7 @@
           statusLabel={exportStory.statusLabel}
           evidence={exportStory.evidence}
           primaryActionLabel={exportStory.primaryActionLabel}
-          primaryActionIcon={exportStory.primaryActionIcon}
+          primaryActionIcon={exportStory.primaryActionIcon as IconName}
           onPrimaryAction={handleExportStoryAction}
         />
         <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
@@ -948,7 +996,7 @@
             aria-live="polite"
           >
             <div class="flex items-start gap-2">
-              <Icon name="check-circle-2" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+              <Icon name="check-circle" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
               <div class="min-w-0">
                 <p class="text-xs font-medium text-text-primary">Export prêt à partager</p>
                 <p class="mt-0.5 text-[11px] leading-4 text-text-subtle">
@@ -964,7 +1012,7 @@
         <div>
           <h3 class="text-sm font-medium text-text-primary">Sauvegarde</h3>
           <p class="mt-1 text-xs text-text-subtle">
-            Sauvegarder ou restaurer vos données (profil, paramètres, favoris).
+            Exporter une archive de vos données (profil, paramètres, favoris).
           </p>
         </div>
         <OperationalStoryCard
@@ -976,23 +1024,12 @@
           statusLabel={backupStory.statusLabel}
           evidence={backupStory.evidence}
           primaryActionLabel={null}
-          primaryActionIcon={backupStory.primaryActionIcon}
+          primaryActionIcon={backupStory.primaryActionIcon as IconName}
         />
         <div class="flex flex-wrap gap-2">
           <Button variant="secondary" onclick={handleCreateBackup}>
             <Icon name="download" size={14} class="mr-1" />
             Créer une sauvegarde
-          </Button>
-          <input
-            type="file"
-            accept=".pulse-backup,.json"
-            class="hidden"
-            onchange={handleFileSelect}
-            bind:this={settings.fileInput}
-          />
-          <Button variant="ghost" onclick={() => settings.triggerFileSelect()}>
-            <Icon name="upload" size={14} class="mr-1" />
-            Restaurer
           </Button>
         </div>
       </div>
@@ -1047,26 +1084,21 @@
         </div>
       </div>
 
-      <DangerZone
-        showResetConfirm={settings.showResetConfirm}
-        onShowConfirm={() => {
-          settings.showResetConfirm = true;
-        }}
-        onCancelConfirm={() => {
-          settings.showResetConfirm = false;
-        }}
-        onConfirmReset={() => settings.resetAll()}
-        onCreateBackup={handleCreateBackup}
-      />
+      {#if settings.localDataResetAvailability.status === 'available'}
+        <DangerZone
+          showResetConfirm={settings.showResetConfirm}
+          resetAvailability={settings.localDataResetAvailability}
+          resetError={settings.resetError}
+          onShowConfirm={() => {
+            settings.showResetConfirm = true;
+          }}
+          onCancelConfirm={() => {
+            settings.showResetConfirm = false;
+          }}
+          onConfirmReset={() => settings.resetAll()}
+          onCreateBackup={handleCreateBackup}
+        />
+      {/if}
     </section>
   </div>
 </div>
-
-{#if settings.showBackupModal}
-  <BackupRestoreModal
-    backup={settings.pendingBackup}
-    error={settings.backupError}
-    onConfirm={handleRestoreBackup}
-    onCancel={() => settings.cancelRestore()}
-  />
-{/if}

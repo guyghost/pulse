@@ -63,7 +63,8 @@ export class MaltConnector extends BaseConnector {
 
   async fetchMissions(
     now: number,
-    context?: ConnectorSearchContext
+    context?: ConnectorSearchContext,
+    signal?: AbortSignal
   ): Promise<Result<Mission[], AppError>> {
     try {
       const endpoint = new URL(SEARCH_API_URL);
@@ -76,12 +77,17 @@ export class MaltConnector extends BaseConnector {
         endpoint.searchParams.set('query', context.query);
       }
 
-      const result = await this.fetchJSON(endpoint.toString(), now, {
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
+      const result = await this.fetchJSON(
+        endpoint.toString(),
+        now,
+        {
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+          },
         },
-      });
+        signal
+      );
 
       if (!result.ok) {
         return err(

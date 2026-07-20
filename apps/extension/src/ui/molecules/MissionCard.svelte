@@ -7,7 +7,6 @@
   import { Badge } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import { scoreToGrade } from '$lib/core/types/score';
-  import { ripple } from '../actions/ripple';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import Tooltip from '../atoms/Tooltip.svelte';
 
@@ -15,6 +14,7 @@
     mission,
     isSeen = true,
     isFavorite = false,
+    isFavoritePending = false,
     isHidden = false,
     isCompared = false,
     compareDisabled = false,
@@ -31,11 +31,13 @@
     onInvestigate,
     trackingStatus = null as ApplicationStatus | null,
     trackingUpdatedAt = null as number | null,
+    isStatusTransitionPending = false,
     onStatusTransition = null as ((status: ApplicationStatus) => void) | null,
   }: {
     mission: Mission;
     isSeen?: boolean;
     isFavorite?: boolean;
+    isFavoritePending?: boolean;
     isHidden?: boolean;
     isCompared?: boolean;
     compareDisabled?: boolean;
@@ -52,6 +54,7 @@
     onInvestigate?: () => void;
     trackingStatus?: ApplicationStatus | null;
     trackingUpdatedAt?: number | null;
+    isStatusTransitionPending?: boolean;
     onStatusTransition?: ((status: ApplicationStatus) => void) | null;
   } = $props();
 
@@ -87,6 +90,24 @@
   );
   const scoreDetailsId = $derived(
     `mission-score-details-${mission.id.replace(/[^a-zA-Z0-9_-]/g, '-')}`
+  );
+
+  function stableIdHash(value: string): string {
+    let hash = 0x811c9dc5;
+    for (let index = 0; index < value.length; index += 1) {
+      hash ^= value.charCodeAt(index);
+      hash = Math.imul(hash, 0x01000193);
+    }
+    return (hash >>> 0).toString(16).padStart(8, '0');
+  }
+
+  const missionDetailsId = $derived(
+    `mission-details-m-${
+      mission.id
+        .replace(/[^A-Za-z0-9]+/g, '-')
+        .replace(/^-+|-+$/g, '')
+        .slice(0, 53) || 'mission'
+    }-${stableIdHash(mission.id)}`
   );
 
   const decisionInsight = $derived.by(() => {
@@ -206,8 +227,7 @@
   }
 </script>
 
-<div
-  use:ripple
+<article
   use:onVisibleAction={{
     disabled: isSeen,
     onSignal: (signal) => {
@@ -217,21 +237,13 @@
       }
     },
   }}
-  class="group relative cursor-pointer rounded-xl border border-border-light bg-surface-white p-5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
+  class="group relative rounded-xl border border-border-light bg-surface-white p-5 transition-all duration-200 ease-out hover:border-disabled-gray {isSeen
     ? ''
     : 'border-blueprint-blue/20'} {isHidden ? 'opacity-50' : ''} {tourHighlight === 'seen'
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
     : ''}"
   style="contain: layout style paint;"
-  onclick={toggleExpand}
-  role="button"
-  tabindex="0"
-  onkeydown={(e) => {
-    if (e.key === 'Enter' || e.key === ' ') {
-      e.preventDefault();
-      toggleExpand();
-    }
-  }}
+  aria-label={`Mission ${mission.title} chez ${mission.client || 'client non précisé'}`}
 >
   <!-- Header row -->
   <div class="flex items-start justify-between gap-3">
@@ -239,7 +251,10 @@
       <div class="flex flex-wrap items-center gap-1.5">
         <Badge label={mission.source} variant="source" />
         {#if trackingStatus}
-          <Badge label={STATUS_LABELS[trackingStatus]} variant={STATUS_VARIANTS[trackingStatus]} />
+          <Badge
+            label={STATUS_LABELS[trackingStatus]}
+            variant={STATUS_VARIANTS[trackingStatus] as 'source'}
+          />
           {#if trackingUpdatedLabel}
             <span
               class="inline-flex items-center rounded-full bg-page-canvas px-2 py-0.5 text-[10px] font-medium text-text-muted"
@@ -298,18 +313,23 @@
             : ''}">{mission.score}</span
         >
       {/if}
-      <div
-        class="flex h-6 w-6 items-center justify-center rounded-md text-text-muted transition-colors group-hover:text-text-primary {tourHighlight ===
+      <button
+        type="button"
+        class="flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
         'expand'
           ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
           : ''}"
+        onclick={toggleExpand}
+        aria-label={`${expanded ? 'Masquer' : 'Afficher'} les détails de la mission ${mission.title}`}
+        aria-expanded={expanded}
+        aria-controls={missionDetailsId}
       >
         <Icon
           name="chevron-down"
           size={12}
           class="transition-transform duration-200 {expanded ? 'rotate-180' : ''}"
         />
-      </div>
+      </button>
     </div>
   </div>
 
@@ -449,9 +469,15 @@
     </div>
   {/if}
 
-  <!-- Detail grid -->
+  <!-- Inline details controlled by the scoped disclosure. -->
   {#if expanded}
-    <div class="mt-4 border-t border-border-light pt-4">
+    <div
+      id={missionDetailsId}
+      role="region"
+      aria-label={`Détails de la mission ${mission.title}`}
+      class="mt-4 border-t border-border-light pt-4"
+      transition:slide={{ duration: isVirtualized ? 0 : 200 }}
+    >
       <div class="grid grid-cols-2 gap-2 text-xs">
         {#if mission.tjm !== null}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
@@ -492,6 +518,11 @@
           <p class="mt-1 truncate text-text-primary">{mission.source}</p>
         </div>
       </div>
+      {#if mission.description}
+        <div class="mt-4 border-t border-border-light pt-4">
+          <p class="text-xs leading-relaxed text-text-subtle">{mission.description}</p>
+        </div>
+      {/if}
     </div>
   {/if}
 
@@ -509,6 +540,7 @@
             ? 'text-blueprint-blue hover:text-blueprint-blue'
             : ''}"
           onclick={handleToggleFavorite}
+          disabled={isFavoritePending}
           aria-label={isFavorite
             ? 'Retirer la mission des favoris'
             : 'Ajouter la mission aux favoris'}
@@ -589,35 +621,33 @@
     </button>
   </div>
 
-  {#if trackingStatus && availableTransitions.length > 0 && onStatusTransition}
-    <div class="mt-3 flex flex-wrap gap-1.5">
+  {#if trackingStatus}
+    <div
+      class="mt-3 flex flex-wrap gap-1.5"
+      role="group"
+      aria-label={`Statut de la mission ${mission.title}`}
+      aria-busy={isStatusTransitionPending}
+    >
+      <span
+        role="status"
+        aria-label={`Statut actuel : ${STATUS_LABELS[trackingStatus]}`}
+        class="sr-only"
+      >
+        Statut actuel : {STATUS_LABELS[trackingStatus]}
+      </span>
       {#each availableTransitions as nextStatus, i (i)}
         {@const label = STATUS_LABELS[nextStatus]}
-        {@const variant = STATUS_VARIANTS[nextStatus]}
-        <button
-          class="inline-flex items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-[11px] text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
-          onclick={(e) => {
-            e.stopPropagation();
-            onStatusTransition?.(nextStatus);
-          }}
-        >
-          {label}
-        </button>
+        {#if onStatusTransition}
+          <button
+            class="inline-flex items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-[11px] text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait disabled:opacity-50"
+            onclick={() => onStatusTransition?.(nextStatus)}
+            aria-label={`Passer le statut à ${label}`}
+            disabled={isStatusTransitionPending}
+          >
+            {label}
+          </button>
+        {/if}
       {/each}
     </div>
   {/if}
-
-  {#if expanded && mission.description}
-    {#if isVirtualized}
-      <div class="mt-4 border-t border-border-light pt-4">
-        <p class="text-xs leading-relaxed text-text-subtle">{mission.description}</p>
-      </div>
-    {:else}
-      <div transition:slide={{ duration: 200 }}>
-        <div class="mt-4 border-t border-border-light pt-4">
-          <p class="text-xs leading-relaxed text-text-subtle">{mission.description}</p>
-        </div>
-      </div>
-    {/if}
-  {/if}
-</div>
+</article>

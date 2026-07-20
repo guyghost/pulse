@@ -7,6 +7,7 @@
  * Uses Svelte 5 runes for reactive state.
  */
 import type { Mission, MissionSource, RemoteType } from '$lib/core/types/mission';
+import { untrack } from 'svelte';
 import { SvelteMap, SvelteSet, SvelteDate } from 'svelte/reactivity';
 import type { SeniorityLevel, UserProfile } from '$lib/core/types/profile';
 import type {
@@ -44,7 +45,7 @@ import {
 } from '$lib/shell/facades/feed-data.facade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
-import { showToastAction } from '$lib/shell/notifications/toast-service';
+import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
 import { createUndoController, type UndoController } from '$lib/shell/undo/undo-controller';
 import {
   buildProfileImpactItems,
@@ -68,11 +69,21 @@ import {
 } from '$lib/core/deep-link/deep-link-intent';
 import {
   createMissionArrivalQueueState,
-  transitionMissionArrivalQueue,
+  deriveFeedPresentation,
+  getMissionArrivalStackView,
+  isArrivalStackRenderable,
   type MissionArrivalQueueEffect,
-  type MissionArrivalQueueEvent,
   type MissionDwellSignal,
 } from '$lib/core/feed/mission-arrival-queue';
+import {
+  createArrivalPreviewCacheState,
+  transitionArrivalPreviewCache,
+  type ArrivalPreviewCacheSource,
+} from '$lib/core/feed/arrival-preview-cache';
+import {
+  createMissionArrivalActor,
+  type MissionArrivalActorEvent,
+} from '$lib/shell/arrival/mission-arrival-actor';
 
 export type SortBy = FeedSortBy;
 export type ScoreBucket = FeedScoreBucket;
@@ -238,19 +249,32 @@ export function createFeedPageState(
   // Internal state (not directly bound)
   let seenIds = $state<string[]>([]);
   let favorites = $state<Record<string, number>>({});
+  const favoritePendingIds = new SvelteSet<string>();
   let hidden = $state<Record<string, number>>({});
   let pendingSeenIds = new SvelteSet<string>();
   let seenFlushTimer: ReturnType<typeof setTimeout> | null = null;
-  const initialArrivalState = controller.hasPendingMissions
-    ? transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
-        type: 'ARRIVALS_BUFFERED',
-        orderedPendingIds: controller.pendingMissions.map((mission) => mission.id),
-      }).state
-    : createMissionArrivalQueueState();
-  let arrivalQueueState = $state(initialArrivalState);
-  let arrivalPreviewCatalog = $state<Record<string, Mission>>(
-    Object.fromEntries(controller.pendingMissions.map((mission) => [mission.id, mission]))
+  let arrivalQueueState = $state(createMissionArrivalQueueState());
+  let arrivalObservedEffects: MissionArrivalQueueEffect[] = [];
+  const arrivalActor = createMissionArrivalActor({
+    readFeed: () => feedStore.missions,
+    replaceFeedSync: (nextMissions) => feedStore.setMissions([...nextMissions]),
+    loadProjection: (orderedIds) => controller.loadArrivalProjection(orderedIds),
+    persistSeen: async (missionId) => {
+      const nextSeenIds = markAsSeen(Array.from(seenIds), [missionId]);
+      await saveSeenIds(nextSeenIds);
+      seenIds = nextSeenIds;
+    },
+    onStateChanged: (nextState) => {
+      arrivalQueueState = nextState;
+    },
+    onEffect: (effect) => {
+      arrivalObservedEffects = [...arrivalObservedEffects, effect];
+    },
+  });
+  let arrivalPreviewCacheState = $state.raw(
+    createArrivalPreviewCacheState(controller.pendingMissions)
   );
+  const arrivalPreviewCatalog = $derived(arrivalPreviewCacheState.byId);
 
   // ============================================================
   // Focus lens — driven by the notification deep-link intent.
@@ -629,13 +653,27 @@ export function createFeedPageState(
     return sortCurrentMissions(scopedMissions);
   });
 
-  const pendingMissionsSorted = $derived(sortCurrentMissions(controller.pendingMissions));
+  const feedPresentation = $derived(
+    deriveFeedPresentation({
+      feedState: feedStore.state,
+      ownedScan: controller.ownedScan,
+      networkOnline: connection.status !== 'offline',
+    })
+  );
+  const arrivalStackView = $derived(getMissionArrivalStackView(arrivalQueueState));
   const arrivalPreviewMissions = $derived.by(() => {
-    return arrivalQueueState.stack.previewIds
-      .map((id) => arrivalPreviewCatalog[id])
+    const missionCatalog = new SvelteMap(
+      [...allMissions, ...controller.pendingMissions, ...Object.values(arrivalPreviewCatalog)].map(
+        (mission) => [mission.id, mission] as const
+      )
+    );
+    return arrivalStackView.previewIds
+      .map((id) => missionCatalog.get(id))
       .filter((mission): mission is Mission => mission !== undefined);
   });
-  const arrivalStackVisible = $derived(arrivalQueueState.stack.value !== 'empty');
+  const arrivalStackVisible = $derived(
+    isArrivalStackRenderable({ ...arrivalQueueState, presentation: feedPresentation })
+  );
 
   // Focus-lens derived views for the banner UI.
   const focusMissions = $derived(
@@ -674,17 +712,8 @@ export function createFeedPageState(
   // Event handlers
   // ============================================================
 
-  function dispatchArrival(event: MissionArrivalQueueEvent): MissionArrivalQueueEffect[] {
-    const transition = transitionMissionArrivalQueue(arrivalQueueState, event);
-    if (transition.state !== arrivalQueueState) {
-      arrivalQueueState = transition.state;
-    }
-    for (const effect of transition.effects) {
-      if (effect.type === 'mark-seen') {
-        handleMissionSeen(effect.missionId);
-      }
-    }
-    return transition.effects;
+  function dispatchArrival(event: MissionArrivalActorEvent): void {
+    arrivalActor.dispatch(event);
   }
 
   function enterStableNewQueue(): void {
@@ -710,69 +739,58 @@ export function createFeedPageState(
     dispatchArrival({ type: 'DWELL_ELAPSED', missionId, now: signal.at });
   }
 
-  function syncArrivalBuffer(
-    pendingMissions: Mission[],
-    hasPendingMissions: boolean = pendingMissions.length > 0
+  function rememberArrivalPreviews(
+    pendingMissions: readonly Mission[],
+    source: ArrivalPreviewCacheSource
   ): void {
-    if (hasPendingMissions && pendingMissions.length > 0) {
-      let nextCatalog = arrivalPreviewCatalog;
-      for (const mission of pendingMissions) {
-        if (nextCatalog[mission.id] === mission) {
-          continue;
-        }
-        if (nextCatalog === arrivalPreviewCatalog) {
-          nextCatalog = { ...arrivalPreviewCatalog };
-        }
-        nextCatalog[mission.id] = mission;
-      }
-      if (nextCatalog !== arrivalPreviewCatalog) {
-        arrivalPreviewCatalog = nextCatalog;
-      }
-      dispatchArrival({
-        type: 'ARRIVALS_BUFFERED',
-        orderedPendingIds: pendingMissions.map((mission) => mission.id),
-      });
-      return;
-    }
-
-    if (arrivalQueueState.stack.value !== 'refreshing') {
-      arrivalPreviewCatalog = {};
-      dispatchArrival({ type: 'SCAN_CANCELLED' });
-    }
-  }
-
-  function openArrivalStack(): MissionArrivalQueueEffect[] {
-    arrivalPreviewCatalog = {
-      ...arrivalPreviewCatalog,
-      ...Object.fromEntries(pendingMissionsSorted.map((mission) => [mission.id, mission])),
-    };
-    return dispatchArrival({
-      type: 'OPEN_STACK',
-      orderedPreviewIds: pendingMissionsSorted.map((mission) => mission.id),
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'PREVIEW_OBJECTS_OBSERVED',
+      source,
+      missions: pendingMissions,
     });
   }
 
-  function closeArrivalStack(): MissionArrivalQueueEffect[] {
-    return dispatchArrival({ type: 'CLOSE_STACK' });
+  function receiveAlarmMissions(alarmMissions: readonly Mission[]): void {
+    rememberArrivalPreviews(alarmMissions, 'alarm-ingress');
+    arrivalActor.publishAlarm(alarmMissions);
   }
 
-  function startArrivalRefresh(): MissionArrivalQueueEffect[] {
-    return dispatchArrival({
-      type: arrivalQueueState.stack.value === 'refresh-error' ? 'RETRY_REFRESH' : 'REFRESH_QUEUE',
-    });
+  function openArrivalStack(): void {
+    rememberArrivalPreviews(controller.pendingMissions, 'facade-pending-snapshot');
+    dispatchArrival({ type: 'OPEN_STACK' });
   }
 
-  function completeArrivalRefresh(): MissionArrivalQueueEffect[] {
-    const effects = dispatchArrival({
-      type: 'REFRESH_SUCCEEDED',
-      orderedUnseenIds: newQueueCandidateMissions.map((mission) => mission.id),
+  function closeArrivalStack(): void {
+    dispatchArrival({ type: 'CLOSE_STACK' });
+  }
+
+  async function refreshArrivals(): Promise<MissionArrivalQueueEffect[]> {
+    const effectOffset = arrivalObservedEffects.length;
+    dispatchArrival(
+      arrivalQueueState.stack.value === 'projection-error'
+        ? { type: 'RETRY_REQUESTED' }
+        : { type: 'APPLY_REQUESTED' }
+    );
+    await arrivalActor.whenIdle();
+    const effects = arrivalObservedEffects.slice(effectOffset);
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'APPLY_CYCLE_SETTLED',
+      hasRemainingPreviewMembership: getMissionArrivalStackView(arrivalQueueState).count > 0,
     });
-    arrivalPreviewCatalog = {};
     return effects;
   }
 
-  function failArrivalRefresh(message: string): void {
-    dispatchArrival({ type: 'REFRESH_FAILED', message });
+  async function bootstrapArrivalActor(): Promise<void> {
+    rememberArrivalPreviews(controller.pendingMissions, 'facade-pending-snapshot');
+    arrivalActor.synchronizePresentation({
+      feedState: feedStore.state,
+      ownedScan: controller.ownedScan,
+      networkOnline: connection.status !== 'offline',
+    });
+    arrivalActor.synchronizeScope(
+      new SvelteSet([...controller.enabledConnectorIds] as MissionSource[])
+    );
+    await arrivalActor.whenIdle();
   }
 
   function flushSeenIds(): void {
@@ -806,19 +824,40 @@ export function createFeedPageState(
     scheduleSeenFlush();
   }
 
-  function handleToggleFavorite(id: string): void {
+  async function handleToggleFavorite(id: string): Promise<void> {
+    if (favoritePendingIds.has(id)) {
+      return;
+    }
+
     const previous = { ...favorites };
-    const wasFavorite = id in favorites;
+    const wasFavorite = id in previous;
     const updated = toggleFavorite(favorites, id, Date.now());
-    favorites = updated;
-    saveFavorites(favorites).catch(() => {});
-    showToastAction(wasFavorite ? 'Favori retiré' : 'Mission ajoutée aux favoris', 'success', {
-      label: 'Annuler',
-      onClick: () => {
-        favorites = previous;
-        saveFavorites(previous).catch(() => {});
-      },
-    });
+    favoritePendingIds.add(id);
+
+    try {
+      await saveFavorites(updated);
+      favorites = updated;
+      showToastAction(wasFavorite ? 'Favori retiré' : 'Mission ajoutée aux favoris', 'success', {
+        label: 'Annuler',
+        onClick: () => {
+          void (async () => {
+            favoritePendingIds.add(id);
+            try {
+              await saveFavorites(previous);
+              favorites = previous;
+            } catch {
+              void showToast('Impossible d’annuler le changement de favori', 'error');
+            } finally {
+              favoritePendingIds.delete(id);
+            }
+          })();
+        },
+      });
+    } catch {
+      void showToast('Impossible de confirmer le favori', 'error');
+    } finally {
+      favoritePendingIds.delete(id);
+    }
   }
 
   function handleHide(id: string): void {
@@ -1159,7 +1198,29 @@ export function createFeedPageState(
 
     $effect(() => {
       const pendingMissions = controller.pendingMissions;
-      syncArrivalBuffer(pendingMissions, controller.hasPendingMissions);
+      untrack(() => {
+        rememberArrivalPreviews(pendingMissions, 'facade-pending-snapshot');
+      });
+    });
+
+    $effect(() => {
+      const facts = {
+        feedState: feedStore.state,
+        ownedScan: controller.ownedScan,
+        networkOnline: connection.status !== 'offline',
+      };
+      untrack(() => {
+        arrivalActor.synchronizePresentation(facts);
+      });
+    });
+
+    $effect(() => {
+      const enabledSources = new SvelteSet([...controller.enabledConnectorIds] as MissionSource[]);
+      const orderedIds = feedStore.missions.map((mission) => mission.id);
+      untrack(() => {
+        void orderedIds;
+        arrivalActor.synchronizeScope(enabledSources);
+      });
     });
 
     $effect(() => {
@@ -1240,8 +1301,21 @@ export function createFeedPageState(
         {
           config: FeedShortcuts.REFRESH,
           handler: () => {
-            if (!controller.isScanning && !isLoading && !isOffline) {
-              controller.startScan();
+            const presentation = deriveFeedPresentation({
+              feedState: feedStore.state,
+              ownedScan: controller.ownedScan,
+              networkOnline: connection.status !== 'offline',
+            });
+            if (!presentation.actionEnabled) {
+              return;
+            }
+            if (presentation.primaryAction === 'cancel') {
+              void controller.stopScan();
+            } else if (
+              presentation.primaryAction === 'start' ||
+              presentation.primaryAction === 'retry'
+            ) {
+              void controller.startScan();
             }
           },
         },
@@ -1290,6 +1364,9 @@ export function createFeedPageState(
       const unsubscribe = subscribeMessages((message) => {
         if (message.type === 'PROFILE_UPDATED') {
           applyProfile(message.payload);
+        }
+        if (message.type === 'MISSIONS_UPDATED' && message.projection === 'cold-only') {
+          receiveAlarmMissions(message.payload);
         }
       });
 
@@ -1360,8 +1437,11 @@ export function createFeedPageState(
     // Cancel pending undo windows without committing (safe-by-default, invariant I5).
     hideUndo.dispose();
     viewDeleteUndo.dispose();
-    dispatchArrival({ type: 'PANEL_CLOSED' });
-    arrivalPreviewCatalog = {};
+    arrivalActor.dispose();
+    arrivalPreviewCacheState = transitionArrivalPreviewCache(arrivalPreviewCacheState, {
+      type: 'PREVIEW_CACHE_DISPOSED',
+      reason: 'feed-unmounted',
+    });
   }
 
   // ============================================================
@@ -1458,6 +1538,9 @@ export function createFeedPageState(
     get favorites() {
       return favorites;
     },
+    get favoritePendingIds() {
+      return favoritePendingIds;
+    },
     get hidden() {
       return hidden;
     },
@@ -1508,10 +1591,20 @@ export function createFeedPageState(
       return stableQueueActive;
     },
     get arrivalStackState() {
-      return arrivalQueueState.stack;
+      return {
+        value: arrivalStackView.state,
+        message: arrivalStackView.errorMessage,
+        drawerOpen: arrivalStackView.drawerOpen,
+      };
+    },
+    get arrivalStackCount() {
+      return arrivalStackView.count;
     },
     get arrivalStackVisible() {
       return arrivalStackVisible;
+    },
+    get feedPresentation() {
+      return feedPresentation;
     },
     get arrivalPreviewMissions() {
       return arrivalPreviewMissions;
@@ -1570,11 +1663,11 @@ export function createFeedPageState(
     // Actions
     handleMissionSeen,
     handleMissionReadSignal,
+    receiveAlarmMissions,
     openArrivalStack,
     closeArrivalStack,
-    startArrivalRefresh,
-    completeArrivalRefresh,
-    failArrivalRefresh,
+    refreshArrivals,
+    bootstrapArrivalActor,
     handleToggleFavorite,
     handleHide,
     handleCopyLink,

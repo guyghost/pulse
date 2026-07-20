@@ -16,6 +16,14 @@ import type { UserProfile } from '$lib/core/types/profile';
 
 export type Page = 'feed' | 'profile' | 'cv' | 'applications' | 'tjm' | 'settings' | 'onboarding';
 export type AppBootStatus = 'bootstrapping' | 'ready' | 'error';
+export type PageLoadStatus = 'loading' | 'ready' | 'error';
+
+export interface PageLoadSnapshot {
+  status: PageLoadStatus;
+  requestId: string;
+  attempt: number;
+  error: string | null;
+}
 
 const PAGE_INDEX: Record<Page, number> = {
   onboarding: -1,
@@ -52,16 +60,28 @@ export function createAppNavigation() {
   let hasCompletedOnboarding = $state(false);
   let transitionDirection = $state<1 | -1>(1);
   let bootStatus = $state<AppBootStatus>('bootstrapping');
+  let bootError = $state<string | null>(null);
   let previousPageIndex = PAGE_INDEX.feed;
   let profile: UserProfile | null = null;
   let bootstrapRevision = 0;
+  let disposed = false;
+  let unsubscribeMessages: (() => void) | null = null;
 
   async function bootstrap(): Promise<void> {
+    if (disposed) {
+      return;
+    }
+
     const revision = (bootstrapRevision += 1);
     bootStatus = 'bootstrapping';
+    bootError = null;
 
     try {
       const loadedProfile = await getProfile();
+      if (disposed || revision !== bootstrapRevision) {
+        return;
+      }
+
       const [firstScanDone, onboardingCompleted] = loadedProfile
         ? [false, true]
         : await Promise.all([getFirstScanDone(), getOnboardingCompleted()]);
@@ -71,7 +91,7 @@ export function createAppNavigation() {
         onboardingCompleted,
       };
 
-      if (revision !== bootstrapRevision) {
+      if (disposed || revision !== bootstrapRevision) {
         return;
       }
 
@@ -92,16 +112,25 @@ export function createAppNavigation() {
 
       transitionDirection = 1;
       bootStatus = 'ready';
-    } catch {
+    } catch (error: unknown) {
+      if (disposed || revision !== bootstrapRevision) {
+        return;
+      }
+
+      bootError = error instanceof Error ? error.message : 'Bootstrap failed.';
       bootStatus = 'error';
     }
+  }
+
+  function retryBootstrap(): Promise<void> {
+    return bootstrap();
   }
 
   void bootstrap();
 
   try {
-    subscribeMessages((message) => {
-      if (message.type === 'PROFILE_UPDATED') {
+    unsubscribeMessages = subscribeMessages((message) => {
+      if (!disposed && message.type === 'PROFILE_UPDATED') {
         profile = message.payload;
         hasCompletedOnboarding = true;
       }
@@ -111,19 +140,36 @@ export function createAppNavigation() {
   }
 
   function navigate(page: Page) {
+    if (disposed || bootStatus !== 'ready') {
+      return;
+    }
+
     const newIndex = PAGE_INDEX[page];
     transitionDirection = newIndex > previousPageIndex ? 1 : -1;
     previousPageIndex = newIndex;
     currentPage = page;
   }
 
-  function completeOnboarding() {
-    setOnboardingCompleted().catch(() => {});
+  async function completeOnboarding(): Promise<boolean> {
+    if (disposed) {
+      return false;
+    }
+
+    try {
+      await setOnboardingCompleted();
+    } catch {
+      // The canonical flag writer is the truth. A `saved:false` response must
+      // never be projected as a completed onboarding transition.
+      return false;
+    }
+    if (disposed) {
+      return false;
+    }
 
     if (profile === null) {
       void import('$lib/core/profile/normalize-profile')
         .then(({ withProfileDefaults }) => {
-          if (profile !== null) {
+          if (disposed || profile !== null) {
             return;
           }
           const seededProfile = withProfileDefaults({});
@@ -137,14 +183,30 @@ export function createAppNavigation() {
     transitionDirection = 1;
     previousPageIndex = PAGE_INDEX.feed;
     currentPage = 'feed';
+    return true;
   }
 
   function resetToOnboarding() {
+    if (disposed) {
+      return;
+    }
+
     clearOnboardingCompleted().catch(() => {});
     hasCompletedOnboarding = false;
     transitionDirection = -1;
     previousPageIndex = PAGE_INDEX.onboarding;
     currentPage = 'onboarding';
+  }
+
+  function dispose(): void {
+    if (disposed) {
+      return;
+    }
+
+    disposed = true;
+    bootstrapRevision += 1;
+    unsubscribeMessages?.();
+    unsubscribeMessages = null;
   }
 
   return {
@@ -160,9 +222,14 @@ export function createAppNavigation() {
     get bootStatus(): AppBootStatus {
       return bootStatus;
     },
+    get bootError(): string | null {
+      return bootError;
+    },
 
     navigate,
+    retryBootstrap,
     completeOnboarding,
     resetToOnboarding,
+    dispose,
   };
 }

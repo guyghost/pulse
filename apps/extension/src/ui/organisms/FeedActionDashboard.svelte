@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import type {
     FeedDashboardSummary,
     FeedInsightSummary,
@@ -49,7 +49,7 @@
   type FeedInsightItem = {
     label: string;
     value: number;
-    icon: string;
+    icon: IconName;
     stateLabel: string;
     hint: string;
     severity: 'success' | 'attention' | 'neutral';

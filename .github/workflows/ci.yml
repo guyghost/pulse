@@ -15,281 +15,269 @@ concurrency:
   cancel-in-progress: true
 
 env:
-  NODE_VERSION: '22'
+  NODE_VERSION: '22.23.1'
   PNPM_VERSION: '10.32.1'
+  PYTHON_VERSION: '3.14.5'
 
 jobs:
-  setup:
-    name: Setup & Cache
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    outputs:
-      pnpm-store-path: ${{ steps.pnpm-store.outputs.path }}
-
+  quality:
+    name: Quality, unit tests and build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    permissions:
+      contents: read
     steps:
-      - name: Checkout
-        uses: actions/checkout@v7
+      - id: checkout
+        name: Checkout exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - id: setup-pnpm
+        name: Install pinned pnpm launcher
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093
         with:
           version: ${{ env.PNPM_VERSION }}
 
-      - name: Get pnpm store path
-        id: pnpm-store
-        run: echo "path=$(pnpm store path)" >> $GITHUB_OUTPUT
-
-      - name: Setup pnpm cache
-        uses: actions/cache@v6
-        with:
-          path: ${{ steps.pnpm-store.outputs.path }}
-          key: ${{ runner.os }}-pnpm-store-${{ hashFiles('**/pnpm-lock.yaml') }}
-          restore-keys: |
-            ${{ runner.os }}-pnpm-store-
-
-  lint:
-    name: Lint
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: setup
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
+      - id: setup-node
+        name: Install pinned Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
         with:
           node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+          cache: pnpm
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run ESLint
-        run: pnpm turbo lint
-
-  format:
-    name: Format Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 5
-    needs: setup
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+      - id: setup-python
+        name: Install pinned Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
-          version: ${{ env.PNPM_VERSION }}
+          python-version: ${{ env.PYTHON_VERSION }}
 
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
+      - id: expose-pinned-python
+        name: Expose pinned Python executable
+        run: echo "PULSE_RELEASE_PYTHON=$(command -v python3)" >> "$GITHUB_ENV"
 
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Check formatting
-        run: pnpm turbo format:check
-
-  typecheck:
-    name: TypeScript Check
-    runs-on: ubuntu-latest
-    timeout-minutes: 10
-    needs: setup
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: TypeScript check
-        run: pnpm turbo typecheck
-
-  test:
-    name: Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: [lint, format, typecheck]
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Run tests with coverage
-        run: pnpm turbo test -- --coverage
-
-      - name: Upload coverage to Codecov
-        uses: codecov/codecov-action@v7
-        with:
-          token: ${{ secrets.CODECOV_TOKEN }}
-          files: ./apps/extension/coverage/lcov.info
-          flags: unittests
-          name: codecov-umbrella
-          fail_ci_if_error: false
-          verbose: true
-
-  build:
-    name: Build Extension
-    runs-on: ubuntu-latest
-    timeout-minutes: 15
-    needs: test
-    if: github.event_name == 'pull_request' || github.ref == 'refs/heads/develop' || github.ref == 'refs/heads/main'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
-        run: pnpm install --frozen-lockfile
-
-      - name: Build all packages
-        run: pnpm turbo build
-
-      - name: Verify built manifest.json
-        run: pnpm --filter @pulse/extension verify-manifest dist/manifest.json --post-build
-
-      - name: Create extension ZIP
+      - id: verify-toolchain
+        name: Verify the committed package manager authority
         run: |
-          cd apps/extension/dist
-          zip -r ../missionpulse-ci.zip .
+          corepack enable
+          test "$(node --version)" = "v${NODE_VERSION}"
+          test "$(pnpm --version)" = "${PNPM_VERSION}"
+          test "$(node -p 'require("./package.json").packageManager')" = "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"
 
-      - name: Upload build directory artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: chrome-extension-dist
-          path: apps/extension/dist/
-          retention-days: 7
-
-      - name: Upload extension ZIP artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: chrome-extension-zip
-          path: apps/extension/missionpulse-ci.zip
-          retention-days: 7
-
-  test-e2e:
-    name: E2E Tests
-    runs-on: ubuntu-latest
-    timeout-minutes: 20
-    needs: test
-    if: github.event_name == 'pull_request'
-
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v7
-
-      - name: Enable Corepack
-        run: corepack enable
-
-      - name: Setup pnpm
-        uses: pnpm/action-setup@v6
-        with:
-          version: ${{ env.PNPM_VERSION }}
-
-      - name: Setup Node.js
-        uses: actions/setup-node@v6
-        with:
-          node-version: ${{ env.NODE_VERSION }}
-          cache: 'pnpm'
-
-      - name: Install dependencies
+      - id: install
+        name: Install exact committed dependencies
         run: pnpm install --frozen-lockfile
 
-      - name: Cache Playwright browsers
-        uses: actions/cache@v6
-        id: playwright-cache
-        with:
-          path: ~/.cache/ms-playwright
-          key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
-          restore-keys: |
-            playwright-${{ runner.os }}-
-
-      - name: Install Playwright browsers
+      - id: install-browser
+        name: Install Chromium
         run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
 
-      - name: Run E2E tests
+      - id: format
+        name: Check formatting
+        run: pnpm turbo format:check
+
+      - id: lint
+        name: Run static lint
+        run: pnpm turbo lint
+
+      - id: typecheck
+        name: Run TypeScript checks
+        run: pnpm turbo typecheck
+
+      - id: unit
+        name: Run unit and integration tests
+        run: pnpm turbo test
+
+      - id: compile
+        name: Build all production packages
+        run: pnpm turbo build
+
+      - id: manifest
+        name: Verify the built extension manifest
+        run: pnpm --filter @pulse/extension verify-manifest dist/manifest.json --post-build
+
+  browser-e2e:
+    name: Browser E2E
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: quality
+    if: github.event_name == 'pull_request'
+    permissions:
+      contents: read
+    steps:
+      - id: checkout
+        name: Checkout exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+
+      - id: setup-pnpm
+        name: Install pinned pnpm launcher
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - id: setup-node
+        name: Install pinned Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - id: verify-toolchain
+        name: Verify the exact toolchain
+        run: |
+          corepack enable
+          test "$(node --version)" = "v${NODE_VERSION}"
+          test "$(pnpm --version)" = "${PNPM_VERSION}"
+
+      - id: install
+        name: Install exact committed dependencies
+        run: pnpm install --frozen-lockfile
+
+      - id: install-browser
+        name: Install Chromium
+        run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
+
+      - id: test-browser
+        name: Run browser E2E scenarios
         run: pnpm --filter @pulse/extension test:e2e
 
-      - name: Upload Playwright report
-        uses: actions/upload-artifact@v7
-        if: always()
-        with:
-          name: playwright-report
-          path: apps/extension/playwright-report/
-          retention-days: 7
-          if-no-files-found: ignore
+  test-mv3:
+    name: Packaged MV3 gate
+    runs-on: ubuntu-24.04
+    timeout-minutes: 25
+    needs: quality
+    permissions:
+      contents: read
+    steps:
+      - id: checkout
+        name: Checkout exact source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
 
-      - name: Upload Playwright test results
-        uses: actions/upload-artifact@v7
-        if: always()
+      - id: setup-pnpm
+        name: Install pinned pnpm launcher
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093
         with:
-          name: playwright-test-results
-          path: apps/extension/test-results/
-          retention-days: 7
-          if-no-files-found: ignore
+          version: ${{ env.PNPM_VERSION }}
+
+      - id: setup-node
+        name: Install pinned Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - id: verify-toolchain
+        name: Verify the exact toolchain
+        run: |
+          corepack enable
+          test "$(node --version)" = "v${NODE_VERSION}"
+          test "$(pnpm --version)" = "${PNPM_VERSION}"
+
+      - id: setup-python
+        name: Install pinned Python
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - id: expose-pinned-python
+        name: Expose pinned Python executable
+        run: echo "PULSE_RELEASE_PYTHON=$(command -v python3)" >> "$GITHUB_ENV"
+
+      - id: install
+        name: Install exact committed dependencies
+        run: pnpm install --frozen-lockfile
+
+      - id: install-browser
+        name: Install Chromium
+        run: pnpm --filter @pulse/extension exec playwright install --with-deps chromium
+
+      - id: test-mv3
+        name: Run all committed packaged MV3 scenarios
+        run: pnpm --filter @pulse/extension test:mv3
+
+      - id: upload-mv3-evidence
+        name: Upload MV3 Playwright evidence
+        if: always()
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: missionpulse-mv3-evidence-${{ github.run_id }}-${{ github.run_attempt }}
+          path: output/playwright/
+          if-no-files-found: error
+          overwrite: false
+          retention-days: 14
+
+  seal-candidate:
+    name: Build, exercise and seal one exact candidate
+    if: github.event_name == 'workflow_dispatch' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
+    timeout-minutes: 45
+    permissions:
+      attestations: write
+      contents: read
+      id-token: write
+    steps:
+      - id: checkout
+        name: Checkout exact candidate source
+        uses: actions/checkout@de0fac2e4500dabe0009e67214ff5f5447ce83dd
+        with:
+          fetch-depth: 0
+
+      - id: setup-pnpm
+        name: Install pinned pnpm launcher
+        uses: pnpm/action-setup@0e279bb959325dab635dd2c09392533439d90093
+        with:
+          version: ${{ env.PNPM_VERSION }}
+
+      - id: setup-node
+        name: Install pinned Node.js
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: pnpm
+
+      - id: verify-toolchain
+        name: Verify the committed package manager authority
+        run: |
+          corepack enable
+          test "$(node --version)" = "v${NODE_VERSION}"
+          test "$(pnpm --version)" = "${PNPM_VERSION}"
+          test "$(node -p 'require("./package.json").packageManager')" = "pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be"
+          test -z "$(git status --porcelain=v1 --untracked-files=all)"
+
+      - id: install
+        name: Install exact committed dependencies
+        run: pnpm install --frozen-lockfile
+
+      - id: build
+        name: Build, exercise, authorize and capture the sealed transport
+        run: |
+          "$GITHUB_WORKSPACE/node_modules/.bin/tsx" \
+            "$GITHUB_WORKSPACE/apps/extension/scripts/build-sealed-candidate-transport.ts" \
+            --output "$RUNNER_TEMP/missionpulse-sealed-candidate" \
+            --github-output "$GITHUB_OUTPUT"
+
+      - id: attest
+        name: Attest the captured transport digest
+        uses: actions/attest@f7c74d28b9d84cb8768d0b8ca14a4bac6ef463e6
+        with:
+          subject-name: missionpulse-sealed-candidate
+          subject-digest: sha256:${{ steps.build.outputs.transport-sha256 }}
+
+      - id: upload
+        name: Upload the exact attested transport bytes
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
+        with:
+          name: missionpulse-sealed-candidate
+          path: ${{ steps.build.outputs.transport-path }}
+          archive: false
+          overwrite: false
+          retention-days: 30
+
+      - id: verify-upload-digest
+        name: Verify the uploaded transport digest
+        shell: bash
+        env:
+          CAPTURED_TRANSPORT_SHA256: ${{ steps.build.outputs.transport-sha256 }}
+          UPLOADED_ARTIFACT_SHA256: ${{ steps.upload.outputs.artifact-digest }}
+        run: |
+          [[ "$CAPTURED_TRANSPORT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$UPLOADED_ARTIFACT_SHA256" =~ ^[0-9a-f]{64}$ ]]
+          [[ "$UPLOADED_ARTIFACT_SHA256" == "$CAPTURED_TRANSPORT_SHA256" ]]

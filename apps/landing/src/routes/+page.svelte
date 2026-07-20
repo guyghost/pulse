@@ -21,7 +21,7 @@
 
   type FeatureTier = 'free' | 'premium';
   const featureMatrix: { label: string; tier: FeatureTier; note?: string }[] = [
-    { label: 'Feed unique, 5 plateformes dédupliquées', tier: 'free' },
+    { label: 'Feed unique, 4 plateformes dédupliquées', tier: 'free' },
     { label: 'Score stack, TJM, remote, séniorité', tier: 'free' },
     {
       label: 'Score sémantique (IA locale Chrome)',
@@ -44,7 +44,6 @@
     { name: 'Free-Work', logo: '/logos/free-work.png' },
     { name: 'LeHibou', logo: '/logos/lehibou.png' },
     { name: 'Hiway', logo: '/logos/hiway.png' },
-    { name: 'Collective', logo: '/logos/collective.png' },
     { name: 'Cherry Pick', logo: '/logos/cherry-pick.png' },
   ];
 
@@ -231,7 +230,7 @@
   <meta name="title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     name="description"
-    content="MissionPulse est le radar quotidien des freelances tech français: 5 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant."
+    content="MissionPulse est le radar quotidien des freelances tech français: 4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant."
   />
   <meta
     name="keywords"
@@ -246,7 +245,7 @@
   <meta property="og:title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     property="og:description"
-    content="5 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. Gratuit pour scanner, Premium pour suivre, négocier et candidater."
+    content="4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. Gratuit pour scanner, Premium pour suivre, négocier et candidater."
   />
   <meta property="og:image" content="https://missionpulse.app/og-image.png" />
   <meta property="og:locale" content="fr_FR" />
@@ -261,7 +260,7 @@
   />
   <meta
     name="twitter:description"
-    content="Le radar quotidien des freelances tech français: Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans un feed scoré."
+    content="Le radar quotidien des freelances tech français: Free-Work, LeHibou, Hiway et Cherry Pick dans un feed scoré."
   />
   <meta name="twitter:image" content="https://missionpulse.app/og-image.png" />
 </svelte:head>
@@ -396,14 +395,13 @@
       </div>
 
       <h1 class="hero__title">
-        5 plateformes.<br />1 feed scoré.<br /><span class="light-text">Zéro doublon.</span>
+        4 plateformes.<br />1 feed scoré.<br /><span class="light-text">Zéro doublon.</span>
       </h1>
 
       <div class="hero__bottom-bar">
         <p class="hero__description">
-          Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans un seul feed, scoré selon votre
-          stack, votre TJM et votre remote. Le dernier scan a remonté 42 missions, dont 8 à
-          contacter maintenant.
+          Free-Work, LeHibou, Hiway et Cherry Pick dans un seul feed, scoré selon votre stack, votre
+          TJM et votre remote. Le dernier scan a remonté 42 missions, dont 8 à contacter maintenant.
         </p>
 
         <div class="hero__actions">
@@ -432,7 +430,6 @@
           <img src="/logos/free-work.png" alt="Free-Work" width="112" height="40" />
           <img src="/logos/lehibou.png" alt="LeHibou" width="112" height="40" />
           <img src="/logos/hiway.png" alt="Hiway" width="112" height="40" />
-          <img src="/logos/collective.png" alt="Collective" width="112" height="40" />
           <img src="/logos/cherry-pick.png" alt="Cherry Pick" width="112" height="40" />
         </div>
 
@@ -567,7 +564,7 @@
                 <article class="mission-row">
                   <div>
                     <strong>Consultant Design System</strong>
-                    <span>Collective · Lyon</span>
+                    <span>Cherry Pick · Lyon</span>
                   </div>
                   <mark>B</mark>
                   <span>650€</span>
@@ -903,7 +900,7 @@
             <p>Pour valider la valeur en quelques minutes depuis l'extension Chrome.</p>
           </div>
           <ul class="plan-card__list">
-            <li>Scan des 5 plateformes connectées depuis vos sessions navigateur.</li>
+            <li>Scan des 4 plateformes connectées depuis vos sessions navigateur.</li>
             <li>Feed centralisé avec recherche, filtres, tri, nouveautés et favoris.</li>
             <li>Scoring de pertinence, déduplication et comparaison des meilleures missions.</li>
             <li>Paramètres de profil, alertes, exports et sauvegarde locale.</li>
@@ -963,7 +960,7 @@
   <section class="platforms section" id="platforms">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title fade-in">5 plateformes connectées</h2>
+        <h2 class="section-title fade-in">4 plateformes connectées</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
           Les principales sources de missions freelance tech en France, dans un seul feed.
         </p>
@@ -1001,7 +998,7 @@
           <p class="cta__proof">
             <span class="cta__proof-dot" aria-hidden="true"></span>
             Le même classement à chaque scan — scoring déterministe, aucune opacité, aucun tirage aléatoire.
-            Vos 5 plateformes, scannées depuis vos sessions existantes.
+            Vos 4 plateformes, scannées depuis vos sessions existantes.
           </p>
           <a
             href={chromeStoreUrl}

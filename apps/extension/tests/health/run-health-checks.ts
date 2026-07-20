@@ -1,169 +1,124 @@
 #!/usr/bin/env tsx
-/**
- * Health checks connecteurs — fixture-based, sans appels live.
- *
- * Usage:
- *   pnpm health-check
- *   pnpm health-check:json > report.json
- */
 
-import { execSync } from 'node:child_process';
-import { existsSync, readdirSync } from 'node:fs';
-import { join } from 'node:path';
-import { CONNECTOR_HEALTH_REGISTRY } from './connector-registry';
+import { lstatSync, readdirSync, realpathSync } from 'node:fs';
+import { isAbsolute, join, parse, relative, resolve, sep } from 'node:path';
+import { fileURLToPath } from 'node:url';
 
-export interface ConnectorHealthCheckResult {
-  connectorId: string;
-  name: string;
-  status: 'pass' | 'fail';
-  checks: Array<{ name: string; status: 'pass' | 'fail'; detail?: string }>;
-}
+import { getAllConnectorsMeta } from '../../src/lib/shell/connectors/meta';
+import { CONNECTOR_HEALTH_REGISTRY, validateConnectorHealthRegistry } from './connector-registry';
+import { createConnectorHealthReport } from './report';
+import { createFixtureTestRunner } from './vitest-runner';
 
-export interface HealthCheckReport {
-  generatedAt: string;
-  status: 'pass' | 'fail';
-  connectors: ConnectorHealthCheckResult[];
-}
+let extensionRoot = '';
 
-const EXTENSION_ROOT = process.cwd();
-
-function checkUnitTestFile(entry: (typeof CONNECTOR_HEALTH_REGISTRY)[number]) {
-  const path = join(EXTENSION_ROOT, entry.unitTestFile);
-  if (!existsSync(path)) {
-    return {
-      name: 'unit-test-file',
-      status: 'fail' as const,
-      detail: `Missing ${entry.unitTestFile}`,
-    };
+function pathBelowRoot(relativePath: string): string {
+  if (
+    isAbsolute(relativePath) ||
+    relativePath.includes('\\') ||
+    relativePath.split('/').some((segment) => segment === '' || segment === '.' || segment === '..')
+  ) {
+    throw new Error('Connector health path is outside the committed relative-path policy.');
   }
+  const absolute = resolve(extensionRoot, relativePath);
+  const fromRoot = relative(extensionRoot, absolute);
+  if (fromRoot.startsWith(`..${sep}`) || fromRoot === '..' || isAbsolute(fromRoot)) {
+    throw new Error('Connector health path escapes the extension root.');
+  }
+  let cursor = extensionRoot;
+  for (const segment of relativePath.split('/')) {
+    cursor = join(cursor, segment);
+    const stat = lstatSync(cursor);
+    if (stat.isSymbolicLink()) {
+      throw new Error(`Connector health path contains a symlink: ${relativePath}.`);
+    }
+  }
+  return absolute;
+}
 
+function committedEntryExists(relativePath: string): boolean {
   try {
-    execSync(`pnpm exec vitest run ${entry.unitTestFile}`, {
-      cwd: EXTENSION_ROOT,
-      stdio: 'pipe',
-      encoding: 'utf8',
-    });
-    return { name: 'unit-tests', status: 'pass' as const };
-  } catch (error) {
-    const detail = error instanceof Error ? error.message : String(error);
-    return { name: 'unit-tests', status: 'fail' as const, detail };
+    const stat = lstatSync(pathBelowRoot(relativePath));
+    return relativePath.startsWith('tests/unit/') ? stat.isFile() : stat.isDirectory();
+  } catch {
+    return false;
   }
 }
 
-function checkRegressionFixtures(entry: (typeof CONNECTOR_HEALTH_REGISTRY)[number]) {
-  if (!entry.regressionFixtureDir) {
-    return {
-      name: 'regression-fixtures',
-      status: 'pass' as const,
-      detail: 'Not registered for golden regression yet',
-    };
-  }
-
-  const fixtureDir = join(EXTENSION_ROOT, entry.regressionFixtureDir);
-  if (!existsSync(fixtureDir)) {
-    return {
-      name: 'regression-fixtures',
-      status: 'fail' as const,
-      detail: `Missing fixture dir ${entry.regressionFixtureDir}`,
-    };
-  }
-
-  const htmlFixtures = readdirSync(fixtureDir).filter(
-    (file) => file.endsWith('.html') || file.endsWith('.json')
-  );
-  if (htmlFixtures.length === 0) {
-    return {
-      name: 'regression-fixtures',
-      status: 'fail' as const,
-      detail: 'No regression fixtures found',
-    };
-  }
-
-  return {
-    name: 'regression-fixtures',
-    status: 'pass' as const,
-    detail: `${htmlFixtures.length} fixture(s)`,
-  };
+function listFixtureFiles(relativeDirectory: string): string[] {
+  return readdirSync(pathBelowRoot(relativeDirectory), { withFileTypes: true })
+    .filter((entry) => entry.isFile() && !entry.isSymbolicLink())
+    .map((entry) => entry.name)
+    .sort((left, right) => Buffer.compare(Buffer.from(left), Buffer.from(right)));
 }
 
-export function runHealthChecks(): HealthCheckReport {
-  const connectors: ConnectorHealthCheckResult[] = CONNECTOR_HEALTH_REGISTRY.map((entry) => {
-    const checks = [checkUnitTestFile(entry), checkRegressionFixtures(entry)];
-    const status = checks.every((check) => check.status === 'pass') ? 'pass' : 'fail';
-
-    return {
-      connectorId: entry.id,
-      name: entry.name,
-      status,
-      checks,
-    };
-  });
-
-  const status = connectors.every((connector) => connector.status === 'pass') ? 'pass' : 'fail';
-
-  return {
-    generatedAt: new Date().toISOString(),
-    status,
-    connectors,
-  };
-}
-
-function runRegressionSuite(): { status: 'pass' | 'fail'; detail?: string } {
-  try {
-    execSync('pnpm exec vitest run tests/unit/regression/parser-regression.test.ts', {
-      cwd: EXTENSION_ROOT,
-      stdio: 'pipe',
-      encoding: 'utf8',
-    });
-    return { status: 'pass' };
-  } catch (error) {
-    return {
-      status: 'fail',
-      detail: error instanceof Error ? error.message : String(error),
-    };
+function verifyRegistryFilesystem(): void {
+  validateConnectorHealthRegistry(CONNECTOR_HEALTH_REGISTRY, getAllConnectorsMeta());
+  for (const entry of CONNECTOR_HEALTH_REGISTRY) {
+    const unitStat = lstatSync(pathBelowRoot(entry.unitTestFile));
+    const fixtureStat = lstatSync(pathBelowRoot(entry.regressionFixtureDir));
+    if (!unitStat.isFile() || !fixtureStat.isDirectory()) {
+      throw new Error(`Connector health registry type drifted for ${entry.id}.`);
+    }
+    const fixtures = listFixtureFiles(entry.regressionFixtureDir).filter(
+      (file) => file.endsWith('.html') || file.endsWith('.json')
+    );
+    if (fixtures.length === 0) {
+      throw new Error(`Connector health fixture set is empty for ${entry.id}.`);
+    }
+    for (const fixture of fixtures) {
+      const goldenPath = `${entry.regressionFixtureDir}/golden/${parse(fixture).name}.json`;
+      const goldenStat = lstatSync(pathBelowRoot(goldenPath));
+      if (!goldenStat.isFile()) {
+        throw new Error(`Connector health golden output is absent for ${entry.id}/${fixture}.`);
+      }
+    }
   }
 }
 
 function main(): void {
-  const report = runHealthChecks();
-  const regression = runRegressionSuite();
-
-  const fullReport = {
-    ...report,
-    regression,
-    status:
-      report.status === 'pass' && regression.status === 'pass'
-        ? ('pass' as const)
-        : ('fail' as const),
-  };
-
-  const json = `${JSON.stringify(fullReport, null, 2)}\n`;
-  const outputJson = process.argv.includes('--json') || process.env.HEALTH_CHECK_JSON === '1';
-
-  if (outputJson) {
-    process.stdout.write(json);
-  } else {
-    for (const connector of fullReport.connectors) {
-      const icon = connector.status === 'pass' ? '✓' : '✗';
-      console.log(`${icon} ${connector.name} (${connector.connectorId})`);
-      for (const check of connector.checks) {
-        const checkIcon = check.status === 'pass' ? '  ✓' : '  ✗';
-        console.log(`${checkIcon} ${check.name}${check.detail ? `: ${check.detail}` : ''}`);
-      }
-    }
-
-    const regressionIcon = regression.status === 'pass' ? '✓' : '✗';
-    console.log(`${regressionIcon} parser-regression`);
-    if (regression.detail) {
-      console.log(`  ${regression.detail}`);
-    }
-
-    console.log(`\nStatus: ${fullReport.status.toUpperCase()}`);
+  if (process.env.MISSIONPULSE_CONNECTOR_HEALTH_FIXTURE_ONLY !== '1') {
+    throw new Error('Connector health refuses to run without fixture-only authority.');
   }
+  const args = process.argv.slice(2);
+  if (args.length > 1 || (args.length === 1 && args[0] !== '--json')) {
+    throw new Error('Connector health accepts only the optional --json argument.');
+  }
+  extensionRoot = realpathSync.native(process.cwd());
+  verifyRegistryFilesystem();
+  const nodeExecutable = realpathSync.native(process.execPath);
+  const vitestModulePath = realpathSync.native(
+    fileURLToPath(import.meta.resolve('vitest/vitest.mjs'))
+  );
+  const runTestFile = createFixtureTestRunner({
+    extensionRoot,
+    nodeExecutable,
+    vitestModulePath,
+    environment: process.env,
+  });
+  const report = createConnectorHealthReport({
+    now: () => new Date(),
+    fileExists: committedEntryExists,
+    listFixtureFiles,
+    runTestFile,
+  });
 
-  if (fullReport.status === 'fail') {
-    process.exit(1);
+  if (args[0] === '--json') {
+    process.stdout.write(JSON.stringify(report));
+  } else {
+    for (const connector of report.connectors) {
+      process.stdout.write(`${connector.status === 'pass' ? 'PASS' : 'FAIL'} ${connector.name}\n`);
+    }
+    process.stdout.write(`${report.status === 'pass' ? 'PASS' : 'FAIL'} parser-regression\n`);
+  }
+  if (report.status === 'fail') {
+    process.exitCode = 1;
   }
 }
 
-main();
+try {
+  main();
+} catch (error) {
+  const message = error instanceof Error ? error.message : 'Unknown connector health failure.';
+  process.stderr.write(`connector-health infrastructure failure: ${message}\n`);
+  process.exitCode = 2;
+}

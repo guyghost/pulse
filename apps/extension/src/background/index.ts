@@ -4,6 +4,8 @@ import {
   saveConnectorStatuses,
   getConnectorStatuses,
   getMissions,
+  saveMissions,
+  purgeOldMissions,
   runMigrations,
   getMigrationStatus,
 } from '../lib/shell/storage/db';
@@ -19,24 +21,27 @@ import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
 import { resolvePremiumFeatureFlag, shouldPremiumGate } from '../lib/core/features/flags';
 import {
-  DEFAULT_SETTINGS,
   getFeedSavedViews,
   getFeedSortBy,
-  getSettings,
   setFeedSavedViews,
   setFeedSortBy,
-  setSettings,
 } from '../lib/shell/storage/chrome-storage';
 import {
   runScan,
-  cancelCurrentScan,
-  isScanRunning,
   ScanError,
   type ScanResult,
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
+import { createActor, type ActorRefFrom } from 'xstate';
+import {
+  scanLifecycleMachine,
+  type ScanCheckpoint,
+  type ScanTerminalDecision,
+  type ScanTrigger,
+} from '../models/scan-lifecycle.machine';
+import { waitForScanRecovery } from './scan-recovery';
 import { rescoreStoredMissions } from '../lib/shell/scan/rescore';
-import { getConnectorIds, getConnectors } from '../lib/shell/connectors/index';
+import { getConnectorIds, getConnectorsMeta } from '../lib/shell/connectors/index';
 import { getSeenIds, saveSeenIds } from '../lib/shell/storage/seen-missions';
 import { getFavorites, saveFavorites, getHidden, saveHidden } from '../lib/shell/storage/favorites';
 import {
@@ -45,9 +50,11 @@ import {
 } from '../lib/shell/storage/connected-alert-preferences';
 import { getAlertHistory } from '../lib/shell/storage/alert-history';
 import {
+  clearScanCheckpoint,
   setNewMissionCount,
   resetNewMissionCount,
   consumeDeepLinkIntent,
+  saveScanCheckpoint,
 } from '../lib/shell/storage/session-storage';
 import { markAsSeen } from '../lib/core/seen/mark-seen';
 import {
@@ -60,24 +67,29 @@ import {
   DIGEST_ALARM_NAME,
 } from '../lib/shell/notifications/daily-digest';
 import { clearExpiredSemanticCache } from '../lib/shell/storage/semantic-cache';
-import { getAllHealthSnapshots, resetHealthSnapshot } from '../lib/shell/storage/connector-health';
+import {
+  getAllHealthSnapshots,
+  readHealthSnapshotsForProbeReconciliation,
+  resetHealthSnapshot,
+} from '../lib/shell/storage/connector-health';
 import { collectDiagnosticExport } from '../lib/shell/diagnostics/collect-diagnostic-export';
 import { getAllParserHealth } from '../lib/shell/scan/parser-health';
 import {
   clearFeedTourSeen,
-  clearOnboardingCompleted,
   getFeedTourSeen,
   getFirstScanDone,
   getKbdCheatsheetTipSeen,
-  getOnboardingCompleted,
   getProfileBannerDismissed,
   setFeedTourSeen,
-  setFirstScanDone,
   setKbdCheatsheetTipSeen,
-  setOnboardingCompleted,
   setProfileBannerDismissed,
 } from '../lib/shell/storage/first-scan';
-import { createDefaultProfile } from '../lib/core/profile/defaults';
+import {
+  connectorIdFromAlarm,
+  isProbeAlarm,
+  reconcileProbeAlarmsLocally,
+  syncProbeAlarm,
+} from '../lib/shell/health/probe-scheduler';
 import {
   getTracking,
   saveTracking,
@@ -88,21 +100,45 @@ import {
 import { createTracking, transitionStatus } from '../lib/core/tracking/transitions';
 import { isTerminalStatus } from '../lib/core/tracking/pipeline-summary';
 import { getGeneratedAssetsForMission } from '../lib/shell/storage/generated-assets';
-import { validateMessage } from '../lib/shell/messaging/schemas';
+import { isMissionTrackingPayload, validateMessage } from '../lib/shell/messaging/schemas';
+import {
+  createSerializedApplicationTrackingError,
+  type ApplicationTrackingIntent,
+  type Task5ApplicationTrackingErrorCode,
+} from '../lib/core/tracking/application-tracking-error';
 import { classifyError } from '../lib/shell/messaging/error-boundary';
 import { getProfileExtractor } from '../lib/shell/profile-extractors';
 import { mergeCandidateProfileIntoUserProfile } from '../lib/core/profile-extractors/merge-candidate-profile';
 import { countNewlyAddedExperiences } from '../lib/core/cv/experience-helpers';
 import { verifyProfilePage } from '../lib/shell/profile/profile-page-verification';
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
-import { loadTJMHistory } from '../lib/shell/storage/tjm-history';
+import { loadTJMHistory, recordTJMFromMissions } from '../lib/shell/storage/tjm-history';
 import { clearConnectorDynamicRules } from '../lib/shell/connectors/cookie-rules';
+import { createSettingsReleaseCoordinator } from '../lib/shell/settings-release/settings-release.coordinator';
+import { createChromeSettingsReleasePorts } from '../lib/shell/settings-release/chrome-settings-release-ports';
+import {
+  createChromeScanLedgerStorage,
+  createSettingsReleaseScanLedgerPort,
+} from '../lib/shell/settings-release/settings-release-scan-ledger';
+import { installSettingsReleaseSnapshotReader } from '../lib/shell/settings-release/settings-release-reader';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
 }
 
 type LinkedInProfilePreviewMessage = Extract<BridgeMessage, { type: 'LINKEDIN_PROFILE_PREVIEWED' }>;
+type TrackingFailureMessage = Extract<BridgeMessage, { type: 'TRACKING_FAILED' }>;
+
+function trackingFailureMessage(
+  intent: ApplicationTrackingIntent,
+  missionId: string | null,
+  code: Task5ApplicationTrackingErrorCode
+): TrackingFailureMessage {
+  return {
+    type: 'TRACKING_FAILED',
+    payload: createSerializedApplicationTrackingError(intent, missionId, code),
+  };
+}
 
 function buildTJMAnalysis(
   history: TJMHistory,
@@ -210,6 +246,7 @@ function sendScanProgress(payload: ScanProgressPayload): void {
 }
 
 function sendScanPartialResult(payload: {
+  operationId: string;
   connectorId: string;
   connectorName: string;
   missions: Mission[];
@@ -219,48 +256,669 @@ function sendScanPartialResult(payload: {
   });
 }
 
-/**
- * Gère un SCAN_START initié par le side panel.
- * Lance runScan() avec un callback de progression qui envoie SCAN_PROGRESS au panel.
- * Retourne les missions scannées.
- */
-async function handleScanStartFromPanel(): Promise<import('../lib/core/types/mission').Mission[]> {
-  // Si un scan est déjà en cours, retourner vide (mutex du scanner)
-  if (isScanRunning()) {
-    if (import.meta.env.DEV) {
-      console.debug('[MissionPulse] SCAN_START ignored — scan already in progress');
-    }
-    return [];
-  }
+type ScanLifecycleActor = ActorRefFrom<typeof scanLifecycleMachine>;
+type ScanTerminalMessage = Extract<
+  BridgeMessage,
+  { type: 'SCAN_COMPLETE' | 'SCAN_ERROR' | 'SCAN_CANCELLED' }
+>;
+type ScanExecutionMessage = ScanTerminalMessage | Extract<BridgeMessage, { type: 'SCAN_BUSY' }>;
+type ScanStartedMessage = Extract<BridgeMessage, { type: 'SCAN_STARTED' }>;
+type ScanCancelRequestedMessage = Extract<BridgeMessage, { type: 'SCAN_CANCEL_REQUESTED' }>;
+type ScanStartRejectedMessage = Extract<BridgeMessage, { type: 'SCAN_START_REJECTED' }>;
+type ScanCancelRejectedMessage = Extract<BridgeMessage, { type: 'SCAN_CANCEL_REJECTED' }>;
 
-  const result = await runScan(
-    undefined, // signal (panel can use SCAN_CANCEL instead)
-    undefined, // onProgress (legacy)
-    {
-      pageDelayMs: 500,
-      onDetailedProgress: (info) => {
-        sendScanProgress({
-          phase: info.phase,
-          current: info.current,
-          total: info.total,
-          connectorProgress: toConnectorProgress(info.connectorStates),
-        });
-      },
-      onConnectorResult: (info) => {
-        sendScanPartialResult(info);
-      },
+interface ActiveScanOperation {
+  operationId: string;
+  trigger: ScanTrigger;
+  controller: AbortController;
+  actor: ScanLifecycleActor;
+  terminalMessage: ScanTerminalMessage | null;
+  terminalBroadcasted: boolean;
+  checkpointTail: Promise<void>;
+  checkpointFailure: unknown | null;
+}
+
+interface ScanExecutionOutcome {
+  message: ScanExecutionMessage;
+  result: ScanResult | null;
+}
+
+interface ExecuteScanOptions {
+  pageDelayMs: number;
+  profileOverride?: import('../lib/core/types/profile').UserProfile;
+  connectorIdsOverride?: readonly string[];
+  settingsSnapshot?: import('../lib/shell/settings-release/settings-release.contract').SettingsReleaseSnapshot;
+  emitProgress?: boolean;
+  emitPartialResults?: boolean;
+}
+
+type BeginScanResult =
+  | { kind: 'busy'; outcome: ScanExecutionOutcome }
+  | {
+      kind: 'started';
+      operation: ActiveScanOperation;
+      complete: () => Promise<ScanExecutionOutcome>;
+    };
+
+let activeScanOperation: ActiveScanOperation | null = null;
+const settledScanOperationIds = new Set<string>();
+
+type ProvisionalScanAdmissionDecision =
+  | { kind: 'accepted' }
+  | { kind: 'busy'; activeOperationId: string }
+  | { kind: 'rejected'; code: string; message: string };
+
+interface ProvisionalScanAdmission {
+  decision: Promise<ProvisionalScanAdmissionDecision>;
+  resolve: (decision: ProvisionalScanAdmissionDecision) => void;
+}
+
+const provisionalScanAdmissions = new Map<string, ProvisionalScanAdmission>();
+let provisionalScanAdmissionTail: Promise<void> = Promise.resolve();
+
+function createProvisionalScanAdmission(): ProvisionalScanAdmission {
+  let resolveDecision: ((decision: ProvisionalScanAdmissionDecision) => void) | undefined;
+  const decision = new Promise<ProvisionalScanAdmissionDecision>((resolve) => {
+    resolveDecision = resolve;
+  });
+  return {
+    decision,
+    resolve: (result) => {
+      resolveDecision?.(result);
+    },
+  };
+}
+
+async function serializeProvisionalScanAdmission<T>(work: () => Promise<T>): Promise<T> {
+  const predecessor = provisionalScanAdmissionTail;
+  let release: (() => void) | undefined;
+  provisionalScanAdmissionTail = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  await predecessor;
+  try {
+    return await work();
+  } finally {
+    release?.();
+  }
+}
+
+interface ScanAdmissionState {
+  operationId: string | null;
+  observed: Promise<void>;
+  failure: unknown | null;
+  retry: (() => Promise<void>) | null;
+  retrying: boolean;
+}
+
+class ScanCommandRejectedError extends Error {
+  constructor(
+    readonly code: string,
+    message: string
+  ) {
+    super(message);
+    this.name = 'ScanCommandRejectedError';
+  }
+}
+
+let scanAdmissionState: ScanAdmissionState = {
+  operationId: null,
+  observed: Promise.resolve(),
+  failure: null,
+  retry: null,
+  retrying: false,
+};
+
+function installScanAdmissionBarrier(
+  work: Promise<unknown>,
+  operationId: string,
+  retry: () => Promise<void>
+): void {
+  const state: ScanAdmissionState = {
+    operationId,
+    observed: Promise.resolve(),
+    failure: null,
+    retry,
+    retrying: false,
+  };
+  state.observed = work.then(
+    () => undefined,
+    (error: unknown) => {
+      state.failure = error;
     }
   );
+  scanAdmissionState = state;
+}
 
-  // Persist connector statuses + update badge (same as alarm handler)
-  await persistScanResults(result);
+async function waitForScanAdmission(): Promise<void> {
+  const state = scanAdmissionState;
+  await state.observed;
+  if (state.failure && state.retry && !state.retrying) {
+    state.failure = null;
+    state.retrying = true;
+    state.observed = state.retry().then(
+      () => {
+        state.retrying = false;
+      },
+      (error: unknown) => {
+        state.failure = error;
+        state.retrying = false;
+      }
+    );
+  }
+  await state.observed;
+  if (state.failure) {
+    throw new ScanCommandRejectedError(
+      'CHECKPOINT_CLEANUP_PENDING',
+      `Le checkpoint terminal de ${state.operationId ?? 'l’opération précédente'} doit être récupéré.`
+    );
+  }
+}
 
-  return result.missions;
+function rememberSettledScanOperation(operationId: string): void {
+  settledScanOperationIds.add(operationId);
+  if (settledScanOperationIds.size > 32) {
+    const oldestOperationId = settledScanOperationIds.values().next().value;
+    if (typeof oldestOperationId === 'string') {
+      settledScanOperationIds.delete(oldestOperationId);
+    }
+  }
+}
+
+async function waitForScanRecoveryAndRemember(): Promise<string | null> {
+  const recoveredOperationId = await waitForScanRecovery();
+  if (recoveredOperationId) {
+    rememberSettledScanOperation(recoveredOperationId);
+  }
+  return recoveredOperationId;
+}
+
+function isCancelledScan(error: unknown, signal: AbortSignal): boolean {
+  return (
+    signal.aborted ||
+    (error instanceof ScanError && error.code === 'CANCELLED') ||
+    (typeof error === 'object' && error !== null && 'code' in error && error.code === 'CANCELLED')
+  );
+}
+
+function assertOperationNotCancelled(operation: ActiveScanOperation): void {
+  if (operation.controller.signal.aborted) {
+    throw new ScanError('Scan annulé.', 'CANCELLED');
+  }
+}
+
+function checkpointStorageError(error: unknown): { code: 'CHECKPOINT_STORAGE'; message: string } {
+  return {
+    code: 'CHECKPOINT_STORAGE',
+    message: error instanceof Error ? error.message : 'Le checkpoint du scan est indisponible.',
+  };
+}
+
+function scanCommandRejection(error: unknown): { code: string; message: string } {
+  if (error instanceof ScanCommandRejectedError) {
+    return { code: error.code, message: error.message };
+  }
+  return checkpointStorageError(error);
+}
+
+function checkpointState(operation: ActiveScanOperation): ScanCheckpoint['state'] {
+  const state = operation.actor.getSnapshot().value;
+  if (typeof state !== 'string' || state === 'idle' || state === 'busy') {
+    throw new Error(`Cannot checkpoint scan lifecycle state: ${String(state)}`);
+  }
+  return state;
+}
+
+function terminalDecisionFromMessage(message: ScanTerminalMessage): ScanTerminalDecision {
+  if (message.type === 'SCAN_COMPLETE') {
+    return { type: 'SCAN_COMPLETE', missionIds: message.payload.missions.map(({ id }) => id) };
+  }
+  if (message.type === 'SCAN_ERROR') {
+    return {
+      type: 'SCAN_ERROR',
+      code: message.payload.code,
+      message: message.payload.message,
+    };
+  }
+  return { type: 'SCAN_CANCELLED' };
+}
+
+function createScanCheckpoint(
+  operation: ActiveScanOperation,
+  terminal: ScanTerminalDecision | null = null
+): ScanCheckpoint {
+  const snapshot = operation.actor.getSnapshot();
+  return {
+    version: 1,
+    operationId: operation.operationId,
+    state: checkpointState(operation),
+    trigger: operation.trigger,
+    connectorResults: { ...snapshot.context.connectorResults },
+    cancellationRequested: snapshot.context.cancellationRequested,
+    terminal,
+  };
+}
+
+function queueLiveCheckpoint(operation: ActiveScanOperation): void {
+  const write = saveScanCheckpoint(createScanCheckpoint(operation));
+  operation.checkpointTail = write.then(
+    () => undefined,
+    (error: unknown) => {
+      operation.checkpointFailure ??= error;
+    }
+  );
+}
+
+async function awaitQueuedCheckpoints(operation: ActiveScanOperation): Promise<void> {
+  await operation.checkpointTail;
+  if (operation.checkpointFailure) {
+    const error = checkpointStorageError(operation.checkpointFailure);
+    throw new ScanError(error.message, error.code);
+  }
+}
+
+async function persistLiveCheckpoint(operation: ActiveScanOperation): Promise<void> {
+  await awaitQueuedCheckpoints(operation);
+  try {
+    await saveScanCheckpoint(createScanCheckpoint(operation));
+  } catch (error) {
+    operation.checkpointFailure = error;
+    const storageError = checkpointStorageError(error);
+    throw new ScanError(storageError.message, storageError.code);
+  }
+}
+
+async function broadcastTerminalOnce(
+  operation: ActiveScanOperation,
+  message: ScanTerminalMessage
+): Promise<void> {
+  if (operation.terminalBroadcasted) {
+    return;
+  }
+  operation.terminalMessage = message;
+  operation.terminalBroadcasted = true;
+  rememberSettledScanOperation(operation.operationId);
+  await chrome.runtime.sendMessage(message).catch(() => {
+    // Side panel not open, ignore
+  });
+}
+
+function releaseOperationRuntime(operation: ActiveScanOperation): void {
+  if (activeScanOperation === operation) {
+    activeScanOperation = null;
+  }
+  operation.actor.stop();
+}
+
+async function settleTerminalOperation(
+  operation: ActiveScanOperation,
+  message: ScanTerminalMessage,
+  afterTerminal?: () => Promise<void>
+): Promise<ScanTerminalMessage> {
+  let afterTerminalCompleted = false;
+  let afterTerminalAttempt: Promise<void> | null = null;
+  const runAfterTerminalOnce = (): Promise<void> => {
+    if (!afterTerminal || afterTerminalCompleted) {
+      return Promise.resolve();
+    }
+    afterTerminalAttempt ??= afterTerminal().then(
+      () => {
+        afterTerminalCompleted = true;
+      },
+      (error: unknown) => {
+        afterTerminalAttempt = null;
+        throw error;
+      }
+    );
+    return afterTerminalAttempt;
+  };
+  const finalize = async (): Promise<void> => {
+    try {
+      await operation.checkpointTail;
+      await saveScanCheckpoint(
+        createScanCheckpoint(operation, terminalDecisionFromMessage(message))
+      );
+      await broadcastTerminalOnce(operation, message);
+      const cleared = await clearScanCheckpoint(operation.operationId);
+      if (!cleared) {
+        throw new Error(
+          `Terminal checkpoint ${operation.operationId} was not cleared conditionally.`
+        );
+      }
+    } finally {
+      releaseOperationRuntime(operation);
+    }
+    await runAfterTerminalOnce();
+  };
+  const finalization = finalize();
+  installScanAdmissionBarrier(finalization, operation.operationId, finalize);
+  await finalization;
+  return message;
+}
+
+async function requestCancellation(
+  operation: ActiveScanOperation
+): Promise<ScanCancelRequestedMessage> {
+  const snapshot = operation.actor.getSnapshot();
+  if (snapshot.status === 'active' && snapshot.value !== 'cancelling') {
+    operation.actor.send({ type: 'CANCEL', operationId: operation.operationId });
+  }
+  operation.controller.abort();
+  if (operation.actor.getSnapshot().status === 'active') {
+    try {
+      await persistLiveCheckpoint(operation);
+    } catch {
+      // The terminal checkpoint is still attempted after scanner/transaction
+      // quiescence. This rejection is retained on the operation and observed.
+    }
+  }
+  return {
+    type: 'SCAN_CANCEL_REQUESTED',
+    payload: { operationId: operation.operationId },
+  };
+}
+
+async function settleCancelledAfterQuiescence(
+  operation: ActiveScanOperation
+): Promise<ScanTerminalMessage> {
+  if (operation.actor.getSnapshot().value === 'cancelling') {
+    operation.actor.send({ type: 'ABORT_CONFIRMED', operationId: operation.operationId });
+  }
+
+  const message: ScanTerminalMessage = {
+    type: 'SCAN_CANCELLED',
+    payload: { operationId: operation.operationId },
+  };
+  return settleTerminalOperation(operation, message);
+}
+
+function createBusyOutcome(operationId: string, trigger: ScanTrigger): ScanExecutionOutcome {
+  const activeOperationId = activeScanOperation?.operationId;
+  if (!activeOperationId) {
+    throw new Error('Cannot create a busy result without an active scan lease.');
+  }
+  const actor = createActor(scanLifecycleMachine, {
+    input: {
+      now: Date.now(),
+      maxRetries: 2,
+      activeLeaseOperationId: activeOperationId,
+    },
+  });
+  actor.start();
+  actor.send({ type: 'START', operationId, trigger });
+  actor.stop();
+
+  return {
+    message: {
+      type: 'SCAN_BUSY',
+      payload: { operationId, activeOperationId },
+    },
+    result: null,
+  };
+}
+
+function forwardScanRuntimeEvent(
+  operation: ActiveScanOperation,
+  event: import('../lib/shell/scan/scanner').ScanRuntimeEvent
+): void {
+  if (operation.controller.signal.aborted || operation.actor.getSnapshot().status !== 'active') {
+    return;
+  }
+  const operationId = operation.operationId;
+  switch (event.type) {
+    case 'CONNECTOR_STARTED':
+      operation.actor.send({ ...event, operationId });
+      break;
+    case 'CONNECTOR_SUCCEEDED':
+      operation.actor.send({ ...event, operationId });
+      break;
+    case 'CONNECTOR_FAILED':
+      operation.actor.send({ ...event, operationId });
+      break;
+    case 'RETRY_TIMER_FIRED':
+      operation.actor.send({ ...event, operationId });
+      break;
+    case 'NETWORK_OFFLINE':
+      operation.actor.send({ type: 'NETWORK_OFFLINE', operationId });
+      break;
+  }
+  if (operation.actor.getSnapshot().status === 'active') {
+    queueLiveCheckpoint(operation);
+  }
+}
+
+async function executeAcceptedScanOperation(
+  operation: ActiveScanOperation,
+  options: ExecuteScanOptions
+): Promise<ScanExecutionOutcome> {
+  const { actor, operationId, trigger } = operation;
+
+  try {
+    const settingsSnapshot = options.settingsSnapshot ?? (await requireSettingsReleaseSnapshot());
+    const settings = settingsSnapshot.settings;
+    assertOperationNotCancelled(operation);
+    const connectorIds = options.connectorIdsOverride
+      ? [...options.connectorIdsOverride]
+      : settings.enabledConnectors;
+    if (connectorIds.length === 0) {
+      const error = { code: 'NO_CONNECTORS', message: 'Aucun connecteur actif.' };
+      actor.send({ type: 'START_FAILED', operationId, error });
+      const message: ScanTerminalMessage = {
+        type: 'SCAN_ERROR',
+        payload: { operationId, ...error },
+      };
+      return { message: await settleTerminalOperation(operation, message), result: null };
+    }
+
+    actor.send({ type: 'START_READY', operationId, connectorIds });
+    await persistLiveCheckpoint(operation);
+    const result = await runScan(operation.controller.signal, undefined, {
+      pageDelayMs: options.pageDelayMs,
+      profileOverride: options.profileOverride,
+      connectorIdsOverride: connectorIds,
+      settingsSnapshot,
+      onDetailedProgress: options.emitProgress
+        ? (info) => {
+            if (activeScanOperation?.operationId !== operationId) {
+              return;
+            }
+            sendScanProgress({
+              operationId,
+              phase: info.phase,
+              current: info.current,
+              total: info.total,
+              connectorProgress: toConnectorProgress(info.connectorStates),
+            });
+          }
+        : undefined,
+      onConnectorResult: options.emitPartialResults
+        ? (info) => {
+            if (activeScanOperation?.operationId !== operationId) {
+              return;
+            }
+            sendScanPartialResult({ operationId, ...info });
+          }
+        : undefined,
+      onLifecycleEvent: (event) => {
+        forwardScanRuntimeEvent(operation, event);
+      },
+    });
+    assertOperationNotCancelled(operation);
+    await awaitQueuedCheckpoints(operation);
+
+    if (actor.getSnapshot().value === 'failed') {
+      const message: ScanTerminalMessage = {
+        type: 'SCAN_ERROR',
+        payload: {
+          operationId,
+          code: 'ALL_CONNECTORS_FAILED',
+          message: 'Tous les connecteurs ont échoué.',
+        },
+      };
+      return { message: await settleTerminalOperation(operation, message), result };
+    }
+    if (actor.getSnapshot().value !== 'persisting') {
+      throw new Error(`Invalid scan lifecycle before persistence: ${actor.getSnapshot().value}`);
+    }
+
+    await persistLiveCheckpoint(operation);
+    await saveMissions(result.missions, operation.controller.signal);
+    actor.send({ type: 'PERSIST_SUCCEEDED', operationId });
+    const committedState = actor.getSnapshot().value;
+    if (committedState !== 'completed' && committedState !== 'partial') {
+      throw new Error(`Invalid scan lifecycle after persistence: ${committedState}`);
+    }
+
+    const message: ScanTerminalMessage = {
+      type: 'SCAN_COMPLETE',
+      payload: { operationId, missions: result.missions },
+    };
+    // Claim and publish the canonical terminal synchronously before any
+    // suspendable projection. The actor can be released after terminal clear,
+    // but scan admission remains fenced until every older projection settles
+    // so its badge/status writes cannot overtake a newer scan.
+    await settleTerminalOperation(operation, message, async () => {
+      if (trigger === 'alarm') {
+        await chrome.runtime
+          .sendMessage({
+            type: 'MISSIONS_UPDATED',
+            projection: 'cold-only',
+            payload: result.missions,
+          })
+          .catch(() => {
+            // Side panel not open, durable missions remain committed.
+          });
+      }
+
+      try {
+        await persistPostCommitEffects(result, settingsSnapshot);
+      } catch (error) {
+        console.warn('[MissionPulse] Post-commit scan effects failed:', error);
+      }
+    });
+
+    return { message, result };
+  } catch (error) {
+    if (actor.getSnapshot().status === 'done') {
+      throw error;
+    }
+    if (isCancelledScan(error, operation.controller.signal)) {
+      return { message: await settleCancelledAfterQuiescence(operation), result: null };
+    }
+
+    const scanError = {
+      code: error instanceof ScanError ? error.code : 'UNKNOWN',
+      message: error instanceof Error ? error.message : 'Erreur inconnue lors du scan',
+    };
+    const snapshot = actor.getSnapshot();
+    if (snapshot.status === 'active' && snapshot.value === 'starting') {
+      actor.send({ type: 'START_FAILED', operationId, error: scanError });
+    } else if (snapshot.status === 'active' && snapshot.value === 'persisting') {
+      actor.send({ type: 'PERSIST_FAILED', operationId, error: scanError });
+    } else if (snapshot.status === 'active') {
+      actor.send({ type: 'RUNTIME_FAILED', operationId, error: scanError });
+    }
+    const message: ScanTerminalMessage = {
+      type: 'SCAN_ERROR',
+      payload: { operationId, ...scanError },
+    };
+    return { message: await settleTerminalOperation(operation, message), result: null };
+  }
+}
+
+async function beginScanOperation(
+  operationId: string,
+  trigger: ScanTrigger,
+  options: ExecuteScanOptions
+): Promise<BeginScanResult> {
+  if (provisionalScanAdmissions.has(operationId)) {
+    throw new ScanCommandRejectedError(
+      'DUPLICATE_OPERATION',
+      'Cette opération de scan est déjà en cours d’admission.'
+    );
+  }
+  const provisionalAdmission = createProvisionalScanAdmission();
+  provisionalScanAdmissions.set(operationId, provisionalAdmission);
+
+  try {
+    const result = await serializeProvisionalScanAdmission(async (): Promise<BeginScanResult> => {
+      await waitForScanRecoveryAndRemember();
+      await waitForScanAdmission();
+      if (activeScanOperation) {
+        const activeOperationId = activeScanOperation.operationId;
+        provisionalAdmission.resolve({ kind: 'busy', activeOperationId });
+        return { kind: 'busy', outcome: createBusyOutcome(operationId, trigger) };
+      }
+
+      const actor = createActor(scanLifecycleMachine, {
+        input: { now: Date.now(), maxRetries: 2, activeLeaseOperationId: null },
+      });
+      const operation: ActiveScanOperation = {
+        operationId,
+        trigger,
+        controller: new AbortController(),
+        actor,
+        terminalMessage: null,
+        terminalBroadcasted: false,
+        checkpointTail: Promise.resolve(),
+        checkpointFailure: null,
+      };
+      actor.start();
+      actor.send({ type: 'START', operationId, trigger });
+
+      try {
+        await saveScanCheckpoint(createScanCheckpoint(operation));
+      } catch (error) {
+        const startFailure = checkpointStorageError(error);
+        if (actor.getSnapshot().value === 'starting') {
+          actor.send({ type: 'START_FAILED', operationId, error: startFailure });
+        }
+        releaseOperationRuntime(operation);
+        throw new ScanCommandRejectedError(startFailure.code, startFailure.message);
+      }
+
+      activeScanOperation = operation;
+      provisionalAdmission.resolve({ kind: 'accepted' });
+
+      let completion: Promise<ScanExecutionOutcome> | null = null;
+      const complete = (): Promise<ScanExecutionOutcome> => {
+        completion ??= executeAcceptedScanOperation(operation, options);
+        return completion;
+      };
+
+      return {
+        kind: 'started',
+        operation,
+        complete,
+      };
+    });
+    return result;
+  } catch (error) {
+    const rejection = scanCommandRejection(error);
+    provisionalAdmission.resolve({ kind: 'rejected', ...rejection });
+    throw error;
+  } finally {
+    if (provisionalScanAdmissions.get(operationId) === provisionalAdmission) {
+      provisionalScanAdmissions.delete(operationId);
+    }
+  }
+}
+
+async function executeScanOperation(
+  operationId: string,
+  trigger: ScanTrigger,
+  options: ExecuteScanOptions
+): Promise<ScanExecutionOutcome> {
+  const begun = await beginScanOperation(operationId, trigger, options);
+  return begun.kind === 'busy' ? begun.outcome : begun.complete();
 }
 
 /**
- * Persiste les résultats de scan: statuts connecteurs, badge, notifications.
- * Partagé entre l'alarm handler et le SCAN_START handler.
+ * Projette les effets secondaires dérivés d'un scan déjà commité.
+ *
+ * La transaction missions est l'unique commit canonique. Tout ce qui suit est
+ * best-effort : une projection défaillante ne peut ni annuler le commit, ni
+ * transformer son terminal en erreur.
  */
 async function clearNewMissionBadge(): Promise<void> {
   await setNewMissionCount(0);
@@ -274,39 +932,97 @@ async function loadConnectorHealthSnapshots() {
   return [...snapshots.values()];
 }
 
+async function enableConnectorThroughSettingsRelease(
+  connectorId: string
+): Promise<'committed' | 'already_confirmed'> {
+  const latest = await requireSettingsReleaseSnapshot();
+  const enabled = new Set([...latest.settings.enabledConnectors, connectorId]);
+  const enabledConnectors = getConnectorIds()
+    .sort((left, right) => (left < right ? -1 : left > right ? 1 : 0))
+    .filter((id) => enabled.has(id));
+  if (!enabledConnectors.some((id) => id === connectorId)) {
+    throw new Error('Connector activation target is not shipped.');
+  }
+  const result = await settingsReleaseCoordinator.mutate({
+    kind: 'save_settings',
+    requestId: crypto.randomUUID(),
+    baseRevision: latest.revision,
+    settings: { ...latest.settings, enabledConnectors },
+  });
+  if (result.status === 'settled' && result.outcome.status === 'committed') {
+    return 'committed';
+  }
+  if (result.status === 'not_admitted' && result.reason === 'already_confirmed') {
+    return 'already_confirmed';
+  }
+  throw new Error('Connector activation was not committed.');
+}
+
+interface ConnectorRecheckOutcome {
+  missions: import('../lib/core/types/mission').Mission[];
+  scan: 'completed' | 'failed';
+  activation: 'not_requested' | 'committed' | 'already_confirmed' | 'failed';
+}
+
 async function recheckConnectorHealth(
   connectorId: string,
   enable = false
-): Promise<import('../lib/core/types/mission').Mission[]> {
-  const settings = await getSettings();
-  const persistedEnabled = enable
-    ? Array.from(new Set([...settings.enabledConnectors, connectorId]))
-    : settings.enabledConnectors;
-
-  await resetHealthSnapshot(connectorId);
-  await setSettings({ ...settings, enabledConnectors: [connectorId] });
-
+): Promise<ConnectorRecheckOutcome> {
+  let missions: import('../lib/core/types/mission').Mission[] = [];
+  let scan: ConnectorRecheckOutcome['scan'] = 'completed';
   try {
-    const result = await runScan(undefined, undefined, { pageDelayMs: 300 });
-    await persistScanResults(result);
-
-    try {
-      await chrome.runtime.sendMessage({ type: 'SCAN_COMPLETE', payload: result.missions });
-    } catch {
-      // Side panel not open, ignore
+    await resetHealthSnapshot(connectorId);
+    const outcome = await executeScanOperation(crypto.randomUUID(), 'manual', {
+      pageDelayMs: 300,
+      connectorIdsOverride: [connectorId],
+    });
+    if (outcome.message.type === 'SCAN_BUSY') {
+      throw new ScanError('Un scan est déjà en cours. Veuillez patienter.', 'MUTEX');
     }
-
-    return result.missions;
-  } finally {
-    await setSettings({ ...settings, enabledConnectors: persistedEnabled });
+    if (outcome.message.type === 'SCAN_ERROR') {
+      throw new ScanError(outcome.message.payload.message, 'UNKNOWN');
+    }
+    if (outcome.message.type === 'SCAN_CANCELLED') {
+      throw new ScanError('Scan annulé.', 'CANCELLED');
+    }
+    missions = outcome.result?.missions ?? [];
+  } catch (error) {
+    scan = 'failed';
+    console.warn('[MissionPulse] connector health recheck failed:', error);
   }
+
+  let activation: ConnectorRecheckOutcome['activation'] = 'not_requested';
+  if (enable) {
+    try {
+      activation = await enableConnectorThroughSettingsRelease(connectorId);
+    } catch (error) {
+      activation = 'failed';
+      console.warn('[MissionPulse] connector activation failed:', error);
+    }
+  }
+
+  return { missions, scan, activation };
 }
 
-async function persistScanResults(
-  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>
+async function persistPostCommitEffects(
+  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>,
+  settingsSnapshot: import('../lib/shell/settings-release/settings-release.contract').SettingsReleaseSnapshot
 ): Promise<void> {
   const { missions, errors } = result;
   const now = Date.now();
+
+  if (missions.length > 0) {
+    try {
+      await recordTJMFromMissions(missions, new Date(now).toISOString().slice(0, 10));
+    } catch {
+      // TJM history is non-critical.
+    }
+  }
+  try {
+    await purgeOldMissions(90);
+  } catch {
+    // Purge is non-critical.
+  }
 
   // Persist connector statuses
   const statusMap = new Map<string, { missions: number; error: string | null }>();
@@ -337,36 +1053,96 @@ async function persistScanResults(
     /* Non-critical: status persistence */
   }
 
-  if (missions.length === 0) {
-    await clearNewMissionBadge();
-    return;
-  }
-
-  // Update badge with new mission count
-  const seenIds = await getSeenIds();
-  const seenSet = new Set(seenIds);
-  const newMissions = missions.filter((m) => !seenSet.has(m.id));
-  const newCount = newMissions.length;
-
-  if (newCount > 0) {
-    await setNewMissionCount(newCount);
-    await chrome.action.setBadgeText({ text: String(newCount) });
-    await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
-    await chrome.action.setBadgeTextColor({ color: '#ffffff' });
-  } else {
-    await clearNewMissionBadge();
-  }
-
-  // Send notifications for high-score missions if enabled. notifyHighScoreMissions
-  // also persists the deep-link focus intent BEFORE the Chrome notification is
-  // shown, so a fast click can never race ahead of the intent write.
-  if (newCount > 0) {
-    const notification = await notifyHighScoreMissions(newMissions);
-    if (notification.shown && notification.notifiedMissionIds.length > 0) {
-      await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
+  try {
+    if (missions.length === 0) {
+      await clearNewMissionBadge();
+      return;
     }
+
+    // Update badge with new mission count
+    const seenIds = await getSeenIds();
+    const seenSet = new Set(seenIds);
+    const newMissions = missions.filter((m) => !seenSet.has(m.id));
+    const newCount = newMissions.length;
+
+    if (newCount > 0) {
+      await setNewMissionCount(newCount);
+      await chrome.action.setBadgeText({ text: String(newCount) });
+      await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
+      await chrome.action.setBadgeTextColor({ color: '#ffffff' });
+    } else {
+      await clearNewMissionBadge();
+    }
+
+    // notifyHighScoreMissions persists its focus intent before showing Chrome's
+    // notification, so a fast click cannot race ahead of that write.
+    if (newCount > 0) {
+      const notification = await notifyHighScoreMissions(newMissions, settingsSnapshot);
+      if (notification.shown && notification.notifiedMissionIds.length > 0) {
+        await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
+      }
+    }
+  } catch {
+    // Badge and notification projections are non-critical after commit.
   }
 }
+
+const settingsReleaseScanPort = createSettingsReleaseScanLedgerPort({
+  storage: createChromeScanLedgerStorage(),
+  permission: {
+    async containsForSnapshot(snapshot) {
+      const enabled = new Set(snapshot.settings.enabledConnectors);
+      const origins = [
+        ...new Set(
+          getConnectorsMeta()
+            .filter((connector) => enabled.has(connector.id))
+            .flatMap((connector) => connector.hostPermissions)
+        ),
+      ].sort();
+      if (origins.length === 0) {
+        return true;
+      }
+      return chrome.permissions.contains({ origins });
+    },
+  },
+  scan: {
+    async start(operationId, snapshot) {
+      const begun = await beginScanOperation(operationId, 'alarm', {
+        pageDelayMs: 500,
+        connectorIdsOverride: snapshot.settings.enabledConnectors,
+        settingsSnapshot: snapshot,
+        emitProgress: true,
+      });
+      if (begun.kind === 'busy') {
+        const activeOperationId =
+          begun.outcome.message.type === 'SCAN_BUSY'
+            ? begun.outcome.message.payload.activeOperationId
+            : operationId;
+        return { status: 'busy', activeOperationId };
+      }
+      void begun.complete().catch((error) => {
+        console.error('[MissionPulse] Admitted auto-scan completion error:', error);
+      });
+      return { status: 'accepted' };
+    },
+  },
+});
+
+const settingsReleaseCoordinator = createSettingsReleaseCoordinator(
+  createChromeSettingsReleasePorts(settingsReleaseScanPort)
+);
+
+async function requireSettingsReleaseSnapshot() {
+  const result = await settingsReleaseCoordinator.read();
+  if (result.status !== 'confirmed') {
+    throw new Error(`Settings release snapshot unavailable: ${result.reason}`);
+  }
+  return result.snapshot;
+}
+installSettingsReleaseSnapshotReader(requireSettingsReleaseSnapshot);
+void settingsReleaseCoordinator.boot().catch((error) => {
+  console.error('[MissionPulse] Settings release boot failed:', error);
+});
 
 // Message handler — profile management + scan orchestration
 chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse) => {
@@ -387,8 +1163,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     return false;
   }
 
-  // Cast validé — le message a passé les schémas Zod
-  const message = rawMessage as BridgeMessage;
+  // Consume the detached object returned by the strict decoder. Keeping the
+  // caller-owned reference here would let it drift after validation while an
+  // async Settings FIFO head is waiting to run.
+  const message = validation.message as BridgeMessage;
 
   // ── Error boundary global ─────────────────────────────────────────────────
   // Chaque branche a son propre try/catch mais cette enveloppe protège contre
@@ -407,7 +1185,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           await saveProfile(message.payload);
 
           try {
-            const rescored = await rescoreStoredMissions(message.payload);
+            const rescored = await rescoreStoredMissions(
+              message.payload,
+              await requireSettingsReleaseSnapshot()
+            );
             await chrome.runtime.sendMessage({ type: 'MISSIONS_UPDATED', payload: rescored });
           } catch (err) {
             if (import.meta.env.DEV) {
@@ -430,34 +1211,59 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
-    if (message.type === 'GET_SETTINGS') {
-      getSettings()
-        .then((settings) => {
-          sendResponse({ type: 'SETTINGS_RESULT', payload: settings });
+    if (
+      message.type === 'GET_SETTINGS_RELEASE' ||
+      message.type === 'GET_SETTINGS' ||
+      message.type === 'GET_ONBOARDING_COMPLETED'
+    ) {
+      settingsReleaseCoordinator
+        .read()
+        .then((result) => {
+          sendResponse({ type: 'SETTINGS_RELEASE_RESULT', payload: result });
         })
         .catch((err) => {
-          console.warn('[MissionPulse] GET_SETTINGS error:', err);
-          sendResponse({ type: 'SETTINGS_RESULT', payload: DEFAULT_SETTINGS });
+          console.warn('[MissionPulse] GET_SETTINGS_RELEASE error:', err);
+          sendResponse({
+            type: 'SETTINGS_RELEASE_RESULT',
+            payload: { status: 'unavailable', reason: 'actor_blocked', snapshot: null },
+          });
         });
       return true;
     }
 
-    if (message.type === 'SAVE_SETTINGS') {
-      setSettings(message.payload)
-        .then(() => {
-          chrome.runtime
-            .sendMessage({ type: 'SETTINGS_UPDATED', payload: message.payload })
-            .catch(() => {
-              // Side panel may be closed.
-            });
+    if (message.type === 'RETRY_SETTINGS_RELEASE') {
+      settingsReleaseCoordinator
+        .retry()
+        .then((result) => {
+          sendResponse({ type: 'SETTINGS_RELEASE_RETRY_RESULT', payload: result });
+        })
+        .catch(() => {
           sendResponse({
-            type: 'SETTINGS_SAVED',
-            payload: { saved: true, settings: message.payload },
+            type: 'SETTINGS_RELEASE_RETRY_RESULT',
+            payload: { status: 'retry_not_applicable', snapshot: null },
           });
+        });
+      return true;
+    }
+
+    if (message.type === 'MUTATE_SETTINGS_RELEASE') {
+      settingsReleaseCoordinator
+        .mutate(message.payload)
+        .then((result) => {
+          sendResponse({ type: 'SETTINGS_RELEASE_MUTATION_RESULT', payload: result });
         })
         .catch((err) => {
-          console.warn('[MissionPulse] SAVE_SETTINGS error:', err);
-          sendResponse({ type: 'SETTINGS_SAVED', payload: { saved: false, settings: null } });
+          console.warn('[MissionPulse] MUTATE_SETTINGS_RELEASE error:', err);
+          sendResponse({
+            type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+            payload: {
+              status: 'blocked',
+              requestId: message.payload.requestId,
+              commandId: null,
+              reason: 'actor_blocked',
+              snapshot: null,
+            },
+          });
         });
       return true;
     }
@@ -749,42 +1555,6 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
-    if (message.type === 'GET_ONBOARDING_COMPLETED') {
-      getOnboardingCompleted()
-        .then((completed) => {
-          sendResponse({ type: 'ONBOARDING_COMPLETED_RESULT', payload: completed });
-        })
-        .catch((err) => {
-          console.warn('[MissionPulse] GET_ONBOARDING_COMPLETED error:', err);
-          sendResponse({ type: 'ONBOARDING_COMPLETED_RESULT', payload: false });
-        });
-      return true;
-    }
-
-    if (message.type === 'SET_ONBOARDING_COMPLETED') {
-      setOnboardingCompleted()
-        .then(() => {
-          sendResponse({ type: 'ONBOARDING_COMPLETED_SET', payload: { saved: true } });
-        })
-        .catch((err) => {
-          console.warn('[MissionPulse] SET_ONBOARDING_COMPLETED error:', err);
-          sendResponse({ type: 'ONBOARDING_COMPLETED_SET', payload: { saved: false } });
-        });
-      return true;
-    }
-
-    if (message.type === 'CLEAR_ONBOARDING_COMPLETED') {
-      clearOnboardingCompleted()
-        .then(() => {
-          sendResponse({ type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: true } });
-        })
-        .catch((err) => {
-          console.warn('[MissionPulse] CLEAR_ONBOARDING_COMPLETED error:', err);
-          sendResponse({ type: 'ONBOARDING_COMPLETED_CLEARED', payload: { cleared: false } });
-        });
-      return true;
-    }
-
     if (message.type === 'GET_FEED_TOUR_SEEN') {
       getFeedTourSeen()
         .then((seen) => {
@@ -956,23 +1726,86 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     // ── Scan orchestration (panel → service worker) ──
 
     if (message.type === 'SCAN_START') {
-      handleScanStartFromPanel()
-        .then((missions) => {
-          sendResponse({ type: 'SCAN_COMPLETE', payload: missions });
+      void beginScanOperation(message.payload.operationId, 'manual', {
+        pageDelayMs: 300,
+        emitProgress: true,
+        emitPartialResults: true,
+      })
+        .then((begun) => {
+          if (begun.kind === 'busy') {
+            sendResponse(begun.outcome.message);
+            return;
+          }
+          const acknowledgement: ScanStartedMessage = {
+            type: 'SCAN_STARTED',
+            payload: { operationId: message.payload.operationId },
+          };
+          sendResponse(acknowledgement);
+          void begun.complete().catch((error) => {
+            // executeAcceptedScanOperation owns terminal settlement. This catch
+            // is a last-resort boundary for an unexpected programming failure.
+            console.error('[MissionPulse] SCAN_START completion error:', error);
+          });
         })
-        .catch((err) => {
-          console.error('[MissionPulse] SCAN_START error:', err);
-          const code = err instanceof ScanError ? err.code : 'UNKNOWN';
-          const errorMessage = err instanceof Error ? err.message : 'Erreur inconnue lors du scan';
-          sendResponse({ type: 'SCAN_ERROR', payload: { message: errorMessage, code } });
+        .catch((error: unknown) => {
+          const rejection = scanCommandRejection(error);
+          const response: ScanStartRejectedMessage = {
+            type: 'SCAN_START_REJECTED',
+            payload: { operationId: message.payload.operationId, ...rejection },
+          };
+          sendResponse(response);
         });
-      return true; // async response
+      return true;
     }
 
     if (message.type === 'SCAN_CANCEL') {
-      cancelCurrentScan();
-      sendResponse({ type: 'SCAN_CANCEL' });
-      return false;
+      void (async (): Promise<ScanCancelRequestedMessage> => {
+        const provisionalDecision = provisionalScanAdmissions.get(
+          message.payload.operationId
+        )?.decision;
+        await waitForScanRecoveryAndRemember();
+        if (provisionalDecision) {
+          const decision = await provisionalDecision;
+          if (decision.kind === 'rejected') {
+            throw new ScanCommandRejectedError(decision.code, decision.message);
+          }
+          if (decision.kind === 'busy') {
+            throw new ScanCommandRejectedError(
+              'START_NOT_ACCEPTED',
+              `Le scan ${message.payload.operationId} n’a pas été accepté car ${decision.activeOperationId} est actif.`
+            );
+          }
+        }
+        await waitForScanAdmission();
+        const operation = activeScanOperation;
+        if (
+          settledScanOperationIds.has(message.payload.operationId) ||
+          (operation?.operationId === message.payload.operationId &&
+            (operation.terminalMessage || operation.actor.getSnapshot().status === 'done'))
+        ) {
+          return {
+            type: 'SCAN_CANCEL_REQUESTED',
+            payload: { operationId: message.payload.operationId },
+          };
+        }
+        if (!operation || operation.operationId !== message.payload.operationId) {
+          throw new ScanCommandRejectedError(
+            'STALE_OPERATION',
+            'Aucun scan actif ne correspond à cette opération.'
+          );
+        }
+        return requestCancellation(operation);
+      })()
+        .then(sendResponse)
+        .catch((error: unknown) => {
+          const rejection = scanCommandRejection(error);
+          const response: ScanCancelRejectedMessage = {
+            type: 'SCAN_CANCEL_REJECTED',
+            payload: { operationId: message.payload.operationId, ...rejection },
+          };
+          sendResponse(response);
+        });
+      return true;
     }
 
     if (message.type === 'GET_CONNECTOR_HEALTH') {
@@ -990,14 +1823,38 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     if (message.type === 'RECHECK_CONNECTOR_HEALTH') {
       const { connectorId, enable = false } = message.payload;
       recheckConnectorHealth(connectorId, enable)
-        .then(async () => {
-          const snapshots = await loadConnectorHealthSnapshots();
-          sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: snapshots });
+        .then(async (outcome) => {
+          let snapshots: Awaited<ReturnType<typeof loadConnectorHealthSnapshots>> = [];
+          try {
+            snapshots = await loadConnectorHealthSnapshots();
+          } catch (error) {
+            console.warn('[MissionPulse] connector health snapshot refresh failed:', error);
+          }
+          sendResponse({
+            type: 'CONNECTOR_RECHECK_RESULT',
+            payload: {
+              snapshots,
+              scan: outcome.scan,
+              activation: outcome.activation,
+            },
+          });
         })
         .catch(async (err) => {
           console.warn('[MissionPulse] RECHECK_CONNECTOR_HEALTH error:', err);
-          const snapshots = await loadConnectorHealthSnapshots();
-          sendResponse({ type: 'CONNECTOR_HEALTH_RESULT', payload: snapshots });
+          let snapshots: Awaited<ReturnType<typeof loadConnectorHealthSnapshots>> = [];
+          try {
+            snapshots = await loadConnectorHealthSnapshots();
+          } catch (error) {
+            console.warn('[MissionPulse] connector health snapshot fallback failed:', error);
+          }
+          sendResponse({
+            type: 'CONNECTOR_RECHECK_RESULT',
+            payload: {
+              snapshots,
+              scan: 'failed',
+              activation: enable ? 'failed' : 'not_requested',
+            },
+          });
         });
       return true;
     }
@@ -1083,10 +1940,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
           const updated = transitionStatus(tracking, status, now, note ?? null);
           if (!updated) {
-            sendResponse({
-              type: 'TRACKING_UPDATED',
-              payload: tracking,
-            });
+            sendResponse(trackingFailureMessage('transition', missionId, 'INVALID_TRANSITION'));
             return;
           }
 
@@ -1099,18 +1953,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           sendResponse({ type: 'TRACKING_UPDATED', payload: persisted });
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING error:', err);
-          sendResponse({
-            type: 'TRACKING_UPDATED',
-            payload: {
-              missionId,
-              currentStatus: 'detected',
-              history: [],
-              generatedAssetIds: [],
-              userRating: null,
-              notes: '',
-              nextActionAt: null,
-            },
-          });
+          sendResponse(trackingFailureMessage('transition', missionId, 'PERSIST_FAILED'));
         }
       })();
       return true;
@@ -1122,29 +1965,31 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
       (async () => {
         try {
+          const normalizedNextActionAt = nextActionAt ?? null;
+          if (
+            normalizedNextActionAt !== null &&
+            !Number.isFinite(Date.parse(normalizedNextActionAt))
+          ) {
+            sendResponse(trackingFailureMessage('details', missionId, 'INVALID_DETAILS'));
+            return;
+          }
+
           let tracking = await getTracking(missionId);
           if (!tracking) {
             tracking = createTracking(missionId, now);
           }
 
-          const updated: MissionTracking = { ...tracking, nextActionAt: nextActionAt ?? null };
+          if (normalizedNextActionAt !== null && isTerminalStatus(tracking.currentStatus)) {
+            sendResponse(trackingFailureMessage('details', missionId, 'INVALID_DETAILS'));
+            return;
+          }
+
+          const updated: MissionTracking = { ...tracking, nextActionAt: normalizedNextActionAt };
           await saveTracking(updated);
           sendResponse({ type: 'TRACKING_UPDATED', payload: updated });
         } catch (err) {
           console.error('[MissionPulse] UPDATE_TRACKING_DETAILS error:', err);
-          const current = await getTracking(missionId).catch(() => null);
-          sendResponse({
-            type: 'TRACKING_UPDATED',
-            payload: current ?? {
-              missionId,
-              currentStatus: 'detected',
-              history: [],
-              generatedAssetIds: [],
-              userRating: null,
-              notes: '',
-              nextActionAt: null,
-            },
-          });
+          sendResponse(trackingFailureMessage('details', missionId, 'PERSIST_FAILED'));
         }
       })();
       return true;
@@ -1155,18 +2000,27 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
       (async () => {
         try {
-          if (tracking) {
+          if (tracking !== null) {
+            if (!isMissionTrackingPayload(tracking) || tracking.missionId !== missionId) {
+              sendResponse(trackingFailureMessage('restore', missionId, 'INVALID_RESTORE'));
+              return;
+            }
             await saveTracking(tracking);
-            sendResponse({ type: 'TRACKING_RESTORED', payload: tracking });
+            sendResponse({
+              type: 'TRACKING_RESTORED',
+              payload: { missionId, tracking },
+            });
             return;
           }
 
           await deleteTracking(missionId);
-          sendResponse({ type: 'TRACKING_RESTORED', payload: null });
+          sendResponse({
+            type: 'TRACKING_RESTORED',
+            payload: { missionId, tracking: null },
+          });
         } catch (err) {
           console.error('[MissionPulse] RESTORE_TRACKING error:', err);
-          const current = await getTracking(missionId).catch(() => null);
-          sendResponse({ type: 'TRACKING_RESTORED', payload: current });
+          sendResponse(trackingFailureMessage('restore', missionId, 'PERSIST_FAILED'));
         }
       })();
       return true;
@@ -1182,7 +2036,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
         })
         .catch((err) => {
           console.error('[MissionPulse] GET_TRACKINGS error:', err);
-          sendResponse({ type: 'TRACKINGS_RESULT', payload: [] });
+          sendResponse(trackingFailureMessage('load', null, 'LOAD_FAILED'));
         });
       return true;
     }
@@ -1355,20 +2209,21 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
 const ALARM_NAME = 'auto-scan';
 
-async function setupAlarm() {
-  const settings = await getSettings();
-  await chrome.alarms.clearAll();
-  if (settings.autoScan) {
-    chrome.alarms.create(ALARM_NAME, {
-      periodInMinutes: settings.scanIntervalMinutes,
-    });
-    if (import.meta.env.DEV) {
-      console.debug(`[MissionPulse] Auto-scan alarm set: every ${settings.scanIntervalMinutes}min`);
-    }
-  }
+async function setupBackgroundSchedules() {
+  const connectorIds = getConnectorIds();
+  const now = Date.now();
+  const [, healthRead] = await Promise.all([
+    settingsReleaseCoordinator.boot(),
+    readHealthSnapshotsForProbeReconciliation(connectorIds, now),
+  ]);
   // Daily digest fires independently of auto-scan — it pushes the top unseen
   // missions once per day even if the user never opens the panel.
-  scheduleDailyDigestAlarm();
+  await scheduleDailyDigestAlarm();
+  if (healthRead.status === 'available') {
+    await reconcileProbeAlarmsLocally(connectorIds, healthRead.snapshots, undefined, now);
+  } else {
+    console.warn(`[MissionPulse] Probe reconciliation skipped: health proof ${healthRead.reason}.`);
+  }
 }
 
 chrome.alarms.onAlarm.addListener(async (alarm) => {
@@ -1376,10 +2231,56 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     if (import.meta.env.DEV) {
       console.debug('[MissionPulse] Daily digest triggered');
     }
-    await sendDailyDigest();
-    // Reschedule the next fire. The alarm is one-shot (no periodInMinutes) so
-    // that recomputing DIGEST_HOUR in local time keeps it stable across DST.
-    scheduleDailyDigestAlarm();
+    try {
+      await sendDailyDigest(await requireSettingsReleaseSnapshot());
+    } catch (error) {
+      console.error('[MissionPulse] Daily digest error:', error);
+    } finally {
+      // Reschedule even when delivery or storage rejects. The alarm is
+      // one-shot, so a missing finally would silently stop future digests.
+      await scheduleDailyDigestAlarm();
+    }
+    return;
+  }
+
+  if (isProbeAlarm(alarm.name)) {
+    const connectorId = connectorIdFromAlarm(alarm.name);
+    if (
+      connectorId === null ||
+      !getConnectorIds().some((includedId) => includedId === connectorId)
+    ) {
+      return;
+    }
+    try {
+      await executeScanOperation(crypto.randomUUID(), 'alarm', {
+        pageDelayMs: 500,
+        connectorIdsOverride: [connectorId],
+        emitProgress: true,
+      });
+    } catch (err) {
+      console.error(`[MissionPulse] Probe ${connectorId} error:`, err);
+    } finally {
+      // Final Chrome-local convergence. The durable actor/ledger and crash
+      // handoff remain explicitly tracked by background-scheduling.model.md.
+      try {
+        const healthRead = await readHealthSnapshotsForProbeReconciliation(
+          [connectorId],
+          Date.now()
+        );
+        const snapshot =
+          healthRead.status === 'available' ? healthRead.snapshots.get(connectorId) : undefined;
+        if (snapshot?.connectorId === connectorId) {
+          await syncProbeAlarm(snapshot);
+        } else {
+          const reason = healthRead.status === 'unavailable' ? healthRead.reason : 'identity';
+          console.warn(
+            `[MissionPulse] Probe ${connectorId} reconciliation skipped: health proof ${reason}.`
+          );
+        }
+      } catch (error) {
+        console.error(`[MissionPulse] Probe ${connectorId} reconciliation error:`, error);
+      }
+    }
     return;
   }
 
@@ -1390,55 +2291,19 @@ chrome.alarms.onAlarm.addListener(async (alarm) => {
     console.debug('[MissionPulse] Auto-scan triggered');
   }
   try {
-    const result = await runScan(undefined, undefined, {
-      pageDelayMs: 500,
-      onDetailedProgress: (info) => {
-        // Envoyer la progression au panel (si ouvert)
-        sendScanProgress({
-          phase: info.phase,
-          current: info.current,
-          total: info.total,
-          connectorProgress: toConnectorProgress(info.connectorStates),
-        });
-      },
-    });
-
-    // Persist results + badge + notifications (shared logic)
-    await persistScanResults(result);
-
-    // Notify side panel with final missions (for immediate UI update)
-    if (result.missions.length > 0) {
-      try {
-        await chrome.runtime.sendMessage({ type: 'SCAN_COMPLETE', payload: result.missions });
-      } catch {
-        // Side panel not open, ignore
-      }
+    const disposition = await settingsReleaseCoordinator.admitAutoScan(alarm.scheduledTime);
+    if (disposition.status === 'blocked') {
+      console.error(`[MissionPulse] Auto-scan admission blocked: ${disposition.reason}`);
     }
   } catch (err) {
     console.error('[MissionPulse] Auto-scan error:', err);
-    const code = err instanceof ScanError ? err.code : 'UNKNOWN';
-    const errorMessage =
-      err instanceof Error ? err.message : 'Erreur inconnue lors du scan automatique';
-    try {
-      await chrome.runtime.sendMessage({
-        type: 'SCAN_ERROR',
-        payload: { message: errorMessage, code },
-      });
-    } catch {
-      // Side panel not open, ignore
-    }
-  }
-});
-
-// Re-setup alarm when settings change
-chrome.storage.onChanged.addListener((changes, area) => {
-  if (area === 'local' && changes.settings) {
-    setupAlarm();
   }
 });
 
 // Initial setup
-setupAlarm();
+void setupBackgroundSchedules().catch((error) => {
+  console.error('[MissionPulse] Initial schedule reconciliation failed:', error);
+});
 
 // ── Cold-start migration guard ───────────────────────────────────────────────
 // MV3 service workers restart on every event. `onInstalled` only fires on
@@ -1457,10 +2322,6 @@ void runMigrations()
     console.warn('[MissionPulse] Cold-start migration guard error:', err);
   });
 
-// ── First-install silent scan ──────────────────────────────────────────────────
-// On fresh install: detect active platform sessions in parallel.
-// If any found, run a silent scan with a default profile so the user
-// lands directly on a populated feed — no wizard required.
 chrome.runtime.onInstalled.addListener(async (details) => {
   // On every install/update: run the DB migration orchestrator FIRST, so
   // the schema is reconciled before any read/write happens. Safe to call
@@ -1493,78 +2354,7 @@ chrome.runtime.onInstalled.addListener(async (details) => {
   }
 
   if (import.meta.env.DEV) {
-    console.debug('[MissionPulse] Fresh install — starting zero-config first scan');
-  }
-
-  try {
-    // Already done? (shouldn't happen on fresh install, but guard anyway)
-    const alreadyDone = await getFirstScanDone();
-    if (alreadyDone) {
-      return;
-    }
-
-    // Detect active sessions across all connectors in parallel
-    const settings = await getSettings();
-    const allConnectors = await getConnectors(settings.enabledConnectors);
-    const now = Date.now();
-    const sessionResults = await Promise.allSettled(allConnectors.map((c) => c.detectSession(now)));
-
-    const activeConnectorIds: string[] = allConnectors
-      .filter((_c, i) => {
-        const r = sessionResults[i];
-        return r.status === 'fulfilled' && r.value.ok && r.value.value === true;
-      })
-      .map((c) => c.id);
-
-    if (activeConnectorIds.length === 0) {
-      // No sessions — user will go through normal onboarding
-      if (import.meta.env.DEV) {
-        console.debug('[MissionPulse] No active sessions found on install, skipping first scan');
-      }
-      return;
-    }
-
-    if (import.meta.env.DEV) {
-      console.debug(
-        `[MissionPulse] Found ${activeConnectorIds.length} active session(s):`,
-        activeConnectorIds
-      );
-    }
-
-    // Temporarily restrict scan to only connectors with active sessions
-    const previousEnabled = settings.enabledConnectors;
-    await setSettings({ ...settings, enabledConnectors: activeConnectorIds });
-
-    // Run silent scan with an explicit default profile so missions are scored
-    // even before the user completes onboarding.
-    const result = await runScan(undefined, undefined, {
-      pageDelayMs: 300,
-      profileOverride: createDefaultProfile(),
-    });
-
-    // Restore previous connector list
-    await setSettings({
-      ...settings,
-      enabledConnectors: previousEnabled.length > 0 ? previousEnabled : activeConnectorIds,
-    });
-
-    if (result.missions.length > 0) {
-      await setFirstScanDone();
-
-      // Notify side panel if it’s open
-      try {
-        await chrome.runtime.sendMessage({ type: 'SCAN_COMPLETE', payload: result.missions });
-      } catch {
-        // Panel not open yet — missions are in IndexedDB, will load on next open
-      }
-
-      if (import.meta.env.DEV) {
-        console.debug(`[MissionPulse] First scan complete: ${result.missions.length} missions`);
-      }
-    }
-  } catch (err) {
-    // First scan failure is non-critical — user sees normal onboarding
-    console.warn('[MissionPulse] First scan on install failed:', err);
+    console.debug('[MissionPulse] Fresh install — awaiting explicit onboarding consent');
   }
 });
 
@@ -1576,7 +2366,7 @@ chrome.action.onUserSettingsChanged?.addListener(async (change) => {
   if (import.meta.env.DEV) {
     console.debug('[MissionPulse] Extension pinned to toolbar');
   }
-  const settings = await getSettings();
+  const settings = (await requireSettingsReleaseSnapshot()).settings;
   if (!settings.autoScan && settings.notifications) {
     try {
       await chrome.notifications.create('suggest-auto-scan', {

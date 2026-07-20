@@ -17,11 +17,20 @@ import { countNewlyAddedExperiences } from '$lib/core/cv/experience-helpers';
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
+import {
+  createSerializedApplicationTrackingError,
+  type ApplicationTrackingIntent,
+  type Task5ApplicationTrackingErrorCode,
+} from '$lib/core/tracking/application-tracking-error';
+import { isMissionTrackingPayload } from '$lib/shell/messaging/schemas';
+import { isTerminalStatus } from '$lib/core/tracking/pipeline-summary';
 import { resolvePremiumFeatureFlag, shouldPremiumGate } from '$lib/core/features/flags';
 import {
   DEV_PREMIUM_FEATURE_STORAGE_KEY,
   DEV_PREMIUM_ENABLED_STORAGE_KEY,
 } from '$lib/state/features.svelte';
+import type { AppSettings } from '$lib/core/types/app-settings';
+import type { SettingsReleaseMutationIntent } from '$lib/shell/settings-release/settings-release.contract';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
@@ -45,6 +54,17 @@ type RuntimeMessageListener = (
   sendResponse: (response?: unknown) => void
 ) => boolean | void;
 type SerializedMission = Omit<Mission, 'scrapedAt'> & { scrapedAt: string };
+
+function devTrackingFailure(
+  intent: ApplicationTrackingIntent,
+  missionId: string | null,
+  code: Task5ApplicationTrackingErrorCode
+): RuntimeMessage {
+  return {
+    type: 'TRACKING_FAILED',
+    payload: createSerializedApplicationTrackingError(intent, missionId, code),
+  };
+}
 
 function readDevStorage<T>(key: string, fallback: T): T {
   try {
@@ -224,7 +244,7 @@ function defaultDevTrackings(now: number): MissionTracking[] {
 
 function readDevTrackings(now: number): MissionTracking[] {
   const stored = readDevStorage<MissionTracking[] | null>(DEV_TRACKINGS_STORAGE_KEY, null);
-  return stored && stored.length > 0 ? stored : defaultDevTrackings(now);
+  return stored !== null ? stored : defaultDevTrackings(now);
 }
 
 function writeDevTrackings(trackings: MissionTracking[]): void {
@@ -298,6 +318,18 @@ const storage: Record<string, unknown> = {
   tjm_history: generateMockTJMHistory(),
 };
 
+let settingsReleaseRevision = 0;
+let settingsReleaseGeneration = 0;
+
+function devSettingsReleaseSnapshot() {
+  return {
+    settings: structuredClone(storage.settings as AppSettings),
+    onboardingCompleted: storage.onboarding_completed === true,
+    revision: settingsReleaseRevision,
+    generation: settingsReleaseGeneration,
+  };
+}
+
 function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
   const storedHealth = readDevStorage<ConnectorHealthSnapshot[] | null>(
     DEV_HEALTH_STORAGE_KEY,
@@ -318,6 +350,11 @@ function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
 }
 
 function createChromeStubs() {
+  let activeDevScan: {
+    operationId: string;
+    timers: ReturnType<typeof setTimeout>[];
+  } | null = null;
+
   const runtimeMessageListeners = new Set<RuntimeMessageListener>();
 
   function emitRuntimeMessage(message: RuntimeMessage): void {
@@ -341,6 +378,70 @@ function createChromeStubs() {
         console.log('[Chrome Stub] sendMessage:', message.type);
 
         switch (message.type) {
+          case 'GET_SETTINGS_RELEASE':
+            return {
+              type: 'SETTINGS_RELEASE_RESULT',
+              payload: { status: 'confirmed', snapshot: devSettingsReleaseSnapshot() },
+            };
+          case 'MUTATE_SETTINGS_RELEASE': {
+            const intent = message.payload as SettingsReleaseMutationIntent;
+            const current = devSettingsReleaseSnapshot();
+            if (intent.baseRevision !== current.revision) {
+              return {
+                type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+                payload: {
+                  status: 'not_admitted',
+                  requestId: intent.requestId,
+                  commandId: null,
+                  reason: 'conflict',
+                  snapshot: current,
+                },
+              };
+            }
+            const candidateSettings =
+              intent.kind === 'save_settings' ? intent.settings : current.settings;
+            const candidateConsent =
+              intent.kind === 'save_settings' ? current.onboardingCompleted : intent.targetConsent;
+            if (
+              JSON.stringify(candidateSettings) === JSON.stringify(current.settings) &&
+              candidateConsent === current.onboardingCompleted
+            ) {
+              return {
+                type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+                payload: {
+                  status: 'not_admitted',
+                  requestId: intent.requestId,
+                  commandId: null,
+                  reason: 'already_confirmed',
+                  snapshot: current,
+                },
+              };
+            }
+            storage.settings = structuredClone(candidateSettings);
+            storage.onboarding_completed = candidateConsent;
+            writeDevStorage(DEV_ONBOARDING_COMPLETED_KEY, candidateConsent);
+            settingsReleaseRevision += 1;
+            settingsReleaseGeneration += 1;
+            const snapshot = devSettingsReleaseSnapshot();
+            const commandId = `settings-release:92000000-0000-4000-8000-000000000001:${settingsReleaseRevision}:command`;
+            return {
+              type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+              payload: {
+                status: 'settled',
+                outcome: {
+                  commandId,
+                  requestId: intent.requestId,
+                  intentDigest: '0'.repeat(64),
+                  kind: intent.kind,
+                  settledRevision: snapshot.revision,
+                  settledGeneration: snapshot.generation,
+                  snapshot,
+                  status: 'committed',
+                  reason: 'committed',
+                },
+              },
+            };
+          }
           case 'GET_SETTINGS':
             return { type: 'SETTINGS_RESULT', payload: storage.settings };
           case 'SAVE_SETTINGS':
@@ -576,21 +677,34 @@ function createChromeStubs() {
           case 'CLEAR_FEED_TOUR_SEEN':
             storage.feed_tour_seen = false;
             return { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } };
-          case 'SCAN_START':
-            return new Promise((resolve) => {
-              const runtimeMissions = readDevStorage<Mission[]>(
-                DEV_MISSIONS_STORAGE_KEY,
-                mockMissions
-              ).map((m) => ({ ...m, scrapedAt: new Date() }));
-              const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
-              const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
+          case 'SCAN_START': {
+            const operationId = (message.payload as { operationId: string }).operationId;
+            if (activeDevScan) {
+              return {
+                type: 'SCAN_BUSY',
+                payload: {
+                  operationId,
+                  activeOperationId: activeDevScan.operationId,
+                },
+              };
+            }
+            const runtimeMissions = readDevStorage<Mission[]>(
+              DEV_MISSIONS_STORAGE_KEY,
+              mockMissions
+            ).map((m) => ({ ...m, scrapedAt: new Date() }));
+            const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
+            const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
+            const timers: ReturnType<typeof setTimeout>[] = [];
+            activeDevScan = { operationId, timers };
 
-              groupedBySource.forEach(([connectorId, connectorMissions], index) => {
+            groupedBySource.forEach(([connectorId, connectorMissions], index) => {
+              timers.push(
                 setTimeout(
                   () => {
                     emitRuntimeMessage({
                       type: 'SCAN_PARTIAL_RESULT',
                       payload: {
+                        operationId,
                         connectorId,
                         connectorName: connectorDisplayName(connectorId),
                         missions: connectorMissions,
@@ -598,14 +712,20 @@ function createChromeStubs() {
                     });
                   },
                   250 + index * 250
-                );
-              });
+                )
+              );
+            });
 
+            timers.push(
               setTimeout(
                 () => {
-                  resolve({
+                  if (activeDevScan?.operationId !== operationId) {
+                    return;
+                  }
+                  activeDevScan = null;
+                  emitRuntimeMessage({
                     type: 'SCAN_COMPLETE',
-                    payload: bridgeMissions,
+                    payload: { operationId, missions: bridgeMissions },
                   });
                   window.dispatchEvent(
                     new CustomEvent('dev:missions', {
@@ -614,8 +734,33 @@ function createChromeStubs() {
                   );
                 },
                 Math.max(800, 500 + groupedBySource.length * 250)
-              );
-            });
+              )
+            );
+
+            return { type: 'SCAN_STARTED', payload: { operationId } };
+          }
+          case 'SCAN_CANCEL': {
+            const operationId = (message.payload as { operationId: string }).operationId;
+            if (!activeDevScan || activeDevScan.operationId !== operationId) {
+              return {
+                type: 'SCAN_CANCEL_REJECTED',
+                payload: {
+                  operationId,
+                  code: 'STALE_OPERATION',
+                  message: 'Aucun scan actif ne correspond à cette opération.',
+                },
+              };
+            }
+            for (const timer of activeDevScan.timers) {
+              clearTimeout(timer);
+            }
+            const cancelled = { type: 'SCAN_CANCELLED', payload: { operationId } };
+            activeDevScan = null;
+            setTimeout(() => {
+              emitRuntimeMessage(cancelled);
+            }, 0);
+            return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
+          }
           case 'GET_TRACKINGS': {
             const now = Date.now();
             const all = readDevTrackings(now);
@@ -633,18 +778,28 @@ function createChromeStubs() {
             const all = readDevTrackings(now);
             const existing =
               all.find((t) => t.missionId === p.missionId) ?? createTracking(p.missionId, now);
-            const updated = transitionStatus(existing, p.status, now, p.note ?? null) ?? existing;
+            const updated = transitionStatus(existing, p.status, now, p.note ?? null);
+            if (!updated) {
+              return devTrackingFailure('transition', p.missionId, 'INVALID_TRANSITION');
+            }
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
             return { type: 'TRACKING_UPDATED', payload: updated };
           }
           case 'UPDATE_TRACKING_DETAILS': {
             const p = message.payload as { missionId: string; nextActionAt?: string | null };
+            const nextActionAt = p.nextActionAt ?? null;
+            if (nextActionAt !== null && !Number.isFinite(Date.parse(nextActionAt))) {
+              return devTrackingFailure('details', p.missionId, 'INVALID_DETAILS');
+            }
             const now = Date.now();
             const all = readDevTrackings(now);
             const existing =
               all.find((t) => t.missionId === p.missionId) ?? createTracking(p.missionId, now);
-            const updated: MissionTracking = { ...existing, nextActionAt: p.nextActionAt ?? null };
+            if (nextActionAt !== null && isTerminalStatus(existing.currentStatus)) {
+              return devTrackingFailure('details', p.missionId, 'INVALID_DETAILS');
+            }
+            const updated: MissionTracking = { ...existing, nextActionAt };
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
             return { type: 'TRACKING_UPDATED', payload: updated };
@@ -654,12 +809,21 @@ function createChromeStubs() {
             const now = Date.now();
             const all = readDevTrackings(now);
             const without = all.filter((t) => t.missionId !== p.missionId);
-            if (p.tracking) {
+            if (p.tracking !== null) {
+              if (!isMissionTrackingPayload(p.tracking) || p.tracking.missionId !== p.missionId) {
+                return devTrackingFailure('restore', p.missionId, 'INVALID_RESTORE');
+              }
               writeDevTrackings([...without, p.tracking]);
-              return { type: 'TRACKING_RESTORED', payload: p.tracking };
+              return {
+                type: 'TRACKING_RESTORED',
+                payload: { missionId: p.missionId, tracking: p.tracking },
+              };
             }
             writeDevTrackings(without);
-            return { type: 'TRACKING_RESTORED', payload: null };
+            return {
+              type: 'TRACKING_RESTORED',
+              payload: { missionId: p.missionId, tracking: null },
+            };
           }
           case 'GENERATE_ASSET': {
             // Dev mode returns a realistic mock asset so the kit-generation UI

@@ -49,7 +49,7 @@ describe('getSettings', () => {
     const settings = await getSettings();
     expect(settings).toEqual({
       scanIntervalMinutes: 30,
-      enabledConnectors: ['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt'],
+      enabledConnectors: ['cherry-pick', 'collective', 'free-work', 'hiway', 'lehibou', 'malt'],
       notifications: true,
       autoScan: true,
       maxSemanticPerScan: 10,
@@ -80,7 +80,7 @@ describe('getSettings', () => {
     const settings = await getSettings();
 
     expect(settings.scanIntervalMinutes).toBe(60);
-    expect(settings.enabledConnectors).toEqual(['free-work', 'collective']);
+    expect(settings.enabledConnectors).toEqual(['collective', 'free-work']);
     expect(settings.notifications).toBe(false);
     expect(settings.autoScan).toBe(false);
     expect(settings.maxSemanticPerScan).toBe(20);
@@ -200,11 +200,11 @@ describe('getSettings', () => {
     const settings = await getSettings();
 
     expect(settings.enabledConnectors).toEqual([
-      'free-work',
-      'lehibou',
-      'hiway',
-      'collective',
       'cherry-pick',
+      'collective',
+      'free-work',
+      'hiway',
+      'lehibou',
       'malt',
     ]); // default
   });

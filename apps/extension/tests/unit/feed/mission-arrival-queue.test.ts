@@ -1,239 +1,343 @@
 import { describe, expect, it } from 'vitest';
-import {
-  ARRIVAL_PREVIEW_LIMIT,
-  DWELL_THRESHOLD_MS,
-  createMissionArrivalQueueState,
-  transitionMissionArrivalQueue,
-} from '../../../src/lib/core/feed/mission-arrival-queue';
+import * as arrival from '../../../src/lib/core/feed/mission-arrival-queue';
 
-describe('mission arrival queue model', () => {
-  it('captures a deduplicated stable queue without changing the stack region', () => {
-    const initial = createMissionArrivalQueueState();
-    const buffered = transitionMissionArrivalQueue(initial, {
-      type: 'ARRIVALS_BUFFERED',
-      orderedPendingIds: ['pending-1'],
-    }).state;
+type State = ReturnType<typeof arrival.createMissionArrivalQueueState>;
 
-    const transition = transitionMissionArrivalQueue(buffered, {
-      type: 'ENTER_NEW_QUEUE',
-      orderedUnseenIds: ['mission-1', 'mission-1', 'mission-2'],
-    });
+const loadedFacts = {
+  feedState: 'loaded' as const,
+  ownedScan: null,
+  networkOnline: true,
+};
 
-    expect(transition.state.queue).toEqual({
-      value: 'stable-queue',
-      queueIds: ['mission-1', 'mission-2'],
-      dwells: {},
-    });
-    expect(transition.state.stack).toEqual(buffered.stack);
-    expect(transition.effects).toEqual([]);
+function dispatch(state: State, event: arrival.MissionArrivalQueueEvent) {
+  return arrival.transitionMissionArrivalQueue(state, event);
+}
+
+function initialized(feedState: 'empty' | 'loaded' = 'loaded'): State {
+  let state = arrival.createMissionArrivalQueueState();
+  state = dispatch(state, {
+    type: 'FEED_FACTS_CHANGED',
+    revision: 0,
+    facts: { ...loadedFacts, feedState },
+  }).state;
+  return dispatch(state, {
+    type: 'PENDING_SCOPE_CHANGED',
+    scopeRevision: 0,
+    feedRevision: 0,
+    enabledSources: new Set(['free-work']),
+    orderedVisibleFeedIds: feedState === 'loaded' ? ['base-1'] : [],
+    visibleFeedIds: new Set(feedState === 'loaded' ? ['base-1'] : []),
+  }).state;
+}
+
+function withPending(ids = ['new-1']): State {
+  return dispatch(initialized(), {
+    type: 'ALARM_MISSIONS_RECEIVED',
+    scopeRevision: 0,
+    candidates: ids.map((id) => ({ id, source: 'free-work' as const })),
+  }).state;
+}
+
+function applying(ids = ['new-1']): State {
+  return dispatch(withPending(ids), { type: 'APPLY_REQUESTED' }).state;
+}
+
+function preparedCandidate(state: State, orderedAllFeedIds = ['base-1', 'new-1']) {
+  if (state.stack.value !== 'applying') {
+    throw new Error('expected applying state');
+  }
+  return {
+    applyId: state.stack.applyId,
+    appliedRevision: state.stack.applied.revision,
+    scopeRevision: state.stack.appliedScopeRevision,
+    baseFeedRevision: state.stack.baseFeedRevision,
+    orderedAllFeedIds,
+    orderedUnseenIds: ['new-1'],
+  };
+}
+
+describe('approved Feed presentation', () => {
+  it.each([
+    [
+      {
+        feedState: 'loading',
+        ownedScan: { operationId: 'scan-1', state: 'scanning' },
+        networkOnline: true,
+      },
+      { value: 'loading', primaryAction: 'cancel', actionEnabled: true, arrivalCompatible: false },
+    ],
+    [
+      { feedState: 'empty', ownedScan: null, networkOnline: false },
+      { value: 'empty', primaryAction: 'start', actionEnabled: false, arrivalCompatible: false },
+    ],
+    [
+      { feedState: 'error', ownedScan: null, networkOnline: true },
+      { value: 'error', primaryAction: 'retry', actionEnabled: true, arrivalCompatible: false },
+    ],
+    [
+      loadedFacts,
+      { value: 'loaded', primaryAction: 'start', actionEnabled: true, arrivalCompatible: true },
+    ],
+  ] as const)('derives the sole action %#', (facts, expected) => {
+    expect(arrival.deriveFeedPresentation(facts)).toEqual(expected);
   });
 
-  it('marks a mission seen only after an uninterrupted dwell reaches the threshold', () => {
-    const initial = createMissionArrivalQueueState();
-    const started = transitionMissionArrivalQueue(initial, {
-      type: 'DWELL_STARTED',
-      missionId: 'mission-1',
-      now: 100,
-    }).state;
+  it('fails closed for an owned scan outside loading', () => {
+    expect(
+      arrival.deriveFeedPresentation({
+        feedState: 'loaded',
+        ownedScan: { operationId: 'scan-1', state: 'scanning' },
+        networkOnline: true,
+      })
+    ).toMatchObject({ value: 'inconsistent', primaryAction: null });
+  });
+});
 
-    const early = transitionMissionArrivalQueue(started, {
-      type: 'DWELL_ELAPSED',
-      missionId: 'mission-1',
-      now: 100 + DWELL_THRESHOLD_MS - 1,
+describe('approved ephemeral arrival reducer', () => {
+  it('routes an exact cold alarm to one synchronous hydration effect', () => {
+    const result = dispatch(initialized('empty'), {
+      type: 'ALARM_MISSIONS_RECEIVED',
+      scopeRevision: 0,
+      candidates: [
+        { id: 'cold-1', source: 'free-work' },
+        { id: 'disabled', source: 'malt' },
+      ],
     });
-    expect(early.state).toEqual(started);
-    expect(early.effects).toEqual([]);
 
-    const elapsed = transitionMissionArrivalQueue(started, {
-      type: 'DWELL_ELAPSED',
-      missionId: 'mission-1',
-      now: 100 + DWELL_THRESHOLD_MS,
-    });
-    expect(elapsed.effects).toEqual([{ type: 'mark-seen', missionId: 'mission-1' }]);
-    expect(elapsed.state.queue.dwells).toEqual({});
+    expect(result.state.stack).toEqual({ value: 'empty' });
+    expect(result.effects).toEqual([
+      {
+        type: 'hydrate-cold-feed-sync',
+        scopeRevision: 0,
+        baseFeedRevision: 0,
+        orderedIds: ['cold-1'],
+      },
+    ]);
   });
 
-  it('cancels only the matching mission dwell', () => {
-    const initial = createMissionArrivalQueueState();
-    const first = transitionMissionArrivalQueue(initial, {
-      type: 'DWELL_STARTED',
-      missionId: 'mission-1',
-      now: 100,
+  it('captures warm arrivals in order and ignores stale scope publications', () => {
+    let state = initialized();
+    state = dispatch(state, {
+      type: 'ALARM_MISSIONS_RECEIVED',
+      scopeRevision: 0,
+      candidates: [
+        { id: 'base-1', source: 'free-work' },
+        { id: 'new-1', source: 'free-work' },
+        { id: 'new-1', source: 'free-work' },
+        { id: 'disabled', source: 'malt' },
+      ],
     }).state;
-    const second = transitionMissionArrivalQueue(first, {
-      type: 'DWELL_STARTED',
-      missionId: 'mission-2',
-      now: 200,
-    }).state;
-
-    const cancelled = transitionMissionArrivalQueue(second, {
-      type: 'DWELL_CANCELLED',
-      missionId: 'mission-1',
-    });
-
-    expect(cancelled.state.queue.dwells).toEqual({ 'mission-2': 200 });
-    expect(cancelled.effects).toEqual([]);
-  });
-
-  it('clears active dwells when leaving the stable queue', () => {
-    const entered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
-      type: 'ENTER_NEW_QUEUE',
-      orderedUnseenIds: ['mission-1'],
-    }).state;
-    const withDwell = transitionMissionArrivalQueue(entered, {
-      type: 'DWELL_STARTED',
-      missionId: 'mission-1',
-      now: 100,
-    }).state;
-
-    const exited = transitionMissionArrivalQueue(withDwell, { type: 'EXIT_NEW_QUEUE' });
-    expect(exited.state.queue).toEqual({
-      value: 'all-feed',
-      queueIds: [],
-      dwells: {},
-    });
-    expect(exited.effects).toEqual([]);
-  });
-
-  it('freezes at most three previews while pending arrivals continue', () => {
-    const initial = createMissionArrivalQueueState();
-    const buffered = transitionMissionArrivalQueue(initial, {
-      type: 'ARRIVALS_BUFFERED',
-      orderedPendingIds: ['n1', 'n2', 'n3', 'n4'],
-    }).state;
-    const opened = transitionMissionArrivalQueue(buffered, {
-      type: 'OPEN_STACK',
-      orderedPreviewIds: ['n1', 'n2', 'n3', 'n4'],
-    });
-
-    expect(opened.state.stack.value).toBe('open');
-    expect(opened.state.stack.previewIds).toEqual(['n1', 'n2', 'n3']);
-    expect(opened.state.stack.previewIds).toHaveLength(ARRIVAL_PREVIEW_LIMIT);
-    expect(opened.effects).toEqual([{ type: 'focus-drawer-heading' }]);
-
-    const updated = transitionMissionArrivalQueue(opened.state, {
-      type: 'ARRIVALS_BUFFERED',
-      orderedPendingIds: ['n1', 'n2', 'n3', 'n4', 'n5'],
-    });
-    expect(updated.state.stack.pendingIds).toEqual(['n1', 'n2', 'n3', 'n4', 'n5']);
-    expect(updated.state.stack.previewIds).toEqual(['n1', 'n2', 'n3']);
-  });
-
-  it('keeps queue membership intact while opening and closing arrivals', () => {
-    const entered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
-      type: 'ENTER_NEW_QUEUE',
-      orderedUnseenIds: ['mission-1', 'mission-2'],
-    }).state;
-    const buffered = transitionMissionArrivalQueue(entered, {
-      type: 'ARRIVALS_BUFFERED',
-      orderedPendingIds: ['n1'],
-    }).state;
-    const opened = transitionMissionArrivalQueue(buffered, {
-      type: 'OPEN_STACK',
-      orderedPreviewIds: ['n1'],
-    }).state;
-    const closed = transitionMissionArrivalQueue(opened, { type: 'CLOSE_STACK' });
-
-    expect(closed.state.queue).toEqual(entered.queue);
-    expect(closed.state.stack.value).toBe('collapsed');
-    expect(closed.effects).toEqual([{ type: 'focus-stack-trigger' }]);
-  });
-
-  it('refreshes atomically and rebuilds only an active stable queue', () => {
-    const entered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
-      type: 'ENTER_NEW_QUEUE',
-      orderedUnseenIds: ['old-1'],
-    }).state;
-    const buffered = transitionMissionArrivalQueue(entered, {
-      type: 'ARRIVALS_BUFFERED',
-      orderedPendingIds: ['new-1', 'new-2'],
-    }).state;
-    const refreshing = transitionMissionArrivalQueue(buffered, { type: 'REFRESH_QUEUE' });
-
-    expect(refreshing.state.stack.value).toBe('refreshing');
-    expect(refreshing.effects).toEqual([{ type: 'apply-pending' }]);
-
-    const completed = transitionMissionArrivalQueue(refreshing.state, {
-      type: 'REFRESH_SUCCEEDED',
-      orderedUnseenIds: ['new-1', 'new-2'],
-    });
-    expect(completed.state.queue).toMatchObject({
-      value: 'stable-queue',
-      queueIds: ['new-1', 'new-2'],
-    });
-    expect(completed.state.stack).toEqual({
-      value: 'empty',
-      pendingIds: [],
-      previewIds: [],
-      message: null,
-    });
-    expect(completed.effects).toEqual([{ type: 'scroll-feed-start' }]);
-  });
-
-  it('preserves pending arrivals on refresh failure and allows retry', () => {
-    const buffered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
-      type: 'ARRIVALS_BUFFERED',
-      orderedPendingIds: ['new-1'],
-    }).state;
-    const refreshing = transitionMissionArrivalQueue(buffered, {
-      type: 'REFRESH_QUEUE',
-    }).state;
-    const failed = transitionMissionArrivalQueue(refreshing, {
-      type: 'REFRESH_FAILED',
-      message: 'Impossible d’actualiser la file. Réessayer.',
-    });
-
-    expect(failed.state.stack).toMatchObject({
-      value: 'refresh-error',
-      pendingIds: ['new-1'],
-      message: 'Impossible d’actualiser la file. Réessayer.',
-    });
-
-    const retried = transitionMissionArrivalQueue(failed.state, { type: 'RETRY_REFRESH' });
-    expect(retried.state.stack.value).toBe('refreshing');
-    expect(retried.effects).toEqual([{ type: 'apply-pending' }]);
-  });
-
-  it('allows a failed drawer to collapse without interrupting an active refresh', () => {
-    const buffered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
-      type: 'ARRIVALS_BUFFERED',
-      orderedPendingIds: ['new-1'],
-    }).state;
-    const refreshing = transitionMissionArrivalQueue(buffered, { type: 'REFRESH_QUEUE' }).state;
-    const failed = transitionMissionArrivalQueue(refreshing, {
-      type: 'REFRESH_FAILED',
-      message: 'Impossible d’actualiser la file. Réessayer.',
-    }).state;
-
-    const collapsed = transitionMissionArrivalQueue(failed, { type: 'CLOSE_STACK' });
-    expect(collapsed.state.stack).toEqual({
+    expect(state.stack).toMatchObject({
       value: 'collapsed',
-      pendingIds: ['new-1'],
-      previewIds: [],
-      message: null,
+      pending: { orderedIds: ['new-1'] },
     });
-    expect(collapsed.effects).toEqual([{ type: 'focus-stack-trigger' }]);
 
-    const ignored = transitionMissionArrivalQueue(refreshing, { type: 'CLOSE_STACK' });
-    expect(ignored.state).toBe(refreshing);
-    expect(ignored.effects).toEqual([]);
+    const stale = dispatch(state, {
+      type: 'ALARM_MISSIONS_RECEIVED',
+      scopeRevision: -1,
+      candidates: [{ id: 'stale', source: 'free-work' }],
+    });
+    expect(stale.state).toBe(state);
+    expect(stale.effects).toEqual([]);
   });
 
-  it('clears only the stack on scan cancellation and resets both regions on panel close', () => {
-    const entered = transitionMissionArrivalQueue(createMissionArrivalQueueState(), {
+  it('freezes exact base order and emits one single-flight load', () => {
+    const first = dispatch(withPending(), { type: 'APPLY_REQUESTED' });
+    expect(first.state.stack).toMatchObject({
+      value: 'applying',
+      applyId: 1,
+      baseFeedRevision: 0,
+      orderedBaseFeedIds: ['base-1'],
+      applied: { orderedIds: ['new-1'] },
+    });
+    expect(first.effects).toEqual([
+      expect.objectContaining({
+        type: 'load-feed-projection',
+        applyId: 1,
+        baseFeedRevision: 0,
+        orderedBaseFeedIds: ['base-1'],
+      }),
+    ]);
+
+    const duplicate = dispatch(first.state, { type: 'APPLY_REQUESTED' });
+    expect(duplicate.state).toBe(first.state);
+    expect(duplicate.effects).toEqual([]);
+  });
+
+  it.each([
+    ['foreign', ['base-1', 'foreign', 'new-1']],
+    ['omitted', ['base-1']],
+    ['reordered', ['new-1', 'base-1']],
+  ])('rejects a %s prepared projection before any write', (_name, orderedIds) => {
+    const state = applying();
+    const result = dispatch(state, {
+      type: 'PROJECTION_PREPARED',
+      candidate: preparedCandidate(state, orderedIds),
+    });
+    expect(result.state.stack).toMatchObject({
+      value: 'projection-error',
+      reason: 'INVALID_CANDIDATE',
+      pending: { orderedIds: ['new-1'] },
+    });
+    expect(result.effects).not.toContainEqual(
+      expect.objectContaining({ type: 'write-feed-projection-sync' })
+    );
+  });
+
+  it('retains arrivals received during apply and advances Feed/scope atomically on success', () => {
+    let state = applying();
+    state = dispatch(state, {
+      type: 'ALARM_MISSIONS_RECEIVED',
+      scopeRevision: 0,
+      candidates: [{ id: 'new-2', source: 'free-work' }],
+    }).state;
+    expect(state.stack).toMatchObject({
+      value: 'applying',
+      latest: { orderedIds: ['new-2'] },
+    });
+
+    const prepared = dispatch(state, {
+      type: 'PROJECTION_PREPARED',
+      candidate: preparedCandidate(state),
+    });
+    expect(prepared.effects).toEqual([
+      { type: 'write-feed-projection-sync', candidate: preparedCandidate(state) },
+    ]);
+
+    const candidate = preparedCandidate(state);
+    const committed = dispatch(prepared.state, {
+      type: 'PROJECTION_WRITE_SUCCEEDED',
+      applyId: candidate.applyId,
+      appliedRevision: candidate.appliedRevision,
+      scopeRevision: candidate.scopeRevision,
+      baseFeedRevision: candidate.baseFeedRevision,
+    });
+    expect(committed.state).toMatchObject({
+      scopeRevision: 1,
+      feedRevision: 1,
+      orderedVisibleFeedIds: ['base-1', 'new-1'],
+      stack: { value: 'collapsed', pending: { orderedIds: ['new-2'] } },
+    });
+
+    const oldPublication = dispatch(committed.state, {
+      type: 'ALARM_MISSIONS_RECEIVED',
+      scopeRevision: 0,
+      candidates: [{ id: 'new-1', source: 'free-work' }],
+    });
+    expect(oldPublication.state).toBe(committed.state);
+  });
+
+  it('invalidates an apply before write when scope changes', () => {
+    const state = applying();
+    const invalidated = dispatch(state, {
+      type: 'PENDING_SCOPE_CHANGED',
+      scopeRevision: 1,
+      feedRevision: 0,
+      enabledSources: new Set(),
+      orderedVisibleFeedIds: ['base-1'],
+      visibleFeedIds: new Set(['base-1']),
+    });
+    expect(invalidated.state.stack).toEqual({ value: 'empty' });
+
+    const late = dispatch(invalidated.state, {
+      type: 'PROJECTION_PREPARED',
+      candidate: preparedCandidate(state),
+    });
+    expect(late.state).toBe(invalidated.state);
+    expect(late.effects).toEqual([]);
+  });
+
+  it('keeps projection failures retryable without consuming pending', () => {
+    const state = applying();
+    const failed = dispatch(state, {
+      type: 'PROJECTION_LOAD_FAILED',
+      applyId: 1,
+      appliedRevision: 1,
+      scopeRevision: 0,
+      baseFeedRevision: 0,
+      reason: 'CATALOGUE_READ_FAILED',
+    });
+    expect(failed.state.stack).toMatchObject({
+      value: 'projection-error',
+      pending: { orderedIds: ['new-1'] },
+    });
+    expect(dispatch(failed.state, { type: 'RETRY_REQUESTED' }).effects).toEqual([
+      expect.objectContaining({ type: 'load-feed-projection', applyId: 2 }),
+    ]);
+  });
+
+  it('uses actor-wide non-reusable seen IDs and retries only after persistence failure', () => {
+    let state = dispatch(initialized(), {
       type: 'ENTER_NEW_QUEUE',
-      orderedUnseenIds: ['mission-1'],
+      orderedUnseenIds: ['new-1'],
     }).state;
-    const buffered = transitionMissionArrivalQueue(entered, {
-      type: 'ARRIVALS_BUFFERED',
-      orderedPendingIds: ['new-1'],
+    state = dispatch(state, { type: 'DWELL_STARTED', missionId: 'new-1', now: 0 }).state;
+    const first = dispatch(state, { type: 'DWELL_ELAPSED', missionId: 'new-1', now: 1500 });
+    expect(first.effects).toEqual([{ type: 'persist-seen', missionId: 'new-1', seenOpId: 1 }]);
+
+    const failed = dispatch(first.state, {
+      type: 'SEEN_PERSIST_FAILED',
+      missionId: 'new-1',
+      seenOpId: 1,
+    }).state;
+    state = dispatch(failed, { type: 'EXIT_NEW_QUEUE' }).state;
+    state = dispatch(state, { type: 'ENTER_NEW_QUEUE', orderedUnseenIds: ['new-1'] }).state;
+    state = dispatch(state, { type: 'DWELL_STARTED', missionId: 'new-1', now: 2000 }).state;
+    const second = dispatch(state, {
+      type: 'DWELL_ELAPSED',
+      missionId: 'new-1',
+      now: 3500,
+    });
+    expect(second.effects).toEqual([{ type: 'persist-seen', missionId: 'new-1', seenOpId: 2 }]);
+  });
+
+  it('preserves a seen operation across apply success so its ACK can project Vu', () => {
+    let state = dispatch(initialized(), {
+      type: 'ENTER_NEW_QUEUE',
+      orderedUnseenIds: ['new-1'],
+    }).state;
+    state = dispatch(state, { type: 'DWELL_STARTED', missionId: 'new-1', now: 0 }).state;
+    state = dispatch(state, { type: 'DWELL_ELAPSED', missionId: 'new-1', now: 1500 }).state;
+    state = dispatch(state, {
+      type: 'ALARM_MISSIONS_RECEIVED',
+      scopeRevision: 0,
+      candidates: [{ id: 'new-1', source: 'free-work' }],
+    }).state;
+    state = dispatch(state, { type: 'APPLY_REQUESTED' }).state;
+    const candidate = preparedCandidate(state);
+    state = dispatch(state, { type: 'PROJECTION_PREPARED', candidate }).state;
+    state = dispatch(state, {
+      type: 'PROJECTION_WRITE_SUCCEEDED',
+      applyId: candidate.applyId,
+      appliedRevision: candidate.appliedRevision,
+      scopeRevision: candidate.scopeRevision,
+      baseFeedRevision: candidate.baseFeedRevision,
     }).state;
 
-    const cancelled = transitionMissionArrivalQueue(buffered, { type: 'SCAN_CANCELLED' });
-    expect(cancelled.state.queue).toEqual(entered.queue);
-    expect(cancelled.state.stack.value).toBe('empty');
+    expect(state.queue).toMatchObject({
+      value: 'stable-queue',
+      seenInFlight: { 'new-1': 1 },
+    });
+    const acked = dispatch(state, {
+      type: 'SEEN_PERSISTED',
+      missionId: 'new-1',
+      seenOpId: 1,
+    }).state;
+    expect(acked.queue).toMatchObject({
+      confirmedSeenIds: ['new-1'],
+      seenInFlight: {},
+    });
+  });
 
-    const closed = transitionMissionArrivalQueue(buffered, { type: 'PANEL_CLOSED' });
-    expect(closed.state).toEqual(createMissionArrivalQueueState());
+  it('disposes on unmount and ignores every late write', () => {
+    const state = applying();
+    const disposed = dispatch(state, { type: 'FEED_UNMOUNTED' }).state;
+    expect(disposed).toMatchObject({ lifecycle: 'disposed', stack: { value: 'empty' } });
+    const late = dispatch(disposed, {
+      type: 'PROJECTION_PREPARED',
+      candidate: preparedCandidate(state),
+    });
+    expect(late.state).toBe(disposed);
+    expect(late.effects).toEqual([]);
   });
 });

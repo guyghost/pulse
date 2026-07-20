@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mount, tick } from 'svelte';
+import { mount, tick, unmount } from 'svelte';
 import BackupRestoreModal from '../../../src/ui/molecules/BackupRestoreModal.svelte';
 import { createBackup, type BackupData } from '../../../src/lib/core/backup/backup';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
@@ -53,7 +53,8 @@ function mountModal(props: Record<string, unknown> = {}) {
 }
 
 async function typeConfirmation(target: HTMLElement): Promise<void> {
-  const input = target.querySelector('#backup-restore-confirm') as HTMLInputElement;
+  void target;
+  const input = document.querySelector('#backup-restore-confirm') as HTMLInputElement;
   expect(input).not.toBeNull();
   input.value = 'RESTAURER';
   input.dispatchEvent(new Event('input', { bubbles: true }));
@@ -61,7 +62,8 @@ async function typeConfirmation(target: HTMLElement): Promise<void> {
 }
 
 function getPrimaryButton(target: HTMLElement): HTMLButtonElement {
-  const buttons = Array.from(target.querySelectorAll('button'));
+  void target;
+  const buttons = Array.from(document.querySelectorAll('button'));
   // Matches both the idle label ("Restaurer ce point") and the in-flight
   // label ("Restauration...") so the assertion can distinguish the two states.
   return buttons.find((btn) => /Restaur/.test(btn.textContent ?? '')) as HTMLButtonElement;
@@ -96,7 +98,7 @@ describe('BackupRestoreModal — SET-01 isRestoring reset', () => {
     expect(primaryAfter.textContent).not.toContain('Restauration');
 
     // An inline error must be surfaced so the user can retry.
-    expect(target.textContent).toContain('Échec persisté en base');
+    expect(document.body.textContent).toContain('Échec persisté en base');
   });
 
   it('keeps the modal actionable for retry after a failure', async () => {
@@ -122,5 +124,120 @@ describe('BackupRestoreModal — SET-01 isRestoring reset', () => {
     await tick();
 
     expect(onConfirm).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('BackupRestoreModal — modal focus contract', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('focuses confirmation, traps Tab, closes on Escape and restores the trigger', async () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Importer un backup';
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    let component: ReturnType<typeof mount> | null = null;
+    const onCancel = vi.fn(() => {
+      if (component) {
+        void unmount(component);
+      }
+    });
+    component = mount(BackupRestoreModal, {
+      target,
+      props: {
+        backup: makeBackup(),
+        error: null,
+        onConfirm: () => Promise.resolve(),
+        onCancel,
+      },
+    });
+    await tick();
+    await Promise.resolve();
+
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    const confirmation = document.querySelector<HTMLInputElement>('#backup-restore-confirm');
+    const cancel = [...document.querySelectorAll<HTMLButtonElement>('button')].find((button) =>
+      button.textContent?.includes('Annuler')
+    );
+    expect(dialog).not.toBeNull();
+    expect(confirmation).not.toBeNull();
+    expect(cancel).toBeDefined();
+    expect(document.activeElement).toBe(confirmation);
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+
+    confirmation!.focus();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    );
+    expect(document.activeElement).toBe(cancel);
+
+    cancel!.focus();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', {
+        key: 'Tab',
+        shiftKey: true,
+        bubbles: true,
+        cancelable: true,
+      })
+    );
+    expect(document.activeElement).toBe(confirmation);
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    );
+    await tick();
+    await Promise.resolve();
+
+    expect(onCancel).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('focuses the close action for an invalid backup', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const component = mount(BackupRestoreModal, {
+      target,
+      props: {
+        backup: null,
+        error: { type: 'INVALID_JSON', message: 'invalid' },
+        onConfirm: () => Promise.resolve(),
+        onCancel: () => {},
+      },
+    });
+    await tick();
+    await Promise.resolve();
+
+    expect((document.activeElement as HTMLButtonElement).textContent).toContain('Fermer');
+    await unmount(component);
+  });
+
+  it('consumes Escape without closing while the restore operation is busy', async () => {
+    let settleRestore: (() => void) | null = null;
+    const onConfirm = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          settleRestore = resolve;
+        })
+    );
+    const onCancel = vi.fn();
+    const target = mountModal({ onConfirm, onCancel });
+    await tick();
+    await Promise.resolve();
+    await typeConfirmation(target);
+
+    getPrimaryButton(target).click();
+    await tick();
+    document
+      .querySelector<HTMLElement>('[role="dialog"]')!
+      .dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+
+    expect(onCancel).not.toHaveBeenCalled();
+    expect(document.querySelector('[role="dialog"]')).not.toBeNull();
+    settleRestore?.();
+    await flushMicrotasks();
   });
 });

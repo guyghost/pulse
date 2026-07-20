@@ -32,7 +32,20 @@ const ConnectorHealthSnapshotSchema = z.object({
   recentLatenciesMs: z.array(z.number()).max(DEFAULT_HEALTH_THRESHOLDS.latencyWindowSize * 2),
 });
 
+const StrictConnectorHealthSnapshotSchema = ConnectorHealthSnapshotSchema.strict();
+
 type StoredSnapshots = Record<string, ConnectorHealthSnapshot>;
+
+export type ProbeHealthSnapshotsRead =
+  | {
+      readonly status: 'available';
+      readonly source: 'absent' | 'stored';
+      readonly snapshots: ReadonlyMap<string, ConnectorHealthSnapshot>;
+    }
+  | {
+      readonly status: 'unavailable';
+      readonly reason: 'corrupt' | 'io_error';
+    };
 
 /** Détecte les erreurs de quota chrome.storage */
 function isQuotaError(err: unknown): boolean {
@@ -70,6 +83,36 @@ async function loadAll(): Promise<StoredSnapshots> {
   } catch {
     return {};
   }
+}
+
+function parseStoredSnapshotsStrict(raw: unknown): StoredSnapshots | null {
+  if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) {
+    return null;
+  }
+
+  const prototype = Object.getPrototypeOf(raw);
+  if (prototype !== Object.prototype && prototype !== null) {
+    return null;
+  }
+
+  const descriptors = Object.getOwnPropertyDescriptors(raw);
+  const snapshots: StoredSnapshots = Object.create(null) as StoredSnapshots;
+  for (const key of Reflect.ownKeys(raw)) {
+    if (typeof key !== 'string') {
+      return null;
+    }
+    const descriptor = descriptors[key];
+    if (descriptor === undefined || !descriptor.enumerable || !('value' in descriptor)) {
+      return null;
+    }
+    const parsed = StrictConnectorHealthSnapshotSchema.safeParse(descriptor.value);
+    if (!parsed.success || parsed.data.connectorId !== key) {
+      return null;
+    }
+    snapshots[key] = parsed.data;
+  }
+
+  return snapshots;
 }
 
 // ============================================================================
@@ -144,6 +187,42 @@ export async function getAllHealthSnapshots(
     result.set(id, all[id] ?? createInitialHealthSnapshot(id, now));
   }
   return result;
+}
+
+/**
+ * Reads the complete health proof used to reconcile probe alarms.
+ *
+ * Unlike the user-facing lenient reads above, this boundary never projects a
+ * corrupt row or an I/O failure as a valid absence. A genuinely missing key is
+ * the only case allowed to synthesize correlated initial snapshots.
+ */
+export async function readHealthSnapshotsForProbeReconciliation(
+  connectorIds: readonly string[],
+  now: number
+): Promise<ProbeHealthSnapshotsRead> {
+  let raw: unknown;
+  try {
+    const result = await chrome.storage.local.get(STORAGE_KEY);
+    raw = result[STORAGE_KEY];
+  } catch {
+    return { status: 'unavailable', reason: 'io_error' };
+  }
+
+  const source = raw === undefined ? 'absent' : 'stored';
+  const stored = raw === undefined ? {} : parseStoredSnapshotsStrict(raw);
+  if (stored === null) {
+    return { status: 'unavailable', reason: 'corrupt' };
+  }
+
+  const snapshots = new Map<string, ConnectorHealthSnapshot>();
+  for (const connectorId of connectorIds) {
+    snapshots.set(
+      connectorId,
+      stored[connectorId] ?? createInitialHealthSnapshot(connectorId, now)
+    );
+  }
+
+  return { status: 'available', source, snapshots };
 }
 
 /**
