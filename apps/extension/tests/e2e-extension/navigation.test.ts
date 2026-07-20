@@ -82,7 +82,6 @@ test(
       feed_tour_seen: true,
       first_scan_done: true,
       kbd_cheatsheet_tip_seen: true,
-      onboarding_completed: true,
       premium_enabled: true,
       profile_banner_dismissed: true,
     });
