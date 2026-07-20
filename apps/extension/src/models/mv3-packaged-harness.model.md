@@ -801,7 +801,13 @@ exit and matching late-settlement record. The fixture owns one epoch-keyed
 bounded evidence accumulator across every raw and Playwright epoch and exposes
 frozen copies only.
 
-Every inbound CDP message is rejected above `MAX_CDP_MESSAGE_BYTES = 1_048_576`.
+Every harness-controlled inbound CDP message (raw epoch client and nested
+service-worker session) is rejected above `MAX_CDP_MESSAGE_BYTES = 1_048_576`.
+The tracked Playwright browser-socket transport instead uses
+`PLAYWRIGHT_MAX_INBOUND_MESSAGE_BYTES = 16_777_216`, because it multiplexes
+Playwright's own protocol traffic — trace DOM snapshots with inlined
+stylesheets, captured resource bodies and on-failure screenshots — whose
+individual frames legitimately exceed 1 MiB.
 Every schema-valid evidence item has a canonical JCS form capped at 65,536 bytes.
 Diagnostic, protocol-command and nested-CDP accumulators each retain at most
 4,096 items and 4 MiB.

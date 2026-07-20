@@ -49,6 +49,13 @@ const RAW_OPERATION_TIMEOUT_MS = 20_000;
 const RAW_RELEASE_TIMEOUT_MS = 5_000;
 const PLAYWRIGHT_HANDOFF_TIMEOUT_MS = 15_000;
 const PLAYWRIGHT_RELEASE_TIMEOUT_MS = 5_000;
+// The Playwright browser WebSocket multiplexes Playwright's own protocol traffic
+// (trace DOM snapshots with inlined stylesheets, captured resource bodies, and
+// on-failure screenshots), any single frame of which can legitimately exceed the
+// 1 MiB cap used by the harness-controlled raw and nested CDP channels. Sizing the
+// tracked inbound cap at 16 MiB keeps a bounded robustness guard while preventing
+// legitimate Playwright frames from aborting the packaged MV3 gate.
+const PLAYWRIGHT_MAX_INBOUND_MESSAGE_BYTES = 16_777_216;
 const SHUTDOWN_TIMEOUT_MS = 10_000;
 const TERM_GRACE_MS = 2_000;
 const KILL_GRACE_MS = 2_000;
@@ -740,7 +747,7 @@ export class Mv3HarnessController {
             leaseEpoch: input.leaseEpoch,
             transportId,
           },
-          maxInboundMessageBytes: 1_048_576,
+          maxInboundMessageBytes: PLAYWRIGHT_MAX_INBOUND_MESSAGE_BYTES,
           onProtocolFailure: input.onProtocolFailure,
           openTimeoutMs: PLAYWRIGHT_HANDOFF_TIMEOUT_MS,
         });
