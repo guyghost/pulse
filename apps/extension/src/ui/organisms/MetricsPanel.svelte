@@ -460,7 +460,7 @@
           <button
             class="shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-colors {activeTab ===
             tab.id
-              ? 'bg-blueprint-blue text-surface-white'
+              ? 'bg-blueprint-blue-strong text-white'
               : 'text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
             onclick={() => (activeTab = tab.id)}
           >

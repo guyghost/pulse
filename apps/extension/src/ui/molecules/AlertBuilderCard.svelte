@@ -470,7 +470,7 @@
 
   <button
     type="button"
-    class="mt-4 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90 disabled:opacity-50"
+    class="mt-4 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90 disabled:opacity-50"
     disabled={isSaving}
     onclick={save}
   >

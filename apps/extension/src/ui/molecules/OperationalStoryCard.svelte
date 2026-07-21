@@ -179,7 +179,7 @@
       <div class="flex flex-wrap gap-2 border-t border-border-light pt-3">
         {#if primaryActionLabel}
           <button
-            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
             onclick={onPrimaryAction}
             type="button"
           >

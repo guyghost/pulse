@@ -165,7 +165,7 @@
         <Tooltip label="Valider la vue" description="Enregistre ce filtre dans vos vues rapides.">
           <button
             type="submit"
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue text-surface-white transition-opacity disabled:opacity-40"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue-strong text-white transition-opacity disabled:opacity-40"
             disabled={isSaving}
             aria-label="Valider le nom de la vue"
           >
