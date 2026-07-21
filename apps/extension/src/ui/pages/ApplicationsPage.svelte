@@ -606,7 +606,7 @@
           </div>
           <button
             type="button"
-            class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue/90"
+            class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
             onclick={openRecommendedDossier}
           >
             <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />

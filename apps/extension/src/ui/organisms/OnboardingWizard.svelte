@@ -272,7 +272,7 @@
             premier.
           </p>
           <button
-            class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white"
+            class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white"
             type="button"
             onclick={goNext}
           >
@@ -305,7 +305,7 @@
         {/each}
       </div>
       <button
-        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white"
+        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white"
         type="button"
         disabled={selectedSource === null}
         onclick={goNext}
@@ -330,7 +330,7 @@
         </div>
       </div>
       <button
-        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white"
+        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white"
         type="button"
         onclick={goNext}
       >
@@ -363,7 +363,7 @@
         </span>
       </div>
       <button
-        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white"
+        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white"
         type="button"
         onclick={saveAlertAndContinue}
         disabled={isSavingAlertPreferences}
@@ -554,7 +554,7 @@
   <div class="mt-2 flex flex-col gap-2">
     <button
       use:ripple
-      class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/88 py-3 text-sm font-semibold text-surface-white transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+      class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blueprint-blue-strong/25 bg-blueprint-blue-strong/88 py-3 text-sm font-semibold text-white transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
       disabled={!canSubmit || isSaving}
       onclick={handleSubmit}
     >

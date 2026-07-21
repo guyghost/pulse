@@ -163,7 +163,7 @@
           <p class="text-[11px] leading-4 text-text-subtle">Désactivés pendant la saisie</p>
           <button
             type="button"
-            class="shrink-0 rounded-lg bg-blueprint-blue px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-blueprint-blue/90"
+            class="shrink-0 rounded-lg bg-blueprint-blue-strong px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90"
             onclick={handleExplicitClose}
             data-modal-acknowledgement
           >

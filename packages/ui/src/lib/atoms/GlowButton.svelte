@@ -36,7 +36,7 @@
 
   const variantClasses = $derived(
     variant === 'primary'
-      ? 'border border-blueprint-blue bg-blueprint-blue text-surface-white shadow-subtle-3 hover:bg-blueprint-blue/90'
+      ? 'border border-blueprint-blue-strong bg-blueprint-blue-strong text-white shadow-subtle-3 hover:bg-blueprint-blue-strong/90'
       : variant === 'secondary'
         ? 'border border-blueprint-blue/30 bg-subtle-gray text-blueprint-blue shadow-subtle-2 hover:border-blueprint-blue/50 hover:bg-blueprint-blue/8'
         : 'border border-border-light bg-surface-white text-text-primary shadow-subtle-2 hover:bg-subtle-gray'

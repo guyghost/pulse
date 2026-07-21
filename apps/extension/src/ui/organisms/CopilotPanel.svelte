@@ -400,7 +400,7 @@
       </p>
       <button
         type="button"
-        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
         onclick={() => store.link()}
         disabled={store.action !== null}
       >
@@ -678,7 +678,7 @@
           {#if store.job.status === 'review'}
             <button
               type="button"
-              class="rounded-lg bg-blueprint-blue px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+              class="rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
               onclick={() => store.reviewJob('accept')}
               disabled={store.action !== null || !hasCompleteGroundedDraft}>Conserver</button
             >

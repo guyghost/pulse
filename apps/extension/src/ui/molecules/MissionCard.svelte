@@ -425,11 +425,11 @@
             {@const grade = scoreToGrade(line.value)}
             {@const color =
               grade === 'A'
-                ? 'bg-accent-green text-surface-white'
+                ? 'bg-accent-green text-[#0c0a09]'
                 : grade === 'B'
-                  ? 'bg-accent-amber text-surface-white'
+                  ? 'bg-accent-amber text-[#0c0a09]'
                   : grade === 'C'
-                    ? 'bg-status-orange text-surface-white'
+                    ? 'bg-status-orange text-[#0c0a09]'
                     : 'bg-disabled-gray text-text-secondary'}
             <div class="flex items-center gap-2.5 py-0.5">
               <span class="text-[11px] text-text-subtle flex-1">{line.label}</span>
@@ -445,7 +445,7 @@
             <div class="flex items-center gap-2.5 py-0.5">
               <span class="text-[11px] text-blueprint-blue flex-1">IA sémantique</span>
               <span
-                class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blueprint-blue text-surface-white text-[10px] font-bold font-mono"
+                class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blueprint-blue-strong text-white text-[10px] font-bold font-mono"
               >
                 {sg}
               </span>

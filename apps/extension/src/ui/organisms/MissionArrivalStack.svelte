@@ -170,7 +170,7 @@
         <div class="border-t border-border-light p-3">
           <button
             type="button"
-            class="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blueprint-blue px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blueprint-blue/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-wait disabled:opacity-60"
+            class="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blueprint-blue-strong px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-wait disabled:opacity-60"
             aria-label={isRefreshing ? 'Actualisation de la file en cours' : refreshLabel}
             disabled={isRefreshing}
             onclick={() => onRefresh?.()}
@@ -217,7 +217,7 @@
             </span>
           </span>
           <span
-            class="rounded-md bg-blueprint-blue px-2 py-1 text-xs font-semibold tabular-nums text-white"
+            class="rounded-md bg-blueprint-blue-strong px-2 py-1 text-xs font-semibold tabular-nums text-white"
             aria-hidden="true"
           >
             +{boundedCount}
