@@ -28,6 +28,8 @@ reports/performance/
 .worktrees/
 .turbo/
 .vercel/
+.eve/
+.output/
 .ralph/
 .idea/
 .vscode/

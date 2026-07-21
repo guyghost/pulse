@@ -126,6 +126,19 @@ describe('ApplicationsPage next-action toast', () => {
     vi.clearAllMocks();
   });
 
+  it('labels Gemini Nano as the free local kit without cloud transfer', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    expect(target.textContent).toContain('Kit local · Gemini Nano');
+    expect(target.textContent).toContain('sans envoi cloud');
+    expect(target.textContent).toContain('Copilot Premium');
+    expect(target.textContent).toContain('Analyse contextualisée Premium');
+  });
+
   it('keeps load failure distinct from a successful empty pipeline', async () => {
     sendMessage.mockImplementation((message: { type: string }) => {
       if (message.type === 'GET_TRACKINGS') {

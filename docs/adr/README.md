@@ -9,3 +9,4 @@
 - [003 - Connector Architecture](./003-connector-architecture.md)
 - [004 - Result Pattern Error Handling](./004-result-pattern-error-handling.md)
 - [005 - Storage Hierarchy](./005-storage-hierarchy.md)
+- [006 - Remote AI Provider Boundary](./006-remote-ai-provider-boundary.md)
