@@ -425,11 +425,11 @@
             {@const grade = scoreToGrade(line.value)}
             {@const color =
               grade === 'A'
-                ? 'bg-accent-green text-white'
+                ? 'bg-accent-green text-[#0c0a09]'
                 : grade === 'B'
-                  ? 'bg-accent-amber text-white'
+                  ? 'bg-accent-amber text-[#0c0a09]'
                   : grade === 'C'
-                    ? 'bg-status-orange text-white'
+                    ? 'bg-status-orange text-[#0c0a09]'
                     : 'bg-disabled-gray text-text-secondary'}
             <div class="flex items-center gap-2.5 py-0.5">
               <span class="text-[11px] text-text-subtle flex-1">{line.label}</span>

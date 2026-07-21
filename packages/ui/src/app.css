@@ -19,8 +19,8 @@
      #3b82f6 passes AA for large text and icons (>=3:1) on all dark surfaces; for body-sized link text it passes on card (4.75) and canvas (~4.4) but only reaches 4.12 on subtle-gray, so avoid it for small body copy on subtle-gray backgrounds. Use --color-blueprint-blue-strong for fills that carry white text. */
   --color-blueprint-blue-dark: #3b82f6;
   /* Stronger blue for FILLS that carry white text (buttons, selected chips).
-     White-on-#2563eb = 5.17:1 (AA). Light-mode default mirrors --color-blueprint-blue (#0b64e9, white-on-blue 5.23:1) so light buttons are unchanged. */
-  --color-blueprint-blue-strong: #0b64e9;
+     Light-mode default lives in packages/design/theme.css (mirrors --color-blueprint-blue, white-on-blue 5.23:1).
+     Dark override below: White-on-#2563eb = 5.17:1 (AA), so light buttons are unchanged. */
   --color-blueprint-blue-strong-dark: #2563eb;
   --color-text-primary-dark: #f5f5f4;
   --color-text-secondary-dark: #e7e5e4;
