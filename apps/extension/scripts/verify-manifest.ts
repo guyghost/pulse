@@ -85,6 +85,10 @@ const ManifestV3Schema = z.object({
 
 type ManifestV3 = z.infer<typeof ManifestV3Schema>;
 
+export const ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS = [
+  'https://copilot.missionpulse.app/*',
+] as const;
+
 // Pure validation functions
 
 /**
@@ -201,7 +205,8 @@ export const validateHostPermissionCoverage = (
 export const validateNoExcludedConnectorPatterns = (
   manifest: Pick<ManifestV3, 'host_permissions'>,
   allConnectors: readonly HostPermissionConnector[],
-  shippedConnectors: readonly HostPermissionConnector[]
+  shippedConnectors: readonly HostPermissionConnector[],
+  allowedInfrastructurePatterns: readonly string[] = []
 ): { valid: true } | { valid: false; errors: string[] } => {
   const hostPermissions = manifest.host_permissions ?? [];
   const shippedConnectorIds = new Set(shippedConnectors.map(({ id }) => id));
@@ -214,8 +219,12 @@ export const validateNoExcludedConnectorPatterns = (
     }
   }
   const errors: string[] = [];
+  const allowedInfrastructure = new Set(allowedInfrastructurePatterns);
 
   for (const pattern of hostPermissions) {
+    if (allowedInfrastructure.has(pattern)) {
+      continue;
+    }
     const owners = ownersByPattern.get(pattern) ?? [];
     if (owners.length === 0) {
       errors.push(
@@ -392,7 +401,8 @@ export const main = (): void => {
     const excludedResult = validateNoExcludedConnectorPatterns(
       schemaResult.data,
       allConnectors,
-      shippedConnectors
+      shippedConnectors,
+      ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS
     );
     if (!excludedResult.valid) {
       console.error('❌ Unowned or excluded host patterns leaked into built manifest:\n');
@@ -417,7 +427,8 @@ export const main = (): void => {
     const ownershipResult = validateNoExcludedConnectorPatterns(
       schemaResult.data,
       allConnectors,
-      allConnectors
+      allConnectors,
+      ALLOWED_INFRASTRUCTURE_HOST_PERMISSIONS
     );
     if (!ownershipResult.valid) {
       console.error('❌ Source manifest contains unowned host_permissions:\n');

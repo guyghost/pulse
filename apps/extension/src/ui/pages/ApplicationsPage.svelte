@@ -25,6 +25,7 @@
   } from '$lib/core/tracking/pipeline-summary';
   import ApplicationPipelineSummary from '../organisms/ApplicationPipelineSummary.svelte';
   import AvailabilityPanel from '../organisms/AvailabilityPanel.svelte';
+  import CopilotPanel from '../organisms/CopilotPanel.svelte';
   import OperationalStoryCard, {
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
@@ -869,8 +870,10 @@
           <div class="section-card rounded-xl p-5">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <h3 class="text-sm font-medium text-text-primary">Kit de candidature</h3>
-                <p class="mt-1 text-xs text-text-subtle">Pitch, message recruteur et résumé CV.</p>
+                <h3 class="text-sm font-medium text-text-primary">Kit local · Gemini Nano</h3>
+                <p class="mt-1 text-xs text-text-subtle">
+                  Pitch, message recruteur et résumé CV — sans envoi cloud.
+                </p>
               </div>
             </div>
             <div class="mt-4 grid gap-2">
@@ -886,6 +889,8 @@
               {/each}
             </div>
           </div>
+
+          <CopilotPanel missionId={selectedMission.id} onCopy={copyAsset} />
 
           {#if assets.length === 0}
             <OperationalEmptyState

@@ -27,6 +27,14 @@ import type {
   SettingsReleaseReadResult,
   SettingsReleaseSnapshot,
 } from '../settings-release/settings-release.contract';
+import type {
+  CopilotCreateCommand,
+  CopilotDeleteResultPayload,
+  CopilotDossierResultPayload,
+  CopilotEntitlementResultPayload,
+  CopilotJobResultPayload,
+  CopilotLinkResultPayload,
+} from '../copilot/contracts';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -226,6 +234,34 @@ export type BridgeMessage =
   | { type: 'GENERATION_RESULT'; payload: GenerationResultPayload }
   | { type: 'GET_GENERATED_ASSETS'; payload: { missionId: string } }
   | { type: 'GENERATED_ASSETS_RESULT'; payload: GeneratedAsset[] }
+  // Premium Copilot (remote, distinct from on-device GENERATE_ASSET)
+  | { type: 'COPILOT_LINK'; payload: { requestId: string } }
+  | { type: 'COPILOT_LINK_RESULT'; payload: CopilotLinkResultPayload }
+  | { type: 'COPILOT_SYNC_ENTITLEMENT'; payload: { requestId: string } }
+  | { type: 'COPILOT_ENTITLEMENT_RESULT'; payload: CopilotEntitlementResultPayload }
+  | { type: 'COPILOT_CREATE_JOB'; payload: CopilotCreateCommand }
+  | { type: 'COPILOT_CREATE_JOB_RESULT'; payload: CopilotJobResultPayload }
+  | { type: 'COPILOT_GET_DOSSIER'; payload: { requestId: string; missionId: string } }
+  | { type: 'COPILOT_GET_DOSSIER_RESULT'; payload: CopilotDossierResultPayload }
+  | { type: 'COPILOT_GET_JOB'; payload: { requestId: string; missionId: string } }
+  | { type: 'COPILOT_GET_JOB_RESULT'; payload: CopilotJobResultPayload }
+  | {
+      type: 'COPILOT_CANCEL_JOB';
+      payload: { requestId: string; missionId: string; jobId: string };
+    }
+  | { type: 'COPILOT_CANCEL_JOB_RESULT'; payload: CopilotJobResultPayload }
+  | {
+      type: 'COPILOT_REVIEW_JOB';
+      payload: {
+        requestId: string;
+        missionId: string;
+        jobId: string;
+        decision: 'accept' | 'reject';
+      };
+    }
+  | { type: 'COPILOT_REVIEW_JOB_RESULT'; payload: CopilotJobResultPayload }
+  | { type: 'COPILOT_DELETE_DOSSIER'; payload: { requestId: string; missionId: string } }
+  | { type: 'COPILOT_DELETE_DOSSIER_RESULT'; payload: CopilotDeleteResultPayload }
   // Toast
   | { type: 'SHOW_TOAST'; payload: { message: string; toastType: ToastType; duration?: number } }
   | { type: 'TOAST_SHOWN' }

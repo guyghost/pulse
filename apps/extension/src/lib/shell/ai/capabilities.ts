@@ -48,10 +48,9 @@ export const isPromptApiAvailable = async (): Promise<AiAvailability> => {
     }
 
     if (runtime.kind === 'current') {
-      const availability = await runtime.model.availability({
-        expectedInputs: [{ type: 'text', languages: ['fr'] }],
-        expectedOutputs: [{ type: 'text', languages: ['fr'] }],
-      });
+      // Current Chromium builds warn when language negotiation options are
+      // supplied even though session creation below does not use them.
+      const availability = await runtime.model.availability();
 
       if (availability === 'available') {
         return 'available';

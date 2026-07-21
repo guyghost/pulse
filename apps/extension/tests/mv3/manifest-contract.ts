@@ -16,7 +16,10 @@ export const EXPECTED_PERMISSIONS = [
   'declarativeNetRequest',
   'scripting',
   'activeTab',
+  'identity',
 ] as const;
+
+export const EXPECTED_INFRA_HOST_PERMISSIONS = ['https://copilot.missionpulse.app/*'] as const;
 
 export const EXPECTED_OPTIONAL_HOST_PERMISSIONS = ['https://www.linkedin.com/*'] as const;
 
@@ -77,7 +80,7 @@ export function getExpectedHostPermissions(options: ExpectedHostPermissionOption
     }
     return [...matches[0].hostPermissions];
   });
-  const expected = connectorHosts;
+  const expected = [...connectorHosts, ...EXPECTED_INFRA_HOST_PERMISSIONS];
   if (new Set(expected).size !== expected.length) {
     throw new Error('Derived host permission contract contains duplicate patterns.');
   }

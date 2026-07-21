@@ -18,6 +18,24 @@ import {
 } from '../../core/tracking/application-tracking-error';
 import { isCanonicalMissionTracking } from '../../core/tracking/application-tracking-contract';
 import { CANONICAL_INCLUDED_CONNECTOR_IDS } from '../connectors/build-config';
+import {
+  CopilotLinkResultPayloadSchema,
+  CopilotDeleteResultPayloadSchema,
+  CopilotDossierResultPayloadSchema,
+  CopilotEntitlementResultPayloadSchema,
+  CopilotJobIdSchema,
+  CopilotJobResultPayloadSchema,
+  CopilotMissionFieldSchema,
+  CopilotMissionIdSchema,
+  CopilotOperationKindSchema,
+  CopilotProfileFieldSchema,
+  CopilotRequestIdSchema,
+} from '../copilot/validation';
+import {
+  COPILOT_MISSION_FIELD_ALLOWLIST,
+  COPILOT_PROFILE_FIELD_ALLOWLIST,
+  MAX_COPILOT_EVIDENCE_ITEMS,
+} from '@pulse/domain';
 
 // ============================================================================
 // Helpers de validation réutilisables
@@ -1065,6 +1083,146 @@ export const MessageSchemas = {
     type: z.literal('GENERATED_ASSETS_RESULT'),
     payload: z.unknown(),
   }),
+
+  // Premium Copilot — every command and result is fail-closed and strict.
+  COPILOT_LINK: z
+    .object({
+      type: z.literal('COPILOT_LINK'),
+      payload: z.object({ requestId: CopilotRequestIdSchema }).strict(),
+    })
+    .strict(),
+  COPILOT_LINK_RESULT: z
+    .object({
+      type: z.literal('COPILOT_LINK_RESULT'),
+      payload: CopilotLinkResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_SYNC_ENTITLEMENT: z
+    .object({
+      type: z.literal('COPILOT_SYNC_ENTITLEMENT'),
+      payload: z.object({ requestId: CopilotRequestIdSchema }).strict(),
+    })
+    .strict(),
+  COPILOT_ENTITLEMENT_RESULT: z
+    .object({
+      type: z.literal('COPILOT_ENTITLEMENT_RESULT'),
+      payload: CopilotEntitlementResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_CREATE_JOB: z
+    .object({
+      type: z.literal('COPILOT_CREATE_JOB'),
+      payload: z
+        .object({
+          requestId: CopilotRequestIdSchema,
+          missionId: CopilotMissionIdSchema,
+          kind: CopilotOperationKindSchema,
+          missionFields: z
+            .array(CopilotMissionFieldSchema)
+            .max(COPILOT_MISSION_FIELD_ALLOWLIST.length)
+            .refine((items) => new Set(items).size === items.length),
+          profileFields: z
+            .array(CopilotProfileFieldSchema)
+            .max(COPILOT_PROFILE_FIELD_ALLOWLIST.length)
+            .refine((items) => new Set(items).size === items.length),
+          evidenceIds: z
+            .array(z.string().trim().min(1).max(256))
+            .max(MAX_COPILOT_EVIDENCE_ITEMS)
+            .refine((items) => new Set(items).size === items.length),
+        })
+        .strict()
+        .refine(
+          ({ missionFields, profileFields, evidenceIds }) =>
+            missionFields.length + profileFields.length + evidenceIds.length > 0,
+          'Consent selection must not be empty'
+        ),
+    })
+    .strict(),
+  COPILOT_CREATE_JOB_RESULT: z
+    .object({
+      type: z.literal('COPILOT_CREATE_JOB_RESULT'),
+      payload: CopilotJobResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_GET_DOSSIER: z
+    .object({
+      type: z.literal('COPILOT_GET_DOSSIER'),
+      payload: z
+        .object({ requestId: CopilotRequestIdSchema, missionId: CopilotMissionIdSchema })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_GET_DOSSIER_RESULT: z
+    .object({
+      type: z.literal('COPILOT_GET_DOSSIER_RESULT'),
+      payload: CopilotDossierResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_GET_JOB: z
+    .object({
+      type: z.literal('COPILOT_GET_JOB'),
+      payload: z
+        .object({ requestId: CopilotRequestIdSchema, missionId: CopilotMissionIdSchema })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_GET_JOB_RESULT: z
+    .object({
+      type: z.literal('COPILOT_GET_JOB_RESULT'),
+      payload: CopilotJobResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_CANCEL_JOB: z
+    .object({
+      type: z.literal('COPILOT_CANCEL_JOB'),
+      payload: z
+        .object({
+          requestId: CopilotRequestIdSchema,
+          missionId: CopilotMissionIdSchema,
+          jobId: CopilotJobIdSchema,
+        })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_CANCEL_JOB_RESULT: z
+    .object({
+      type: z.literal('COPILOT_CANCEL_JOB_RESULT'),
+      payload: CopilotJobResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_REVIEW_JOB: z
+    .object({
+      type: z.literal('COPILOT_REVIEW_JOB'),
+      payload: z
+        .object({
+          requestId: CopilotRequestIdSchema,
+          missionId: CopilotMissionIdSchema,
+          jobId: CopilotJobIdSchema,
+          decision: z.enum(['accept', 'reject']),
+        })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_REVIEW_JOB_RESULT: z
+    .object({
+      type: z.literal('COPILOT_REVIEW_JOB_RESULT'),
+      payload: CopilotJobResultPayloadSchema,
+    })
+    .strict(),
+  COPILOT_DELETE_DOSSIER: z
+    .object({
+      type: z.literal('COPILOT_DELETE_DOSSIER'),
+      payload: z
+        .object({ requestId: CopilotRequestIdSchema, missionId: CopilotMissionIdSchema })
+        .strict(),
+    })
+    .strict(),
+  COPILOT_DELETE_DOSSIER_RESULT: z
+    .object({
+      type: z.literal('COPILOT_DELETE_DOSSIER_RESULT'),
+      payload: CopilotDeleteResultPayloadSchema,
+    })
+    .strict(),
 
   // Toast
   SHOW_TOAST: z.object({

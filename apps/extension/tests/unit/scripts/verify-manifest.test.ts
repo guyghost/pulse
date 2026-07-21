@@ -644,7 +644,7 @@ describe('validateNoExcludedConnectorPatterns', () => {
 
   it('rejects mandatory host patterns with no connector ownership claim', () => {
     const result = validateNoExcludedConnectorPatterns(
-      { host_permissions: ['https://supabase.co/*', 'https://missionpulse.app/*'] },
+      { host_permissions: ['https://supabase.co/*', 'https://copilot.missionpulse.app/*'] },
       ALL,
       []
     );
@@ -653,35 +653,34 @@ describe('validateNoExcludedConnectorPatterns', () => {
       expect(result.errors).toEqual(
         expect.arrayContaining([
           expect.stringContaining('https://supabase.co/*'),
-          expect.stringContaining('https://missionpulse.app/*'),
+          expect.stringContaining('https://copilot.missionpulse.app/*'),
         ])
       );
     }
   });
 
-  it('keeps the owned Hiway Supabase host while rejecting MissionPulse as unused', () => {
+  it('keeps the owned Hiway Supabase host and the explicit MissionPulse API origin', () => {
     const hiway = ALL.find(({ id }) => id === 'hiway');
     expect(hiway).toBeDefined();
 
     const result = validateNoExcludedConnectorPatterns(
       {
-        host_permissions: [...(hiway?.hostPermissions ?? []), 'https://missionpulse.app/*'],
+        host_permissions: [...(hiway?.hostPermissions ?? []), 'https://copilot.missionpulse.app/*'],
       },
       ALL,
-      hiway ? [hiway] : []
+      hiway ? [hiway] : [],
+      ['https://copilot.missionpulse.app/*']
     );
 
-    expect(result.valid).toBe(false);
-    if (!result.valid) {
-      expect(result.errors).toEqual([expect.stringContaining('https://missionpulse.app/*')]);
-    }
+    expect(result.valid).toBe(true);
   });
 
-  it('keeps the source manifest free of unused MissionPulse host access', () => {
+  it('declares the MissionPulse Copilot API origin in the source manifest', () => {
     const manifest = JSON.parse(
       readFileSync(resolve(process.cwd(), 'src/manifest.json'), 'utf-8')
     ) as { host_permissions?: string[] };
 
+    expect(manifest.host_permissions ?? []).toContain('https://copilot.missionpulse.app/*');
     expect(manifest.host_permissions ?? []).not.toContain('https://missionpulse.app/*');
   });
 

@@ -25,13 +25,13 @@ describe('packaged MV3 manifest permission contract', () => {
         config: { include: ['free-work'] },
         env: {},
       })
-    ).toEqual(['https://www.free-work.com/*']);
+    ).toEqual(['https://www.free-work.com/*', 'https://copilot.missionpulse.app/*']);
     expect(
       getExpectedHostPermissions({
         config: { include: ['free-work'] },
         env: { CONNECTORS_INCLUDE: 'lehibou' },
       })
-    ).toEqual(['https://*.lehibou.com/*']);
+    ).toEqual(['https://*.lehibou.com/*', 'https://copilot.missionpulse.app/*']);
     expect(
       getExpectedHostPermissions({
         config: {},

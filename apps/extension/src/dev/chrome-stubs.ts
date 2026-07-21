@@ -16,6 +16,13 @@ import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extracto
 import { countNewlyAddedExperiences } from '$lib/core/cv/experience-helpers';
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
+import { buildConsentedCopilotPayload } from '$lib/core/copilot/build-consented-payload';
+import type {
+  CopilotDeletionReceipt,
+  CopilotDossierProjection,
+  CopilotJobSnapshot,
+} from '$lib/shell/copilot/contracts';
+import { copilotCreditCost, renderCopilotDraft, type CopilotOperationKind } from '@pulse/domain';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
 import {
   createSerializedApplicationTrackingError,
@@ -24,7 +31,6 @@ import {
 } from '$lib/core/tracking/application-tracking-error';
 import { isMissionTrackingPayload } from '$lib/shell/messaging/schemas';
 import { isTerminalStatus } from '$lib/core/tracking/pipeline-summary';
-import { resolvePremiumFeatureFlag, shouldPremiumGate } from '$lib/core/features/flags';
 import {
   DEV_PREMIUM_FEATURE_STORAGE_KEY,
   DEV_PREMIUM_ENABLED_STORAGE_KEY,
@@ -46,6 +52,9 @@ const DEV_TRACKINGS_STORAGE_KEY = '__missionpulse_dev_trackings';
 const DEV_HEALTH_STORAGE_KEY = '__missionpulse_dev_health';
 const DEV_ONBOARDING_COMPLETED_KEY = '__missionpulse_dev_onboarding_completed';
 const DEV_FIRST_SCAN_DONE_KEY = '__missionpulse_dev_first_scan_done';
+const DEV_COPILOT_JOBS_STORAGE_KEY = '__missionpulse_dev_copilot_jobs';
+const DEV_COPILOT_DOSSIERS_STORAGE_KEY = '__missionpulse_dev_copilot_dossiers';
+const DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY = '__missionpulse_dev_copilot_deletion_receipts';
 
 type RuntimeMessage = { type: string; payload?: unknown };
 type RuntimeMessageListener = (
@@ -81,6 +90,165 @@ function writeDevStorage(key: string, value: unknown): void {
   } catch {
     // Dev-only persistence should never break the app shell.
   }
+}
+
+function readDevCopilotJobs(): Record<string, CopilotJobSnapshot> {
+  return readDevStorage<Record<string, CopilotJobSnapshot>>(DEV_COPILOT_JOBS_STORAGE_KEY, {});
+}
+
+function writeDevCopilotJob(job: CopilotJobSnapshot): void {
+  writeDevStorage(DEV_COPILOT_JOBS_STORAGE_KEY, {
+    ...readDevCopilotJobs(),
+    [job.missionId]: job,
+  });
+}
+
+function readDevCopilotDossiers(): Record<string, CopilotDossierProjection> {
+  return readDevStorage<Record<string, CopilotDossierProjection>>(
+    DEV_COPILOT_DOSSIERS_STORAGE_KEY,
+    {}
+  );
+}
+
+function writeDevCopilotDossier(dossier: CopilotDossierProjection): void {
+  writeDevStorage(DEV_COPILOT_DOSSIERS_STORAGE_KEY, {
+    ...readDevCopilotDossiers(),
+    [dossier.missionId]: dossier,
+  });
+}
+
+function devDossierForJob(job: CopilotJobSnapshot): CopilotDossierProjection {
+  const existing = readDevCopilotDossiers()[job.missionId];
+  return {
+    missionId: job.missionId,
+    state: 'reviewing',
+    consent: {
+      missionFields: [
+        ...new Set([...(existing?.consent.missionFields ?? []), ...job.selection.missionFields]),
+      ],
+      profileFields: [
+        ...new Set([...(existing?.consent.profileFields ?? []), ...job.selection.profileFields]),
+      ],
+      evidenceIds: [
+        ...new Set([...(existing?.consent.evidenceIds ?? []), ...job.selection.evidenceIds]),
+      ],
+    },
+    analysis: existing?.analysis ?? null,
+    approvedArtifacts: existing?.approvedArtifacts ?? [],
+    activeJob: { jobId: job.jobId ?? '', kind: job.kind, state: 'review' },
+  };
+}
+
+function readDevCopilotDeletionReceipts(): Record<string, CopilotDeletionReceipt> {
+  return readDevStorage<Record<string, CopilotDeletionReceipt>>(
+    DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY,
+    {}
+  );
+}
+
+function buildDevCopilotJob(input: {
+  missionId: string;
+  requestId: string;
+  kind: CopilotOperationKind;
+  evidenceIds: string[];
+  missionFields: CopilotJobSnapshot['selection']['missionFields'];
+  profileFields: CopilotJobSnapshot['selection']['profileFields'];
+}): CopilotJobSnapshot {
+  const now = Date.now();
+  const primaryEvidenceId = input.evidenceIds[0] ?? null;
+  const selection = {
+    missionFields: input.missionFields,
+    profileFields: input.profileFields,
+    evidenceIds: input.evidenceIds,
+  };
+  const currentMission = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions).find(
+    (mission) => mission.id === input.missionId
+  );
+  const currentProfile = readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile);
+  const built = currentMission
+    ? buildConsentedCopilotPayload(currentMission, currentProfile, selection)
+    : null;
+  const payload = built?.ok ? built.payload : { mission: {}, profile: {}, experienceEvidence: [] };
+  const primaryEvidence = payload.experienceEvidence.find(
+    (evidence) => evidence.evidenceId === primaryEvidenceId
+  );
+  const inputHash = input.requestId.replaceAll('-', '').repeat(2);
+  const tjmFacts =
+    input.kind === 'tjm-coach'
+      ? {
+          schemaVersion: 1 as const,
+          confidence: 'medium' as const,
+          missionDisplayedTjm: 700,
+          profileBounds: { min: 500, target: 625, max: 750, currency: 'EUR' as const },
+          market: {
+            matchedStacks: ['svelte'],
+            recordCount: 2,
+            sampleCount: 10,
+            min: 550,
+            weightedAverage: 680,
+            max: 800,
+            trend: 'up' as const,
+            lastObservedAt: '2026-07-20',
+          },
+        }
+      : null;
+  const result = {
+    schemaVersion: 1 as const,
+    kind: input.kind,
+    evidenceClaims: primaryEvidenceId
+      ? [
+          {
+            text: 'Une expérience sélectionnée soutient cette proposition.',
+            evidenceIds: [primaryEvidenceId],
+          },
+        ]
+      : [],
+    gaps: [],
+    risks: ['Contenu synthétique de démonstration : une relecture humaine reste requise.'],
+    questions: ['Souhaitez-vous préciser votre disponibilité ?'],
+    ...(input.kind === 'analysis'
+      ? {}
+      : {
+          draftSegments: [
+            {
+              text: 'Je peux mobiliser mon expertise TypeScript et Svelte pour cadrer puis livrer cette mission avec une communication régulière.',
+              sourceRefs:
+                input.kind === 'tjm-coach'
+                  ? [
+                      {
+                        kind: 'tjm-fact' as const,
+                        id: 'profile-tjm-bounds' as const,
+                        quote: '500 / 625 / 750 EUR',
+                      },
+                    ]
+                  : [
+                      {
+                        kind: 'experience' as const,
+                        id: primaryEvidenceId as string,
+                        quote: primaryEvidence?.summary.slice(0, 80) ?? 'Source indisponible',
+                      },
+                    ],
+            },
+          ],
+        }),
+  };
+
+  return {
+    jobId: `dev-copilot-${input.missionId}-${now}`,
+    missionId: input.missionId,
+    requestId: input.requestId,
+    kind: input.kind,
+    creditCost: copilotCreditCost(input.kind),
+    selection,
+    sourceSnapshot: { inputHash, payload },
+    status: 'review',
+    tjmFacts,
+    result,
+    error: null,
+    creditsRemaining: input.kind === 'analysis' ? 4 : 3,
+    createdAtMs: now,
+    updatedAtMs: now,
+  };
 }
 
 /**
@@ -489,6 +657,280 @@ function createChromeStubs() {
               type: 'PREMIUM_STATUS_RESULT',
               payload: storage.premium_enabled === true,
             };
+          case 'COPILOT_LINK': {
+            const payload = message.payload as { requestId: string };
+            return {
+              type: 'COPILOT_LINK_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                outcome: 'linked',
+                subject: 'dev-premium-user',
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_SYNC_ENTITLEMENT': {
+            const payload = message.payload as { requestId: string };
+            const now = Date.now();
+            return {
+              type: 'COPILOT_ENTITLEMENT_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                outcome: 'synced',
+                state: 'active',
+                entitlement: {
+                  status: 'active',
+                  subject: 'dev-premium-user',
+                  issuedAtMs: now,
+                  expiresAtMs: now + 86_400_000,
+                  creditsRemaining: 4,
+                },
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_CREATE_JOB': {
+            const payload = message.payload as {
+              requestId: string;
+              missionId: string;
+              kind: CopilotOperationKind;
+              evidenceIds: string[];
+              missionFields: CopilotJobSnapshot['selection']['missionFields'];
+              profileFields: CopilotJobSnapshot['selection']['profileFields'];
+            };
+            if (
+              payload.kind !== 'analysis' &&
+              payload.kind !== 'tjm-coach' &&
+              payload.evidenceIds.length === 0
+            ) {
+              return {
+                type: 'COPILOT_CREATE_JOB_RESULT',
+                payload: {
+                  requestId: payload.requestId,
+                  missionId: payload.missionId,
+                  outcome: 'error',
+                  job: null,
+                  deletionReceipt: null,
+                  error: {
+                    code: 'INVALID_REQUEST',
+                    message: 'Sélectionnez une expérience pour ancrer le contenu.',
+                    retryable: false,
+                  },
+                },
+              };
+            }
+            const job = buildDevCopilotJob(payload);
+            writeDevCopilotJob(job);
+            writeDevCopilotDossier(devDossierForJob(job));
+            const receipts = readDevCopilotDeletionReceipts();
+            delete receipts[payload.missionId];
+            writeDevStorage(DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY, receipts);
+            return {
+              type: 'COPILOT_CREATE_JOB_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: 'ok',
+                job,
+                deletionReceipt: null,
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_GET_DOSSIER': {
+            const payload = message.payload as { requestId: string; missionId: string };
+            const dossier = readDevCopilotDossiers()[payload.missionId] ?? null;
+            return {
+              type: 'COPILOT_GET_DOSSIER_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: dossier ? 'ok' : 'not_found',
+                dossier,
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_GET_JOB': {
+            const payload = message.payload as { requestId: string; missionId: string };
+            const job = readDevCopilotJobs()[payload.missionId] ?? null;
+            const deletionReceipt = readDevCopilotDeletionReceipts()[payload.missionId] ?? null;
+            return {
+              type: 'COPILOT_GET_JOB_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: job ? 'ok' : 'not_found',
+                job,
+                deletionReceipt: job ? null : deletionReceipt,
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_CANCEL_JOB': {
+            const payload = message.payload as {
+              requestId: string;
+              missionId: string;
+              jobId: string;
+            };
+            const existing = readDevCopilotJobs()[payload.missionId] ?? null;
+            const job =
+              existing && existing.jobId === payload.jobId
+                ? { ...existing, status: 'cancelled' as const, updatedAtMs: Date.now() }
+                : null;
+            if (job) {
+              writeDevCopilotJob(job);
+            }
+            if (job) {
+              const dossier = readDevCopilotDossiers()[payload.missionId];
+              if (dossier) {
+                writeDevCopilotDossier({ ...dossier, state: 'ready', activeJob: null });
+              }
+            }
+            return {
+              type: 'COPILOT_CANCEL_JOB_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: job ? 'ok' : 'error',
+                job,
+                deletionReceipt: null,
+                error: job
+                  ? null
+                  : { code: 'JOB_NOT_FOUND', message: 'Job dev introuvable.', retryable: false },
+              },
+            };
+          }
+          case 'COPILOT_REVIEW_JOB': {
+            const payload = message.payload as {
+              requestId: string;
+              missionId: string;
+              jobId: string;
+              decision: 'accept' | 'reject';
+            };
+            const existing = readDevCopilotJobs()[payload.missionId] ?? null;
+            const job =
+              existing && existing.jobId === payload.jobId && existing.status === 'review'
+                ? {
+                    ...existing,
+                    jobId: payload.jobId,
+                    status:
+                      payload.decision === 'accept' ? ('accepted' as const) : ('rejected' as const),
+                    updatedAtMs: Date.now(),
+                  }
+                : null;
+            if (job) {
+              writeDevCopilotJob(job);
+              const dossier = readDevCopilotDossiers()[payload.missionId];
+              if (dossier) {
+                const reviewedAtMs = Date.now();
+                const renderedDraft = job.result === null ? null : renderCopilotDraft(job.result);
+                writeDevCopilotDossier({
+                  ...dossier,
+                  state: 'ready',
+                  activeJob: null,
+                  analysis:
+                    payload.decision === 'accept' &&
+                    job.kind === 'analysis' &&
+                    job.result?.kind === 'analysis'
+                      ? {
+                          jobId: job.jobId,
+                          result: job.result as NonNullable<
+                            CopilotDossierProjection['analysis']
+                          >['result'],
+                          approvedAtMs: reviewedAtMs,
+                        }
+                      : dossier.analysis,
+                  approvedArtifacts:
+                    payload.decision === 'accept' &&
+                    job.kind !== 'analysis' &&
+                    job.result &&
+                    renderedDraft !== null
+                      ? [
+                          ...dossier.approvedArtifacts,
+                          {
+                            artifactId: `dev-artifact-${job.jobId}`,
+                            jobId: job.jobId,
+                            kind: job.kind,
+                            draft: renderedDraft,
+                            approvedAtMs: reviewedAtMs,
+                          },
+                        ]
+                      : dossier.approvedArtifacts,
+                });
+              }
+            }
+            return {
+              type: 'COPILOT_REVIEW_JOB_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: job ? 'ok' : 'error',
+                job,
+                deletionReceipt: null,
+                error: job
+                  ? null
+                  : {
+                      code: 'JOB_NOT_REVIEWABLE',
+                      message: 'Job dev non révisable.',
+                      retryable: false,
+                    },
+              },
+            };
+          }
+          case 'COPILOT_DELETE_DOSSIER': {
+            const payload = message.payload as { requestId: string; missionId: string };
+            const jobs = readDevCopilotJobs();
+            const dossiers = readDevCopilotDossiers();
+            const existingDossier = dossiers[payload.missionId] ?? null;
+            const deletable =
+              existingDossier !== null &&
+              (existingDossier.state === 'ready' || existingDossier.state === 'deletionFailed') &&
+              existingDossier.activeJob === null;
+            if (existingDossier && !deletable) {
+              return {
+                type: 'COPILOT_DELETE_DOSSIER_RESULT',
+                payload: {
+                  requestId: payload.requestId,
+                  missionId: payload.missionId,
+                  outcome: 'error',
+                  disposition: null,
+                  receipt: null,
+                  error: {
+                    code: 'DELETE_FAILED',
+                    message: 'Le job dev doit être réglé avant la suppression.',
+                    retryable: false,
+                  },
+                },
+              };
+            }
+            const disposition = existingDossier ? 'deleted' : 'not-created';
+            delete jobs[payload.missionId];
+            writeDevStorage(DEV_COPILOT_JOBS_STORAGE_KEY, jobs);
+            delete dossiers[payload.missionId];
+            writeDevStorage(DEV_COPILOT_DOSSIERS_STORAGE_KEY, dossiers);
+            const receipt = {
+              version: 1 as const,
+              missionId: payload.missionId,
+              disposition,
+              confirmedAtMs: Date.now(),
+            };
+            writeDevStorage(DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY, {
+              ...readDevCopilotDeletionReceipts(),
+              [payload.missionId]: receipt,
+            });
+            return {
+              type: 'COPILOT_DELETE_DOSSIER_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: 'deleted',
+                disposition,
+                receipt,
+                error: null,
+              },
+            };
+          }
           case 'SET_PREMIUM':
             storage.premium_enabled = message.payload === true;
             writeDevStorage(DEV_PREMIUM_ENABLED_STORAGE_KEY, message.payload === true);
@@ -827,17 +1269,9 @@ function createChromeStubs() {
           }
           case 'GENERATE_ASSET': {
             // Dev mode returns a realistic mock asset so the kit-generation UI
-            // flow is exercisable without a service worker. The premium gate
-            // is honoured so the "active + free" DevPanel scenario produces
-            // PREMIUM_REQUIRED just like production. When dormant (flag off),
-            // generation is always allowed. See models/premium-feature-flag.model.md.
-            const featureActive = resolvePremiumFeatureFlag(storage.premium_feature_enabled);
-            if (shouldPremiumGate(featureActive, storage.premium_enabled === true)) {
-              return {
-                type: 'GENERATION_RESULT',
-                payload: { asset: null, error: 'PREMIUM_REQUIRED' },
-              };
-            }
+            // flow is exercisable without a service worker. Local Gemini Nano
+            // generation remains free and independent from the Copilot Premium
+            // entitlement. See models/premium-feature-flag.model.md.
             const { missionId: genMissionId, generationType: genType } = (message.payload ??
               {}) as {
               missionId: string;

@@ -2216,12 +2216,19 @@ describe('background auto-scan notifications', () => {
     });
   });
 
-  it('returns PREMIUM_REQUIRED for GENERATE_ASSET when premium feature is active and user is not premium', async () => {
+  it('keeps local GENERATE_ASSET free when the legacy premium flag is active and user is free', async () => {
     expect(messageListener).toBeTypeOf('function');
-    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
-      premium_enabled: false,
-      premium_feature_enabled: true,
-    });
+    getMissions.mockResolvedValueOnce([makeMission({ id: 'mission-1' })]);
+    getProfile.mockResolvedValueOnce(profile);
+    const fakeAsset = {
+      id: 'gen-pitch-mission-1-1000',
+      missionId: 'mission-1',
+      type: 'pitch' as const,
+      content: 'Generated pitch content.',
+      createdAt: 1000,
+      modelUsed: 'gemini-nano',
+    };
+    generateAsset.mockResolvedValueOnce(fakeAsset);
     const sendResponse = vi.fn();
 
     const handled = messageListener?.(
@@ -2235,19 +2242,19 @@ describe('background auto-scan notifications', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
 
     expect(handled).toBe(true);
-    expect(generateAsset).not.toHaveBeenCalled();
+    expect(generateAsset).toHaveBeenCalled();
+    expect(chrome.storage.local.get).not.toHaveBeenCalledWith([
+      'premium_enabled',
+      'premium_feature_enabled',
+    ]);
     expect(sendResponse).toHaveBeenCalledWith({
       type: 'GENERATION_RESULT',
-      payload: { asset: null, error: 'PREMIUM_REQUIRED' },
+      payload: { asset: fakeAsset },
     });
   });
 
-  it('allows GENERATE_ASSET when premium feature is dormant even if user is not premium', async () => {
+  it('allows local GENERATE_ASSET when the legacy premium feature is dormant', async () => {
     expect(messageListener).toBeTypeOf('function');
-    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
-      premium_enabled: false,
-      premium_feature_enabled: false,
-    });
     getMissions.mockResolvedValueOnce([makeMission({ id: 'mission-1' })]);
     getProfile.mockResolvedValueOnce(profile);
     const fakeAsset = {
@@ -2276,12 +2283,8 @@ describe('background auto-scan notifications', () => {
     expect(saveGeneratedAsset).toHaveBeenCalledWith(fakeAsset);
   });
 
-  it('generates and persists an asset for GENERATE_ASSET when premium feature is active and user is premium', async () => {
+  it('generates and persists a local asset independently from legacy premium state', async () => {
     expect(messageListener).toBeTypeOf('function');
-    vi.mocked(chrome.storage.local.get).mockResolvedValueOnce({
-      premium_enabled: true,
-      premium_feature_enabled: true,
-    });
     getMissions.mockResolvedValueOnce([makeMission({ id: 'mission-1' })]);
     getProfile.mockResolvedValueOnce(profile);
     const fakeAsset = {

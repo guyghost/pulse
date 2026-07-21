@@ -12,7 +12,8 @@
     "notifications",
     "declarativeNetRequest",
     "scripting",
-    "activeTab"
+    "activeTab",
+    "identity"
   ],
   "host_permissions": [
     "https://www.free-work.com/*",
@@ -22,7 +23,8 @@
     "https://*.collective.work/*",
     "https://app.cherry-pick.io/*",
     "https://*.malt.fr/*",
-    "https://*.malt.io/*"
+    "https://*.malt.io/*",
+    "https://copilot.missionpulse.app/*"
   ],
   "optional_host_permissions": ["https://www.linkedin.com/*"],
   "background": {

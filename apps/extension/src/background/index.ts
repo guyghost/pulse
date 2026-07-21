@@ -4,6 +4,7 @@ import {
   saveConnectorStatuses,
   getConnectorStatuses,
   getMissions,
+  getMissionById,
   saveMissions,
   purgeOldMissions,
   runMigrations,
@@ -19,7 +20,6 @@ import type { Mission } from '../lib/core/types/mission';
 import type { MissionTracking } from '../lib/core/types/tracking';
 import { analyzeTJMHistory } from '../lib/core/tjm-history';
 import type { TJMHistory, TJMRegion } from '../lib/core/types/tjm';
-import { resolvePremiumFeatureFlag, shouldPremiumGate } from '../lib/core/features/flags';
 import {
   getFeedSavedViews,
   getFeedSortBy,
@@ -121,6 +121,12 @@ import {
   createSettingsReleaseScanLedgerPort,
 } from '../lib/shell/settings-release/settings-release-scan-ledger';
 import { installSettingsReleaseSnapshotReader } from '../lib/shell/settings-release/settings-release-reader';
+import { createCopilotCoordinator } from '../lib/shell/copilot/coordinator';
+import { createCopilotSessionRepository } from '../lib/shell/copilot/session';
+import { createCopilotCheckpointRepository } from '../lib/shell/copilot/checkpoints';
+import { createCopilotTransport } from '../lib/shell/copilot/transport';
+import { getCopilotOrigins, isCopilotRolloutEnabled } from '../lib/shell/copilot/config';
+import { createCopilotBridgeHandler } from '../lib/shell/copilot/background-handler';
 
 if (import.meta.env.DEV) {
   console.debug('[MissionPulse] Service worker started');
@@ -1132,6 +1138,24 @@ const settingsReleaseCoordinator = createSettingsReleaseCoordinator(
   createChromeSettingsReleasePorts(settingsReleaseScanPort)
 );
 
+const copilotOrigins = getCopilotOrigins();
+const copilotCoordinator = createCopilotCoordinator({
+  rolloutEnabled: isCopilotRolloutEnabled(),
+  identity: {
+    getRedirectURL: (path) => chrome.identity.getRedirectURL(path),
+    launchWebAuthFlow: (details) => chrome.identity.launchWebAuthFlow(details),
+  },
+  sessions: createCopilotSessionRepository(),
+  checkpoints: createCopilotCheckpointRepository(),
+  transport: createCopilotTransport(copilotOrigins),
+  getMissionById,
+  getProfile,
+  loadTJMHistory,
+  now: () => Date.now(),
+  randomUUID: () => crypto.randomUUID(),
+});
+const handleCopilotBridgeMessage = createCopilotBridgeHandler(copilotCoordinator);
+
 async function requireSettingsReleaseSnapshot() {
   const result = await settingsReleaseCoordinator.read();
   if (result.status !== 'confirmed') {
@@ -1172,6 +1196,10 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
   // Chaque branche a son propre try/catch mais cette enveloppe protège contre
   // toute exception imprévue qui sinon crasherait le service worker.
   try {
+    if (handleCopilotBridgeMessage(message, sendResponse)) {
+      return true;
+    }
+
     if (message.type === 'GET_PROFILE') {
       getProfile().then((profile) => {
         sendResponse({ type: 'PROFILE_RESULT', payload: profile });
@@ -2046,28 +2074,11 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
     if (message.type === 'GENERATE_ASSET') {
       const { missionId, generationType } = message.payload;
 
-      // Kit generation is a premium-gated feature. The on-device Gemini Nano
-      // generator (shell/ai/mission-generator) is loaded lazily so the service
-      // worker does not pay the AI module cost until a generation is requested.
-      //
-      // The premium feature flag deactivates the entire premium system: when
-      // dormant (flag off), the gate is skipped and generation is always
-      // allowed. See models/premium-feature-flag.model.md.
+      // The local Gemini Nano kit is free in every legacy premium-flag state.
+      // Its module remains lazy-loaded so the worker pays the AI cost only when
+      // the user explicitly requests local generation.
       (async () => {
         try {
-          const { premium_enabled, premium_feature_enabled } = await chrome.storage.local.get([
-            'premium_enabled',
-            'premium_feature_enabled',
-          ]);
-          const featureActive = resolvePremiumFeatureFlag(premium_feature_enabled);
-          if (shouldPremiumGate(featureActive, premium_enabled === true)) {
-            sendResponse({
-              type: 'GENERATION_RESULT',
-              payload: { asset: null, error: 'PREMIUM_REQUIRED' },
-            });
-            return;
-          }
-
           const { generateAsset } = await import('../lib/shell/ai/mission-generator');
           const { saveGeneratedAsset } = await import('../lib/shell/storage/generated-assets');
 
