@@ -1531,7 +1531,7 @@
               </div>
             </div>
             <a
-              class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue-strong px-3 text-xs font-semibold text-white hover:bg-blueprint-blue/90"
+              class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue-strong px-3 text-xs font-semibold text-white hover:bg-blueprint-blue-strong/90"
               href={operationalStory.actionTarget === 'install'
                 ? chromeStoreUrl
                 : operationalStory.actionTarget === 'sync'
@@ -2197,8 +2197,7 @@
                     id="application-notes"
                     name="notes"
                     class="mt-1 min-h-20 w-full resize-y rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-sm leading-6 text-text-primary outline-none focus:border-blueprint-blue/40"
-                    value={selectedApplication.notes}
-                  ></textarea>
+                    value={selectedApplication.notes}></textarea>
 
                   <div class="mt-3 grid grid-cols-2 gap-2">
                     <label
@@ -2564,8 +2563,7 @@
                     name="summary"
                     maxlength="4000"
                     class="mt-1 min-h-24 w-full resize-y rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-sm leading-6 text-text-primary outline-none focus:border-blueprint-blue/40"
-                    value={cv.summary}
-                  ></textarea>
+                    value={cv.summary}></textarea>
                 </label>
                 <div class="mt-3 grid gap-3 sm:grid-cols-2">
                   <label class="block text-xs font-medium text-text-subtle" for="cv-location">
@@ -3287,7 +3285,7 @@
 
               <button
                 type="button"
-                class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-blueprint-blue bg-blueprint-blue-strong px-4 text-sm font-medium text-white shadow-subtle-2 hover:bg-blueprint-blue/90 disabled:cursor-not-allowed disabled:opacity-40"
+                class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-blueprint-blue-strong bg-blueprint-blue-strong px-4 text-sm font-medium text-white shadow-subtle-2 hover:bg-blueprint-blue-strong/90 disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canPrepareCvSync}
                 onclick={() => {
                   syncPrepared = true;
