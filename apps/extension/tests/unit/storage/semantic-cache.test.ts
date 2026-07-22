@@ -128,13 +128,14 @@ describe('semantic cache', () => {
   });
 
   it('round-trips a batch of missions with a single batched storage read', async () => {
-    const results = new Map(
-      ['mission-a', 'mission-b', 'mission-c'].map((id) => [id, { score: 80, reason: 'match' }])
-    );
+    // Ids deliberately use different dash shapes so that a naive
+    // `lastIndexOf('-')` split would leak part of the id into the fingerprint
+    // and hide regressions.
+    const ids = ['mission-a', 'mission-b-2', 'mission-c-extra'];
+    const results = new Map(ids.map((id) => [id, { score: 80, reason: 'match' }]));
 
     await cacheSemanticScores(results, baseProfile);
 
-    const ids = [...results.keys()];
     const cached = await getCachedSemanticScores(ids, baseProfile);
 
     // Every entry round-trips intact.
@@ -150,7 +151,16 @@ describe('semantic cache', () => {
     expect(getCalls).toHaveLength(1);
     const requestedKeys = getCalls[0][0];
     expect(requestedKeys).toHaveLength(ids.length);
-    const fingerprints = new Set(requestedKeys.map((key) => key.slice(0, key.lastIndexOf('-'))));
+    // Keys are `${CACHE_KEY_PREFIX}${fingerprint}-${missionId}`. Strip the
+    // known prefix and the known `-${missionId}` suffix (using the mission id
+    // we requested, in order) to isolate the exact fingerprint substring.
+    const PREFIX = 'semantic-';
+    const fingerprints = new Set(
+      requestedKeys.map((key, index) => {
+        const suffixLength = ids[index].length + 1; // +1 for the '-' separator
+        return key.slice(PREFIX.length, key.length - suffixLength);
+      })
+    );
     expect(fingerprints.size).toBe(1);
   });
 
