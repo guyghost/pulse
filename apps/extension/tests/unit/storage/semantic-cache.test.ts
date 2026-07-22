@@ -127,6 +127,33 @@ describe('semantic cache', () => {
     expect(chrome.storage.local.remove).toHaveBeenCalled();
   });
 
+  it('round-trips a batch of missions with a single batched storage read', async () => {
+    const results = new Map(
+      ['mission-a', 'mission-b', 'mission-c'].map((id) => [id, { score: 80, reason: 'match' }])
+    );
+
+    await cacheSemanticScores(results, baseProfile);
+
+    const ids = [...results.keys()];
+    const cached = await getCachedSemanticScores(ids, baseProfile);
+
+    // Every entry round-trips intact.
+    expect(cached).toEqual(results);
+
+    // The read path must batch all keys into one storage.local.get call —
+    // no per-mission reads — and every requested key shares the same profile
+    // fingerprint (differs only by mission id), proving the keys for a batch
+    // are derived from a single fingerprint computation.
+    const getCalls = vi
+      .mocked(chrome.storage.local.get)
+      .mock.calls.filter((call): call is [string[]] => Array.isArray(call[0]));
+    expect(getCalls).toHaveLength(1);
+    const requestedKeys = getCalls[0][0];
+    expect(requestedKeys).toHaveLength(ids.length);
+    const fingerprints = new Set(requestedKeys.map((key) => key.slice(0, key.lastIndexOf('-'))));
+    expect(fingerprints.size).toBe(1);
+  });
+
   it('does not duplicate index entries when re-caching existing keys', async () => {
     const first = new Map([
       ['mission-1', { score: 80, reason: 'A' }],
