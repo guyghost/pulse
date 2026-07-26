@@ -1,1 +1,2 @@
 apps/extension/scripts/release-readiness/policies/*.json
+apps/extension/tests/mv3/scenarios.v1.json
