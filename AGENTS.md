@@ -464,3 +464,17 @@ Tout le code dans `src/dev/` est derrière `import.meta.env.DEV` et n'est jamais
 11. **Importer du Shell depuis le Core** — `core/` ne doit JAMAIS importer depuis `shell/`
 12. **Utiliser `Date.now()` ou `new Date()` dans le Core** — Injecter via paramètre depuis le Shell
 13. **Mettre de l'I/O dans le Core** — Pas de `fetch`, `indexedDB`, `chrome.*` dans `core/`
+
+## Cursor Cloud specific instructions
+
+Environnement : Node ≥22 et pnpm 10.x sont préinstallés. Le script de mise à jour lance `pnpm install`, donc les dépendances sont déjà présentes au démarrage d'une session.
+
+Commandes standards (voir `package.json` racine et `README.md`) : `pnpm lint`, `pnpm test`, `pnpm build` — toutes passent en l'état (le lint ne renvoie que des warnings, 0 erreur).
+
+Lancer le produit principal (extension Chrome) sans navigateur :
+
+- `pnpm --filter @pulse/extension dev` (ou `pnpm dev` à la racine) sert le side panel sur le port **5176** (`strictPort`, cf. `apps/extension/vite.config.ts`).
+- Ouvrir `http://localhost:5176/src/sidepanel/index.html` (la racine `/` renvoie 404, c'est normal). En dev, les APIs `chrome.*` sont stubées automatiquement et le feed est peuplé de missions mock — aucune extension chargée ni navigateur MV3 requis.
+- `Ctrl+Shift+D` ouvre le Dev Panel (injection de missions, toggle états, logs bridge).
+
+Services optionnels non disponibles par défaut : `pnpm dev:local` / `pnpm supabase:*` nécessitent **Docker + Supabase CLI**, qui ne sont PAS installés dans l'environnement cloud. Les apps `landing` (5173) et `dashboard` (5174) buildent et démarrent sans Supabase (auth/sync désactivés) ; seul le noyau extension est requis pour développer/tester le produit principal.
