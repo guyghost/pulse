@@ -344,6 +344,7 @@ describe('background auto-scan notifications', () => {
     notifyHighScoreMissions.mockResolvedValue({
       shown: true,
       notifiedMissionIds: ['mission-1'],
+      notifiableMissionIds: ['mission-1'],
     });
     getMissions.mockResolvedValue([makeMission()]);
     resetNewMissionCount.mockResolvedValue(undefined);
@@ -396,8 +397,48 @@ describe('background auto-scan notifications', () => {
       expect.objectContaining({ id: 'mission-2' }),
     ]);
     expect(saveSeenIds).toHaveBeenCalledWith(['already-seen', 'mission-1']);
+    // Badge mirrors the notifiable differential (mission-1), not all unseen (2).
+    expect(setNewMissionCount).toHaveBeenCalledWith(1);
+    expect(setBadgeText).toHaveBeenCalledWith({ text: '1' });
+  });
+
+  it('badges only notifiable missions even when the unseen pool is large', async () => {
+    const manyUnseen = Array.from({ length: 1000 }, (_, index) =>
+      makeMission({ id: `bulk-${index}`, score: 40 })
+    );
+    runScan.mockResolvedValueOnce({
+      missions: [
+        ...manyUnseen,
+        makeMission({ id: 'hot-1', score: 95 }),
+        makeMission({ id: 'hot-2', score: 91 }),
+      ],
+      errors: [],
+    });
+    notifyHighScoreMissions.mockResolvedValueOnce({
+      shown: true,
+      notifiedMissionIds: ['hot-1', 'hot-2'],
+      notifiableMissionIds: ['hot-1', 'hot-2'],
+    });
+
+    await alarmListener?.({ name: 'auto-scan' });
+
     expect(setNewMissionCount).toHaveBeenCalledWith(2);
     expect(setBadgeText).toHaveBeenCalledWith({ text: '2' });
+    expect(setBadgeText).not.toHaveBeenCalledWith({ text: '1002' });
+  });
+
+  it('still badges notifiable missions when Chrome notification is rate-limited', async () => {
+    notifyHighScoreMissions.mockResolvedValueOnce({
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds: ['mission-1'],
+    });
+
+    await alarmListener?.({ name: 'auto-scan' });
+
+    expect(setNewMissionCount).toHaveBeenCalledWith(1);
+    expect(setBadgeText).toHaveBeenCalledWith({ text: '1' });
+    expect(saveSeenIds).not.toHaveBeenCalled();
   });
 
   it('clears badge and new mission count when all fetched missions are already seen', async () => {
@@ -405,7 +446,6 @@ describe('background auto-scan notifications', () => {
       missions: [makeMission({ id: 'already-seen', score: 92 })],
       errors: [],
     });
-    notifyHighScoreMissions.mockResolvedValueOnce({ shown: false, notifiedMissionIds: [] });
 
     await alarmListener?.({ name: 'auto-scan' });
 
@@ -426,6 +466,21 @@ describe('background auto-scan notifications', () => {
     expect(setNewMissionCount).toHaveBeenCalledWith(0);
     expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
     expect(notifyHighScoreMissions).not.toHaveBeenCalled();
+  });
+
+  it('clears badge when no unseen mission passes notification filters', async () => {
+    notifyHighScoreMissions.mockResolvedValueOnce({
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds: [],
+    });
+
+    await alarmListener?.({ name: 'auto-scan' });
+
+    expect(notifyHighScoreMissions).toHaveBeenCalled();
+    expect(setNewMissionCount).toHaveBeenCalledWith(0);
+    expect(setBadgeText).toHaveBeenCalledWith({ text: '' });
+    expect(saveSeenIds).not.toHaveBeenCalled();
   });
 
   it('saves profiles through the service worker and rescored missions locally', async () => {

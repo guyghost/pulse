@@ -342,29 +342,34 @@ async function persistScanResults(
     return;
   }
 
-  // Update badge with new mission count
+  // Unseen missions feed the notification filter. The icon badge must mirror
+  // that notifiable differential (high-score / smart-alert matches), not the
+  // raw unseen pool — otherwise a first scan of ~1000 missions badges "1000"
+  // while the Chrome notification correctly reports only ~2 new ones.
   const seenIds = await getSeenIds();
   const seenSet = new Set(seenIds);
   const newMissions = missions.filter((m) => !seenSet.has(m.id));
-  const newCount = newMissions.length;
 
-  if (newCount > 0) {
-    await setNewMissionCount(newCount);
-    await chrome.action.setBadgeText({ text: String(newCount) });
+  const notification =
+    newMissions.length > 0
+      ? await notifyHighScoreMissions(newMissions)
+      : { shown: false, notifiedMissionIds: [], notifiableMissionIds: [] };
+
+  const badgeCount = notification.notifiableMissionIds.length;
+  if (badgeCount > 0) {
+    await setNewMissionCount(badgeCount);
+    await chrome.action.setBadgeText({ text: String(badgeCount) });
     await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
     await chrome.action.setBadgeTextColor({ color: '#ffffff' });
   } else {
     await clearNewMissionBadge();
   }
 
-  // Send notifications for high-score missions if enabled. notifyHighScoreMissions
-  // also persists the deep-link focus intent BEFORE the Chrome notification is
-  // shown, so a fast click can never race ahead of the intent write.
-  if (newCount > 0) {
-    const notification = await notifyHighScoreMissions(newMissions);
-    if (notification.shown && notification.notifiedMissionIds.length > 0) {
-      await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
-    }
+  // notifyHighScoreMissions also persists the deep-link focus intent BEFORE the
+  // Chrome notification is shown, so a fast click can never race ahead of the
+  // intent write.
+  if (notification.shown && notification.notifiedMissionIds.length > 0) {
+    await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
   }
 }
 
