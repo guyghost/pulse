@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import type {
     FeedDashboardSummary,
     FeedInsightSummary,
@@ -49,7 +49,7 @@
   type FeedInsightItem = {
     label: string;
     value: number;
-    icon: string;
+    icon: IconName;
     stateLabel: string;
     hint: string;
     severity: 'success' | 'attention' | 'neutral';
@@ -194,7 +194,7 @@
 
     {#if hasScoreData}
       <div class="flex h-2 overflow-hidden rounded-full bg-subtle-gray">
-        {#each scoreDistribution as bucket}
+        {#each scoreDistribution as bucket, i (i)}
           {@const width = Math.max(3, Math.round((bucket.count / totalBucketCount) * 100))}
           {#if bucket.count > 0}
             <button
@@ -214,7 +214,7 @@
       </div>
 
       <div class="mt-2 grid grid-cols-3 gap-1.5">
-        {#each scoreDistribution as bucket}
+        {#each scoreDistribution as bucket, i (i)}
           <button
             type="button"
             class="rounded-md px-1.5 py-1 text-left transition-colors {selectedScoreBucket ===
@@ -246,7 +246,7 @@
   </div>
 
   <div class="mt-3 grid grid-cols-2 gap-1.5" aria-label="Détails du tri avec les filtres actuels">
-    {#each insightItems as item}
+    {#each insightItems as item, i (i)}
       <div
         class="rounded-lg border bg-page-canvas px-2 py-1.5 {item.severity === 'attention'
           ? 'border-status-orange/25'

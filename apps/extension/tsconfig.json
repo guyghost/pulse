@@ -1,6 +1,7 @@
 {
   "extends": "@pulse/tsconfig/svelte.json",
   "compilerOptions": {
+    "allowImportingTsExtensions": true,
     "paths": {
       "$lib/*": ["./src/lib/*"]
     }
@@ -10,7 +11,9 @@
     "src/**/*.svelte",
     "scripts/**/*.ts",
     "vite.config.ts",
-    "playwright.config.ts"
+    "playwright.config.ts",
+    "playwright.extension.config.ts",
+    "playwright.mv3.config.ts"
   ],
   "exclude": ["node_modules", "dist"]
 }

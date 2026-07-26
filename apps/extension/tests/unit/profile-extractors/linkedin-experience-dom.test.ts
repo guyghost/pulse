@@ -112,6 +112,43 @@ describe('extractLinkedInExperiencesFromDom', () => {
     ]);
   });
 
+  it('parses the LinkedIn owner view from stable edit-form links', async () => {
+    render(`
+      <main>
+        <section>
+          <h1>Expérience</h1>
+          <div class="generated-owner-position">
+            <a href="/in/guyghost/details/experience/edit/forms/2397304299/">
+              <span aria-hidden="true"><strong>Technical Lead</strong></span>
+              <span aria-hidden="true">BNP Paribas Personal Finance · Freelance</span>
+              <span aria-hidden="true">janv. 2023 - oct. 2025 · 2 ans 10 mois</span>
+              <span aria-hidden="true">Levallois-Perret, Île-de-France, France · Hybride</span>
+            </a>
+            <a href="/in/guyghost/details/experience/edit/forms/2397304299/">
+              Modifier Technical Lead chez BNP Paribas Personal Finance
+            </a>
+          </div>
+        </section>
+      </main>
+    `);
+
+    const snapshot = await extract();
+
+    expect(snapshot.kind).toBe('ready');
+    if (snapshot.kind !== 'ready') {
+      throw new Error('expected ready');
+    }
+    expect(snapshot.experiences).toEqual([
+      expect.objectContaining({
+        title: 'Technical Lead',
+        company: 'BNP Paribas Personal Finance',
+        employmentType: 'Freelance',
+        dateRange: 'janv. 2023 - oct. 2025',
+        externalId: 'linkedin-owner-position-2397304299',
+      }),
+    ]);
+  });
+
   it('parses a structurally valid generic list row with generated CSS classes', async () => {
     render(`
       <main>

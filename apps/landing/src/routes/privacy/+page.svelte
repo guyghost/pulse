@@ -96,8 +96,8 @@
           de télétravail et niveau de seniorité que vous configurez lors de l'onboarding.
         </li>
         <li>
-          <strong>Missions scrapées</strong> — Les missions récupérées depuis Free-Work, LeHibou, Hiway,
-          Collective et Cherry Pick sont stockées dans IndexedDB sur votre machine.
+          <strong>Missions scrapées</strong> — Les missions récupérées depuis Free-Work, LeHibou, Hiway
+          et Cherry Pick sont stockées dans IndexedDB sur votre machine.
         </li>
         <li>
           <strong>États des connecteurs</strong> — Le statut de vos connexions aux différentes plateformes.
@@ -156,8 +156,8 @@
       <h2>Accès aux plateformes tierces</h2>
 
       <p>
-        MissionPulse accède aux sites Free-Work, LeHibou, Hiway, Collective et Cherry Pick pour
-        scrapper les missions disponibles. Ces accès sont effectués via <strong
+        MissionPulse accède aux sites Free-Work, LeHibou, Hiway et Cherry Pick pour scrapper les
+        missions disponibles. Ces accès sont effectués via <strong
           >votre session navigateur existante</strong
         > — vous devez être connecté à ces plateformes. Nous ne stockons jamais vos identifiants de connexion.
       </p>

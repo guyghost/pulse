@@ -211,7 +211,7 @@
         aria-label="Filtrer les tendances TJM par région"
       >
         <option value="">Toutes les régions</option>
-        {#each regionOptions as option}
+        {#each regionOptions as option, i (i)}
           <option value={option.region}>{option.label}</option>
         {/each}
       </select>

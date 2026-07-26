@@ -48,11 +48,10 @@ MissionPulse peut acceder en **lecture seule** aux cookies ou aux sessions navig
 
 Plateformes actuellement supportees :
 
-- `www.free-work.com`
-- `*.lehibou.com`
-- `hiway-missions.fr`
-- `*.collective.work`
-- `app.cherry-pick.io`
+- **Free-Work** (`www.free-work.com`)
+- **LeHibou** (`*.lehibou.com`)
+- **Hiway** (`hiway-missions.fr`)
+- **Cherry Pick** (`app.cherry-pick.io`)
 
 MissionPulse **ne modifie, ne cree et ne supprime aucun cookie utilisateur**. Ces acces servent uniquement au fonctionnement local de l'extension.
 
@@ -86,7 +85,7 @@ Aucun backend MissionPulse ne scrape les plateformes a votre place. Le dashboard
 
 Pour toute question relative a la confidentialite de vos donnees, veuillez nous contacter a :
 
-**Email** : [a completer]
+**Email** : privacy@missionpulse.app
 
 ---
 

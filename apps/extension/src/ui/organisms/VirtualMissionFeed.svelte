@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
+  import type { MissionDwellSignal } from '$lib/core/feed/mission-arrival-queue';
   import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
   import { getLastTransitionTime } from '$lib/core/tracking';
   import MissionCard from '../molecules/MissionCard.svelte';
@@ -15,14 +16,18 @@
     error = null,
     seenIds = [],
     favorites = {},
+    favoritePendingIds = new Set<string>(),
     hidden = {},
     comparisonMissionIds = [],
     trackingByMissionId = new Map<string, MissionTracking>(),
+    statusPendingMissionIds = new Set<string>(),
     sortBy = 'score',
     resetKey = '',
     filterActive = false,
+    stableQueueActive = false,
     tourStep = null,
     onMissionSeen,
+    onMissionReadSignal,
     onToggleFavorite,
     onHide,
     onToggleCompare,
@@ -39,14 +44,18 @@
     error?: string | null;
     seenIds?: string[];
     favorites?: Record<string, number>;
+    favoritePendingIds?: Set<string>;
     hidden?: Record<string, number>;
     comparisonMissionIds?: string[];
     trackingByMissionId?: Map<string, MissionTracking>;
+    statusPendingMissionIds?: Set<string>;
     sortBy?: 'score' | 'date' | 'tjm';
     resetKey?: string;
     filterActive?: boolean;
+    stableQueueActive?: boolean;
     tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onMissionSeen?: (id: string) => void;
+    onMissionReadSignal?: (id: string, signal: MissionDwellSignal) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
     onToggleCompare?: (id: string) => void;
@@ -136,14 +145,14 @@
 
 <div class="flex flex-col gap-3">
   {#if isLoading && sortedMissions.length === 0}
-    {#each Array(3) as _}
+    {#each Array(3) as _, i (i)}
       <div class="section-card rounded-2xl p-4 space-y-3">
         <Skeleton width="58%" height="1.15rem" />
         <Skeleton width="34%" height="0.8rem" />
         <div class="flex gap-2">
-          <Skeleton width="3rem" height="1.25rem" rounded="full" />
-          <Skeleton width="4rem" height="1.25rem" rounded="full" />
-          <Skeleton width="3.5rem" height="1.25rem" rounded="full" />
+          <Skeleton width="3rem" height="1.25rem" variant="circle" />
+          <Skeleton width="4rem" height="1.25rem" variant="circle" />
+          <Skeleton width="3.5rem" height="1.25rem" variant="circle" />
         </div>
         <Skeleton width="100%" height="3rem" />
       </div>
@@ -213,13 +222,22 @@
           {mission}
           isSeen={seenSet.has(mission.id)}
           isFavorite={mission.id in (favorites ?? {})}
+          isFavoritePending={favoritePendingIds.has(mission.id)}
           isHidden={mission.id in (hidden ?? {})}
           isCompared={comparedIds.has(mission.id)}
           compareDisabled={comparisonLimitReached && !comparedIds.has(mission.id)}
           trackingStatus={missionTracking?.currentStatus ?? null}
           trackingUpdatedAt={missionTracking ? getLastTransitionTime(missionTracking) : null}
+          isStatusTransitionPending={statusPendingMissionIds.has(mission.id)}
           tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
-          onVisible={() => onMissionSeen?.(mission.id)}
+          showSeenStatus={stableQueueActive}
+          onReadSignal={(signal) => {
+            if (onMissionReadSignal) {
+              onMissionReadSignal(mission.id, signal);
+            } else if (signal.type === 'elapsed') {
+              onMissionSeen?.(mission.id);
+            }
+          }}
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}
           onToggleCompare={() => onToggleCompare?.(mission.id)}

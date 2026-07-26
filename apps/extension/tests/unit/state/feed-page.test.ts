@@ -119,22 +119,31 @@ function makeScoreBreakdown(overrides: Partial<NonNullable<Mission['scoreBreakdo
   };
 }
 
-function makeController(enabledConnectorIds = new Set<string>()): FeedController {
+function makeController(
+  enabledConnectorIds = new Set<string>(),
+  pendingMissions: Mission[] = []
+): FeedController {
   return {
     get isScanning() {
       return false;
+    },
+    get ownedScan() {
+      return null;
     },
     get scanCompleted() {
       return false;
     },
     get hasPendingMissions() {
-      return false;
+      return pendingMissions.length > 0;
     },
     get pendingMissionCount() {
-      return 0;
+      return pendingMissions.length;
     },
     get pendingConnectorCount() {
       return 0;
+    },
+    get pendingMissions() {
+      return [...pendingMissions];
     },
     get isApplyingPendingMissions() {
       return false;
@@ -160,6 +169,9 @@ function makeController(enabledConnectorIds = new Set<string>()): FeedController
     get healthSnapshots() {
       return new Map();
     },
+    get parserHealthRecords() {
+      return new Map();
+    },
     get sourceStatuses() {
       return [];
     },
@@ -173,6 +185,14 @@ function makeController(enabledConnectorIds = new Set<string>()): FeedController
     stopScan: vi.fn(),
     handleScanComplete: vi.fn(async () => {}),
     applyPendingMissions: vi.fn(async () => {}),
+    loadArrivalProjection: vi.fn(async (orderedIds: readonly string[]) => ({
+      missions: orderedIds.map(
+        (id) => pendingMissions.find((mission) => mission.id === id) ?? makeMission({ id })
+      ),
+      orderedUnseenIds: orderedIds.filter((id) =>
+        pendingMissions.some((mission) => mission.id === id)
+      ),
+    })),
     smartLoad: vi.fn(async () => {}),
     checkSourceSessions: vi.fn(async () => {}),
     handleToggleConnector: vi.fn(async () => {}),
@@ -190,6 +210,7 @@ describe('feed page state', () => {
     feedDataMock.saveSeenIds.mockResolvedValue(undefined);
     feedDataMock.getSeenIds.mockResolvedValue([]);
     feedDataMock.getFavorites.mockResolvedValue({});
+    feedDataMock.saveFavorites.mockResolvedValue(undefined);
     feedDataMock.getHidden.mockResolvedValue({});
     feedDataMock.getProfile.mockResolvedValue(null);
     feedDataMock.resetNewMissionCount.mockResolvedValue(undefined);
@@ -198,6 +219,28 @@ describe('feed page state', () => {
     feedDataMock.setFeedSavedViews.mockResolvedValue(undefined);
     feedDataMock.consumeDeepLinkIntent.mockResolvedValue(null);
     feedDataMock.subscribeToNotificationClicked.mockReturnValue(() => {});
+  });
+
+  it('confirme un favori seulement après son accusé de persistance', async () => {
+    let confirmPersistence: (() => void) | null = null;
+    feedDataMock.saveFavorites.mockImplementation(
+      () =>
+        new Promise<void>((resolve) => {
+          confirmPersistence = resolve;
+        })
+    );
+    const page = createFeedPageState(createFeedStore(), makeController());
+
+    const pending = page.handleToggleFavorite('mission-1');
+
+    expect(page.favoritePendingIds.has('mission-1')).toBe(true);
+    expect(page.favorites).not.toHaveProperty('mission-1');
+
+    confirmPersistence?.();
+    await pending;
+
+    expect(page.favoritePendingIds.has('mission-1')).toBe(false);
+    expect(page.favorites).toHaveProperty('mission-1');
   });
 
   it('counts source filter pills from the same missions shown by source filtering', () => {
@@ -282,6 +325,145 @@ describe('feed page state', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+
+  it('keeps a read mission in the active stable new queue until the queue is reopened', async () => {
+    vi.useFakeTimers();
+    try {
+      const feed = createFeedStore();
+      const page = createFeedPageState(feed, makeController());
+      feed.setMissions([
+        makeMission({ id: 'new-1', score: 88 }),
+        makeMission({ id: 'new-2', score: 72 }),
+      ]);
+
+      page.toggleNewOnly();
+      expect(page.stableQueueActive).toBe(true);
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-1', 'new-2']);
+
+      page.handleMissionReadSignal('new-1', { type: 'started', at: 0 });
+      page.handleMissionReadSignal('new-1', { type: 'elapsed', at: 1500 });
+      vi.advanceTimersByTime(120);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      expect(page.seenIds).toContain('new-1');
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-1', 'new-2']);
+
+      page.toggleNewOnly();
+      page.toggleNewOnly();
+
+      expect(page.displayMissions.map((mission) => mission.id)).toEqual(['new-2']);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('opens frozen arrival previews without changing normal feed membership', async () => {
+    const feed = createFeedStore();
+    const pending = [
+      makeMission({ id: 'pending-1', score: 91 }),
+      makeMission({ id: 'pending-2', score: 86 }),
+      makeMission({ id: 'pending-3', score: 82 }),
+      makeMission({ id: 'pending-4', score: 78 }),
+    ];
+    const page = createFeedPageState(feed, makeController(new Set(['hiway']), pending));
+    feed.setMissions([makeMission({ id: 'current-1' })]);
+    await page.bootstrapArrivalActor();
+    page.receiveAlarmMissions(pending);
+
+    expect(page.arrivalStackState.value).toBe('collapsed');
+    page.openArrivalStack();
+
+    expect(page.arrivalStackState.value).toBe('open');
+    expect(page.arrivalPreviewMissions.map((mission) => mission.id)).toEqual([
+      'pending-1',
+      'pending-2',
+      'pending-3',
+    ]);
+    expect(page.displayMissions.map((mission) => mission.id)).toEqual(['current-1']);
+  });
+
+  it('hides pending arrivals until the Feed projection is loaded-compatible', async () => {
+    const feed = createFeedStore();
+    const pending = [makeMission({ id: 'pending-1', score: 91 })];
+    const page = createFeedPageState(feed, makeController(new Set(['hiway']), pending));
+    feed.setMissions([makeMission({ id: 'current-1' })]);
+    await page.bootstrapArrivalActor();
+    page.receiveAlarmMissions(pending);
+
+    expect(page.feedPresentation).toEqual({
+      value: 'loaded',
+      primaryAction: 'start',
+      actionEnabled: true,
+      arrivalCompatible: true,
+    });
+    expect(page.arrivalStackVisible).toBe(true);
+
+    feed.setError('Scan interrompu');
+
+    expect(page.feedPresentation).toEqual({
+      value: 'error',
+      primaryAction: 'retry',
+      actionEnabled: true,
+      arrivalCompatible: false,
+    });
+    expect(page.arrivalStackVisible).toBe(false);
+  });
+
+  it('applies one exact base-plus-arrivals replacement after Core validation', async () => {
+    const feed = createFeedStore();
+    const pending = [makeMission({ id: 'pending-1', score: 91 })];
+    const controller = makeController(new Set(['hiway']), pending);
+    feed.setMissions([makeMission({ id: 'current-1' })]);
+    const page = createFeedPageState(feed, controller);
+    await page.bootstrapArrivalActor();
+    page.receiveAlarmMissions(pending);
+
+    await page.refreshArrivals();
+
+    expect(controller.loadArrivalProjection).toHaveBeenCalledTimes(1);
+    expect(controller.loadArrivalProjection).toHaveBeenCalledWith(['current-1', 'pending-1']);
+    expect(feed.missions.map((mission) => mission.id)).toEqual(['current-1', 'pending-1']);
+    expect(page.arrivalStackState.value).toBe('empty');
+  });
+
+  it('rejects an incomplete canonical candidate without changing the Feed', async () => {
+    const feed = createFeedStore();
+    const pending = [makeMission({ id: 'pending-1', score: 91 })];
+    const controller = makeController(new Set(['hiway']), pending);
+    feed.setMissions([makeMission({ id: 'current-1' })]);
+    vi.mocked(controller.loadArrivalProjection).mockResolvedValue({
+      missions: [makeMission({ id: 'current-1' })],
+      orderedUnseenIds: [],
+    });
+    const page = createFeedPageState(feed, controller);
+    await page.bootstrapArrivalActor();
+    page.receiveAlarmMissions(pending);
+
+    await page.refreshArrivals();
+
+    expect(feed.missions.map((mission) => mission.id)).toEqual(['current-1']);
+    expect(page.arrivalStackState.value).toBe('refresh-error');
+  });
+
+  it('does not silently consume arrivals when preparation fails before the indivisible commit', async () => {
+    const feed = createFeedStore();
+    const pending = [makeMission({ id: 'pending-1', score: 91 })];
+    const controller = makeController(new Set(['hiway']), pending);
+    feed.setMissions([makeMission({ id: 'current-1' })]);
+    vi.mocked(controller.loadArrivalProjection).mockRejectedValue(
+      new Error('canonical catalogue unavailable')
+    );
+    const page = createFeedPageState(feed, controller);
+    await page.bootstrapArrivalActor();
+    page.receiveAlarmMissions(pending);
+
+    await page.refreshArrivals();
+
+    expect(feed.missions.map((mission) => mission.id)).toEqual(['current-1']);
+    expect(page.arrivalStackState.value).toBe('refresh-error');
+    expect(page.arrivalStackCount).toBe(1);
   });
 
   it('applies decision presets for business-oriented feed filtering', () => {

@@ -11,10 +11,12 @@ a pure function; the shell reads the flag value and applies the effect.
 
 ## Goal
 
-Deactivate **all** premium functionality in the extension today (everything
-unlocked, no paywall), while keeping the premium code intact behind a feature
-flag so it can be re-enabled later via feature flipping. For development, every
-surface must remain testable — including the dormant and active states.
+Deactivate the legacy local page paywall today while keeping its navigation
+code testable behind a feature flag. The on-device Gemini Nano kit is a free,
+local capability in every flag state. The remote Eve Copilot is a separate
+product boundary: only its server entitlement and build-time rollout authorize
+remote jobs; neither `premium_enabled` nor `premium_feature_enabled` is an
+authority for Eve.
 
 ## Flag states
 
@@ -52,15 +54,16 @@ decide whether premium pages/features are reachable.
 
 ## Surfaces affected
 
-| Surface                           | Location                       | Dormant behaviour            | Active behaviour                                   |
-| --------------------------------- | ------------------------------ | ---------------------------- | -------------------------------------------------- |
-| Nav lock indicator                | `sidepanel/App.svelte`         | Never shown                  | Shown for cv/applications/tjm when free user       |
-| Page lock screen                  | `sidepanel/App.svelte`         | Never shown                  | Shown when navigating to a gated page as free user |
-| cv / applications / tjm pages     | `sidepanel/App.svelte`         | Rendered (accessible)        | Rendered only when `canAccessPremium`              |
-| Premium page preload              | `sidepanel/App.svelte`         | Preloaded (accessible)       | Preloaded only when `canAccessPremium`             |
-| Kit generation (`GENERATE_ASSET`) | `background/index.ts`          | Allowed (no gate)            | Returns `PREMIUM_REQUIRED` when free user          |
-| Settings "Plan" display           | `ui/pages/SettingsPage.svelte` | Hidden / "Premium désactivé" | Shows "Premium local actif" / "Gratuit local"      |
-| Dev generation stub               | `dev/chrome-stubs.ts`          | Returns mock asset (no gate) | Respects gate (returns `PREMIUM_REQUIRED` if free) |
+| Surface                       | Location                       | Dormant behaviour            | Active behaviour                                   |
+| ----------------------------- | ------------------------------ | ---------------------------- | -------------------------------------------------- |
+| Nav lock indicator            | `sidepanel/App.svelte`         | Never shown                  | Shown for cv/applications/tjm when free user       |
+| Page lock screen              | `sidepanel/App.svelte`         | Never shown                  | Shown when navigating to a gated page as free user |
+| cv / applications / tjm pages | `sidepanel/App.svelte`         | Rendered (accessible)        | Rendered only when `canAccessPremium`              |
+| Premium page preload          | `sidepanel/App.svelte`         | Preloaded (accessible)       | Preloaded only when `canAccessPremium`             |
+| Local kit (`GENERATE_ASSET`)  | `background/index.ts`          | Allowed, no cloud send       | Allowed, no cloud send                             |
+| Settings "Plan" display       | `ui/pages/SettingsPage.svelte` | Hidden / "Premium désactivé" | Shows "Premium local actif" / "Gratuit local"      |
+| Dev generation stub           | `dev/chrome-stubs.ts`          | Returns mock local asset     | Returns mock local asset                           |
+| Remote Eve Copilot            | `shell/copilot/`               | Server entitlement only      | Server entitlement only                            |
 
 ## Runtime flag value — where it comes from
 
@@ -102,6 +105,10 @@ premium-unlocked (active + premium), and the paywall/lock UI (active + free).
 6. The existing premium infrastructure (store, facade, bridge messages, SW
    handlers) is preserved unchanged — only the **gating sites** consult the
    flag. This keeps feature flipping ready for later re-enablement.
+7. `GENERATE_ASSET` and its dev stub never read either legacy premium boolean;
+   the local kit stays free and does not send candidate content to a backend.
+8. Eve job creation never reads either legacy premium boolean. It requires the
+   fail-closed Copilot rollout plus a fresh canonical server entitlement.
 
 ## Out of scope (deferred)
 

@@ -2,7 +2,10 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { resolve, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { parse as parseYaml } from 'yaml';
 import { isValidSemver } from '../../../scripts/bump-version.ts';
+import { jcsCanonicalize } from '../../../scripts/canonical-artifact.ts';
+import { RELEASE_HOST_GATE_PLAN_V1 } from '../../../scripts/release-runtime/host-gate-plan.ts';
 import { validateSchema, validateVersionConsistency } from '../../../scripts/verify-manifest.ts';
 
 /**
@@ -30,6 +33,55 @@ const WORKSPACE_ROOT = resolve(EXTENSION_ROOT, '..', '..');
 const MANIFEST_PATH = resolve(EXTENSION_ROOT, 'src/manifest.json');
 const PACKAGE_JSON_PATH = resolve(EXTENSION_ROOT, 'package.json');
 const ROOT_PACKAGE_JSON_PATH = resolve(WORKSPACE_ROOT, 'package.json');
+const RELEASE_WORKFLOW_PATH = resolve(WORKSPACE_ROOT, '.github/workflows/release.yml');
+const CI_WORKFLOW_PATH = resolve(WORKSPACE_ROOT, '.github/workflows/ci.yml');
+
+type ReleaseWorkflowStep = {
+  name?: string;
+  run?: string;
+  env?: Record<string, string>;
+};
+
+type DeployPreflightModule = {
+  createManifestValidationCommand?: (expectedVersion: string) => {
+    command: string;
+    args: string[];
+  };
+  evaluateRuntimeEnvironment?: (
+    environment: Record<string, string | undefined>,
+    mode: 'production' | 'inspection'
+  ) => {
+    missing: string[];
+    exitCode: 0 | 1;
+  };
+};
+
+const isRecord = (value: unknown): value is Record<string, unknown> =>
+  typeof value === 'object' && value !== null;
+
+const readReleaseWorkflowSteps = (): ReleaseWorkflowStep[] => {
+  const workflow: unknown = parseYaml(readFileSync(RELEASE_WORKFLOW_PATH, 'utf-8'));
+  if (!isRecord(workflow) || !isRecord(workflow.jobs)) {
+    throw new Error('release.yml must define jobs');
+  }
+
+  const buildJob = workflow.jobs['package-validated'];
+  if (!isRecord(buildJob) || !Array.isArray(buildJob.steps)) {
+    throw new Error('release.yml must define package-validated steps');
+  }
+
+  return buildJob.steps.filter(isRecord).map((step) => ({
+    name: typeof step.name === 'string' ? step.name : undefined,
+    run: typeof step.run === 'string' ? step.run : undefined,
+    env:
+      isRecord(step.env) && Object.values(step.env).every((value) => typeof value === 'string')
+        ? (step.env as Record<string, string>)
+        : undefined,
+  }));
+};
+
+const loadDeployPreflight = async (): Promise<DeployPreflightModule> =>
+  (await import('../../../../../scripts/deploy-preflight.mjs')) as DeployPreflightModule;
 
 describe('Release validation — actual project files', () => {
   /**
@@ -191,5 +243,229 @@ describe('Release validation — actual project files', () => {
     for (const key of disallowedKeys) {
       expect(manifest).not.toHaveProperty(key);
     }
+  });
+});
+
+describe('Release validation — fail-closed artifact contracts', () => {
+  it('consumes an archived seal and calls only direct absolute package runners afterward', () => {
+    const steps = readReleaseWorkflowSteps();
+    const downloadIndex = steps.findIndex(
+      (step) => step.name === 'Download sealed candidate evidence'
+    );
+    const packageStep = steps.find((step) => step.name === 'Package the sealed dist');
+
+    expect(downloadIndex).toBeGreaterThan(0);
+    expect(packageStep?.run).toContain('$GITHUB_WORKSPACE/node_modules/.bin/tsx');
+    expect(packageStep?.run).toContain(
+      '$GITHUB_WORKSPACE/apps/extension/scripts/package-sealed-dist.ts'
+    );
+    expect(packageStep?.run).toContain(
+      '--seal "$GITHUB_WORKSPACE/release-input/tested-dist-seal.json"'
+    );
+    expect(packageStep?.run).toContain('--dist "$GITHUB_WORKSPACE/release-input/dist"');
+    expect(packageStep?.run).not.toContain('pnpm --filter');
+    for (const step of steps.slice(downloadIndex + 1)) {
+      expect(step.run ?? '').not.toMatch(/\b(?:install|build|bump-version)\b/);
+    }
+  });
+
+  it('pins one exact Node, pnpm and Python helper contract everywhere evidence moves', () => {
+    const ci = readFileSync(CI_WORKFLOW_PATH, 'utf8');
+    const release = readFileSync(RELEASE_WORKFLOW_PATH, 'utf8');
+    const model = readFileSync(
+      resolve(EXTENSION_ROOT, 'src/models/release-readiness.model.md'),
+      'utf8'
+    );
+    const canonicalRuntime = readFileSync(
+      resolve(EXTENSION_ROOT, 'scripts/canonical-artifact.ts'),
+      'utf8'
+    );
+    const packageRuntime = readFileSync(
+      resolve(EXTENSION_ROOT, 'scripts/package-sealed-dist.ts'),
+      'utf8'
+    );
+    const rootPackage = JSON.parse(readFileSync(ROOT_PACKAGE_JSON_PATH, 'utf8')) as {
+      packageManager?: string;
+      engines?: Record<string, string>;
+    };
+
+    for (const content of [ci, release, model]) {
+      expect(content).toContain('22.23.1');
+      expect(content).toContain('10.32.1');
+      expect(content).toContain('3.14.5');
+    }
+    expect(ci).not.toMatch(/NODE_VERSION:\s*['"]22['"]/);
+    expect(release).not.toMatch(/NODE_VERSION:\s*['"]22['"]/);
+    expect(rootPackage.packageManager).toBe(
+      'pnpm@10.32.1+sha512.a706938f0e89ac1456b6563eab4edf1d1faf3368d1191fc5c59790e96dc918e4456ab2e67d613de1043d2e8c81f87303e6b40d4ffeca9df15ef1ad567348f2be'
+    );
+    expect(rootPackage.engines).toEqual({ node: '22.23.1', pnpm: '10.32.1' });
+    expect(canonicalRuntime).toContain('missionpulse.descriptor-scanner.v1');
+    expect(packageRuntime).toContain('missionpulse.safe-extraction.v1');
+    expect(packageRuntime).toContain('missionpulse.atomic-rename-no-replace.v1');
+    expect(packageRuntime).not.toContain('/usr/bin/python3');
+  });
+
+  it('builds and seals the candidate in one clean CI job with exact structured MV3 evidence', () => {
+    const workflow: unknown = parseYaml(readFileSync(CI_WORKFLOW_PATH, 'utf8'));
+    if (!isRecord(workflow) || !isRecord(workflow.jobs)) {
+      throw new Error('CI jobs missing');
+    }
+    const sealJob = workflow.jobs['seal-candidate'];
+    expect(sealJob).toBeTypeOf('object');
+    if (!isRecord(sealJob) || !Array.isArray(sealJob.steps)) {
+      return;
+    }
+    const steps = sealJob.steps.filter(isRecord) as Array<Record<string, unknown>>;
+    const runs = steps
+      .map((step) => (typeof step.run === 'string' ? step.run : ''))
+      .filter(Boolean)
+      .join('\n');
+
+    expect(runs).toContain('pnpm install --frozen-lockfile');
+    expect(runs).toContain('build-sealed-candidate-transport.ts');
+    expect(RELEASE_HOST_GATE_PLAN_V1.map(({ id }) => id)).toEqual([
+      'format',
+      'lint',
+      'typecheck',
+      'unit',
+      'verify-source-manifest',
+      'build-ui',
+      'build-extension',
+      'verify-built-manifest-before-mv3',
+      'playwright-packaged-mv3',
+      'verify-built-manifest-after-mv3',
+    ]);
+    expect(RELEASE_HOST_GATE_PLAN_V1.filter(({ producesDist }) => producesDist)).toEqual([
+      expect.objectContaining({ id: 'build-extension' }),
+    ]);
+    expect(RELEASE_HOST_GATE_PLAN_V1[8]?.args).toContain('--reporter=json');
+    expect(runs).not.toContain('test:mv3');
+
+    const upload = steps.find(
+      (step) => step.uses === 'actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a'
+    );
+    expect(upload).toMatchObject({
+      with: {
+        name: 'missionpulse-sealed-candidate',
+        archive: false,
+        overwrite: false,
+      },
+    });
+    expect(jcsCanonicalize((upload as { with: Record<string, unknown> }).with.path)).toBe(
+      '"${{ steps.build.outputs.transport-path }}"'
+    );
+  });
+
+  it('binds every packaged MV3 test to exactly one committed scenario ID annotation', () => {
+    const inventory = JSON.parse(
+      readFileSync(resolve(EXTENSION_ROOT, 'tests/mv3/scenarios.v1.json'), 'utf8')
+    ) as { scenarioIds: string[] };
+    const testSources = [
+      resolve(EXTENSION_ROOT, 'tests/mv3/harness-adversarial.test.ts'),
+      resolve(EXTENSION_ROOT, 'tests/e2e-extension/navigation.test.ts'),
+      resolve(EXTENSION_ROOT, 'tests/e2e-extension/runtime.test.ts'),
+    ].map((path) => readFileSync(path, 'utf8'));
+    const annotations = testSources.flatMap((source) =>
+      [...source.matchAll(/type:\s*['"]scenario-id['"],\s*description:\s*['"]([^'"]+)['"]/g)].map(
+        (match) => match[1]
+      )
+    );
+
+    expect(annotations.sort()).toEqual([...inventory.scenarioIds].sort());
+    expect(new Set(annotations).size).toBe(inventory.scenarioIds.length);
+  });
+
+  it('has no ad hoc ZIP, version bump, provider publication, canary or production claim', () => {
+    const releaseWorkflow = readFileSync(RELEASE_WORKFLOW_PATH, 'utf8');
+    const ciWorkflow = readFileSync(CI_WORKFLOW_PATH, 'utf8');
+
+    expect(releaseWorkflow).not.toMatch(/(?:^|\n)\s*zip\s+/i);
+    expect(ciWorkflow).not.toMatch(/(?:^|\n)\s*zip\s+/i);
+    expect(releaseWorkflow).not.toContain('bump-version');
+    expect(releaseWorkflow).not.toContain('chrome-extension-upload');
+    expect(releaseWorkflow).not.toContain('publish-to-chrome-store');
+    expect(releaseWorkflow).not.toMatch(/canary|production_promotion|published to chrome/i);
+  });
+
+  it('re-verifies the downloaded package at a separate consumer boundary', () => {
+    const workflow: unknown = parseYaml(readFileSync(RELEASE_WORKFLOW_PATH, 'utf8'));
+    expect(workflow).toMatchObject({
+      permissions: { actions: 'read', contents: 'read' },
+      jobs: {
+        'consumer-verify': expect.any(Object),
+        'package-validated': expect.any(Object),
+      },
+    });
+    expect(readFileSync(RELEASE_WORKFLOW_PATH, 'utf8')).toContain(
+      '$GITHUB_WORKSPACE/apps/extension/scripts/verify-release-artifact.ts'
+    );
+  });
+
+  it('verifies the requested CI run is a successful seal-candidate source before download', () => {
+    const release = readFileSync(RELEASE_WORKFLOW_PATH, 'utf8');
+    expect(release).toContain('actions/github-script@');
+    expect(release).toContain('evidence_run_id');
+    expect(release).toContain('.github/workflows/ci.yml');
+    expect(release).toContain("conclusion !== 'success'");
+    expect(release).not.toMatch(/(?:^|\s)<commit>(?:\s|$)/);
+  });
+
+  it('builds the deploy preflight manifest command from exact structured metadata', async () => {
+    const { createManifestValidationCommand } = await loadDeployPreflight();
+
+    expect(createManifestValidationCommand).toBeTypeOf('function');
+    if (typeof createManifestValidationCommand !== 'function') {
+      return;
+    }
+
+    expect(createManifestValidationCommand('1.2.3')).toEqual({
+      command: 'pnpm',
+      args: [
+        '--filter',
+        '@pulse/extension',
+        'verify-manifest',
+        'dist/manifest.json',
+        '--post-build',
+        '--expected-version',
+        '1.2.3',
+      ],
+    });
+  });
+
+  it('accumulates every missing required variable and fails production preflight', async () => {
+    const { evaluateRuntimeEnvironment } = await loadDeployPreflight();
+
+    expect(evaluateRuntimeEnvironment).toBeTypeOf('function');
+    if (typeof evaluateRuntimeEnvironment !== 'function') {
+      return;
+    }
+
+    expect(evaluateRuntimeEnvironment({}, 'production')).toEqual({
+      missing: [
+        'landing: PUBLIC_SUPABASE_URL',
+        'landing: PUBLIC_SUPABASE_ANON_KEY',
+        'landing: PUBLIC_LANDING_URL',
+        'landing: SUPABASE_SERVICE_ROLE_KEY',
+        'dashboard: PUBLIC_SUPABASE_URL',
+        'dashboard: PUBLIC_SUPABASE_ANON_KEY',
+        'dashboard: PUBLIC_LANDING_URL',
+      ],
+      exitCode: 1,
+    });
+  });
+
+  it('keeps missing required variables non-blocking only in explicit inspection mode', async () => {
+    const { evaluateRuntimeEnvironment } = await loadDeployPreflight();
+
+    expect(evaluateRuntimeEnvironment).toBeTypeOf('function');
+    if (typeof evaluateRuntimeEnvironment !== 'function') {
+      return;
+    }
+
+    expect(evaluateRuntimeEnvironment({}, 'inspection')).toMatchObject({
+      missing: expect.any(Array),
+      exitCode: 0,
+    });
   });
 });

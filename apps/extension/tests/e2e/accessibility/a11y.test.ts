@@ -82,27 +82,22 @@ test.describe('Accessibility', () => {
     const cardCount = await cards.count();
     expect(cardCount).toBeGreaterThanOrEqual(5);
 
-    // Naviguer vers la première carte avec Tab
-    // Le nombre de tabs dépend de l'ordre des éléments dans le DOM
-    for (let i = 0; i < 5; i++) {
-      await page.keyboard.press('Tab');
-    }
+    // La carte reste un conteneur sémantique non interactif. Son action de
+    // divulgation explicite doit, elle, être accessible au clavier.
+    const firstCard = cards.first();
+    await expect(firstCard).not.toHaveAttribute('tabindex', /.+/);
 
-    // Une carte ou un de ses boutons doit être focusé
-    const focusedElement = page.locator(':focus');
-    const isCardOrButton = await focusedElement.evaluate(
-      (el) =>
-        el.getAttribute('role') === 'button' ||
-        el.tagName === 'BUTTON' ||
-        el.closest('[role="button"]') !== null
-    );
-    expect(isCardOrButton).toBe(true);
-
-    // Vérifier que l'élément focusé est visible
-    await expect(focusedElement).toBeVisible();
-
-    // Enter pour activer l'élément focusé (ouvre le lien externe)
+    const detailsButton = firstCard.getByRole('button', {
+      name: /Afficher les détails de la mission/,
+    });
+    await detailsButton.focus();
+    await expect(detailsButton).toBeFocused();
     await page.keyboard.press('Enter');
+
+    await expect(
+      firstCard.getByRole('button', { name: /Masquer les détails de la mission/ })
+    ).toHaveAttribute('aria-expanded', 'true');
+    await expect(firstCard.getByRole('region', { name: /Détails de la mission/ })).toBeVisible();
   });
 
   test('ARIA labels on action buttons', async ({ page }) => {

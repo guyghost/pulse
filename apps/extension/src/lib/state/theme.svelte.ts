@@ -1,6 +1,6 @@
 import type { ThemePreference } from '$lib/core/types/app-settings';
-import { getSettings, setSettings } from '$lib/shell/facades/settings.facade';
-import { subscribeMessages } from '$lib/shell/messaging/bridge';
+import { getSettings, setSettingsConfirmed } from '$lib/shell/facades/settings.facade';
+import { subscribeSettingsReleaseSnapshots } from '$lib/shell/facades/settings-release.facade';
 
 function getSystemTheme(): 'light' | 'dark' {
   return window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light';
@@ -46,31 +46,22 @@ export function createThemeStore() {
       }
     });
 
-    subscribeMessages((message) => {
-      if (message.type === 'SETTINGS_UPDATED' && message.payload.theme !== preference) {
-        preference = message.payload.theme;
-        sync();
-      }
-    });
-
-    // Cross-module sync for dev mode (no chrome.storage events)
-    window.addEventListener('mp:theme-changed', (e) => {
-      const next = (e as CustomEvent).detail as ThemePreference;
-      if (next && next !== preference) {
-        preference = next;
+    subscribeSettingsReleaseSnapshots((snapshot) => {
+      if (snapshot.settings.theme !== preference) {
+        preference = snapshot.settings.theme;
         sync();
       }
     });
   }
 
   async function setTheme(next: ThemePreference) {
-    preference = next;
-    sync();
     try {
       const settings = await getSettings();
-      await setSettings({ ...settings, theme: next });
+      const confirmed = await setSettingsConfirmed({ ...settings, theme: next });
+      preference = confirmed.theme;
+      sync();
     } catch {
-      // Outside extension context
+      // Keep the last confirmed projection when the mutation is not committed.
     }
   }
 

@@ -1,0 +1,11 @@
+{
+  "schema": "missionpulse.connector-catalogue-history-predecessor-receipt",
+  "version": 1,
+  "authorityStatus": "approved",
+  "predecessorJcsSha256": "1033ecb4dd9e23ca70a0ebae009663ab2196397526b6a7cce8333653f80be0b9",
+  "predecessor": {
+    "schema": "missionpulse.connector-catalogue-history",
+    "version": 1,
+    "catalogues": []
+  }
+}

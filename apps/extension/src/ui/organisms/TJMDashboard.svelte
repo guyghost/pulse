@@ -42,7 +42,7 @@
   const levels: Array<{
     key: 'junior' | 'confirmed' | 'senior';
     label: string;
-    icon: string;
+    icon: IconName;
   }> = [
     { key: 'junior', label: 'Junior', icon: 'zap' },
     { key: 'confirmed', label: 'Confirmé', icon: 'shield' },
@@ -359,7 +359,7 @@
 
     <!-- Level cards -->
     <div class="space-y-3">
-      {#each levels as level}
+      {#each levels as level (level)}
         {@const range = analysis[level.key]}
         {@const isSelected = userSeniority === level.key}
         <div
@@ -408,7 +408,7 @@
           Stacks suivies
         </p>
         <div class="space-y-3">
-          {#each analysis.topStacks as stack}
+          {#each analysis.topStacks as stack, i (i)}
             {@const maxAverage = Math.max(...analysis.topStacks.map((item) => item.average), 1)}
             {@const barWidth = Math.max(8, Math.round((stack.average / maxAverage) * 100))}
             <div>
@@ -442,19 +442,19 @@
 
     <!-- Region insights -->
     {#if analysis.regionInsights && analysis.regionInsights.length > 0}
-      <div class="section-card rounded-xl p-5">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
+      <section class="section-card rounded-xl p-5" aria-label="TJM par région">
+        <h3 class="mb-4 text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
           TJM par région
-        </p>
-        <div class="space-y-3">
-          {#each analysis.regionInsights.slice(0, 8) as region}
+        </h3>
+        <ul class="space-y-3" aria-label="Régions analysées">
+          {#each analysis.regionInsights.slice(0, 8) as region, i (i)}
             {@const barWidth = Math.max(
               15,
               Math.round((region.average / (analysis.regionInsights[0]?.average || 1)) * 100)
             )}
-            <div>
+            <li>
               <div class="flex items-center justify-between">
-                <span class="truncate text-xs text-text-primary">{region.label}</span>
+                <h4 class="truncate text-xs text-text-primary">{region.label}</h4>
                 <div class="flex shrink-0 items-center gap-2 pl-3">
                   <span class="text-[10px] font-mono text-text-muted"
                     >{region.min}–{region.max}€</span
@@ -475,10 +475,10 @@
                   style:width="{barWidth}%"
                 ></div>
               </div>
-            </div>
+            </li>
           {/each}
-        </div>
-      </div>
+        </ul>
+      </section>
     {/if}
   {:else}
     <div class="space-y-3">
@@ -512,7 +512,7 @@
         </div>
 
         <div class="mt-4 space-y-2">
-          {#each tjmSetupSteps as step, index}
+          {#each tjmSetupSteps as step, index (index)}
             <button
               type="button"
               class="group flex w-full items-start gap-3 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/20 hover:bg-surface-white disabled:cursor-not-allowed disabled:opacity-60"

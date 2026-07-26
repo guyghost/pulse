@@ -1,4 +1,30 @@
 {
+  "$schema": "https://openapi.vercel.sh/vercel.json",
+  "experimentalServices": {
+    "web": {
+      "entrypoint": ".",
+      "framework": "sveltekit",
+      "routePrefix": "/"
+    },
+    "eve": {
+      "buildCommand": "eve build",
+      "entrypoint": ".",
+      "framework": "eve",
+      "routePrefix": "/_eve_internal/eve"
+    }
+  },
+  "crons": [
+    {
+      "path": "/api/internal/copilot/receipt-maintenance",
+      "schedule": "17 3 * * *"
+    }
+  ],
+  "rewrites": [
+    {
+      "source": "/eve/v1/:path*",
+      "destination": "/_eve_internal/eve/eve/v1/:path*"
+    }
+  ],
   "headers": [
     {
       "source": "/(.*)",

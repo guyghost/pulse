@@ -1,5 +1,6 @@
 import { BaseConnector } from './base.connector';
 import type { Mission, MissionSource } from '../../core/types/mission';
+import type { ConnectorSearchContext } from '../../core/connectors/search-context';
 import { parseGenericHTML } from '../../core/connectors/generic-parser';
 import { type Result, type AppError, ok, err, createConnectorError } from '$lib/core/errors';
 
@@ -77,9 +78,13 @@ export class GenericConnector extends BaseConnector {
     }
   }
 
-  async fetchMissions(now: number): Promise<Result<Mission[], AppError>> {
+  async fetchMissions(
+    now: number,
+    _context?: ConnectorSearchContext,
+    signal?: AbortSignal
+  ): Promise<Result<Mission[], AppError>> {
     try {
-      const result = await this.fetchHTML(this.missionsUrl, now);
+      const result = await this.fetchHTML(this.missionsUrl, now, signal);
 
       if (!result.ok) {
         return err(

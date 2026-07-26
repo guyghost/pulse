@@ -53,7 +53,7 @@
 
     <div class="mt-4 flex items-center justify-between gap-3">
       <div class="flex items-center gap-1.5">
-        {#each Array(totalSteps) as _, index}
+        {#each Array(totalSteps) as _, index (index)}
           <span
             class="h-1.5 rounded-full transition-all duration-200 {index === stepIndex
               ? 'w-6 bg-blueprint-blue'
@@ -62,7 +62,7 @@
         {/each}
       </div>
       <button
-        class="inline-flex items-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/88 px-4 py-2 text-xs font-semibold text-surface-white transition-all duration-200 hover:brightness-105"
+        class="inline-flex items-center gap-2 rounded-lg border border-blueprint-blue-strong/25 bg-blueprint-blue-strong/88 px-4 py-2 text-xs font-semibold text-white transition-all duration-200 hover:brightness-105"
         onclick={onNext}
       >
         {stepIndex + 1 === totalSteps ? 'Terminer' : 'Suivant'}

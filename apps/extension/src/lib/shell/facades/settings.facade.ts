@@ -7,20 +7,25 @@
 import type { UserProfile } from '$lib/core/types/profile';
 import type { AppSettings } from '$lib/core/types/app-settings';
 import { sendMessage } from '$lib/shell/messaging/bridge';
+import {
+  getSettingsReleaseSnapshot,
+  saveSettingsRelease,
+} from '$lib/shell/facades/settings-release.facade';
 
 export async function getSettings(): Promise<AppSettings> {
-  const response = await sendMessage({ type: 'GET_SETTINGS' });
-  if (response.type !== 'SETTINGS_RESULT') {
-    throw new Error('Settings load failed.');
-  }
-  return response.payload;
+  return (await getSettingsReleaseSnapshot()).settings;
 }
 
 export async function setSettings(settings: AppSettings): Promise<void> {
-  const response = await sendMessage({ type: 'SAVE_SETTINGS', payload: settings });
-  if (response.type !== 'SETTINGS_SAVED' || !response.payload.saved) {
-    throw new Error('Settings save failed.');
+  try {
+    await saveSettingsRelease(settings);
+  } catch (error) {
+    throw new Error('Settings save was not committed.', { cause: error });
   }
+}
+
+export async function setSettingsConfirmed(settings: AppSettings): Promise<AppSettings> {
+  return structuredClone((await saveSettingsRelease(settings)).settings);
 }
 
 export async function getProfile(): Promise<UserProfile | null> {

@@ -14,6 +14,7 @@
   } from '$lib/shell/facades/alert-preferences.facade';
   import { showToast } from '$lib/shell/notifications/toast-service';
   import { withProfileDefaults } from '$lib/core/profile/normalize-profile';
+  import { getConnectorsMeta } from '$lib/shell/connectors/meta';
 
   const { onComplete, onSkip }: { onComplete?: () => void; onSkip?: () => void } = $props();
 
@@ -34,6 +35,7 @@
   // a local draft and forwarded to the profile store so partial data is not
   // silently dropped between steps (B-1).
   let profileDraft = $state<UserProfile>(withProfileDefaults({}));
+  const sources = getConnectorsMeta().map(({ id, name }) => ({ id, name }));
 
   (async () => {
     alertPreferences = await getAlertPreferences();
@@ -104,6 +106,7 @@
 
 {#snippet wizardContent()}
   <OnboardingWizard
+    {sources}
     onComplete={handleComplete}
     {onSkip}
     onUpdateProfile={handleUpdateProfile}

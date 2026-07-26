@@ -75,14 +75,14 @@
 
 <div class="flex flex-col gap-3 overflow-y-auto">
   {#if isLoading && sortedMissions.length === 0}
-    {#each Array(3) as _}
+    {#each Array(3) as _, i (i)}
       <div class="section-card rounded-xl p-4 space-y-3">
         <Skeleton width="58%" height="1.15rem" />
         <Skeleton width="34%" height="0.8rem" />
         <div class="flex gap-2">
-          <Skeleton width="3rem" height="1.25rem" rounded="full" />
-          <Skeleton width="4rem" height="1.25rem" rounded="full" />
-          <Skeleton width="3.5rem" height="1.25rem" rounded="full" />
+          <Skeleton width="3rem" height="1.25rem" variant="circle" />
+          <Skeleton width="4rem" height="1.25rem" variant="circle" />
+          <Skeleton width="3.5rem" height="1.25rem" variant="circle" />
         </div>
         <Skeleton width="100%" height="3rem" />
       </div>

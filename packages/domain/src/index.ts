@@ -104,3 +104,9 @@ export function transitionApplicationStage(
 export function canonicalizeLegacyApplicationStage(value: string): ApplicationStage | null {
   return LEGACY_STAGE_MAP[value] ?? null;
 }
+
+export * from './release-cache-policy';
+export * from './models/copilot-contracts';
+export * from './models/copilot-dossier.machine';
+export * from './models/premium-entitlement-sync.machine';
+export * from './models/remote-copilot-job.machine';

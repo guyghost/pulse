@@ -1,5 +1,38 @@
-import { describe, it, expect } from 'vitest';
-import { nextDigestTime, DIGEST_HOUR } from '../../../src/lib/shell/notifications/daily-digest';
+import { beforeEach, describe, it, expect, vi } from 'vitest';
+import {
+  nextDigestTime,
+  DIGEST_HOUR,
+  scheduleDailyDigestAlarm,
+} from '../../../src/lib/shell/notifications/daily-digest';
+
+const registeredAlarms = new Map<string, chrome.alarms.AlarmCreateInfo>();
+const alarms = {
+  create: vi.fn(async (name: string, info: chrome.alarms.AlarmCreateInfo) => {
+    registeredAlarms.set(name, info);
+  }),
+  get: vi.fn(async (name: string) => {
+    const info = registeredAlarms.get(name);
+    if (!info) {
+      return undefined;
+    }
+    return {
+      name,
+      scheduledTime: info.when ?? 0,
+      periodInMinutes: info.periodInMinutes,
+    };
+  }),
+  clear: vi.fn(async (name: string) => {
+    registeredAlarms.delete(name);
+    return true;
+  }),
+};
+
+vi.stubGlobal('chrome', { alarms });
+
+beforeEach(() => {
+  registeredAlarms.clear();
+  vi.clearAllMocks();
+});
 
 describe('nextDigestTime', () => {
   it('returns today at DIGEST_HOUR if that time has not passed yet', () => {
@@ -81,5 +114,61 @@ describe('nextDigestTime', () => {
     const resultDate = new Date(nextDigestTime(now));
     expect(resultDate.getHours()).toBe(DIGEST_HOUR);
     expect(resultDate.getDate()).toBe(1);
+  });
+});
+
+describe('scheduleDailyDigestAlarm', () => {
+  const now = new Date('2026-07-01T06:00:00');
+  const expectedWhen = new Date('2026-07-01T09:00:00').getTime();
+
+  it('attend create puis exige le read-back one-shot exact', async () => {
+    await scheduleDailyDigestAlarm(now);
+
+    expect(alarms.create).toHaveBeenCalledWith('daily-digest', { when: expectedWhen });
+    expect(alarms.get).toHaveBeenCalledWith('daily-digest');
+  });
+
+  it("n'effectue aucun read-back avant la résolution de create", async () => {
+    let finishCreate: (() => void) | undefined;
+    alarms.create.mockImplementationOnce(
+      (name: string, info: chrome.alarms.AlarmCreateInfo) =>
+        new Promise<void>((resolve) => {
+          finishCreate = () => {
+            registeredAlarms.set(name, info);
+            resolve();
+          };
+        })
+    );
+
+    const scheduling = scheduleDailyDigestAlarm(now);
+    await vi.waitFor(() => {
+      expect(finishCreate).toBeTypeOf('function');
+    });
+
+    expect(alarms.get).not.toHaveBeenCalled();
+    finishCreate?.();
+    await scheduling;
+    expect(alarms.get).toHaveBeenCalledWith('daily-digest');
+  });
+
+  it('propage un rejet create sans fabriquer de succès', async () => {
+    alarms.create.mockRejectedValueOnce(new Error('digest alarm create rejected'));
+
+    await expect(scheduleDailyDigestAlarm(now)).rejects.toThrow('digest alarm create rejected');
+
+    expect(alarms.get).not.toHaveBeenCalled();
+  });
+
+  it('rejette et nettoie un read-back différent', async () => {
+    alarms.get.mockResolvedValueOnce({
+      name: 'daily-digest',
+      scheduledTime: expectedWhen + 1,
+      periodInMinutes: undefined,
+    });
+
+    await expect(scheduleDailyDigestAlarm(now)).rejects.toMatchObject({
+      code: 'DIGEST_ALARM_READBACK_MISMATCH',
+    });
+    expect(alarms.clear).toHaveBeenCalledWith('daily-digest');
   });
 });

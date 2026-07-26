@@ -16,6 +16,9 @@
     "test:watch": "vitest",
     "typecheck": "tsc --noEmit"
   },
+  "dependencies": {
+    "xstate": "^5.32.5"
+  },
   "devDependencies": {
     "@pulse/tsconfig": "workspace:*",
     "typescript": "^5.7.0",

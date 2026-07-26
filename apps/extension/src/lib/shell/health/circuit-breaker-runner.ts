@@ -30,6 +30,11 @@ export type CircuitRunResult =
   | { status: 'executed'; result: Result<Mission[], AppError>; snapshot: ConnectorHealthSnapshot }
   | { status: 'skipped'; snapshot: ConnectorHealthSnapshot; reason: 'circuit-open' };
 
+export interface CircuitRunLifecycleObserver {
+  onRetryableFailure?(error: AppError, attempt: number): void;
+  onRetryTimerFired?(attempt: number): void;
+}
+
 // ============================================================================
 // CircuitBreakerRunner
 // ============================================================================
@@ -52,10 +57,19 @@ export async function runWithCircuitBreaker(
   now: number,
   context?: ConnectorSearchContext,
   signal?: AbortSignal,
+  lifecycle?: CircuitRunLifecycleObserver,
   thresholds: HealthThresholds = DEFAULT_HEALTH_THRESHOLDS
 ): Promise<CircuitRunResult> {
+  const throwIfAborted = (): void => {
+    if (signal?.aborted) {
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }
+  };
+
+  throwIfAborted();
   // Charger le snapshot courant (ou créer un snapshot initial si premier run)
   let snapshot = await getHealthSnapshot(connector.id, now);
+  throwIfAborted();
 
   // Vérifier si le circuit est ouvert
   if (snapshot.circuitState === 'open') {
@@ -66,7 +80,9 @@ export async function runWithCircuitBreaker(
 
     // Probe interval écoulé → passer en half-open pour tenter la sonde
     snapshot = transitionToHalfOpen(snapshot, now);
+    throwIfAborted();
     await saveHealthSnapshot(snapshot);
+    throwIfAborted();
 
     if (import.meta.env.DEV) {
       console.debug(`[CircuitBreaker] ${connector.id}: open → half-open (probe attempt)`);
@@ -76,11 +92,17 @@ export async function runWithCircuitBreaker(
   // Exécuter l'appel avec retry pour les erreurs transientes,
   // puis mesurer la latence totale pour le circuit breaker
   const startTime = performance.now();
-  const result = await withResultRetry(() => connector.fetchMissions(now, context, signal), {
-    maxAttempts: 3,
-    baseDelayMs: 1000,
-    maxDelayMs: 10_000,
-  });
+  const result = await withResultRetry(
+    () => connector.fetchMissions(now, context, signal),
+    {
+      maxAttempts: 3,
+      baseDelayMs: 1000,
+      maxDelayMs: 10_000,
+    },
+    signal,
+    lifecycle
+  );
+  throwIfAborted();
   const latencyMs = Math.round(performance.now() - startTime);
 
   // Calculer le prochain état de santé (pure function)
@@ -99,7 +121,9 @@ export async function runWithCircuitBreaker(
   }
 
   // Persister le snapshot mis à jour
+  throwIfAborted();
   await saveHealthSnapshot(nextSnapshot);
+  throwIfAborted();
 
   return { status: 'executed', result, snapshot: nextSnapshot };
 }

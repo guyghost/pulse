@@ -17,6 +17,15 @@ vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
   getSettings,
 }));
 
+vi.mock('../../../src/lib/shell/settings-release/settings-release-reader', () => ({
+  readSettingsReleaseSnapshot: vi.fn(async () => ({
+    settings: await getSettings(),
+    onboardingCompleted: true,
+    revision: 0,
+    generation: 0,
+  })),
+}));
+
 vi.mock('../../../src/lib/shell/storage/db', () => ({
   getMissions,
 }));

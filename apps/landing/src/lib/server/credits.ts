@@ -27,11 +27,12 @@ export function isPremiumProfileActive(profile: {
 
 export async function grantPremiumMonthlyCredits(
   supabase: SupabaseClient,
-  userId: string
+  userId: string,
+  now = new Date()
 ): Promise<number | null> {
   const { data, error } = await supabase.rpc('grant_premium_monthly_credits', {
     p_user_id: userId,
-    p_period: currentPremiumCreditPeriod(),
+    p_period: currentPremiumCreditPeriod(now),
     p_amount: PREMIUM_MONTHLY_CREDITS,
   });
 

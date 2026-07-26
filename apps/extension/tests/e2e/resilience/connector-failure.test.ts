@@ -1,351 +1,491 @@
 import { test, expect } from '../fixtures';
-import {
-  expectMissionCount,
-  injectMissions,
-  missionCards,
-  scanButton,
-  waitForMissions,
-  setFeedState,
-} from '../helpers';
+import type { Page } from '@playwright/test';
+import { mockConnectorFailure, scanButton } from '../helpers';
 import { generateBalancedDataset } from '../../fixtures/large-dataset';
+
+type ScanProtocolScenario =
+  | { kind: 'error'; message: string; code: string; delayMs: number }
+  | {
+      kind: 'partial-success';
+      missions: unknown[];
+      failedConnectorMessage: string;
+      completeDelayMs: number;
+    }
+  | {
+      kind: 'manual-partial-success';
+      mission: Record<string, unknown>;
+      failedConnectorMessage: string;
+    }
+  | { kind: 'retry'; mission: Record<string, unknown> };
+
+async function mockScanProtocol(page: Page, scenario: ScanProtocolScenario): Promise<void> {
+  await page.addInitScript((config: ScanProtocolScenario) => {
+    let _chrome: unknown = undefined;
+    const runtimeListeners: Array<
+      (message: unknown, sender: unknown, sendResponse: (response?: unknown) => void) => void
+    > = [];
+
+    if (config.kind === 'retry') {
+      (window as unknown as Record<string, boolean>).__shouldFail = true;
+    }
+    (window as unknown as Record<string, unknown>).__scanProtocolEmissions = [];
+    (window as unknown as Record<string, unknown>).__scanProtocolRequests = [];
+
+    function emitRuntimeMessage(message: unknown): void {
+      const emissions = (window as unknown as Record<string, unknown>)
+        .__scanProtocolEmissions as unknown[];
+      emissions.push(message);
+      for (const listener of runtimeListeners) {
+        listener(message, { id: 'e2e-connector-resilience' }, () => {});
+      }
+    }
+
+    Object.defineProperty(window, 'chrome', {
+      configurable: true,
+      enumerable: true,
+      get() {
+        return _chrome;
+      },
+      set(val) {
+        _chrome = val;
+        const chromeStub = val as {
+          runtime?: {
+            sendMessage?: (message: unknown) => Promise<unknown>;
+            onMessage?: {
+              addListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+              removeListener?: (
+                listener: (
+                  message: unknown,
+                  sender: unknown,
+                  sendResponse: (response?: unknown) => void
+                ) => void
+              ) => void;
+            };
+          };
+        };
+        if (!chromeStub.runtime?.sendMessage) {
+          return;
+        }
+
+        const originalSendMessage = chromeStub.runtime.sendMessage.bind(chromeStub.runtime);
+        const originalAddListener = chromeStub.runtime.onMessage?.addListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+        const originalRemoveListener = chromeStub.runtime.onMessage?.removeListener?.bind(
+          chromeStub.runtime.onMessage
+        );
+
+        if (chromeStub.runtime.onMessage) {
+          chromeStub.runtime.onMessage.addListener = (listener) => {
+            runtimeListeners.push(listener);
+            originalAddListener?.(listener);
+          };
+          chromeStub.runtime.onMessage.removeListener = (listener) => {
+            const index = runtimeListeners.indexOf(listener);
+            if (index >= 0) {
+              runtimeListeners.splice(index, 1);
+            }
+            originalRemoveListener?.(listener);
+          };
+        }
+
+        chromeStub.runtime.sendMessage = async (rawMessage: unknown) => {
+          const message = rawMessage as {
+            type?: string;
+            payload?: { operationId?: string };
+          };
+          if (
+            config.kind === 'manual-partial-success' &&
+            message.type === 'GET_PERSISTED_CONNECTOR_STATUSES'
+          ) {
+            const now = Date.now();
+            return {
+              type: 'PERSISTED_CONNECTOR_STATUSES_RESULT',
+              payload: [
+                {
+                  connectorId: 'free-work',
+                  connectorName: 'Free-Work',
+                  lastState: 'done',
+                  missionsCount: 1,
+                  error: null,
+                  lastSyncAt: now,
+                  lastSuccessAt: now,
+                },
+              ],
+            };
+          }
+          if (message.type !== 'SCAN_START' || !message.payload?.operationId) {
+            return originalSendMessage(rawMessage);
+          }
+
+          const operationId = message.payload.operationId;
+          const requests = (window as unknown as Record<string, unknown>)
+            .__scanProtocolRequests as unknown[];
+          requests.push(rawMessage);
+
+          if (config.kind === 'error') {
+            window.setTimeout(() => {
+              emitRuntimeMessage({
+                type: 'SCAN_ERROR',
+                payload: { operationId, message: config.message, code: config.code },
+              });
+            }, config.delayMs);
+          } else if (
+            config.kind === 'retry' &&
+            (window as unknown as Record<string, boolean>).__shouldFail
+          ) {
+            window.setTimeout(() => {
+              emitRuntimeMessage({
+                type: 'SCAN_ERROR',
+                payload: {
+                  operationId,
+                  message: 'Temporary error',
+                  code: 'TEMP_ERROR',
+                },
+              });
+            }, 100);
+          } else {
+            const missions = config.kind === 'partial-success' ? config.missions : [config.mission];
+
+            if (config.kind === 'partial-success' || config.kind === 'manual-partial-success') {
+              window.setTimeout(
+                () => {
+                  emitRuntimeMessage({
+                    type: 'SCAN_PROGRESS',
+                    payload: {
+                      operationId,
+                      phase: 'scanning',
+                      current: config.kind === 'manual-partial-success' ? 2 : 3,
+                      total: config.kind === 'manual-partial-success' ? 2 : 3,
+                      connectorProgress: [
+                        {
+                          connectorId: 'free-work',
+                          connectorName: 'Free-Work',
+                          state: 'done',
+                          missionsCount: missions.length,
+                          error: null,
+                          retryCount: 0,
+                        },
+                        {
+                          connectorId: 'lehibou',
+                          connectorName: 'LeHibou',
+                          state: 'error',
+                          missionsCount: 0,
+                          error: {
+                            type: 'connector',
+                            message: config.failedConnectorMessage,
+                            recoverable: true,
+                            timestamp: 1,
+                            connectorId: 'lehibou',
+                            phase: 'fetch',
+                          },
+                          retryCount: 3,
+                        },
+                        ...(config.kind === 'partial-success'
+                          ? [
+                              {
+                                connectorId: 'hiway',
+                                connectorName: 'Hiway',
+                                state: 'error',
+                                missionsCount: 0,
+                                error: {
+                                  type: 'network',
+                                  message: 'Hiway timeout during partial scan',
+                                  recoverable: true,
+                                  timestamp: 1,
+                                  retryable: true,
+                                },
+                                retryCount: 3,
+                              },
+                            ]
+                          : []),
+                      ],
+                    },
+                  });
+                },
+                config.kind === 'manual-partial-success' ? 50 : 800
+              );
+            }
+
+            window.setTimeout(() => {
+              emitRuntimeMessage({
+                type: 'SCAN_PARTIAL_RESULT',
+                payload: {
+                  operationId,
+                  connectorId: 'free-work',
+                  connectorName: 'Free-Work',
+                  missions,
+                },
+              });
+            }, 100);
+            window.setTimeout(
+              () => {
+                emitRuntimeMessage({
+                  type: 'SCAN_COMPLETE',
+                  payload: { operationId, missions },
+                });
+              },
+              config.kind === 'partial-success' ? config.completeDelayMs : 300
+            );
+          }
+
+          return { type: 'SCAN_STARTED', payload: { operationId } };
+        };
+      },
+    });
+  }, scenario);
+
+  // The fixture navigates before each test. Reload so this init script actually
+  // installs before the dev Chrome stub and intercepts the next scan.
+  await page.reload();
+  await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible({
+    timeout: 10000,
+  });
+}
 
 test.describe('Connector Resilience', () => {
   test('handles connector HTTP 500 error gracefully', async ({ page }) => {
-    // Simuler une erreur 500 via le dev panel
-    await setFeedState(page, 'error');
+    const errorMessage = 'Le connecteur free-work a échoué avec HTTP 500.';
+    await mockConnectorFailure(page, 'free-work', 500);
 
-    // Vérifier le message d'erreur
-    await expect(page.getByText('[Dev] Simulated error')).toBeVisible({ timeout: 3000 });
+    if (!(await page.getByText(errorMessage, { exact: true }).first().isVisible())) {
+      await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
+      await scanButton(page).click();
+    }
+
+    await expect(page.getByText(errorMessage, { exact: true }).first()).toBeVisible({
+      timeout: 5000,
+    });
   });
 
   test('continues scanning when one connector fails', async ({ page }) => {
-    // Injecter des missions normalement
-    await injectMissions(page, 5);
-    await waitForMissions(page, 5, 5000);
+    const [mission] = generateBalancedDataset(1);
+    const missionId = 'causal-survivor-proof';
+    const missionTitle = 'Connecteur survivant — preuve causale';
+    await mockScanProtocol(page, {
+      kind: 'manual-partial-success',
+      mission: {
+        ...mission,
+        id: missionId,
+        title: missionTitle,
+        source: 'free-work',
+        score: 100,
+      },
+      failedConnectorMessage: 'LeHibou indisponible pendant le scan causal',
+    });
 
-    // Vérifier que les missions sont affichées (les autres connecteurs ont continué)
-    const missionCount = await missionCards(page).count();
-    expect(missionCount).toBe(5);
+    await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
+    await page.evaluate(() => {
+      const trace = window as unknown as {
+        __scanProtocolEmissions?: unknown[];
+        __scanProtocolRequests?: unknown[];
+      };
+      trace.__scanProtocolEmissions = [];
+      trace.__scanProtocolRequests = [];
+    });
+    await scanButton(page).click();
 
-    // Vérifier que le compteur affiche 5 missions
-    await expectMissionCount(page, 5, 2000);
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(
+            ({ expectedMissionId, expectedMissionTitle }) => {
+              type ProtocolMessage = {
+                type?: string;
+                payload?: {
+                  operationId?: string;
+                  connectorId?: string;
+                  connectorProgress?: Array<{ connectorId?: string; state?: string }>;
+                  missions?: Array<{ id?: string; title?: string }>;
+                };
+              };
+              const trace = window as unknown as {
+                __scanProtocolEmissions?: ProtocolMessage[];
+                __scanProtocolRequests?: ProtocolMessage[];
+              };
+              const requests = trace.__scanProtocolRequests ?? [];
+              const emissions = trace.__scanProtocolEmissions ?? [];
+              const start = requests.find((message) => message.type === 'SCAN_START');
+              const operationId = start?.payload?.operationId;
+              const scoped = operationId
+                ? emissions.filter((message) => message.payload?.operationId === operationId)
+                : [];
+              const progress = scoped.find((message) => message.type === 'SCAN_PROGRESS');
+              const partial = scoped.find((message) => message.type === 'SCAN_PARTIAL_RESULT');
+              const terminal = scoped.find((message) => message.type === 'SCAN_COMPLETE');
+
+              return {
+                hasUiStart: Boolean(operationId),
+                sameOperation:
+                  scoped.length >= 3 &&
+                  scoped.every((message) => message.payload?.operationId === operationId),
+                failedConnectorObserved: Boolean(
+                  progress?.payload?.connectorProgress?.some(
+                    (connector) =>
+                      connector.connectorId === 'lehibou' && connector.state === 'error'
+                  )
+                ),
+                survivingConnectorObserved: Boolean(
+                  progress?.payload?.connectorProgress?.some(
+                    (connector) =>
+                      connector.connectorId === 'free-work' && connector.state === 'done'
+                  )
+                ),
+                survivingMissionObserved: Boolean(
+                  partial?.payload?.connectorId === 'free-work' &&
+                  partial.payload.missions?.some(
+                    (item) => item.id === expectedMissionId && item.title === expectedMissionTitle
+                  )
+                ),
+                terminalObserved: Boolean(
+                  terminal?.payload?.missions?.some((item) => item.id === expectedMissionId)
+                ),
+              };
+            },
+            { expectedMissionId: missionId, expectedMissionTitle: missionTitle }
+          ),
+        { timeout: 5000 }
+      )
+      .toEqual({
+        hasUiStart: true,
+        sameOperation: true,
+        failedConnectorObserved: true,
+        survivingConnectorObserved: true,
+        survivingMissionObserved: true,
+        terminalObserved: true,
+      });
+
+    await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
+    await expect(page.getByText(missionTitle, { exact: true })).toBeVisible({ timeout: 10000 });
   });
 
   test('shows typed error message for connector failure', async ({ page }) => {
-    await page.addInitScript(() => {
-      let _chrome: unknown = undefined;
-      Object.defineProperty(window, 'chrome', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return _chrome;
-        },
-        set(val) {
-          _chrome = val;
-          if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-            const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown
-            ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-              type: string;
-            }) => {
-              if (msg?.type === 'SCAN_START') {
-                // Simuler une erreur de connecteur typée
-                setTimeout(() => {
-                  window.dispatchEvent(
-                    new CustomEvent('dev:scanError', {
-                      detail: {
-                        connectorId: 'free-work',
-                        error: 'ConnectorError',
-                        message: 'Le connecteur free-work a échoué',
-                        code: 'PARSER_ERROR',
-                      },
-                    })
-                  );
-                }, 500);
-
-                return {
-                  type: 'SCAN_STATUS',
-                  payload: {
-                    state: 'scanning',
-                    currentConnector: 'free-work',
-                    progress: 0,
-                    missionsFound: 0,
-                  },
-                };
-              }
-              return origSend.call((val as Record<string, unknown>).runtime, msg);
-            };
-          }
-        },
-      });
+    const errorMessage = 'Le connecteur free-work a échoué';
+    await mockScanProtocol(page, {
+      kind: 'error',
+      message: errorMessage,
+      code: 'PARSER_ERROR',
+      delayMs: 500,
     });
 
-    // Attendre un peu pour voir si une erreur s'affiche
-    await page.waitForTimeout(2000);
-
-    // L'application doit rester fonctionnelle
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+    await expect(page.getByText(errorMessage, { exact: true }).first()).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('handles DOM changed scenario (parser failure)', async ({ page }) => {
-    await page.addInitScript(() => {
-      let _chrome: unknown = undefined;
-      Object.defineProperty(window, 'chrome', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return _chrome;
-        },
-        set(val) {
-          _chrome = val;
-          if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-            const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown
-            ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-              type: string;
-            }) => {
-              if (msg?.type === 'SCAN_START') {
-                // Simuler une erreur de parsing (DOM changé)
-                setTimeout(() => {
-                  window.dispatchEvent(
-                    new CustomEvent('dev:scanError', {
-                      detail: {
-                        connectorId: 'free-work',
-                        error: 'ParserError',
-                        message: 'Structure HTML inattendue',
-                        code: 'DOM_CHANGED',
-                        hint: 'Le site free-work a été mis à jour',
-                      },
-                    })
-                  );
-                }, 800);
-
-                return {
-                  type: 'SCAN_STATUS',
-                  payload: {
-                    state: 'scanning',
-                    currentConnector: 'free-work',
-                    progress: 0.5,
-                    missionsFound: 0,
-                  },
-                };
-              }
-              return origSend.call((val as Record<string, unknown>).runtime, msg);
-            };
-          }
-        },
-      });
+    const errorMessage = 'Structure HTML inattendue';
+    await mockScanProtocol(page, {
+      kind: 'error',
+      message: errorMessage,
+      code: 'DOM_CHANGED',
+      delayMs: 800,
     });
 
-    // Attendre l'erreur
-    await page.waitForTimeout(1500);
-
-    // L'application doit rester fonctionnelle malgré l'erreur de parsing
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+    await expect(page.getByText(errorMessage, { exact: true }).first()).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('handles multiple connector failures with partial success', async ({ page }) => {
-    const missions = generateBalancedDataset(10);
+    const [mission] = generateBalancedDataset(1);
+    const uniqueMissionTitle = 'Résilience partielle — mission témoin';
+    const missions = [
+      {
+        ...mission,
+        id: 'partial-success-proof',
+        title: uniqueMissionTitle,
+        score: 100,
+      },
+    ];
+    await mockScanProtocol(page, {
+      kind: 'partial-success',
+      missions,
+      failedConnectorMessage: 'LeHibou indisponible pendant le scan partiel',
+      completeDelayMs: 2500,
+    });
 
-    await page.addInitScript((mockMissions: unknown) => {
-      (window as unknown as Record<string, unknown>).__mockMissions = mockMissions;
-
-      let _chrome: unknown = undefined;
-      Object.defineProperty(window, 'chrome', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return _chrome;
-        },
-        set(val) {
-          _chrome = val;
-          if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-            const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown
-            ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-              type: string;
-              payload?: { connectorId?: string };
-            }) => {
-              if (msg?.type === 'SCAN_START') {
-                const connectorId = msg.payload?.connectorId || 'free-work';
-
-                // Simuler que certains connecteurs échouent
-                if (connectorId === 'free-work' || connectorId === 'lehibou') {
-                  return {
-                    type: 'SCAN_ERROR',
-                    payload: {
-                      connectorId,
-                      error: 'Connection refused',
-                      code: 'ECONNREFUSED',
-                    },
-                  };
-                }
-
-                // Les autres connecteurs réussissent
-                setTimeout(() => {
-                  const missions = (window as unknown as Record<string, unknown>).__mockMissions;
-                  window.dispatchEvent(
-                    new CustomEvent('dev:missions', {
-                      detail: missions,
-                    })
-                  );
-                }, 300);
-
-                return {
-                  type: 'SCAN_STATUS',
-                  payload: {
-                    state: 'scanning',
-                    currentConnector: connectorId,
-                    progress: 0,
-                    missionsFound: 0,
-                  },
-                };
+    await expect
+      .poll(
+        async () =>
+          page.evaluate(() => {
+            const emissions = (
+              window as unknown as {
+                __scanProtocolEmissions?: Array<{
+                  type?: string;
+                  payload?: { connectorProgress?: Array<{ state?: string }> };
+                }>;
               }
-              return origSend.call((val as Record<string, unknown>).runtime, msg);
-            };
-          }
-        },
-      });
-    }, missions);
+            ).__scanProtocolEmissions;
+            return Boolean(
+              emissions?.some(
+                (message) =>
+                  message.type === 'SCAN_PROGRESS' &&
+                  message.payload?.connectorProgress?.some((status) => status.state === 'error')
+              )
+            );
+          }),
+        { timeout: 2000 }
+      )
+      .toBe(true);
 
-    // Attendre que les missions apparaissent
-    await waitForMissions(page, 1, 10000);
-
-    // Vérifier qu'on a des missions malgré les échecs
-    const missionCount = await page.locator('text=/\\d+ mission/').first().textContent();
-    expect(missionCount).toMatch(/\d+ mission/);
+    await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
+    await expect(page.getByText(uniqueMissionTitle, { exact: true })).toBeVisible({
+      timeout: 5000,
+    });
+    await expect(scanButton(page)).toBeEnabled({ timeout: 5000 });
   });
 
   test('handles network timeout gracefully', async ({ page }) => {
-    await page.addInitScript(() => {
-      let _chrome: unknown = undefined;
-      Object.defineProperty(window, 'chrome', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return _chrome;
-        },
-        set(val) {
-          _chrome = val;
-          if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-            const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown
-            ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-              type: string;
-            }) => {
-              if (msg?.type === 'SCAN_START') {
-                // Simuler un timeout (pas de réponse)
-                return new Promise((resolve) => {
-                  setTimeout(() => {
-                    resolve({
-                      type: 'SCAN_ERROR',
-                      payload: {
-                        error: 'Timeout',
-                        message: 'La requête a expiré après 30s',
-                        code: 'TIMEOUT',
-                      },
-                    });
-                  }, 100);
-                });
-              }
-              return origSend.call((val as Record<string, unknown>).runtime, msg);
-            };
-          }
-        },
-      });
+    const errorMessage = 'La requête a expiré après 30s';
+    await mockScanProtocol(page, {
+      kind: 'error',
+      message: errorMessage,
+      code: 'TIMEOUT',
+      delayMs: 100,
     });
 
-    // Attendre le timeout
-    await page.waitForTimeout(500);
-
-    // L'application doit rester fonctionnelle
-    await expect(page.getByRole('navigation', { name: 'Main navigation' })).toBeVisible();
+    await expect(page.getByText(errorMessage, { exact: true }).first()).toBeVisible({
+      timeout: 3000,
+    });
   });
 
   test('error recovery allows retry', async ({ page }) => {
-    const shouldFail = true;
+    const now = new Date().toISOString();
+    await mockScanProtocol(page, {
+      kind: 'retry',
+      mission: {
+        id: 'retry-success',
+        title: 'Mission après retry',
+        client: 'Test',
+        description: 'Test',
+        stack: ['React'],
+        tjm: 600,
+        location: 'Paris',
+        remote: 'hybrid',
+        duration: '6 mois',
+        startDate: null,
+        publishedAt: now,
+        url: 'https://example.com/test',
+        source: 'free-work',
+        scrapedAt: now,
+        seniority: 'senior',
+        scoreBreakdown: null,
+        score: 80,
+        semanticScore: null,
+        semanticReason: null,
+      },
+    });
 
-    await page.addInitScript((initialFail: boolean) => {
-      let _chrome: unknown = undefined;
-      (window as unknown as Record<string, boolean>).__shouldFail = initialFail;
-
-      Object.defineProperty(window, 'chrome', {
-        configurable: true,
-        enumerable: true,
-        get() {
-          return _chrome;
-        },
-        set(val) {
-          _chrome = val;
-          if ((val as Record<string, unknown>)?.runtime?.sendMessage) {
-            const origSend = (val as Record<string, unknown>).runtime.sendMessage as (
-              msg: unknown
-            ) => Promise<unknown>;
-            (val as Record<string, unknown>).runtime.sendMessage = async (msg: {
-              type: string;
-            }) => {
-              if (msg?.type === 'SCAN_START') {
-                if ((window as unknown as Record<string, boolean>).__shouldFail) {
-                  // Premier appel échoue
-                  return {
-                    type: 'SCAN_ERROR',
-                    payload: {
-                      error: 'Temporary error',
-                      code: 'TEMP_ERROR',
-                    },
-                  };
-                }
-
-                // Retry réussit
-                setTimeout(() => {
-                  window.dispatchEvent(
-                    new CustomEvent('dev:missions', {
-                      detail: [
-                        {
-                          id: 'retry-success',
-                          title: 'Mission après retry',
-                          client: 'Test',
-                          description: 'Test',
-                          stack: ['React'],
-                          tjm: 600,
-                          location: 'Paris',
-                          remote: 'hybrid',
-                          duration: '6 mois',
-                          url: 'https://example.com/test',
-                          source: 'free-work',
-                          scrapedAt: new Date(),
-                          score: 80,
-                          semanticScore: null,
-                          semanticReason: null,
-                        },
-                      ],
-                    })
-                  );
-                }, 300);
-
-                return {
-                  type: 'SCAN_STATUS',
-                  payload: {
-                    state: 'scanning',
-                    currentConnector: 'free-work',
-                    progress: 0,
-                    missionsFound: 0,
-                  },
-                };
-              }
-              return origSend.call((val as Record<string, unknown>).runtime, msg);
-            };
-          }
-        },
-      });
-    }, shouldFail);
-
-    // Attendre l'erreur
-    await page.waitForTimeout(500);
+    await expect(page.getByText('Temporary error', { exact: true }).first()).toBeVisible({
+      timeout: 3000,
+    });
 
     // Simuler le retry en changeant le flag
     await page.evaluate(() => {
@@ -355,7 +495,9 @@ test.describe('Connector Resilience', () => {
     // Relancer le scan
     await scanButton(page).click();
 
-    // Attendre que ça fonctionne
-    await waitForMissions(page, 1, 10000);
+    await expect(page.getByTestId('mission-arrival-stack')).not.toBeVisible();
+    await expect(page.getByText('Mission après retry', { exact: true })).toBeVisible({
+      timeout: 10000,
+    });
   });
 });

@@ -16,12 +16,27 @@ import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extracto
 import { countNewlyAddedExperiences } from '$lib/core/cv/experience-helpers';
 import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
 import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
+import { buildConsentedCopilotPayload } from '$lib/core/copilot/build-consented-payload';
+import type {
+  CopilotDeletionReceipt,
+  CopilotDossierProjection,
+  CopilotJobSnapshot,
+} from '$lib/shell/copilot/contracts';
+import { copilotCreditCost, renderCopilotDraft, type CopilotOperationKind } from '@pulse/domain';
 import { createTracking, transitionStatus } from '$lib/core/tracking/transitions';
-import { resolvePremiumFeatureFlag, shouldPremiumGate } from '$lib/core/features/flags';
+import {
+  createSerializedApplicationTrackingError,
+  type ApplicationTrackingIntent,
+  type Task5ApplicationTrackingErrorCode,
+} from '$lib/core/tracking/application-tracking-error';
+import { isMissionTrackingPayload } from '$lib/shell/messaging/schemas';
+import { isTerminalStatus } from '$lib/core/tracking/pipeline-summary';
 import {
   DEV_PREMIUM_FEATURE_STORAGE_KEY,
   DEV_PREMIUM_ENABLED_STORAGE_KEY,
 } from '$lib/state/features.svelte';
+import type { AppSettings } from '$lib/core/types/app-settings';
+import type { SettingsReleaseMutationIntent } from '$lib/shell/settings-release/settings-release.contract';
 
 const DEV_MISSIONS_STORAGE_KEY = '__missionpulse_dev_missions';
 const DEV_FAVORITES_STORAGE_KEY = '__missionpulse_dev_favorites';
@@ -37,6 +52,9 @@ const DEV_TRACKINGS_STORAGE_KEY = '__missionpulse_dev_trackings';
 const DEV_HEALTH_STORAGE_KEY = '__missionpulse_dev_health';
 const DEV_ONBOARDING_COMPLETED_KEY = '__missionpulse_dev_onboarding_completed';
 const DEV_FIRST_SCAN_DONE_KEY = '__missionpulse_dev_first_scan_done';
+const DEV_COPILOT_JOBS_STORAGE_KEY = '__missionpulse_dev_copilot_jobs';
+const DEV_COPILOT_DOSSIERS_STORAGE_KEY = '__missionpulse_dev_copilot_dossiers';
+const DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY = '__missionpulse_dev_copilot_deletion_receipts';
 
 type RuntimeMessage = { type: string; payload?: unknown };
 type RuntimeMessageListener = (
@@ -45,6 +63,17 @@ type RuntimeMessageListener = (
   sendResponse: (response?: unknown) => void
 ) => boolean | void;
 type SerializedMission = Omit<Mission, 'scrapedAt'> & { scrapedAt: string };
+
+function devTrackingFailure(
+  intent: ApplicationTrackingIntent,
+  missionId: string | null,
+  code: Task5ApplicationTrackingErrorCode
+): RuntimeMessage {
+  return {
+    type: 'TRACKING_FAILED',
+    payload: createSerializedApplicationTrackingError(intent, missionId, code),
+  };
+}
 
 function readDevStorage<T>(key: string, fallback: T): T {
   try {
@@ -61,6 +90,165 @@ function writeDevStorage(key: string, value: unknown): void {
   } catch {
     // Dev-only persistence should never break the app shell.
   }
+}
+
+function readDevCopilotJobs(): Record<string, CopilotJobSnapshot> {
+  return readDevStorage<Record<string, CopilotJobSnapshot>>(DEV_COPILOT_JOBS_STORAGE_KEY, {});
+}
+
+function writeDevCopilotJob(job: CopilotJobSnapshot): void {
+  writeDevStorage(DEV_COPILOT_JOBS_STORAGE_KEY, {
+    ...readDevCopilotJobs(),
+    [job.missionId]: job,
+  });
+}
+
+function readDevCopilotDossiers(): Record<string, CopilotDossierProjection> {
+  return readDevStorage<Record<string, CopilotDossierProjection>>(
+    DEV_COPILOT_DOSSIERS_STORAGE_KEY,
+    {}
+  );
+}
+
+function writeDevCopilotDossier(dossier: CopilotDossierProjection): void {
+  writeDevStorage(DEV_COPILOT_DOSSIERS_STORAGE_KEY, {
+    ...readDevCopilotDossiers(),
+    [dossier.missionId]: dossier,
+  });
+}
+
+function devDossierForJob(job: CopilotJobSnapshot): CopilotDossierProjection {
+  const existing = readDevCopilotDossiers()[job.missionId];
+  return {
+    missionId: job.missionId,
+    state: 'reviewing',
+    consent: {
+      missionFields: [
+        ...new Set([...(existing?.consent.missionFields ?? []), ...job.selection.missionFields]),
+      ],
+      profileFields: [
+        ...new Set([...(existing?.consent.profileFields ?? []), ...job.selection.profileFields]),
+      ],
+      evidenceIds: [
+        ...new Set([...(existing?.consent.evidenceIds ?? []), ...job.selection.evidenceIds]),
+      ],
+    },
+    analysis: existing?.analysis ?? null,
+    approvedArtifacts: existing?.approvedArtifacts ?? [],
+    activeJob: { jobId: job.jobId ?? '', kind: job.kind, state: 'review' },
+  };
+}
+
+function readDevCopilotDeletionReceipts(): Record<string, CopilotDeletionReceipt> {
+  return readDevStorage<Record<string, CopilotDeletionReceipt>>(
+    DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY,
+    {}
+  );
+}
+
+function buildDevCopilotJob(input: {
+  missionId: string;
+  requestId: string;
+  kind: CopilotOperationKind;
+  evidenceIds: string[];
+  missionFields: CopilotJobSnapshot['selection']['missionFields'];
+  profileFields: CopilotJobSnapshot['selection']['profileFields'];
+}): CopilotJobSnapshot {
+  const now = Date.now();
+  const primaryEvidenceId = input.evidenceIds[0] ?? null;
+  const selection = {
+    missionFields: input.missionFields,
+    profileFields: input.profileFields,
+    evidenceIds: input.evidenceIds,
+  };
+  const currentMission = readDevStorage<Mission[]>(DEV_MISSIONS_STORAGE_KEY, mockMissions).find(
+    (mission) => mission.id === input.missionId
+  );
+  const currentProfile = readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile);
+  const built = currentMission
+    ? buildConsentedCopilotPayload(currentMission, currentProfile, selection)
+    : null;
+  const payload = built?.ok ? built.payload : { mission: {}, profile: {}, experienceEvidence: [] };
+  const primaryEvidence = payload.experienceEvidence.find(
+    (evidence) => evidence.evidenceId === primaryEvidenceId
+  );
+  const inputHash = input.requestId.replaceAll('-', '').repeat(2);
+  const tjmFacts =
+    input.kind === 'tjm-coach'
+      ? {
+          schemaVersion: 1 as const,
+          confidence: 'medium' as const,
+          missionDisplayedTjm: 700,
+          profileBounds: { min: 500, target: 625, max: 750, currency: 'EUR' as const },
+          market: {
+            matchedStacks: ['svelte'],
+            recordCount: 2,
+            sampleCount: 10,
+            min: 550,
+            weightedAverage: 680,
+            max: 800,
+            trend: 'up' as const,
+            lastObservedAt: '2026-07-20',
+          },
+        }
+      : null;
+  const result = {
+    schemaVersion: 1 as const,
+    kind: input.kind,
+    evidenceClaims: primaryEvidenceId
+      ? [
+          {
+            text: 'Une expérience sélectionnée soutient cette proposition.',
+            evidenceIds: [primaryEvidenceId],
+          },
+        ]
+      : [],
+    gaps: [],
+    risks: ['Contenu synthétique de démonstration : une relecture humaine reste requise.'],
+    questions: ['Souhaitez-vous préciser votre disponibilité ?'],
+    ...(input.kind === 'analysis'
+      ? {}
+      : {
+          draftSegments: [
+            {
+              text: 'Je peux mobiliser mon expertise TypeScript et Svelte pour cadrer puis livrer cette mission avec une communication régulière.',
+              sourceRefs:
+                input.kind === 'tjm-coach'
+                  ? [
+                      {
+                        kind: 'tjm-fact' as const,
+                        id: 'profile-tjm-bounds' as const,
+                        quote: '500 / 625 / 750 EUR',
+                      },
+                    ]
+                  : [
+                      {
+                        kind: 'experience' as const,
+                        id: primaryEvidenceId as string,
+                        quote: primaryEvidence?.summary.slice(0, 80) ?? 'Source indisponible',
+                      },
+                    ],
+            },
+          ],
+        }),
+  };
+
+  return {
+    jobId: `dev-copilot-${input.missionId}-${now}`,
+    missionId: input.missionId,
+    requestId: input.requestId,
+    kind: input.kind,
+    creditCost: copilotCreditCost(input.kind),
+    selection,
+    sourceSnapshot: { inputHash, payload },
+    status: 'review',
+    tjmFacts,
+    result,
+    error: null,
+    creditsRemaining: input.kind === 'analysis' ? 4 : 3,
+    createdAtMs: now,
+    updatedAtMs: now,
+  };
 }
 
 /**
@@ -224,7 +412,7 @@ function defaultDevTrackings(now: number): MissionTracking[] {
 
 function readDevTrackings(now: number): MissionTracking[] {
   const stored = readDevStorage<MissionTracking[] | null>(DEV_TRACKINGS_STORAGE_KEY, null);
-  return stored && stored.length > 0 ? stored : defaultDevTrackings(now);
+  return stored !== null ? stored : defaultDevTrackings(now);
 }
 
 function writeDevTrackings(trackings: MissionTracking[]): void {
@@ -298,6 +486,18 @@ const storage: Record<string, unknown> = {
   tjm_history: generateMockTJMHistory(),
 };
 
+let settingsReleaseRevision = 0;
+let settingsReleaseGeneration = 0;
+
+function devSettingsReleaseSnapshot() {
+  return {
+    settings: structuredClone(storage.settings as AppSettings),
+    onboardingCompleted: storage.onboarding_completed === true,
+    revision: settingsReleaseRevision,
+    generation: settingsReleaseGeneration,
+  };
+}
+
 function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
   const storedHealth = readDevStorage<ConnectorHealthSnapshot[] | null>(
     DEV_HEALTH_STORAGE_KEY,
@@ -318,6 +518,11 @@ function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
 }
 
 function createChromeStubs() {
+  let activeDevScan: {
+    operationId: string;
+    timers: ReturnType<typeof setTimeout>[];
+  } | null = null;
+
   const runtimeMessageListeners = new Set<RuntimeMessageListener>();
 
   function emitRuntimeMessage(message: RuntimeMessage): void {
@@ -341,6 +546,70 @@ function createChromeStubs() {
         console.log('[Chrome Stub] sendMessage:', message.type);
 
         switch (message.type) {
+          case 'GET_SETTINGS_RELEASE':
+            return {
+              type: 'SETTINGS_RELEASE_RESULT',
+              payload: { status: 'confirmed', snapshot: devSettingsReleaseSnapshot() },
+            };
+          case 'MUTATE_SETTINGS_RELEASE': {
+            const intent = message.payload as SettingsReleaseMutationIntent;
+            const current = devSettingsReleaseSnapshot();
+            if (intent.baseRevision !== current.revision) {
+              return {
+                type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+                payload: {
+                  status: 'not_admitted',
+                  requestId: intent.requestId,
+                  commandId: null,
+                  reason: 'conflict',
+                  snapshot: current,
+                },
+              };
+            }
+            const candidateSettings =
+              intent.kind === 'save_settings' ? intent.settings : current.settings;
+            const candidateConsent =
+              intent.kind === 'save_settings' ? current.onboardingCompleted : intent.targetConsent;
+            if (
+              JSON.stringify(candidateSettings) === JSON.stringify(current.settings) &&
+              candidateConsent === current.onboardingCompleted
+            ) {
+              return {
+                type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+                payload: {
+                  status: 'not_admitted',
+                  requestId: intent.requestId,
+                  commandId: null,
+                  reason: 'already_confirmed',
+                  snapshot: current,
+                },
+              };
+            }
+            storage.settings = structuredClone(candidateSettings);
+            storage.onboarding_completed = candidateConsent;
+            writeDevStorage(DEV_ONBOARDING_COMPLETED_KEY, candidateConsent);
+            settingsReleaseRevision += 1;
+            settingsReleaseGeneration += 1;
+            const snapshot = devSettingsReleaseSnapshot();
+            const commandId = `settings-release:92000000-0000-4000-8000-000000000001:${settingsReleaseRevision}:command`;
+            return {
+              type: 'SETTINGS_RELEASE_MUTATION_RESULT',
+              payload: {
+                status: 'settled',
+                outcome: {
+                  commandId,
+                  requestId: intent.requestId,
+                  intentDigest: '0'.repeat(64),
+                  kind: intent.kind,
+                  settledRevision: snapshot.revision,
+                  settledGeneration: snapshot.generation,
+                  snapshot,
+                  status: 'committed',
+                  reason: 'committed',
+                },
+              },
+            };
+          }
           case 'GET_SETTINGS':
             return { type: 'SETTINGS_RESULT', payload: storage.settings };
           case 'SAVE_SETTINGS':
@@ -388,6 +657,280 @@ function createChromeStubs() {
               type: 'PREMIUM_STATUS_RESULT',
               payload: storage.premium_enabled === true,
             };
+          case 'COPILOT_LINK': {
+            const payload = message.payload as { requestId: string };
+            return {
+              type: 'COPILOT_LINK_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                outcome: 'linked',
+                subject: 'dev-premium-user',
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_SYNC_ENTITLEMENT': {
+            const payload = message.payload as { requestId: string };
+            const now = Date.now();
+            return {
+              type: 'COPILOT_ENTITLEMENT_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                outcome: 'synced',
+                state: 'active',
+                entitlement: {
+                  status: 'active',
+                  subject: 'dev-premium-user',
+                  issuedAtMs: now,
+                  expiresAtMs: now + 86_400_000,
+                  creditsRemaining: 4,
+                },
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_CREATE_JOB': {
+            const payload = message.payload as {
+              requestId: string;
+              missionId: string;
+              kind: CopilotOperationKind;
+              evidenceIds: string[];
+              missionFields: CopilotJobSnapshot['selection']['missionFields'];
+              profileFields: CopilotJobSnapshot['selection']['profileFields'];
+            };
+            if (
+              payload.kind !== 'analysis' &&
+              payload.kind !== 'tjm-coach' &&
+              payload.evidenceIds.length === 0
+            ) {
+              return {
+                type: 'COPILOT_CREATE_JOB_RESULT',
+                payload: {
+                  requestId: payload.requestId,
+                  missionId: payload.missionId,
+                  outcome: 'error',
+                  job: null,
+                  deletionReceipt: null,
+                  error: {
+                    code: 'INVALID_REQUEST',
+                    message: 'Sélectionnez une expérience pour ancrer le contenu.',
+                    retryable: false,
+                  },
+                },
+              };
+            }
+            const job = buildDevCopilotJob(payload);
+            writeDevCopilotJob(job);
+            writeDevCopilotDossier(devDossierForJob(job));
+            const receipts = readDevCopilotDeletionReceipts();
+            delete receipts[payload.missionId];
+            writeDevStorage(DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY, receipts);
+            return {
+              type: 'COPILOT_CREATE_JOB_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: 'ok',
+                job,
+                deletionReceipt: null,
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_GET_DOSSIER': {
+            const payload = message.payload as { requestId: string; missionId: string };
+            const dossier = readDevCopilotDossiers()[payload.missionId] ?? null;
+            return {
+              type: 'COPILOT_GET_DOSSIER_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: dossier ? 'ok' : 'not_found',
+                dossier,
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_GET_JOB': {
+            const payload = message.payload as { requestId: string; missionId: string };
+            const job = readDevCopilotJobs()[payload.missionId] ?? null;
+            const deletionReceipt = readDevCopilotDeletionReceipts()[payload.missionId] ?? null;
+            return {
+              type: 'COPILOT_GET_JOB_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: job ? 'ok' : 'not_found',
+                job,
+                deletionReceipt: job ? null : deletionReceipt,
+                error: null,
+              },
+            };
+          }
+          case 'COPILOT_CANCEL_JOB': {
+            const payload = message.payload as {
+              requestId: string;
+              missionId: string;
+              jobId: string;
+            };
+            const existing = readDevCopilotJobs()[payload.missionId] ?? null;
+            const job =
+              existing && existing.jobId === payload.jobId
+                ? { ...existing, status: 'cancelled' as const, updatedAtMs: Date.now() }
+                : null;
+            if (job) {
+              writeDevCopilotJob(job);
+            }
+            if (job) {
+              const dossier = readDevCopilotDossiers()[payload.missionId];
+              if (dossier) {
+                writeDevCopilotDossier({ ...dossier, state: 'ready', activeJob: null });
+              }
+            }
+            return {
+              type: 'COPILOT_CANCEL_JOB_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: job ? 'ok' : 'error',
+                job,
+                deletionReceipt: null,
+                error: job
+                  ? null
+                  : { code: 'JOB_NOT_FOUND', message: 'Job dev introuvable.', retryable: false },
+              },
+            };
+          }
+          case 'COPILOT_REVIEW_JOB': {
+            const payload = message.payload as {
+              requestId: string;
+              missionId: string;
+              jobId: string;
+              decision: 'accept' | 'reject';
+            };
+            const existing = readDevCopilotJobs()[payload.missionId] ?? null;
+            const job =
+              existing && existing.jobId === payload.jobId && existing.status === 'review'
+                ? {
+                    ...existing,
+                    jobId: payload.jobId,
+                    status:
+                      payload.decision === 'accept' ? ('accepted' as const) : ('rejected' as const),
+                    updatedAtMs: Date.now(),
+                  }
+                : null;
+            if (job) {
+              writeDevCopilotJob(job);
+              const dossier = readDevCopilotDossiers()[payload.missionId];
+              if (dossier) {
+                const reviewedAtMs = Date.now();
+                const renderedDraft = job.result === null ? null : renderCopilotDraft(job.result);
+                writeDevCopilotDossier({
+                  ...dossier,
+                  state: 'ready',
+                  activeJob: null,
+                  analysis:
+                    payload.decision === 'accept' &&
+                    job.kind === 'analysis' &&
+                    job.result?.kind === 'analysis'
+                      ? {
+                          jobId: job.jobId,
+                          result: job.result as NonNullable<
+                            CopilotDossierProjection['analysis']
+                          >['result'],
+                          approvedAtMs: reviewedAtMs,
+                        }
+                      : dossier.analysis,
+                  approvedArtifacts:
+                    payload.decision === 'accept' &&
+                    job.kind !== 'analysis' &&
+                    job.result &&
+                    renderedDraft !== null
+                      ? [
+                          ...dossier.approvedArtifacts,
+                          {
+                            artifactId: `dev-artifact-${job.jobId}`,
+                            jobId: job.jobId,
+                            kind: job.kind,
+                            draft: renderedDraft,
+                            approvedAtMs: reviewedAtMs,
+                          },
+                        ]
+                      : dossier.approvedArtifacts,
+                });
+              }
+            }
+            return {
+              type: 'COPILOT_REVIEW_JOB_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: job ? 'ok' : 'error',
+                job,
+                deletionReceipt: null,
+                error: job
+                  ? null
+                  : {
+                      code: 'JOB_NOT_REVIEWABLE',
+                      message: 'Job dev non révisable.',
+                      retryable: false,
+                    },
+              },
+            };
+          }
+          case 'COPILOT_DELETE_DOSSIER': {
+            const payload = message.payload as { requestId: string; missionId: string };
+            const jobs = readDevCopilotJobs();
+            const dossiers = readDevCopilotDossiers();
+            const existingDossier = dossiers[payload.missionId] ?? null;
+            const deletable =
+              existingDossier !== null &&
+              (existingDossier.state === 'ready' || existingDossier.state === 'deletionFailed') &&
+              existingDossier.activeJob === null;
+            if (existingDossier && !deletable) {
+              return {
+                type: 'COPILOT_DELETE_DOSSIER_RESULT',
+                payload: {
+                  requestId: payload.requestId,
+                  missionId: payload.missionId,
+                  outcome: 'error',
+                  disposition: null,
+                  receipt: null,
+                  error: {
+                    code: 'DELETE_FAILED',
+                    message: 'Le job dev doit être réglé avant la suppression.',
+                    retryable: false,
+                  },
+                },
+              };
+            }
+            const disposition = existingDossier ? 'deleted' : 'not-created';
+            delete jobs[payload.missionId];
+            writeDevStorage(DEV_COPILOT_JOBS_STORAGE_KEY, jobs);
+            delete dossiers[payload.missionId];
+            writeDevStorage(DEV_COPILOT_DOSSIERS_STORAGE_KEY, dossiers);
+            const receipt = {
+              version: 1 as const,
+              missionId: payload.missionId,
+              disposition,
+              confirmedAtMs: Date.now(),
+            };
+            writeDevStorage(DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY, {
+              ...readDevCopilotDeletionReceipts(),
+              [payload.missionId]: receipt,
+            });
+            return {
+              type: 'COPILOT_DELETE_DOSSIER_RESULT',
+              payload: {
+                requestId: payload.requestId,
+                missionId: payload.missionId,
+                outcome: 'deleted',
+                disposition,
+                receipt,
+                error: null,
+              },
+            };
+          }
           case 'SET_PREMIUM':
             storage.premium_enabled = message.payload === true;
             writeDevStorage(DEV_PREMIUM_ENABLED_STORAGE_KEY, message.payload === true);
@@ -576,21 +1119,34 @@ function createChromeStubs() {
           case 'CLEAR_FEED_TOUR_SEEN':
             storage.feed_tour_seen = false;
             return { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } };
-          case 'SCAN_START':
-            return new Promise((resolve) => {
-              const runtimeMissions = readDevStorage<Mission[]>(
-                DEV_MISSIONS_STORAGE_KEY,
-                mockMissions
-              ).map((m) => ({ ...m, scrapedAt: new Date() }));
-              const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
-              const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
+          case 'SCAN_START': {
+            const operationId = (message.payload as { operationId: string }).operationId;
+            if (activeDevScan) {
+              return {
+                type: 'SCAN_BUSY',
+                payload: {
+                  operationId,
+                  activeOperationId: activeDevScan.operationId,
+                },
+              };
+            }
+            const runtimeMissions = readDevStorage<Mission[]>(
+              DEV_MISSIONS_STORAGE_KEY,
+              mockMissions
+            ).map((m) => ({ ...m, scrapedAt: new Date() }));
+            const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
+            const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
+            const timers: ReturnType<typeof setTimeout>[] = [];
+            activeDevScan = { operationId, timers };
 
-              groupedBySource.forEach(([connectorId, connectorMissions], index) => {
+            groupedBySource.forEach(([connectorId, connectorMissions], index) => {
+              timers.push(
                 setTimeout(
                   () => {
                     emitRuntimeMessage({
                       type: 'SCAN_PARTIAL_RESULT',
                       payload: {
+                        operationId,
                         connectorId,
                         connectorName: connectorDisplayName(connectorId),
                         missions: connectorMissions,
@@ -598,14 +1154,20 @@ function createChromeStubs() {
                     });
                   },
                   250 + index * 250
-                );
-              });
+                )
+              );
+            });
 
+            timers.push(
               setTimeout(
                 () => {
-                  resolve({
+                  if (activeDevScan?.operationId !== operationId) {
+                    return;
+                  }
+                  activeDevScan = null;
+                  emitRuntimeMessage({
                     type: 'SCAN_COMPLETE',
-                    payload: bridgeMissions,
+                    payload: { operationId, missions: bridgeMissions },
                   });
                   window.dispatchEvent(
                     new CustomEvent('dev:missions', {
@@ -614,8 +1176,33 @@ function createChromeStubs() {
                   );
                 },
                 Math.max(800, 500 + groupedBySource.length * 250)
-              );
-            });
+              )
+            );
+
+            return { type: 'SCAN_STARTED', payload: { operationId } };
+          }
+          case 'SCAN_CANCEL': {
+            const operationId = (message.payload as { operationId: string }).operationId;
+            if (!activeDevScan || activeDevScan.operationId !== operationId) {
+              return {
+                type: 'SCAN_CANCEL_REJECTED',
+                payload: {
+                  operationId,
+                  code: 'STALE_OPERATION',
+                  message: 'Aucun scan actif ne correspond à cette opération.',
+                },
+              };
+            }
+            for (const timer of activeDevScan.timers) {
+              clearTimeout(timer);
+            }
+            const cancelled = { type: 'SCAN_CANCELLED', payload: { operationId } };
+            activeDevScan = null;
+            setTimeout(() => {
+              emitRuntimeMessage(cancelled);
+            }, 0);
+            return { type: 'SCAN_CANCEL_REQUESTED', payload: { operationId } };
+          }
           case 'GET_TRACKINGS': {
             const now = Date.now();
             const all = readDevTrackings(now);
@@ -633,18 +1220,28 @@ function createChromeStubs() {
             const all = readDevTrackings(now);
             const existing =
               all.find((t) => t.missionId === p.missionId) ?? createTracking(p.missionId, now);
-            const updated = transitionStatus(existing, p.status, now, p.note ?? null) ?? existing;
+            const updated = transitionStatus(existing, p.status, now, p.note ?? null);
+            if (!updated) {
+              return devTrackingFailure('transition', p.missionId, 'INVALID_TRANSITION');
+            }
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
             return { type: 'TRACKING_UPDATED', payload: updated };
           }
           case 'UPDATE_TRACKING_DETAILS': {
             const p = message.payload as { missionId: string; nextActionAt?: string | null };
+            const nextActionAt = p.nextActionAt ?? null;
+            if (nextActionAt !== null && !Number.isFinite(Date.parse(nextActionAt))) {
+              return devTrackingFailure('details', p.missionId, 'INVALID_DETAILS');
+            }
             const now = Date.now();
             const all = readDevTrackings(now);
             const existing =
               all.find((t) => t.missionId === p.missionId) ?? createTracking(p.missionId, now);
-            const updated: MissionTracking = { ...existing, nextActionAt: p.nextActionAt ?? null };
+            if (nextActionAt !== null && isTerminalStatus(existing.currentStatus)) {
+              return devTrackingFailure('details', p.missionId, 'INVALID_DETAILS');
+            }
+            const updated: MissionTracking = { ...existing, nextActionAt };
             const without = all.filter((t) => t.missionId !== p.missionId);
             writeDevTrackings([...without, updated]);
             return { type: 'TRACKING_UPDATED', payload: updated };
@@ -654,26 +1251,27 @@ function createChromeStubs() {
             const now = Date.now();
             const all = readDevTrackings(now);
             const without = all.filter((t) => t.missionId !== p.missionId);
-            if (p.tracking) {
+            if (p.tracking !== null) {
+              if (!isMissionTrackingPayload(p.tracking) || p.tracking.missionId !== p.missionId) {
+                return devTrackingFailure('restore', p.missionId, 'INVALID_RESTORE');
+              }
               writeDevTrackings([...without, p.tracking]);
-              return { type: 'TRACKING_RESTORED', payload: p.tracking };
+              return {
+                type: 'TRACKING_RESTORED',
+                payload: { missionId: p.missionId, tracking: p.tracking },
+              };
             }
             writeDevTrackings(without);
-            return { type: 'TRACKING_RESTORED', payload: null };
+            return {
+              type: 'TRACKING_RESTORED',
+              payload: { missionId: p.missionId, tracking: null },
+            };
           }
           case 'GENERATE_ASSET': {
             // Dev mode returns a realistic mock asset so the kit-generation UI
-            // flow is exercisable without a service worker. The premium gate
-            // is honoured so the "active + free" DevPanel scenario produces
-            // PREMIUM_REQUIRED just like production. When dormant (flag off),
-            // generation is always allowed. See models/premium-feature-flag.model.md.
-            const featureActive = resolvePremiumFeatureFlag(storage.premium_feature_enabled);
-            if (shouldPremiumGate(featureActive, storage.premium_enabled === true)) {
-              return {
-                type: 'GENERATION_RESULT',
-                payload: { asset: null, error: 'PREMIUM_REQUIRED' },
-              };
-            }
+            // flow is exercisable without a service worker. Local Gemini Nano
+            // generation remains free and independent from the Copilot Premium
+            // entitlement. See models/premium-feature-flag.model.md.
             const { missionId: genMissionId, generationType: genType } = (message.payload ??
               {}) as {
               missionId: string;

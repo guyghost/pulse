@@ -1,6 +1,15 @@
 <script lang="ts">
   import { createConnectionStore } from '$lib/state/connection.svelte';
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
+
+  type ConnectionStatusConfig = {
+    color: string;
+    bgColor: string;
+    borderColor: string;
+    textColor: string;
+    icon: IconName;
+    label: string;
+  };
 
   const connection = createConnectionStore();
 
@@ -18,7 +27,7 @@
   let showDetails = $state(false);
 
   // Couleurs selon le statut
-  const statusConfig = $derived.by(() => {
+  const statusConfig = $derived.by<ConnectionStatusConfig>(() => {
     switch (status) {
       case 'online':
         return {

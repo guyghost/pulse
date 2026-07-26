@@ -15,6 +15,7 @@
  * Svelte 5 runes only.
  */
 import type { Experience } from '$lib/core/types/profile';
+import { SvelteMap } from 'svelte/reactivity';
 import {
   buildPlatformPayloads,
   normalizeExperience,
@@ -80,7 +81,7 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
   let draft = $state<Experience | null>(null);
   let editingId = $state<string | null>(null);
   let syncStatus = $state<SyncStatus>('idle');
-  let platformStatuses = $state<Map<string, PlatformSyncStatus>>(new Map());
+  const platformStatuses = new SvelteMap<string, PlatformSyncStatus>();
   let lastSyncedAt = $state<number | null>(null);
   let feedError = $state<string | null>(null);
   let editError = $state<string | null>(null);
@@ -96,24 +97,21 @@ export function createCvExperienceStore(deps: CvExperienceDeps): CvExperienceSto
   }
 
   function setPlatformStatus(id: string, status: PlatformSyncStatus): void {
-    const next = new Map(platformStatuses);
-    next.set(id, status);
-    platformStatuses = next;
+    platformStatuses.set(id, status);
   }
 
   function resetPlatformStatuses(): void {
-    const next = new Map<string, PlatformSyncStatus>();
+    platformStatuses.clear();
     for (const target of deps.platforms) {
-      next.set(target.id, 'pending');
+      platformStatuses.set(target.id, 'pending');
     }
-    platformStatuses = next;
   }
 
   function resetSyncSnapshot(): void {
     syncStatus = 'idle';
     syncError = null;
     lastSyncedAt = null;
-    platformStatuses = new Map();
+    platformStatuses.clear();
   }
 
   // ── Feed machine ────────────────────────────────────────────────────────

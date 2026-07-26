@@ -1,4 +1,5 @@
 import type { UserProfile } from '$lib/core/types/profile';
+import { SvelteSet } from 'svelte/reactivity';
 
 /**
  * Runes-based profile lifecycle store. Replaces the former XState
@@ -48,7 +49,7 @@ export function createProfileStore(deps: ProfileStoreDeps): ProfileStore {
   let draftProfile = $state<UserProfile | null>(null);
   let profileError = $state<string | null>(null);
 
-  const listeners = new Set<(snapshot: ProfileSnapshot) => void>();
+  const listeners = new SvelteSet<(snapshot: ProfileSnapshot) => void>();
 
   const context: ProfileContext = {
     get current() {

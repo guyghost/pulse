@@ -127,8 +127,11 @@ export async function extractLinkedInExperiencesFromDom(
     return null;
   };
 
-  const strongPositionSelector =
-    '[data-entity-urn*="profilePosition"], a[href*="profilePosition="]';
+  const strongPositionSelector = [
+    '[data-entity-urn*="profilePosition"]',
+    'a[href*="profilePosition="]',
+    'a[href*="/details/experience/edit/forms/"]',
+  ].join(', ');
   const rowDiscoverySelector = [
     strongPositionSelector,
     '[data-view-name="profile-component-entity"]',
@@ -179,7 +182,18 @@ export async function extractLinkedInExperiencesFromDom(
       return undefined;
     }
     try {
-      const hrefIdentity = new URL(href, window.location.href).searchParams.get('profilePosition');
+      const parsedHref = new URL(href, window.location.href);
+      const ownerPositionId = parsedHref.pathname.match(
+        /\/details\/experience\/edit\/forms\/([^/]+)\/?$/i
+      )?.[1];
+      if (ownerPositionId) {
+        const normalizedOwnerPositionId = normalize(ownerPositionId);
+        return normalizedOwnerPositionId
+          ? `owner-position:${normalizedOwnerPositionId}`
+          : undefined;
+      }
+
+      const hrefIdentity = parsedHref.searchParams.get('profilePosition');
       return hrefIdentity ? normalize(hrefIdentity) : undefined;
     } catch {
       return undefined;
@@ -337,9 +351,16 @@ export async function extractLinkedInExperiencesFromDom(
       )
       .join('\n');
     const entityUrn = cleanLine(row.getAttribute('data-entity-urn'));
-    const stableHref = [...row.querySelectorAll('a[href]')]
+    const hrefCandidates = [
+      ...(row.matches('a[href]') ? [row] : []),
+      ...row.querySelectorAll('a[href]'),
+    ];
+    const stableHref = hrefCandidates
       .map((anchor) => (anchor as HTMLAnchorElement).href)
       .find((href) => /\/details\/experience\//.test(href) || /profilePosition=/.test(href));
+    const ownerPositionId = stableHref?.match(
+      /\/details\/experience\/edit\/forms\/([^/?#]+)\/?(?:[?#].*)?$/i
+    )?.[1];
 
     if (!title || !company || !dateRange) {
       return null;
@@ -352,7 +373,10 @@ export async function extractLinkedInExperiencesFromDom(
       ...(location ? { location } : {}),
       ...(description ? { description } : {}),
       skills,
-      externalId: entityUrn || stableHref || `linkedin-experience-${positionIndex}`,
+      externalId:
+        entityUrn ||
+        (ownerPositionId ? `linkedin-owner-position-${ownerPositionId}` : stableHref) ||
+        `linkedin-experience-${positionIndex}`,
     };
   };
 

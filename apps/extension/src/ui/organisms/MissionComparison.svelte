@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
-  import { Icon } from '@pulse/ui';
+  import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
+  import { Icon, type IconName } from '@pulse/ui';
 
   const {
     missions,
@@ -9,6 +10,15 @@
     missions: Mission[];
     onClose: () => void;
   } = $props();
+
+  let modalRoot = $state<HTMLElement | null>(null);
+  let dialogElement = $state<HTMLElement | null>(null);
+
+  function handleClose(): void {
+    if (!requestModalClose(modalRoot, 'explicit')) {
+      onClose();
+    }
+  }
 
   const remoteLabels: Record<string, string> = {
     full: 'Full remote',
@@ -19,7 +29,7 @@
   type DecisionEvidence = {
     label: string;
     value: string;
-    icon: string;
+    icon: IconName;
     severity: 'success' | 'attention' | 'neutral';
   };
 
@@ -138,24 +148,38 @@
 
 {#if missions.length >= 2}
   <div
+    bind:this={modalRoot}
+    use:modalFocus={{
+      surface: 'mission_comparison',
+      variant: 'comparison',
+      ownerScopePath: ['feed', 'mission_comparison'],
+      onBeforeClose: () => {
+        onClose();
+        return 'accepted';
+      },
+      onRejected: onClose,
+    }}
     class="fixed inset-0 z-50 flex items-end justify-center bg-black/60 backdrop-blur-sm"
-    role="dialog"
-    aria-modal="true"
   >
     <div
+      bind:this={dialogElement}
       class="w-full max-w-lg animate-slide-up rounded-t-3xl bg-surface-white border border-border-light max-h-[85vh] overflow-y-auto"
+      role="dialog"
+      tabindex="-1"
+      aria-labelledby="mission-comparison-title"
     >
       <!-- Header -->
       <div
         class="sticky top-0 z-10 flex items-center justify-between border-b border-border-light bg-surface-white/95 backdrop-blur-sm px-4 py-3"
       >
-        <h2 class="text-sm font-semibold text-text-primary">
+        <h2 id="mission-comparison-title" class="text-sm font-semibold text-text-primary">
           Comparaison ({missions.length} missions)
         </h2>
         <button
           class="inline-flex h-8 w-8 items-center justify-center rounded-full text-text-secondary hover:bg-subtle-gray hover:text-text-primary transition-colors"
-          onclick={onClose}
+          onclick={handleClose}
           aria-label="Fermer"
+          data-modal-close
         >
           <Icon name="x" size={16} />
         </button>
@@ -187,7 +211,7 @@
             </div>
 
             <div class="mt-3 grid grid-cols-2 gap-2">
-              {#each decisionEvidence as item}
+              {#each decisionEvidence as item, i (i)}
                 <div
                   class="rounded-lg border px-2 py-1.5 {item.severity === 'attention'
                     ? 'border-status-orange/25 bg-status-orange/5'
@@ -222,9 +246,10 @@
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted self-end">Mission</div>
-        {#each missions as mission}
+        {#each missions as mission (mission.id)}
           <div class="px-2">
             <a
+              data-modal-mission-link
               href={mission.url}
               target="_blank"
               rel="noopener"
@@ -242,9 +267,9 @@
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">Stack</div>
-        {#each missions as mission}
+        {#each missions as mission (mission.id)}
           <div class="flex flex-wrap gap-1 px-2">
-            {#each mission.stack.slice(0, 5) as tech}
+            {#each mission.stack.slice(0, 5) as tech (tech)}
               <span
                 class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-[10px] text-blueprint-blue"
                 >{tech}</span
@@ -258,13 +283,13 @@
       </div>
 
       <!-- Data rows -->
-      {#each fields as field, i}
+      {#each fields as field, i (i)}
         <div
           class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
           style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
         >
           <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">{field.label}</div>
-          {#each missions as mission}
+          {#each missions as mission (mission.id)}
             <div class="px-2 text-xs text-text-primary">{field.render(mission)}</div>
           {/each}
         </div>
@@ -276,9 +301,10 @@
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
         <div></div>
-        {#each missions as mission}
+        {#each missions as mission (mission.id)}
           <div class="px-2">
             <a
+              data-modal-action
               href={mission.url}
               target="_blank"
               rel="noopener"

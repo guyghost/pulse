@@ -1,14 +1,19 @@
 <script lang="ts">
   import { Icon } from '@pulse/ui';
+  import type { LocalDataResetRuntimeAvailability } from '../../models/local-data-reset-availability.contract';
 
   const {
     showResetConfirm,
+    resetAvailability,
+    resetError,
     onShowConfirm,
     onCancelConfirm,
     onConfirmReset,
     onCreateBackup,
   }: {
     showResetConfirm: boolean;
+    resetAvailability: LocalDataResetRuntimeAvailability;
+    resetError: string | null;
     onShowConfirm: () => void;
     onCancelConfirm: () => void;
     onConfirmReset: () => void;
@@ -17,10 +22,11 @@
 
   let confirmationText = $state('');
   let confirmActions: HTMLDivElement | null = $state(null);
-  const canConfirmReset = $derived(confirmationText === 'SUPPRIMER');
+  const resetUnavailable = $derived(resetAvailability.status === 'unavailable');
+  const canConfirmReset = $derived(!resetUnavailable && confirmationText === 'SUPPRIMER');
 
   $effect(() => {
-    if (!showResetConfirm) {
+    if (!showResetConfirm || resetUnavailable) {
       confirmationText = '';
     }
   });
@@ -34,7 +40,7 @@
   });
 
   function handleConfirmReset(): void {
-    if (!canConfirmReset) {
+    if (resetUnavailable || !canConfirmReset) {
       return;
     }
     onConfirmReset();
@@ -54,7 +60,30 @@
     </div>
   </div>
   <div class="mt-4">
-    {#if showResetConfirm}
+    {#if resetUnavailable}
+      <div class="rounded-xl border border-status-red/20 bg-status-red/6 px-3 py-2.5">
+        <button
+          type="button"
+          class="inline-flex cursor-not-allowed items-center rounded-lg border border-status-red/15 bg-surface-white px-3 py-2 text-xs font-medium text-text-muted opacity-70"
+          disabled={resetUnavailable}
+          aria-disabled={resetUnavailable}
+          aria-describedby="danger-reset-unavailable"
+        >
+          <Icon name="trash-2" size={12} class="mr-1 text-status-red" />
+          Réinitialisation indisponible
+        </button>
+        <p
+          id="danger-reset-unavailable"
+          class="mt-2 text-xs leading-4 text-status-red"
+          role="alert"
+        >
+          {resetAvailability.reason}
+        </p>
+        {#if resetError && resetError !== resetAvailability.reason}
+          <p class="mt-2 text-xs leading-4 text-status-red" role="alert">{resetError}</p>
+        {/if}
+      </div>
+    {:else if showResetConfirm}
       <div class="rounded-xl border border-status-red/20 bg-status-red/6 px-3 py-2.5">
         <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-primary">
           Suppression irréversible
@@ -65,6 +94,10 @@
         <p class="mt-1 text-xs leading-4 text-text-subtle">
           Après suppression : relancer l’onboarding, reconnecter les sources, puis refaire un scan.
         </p>
+
+        {#if resetError}
+          <p class="mt-2 text-xs leading-4 text-status-red" role="alert">{resetError}</p>
+        {/if}
 
         <label
           for="danger-reset-confirm"

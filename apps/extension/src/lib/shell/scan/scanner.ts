@@ -1,11 +1,10 @@
 import type { Mission } from '../../core/types/mission';
 import type { UserProfile } from '../../core/types/profile';
 import type { ConnectorSearchContext } from '../../core/connectors/search-context';
-import type { AppError } from '../../core/errors/app-error';
+import { isRetryable, type AppError } from '../../core/errors/app-error';
 import { buildSearchContext } from '../../core/connectors/search-context';
 import { getConnectors, getConnector } from '../connectors/index';
-import { getSettings } from '../storage/chrome-storage';
-import { getProfile, saveMissions, purgeOldMissions } from '../storage/db';
+import { getProfile } from '../storage/db';
 import {
   deduplicateMissionsDetailed,
   type MissionDuplicateRelation,
@@ -20,27 +19,15 @@ import { scoreMissionsSemantic } from '../ai/semantic-scorer';
 import { metricsCollector } from '../metrics/collector';
 import { calculateDedupRatio } from '../../core/metrics/types';
 import type { ScanMetrics } from '../../core/metrics/types';
-import { recordTJMFromMissions } from '../storage/tjm-history';
 import { isOnline } from '../utils/connection-monitor';
 import { trackParserHealth } from './parser-health';
 import { runWithCircuitBreaker } from '../health/circuit-breaker-runner';
 import { syncProbeAlarm } from '../health/probe-scheduler';
+import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
+import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
 /** Mutex pour empêcher les scans concurrents */
 let scanInProgress = false;
-
-/** AbortController global pour permettre la cancellation depuis le service worker */
-let currentAbortController: AbortController | null = null;
-
-/**
- * Annule le scan en cours (si existant).
- * Utilisé par le handler SCAN_CANCEL dans le service worker.
- */
-export function cancelCurrentScan(): void {
-  if (currentAbortController) {
-    currentAbortController.abort();
-  }
-}
 
 /**
  * Retourne true si un scan est actuellement en cours.
@@ -55,11 +42,24 @@ export function isScanRunning(): boolean {
 export class ScanError extends Error {
   constructor(
     message: string,
-    public readonly code: 'OFFLINE' | 'NETWORK_ERROR' | 'CANCELLED' | 'MUTEX' | 'UNKNOWN'
+    public readonly code:
+      'OFFLINE' | 'NETWORK_ERROR' | 'CANCELLED' | 'MUTEX' | 'CHECKPOINT_STORAGE' | 'UNKNOWN'
   ) {
     super(message);
     this.name = 'ScanError';
   }
+}
+
+function throwIfScanCancelled(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw new ScanError('Scan annulé.', 'CANCELLED');
+  }
+}
+
+function isAbortError(error: unknown): boolean {
+  return (
+    typeof error === 'object' && error !== null && 'name' in error && error.name === 'AbortError'
+  );
 }
 
 export interface ScanResult {
@@ -104,6 +104,22 @@ export type ConnectorResultCallback = (info: {
   missions: Mission[];
 }) => void;
 
+export type ScanRuntimeEvent =
+  | { type: 'CONNECTOR_STARTED'; connectorId: string }
+  | {
+      type: 'CONNECTOR_SUCCEEDED';
+      connectorId: string;
+      missions: readonly Mission[];
+    }
+  | {
+      type: 'CONNECTOR_FAILED';
+      connectorId: string;
+      error: { connectorId: string; code: string; message: string };
+      retryable: boolean;
+    }
+  | { type: 'RETRY_TIMER_FIRED'; connectorId: string }
+  | { type: 'NETWORK_OFFLINE' };
+
 export interface ScanOptions {
   /** Délai entre les pages d'un même connecteur en ms (défaut: 500) */
   pageDelayMs?: number;
@@ -111,8 +127,14 @@ export interface ScanOptions {
   onDetailedProgress?: DetailedProgressCallback;
   /** Callback appelé quand un connecteur réussit, avant le résultat final global */
   onConnectorResult?: ConnectorResultCallback;
+  /** Événements runtime consommés en direct par l'acteur de cycle de vie. */
+  onLifecycleEvent?: (event: ScanRuntimeEvent) => void;
   /** Override explicite du profil utilisé pour le scan */
   profileOverride?: UserProfile;
+  /** Liste de connecteurs figée par l'opération admise (health/first scan). */
+  connectorIdsOverride?: readonly string[];
+  /** Snapshot Settings immuable admis avec l'opération. */
+  settingsSnapshot?: SettingsReleaseSnapshot;
 }
 
 export async function runScan(
@@ -120,23 +142,25 @@ export async function runScan(
   onProgress?: (info: ScanProgressInfo) => void,
   options?: ScanOptions
 ): Promise<ScanResult> {
+  throwIfScanCancelled(signal);
+
   // Mutex : empêcher les scans concurrents
   if (scanInProgress) {
     throw new ScanError('Un scan est déjà en cours. Veuillez patienter.', 'MUTEX');
   }
   scanInProgress = true;
-  currentAbortController = new AbortController();
-
-  // Combiner le signal externe avec le AbortController global
-  const combinedSignal = signal
-    ? AbortSignal.any([signal, currentAbortController.signal])
-    : currentAbortController.signal;
 
   try {
-    return await _runScanInternal(combinedSignal, onProgress, options);
+    const result = await _runScanInternal(signal, onProgress, options);
+    throwIfScanCancelled(signal);
+    return result;
+  } catch (error) {
+    if (isAbortError(error) || (error instanceof ScanError && error.code === 'CANCELLED')) {
+      throw new ScanError('Scan annulé.', 'CANCELLED');
+    }
+    throw error;
   } finally {
     scanInProgress = false;
-    currentAbortController = null;
   }
 }
 
@@ -145,9 +169,13 @@ async function _runScanInternal(
   onProgress?: (info: ScanProgressInfo) => void,
   options?: ScanOptions
 ): Promise<ScanResult> {
+  throwIfScanCancelled(signal);
   const scanStartTime = performance.now();
   const detailedProgress = options?.onDetailedProgress;
   const connectorStates: ConnectorScanState[] = [];
+  const emitLifecycle = (event: ScanRuntimeEvent): void => {
+    options?.onLifecycleEvent?.(event);
+  };
 
   function emitDetailed(
     phase: 'connecting' | 'scanning' | 'post-processing' | 'done',
@@ -155,18 +183,24 @@ async function _runScanInternal(
     total = 0
   ) {
     detailedProgress?.({ phase, current, total, connectorStates: [...connectorStates] });
+    throwIfScanCancelled(signal);
   }
 
   // Vérifier la connexion avant de scanner
   if (!isOnline()) {
+    emitLifecycle({ type: 'NETWORK_OFFLINE' });
     throw new ScanError(
       'Aucune connexion internet. Le scan sera automatiquement relancé quand la connexion reviendra.',
       'OFFLINE'
     );
   }
 
-  const settings = await getSettings();
-  const enabledIds = settings.enabledConnectors;
+  const settingsSnapshot = options?.settingsSnapshot ?? (await readSettingsReleaseSnapshot());
+  const settings = settingsSnapshot.settings;
+  throwIfScanCancelled(signal);
+  const enabledIds = options?.connectorIdsOverride
+    ? [...options.connectorIdsOverride]
+    : settings.enabledConnectors;
   const errors: ScanResult['errors'] = [];
 
   try {
@@ -174,6 +208,7 @@ async function _runScanInternal(
   } catch {
     /* Non-critical: scan state is UI-only */
   }
+  throwIfScanCancelled(signal);
 
   if (enabledIds.length === 0) {
     try {
@@ -193,30 +228,43 @@ async function _runScanInternal(
   const validConnectorIds: string[] = [];
   for (const id of enabledIds) {
     const connector = await getConnector(id);
+    throwIfScanCancelled(signal);
     if (!connector) {
       errors.push({ connectorId: id, message: 'Connecteur introuvable' });
+      emitLifecycle({ type: 'CONNECTOR_STARTED', connectorId: id });
+      emitLifecycle({
+        type: 'CONNECTOR_FAILED',
+        connectorId: id,
+        error: { connectorId: id, code: 'UNKNOWN_CONNECTOR', message: 'Connecteur introuvable' },
+        retryable: false,
+      });
     } else {
       validConnectorIds.push(id);
     }
   }
 
-  if (signal?.aborted) {
-    try {
-      await setScanState('idle');
-    } catch {
-      /* Non-critical: scan state is UI-only */
-    }
-    return { missions: [], sourceMissions: [], duplicateRelations: [], errors };
-  }
+  throwIfScanCancelled(signal);
 
   // Load all connectors in parallel (they're lazy-loaded, so this loads only enabled ones)
   const connectors = await getConnectors(validConnectorIds);
+  throwIfScanCancelled(signal);
 
   // Check for connectors that failed to load
   const loadedIds = new Set(connectors.map((c) => c.id));
   for (const id of validConnectorIds) {
     if (!loadedIds.has(id)) {
       errors.push({ connectorId: id, message: 'Échec du chargement du connecteur' });
+      emitLifecycle({ type: 'CONNECTOR_STARTED', connectorId: id });
+      emitLifecycle({
+        type: 'CONNECTOR_FAILED',
+        connectorId: id,
+        error: {
+          connectorId: id,
+          code: 'CONNECTOR_LOAD_FAILED',
+          message: 'Échec du chargement du connecteur',
+        },
+        retryable: false,
+      });
     }
   }
 
@@ -233,20 +281,14 @@ async function _runScanInternal(
   }
   emitDetailed('connecting', 0, connectors.length);
 
-  if (signal?.aborted) {
-    try {
-      await setScanState('idle');
-    } catch {
-      /* Non-critical: scan state is UI-only */
-    }
-    return { missions: [], sourceMissions: [], duplicateRelations: [], errors };
-  }
+  throwIfScanCancelled(signal);
 
   // Load profile early for connector search filtering + scoring
   let profile = options?.profileOverride ?? null;
   if (!profile) {
     try {
       profile = await getProfile();
+      throwIfScanCancelled(signal);
     } catch {
       // No saved profile available
     }
@@ -290,9 +332,8 @@ async function _runScanInternal(
     connector: (typeof connectors)[number],
     index: number
   ): Promise<void> {
-    if (signal?.aborted) {
-      return;
-    }
+    throwIfScanCancelled(signal);
+    emitLifecycle({ type: 'CONNECTOR_STARTED', connectorId: connector.id });
 
     const stateIdx = connectorStates.findIndex((s) => s.connectorId === connector.id);
     onProgress?.({ current: index, total: connectors.length, connectorName: connector.name });
@@ -317,7 +358,42 @@ async function _runScanInternal(
 
     // --- Circuit Breaker ---
     // runWithCircuitBreaker gère : open → skip, half-open → probe, closed → execute
-    const circuitRun = await runWithCircuitBreaker(connector, now, connectorContext, signal);
+    const circuitRun = await runWithCircuitBreaker(connector, now, connectorContext, signal, {
+      onRetryableFailure: (error, attempt) => {
+        if (stateIdx >= 0) {
+          connectorStates[stateIdx] = {
+            ...connectorStates[stateIdx],
+            state: 'retrying',
+            error,
+            retryCount: attempt,
+          };
+        }
+        emitLifecycle({
+          type: 'CONNECTOR_FAILED',
+          connectorId: connector.id,
+          error: {
+            connectorId: connector.id,
+            code: error.type.toUpperCase(),
+            message: error.message,
+          },
+          retryable: true,
+        });
+        emitDetailed('scanning', index, connectors.length);
+      },
+      onRetryTimerFired: () => {
+        emitLifecycle({ type: 'RETRY_TIMER_FIRED', connectorId: connector.id });
+        emitLifecycle({ type: 'CONNECTOR_STARTED', connectorId: connector.id });
+        if (stateIdx >= 0) {
+          connectorStates[stateIdx] = {
+            ...connectorStates[stateIdx],
+            state: 'fetching',
+            error: null,
+          };
+        }
+        emitDetailed('scanning', index, connectors.length);
+      },
+    });
+    throwIfScanCancelled(signal);
 
     // Sync alarme de sonde (schedule si open, cancel si closed/half-open)
     syncProbeAlarm(circuitRun.snapshot).catch(() => {});
@@ -365,6 +441,16 @@ async function _runScanInternal(
       if (stateIdx >= 0) {
         connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'error', error: null };
       }
+      emitLifecycle({
+        type: 'CONNECTOR_FAILED',
+        connectorId: connector.id,
+        error: {
+          connectorId: connector.id,
+          code: 'CIRCUIT_OPEN',
+          message: `Circuit ouvert — connecteur ${connector.name} temporairement désactivé`,
+        },
+        retryable: false,
+      });
       emitDetailed('scanning', index + 1, connectors.length);
       return;
     }
@@ -381,6 +467,16 @@ async function _runScanInternal(
 
     if (!result.ok) {
       errors.push({ connectorId: connector.id, message: result.error.message });
+      emitLifecycle({
+        type: 'CONNECTOR_FAILED',
+        connectorId: connector.id,
+        error: {
+          connectorId: connector.id,
+          code: result.error.type.toUpperCase(),
+          message: result.error.message,
+        },
+        retryable: isRetryable(result.error),
+      });
       trackParserHealth(connector.id, 0, now).catch(() => {});
       if (stateIdx >= 0) {
         connectorStates[stateIdx] = {
@@ -392,11 +488,17 @@ async function _runScanInternal(
     } else {
       trackParserHealth(connector.id, result.value.length, now).catch(() => {});
       connectorResults.push({ connectorId: connector.id, missions: result.value });
+      const deterministicMissions = buildDeterministicMissions(result.value, new Date(now));
+      emitLifecycle({
+        type: 'CONNECTOR_SUCCEEDED',
+        connectorId: connector.id,
+        missions: deterministicMissions,
+      });
       try {
         options?.onConnectorResult?.({
           connectorId: connector.id,
           connectorName: connector.name,
-          missions: buildDeterministicMissions(result.value, new Date(now)),
+          missions: deterministicMissions,
         });
       } catch {
         // Partial UI updates are best-effort; the final scan result remains canonical.
@@ -429,37 +531,54 @@ async function _runScanInternal(
     emitDetailed('scanning', index + 1, connectors.length);
   }
 
-  // Execute with concurrency pool
-  const pending: Promise<void>[] = [];
+  // Execute with a quiescent concurrency pool. Every started task is retained
+  // until settlement so one fast abort/error cannot release the scan mutex
+  // while another connector is still cleaning up.
+  const noFailure = Symbol('no-connector-failure');
+  let firstFailure: unknown | typeof noFailure = noFailure;
+  const activeTasks = new Set<Promise<void>>();
+  const startedTasks: Promise<void>[] = [];
   let nextIndex = 0;
 
-  while (nextIndex < connectors.length) {
-    if (signal?.aborted) {
-      break;
-    }
-
-    // Fill up to CONCURRENCY slots
-    while (pending.length < CONCURRENCY && nextIndex < connectors.length) {
-      const idx = nextIndex++;
-      const promise = fetchOneConnector(connectors[idx], idx).then(() => {
-        // Remove from pending when done
-        const pIdx = pending.indexOf(promise);
-        if (pIdx >= 0) {
-          pending.splice(pIdx, 1);
+  const shouldStopScheduling = (): boolean =>
+    firstFailure !== noFailure || signal?.aborted === true;
+  const startConnectorTask = (index: number): void => {
+    const task = fetchOneConnector(connectors[index], index)
+      .catch((error: unknown) => {
+        if (firstFailure === noFailure) {
+          firstFailure = error;
         }
+      })
+      .finally(() => {
+        activeTasks.delete(task);
       });
-      pending.push(promise);
+    activeTasks.add(task);
+    startedTasks.push(task);
+  };
+
+  while (nextIndex < connectors.length && !shouldStopScheduling()) {
+    // Fill up to CONCURRENCY slots
+    while (
+      activeTasks.size < CONCURRENCY &&
+      nextIndex < connectors.length &&
+      !shouldStopScheduling()
+    ) {
+      startConnectorTask(nextIndex);
+      nextIndex += 1;
     }
 
-    // Wait for at least one to finish before filling more
-    if (pending.length >= CONCURRENCY) {
-      await Promise.race(pending);
+    if (activeTasks.size > 0) {
+      await Promise.race(activeTasks);
     }
   }
 
-  // Wait for all remaining
-  await Promise.all(pending);
+  await Promise.allSettled(startedTasks);
+  if (firstFailure !== noFailure) {
+    throw firstFailure;
+  }
+  throwIfScanCancelled(signal);
   onProgress?.({ current: connectors.length, total: connectors.length, connectorName: '' });
+  throwIfScanCancelled(signal);
 
   const allMissions: Mission[] = [];
   for (const result of connectorResults) {
@@ -504,8 +623,10 @@ async function _runScanInternal(
       const semanticResults = await scoreMissionsSemantic(
         scored,
         scanProfile,
-        settings.maxSemanticPerScan
+        settings.maxSemanticPerScan,
+        signal
       );
+      throwIfScanCancelled(signal);
       for (const mission of scored) {
         const semantic = semanticResults.get(mission.id);
         if (semantic && mission.scoreBreakdown) {
@@ -523,27 +644,12 @@ async function _runScanInternal(
         }
       }
     } catch {
+      throwIfScanCancelled(signal);
       // Gemini Nano unavailable, continue with basic scoring
     }
   }
+  throwIfScanCancelled(signal);
   emitDetailed('post-processing', 2, 3);
-
-  // Persist
-  if (scored.length > 0) {
-    try {
-      await saveMissions(scored);
-    } catch {
-      // Storage not available
-    }
-
-    // Record TJM data from this scan into history
-    try {
-      const today = new Date().toISOString().slice(0, 10);
-      await recordTJMFromMissions(scored, today);
-    } catch {
-      // TJM recording is non-critical
-    }
-  }
 
   const scoredIds = new Set(scored.map((mission) => mission.id));
   const eligibleSourceMissionsById = new Map(
@@ -561,16 +667,6 @@ async function _runScanInternal(
       return mission ? [mission] : [];
     }),
   ];
-
-  // Purge old missions (older than 90 days) - non-blocking, silent failure
-  try {
-    const purged = await purgeOldMissions(90);
-    if (purged > 0 && import.meta.env.DEV) {
-      console.debug(`[Scanner] Purged ${purged} old missions`);
-    }
-  } catch {
-    // Purge failure is non-critical
-  }
 
   // Calculer et enregistrer les métriques du scan
   const scanDuration = Math.round(performance.now() - scanStartTime);
@@ -610,10 +706,12 @@ async function _runScanInternal(
   }
 
   try {
+    throwIfScanCancelled(signal);
     await setScanState('idle');
   } catch {
     /* Non-critical: scan state is UI-only */
   }
+  throwIfScanCancelled(signal);
   emitDetailed('done', connectors.length, connectors.length);
   return { missions: scored, sourceMissions, duplicateRelations, errors };
 }

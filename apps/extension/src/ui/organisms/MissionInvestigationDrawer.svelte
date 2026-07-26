@@ -4,6 +4,7 @@
   import type { ApplicationStatus } from '$lib/core/types/tracking';
   import { STATUS_LABELS } from '$lib/core/types/tracking';
   import { scoreToGrade } from '$lib/core/types/score';
+  import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
   import OperationalStoryCard, {
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
@@ -15,11 +16,14 @@
     isHidden = false,
     trackingStatus = null,
     trackingUpdatedAt = null,
+    trackingState = 'loading',
+    trackingError = null,
     onClose,
     onOpenLink,
     onToggleCompare,
     onHide,
     onSelectForTracking,
+    onRetryTracking,
   }: {
     mission: Mission;
     isCompared?: boolean;
@@ -27,12 +31,24 @@
     isHidden?: boolean;
     trackingStatus?: ApplicationStatus | null;
     trackingUpdatedAt?: number | null;
+    trackingState?: 'idle' | 'loading' | 'loaded' | 'error';
+    trackingError?: string | null;
     onClose?: () => void;
     onOpenLink?: (url: string) => void;
     onToggleCompare?: () => void;
     onHide?: () => void;
     onSelectForTracking?: () => void;
+    onRetryTracking?: () => void;
   } = $props();
+
+  let modalRoot = $state<HTMLElement | null>(null);
+  let dialogElement = $state<HTMLElement | null>(null);
+
+  function handleClose(): void {
+    if (!requestModalClose(modalRoot, 'explicit')) {
+      onClose?.();
+    }
+  }
 
   type MissionFact = {
     label: string;
@@ -129,11 +145,27 @@
       : []
   );
 
-  const canSelectForTracking = $derived(trackingStatus === null || trackingStatus === 'detected');
+  const trackingReady = $derived(trackingState === 'loaded');
+  const canSelectForTracking = $derived(
+    trackingReady && (trackingStatus === null || trackingStatus === 'detected')
+  );
+  const trackingBadgeLabel = $derived(
+    trackingState === 'error'
+      ? 'Suivi indisponible'
+      : trackingState === 'loading'
+        ? 'Chargement du suivi'
+        : trackingStatus
+          ? STATUS_LABELS[trackingStatus]
+          : 'Non suivie'
+  );
   const trackingActionLabel = $derived(
-    canSelectForTracking
-      ? 'Mettre en suivi'
-      : `Suivi: ${STATUS_LABELS[trackingStatus ?? 'detected']}`
+    trackingState === 'error'
+      ? 'Réessayer le suivi'
+      : trackingState === 'loading'
+        ? 'Chargement du suivi'
+        : canSelectForTracking
+          ? 'Mettre en suivi'
+          : `Suivi: ${STATUS_LABELS[trackingStatus ?? 'detected']}`
   );
   const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
 
@@ -168,6 +200,10 @@
   }
 
   function handleSelectForTracking(): void {
+    if (trackingState === 'error') {
+      onRetryTracking?.();
+      return;
+    }
     if (!canSelectForTracking) {
       return;
     }
@@ -186,11 +222,26 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 bg-page-canvas" role="presentation">
+<div
+  bind:this={modalRoot}
+  use:modalFocus={{
+    surface: 'mission_investigation',
+    variant: 'investigation',
+    ownerScopePath: ['feed', 'mission_investigation'],
+    onBeforeClose: () => {
+      onClose?.();
+      return 'accepted';
+    },
+    onRejected: () => onClose?.(),
+  }}
+  class="fixed inset-0 z-50 bg-page-canvas"
+  role="presentation"
+>
   <div
+    bind:this={dialogElement}
     class="absolute inset-0 flex w-full flex-col bg-page-canvas"
     role="dialog"
-    aria-modal="true"
+    tabindex="-1"
     aria-label="Investigation mission"
   >
     <div
@@ -230,8 +281,9 @@
         <button
           type="button"
           class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
-          onclick={onClose}
+          onclick={handleClose}
           aria-label="Fermer l'investigation"
+          data-modal-close
         >
           <Icon name="x" size={18} />
         </button>
@@ -270,9 +322,9 @@
                 <span
                   class="inline-flex rounded-lg border border-border-light bg-page-canvas px-2.5 py-1.5 text-[11px] font-medium text-text-subtle"
                 >
-                  {trackingStatus ? STATUS_LABELS[trackingStatus] : 'Non suivie'}
+                  {trackingBadgeLabel}
                 </span>
-                {#if trackingUpdatedLabel}
+                {#if trackingReady && trackingUpdatedLabel}
                   <p class="mt-1 text-[10px] text-text-muted">Modifié {trackingUpdatedLabel}</p>
                 {/if}
               </div>
@@ -283,7 +335,7 @@
                 type="button"
                 class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-sm font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
                 onclick={handleSelectForTracking}
-                disabled={!canSelectForTracking}
+                disabled={trackingState === 'loading' || (trackingReady && !canSelectForTracking)}
                 aria-label={trackingActionLabel}
               >
                 <Icon name="list-checks" size={14} />
@@ -319,6 +371,9 @@
                 {isHidden ? 'Restaurer' : 'Masquer'}
               </button>
             </div>
+            {#if trackingState === 'error' && trackingError}
+              <p class="mt-2 text-xs leading-5 text-status-red" role="status">{trackingError}</p>
+            {/if}
           </section>
         </div>
 
@@ -326,7 +381,7 @@
           <section class="section-card-strong rounded-xl p-4 sm:p-5">
             <h3 class="text-base font-semibold text-text-primary">Preuves principales</h3>
             <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {#each missionFacts as fact}
+              {#each missionFacts as fact, i (i)}
                 <div class="rounded-lg bg-page-canvas px-3 py-3">
                   <p
                     class="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.13em] text-text-muted"
@@ -346,7 +401,7 @@
             <section class="section-card rounded-xl p-4 sm:p-5">
               <h3 class="text-base font-semibold text-text-primary">Compétences détectées</h3>
               <div class="mt-3 flex flex-wrap gap-2">
-                {#each visibleStack as skill}
+                {#each visibleStack as skill (skill)}
                   <span
                     class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-xs font-medium text-text-secondary"
                   >
@@ -383,7 +438,7 @@
               </details>
               <h3 class="mt-5 text-base font-semibold text-text-primary">Score par critère</h3>
               <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                {#each scoreLines as line}
+                {#each scoreLines as line, i (i)}
                   {@const grade = scoreToGrade(line.value)}
                   <div
                     class="flex items-center justify-between gap-3 rounded-lg bg-page-canvas px-3 py-3"

@@ -2,10 +2,19 @@ import { describe, expect, it, beforeEach, vi } from 'vitest';
 import { mount, tick } from 'svelte';
 import OnboardingWizard from '../../../src/ui/organisms/OnboardingWizard.svelte';
 
+const defaultSources = [
+  { id: 'free-work', name: 'Free-Work' },
+  { id: 'lehibou', name: 'LeHibou' },
+  { id: 'hiway', name: 'Hiway' },
+  { id: 'collective', name: 'Collective' },
+  { id: 'cherry-pick', name: 'Cherry Pick' },
+  { id: 'malt', name: 'Malt' },
+];
+
 function mountWizard(props: Record<string, unknown> = {}) {
   const target = document.createElement('div');
   document.body.appendChild(target);
-  mount(OnboardingWizard, { target, props });
+  mount(OnboardingWizard, { target, props: { sources: defaultSources, ...props } });
   return target;
 }
 
@@ -70,6 +79,25 @@ describe('OnboardingWizard', () => {
     expect(target.textContent).toContain('Recevoir un insight');
     expect(target.textContent).toContain('5/5');
     expect(target.textContent).toContain('Action recommandée après le scan');
+  });
+
+  it('renders only connector sources shipped in the current build', async () => {
+    const target = mountWizard({
+      sources: [
+        { id: 'free-work', name: 'Free-Work' },
+        { id: 'malt', name: 'Malt' },
+      ],
+    });
+    await tick();
+
+    clickButton(target, 'Configurer le radar');
+    await tick();
+
+    expect(target.textContent).toContain('Free-Work');
+    expect(target.textContent).toContain('Malt');
+    expect(target.textContent).not.toContain('LeHibou');
+    expect(target.textContent).not.toContain('Hiway');
+    expect(target.textContent).not.toContain('Collective');
   });
 
   it('saves the first alert before showing the insight step', async () => {

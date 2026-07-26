@@ -27,8 +27,6 @@
 <script lang="ts">
   import { Chip } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
-  import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import type { SeniorityLevel } from '$lib/core/types/profile';
   import type { SavedFeedView } from '$lib/core/types/feed-view';
   import Tooltip from '../atoms/Tooltip.svelte';
 
@@ -123,7 +121,7 @@
 
     {#if savedViews.length > 0}
       <div class="flex flex-wrap gap-1.5">
-        {#each savedViews as view}
+        {#each savedViews as view (view.id)}
           <span
             class="group inline-flex items-center overflow-hidden rounded-lg border transition-colors {activeSavedViewId ===
             view.id
@@ -167,7 +165,7 @@
         <Tooltip label="Valider la vue" description="Enregistre ce filtre dans vos vues rapides.">
           <button
             type="submit"
-            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue text-surface-white transition-opacity disabled:opacity-40"
+            class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue-strong text-white transition-opacity disabled:opacity-40"
             disabled={isSaving}
             aria-label="Valider le nom de la vue"
           >
@@ -181,7 +179,7 @@
   <div>
     <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Source</p>
     <div class="flex flex-wrap gap-1.5">
-      {#each sources as source}
+      {#each sources as source (source)}
         <Chip
           label={source.label}
           selected={selectedSource === source.value}
@@ -194,7 +192,7 @@
   <div>
     <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Mode de travail</p>
     <div class="flex flex-wrap gap-1.5">
-      {#each remoteTypes as remote}
+      {#each remoteTypes as remote (remote)}
         <Chip
           label={remote.label}
           selected={selectedRemote === remote.value}
@@ -207,7 +205,7 @@
   <div>
     <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Séniorité</p>
     <div class="flex flex-wrap gap-1.5">
-      {#each seniorityLevels as level}
+      {#each seniorityLevels as level (level)}
         <Chip
           label={level.label}
           selected={selectedSeniority === level.value}
@@ -221,7 +219,7 @@
     <div>
       <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Technologies</p>
       <div class="flex flex-wrap gap-1.5">
-        {#each availableStacks as stack}
+        {#each availableStacks as stack (stack)}
           <Chip
             label={stack}
             selected={selectedStacks.includes(stack)}

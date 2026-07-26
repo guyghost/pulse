@@ -1,5 +1,5 @@
-import { beforeEach, describe, expect, it } from 'vitest';
-import { mount, tick } from 'svelte';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mount, tick, unmount } from 'svelte';
 import MissionComparison from '../../../src/ui/organisms/MissionComparison.svelte';
 import type { Mission } from '$lib/core/types/mission';
 import type { Grade, ScoreBreakdown } from '$lib/core/types/score';
@@ -95,16 +95,16 @@ describe('MissionComparison score', () => {
       }),
     ];
 
-    const target = mountComparison(missions);
+    mountComparison(missions);
     await tick();
 
     // The canonical fused score (85) must render in BOTH the recommendation
     // evidence and the comparison table cell for the recommended mission.
-    const occurrences = target.textContent?.match(/85\/100/g) ?? [];
+    const occurrences = document.body.textContent?.match(/85\/100/g) ?? [];
     expect(occurrences.length).toBeGreaterThanOrEqual(2);
 
     // The divergent legacy semantic score must never be shown as a score cell.
-    expect(target.textContent).not.toContain('78/100');
+    expect(document.body.textContent).not.toContain('78/100');
   });
 
   it('ranks the recommendation by the fused total', async () => {
@@ -125,10 +125,83 @@ describe('MissionComparison score', () => {
       }),
     ];
 
-    const target = mountComparison(missions);
+    mountComparison(missions);
     await tick();
 
     // high-total (91) outranks low-semantic (88) despite the 99 semantic bait.
-    expect(target.textContent).toContain('Priorité: True best');
+    expect(document.body.textContent).toContain('Priorité: True best');
+  });
+});
+
+describe('MissionComparison modal focus', () => {
+  beforeEach(() => {
+    document.body.innerHTML = '';
+  });
+
+  it('focuses close, traps Tab, closes with Escape and restores the trigger', async () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Comparer';
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const missions = [
+      makeMission({ id: 'a', title: 'Mission A', url: 'https://example.com/a' }),
+      makeMission({ id: 'b', title: 'Mission B', url: 'https://example.com/b' }),
+    ];
+    let component: ReturnType<typeof mount> | null = null;
+    const onClose = vi.fn(() => {
+      if (component) {
+        void unmount(component);
+      }
+    });
+    component = mount(MissionComparison, { target, props: { missions, onClose } });
+    await tick();
+    await Promise.resolve();
+
+    const dialog = document.querySelector<HTMLElement>('[role="dialog"]');
+    const close = document.querySelector<HTMLButtonElement>('[aria-label="Fermer"]');
+    expect(document.activeElement).toBe(close);
+    expect(dialog?.getAttribute('aria-modal')).toBe('true');
+
+    close!.focus();
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
+    );
+    expect(document.activeElement).toBe(
+      document.querySelector<HTMLAnchorElement>('[data-modal-mission-link]')
+    );
+
+    document.dispatchEvent(
+      new KeyboardEvent('keydown', { key: 'Escape', bubbles: true, cancelable: true })
+    );
+    await tick();
+    await Promise.resolve();
+
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(document.activeElement).toBe(trigger);
+  });
+
+  it('does not restore an external trigger for an owner unmount', async () => {
+    const trigger = document.createElement('button');
+    trigger.textContent = 'Comparer';
+    document.body.appendChild(trigger);
+    trigger.focus();
+
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    const component = mount(MissionComparison, {
+      target,
+      props: {
+        missions: [makeMission({ id: 'a' }), makeMission({ id: 'b' })],
+        onClose: () => {},
+      },
+    });
+    await tick();
+    await Promise.resolve();
+    await unmount(component);
+
+    expect(document.activeElement).not.toBe(trigger);
   });
 });
