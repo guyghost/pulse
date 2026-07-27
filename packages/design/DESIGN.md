@@ -75,7 +75,7 @@ it's set per-element (uppercase labels tracked wide, body neutral). Tokens follo
 | meta            | 0.75    | 12  | 1.5         | `text-xs`, 12px metadata      | `--text-meta`            |
 | body            | 0.8125  | 13  | 1.55        | `text-[13px]`, body copy      | `--text-body`            |
 | body-lg         | 0.875   | 14  | 1.55        | `text-sm`, 14px               | `--text-body-lg`         |
-| subheading      | 1       | 16  | 1.4         | `text-base`, 15px             | `--text-subheading`      |
+| subheading      | 1       | 16  | 1.4         | `text-base`, 16px             | `--text-subheading`      |
 | heading         | 1.125   | 18  | 1.3         | `text-lg`, 18px               | `--text-heading`         |
 | heading-lg      | 1.25    | 20  | 1.25        | `text-xl`, 20px               | `--text-heading-lg`      |
 | display-sm      | 1.5     | 24  | 1.2         | `text-2xl`, 24px              | `--text-display-sm`      |
