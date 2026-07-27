@@ -873,7 +873,10 @@ async function executeAcceptedScanOperation(
           const notifySeenSet = new Set(notifySeenIds);
           const notifiableMissions = result.missions.filter((m) => !notifySeenSet.has(m.id));
           if (notifiableMissions.length > 0) {
-            const notification = await notifyHighScoreMissions(notifiableMissions, settingsSnapshot);
+            const notification = await notifyHighScoreMissions(
+              notifiableMissions,
+              settingsSnapshot
+            );
             if (notification.shown && notification.notifiedMissionIds.length > 0) {
               await saveSeenIds(markAsSeen(notifySeenIds, notification.notifiedMissionIds));
             }
