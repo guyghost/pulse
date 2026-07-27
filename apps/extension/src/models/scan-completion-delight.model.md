@@ -5,7 +5,7 @@
 
 ## Statut
 
-Ce modèle est un **projection de présentation pure**. Il ne définit **aucune
+Ce modèle est **une projection de présentation pure**. Il ne définit **aucune
 nouvelle transition produit**. L'état canonique du scan reste
 [`scan-lifecycle.model.md`](./scan-lifecycle.model.md). `buildScanSummary()` ne
 fait que projeter ces faits en copie/ton/preuves. **Le modèle décide ; la
@@ -79,14 +79,25 @@ Label `Prioritaires {thr}+` → `Prioritaires` quand `threshold = 0`.
 - **Front montant de `controller.lastScanAt`** (monotone, défini uniquement sur
   succès). À chaque changement détecté pendant `!isScanning`, on (re)calcule et
   on révèle.
+- **Garde anti-hydratation** : `lastScanAt` part de `null` et s'hydrate de façon
+  asynchrone depuis IndexedDB lors de `init()`. La première valeur observée
+  (quand `everScanned === false`) est traitée comme **ligne de base**, pas comme
+  un scan nouvellement terminé — sinon la réouverture du panneau révélerait un
+  résumé stale. `everScanned` passe à `true` dès qu'un vrai `isScanning` est vu
+  pendant la session.
+- **Démarrage d'un nouveau scan** : quand `isScanning` passe à `true`, le
+  résumé visible est masqué immédiatement, `scanSummary` est nullé et le timer
+  d'auto-dismiss est annulé. Un scan qui échoue ou est annulé juste après ne
+  produit pas de front sur `lastScanAt` → aucun résumé stale ne réapparaît.
 - **Pas de révélation à l'ouverture** du panneau si un scan est déjà terminé :
-  on initialise le seuil précédent à la valeur courante au montage.
+  couvert par la garde anti-hydratation ci-dessus.
 - **Annulation / échec** : `lastScanAt` n'est pas mis à jour → pas de front →
   aucun résumé. Couverture naturelle par l'invariant du contrôleur.
 
 ## Effets de bord du shell (page)
 
-- Révélation via `{#if}` ; transition `fly`/`fade` (~180ms, quart-out).
+- Révélation via `{#if}` ; transitions `in:fly` (~180ms) à l'entrée et
+  `out:fade` (~150ms) à la sortie, indépendantes (quart-out).
 - **Auto-dismiss 4,5s** après révélation (timer nettoyé au démontage).
 - **Dismissing** : bouton X discret, démarrage du scan suivant, ou timeout.
 - **Reduced motion** : `matchMedia('(prefers-reduced-motion: reduce)')` →

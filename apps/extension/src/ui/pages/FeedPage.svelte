@@ -634,11 +634,17 @@
   let scanSummary = $state<ScanSummaryData | null>(null);
   let scanSummaryVisible = $state(false);
   let scanSummaryTimer: ReturnType<typeof setTimeout> | undefined;
-  // Plain (non-reactive) ref for edge detection on the monotonic lastScanAt.
+  // Plain (non-reactive) refs for edge detection on the monotonic lastScanAt.
   let prevScanAt: number | null = controller.lastScanAt;
+  // Suppresses reveal until a real scan is observed this session. The
+  // controller starts with lastScanAt === null and hydrates the persisted
+  // timestamp asynchronously during init(); without this guard, hydration
+  // reads as a newly completed scan and surfaces a stale summary on reopen.
+  let everScanned = false;
 
   function dismissScanSummary(): void {
     scanSummaryVisible = false;
+    scanSummary = null;
     if (scanSummaryTimer) {
       clearTimeout(scanSummaryTimer);
       scanSummaryTimer = undefined;
@@ -648,11 +654,34 @@
   $effect(() => {
     const ts = controller.lastScanAt;
     const scanning = controller.isScanning;
-    if (ts === prevScanAt) {
+
+    // A new scan starting dismisses any visible summary immediately, and
+    // nulls it so a subsequent failed/cancelled scan (no lastScanAt update)
+    // can never resurface a stale success summary. The baseline is synced
+    // here too, so a non-update after a failed scan produces no edge.
+    if (scanning) {
+      everScanned = true;
+      if (scanSummaryVisible || scanSummary || scanSummaryTimer) {
+        scanSummaryVisible = false;
+        scanSummary = null;
+        if (scanSummaryTimer) {
+          clearTimeout(scanSummaryTimer);
+          scanSummaryTimer = undefined;
+        }
+      }
+      prevScanAt = ts;
       return;
     }
-    // Wait for scanning to settle so the summary reveals only on a true finish.
-    if (ts === null || scanning) {
+
+    // Hydration guard: treat the first observed lastScanAt as baseline, not
+    // a freshly completed scan, so reopening the panel never reveals a
+    // stale summary.
+    if (!everScanned) {
+      prevScanAt = ts;
+      return;
+    }
+
+    if (ts === null || ts === prevScanAt) {
       return;
     }
     prevScanAt = ts;
@@ -668,6 +697,7 @@
     }
     scanSummaryTimer = setTimeout(() => {
       scanSummaryVisible = false;
+      scanSummary = null;
       scanSummaryTimer = undefined;
     }, 4500);
   });
@@ -1252,12 +1282,6 @@
               statuses={controller.connectorStatuses}
             />
 
-            {#if scanSummaryVisible && scanSummary && !feedChromeBusy}
-              <div class="mt-3">
-                <ScanSummaryCard summary={scanSummary} onDismiss={dismissScanSummary} />
-              </div>
-            {/if}
-
             <div class="mt-3">
               <OperationalStoryCard
                 eyebrow="À faire maintenant"
@@ -1344,6 +1368,12 @@
             {:else if page.aiStatus === 'no'}
               <p class="mt-2 text-center text-caption text-text-muted">Scoring IA indisponible</p>
             {/if}
+          {/if}
+
+          {#if scanSummaryVisible && scanSummary && !feedChromeBusy}
+            <div class="mt-3">
+              <ScanSummaryCard summary={scanSummary} onDismiss={dismissScanSummary} />
+            </div>
           {/if}
         </div>
 

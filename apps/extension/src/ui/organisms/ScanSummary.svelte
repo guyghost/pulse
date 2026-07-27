@@ -44,10 +44,11 @@
 </script>
 
 <div
-  class="scan-summary flex items-center gap-3 rounded-xl border border-border-light bg-surface-white px-3.5 py-3 shadow-[0_1px_2px_rgba(12,10,9,0.04)]"
+  class="scan-summary flex flex-wrap items-center gap-3 rounded-xl border border-border-light bg-surface-white px-3.5 py-3 shadow-[0_1px_2px_rgba(12,10,9,0.04)]"
   role="status"
   aria-live="polite"
-  transition:fly={{ y: 4, duration: enterMs }}
+  in:fly={{ y: 4, duration: enterMs }}
+  out:fade={{ duration: leaveMs }}
 >
   <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg {chipClass}">
     <Icon name={iconName} size={16} />
@@ -59,7 +60,7 @@
   </div>
 
   {#if summary.evidence.length > 0}
-    <dl class="flex shrink-0 flex-wrap items-center justify-end gap-1.5">
+    <dl class="flex min-w-0 flex-wrap items-center justify-end gap-1.5">
       {#each summary.evidence as row (row.label)}
         <div class="rounded-lg bg-page-canvas px-2 py-1 text-center">
           <dt class="text-micro uppercase tracking-[0.1em] text-text-muted">{row.label}</dt>
@@ -76,7 +77,6 @@
     class="soft-ring -m-1 flex h-7 w-7 shrink-0 items-center justify-center rounded-full text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
     aria-label="Masquer le résumé du scan"
     onclick={onDismiss}
-    transition:fade={{ duration: leaveMs }}
   >
     <Icon name="x" size={14} />
   </button>
