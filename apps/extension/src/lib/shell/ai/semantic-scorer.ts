@@ -11,6 +11,7 @@ import { createPromptSession, isPromptApiAvailable } from './capabilities';
 import { getCachedSemanticScores, cacheSemanticScores } from '../storage/semantic-cache';
 import type { AILanguageModelSession } from './chrome-ai';
 import { abortableDelay } from '../utils/retry-strategy';
+import { computeFinalBreakdown } from '../../core/scoring/final-score';
 
 const TIMEOUT_MS = 5000;
 const RETRY_DELAYS_MS = [500, 1000] as const;
@@ -189,4 +190,48 @@ export const scoreMissionsSemantic = async (
   }
 
   return results;
+};
+
+/**
+ * Post-terminal semantic enrichment: score missions via Gemini Nano and fuse
+ * the results into each mission's score breakdown in place.
+ *
+ * Non-blocking relative to lifecycle — callers run this AFTER the terminal
+ * broadcast so it can never delay `SCAN_COMPLETE`. No-ops when there are no
+ * missions or when no semantic scores are available (cache miss + unavailable
+ * Prompt API). Returns the same mission array (mutated in place) and whether
+ * at least one mission was enriched, so callers can skip persistence/broadcast.
+ */
+export const enrichMissionsWithSemanticScores = async (
+  missions: Mission[],
+  profile: UserProfile,
+  maxPerScan: number,
+  signal?: AbortSignal
+): Promise<{ missions: Mission[]; changed: boolean }> => {
+  if (missions.length === 0) {
+    return { missions, changed: false };
+  }
+  throwIfAborted(signal);
+  const results = await scoreMissionsSemantic(missions, profile, maxPerScan, signal);
+  throwIfAborted(signal);
+  if (results.size === 0) {
+    return { missions, changed: false };
+  }
+  let changed = false;
+  for (const mission of missions) {
+    const semantic = results.get(mission.id);
+    if (semantic && mission.scoreBreakdown) {
+      mission.scoreBreakdown = computeFinalBreakdown(
+        mission.scoreBreakdown.deterministic,
+        mission.scoreBreakdown.criteria,
+        semantic.score,
+        semantic.reason
+      );
+      mission.semanticScore = semantic.score;
+      mission.semanticReason = semantic.reason;
+      mission.score = mission.scoreBreakdown.total;
+      changed = true;
+    }
+  }
+  return { missions, changed };
 };

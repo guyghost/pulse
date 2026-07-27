@@ -306,9 +306,34 @@ if commit wins, the operation is already terminal and later cancel is rejected.
 - **Feed controller:** owns the current UI operation ID, projects state, clears
   cold Feed to `empty` after cancellation, and ignores stale messages.
 
-Semantic scoring may enrich a mission as a non-blocking signal. Its output can
-affect a deterministic score but cannot choose lifecycle state or terminal
-classification.
+Semantic scoring may enrich a mission as a **non-blocking, post-terminal**
+signal. Its output can affect a deterministic score but cannot choose lifecycle
+state or terminal classification.
+
+### Semantic enrichment projection
+
+Semantic scoring (Gemini Nano) MUST NOT delay the terminal broadcast. The
+enrichment runs as the last projection inside the operation's `afterTerminal`
+hook — i.e. strictly after `SCAN_COMPLETE` has been broadcast and after durable
+persistence (`saveMissions`) has settled.
+
+- **Input:** the persisted, deterministically-scored missions and the resolved
+  scan profile.
+- **Guard:** the enrichment is skipped when the profile is the default profile,
+  when the operation's abort signal is aborted, or when the Prompt API is
+  unavailable. Failure is logged and swallowed; it never produces a terminal
+  event.
+- **Output:** fused `scoreBreakdown` + `semanticScore`/`semanticReason` written
+  back to IndexedDB, then projected to the side panel via a single
+  `MISSIONS_UPDATED` message (no `cold-only` projection) that the feed controller
+  merges in place without altering feed lifecycle state.
+- **Serialization:** the enrichment executes inside the scan-admission barrier,
+  so it cannot overlap a newer scan's persistence. A newer scan admitted after
+  the barrier releases re-runs deterministic scoring on the fresh mission set;
+  cached semantic scores are applied by its own enrichment projection.
+- **Invariants:** missions are usable with deterministic scores alone; semantic
+  enrichment is idempotent and optional; the terminal classification chosen
+  before enrichment is never revised by it.
 
 ## Persistence boundary
 

@@ -1164,7 +1164,6 @@ function createChromeStubs() {
                   if (activeDevScan?.operationId !== operationId) {
                     return;
                   }
-                  activeDevScan = null;
                   emitRuntimeMessage({
                     type: 'SCAN_COMPLETE',
                     payload: { operationId, missions: bridgeMissions },
@@ -1176,6 +1175,39 @@ function createChromeStubs() {
                   );
                 },
                 Math.max(800, 500 + groupedBySource.length * 250)
+              )
+            );
+
+            // Simulate post-terminal semantic enrichment: a delayed in-place
+            // score refresh that arrives AFTER SCAN_COMPLETE so the "collecte"
+            // state clears immediately and scores refine later, mirroring the
+            // production Gemini Nano projection. activeDevScan stays claimed
+            // until this fires so a newer scan cannot overtake it (matches the
+            // production admission barrier).
+            timers.push(
+              setTimeout(
+                () => {
+                  if (activeDevScan?.operationId !== operationId) {
+                    return;
+                  }
+                  activeDevScan = null;
+                  const enriched = bridgeMissions.map((mission) => {
+                    if (typeof mission.score !== 'number') {
+                      return mission;
+                    }
+                    // Mild deterministic nudge to emulate fused semantic score.
+                    const nudged = Math.min(
+                      100,
+                      Math.max(0, Math.round(mission.score + (mission.id.charCodeAt(0) % 5) - 2))
+                    );
+                    return { ...mission, score: nudged };
+                  });
+                  emitRuntimeMessage({
+                    type: 'MISSIONS_UPDATED',
+                    payload: enriched,
+                  });
+                },
+                Math.max(800, 500 + groupedBySource.length * 250) + 1500
               )
             );
 

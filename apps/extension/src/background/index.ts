@@ -32,6 +32,7 @@ import {
   type ScanResult,
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
+import { enrichMissionsWithSemanticScores } from '../lib/shell/ai/semantic-scorer';
 import { createActor, type ActorRefFrom } from 'xstate';
 import {
   scanLifecycleMachine,
@@ -800,6 +801,43 @@ async function executeAcceptedScanOperation(
         await persistPostCommitEffects(result, settingsSnapshot);
       } catch (error) {
         console.warn('[MissionPulse] Post-commit scan effects failed:', error);
+      }
+
+      // Semantic enrichment runs strictly AFTER the terminal broadcast so it
+      // can never delay SCAN_COMPLETE. It is a non-blocking signal: failures
+      // are swallowed and never revise the terminal classification. The
+      // admission barrier (held until afterTerminal settles) serializes this
+      // against a newer scan's persistence.
+      if (
+        !result.usingDefaultProfile &&
+        result.profile &&
+        typeof result.maxSemanticPerScan === 'number' &&
+        !operation.controller.signal.aborted
+      ) {
+        try {
+          const { changed } = await enrichMissionsWithSemanticScores(
+            result.missions,
+            result.profile,
+            result.maxSemanticPerScan,
+            operation.controller.signal
+          );
+          if (changed && !operation.controller.signal.aborted) {
+            await saveMissions(result.missions, operation.controller.signal);
+            await chrome.runtime
+              .sendMessage({
+                type: 'MISSIONS_UPDATED',
+                payload: result.missions,
+              })
+              .catch(() => {
+                // Side panel not open; enriched missions remain durable.
+              });
+          }
+        } catch (error) {
+          if (operation.controller.signal.aborted) {
+            return;
+          }
+          console.warn('[MissionPulse] Semantic enrichment failed:', error);
+        }
       }
     });
 
