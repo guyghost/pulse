@@ -205,6 +205,11 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
+  import ScanSummaryCard from '../organisms/ScanSummary.svelte';
+  import {
+    buildScanSummary,
+    type ScanSummary as ScanSummaryData,
+  } from '$lib/core/scan/scan-summary';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import type { MissionSource } from '$lib/core/types/mission';
@@ -238,6 +243,11 @@
   const page = createFeedPageState(feed, controller);
   page.setup();
   onDestroy(() => page.dispose());
+  onDestroy(() => {
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+    }
+  });
 
   type TrackingStore = ReturnType<typeof import('$lib/state/tracking.svelte').createTrackingStore>;
   const emptyTrackings = new Map<string, MissionTracking>();
@@ -616,6 +626,51 @@
       alertScoreThreshold: alertPreferences.scoreThreshold,
     })
   );
+
+  // ── Scan completion delight ──────────────────────────────────────────
+  // Quiet, confident terminal summary shown the moment a scan finishes.
+  // Pure projection of scan-lifecycle terminal facts — introduces no state
+  // transition. Model: src/models/scan-completion-delight.model.md.
+  let scanSummary = $state<ScanSummaryData | null>(null);
+  let scanSummaryVisible = $state(false);
+  let scanSummaryTimer: ReturnType<typeof setTimeout> | undefined;
+  // Plain (non-reactive) ref for edge detection on the monotonic lastScanAt.
+  let prevScanAt: number | null = controller.lastScanAt;
+
+  function dismissScanSummary(): void {
+    scanSummaryVisible = false;
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+      scanSummaryTimer = undefined;
+    }
+  }
+
+  $effect(() => {
+    const ts = controller.lastScanAt;
+    const scanning = controller.isScanning;
+    if (ts === prevScanAt) {
+      return;
+    }
+    // Wait for scanning to settle so the summary reveals only on a true finish.
+    if (ts === null || scanning) {
+      return;
+    }
+    prevScanAt = ts;
+    scanSummary = buildScanSummary({
+      newCount: page.dashboardSummary.newCount,
+      highScoreCount: alertMatchCount,
+      brokenConnectorCount: brokenConnectors.length,
+      alertScoreThreshold: alertPreferences.scoreThreshold,
+    });
+    scanSummaryVisible = true;
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+    }
+    scanSummaryTimer = setTimeout(() => {
+      scanSummaryVisible = false;
+      scanSummaryTimer = undefined;
+    }, 4500);
+  });
 
   function formatMissionCount(count: number): string {
     return `${count} mission${count > 1 ? 's' : ''}`;
@@ -1196,6 +1251,12 @@
               total={controller.scanProgress.total}
               statuses={controller.connectorStatuses}
             />
+
+            {#if scanSummaryVisible && scanSummary && !feedChromeBusy}
+              <div class="mt-3">
+                <ScanSummaryCard summary={scanSummary} onDismiss={dismissScanSummary} />
+              </div>
+            {/if}
 
             <div class="mt-3">
               <OperationalStoryCard
