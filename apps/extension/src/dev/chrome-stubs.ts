@@ -520,6 +520,7 @@ function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
 function createChromeStubs() {
   let activeDevScan: {
     operationId: string;
+    trigger: 'manual' | 'alarm';
     timers: ReturnType<typeof setTimeout>[];
   } | null = null;
 
@@ -1120,7 +1121,12 @@ function createChromeStubs() {
             storage.feed_tour_seen = false;
             return { type: 'FEED_TOUR_SEEN_CLEARED', payload: { cleared: true } };
           case 'SCAN_START': {
-            const operationId = (message.payload as { operationId: string }).operationId;
+            const payload = message.payload as {
+              operationId: string;
+              trigger?: 'manual' | 'alarm';
+            };
+            const operationId = payload.operationId;
+            const trigger = payload.trigger ?? 'manual';
             if (activeDevScan) {
               return {
                 type: 'SCAN_BUSY',
@@ -1137,7 +1143,7 @@ function createChromeStubs() {
             const bridgeMissions = runtimeMissions.map(serializeMissionForBridge);
             const groupedBySource = [...groupMissionsBySource(bridgeMissions).entries()];
             const timers: ReturnType<typeof setTimeout>[] = [];
-            activeDevScan = { operationId, timers };
+            activeDevScan = { operationId, trigger, timers };
 
             groupedBySource.forEach(([connectorId, connectorMissions], index) => {
               timers.push(
@@ -1164,7 +1170,6 @@ function createChromeStubs() {
                   if (activeDevScan?.operationId !== operationId) {
                     return;
                   }
-                  activeDevScan = null;
                   emitRuntimeMessage({
                     type: 'SCAN_COMPLETE',
                     payload: { operationId, missions: bridgeMissions },
@@ -1176,6 +1181,24 @@ function createChromeStubs() {
                   );
                 },
                 Math.max(800, 500 + groupedBySource.length * 250)
+              )
+            );
+
+            // Simulate post-terminal semantic enrichment timing: activeDevScan
+            // stays claimed until this timer fires so a newer scan cannot overtake
+            // it (matches the production admission barrier). However, do NOT emit
+            // the delayed MISSIONS_UPDATED broadcast — it disrupts e2e tests that
+            // inject missions and expect stable order/state. The production
+            // enrichment flow (background/index.ts L815-860) is covered by unit
+            // tests; the dev stub only needs to simulate the timing/admission fence.
+            timers.push(
+              setTimeout(
+                () => {
+                  if (activeDevScan?.operationId === operationId) {
+                    activeDevScan = null;
+                  }
+                },
+                Math.max(800, 500 + groupedBySource.length * 250) + 1500
               )
             );
 
