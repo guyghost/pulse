@@ -33,7 +33,7 @@ describe('connected privacy copy', () => {
     expect(homePage).toContain('en local');
     expect(homePage).toContain('compte connecté');
     expect(homePage).toContain('synchronisation multi-appareils');
-    expect(homePage).toContain('via Supabase');
+    expect(homePage).toMatch(/via\s+Supabase/); // Whitespace-tolerant to handle line breaks
     expect(homePage).toContain('générations IA distantes');
     expect(privacyPage).toContain("L'exécution plateforme reste locale dans votre navigateur");
     expect(privacyPage).toContain('snapshots normalisés via Supabase');
