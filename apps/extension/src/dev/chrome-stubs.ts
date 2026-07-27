@@ -11,7 +11,6 @@ import {
 import { createInitialHealthSnapshot, type ConnectorHealthSnapshot } from '$lib/core/types/health';
 import { scoreMission } from '$lib/core/scoring/relevance';
 import { buildScoreBreakdown } from '$lib/core/scoring/final-score';
-import { scoreToGrade } from '$lib/core/types/score';
 import type { CanonicalCandidateProfileDraft } from '$lib/core/profile-extractors/types';
 import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extractors/merge-candidate-profile';
 import { countNewlyAddedExperiences } from '$lib/core/cv/experience-helpers';

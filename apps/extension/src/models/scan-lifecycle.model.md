@@ -313,9 +313,10 @@ state or terminal classification.
 ### Semantic enrichment projection
 
 Semantic scoring (Gemini Nano) MUST NOT delay the terminal broadcast. The
-enrichment runs as the last projection inside the operation's `afterTerminal`
-hook — i.e. strictly after `SCAN_COMPLETE` has been broadcast and after durable
-persistence (`saveMissions`) has settled.
+enrichment runs inside the operation's `afterTerminal` hook — strictly after
+`SCAN_COMPLETE` has been broadcast and after durable persistence (`saveMissions`)
+has settled — and before the high-score notification projection, so fused
+semantic scores participate in the notification decision.
 
 - **Input:** the persisted, deterministically-scored missions and the resolved
   scan profile.
@@ -327,6 +328,11 @@ persistence (`saveMissions`) has settled.
   back to IndexedDB, then projected to the side panel via a single
   `MISSIONS_UPDATED` message (no `cold-only` projection) that the feed controller
   merges in place without altering feed lifecycle state.
+- **Notification ordering:** the high-score notification projection runs AFTER
+  enrichment. When enrichment is skipped (default profile / no Prompt API),
+  notifications fall back to deterministic scores. This preserves pre-enrichment
+  notification semantics: a mission whose deterministic score is below the
+  threshold but whose fused semantic score exceeds it is still notified.
 - **Serialization:** the enrichment executes inside the scan-admission barrier,
   so it cannot overlap a newer scan's persistence. A newer scan admitted after
   the barrier releases re-runs deterministic scoring on the fresh mission set;

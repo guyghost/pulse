@@ -798,7 +798,7 @@ async function executeAcceptedScanOperation(
       }
 
       try {
-        await persistPostCommitEffects(result, settingsSnapshot);
+        await persistPostCommitEffects(result);
       } catch (error) {
         console.warn('[MissionPulse] Post-commit scan effects failed:', error);
       }
@@ -856,6 +856,32 @@ async function executeAcceptedScanOperation(
             return;
           }
           console.warn('[MissionPulse] Semantic enrichment failed:', error);
+        }
+      }
+
+      // High-score notifications run AFTER semantic enrichment so missions
+      // whose deterministic score is below the configured threshold but whose
+      // fused semantic score exceeds it are still notified. When enrichment is
+      // skipped (default profile or no Prompt API), notifications fall back to
+      // deterministic scores. Only unseen missions are passed, matching the
+      // pre-enrichment contract; notifyHighScoreMissions persists its focus
+      // intent before showing Chrome's notification, so a fast click cannot
+      // race ahead of that write.
+      try {
+        if (result.missions.length > 0 && !operation.controller.signal.aborted) {
+          const notifySeenIds = await getSeenIds();
+          const notifySeenSet = new Set(notifySeenIds);
+          const notifiableMissions = result.missions.filter((m) => !notifySeenSet.has(m.id));
+          if (notifiableMissions.length > 0) {
+            const notification = await notifyHighScoreMissions(notifiableMissions, settingsSnapshot);
+            if (notification.shown && notification.notifiedMissionIds.length > 0) {
+              await saveSeenIds(markAsSeen(notifySeenIds, notification.notifiedMissionIds));
+            }
+          }
+        }
+      } catch (notifyError) {
+        if (!operation.controller.signal.aborted) {
+          console.warn('[MissionPulse] High-score notification projection failed:', notifyError);
         }
       }
     });
@@ -1068,8 +1094,7 @@ async function recheckConnectorHealth(
 }
 
 async function persistPostCommitEffects(
-  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>,
-  settingsSnapshot: import('../lib/shell/settings-release/settings-release.contract').SettingsReleaseSnapshot
+  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>
 ): Promise<void> {
   const { missions, errors } = result;
   const now = Date.now();
@@ -1136,17 +1161,10 @@ async function persistPostCommitEffects(
     } else {
       await clearNewMissionBadge();
     }
-
-    // notifyHighScoreMissions persists its focus intent before showing Chrome's
-    // notification, so a fast click cannot race ahead of that write.
-    if (newCount > 0) {
-      const notification = await notifyHighScoreMissions(newMissions, settingsSnapshot);
-      if (notification.shown && notification.notifiedMissionIds.length > 0) {
-        await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
-      }
-    }
   } catch {
-    // Badge and notification projections are non-critical after commit.
+    // Badge projection is non-critical after commit. High-score notifications
+    // are evaluated separately, after semantic enrichment, so fused semantic
+    // scores participate in the notification decision.
   }
 }
 
