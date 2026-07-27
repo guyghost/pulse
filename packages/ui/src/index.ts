@@ -7,6 +7,8 @@ export { default as Indicator } from './lib/atoms/Indicator.svelte';
 export { default as GlassCard } from './lib/atoms/GlassCard.svelte';
 export { default as GlowButton } from './lib/atoms/GlowButton.svelte';
 export { default as Toast } from './lib/atoms/Toast.svelte';
+export { default as Toggle } from './lib/atoms/Toggle.svelte';
+export type { ToggleSize } from './lib/atoms/Toggle.svelte';
 export { default as Icon } from './lib/atoms/Icon.svelte';
 
 // Icons (tree-shakeable)

@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, Toggle } from '@pulse/ui';
 
   const {
     autoScan,
@@ -38,21 +38,11 @@
         <p class="mt-0.5 text-meta text-text-subtle">Scanner les plateformes en arrière-plan.</p>
       </div>
     </div>
-    <button
-      class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200
-        {autoScan
-        ? 'border-accent-green/30 bg-accent-green/15'
-        : 'border-border-light bg-surface-white'}"
-      onclick={onToggleAutoScan}
-      role="switch"
-      aria-checked={autoScan}
+    <Toggle
+      checked={autoScan}
       aria-label="Activer le scan automatique"
-    >
-      <span
-        class="inline-block h-4 w-4 rounded-full transition-transform duration-200
-          {autoScan ? 'translate-x-5.5 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
-      ></span>
-    </button>
+      onclick={onToggleAutoScan}
+    />
   </div>
 </div>
 
@@ -134,20 +124,10 @@
         </p>
       </div>
     </div>
-    <button
-      class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200
-        {notifications
-        ? 'border-accent-green/30 bg-accent-green/15'
-        : 'border-border-light bg-surface-white'}"
-      onclick={onToggleNotifications}
-      role="switch"
-      aria-checked={notifications}
+    <Toggle
+      checked={notifications}
       aria-label="Activer les notifications"
-    >
-      <span
-        class="inline-block h-4 w-4 rounded-full transition-transform duration-200
-          {notifications ? 'translate-x-5.5 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
-      ></span>
-    </button>
+      onclick={onToggleNotifications}
+    />
   </div>
 </div>

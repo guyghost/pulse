@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, Toggle } from '@pulse/ui';
   import CircuitBadge from '../atoms/CircuitBadge.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
   import type { AppError } from '$lib/core/errors';
@@ -363,21 +363,12 @@
           >
             <!-- Toggle switch -->
             {#if onToggleConnector}
-              <button
-                class="relative inline-flex h-5 w-9 shrink-0 items-center rounded-full border transition-colors duration-200
-                  {isEnabled
-                  ? 'border-accent-green/30 bg-accent-green/15'
-                  : 'border-border-light bg-surface-white'}"
-                onclick={() => onToggleConnector(source.connectorId)}
-                role="switch"
-                aria-checked={isEnabled}
+              <Toggle
+                size="sm"
+                checked={isEnabled}
                 aria-label={isEnabled ? `Désactiver ${source.name}` : `Activer ${source.name}`}
-              >
-                <span
-                  class="inline-block h-3.5 w-3.5 rounded-full transition-transform duration-200
-                    {isEnabled ? 'translate-x-4 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
-                ></span>
-              </button>
+                onclick={() => onToggleConnector(source.connectorId)}
+              />
             {/if}
 
             <!-- Favicon -->
