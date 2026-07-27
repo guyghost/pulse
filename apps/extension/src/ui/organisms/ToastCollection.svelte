@@ -49,10 +49,10 @@
           <div
             class="flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-surface-white px-4 py-3 font-geist text-blueprint-blue shadow-subtle"
           >
-            <p class="flex-1 text-xs font-medium">{toast.message}</p>
+            <p class="flex-1 text-meta font-medium">{toast.message}</p>
             <button
               type="button"
-              class="rounded-md px-2 py-1 text-[11px] font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
+              class="rounded-md px-2 py-1 text-caption font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/8"
               onclick={() => handleAction(toast.id, toast.action!.onClick)}
             >
               {toast.action.label}

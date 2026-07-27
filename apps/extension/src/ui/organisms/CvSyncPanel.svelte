@@ -64,8 +64,8 @@
 <div class="section-card-strong rounded-xl p-4">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div class="min-w-0">
-      <h2 class="text-sm font-semibold text-text-primary">Synchronisation du CV</h2>
-      <p class="mt-0.5 text-[11px] leading-relaxed text-text-secondary">
+      <h2 class="text-body-lg font-semibold text-text-primary">Synchronisation du CV</h2>
+      <p class="mt-0.5 text-caption leading-relaxed text-text-secondary">
         Copie le bloc CV dans le presse-papiers puis ouvre chaque plateforme pour collage manuel.
       </p>
     </div>
@@ -90,7 +90,7 @@
 
   {#if headline}
     <div
-      class="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed
+      class="mt-3 flex items-center gap-2 rounded-lg px-3 py-2 text-caption leading-relaxed
         {store.syncStatus === 'synced'
         ? 'bg-accent-green/10 text-text-primary'
         : store.syncStatus === 'partial'
@@ -116,8 +116,8 @@
       {#each platforms as platform (platform.id)}
         {@const meta = statusMeta(store.platformStatuses.get(platform.id))}
         <li class="flex items-center justify-between gap-2 rounded-md px-2 py-1.5">
-          <span class="truncate text-xs text-text-secondary">{platform.name}</span>
-          <span class="inline-flex shrink-0 items-center gap-1 text-[11px] {meta.class}">
+          <span class="truncate text-meta text-text-secondary">{platform.name}</span>
+          <span class="inline-flex shrink-0 items-center gap-1 text-caption {meta.class}">
             {#if meta.icon}
               <Icon name={meta.icon} size={12} class={meta.spin ? 'animate-spin' : ''} />
             {:else}

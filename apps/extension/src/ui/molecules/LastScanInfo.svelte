@@ -30,7 +30,7 @@
 </script>
 
 {#if timeAgo}
-  <div class="flex items-center gap-1.5 text-[11px] text-text-muted">
+  <div class="flex items-center gap-1.5 text-caption text-text-muted">
     <Icon name="clock" size={11} />
     <span>Dernier scan {timeAgo}</span>
     {#if missionCount > 0}

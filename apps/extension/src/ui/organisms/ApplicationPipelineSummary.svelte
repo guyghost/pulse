@@ -91,10 +91,10 @@
       >
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
               {card.label}
             </p>
-            <p class="mt-1 text-lg font-semibold tabular-nums text-text-primary">
+            <p class="mt-1 text-heading font-semibold tabular-nums text-text-primary">
               {card.value}
             </p>
           </div>
@@ -112,19 +112,17 @@
             <Icon name={card.icon} size={13} />
           </span>
         </div>
-        <p class="mt-1 text-[10px] font-medium text-text-primary">{card.stateLabel}</p>
-        <p class="mt-0.5 min-h-7 text-[10px] leading-4 text-text-subtle">{card.hint}</p>
+        <p class="mt-1 text-micro font-medium text-text-primary">{card.stateLabel}</p>
+        <p class="mt-0.5 min-h-7 text-micro leading-4 text-text-subtle">{card.hint}</p>
       </div>
     {/each}
   </div>
 
   <div class="rounded-xl border border-border-light bg-surface-white p-3">
     <div class="mb-2 flex items-center justify-between gap-3">
-      <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
-        Avancement
-      </p>
+      <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">Avancement</p>
       {#if summary.bottleneck}
-        <p class="flex items-center gap-1 text-[10px] text-text-subtle">
+        <p class="flex items-center gap-1 text-micro text-text-subtle">
           <Icon name="traffic-cone" size={11} />
           Goulot: {summary.bottleneck.label}
         </p>
@@ -135,8 +133,8 @@
         {@const width = Math.max(3, Math.round((stage.count / maxStageCount) * 100))}
         <div>
           <div class="flex items-center justify-between gap-2">
-            <span class="truncate text-[11px] text-text-subtle">{stage.label}</span>
-            <span class="text-[11px] font-mono tabular-nums text-text-primary">{stage.count}</span>
+            <span class="truncate text-caption text-text-subtle">{stage.label}</span>
+            <span class="text-caption font-mono tabular-nums text-text-primary">{stage.count}</span>
           </div>
           <div class="mt-1 h-1.5 rounded-full bg-subtle-gray">
             <div

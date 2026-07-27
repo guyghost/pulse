@@ -199,16 +199,16 @@
   <section class="rounded-xl border border-border-light bg-surface-white p-3">
     <div class="flex items-start justify-between gap-3">
       <div>
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
           Premier lancement
         </p>
-        <h2 class="mt-1 text-sm font-semibold text-text-primary">
+        <h2 class="mt-1 text-body-lg font-semibold text-text-primary">
           {currentStepDefinition.label}
         </h2>
-        <p class="mt-1 text-xs leading-5 text-text-subtle">
+        <p class="mt-1 text-meta leading-5 text-text-subtle">
           {currentStepDefinition.description}
         </p>
-        <div class="mt-2 flex flex-wrap items-center gap-2 text-[11px] text-text-muted">
+        <div class="mt-2 flex flex-wrap items-center gap-2 text-caption text-text-muted">
           <span
             class="inline-flex items-center gap-1 rounded-md border border-border-light bg-page-canvas px-2 py-1"
           >
@@ -230,7 +230,7 @@
         />
         <button
           type="button"
-          class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2 py-1 text-[11px] font-medium text-text-subtle transition-colors hover:bg-surface-white hover:text-text-primary"
+          class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2 py-1 text-caption font-medium text-text-subtle transition-colors hover:bg-surface-white hover:text-text-primary"
           onclick={onSkip}
           aria-label="Passer l’onboarding"
         >
@@ -264,15 +264,15 @@
           <Icon name="radar" size={16} />
         </div>
         <div>
-          <p class="text-sm font-semibold text-text-primary">
+          <p class="text-body-lg font-semibold text-text-primary">
             Choisissez la première plateforme à scanner.
           </p>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Pulse récupère les missions depuis vos sessions Chrome, puis affiche celles à traiter en
             premier.
           </p>
           <button
-            class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white"
+            class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white"
             type="button"
             onclick={goNext}
           >
@@ -284,17 +284,17 @@
     </section>
   {:else if currentStep === 'source'}
     <section class="rounded-xl border border-border-light bg-surface-white p-4">
-      <p class="text-sm font-semibold text-text-primary">
+      <p class="text-body-lg font-semibold text-text-primary">
         Choisissez la première source à vérifier
       </p>
-      <p class="mt-1 text-xs leading-5 text-text-subtle">
+      <p class="mt-1 text-meta leading-5 text-text-subtle">
         Pulse utilisera vos sessions navigateur existantes. Aucun identifiant n’est stocké.
       </p>
       <div class="mt-3 grid grid-cols-2 gap-2">
         {#each sources as source (source.id)}
           <button
             type="button"
-            class="rounded-lg border px-3 py-2 text-left text-xs font-medium transition-colors {selectedSourceId ===
+            class="rounded-lg border px-3 py-2 text-left text-meta font-medium transition-colors {selectedSourceId ===
             source.id
               ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
               : 'border-border-light bg-page-canvas text-text-primary'}"
@@ -305,7 +305,7 @@
         {/each}
       </div>
       <button
-        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white"
+        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white"
         type="button"
         disabled={selectedSource === null}
         onclick={goNext}
@@ -316,21 +316,23 @@
     </section>
   {:else if currentStep === 'activity'}
     <section class="rounded-xl border border-border-light bg-surface-white p-4">
-      <p class="text-sm font-semibold text-text-primary">Le premier scan classera vos missions</p>
+      <p class="text-body-lg font-semibold text-text-primary">
+        Le premier scan classera vos missions
+      </p>
       <div class="mt-3 space-y-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
-          <p class="text-xs font-medium text-text-primary">Mission prioritaire détectée</p>
-          <p class="mt-0.5 text-[11px] text-text-subtle">Score 86, stack forte, TJM compatible.</p>
+          <p class="text-meta font-medium text-text-primary">Mission prioritaire détectée</p>
+          <p class="mt-0.5 text-caption text-text-subtle">Score 86, stack forte, TJM compatible.</p>
         </div>
         <div class="rounded-lg border border-status-orange/20 bg-status-orange/8 px-3 py-2">
-          <p class="text-xs font-medium text-status-orange">Source à vérifier</p>
-          <p class="mt-0.5 text-[11px] text-text-subtle">
+          <p class="text-meta font-medium text-status-orange">Source à vérifier</p>
+          <p class="mt-0.5 text-caption text-text-subtle">
             Si une source casse, Pulse affiche l’impact avant les résultats.
           </p>
         </div>
       </div>
       <button
-        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white"
+        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white"
         type="button"
         onclick={goNext}
       >
@@ -340,10 +342,10 @@
     </section>
   {:else if currentStep === 'alert'}
     <section class="rounded-xl border border-border-light bg-surface-white p-4">
-      <label for="ob-alert-threshold" class="text-sm font-semibold text-text-primary">
+      <label for="ob-alert-threshold" class="text-body-lg font-semibold text-text-primary">
         Alerte prioritaire
       </label>
-      <p class="mt-1 text-xs leading-5 text-text-subtle">
+      <p class="mt-1 text-meta leading-5 text-text-subtle">
         Les missions au-dessus de ce score doivent apparaître comme action à traiter.
       </p>
       <div class="mt-3 flex items-center gap-3">
@@ -357,13 +359,13 @@
           bind:value={alertThreshold}
         />
         <span
-          class="w-12 text-right font-mono text-sm font-semibold tabular-nums text-text-primary"
+          class="w-12 text-right font-mono text-body-lg font-semibold tabular-nums text-text-primary"
         >
           {alertThreshold}+
         </span>
       </div>
       <button
-        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white"
+        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white"
         type="button"
         onclick={saveAlertAndContinue}
         disabled={isSavingAlertPreferences}
@@ -381,8 +383,10 @@
           <Icon name="lightbulb" size={16} />
         </div>
         <div>
-          <p class="text-sm font-semibold text-text-primary">Action recommandée après le scan</p>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="text-body-lg font-semibold text-text-primary">
+            Action recommandée après le scan
+          </p>
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Commencer par les missions {alertThreshold}+ issues de {selectedSource?.name ??
               'la source choisie'}, puis vérifier les sources qui n’ont rien remonté.
           </p>
@@ -393,8 +397,8 @@
 
   <div class="space-y-2">
     <div>
-      <p class="text-sm font-semibold text-text-primary">Personnalisez vos résultats</p>
-      <p class="mt-1 text-xs leading-relaxed text-text-secondary">
+      <p class="text-body-lg font-semibold text-text-primary">Personnalisez vos résultats</p>
+      <p class="mt-1 text-meta leading-relaxed text-text-secondary">
         Cette étape est facultative. Ajoutez au moins votre poste et vos mots-clés pour mieux
         classer les missions.
       </p>
@@ -402,40 +406,44 @@
   </div>
 
   <div>
-    <label for="ob-firstname" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
-      >Prénom</label
+    <label
+      for="ob-firstname"
+      class="mb-2 block text-meta uppercase tracking-[0.18em] text-text-muted">Prénom</label
     >
     <input
       id="ob-firstname"
       type="text"
-      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
+      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-body-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
       placeholder="ex: Camille"
       bind:value={firstName}
     />
   </div>
 
   <div>
-    <label for="ob-jobtitle" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
+    <label
+      for="ob-jobtitle"
+      class="mb-2 block text-meta uppercase tracking-[0.18em] text-text-muted"
       >Poste recherché</label
     >
     <input
       id="ob-jobtitle"
       type="text"
-      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
+      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-body-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
       placeholder="ex: Développeur React Senior"
       bind:value={jobTitle}
     />
   </div>
 
   <div>
-    <label for="ob-keywords" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
-      >Mots-clés</label
+    <label
+      for="ob-keywords"
+      class="mb-2 block text-meta uppercase tracking-[0.18em] text-text-muted">Mots-clés</label
     >
     <div class="flex gap-2">
       <input
         id="ob-keywords"
         type="text"
-        class="soft-ring flex-1 rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
+        class="soft-ring flex-1 rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-body-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
         placeholder="ex: React, SaaS, marketplace..."
         bind:value={keywordInput}
         onkeydown={(e) => {
@@ -462,13 +470,15 @@
   </div>
 
   <div>
-    <label for="ob-location" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
+    <label
+      for="ob-location"
+      class="mb-2 block text-meta uppercase tracking-[0.18em] text-text-muted"
       >Localisation souhaitée</label
     >
     <input
       id="ob-location"
       type="text"
-      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-sm text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
+      class="soft-ring w-full rounded-lg border border-border-light bg-page-canvas px-4 py-3 text-body-lg text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
       placeholder="Paris, Lyon, Bordeaux…"
       list="ob-location-catalog"
       bind:value={location}
@@ -483,7 +493,7 @@
   <div>
     <p
       id="ob-workmode-label"
-      class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
+      class="mb-2 block text-meta uppercase tracking-[0.18em] text-text-muted"
     >
       Mode de travail
     </p>
@@ -491,7 +501,7 @@
       {#each workModeOptions as option, i (i)}
         <button
           type="button"
-          class="min-h-11 rounded-lg border px-2 py-2.5 text-xs font-medium transition-colors {remote ===
+          class="min-h-11 rounded-lg border px-2 py-2.5 text-meta font-medium transition-colors {remote ===
           option.value
             ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
             : 'border-border-light bg-page-canvas text-text-primary hover:bg-surface-white'}"
@@ -505,14 +515,14 @@
   </div>
 
   <div>
-    <label for="ob-tjm" class="mb-2 block text-xs uppercase tracking-[0.18em] text-text-muted"
+    <label for="ob-tjm" class="mb-2 block text-meta uppercase tracking-[0.18em] text-text-muted"
       >TJM cible (EUR/jour)</label
     >
     <div class="section-card rounded-lg px-4 py-3">
       <div class="flex items-end justify-between gap-3">
         <div>
-          <p class="text-xs text-text-secondary">Base de calibration</p>
-          <p class="mt-1 text-[11px] text-text-muted">
+          <p class="text-meta text-text-secondary">Base de calibration</p>
+          <p class="mt-1 text-caption text-text-muted">
             Nous générons ensuite une fourchette cible.
           </p>
         </div>
@@ -520,10 +530,10 @@
           <input
             id="ob-tjm"
             type="number"
-            class="w-28 rounded-2xl border border-border-light bg-page-canvas px-3 py-2.5 text-sm font-semibold text-text-primary font-mono focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
+            class="w-28 rounded-2xl border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg font-semibold text-text-primary font-mono focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
             bind:value={tjm}
           />
-          <span class="text-sm font-mono text-blueprint-blue">EUR</span>
+          <span class="text-body-lg font-mono text-blueprint-blue">EUR</span>
         </div>
       </div>
     </div>
@@ -531,7 +541,7 @@
 
   {#if hasError && errorMessage}
     <div
-      class="flex items-start gap-2 rounded-lg border border-status-red/30 bg-status-red/10 px-4 py-3 text-xs text-status-red"
+      class="flex items-start gap-2 rounded-lg border border-status-red/30 bg-status-red/10 px-4 py-3 text-meta text-status-red"
     >
       <Icon name="alert-circle" size={14} />
       <div class="flex-1">
@@ -539,7 +549,7 @@
         <p class="mt-0.5 text-status-red/80">{errorMessage}</p>
       </div>
       <button
-        class="shrink-0 rounded-lg px-3 py-1.5 text-[11px] font-semibold text-status-red hover:bg-status-red/15 transition-colors"
+        class="shrink-0 rounded-lg px-3 py-1.5 text-caption font-semibold text-status-red hover:bg-status-red/15 transition-colors"
         onclick={onRetry}
       >
         Réessayer
@@ -548,13 +558,15 @@
   {/if}
 
   {#if firstName.trim().length > 0 && jobTitle.trim().length > 0 && keywords.length === 0}
-    <p class="text-xs text-blueprint-blue">Ajoutez au moins un mot-clé pour activer le scoring.</p>
+    <p class="text-meta text-blueprint-blue">
+      Ajoutez au moins un mot-clé pour activer le scoring.
+    </p>
   {/if}
 
   <div class="mt-2 flex flex-col gap-2">
     <button
       use:ripple
-      class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blueprint-blue-strong/25 bg-blueprint-blue-strong/88 py-3 text-sm font-semibold text-white transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
+      class="inline-flex w-full items-center justify-center gap-2 rounded-lg border border-blueprint-blue-strong/25 bg-blueprint-blue-strong/88 py-3 text-body-lg font-semibold text-white transition-all duration-200 active:scale-[0.97] disabled:opacity-40 disabled:cursor-not-allowed"
       disabled={!canSubmit || isSaving}
       onclick={handleSubmit}
     >
@@ -575,7 +587,7 @@
     </button>
 
     <button
-      class="inline-flex w-full items-center justify-center rounded-lg border border-border-light bg-subtle-gray py-3 text-sm font-medium text-text-secondary transition-all duration-200 hover:bg-subtle-gray hover:text-text-primary"
+      class="inline-flex w-full items-center justify-center rounded-lg border border-border-light bg-subtle-gray py-3 text-body-lg font-medium text-text-secondary transition-all duration-200 hover:bg-subtle-gray hover:text-text-primary"
       onclick={onSkip}
       type="button"
     >

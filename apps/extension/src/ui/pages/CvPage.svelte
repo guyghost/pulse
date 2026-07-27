@@ -92,8 +92,8 @@
   <section class="section-card-strong shrink-0 rounded-2xl px-5 py-4">
     <div class="flex flex-wrap items-start justify-between gap-3">
       <div class="min-w-0">
-        <h1 class="text-base font-semibold text-text-primary">CV &amp; expériences</h1>
-        <p class="mt-1 max-w-prose text-xs leading-relaxed text-text-secondary">
+        <h1 class="text-subheading font-semibold text-text-primary">CV &amp; expériences</h1>
+        <p class="mt-1 max-w-prose text-meta leading-relaxed text-text-secondary">
           La source canonique de votre parcours. Chaque expérience renseignée ici est synchronisable
           vers vos plateformes connectées pour garder le même profil partout.
         </p>

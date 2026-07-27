@@ -169,10 +169,10 @@
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
         <p class="eyebrow text-blueprint-blue">Profil freelance</p>
-        <h2 class="mt-1 text-base font-semibold text-text-primary">
+        <h2 class="mt-1 text-subheading font-semibold text-text-primary">
           {settings.firstName ? `Bonjour ${settings.firstName}` : 'Votre profil MissionPulse'}
         </h2>
-        <p class="mt-1 text-xs leading-5 text-text-subtle">{targetSummary}</p>
+        <p class="mt-1 text-meta leading-5 text-text-subtle">{targetSummary}</p>
       </div>
       <div
         class="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl border border-blueprint-blue/15 bg-blueprint-blue/6"
@@ -188,7 +188,7 @@
           style={`width: ${profileCompleteness}%`}
         ></div>
       </div>
-      <span class="text-xs font-medium text-text-primary">{profileCompleteness}%</span>
+      <span class="text-meta font-medium text-text-primary">{profileCompleteness}%</span>
     </div>
 
     <div class="mt-3 flex items-start gap-2 rounded-xl bg-surface-white/55 px-3 py-2">
@@ -198,9 +198,9 @@
         class="mt-0.5 shrink-0 text-blueprint-blue"
       />
       <div class="min-w-0">
-        <p class="text-[11px] font-medium leading-4 text-text-primary">{completionExplanation}</p>
+        <p class="text-caption font-medium leading-4 text-text-primary">{completionExplanation}</p>
         {#if missingProfileItems.length > 0}
-          <p class="mt-0.5 text-[11px] leading-4 text-text-subtle">
+          <p class="mt-0.5 text-caption leading-4 text-text-subtle">
             Complétez ces champs pour améliorer les requêtes, le scoring et les suggestions de
             candidature.
           </p>
@@ -236,18 +236,18 @@
       <div class="flex items-start justify-between gap-3">
         <div class="min-w-0">
           <p class="eyebrow text-text-muted">Priorités d’impact</p>
-          <h3 class="mt-1 text-sm font-semibold leading-5 text-text-primary">
+          <h3 class="mt-1 text-body-lg font-semibold leading-5 text-text-primary">
             {profileImpactSimulation.title}
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             {profileImpactSimulation.description}
           </p>
         </div>
         <div
           class="shrink-0 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2.5 py-1.5 text-right"
         >
-          <p class="text-[9px] uppercase tracking-[0.13em] text-text-muted">Gain</p>
-          <p class="font-mono text-sm font-semibold text-blueprint-blue">
+          <p class="text-micro uppercase tracking-[0.13em] text-text-muted">Gain</p>
+          <p class="font-mono text-body-lg font-semibold text-blueprint-blue">
             {profileImpactSimulation.delta > 0 ? `+${profileImpactSimulation.delta}` : '0'}
           </p>
         </div>
@@ -268,13 +268,13 @@
               </span>
               <span class="min-w-0 flex-1">
                 <span class="flex items-center justify-between gap-2">
-                  <span class="text-xs font-semibold text-text-primary">{item.label}</span>
-                  <span class="font-mono text-[11px] text-text-muted">{item.weight}%</span>
+                  <span class="text-meta font-semibold text-text-primary">{item.label}</span>
+                  <span class="font-mono text-caption text-text-muted">{item.weight}%</span>
                 </span>
-                <span class="mt-0.5 block text-[11px] leading-4 text-text-subtle">
+                <span class="mt-0.5 block text-caption leading-4 text-text-subtle">
                   {item.action}
                 </span>
-                <span class="mt-1 block text-[10px] leading-4 text-text-muted">
+                <span class="mt-1 block text-micro leading-4 text-text-muted">
                   Impact : {item.impact}
                 </span>
               </span>
@@ -287,7 +287,7 @@
           {/each}
         </div>
       {:else}
-        <div class="mt-3 flex items-center gap-2 text-xs text-text-subtle">
+        <div class="mt-3 flex items-center gap-2 text-meta text-text-subtle">
           <Icon name="check-circle" size={14} class="text-blueprint-blue" />
           <span>Stack, TJM, remote, localisation et mots-clés sont prêts pour le scoring.</span>
         </div>

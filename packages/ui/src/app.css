@@ -94,7 +94,7 @@
   .eyebrow {
     font-family: var(--font-system);
     font-size: var(--text-caption);
-    line-height: var(--leading-caption);
+    line-height: var(--text-caption--line-height);
     letter-spacing: 0.16em;
     text-transform: uppercase;
   }

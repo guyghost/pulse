@@ -210,7 +210,7 @@
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-status-red/10">
           <Icon name="x" size={14} class="text-status-red" />
         </div>
-        <p class="text-xs leading-relaxed text-text-secondary">{error}</p>
+        <p class="text-meta leading-relaxed text-text-secondary">{error}</p>
       </div>
     {/if}
 
@@ -253,7 +253,7 @@
     {#if hasMore}
       <div bind:this={sentinelEl} class="flex items-center justify-center py-4">
         <button
-          class="rounded-full border border-border-light bg-surface-white px-4 py-2 text-xs text-text-secondary transition-all hover:bg-subtle-gray hover:text-text-primary"
+          class="rounded-full border border-border-light bg-surface-white px-4 py-2 text-meta text-text-secondary transition-all hover:bg-subtle-gray hover:text-text-primary"
           onclick={loadMore}
         >
           Voir {Math.min(BATCH_SIZE, remainingCount)} missions de plus ({remainingCount} restantes)
@@ -261,7 +261,7 @@
       </div>
     {/if}
 
-    <p class="py-2 text-center text-[11px] text-text-muted shrink-0">
+    <p class="py-2 text-center text-caption text-text-muted shrink-0">
       {visibleMissions.length}/{sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length >
       1
         ? 's'

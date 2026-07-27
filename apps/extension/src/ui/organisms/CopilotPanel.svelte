@@ -265,14 +265,16 @@
   <div class="flex items-start justify-between gap-3">
     <div class="min-w-0">
       <div class="flex flex-wrap items-center gap-2">
-        <h3 id="copilot-title" class="text-sm font-medium text-text-primary">Copilot Premium</h3>
+        <h3 id="copilot-title" class="text-body-lg font-medium text-text-primary">
+          Copilot Premium
+        </h3>
         <span
-          class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/6 px-2 py-0.5 text-[10px] font-medium text-blueprint-blue"
+          class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/6 px-2 py-0.5 text-micro font-medium text-blueprint-blue"
         >
           Eve · distant
         </span>
       </div>
-      <p class="mt-1 text-xs leading-5 text-text-subtle">
+      <p class="mt-1 text-meta leading-5 text-text-subtle">
         Analyse contextualisée Premium et contenus à relire. Le Copilot ne change jamais le statut
         de la candidature.
       </p>
@@ -282,9 +284,9 @@
 
   {#if deletionReceiptMessage()}
     <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3" role="status">
-      <p class="text-xs font-medium text-text-primary">Issue de la demande de suppression</p>
-      <p class="mt-1 text-[11px] leading-5 text-text-subtle">{deletionReceiptMessage()}</p>
-      <p class="mt-1 text-[10px] text-text-muted">Confirmé le {deletionReceiptDate()}.</p>
+      <p class="text-meta font-medium text-text-primary">Issue de la demande de suppression</p>
+      <p class="mt-1 text-caption leading-5 text-text-subtle">{deletionReceiptMessage()}</p>
+      <p class="mt-1 text-micro text-text-muted">Confirmé le {deletionReceiptDate()}.</p>
     </div>
   {/if}
 
@@ -295,15 +297,15 @@
     >
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p id="living-dossier-title" class="text-xs font-medium text-text-primary">
+          <p id="living-dossier-title" class="text-meta font-medium text-text-primary">
             Dossier vivant
           </p>
-          <p class="mt-1 text-[10px] leading-4 text-text-muted">
+          <p class="mt-1 text-micro leading-4 text-text-muted">
             Contenus explicitement conservés · état serveur {store.dossier.state}
           </p>
         </div>
         {#if store.dossier.activeJob}
-          <span class="rounded-md bg-surface-white px-2 py-1 text-[10px] text-text-subtle">
+          <span class="rounded-md bg-surface-white px-2 py-1 text-micro text-text-subtle">
             Traitement actif · {store.dossier.activeJob.kind}
           </span>
         {/if}
@@ -312,17 +314,17 @@
       {#if store.dossier.analysis}
         <article class="mt-3 rounded-lg border border-border-light bg-surface-white p-3">
           <div class="flex items-center justify-between gap-2">
-            <p class="text-[11px] font-medium text-text-primary">Analyse approuvée</p>
-            <span class="text-[9px] text-text-muted">
+            <p class="text-caption font-medium text-text-primary">Analyse approuvée</p>
+            <span class="text-micro text-text-muted">
               {approvedAt(store.dossier.analysis.approvedAtMs)}
             </span>
           </div>
           {#if store.dossier.analysis.result.evidenceClaims.length > 0}
             <ul class="mt-2 space-y-2">
               {#each store.dossier.analysis.result.evidenceClaims as claim (`${claim.text}:${claim.evidenceIds.join(',')}`)}
-                <li class="text-[11px] leading-5 text-text-secondary">
+                <li class="text-caption leading-5 text-text-secondary">
                   {claim.text}
-                  <span class="block text-[10px] text-text-muted">
+                  <span class="block text-micro text-text-muted">
                     Preuves : {claim.evidenceIds.join(' · ')}
                   </span>
                 </li>
@@ -330,19 +332,19 @@
             </ul>
           {/if}
           {#if store.dossier.analysis.result.gaps.length > 0}
-            <p class="mt-2 text-[11px] leading-5 text-text-subtle">
+            <p class="mt-2 text-caption leading-5 text-text-subtle">
               <span class="font-medium text-text-primary">Écarts :</span>
               {store.dossier.analysis.result.gaps.join(' · ')}
             </p>
           {/if}
           {#if store.dossier.analysis.result.risks.length > 0}
-            <p class="mt-2 text-[11px] leading-5 text-text-subtle">
+            <p class="mt-2 text-caption leading-5 text-text-subtle">
               <span class="font-medium text-text-primary">Risques :</span>
               {store.dossier.analysis.result.risks.join(' · ')}
             </p>
           {/if}
           {#if store.dossier.analysis.result.questions.length > 0}
-            <p class="mt-2 text-[11px] leading-5 text-text-subtle">
+            <p class="mt-2 text-caption leading-5 text-text-subtle">
               <span class="font-medium text-text-primary">Questions :</span>
               {store.dossier.analysis.result.questions.join(' · ')}
             </p>
@@ -352,23 +354,23 @@
 
       {#if store.dossier.approvedArtifacts.length > 0}
         <div class="mt-3 space-y-2">
-          <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+          <p class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
             Brouillons approuvés ({store.dossier.approvedArtifacts.length})
           </p>
           {#each store.dossier.approvedArtifacts as artifact (artifact.artifactId)}
             <article class="rounded-lg border border-border-light bg-surface-white p-3">
               <div class="flex items-center justify-between gap-2">
-                <p class="text-[11px] font-medium text-text-primary">
+                <p class="text-caption font-medium text-text-primary">
                   {artifactLabels[artifact.kind]}
                 </p>
-                <span class="text-[9px] text-text-muted">{approvedAt(artifact.approvedAtMs)}</span>
+                <span class="text-micro text-text-muted">{approvedAt(artifact.approvedAtMs)}</span>
               </div>
-              <p class="mt-2 whitespace-pre-wrap text-xs leading-5 text-text-primary">
+              <p class="mt-2 whitespace-pre-wrap text-meta leading-5 text-text-primary">
                 {artifact.draft}
               </p>
               <button
                 type="button"
-                class="mt-2 inline-flex items-center gap-2 text-[11px] font-medium text-blueprint-blue"
+                class="mt-2 inline-flex items-center gap-2 text-caption font-medium text-blueprint-blue"
                 onclick={() => onCopy(artifact.draft)}
               >
                 <Icon name="check" size={12} /> Copier le brouillon approuvé
@@ -381,26 +383,26 @@
   {/if}
 
   {#if store.accessState === 'loading'}
-    <div class="mt-4 flex items-center gap-2 text-xs text-text-subtle" aria-live="polite">
+    <div class="mt-4 flex items-center gap-2 text-meta text-text-subtle" aria-live="polite">
       <Icon name="loader-2" size={14} class="animate-spin" />
       Vérification du compte Premium…
     </div>
   {:else if store.accessState === 'disabled' && !store.job && !store.dossier}
     <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3">
-      <p class="text-xs font-medium text-text-primary">Déploiement fermé</p>
-      <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+      <p class="text-meta font-medium text-text-primary">Déploiement fermé</p>
+      <p class="mt-1 text-caption leading-5 text-text-subtle">
         Le Copilot reste désactivé dans ce build. Aucun contenu n’est transmis.
       </p>
     </div>
   {:else if store.accessState === 'unlinked'}
     <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3">
-      <p class="text-xs font-medium text-text-primary">Connectez votre compte MissionPulse</p>
-      <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+      <p class="text-meta font-medium text-text-primary">Connectez votre compte MissionPulse</p>
+      <p class="mt-1 text-caption leading-5 text-text-subtle">
         La session est conservée uniquement jusqu’à la fermeture du navigateur.
       </p>
       <button
         type="button"
-        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+        class="mt-3 inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white disabled:opacity-50"
         onclick={() => store.link()}
         disabled={store.action !== null}
       >
@@ -414,13 +416,13 @@
     </div>
   {:else if (store.accessState === 'free' || store.accessState === 'expired' || store.accessState === 'revoked') && !store.job && !store.dossier}
     <div class="mt-4 rounded-lg border border-status-orange/20 bg-status-orange/5 p-3">
-      <p class="text-xs font-medium text-text-primary">Premium requis</p>
-      <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+      <p class="text-meta font-medium text-text-primary">Premium requis</p>
+      <p class="mt-1 text-caption leading-5 text-text-subtle">
         L’entitlement canonique est « {store.accessState} ». Aucun job ne peut être créé.
       </p>
       <button
         type="button"
-        class="mt-2 inline-flex items-center gap-2 text-xs font-medium text-blueprint-blue"
+        class="mt-2 inline-flex items-center gap-2 text-meta font-medium text-blueprint-blue"
         onclick={() => store.syncEntitlement()}
       >
         <Icon name="refresh-cw" size={12} /> Resynchroniser
@@ -429,8 +431,8 @@
   {:else}
     {#if store.entitlement}
       <div class="mt-4 flex items-center justify-between rounded-lg bg-page-canvas px-3 py-2">
-        <span class="text-[11px] text-text-subtle">Entitlement vérifié côté serveur</span>
-        <span class="text-xs font-medium text-text-primary">
+        <span class="text-caption text-text-subtle">Entitlement vérifié côté serveur</span>
+        <span class="text-meta font-medium text-text-primary">
           {store.entitlement.creditsRemaining} crédit{store.entitlement.creditsRemaining > 1
             ? 's'
             : ''}
@@ -439,17 +441,17 @@
     {/if}
 
     <details class="mt-4 rounded-lg border border-border-light bg-surface-white" open={!store.job}>
-      <summary class="cursor-pointer px-3 py-2 text-xs font-medium text-text-primary">
+      <summary class="cursor-pointer px-3 py-2 text-meta font-medium text-text-primary">
         Données transmises avec votre accord
       </summary>
       <div class="border-t border-border-light p-3">
         <fieldset>
-          <legend class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+          <legend class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
             Mission
           </legend>
           <div class="mt-2 grid grid-cols-2 gap-2">
             {#each store.missionFieldOptions as field (field)}
-              <label class="flex items-center gap-2 text-[11px] text-text-secondary">
+              <label class="flex items-center gap-2 text-caption text-text-secondary">
                 <input
                   type="checkbox"
                   checked={store.missionFields.includes(field)}
@@ -463,12 +465,12 @@
         </fieldset>
 
         <fieldset class="mt-4">
-          <legend class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+          <legend class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
             Profil
           </legend>
           <div class="mt-2 grid grid-cols-2 gap-2">
             {#each store.profileFieldOptions as field (field)}
-              <label class="flex items-center gap-2 text-[11px] text-text-secondary">
+              <label class="flex items-center gap-2 text-caption text-text-secondary">
                 <input
                   type="checkbox"
                   checked={store.profileFields.includes(field)}
@@ -483,12 +485,12 @@
 
         {#if store.availableEvidence.length > 0}
           <fieldset class="mt-4">
-            <legend class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+            <legend class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
               Expériences comme sources
             </legend>
             <div class="mt-2 space-y-2">
               {#each store.availableEvidence as evidence (evidence.id)}
-                <label class="flex items-start gap-2 text-[11px] text-text-secondary">
+                <label class="flex items-start gap-2 text-caption text-text-secondary">
                   <input
                     type="checkbox"
                     checked={store.selectedEvidenceIds.includes(evidence.id)}
@@ -503,7 +505,7 @@
         {/if}
 
         <label
-          class="mt-4 flex items-start gap-2 rounded-lg bg-page-canvas p-3 text-[11px] leading-5 text-text-secondary"
+          class="mt-4 flex items-start gap-2 rounded-lg bg-page-canvas p-3 text-caption leading-5 text-text-secondary"
         >
           <input
             type="checkbox"
@@ -514,15 +516,15 @@
           />
           Je consens à transmettre uniquement les champs cochés à MissionPulse Copilot pour ce job.
         </label>
-        <p class="mt-2 text-[10px] leading-4 text-text-muted">
+        <p class="mt-2 text-micro leading-4 text-text-muted">
           Coach TJM transmet aussi des repères de marché numériques agrégés : stacks rapprochées,
           volumes, fourchette, tendance et date. Aucun relevé de mission individuel n’est transmis.
         </p>
-        <p class="mt-1 text-[10px] leading-4 text-text-muted">
+        <p class="mt-1 text-micro leading-4 text-text-muted">
           Pitch, message et résumé CV exigent au moins une expérience cochée afin que chaque segment
           généré cite sa source.
         </p>
-        <p class="mt-1 text-[10px] leading-4 text-text-muted">
+        <p class="mt-1 text-micro leading-4 text-text-muted">
           Décocher limite le job courant. Les données déjà consenties restent dans le dossier
           Copilot jusqu’à sa suppression confirmée.
         </p>
@@ -537,11 +539,11 @@
           onclick={() => store.createJob(operation.kind)}
           disabled={!canCreateOperation(operation.kind)}
         >
-          <span class="flex items-center gap-2 text-xs font-medium text-text-primary">
+          <span class="flex items-center gap-2 text-meta font-medium text-text-primary">
             <Icon name={operation.icon} size={13} class="text-blueprint-blue" />
             {operation.label}
           </span>
-          <span class="text-[10px] text-text-muted">{operation.detail}</span>
+          <span class="text-micro text-text-muted">{operation.detail}</span>
         </button>
       {/each}
     </div>
@@ -550,8 +552,8 @@
       <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3" aria-live="polite">
         <div class="flex items-center justify-between gap-3">
           <div>
-            <p class="text-xs font-medium text-text-primary">{statusLabel(store.job.status)}</p>
-            <p class="mt-0.5 text-[10px] text-text-muted">
+            <p class="text-meta font-medium text-text-primary">{statusLabel(store.job.status)}</p>
+            <p class="mt-0.5 text-micro text-text-muted">
               {store.job.kind === 'analysis' ? 'Analyse incluse' : `${store.job.creditCost} crédit`}
             </p>
           </div>
@@ -561,7 +563,7 @@
         </div>
 
         {#if store.job.status === 'uncertain'}
-          <p class="mt-2 text-[11px] leading-5 text-text-subtle">
+          <p class="mt-2 text-caption leading-5 text-text-subtle">
             Eve ne permet pas de vérifier automatiquement cet effet distant. Le checkpoint et le
             crédit restent inchangés jusqu’à une réconciliation opérateur; aucun retry ni
             remboursement aveugle n’est lancé.
@@ -570,16 +572,16 @@
 
         {#if store.job.tjmFacts}
           <div class="mt-3 rounded-lg border border-border-light bg-surface-white p-3">
-            <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+            <p class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
               Repères locaux déterministes
             </p>
-            <div class="mt-2 grid grid-cols-2 gap-2 text-[11px] text-text-secondary">
+            <div class="mt-2 grid grid-cols-2 gap-2 text-caption text-text-secondary">
               <span>Mission : {formatEur(store.job.tjmFacts.missionDisplayedTjm)}</span>
               <span>Cible profil : {formatEur(store.job.tjmFacts.profileBounds.target)}</span>
               <span>Marché : {formatEur(store.job.tjmFacts.market.weightedAverage)}</span>
               <span>Confiance : {store.job.tjmFacts.confidence}</span>
             </div>
-            <p class="mt-2 text-[10px] text-text-muted">
+            <p class="mt-2 text-micro text-text-muted">
               {store.job.tjmFacts.market.sampleCount} observation{store.job.tjmFacts.market
                 .sampleCount > 1
                 ? 's'
@@ -590,17 +592,17 @@
 
         {#if store.job.result && store.job.status === 'review'}
           <div class="mt-3 rounded-lg border border-border-light bg-surface-white p-3">
-            <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-blueprint-blue">
+            <p class="text-micro font-medium uppercase tracking-[0.14em] text-blueprint-blue">
               Proposition IA non vérifiée
             </p>
             {#if groundedDraftText}
               <div class="mt-3 border-t border-border-light pt-3">
-                <p class="text-[11px] font-medium text-text-primary">Sources à vérifier</p>
+                <p class="text-caption font-medium text-text-primary">Sources à vérifier</p>
                 <ol class="mt-2 space-y-3">
                   {#each groundedDraftSegments as segment, index (`${index}:${segment.text}`)}
-                    <li class="text-xs leading-5 text-text-primary">
+                    <li class="text-meta leading-5 text-text-primary">
                       <span class="whitespace-pre-wrap">{segment.text}</span>
-                      <span class="mt-1 block space-y-1 text-[10px] leading-4 text-text-muted">
+                      <span class="mt-1 block space-y-1 text-micro leading-4 text-text-muted">
                         {#each segment.sourceRefs as sourceRef (`${sourceRef.kind}:${sourceRef.id}`)}
                           <span class="block">
                             {sourceRefLabel(sourceRef)} — « {sourceRefExcerpt(sourceRef)} »
@@ -612,7 +614,7 @@
                 </ol>
                 <button
                   type="button"
-                  class="mt-3 inline-flex items-center gap-2 rounded-lg border border-border-light px-3 py-2 text-xs font-medium text-text-primary hover:bg-subtle-gray"
+                  class="mt-3 inline-flex items-center gap-2 rounded-lg border border-border-light px-3 py-2 text-meta font-medium text-text-primary hover:bg-subtle-gray"
                   onclick={() => onCopy(groundedDraftText ?? '')}
                 >
                   <Icon name="check" size={12} /> Copier
@@ -623,8 +625,8 @@
                 class="mt-3 rounded-lg border border-status-red/20 bg-status-red/8 p-3"
                 role="alert"
               >
-                <p class="text-[11px] font-medium text-text-primary">Proposition non vérifiée</p>
-                <p class="mt-1 text-[10px] leading-4 text-text-subtle">
+                <p class="text-caption font-medium text-text-primary">Proposition non vérifiée</p>
+                <p class="mt-1 text-micro leading-4 text-text-subtle">
                   Les segments ne disposent pas tous de sources consenties valides. Le contenu est
                   masqué et ne peut être ni copié ni conservé.
                 </p>
@@ -632,14 +634,14 @@
             {/if}
             {#if supportedEvidenceClaims.length > 0}
               <div class="mt-3 border-t border-border-light pt-3">
-                <p class="text-[11px] font-medium text-text-primary">
+                <p class="text-caption font-medium text-text-primary">
                   Affirmations IA — sources à vérifier
                 </p>
                 <ul class="mt-2 space-y-2">
                   {#each supportedEvidenceClaims as claim (claim.text)}
-                    <li class="text-[11px] leading-5 text-text-secondary">
+                    <li class="text-caption leading-5 text-text-secondary">
                       <span>{claim.text}</span>
-                      <span class="block text-[10px] text-text-muted">
+                      <span class="block text-micro text-text-muted">
                         {claim.evidenceIds
                           .map((id) => `${evidenceLabel(id)} — « ${evidenceExcerpt(id)} »`)
                           .join(' · ')}
@@ -650,21 +652,21 @@
               </div>
             {/if}
             {#if store.job.result.gaps.length > 0}
-              <p class="mt-3 text-[11px] leading-5 text-text-subtle">
+              <p class="mt-3 text-caption leading-5 text-text-subtle">
                 <span class="font-medium text-text-primary">Manques :</span>
                 {store.job.result.gaps.join(' · ')}
               </p>
             {/if}
             {#if store.job.result.risks.length > 0}
-              <p class="mt-2 text-[11px] leading-5 text-text-subtle">
+              <p class="mt-2 text-caption leading-5 text-text-subtle">
                 <span class="font-medium text-text-primary">Risques :</span>
                 {store.job.result.risks.join(' · ')}
               </p>
             {/if}
             {#if store.job.result.questions.length > 0}
               <div class="mt-3 border-t border-border-light pt-3">
-                <p class="text-[11px] font-medium text-text-primary">Questions à clarifier</p>
-                <ul class="mt-2 list-disc space-y-1 pl-4 text-[11px] leading-5 text-text-subtle">
+                <p class="text-caption font-medium text-text-primary">Questions à clarifier</p>
+                <ul class="mt-2 list-disc space-y-1 pl-4 text-caption leading-5 text-text-subtle">
                   {#each store.job.result.questions as question (question)}
                     <li>{question}</li>
                   {/each}
@@ -678,20 +680,20 @@
           {#if store.job.status === 'review'}
             <button
               type="button"
-              class="rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white disabled:opacity-50"
+              class="rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white disabled:opacity-50"
               onclick={() => store.reviewJob('accept')}
               disabled={store.action !== null || !hasCompleteGroundedDraft}>Conserver</button
             >
             <button
               type="button"
-              class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary disabled:opacity-50"
+              class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary disabled:opacity-50"
               onclick={() => store.reviewJob('reject')}
               disabled={store.action !== null}>Écarter</button
             >
           {:else if pollingStatuses.has(store.job.status) && store.job.jobId}
             <button
               type="button"
-              class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary disabled:opacity-50"
+              class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary disabled:opacity-50"
               onclick={() => store.cancelJob()}
               disabled={store.action !== null}>Annuler le job</button
             >
@@ -699,7 +701,7 @@
           {#if store.job.status === 'failed'}
             <button
               type="button"
-              class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-blueprint-blue disabled:opacity-50"
+              class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-blueprint-blue disabled:opacity-50"
               onclick={() => store.refreshJob()}
               disabled={store.action !== null}>Vérifier maintenant</button
             >
@@ -710,7 +712,7 @@
 
     {#if store.error && store.error.code !== 'ROLLOUT_DISABLED'}
       <div
-        class="mt-3 rounded-lg bg-status-red/8 px-3 py-2 text-[11px] leading-5 text-text-primary"
+        class="mt-3 rounded-lg bg-status-red/8 px-3 py-2 text-caption leading-5 text-text-primary"
         role="alert"
       >
         {store.error.message}
@@ -722,18 +724,18 @@
     <div class="mt-4 border-t border-border-light pt-3">
       {#if deleteConfirmation}
         <div class="flex flex-wrap items-center justify-between gap-2">
-          <p class="text-[11px] text-text-subtle">
+          <p class="text-caption text-text-subtle">
             Supprimer les données Copilot de cette mission ?
           </p>
           <div class="flex gap-2">
             <button
               type="button"
-              class="text-xs text-text-subtle"
+              class="text-meta text-text-subtle"
               onclick={() => (deleteConfirmation = false)}>Annuler</button
             >
             <button
               type="button"
-              class="text-xs font-medium text-status-red disabled:opacity-50"
+              class="text-meta font-medium text-status-red disabled:opacity-50"
               onclick={() => store.deleteDossier()}
               disabled={store.action !== null}>Confirmer</button
             >
@@ -742,7 +744,7 @@
       {:else}
         <button
           type="button"
-          class="text-[11px] font-medium text-text-muted hover:text-status-red"
+          class="text-caption font-medium text-text-muted hover:text-status-red"
           onclick={() => (deleteConfirmation = true)}>Supprimer le dossier Copilot</button
         >
       {/if}

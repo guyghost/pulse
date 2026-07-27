@@ -249,28 +249,28 @@
     >
       <div class="mx-auto flex w-full max-w-6xl items-start justify-between gap-4">
         <div class="min-w-0 flex-1">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
             Investigation
           </p>
-          <h2 class="mt-1 max-w-4xl text-xl font-semibold leading-tight text-text-primary">
+          <h2 class="mt-1 max-w-4xl text-heading-lg font-semibold leading-tight text-text-primary">
             {mission.title}
           </h2>
           <div class="mt-3 flex flex-wrap gap-2">
             <span
-              class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-[11px] font-medium text-text-secondary"
+              class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-caption font-medium text-text-secondary"
             >
               <Icon name="database" size={12} />
               {mission.source}
             </span>
             <span
-              class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-[11px] font-medium text-text-secondary"
+              class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-caption font-medium text-text-secondary"
             >
               <Icon name="badge-euro" size={12} />
               {mission.tjm !== null ? `${mission.tjm}€/j` : 'TJM à vérifier'}
             </span>
             {#if formattedPublishedAt}
               <span
-                class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-[11px] font-medium text-text-secondary"
+                class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-caption font-medium text-text-secondary"
               >
                 <Icon name="calendar-clock" size={12} />
                 Publiée {formattedPublishedAt}
@@ -313,19 +313,21 @@
           >
             <div class="flex items-start justify-between gap-3">
               <div>
-                <h3 class="text-base font-semibold text-text-primary">Transformer la décision</h3>
-                <p class="mt-1 text-sm leading-6 text-text-subtle">
+                <h3 class="text-subheading font-semibold text-text-primary">
+                  Transformer la décision
+                </h3>
+                <p class="mt-1 text-body-lg leading-6 text-text-subtle">
                   Gardez le contrôle avant de sortir vers la plateforme source.
                 </p>
               </div>
               <div class="shrink-0 text-right">
                 <span
-                  class="inline-flex rounded-lg border border-border-light bg-page-canvas px-2.5 py-1.5 text-[11px] font-medium text-text-subtle"
+                  class="inline-flex rounded-lg border border-border-light bg-page-canvas px-2.5 py-1.5 text-caption font-medium text-text-subtle"
                 >
                   {trackingBadgeLabel}
                 </span>
                 {#if trackingReady && trackingUpdatedLabel}
-                  <p class="mt-1 text-[10px] text-text-muted">Modifié {trackingUpdatedLabel}</p>
+                  <p class="mt-1 text-micro text-text-muted">Modifié {trackingUpdatedLabel}</p>
                 {/if}
               </div>
             </div>
@@ -333,7 +335,7 @@
             <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-sm font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-body-lg font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
                 onclick={handleSelectForTracking}
                 disabled={trackingState === 'loading' || (trackingReady && !canSelectForTracking)}
                 aria-label={trackingActionLabel}
@@ -343,7 +345,7 @@
               </button>
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-subtle-gray"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray"
                 onclick={handleOpenForTracking}
               >
                 <Icon name="external-link" size={14} />
@@ -351,7 +353,7 @@
               </button>
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-subtle-gray disabled:cursor-not-allowed disabled:opacity-45 {isCompared
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray disabled:cursor-not-allowed disabled:opacity-45 {isCompared
                   ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
                   : ''}"
                 onclick={handleToggleCompare}
@@ -363,7 +365,7 @@
               </button>
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red"
                 onclick={() => onHide?.()}
                 aria-pressed={isHidden}
               >
@@ -372,24 +374,24 @@
               </button>
             </div>
             {#if trackingState === 'error' && trackingError}
-              <p class="mt-2 text-xs leading-5 text-status-red" role="status">{trackingError}</p>
+              <p class="mt-2 text-meta leading-5 text-status-red" role="status">{trackingError}</p>
             {/if}
           </section>
         </div>
 
         <div class="space-y-4">
           <section class="section-card-strong rounded-xl p-4 sm:p-5">
-            <h3 class="text-base font-semibold text-text-primary">Preuves principales</h3>
+            <h3 class="text-subheading font-semibold text-text-primary">Preuves principales</h3>
             <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
               {#each missionFacts as fact, i (i)}
                 <div class="rounded-lg bg-page-canvas px-3 py-3">
                   <p
-                    class="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.13em] text-text-muted"
+                    class="flex items-center gap-1.5 text-micro uppercase tracking-[0.13em] text-text-muted"
                   >
                     <Icon name={fact.icon} size={11} />
                     {fact.label}
                   </p>
-                  <p class="mt-1.5 break-words text-sm font-medium text-text-primary">
+                  <p class="mt-1.5 break-words text-body-lg font-medium text-text-primary">
                     {fact.value}
                   </p>
                 </div>
@@ -399,11 +401,11 @@
 
           {#if visibleStack.length > 0}
             <section class="section-card rounded-xl p-4 sm:p-5">
-              <h3 class="text-base font-semibold text-text-primary">Compétences détectées</h3>
+              <h3 class="text-subheading font-semibold text-text-primary">Compétences détectées</h3>
               <div class="mt-3 flex flex-wrap gap-2">
                 {#each visibleStack as skill (skill)}
                   <span
-                    class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-xs font-medium text-text-secondary"
+                    class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-meta font-medium text-text-secondary"
                   >
                     {skill}
                   </span>
@@ -417,34 +419,36 @@
               <details
                 class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2"
               >
-                <summary class="cursor-pointer text-sm font-semibold text-blueprint-blue">
+                <summary class="cursor-pointer text-body-lg font-semibold text-blueprint-blue">
                   Pourquoi ce score ?
                 </summary>
-                <p class="mt-2 text-sm leading-6 text-text-secondary">
+                <p class="mt-2 text-body-lg leading-6 text-text-secondary">
                   Score final {mission.scoreBreakdown?.total ?? score}/100, calculé depuis le
                   profil, l’annonce et les critères ci-dessous.
                 </p>
                 {#if mission.scoreBreakdown}
-                  <p class="mt-2 text-xs leading-5 text-text-subtle">
+                  <p class="mt-2 text-meta leading-5 text-text-subtle">
                     Base de score {mission.scoreBreakdown.deterministic}/100. L’analyse locale,
                     quand elle existe, ajoute une hypothèse non bloquante.
                   </p>
                   {#if mission.scoreBreakdown.semanticReason}
-                    <p class="mt-2 text-xs leading-5 text-blueprint-blue">
+                    <p class="mt-2 text-meta leading-5 text-blueprint-blue">
                       {mission.scoreBreakdown.semanticReason}
                     </p>
                   {/if}
                 {/if}
               </details>
-              <h3 class="mt-5 text-base font-semibold text-text-primary">Score par critère</h3>
+              <h3 class="mt-5 text-subheading font-semibold text-text-primary">
+                Score par critère
+              </h3>
               <div class="mt-3 grid gap-2 sm:grid-cols-2">
                 {#each scoreLines as line, i (i)}
                   {@const grade = scoreToGrade(line.value)}
                   <div
                     class="flex items-center justify-between gap-3 rounded-lg bg-page-canvas px-3 py-3"
                   >
-                    <span class="text-sm text-text-subtle">{line.label}</span>
-                    <span class="font-mono text-sm font-semibold text-text-primary">
+                    <span class="text-body-lg text-text-subtle">{line.label}</span>
+                    <span class="font-mono text-body-lg font-semibold text-text-primary">
                       {grade} · {line.value}
                     </span>
                   </div>
@@ -455,8 +459,8 @@
 
           {#if mission.description}
             <section class="section-card rounded-xl p-4 sm:p-5">
-              <h3 class="text-base font-semibold text-text-primary">Détails techniques</h3>
-              <p class="mt-3 whitespace-pre-wrap text-sm leading-6 text-text-subtle">
+              <h3 class="text-subheading font-semibold text-text-primary">Détails techniques</h3>
+              <p class="mt-3 whitespace-pre-wrap text-body-lg leading-6 text-text-subtle">
                 {mission.description}
               </p>
             </section>

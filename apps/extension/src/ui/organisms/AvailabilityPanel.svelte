@@ -101,8 +101,8 @@
 <div class="section-card-strong rounded-xl p-4">
   <div class="flex flex-wrap items-center justify-between gap-3">
     <div class="min-w-0">
-      <h2 class="text-sm font-semibold text-text-primary">Disponibilité</h2>
-      <p class="mt-0.5 text-[11px] leading-relaxed text-text-secondary">
+      <h2 class="text-body-lg font-semibold text-text-primary">Disponibilité</h2>
+      <p class="mt-0.5 text-caption leading-relaxed text-text-secondary">
         Indiquez votre statut, puis diffusez-le sur vos plateformes de missions.
       </p>
     </div>
@@ -120,13 +120,13 @@
   </div>
 
   {#if store.loadStatus === 'loading'}
-    <div class="mt-3 flex items-center gap-2 text-[11px] text-text-muted">
+    <div class="mt-3 flex items-center gap-2 text-caption text-text-muted">
       <Icon name="loader-2" size={13} class="animate-spin" />
       Chargement…
     </div>
   {:else if store.loadError}
     <div
-      class="mt-3 rounded-lg bg-status-red/10 px-3 py-2 text-[11px] leading-relaxed text-text-primary"
+      class="mt-3 rounded-lg bg-status-red/10 px-3 py-2 text-caption leading-relaxed text-text-primary"
     >
       <Icon name="triangle-alert" size={13} />
       {store.loadError}
@@ -135,7 +135,7 @@
 
   {#if !isEditing && store.availability}
     <div
-      class="mt-3 rounded-lg bg-subtle-gray px-3 py-2 text-[11px] leading-relaxed text-text-primary"
+      class="mt-3 rounded-lg bg-subtle-gray px-3 py-2 text-caption leading-relaxed text-text-primary"
     >
       <span class="font-medium">{AVAILABILITY_STATUS_LABELS[store.availability.status]}</span>
       {#if store.availability.date}
@@ -149,7 +149,7 @@
     </div>
   {:else if !isEditing && !store.availability && store.loadStatus === 'idle'}
     <div
-      class="mt-3 rounded-lg bg-subtle-gray px-3 py-2 text-[11px] leading-relaxed text-text-secondary"
+      class="mt-3 rounded-lg bg-subtle-gray px-3 py-2 text-caption leading-relaxed text-text-secondary"
     >
       Aucune disponibilité renseignée. Cliquez sur « Renseigner » pour la définir.
     </div>
@@ -164,10 +164,10 @@
       }}
     >
       <label class="flex flex-col gap-1">
-        <span class="text-[11px] font-medium text-text-secondary">Statut</span>
+        <span class="text-caption font-medium text-text-secondary">Statut</span>
         <select
           bind:value={statusDraft}
-          class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+          class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         >
           {#each AVAILABILITY_STATUS_ORDER as opt (opt)}
             <option value={opt}>{AVAILABILITY_STATUS_LABELS[opt]}</option>
@@ -177,38 +177,38 @@
 
       {#if needsDate}
         <label class="flex flex-col gap-1">
-          <span class="text-[11px] font-medium text-text-secondary">
+          <span class="text-caption font-medium text-text-secondary">
             {statusDraft === 'from-date' ? 'Disponible à partir du' : 'En mission jusqu’au'}
           </span>
           <input
             bind:value={dateDraft}
             type="date"
             required={needsDate}
-            class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+            class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
           />
           {#if dateMissing}
-            <span class="text-[10px] text-status-red">La date est requise pour ce statut.</span>
+            <span class="text-micro text-status-red">La date est requise pour ce statut.</span>
           {/if}
         </label>
       {/if}
 
       <label class="flex flex-col gap-1">
-        <span class="text-[11px] font-medium text-text-secondary">Note (optionnel)</span>
+        <span class="text-caption font-medium text-text-secondary">Note (optionnel)</span>
         <textarea
           bind:value={noteDraft}
           rows="2"
           maxlength={AVAILABILITY_NOTE_MAX_LENGTH}
           placeholder="Précisions : rythme, remote, foursquare…"
-          class="resize-y rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm leading-relaxed text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+          class="resize-y rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg leading-relaxed text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         ></textarea>
-        <span class="text-right text-[10px] text-text-muted"
+        <span class="text-right text-micro text-text-muted"
           >{noteLen}/{AVAILABILITY_NOTE_MAX_LENGTH}</span
         >
       </label>
 
       {#if store.editError}
         <div
-          class="rounded-lg bg-status-red/10 px-3 py-2 text-[11px] leading-relaxed text-text-primary"
+          class="rounded-lg bg-status-red/10 px-3 py-2 text-caption leading-relaxed text-text-primary"
         >
           <Icon name="triangle-alert" size={13} />
           {store.editError}
@@ -236,7 +236,7 @@
   {#if !isEditing}
     <div class="mt-3 border-t border-border-light pt-3">
       <div class="flex flex-wrap items-center justify-between gap-2">
-        <p class="text-[11px] leading-relaxed text-text-secondary">
+        <p class="text-caption leading-relaxed text-text-secondary">
           Copie le statut dans le presse-papiers puis ouvre chaque plateforme pour collage manuel.
         </p>
         {#if isPushing}
@@ -260,7 +260,7 @@
 
       {#if pushHeadline}
         <div
-          class="mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-[11px] leading-relaxed
+          class="mt-2 flex items-center gap-2 rounded-lg px-3 py-2 text-caption leading-relaxed
             {store.pushStatus === 'pushed'
             ? 'bg-accent-green/10 text-text-primary'
             : store.pushStatus === 'partial'
@@ -286,8 +286,8 @@
           {#each platforms as platform (platform.id)}
             {@const meta = statusMeta(store.platformStatuses.get(platform.id))}
             <li class="flex items-center justify-between gap-2 rounded-md px-2 py-1.5">
-              <span class="truncate text-xs text-text-secondary">{platform.name}</span>
-              <span class="inline-flex shrink-0 items-center gap-1 text-[11px] {meta.class}">
+              <span class="truncate text-meta text-text-secondary">{platform.name}</span>
+              <span class="inline-flex shrink-0 items-center gap-1 text-caption {meta.class}">
                 {#if meta.icon}
                   <Icon name={meta.icon} size={12} class={meta.spin ? 'animate-spin' : ''} />
                 {:else}

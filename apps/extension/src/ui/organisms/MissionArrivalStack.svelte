@@ -101,20 +101,20 @@
         <div class="flex items-start justify-between gap-4 border-b border-border-light px-4 py-3">
           <div class="min-w-0">
             <p
-              class="mb-1 text-[10px] font-semibold uppercase tracking-[0.14em] text-blueprint-blue"
+              class="mb-1 text-micro font-semibold uppercase tracking-[0.14em] text-blueprint-blue"
             >
               En attente
             </p>
             <h2
               id="arrival-drawer-title"
-              class="text-sm font-semibold text-text-primary outline-none"
+              class="text-body-lg font-semibold text-text-primary outline-none"
               data-testid="arrival-drawer-heading"
               tabindex="-1"
               bind:this={drawerHeading}
             >
               {countLabel}
             </h2>
-            <p class="mt-1 text-xs leading-5 text-text-subtle">
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
               Votre lecture reste en place jusqu’à l’actualisation.
             </p>
           </div>
@@ -137,13 +137,17 @@
                 <li class="py-3" data-testid="arrival-preview">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="truncate text-sm font-medium text-text-primary">{mission.title}</p>
-                      <p class="mt-1 truncate text-xs text-text-subtle">
+                      <p class="truncate text-body-lg font-medium text-text-primary">
+                        {mission.title}
+                      </p>
+                      <p class="mt-1 truncate text-meta text-text-subtle">
                         {mission.client ?? mission.source} · {remoteLabel(mission.remote)}
                       </p>
                     </div>
                     {#if mission.tjm !== null}
-                      <span class="shrink-0 text-xs font-semibold tabular-nums text-text-secondary">
+                      <span
+                        class="shrink-0 text-meta font-semibold tabular-nums text-text-secondary"
+                      >
                         {mission.tjm} €/j
                       </span>
                     {/if}
@@ -152,7 +156,7 @@
               {/each}
             </ul>
           {:else}
-            <p class="py-4 text-xs leading-5 text-text-subtle">
+            <p class="py-4 text-meta leading-5 text-text-subtle">
               Les aperçus seront disponibles à la fin de la collecte.
             </p>
           {/if}
@@ -160,7 +164,7 @@
 
         {#if stackState === 'refresh-error'}
           <p
-            class="mx-4 mb-3 rounded-lg bg-status-red/10 px-3 py-2 text-xs text-status-red"
+            class="mx-4 mb-3 rounded-lg bg-status-red/10 px-3 py-2 text-meta text-status-red"
             role="alert"
           >
             {errorMessage ?? 'Impossible d’actualiser la file. Réessayer.'}
@@ -170,7 +174,7 @@
         <div class="border-t border-border-light p-3">
           <button
             type="button"
-            class="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blueprint-blue-strong px-4 py-2.5 text-sm font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-wait disabled:opacity-60"
+            class="flex min-h-11 w-full items-center justify-center gap-2 rounded-lg bg-blueprint-blue-strong px-4 py-2.5 text-body-lg font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blueprint-blue disabled:cursor-wait disabled:opacity-60"
             aria-label={isRefreshing ? 'Actualisation de la file en cours' : refreshLabel}
             disabled={isRefreshing}
             onclick={() => onRefresh?.()}
@@ -211,13 +215,13 @@
             <Icon name="layers" size={17} />
           </span>
           <span class="min-w-0 flex-1">
-            <span class="block text-xs font-semibold text-text-primary">Nouvelles arrivées</span>
-            <span class="mt-0.5 block truncate text-[11px] text-text-subtle">
+            <span class="block text-meta font-semibold text-text-primary">Nouvelles arrivées</span>
+            <span class="mt-0.5 block truncate text-caption text-text-subtle">
               Prêtes à rejoindre votre file
             </span>
           </span>
           <span
-            class="rounded-md bg-blueprint-blue-strong px-2 py-1 text-xs font-semibold tabular-nums text-white"
+            class="rounded-md bg-blueprint-blue-strong px-2 py-1 text-meta font-semibold tabular-nums text-white"
             aria-hidden="true"
           >
             +{boundedCount}

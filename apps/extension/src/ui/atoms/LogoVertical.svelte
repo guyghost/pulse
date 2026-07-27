@@ -9,10 +9,10 @@
 
   const dimensions = $derived(
     size === 'sm'
-      ? { icon: 48, fontSize: 'text-lg', gap: 'gap-2' }
+      ? { icon: 48, fontSize: 'text-heading', gap: 'gap-2' }
       : size === 'lg'
-        ? { icon: 80, fontSize: 'text-3xl', gap: 'gap-3' }
-        : { icon: 64, fontSize: 'text-2xl', gap: 'gap-2.5' }
+        ? { icon: 80, fontSize: 'text-display', gap: 'gap-3' }
+        : { icon: 64, fontSize: 'text-display-sm', gap: 'gap-2.5' }
   );
 </script>
 
@@ -39,7 +39,7 @@
   </div>
 
   <div class="flex flex-col items-center">
-    <span class="text-text-secondary text-xs tracking-[0.35em] uppercase font-medium">
+    <span class="text-text-secondary text-meta tracking-[0.35em] uppercase font-medium">
       Mission
     </span>
     <span class="{dimensions.fontSize} font-bold tracking-wide text-blueprint-blue">PULSE</span>

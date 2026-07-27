@@ -140,7 +140,7 @@
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-status-red/12">
           <Icon name="x" size={14} class="text-status-red" />
         </div>
-        <p class="text-xs leading-relaxed text-text-secondary">{error}</p>
+        <p class="text-meta leading-relaxed text-text-secondary">{error}</p>
       </div>
     {/if}
     {#each sortedMissions as mission, i (mission.id)}
@@ -158,7 +158,7 @@
         />
       </div>
     {/each}
-    <p class="py-2 text-center text-[11px] text-text-muted">
+    <p class="py-2 text-center text-caption text-text-muted">
       {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length >
       1
         ? 's'

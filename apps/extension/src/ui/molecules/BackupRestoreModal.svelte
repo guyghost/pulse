@@ -111,20 +111,20 @@
           <Icon name="alert-circle" size={20} class="text-status-red" />
         </div>
         <div>
-          <h3 id="backup-restore-title" class="text-lg font-semibold text-text-primary">
+          <h3 id="backup-restore-title" class="text-heading font-semibold text-text-primary">
             Backup invalide
           </h3>
-          <p class="text-sm text-text-secondary">Aucune donnée ne sera écrasée</p>
+          <p class="text-body-lg text-text-secondary">Aucune donnée ne sera écrasée</p>
         </div>
       {:else if backup}
         <div class="flex h-10 w-10 items-center justify-center rounded-full bg-blueprint-blue/20">
           <Icon name="database" size={20} class="text-blueprint-blue" />
         </div>
         <div>
-          <h3 id="backup-restore-title" class="text-lg font-semibold text-text-primary">
+          <h3 id="backup-restore-title" class="text-heading font-semibold text-text-primary">
             Restaurer ce point local
           </h3>
-          <p class="text-sm text-text-secondary">
+          <p class="text-body-lg text-text-secondary">
             Vérifiez l’impact avant de remplacer l’état actuel
           </p>
         </div>
@@ -133,10 +133,10 @@
           <Icon name="loader-2" size={20} class="animate-spin text-blueprint-blue" />
         </div>
         <div>
-          <h3 id="backup-restore-title" class="text-lg font-semibold text-text-primary">
+          <h3 id="backup-restore-title" class="text-heading font-semibold text-text-primary">
             Analyse du backup
           </h3>
-          <p class="text-sm text-text-secondary">Validation du format et des données</p>
+          <p class="text-body-lg text-text-secondary">Validation du format et des données</p>
         </div>
       {/if}
     </div>
@@ -144,11 +144,11 @@
     <!-- Content -->
     {#if error}
       <div class="mb-5 rounded-2xl border border-status-red/20 bg-status-red/8 p-4">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-status-red">
+        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-status-red">
           Restauration bloquée
         </p>
-        <p class="mt-2 text-sm leading-5 text-text-primary">{getErrorMessage(error)}</p>
-        <p class="mt-2 text-xs leading-5 text-text-subtle">
+        <p class="mt-2 text-body-lg leading-5 text-text-primary">{getErrorMessage(error)}</p>
+        <p class="mt-2 text-meta leading-5 text-text-subtle">
           Choisissez un autre fichier ou recréez une sauvegarde depuis cet appareil.
         </p>
       </div>
@@ -168,40 +168,43 @@
 
       <div class="mb-5 grid grid-cols-2 gap-2">
         <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-          <span class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+          <span class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
             Profil
           </span>
-          <span class="mt-1 block truncate text-sm font-medium text-text-primary">
+          <span class="mt-1 block truncate text-body-lg font-medium text-text-primary">
             {stats.profileName || 'Non renseigné'}
             {#if stats.jobTitle}
-              <span class="block truncate text-xs text-text-muted">{stats.jobTitle}</span>
+              <span class="block truncate text-meta text-text-muted">{stats.jobTitle}</span>
             {/if}
           </span>
         </div>
 
         <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-          <span class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+          <span class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
             Favoris
           </span>
-          <span class="mt-1 block font-mono text-sm font-semibold tabular-nums text-blueprint-blue"
+          <span
+            class="mt-1 block font-mono text-body-lg font-semibold tabular-nums text-blueprint-blue"
             >{stats.favoritesCount} mission(s)</span
           >
         </div>
 
         <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-          <span class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+          <span class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
             Masquées
           </span>
-          <span class="mt-1 block font-mono text-sm font-semibold tabular-nums text-text-primary">
+          <span
+            class="mt-1 block font-mono text-body-lg font-semibold tabular-nums text-text-primary"
+          >
             {stats.hiddenCount}
           </span>
         </div>
 
         <div class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
-          <span class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+          <span class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
             Version
           </span>
-          <span class="mt-1 block font-mono text-sm font-semibold text-text-primary">
+          <span class="mt-1 block font-mono text-body-lg font-semibold text-text-primary">
             v{stats.version}
           </span>
         </div>
@@ -209,26 +212,29 @@
 
       <div class="mb-4 rounded-2xl border border-status-orange/25 bg-status-orange/8 p-4">
         <p
-          class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-status-orange"
+          class="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.15em] text-status-orange"
         >
           <Icon name="alert-triangle" size={13} class="shrink-0" />
           Décision requise
         </p>
-        <p class="mt-2 text-sm leading-5 text-text-primary">
+        <p class="mt-2 text-body-lg leading-5 text-text-primary">
           Impact : l’état actuel sera remplacé par le backup du {formatDate(backup.timestamp)}.
         </p>
-        <p class="mt-1 text-xs leading-5 text-text-subtle">
+        <p class="mt-1 text-meta leading-5 text-text-subtle">
           Après restauration : vérifiez le feed, le profil et les favoris avant de reprendre les
           scans.
         </p>
       </div>
 
-      <label for="backup-restore-confirm" class="mb-1 block text-xs font-medium text-text-primary">
+      <label
+        for="backup-restore-confirm"
+        class="mb-1 block text-meta font-medium text-text-primary"
+      >
         Tapez RESTAURER pour confirmer
       </label>
       <input
         id="backup-restore-confirm"
-        class="mb-5 w-full rounded-lg border border-status-orange/25 bg-surface-white px-3 py-2 text-sm font-medium text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-status-orange/50"
+        class="mb-5 w-full rounded-lg border border-status-orange/25 bg-surface-white px-3 py-2 text-body-lg font-medium text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-status-orange/50"
         placeholder="RESTAURER"
         bind:value={confirmationText}
         autocomplete="off"
@@ -242,13 +248,13 @@
           aria-live="assertive"
         >
           <p
-            class="flex items-center gap-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-status-red"
+            class="flex items-center gap-2 text-micro font-semibold uppercase tracking-[0.15em] text-status-red"
           >
             <Icon name="alert-circle" size={13} class="shrink-0" />
             Restauration échouée
           </p>
-          <p class="mt-1.5 text-xs leading-5 text-text-primary">{restoreError}</p>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1.5 text-meta leading-5 text-text-primary">{restoreError}</p>
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Aucune donnée n’a été écrasée. Vous pouvez réessayer.
           </p>
         </div>

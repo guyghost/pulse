@@ -19,10 +19,10 @@
     <div class="relative">
       <div class="mb-6">
         <p class="eyebrow text-blueprint-blue/80">MissionPulse</p>
-        <h1 class="mt-3 text-xl font-semibold leading-tight text-text-primary">
+        <h1 class="mt-3 text-heading-lg font-semibold leading-tight text-text-primary">
           Configurez votre premier scan
         </h1>
-        <p class="mt-3 text-sm leading-relaxed text-text-secondary">
+        <p class="mt-3 text-body-lg leading-relaxed text-text-secondary">
           Pulse utilise vos sessions Chrome pour récupérer les missions et afficher celles à traiter
           en premier.
         </p>
@@ -30,16 +30,16 @@
 
       <div class="mb-6 grid grid-cols-3 gap-2">
         <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-          <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Scan</p>
-          <p class="mt-2 text-sm font-semibold text-text-primary">Multi-source</p>
+          <p class="text-caption uppercase tracking-[0.18em] text-text-muted">Scan</p>
+          <p class="mt-2 text-body-lg font-semibold text-text-primary">Multi-source</p>
         </div>
         <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-          <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">Score</p>
-          <p class="mt-2 text-sm font-semibold text-text-primary">Pertinence</p>
+          <p class="text-caption uppercase tracking-[0.18em] text-text-muted">Score</p>
+          <p class="mt-2 text-body-lg font-semibold text-text-primary">Pertinence</p>
         </div>
         <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-          <p class="text-[11px] uppercase tracking-[0.18em] text-text-muted">TJM</p>
-          <p class="mt-2 text-sm font-semibold text-text-primary">Ajuste</p>
+          <p class="text-caption uppercase tracking-[0.18em] text-text-muted">TJM</p>
+          <p class="mt-2 text-body-lg font-semibold text-text-primary">Ajuste</p>
         </div>
       </div>
 

@@ -98,7 +98,7 @@
 <div class="flex flex-col gap-3 rounded-2xl border border-border-light bg-page-canvas p-3">
   <div>
     <div class="mb-2 flex items-center justify-between gap-2">
-      <p class="text-[11px] uppercase tracking-[0.15em] text-text-subtle">Vues</p>
+      <p class="text-caption uppercase tracking-[0.15em] text-text-subtle">Vues</p>
       <Tooltip
         label={savedViewLimitReached
           ? 'Limite de vues atteinte'
@@ -109,7 +109,7 @@
       >
         <button
           type="button"
-          class="inline-flex h-7 items-center gap-1 rounded-lg border border-border-light bg-surface-white px-2 text-[10px] font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex h-7 items-center gap-1 rounded-lg border border-border-light bg-surface-white px-2 text-micro font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
           onclick={() => (saveOpen = !saveOpen)}
           disabled={!canSaveCurrentView || savedViewLimitReached}
         >
@@ -130,7 +130,7 @@
           >
             <button
               type="button"
-              class="min-w-0 px-2 py-1.5 text-[10px] font-medium"
+              class="min-w-0 px-2 py-1.5 text-micro font-medium"
               onclick={() => onApplyView?.(view.id)}
               aria-pressed={activeSavedViewId === view.id}
               title={view.name}
@@ -157,7 +157,7 @@
         <label class="sr-only" for="saved-view-name">Nom de la vue</label>
         <input
           id="saved-view-name"
-          class="h-8 min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-2 text-xs text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-blueprint-blue/30"
+          class="h-8 min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-2 text-meta text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-blueprint-blue/30"
           bind:value={saveName}
           maxlength="48"
           placeholder="Nom de la vue"
@@ -177,7 +177,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Source</p>
+    <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Source</p>
     <div class="flex flex-wrap gap-1.5">
       {#each sources as source (source)}
         <Chip
@@ -190,7 +190,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Mode de travail</p>
+    <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Mode de travail</p>
     <div class="flex flex-wrap gap-1.5">
       {#each remoteTypes as remote (remote)}
         <Chip
@@ -203,7 +203,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Séniorité</p>
+    <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Séniorité</p>
     <div class="flex flex-wrap gap-1.5">
       {#each seniorityLevels as level (level)}
         <Chip
@@ -217,7 +217,7 @@
 
   {#if availableStacks.length > 0}
     <div>
-      <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Technologies</p>
+      <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Technologies</p>
       <div class="flex flex-wrap gap-1.5">
         {#each availableStacks as stack (stack)}
           <Chip
@@ -232,7 +232,7 @@
 
   {#if hasFilters}
     <button
-      class="self-start text-xs text-blueprint-blue hover:text-blueprint-blue/80 transition-colors"
+      class="self-start text-meta text-blueprint-blue hover:text-blueprint-blue/80 transition-colors"
       onclick={() => onClearAll?.()}
     >
       <span class="flex items-center gap-1">
