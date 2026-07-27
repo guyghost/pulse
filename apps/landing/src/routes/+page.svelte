@@ -29,15 +29,15 @@
       note: 'Quand Gemini Nano est disponible',
     },
     { label: 'Comparateur et shortlist quotidienne', tier: 'free' },
-    { label: 'Radar TJM marché par stack', tier: 'premium' },
-    { label: 'Suivi de candidatures (pipeline, notes, relances)', tier: 'premium' },
-    { label: 'Assistant profil et CV', tier: 'premium' },
+    { label: 'Assistant profil et CV', tier: 'free' },
+    { label: 'Suivi de candidatures (pipeline, notes, relances)', tier: 'free' },
+    { label: 'Radar TJM par stack', tier: 'free' },
     {
-      label: 'Génération pitch, message et résumé CV',
+      label: 'Génération pitch, message et résumé (IA distante)',
       tier: 'premium',
       note: '1 crédit = 1 génération',
     },
-    { label: 'Dashboard connecté (synchronisation optionnelle)', tier: 'premium' },
+    { label: 'Dashboard connecté (synchronisation multi-appareils)', tier: 'premium' },
   ];
 
   const platforms: { name: string; logo: string }[] = [
@@ -245,7 +245,7 @@
   <meta property="og:title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     property="og:description"
-    content="4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. Gratuit pour scanner, Premium pour suivre, négocier et candidater."
+    content="4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. L'extension Chrome est 100% gratuite et locale: scan, scoring, suivi, radar TJM et profil/CV. Le compte connecté ajoute la synchronisation multi-appareils et les générations IA distantes."
   />
   <meta property="og:image" content="https://missionpulse.app/og-image.png" />
   <meta property="og:locale" content="fr_FR" />
@@ -434,9 +434,9 @@
         </div>
 
         <p class="showcase-caption">
-          Le feed gratuit prouve la valeur dès le premier scan: une mission 80+, un TJM compatible,
-          une action immédiate. Premium ajoute le suivi, le radar TJM, le profil/CV et les
-          générations par crédits.
+          L'extension livre le scan, le scoring, le suivi de candidatures, le radar TJM et le
+          profil/CV — gratuitement, en local. Le compte connecté ajoute la synchronisation
+          multi-appareils et les générations IA distantes via crédits.
         </p>
 
         <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -684,7 +684,8 @@
               <div class="decision-panel" aria-label="Aide à la décision">
                 <h3>Décision assistée</h3>
                 <p>
-                  Premium relie shortlist, TJM, profil et suivi pour arbitrer les meilleures pistes.
+                  Shortlist, TJM, profil et suivi se croisent pour arbitrer les meilleures pistes,
+                  directement dans l'extension.
                 </p>
                 <div class="decision-row">
                   <span>Meilleur fit profil</span><strong>Lead Svelte</strong>
@@ -806,8 +807,8 @@
       <div class="section-header">
         <h2 class="section-title fade-in">Ce que vous obtenez</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          Le gratuit couvre le scan et le scoring. Le premium ouvre la négociation, le suivi et la
-          candidature.
+          L'extension offre le scan, le scoring, le suivi, le radar TJM et le profil/CV. Le compte
+          connecté ajoute la synchronisation multi-appareils et les générations IA distantes.
         </p>
       </div>
 
@@ -897,17 +898,14 @@
           <div class="plan-card__header">
             <span class="plan-card__name">Gratuit</span>
             <strong class="plan-card__price">0€</strong>
-            <p>Pour valider la valeur en quelques minutes depuis l'extension Chrome.</p>
+            <p>L'extension Chrome, 100% gratuite et locale. Tout le kit freelance, sans compte.</p>
           </div>
           <ul class="plan-card__list">
-            <li>Scan des 4 plateformes connectées depuis vos sessions navigateur.</li>
+            <li>Scan des 4 plateformes depuis vos sessions navigateur existantes.</li>
             <li>Feed centralisé avec recherche, filtres, tri, nouveautés et favoris.</li>
-            <li>Scoring de pertinence, déduplication et comparaison des meilleures missions.</li>
-            <li>Paramètres de profil, alertes, exports et sauvegarde locale.</li>
-            <li>
-              Scoring sémantique local via l'IA intégrée à Chrome (Gemini Nano), quand Chrome le
-              permet.
-            </li>
+            <li>Scoring de pertinence, déduplication et comparateur de missions.</li>
+            <li>Assistant profil et CV, suivi de candidatures (pipeline, notes, relances).</li>
+            <li>Radar TJM par stack et scoring sémantique local via Gemini Nano.</li>
           </ul>
           <a href={chromeStoreUrl} class="btn btn--primary btn--lg">Installer gratuitement</a>
         </article>
@@ -916,21 +914,17 @@
           <div class="plan-card__header">
             <span class="plan-card__name">Premium</span>
             <strong class="plan-card__price">12€<small>/mois</small></strong>
-            <p>Pour piloter votre prospection comme un pipeline et produire vos candidatures.</p>
+            <p>Le compte connecté: synchronisation multi-appareils et générations IA distantes.</p>
             <p class="plan-card__anchor">≈ 0,40€/jour — moins qu'un café par semaine.</p>
           </div>
           <ul class="plan-card__list">
             <li>
-              Le dashboard connecté optionnel synchronise votre shortlist et vos candidatures entre
-              vos appareils.
+              Dashboard connecté: shortlist, candidatures et profil CV synchronisés entre vos
+              appareils via Supabase.
             </li>
-            <li>Pages Premium dans l'extension: profil, CV, suivi de candidatures et radar TJM.</li>
-            <li>Pipeline de candidature avec statuts, notes, prochaine action et historique.</li>
-            <li>Assistant profil/CV pour garder vos informations cohérentes entre plateformes.</li>
-            <li>
-              20 contenus générés par mois (pitch, message recruteur ou résumé CV). 1 crédit = 1
-              contenu.
-            </li>
+            <li>20 générations IA distantes par mois (pitch, message recruteur, résumé CV).</li>
+            <li>1 crédit = 1 contenu; packs à la demande si vous dépassez le quota.</li>
+            <li>Le scan local, le scoring et toutes les pages de l'extension restent gratuits.</li>
           </ul>
           <a
             href="https://missionpulse.lemonsqueezy.com/checkout"
@@ -991,9 +985,9 @@
         <div class="cta__content">
           <h2 class="cta__title">Prêt à installer votre radar mission ?</h2>
           <p class="cta__desc">
-            Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le compte sert au
-            dashboard connecté optionnel, au radar TJM, au suivi de candidature, au profil/CV et aux
-            crédits de génération; l'exécution plateforme reste dans votre navigateur.
+            Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le radar TJM, le suivi
+            de candidatures et le profil/CV restent dans l'extension. Le compte connecté (optionnel)
+            ajoute la synchronisation multi-appareils et les crédits de génération IA distante.
           </p>
           <p class="cta__proof">
             <span class="cta__proof-dot" aria-hidden="true"></span>
