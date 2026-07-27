@@ -11,6 +11,7 @@ import {
 import { createInitialHealthSnapshot, type ConnectorHealthSnapshot } from '$lib/core/types/health';
 import { scoreMission } from '$lib/core/scoring/relevance';
 import { buildScoreBreakdown } from '$lib/core/scoring/final-score';
+import { scoreToGrade } from '$lib/core/types/score';
 import type { CanonicalCandidateProfileDraft } from '$lib/core/profile-extractors/types';
 import { mergeCandidateProfileIntoUserProfile } from '$lib/core/profile-extractors/merge-candidate-profile';
 import { countNewlyAddedExperiences } from '$lib/core/cv/experience-helpers';
@@ -1192,7 +1193,7 @@ function createChromeStubs() {
                   }
                   activeDevScan = null;
                   const enriched = bridgeMissions.map((mission) => {
-                    if (typeof mission.score !== 'number') {
+                    if (typeof mission.score !== 'number' || !mission.scoreBreakdown) {
                       return mission;
                     }
                     // Mild deterministic nudge to emulate fused semantic score.
@@ -1200,7 +1201,19 @@ function createChromeStubs() {
                       100,
                       Math.max(0, Math.round(mission.score + (mission.id.charCodeAt(0) % 5) - 2))
                     );
-                    return { ...mission, score: nudged };
+                    return {
+                      ...mission,
+                      score: nudged,
+                      scoreBreakdown: {
+                        ...mission.scoreBreakdown,
+                        total: nudged,
+                        grade: scoreToGrade(nudged),
+                        semantic: nudged,
+                        semanticReason: 'Dev semantic enrichment',
+                      },
+                      semanticScore: nudged,
+                      semanticReason: 'Dev semantic enrichment',
+                    };
                   });
                   emitRuntimeMessage({
                     type: 'MISSIONS_UPDATED',

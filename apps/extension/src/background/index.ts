@@ -822,15 +822,34 @@ async function executeAcceptedScanOperation(
             operation.controller.signal
           );
           if (changed && !operation.controller.signal.aborted) {
-            await saveMissions(result.missions, operation.controller.signal);
-            await chrome.runtime
-              .sendMessage({
-                type: 'MISSIONS_UPDATED',
-                payload: result.missions,
-              })
-              .catch(() => {
-                // Side panel not open; enriched missions remain durable.
-              });
+            // Profile fence: if the user saved a new profile during enrichment,
+            // SAVE_PROFILE already cleared the semantic cache and rescored
+            // stored missions with the new profile. Discard this stale
+            // old-profile write so it cannot overwrite the fresh rescore or
+            // broadcast stale scores to the feed.
+            const currentProfile = await getProfile();
+            const profileChangedDuringEnrichment =
+              JSON.stringify(currentProfile) !== JSON.stringify(result.profile);
+            if (profileChangedDuringEnrichment) {
+              // Stale enrichment dropped; the SAVE_PROFILE rescore wins.
+            } else {
+              await saveMissions(result.missions, operation.controller.signal);
+              // Alarm scans already published a cold-only batch to the arrival
+              // actor. A live unqualified broadcast here would bypass that actor
+              // and replace the visible catalogue without the user's apply
+              // action. Persist the enriched records and let the actor load them
+              // from IndexedDB; only manual scans refine scores in place.
+              if (trigger !== 'alarm') {
+                await chrome.runtime
+                  .sendMessage({
+                    type: 'MISSIONS_UPDATED',
+                    payload: result.missions,
+                  })
+                  .catch(() => {
+                    // Side panel not open; enriched missions remain durable.
+                  });
+              }
+            }
           }
         } catch (error) {
           if (operation.controller.signal.aborted) {
