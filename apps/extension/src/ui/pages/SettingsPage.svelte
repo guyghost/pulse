@@ -1,7 +1,6 @@
 <script lang="ts">
   import { onDestroy } from 'svelte';
-  import { Button } from '@pulse/ui';
-  import { Icon } from '@pulse/ui';
+  import { Button, Icon, Toggle } from '@pulse/ui';
   import type { IconName } from '@pulse/ui';
   import ScanSettings from '../organisms/ScanSettings.svelte';
   import DangerZone from '../organisms/DangerZone.svelte';
@@ -622,24 +621,12 @@
                 </span>
               </div>
 
-              <button
-                type="button"
-                role="switch"
-                aria-checked={source.enabled}
-                aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
+              <Toggle
+                checked={source.enabled}
                 disabled={settings.isSavingSettings}
-                class="relative h-6 w-10 shrink-0 rounded-full border transition-colors focus:outline-none focus:ring-2 focus:ring-blueprint-blue/30 disabled:cursor-wait disabled:opacity-60 {source.enabled
-                  ? 'border-blueprint-blue bg-blueprint-blue'
-                  : 'border-disabled-gray bg-subtle-gray'}"
+                aria-label={`${source.enabled ? 'Désactiver' : 'Activer'} ${source.name}`}
                 onclick={() => settings.toggleConnector(source.id)}
-              >
-                <span
-                  class="absolute top-0.5 h-4.5 w-4.5 rounded-full bg-white shadow-sm transition-transform {source.enabled
-                    ? 'translate-x-4.5'
-                    : 'translate-x-0.5'}"
-                  aria-hidden="true"
-                ></span>
-              </button>
+              />
             </div>
           {/each}
         </div>
