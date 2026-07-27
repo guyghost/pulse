@@ -7,6 +7,7 @@
   import { Badge } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import { scoreToGrade } from '$lib/core/types/score';
+  import { formatTJM, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import Tooltip from '../atoms/Tooltip.svelte';
 
@@ -116,7 +117,7 @@
         label: 'Action recommandée',
         text:
           mission.tjm !== null
-            ? `À examiner en premier : score fort et TJM ${mission.tjm}€/j.`
+            ? `À examiner en premier : score fort et TJM ${formatTJM(mission.tjm, { fallback: 'non précisé' })}.`
             : 'À examiner en premier : score fort, TJM à vérifier dans l’annonce.',
         tone: 'border-accent-green/20 bg-accent-green/10 text-text-primary',
       };
@@ -168,13 +169,7 @@
     if (typeof timestamp !== 'number' || !Number.isFinite(timestamp) || timestamp <= 0) {
       return null;
     }
-
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(timestamp));
+    return formatTimestamp(timestamp);
   }
 
   function toggleExpand() {
@@ -190,12 +185,18 @@
 
   function handleCopyLink(e: MouseEvent) {
     e.stopPropagation();
-    navigator.clipboard.writeText(mission.url).catch(() => {});
-    copied = true;
-    onCopyLink?.();
-    setTimeout(() => {
-      copied = false;
-    }, 1500);
+    navigator.clipboard
+      .writeText(mission.url)
+      .then(() => {
+        copied = true;
+        onCopyLink?.();
+        setTimeout(() => {
+          copied = false;
+        }, 1500);
+      })
+      .catch(() => {
+        // Clipboard write rejected (permissions/focus): stay silent, no false "copied".
+      });
   }
 
   function handleToggleFavorite(e: MouseEvent) {
@@ -243,7 +244,7 @@
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
     : ''}"
   style="contain: layout style paint;"
-  aria-label={`Mission ${mission.title} chez ${mission.client || 'client non précisé'}`}
+  aria-label={`Mission ${mission.title || 'sans titre'} chez ${mission.client || 'client non précisé'}`}
 >
   <!-- Header row -->
   <div class="flex items-start justify-between gap-3">
@@ -481,7 +482,7 @@
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
             <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">TJM</p>
             <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">
-              {mission.tjm}€<span class="text-text-muted">/j</span>
+              {formatTJMValue(mission.tjm)}<span class="text-text-muted">/j</span>
             </p>
           </div>
         {/if}

@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TJMAnalysis } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
+  import { formatTJMValue } from '$lib/core/utils/format';
   import TrendBadge from '../molecules/TrendBadge.svelte';
   import { Skeleton } from '@pulse/ui';
   import { Icon, type IconName } from '@pulse/ui';
@@ -350,7 +351,7 @@
           <p class="flex-1 text-micro leading-relaxed text-text-muted">
             Trait plein : médiane marché
             <span class="font-mono tabular-nums text-text-subtle"
-              >{positioning.marketMedian}€/j</span
+              >{formatTJMValue(positioning.marketMedian)}/j</span
             >.
           </p>
         </div>

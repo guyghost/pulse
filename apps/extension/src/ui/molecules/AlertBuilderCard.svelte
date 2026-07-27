@@ -4,6 +4,7 @@
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import type { AlertHistoryEntry } from '$lib/core/types/alert-history';
   import { summarizeSmartNotificationPreview } from '$lib/core/scoring/smart-notification';
+  import { formatTJMValue } from '$lib/core/utils/format';
   import OperationalStatusBadge from '../atoms/OperationalStatusBadge.svelte';
 
   const {
@@ -60,7 +61,7 @@
       ? 'Désactivée'
       : isMuteActive
         ? 'En pause'
-        : `${scoreThreshold}+${minDailyRate > 0 ? ` · ${minDailyRate}€/j min` : ''}`
+        : `${scoreThreshold}+${minDailyRate > 0 ? ` · ${formatTJMValue(minDailyRate)}/j min` : ''}`
   );
 
   const suggestedStacks = $derived(
@@ -159,7 +160,7 @@
     const criteria = [`Score ${entry.scoreThreshold}+`];
 
     if (entry.minDailyRate > 0) {
-      criteria.push(`${entry.minDailyRate}€/j min`);
+      criteria.push(`${formatTJMValue(entry.minDailyRate)}/j min`);
     }
 
     if (entry.requiredStacks.length > 0) {

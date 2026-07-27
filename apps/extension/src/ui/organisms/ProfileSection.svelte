@@ -4,6 +4,7 @@
   import { Button } from '@pulse/ui';
   import type { RemoteType } from '$lib/core/types/mission';
   import type { SeniorityLevel } from '$lib/core/types/profile';
+  import { formatTJMRange } from '$lib/core/utils/format';
   import Tooltip from '../atoms/Tooltip.svelte';
   import { REMOTE_OPTIONS as remoteOptions } from '../constants/remote-options';
   import { LOCATION_LABELS } from '$lib/core/locations/location-catalog';
@@ -223,7 +224,9 @@
         </div>
       </div>
       {#if tjmMin > 0 || tjmMax > 0}
-        <p class="text-text-subtle">TJM : {tjmMin} – {tjmMax} €/jour</p>
+        <p class="text-text-subtle">
+          TJM : {formatTJMRange(tjmMin || null, tjmMax || null, { suffix: '/jour' })}
+        </p>
       {/if}
       {#if profileKeywords.length > 0}
         <div class="flex flex-wrap gap-1.5 pt-1">

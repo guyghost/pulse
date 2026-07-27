@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
+  import { formatTJM } from '$lib/core/utils/format';
   import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
   import { Icon, type IconName } from '@pulse/ui';
 
@@ -45,7 +46,7 @@
   }
 
   const fields: { label: string; key: string; render: (m: Mission) => string }[] = [
-    { label: 'TJM', key: 'tjm', render: (m) => (m.tjm ? `${m.tjm} €/j` : '—') },
+    { label: 'TJM', key: 'tjm', render: (m) => (m.tjm ? formatTJM(m.tjm) : '—') },
     { label: 'Localisation', key: 'location', render: (m) => m.location ?? '—' },
     {
       label: 'Remote',
@@ -63,10 +64,6 @@
     { label: 'Source', key: 'source', render: (m) => m.source },
     { label: 'Client', key: 'client', render: (m) => m.client ?? '—' },
   ];
-
-  function formatTjm(value: number | null): string {
-    return typeof value === 'number' ? `${value} €/j` : 'Non précisé';
-  }
 
   const rankedMissions = $derived(
     [...missions].sort((a, b) => getMissionScore(b) - getMissionScore(a))
@@ -124,7 +121,7 @@
       },
       {
         label: 'Meilleur TJM',
-        value: bestTjmMission ? formatTjm(bestTjmMission.tjm) : 'Absent',
+        value: bestTjmMission ? formatTJM(bestTjmMission.tjm) : 'Absent',
         icon: 'badge-euro',
         severity: bestTjmMission ? 'success' : 'neutral',
       },

@@ -4,6 +4,7 @@
   import type { ApplicationStatus } from '$lib/core/types/tracking';
   import { STATUS_LABELS } from '$lib/core/types/tracking';
   import { scoreToGrade } from '$lib/core/types/score';
+  import { formatTJM } from '$lib/core/utils/format';
   import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
   import OperationalStoryCard, {
     type OperationalEvidence,
@@ -92,7 +93,7 @@
     },
     {
       label: 'TJM',
-      value: mission.tjm !== null ? `${mission.tjm}€/j` : 'À vérifier',
+      value: mission.tjm !== null ? formatTJM(mission.tjm) : 'À vérifier',
       icon: 'badge-euro',
       severity: mission.tjm !== null ? 'success' : 'attention',
     },
@@ -266,7 +267,7 @@
               class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-caption font-medium text-text-secondary"
             >
               <Icon name="badge-euro" size={12} />
-              {mission.tjm !== null ? `${mission.tjm}€/j` : 'TJM à vérifier'}
+              {mission.tjm !== null ? formatTJM(mission.tjm) : 'TJM à vérifier'}
             </span>
             {#if formattedPublishedAt}
               <span
