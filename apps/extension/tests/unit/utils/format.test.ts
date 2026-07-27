@@ -5,6 +5,7 @@ import {
   formatRelativeTime,
   formatTJM,
   formatTJMRange,
+  formatTJMValue,
   formatTimestamp,
 } from '../../../src/lib/core/utils/format';
 
@@ -48,6 +49,11 @@ describe('formatTJMRange', () => {
     expect(formatTJMRange(500, null)).toBe('500–— €/j');
   });
 
+  it('treats negative bounds as absent (consistency with formatTJM)', () => {
+    expect(formatTJMRange(-200, 800)).toBe('—–800 €/j');
+    expect(formatTJMRange(-200, -100)).toBe('Non précisé');
+  });
+
   it('groups thousands inside the range', () => {
     expect(formatTJMRange(1000, 1500)).toMatch(new RegExp(`1${SEP}000–1${SEP}500\\s*€/j`));
   });
@@ -66,11 +72,13 @@ describe('formatRelativeTime', () => {
     expect(formatRelativeTime(NOW + 30_000, NOW)).toBe("à l'instant");
   });
 
-  // ICU narrow unit abbreviations vary across Node builds (e.g. "min" vs
-  // "m.", "j" vs "d"), so we assert the numeric magnitude and that a unit
-  // token is emitted, without pinning the exact abbreviation.
-  it('renders minutes with the right magnitude', () => {
-    expect(formatRelativeTime(NOW - 10 * 60_000, NOW)).toContain('10');
+  // ICU short unit abbreviations render "il y a" phrasing for past timestamps.
+  // We assert the phrasing and numeric magnitude, without pinning exact spacing
+  // variations across ICU builds.
+  it('renders minutes with the right magnitude and "il y a" phrasing', () => {
+    const out = formatRelativeTime(NOW - 10 * 60_000, NOW);
+    expect(out).toContain('il y a');
+    expect(out).toContain('10');
   });
 
   it('renders hours with the right magnitude', () => {
@@ -115,9 +123,10 @@ describe('formatTimestamp', () => {
     expect(formatTimestamp(null)).toBeNull();
   });
 
-  it('formats date and time together', () => {
+  it('formats date and time together with year', () => {
     const out = formatTimestamp(new Date('2026-04-07T14:30:00.000Z'));
     expect(out).toContain('avr.');
+    expect(out).toContain('2026');
     expect(out).toMatch(/\d{2}:\d{2}/); // HH:MM, TZ-dependent in the runner
   });
 });
@@ -132,5 +141,19 @@ describe('formatMissionCount', () => {
   it('coerces non-finite or negative input to zero', () => {
     expect(formatMissionCount(Number.NaN)).toBe('0 mission');
     expect(formatMissionCount(-5)).toBe('0 mission');
+  });
+});
+
+describe('formatTJMValue', () => {
+  it('groups thousands and appends the EUR symbol', () => {
+    expect(formatTJMValue(1200)).toMatch(new RegExp(`1${SEP}200\\s*€`));
+    expect(formatTJMValue(650)).toBe('650 €');
+  });
+
+  it('returns null for missing, invalid, or negative values', () => {
+    expect(formatTJMValue(null)).toBeNull();
+    expect(formatTJMValue(undefined)).toBeNull();
+    expect(formatTJMValue(Number.NaN)).toBeNull();
+    expect(formatTJMValue(-100)).toBeNull();
   });
 });

@@ -14,6 +14,30 @@ const MS_PER_MINUTE = 60_000;
 const MS_PER_HOUR = 3_600_000;
 const MS_PER_DAY = 86_400_000;
 
+// Module-level cached formatters (deterministic, pure, reused across calls)
+const TJM_NUMBER_FORMATTER = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 });
+const RELATIVE_TIME_FORMATTER = new Intl.RelativeTimeFormat('fr-FR', {
+  numeric: 'auto',
+  style: 'short',
+});
+const SHORT_DATE_FORMATTER = new Intl.DateTimeFormat('fr-FR', {
+  day: '2-digit',
+  month: '2-digit',
+  year: 'numeric',
+});
+const MEDIUM_DATE_FORMATTER = new Intl.DateTimeFormat('fr-FR', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+});
+const TIMESTAMP_FORMATTER = new Intl.DateTimeFormat('fr-FR', {
+  day: '2-digit',
+  month: 'short',
+  year: 'numeric',
+  hour: '2-digit',
+  minute: '2-digit',
+});
+
 function toEpochMs(value: DateInput): number | null {
   if (value === null || value === undefined) {
     return null;
@@ -38,7 +62,7 @@ export function formatTJM(
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
     return fallback;
   }
-  const grouped = new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value);
+  const grouped = TJM_NUMBER_FORMATTER.format(value);
   return `${grouped} €${suffix}`;
 }
 
@@ -55,8 +79,8 @@ export function formatTJMRange(
   max: number | null | undefined,
   options: { fallback?: string; suffix?: string } = {}
 ): string {
-  const hasMin = typeof min === 'number' && Number.isFinite(min);
-  const hasMax = typeof max === 'number' && Number.isFinite(max);
+  const hasMin = typeof min === 'number' && Number.isFinite(min) && min >= 0;
+  const hasMax = typeof max === 'number' && Number.isFinite(max) && max >= 0;
   if (!hasMin && !hasMax) {
     return options.fallback ?? 'Non précisé';
   }
@@ -70,15 +94,15 @@ export function formatTJMRange(
 }
 
 function formatTJMAmount(value: number): string {
-  return new Intl.NumberFormat('fr-FR', { maximumFractionDigits: 0 }).format(value);
+  return TJM_NUMBER_FORMATTER.format(value);
 }
 
 /**
  * Grouped amount with the EUR symbol but no suffix, for call sites that style
  * the unit separately (e.g. a muted "/j").
  *
- * `formatTJMAmount(1200)` → "1 200 €"
- * `formatTJMAmount(null)` → null
+ * `formatTJMValue(1200)` → "1 200 €"
+ * `formatTJMValue(null)` → null
  */
 export function formatTJMValue(value: number | null | undefined): string | null {
   if (typeof value !== 'number' || !Number.isFinite(value) || value < 0) {
@@ -90,8 +114,8 @@ export function formatTJMValue(value: number | null | undefined): string | null 
 /**
  * Compact relative time using the runtime's i18n tables (singular/plural and
  * the "hier"/"aujourd'hui" special cases come for free). `numeric: 'auto'`
- * yields "hier" rather than "il y a 1 jour"; `style: 'narrow'` keeps the
- * density the connector surfaces need ("il y a 2 j").
+ * yields "hier" rather than "il y a 1 jour"; `style: 'short'` keeps readability
+ * while rendering natural past phrasing ("il y a 2 h", "il y a 5 min").
  *
  * Returns null when either timestamp is missing so callers can omit the line.
  */
@@ -106,21 +130,20 @@ export function formatRelativeTime(value: DateInput, now: DateInput): string | n
   if (diffMs < MS_PER_MINUTE) {
     return "à l'instant";
   }
-  const rtf = new Intl.RelativeTimeFormat('fr-FR', { numeric: 'auto', style: 'narrow' });
   const absDiff = Math.abs(diffMs);
   if (absDiff < MS_PER_HOUR) {
-    return rtf.format(-Math.floor(diffMs / MS_PER_MINUTE), 'minute');
+    return RELATIVE_TIME_FORMATTER.format(-Math.floor(diffMs / MS_PER_MINUTE), 'minute');
   }
   if (absDiff < MS_PER_DAY) {
-    return rtf.format(-Math.floor(diffMs / MS_PER_HOUR), 'hour');
+    return RELATIVE_TIME_FORMATTER.format(-Math.floor(diffMs / MS_PER_HOUR), 'hour');
   }
   if (absDiff < 30 * MS_PER_DAY) {
-    return rtf.format(-Math.floor(diffMs / MS_PER_DAY), 'day');
+    return RELATIVE_TIME_FORMATTER.format(-Math.floor(diffMs / MS_PER_DAY), 'day');
   }
   if (absDiff < 365 * MS_PER_DAY) {
-    return rtf.format(-Math.floor(diffMs / (30 * MS_PER_DAY)), 'month');
+    return RELATIVE_TIME_FORMATTER.format(-Math.floor(diffMs / (30 * MS_PER_DAY)), 'month');
   }
-  return rtf.format(-Math.floor(diffMs / (365 * MS_PER_DAY)), 'year');
+  return RELATIVE_TIME_FORMATTER.format(-Math.floor(diffMs / (365 * MS_PER_DAY)), 'year');
 }
 
 /**
@@ -136,11 +159,8 @@ export function formatAbsoluteDate(
     return null;
   }
   const style = options.style ?? 'short';
-  const formatOpts: Intl.DateTimeFormatOptions =
-    style === 'medium'
-      ? { day: '2-digit', month: 'short', year: 'numeric' }
-      : { day: '2-digit', month: '2-digit', year: 'numeric' };
-  return new Intl.DateTimeFormat('fr-FR', formatOpts).format(new Date(ms));
+  const formatter = style === 'medium' ? MEDIUM_DATE_FORMATTER : SHORT_DATE_FORMATTER;
+  return formatter.format(ms);
 }
 
 /**
@@ -151,12 +171,7 @@ export function formatTimestamp(value: DateInput): string | null {
   if (ms === null) {
     return null;
   }
-  return new Intl.DateTimeFormat('fr-FR', {
-    day: '2-digit',
-    month: 'short',
-    hour: '2-digit',
-    minute: '2-digit',
-  }).format(new Date(ms));
+  return TIMESTAMP_FORMATTER.format(ms);
 }
 
 /**

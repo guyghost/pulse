@@ -55,10 +55,11 @@ describe('ConnectorStatus — SET-04 sub-minute relative time', () => {
     });
     await tick();
 
-    // The shared formatter (Intl.RelativeTimeFormat fr-FR narrow) renders the
-    // 5-minute magnitude; exact spacing/wording varies across ICU builds.
+    // The shared formatter (Intl.RelativeTimeFormat fr-FR short) renders
+    // "il y a 5 min" phrasing for the 5-minute delta. Assert the phrasing
+    // and magnitude, accounting for narrow-no-break-space separators in ICU.
     const text = target.textContent ?? '';
-    expect(text).toContain('5');
-    expect(text).toContain('min');
+    expect(text).toContain('il y a');
+    expect(text).toMatch(/5[\s\u00a0\u202f]*min/);
   });
 });
