@@ -18,7 +18,10 @@ describe('connected privacy copy', () => {
   const publicCopy = `${homePage}\n${privacyPage}\n${storeListing}\n${privacyPolicy}`;
 
   it('does not promise a serverless local-only product after connected sync launch', () => {
-    expect(publicCopy).not.toContain('100% local');
+    // Reject "100% local" and any "100% ... local(e)" variant (e.g. "100% gratuite et locale"):
+    // the connected dashboard path makes a pure-local claim inaccurate (see
+    // docs/specs/dashboard-microfrontend.md). Execution is local; sync is optional/à venir.
+    expect(publicCopy).not.toMatch(/100\s*%[^\n.]*\blocal/i);
     expect(publicCopy).not.toContain('Aucun serveur');
     expect(publicCopy).not.toContain("nous n'en avons pas");
     expect(publicCopy).not.toContain('Aucun compte à créer');

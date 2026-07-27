@@ -37,7 +37,7 @@
       tier: 'premium',
       note: '1 crédit = 1 génération',
     },
-    { label: 'Dashboard connecté (synchronisation multi-appareils)', tier: 'premium' },
+    { label: 'Dashboard connecté (crédits, gestion de compte)', tier: 'premium' },
   ];
 
   const platforms: { name: string; logo: string }[] = [
@@ -245,7 +245,7 @@
   <meta property="og:title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     property="og:description"
-    content="4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. L'extension Chrome est 100% gratuite et locale: scan, scoring, suivi, radar TJM et profil/CV. Le compte connecté ajoute la synchronisation multi-appareils et les générations IA distantes."
+    content="4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. L'exécution plateforme reste locale dans votre navigateur: scan, scoring, suivi, radar TJM et profil/CV. Le compte connecté (optionnel) ouvre les générations IA distantes; la synchronisation multi-appareils est à venir."
   />
   <meta property="og:image" content="https://missionpulse.app/og-image.png" />
   <meta property="og:locale" content="fr_FR" />
@@ -435,8 +435,8 @@
 
         <p class="showcase-caption">
           L'extension livre le scan, le scoring, le suivi de candidatures, le radar TJM et le
-          profil/CV — gratuitement, en local. Le compte connecté ajoute la synchronisation
-          multi-appareils et les générations IA distantes via crédits.
+          profil/CV — gratuitement, en local. Le compte connecté ouvre les générations IA distantes
+          via crédits; la synchronisation multi-appareils est à venir.
         </p>
 
         <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -808,7 +808,8 @@
         <h2 class="section-title fade-in">Ce que vous obtenez</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
           L'extension offre le scan, le scoring, le suivi, le radar TJM et le profil/CV. Le compte
-          connecté ajoute la synchronisation multi-appareils et les générations IA distantes.
+          connecté ouvre les générations IA distantes; la synchronisation multi-appareils est à
+          venir.
         </p>
       </div>
 
@@ -898,7 +899,10 @@
           <div class="plan-card__header">
             <span class="plan-card__name">Gratuit</span>
             <strong class="plan-card__price">0€</strong>
-            <p>L'extension Chrome, 100% gratuite et locale. Tout le kit freelance, sans compte.</p>
+            <p>
+              L'extension Chrome, gratuite. L'exécution plateforme reste locale dans votre
+              navigateur. Tout le kit freelance, sans compte.
+            </p>
           </div>
           <ul class="plan-card__list">
             <li>Scan des 4 plateformes depuis vos sessions navigateur existantes.</li>
@@ -914,13 +918,16 @@
           <div class="plan-card__header">
             <span class="plan-card__name">Premium</span>
             <strong class="plan-card__price">12€<small>/mois</small></strong>
-            <p>Le compte connecté: synchronisation multi-appareils et générations IA distantes.</p>
+            <p>
+              Le compte connecté: générations IA distantes via crédits. Synchronisation
+              multi-appareils à venir.
+            </p>
             <p class="plan-card__anchor">≈ 0,40€/jour — moins qu'un café par semaine.</p>
           </div>
           <ul class="plan-card__list">
             <li>
-              Dashboard connecté: shortlist, candidatures et profil CV synchronisés entre vos
-              appareils via Supabase.
+              Synchronisation multi-appareils (shortlist, candidatures, profil) — à venir, via
+              Supabase.
             </li>
             <li>20 générations IA distantes par mois (pitch, message recruteur, résumé CV).</li>
             <li>1 crédit = 1 contenu; packs à la demande si vous dépassez le quota.</li>
@@ -987,7 +994,8 @@
           <p class="cta__desc">
             Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le radar TJM, le suivi
             de candidatures et le profil/CV restent dans l'extension. Le compte connecté (optionnel)
-            ajoute la synchronisation multi-appareils et les crédits de génération IA distante.
+            ouvre les crédits de génération IA distante; la synchronisation multi-appareils est à
+            venir.
           </p>
           <p class="cta__proof">
             <span class="cta__proof-dot" aria-hidden="true"></span>

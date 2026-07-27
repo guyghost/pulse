@@ -64,11 +64,28 @@ PREMIUM_FEATURE_ENABLED = false
 2. **Non-gating rhétorique.** Aucune copie de la landing (`showcase-caption`,
    sous-titres, `plan-card`, CTA) ne peut affirmer qu'une capacité `free` est
    déverrouillée par Premium.
-3. **Prix unique.** Le prix mensuel (`12€`) et les packs de crédits doivent
-   refléter `apps/landing/src/lib/credits.ts` (`PREMIUM_MONTHLY_CREDITS`, `CREDIT_PACKS`).
+3. **Prix cohérents.** Les compteurs de crédits (`PREMIUM_MONTHLY_CREDITS = 20`)
+   et les packs (`CREDIT_PACKS`) doivent refléter `apps/landing/src/lib/credits.ts`.
+   Le prix mensuel (`12€`) est aujourd'hui un littéral dans
+   `apps/landing/src/routes/+page.svelte` et doit rester aligné avec la
+   configuration Lemon Squeezy (`https://missionpulse.lemonsqueezy.com/checkout`);
+   il n'est pas encore porté par `credits.ts`.
 4. **Connexion vs extension.** Le mot "dashboard" qualifie la surface web
    connectée (`/dashboard`). Les pages de l'extension ne sont jamais
    "Premium".
+5. **Candeur sur la synchronisation.** Toute mention de synchronisation
+   multi-appareils sur la landing doit être qualifiée comme à venir
+   (`à venir`, `sera disponible`), car `loadConnectedAccount()` dans
+   `apps/extension/src/lib/state/settings-page.svelte.ts` n'est activé qu'en
+   développement (`import.meta.env.DEV`) et le dashboard (`apps/dashboard`)
+   déclare la synchronisation "à venir". À l'inverse, les générations IA
+   distantes via crédits sont livrées aujourd'hui (checkout Lemon Squeezy
+   actif) et peuvent être présentées sans réserve.
+6. **Exécution locale, synchronisation optionnelle.** Aucune copie de la
+   landing ne peut promettre un produit "100% local" ou équivalent: le
+   chemin connecté rend cette affirmation inexacte (voir
+   `docs/specs/dashboard-microfrontend.md`). Formulation attendue:
+   exécution plateforme locale + synchronisation cloud optionnelle/à venir.
 
 ## Transitions de surface (revue)
 
