@@ -3,6 +3,7 @@
   import { Icon, type IconName } from '@pulse/ui';
   import ProfileSection from '../organisms/ProfileSection.svelte';
   import { SettingsPageController } from '$lib/state/settings-page.svelte';
+  import { formatTJMRange } from '$lib/core/utils/format';
   import { showToast } from '$lib/shell/notifications/toast-service';
   import OperationalStoryCard, {
     type OperationalEvidence,
@@ -66,7 +67,7 @@
       settings.jobTitle || 'Poste non renseigné',
       settings.profileLocation || 'Lieu non renseigné',
       settings.tjmMin > 0 || settings.tjmMax > 0
-        ? `${settings.tjmMin}-${settings.tjmMax} €/j`
+        ? formatTJMRange(settings.tjmMin || null, settings.tjmMax || null)
         : 'TJM non renseigné',
     ].join(' · ')
   );

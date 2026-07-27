@@ -4,6 +4,7 @@
   import { quartOut } from 'svelte/easing';
   import { Icon } from '@pulse/ui';
   import type { Mission } from '$lib/core/types/mission';
+  import { formatTJM } from '$lib/core/utils/format';
 
   type ArrivalStackState = 'empty' | 'collapsed' | 'open' | 'refreshing' | 'refresh-error';
 
@@ -148,7 +149,7 @@
                       <span
                         class="shrink-0 text-meta font-semibold tabular-nums text-text-secondary"
                       >
-                        {mission.tjm} €/j
+                        {formatTJM(mission.tjm)}
                       </span>
                     {/if}
                   </div>

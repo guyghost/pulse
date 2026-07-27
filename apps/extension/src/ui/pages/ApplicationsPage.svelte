@@ -9,6 +9,7 @@
     StatusTransition,
   } from '$lib/core/types/tracking';
   import { STATUS_LABELS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
+  import { formatTJM } from '$lib/core/utils/format';
   import { getMissions } from '$lib/shell/facades/feed-data.facade';
   import {
     createAvailabilityDeps,
@@ -262,7 +263,7 @@
   }
 
   function formatMissionMeta(mission: Mission): string {
-    return [mission.client, mission.location, mission.tjm ? `${mission.tjm} €/j` : null]
+    return [mission.client, mission.location, mission.tjm ? formatTJM(mission.tjm) : null]
       .filter(Boolean)
       .join(' · ');
   }

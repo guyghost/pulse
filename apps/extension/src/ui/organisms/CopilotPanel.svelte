@@ -14,6 +14,7 @@
   import { untrack } from 'svelte';
 
   import type { CopilotJobStatus } from '$lib/shell/copilot/contracts';
+  import { formatTJM, formatTimestamp } from '$lib/core/utils/format';
   import { createCopilotStore, type CopilotStore } from '$lib/state/copilot.svelte';
 
   const {
@@ -160,7 +161,7 @@
   }
 
   function formatEur(value: number | null): string {
-    return value === null ? 'Non disponible' : `${value.toLocaleString('fr-FR')} €/j`;
+    return formatTJM(value, { fallback: 'Non disponible' });
   }
 
   function evidenceLabel(evidenceId: string): string {
@@ -251,13 +252,11 @@
   }
 
   function deletionReceiptDate(): string | null {
-    return store.deletionReceipt
-      ? new Date(store.deletionReceipt.confirmedAtMs).toLocaleString('fr-FR')
-      : null;
+    return store.deletionReceipt ? formatTimestamp(store.deletionReceipt.confirmedAtMs) : null;
   }
 
   function approvedAt(value: number): string {
-    return new Date(value).toLocaleString('fr-FR');
+    return formatTimestamp(value) ?? '—';
   }
 </script>
 
