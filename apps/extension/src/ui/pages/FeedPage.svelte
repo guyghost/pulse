@@ -205,6 +205,11 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
+  import ScanSummaryCard from '../organisms/ScanSummary.svelte';
+  import {
+    buildScanSummary,
+    type ScanSummary as ScanSummaryData,
+  } from '$lib/core/scan/scan-summary';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import type { MissionSource } from '$lib/core/types/mission';
@@ -238,6 +243,11 @@
   const page = createFeedPageState(feed, controller);
   page.setup();
   onDestroy(() => page.dispose());
+  onDestroy(() => {
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+    }
+  });
 
   type TrackingStore = ReturnType<typeof import('$lib/state/tracking.svelte').createTrackingStore>;
   const emptyTrackings = new Map<string, MissionTracking>();
@@ -616,6 +626,81 @@
       alertScoreThreshold: alertPreferences.scoreThreshold,
     })
   );
+
+  // ── Scan completion delight ──────────────────────────────────────────
+  // Quiet, confident terminal summary shown the moment a scan finishes.
+  // Pure projection of scan-lifecycle terminal facts — introduces no state
+  // transition. Model: src/models/scan-completion-delight.model.md.
+  let scanSummary = $state<ScanSummaryData | null>(null);
+  let scanSummaryVisible = $state(false);
+  let scanSummaryTimer: ReturnType<typeof setTimeout> | undefined;
+  // Plain (non-reactive) refs for edge detection on the monotonic lastScanAt.
+  let prevScanAt: number | null = controller.lastScanAt;
+  // Suppresses reveal until a real scan is observed this session. The
+  // controller starts with lastScanAt === null and hydrates the persisted
+  // timestamp asynchronously during init(); without this guard, hydration
+  // reads as a newly completed scan and surfaces a stale summary on reopen.
+  let everScanned = false;
+
+  function dismissScanSummary(): void {
+    scanSummaryVisible = false;
+    scanSummary = null;
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+      scanSummaryTimer = undefined;
+    }
+  }
+
+  $effect(() => {
+    const ts = controller.lastScanAt;
+    const scanning = controller.isScanning;
+
+    // A new scan starting dismisses any visible summary immediately, and
+    // nulls it so a subsequent failed/cancelled scan (no lastScanAt update)
+    // can never resurface a stale success summary. The baseline is synced
+    // here too, so a non-update after a failed scan produces no edge.
+    if (scanning) {
+      everScanned = true;
+      if (scanSummaryVisible || scanSummary || scanSummaryTimer) {
+        scanSummaryVisible = false;
+        scanSummary = null;
+        if (scanSummaryTimer) {
+          clearTimeout(scanSummaryTimer);
+          scanSummaryTimer = undefined;
+        }
+      }
+      prevScanAt = ts;
+      return;
+    }
+
+    // Hydration guard: treat the first observed lastScanAt as baseline, not
+    // a freshly completed scan, so reopening the panel never reveals a
+    // stale summary.
+    if (!everScanned) {
+      prevScanAt = ts;
+      return;
+    }
+
+    if (ts === null || ts === prevScanAt) {
+      return;
+    }
+    prevScanAt = ts;
+    scanSummary = buildScanSummary({
+      newCount: page.dashboardSummary.newCount,
+      highScoreCount: alertMatchCount,
+      brokenConnectorCount: brokenConnectors.length,
+      alertScoreThreshold: alertPreferences.scoreThreshold,
+    });
+    scanSummaryVisible = true;
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+    }
+    scanSummaryTimer = setTimeout(() => {
+      scanSummaryVisible = false;
+      scanSummary = null;
+      scanSummaryTimer = undefined;
+    }, 4500);
+  });
 
   function formatMissionCount(count: number): string {
     return `${count} mission${count > 1 ? 's' : ''}`;
@@ -1283,6 +1368,12 @@
             {:else if page.aiStatus === 'no'}
               <p class="mt-2 text-center text-caption text-text-muted">Scoring IA indisponible</p>
             {/if}
+          {/if}
+
+          {#if scanSummaryVisible && scanSummary && !feedChromeBusy}
+            <div class="mt-3">
+              <ScanSummaryCard summary={scanSummary} onDismiss={dismissScanSummary} />
+            </div>
           {/if}
         </div>
 
