@@ -44,6 +44,6 @@
 <span class="inline-flex items-center gap-1.5" title={config.title} aria-label={config.title}>
   <span class="shrink-0 rounded-full {dotSize} {config.dotClass}" aria-hidden="true"></span>
   {#if showLabel}
-    <span class="text-[10px] font-medium {config.labelClass}">{config.label}</span>
+    <span class="text-micro font-medium {config.labelClass}">{config.label}</span>
   {/if}
 </span>

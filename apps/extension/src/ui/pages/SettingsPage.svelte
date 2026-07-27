@@ -490,7 +490,7 @@
       </div>
       <div>
         <p class="eyebrow text-blueprint-blue">Configuration</p>
-        <h2 class="mt-1 text-base font-semibold text-text-primary">Paramètres</h2>
+        <h2 class="mt-1 text-subheading font-semibold text-text-primary">Paramètres</h2>
       </div>
     </div>
 
@@ -533,12 +533,12 @@
           </span>
           <span class="min-w-0">
             <span
-              class="block text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted"
+              class="block text-micro font-semibold uppercase tracking-[0.15em] text-text-muted"
             >
               {section.label}
             </span>
-            <span class="mt-1 block text-xs font-medium text-text-primary">{section.title}</span>
-            <span class="mt-1 block text-[11px] leading-4 text-text-subtle">
+            <span class="mt-1 block text-meta font-medium text-text-primary">{section.title}</span>
+            <span class="mt-1 block text-caption leading-4 text-text-subtle">
               {section.description}
             </span>
           </span>
@@ -561,10 +561,10 @@
         </div>
         <div>
           <p class="eyebrow text-text-muted">Sources</p>
-          <h3 id="settings-sources-title" class="mt-1 text-sm font-semibold text-text-primary">
+          <h3 id="settings-sources-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Choisir les sources à scanner
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Cadence, notifications et historique source alimentent les missions visibles.
           </p>
         </div>
@@ -586,15 +586,15 @@
       <div class="section-card space-y-3 rounded-xl p-4">
         <div class="flex items-start justify-between gap-3">
           <div>
-            <p class="text-xs font-semibold text-text-primary">
+            <p class="text-meta font-semibold text-text-primary">
               Sources incluses dans cette version
             </p>
-            <p class="mt-1 text-[11px] leading-4 text-text-muted">
+            <p class="mt-1 text-caption leading-4 text-text-muted">
               Seules les plateformes réellement livrées avec l’extension peuvent être activées.
             </p>
           </div>
           <span
-            class="shrink-0 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+            class="shrink-0 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
           >
             {settings.connectorSources.filter((source) => source.enabled).length}/{settings
               .connectorSources.length} actives
@@ -613,10 +613,10 @@
                   <Icon name="database" size={13} />
                 </span>
                 <span class="min-w-0">
-                  <span class="block truncate text-xs font-medium text-text-primary">
+                  <span class="block truncate text-meta font-medium text-text-primary">
                     {source.name}
                   </span>
-                  <span class="mt-0.5 block text-[10px] text-text-muted">
+                  <span class="mt-0.5 block text-micro text-text-muted">
                     {source.enabled ? 'Incluse dans les prochains scans' : 'Scan désactivé'}
                   </span>
                 </span>
@@ -647,13 +647,13 @@
 
       {#if settings.settingsError}
         <p
-          class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-xs text-status-red"
+          class="rounded-lg border border-status-red/20 bg-status-red/5 px-3 py-2 text-meta text-status-red"
           role="alert"
         >
           {settings.settingsError}. La dernière configuration confirmée reste active.
         </p>
       {:else if settings.isSavingSettings}
-        <p class="px-1 text-[11px] text-text-muted" role="status">Enregistrement…</p>
+        <p class="px-1 text-caption text-text-muted" role="status">Enregistrement…</p>
       {/if}
     </section>
 
@@ -670,10 +670,10 @@
         </div>
         <div>
           <p class="eyebrow text-text-muted">Alertes</p>
-          <h3 id="settings-alerts-title" class="mt-1 text-sm font-semibold text-text-primary">
+          <h3 id="settings-alerts-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Choisir les missions qui méritent une alerte
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Ajustez les conditions avant d’autoriser une notification prioritaire.
           </p>
         </div>
@@ -703,10 +703,10 @@
         </div>
         <div>
           <p class="eyebrow text-text-muted">Compte & IA</p>
-          <h3 id="settings-account-title" class="mt-1 text-sm font-semibold text-text-primary">
+          <h3 id="settings-account-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Synchroniser et enrichir
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Le dashboard connecté et l’analyse locale restent optionnels, mais clarifient le
             pilotage.
           </p>
@@ -723,14 +723,16 @@
           <div class="min-w-0 flex-1">
             <div class="flex flex-wrap items-center justify-between gap-2">
               <div>
-                <h3 class="text-sm font-medium text-text-primary">Compte et synchronisation</h3>
-                <p class="mt-1 text-xs leading-5 text-text-subtle">
+                <h3 class="text-body-lg font-medium text-text-primary">
+                  Compte et synchronisation
+                </h3>
+                <p class="mt-1 text-meta leading-5 text-text-subtle">
                   Le scan reste local. Le compte MissionPulse sert à synchroniser les snapshots vers
                   le dashboard connecté.
                 </p>
               </div>
               <span
-                class="rounded-md border px-2 py-1 text-[10px] font-medium {settings.isConnectedAccount
+                class="rounded-md border px-2 py-1 text-micro font-medium {settings.isConnectedAccount
                   ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
                   : 'border-border-light bg-page-canvas text-text-subtle'}"
               >
@@ -742,14 +744,14 @@
 
         <div class="grid gap-2 sm:grid-cols-2">
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Compte</p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Compte</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {settings.connectedAccountEmail ?? 'Non connecté'}
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Plan</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {features.premiumFeatureActive
                 ? settings.premiumEnabled
                   ? 'Premium local actif'
@@ -758,16 +760,16 @@
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
               Appareil
             </p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {settings.connectedDeviceLabel}
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">File</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {settings.connectedPendingUploads} envoi · {settings.connectedPendingDownloads}
               réception
             </p>
@@ -775,21 +777,21 @@
         </div>
 
         <p
-          class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs leading-5 text-text-subtle"
+          class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta leading-5 text-text-subtle"
         >
           {settings.syncStatusText}
         </p>
 
         <div class="flex flex-wrap gap-2">
           <button
-            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
+            class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
             onclick={() => settings.openAccountCenter()}
           >
             <Icon name="user" size={13} />
             {settings.isConnectedAccount ? 'Gérer mon compte' : 'Connecter mon compte'}
           </button>
           <button
-            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+            class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
             onclick={() => settings.openConnectedDashboard()}
           >
             <Icon name="external-link" size={13} />
@@ -797,7 +799,7 @@
           </button>
         </div>
 
-        <p class="text-[11px] leading-5 text-text-muted">
+        <p class="text-caption leading-5 text-text-muted">
           Les sessions Free-Work, LeHibou, Hiway, Collective et Cherry Pick restent dans Chrome;
           seuls les résultats normalisés, les candidatures, le CV et les préférences peuvent être
           synchronisés.
@@ -816,8 +818,8 @@
             <Icon name="cpu" size={14} class="text-blueprint-blue" />
           </div>
           <div>
-            <h3 class="text-sm font-medium text-text-primary">IA locale</h3>
-            <p class="mt-1 text-xs text-text-subtle">
+            <h3 class="text-body-lg font-medium text-text-primary">IA locale</h3>
+            <p class="mt-1 text-meta text-text-subtle">
               L’analyse locale utilise Gemini Nano via la Prompt API de Chrome, sans clé API
               externe.
             </p>
@@ -837,8 +839,8 @@
         />
         <div class="grid grid-cols-2 gap-2">
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>
-            <p class="mt-1 text-xs font-medium text-text-primary">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Statut</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
               {settings.aiAvailability === 'available'
                 ? 'Disponible'
                 : settings.aiAvailability === 'after-download'
@@ -847,18 +849,22 @@
             </p>
           </div>
           <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
               Missions / scan
             </p>
-            <p class="mt-1 text-xs font-medium text-text-primary">{settings.maxSemanticPerScan}</p>
+            <p class="mt-1 text-meta font-medium text-text-primary">
+              {settings.maxSemanticPerScan}
+            </p>
           </div>
         </div>
         <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
           <div class="flex items-start gap-2">
             <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
             <div class="min-w-0">
-              <p class="text-xs font-medium text-text-primary">Données utilisées par l'IA locale</p>
-              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+              <p class="text-meta font-medium text-text-primary">
+                Données utilisées par l'IA locale
+              </p>
+              <p class="mt-1 text-caption leading-5 text-text-subtle">
                 Gemini Nano reçoit uniquement le contexte utile au score de mission. Le résultat
                 reste local avec le score et une raison courte.
               </p>
@@ -869,11 +875,11 @@
               <div class="rounded-md bg-surface-white px-2.5 py-2">
                 <div class="flex items-center gap-1.5">
                   <Icon name={item.icon} size={12} class="text-blueprint-blue" />
-                  <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+                  <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
                     {item.label}
                   </p>
                 </div>
-                <p class="mt-1 text-[11px] leading-4 text-text-secondary">{item.value}</p>
+                <p class="mt-1 text-caption leading-4 text-text-secondary">{item.value}</p>
               </div>
             {/each}
           </div>
@@ -890,10 +896,10 @@
         </div>
         <div>
           <p class="eyebrow text-text-muted">Données</p>
-          <h3 id="settings-data-title" class="mt-1 text-sm font-semibold text-text-primary">
+          <h3 id="settings-data-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Sorties et nettoyage
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Les actions qui modifient ou exportent l’espace local sont regroupées ici.
           </p>
         </div>
@@ -901,8 +907,8 @@
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Apparence</h3>
-          <p class="mt-1 text-xs text-text-subtle">Choisir le thème de l'interface.</p>
+          <h3 class="text-body-lg font-medium text-text-primary">Apparence</h3>
+          <p class="mt-1 text-meta text-text-subtle">Choisir le thème de l'interface.</p>
         </div>
         <ThemeSelector
           theme={settings.theme}
@@ -913,8 +919,8 @@
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Export</h3>
-          <p class="mt-1 text-xs text-text-subtle">
+          <h3 class="text-body-lg font-medium text-text-primary">Export</h3>
+          <p class="mt-1 text-meta text-text-subtle">
             Préparer une shortlist partageable ou sortir les données brutes.
           </p>
         </div>
@@ -934,8 +940,8 @@
           <div class="flex items-start gap-2">
             <Icon name="file-text" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
             <div class="min-w-0">
-              <p class="text-xs font-medium text-text-primary">Rapport shortlist</p>
-              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+              <p class="text-meta font-medium text-text-primary">Rapport shortlist</p>
+              <p class="mt-1 text-caption leading-5 text-text-subtle">
                 Le Markdown inclut synthèse, critères visibles, signaux de score, liens sources et
                 rappel de confidentialité locale.
               </p>
@@ -943,28 +949,28 @@
           </div>
           <div class="mt-3 grid grid-cols-3 gap-2 text-center">
             <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="font-mono text-sm font-semibold tabular-nums text-text-primary">
+              <p class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
                 {favoriteExportCount}
               </p>
-              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Favoris</p>
+              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Favoris</p>
             </div>
             <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="text-sm font-semibold text-text-primary">MD</p>
-              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Rapport</p>
+              <p class="text-body-lg font-semibold text-text-primary">MD</p>
+              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Rapport</p>
             </div>
             <div class="rounded-md bg-surface-white px-2 py-2">
-              <p class="text-sm font-semibold text-text-primary">Local</p>
-              <p class="mt-0.5 text-[9px] uppercase tracking-[0.12em] text-text-muted">Sessions</p>
+              <p class="text-body-lg font-semibold text-text-primary">Local</p>
+              <p class="mt-0.5 text-micro uppercase tracking-[0.12em] text-text-muted">Sessions</p>
             </div>
           </div>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
             Formats secondaires
           </p>
           <div class="mt-2 flex flex-wrap gap-2">
             <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
               onclick={() => handleExportFavorites('json')}
               disabled={settings.isExporting}
             >
@@ -972,7 +978,7 @@
               JSON
             </button>
             <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
               onclick={() => handleExportFavorites('csv')}
               disabled={settings.isExporting}
             >
@@ -980,7 +986,7 @@
               CSV
             </button>
             <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
               onclick={() => handleExportFavorites('markdown')}
               disabled={settings.isExporting}
             >
@@ -998,8 +1004,8 @@
             <div class="flex items-start gap-2">
               <Icon name="check-circle" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
               <div class="min-w-0">
-                <p class="text-xs font-medium text-text-primary">Export prêt à partager</p>
-                <p class="mt-0.5 text-[11px] leading-4 text-text-subtle">
+                <p class="text-meta font-medium text-text-primary">Export prêt à partager</p>
+                <p class="mt-0.5 text-caption leading-4 text-text-subtle">
                   {settings.lastExportSummary}
                 </p>
               </div>
@@ -1010,8 +1016,8 @@
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Sauvegarde</h3>
-          <p class="mt-1 text-xs text-text-subtle">
+          <h3 class="text-body-lg font-medium text-text-primary">Sauvegarde</h3>
+          <p class="mt-1 text-meta text-text-subtle">
             Exporter une archive de vos données (profil, paramètres, favoris).
           </p>
         </div>
@@ -1036,8 +1042,8 @@
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Diagnostic</h3>
-          <p class="mt-1 text-xs text-text-subtle">
+          <h3 class="text-body-lg font-medium text-text-primary">Diagnostic</h3>
+          <p class="mt-1 text-meta text-text-subtle">
             Exportez un rapport local pour signaler un problème de connecteur ou de scan. Aucune
             session ni cookie n'est inclus.
           </p>
@@ -1046,8 +1052,8 @@
           <div class="flex items-start gap-2">
             <Icon name="activity" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
             <div class="min-w-0">
-              <p class="text-xs font-medium text-text-primary">Rapport technique</p>
-              <p class="mt-1 text-[11px] leading-5 text-text-subtle">
+              <p class="text-meta font-medium text-text-primary">Rapport technique</p>
+              <p class="mt-1 text-caption leading-5 text-text-subtle">
                 Erreurs récentes, état des connecteurs et version Chrome. À joindre aux issues
                 GitHub si un scan échoue de façon répétée.
               </p>
@@ -1055,7 +1061,7 @@
           </div>
           <div class="mt-3">
             <button
-              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+              class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
               onclick={handleExportDiagnostic}
             >
               <Icon name="file-json" size={14} class="text-blueprint-blue" />
@@ -1067,8 +1073,8 @@
 
       <div class="section-card rounded-xl p-5 space-y-4">
         <div>
-          <h3 class="text-sm font-medium text-text-primary">Onboarding</h3>
-          <p class="mt-1 text-xs text-text-subtle">
+          <h3 class="text-body-lg font-medium text-text-primary">Onboarding</h3>
+          <p class="mt-1 text-meta text-text-subtle">
             Rejouer l'accompagnement initial ou relancer le tour du feed.
           </p>
         </div>

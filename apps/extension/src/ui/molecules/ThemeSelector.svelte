@@ -24,7 +24,7 @@
   {#each options as option (option.id)}
     <button
       type="button"
-      class="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-xs font-medium transition-colors disabled:cursor-wait disabled:opacity-60
+      class="flex flex-1 items-center justify-center gap-2 rounded-lg border px-3 py-2 text-meta font-medium transition-colors disabled:cursor-wait disabled:opacity-60
         {theme === option.id
         ? 'border-blueprint-blue bg-blueprint-blue/10 text-blueprint-blue'
         : 'border-border-light bg-page-canvas text-text-primary hover:bg-subtle-gray'}"

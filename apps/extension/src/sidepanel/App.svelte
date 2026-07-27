@@ -401,7 +401,7 @@
   <div class="relative z-10 flex h-full flex-col">
     {#if showOfflineBanner}
       <div
-        class="flex items-center justify-center gap-2 border-b border-border-light bg-status-red/8 px-4 py-2 text-xs text-status-red"
+        class="flex items-center justify-center gap-2 border-b border-border-light bg-status-red/8 px-4 py-2 text-meta text-status-red"
         transition:fade={{ duration: 200 }}
       >
         <Icon name="wifi-off" size={12} />
@@ -422,7 +422,7 @@
           {#each visibleNavItems as item}
             {@const itemLocked = isPremiumLocked(item.page)}
             <button
-              class="relative flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
+              class="relative flex min-w-0 items-center justify-center rounded-full text-caption font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
           {feedNavCompact
                 ? nav.currentPage === item.page
                   ? 'flex-1 gap-1.5 px-3 py-1.5'
@@ -592,7 +592,7 @@
               <div class="relative flex h-full flex-col px-4 py-6">
                 <div class="section-card-strong relative my-auto w-full rounded-2xl p-5">
                   <p class="eyebrow text-blueprint-blue/80">MissionPulse</p>
-                  <h1 class="mt-3 text-xl font-semibold leading-tight text-text-primary">
+                  <h1 class="mt-3 text-heading-lg font-semibold leading-tight text-text-primary">
                     Configurez votre premier scan
                   </h1>
                   <div class="mt-6 grid grid-cols-3 gap-2">

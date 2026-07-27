@@ -172,7 +172,7 @@
       <div
         class="sticky top-0 z-10 flex items-center justify-between border-b border-border-light bg-surface-white/95 backdrop-blur-sm px-4 py-3"
       >
-        <h2 id="mission-comparison-title" class="text-sm font-semibold text-text-primary">
+        <h2 id="mission-comparison-title" class="text-body-lg font-semibold text-text-primary">
           Comparaison ({missions.length} missions)
         </h2>
         <button
@@ -196,15 +196,13 @@
                 <Icon name="target" size={16} />
               </span>
               <div class="min-w-0 flex-1">
-                <p
-                  class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue"
-                >
+                <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
                   Décision recommandée
                 </p>
-                <h3 class="mt-1 text-sm font-semibold text-text-primary">
+                <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
                   {recommendationTitle}
                 </h3>
-                <p class="mt-1 text-xs leading-5 text-text-subtle">
+                <p class="mt-1 text-meta leading-5 text-text-subtle">
                   {recommendationDescription}
                 </p>
               </div>
@@ -219,12 +217,12 @@
                       ? 'border-accent-green/20 bg-accent-green/5'
                       : 'border-border-light bg-page-canvas'}"
                 >
-                  <span class="flex items-center gap-1 text-[10px] text-text-muted">
+                  <span class="flex items-center gap-1 text-micro text-text-muted">
                     <Icon name={item.icon} size={11} />
                     {item.label}
                   </span>
                   <span
-                    class="mt-0.5 block text-xs font-semibold tabular-nums {item.severity ===
+                    class="mt-0.5 block text-meta font-semibold tabular-nums {item.severity ===
                     'attention'
                       ? 'text-status-orange'
                       : item.severity === 'success'
@@ -245,7 +243,7 @@
         class="grid border-b border-border-light px-4 py-3"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
-        <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted self-end">Mission</div>
+        <div class="text-caption uppercase tracking-[0.15em] text-text-muted self-end">Mission</div>
         {#each missions as mission (mission.id)}
           <div class="px-2">
             <a
@@ -253,7 +251,7 @@
               href={mission.url}
               target="_blank"
               rel="noopener"
-              class="text-xs font-semibold text-blueprint-blue hover:underline line-clamp-2"
+              class="text-meta font-semibold text-blueprint-blue hover:underline line-clamp-2"
             >
               {mission.title}
             </a>
@@ -266,17 +264,17 @@
         class="grid border-b border-border-light px-4 py-3"
         style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
       >
-        <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">Stack</div>
+        <div class="text-caption uppercase tracking-[0.15em] text-text-muted">Stack</div>
         {#each missions as mission (mission.id)}
           <div class="flex flex-wrap gap-1 px-2">
             {#each mission.stack.slice(0, 5) as tech (tech)}
               <span
-                class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-[10px] text-blueprint-blue"
+                class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-micro text-blueprint-blue"
                 >{tech}</span
               >
             {/each}
             {#if mission.stack.length > 5}
-              <span class="text-[10px] text-text-muted">+{mission.stack.length - 5}</span>
+              <span class="text-micro text-text-muted">+{mission.stack.length - 5}</span>
             {/if}
           </div>
         {/each}
@@ -288,9 +286,9 @@
           class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
           style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
         >
-          <div class="text-[11px] uppercase tracking-[0.15em] text-text-muted">{field.label}</div>
+          <div class="text-caption uppercase tracking-[0.15em] text-text-muted">{field.label}</div>
           {#each missions as mission (mission.id)}
-            <div class="px-2 text-xs text-text-primary">{field.render(mission)}</div>
+            <div class="px-2 text-meta text-text-primary">{field.render(mission)}</div>
           {/each}
         </div>
       {/each}
@@ -308,7 +306,7 @@
               href={mission.url}
               target="_blank"
               rel="noopener"
-              class="inline-flex items-center gap-1 rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-xs text-blueprint-blue hover:bg-blueprint-blue/20 transition-colors"
+              class="inline-flex items-center gap-1 rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-meta text-blueprint-blue hover:bg-blueprint-blue/20 transition-colors"
             >
               <Icon name="external-link" size={12} />
               Voir

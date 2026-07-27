@@ -114,7 +114,7 @@
         <span class="relative inline-flex h-2 w-2 rounded-full {statusConfig.color}"></span>
       </span>
       <Icon name={statusConfig.icon} size={12} />
-      <span class="text-[10px] font-medium uppercase tracking-wider">{statusConfig.label}</span>
+      <span class="text-micro font-medium uppercase tracking-wider">{statusConfig.label}</span>
     </button>
 
     {#if showDetails}
@@ -125,10 +125,10 @@
       >
         <div class="flex items-center gap-2 border-b border-border-light pb-2 mb-2">
           <span class="h-2 w-2 rounded-full {statusConfig.color}"></span>
-          <span class="text-xs font-medium text-text-primary">{statusConfig.label}</span>
+          <span class="text-meta font-medium text-text-primary">{statusConfig.label}</span>
         </div>
 
-        <div class="space-y-1.5 text-xs">
+        <div class="space-y-1.5 text-meta">
           {#if rtt !== undefined}
             <div class="flex justify-between">
               <span class="text-text-secondary">Latence:</span>

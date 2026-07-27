@@ -523,17 +523,17 @@
       <div>
         <p class="eyebrow text-blueprint-blue">Pipeline</p>
         <div class="mt-1 flex flex-wrap items-center gap-2">
-          <h2 class="text-base font-semibold text-text-primary">Candidatures</h2>
+          <h2 class="text-subheading font-semibold text-text-primary">Candidatures</h2>
           <span
-            class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+            class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
           >
             Local uniquement
           </span>
         </div>
-        <p class="mt-1 text-xs leading-5 text-text-subtle">
+        <p class="mt-1 text-meta leading-5 text-text-subtle">
           Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier.
         </p>
-        <p class="mt-2 text-[11px] leading-5 text-text-muted">
+        <p class="mt-2 text-caption leading-5 text-text-muted">
           Ces statuts restent dans l'extension tant que le compte MissionPulse n'est pas connecté.
         </p>
       </div>
@@ -573,40 +573,40 @@
       >
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
               Dossier recommandé
             </p>
             {#if recommendedTrackedMission}
-              <h3 class="mt-1 truncate text-sm font-semibold text-text-primary">
+              <h3 class="mt-1 truncate text-body-lg font-semibold text-text-primary">
                 {recommendedTrackedMission.mission.title}
               </h3>
-              <p class="mt-1 text-xs leading-5 text-text-subtle">
+              <p class="mt-1 text-meta leading-5 text-text-subtle">
                 {getRecommendedDossierReason(recommendedTrackedMission)}
               </p>
               <div class="mt-2 flex flex-wrap items-center gap-2">
                 <span
-                  class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-[10px] font-medium text-blueprint-blue"
+                  class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-micro font-medium text-blueprint-blue"
                 >
                   {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
                 </span>
                 {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
-                  <span class="text-[10px] text-text-muted">
+                  <span class="text-micro text-text-muted">
                     Action {formatNextAction(recommendedTrackedMission.record.nextActionAt)}
                   </span>
                 {/if}
               </div>
             {:else}
-              <h3 class="mt-1 text-sm font-semibold text-text-primary">
+              <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
                 Aucun dossier suivi pour l’instant
               </h3>
-              <p class="mt-1 text-xs leading-5 text-text-subtle">
+              <p class="mt-1 text-meta leading-5 text-text-subtle">
                 Qualifiez une mission depuis le Feed pour transformer la veille en candidature.
               </p>
             {/if}
           </div>
           <button
             type="button"
-            class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
+            class="inline-flex shrink-0 items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
             onclick={openRecommendedDossier}
           >
             <Icon name={recommendedTrackedMission ? 'arrow-right' : 'briefcase'} size={13} />
@@ -622,13 +622,13 @@
     <div class="mt-4 section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
             Chargement candidatures
           </p>
-          <h3 class="mt-1 text-sm font-semibold text-text-primary">
+          <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
             Reconstruction du pipeline local
           </h3>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             Pulse relie les missions, statuts et contenus générés avant de recommander le prochain
             dossier.
           </p>
@@ -647,8 +647,8 @@
             >
               <Icon name={step.icon} size={13} />
             </div>
-            <p class="mt-2 text-xs font-medium text-text-primary">{step.label}</p>
-            <p class="mt-1 text-[11px] leading-5 text-text-subtle">{step.detail}</p>
+            <p class="mt-2 text-meta font-medium text-text-primary">{step.label}</p>
+            <p class="mt-1 text-caption leading-5 text-text-subtle">{step.detail}</p>
           </div>
         {/each}
       </div>
@@ -695,8 +695,8 @@
     <div class="mt-4 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
       <section class="section-card rounded-xl p-3">
         <div class="flex items-center justify-between px-2 pb-2">
-          <h3 class="text-sm font-medium text-text-primary">Missions</h3>
-          <span class="text-xs text-text-muted">{trackedMissions.length} suivies</span>
+          <h3 class="text-body-lg font-medium text-text-primary">Missions</h3>
+          <span class="text-meta text-text-muted">{trackedMissions.length} suivies</span>
         </div>
         <div class="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
           {#each trackedMissions.length > 0 ? trackedMissions : missions
@@ -711,22 +711,24 @@
             >
               <div class="flex items-start justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="truncate text-sm font-medium text-text-primary">{item.mission.title}</p>
-                  <p class="mt-1 truncate text-xs text-text-subtle">
+                  <p class="truncate text-body-lg font-medium text-text-primary">
+                    {item.mission.title}
+                  </p>
+                  <p class="mt-1 truncate text-meta text-text-subtle">
                     {formatMissionMeta(item.mission)}
                   </p>
                 </div>
-                <span class="shrink-0 text-xs font-semibold text-blueprint-blue">
+                <span class="shrink-0 text-meta font-semibold text-blueprint-blue">
                   {getMissionScore(item.mission)}
                 </span>
               </div>
               <div class="mt-2 flex items-center justify-between gap-2">
                 <span
-                  class="rounded-md bg-surface-white px-2 py-0.5 text-[10px] font-medium text-text-subtle"
+                  class="rounded-md bg-surface-white px-2 py-0.5 text-micro font-medium text-text-subtle"
                 >
                   {STATUS_LABELS[item.record?.currentStatus ?? 'detected']}
                 </span>
-                <span class="text-[10px] text-text-muted">
+                <span class="text-micro text-text-muted">
                   {formatNextAction(item.record?.nextActionAt) ??
                     formatDate(getLastActivity(item.record))}
                 </span>
@@ -741,18 +743,18 @@
           <div class="section-card rounded-xl p-5">
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
-                <p class="text-[10px] font-medium uppercase tracking-[0.15em] text-blueprint-blue">
+                <p class="text-micro font-medium uppercase tracking-[0.15em] text-blueprint-blue">
                   {STATUS_LABELS[selectedStatus]}
                 </p>
-                <h3 class="mt-1 text-base font-semibold text-text-primary">
+                <h3 class="mt-1 text-subheading font-semibold text-text-primary">
                   {selectedMission.title}
                 </h3>
-                <p class="mt-1 text-xs leading-5 text-text-subtle">
+                <p class="mt-1 text-meta leading-5 text-text-subtle">
                   {formatMissionMeta(selectedMission)}
                 </p>
                 {#if formatNextAction(selectedTracking?.nextActionAt)}
                   <p
-                    class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2 py-1 text-[11px] font-medium text-blueprint-blue"
+                    class="mt-2 inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/6 px-2 py-1 text-caption font-medium text-blueprint-blue"
                   >
                     <Icon name="calendar-clock" size={12} />
                     Prochaine action {formatNextAction(selectedTracking?.nextActionAt)}
@@ -773,7 +775,7 @@
             <div class="mt-4 flex flex-wrap gap-2">
               {#each nextStatuses as status, i (i)}
                 <button
-                  class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+                  class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
                   onclick={() => transitionTo(status)}
                 >
                   <Icon name="arrow-right" size={12} />
@@ -784,13 +786,13 @@
 
             <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3">
               {#if selectedFollowUpTerminal}
-                <p class="text-xs leading-5 text-text-subtle">
+                <p class="text-meta leading-5 text-text-subtle">
                   Le suivi de relance est terminé pour ce statut.
                 </p>
               {:else}
                 <label
                   for="application-next-action"
-                  class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted"
+                  class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted"
                 >
                   Prochaine action
                 </label>
@@ -798,12 +800,12 @@
                   <input
                     id="application-next-action"
                     type="datetime-local"
-                    class="min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+                    class="min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
                     bind:value={nextActionInput}
                     aria-label="Prochaine action"
                   />
                   <button
-                    class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+                    class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
                     onclick={saveNextAction}
                   >
                     <Icon name="save" size={12} />
@@ -811,7 +813,7 @@
                   </button>
                   {#if selectedTracking?.nextActionAt}
                     <button
-                      class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
+                      class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
                       onclick={clearNextAction}
                     >
                       <Icon name="x" size={12} />
@@ -828,10 +830,10 @@
                 aria-label="Historique des décisions"
               >
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted">
+                  <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
                     Historique des décisions
                   </p>
-                  <span class="text-[10px] text-text-muted">
+                  <span class="text-micro text-text-muted">
                     {selectedTracking?.history.length ?? 0} événement{(selectedTracking?.history
                       .length ?? 0) > 1
                       ? 's'
@@ -848,14 +850,14 @@
                         aria-hidden="true"
                       ></span>
                       <div class="min-w-0">
-                        <p class="text-xs font-medium text-text-primary">
+                        <p class="text-meta font-medium text-text-primary">
                           {formatDecisionTransition(transition)}
                         </p>
-                        <p class="mt-0.5 text-[11px] text-text-muted">
+                        <p class="mt-0.5 text-caption text-text-muted">
                           {formatDate(transition.timestamp)}
                         </p>
                         {#if formatDecisionNote(transition.note)}
-                          <p class="mt-1 text-[11px] leading-4 text-text-subtle">
+                          <p class="mt-1 text-caption leading-4 text-text-subtle">
                             Note : {formatDecisionNote(transition.note)}
                           </p>
                         {/if}
@@ -870,8 +872,8 @@
           <div class="section-card rounded-xl p-5">
             <div class="flex items-center justify-between gap-3">
               <div>
-                <h3 class="text-sm font-medium text-text-primary">Kit local · Gemini Nano</h3>
-                <p class="mt-1 text-xs text-text-subtle">
+                <h3 class="text-body-lg font-medium text-text-primary">Kit local · Gemini Nano</h3>
+                <p class="mt-1 text-meta text-text-subtle">
                   Pitch, message recruteur et résumé CV — sans envoi cloud.
                 </p>
               </div>
@@ -879,7 +881,7 @@
             <div class="mt-4 grid gap-2">
               {#each generationTypes as type, i (i)}
                 <button
-                  class="inline-flex items-center justify-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
+                  class="inline-flex items-center justify-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
                   onclick={() => generate(type)}
                   disabled={generatingType !== null}
                 >
@@ -919,7 +921,7 @@
                     size={14}
                     class="text-blueprint-blue"
                   />
-                  <h4 class="text-sm font-medium text-text-primary">
+                  <h4 class="text-body-lg font-medium text-text-primary">
                     {GENERATION_TYPE_LABELS[asset.type]}
                   </h4>
                 </div>
@@ -931,7 +933,7 @@
                   <Icon name="check" size={13} />
                 </button>
               </div>
-              <p class="mt-3 whitespace-pre-wrap text-sm leading-6 text-text-secondary">
+              <p class="mt-3 whitespace-pre-wrap text-body-lg leading-6 text-text-secondary">
                 {asset.content}
               </p>
             </article>

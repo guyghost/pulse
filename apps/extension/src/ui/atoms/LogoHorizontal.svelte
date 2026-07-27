@@ -11,10 +11,10 @@
 
   const dimensions = $derived(
     size === 'sm'
-      ? { icon: 24, fontSize: 'text-base', gap: 'gap-2' }
+      ? { icon: 24, fontSize: 'text-subheading', gap: 'gap-2' }
       : size === 'lg'
-        ? { icon: 40, fontSize: 'text-2xl', gap: 'gap-3' }
-        : { icon: 32, fontSize: 'text-xl', gap: 'gap-2.5' }
+        ? { icon: 40, fontSize: 'text-display-sm', gap: 'gap-3' }
+        : { icon: 32, fontSize: 'text-heading-lg', gap: 'gap-2.5' }
   );
 </script>
 
@@ -45,7 +45,7 @@
 
   {#if showText}
     <div class="flex items-baseline">
-      <span class="text-text-secondary text-sm tracking-wide">Mission</span>
+      <span class="text-text-secondary text-body-lg tracking-wide">Mission</span>
       <span class="{dimensions.fontSize} font-bold tracking-wide text-blueprint-blue">Pulse</span>
     </div>
   {/if}

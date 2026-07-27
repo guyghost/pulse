@@ -98,13 +98,13 @@
               <Icon name="keyboard" size={17} class="text-blueprint-blue" />
             </div>
             <div class="min-w-0">
-              <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+              <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
                 Navigation rapide
               </p>
               <h2 id="shortcuts-title" class="mt-0.5 text-heading font-semibold text-text-primary">
                 Raccourcis clavier
               </h2>
-              <p id="shortcuts-description" class="mt-1 text-[12px] leading-5 text-text-subtle">
+              <p id="shortcuts-description" class="mt-1 text-meta leading-5 text-text-subtle">
                 Repérez l'action, puis sa touche associée.
               </p>
             </div>
@@ -128,7 +128,7 @@
             <section aria-labelledby={`shortcut-category-${category}`}>
               <h3
                 id={`shortcut-category-${category}`}
-                class="mb-2 text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted"
+                class="mb-2 text-micro font-semibold uppercase tracking-[0.15em] text-text-muted"
               >
                 {category}
               </h3>
@@ -141,11 +141,11 @@
                       ? 'border-t border-border-light'
                       : ''}"
                   >
-                    <span class="min-w-0 text-[13px] font-medium leading-5 text-text-secondary">
+                    <span class="min-w-0 text-body font-medium leading-5 text-text-secondary">
                       {shortcut.description}
                     </span>
                     <kbd
-                      class="inline-flex shrink-0 items-center justify-center rounded-lg border border-border-light bg-subtle-gray px-2.5 py-1 text-[12px] font-mono font-semibold leading-none text-text-primary shadow-subtle-2"
+                      class="inline-flex shrink-0 items-center justify-center rounded-lg border border-border-light bg-subtle-gray px-2.5 py-1 text-meta font-mono font-semibold leading-none text-text-primary shadow-subtle-2"
                     >
                       {formatShortcut(shortcut)}
                     </kbd>
@@ -160,10 +160,10 @@
       <!-- Footer -->
       <footer class="shrink-0 border-t border-border-light bg-surface-white px-4 py-3">
         <div class="flex items-center justify-between gap-3">
-          <p class="text-[11px] leading-4 text-text-subtle">Désactivés pendant la saisie</p>
+          <p class="text-caption leading-4 text-text-subtle">Désactivés pendant la saisie</p>
           <button
             type="button"
-            class="shrink-0 rounded-lg bg-blueprint-blue-strong px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90"
+            class="shrink-0 rounded-lg bg-blueprint-blue-strong px-3.5 py-2 text-meta font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90"
             onclick={handleExplicitClose}
             data-modal-acknowledgement
           >

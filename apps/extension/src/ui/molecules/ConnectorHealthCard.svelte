@@ -108,7 +108,7 @@
 </script>
 
 <div
-  class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[11px]
+  class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-caption
     {isOpen
     ? 'border-status-red/20 bg-status-red/8'
     : isHealthy
@@ -119,12 +119,12 @@
     <CircuitBadge state={snapshot.circuitState} size="md" />
     <div class="min-w-0">
       <span class="block truncate font-medium text-text-primary">{connectorName}</span>
-      <span class="mt-0.5 block truncate text-[10px] text-text-subtle">{diagnosis.hint}</span>
+      <span class="mt-0.5 block truncate text-micro text-text-subtle">{diagnosis.hint}</span>
     </div>
   </div>
 
   <div
-    class="flex shrink-0 flex-col items-end gap-0.5 text-[10px]"
+    class="flex shrink-0 flex-col items-end gap-0.5 text-micro"
     title={`Dernier succès : ${lastSuccessText}. Latence p95 : ${p95Text}. Échecs : ${failureRatePct}%.`}
   >
     <span

@@ -36,15 +36,15 @@
           <Icon name="star" size={16} />
         </div>
         <div>
-          <p class="text-[11px] uppercase tracking-[0.18em] text-blueprint-blue/80">
+          <p class="text-caption uppercase tracking-[0.18em] text-blueprint-blue/80">
             Tour du feed · {stepIndex + 1}/{totalSteps}
           </p>
-          <h3 class="mt-1 text-sm font-semibold text-text-primary">{step.title}</h3>
-          <p class="mt-1 text-xs leading-relaxed text-text-secondary">{step.description}</p>
+          <h3 class="mt-1 text-body-lg font-semibold text-text-primary">{step.title}</h3>
+          <p class="mt-1 text-meta leading-relaxed text-text-secondary">{step.description}</p>
         </div>
       </div>
       <button
-        class="rounded-lg px-2 py-1 text-[11px] text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
+        class="rounded-lg px-2 py-1 text-caption text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
         onclick={onSkip}
       >
         Passer
@@ -62,7 +62,7 @@
         {/each}
       </div>
       <button
-        class="inline-flex items-center gap-2 rounded-lg border border-blueprint-blue-strong/25 bg-blueprint-blue-strong/88 px-4 py-2 text-xs font-semibold text-white transition-all duration-200 hover:brightness-105"
+        class="inline-flex items-center gap-2 rounded-lg border border-blueprint-blue-strong/25 bg-blueprint-blue-strong/88 px-4 py-2 text-meta font-semibold text-white transition-all duration-200 hover:brightness-105"
         onclick={onNext}
       >
         {stepIndex + 1 === totalSteps ? 'Terminer' : 'Suivant'}

@@ -126,11 +126,11 @@
       aria-pressed={showNewOnly}
       title="Filtrer les nouvelles missions"
     >
-      <span class="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-text-muted">
+      <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
         <Icon name="sparkles" size={11} />
         Nouvelles
       </span>
-      <span class="mt-1 block text-lg font-semibold tabular-nums text-text-primary">
+      <span class="mt-1 block text-heading font-semibold tabular-nums text-text-primary">
         {summary.newCount}
       </span>
     </button>
@@ -145,11 +145,11 @@
       aria-pressed={selectedScoreBucket === 'strong'}
       title="Filtrer les missions prioritaires"
     >
-      <span class="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-text-muted">
+      <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
         <Icon name="target" size={11} />
         80+
       </span>
-      <span class="mt-1 block text-lg font-semibold tabular-nums text-text-primary">
+      <span class="mt-1 block text-heading font-semibold tabular-nums text-text-primary">
         {summary.highScoreCount}
       </span>
     </button>
@@ -160,22 +160,22 @@
       onclick={onToggleFavorites}
       title="Filtrer les favoris"
     >
-      <span class="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-text-muted">
+      <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
         <Icon name="star" size={11} />
         Favoris
       </span>
-      <span class="mt-1 block text-lg font-semibold tabular-nums text-text-primary">
+      <span class="mt-1 block text-heading font-semibold tabular-nums text-text-primary">
         {summary.favoriteCount}
       </span>
     </button>
 
     <div class="min-w-0 rounded-lg px-2 py-2">
-      <span class="flex items-center gap-1 text-[10px] uppercase tracking-[0.14em] text-text-muted">
+      <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
         <Icon name={brokenConnectorCount > 0 ? 'circle-alert' : 'shield-check'} size={11} />
         Sources
       </span>
       <span
-        class="mt-1 block text-lg font-semibold tabular-nums {brokenConnectorCount > 0
+        class="mt-1 block text-heading font-semibold tabular-nums {brokenConnectorCount > 0
           ? 'text-status-red'
           : 'text-text-primary'}"
       >
@@ -186,10 +186,10 @@
 
   <div class="mt-3" aria-label="Distribution des missions par score">
     <div class="mb-1.5 flex items-center justify-between gap-3">
-      <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+      <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
         Score des missions
       </p>
-      <p class="text-[10px] text-text-muted">{summary.visibleCount} visibles</p>
+      <p class="text-micro text-text-muted">{summary.visibleCount} visibles</p>
     </div>
 
     {#if hasScoreData}
@@ -224,9 +224,9 @@
             onclick={() => toggleBucket(bucket.bucket)}
             aria-pressed={selectedScoreBucket === bucket.bucket}
           >
-            <span class="block truncate text-[10px] text-text-subtle">{bucket.label}</span>
+            <span class="block truncate text-micro text-text-subtle">{bucket.label}</span>
             <span
-              class="mt-0.5 block text-[11px] font-mono font-semibold tabular-nums {bucketTextTone[
+              class="mt-0.5 block text-caption font-mono font-semibold tabular-nums {bucketTextTone[
                 bucket.bucket
               ]}"
             >
@@ -238,7 +238,7 @@
       </div>
     {:else}
       <div
-        class="rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs text-text-muted"
+        class="rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-meta text-text-muted"
       >
         Aucun score disponible avec les filtres actuels.
       </div>
@@ -256,16 +256,16 @@
       >
         <div class="flex items-start justify-between gap-2">
           <span class="min-w-0">
-            <span class="flex items-center gap-1 text-[10px] text-text-muted">
+            <span class="flex items-center gap-1 text-micro text-text-muted">
               <Icon name={item.icon} size={11} />
               {item.label}
             </span>
-            <span class="mt-0.5 block truncate text-[10px] font-medium text-text-primary">
+            <span class="mt-0.5 block truncate text-micro font-medium text-text-primary">
               {item.stateLabel}
             </span>
           </span>
           <span
-            class="shrink-0 text-[12px] font-mono font-semibold tabular-nums {item.severity ===
+            class="shrink-0 text-meta font-mono font-semibold tabular-nums {item.severity ===
             'attention'
               ? 'text-status-orange'
               : item.severity === 'success'
@@ -275,7 +275,7 @@
             {item.value}
           </span>
         </div>
-        <p class="mt-1 min-h-7 text-[10px] leading-4 text-text-subtle">{item.hint}</p>
+        <p class="mt-1 min-h-7 text-micro leading-4 text-text-subtle">{item.hint}</p>
       </div>
     {/each}
   </div>
