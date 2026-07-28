@@ -1150,20 +1150,37 @@ async function persistPostCommitEffects(
       return;
     }
 
-    // Update badge with new mission count
+    // Unseen missions feed the notification filter. The icon badge must mirror
+    // that notifiable differential (high-score / smart-alert matches), not the
+    // raw unseen pool — otherwise a first scan of ~1000 missions badges "1000"
+    // while the Chrome notification correctly reports only ~2 new ones.
     const seenIds = await getSeenIds();
     const seenSet = new Set(seenIds);
     const newMissions = missions.filter((m) => !seenSet.has(m.id));
-    const newCount = newMissions.length;
 
-    if (newCount > 0) {
-      await setNewMissionCount(newCount);
-      await chrome.action.setBadgeText({ text: String(newCount) });
+    const notification =
+      newMissions.length > 0
+        ? await notifyHighScoreMissions(newMissions, settingsSnapshot)
+        : { shown: false, notifiedMissionIds: [], notifiableMissionIds: [] };
+
+    const badgeCount = notification.notifiableMissionIds.length;
+    if (badgeCount > 0) {
+      await setNewMissionCount(badgeCount);
+      await chrome.action.setBadgeText({ text: String(badgeCount) });
       await chrome.action.setBadgeBackgroundColor({ color: '#58d9a9' });
       await chrome.action.setBadgeTextColor({ color: '#ffffff' });
     } else {
       await clearNewMissionBadge();
     }
+<<<<<<< HEAD
+
+    // notifyHighScoreMissions persists its focus intent before showing Chrome's
+    // notification, so a fast click cannot race ahead of that write.
+    if (notification.shown && notification.notifiedMissionIds.length > 0) {
+      await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
+    }
+=======
+>>>>>>> origin/develop
   } catch {
     // Badge projection is non-critical after commit. High-score notifications
     // are evaluated separately, after semantic enrichment, so fused semantic
