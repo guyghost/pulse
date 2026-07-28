@@ -19,10 +19,14 @@
     snapshot,
     sources,
     onEvent,
+    onRetry,
+    navFailed = false,
   }: {
     snapshot: OnboardingFlowSnapshot;
     sources: { id: string; name: string }[];
     onEvent: (event: OnboardingFlowEvent) => void;
+    onRetry?: () => void;
+    navFailed?: boolean;
   } = $props();
 
   // Local mirrors of inputs, synced FROM the snapshot (single source of truth).
@@ -206,8 +210,11 @@
             <span class="text-xs font-medium text-text-secondary">Prénom</span>
             <input
               type="text"
-              bind:value={firstName}
-              oninput={() => patch({ firstName })}
+              value={firstName}
+              oninput={(e) => {
+                firstName = e.currentTarget.value;
+                patch({ firstName: e.currentTarget.value });
+              }}
               placeholder="Alex"
               class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
             />
@@ -216,8 +223,11 @@
             <span class="text-xs font-medium text-text-secondary">Métier</span>
             <input
               type="text"
-              bind:value={jobTitle}
-              oninput={() => patch({ jobTitle })}
+              value={jobTitle}
+              oninput={(e) => {
+                jobTitle = e.currentTarget.value;
+                patch({ jobTitle: e.currentTarget.value });
+              }}
               placeholder="Développeur·euse"
               class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
             />
@@ -226,8 +236,11 @@
             <span class="text-xs font-medium text-text-secondary">Localisation (optionnel)</span>
             <input
               type="text"
-              bind:value={location}
-              oninput={() => patch({ location })}
+              value={location}
+              oninput={(e) => {
+                location = e.currentTarget.value;
+                patch({ location: e.currentTarget.value });
+              }}
               placeholder="Paris, France"
               class="mt-1 h-11 w-full rounded-xl border border-border-light bg-surface-white px-3 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/50 focus:ring-2 focus:ring-blueprint-blue/15"
             />
@@ -413,17 +426,30 @@
     transition:fade={{ duration: 120 }}
   >
     <div
-      class="flex h-16 w-16 items-center justify-center rounded-full bg-accent-green/15 text-accent-green"
+      class="flex h-16 w-16 items-center justify-center rounded-full {navFailed
+        ? 'bg-status-orange/15 text-status-orange'
+        : 'bg-accent-green/15 text-accent-green'}"
     >
-      <Icon name="check" class="h-8 w-8" />
+      <Icon name={navFailed ? 'alert-triangle' : 'check'} class="h-8 w-8" />
     </div>
     <h2 class="mt-5 text-heading-lg font-semibold text-text-primary">
-      {snapshot.error ? 'Presque terminé' : "C'est prêt"}
+      {navFailed ? 'Finalisation impossible' : snapshot.error ? 'Presque terminé' : "C'est prêt"}
     </h2>
     <p class="mt-2 max-w-xs text-sm text-text-secondary">
-      {snapshot.error
-        ? 'Une étape a échoué, mais votre feed est prêt. Vous pourrez compléter plus tard.'
-        : 'Votre feed est prêt. Redirection…'}
+      {navFailed
+        ? 'La sauvegarde de votre progression a échoué. Réessayez.'
+        : snapshot.error
+          ? 'Une étape a échoué, mais votre feed est prêt. Vous pourrez compléter plus tard.'
+          : 'Votre feed est prêt. Redirection…'}
     </p>
+    {#if navFailed && onRetry}
+      <button
+        type="button"
+        onclick={onRetry}
+        class="mt-5 h-11 rounded-2xl bg-blueprint-blue px-6 text-sm font-semibold text-white transition-transform active:scale-[0.99] hover:brightness-105"
+      >
+        Réessayer
+      </button>
+    {/if}
   </section>
 {/if}

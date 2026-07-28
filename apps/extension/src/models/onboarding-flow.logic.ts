@@ -147,7 +147,10 @@ function finalizeProfile(ctx: OnboardingFlowContext): UserProfile {
     jobTitle: p.jobTitle.trim() || 'Freelance',
     keywords: [...p.keywords],
     tjmMin: p.tjmMin,
-    tjmMax: Math.max(p.tjmMax, p.tjmMin + 100),
+    // Respect the user's explicit max. The `preferences` guard already enforces
+    // tjmMax >= tjmMin; silently widening a valid narrow range (e.g. 800-850)
+    // would discard the user's intent.
+    tjmMax: p.tjmMax,
     location: p.location || '',
     remote: p.remote,
     seniority: 'senior',

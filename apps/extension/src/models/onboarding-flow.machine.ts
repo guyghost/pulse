@@ -47,6 +47,10 @@ const onboardingFlowMachine = onboardingFlowSetup.createMachine({
   states: {
     welcome: {
       on: {
+        // UPDATE_PROFILE is admitted so the shell can rehydrate an existing
+        // profile before the user advances (best-effort, races with START).
+        // The pure mergeProfile action is harmless in this state.
+        UPDATE_PROFILE: { guard: and(['admittedEvent']), actions: 'mergeProfile' },
         START: { guard: and(['admittedEvent']), target: 'connecting' },
         SKIP: { guard: and(['admittedEvent']), target: 'scanning', actions: 'skipToScan' },
       },
@@ -56,6 +60,7 @@ const onboardingFlowMachine = onboardingFlowSetup.createMachine({
         CONNECT_SOURCE: { guard: and(['admittedEvent']), actions: 'toggleSource' },
         DISCONNECT_SOURCE: { guard: and(['admittedEvent']), actions: 'toggleSource' },
         SOURCE_SESSION: { guard: and(['admittedEvent']), actions: 'markSession' },
+        UPDATE_PROFILE: { guard: and(['admittedEvent']), actions: 'mergeProfile' },
         NEXT: {
           guard: and(['admittedEvent', 'hasConnectedSource']),
           target: 'wizard',

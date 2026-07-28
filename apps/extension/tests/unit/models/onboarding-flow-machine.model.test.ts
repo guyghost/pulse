@@ -89,6 +89,31 @@ describe('onboarding-flow machine', () => {
       expect(scanEffect?.kind).toBe('START_SCAN');
       expect(scanEffect).toMatchObject({ kind: 'START_SCAN', partial: false });
     });
+
+    it('PERSIST_PROFILE preserves a narrow tjmMax instead of widening it', () => {
+      // Regression: finalizeProfile used to write tjmMax = max(tjmMax, tjmMin+100),
+      // silently discarding a valid narrow range (e.g. 800-850). The guard only
+      // enforces tjmMax >= tjmMin, so the user's explicit max must be honored.
+      const c = makeController();
+      run(c, [
+        { type: 'START' },
+        { type: 'CONNECT_SOURCE', sourceId: 'free-work' },
+        { type: 'NEXT' },
+        { type: 'UPDATE_PROFILE', partial: { firstName: 'A', jobTitle: 'B' } },
+        { type: 'NEXT' },
+        { type: 'UPDATE_PROFILE', partial: { tjmMin: 800, tjmMax: 850 } },
+        { type: 'NEXT' },
+        { type: 'UPDATE_PROFILE', partial: { keywords: ['React'] } },
+        { type: 'NEXT' }, // skills → notifying
+        { type: 'NEXT' }, // notifying → persisting
+      ]);
+      const effect = c.getSnapshot().pendingEffect;
+      expect(effect?.kind).toBe('PERSIST_PROFILE');
+      if (effect.kind === 'PERSIST_PROFILE') {
+        expect(effect.profile.tjmMin).toBe(800);
+        expect(effect.profile.tjmMax).toBe(850); // not widened to 900
+      }
+    });
   });
 
   describe('skip path', () => {
@@ -121,6 +146,21 @@ describe('onboarding-flow machine', () => {
       const c = makeController();
       run(c, [{ type: 'START' }, { type: 'BACK' }]);
       expect(c.getSnapshot().phase).toBe('welcome');
+    });
+
+    it('UPDATE_PROFILE is admitted in welcome so the shell can rehydrate an existing profile', () => {
+      const c = makeController();
+      // The shell rehydrates a persisted profile before the user advances.
+      c.send({
+        type: 'UPDATE_PROFILE',
+        partial: { firstName: 'Rehydrated', jobTitle: 'Dev', tjmMin: 700, tjmMax: 900 },
+      });
+      // Stays in welcome, but the draft is merged (pre-fills the wizard later).
+      const snap = c.getSnapshot();
+      expect(snap.phase).toBe('welcome');
+      expect(snap.profile.firstName).toBe('Rehydrated');
+      expect(snap.profile.tjmMin).toBe(700);
+      expect(snap.profile.tjmMax).toBe(900);
     });
 
     it('wizard BACK from first step → connecting', () => {
