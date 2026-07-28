@@ -2,7 +2,7 @@
   import type { Mission } from '$lib/core/types/mission';
   import { formatTJM } from '$lib/core/utils/format';
   import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
-  import { Icon, type IconName } from '@pulse/ui';
+  import { Icon } from '@pulse/ui';
 
   const {
     missions,
@@ -14,6 +14,7 @@
 
   let modalRoot = $state<HTMLElement | null>(null);
   let dialogElement = $state<HTMLElement | null>(null);
+  let showFullDetails = $state(false);
 
   function handleClose(): void {
     if (!requestModalClose(modalRoot, 'explicit')) {
@@ -21,17 +22,14 @@
     }
   }
 
+  function toggleDetails(): void {
+    showFullDetails = !showFullDetails;
+  }
+
   const remoteLabels: Record<string, string> = {
     full: 'Full remote',
     hybrid: 'Hybride',
     onsite: 'Sur site',
-  };
-
-  type DecisionEvidence = {
-    label: string;
-    value: string;
-    icon: IconName;
-    severity: 'success' | 'attention' | 'neutral';
   };
 
   /**
@@ -45,8 +43,18 @@
     return mission.scoreBreakdown?.total ?? mission.semanticScore ?? mission.score ?? 0;
   }
 
-  const fields: { label: string; key: string; render: (m: Mission) => string }[] = [
+  // High-signal fields — always visible (collapsed default view)
+  const primaryFields: { label: string; key: string; render: (m: Mission) => string }[] = [
+    {
+      label: 'Score',
+      key: 'score',
+      render: (m) => `${getMissionScore(m)}/100`,
+    },
     { label: 'TJM', key: 'tjm', render: (m) => (m.tjm ? formatTJM(m.tjm) : '—') },
+  ];
+
+  // Detail fields — behind toggle
+  const detailFields: { label: string; key: string; render: (m: Mission) => string }[] = [
     { label: 'Localisation', key: 'location', render: (m) => m.location ?? '—' },
     {
       label: 'Remote',
@@ -56,11 +64,6 @@
     { label: 'Durée', key: 'duration', render: (m) => m.duration ?? '—' },
     { label: 'Début', key: 'startDate', render: (m) => m.startDate ?? '—' },
     { label: 'Séniorité', key: 'seniority', render: (m) => m.seniority ?? '—' },
-    {
-      label: 'Score',
-      key: 'score',
-      render: (m) => `${getMissionScore(m)}/100`,
-    },
     { label: 'Source', key: 'source', render: (m) => m.source },
     { label: 'Client', key: 'client', render: (m) => m.client ?? '—' },
   ];
@@ -101,43 +104,24 @@
     return 'Les scores sont à égalité. Utilisez le TJM, le remote et le client pour trancher.';
   });
 
+  /**
+   * Compact decision evidence — a single high-signal value (the recommended
+   * mission's fused score) rendered inline inside the recommendation box.
+   * Not the old 2×2 grid; this stays decision-first and unobtrusive.
+   */
+  type DecisionEvidence = {
+    label: string;
+    value: string;
+  };
+
   const decisionEvidence = $derived.by<DecisionEvidence[]>(() => {
     if (!recommendedMission) {
       return [];
     }
-
     return [
       {
         label: 'Score',
         value: `${getMissionScore(recommendedMission)}/100`,
-        icon: 'target',
-        severity: getMissionScore(recommendedMission) >= 80 ? 'success' : 'attention',
-      },
-      {
-        label: 'Écart',
-        value: scoreGap > 0 ? `+${scoreGap} pts` : 'Égalité',
-        icon: 'git-compare-arrows',
-        severity: scoreGap >= 10 ? 'success' : 'attention',
-      },
-      {
-        label: 'Meilleur TJM',
-        value: bestTjmMission ? formatTJM(bestTjmMission.tjm) : 'Absent',
-        icon: 'badge-euro',
-        severity: bestTjmMission ? 'success' : 'neutral',
-      },
-      {
-        label: 'Vigilance',
-        value:
-          recommendedMission.remote === 'onsite'
-            ? 'Présentiel'
-            : recommendedMission.tjm === null
-              ? 'TJM absent'
-              : 'Aucune',
-        icon: 'circle-alert',
-        severity:
-          recommendedMission.remote === 'onsite' || recommendedMission.tjm === null
-            ? 'attention'
-            : 'success',
       },
     ];
   });
@@ -199,37 +183,24 @@
                 <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
                   {recommendationTitle}
                 </h3>
+                {#if decisionEvidence.length > 0}
+                  <div class="mt-2 flex flex-wrap gap-1.5">
+                    {#each decisionEvidence as evidence (evidence.label)}
+                      <span
+                        class="inline-flex items-baseline gap-1 rounded-md bg-blueprint-blue/10 px-2 py-0.5 text-meta text-blueprint-blue"
+                      >
+                        <span class="text-micro uppercase tracking-[0.12em] opacity-70"
+                          >{evidence.label}</span
+                        >
+                        <span class="font-semibold tabular-nums">{evidence.value}</span>
+                      </span>
+                    {/each}
+                  </div>
+                {/if}
                 <p class="mt-1 text-meta leading-5 text-text-subtle">
                   {recommendationDescription}
                 </p>
               </div>
-            </div>
-
-            <div class="mt-3 grid grid-cols-2 gap-2">
-              {#each decisionEvidence as item, i (i)}
-                <div
-                  class="rounded-lg border px-2 py-1.5 {item.severity === 'attention'
-                    ? 'border-status-orange/25 bg-status-orange/5'
-                    : item.severity === 'success'
-                      ? 'border-accent-green/20 bg-accent-green/5'
-                      : 'border-border-light bg-page-canvas'}"
-                >
-                  <span class="flex items-center gap-1 text-micro text-text-muted">
-                    <Icon name={item.icon} size={11} />
-                    {item.label}
-                  </span>
-                  <span
-                    class="mt-0.5 block text-meta font-semibold tabular-nums {item.severity ===
-                    'attention'
-                      ? 'text-status-orange'
-                      : item.severity === 'success'
-                        ? 'text-text-primary'
-                        : 'text-text-subtle'}"
-                  >
-                    {item.value}
-                  </span>
-                </div>
-              {/each}
             </div>
           </div>
         </section>
@@ -242,7 +213,11 @@
       >
         <div class="text-caption uppercase tracking-[0.15em] text-text-muted self-end">Mission</div>
         {#each missions as mission (mission.id)}
-          <div class="px-2">
+          <div
+            class="px-2 {mission.id === recommendedMission?.id
+              ? 'bg-blueprint-blue/5 -mx-2 px-4 pt-2 border-t border-t-blueprint-blue/30'
+              : ''}"
+          >
             <a
               data-modal-mission-link
               href={mission.url}
@@ -263,7 +238,11 @@
       >
         <div class="text-caption uppercase tracking-[0.15em] text-text-muted">Stack</div>
         {#each missions as mission (mission.id)}
-          <div class="flex flex-wrap gap-1 px-2">
+          <div
+            class="flex flex-wrap gap-1 px-2 {mission.id === recommendedMission?.id
+              ? 'bg-blueprint-blue/5 -mx-2 px-4'
+              : ''}"
+          >
             {#each mission.stack.slice(0, 5) as tech (tech)}
               <span
                 class="inline-flex rounded-full bg-blueprint-blue/10 px-1.5 py-0.5 text-micro text-blueprint-blue"
@@ -277,18 +256,68 @@
         {/each}
       </div>
 
-      <!-- Data rows -->
-      {#each fields as field, i (i)}
+      <!-- Primary fields (always visible) -->
+      {#each primaryFields as field, i (i)}
         <div
           class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
           style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
         >
           <div class="text-caption uppercase tracking-[0.15em] text-text-muted">{field.label}</div>
           {#each missions as mission (mission.id)}
-            <div class="px-2 text-meta text-text-primary">{field.render(mission)}</div>
+            <div
+              class="px-2 text-meta text-text-primary {mission.id === recommendedMission?.id
+                ? 'bg-blueprint-blue/5 -mx-2 px-4'
+                : ''}"
+            >
+              {field.render(mission)}
+            </div>
           {/each}
         </div>
       {/each}
+
+      <!-- Toggle button -->
+      <div class="border-y border-border-light bg-page-canvas px-4 py-2">
+        <button
+          class="inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-meta text-text-secondary hover:bg-subtle-gray hover:text-text-primary transition-colors focus-visible:outline focus-visible:outline-2 focus-visible:outline-blueprint-blue focus-visible:outline-offset-2"
+          onclick={toggleDetails}
+          aria-expanded={showFullDetails}
+          aria-controls="comparison-details"
+        >
+          <Icon
+            name="chevron-down"
+            size={14}
+            class="transition-transform motion-reduce:transition-none {showFullDetails
+              ? 'rotate-180'
+              : ''}"
+          />
+          {showFullDetails ? 'Masquer les détails' : 'Afficher tous les détails'}
+        </button>
+      </div>
+
+      <!-- Detail fields (expandable) -->
+      {#if showFullDetails}
+        <div id="comparison-details" class="details-container overflow-hidden">
+          {#each detailFields as field, i (i)}
+            <div
+              class="grid px-4 py-2.5 {i % 2 === 0 ? 'bg-page-canvas' : ''}"
+              style="grid-template-columns: 90px repeat({missions.length}, 1fr)"
+            >
+              <div class="text-caption uppercase tracking-[0.15em] text-text-muted">
+                {field.label}
+              </div>
+              {#each missions as mission (mission.id)}
+                <div
+                  class="px-2 text-meta text-text-primary {mission.id === recommendedMission?.id
+                    ? 'bg-blueprint-blue/5 -mx-2 px-4'
+                    : ''}"
+                >
+                  {field.render(mission)}
+                </div>
+              {/each}
+            </div>
+          {/each}
+        </div>
+      {/if}
 
       <!-- Actions -->
       <div
@@ -314,3 +343,37 @@
     </div>
   </div>
 {/if}
+
+<style>
+  @keyframes slideDown {
+    from {
+      opacity: 0;
+      max-height: 0;
+    }
+    to {
+      opacity: 1;
+      max-height: 1000px;
+    }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    @keyframes slideDown {
+      from {
+        opacity: 0;
+      }
+      to {
+        opacity: 1;
+      }
+    }
+  }
+
+  .details-container {
+    animation: slideDown 200ms ease-out;
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .details-container {
+      animation-duration: 0.01ms;
+    }
+  }
+</style>

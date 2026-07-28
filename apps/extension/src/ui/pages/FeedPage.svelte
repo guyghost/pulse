@@ -1,191 +1,10 @@
 <script module lang="ts">
-  import type { IconName as FeedIconName } from '@pulse/ui';
-  import type { OperationalEvidence } from '../molecules/OperationalStoryCard.svelte';
-
-  export type FeedStorySeverity = 'critical' | 'incident' | 'attention' | 'success' | 'neutral';
-
-  export interface FeedStory {
-    severity: FeedStorySeverity;
-    statusLabel: string;
-    title: string;
-    description: string;
-    evidence: OperationalEvidence[];
-    primaryActionLabel: string;
-    primaryActionIcon: FeedIconName;
-  }
-
-  export interface FeedStoryInput {
-    error: string | null;
-    isOffline: boolean;
-    brokenConnectorCount: number;
-    firstBrokenConnectorName: string | null;
-    newCount: number;
-    highScoreCount: number;
-    visibleCount: number;
-    alertEnabled: boolean;
-    alertScoreThreshold: number;
-  }
-
-  function formatStoryMissionCount(count: number): string {
-    return `${count} mission${count > 1 ? 's' : ''}`;
-  }
-
-  /**
-   * Pure resolver for the feed operational story.
-   *
-   * Extracted from the FeedPage derived so the precedence rules (error vs
-   * offline vs broken sources vs new/priority) are unit-testable without
-   * mounting the whole page. Shell/page wiring assembles the inputs; this
-   * function owns the decision tree and the copy.
-   */
-  export function buildFeedStory(input: FeedStoryInput): FeedStory {
-    const {
-      error,
-      isOffline,
-      brokenConnectorCount,
-      firstBrokenConnectorName,
-      newCount,
-      highScoreCount,
-      visibleCount,
-      alertEnabled,
-      alertScoreThreshold,
-    } = input;
-
-    const evidence: OperationalEvidence[] = [
-      {
-        label: 'Nouvelles',
-        value: newCount,
-        icon: 'sparkles',
-        severity: newCount > 0 ? 'attention' : 'neutral',
-      },
-      {
-        label: `Prioritaires ${alertScoreThreshold}+`,
-        value: highScoreCount,
-        icon: 'target',
-        severity: highScoreCount > 0 ? 'success' : 'neutral',
-      },
-      {
-        label: 'Sources en erreur',
-        value: brokenConnectorCount,
-        icon: brokenConnectorCount > 0 ? 'triangle-alert' : 'shield-check',
-        severity: brokenConnectorCount > 0 ? 'critical' : 'success',
-      },
-    ];
-
-    if (error) {
-      // The feed list still renders cached missions, so degrade the hero
-      // story to a warning rather than a critical "impossible to retrieve"
-      // incident. Only escalate to critical when nothing is visible.
-      if (visibleCount > 0) {
-        return {
-          severity: 'incident',
-          statusLabel: 'Données en cache',
-          title: 'Récupération interrompue — affichage en cache',
-          description: `Les ${formatStoryMissionCount(visibleCount)} déjà récupérées restent disponibles. Réessayez le scan ou vérifiez vos sources.`,
-          evidence,
-          primaryActionLabel: 'Réessayer le scan',
-          primaryActionIcon: 'refresh-cw',
-        };
-      }
-      return {
-        severity: 'critical',
-        statusLabel: 'Incident',
-        title: 'Impossible de récupérer les missions',
-        description: 'Réessayez le scan ou vérifiez vos sources pour récupérer les missions.',
-        evidence,
-        primaryActionLabel: 'Réessayer le scan',
-        primaryActionIcon: 'refresh-cw',
-      };
-    }
-
-    if (isOffline) {
-      return {
-        severity: 'incident' as const,
-        statusLabel: 'Hors ligne',
-        title: 'Pulse affiche les données en cache',
-        description:
-          'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions déjà stockées.',
-        evidence,
-        primaryActionLabel:
-          visibleCount > 0
-            ? `Voir les ${formatStoryMissionCount(visibleCount)} en cache`
-            : 'Hors ligne',
-        primaryActionIcon: visibleCount > 0 ? 'chevron-down' : 'database',
-      };
-    }
-
-    if (brokenConnectorCount > 0) {
-      return {
-        severity: 'critical' as const,
-        statusLabel: 'Action requise',
-        title: `${brokenConnectorCount} source${brokenConnectorCount > 1 ? 's' : ''} à corriger avant de traiter les missions`,
-        description: `${firstBrokenConnectorName ?? 'Une source'} ne remonte plus correctement. Le feed peut manquer des opportunités.`,
-        evidence,
-        primaryActionLabel: 'Relancer le diagnostic',
-        primaryActionIcon: 'refresh-cw',
-      };
-    }
-
-    if (newCount > 0) {
-      return {
-        severity: 'attention' as const,
-        statusLabel: 'À traiter',
-        title:
-          highScoreCount > 0
-            ? `${highScoreCount} mission${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} à examiner`
-            : `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} à examiner`,
-        description:
-          highScoreCount > 0
-            ? `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} au total. Commencez par celles qui dépassent le seuil ${alertScoreThreshold}+.`
-            : 'Aucune urgence détectée, mais les nouvelles missions méritent une qualification rapide.',
-        evidence,
-        primaryActionLabel:
-          highScoreCount > 0
-            ? `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaires`
-            : `Voir les ${formatStoryMissionCount(newCount)} nouvelles`,
-        primaryActionIcon: 'chevron-down',
-      };
-    }
-
-    if (alertEnabled && highScoreCount > 0) {
-      return {
-        severity: 'success' as const,
-        statusLabel: 'Priorités prêtes',
-        title: `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prête${highScoreCount > 1 ? 's' : ''}`,
-        description: `Elles dépassent votre seuil ${alertScoreThreshold}+. Comparez-les avant de mettre une mission en suivi.`,
-        evidence,
-        primaryActionLabel:
-          alertScoreThreshold >= 80
-            ? `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaire${highScoreCount > 1 ? 's' : ''}`
-            : `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaires`,
-        primaryActionIcon: 'chevron-down',
-      };
-    }
-
-    if (visibleCount === 0) {
-      return {
-        severity: 'neutral' as const,
-        statusLabel: 'Aucune donnée',
-        title: 'Lancez un premier scan pour voir vos missions',
-        description:
-          'Connectez ou vérifiez les sources, puis lancez un scan pour obtenir les premières recommandations.',
-        evidence,
-        primaryActionLabel: 'Lancer le scan',
-        primaryActionIcon: 'play',
-      };
-    }
-
-    return {
-      severity: 'success' as const,
-      statusLabel: 'Normal',
-      title: `${visibleCount} mission${visibleCount > 1 ? 's' : ''} disponible${visibleCount > 1 ? 's' : ''}, aucune priorité critique`,
-      description:
-        'Le système est stable. Continuez par les favoris ou relancez un scan si la veille doit être rafraîchie.',
-      evidence,
-      primaryActionLabel: `Voir les ${formatStoryMissionCount(visibleCount)}`,
-      primaryActionIcon: 'chevron-down',
-    };
-  }
+  // Re-export types from core for backward compatibility
+  export type {
+    FeedStory,
+    FeedStoryInput,
+    FeedStorySeverity,
+  } from '$lib/core/feed/build-feed-story';
 </script>
 
 <script lang="ts">
@@ -210,6 +29,7 @@
     buildScanSummary,
     type ScanSummary as ScanSummaryData,
   } from '$lib/core/scan/scan-summary';
+  import { buildFeedStory } from '$lib/core/feed/build-feed-story';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import type { MissionSource } from '$lib/core/types/mission';
@@ -624,6 +444,9 @@
       visibleCount: page.dashboardSummary.visibleCount,
       alertEnabled: alertPreferences.enabled,
       alertScoreThreshold: alertPreferences.scoreThreshold,
+      hasCompletedScan: controller.lastScanAt !== null,
+      filterActive: page.filterActive,
+      totalMissionCount: page.totalMissions,
     })
   );
 
@@ -757,6 +580,18 @@
     if (alertMatchCount > 0) {
       showAlertOnly = true;
       void scrollToMissionFeed();
+      return;
+    }
+
+    // Empty state: filters hide all cached missions → clear filters (not Profile)
+    if (page.dashboardSummary.visibleCount === 0 && page.filterActive && page.totalMissions > 0) {
+      handleClearMissionFilters();
+      return;
+    }
+
+    // Empty state: scanned but no matches → route to Profile
+    if (page.dashboardSummary.visibleCount === 0 && controller.lastScanAt !== null) {
+      onNavigateToProfile?.();
       return;
     }
 
