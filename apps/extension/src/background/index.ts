@@ -1172,15 +1172,12 @@ async function persistPostCommitEffects(
     } else {
       await clearNewMissionBadge();
     }
-<<<<<<< HEAD
 
     // notifyHighScoreMissions persists its focus intent before showing Chrome's
     // notification, so a fast click cannot race ahead of that write.
     if (notification.shown && notification.notifiedMissionIds.length > 0) {
       await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
     }
-=======
->>>>>>> origin/develop
   } catch {
     // Badge projection is non-critical after commit. High-score notifications
     // are evaluated separately, after semantic enrichment, so fused semantic
