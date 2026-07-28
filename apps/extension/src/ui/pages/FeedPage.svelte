@@ -132,6 +132,9 @@
     $state(null);
   let ProfileRefinementBanner:
     typeof import('../molecules/ProfileRefinementBanner.svelte').default | null = $state(null);
+  let ProfileChecklistPill:
+    typeof import('../molecules/ProfileChecklistPill.svelte').default | null = $state(null);
+  let checklistPillDismissed = $state(false);
   let ConnectorAlertBar: typeof import('../molecules/ConnectorAlertBar.svelte').default | null =
     $state(null);
   let FeedTourOverlay: typeof import('../molecules/FeedTourOverlay.svelte').default | null =
@@ -212,6 +215,11 @@
     if (!ProfileRefinementBanner) {
       import('../molecules/ProfileRefinementBanner.svelte').then((module) => {
         ProfileRefinementBanner = module.default;
+      });
+    }
+    if (!ProfileChecklistPill) {
+      import('../molecules/ProfileChecklistPill.svelte').then((module) => {
+        ProfileChecklistPill = module.default;
       });
     }
   }
@@ -1235,6 +1243,22 @@
                 onNavigateToOnboarding?.();
               }}
             />
+          {/if}
+
+          {#if !checklistPillDismissed && page.profileLoaded && page.profileCompletion < 100 && ProfileChecklistPill}
+            <div class="flex justify-center">
+              <ProfileChecklistPill
+                completion={page.profileCompletion}
+                onOpenProfile={() => {
+                  if (onNavigateToProfile) {
+                    onNavigateToProfile();
+                    return;
+                  }
+                  onNavigateToOnboarding?.();
+                }}
+                onDismiss={() => (checklistPillDismissed = true)}
+              />
+            </div>
           {/if}
 
           <!-- Row 1: title + search -->

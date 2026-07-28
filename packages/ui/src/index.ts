@@ -9,6 +9,10 @@ export { default as GlowButton } from './lib/atoms/GlowButton.svelte';
 export { default as Toast } from './lib/atoms/Toast.svelte';
 export { default as Toggle } from './lib/atoms/Toggle.svelte';
 export type { ToggleSize } from './lib/atoms/Toggle.svelte';
+export { default as SegmentedControl } from './lib/atoms/SegmentedControl.svelte';
+export type { SegmentedControlOption } from './lib/atoms/SegmentedControl.svelte';
+export { default as ChipGroup } from './lib/atoms/ChipGroup.svelte';
+export type { ChipGroupOption } from './lib/atoms/ChipGroup.svelte';
 export { default as Icon } from './lib/atoms/Icon.svelte';
 
 // Icons (tree-shakeable)
