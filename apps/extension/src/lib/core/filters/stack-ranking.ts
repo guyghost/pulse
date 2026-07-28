@@ -43,9 +43,23 @@ export function computeVisibleStacks(
 }
 
 /**
- * Returns the overflow count: total - top-N, clamped to ≥0.
- * Does NOT subtract pinned selected stacks (they're bonus visibility).
+ * Returns the number of available stacks that are NOT visible — i.e. neither
+ * in the top-N nor pinned as a selected stack. This is the true count the
+ * "Voir N autres" toggle represents.
+ *
+ * The previous `total - topN` formula overcounted when selected stacks were
+ * pinned outside the top-N: those pinned stacks are already visible, so they
+ * must not be reported as hidden overflow.
  */
-export function computeOverflowCount(totalStacks: number, topN: number): number {
-  return Math.max(0, totalStacks - topN);
+export function computeOverflowCount(
+  availableStacks: readonly string[],
+  visibleStacksSet: ReadonlySet<string>
+): number {
+  let hidden = 0;
+  for (const stack of availableStacks) {
+    if (!visibleStacksSet.has(stack)) {
+      hidden += 1;
+    }
+  }
+  return hidden;
 }

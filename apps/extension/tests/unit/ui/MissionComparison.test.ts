@@ -165,7 +165,15 @@ describe('MissionComparison modal focus', () => {
     expect(document.activeElement).toBe(close);
     expect(dialog?.getAttribute('aria-modal')).toBe('true');
 
-    close!.focus();
+    // The disclosure toggle is now keyboard-focusable (no tabindex="-1"), so it
+    // joins the trap as the last tab stop. Forward Tab must wrap to the first
+    // focusable (the mission link), proving the trap still cycles correctly.
+    const toggle = document.querySelector<HTMLButtonElement>(
+      'button[aria-controls="comparison-details"]'
+    );
+    expect(toggle?.getAttribute('tabindex')).toBeNull();
+
+    toggle!.focus();
     document.dispatchEvent(
       new KeyboardEvent('keydown', { key: 'Tab', bubbles: true, cancelable: true })
     );

@@ -384,7 +384,11 @@ export function createFeedPageState(
   );
 
   const stackCounts = $derived.by(() => {
-    const counts: Record<string, number> = {};
+    // Null-prototype dictionary: stack names are scraped from external pages
+    // (untrusted), so a plain {} would let keys like "__proto__" / "constructor"
+    // collide with inherited members. Object.create(null) has no prototype, so
+    // every key is a plain own property.
+    const counts: Record<string, number> = Object.create(null);
     for (const m of missions) {
       for (const s of m.stack) {
         counts[s] = (counts[s] ?? 0) + 1;

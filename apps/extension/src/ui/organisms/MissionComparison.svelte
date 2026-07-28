@@ -282,7 +282,6 @@
           onclick={toggleDetails}
           aria-expanded={showFullDetails}
           aria-controls="comparison-details"
-          tabindex="-1"
         >
           <Icon
             name="chevron-down"

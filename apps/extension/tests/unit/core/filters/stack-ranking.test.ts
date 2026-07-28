@@ -60,16 +60,29 @@ describe('computeVisibleStacks', () => {
 });
 
 describe('computeOverflowCount', () => {
-  it('returns difference when total > topN', () => {
-    expect(computeOverflowCount(10, 8)).toBe(2);
+  it('counts stacks outside the visible set', () => {
+    const visible = new Set(['A', 'B', 'C']);
+    expect(computeOverflowCount(['A', 'B', 'C', 'D', 'E'], visible)).toBe(2);
   });
 
-  it('returns 0 when total <= topN', () => {
-    expect(computeOverflowCount(5, 8)).toBe(0);
-    expect(computeOverflowCount(8, 8)).toBe(0);
+  it('returns 0 when all available stacks are visible', () => {
+    const visible = new Set(['A', 'B', 'C']);
+    expect(computeOverflowCount(['A', 'B', 'C'], visible)).toBe(0);
   });
 
-  it('returns 0 for empty list', () => {
-    expect(computeOverflowCount(0, 8)).toBe(0);
+  it('returns 0 for an empty available list', () => {
+    expect(computeOverflowCount([], new Set())).toBe(0);
+  });
+
+  it('does not overcount pinned selected stacks (all pinned → 0 overflow)', () => {
+    // 5 ranked stacks, top-3 = {A,B,C}; selected pins D and E → all visible.
+    const visible = new Set(['A', 'B', 'C', 'D', 'E']);
+    expect(computeOverflowCount(['A', 'B', 'C', 'D', 'E'], visible)).toBe(0);
+  });
+
+  it('counts only truly hidden stacks when some selected are pinned', () => {
+    // 5 ranked, top-3 = {A,B,C}; selected pins E → visible {A,B,C,E}; hidden = D.
+    const visible = new Set(['A', 'B', 'C', 'E']);
+    expect(computeOverflowCount(['A', 'B', 'C', 'D', 'E'], visible)).toBe(1);
   });
 });

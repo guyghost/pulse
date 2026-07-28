@@ -92,7 +92,7 @@
     showAllStacks ? availableStacks : availableStacks.filter((stack) => visibleStacksSet.has(stack))
   );
 
-  const overflowCount = $derived(computeOverflowCount(availableStacks.length, TOP_N_STACKS));
+  const overflowCount = $derived(computeOverflowCount(availableStacks, visibleStacksSet));
 
   async function handleSaveSubmit(event: SubmitEvent) {
     event.preventDefault();
