@@ -119,7 +119,6 @@ const onboardingFlowMachine = onboardingFlowSetup.createMachine({
       },
     },
     completed: { type: 'final' },
-    skipped: { type: 'final' },
   },
 });
 

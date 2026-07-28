@@ -9,8 +9,8 @@
   };
 </script>
 
-<script lang="ts">
-  type ChipGroupProps<T extends string = string> = {
+<script lang="ts" generics="T extends string">
+  type ChipGroupProps = {
     /** Currently selected values. */
     values: readonly T[];
     /** Ordered list of options. */
@@ -30,13 +30,12 @@
     onchange,
   }: ChipGroupProps = $props();
 
-  function toggle(opt: ChipGroupOption<string>) {
+  function toggle(opt: ChipGroupOption<T>) {
     if (disabled || opt.disabled) return;
-    const current = values as readonly string[];
-    const next: string[] = current.includes(opt.value)
-      ? current.filter((v) => v !== opt.value)
-      : [...current, opt.value];
-    onchange?.(next as unknown as string[] & typeof values);
+    const next: T[] = values.includes(opt.value)
+      ? values.filter((v) => v !== opt.value)
+      : [...values, opt.value];
+    onchange?.(next);
   }
 </script>
 

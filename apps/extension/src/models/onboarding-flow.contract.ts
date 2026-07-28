@@ -3,12 +3,12 @@
  *
  * Models the end-to-end onboarding UI flow as an explicit state machine:
  *   welcome → connecting → wizard(identity → preferences → skills) →
- *   notifying → persisting → scanning → completed | skipped
+ *   notifying → persisting → scanning → completed
  *
  * Invariant (binding): the first scan is NEVER blocked. A persist failure or a
- * scan failure still advances to `completed` (with a typed error surfaced). The
- * only way to not reach the feed is an explicit terminal `skipped` that still
- * ran a default partial scan.
+ * scan failure still advances to `completed` (with a typed error surfaced).
+ * SKIP fast-forwards to `scanning` with a partial-default scan and then reaches
+ * the same sole terminal `completed` — there is no second terminal state.
  *
  * Discipline (binding):
  * - This file is pure: no fetch, no chrome.*, no async, no Date.now/UUID. The
@@ -33,14 +33,7 @@ export type OnboardingWizardStep = (typeof ONBOARDING_WIZARD_STEPS)[number];
 
 /** Top-level phase the UI renders. */
 export type OnboardingFlowPhase =
-  | 'welcome'
-  | 'connecting'
-  | 'wizard'
-  | 'notifying'
-  | 'persisting'
-  | 'scanning'
-  | 'completed'
-  | 'skipped';
+  'welcome' | 'connecting' | 'wizard' | 'notifying' | 'persisting' | 'scanning' | 'completed';
 
 /** Draft profile built during the wizard. Partial until completion. */
 export type OnboardingProfileDraft = Pick<
@@ -101,7 +94,12 @@ export type OnboardingFlowEvent =
 
 export interface OnboardingFlowInput {
   readonly attemptId: string;
-  /** Catalog of selectable sources (already filtered to included connectors). */
+  /**
+   * Catalog of selectable sources (already filtered to included connectors).
+   * May be empty in a degenerate build where every connector is excluded; the
+   * flow still reaches `completed` (the user can SKIP to a default scan, and
+   * the `connecting` phase simply renders an empty list).
+   */
   readonly sources: readonly { readonly id: string }[];
   /** Optional re-hydration seed (e.g. a profile loaded from storage). */
   readonly initialProfile?: Partial<OnboardingProfileDraft>;
@@ -133,9 +131,10 @@ export function parseOnboardingFlowInput(input: OnboardingFlowInput): Onboarding
   if (!Array.isArray(input.sources)) {
     throw new Error('onboarding-flow: sources catalog required');
   }
-  if (input.sources.length === 0) {
-    throw new Error('onboarding-flow: sources catalog must not be empty');
-  }
+  // An empty catalog is valid: it represents a degenerate build where every
+  // connector is excluded. The flow still reaches `completed` via SKIP; the
+  // `connecting` phase simply has nothing to render. Per-entry validation still
+  // rejects malformed or duplicate entries when sources are present.
   const seen = new Set<string>();
   for (const s of input.sources) {
     if (!s || typeof s.id !== 'string' || s.id.length === 0) {
@@ -185,7 +184,6 @@ export function phaseFromStateValue(value: string | undefined): OnboardingFlowPh
     'persisting',
     'scanning',
     'completed',
-    'skipped',
   ];
   return value && (known as readonly string[]).includes(value)
     ? (value as OnboardingFlowPhase)
@@ -215,7 +213,7 @@ export function projectOnboardingFlow(
     progress: { current: current < 0 ? 0 : current, total: order.length },
     pendingEffect: ctx.pendingEffect,
     error: ctx.error,
-    terminal: phase === 'completed' || phase === 'skipped',
+    terminal: phase === 'completed',
     canAdvance: canAdvanceStep(ctx),
   };
 }

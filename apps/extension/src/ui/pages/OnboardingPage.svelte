@@ -83,6 +83,7 @@
   controller.start();
   onDestroy(unsubscribe);
   onDestroy(() => controller.stop());
+  onDestroy(() => feedController.dispose());
 
   // ── Effect executor ──────────────────────────────────────────────────────
   // Fires once per emitted effect (ref-equality guard prevents re-runs).

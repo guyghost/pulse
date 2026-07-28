@@ -1,9 +1,9 @@
 <script lang="ts">
   /**
-   * Profile checklist pill — compact, persistent, never blocking.
+   * Profile checklist pill — compact, never blocking.
    * Shows profile completion % and lets the user jump to profile settings.
-   * Dismissible (state persists via the same flag the refinement banner uses,
-   * or a dedicated one). Pure presentational: receives completion + callbacks.
+   * Purely presentational: receives completion + callbacks; any "dismissed"
+   * persistence is the parent's responsibility (the host owns the flag).
    */
   import { Icon, type IconName } from '@pulse/ui';
   import { slide } from 'svelte/transition';

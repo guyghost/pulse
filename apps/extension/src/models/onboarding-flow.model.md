@@ -46,11 +46,12 @@ desync.
 
 ## Invariants (binding)
 
-1. **Never block first value.** A scan always runs. The only terminal besides
-   `completed` is `skipped`, which _also_ runs a partial scan first. There is
-   no aborted dead-end.
-2. **Idempotent terminal.** `completed` and `skipped` are XState `final`
-   states. No event is admitted after the terminal is reached.
+1. **Never block first value.** A scan always runs. `SKIP` fast-forwards to
+   `scanning` with a partial-default profile; `_FAILED` transitions still
+   advance to the next phase. There is no aborted dead-end and no terminal
+   short of `completed`.
+2. **Idempotent terminal.** `completed` is the sole XState `final` state. No
+   event is admitted after it is reached.
 3. **One primary action per screen.** Each phase has at most one forward (NEXT)
    and one back (BACK); SKIP is the only escape hatch.
 4. **Guards decide, components don't.** `canAdvanceStep` (pure, in contract) is
@@ -90,10 +91,9 @@ On `PERSIST_FAILED`, the machine still writes `START_SCAN` and transitions to
 
 ## Re-entry guard
 
-`completed` / `skipped` are `final`. The extension gates on
-`hasCompletedOnboarding` (storage flag set by the shell once `completed` is
-reached), so the flow is never re-entered. The controller is created fresh each
-onboarding run.
+`completed` is `final`. The extension gates on `hasCompletedOnboarding`
+(storage flag set by the shell once `completed` is reached), so the flow is
+never re-entered. The controller is created fresh each onboarding run.
 
 ## Snapshot (projection)
 

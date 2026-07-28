@@ -301,10 +301,30 @@ describe('onboarding-flow machine', () => {
   });
 
   describe('input validation', () => {
-    it('rejects an empty sources catalog', () => {
-      expect(() => createOnboardingFlowController({ attemptId: ATTEMPT_ID, sources: [] })).toThrow(
-        /sources/
-      );
+    it('accepts an empty sources catalog (degenerate build, all connectors excluded)', () => {
+      // Empty catalog must NOT throw — the user can still SKIP to a default
+      // scan. See onboarding-flow.contract.ts `parseOnboardingFlowInput`.
+      const ctrl = createOnboardingFlowController({ attemptId: ATTEMPT_ID, sources: [] });
+      expect(ctrl.getSnapshot().phase).toBe('welcome');
+      ctrl.stop();
+    });
+
+    it('rejects a malformed source entry', () => {
+      expect(() =>
+        createOnboardingFlowController({
+          attemptId: ATTEMPT_ID,
+          sources: [{ id: '' }],
+        })
+      ).toThrow(/invalid source entry/);
+    });
+
+    it('rejects a duplicate source id', () => {
+      expect(() =>
+        createOnboardingFlowController({
+          attemptId: ATTEMPT_ID,
+          sources: [{ id: 'free-work' }, { id: 'free-work' }],
+        })
+      ).toThrow(/duplicate source id/);
     });
 
     it('rejects a missing attemptId', () => {

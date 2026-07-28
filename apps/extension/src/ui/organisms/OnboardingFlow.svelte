@@ -167,7 +167,7 @@
       </button>
       <button
         type="button"
-        disabled={!snapshot.canAdvance && snapshot.connectedSources.length === 0}
+        disabled={snapshot.connectedSources.length === 0}
         onclick={() => onEvent({ type: 'NEXT' })}
         class="h-12 flex-[2] rounded-2xl bg-blueprint-blue text-sm font-semibold text-white transition-transform duration-150 active:scale-[0.99] enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
       >
@@ -407,7 +407,7 @@
         : 'Pulse récupère et score vos missions. Cela prend quelques secondes.'}
     </p>
   </section>
-{:else if snapshot.phase === 'completed' || snapshot.phase === 'skipped'}
+{:else if snapshot.phase === 'completed'}
   <section
     class="flex h-full flex-col items-center justify-center text-center"
     transition:fade={{ duration: 120 }}
