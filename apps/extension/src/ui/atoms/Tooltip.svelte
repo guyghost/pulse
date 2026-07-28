@@ -64,7 +64,7 @@
     <span
       id={tooltipId}
       role="tooltip"
-      class="pointer-events-none absolute z-50 w-max max-w-52 rounded-lg border border-border-light bg-text-primary px-2.5 py-2 text-left font-geist text-[11px] leading-4 text-page-canvas shadow-subtle-3 {placementClass}"
+      class="pointer-events-none absolute z-50 w-max max-w-52 rounded-lg border border-border-light bg-text-primary px-2.5 py-2 text-left font-geist text-caption leading-4 text-page-canvas shadow-subtle-3 {placementClass}"
       transition:fade={{ duration: 100 }}
     >
       <span class="block font-semibold">{label}</span>

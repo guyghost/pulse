@@ -155,6 +155,7 @@ describe('operational UI constraints', () => {
 
   it('guides users from the feed summary to missions below the fold', () => {
     const source = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const storySource = readFileSync('src/lib/core/feed/build-feed-story.ts', 'utf8');
 
     expect(source).toContain('data-testid="mission-scroll-cue"');
     expect(source).toContain('data-testid="mission-feed-anchor"');
@@ -164,7 +165,9 @@ describe('operational UI constraints', () => {
     );
     expect(source).toContain('Missions proposées plus bas');
     expect(source).toContain('Missions proposées');
-    expect(source).toContain('Voir les ${formatStoryMissionCount(newCount)} nouvelles');
+    // buildFeedStory was extracted to the functional core (pure presentation
+    // logic); the new-mission cue string now lives there, not in FeedPage.
+    expect(storySource).toContain('Voir les ${formatStoryMissionCount(newCount)} nouvelles');
     expect(source).toContain('visibleFeedMissionLabel');
     expect(source).toContain('missionFeedReached = sectionRect.top <= containerRect.bottom - 48');
   });

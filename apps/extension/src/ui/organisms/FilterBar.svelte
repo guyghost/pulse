@@ -29,6 +29,7 @@
   import { Icon } from '@pulse/ui';
   import type { SavedFeedView } from '$lib/core/types/feed-view';
   import Tooltip from '../atoms/Tooltip.svelte';
+  import { computeVisibleStacks, computeOverflowCount } from '$lib/core/filters/stack-ranking';
 
   const {
     availableStacks = [],
@@ -71,6 +72,9 @@
   let saveOpen = $state(false);
   let saveName = $state('');
   let isSaving = $state(false);
+  let showAllStacks = $state(false);
+
+  const TOP_N_STACKS = 8;
 
   const hasFilters = $derived(
     selectedStacks.length > 0 ||
@@ -78,6 +82,17 @@
       selectedRemote !== null ||
       selectedSeniority !== null
   );
+
+  // Compute visible stacks: top-N + selected stacks pinned
+  const visibleStacksSet = $derived(
+    computeVisibleStacks(availableStacks, selectedStacks, TOP_N_STACKS)
+  );
+
+  const visibleStacks = $derived(
+    showAllStacks ? availableStacks : availableStacks.filter((stack) => visibleStacksSet.has(stack))
+  );
+
+  const overflowCount = $derived(computeOverflowCount(availableStacks, visibleStacksSet));
 
   async function handleSaveSubmit(event: SubmitEvent) {
     event.preventDefault();
@@ -98,7 +113,7 @@
 <div class="flex flex-col gap-3 rounded-2xl border border-border-light bg-page-canvas p-3">
   <div>
     <div class="mb-2 flex items-center justify-between gap-2">
-      <p class="text-[11px] uppercase tracking-[0.15em] text-text-subtle">Vues</p>
+      <p class="text-caption uppercase tracking-[0.15em] text-text-subtle">Vues</p>
       <Tooltip
         label={savedViewLimitReached
           ? 'Limite de vues atteinte'
@@ -109,7 +124,7 @@
       >
         <button
           type="button"
-          class="inline-flex h-7 items-center gap-1 rounded-lg border border-border-light bg-surface-white px-2 text-[10px] font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
+          class="inline-flex h-7 items-center gap-1 rounded-lg border border-border-light bg-surface-white px-2 text-micro font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary disabled:cursor-not-allowed disabled:opacity-40"
           onclick={() => (saveOpen = !saveOpen)}
           disabled={!canSaveCurrentView || savedViewLimitReached}
         >
@@ -130,7 +145,7 @@
           >
             <button
               type="button"
-              class="min-w-0 px-2 py-1.5 text-[10px] font-medium"
+              class="min-w-0 px-2 py-1.5 text-micro font-medium"
               onclick={() => onApplyView?.(view.id)}
               aria-pressed={activeSavedViewId === view.id}
               title={view.name}
@@ -157,7 +172,7 @@
         <label class="sr-only" for="saved-view-name">Nom de la vue</label>
         <input
           id="saved-view-name"
-          class="h-8 min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-2 text-xs text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-blueprint-blue/30"
+          class="h-8 min-w-0 flex-1 rounded-lg border border-border-light bg-surface-white px-2 text-meta text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-blueprint-blue/30"
           bind:value={saveName}
           maxlength="48"
           placeholder="Nom de la vue"
@@ -177,7 +192,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Source</p>
+    <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Source</p>
     <div class="flex flex-wrap gap-1.5">
       {#each sources as source (source)}
         <Chip
@@ -190,7 +205,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Mode de travail</p>
+    <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Mode de travail</p>
     <div class="flex flex-wrap gap-1.5">
       {#each remoteTypes as remote (remote)}
         <Chip
@@ -203,7 +218,7 @@
   </div>
 
   <div>
-    <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Séniorité</p>
+    <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Séniorité</p>
     <div class="flex flex-wrap gap-1.5">
       {#each seniorityLevels as level (level)}
         <Chip
@@ -217,22 +232,37 @@
 
   {#if availableStacks.length > 0}
     <div>
-      <p class="mb-2 text-[11px] uppercase tracking-[0.15em] text-text-subtle">Technologies</p>
+      <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Technologies</p>
       <div class="flex flex-wrap gap-1.5">
-        {#each availableStacks as stack (stack)}
+        {#each visibleStacks as stack (stack)}
           <Chip
             label={stack}
             selected={selectedStacks.includes(stack)}
             onclick={() => onToggleStack?.(stack)}
           />
         {/each}
+        {#if overflowCount > 0}
+          <button
+            class="inline-flex h-7 items-center gap-1 rounded-full border border-border-light bg-surface-white px-3 text-caption text-text-secondary transition-colors hover:bg-subtle-gray motion-reduce:transition-none"
+            onclick={() => (showAllStacks = !showAllStacks)}
+            aria-expanded={showAllStacks}
+          >
+            {#if showAllStacks}
+              <Icon name="chevron-up" size={12} />
+              <span>Réduire</span>
+            {:else}
+              <Icon name="chevron-down" size={12} />
+              <span>Voir {overflowCount} autres</span>
+            {/if}
+          </button>
+        {/if}
       </div>
     </div>
   {/if}
 
   {#if hasFilters}
     <button
-      class="self-start text-xs text-blueprint-blue hover:text-blueprint-blue/80 transition-colors"
+      class="self-start text-meta text-blueprint-blue hover:text-blueprint-blue/80 transition-colors"
       onclick={() => onClearAll?.()}
     >
       <span class="flex items-center gap-1">

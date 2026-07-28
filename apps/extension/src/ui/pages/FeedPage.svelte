@@ -1,191 +1,10 @@
 <script module lang="ts">
-  import type { IconName as FeedIconName } from '@pulse/ui';
-  import type { OperationalEvidence } from '../molecules/OperationalStoryCard.svelte';
-
-  export type FeedStorySeverity = 'critical' | 'incident' | 'attention' | 'success' | 'neutral';
-
-  export interface FeedStory {
-    severity: FeedStorySeverity;
-    statusLabel: string;
-    title: string;
-    description: string;
-    evidence: OperationalEvidence[];
-    primaryActionLabel: string;
-    primaryActionIcon: FeedIconName;
-  }
-
-  export interface FeedStoryInput {
-    error: string | null;
-    isOffline: boolean;
-    brokenConnectorCount: number;
-    firstBrokenConnectorName: string | null;
-    newCount: number;
-    highScoreCount: number;
-    visibleCount: number;
-    alertEnabled: boolean;
-    alertScoreThreshold: number;
-  }
-
-  function formatStoryMissionCount(count: number): string {
-    return `${count} mission${count > 1 ? 's' : ''}`;
-  }
-
-  /**
-   * Pure resolver for the feed operational story.
-   *
-   * Extracted from the FeedPage derived so the precedence rules (error vs
-   * offline vs broken sources vs new/priority) are unit-testable without
-   * mounting the whole page. Shell/page wiring assembles the inputs; this
-   * function owns the decision tree and the copy.
-   */
-  export function buildFeedStory(input: FeedStoryInput): FeedStory {
-    const {
-      error,
-      isOffline,
-      brokenConnectorCount,
-      firstBrokenConnectorName,
-      newCount,
-      highScoreCount,
-      visibleCount,
-      alertEnabled,
-      alertScoreThreshold,
-    } = input;
-
-    const evidence: OperationalEvidence[] = [
-      {
-        label: 'Nouvelles',
-        value: newCount,
-        icon: 'sparkles',
-        severity: newCount > 0 ? 'attention' : 'neutral',
-      },
-      {
-        label: `Prioritaires ${alertScoreThreshold}+`,
-        value: highScoreCount,
-        icon: 'target',
-        severity: highScoreCount > 0 ? 'success' : 'neutral',
-      },
-      {
-        label: 'Sources en erreur',
-        value: brokenConnectorCount,
-        icon: brokenConnectorCount > 0 ? 'triangle-alert' : 'shield-check',
-        severity: brokenConnectorCount > 0 ? 'critical' : 'success',
-      },
-    ];
-
-    if (error) {
-      // The feed list still renders cached missions, so degrade the hero
-      // story to a warning rather than a critical "impossible to retrieve"
-      // incident. Only escalate to critical when nothing is visible.
-      if (visibleCount > 0) {
-        return {
-          severity: 'incident',
-          statusLabel: 'Données en cache',
-          title: 'Récupération interrompue — affichage en cache',
-          description: `Les ${formatStoryMissionCount(visibleCount)} déjà récupérées restent disponibles. Réessayez le scan ou vérifiez vos sources.`,
-          evidence,
-          primaryActionLabel: 'Réessayer le scan',
-          primaryActionIcon: 'refresh-cw',
-        };
-      }
-      return {
-        severity: 'critical',
-        statusLabel: 'Incident',
-        title: 'Impossible de récupérer les missions',
-        description: 'Réessayez le scan ou vérifiez vos sources pour récupérer les missions.',
-        evidence,
-        primaryActionLabel: 'Réessayer le scan',
-        primaryActionIcon: 'refresh-cw',
-      };
-    }
-
-    if (isOffline) {
-      return {
-        severity: 'incident' as const,
-        statusLabel: 'Hors ligne',
-        title: 'Pulse affiche les données en cache',
-        description:
-          'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions déjà stockées.',
-        evidence,
-        primaryActionLabel:
-          visibleCount > 0
-            ? `Voir les ${formatStoryMissionCount(visibleCount)} en cache`
-            : 'Hors ligne',
-        primaryActionIcon: visibleCount > 0 ? 'chevron-down' : 'database',
-      };
-    }
-
-    if (brokenConnectorCount > 0) {
-      return {
-        severity: 'critical' as const,
-        statusLabel: 'Action requise',
-        title: `${brokenConnectorCount} source${brokenConnectorCount > 1 ? 's' : ''} à corriger avant de traiter les missions`,
-        description: `${firstBrokenConnectorName ?? 'Une source'} ne remonte plus correctement. Le feed peut manquer des opportunités.`,
-        evidence,
-        primaryActionLabel: 'Relancer le diagnostic',
-        primaryActionIcon: 'refresh-cw',
-      };
-    }
-
-    if (newCount > 0) {
-      return {
-        severity: 'attention' as const,
-        statusLabel: 'À traiter',
-        title:
-          highScoreCount > 0
-            ? `${highScoreCount} mission${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} à examiner`
-            : `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} à examiner`,
-        description:
-          highScoreCount > 0
-            ? `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} au total. Commencez par celles qui dépassent le seuil ${alertScoreThreshold}+.`
-            : 'Aucune urgence détectée, mais les nouvelles missions méritent une qualification rapide.',
-        evidence,
-        primaryActionLabel:
-          highScoreCount > 0
-            ? `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaires`
-            : `Voir les ${formatStoryMissionCount(newCount)} nouvelles`,
-        primaryActionIcon: 'chevron-down',
-      };
-    }
-
-    if (alertEnabled && highScoreCount > 0) {
-      return {
-        severity: 'success' as const,
-        statusLabel: 'Priorités prêtes',
-        title: `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prête${highScoreCount > 1 ? 's' : ''}`,
-        description: `Elles dépassent votre seuil ${alertScoreThreshold}+. Comparez-les avant de mettre une mission en suivi.`,
-        evidence,
-        primaryActionLabel:
-          alertScoreThreshold >= 80
-            ? `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaire${highScoreCount > 1 ? 's' : ''}`
-            : `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaires`,
-        primaryActionIcon: 'chevron-down',
-      };
-    }
-
-    if (visibleCount === 0) {
-      return {
-        severity: 'neutral' as const,
-        statusLabel: 'Aucune donnée',
-        title: 'Lancez un premier scan pour voir vos missions',
-        description:
-          'Connectez ou vérifiez les sources, puis lancez un scan pour obtenir les premières recommandations.',
-        evidence,
-        primaryActionLabel: 'Lancer le scan',
-        primaryActionIcon: 'play',
-      };
-    }
-
-    return {
-      severity: 'success' as const,
-      statusLabel: 'Normal',
-      title: `${visibleCount} mission${visibleCount > 1 ? 's' : ''} disponible${visibleCount > 1 ? 's' : ''}, aucune priorité critique`,
-      description:
-        'Le système est stable. Continuez par les favoris ou relancez un scan si la veille doit être rafraîchie.',
-      evidence,
-      primaryActionLabel: `Voir les ${formatStoryMissionCount(visibleCount)}`,
-      primaryActionIcon: 'chevron-down',
-    };
-  }
+  // Re-export types from core for backward compatibility
+  export type {
+    FeedStory,
+    FeedStoryInput,
+    FeedStorySeverity,
+  } from '$lib/core/feed/build-feed-story';
 </script>
 
 <script lang="ts">
@@ -205,6 +24,12 @@
   import { SvelteSet } from 'svelte/reactivity';
   import { slide } from 'svelte/transition';
   import ScanProgress from '../organisms/ScanProgress.svelte';
+  import ScanSummaryCard from '../organisms/ScanSummary.svelte';
+  import {
+    buildScanSummary,
+    type ScanSummary as ScanSummaryData,
+  } from '$lib/core/scan/scan-summary';
+  import { buildFeedStory } from '$lib/core/feed/build-feed-story';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import type { MissionSource } from '$lib/core/types/mission';
@@ -238,6 +63,11 @@
   const page = createFeedPageState(feed, controller);
   page.setup();
   onDestroy(() => page.dispose());
+  onDestroy(() => {
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+    }
+  });
 
   type TrackingStore = ReturnType<typeof import('$lib/state/tracking.svelte').createTrackingStore>;
   const emptyTrackings = new Map<string, MissionTracking>();
@@ -614,8 +444,86 @@
       visibleCount: page.dashboardSummary.visibleCount,
       alertEnabled: alertPreferences.enabled,
       alertScoreThreshold: alertPreferences.scoreThreshold,
+      hasCompletedScan: controller.lastScanAt !== null,
+      filterActive: page.filterActive,
+      totalMissionCount: page.totalMissions,
     })
   );
+
+  // ── Scan completion delight ──────────────────────────────────────────
+  // Quiet, confident terminal summary shown the moment a scan finishes.
+  // Pure projection of scan-lifecycle terminal facts — introduces no state
+  // transition. Model: src/models/scan-completion-delight.model.md.
+  let scanSummary = $state<ScanSummaryData | null>(null);
+  let scanSummaryVisible = $state(false);
+  let scanSummaryTimer: ReturnType<typeof setTimeout> | undefined;
+  // Plain (non-reactive) refs for edge detection on the monotonic lastScanAt.
+  let prevScanAt: number | null = controller.lastScanAt;
+  // Suppresses reveal until a real scan is observed this session. The
+  // controller starts with lastScanAt === null and hydrates the persisted
+  // timestamp asynchronously during init(); without this guard, hydration
+  // reads as a newly completed scan and surfaces a stale summary on reopen.
+  let everScanned = false;
+
+  function dismissScanSummary(): void {
+    scanSummaryVisible = false;
+    scanSummary = null;
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+      scanSummaryTimer = undefined;
+    }
+  }
+
+  $effect(() => {
+    const ts = controller.lastScanAt;
+    const scanning = controller.isScanning;
+
+    // A new scan starting dismisses any visible summary immediately, and
+    // nulls it so a subsequent failed/cancelled scan (no lastScanAt update)
+    // can never resurface a stale success summary. The baseline is synced
+    // here too, so a non-update after a failed scan produces no edge.
+    if (scanning) {
+      everScanned = true;
+      if (scanSummaryVisible || scanSummary || scanSummaryTimer) {
+        scanSummaryVisible = false;
+        scanSummary = null;
+        if (scanSummaryTimer) {
+          clearTimeout(scanSummaryTimer);
+          scanSummaryTimer = undefined;
+        }
+      }
+      prevScanAt = ts;
+      return;
+    }
+
+    // Hydration guard: treat the first observed lastScanAt as baseline, not
+    // a freshly completed scan, so reopening the panel never reveals a
+    // stale summary.
+    if (!everScanned) {
+      prevScanAt = ts;
+      return;
+    }
+
+    if (ts === null || ts === prevScanAt) {
+      return;
+    }
+    prevScanAt = ts;
+    scanSummary = buildScanSummary({
+      newCount: page.dashboardSummary.newCount,
+      highScoreCount: alertMatchCount,
+      brokenConnectorCount: brokenConnectors.length,
+      alertScoreThreshold: alertPreferences.scoreThreshold,
+    });
+    scanSummaryVisible = true;
+    if (scanSummaryTimer) {
+      clearTimeout(scanSummaryTimer);
+    }
+    scanSummaryTimer = setTimeout(() => {
+      scanSummaryVisible = false;
+      scanSummary = null;
+      scanSummaryTimer = undefined;
+    }, 4500);
+  });
 
   function formatMissionCount(count: number): string {
     return `${count} mission${count > 1 ? 's' : ''}`;
@@ -672,6 +580,18 @@
     if (alertMatchCount > 0) {
       showAlertOnly = true;
       void scrollToMissionFeed();
+      return;
+    }
+
+    // Empty state: filters hide all cached missions → clear filters (not Profile)
+    if (page.dashboardSummary.visibleCount === 0 && page.filterActive && page.totalMissions > 0) {
+      handleClearMissionFilters();
+      return;
+    }
+
+    // Empty state: scanned but no matches → route to Profile
+    if (page.dashboardSummary.visibleCount === 0 && controller.lastScanAt !== null) {
+      onNavigateToProfile?.();
       return;
     }
 
@@ -976,10 +896,10 @@
         transition:slide={{ duration: 160 }}
       >
         <span class="min-w-0">
-          <span class="block text-[11px] font-semibold text-text-primary"
+          <span class="block text-caption font-semibold text-text-primary"
             >Missions proposées plus bas</span
           >
-          <span class="mt-0.5 block text-[10px] leading-4 text-text-subtle"
+          <span class="mt-0.5 block text-micro leading-4 text-text-subtle"
             >{visibleFeedMissionLabel} selon vos filtres. Continuez pour les comparer.</span
           >
         </span>
@@ -1016,7 +936,7 @@
               <div class="flex items-center gap-3 min-w-0">
                 <div>
                   <p
-                    class="text-[10px] font-semibold uppercase tracking-[0.18em] text-blueprint-blue"
+                    class="text-micro font-semibold uppercase tracking-[0.18em] text-blueprint-blue"
                   >
                     MissionPulse
                   </p>
@@ -1024,10 +944,12 @@
                     class="mt-1 flex items-baseline gap-3"
                     aria-label={`${page.visibleCount} missions visibles`}
                   >
-                    <span class="text-lg font-semibold text-text-primary">{page.visibleCount}</span>
-                    <span class="text-[10px] text-text-muted">missions</span>
+                    <span class="text-heading font-semibold text-text-primary"
+                      >{page.visibleCount}</span
+                    >
+                    <span class="text-micro text-text-muted">missions</span>
                     {#if page.favoriteCount > 0}
-                      <span class="flex items-center gap-1 text-[10px] text-blueprint-blue">
+                      <span class="flex items-center gap-1 text-micro text-blueprint-blue">
                         <Icon name="star" size={10} class="fill-blueprint-blue" />
                         {page.favoriteCount}
                       </span>
@@ -1040,7 +962,7 @@
                 class:flex-row-reverse={page.panelSide === 'left'}
               >
                 {#if page.isOffline}
-                  <span class="text-[10px] text-blueprint-blue">
+                  <span class="text-micro text-blueprint-blue">
                     <Icon name="database" size={12} />
                   </span>
                 {/if}
@@ -1131,7 +1053,7 @@
                 >
                   {page.firstName ? `Bonjour, ${page.firstName}` : 'Radar freelance'}
                 </h2>
-                <p class="mt-6 max-w-[26rem] text-[0.95rem] leading-[1.6] text-text-subtle">
+                <p class="mt-6 max-w-[26rem] text-subheading leading-[1.6] text-text-subtle">
                   Surveille les pistes utiles, filtre le bruit et garde les meilleures missions à
                   portée de main.
                 </p>
@@ -1268,19 +1190,25 @@
 
             {#if page.isOffline}
               <div
-                class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-xs text-blueprint-blue"
+                class="mt-3 flex items-center gap-2 rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/5 px-3 py-2 text-meta text-blueprint-blue"
               >
                 <Icon name="database" size={14} />
                 <span>Mode hors ligne — Données en cache</span>
               </div>
             {/if}
             {#if page.aiStatus === 'after-download'}
-              <p class="mt-2 text-center text-[11px] text-text-muted">
+              <p class="mt-2 text-center text-caption text-text-muted">
                 Scoring IA en téléchargement...
               </p>
             {:else if page.aiStatus === 'no'}
-              <p class="mt-2 text-center text-[11px] text-text-muted">Scoring IA indisponible</p>
+              <p class="mt-2 text-center text-caption text-text-muted">Scoring IA indisponible</p>
             {/if}
+          {/if}
+
+          {#if scanSummaryVisible && scanSummary && !feedChromeBusy}
+            <div class="mt-3">
+              <ScanSummaryCard summary={scanSummary} onDismiss={dismissScanSummary} />
+            </div>
           {/if}
         </div>
 
@@ -1311,7 +1239,7 @@
 
           <!-- Row 1: title + search -->
           {#if feedChromeBusy}
-            <div class="flex items-center gap-2 text-xs text-text-muted">
+            <div class="flex items-center gap-2 text-meta text-text-muted">
               <span
                 class="h-3 w-3 animate-spin rounded-full border-2 border-blueprint-blue/20 border-t-blueprint-blue"
               ></span>
@@ -1354,9 +1282,9 @@
                   size={12}
                   class={page.showFavoritesOnly ? 'fill-blueprint-blue' : ''}
                 />
-                <span class="hidden @[20rem]:inline text-[10px] font-medium">Favoris</span>
+                <span class="hidden @[20rem]:inline text-micro font-medium">Favoris</span>
                 {#if page.favoriteCount > 0}
-                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium"
+                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-micro font-medium"
                     >{page.favoriteCount}</span
                   >
                 {/if}
@@ -1376,9 +1304,9 @@
                 aria-label={page.showHidden ? 'Masquer les missions ignorées' : 'Voir les ignorées'}
               >
                 <Icon name={page.showHidden ? 'eye' : 'eye-off'} size={12} />
-                <span class="hidden @[20rem]:inline text-[10px] font-medium">Ignorées</span>
+                <span class="hidden @[20rem]:inline text-micro font-medium">Ignorées</span>
                 {#if page.hiddenCount > 0}
-                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-[9px] font-medium"
+                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-micro font-medium"
                     >{page.hiddenCount}</span
                   >
                 {/if}
@@ -1390,7 +1318,7 @@
             <label class="sr-only" for="sort-select">Trier par</label>
             <select
               id="sort-select"
-              class="h-7 min-w-0 cursor-pointer rounded-lg border border-border-light bg-surface-white px-2 text-[10px] text-text-secondary outline-none transition-colors focus:border-blueprint-blue/30"
+              class="h-7 min-w-0 cursor-pointer rounded-lg border border-border-light bg-surface-white px-2 text-micro text-text-secondary outline-none transition-colors focus:border-blueprint-blue/30"
               bind:value={page.sortBy}
             >
               <option value="score">Pertinence</option>
@@ -1404,7 +1332,7 @@
                 : 'Affinez par stack, source, remote ou seniorite.'}
             >
               <button
-                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-[10px] font-medium transition-all duration-150
+                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 text-micro font-medium transition-all duration-150
                 {page.showFilters || page.filterActive
                   ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
                   : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
@@ -1425,7 +1353,7 @@
               description="Ouvre la liste des commandes disponibles. Raccourci: ?."
             >
               <button
-                class="soft-ring inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white px-1.5 font-mono text-[12px] font-semibold leading-none text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
+                class="soft-ring inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white px-1.5 font-mono text-meta font-semibold leading-none text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
                 onclick={() => (page.showShortcutsHelp = true)}
                 aria-label="Afficher l'aide des raccourcis clavier"
                 title="Raccourcis clavier (?)"
@@ -1438,7 +1366,7 @@
           <div class="mt-2 flex justify-end">
             <button
               type="button"
-              class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-[10px] font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary"
+              class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-micro font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary"
               onclick={() => {
                 advancedControlsUserInteracted = true;
                 advancedControlsUserOpened = showAdvancedControls ? false : true;
@@ -1456,13 +1384,13 @@
           {#if showAdvancedControls}
             <div class="mt-2" aria-label="Presets métier du feed">
               <div class="mb-1 flex items-center justify-between gap-2">
-                <p class="text-[10px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                <p class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
                   Presets métier
                 </p>
                 {#if page.decisionPreset}
                   <button
                     type="button"
-                    class="text-[10px] font-medium text-blueprint-blue hover:text-blueprint-blue/80"
+                    class="text-micro font-medium text-blueprint-blue hover:text-blueprint-blue/80"
                     onclick={page.clearAllFilters}
                   >
                     Réinitialiser
@@ -1473,7 +1401,7 @@
                 {#each page.decisionPresets as preset (preset.id)}
                   <button
                     type="button"
-                    class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-[10px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
+                    class="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-lg border px-2 text-micro font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-45 {preset.active
                       ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
                       : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
                     onclick={() => page.applyDecisionPreset(preset.id)}
@@ -1482,7 +1410,7 @@
                     title={preset.description}
                   >
                     <span>{preset.label}</span>
-                    <span class="rounded-md bg-page-canvas px-1 py-0.5 text-[9px]">
+                    <span class="rounded-md bg-page-canvas px-1 py-0.5 text-micro">
                       {preset.count}
                     </span>
                   </button>
@@ -1557,20 +1485,20 @@
           </svg>
         </div>
         <div class="min-w-0 flex-1">
-          <p class="text-sm font-semibold text-text-primary">
+          <p class="text-body-lg font-semibold text-text-primary">
             {page.focusMissions.length} mission{page.focusMissions.length > 1 ? 's' : ''} issue{page
               .focusMissions.length > 1
               ? 's'
               : ''} de la notification
           </p>
-          <p class="mt-0.5 text-xs leading-5 text-text-subtle">
+          <p class="mt-0.5 text-meta leading-5 text-text-subtle">
             Notifications · {page.focusSinceLabel}
           </p>
         </div>
         <button
           type="button"
           onclick={() => page.dismissFocus()}
-          class="shrink-0 rounded-lg px-2.5 py-1.5 text-xs font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blueprint-blue/40"
+          class="shrink-0 rounded-lg px-2.5 py-1.5 text-meta font-semibold text-blueprint-blue transition-colors hover:bg-blueprint-blue/10 focus:outline-none focus-visible:ring-2 focus-visible:ring-blueprint-blue/40"
           data-testid="focus-lens-dismiss"
         >
           Voir tout le feed
@@ -1583,19 +1511,19 @@
         class="mb-3 flex items-end justify-between gap-3 border-t border-border-light pt-4"
       >
         <div class="min-w-0">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
             Missions
           </p>
-          <h2 id="mission-feed-title" class="mt-1 text-sm font-semibold text-text-primary">
+          <h2 id="mission-feed-title" class="mt-1 text-body-lg font-semibold text-text-primary">
             Missions à examiner
           </h2>
-          <p class="mt-1 text-xs leading-5 text-text-subtle">
+          <p class="mt-1 text-meta leading-5 text-text-subtle">
             {visibleFeedMissionLabel} visible{visibleFeedMissionCount > 1 ? 's' : ''} selon vos filtres
             actuels.
           </p>
         </div>
         <span
-          class="shrink-0 rounded-lg border border-border-light bg-surface-white px-2 py-1 font-mono text-xs font-semibold tabular-nums text-text-primary"
+          class="shrink-0 rounded-lg border border-border-light bg-surface-white px-2 py-1 font-mono text-meta font-semibold tabular-nums text-text-primary"
           aria-label={`${visibleFeedMissionCount} missions dans la liste`}
         >
           {visibleFeedMissionCount}
@@ -1659,7 +1587,7 @@
     </div>
     {#if showAlertOnly}
       <button
-        class="mt-3 w-full rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/6 py-2.5 text-[11px] font-medium text-blueprint-blue transition-all duration-200 hover:bg-blueprint-blue/10"
+        class="mt-3 w-full rounded-xl border border-blueprint-blue/20 bg-blueprint-blue/6 py-2.5 text-caption font-medium text-blueprint-blue transition-all duration-200 hover:bg-blueprint-blue/10"
         onclick={() => (showAlertOnly = false)}
       >
         Afficher toutes les missions
@@ -1667,7 +1595,7 @@
     {/if}
     {#if page.hiddenCount > 0 && !page.showFavoritesOnly}
       <button
-        class="mt-3 w-full rounded-xl border border-border-light bg-surface-white py-2.5 text-[11px] text-text-secondary transition-all duration-200 hover:border-disabled-gray hover:bg-subtle-gray hover:text-text-primary"
+        class="mt-3 w-full rounded-xl border border-border-light bg-surface-white py-2.5 text-caption text-text-secondary transition-all duration-200 hover:border-disabled-gray hover:bg-subtle-gray hover:text-text-primary"
         onclick={page.toggleHiddenFilter}
         aria-pressed={page.showHidden}
       >
@@ -1733,21 +1661,21 @@
       ? 'bottom-24'
       : 'bottom-4'}"
   >
-    <span class="text-xs text-text-secondary">
+    <span class="text-meta text-text-secondary">
       {page.comparisonMissionIds.length}/3 sélectionnée{page.comparisonMissionIds.length > 1
         ? 's'
         : ''}
     </span>
     {#if page.comparisonMissions.length >= 2}
       <button
-        class="rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-xs font-medium text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
+        class="rounded-lg bg-blueprint-blue/10 px-3 py-1.5 text-meta font-medium text-blueprint-blue hover:bg-blueprint-blue/15 transition-colors"
         onclick={openComparison}
       >
         Comparer
       </button>
     {/if}
     <button
-      class="rounded-lg px-2 py-1.5 text-xs text-text-muted hover:text-text-primary transition-colors"
+      class="rounded-lg px-2 py-1.5 text-meta text-text-muted hover:text-text-primary transition-colors"
       onclick={clearComparison}
     >
       Annuler

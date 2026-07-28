@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, Toggle } from '@pulse/ui';
 
   const {
     autoScan,
@@ -34,25 +34,15 @@
         <Icon name="radar" size={14} class="text-blueprint-blue" />
       </div>
       <div>
-        <p class="text-sm font-medium text-text-primary">Scan automatique</p>
-        <p class="mt-0.5 text-xs text-text-subtle">Scanner les plateformes en arrière-plan.</p>
+        <p class="text-body-lg font-medium text-text-primary">Scan automatique</p>
+        <p class="mt-0.5 text-meta text-text-subtle">Scanner les plateformes en arrière-plan.</p>
       </div>
     </div>
-    <button
-      class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200
-        {autoScan
-        ? 'border-accent-green/30 bg-accent-green/15'
-        : 'border-border-light bg-surface-white'}"
-      onclick={onToggleAutoScan}
-      role="switch"
-      aria-checked={autoScan}
+    <Toggle
+      checked={autoScan}
       aria-label="Activer le scan automatique"
-    >
-      <span
-        class="inline-block h-4 w-4 rounded-full transition-transform duration-200
-          {autoScan ? 'translate-x-5.5 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
-      ></span>
-    </button>
+      onclick={onToggleAutoScan}
+    />
   </div>
 </div>
 
@@ -63,18 +53,18 @@
   class:pointer-events-none={!autoScan}
 >
   <div>
-    <p class="text-sm font-medium text-text-primary">Fréquence</p>
-    <p class="mt-0.5 text-xs text-text-subtle">Intervalle entre chaque scan automatique.</p>
+    <p class="text-body-lg font-medium text-text-primary">Fréquence</p>
+    <p class="mt-0.5 text-meta text-text-subtle">Intervalle entre chaque scan automatique.</p>
   </div>
   {#if !autoScan}
     <p
-      class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs text-text-subtle"
+      class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta text-text-subtle"
     >
       Activez le scan automatique pour modifier la fréquence.
     </p>
   {/if}
   <div class="flex items-center gap-3">
-    <span class="text-[10px] text-text-muted">5 min</span>
+    <span class="text-micro text-text-muted">5 min</span>
     <input
       type="range"
       min="5"
@@ -87,15 +77,17 @@
       aria-label="Fréquence de scan"
       class="flex-1 accent-blueprint-blue"
     />
-    <span class="text-[10px] text-text-muted">2h</span>
+    <span class="text-micro text-text-muted">2h</span>
   </div>
-  <p class="text-center text-sm font-semibold tabular-nums text-text-primary">{scanInterval} min</p>
+  <p class="text-center text-body-lg font-semibold tabular-nums text-text-primary">
+    {scanInterval} min
+  </p>
   <div class="grid gap-2 sm:grid-cols-3" aria-label="Historique et cadence des scans">
     <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-      <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+      <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
         Dernier déclenchement
       </p>
-      <p class="mt-1 text-[11px] leading-4 text-text-secondary">{lastScanLabel}</p>
+      <p class="mt-1 text-caption leading-4 text-text-secondary">{lastScanLabel}</p>
     </div>
     <div
       class="rounded-lg border px-3 py-2 {scanHistoryTone === 'attention'
@@ -104,16 +96,16 @@
           ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
           : 'border-border-light bg-surface-white'}"
     >
-      <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+      <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
         Historique récent
       </p>
-      <p class="mt-1 text-[11px] leading-4 text-text-secondary">{scanHistoryLabel}</p>
+      <p class="mt-1 text-caption leading-4 text-text-secondary">{scanHistoryLabel}</p>
     </div>
     <div class="rounded-lg border border-border-light bg-surface-white px-3 py-2">
-      <p class="text-[9px] font-semibold uppercase tracking-[0.12em] text-text-muted">
+      <p class="text-micro font-semibold uppercase tracking-[0.12em] text-text-muted">
         Prochain déclenchement
       </p>
-      <p class="mt-1 text-[11px] leading-4 text-text-secondary">{nextScanLabel}</p>
+      <p class="mt-1 text-caption leading-4 text-text-secondary">{nextScanLabel}</p>
     </div>
   </div>
 </div>
@@ -126,24 +118,16 @@
         <Icon name="bell" size={14} class="text-blueprint-blue" />
       </div>
       <div>
-        <p class="text-sm font-medium text-text-primary">Notifications</p>
-        <p class="mt-0.5 text-xs text-text-subtle">Alerte quand de nouvelles missions arrivent.</p>
+        <p class="text-body-lg font-medium text-text-primary">Notifications</p>
+        <p class="mt-0.5 text-meta text-text-subtle">
+          Alerte quand de nouvelles missions arrivent.
+        </p>
       </div>
     </div>
-    <button
-      class="relative inline-flex h-6 w-11 shrink-0 items-center rounded-full border transition-colors duration-200
-        {notifications
-        ? 'border-accent-green/30 bg-accent-green/15'
-        : 'border-border-light bg-surface-white'}"
-      onclick={onToggleNotifications}
-      role="switch"
-      aria-checked={notifications}
+    <Toggle
+      checked={notifications}
       aria-label="Activer les notifications"
-    >
-      <span
-        class="inline-block h-4 w-4 rounded-full transition-transform duration-200
-          {notifications ? 'translate-x-5.5 bg-accent-green' : 'translate-x-0.5 bg-text-muted'}"
-      ></span>
-    </button>
+      onclick={onToggleNotifications}
+    />
   </div>
 </div>

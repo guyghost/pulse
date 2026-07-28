@@ -73,7 +73,7 @@
     ></div>
   </div>
   <div class="px-1 pt-2">
-    <div class="flex items-center justify-between gap-3 text-[11px] text-text-secondary">
+    <div class="flex items-center justify-between gap-3 text-caption text-text-secondary">
       <p class="transition-opacity duration-300">
         {#if connectorName}
           Collecte {connectorName}... ({current}/{total})
@@ -95,19 +95,19 @@
     {#if entries.length > 0}
       <div class="mt-2 grid grid-cols-3 gap-1.5">
         <div class="rounded-lg bg-page-canvas px-2 py-1.5">
-          <p class="text-[9px] uppercase tracking-[0.12em] text-text-muted">Actifs</p>
-          <p class="mt-0.5 text-xs font-semibold tabular-nums text-blueprint-blue">
+          <p class="text-micro uppercase tracking-[0.12em] text-text-muted">Actifs</p>
+          <p class="mt-0.5 text-meta font-semibold tabular-nums text-blueprint-blue">
             {activeCount}
           </p>
         </div>
         <div class="rounded-lg bg-page-canvas px-2 py-1.5">
-          <p class="text-[9px] uppercase tracking-[0.12em] text-text-muted">Terminés</p>
-          <p class="mt-0.5 text-xs font-semibold tabular-nums text-accent-green">{doneCount}</p>
+          <p class="text-micro uppercase tracking-[0.12em] text-text-muted">Terminés</p>
+          <p class="mt-0.5 text-meta font-semibold tabular-nums text-accent-green">{doneCount}</p>
         </div>
         <div class="rounded-lg bg-page-canvas px-2 py-1.5">
-          <p class="text-[9px] uppercase tracking-[0.12em] text-text-muted">Erreurs</p>
+          <p class="text-micro uppercase tracking-[0.12em] text-text-muted">Erreurs</p>
           <p
-            class="mt-0.5 text-xs font-semibold tabular-nums {errorCount > 0
+            class="mt-0.5 text-meta font-semibold tabular-nums {errorCount > 0
               ? 'text-status-red'
               : 'text-text-primary'}"
           >
@@ -119,7 +119,7 @@
       <div class="mt-2 flex gap-1.5 overflow-x-auto pb-0.5" aria-label="Progression par source">
         {#each entries as status (status.connectorId)}
           <div
-            class="shrink-0 rounded-lg border px-2 py-1 text-[10px] {statusTone(status.state)}"
+            class="shrink-0 rounded-lg border px-2 py-1 text-micro {statusTone(status.state)}"
             title={`${status.connectorName}: ${statusLabel(status.state)}`}
           >
             <span class="font-medium">{status.connectorName}</span>

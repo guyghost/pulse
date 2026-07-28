@@ -2,6 +2,7 @@
   import type { ConnectorStatus as ConnectorStatusType } from '$lib/core/types/connector-status';
   import type { PersistedConnectorStatus } from '$lib/core/types/connector-status';
   import { Icon, type IconName } from '@pulse/ui';
+  import { formatRelativeTime } from '$lib/core/utils/format';
   import { getConnectorErrorCopy } from '../copy/connector-error-copy';
 
   const {
@@ -40,24 +41,9 @@
 
   const isSessionError = $derived(connectorErrorCopy.reconnectRecommended);
 
-  const relativeTime = $derived.by(() => {
-    if (!persisted?.lastSyncAt) {
-      return undefined;
-    }
-    const diff = Date.now() - persisted.lastSyncAt;
-    const minutes = Math.floor(diff / 60000);
-    if (minutes < 1) {
-      return "à l'instant";
-    }
-    if (minutes < 60) {
-      return `il y a ${minutes}min`;
-    }
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) {
-      return `il y a ${hours}h`;
-    }
-    return `il y a ${Math.floor(hours / 24)}j`;
-  });
+  const relativeTime = $derived(
+    formatRelativeTime(persisted?.lastSyncAt ?? null, Date.now()) ?? undefined
+  );
 
   type ConnectorStateConfig = {
     icon: IconName;
@@ -124,20 +110,20 @@
         }}
       />
     {:else}
-      <span class="text-[9px] font-bold text-text-secondary">{name.slice(0, 2).toUpperCase()}</span>
+      <span class="text-micro font-bold text-text-secondary">{name.slice(0, 2).toUpperCase()}</span>
     {/if}
   </div>
-  <span class="min-w-0 flex-1 truncate text-[11px] font-medium text-text-primary">{name}</span>
+  <span class="min-w-0 flex-1 truncate text-caption font-medium text-text-primary">{name}</span>
   <div class="flex items-center gap-1.5">
     {#if connectorState === 'error' && isSessionError && url}
-      <button class="text-[10px] text-blueprint-blue hover:underline" onclick={handleReconnect}>
+      <button class="text-micro text-blueprint-blue hover:underline" onclick={handleReconnect}>
         Reconnecter
       </button>
     {/if}
     {#if relativeTime && connectorState === 'error'}
-      <span class="text-[9px] text-text-muted">{relativeTime}</span>
+      <span class="text-micro text-text-muted">{relativeTime}</span>
     {/if}
-    <span class="flex items-center gap-1 text-[10px] text-text-primary">
+    <span class="flex items-center gap-1 text-micro text-text-primary">
       <span class="shrink-0 {stateConfig.color}" class:animate-spin={stateConfig.spin}>
         <Icon name={stateConfig.icon} size={12} />
       </span>

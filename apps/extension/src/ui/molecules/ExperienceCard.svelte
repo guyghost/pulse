@@ -256,15 +256,15 @@
 {#snippet summary()}
   <div class="min-w-0 flex-1">
     <div class="flex flex-wrap items-baseline gap-x-2 gap-y-0.5">
-      <h3 class="truncate text-sm font-semibold text-text-primary">
+      <h3 class="truncate text-body-lg font-semibold text-text-primary">
         {snapshot.context.projection.displayTitle}
       </h3>
-      <span class="text-xs text-text-muted">·</span>
-      <span class="truncate text-sm text-text-secondary">
+      <span class="text-meta text-text-muted">·</span>
+      <span class="truncate text-body-lg text-text-secondary">
         {snapshot.context.projection.displayCompany}
       </span>
     </div>
-    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-text-subtle">
+    <div class="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-caption text-text-subtle">
       <span class="inline-flex items-center gap-1">
         <Icon name="calendar-clock" size={12} />
         {dateRange}
@@ -326,7 +326,7 @@
       <div>
         <div class="mb-3 flex items-center gap-2">
           <Icon name="edit-2" size={14} class="text-blueprint-blue" />
-          <span class="text-xs font-medium text-text-secondary">
+          <span class="text-meta font-medium text-text-secondary">
             {ownedExperience.title ? 'Modifier l’expérience' : 'Nouvelle expérience'}
           </span>
         </div>
@@ -372,7 +372,7 @@
           class="mt-3 space-y-3 border-t border-border-light pt-3"
         >
           {#if snapshot.context.projection.normalizedDescription}
-            <p class="whitespace-pre-line text-xs leading-relaxed text-text-secondary">
+            <p class="whitespace-pre-line text-meta leading-relaxed text-text-secondary">
               {snapshot.context.projection.normalizedDescription}
             </p>
           {/if}
@@ -387,9 +387,9 @@
       {/if}
 
       <div class="mt-2 flex items-center justify-between">
-        <span class="text-[10px] uppercase tracking-wide text-text-muted">{sourceLabel}</span>
+        <span class="text-micro uppercase tracking-wide text-text-muted">{sourceLabel}</span>
         {#if snapshot.context.input.isBusy}
-          <span class="inline-flex items-center gap-1 text-[10px] text-text-muted">
+          <span class="inline-flex items-center gap-1 text-micro text-text-muted">
             <Icon name="loader-2" size={11} class="animate-spin" />
             Enregistrement…
           </span>
@@ -407,9 +407,9 @@
         {/if}
       </div>
       <div class="mt-2 flex items-center justify-between">
-        <span class="text-[10px] uppercase tracking-wide text-text-muted">{sourceLabel}</span>
+        <span class="text-micro uppercase tracking-wide text-text-muted">{sourceLabel}</span>
         {#if snapshot.context.input.isBusy}
-          <span class="inline-flex items-center gap-1 text-[10px] text-text-muted">
+          <span class="inline-flex items-center gap-1 text-micro text-text-muted">
             <Icon name="loader-2" size={11} class="animate-spin" />
             Enregistrement…
           </span>

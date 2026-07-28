@@ -26,7 +26,7 @@
 </script>
 
 <span
-  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-[11px] font-medium {config.class}"
+  class="inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-caption font-medium {config.class}"
 >
   <Icon name={config.icon} size={12} />
   {config.label}

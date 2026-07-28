@@ -7,6 +7,7 @@
   import { Badge } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
   import { scoreToGrade } from '$lib/core/types/score';
+  import { formatTJM, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
   import Tooltip from '../atoms/Tooltip.svelte';
 
@@ -116,7 +117,7 @@
         label: 'Action recommandée',
         text:
           mission.tjm !== null
-            ? `À examiner en premier : score fort et TJM ${mission.tjm}€/j.`
+            ? `À examiner en premier : score fort et TJM ${formatTJM(mission.tjm, { fallback: 'non précisé' })}.`
             : 'À examiner en premier : score fort, TJM à vérifier dans l’annonce.',
         tone: 'border-accent-green/20 bg-accent-green/10 text-text-primary',
       };
@@ -168,13 +169,7 @@
     if (typeof timestamp !== 'number' || !Number.isFinite(timestamp) || timestamp <= 0) {
       return null;
     }
-
-    return new Intl.DateTimeFormat('fr-FR', {
-      day: '2-digit',
-      month: 'short',
-      hour: '2-digit',
-      minute: '2-digit',
-    }).format(new Date(timestamp));
+    return formatTimestamp(timestamp);
   }
 
   function toggleExpand() {
@@ -190,12 +185,18 @@
 
   function handleCopyLink(e: MouseEvent) {
     e.stopPropagation();
-    navigator.clipboard.writeText(mission.url).catch(() => {});
-    copied = true;
-    onCopyLink?.();
-    setTimeout(() => {
-      copied = false;
-    }, 1500);
+    navigator.clipboard
+      .writeText(mission.url)
+      .then(() => {
+        copied = true;
+        onCopyLink?.();
+        setTimeout(() => {
+          copied = false;
+        }, 1500);
+      })
+      .catch(() => {
+        // Clipboard write rejected (permissions/focus): stay silent, no false "copied".
+      });
   }
 
   function handleToggleFavorite(e: MouseEvent) {
@@ -243,7 +244,7 @@
     ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
     : ''}"
   style="contain: layout style paint;"
-  aria-label={`Mission ${mission.title} chez ${mission.client || 'client non précisé'}`}
+  aria-label={`Mission ${mission.title || 'sans titre'} chez ${mission.client || 'client non précisé'}`}
 >
   <!-- Header row -->
   <div class="flex items-start justify-between gap-3">
@@ -257,7 +258,7 @@
           />
           {#if trackingUpdatedLabel}
             <span
-              class="inline-flex items-center rounded-full bg-page-canvas px-2 py-0.5 text-[10px] font-medium text-text-muted"
+              class="inline-flex items-center rounded-full bg-page-canvas px-2 py-0.5 text-micro font-medium text-text-muted"
             >
               Modifié {trackingUpdatedLabel}
             </span>
@@ -265,33 +266,33 @@
         {/if}
         {#if !isSeen}
           <span
-            class="inline-flex items-center rounded-full bg-blueprint-blue/8 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-blueprint-blue"
+            class="inline-flex items-center rounded-full bg-blueprint-blue/8 px-2 py-0.5 text-micro font-medium uppercase tracking-wider text-blueprint-blue"
           >
             Nouveau
           </span>
         {:else if showSeenStatus}
           <span
-            class="inline-flex items-center rounded-full bg-subtle-gray px-2 py-0.5 text-[10px] font-medium uppercase tracking-wider text-text-subtle"
+            class="inline-flex items-center rounded-full bg-subtle-gray px-2 py-0.5 text-micro font-medium uppercase tracking-wider text-text-subtle"
           >
             Vu
           </span>
         {/if}
         {#if mission.remote}
           <span
-            class="inline-flex items-center rounded-full border border-border-light px-2 py-0.5 text-[10px] capitalize text-text-subtle"
+            class="inline-flex items-center rounded-full border border-border-light px-2 py-0.5 text-micro capitalize text-text-subtle"
           >
             {mission.remote}
           </span>
         {/if}
       </div>
       <h3
-        class="mt-2 line-clamp-2 break-words text-[0.9375rem] font-medium leading-snug text-text-primary"
+        class="mt-2 line-clamp-2 break-words text-subheading font-medium leading-snug text-text-primary"
         title={mission.title}
       >
         {mission.title}
       </h3>
       {#if mission.client}
-        <p class="mt-1 line-clamp-1 break-words text-xs text-text-subtle" title={mission.client}>
+        <p class="mt-1 line-clamp-1 break-words text-meta text-text-subtle" title={mission.client}>
           {mission.client}
         </p>
       {/if}
@@ -299,7 +300,7 @@
     <div class="flex shrink-0 items-center gap-2">
       {#if mission.scoreBreakdown}
         <span
-          class="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg px-2.5 py-1 text-center text-[13px] font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
+          class="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg px-2.5 py-1 text-center text-body font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
           'score'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
@@ -307,7 +308,7 @@
         >
       {:else if mission.score !== null}
         <span
-          class="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg px-2.5 py-1 text-center text-[13px] font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
+          class="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg px-2.5 py-1 text-center text-body font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
           'score'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}">{mission.score}</span
@@ -343,7 +344,7 @@
     {/if}
     {#if semanticReason}
       <span
-        class="inline-flex items-center gap-1 rounded-full border border-blueprint-blue/15 bg-blueprint-blue/5 px-2 py-0.5 text-[10px] text-blueprint-blue"
+        class="inline-flex items-center gap-1 rounded-full border border-blueprint-blue/15 bg-blueprint-blue/5 px-2 py-0.5 text-micro text-blueprint-blue"
       >
         {semanticReason}
       </span>
@@ -351,20 +352,20 @@
   </div>
 
   {#if mission.description && !expanded}
-    <p class="mt-3 line-clamp-2 text-xs leading-relaxed text-text-subtle">
+    <p class="mt-3 line-clamp-2 text-meta leading-relaxed text-text-subtle">
       {mission.description}
     </p>
   {/if}
 
   <div class="mt-3 rounded-lg border px-3 py-2 {decisionInsight.tone}">
-    <p class="text-[9px] font-semibold uppercase tracking-[0.13em]">{decisionInsight.label}</p>
-    <p class="mt-1 text-[11px] leading-4 text-text-secondary">{decisionInsight.text}</p>
+    <p class="text-micro font-semibold uppercase tracking-[0.13em]">{decisionInsight.label}</p>
+    <p class="mt-1 text-caption leading-4 text-text-secondary">{decisionInsight.text}</p>
   </div>
 
   {#if hasScoreDetails}
     <button
       type="button"
-      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-[11px] font-medium text-text-subtle transition-colors hover:bg-page-canvas hover:text-blueprint-blue"
+      class="mt-2 inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1.5 text-caption font-medium text-text-subtle transition-colors hover:bg-page-canvas hover:text-blueprint-blue"
       onclick={handleScoreDetailsToggle}
       onkeydown={(e) => e.stopPropagation()}
       aria-expanded={scoreDetailsOpen}
@@ -388,10 +389,10 @@
     >
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
             Score expliqué
           </p>
-          <p class="mt-1 text-[11px] leading-4 text-text-secondary">
+          <p class="mt-1 text-caption leading-4 text-text-secondary">
             {#if scoreDisplayValue !== null}
               Score final {scoreDisplayValue}/100, calculé depuis le profil, l’annonce et les
               critères disponibles.
@@ -402,13 +403,13 @@
         </div>
         {#if mission.scoreBreakdown}
           <span
-            class="shrink-0 rounded-md bg-surface-white px-2 py-1 font-mono text-[10px] font-semibold text-text-primary"
+            class="shrink-0 rounded-md bg-surface-white px-2 py-1 font-mono text-micro font-semibold text-text-primary"
           >
             Base {mission.scoreBreakdown.deterministic}
           </span>
         {/if}
       </div>
-      <p class="mt-2 text-[10px] leading-4 text-text-subtle">
+      <p class="mt-2 text-micro leading-4 text-text-subtle">
         Les critères sont calculés depuis l’annonce et votre profil. L’analyse locale, quand elle
         existe, ajoute une hypothèse courte et reste facultative.
       </p>
@@ -432,9 +433,9 @@
                     ? 'bg-status-orange text-[#0c0a09]'
                     : 'bg-disabled-gray text-text-secondary'}
             <div class="flex items-center gap-2.5 py-0.5">
-              <span class="text-[11px] text-text-subtle flex-1">{line.label}</span>
+              <span class="text-caption text-text-subtle flex-1">{line.label}</span>
               <span
-                class="inline-flex items-center justify-center w-5 h-5 rounded-full text-[10px] font-bold font-mono {color}"
+                class="inline-flex items-center justify-center w-5 h-5 rounded-full text-micro font-bold font-mono {color}"
               >
                 {grade}
               </span>
@@ -443,9 +444,9 @@
           {#if semanticDisplayValue !== null}
             {@const sg = scoreToGrade(semanticDisplayValue)}
             <div class="flex items-center gap-2.5 py-0.5">
-              <span class="text-[11px] text-blueprint-blue flex-1">IA sémantique</span>
+              <span class="text-caption text-blueprint-blue flex-1">IA sémantique</span>
               <span
-                class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blueprint-blue-strong text-white text-[10px] font-bold font-mono"
+                class="inline-flex items-center justify-center w-5 h-5 rounded-full bg-blueprint-blue-strong text-white text-micro font-bold font-mono"
               >
                 {sg}
               </span>
@@ -453,16 +454,14 @@
           {/if}
         </div>
       {:else}
-        <p
-          class="mt-3 rounded-md bg-surface-white px-3 py-2 text-[10px] leading-4 text-text-subtle"
-        >
+        <p class="mt-3 rounded-md bg-surface-white px-3 py-2 text-micro leading-4 text-text-subtle">
           Score historique conservé sans détail par critère. Relancez un scan pour reconstruire les
           critères stack, TJM, localisation et remote.
         </p>
       {/if}
 
       {#if semanticReason}
-        <p class="pt-2 text-[10px] leading-snug text-blueprint-blue">
+        <p class="pt-2 text-micro leading-snug text-blueprint-blue">
           {semanticReason}
         </p>
       {/if}
@@ -478,49 +477,49 @@
       class="mt-4 border-t border-border-light pt-4"
       transition:slide={{ duration: isVirtualized ? 0 : 200 }}
     >
-      <div class="grid grid-cols-2 gap-2 text-xs">
+      <div class="grid grid-cols-2 gap-2 text-meta">
         {#if mission.tjm !== null}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">TJM</p>
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">TJM</p>
             <p class="mt-1 font-mono font-semibold tabular-nums text-text-primary">
-              {mission.tjm}€<span class="text-text-muted">/j</span>
+              {formatTJMValue(mission.tjm)}<span class="text-text-muted">/j</span>
             </p>
           </div>
         {/if}
         {#if mission.location}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Zone</p>
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Zone</p>
             <p class="mt-1 truncate text-text-primary">{mission.location}</p>
           </div>
         {/if}
         {#if mission.duration}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Durée</p>
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Durée</p>
             <p class="mt-1 truncate text-text-primary">{mission.duration}</p>
           </div>
         {/if}
         {#if mission.startDate}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Début</p>
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Début</p>
             <p class="mt-1 truncate text-text-primary">{mission.startDate}</p>
           </div>
         {/if}
         {#if seniorityLabel}
           <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
               Séniorité
             </p>
             <p class="mt-1 truncate text-text-primary">{seniorityLabel}</p>
           </div>
         {/if}
         <div class="rounded-lg bg-page-canvas px-3 py-2.5">
-          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Source</p>
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Source</p>
           <p class="mt-1 truncate text-text-primary">{mission.source}</p>
         </div>
       </div>
       {#if mission.description}
         <div class="mt-4 border-t border-border-light pt-4">
-          <p class="text-xs leading-relaxed text-text-subtle">{mission.description}</p>
+          <p class="text-meta leading-relaxed text-text-subtle">{mission.description}</p>
         </div>
       {/if}
     </div>
@@ -614,7 +613,7 @@
     </div>
     <button
       type="button"
-      class="text-[11px] font-medium text-text-muted transition-colors hover:text-blueprint-blue"
+      class="text-caption font-medium text-text-muted transition-colors hover:text-blueprint-blue"
       onclick={handleInvestigate}
     >
       Investiguer →
@@ -639,7 +638,7 @@
         {@const label = STATUS_LABELS[nextStatus]}
         {#if onStatusTransition}
           <button
-            class="inline-flex items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-[11px] text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait disabled:opacity-50"
+            class="inline-flex items-center gap-1 rounded-lg bg-page-canvas px-2.5 py-1 text-caption text-text-secondary transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary disabled:cursor-wait disabled:opacity-50"
             onclick={() => onStatusTransition?.(nextStatus)}
             aria-label={`Passer le statut à ${label}`}
             disabled={isStatusTransitionPending}

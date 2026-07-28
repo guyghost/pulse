@@ -42,10 +42,10 @@
     </div>
 
     <div class="min-w-0 flex-1">
-      <p class="text-[12px] font-semibold text-text-primary">
+      <p class="text-meta font-semibold text-text-primary">
         Profil à {completion}% · affinez vos résultats
       </p>
-      <p class="text-[11px] leading-4 text-text-secondary">
+      <p class="text-caption leading-4 text-text-secondary">
         À compléter : {missingSummary}
       </p>
     </div>
@@ -53,7 +53,7 @@
     <div class="flex shrink-0 items-center gap-1">
       <button
         class="rounded-lg border border-blueprint-blue/30 bg-blueprint-blue/15 px-3 py-1.5
-               text-[11px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/25"
+               text-caption font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/25"
         onclick={handleSetupProfile}
       >
         Compléter

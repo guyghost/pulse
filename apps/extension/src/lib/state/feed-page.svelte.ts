@@ -43,6 +43,7 @@ import {
   consumeDeepLinkIntent,
   subscribeToNotificationClicked,
 } from '$lib/shell/facades/feed-data.facade';
+import { rankStacksByCount } from '$lib/core/filters/stack-ranking';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
 import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
@@ -382,15 +383,21 @@ export function createFeedPageState(
       showNewOnly
   );
 
-  const availableStacks = $derived.by(() => {
-    const counts = new SvelteMap<string, number>();
+  const stackCounts = $derived.by(() => {
+    // Null-prototype dictionary: stack names are scraped from external pages
+    // (untrusted), so a plain {} would let keys like "__proto__" / "constructor"
+    // collide with inherited members. Object.create(null) has no prototype, so
+    // every key is a plain own property.
+    const counts: Record<string, number> = Object.create(null);
     for (const m of missions) {
       for (const s of m.stack) {
-        counts.set(s, (counts.get(s) ?? 0) + 1);
+        counts[s] = (counts[s] ?? 0) + 1;
       }
     }
-    return [...counts.entries()].sort((a, b) => b[1] - a[1]).map(([name]) => name);
+    return counts;
   });
+
+  const availableStacks = $derived(rankStacksByCount(stackCounts));
 
   // Shared base filter (enabled connectors + favorites + hidden) reused by both
   // sourceCountBaseMissions and dashboardScopeMissions so this prefix runs once.
@@ -1583,6 +1590,9 @@ export function createFeedPageState(
     },
     get availableStacks() {
       return availableStacks;
+    },
+    get stackCounts() {
+      return stackCounts;
     },
     get displayMissions() {
       return displayMissions;

@@ -32,6 +32,7 @@ import {
   type ScanResult,
   type ConnectorScanState,
 } from '../lib/shell/scan/scanner';
+import { enrichMissionsWithSemanticScores } from '../lib/shell/ai/semantic-scorer';
 import { createActor, type ActorRefFrom } from 'xstate';
 import {
   scanLifecycleMachine,
@@ -797,9 +798,94 @@ async function executeAcceptedScanOperation(
       }
 
       try {
-        await persistPostCommitEffects(result, settingsSnapshot);
+        await persistPostCommitEffects(result);
       } catch (error) {
         console.warn('[MissionPulse] Post-commit scan effects failed:', error);
+      }
+
+      // Semantic enrichment runs strictly AFTER the terminal broadcast so it
+      // can never delay SCAN_COMPLETE. It is a non-blocking signal: failures
+      // are swallowed and never revise the terminal classification. The
+      // admission barrier (held until afterTerminal settles) serializes this
+      // against a newer scan's persistence.
+      if (
+        !result.usingDefaultProfile &&
+        result.profile &&
+        typeof result.maxSemanticPerScan === 'number' &&
+        !operation.controller.signal.aborted
+      ) {
+        try {
+          const { changed } = await enrichMissionsWithSemanticScores(
+            result.missions,
+            result.profile,
+            result.maxSemanticPerScan,
+            operation.controller.signal
+          );
+          if (changed && !operation.controller.signal.aborted) {
+            // Profile fence: if the user saved a new profile during enrichment,
+            // SAVE_PROFILE already cleared the semantic cache and rescored
+            // stored missions with the new profile. Discard this stale
+            // old-profile write so it cannot overwrite the fresh rescore or
+            // broadcast stale scores to the feed.
+            const currentProfile = await getProfile();
+            const profileChangedDuringEnrichment =
+              JSON.stringify(currentProfile) !== JSON.stringify(result.profile);
+            if (profileChangedDuringEnrichment) {
+              // Stale enrichment dropped; the SAVE_PROFILE rescore wins.
+            } else {
+              await saveMissions(result.missions, operation.controller.signal);
+              // Alarm scans already published a cold-only batch to the arrival
+              // actor. A live unqualified broadcast here would bypass that actor
+              // and replace the visible catalogue without the user's apply
+              // action. Persist the enriched records and let the actor load them
+              // from IndexedDB; only manual scans refine scores in place.
+              if (trigger !== 'alarm') {
+                await chrome.runtime
+                  .sendMessage({
+                    type: 'MISSIONS_UPDATED',
+                    payload: result.missions,
+                  })
+                  .catch(() => {
+                    // Side panel not open; enriched missions remain durable.
+                  });
+              }
+            }
+          }
+        } catch (error) {
+          if (operation.controller.signal.aborted) {
+            return;
+          }
+          console.warn('[MissionPulse] Semantic enrichment failed:', error);
+        }
+      }
+
+      // High-score notifications run AFTER semantic enrichment so missions
+      // whose deterministic score is below the configured threshold but whose
+      // fused semantic score exceeds it are still notified. When enrichment is
+      // skipped (default profile or no Prompt API), notifications fall back to
+      // deterministic scores. Only unseen missions are passed, matching the
+      // pre-enrichment contract; notifyHighScoreMissions persists its focus
+      // intent before showing Chrome's notification, so a fast click cannot
+      // race ahead of that write.
+      try {
+        if (result.missions.length > 0 && !operation.controller.signal.aborted) {
+          const notifySeenIds = await getSeenIds();
+          const notifySeenSet = new Set(notifySeenIds);
+          const notifiableMissions = result.missions.filter((m) => !notifySeenSet.has(m.id));
+          if (notifiableMissions.length > 0) {
+            const notification = await notifyHighScoreMissions(
+              notifiableMissions,
+              settingsSnapshot
+            );
+            if (notification.shown && notification.notifiedMissionIds.length > 0) {
+              await saveSeenIds(markAsSeen(notifySeenIds, notification.notifiedMissionIds));
+            }
+          }
+        }
+      } catch (notifyError) {
+        if (!operation.controller.signal.aborted) {
+          console.warn('[MissionPulse] High-score notification projection failed:', notifyError);
+        }
       }
     });
 
@@ -1011,8 +1097,7 @@ async function recheckConnectorHealth(
 }
 
 async function persistPostCommitEffects(
-  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>,
-  settingsSnapshot: import('../lib/shell/settings-release/settings-release.contract').SettingsReleaseSnapshot
+  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>
 ): Promise<void> {
   const { missions, errors } = result;
   const now = Date.now();
@@ -1087,14 +1172,19 @@ async function persistPostCommitEffects(
     } else {
       await clearNewMissionBadge();
     }
+<<<<<<< HEAD
 
     // notifyHighScoreMissions persists its focus intent before showing Chrome's
     // notification, so a fast click cannot race ahead of that write.
     if (notification.shown && notification.notifiedMissionIds.length > 0) {
       await saveSeenIds(markAsSeen(seenIds, notification.notifiedMissionIds));
     }
+=======
+>>>>>>> origin/develop
   } catch {
-    // Badge and notification projections are non-critical after commit.
+    // Badge projection is non-critical after commit. High-score notifications
+    // are evaluated separately, after semantic enrichment, so fused semantic
+    // scores participate in the notification decision.
   }
 }
 

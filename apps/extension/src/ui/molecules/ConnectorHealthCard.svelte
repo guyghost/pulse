@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { ConnectorHealthSnapshot } from '$lib/core/types/health';
   import { computeHealthMetrics } from '$lib/core/health/health-metrics';
+  import { formatRelativeTime } from '$lib/core/utils/format';
   import CircuitBadge from '../atoms/CircuitBadge.svelte';
 
   const {
@@ -35,26 +36,7 @@
     return `${(ms / 1000).toFixed(1)}s`;
   }
 
-  function formatRelativeTime(ts: number | null): string {
-    if (ts === null) {
-      return 'jamais';
-    }
-    const diff = now - ts;
-    const minutes = Math.floor(diff / 60_000);
-    if (minutes < 1) {
-      return "à l'instant";
-    }
-    if (minutes < 60) {
-      return `il y a ${minutes}min`;
-    }
-    const hours = Math.floor(minutes / 60);
-    if (hours < 24) {
-      return `il y a ${hours}h`;
-    }
-    return `il y a ${Math.floor(hours / 24)}j`;
-  }
-
-  const lastSuccessText = $derived(formatRelativeTime(snapshot.lastSuccessAt));
+  const lastSuccessText = $derived(formatRelativeTime(snapshot.lastSuccessAt, now) ?? 'jamais');
   const p95Text = $derived(formatLatency(metrics.p95LatencyMs));
   const failureRatePct = $derived(Math.round(metrics.failureRate * 100));
 
@@ -108,7 +90,7 @@
 </script>
 
 <div
-  class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-[11px]
+  class="flex items-center justify-between gap-3 rounded-lg border px-3 py-2 text-caption
     {isOpen
     ? 'border-status-red/20 bg-status-red/8'
     : isHealthy
@@ -119,12 +101,12 @@
     <CircuitBadge state={snapshot.circuitState} size="md" />
     <div class="min-w-0">
       <span class="block truncate font-medium text-text-primary">{connectorName}</span>
-      <span class="mt-0.5 block truncate text-[10px] text-text-subtle">{diagnosis.hint}</span>
+      <span class="mt-0.5 block truncate text-micro text-text-subtle">{diagnosis.hint}</span>
     </div>
   </div>
 
   <div
-    class="flex shrink-0 flex-col items-end gap-0.5 text-[10px]"
+    class="flex shrink-0 flex-col items-end gap-0.5 text-micro"
     title={`Dernier succès : ${lastSuccessText}. Latence p95 : ${p95Text}. Échecs : ${failureRatePct}%.`}
   >
     <span

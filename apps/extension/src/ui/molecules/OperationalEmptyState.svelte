@@ -66,24 +66,22 @@
     </div>
     <div class="min-w-0 flex-1">
       <div class="flex flex-wrap items-center gap-2">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
-          Décision
-        </p>
+        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">Décision</p>
         {#if statusLabel}
           <OperationalStatusBadge label={statusLabel} {severity} />
         {/if}
       </div>
-      <h3 class="mt-1 text-sm font-semibold leading-5 text-text-primary">{title}</h3>
-      <p class="mt-1 text-xs leading-5 text-text-subtle">{description}</p>
+      <h3 class="mt-1 text-body-lg font-semibold leading-5 text-text-primary">{title}</h3>
+      <p class="mt-1 text-meta leading-5 text-text-subtle">{description}</p>
     </div>
   </div>
 
   {#if proofLabel && proofValue !== null}
     <div class="mt-4 rounded-lg border border-border-light bg-surface-white/70 px-3 py-2">
-      <p class="text-[9px] font-semibold uppercase tracking-[0.13em] text-text-muted">
+      <p class="text-micro font-semibold uppercase tracking-[0.13em] text-text-muted">
         {proofLabel}
       </p>
-      <p class="mt-1 font-mono text-sm font-semibold tabular-nums text-text-primary">
+      <p class="mt-1 font-mono text-body-lg font-semibold tabular-nums text-text-primary">
         {proofValue}
       </p>
     </div>
@@ -94,7 +92,7 @@
       {#if primaryActionLabel}
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-xs font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
+          class="inline-flex items-center gap-2 rounded-lg bg-blueprint-blue-strong px-3 py-2 text-meta font-medium text-white transition-colors hover:bg-blueprint-blue-strong/90"
           onclick={onPrimaryAction}
         >
           <Icon name={primaryActionIcon} size={13} />
@@ -104,7 +102,7 @@
       {#if secondaryActionLabel}
         <button
           type="button"
-          class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
+          class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-meta font-medium text-text-primary transition-colors hover:bg-subtle-gray"
           onclick={onSecondaryAction}
         >
           <Icon name={secondaryActionIcon} size={13} />

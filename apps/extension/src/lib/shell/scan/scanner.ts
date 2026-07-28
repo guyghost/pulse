@@ -12,10 +12,9 @@ import {
 import { filterSalariedMissions } from '../../core/scoring/contract-filter';
 import { filterStaleMissions } from '../../core/scoring/mission-freshness';
 import { scoreMission } from '../../core/scoring/relevance';
-import { computeFinalBreakdown, buildScoreBreakdown } from '../../core/scoring/final-score';
+import { buildScoreBreakdown } from '../../core/scoring/final-score';
 import { createDefaultProfile, isDefaultProfile } from '../../core/profile/defaults';
 import { setScanState } from '../storage/session-storage';
-import { scoreMissionsSemantic } from '../ai/semantic-scorer';
 import { metricsCollector } from '../metrics/collector';
 import { calculateDedupRatio } from '../../core/metrics/types';
 import type { ScanMetrics } from '../../core/metrics/types';
@@ -67,6 +66,12 @@ export interface ScanResult {
   sourceMissions: Mission[];
   duplicateRelations: MissionDuplicateRelation[];
   errors: { connectorId: string; message: string }[];
+  /** Profil résolu utilisé pour le scoring déterministe (pour l'enrichissement sémantique post-terminal). */
+  profile?: UserProfile;
+  /** True si le profil résolu était le profil par défaut (l'enrichissement sémantique est alors ignoré). */
+  usingDefaultProfile?: boolean;
+  /** Snapshot de `settings.maxSemanticPerScan` pour l'enrichissement post-terminal. */
+  maxSemanticPerScan?: number;
 }
 
 export interface ScanProgressInfo {
@@ -221,6 +226,9 @@ async function _runScanInternal(
       sourceMissions: [],
       duplicateRelations: [],
       errors: [{ connectorId: '*', message: 'Aucun connecteur actif' }],
+      profile: createDefaultProfile(),
+      usingDefaultProfile: true,
+      maxSemanticPerScan: settings.maxSemanticPerScan,
     };
   }
 
@@ -617,37 +625,8 @@ async function _runScanInternal(
     };
   });
 
-  // Semantic scoring (async enrichment, non-blocking)
-  if (!usingDefaultProfile && !signal?.aborted) {
-    try {
-      const semanticResults = await scoreMissionsSemantic(
-        scored,
-        scanProfile,
-        settings.maxSemanticPerScan,
-        signal
-      );
-      throwIfScanCancelled(signal);
-      for (const mission of scored) {
-        const semantic = semanticResults.get(mission.id);
-        if (semantic && mission.scoreBreakdown) {
-          // Rebuild breakdown with semantic fusion
-          mission.scoreBreakdown = computeFinalBreakdown(
-            mission.scoreBreakdown.deterministic,
-            mission.scoreBreakdown.criteria,
-            semantic.score,
-            semantic.reason
-          );
-          mission.semanticScore = semantic.score;
-          mission.semanticReason = semantic.reason;
-          // Keep legacy score in sync
-          mission.score = mission.scoreBreakdown.total;
-        }
-      }
-    } catch {
-      throwIfScanCancelled(signal);
-      // Gemini Nano unavailable, continue with basic scoring
-    }
-  }
+  // Semantic scoring is deferred to a post-terminal enrichment projection
+  // (background afterTerminal) so it can never delay SCAN_COMPLETE.
   throwIfScanCancelled(signal);
   emitDetailed('post-processing', 2, 3);
 
@@ -713,5 +692,13 @@ async function _runScanInternal(
   }
   throwIfScanCancelled(signal);
   emitDetailed('done', connectors.length, connectors.length);
-  return { missions: scored, sourceMissions, duplicateRelations, errors };
+  return {
+    missions: scored,
+    sourceMissions,
+    duplicateRelations,
+    errors,
+    profile: scanProfile,
+    usingDefaultProfile,
+    maxSemanticPerScan: settings.maxSemanticPerScan,
+  };
 }

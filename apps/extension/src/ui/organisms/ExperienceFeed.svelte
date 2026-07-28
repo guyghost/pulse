@@ -131,10 +131,10 @@
 <div bind:this={feedRoot} class="flex flex-col gap-3">
   <div class="flex items-center justify-between gap-3">
     <div class="flex items-baseline gap-2">
-      <h2 tabindex="-1" data-cv-heading class="text-sm font-semibold text-text-primary">
+      <h2 tabindex="-1" data-cv-heading class="text-body-lg font-semibold text-text-primary">
         Expériences
       </h2>
-      <span class="text-[11px] text-text-muted">
+      <span class="text-caption text-text-muted">
         {store.experiences.length}
         {store.experiences.length > 1 ? 'entrées' : 'entrée'}
       </span>
@@ -197,7 +197,7 @@
       <div
         role="alert"
         aria-live="assertive"
-        class="flex items-start gap-2 rounded-xl border border-status-red/30 bg-status-red/5 px-4 py-3 text-xs text-status-red"
+        class="flex items-start gap-2 rounded-xl border border-status-red/30 bg-status-red/5 px-4 py-3 text-meta text-status-red"
       >
         <Icon name="triangle-alert" size={14} />
         <span class="flex-1">{store.editError}</span>
@@ -234,7 +234,7 @@
     {/each}
 
     {#if store.experiences.length > 0}
-      <p class="py-1 text-center text-[11px] text-text-muted">Tri du plus récent au plus ancien</p>
+      <p class="py-1 text-center text-caption text-text-muted">Tri du plus récent au plus ancien</p>
     {/if}
   {/if}
 </div>

@@ -147,7 +147,7 @@
 >
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] font-medium text-text-secondary">Titre du poste</span>
+      <span class="text-caption font-medium text-text-secondary">Titre du poste</span>
       <input
         bind:value={title}
         oninput={() => (touched = true)}
@@ -155,62 +155,62 @@
         data-experience-control="title"
         data-experience-focus="title"
         placeholder="Lead Frontend"
-        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         aria-invalid={Boolean(titleError)}
       />
       {#if titleError}
-        <span class="text-[11px] text-status-red">{titleError}</span>
+        <span class="text-caption text-status-red">{titleError}</span>
       {/if}
     </label>
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] font-medium text-text-secondary">Entreprise</span>
+      <span class="text-caption font-medium text-text-secondary">Entreprise</span>
       <input
         bind:value={company}
         oninput={() => (touched = true)}
         type="text"
         data-experience-focus="company"
         placeholder="Acme"
-        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         aria-invalid={Boolean(companyError)}
       />
       {#if companyError}
-        <span class="text-[11px] text-status-red">{companyError}</span>
+        <span class="text-caption text-status-red">{companyError}</span>
       {/if}
     </label>
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] font-medium text-text-secondary">Type de contrat</span>
+      <span class="text-caption font-medium text-text-secondary">Type de contrat</span>
       <input
         name="employmentType"
         bind:value={employmentType}
         type="text"
         placeholder="Freelance, CDI, Temps plein"
-        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
       />
     </label>
   </div>
 
   <div class="grid grid-cols-1 gap-3 sm:grid-cols-3">
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] font-medium text-text-secondary">Début</span>
+      <span class="text-caption font-medium text-text-secondary">Début</span>
       <input
         bind:value={startDate}
         type="month"
         data-experience-focus="startDate"
-        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         aria-invalid={Boolean(startDateError)}
       />
       {#if startDateError}
-        <span class="text-[11px] text-status-red">{startDateError}</span>
+        <span class="text-caption text-status-red">{startDateError}</span>
       {/if}
     </label>
     <label class="flex flex-col gap-1">
-      <span class="text-[11px] font-medium text-text-secondary">Fin</span>
+      <span class="text-caption font-medium text-text-secondary">Fin</span>
       <input
         bind:value={endDate}
         type="month"
         disabled={isCurrent}
         data-experience-focus="endDate"
-        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20 disabled:opacity-40"
+        class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20 disabled:opacity-40"
       />
     </label>
     <label class="flex items-end gap-2 pb-2">
@@ -222,32 +222,32 @@
         data-experience-focus="current"
         class="h-4 w-4 rounded border-border-light text-blueprint-blue focus:ring-blueprint-blue/30"
       />
-      <span class="text-xs text-text-secondary">Poste actuel</span>
+      <span class="text-meta text-text-secondary">Poste actuel</span>
     </label>
   </div>
 
   <label class="flex flex-col gap-1">
-    <span class="text-[11px] font-medium text-text-secondary">Localisation</span>
+    <span class="text-caption font-medium text-text-secondary">Localisation</span>
     <input
       bind:value={location}
       type="text"
       placeholder="Paris, France (ou distant)"
-      class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+      class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
     />
   </label>
 
   <label class="flex flex-col gap-1">
-    <span class="text-[11px] font-medium text-text-secondary">Description</span>
+    <span class="text-caption font-medium text-text-secondary">Description</span>
     <textarea
       bind:value={description}
       rows="3"
       placeholder="Contexte, responsabilités, réalisations notables."
-      class="resize-y rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm leading-relaxed text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+      class="resize-y rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg leading-relaxed text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
     ></textarea>
   </label>
 
   <label class="flex flex-col gap-1">
-    <span class="text-[11px] font-medium text-text-secondary"
+    <span class="text-caption font-medium text-text-secondary"
       >Compétences (séparées par des virgules)</span
     >
     <input
@@ -255,7 +255,7 @@
       type="text"
       data-experience-focus="skills"
       placeholder="React, TypeScript, Node.js"
-      class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-sm text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
+      class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
     />
   </label>
 

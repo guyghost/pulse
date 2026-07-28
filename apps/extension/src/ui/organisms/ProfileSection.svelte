@@ -4,6 +4,7 @@
   import { Button } from '@pulse/ui';
   import type { RemoteType } from '$lib/core/types/mission';
   import type { SeniorityLevel } from '$lib/core/types/profile';
+  import { formatTJMRange } from '$lib/core/utils/format';
   import Tooltip from '../atoms/Tooltip.svelte';
   import { REMOTE_OPTIONS as remoteOptions } from '../constants/remote-options';
   import { LOCATION_LABELS } from '$lib/core/locations/location-catalog';
@@ -62,8 +63,8 @@
         <Icon name="edit-2" size={14} class="text-blueprint-blue" />
       </div>
       <div>
-        <h3 class="text-sm font-medium text-text-primary">Profil</h3>
-        <p class="mt-0.5 text-xs text-text-subtle">Vos informations de freelance.</p>
+        <h3 class="text-body-lg font-medium text-text-primary">Profil</h3>
+        <p class="mt-0.5 text-meta text-text-subtle">Vos informations de freelance.</p>
       </div>
     </div>
     <Tooltip
@@ -88,19 +89,19 @@
       <input
         type="text"
         placeholder="Prénom"
-        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={firstName}
       />
       <input
         type="text"
         placeholder="Poste (ex: Développeur React Senior)"
-        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={jobTitle}
       />
       <input
         type="text"
         placeholder="Localisation"
-        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+        class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         list="profile-location-catalog"
         bind:value={profileLocation}
       />
@@ -111,11 +112,11 @@
       </datalist>
       <div class="grid grid-cols-2 gap-2">
         <label class="space-y-1">
-          <span class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
+          <span class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
             Remote
           </span>
           <select
-            class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+            class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={profileRemote}
           >
             {#each remoteOptions as option, i (i)}
@@ -124,11 +125,11 @@
           </select>
         </label>
         <label class="space-y-1">
-          <span class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">
+          <span class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
             Séniorité
           </span>
           <select
-            class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+            class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={seniority}
           >
             {#each seniorityOptions as option, i (i)}
@@ -141,26 +142,26 @@
         <input
           type="number"
           placeholder="TJM min"
-          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
           bind:value={tjmMin}
         />
         <input
           type="number"
           placeholder="TJM max"
-          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+          class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
           bind:value={tjmMax}
         />
       </div>
 
       <div class="space-y-2">
-        <p class="text-[10px] font-medium uppercase tracking-[0.12em] text-text-muted">Mots-clés</p>
+        <p class="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">Mots-clés</p>
         <div class="flex gap-2">
           <input
             type="text"
             aria-label="Mots-clés"
             id="profile-keywords-input"
             placeholder="ex: React, Node.js, SaaS, marketplace..."
-            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-sm text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
+            class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
             bind:value={keywordInput}
             onkeydown={(e) => {
               if (e.key === 'Enter') {
@@ -196,11 +197,11 @@
         </Button>
       </div>
       {#if profileError}
-        <p class="text-xs text-status-red">{profileError}</p>
+        <p class="text-meta text-status-red">{profileError}</p>
       {/if}
     </div>
   {:else}
-    <div class="mt-4 space-y-2 text-sm">
+    <div class="mt-4 space-y-2 text-body-lg">
       <p class="text-text-primary">
         {firstName || 'Non renseigné'}
         {jobTitle ? ` — ${jobTitle}` : ''}
@@ -208,34 +209,36 @@
       <p class="text-text-subtle">{profileLocation || 'Localisation non renseignée'}</p>
       <div class="grid grid-cols-2 gap-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">Remote</p>
-          <p class="mt-1 text-xs font-medium text-text-primary">
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">Remote</p>
+          <p class="mt-1 text-meta font-medium text-text-primary">
             {remoteOptions.find((option) => option.value === profileRemote)?.label ?? 'Indifférent'}
           </p>
         </div>
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2.5">
-          <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+          <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
             Séniorité
           </p>
-          <p class="mt-1 text-xs font-medium text-text-primary">
+          <p class="mt-1 text-meta font-medium text-text-primary">
             {seniorityOptions.find((option) => option.value === seniority)?.label ?? 'Senior'}
           </p>
         </div>
       </div>
       {#if tjmMin > 0 || tjmMax > 0}
-        <p class="text-text-subtle">TJM : {tjmMin} – {tjmMax} €/jour</p>
+        <p class="text-text-subtle">
+          TJM : {formatTJMRange(tjmMin || null, tjmMax || null, { suffix: '/jour' })}
+        </p>
       {/if}
       {#if profileKeywords.length > 0}
         <div class="flex flex-wrap gap-1.5 pt-1">
           {#each profileKeywords as keyword (keyword)}
             <span
-              class="inline-flex items-center rounded-md bg-blueprint-blue/6 px-2 py-0.5 text-[11px] text-blueprint-blue"
+              class="inline-flex items-center rounded-md bg-blueprint-blue/6 px-2 py-0.5 text-caption text-blueprint-blue"
               >{keyword}</span
             >
           {/each}
         </div>
       {:else}
-        <p class="text-xs text-text-muted">Aucun mot-clé renseigné</p>
+        <p class="text-meta text-text-muted">Aucun mot-clé renseigné</p>
       {/if}
     </div>
   {/if}
