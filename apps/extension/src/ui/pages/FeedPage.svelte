@@ -5,7 +5,6 @@
     FeedStoryInput,
     FeedStorySeverity,
   } from '$lib/core/feed/build-feed-story';
-  export { buildFeedStory } from '$lib/core/feed/build-feed-story';
 </script>
 
 <script lang="ts">
@@ -30,6 +29,7 @@
     buildScanSummary,
     type ScanSummary as ScanSummaryData,
   } from '$lib/core/scan/scan-summary';
+  import { buildFeedStory } from '$lib/core/feed/build-feed-story';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
   import type { MissionSource } from '$lib/core/types/mission';
