@@ -43,6 +43,8 @@ export interface FeedStoryInput {
   alertEnabled: boolean;
   alertScoreThreshold: number;
   hasCompletedScan: boolean;
+  filterActive: boolean;
+  totalMissionCount: number;
 }
 
 function formatStoryMissionCount(count: number): string {
@@ -61,6 +63,8 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
     alertEnabled,
     alertScoreThreshold,
     hasCompletedScan,
+    filterActive,
+    totalMissionCount,
   } = input;
 
   const evidence: OperationalEvidence[] = [
@@ -177,8 +181,23 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
     };
   }
 
-  // Empty states — distinguish never-scanned vs scanned-empty (P0 fix)
+  // Empty states — distinguish filtered-empty vs scanned-empty vs never-scanned
   if (visibleCount === 0) {
+    // Cached missions exist but active filters hide them all — clear filters,
+    // do not route to Profile or invite a redundant scan.
+    if (filterActive && totalMissionCount > 0) {
+      return {
+        severity: 'attention' as const,
+        statusLabel: 'Filtres sans résultat',
+        title: 'Aucune mission ne correspond à vos filtres actifs',
+        description:
+          'Des missions sont disponibles mais vos filtres les masquent toutes. Ajustez ou effacez les filtres pour les réafficher.',
+        evidence,
+        primaryActionLabel: 'Effacer les filtres',
+        primaryActionIcon: 'filter-x',
+      };
+    }
+
     if (hasCompletedScan) {
       // Scanned, found nothing matching — attention state, route to Profile
       return {

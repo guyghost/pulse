@@ -23,35 +23,48 @@ empty states. **Jamais** un widget permanent — c'est un call-to-action context
 
 Six états distincts, avec **précédence stricte** (de haut en bas) :
 
-| État                  | Sévérité    | Condition                                              | Intention                                         |
-| --------------------- | ----------- | ------------------------------------------------------ | ------------------------------------------------- |
-| `error-cached`        | `incident`  | `error != null && visibleCount > 0`                    | Données en cache disponibles, scan interrompu     |
-| `error-critical`      | `critical`  | `error != null && visibleCount === 0`                  | Aucune donnée disponible, scan impossible         |
-| `offline`             | `incident`  | `isOffline`                                            | Hors ligne, données en cache disponibles          |
-| `broken-sources`      | `critical`  | `brokenConnectorCount > 0`                             | Sources cassées, feed incomplet                   |
-| `new-missions`        | `attention` | `newCount > 0`                                         | Nouvelles missions à traiter, prioritaires ou non |
-| `priority-ready`      | `success`   | `alertEnabled && highScoreCount > 0 && newCount === 0` | Missions prioritaires disponibles (seuil dépassé) |
-| `scanned-empty`       | `attention` | `visibleCount === 0 && hasCompletedScan`               | **Scan terminé, 0 résultat — ajuster le profil**  |
-| `never-scanned-empty` | `neutral`   | `visibleCount === 0 && !hasCompletedScan`              | Premier lancement, inviter au scan                |
-| `feed-ready`          | `success`   | _défaut final_                                         | Feed prêt, aucune action requise                  |
+| État                  | Sévérité    | Condition                                                                            | Intention                                                      |
+| --------------------- | ----------- | ------------------------------------------------------------------------------------ | -------------------------------------------------------------- |
+| `error-cached`        | `incident`  | `error != null && visibleCount > 0`                                                  | Données en cache disponibles, scan interrompu                  |
+| `error-critical`      | `critical`  | `error != null && visibleCount === 0`                                                | Aucune donnée disponible, scan impossible                      |
+| `offline`             | `incident`  | `isOffline`                                                                          | Hors ligne, données en cache disponibles                       |
+| `broken-sources`      | `critical`  | `brokenConnectorCount > 0`                                                           | Sources cassées, feed incomplet                                |
+| `new-missions`        | `attention` | `newCount > 0`                                                                       | Nouvelles missions à traiter, prioritaires ou non              |
+| `priority-ready`      | `success`   | `alertEnabled && highScoreCount > 0 && newCount === 0`                               | Missions prioritaires disponibles (seuil dépassé)              |
+| `filtered-empty`      | `attention` | `visibleCount === 0 && filterActive && totalMissionCount > 0`                        | **Des missions existent mais les filtres les masquent toutes** |
+| `scanned-empty`       | `attention` | `visibleCount === 0 && hasCompletedScan && !(filterActive && totalMissionCount > 0)` | **Scan terminé, 0 résultat — ajuster le profil**               |
+| `never-scanned-empty` | `neutral`   | `visibleCount === 0 && !hasCompletedScan`                                            | Premier lancement, inviter au scan                             |
+| `feed-ready`          | `success`   | _défaut final_                                                                       | Feed prêt, aucune action requise                               |
 
 **Précédence** : erreur > offline > sources cassées > nouvelles > prioritaires >
-scanned-empty > never-scanned > feed-ready.
+filtered-empty > scanned-empty > never-scanned > feed-ready.
 
-### Nouveauté : distinction des empty states
+### Distinction des empty states
 
 Avant ce modèle, `visibleCount === 0` affichait toujours un neutral CTA "Lancez
 un premier scan" — ambiguïté P0 quand un scan a **déjà terminé** et légitimement
-trouvé zéro match.
+trouvé zéro match, ou quand des **filtres actifs** masquent toutes les missions
+en cache.
 
-**Signal discriminant** : `hasCompletedScan` (dérivé de `controller.lastScanAt != null`)
+Trois signaux discriminants ordonnés (le premier qui matche gagne, dans le
+bucket `visibleCount === 0`) :
 
-- `lastScanAt === null` → jamais scanné → `never-scanned-empty` (neutral, CTA scan)
-- `lastScanAt != null` → déjà scanné → `scanned-empty` (attention, CTA profil)
+1. **`filterActive && totalMissionCount > 0`** → `filtered-empty` (attention,
+   CTA « Effacer les filtres »). Des missions existent en cache mais les filtres
+   les masquent toutes. L'utilisateur doit ajuster/effacer ses filtres, **pas**
+   modifier son profil ni relancer un scan.
+2. **`hasCompletedScan`** (dérivé de `controller.lastScanAt != null`) →
+   `scanned-empty` (attention, CTA profil). Un scan a terminé et légitimement
+   trouvé zéro match.
+3. sinon → `never-scanned-empty` (neutral, CTA scan). Premier lancement.
 
 Invariant : `lastScanAt` est monotone (uniquement mis à jour sur succès scan),
 donc `hasCompletedScan` est un edge-detector fiable. Cf. `scan-lifecycle.model.md`
 et `scan-completion-delight.model.md` pour le contrat de `lastScanAt`.
+
+**Note** : `totalMissionCount` est le count **non filtré** (`missions.length`),
+distinct de `visibleCount` (post-filtres). `filterActive` reflète la présence
+d'au moins un filtre source/remote/stack/seniority sélectionné.
 
 ## Entrées (pures)
 
@@ -66,7 +79,9 @@ interface FeedStoryInput {
   visibleCount: number;
   alertEnabled: boolean;
   alertScoreThreshold: number;
-  hasCompletedScan: boolean; // ← ajouté pour discriminer les empty states
+  hasCompletedScan: boolean; // ← discriminant scanned-empty vs never-scanned
+  filterActive: boolean; // ← au moins un filtre sélectionné
+  totalMissionCount: number; // ← count non filtré (missions.length)
 }
 ```
 
@@ -85,6 +100,15 @@ interface FeedStory {
 ```
 
 ## Matrice de copie (FR)
+
+### `filtered-empty` (attention) — NOUVEAU
+
+- **statusLabel** : `Filtres sans résultat`
+- **title** : `Aucune mission ne correspond à vos filtres actifs`
+- **description** : `Des missions sont disponibles mais vos filtres les masquent toutes. Ajustez ou effacez les filtres pour les réafficher.`
+- **primaryActionLabel** : `Effacer les filtres`
+- **primaryActionIcon** : `filter-x`
+- **evidence** : inchangée
 
 ### `scanned-empty` (attention) — NOUVEAU
 
@@ -113,12 +137,14 @@ interface FeedStory {
 | `broken-sources`      | `Relancer le diagnostic`  | `controller.recheckConnector(id)`       |
 | `new-missions`        | `Voir les N nouvelles`    | `toggleNewOnly() + scroll`              |
 | `priority-ready`      | `Voir les N prioritaires` | `showAlertOnly = true + scroll`         |
+| **`filtered-empty`**  | **`Effacer les filtres`** | **`handleClearMissionFilters()`**       |
 | **`scanned-empty`**   | **`Ajuster le profil`**   | **`appNavigation.navigate('profile')`** |
 | `never-scanned-empty` | `Lancer le scan`          | `handleMissionFeedScanAction()`         |
 | `feed-ready`          | `Voir le feed`            | `scrollToMissionFeed()`                 |
 
-**Nouveauté** : `scanned-empty` route vers la page **Profile** pour permettre
-l'ajustement des critères — pas vers un nouveau scan.
+**Nouveauté** : `filtered-empty` efface les filtres (les missions existent en
+cache) ; `scanned-empty` route vers la page **Profile** pour ajuster les
+critères — ni l'un ni l'autre ne lance un scan intempestif.
 
 ## Implémentation — résolveur pur
 
@@ -143,10 +169,15 @@ const feedStory = $derived(
 1. La story **ne bloque jamais** le feed — elle est un guide contextuel.
 2. Aucune transition produit n'est créée ici — pure projection.
 3. `buildFeedStory` est **testable sans mocks** (fonction pure).
-4. `scanned-empty` et `never-scanned-empty` sont **mutuellement exclusifs** :
-   `hasCompletedScan` est le discriminant booléen.
+4. `scanned-empty`, `filtered-empty` et `never-scanned-empty` sont **mutuellement
+   exclusifs** : la précédence ordonne `filtered-empty` > `scanned-empty` >
+   `never-scanned` dans le bucket `visibleCount === 0`.
 5. Le handler `scanned-empty` **ne lance jamais de scan** — il route vers Profile.
+   Le handler `filtered-empty` **ne lance jamais de scan ni ne route vers Profile**
+   — il efface les filtres.
 6. `hasCompletedScan` est monotone (une fois `true`, reste `true` sauf reset app).
+7. `filtered-empty` ne peut se produire que si `totalMissionCount > 0` (des
+   missions en cache) ET `filterActive` (filtres qui les masquent).
 
 ## Cas de test obligatoires
 
@@ -156,20 +187,24 @@ const feedStory = $derived(
 - `brokenConnectorCount > 0` → `broken-sources` (critical)
 - `newCount > 0` → `new-missions` (attention)
 - `alertEnabled && highScoreCount > 0 && newCount === 0` → `priority-ready` (success)
-- **`visibleCount === 0 && hasCompletedScan === true`** → **`scanned-empty`** (attention)
+- **`visibleCount === 0 && filterActive && totalMissionCount > 0`** → **`filtered-empty`** (attention, CTA « Effacer les filtres »)
+- **`visibleCount === 0 && hasCompletedScan === true && !(filterActive && totalMissionCount > 0)`** → **`scanned-empty`** (attention)
 - **`visibleCount === 0 && hasCompletedScan === false`** → **`never-scanned-empty`** (neutral)
 - `visibleCount > 0 && newCount === 0 && highScoreCount === 0` → `feed-ready` (success)
 
 ## Changements requis dans le code
 
-1. **Type** : ajouter `hasCompletedScan: boolean` à `FeedStoryInput`
-2. **Fonction** : insérer la branche `scanned-empty` avant `never-scanned-empty`
-   dans l'arbre de décision de `buildFeedStory`
-3. **Page** : passer `hasCompletedScan: controller.lastScanAt != null` au
-   `buildFeedStory` dans le `$derived`
+1. **Type** : ajouter `hasCompletedScan: boolean`, `filterActive: boolean`,
+   `totalMissionCount: number` à `FeedStoryInput`
+2. **Fonction** : insérer la branche `filtered-empty` (filtres masquent tout)
+   **avant** `scanned-empty` dans l'arbre de décision de `buildFeedStory`
+3. **Page** : passer `filterActive: page.filterActive`,
+   `totalMissionCount: page.totalMissions`, et
+   `hasCompletedScan: controller.lastScanAt != null` au `buildFeedStory`
 4. **Handler** : ajouter une branche dans `handleFeedStoryPrimaryAction` pour
-   détecter `scanned-empty` et appeler `appNavigation.navigate('profile')`
-5. **Tests** : couvrir les deux nouveaux cas empty dans les unit tests
+   détecter `filtered-empty` et appeler `handleClearMissionFilters()`, **avant**
+   la branche `scanned-empty` qui appelle `appNavigation.navigate('profile')`
+5. **Tests** : couvrir les trois cas empty dans les unit tests
 
 ## Références
 

@@ -445,6 +445,8 @@
       alertEnabled: alertPreferences.enabled,
       alertScoreThreshold: alertPreferences.scoreThreshold,
       hasCompletedScan: controller.lastScanAt !== null,
+      filterActive: page.filterActive,
+      totalMissionCount: page.totalMissions,
     })
   );
 
@@ -578,6 +580,12 @@
     if (alertMatchCount > 0) {
       showAlertOnly = true;
       void scrollToMissionFeed();
+      return;
+    }
+
+    // Empty state: filters hide all cached missions → clear filters (not Profile)
+    if (page.dashboardSummary.visibleCount === 0 && page.filterActive && page.totalMissions > 0) {
+      handleClearMissionFilters();
       return;
     }
 

@@ -21,6 +21,8 @@ const DEFAULT_INPUT: FeedStoryInput = {
   alertEnabled: true,
   alertScoreThreshold: 75,
   hasCompletedScan: false,
+  filterActive: false,
+  totalMissionCount: 0,
 };
 
 describe('buildFeedStory', () => {
@@ -208,7 +210,63 @@ describe('buildFeedStory', () => {
     });
   });
 
-  describe('empty states (P0 fix: scanned vs never-scanned)', () => {
+  describe('empty states (filtered-empty / scanned-empty / never-scanned)', () => {
+    it('returns attention filtered-empty when filters hide all cached missions', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        filterActive: true,
+        totalMissionCount: 8, // 8 missions cached but hidden by filters
+        hasCompletedScan: true,
+      });
+
+      expect(result.severity).toBe('attention');
+      expect(result.statusLabel).toBe('Filtres sans résultat');
+      expect(result.title).toBe('Aucune mission ne correspond à vos filtres actifs');
+      expect(result.description).toContain('filtres les masquent');
+      expect(result.primaryActionLabel).toBe('Effacer les filtres');
+      expect(result.primaryActionIcon).toBe('filter-x');
+    });
+
+    it('filtered-empty takes precedence over scanned-empty', () => {
+      // Missions exist + filters active + scan completed: filters win.
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        filterActive: true,
+        totalMissionCount: 5,
+        hasCompletedScan: true,
+      });
+
+      expect(result.statusLabel).toBe('Filtres sans résultat');
+      expect(result.primaryActionLabel).toBe('Effacer les filtres');
+    });
+
+    it('does not show filtered-empty when no filter is active even if missions cached', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        filterActive: false,
+        totalMissionCount: 8,
+        hasCompletedScan: true,
+      });
+
+      expect(result.statusLabel).toBe('Aucune correspondance');
+      expect(result.primaryActionLabel).toBe('Ajuster le profil');
+    });
+
+    it('does not show filtered-empty when totalMissionCount is 0 (no cached missions)', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        filterActive: true,
+        totalMissionCount: 0,
+        hasCompletedScan: true,
+      });
+
+      expect(result.statusLabel).toBe('Aucune correspondance');
+    });
+
     it('returns attention scanned-empty when scanned but no matches', () => {
       const result = buildFeedStory({
         ...DEFAULT_INPUT,

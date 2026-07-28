@@ -7,6 +7,9 @@ const baseInput = {
   firstBrokenConnectorName: null,
   alertEnabled: false,
   alertScoreThreshold: 80,
+  hasCompletedScan: false,
+  filterActive: false,
+  totalMissionCount: 0,
 };
 
 describe('buildFeedStory', () => {
