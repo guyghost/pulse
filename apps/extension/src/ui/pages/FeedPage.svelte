@@ -36,7 +36,11 @@
   import type { FeedTourStep } from '../molecules/FeedTourOverlay.svelte';
   import OperationalStoryCard from '../molecules/OperationalStoryCard.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
-  import { getProfileBannerDismissed, setFeedTourSeen } from '$lib/shell/facades/app-flags.facade';
+  import {
+    getProfileBannerDismissed,
+    setProfileBannerDismissed,
+    setFeedTourSeen,
+  } from '$lib/shell/facades/app-flags.facade';
   import {
     getKbdCheatsheetTipSeen,
     setKbdCheatsheetTipSeen,
@@ -217,6 +221,13 @@
         ProfileRefinementBanner = module.default;
       });
     }
+  }
+
+  // The checklist pill loads on its own condition (profile < 100%), decoupled
+  // from the refinement banner. Previously it was bundled into
+  // loadRefinementBanner(), so it never loaded when the banner was dismissed
+  // or not yet needed — even though the pill's own render condition was true.
+  function loadChecklistPill(): void {
     if (!ProfileChecklistPill) {
       import('../molecules/ProfileChecklistPill.svelte').then((module) => {
         ProfileChecklistPill = module.default;
@@ -315,6 +326,12 @@
   $effect(() => {
     if (showRefinementBanner && page.profileLoaded && page.profileNeedsCompletion) {
       loadRefinementBanner();
+    }
+  });
+
+  $effect(() => {
+    if (page.profileLoaded && page.profileCompletion < 100) {
+      loadChecklistPill();
     }
   });
 
@@ -759,6 +776,10 @@
       getAlertPreferences(),
     ]);
     showRefinementBanner = !bannerDismissed;
+    // The checklist pill shares the profile-completion nudge's dismiss state:
+    // if the user dismissed the banner, don't re-surface the pill (and vice
+    // versa). Persisted via the existing flag so it survives reloads.
+    checklistPillDismissed = bannerDismissed;
     alertPreferences = storedAlertPreferences;
   })().catch(() => {});
 
@@ -1256,7 +1277,13 @@
                   }
                   onNavigateToOnboarding?.();
                 }}
-                onDismiss={() => (checklistPillDismissed = true)}
+                onDismiss={() => {
+                  checklistPillDismissed = true;
+                  // Persist: the pill and the refinement banner share the same
+                  // profile-completion nudge, so one dismiss state covers both.
+                  showRefinementBanner = false;
+                  void setProfileBannerDismissed().catch(() => {});
+                }}
               />
             </div>
           {/if}
