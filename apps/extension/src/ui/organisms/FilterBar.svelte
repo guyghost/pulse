@@ -29,6 +29,7 @@
   import { Icon } from '@pulse/ui';
   import type { SavedFeedView } from '$lib/core/types/feed-view';
   import Tooltip from '../atoms/Tooltip.svelte';
+  import { computeVisibleStacks, computeOverflowCount } from '$lib/core/filters/stack-ranking';
 
   const {
     availableStacks = [],
@@ -71,6 +72,9 @@
   let saveOpen = $state(false);
   let saveName = $state('');
   let isSaving = $state(false);
+  let showAllStacks = $state(false);
+
+  const TOP_N_STACKS = 8;
 
   const hasFilters = $derived(
     selectedStacks.length > 0 ||
@@ -78,6 +82,17 @@
       selectedRemote !== null ||
       selectedSeniority !== null
   );
+
+  // Compute visible stacks: top-N + selected stacks pinned
+  const visibleStacksSet = $derived(
+    computeVisibleStacks(availableStacks, selectedStacks, TOP_N_STACKS)
+  );
+
+  const visibleStacks = $derived(
+    showAllStacks ? availableStacks : availableStacks.filter((stack) => visibleStacksSet.has(stack))
+  );
+
+  const overflowCount = $derived(computeOverflowCount(availableStacks.length, TOP_N_STACKS));
 
   async function handleSaveSubmit(event: SubmitEvent) {
     event.preventDefault();
@@ -219,13 +234,28 @@
     <div>
       <p class="mb-2 text-caption uppercase tracking-[0.15em] text-text-subtle">Technologies</p>
       <div class="flex flex-wrap gap-1.5">
-        {#each availableStacks as stack (stack)}
+        {#each visibleStacks as stack (stack)}
           <Chip
             label={stack}
             selected={selectedStacks.includes(stack)}
             onclick={() => onToggleStack?.(stack)}
           />
         {/each}
+        {#if overflowCount > 0}
+          <button
+            class="inline-flex h-7 items-center gap-1 rounded-full border border-border-light bg-surface-white px-3 text-caption text-text-secondary transition-colors hover:bg-subtle-gray motion-reduce:transition-none"
+            onclick={() => (showAllStacks = !showAllStacks)}
+            aria-expanded={showAllStacks}
+          >
+            {#if showAllStacks}
+              <Icon name="chevron-up" size={12} />
+              <span>Réduire</span>
+            {:else}
+              <Icon name="chevron-down" size={12} />
+              <span>Voir {overflowCount} autres</span>
+            {/if}
+          </button>
+        {/if}
       </div>
     </div>
   {/if}
