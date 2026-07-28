@@ -925,10 +925,7 @@
             <p class="plan-card__anchor">≈ 0,40€/jour — moins qu'un café par semaine.</p>
           </div>
           <ul class="plan-card__list">
-            <li>
-              Synchronisation multi-appareils (shortlist, candidatures, profil) — à venir, via
-              Supabase.
-            </li>
+            <li>Synchronisation multi-appareils (profil, candidatures) à venir, via Supabase.</li>
             <li>20 générations IA distantes par mois (pitch, message recruteur, résumé CV).</li>
             <li>1 crédit = 1 contenu; packs à la demande si vous dépassez le quota.</li>
             <li>Le scan local, le scoring et toutes les pages de l'extension restent gratuits.</li>
