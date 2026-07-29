@@ -37,7 +37,7 @@
             <p class="mt-2 text-body-lg font-semibold text-text-primary">Multi-source</p>
           </div>
           <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">
-            <p class="text-caption uppercase tracking-[0.18em] text-text-muted">Score</p>
+            <p class="text-caption uppercase tracking-[0.18em] text-text-muted">Notation</p>
             <p class="mt-2 text-body-lg font-semibold text-text-primary">Pertinence</p>
           </div>
           <div class="rounded-lg border border-border-light bg-surface-white px-3 py-3">

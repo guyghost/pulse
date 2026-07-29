@@ -511,7 +511,9 @@ describe('operational UI constraints', () => {
     expect(source).toContain(
       'La prochaine action est d’ouvrir cette mission ou de la mettre en suivi.'
     );
-    expect(source).toContain('Départagez avec le TJM, le remote et la source avant de postuler.');
+    expect(source).toContain(
+      'Départagez-les avec le TJM, le remote et la source avant de postuler.'
+    );
     expect(source.indexOf('Décision recommandée')).toBeLessThan(
       source.indexOf('<!-- Titles row -->')
     );
@@ -527,12 +529,12 @@ describe('operational UI constraints', () => {
     expect(drawerSource).toContain('Mettre en suivi');
     expect(drawerSource).toContain('Comparer');
     expect(drawerSource).toContain('Masquer');
-    expect(drawerSource).toContain('Pourquoi ce score ?');
-    expect(cardSource).toContain('Pourquoi ce score ?');
+    expect(drawerSource).toContain('Pourquoi cette note ?');
+    expect(cardSource).toContain('Pourquoi cette note ?');
     expect(cardSource).toContain('function handleScoreDetailsToggle');
     expect(cardSource).toContain('aria-expanded={scoreDetailsOpen}');
     expect(cardSource).toContain('aria-controls={scoreDetailsId}');
-    expect(cardSource.indexOf('Pourquoi ce score ?')).toBeLessThan(
+    expect(cardSource.indexOf('Pourquoi cette note ?')).toBeLessThan(
       cardSource.indexOf('<!-- Inline details controlled by the scoped disclosure. -->')
     );
     expect(drawerSource.indexOf('Transformer la décision')).toBeLessThan(

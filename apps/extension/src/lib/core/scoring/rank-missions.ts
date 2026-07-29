@@ -1,5 +1,6 @@
 import type { Mission } from '../types/mission';
 import { parseIsoDateTimeToEpochMs } from '../utils/iso-time';
+import { getMissionScore } from './mission-grade';
 
 /**
  * Configuration for the composite ranking weights.
@@ -32,9 +33,6 @@ const MS_PER_DAY = 24 * 60 * 60 * 1000;
  * Best available numeric score for a mission (0-100).
  * Prefers the structured breakdown, falls back to legacy fields.
  */
-const getMissionScore = (m: Mission): number =>
-  m.scoreBreakdown?.total ?? m.semanticScore ?? m.score ?? 0;
-
 /**
  * Compute a freshness score (0-100) based on the publication date.
  *
@@ -91,7 +89,7 @@ export function missionRankScore(
   weights: RankingWeights = DEFAULT_RANKING_WEIGHTS,
   decayDays: number = DEFAULT_FRESHNESS_DECAY_DAYS
 ): number {
-  const relevance = getMissionScore(mission);
+  const relevance = getMissionScore(mission) ?? 0;
   const fresh = freshnessScore(mission.publishedAt, now, decayDays);
   const total = weights.relevance + weights.freshness;
   // Normalize so the result stays in 0-100 even if weights don't sum to 1

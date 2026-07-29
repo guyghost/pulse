@@ -45,6 +45,7 @@ import {
   subscribeToNotificationClicked,
 } from '$lib/shell/facades/feed-data.facade';
 import { rankStacksByCount } from '$lib/core/filters/stack-ranking';
+import { getMissionScore as getCanonicalMissionScore } from '$lib/core/scoring/mission-grade';
 import { getPanelSide } from '$lib/shell/ui/panel-layout';
 import { isPromptApiAvailable } from '$lib/shell/ai/capabilities';
 import { showToast, showToastAction } from '$lib/shell/notifications/toast-service';
@@ -130,7 +131,7 @@ interface FeedAggregates {
 }
 
 function getMissionScore(mission: Mission): number {
-  return mission.scoreBreakdown?.total ?? mission.score ?? 0;
+  return getCanonicalMissionScore(mission) ?? 0;
 }
 
 function getScoreBucket(score: number): ScoreBucket {
@@ -578,7 +579,7 @@ export function createFeedPageState(
         {
           id: 'priority',
           label: 'Prioritaires',
-          description: 'Score 80+',
+          description: 'Note A',
           count: priorityPresetCount,
           active: decisionPreset === 'priority',
         },

@@ -3,6 +3,7 @@
   import type { Mission } from '$lib/core/types/mission';
   import type { ApplicationStatus } from '$lib/core/types/tracking';
   import { STATUS_LABELS } from '$lib/core/types/tracking';
+  import { getMissionGrade, getMissionScore } from '$lib/core/scoring/mission-grade';
   import { scoreToGrade } from '$lib/core/types/score';
   import { formatTJM } from '$lib/core/utils/format';
   import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
@@ -57,7 +58,8 @@
     icon: IconName;
   };
 
-  const score = $derived(mission.scoreBreakdown?.total ?? mission.score ?? 0);
+  const score = $derived(getMissionScore(mission) ?? 0);
+  const missionGrade = $derived(getMissionGrade(mission));
   const criteria = $derived(mission.scoreBreakdown?.criteria ?? null);
   const formattedStartDate = $derived(formatMissionDate(mission.startDate));
   const formattedPublishedAt = $derived(formatMissionDate(mission.publishedAt));
@@ -86,8 +88,8 @@
   ]);
   const storyEvidence = $derived<OperationalEvidence[]>([
     {
-      label: 'Score',
-      value: score,
+      label: 'Note',
+      value: missionGrade ?? 'Non notée',
       icon: 'target',
       severity: score >= 80 ? 'success' : score >= 60 ? 'attention' : 'neutral',
     },
@@ -112,7 +114,7 @@
         statusLabel: 'Prioritaire',
         title: 'Cette mission mérite une qualification rapide',
         description:
-          'Le score global indique un bon alignement. Vérifiez les points faibles ci-dessous avant de postuler.',
+          'La note globale indique un bon alignement. Vérifiez les points faibles ci-dessous avant de postuler.',
       };
     }
 
@@ -421,16 +423,16 @@
                 class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2"
               >
                 <summary class="cursor-pointer text-body-lg font-semibold text-blueprint-blue">
-                  Pourquoi ce score ?
+                  Pourquoi cette note ?
                 </summary>
                 <p class="mt-2 text-body-lg leading-6 text-text-secondary">
-                  Score final {mission.scoreBreakdown?.total ?? score}/100, calculé depuis le
-                  profil, l’annonce et les critères ci-dessous.
+                  Note finale {missionGrade ?? 'non notée'}, calculée depuis le profil, l’annonce et
+                  les critères ci-dessous.
                 </p>
                 {#if mission.scoreBreakdown}
                   <p class="mt-2 text-meta leading-5 text-text-subtle">
-                    Base de score {mission.scoreBreakdown.deterministic}/100. L’analyse locale,
-                    quand elle existe, ajoute une hypothèse non bloquante.
+                    Note de base {scoreToGrade(mission.scoreBreakdown.deterministic)}. L’analyse
+                    locale, quand elle existe, ajoute une hypothèse non bloquante.
                   </p>
                   {#if mission.scoreBreakdown.semanticReason}
                     <p class="mt-2 text-meta leading-5 text-blueprint-blue">
@@ -439,9 +441,7 @@
                   {/if}
                 {/if}
               </details>
-              <h3 class="mt-5 text-subheading font-semibold text-text-primary">
-                Score par critère
-              </h3>
+              <h3 class="mt-5 text-subheading font-semibold text-text-primary">Note par critère</h3>
               <div class="mt-3 grid gap-2 sm:grid-cols-2">
                 {#each scoreLines as line, i (i)}
                   {@const grade = scoreToGrade(line.value)}
@@ -450,7 +450,7 @@
                   >
                     <span class="text-body-lg text-text-subtle">{line.label}</span>
                     <span class="font-mono text-body-lg font-semibold text-text-primary">
-                      {grade} · {line.value}
+                      {grade}
                     </span>
                   </div>
                 {/each}

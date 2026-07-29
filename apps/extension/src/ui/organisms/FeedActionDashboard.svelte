@@ -55,11 +55,14 @@
     severity: 'success' | 'attention' | 'neutral';
   };
 
-  function bucketRange(bucket: ScoreBucketSummary): string {
-    if (bucket.max === null) {
-      return `${bucket.min}+`;
+  function bucketGrades(bucket: ScoreBucket): string {
+    if (bucket === 'strong') {
+      return 'A';
     }
-    return `${bucket.min}-${bucket.max}`;
+    if (bucket === 'good') {
+      return 'B';
+    }
+    return 'C–F';
   }
 
   function toggleBucket(bucket: ScoreBucket): void {
@@ -105,11 +108,11 @@
       label: 'Analyse locale',
       value: insightSummary.semanticAnalyzedCount,
       icon: 'sparkles',
-      stateLabel: insightSummary.semanticAnalyzedCount > 0 ? 'Score enrichi' : 'Inactive',
+      stateLabel: insightSummary.semanticAnalyzedCount > 0 ? 'Note enrichie' : 'Inactive',
       hint:
         insightSummary.semanticAnalyzedCount > 0
-          ? 'Lire les raisons de score.'
-          : 'Pulse utilise le score de base.',
+          ? 'Lire les raisons de la note.'
+          : 'Pulse utilise la note de base.',
       severity: insightSummary.semanticAnalyzedCount > 0 ? 'success' : 'neutral',
     },
   ]);
@@ -147,7 +150,7 @@
     >
       <span class="flex items-center gap-1 text-micro uppercase tracking-[0.14em] text-text-muted">
         <Icon name="target" size={11} />
-        80+
+        Note A
       </span>
       <span class="mt-1 block text-heading font-semibold tabular-nums text-text-primary">
         {summary.highScoreCount}
@@ -184,10 +187,10 @@
     </div>
   </div>
 
-  <div class="mt-3" aria-label="Distribution des missions par score">
+  <div class="mt-3" aria-label="Distribution des missions par note">
     <div class="mb-1.5 flex items-center justify-between gap-3">
       <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
-        Score des missions
+        Notes des missions
       </p>
       <p class="text-micro text-text-muted">{summary.visibleCount} visibles</p>
     </div>
@@ -205,7 +208,7 @@
                 : 'opacity-100'}"
               style:width="{width}%"
               onclick={() => toggleBucket(bucket.bucket)}
-              aria-label={`${bucket.label}: ${bucket.count} missions, score ${bucketRange(bucket)}`}
+              aria-label={`${bucket.label}: ${bucket.count} missions, note ${bucketGrades(bucket.bucket)}`}
               aria-pressed={selectedScoreBucket === bucket.bucket}
               title={`${bucket.label}: ${bucket.count} missions`}
             ></button>
@@ -231,7 +234,7 @@
               ]}"
             >
               {bucket.count}
-              <span class="font-normal text-text-muted"> · {bucketRange(bucket)}</span>
+              <span class="font-normal text-text-muted"> · {bucketGrades(bucket.bucket)}</span>
             </span>
           </button>
         {/each}
@@ -240,7 +243,7 @@
       <div
         class="rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-meta text-text-muted"
       >
-        Aucun score disponible avec les filtres actuels.
+        Aucune note disponible avec les filtres actuels.
       </div>
     {/if}
   </div>

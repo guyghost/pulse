@@ -12,6 +12,7 @@
   } from '$lib/core/types/alert-preferences';
   import { REMOTE_OPTIONS as workModeOptions } from '../constants/remote-options';
   import { LOCATION_LABELS } from '$lib/core/locations/location-catalog';
+  import { scoreToGrade } from '$lib/core/types/score';
 
   type OnboardingStepId = 'understand' | 'source' | 'activity' | 'alert' | 'insight';
 
@@ -69,6 +70,7 @@
   let loadedAlertRevision = $state(-1);
 
   const selectedSource = $derived(sources.find((source) => source.id === selectedSourceId) ?? null);
+  const alertThresholdGrade = $derived(scoreToGrade(alertThreshold));
 
   const onboardingSteps: OnboardingStep[] = [
     {
@@ -322,7 +324,7 @@
       <div class="mt-3 space-y-2">
         <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
           <p class="text-meta font-medium text-text-primary">Mission prioritaire détectée</p>
-          <p class="mt-0.5 text-caption text-text-subtle">Score 86, stack forte, TJM compatible.</p>
+          <p class="mt-0.5 text-caption text-text-subtle">Note A, stack forte, TJM compatible.</p>
         </div>
         <div class="rounded-lg border border-status-orange/20 bg-status-orange/8 px-3 py-2">
           <p class="text-meta font-medium text-status-orange">Source à vérifier</p>
@@ -346,7 +348,7 @@
         Alerte prioritaire
       </label>
       <p class="mt-1 text-meta leading-5 text-text-subtle">
-        Les missions au-dessus de ce score doivent apparaître comme action à traiter.
+        Les missions qui atteignent cette note doivent apparaître comme action à traiter.
       </p>
       <div class="mt-3 flex items-center gap-3">
         <input
@@ -357,11 +359,10 @@
           step="5"
           class="flex-1"
           bind:value={alertThreshold}
+          aria-valuetext={`Note ${alertThresholdGrade}`}
         />
-        <span
-          class="w-12 text-right font-mono text-body-lg font-semibold tabular-nums text-text-primary"
-        >
-          {alertThreshold}+
+        <span class="w-12 text-right font-mono text-body-lg font-semibold text-text-primary">
+          {alertThresholdGrade}
         </span>
       </div>
       <button
@@ -387,7 +388,7 @@
             Action recommandée après le scan
           </p>
           <p class="mt-1 text-meta leading-5 text-text-subtle">
-            Commencer par les missions {alertThreshold}+ issues de {selectedSource?.name ??
+            Commencer par les missions notées {alertThresholdGrade} issues de {selectedSource?.name ??
               'la source choisie'}, puis vérifier les sources qui n’ont rien remonté.
           </p>
         </div>

@@ -374,7 +374,7 @@
         Soyez alerté·e
       </h2>
       <p class="mt-2 text-sm text-text-secondary">
-        Recevez une notification Chrome quand une mission à haut score correspond à votre profil.
+        Recevez une notification Chrome quand une mission notée A correspond à votre profil.
       </p>
 
       <div class="mt-5 rounded-2xl border border-border-light bg-surface-white p-4">
@@ -432,7 +432,7 @@
     <p class="mt-2 max-w-xs text-sm text-text-secondary">
       {scanningPartial
         ? 'Profil partiel — on lance quand même un scan par défaut pour vous montrer la valeur.'
-        : 'Pulse récupère et score vos missions. Cela prend quelques secondes.'}
+        : 'Pulse récupère et note vos missions. Cela prend quelques secondes.'}
     </p>
   </section>
 {:else if snapshot.phase === 'completed'}

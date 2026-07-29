@@ -32,7 +32,8 @@
   import { buildFeedStory } from '$lib/core/feed/build-feed-story';
   import SearchInput from '../molecules/SearchInput.svelte';
   import { Icon, type IconName } from '@pulse/ui';
-  import type { MissionSource } from '$lib/core/types/mission';
+  import type { Mission, MissionSource } from '$lib/core/types/mission';
+  import { getMissionScore as getCanonicalMissionScore } from '$lib/core/scoring/mission-grade';
   import type { FeedTourStep } from '../molecules/FeedTourOverlay.svelte';
   import OperationalStoryCard from '../molecules/OperationalStoryCard.svelte';
   import Tooltip from '../atoms/Tooltip.svelte';
@@ -352,7 +353,7 @@
       id: 'score',
       title: 'La pertinence en premier',
       description:
-        'Chaque mission affiche un score pour vous aider à repérer rapidement les opportunités les plus prometteuses.',
+        'Chaque mission affiche une note pour vous aider à repérer rapidement les opportunités les plus prometteuses.',
     },
     {
       id: 'filters',
@@ -391,11 +392,8 @@
       }));
   });
 
-  function getMissionScore(mission: {
-    scoreBreakdown?: { total?: number } | null;
-    score?: number | null;
-  }): number {
-    return mission.scoreBreakdown?.total ?? mission.score ?? 0;
+  function getMissionScore(mission: Mission): number {
+    return getCanonicalMissionScore(mission) ?? 0;
   }
 
   function missionMatchesAlert(

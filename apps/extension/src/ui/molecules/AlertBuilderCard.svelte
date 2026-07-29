@@ -4,6 +4,7 @@
   import type { ConnectedAlertPreferences } from '$lib/core/types/alert-preferences';
   import type { AlertHistoryEntry } from '$lib/core/types/alert-history';
   import { summarizeSmartNotificationPreview } from '$lib/core/scoring/smart-notification';
+  import { scoreToGrade } from '$lib/core/types/score';
   import { formatTJMValue } from '$lib/core/utils/format';
   import OperationalStatusBadge from '../atoms/OperationalStatusBadge.svelte';
 
@@ -61,7 +62,7 @@
       ? 'Désactivée'
       : isMuteActive
         ? 'En pause'
-        : `${scoreThreshold}+${minDailyRate > 0 ? ` · ${formatTJMValue(minDailyRate)}/j min` : ''}`
+        : `Note ${scoreToGrade(scoreThreshold)}${minDailyRate > 0 ? ` · ${formatTJMValue(minDailyRate)}/j min` : ''}`
   );
 
   const suggestedStacks = $derived(
@@ -157,7 +158,7 @@
   }
 
   function formatAlertHistoryCriteria(entry: AlertHistoryEntry): string {
-    const criteria = [`Score ${entry.scoreThreshold}+`];
+    const criteria = [`Note ${scoreToGrade(entry.scoreThreshold)}`];
 
     if (entry.minDailyRate > 0) {
       criteria.push(`${formatTJMValue(entry.minDailyRate)}/j min`);
@@ -293,10 +294,10 @@
     <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-3">
       <div class="flex items-center justify-between gap-3">
         <label for="alert-score" class="text-meta font-medium text-text-primary"
-          >Score minimum</label
+          >Note minimale</label
         >
-        <span class="font-mono text-body-lg font-semibold tabular-nums text-text-primary">
-          {scoreThreshold}+
+        <span class="font-mono text-body-lg font-semibold text-text-primary">
+          {scoreToGrade(scoreThreshold)}
         </span>
       </div>
       <input
@@ -306,6 +307,7 @@
         max="95"
         step="5"
         bind:value={scoreThreshold}
+        aria-valuetext={`Note ${scoreToGrade(scoreThreshold)}`}
         class="mt-3 w-full"
       />
     </div>

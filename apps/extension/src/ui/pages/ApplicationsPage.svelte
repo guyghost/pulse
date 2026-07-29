@@ -1,6 +1,7 @@
 <script lang="ts">
   import { Icon, type IconName } from '@pulse/ui';
   import type { Mission } from '$lib/core/types/mission';
+  import { getMissionGrade } from '$lib/core/scoring/mission-grade';
   import type { GeneratedAsset, GenerationType } from '$lib/core/types/generation';
   import { GENERATION_TYPE_ICONS, GENERATION_TYPE_LABELS } from '$lib/core/types/generation';
   import type {
@@ -258,8 +259,8 @@
     return Number.isFinite(timestamp) ? timestamp : Number.POSITIVE_INFINITY;
   }
 
-  function getMissionScore(mission: Mission): number {
-    return mission.scoreBreakdown?.total ?? mission.score ?? 0;
+  function formatMissionGrade(mission: Mission): string {
+    return getMissionGrade(mission) ?? '—';
   }
 
   function formatMissionMeta(mission: Mission): string {
@@ -717,7 +718,7 @@
                   </p>
                 </div>
                 <span class="shrink-0 text-meta font-semibold text-blueprint-blue">
-                  {getMissionScore(item.mission)}
+                  {formatMissionGrade(item.mission)}
                 </span>
               </div>
               <div class="mt-2 flex items-center justify-between gap-2">

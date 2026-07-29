@@ -7,7 +7,7 @@
  * facts into copy, tone, and evidence rows for the transient completion card.
  *
  * Core rules respected: no I/O, no async, no Date, no randomness, no console.
- * Inputs are clamped defensively to non-negative integers.
+ * Count inputs are clamped defensively to non-negative integers.
  *
  * Model: src/models/scan-completion-delight.model.md
  */
@@ -36,7 +36,7 @@ export interface ScanSummaryInput {
   readonly highScoreCount: number;
   /** Sources in error after the scan (>0 means partial completion). */
   readonly brokenConnectorCount: number;
-  /** Alert threshold, used to label the priority row ("Prioritaires N+"). */
+  /** Internal alert threshold, retained for projection input compatibility. */
   readonly alertScoreThreshold: number;
 }
 
@@ -48,15 +48,10 @@ function plural(n: number): string {
   return n > 1 ? 's' : '';
 }
 
-function priorityLabel(threshold: number): string {
-  return threshold > 0 ? `Prioritaires ${threshold}+` : 'Prioritaires';
-}
-
 export function buildScanSummary(input: ScanSummaryInput): ScanSummary {
   const newCount = clampCount(input.newCount);
   const highScoreCount = clampCount(input.highScoreCount);
   const brokenConnectorCount = clampCount(input.brokenConnectorCount);
-  const threshold = clampCount(input.alertScoreThreshold);
 
   const hasSignal = newCount > 0 || highScoreCount > 0;
   const isPartial = brokenConnectorCount > 0;
@@ -76,7 +71,7 @@ export function buildScanSummary(input: ScanSummaryInput): ScanSummary {
 
   const evidence: ScanSummaryEvidence[] = [{ label: 'Nouvelles', value: newCount, tone: 'accent' }];
   if (highScoreCount > 0) {
-    evidence.push({ label: priorityLabel(threshold), value: highScoreCount, tone: 'success' });
+    evidence.push({ label: 'Prioritaires', value: highScoreCount, tone: 'success' });
   }
   if (isPartial) {
     evidence.push({ label: 'Sources à vérifier', value: brokenConnectorCount, tone: 'critical' });
@@ -86,9 +81,7 @@ export function buildScanSummary(input: ScanSummaryInput): ScanSummary {
   if (isPartial) {
     caption = `${brokenConnectorCount} source${plural(brokenConnectorCount)} à vérifier`;
   } else if (highScoreCount > 0) {
-    caption = `${highScoreCount} mission${plural(highScoreCount)} prioritaire${plural(highScoreCount)}${
-      threshold > 0 ? ` (${threshold}+)` : ''
-    }`;
+    caption = `${highScoreCount} mission${plural(highScoreCount)} prioritaire${plural(highScoreCount)}`;
   } else {
     caption = `${newCount} nouvelle${plural(newCount)} mission${plural(newCount)}`;
   }

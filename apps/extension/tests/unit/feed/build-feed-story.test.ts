@@ -169,7 +169,8 @@ describe('buildFeedStory', () => {
       expect(result.severity).toBe('success');
       expect(result.statusLabel).toBe('Priorités prêtes');
       expect(result.title).toContain('4 opportunités prioritaires');
-      expect(result.description).toContain('seuil 80+');
+      expect(result.description).toContain('seuil d’alerte');
+      expect(result.description).not.toContain('80+');
       expect(result.primaryActionLabel).toContain('Voir les 4 missions prioritaires');
     });
 
@@ -389,14 +390,15 @@ describe('buildFeedStory', () => {
       expect(result.evidence[2].value).toBe(0);
     });
 
-    it('reflects threshold in Prioritaires label', () => {
+    it('keeps the numeric threshold out of the Prioritaires label', () => {
       const result = buildFeedStory({
         ...DEFAULT_INPUT,
         alertScoreThreshold: 85,
         visibleCount: 5,
       });
 
-      expect(result.evidence[1].label).toBe('Prioritaires 85+');
+      expect(result.evidence[1].label).toBe('Prioritaires');
+      expect(result.evidence[1].label).not.toContain('85');
     });
 
     it('sets attention severity when newCount > 0', () => {

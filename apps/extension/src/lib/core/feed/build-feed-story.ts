@@ -73,7 +73,6 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
     highScoreCount,
     visibleCount,
     alertEnabled,
-    alertScoreThreshold,
     hasCompletedScan,
     filterActive,
     totalMissionCount,
@@ -88,7 +87,7 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
       severity: newCount > 0 ? 'attention' : 'neutral',
     },
     {
-      label: `Prioritaires ${alertScoreThreshold}+`,
+      label: 'Prioritaires',
       value: highScoreCount,
       icon: 'target',
       severity: highScoreCount > 0 ? 'success' : 'neutral',
@@ -169,7 +168,7 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
           : `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} à examiner`,
       description:
         highScoreCount > 0
-          ? `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} au total. Commencez par celles qui dépassent le seuil ${alertScoreThreshold}+.`
+          ? `${newCount} nouvelle${newCount > 1 ? 's' : ''} mission${newCount > 1 ? 's' : ''} au total. Commencez par celles qui dépassent votre seuil d’alerte.`
           : 'Aucune urgence détectée, mais les nouvelles missions méritent une qualification rapide.',
       evidence,
       primaryActionLabel:
@@ -187,7 +186,8 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
       severity: 'success' as const,
       statusLabel: 'Priorités prêtes',
       title: `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prête${highScoreCount > 1 ? 's' : ''}`,
-      description: `Elles dépassent votre seuil ${alertScoreThreshold}+. Comparez-les avant de mettre une mission en suivi.`,
+      description:
+        'Elles dépassent votre seuil d’alerte. Comparez-les avant de mettre une mission en suivi.',
       evidence,
       primaryActionLabel: formatMissionAction(highScoreCount, 'prioritaire', 'prioritaires'),
       primaryActionIcon: 'chevron-down',

@@ -1,4 +1,5 @@
 import type { Mission } from '../types/mission';
+import { getMissionScore } from './mission-grade';
 
 export type MissionSortBy = 'date' | 'score' | 'tjm';
 
@@ -6,9 +7,6 @@ export type MissionSortBy = 'date' | 'score' | 'tjm';
  * Get the best available numeric score for sorting.
  * Uses scoreBreakdown.total if available, falls back to legacy score.
  */
-const getMissionScore = (m: Mission): number =>
-  m.scoreBreakdown?.total ?? m.semanticScore ?? m.score ?? 0;
-
 /**
  * Numeric sort key for one mission under the chosen criterion (descending).
  * Centralized so it is computed exactly once per mission during sorting.
@@ -16,7 +14,7 @@ const getMissionScore = (m: Mission): number =>
 const sortKey = (m: Mission, sortBy: MissionSortBy): number => {
   switch (sortBy) {
     case 'score':
-      return getMissionScore(m);
+      return getMissionScore(m) ?? 0;
     case 'tjm':
       return m.tjm ?? 0;
     case 'date':

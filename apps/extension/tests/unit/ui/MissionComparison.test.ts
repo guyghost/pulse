@@ -70,12 +70,12 @@ function mountComparison(missions: Mission[]): HTMLDivElement {
   return target;
 }
 
-describe('MissionComparison score', () => {
+describe('MissionComparison grade', () => {
   beforeEach(() => {
     document.body.innerHTML = '';
   });
 
-  it('uses the same fused score in the table and the recommendation', async () => {
+  it('uses the same fused grade in the table and the recommendation', async () => {
     // Both missions carry a semanticScore that diverges from breakdown.total.
     // Recommended mission A: fused total = 85, legacy semantic = 78.
     const missions = [
@@ -98,13 +98,17 @@ describe('MissionComparison score', () => {
     mountComparison(missions);
     await tick();
 
-    // The canonical fused score (85) must render in BOTH the recommendation
+    // The canonical fused total (85) projects to A in BOTH the recommendation
     // evidence and the comparison table cell for the recommended mission.
-    const occurrences = document.body.textContent?.match(/85\/100/g) ?? [];
-    expect(occurrences.length).toBeGreaterThanOrEqual(2);
+    const gradeOccurrences = [...document.body.querySelectorAll('span, div')].filter(
+      (element) => element.textContent?.trim() === 'A'
+    );
+    expect(gradeOccurrences.length).toBeGreaterThanOrEqual(2);
 
-    // The divergent legacy semantic score must never be shown as a score cell.
+    // Numeric scores, including the divergent legacy semantic score, stay internal.
+    expect(document.body.textContent).not.toContain('85/100');
     expect(document.body.textContent).not.toContain('78/100');
+    expect(document.body.textContent).not.toContain('12/100');
   });
 
   it('ranks the recommendation by the fused total', async () => {

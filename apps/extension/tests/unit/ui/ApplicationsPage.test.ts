@@ -139,6 +139,20 @@ describe('ApplicationsPage next-action toast', () => {
     expect(target.textContent).toContain('Analyse contextualisée Premium');
   });
 
+  it('affiche uniquement la note alphabétique de la mission dans la liste', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(ApplicationsPage, { target });
+    await tick();
+    await flush();
+
+    const missionButton = [...target.querySelectorAll('button')].find((button) =>
+      button.textContent?.includes('Mission Svelte')
+    );
+    expect(missionButton?.textContent).toContain('A');
+    expect(missionButton?.textContent).not.toMatch(/\b80\b/);
+  });
+
   it('keeps load failure distinct from a successful empty pipeline', async () => {
     sendMessage.mockImplementation((message: { type: string }) => {
       if (message.type === 'GET_TRACKINGS') {

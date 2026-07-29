@@ -86,4 +86,19 @@ describe('MissionInvestigationDrawer modal focus', () => {
     expect(onClose).toHaveBeenCalledTimes(1);
     expect(document.activeElement).toBe(trigger);
   });
+
+  it('présente la mission avec une note alphabétique sans score brut', async () => {
+    const target = document.createElement('div');
+    document.body.appendChild(target);
+    mount(MissionInvestigationDrawer, {
+      target,
+      props: { mission, onClose: () => {} },
+    });
+    await tick();
+
+    expect(document.body.textContent).toContain('Note');
+    expect(document.body.textContent).toContain('A');
+    expect(document.body.textContent).not.toMatch(/\b90\b/);
+    expect(document.body.textContent).not.toContain('/100');
+  });
 });

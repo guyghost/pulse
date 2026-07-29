@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
+  import { getMissionGrade, getMissionScore } from '$lib/core/scoring/mission-grade';
   import { formatTJM } from '$lib/core/utils/format';
   import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
   import { Icon } from '@pulse/ui';
@@ -32,23 +33,12 @@
     onsite: 'Sur site',
   };
 
-  /**
-   * Single source of truth for a mission's score across the comparison
-   * (table cell, ranking and recommendation evidence). Prefers the fused
-   * breakdown.total and only falls back to legacy semantic/score when no
-   * breakdown exists — matching sort-missions.ts so the table can never
-   * diverge from the ranking/recommendation.
-   */
-  function getMissionScore(mission: Mission): number {
-    return mission.scoreBreakdown?.total ?? mission.semanticScore ?? mission.score ?? 0;
-  }
-
   // High-signal fields — always visible (collapsed default view)
   const primaryFields: { label: string; key: string; render: (m: Mission) => string }[] = [
     {
-      label: 'Score',
+      label: 'Note',
       key: 'score',
-      render: (m) => `${getMissionScore(m)}/100`,
+      render: (m) => getMissionGrade(m) ?? '—',
     },
     { label: 'TJM', key: 'tjm', render: (m) => (m.tjm ? formatTJM(m.tjm) : '—') },
   ];
@@ -69,13 +59,17 @@
   ];
 
   const rankedMissions = $derived(
-    [...missions].sort((a, b) => getMissionScore(b) - getMissionScore(a))
+    [...missions].sort((a, b) => (getMissionScore(b) ?? 0) - (getMissionScore(a) ?? 0))
   );
   const recommendedMission = $derived(rankedMissions[0] ?? null);
   const runnerUpMission = $derived(rankedMissions[1] ?? null);
+  const recommendedGrade = $derived(
+    recommendedMission ? getMissionGrade(recommendedMission) : null
+  );
+  const runnerUpGrade = $derived(runnerUpMission ? getMissionGrade(runnerUpMission) : null);
   const scoreGap = $derived(
     recommendedMission && runnerUpMission
-      ? getMissionScore(recommendedMission) - getMissionScore(runnerUpMission)
+      ? (getMissionScore(recommendedMission) ?? 0) - (getMissionScore(runnerUpMission) ?? 0)
       : 0
   );
   const bestTjmMission = $derived(
@@ -93,15 +87,15 @@
       return 'Sélectionnez au moins deux missions pour obtenir une recommandation.';
     }
 
-    if (scoreGap >= 10) {
-      return `${recommendedMission.title} devance la suivante de ${scoreGap} points. La prochaine action est d’ouvrir cette mission ou de la mettre en suivi.`;
+    if (recommendedGrade !== null && recommendedGrade !== runnerUpGrade) {
+      return `${recommendedMission.title} obtient une meilleure note que la suivante. La prochaine action est d’ouvrir cette mission ou de la mettre en suivi.`;
     }
 
     if (scoreGap > 0) {
-      return `Les scores sont proches: ${scoreGap} point${scoreGap > 1 ? 's' : ''} d’écart. Départagez avec le TJM, le remote et la source avant de postuler.`;
+      return 'Les missions partagent la même note. Départagez-les avec le TJM, le remote et la source avant de postuler.';
     }
 
-    return 'Les scores sont à égalité. Utilisez le TJM, le remote et le client pour trancher.';
+    return 'Les notes sont à égalité. Utilisez le TJM, le remote et le client pour trancher.';
   });
 
   /**
@@ -120,8 +114,8 @@
     }
     return [
       {
-        label: 'Score',
-        value: `${getMissionScore(recommendedMission)}/100`,
+        label: 'Note',
+        value: getMissionGrade(recommendedMission) ?? 'Non notée',
       },
     ];
   });

@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getMissionScore } from '$lib/core/scoring/mission-grade';
   import type { Mission } from '$lib/core/types/mission';
   import MissionCard from '../molecules/MissionCard.svelte';
   import { Skeleton } from '@pulse/ui';
@@ -59,7 +60,7 @@
       if (sortBy === 'tjm') {
         return (b.tjm ?? 0) - (a.tjm ?? 0);
       }
-      return (b.score ?? 0) - (a.score ?? 0);
+      return (getMissionScore(b) ?? 0) - (getMissionScore(a) ?? 0);
     });
   });
 

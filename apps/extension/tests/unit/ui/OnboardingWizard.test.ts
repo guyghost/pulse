@@ -73,6 +73,9 @@ describe('OnboardingWizard', () => {
     await tick();
     expect(target.textContent).toContain('Créer une alerte');
     expect(target.textContent).toContain('4/5');
+    expect(target.querySelector('[aria-valuetext="Note B"]')).not.toBeNull();
+    expect(target.textContent).toMatch(/\bB\b/);
+    expect(target.textContent).not.toMatch(/\b70\+/);
 
     clickButton(target, 'Voir le premier insight');
     await flushAsyncStep();

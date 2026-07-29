@@ -6,6 +6,7 @@
   import { STATUS_LABELS, STATUS_VARIANTS, VALID_TRANSITIONS } from '$lib/core/types/tracking';
   import { Badge } from '@pulse/ui';
   import { Icon } from '@pulse/ui';
+  import { getMissionGrade, getMissionScore } from '$lib/core/scoring/mission-grade';
   import { scoreToGrade } from '$lib/core/types/score';
   import { formatTJM, formatTJMValue, formatTimestamp } from '$lib/core/utils/format';
   import { onVisible as onVisibleAction } from '../actions/on-visible';
@@ -77,10 +78,8 @@
   );
   const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
 
-  const scoreValue = $derived(mission.scoreBreakdown?.total ?? mission.score ?? 0);
-  const scoreDisplayValue = $derived(
-    mission.scoreBreakdown?.total ?? mission.score ?? mission.semanticScore
-  );
+  const scoreValue = $derived(getMissionScore(mission) ?? 0);
+  const missionGrade = $derived(getMissionGrade(mission));
   const semanticDisplayValue = $derived(mission.scoreBreakdown?.semantic ?? mission.semanticScore);
   const semanticReason = $derived(mission.scoreBreakdown?.semanticReason ?? mission.semanticReason);
   const hasScoreDetails = $derived(
@@ -117,8 +116,8 @@
         label: 'Action recommandée',
         text:
           mission.tjm !== null
-            ? `À examiner en premier : score fort et TJM ${formatTJM(mission.tjm, { fallback: 'non précisé' })}.`
-            : 'À examiner en premier : score fort, TJM à vérifier dans l’annonce.',
+            ? `À examiner en premier : note A et TJM ${formatTJM(mission.tjm, { fallback: 'non précisé' })}.`
+            : 'À examiner en premier : note A, TJM à vérifier dans l’annonce.',
         tone: 'border-accent-green/20 bg-accent-green/10 text-text-primary',
       };
     }
@@ -134,7 +133,7 @@
     if (scoreValue >= 60) {
       return {
         label: 'À comparer',
-        text: 'Potentiel correct : comparez avec les missions 80+ avant de postuler.',
+        text: 'Potentiel correct : comparez avec les missions notées A avant de postuler.',
         tone: 'border-status-yellow/30 bg-status-yellow/12 text-text-primary',
       };
     }
@@ -149,9 +148,9 @@
   // Tier hue carried by the background tint; glyph stays neutral for WCAG AA.
   // Low tier is intentionally de-emphasized (subtle text on a calm neutral block).
   const scoreColor = $derived(
-    scoreValue >= 80
+    missionGrade === 'A'
       ? 'text-text-primary bg-accent-green/15'
-      : scoreValue >= 50
+      : missionGrade === 'B'
         ? 'text-text-primary bg-accent-amber/15'
         : 'text-text-subtle bg-subtle-gray'
   );
@@ -298,17 +297,16 @@
       {/if}
     </div>
     <div class="flex shrink-0 items-center gap-2">
-      {#if scoreDisplayValue !== null && scoreDisplayValue !== undefined}
+      {#if missionGrade !== null}
         <span
-          class="inline-flex min-w-[3.5rem] items-baseline justify-center gap-0.5 rounded-lg px-2 py-1 text-center font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
+          class="inline-flex min-w-9 items-center justify-center rounded-lg px-2 py-1 text-center font-mono font-bold leading-none {scoreColor} {tourHighlight ===
           'score'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
-          aria-label={`Score ${scoreDisplayValue} sur 100${mission.scoreBreakdown ? `, grade ${mission.scoreBreakdown.grade}` : ''}`}
-          title={mission.scoreBreakdown ? `Grade ${mission.scoreBreakdown.grade}` : undefined}
+          aria-label={`Note ${missionGrade}`}
+          title={`Note ${missionGrade}`}
         >
-          <span class="text-body">{scoreDisplayValue}</span>
-          <span class="text-micro font-medium opacity-70">/100</span>
+          <span class="text-body">{missionGrade}</span>
         </span>
       {/if}
       <button
@@ -369,7 +367,7 @@
       aria-controls={scoreDetailsId}
     >
       <Icon name="help-circle" size={13} />
-      <span>Pourquoi ce score ?</span>
+      <span>Pourquoi cette note ?</span>
       <Icon
         name="chevron-down"
         size={12}
@@ -387,12 +385,12 @@
       <div class="flex items-start justify-between gap-3">
         <div>
           <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
-            Score expliqué
+            Note expliquée
           </p>
           <p class="mt-1 text-caption leading-4 text-text-secondary">
-            {#if scoreDisplayValue !== null}
-              Score final {scoreDisplayValue}/100, calculé depuis le profil, l’annonce et les
-              critères disponibles.
+            {#if missionGrade !== null}
+              Note finale {missionGrade}, calculée depuis le profil, l’annonce et les critères
+              disponibles.
             {:else}
               L’explication disponible vient de l’analyse locale conservée sur l’appareil.
             {/if}
@@ -402,7 +400,7 @@
           <span
             class="shrink-0 rounded-md bg-surface-white px-2 py-1 font-mono text-micro font-semibold text-text-primary"
           >
-            Base {mission.scoreBreakdown.deterministic}
+            Base {scoreToGrade(mission.scoreBreakdown.deterministic)}
           </span>
         {/if}
       </div>
@@ -452,7 +450,7 @@
         </div>
       {:else}
         <p class="mt-3 rounded-md bg-surface-white px-3 py-2 text-micro leading-4 text-text-subtle">
-          Score historique conservé sans détail par critère. Relancez un scan pour reconstruire les
+          Note historique conservée sans détail par critère. Relancez un scan pour reconstruire les
           critères stack, TJM, localisation et remote.
         </p>
       {/if}

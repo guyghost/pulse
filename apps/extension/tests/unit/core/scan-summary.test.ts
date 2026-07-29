@@ -12,10 +12,10 @@ describe('buildScanSummary', () => {
 
     expect(summary.tone).toBe('nominal');
     expect(summary.headline).toBe('Scan terminé');
-    expect(summary.caption).toBe('1 mission prioritaire (80+)');
+    expect(summary.caption).toBe('1 mission prioritaire');
     expect(summary.evidence).toEqual([
       { label: 'Nouvelles', value: 3, tone: 'accent' },
-      { label: 'Prioritaires 80+', value: 1, tone: 'success' },
+      { label: 'Prioritaires', value: 1, tone: 'success' },
     ]);
   });
 
@@ -95,21 +95,23 @@ describe('buildScanSummary', () => {
     expect(summary.evidence).toEqual([]);
   });
 
-  it('uses the bare "Prioritaires" label when the threshold is 0', () => {
+  it('never interpolates the internal threshold in visible copy', () => {
     const summary = buildScanSummary({
       newCount: 1,
       highScoreCount: 2,
       brokenConnectorCount: 0,
-      alertScoreThreshold: 0,
+      alertScoreThreshold: 80,
     });
 
     expect(summary.tone).toBe('nominal');
     expect(summary.caption).toBe('2 missions prioritaires');
+    expect(summary.caption).not.toContain('80');
     expect(summary.evidence).toContainEqual({
       label: 'Prioritaires',
       value: 2,
       tone: 'success',
     });
+    expect(summary.evidence.map(({ label }) => label).join(' ')).not.toContain('80');
   });
 
   it('omits the priority row when highScoreCount is 0 even if threshold is set', () => {

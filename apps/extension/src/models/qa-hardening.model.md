@@ -63,15 +63,18 @@
 
 ## 3. Présentation du score
 
-Le score principal est toujours le total numérique `0–100`.
-`scoreBreakdown.grade` est une métadonnée secondaire facultative.
+Le score numérique `0–100` reste la donnée métier interne. La présentation
+principale d'une mission est toujours la note alphabétique dérivée de ce total,
+conformément à `mission-grade-presentation.model.md`.
 
 Invariants :
 
-- avant et après rescoring, la même mission garde le format principal `N/100` ;
-- un grade ne remplace jamais le total ;
-- le détail, le tri et le badge utilisent le même total canonique ;
-- l'absence de breakdown utilise le score legacy sans changer la forme.
+- avant et après rescoring, une mission présente uniquement une lettre ;
+- le total numérique reste disponible pour le calcul, le tri et les seuils ;
+- le détail, le tri et le badge utilisent la même source canonique ;
+- l'absence de breakdown utilise les champs legacy sans afficher leur valeur
+  numérique ;
+- une mission sans score reste non notée et n'est pas convertie en `F`.
 
 ## 4. Sémantique et accessibilité des pages
 

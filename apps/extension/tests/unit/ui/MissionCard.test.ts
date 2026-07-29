@@ -21,7 +21,7 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
     seniority: 'senior',
     scoreBreakdown: null,
     score: 85,
-    semanticScore: 72,
+    semanticScore: null,
     semanticReason: 'Stack correspondant',
     ...overrides,
   };
@@ -246,24 +246,40 @@ describe('MissionCard', () => {
     expect(target.querySelector('button[aria-label="Retirer la mission des favoris"]')).toBeNull();
   });
 
-  it('affiche le score avec la bonne couleur pour score >= 80', async () => {
+  it('affiche la note A avec la couleur prioritaire', async () => {
     const target = mountCard({ mission: makeMission({ score: 85 }) });
     await tick();
     const scoreEl = target.querySelector('.font-mono.font-bold');
     expect(scoreEl).not.toBeNull();
-    expect(scoreEl!.textContent).toContain('85');
+    expect(scoreEl!.textContent?.trim()).toBe('A');
+    expect(scoreEl!.getAttribute('aria-label')).toBe('Note A');
     expect(scoreEl!.className).toContain('text-text-primary');
     expect(scoreEl!.className).toContain('bg-accent-green/15');
   });
 
-  it('affiche le score avec la bonne couleur pour score entre 50 et 79', async () => {
+  it('affiche la note B avec la couleur intermédiaire', async () => {
     const target = mountCard({ mission: makeMission({ score: 65 }) });
     await tick();
     const scoreEl = target.querySelector('.font-mono.font-bold');
     expect(scoreEl).not.toBeNull();
-    expect(scoreEl!.textContent).toContain('65');
+    expect(scoreEl!.textContent?.trim()).toBe('B');
+    expect(scoreEl!.getAttribute('aria-label')).toBe('Note B');
     expect(scoreEl!.className).toContain('text-text-primary');
     expect(scoreEl!.className).toContain('bg-accent-amber/15');
+  });
+
+  it("n'assimile pas une mission non notée à une note F", async () => {
+    const target = mountCard({
+      mission: makeMission({
+        scoreBreakdown: null,
+        score: null,
+        semanticScore: null,
+        semanticReason: null,
+      }),
+    });
+    await tick();
+
+    expect(target.querySelector('[aria-label^="Note "]')).toBeNull();
   });
 
   it('affiche le client quand il est present', async () => {
@@ -278,7 +294,7 @@ describe('MissionCard', () => {
     expect(target.textContent).toContain('free-work');
   });
 
-  it('explique le score depuis une disclosure accessible', async () => {
+  it('explique la note depuis une disclosure accessible sans afficher le score numérique', async () => {
     const target = mountCard({
       mission: makeMission({
         score: 82,
@@ -303,26 +319,28 @@ describe('MissionCard', () => {
     });
     await tick();
 
-    const scoreBadge = target.querySelector('[aria-label="Score 82 sur 100, grade A"]');
+    const scoreBadge = target.querySelector('[aria-label="Note A"]');
     expect(scoreBadge).not.toBeNull();
-    expect(scoreBadge?.textContent).toContain('82');
-    expect(scoreBadge?.textContent).toContain('/100');
-    expect(scoreBadge?.textContent).not.toBe('A');
+    expect(scoreBadge?.textContent?.trim()).toBe('A');
+    expect(scoreBadge?.textContent).not.toContain('82');
+    expect(scoreBadge?.textContent).not.toContain('/100');
 
     const detailsButton = target.querySelector(
       'button[aria-controls^="mission-score-details-"]'
     ) as HTMLButtonElement;
     expect(detailsButton).not.toBeNull();
-    expect(detailsButton.textContent).toContain('Pourquoi ce score ?');
+    expect(detailsButton.textContent).toContain('Pourquoi cette note ?');
     expect(detailsButton.getAttribute('aria-expanded')).toBe('false');
-    expect(target.textContent).not.toContain('Score final 82/100');
+    expect(target.textContent).not.toContain('Note finale A');
 
     detailsButton.click();
     await tick();
 
     expect(detailsButton.getAttribute('aria-expanded')).toBe('true');
-    expect(target.textContent).toContain('Score final 82/100');
-    expect(target.textContent).toContain('Base 84');
+    expect(target.textContent).toContain('Note finale A');
+    expect(target.textContent).toContain('Base A');
+    expect(target.textContent).not.toContain('82/100');
+    expect(target.textContent).not.toContain('84');
     expect(target.textContent).toContain('Compétences');
     expect(target.textContent).toContain('IA sémantique');
     expect(target.textContent).toContain('Stack TypeScript très proche du profil');

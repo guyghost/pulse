@@ -41,12 +41,14 @@ interface ScanSummaryInput {
   newCount: number; // missions nouvelles depuis dernier scan
   highScoreCount: number; // missions ≥ seuil d'alerte (alertMatchCount)
   brokenConnectorCount: number; // sources en erreur après scan
-  alertScoreThreshold: number; // seuil d'alerte (pour le label "Prioritaires N+")
+  alertScoreThreshold: number; // seuil interne, jamais interpolé dans la copie
 }
 ```
 
-Toutes les entrées sont **bornées à ≥ 0 et tronquées** (défense en profondeur,
-même si les appelants fournissent déjà des valeurs saines).
+Les trois agrégats de compte sont **bornés à ≥ 0 et tronqués** (défense en
+profondeur, même si les appelants fournissent déjà des valeurs saines). Le
+seuil interne est conservé pour la compatibilité du contrat d'entrée, mais
+n'influence aucune copie visible.
 
 ## Sorties
 
@@ -66,13 +68,11 @@ interface ScanSummaryEvidence {
 
 ### Matrice de copie (FR, sobre)
 
-| Tone    | headline       | caption                                                                                      | evidence                                                                                            |
-| ------- | -------------- | -------------------------------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------- |
-| nominal | `Scan terminé` | high>0 → `{high} mission(s) prioritaire(s) ({thr}+)`<br>sinon `{new} nouvelle(s) mission(s)` | `Nouvelles = new` (accent) ; `Prioritaires {thr}+ = high` (success, si high>0)                      |
-| quiet   | `File à jour`  | `Aucune nouvelle mission depuis le dernier scan.`                                            | _(aucune — minimalisme calme)_                                                                      |
-| partial | `Scan terminé` | `{broken} source(s) à vérifier`                                                              | `Nouvelles = new` ; `Prioritaires {thr}+ = high` (si >0) ; `Sources à vérifier = broken` (critical) |
-
-Label `Prioritaires {thr}+` → `Prioritaires` quand `threshold = 0`.
+| Tone    | headline       | caption                                                                             | evidence                                                                                     |
+| ------- | -------------- | ----------------------------------------------------------------------------------- | -------------------------------------------------------------------------------------------- |
+| nominal | `Scan terminé` | high>0 → `{high} mission(s) prioritaire(s)`<br>sinon `{new} nouvelle(s) mission(s)` | `Nouvelles = new` (accent) ; `Prioritaires = high` (success, si high>0)                      |
+| quiet   | `File à jour`  | `Aucune nouvelle mission depuis le dernier scan.`                                   | _(aucune — minimalisme calme)_                                                               |
+| partial | `Scan terminé` | `{broken} source(s) à vérifier`                                                     | `Nouvelles = new` ; `Prioritaires = high` (si >0) ; `Sources à vérifier = broken` (critical) |
 
 ## Déclencheur (edge)
 
@@ -114,6 +114,9 @@ Label `Prioritaires {thr}+` → `Prioritaires` quand `threshold = 0`.
    les libellés de preuve.
 6. `partial` ne crie pas : l'icône d'en-tête reste calme ; la nuance vit dans
    la preuve `critical` (rouge) + le caption.
+7. Le seuil numérique interne n'est jamais interpolé dans la copie visible.
+   La présentation des notes suit
+   [`mission-grade-presentation.model.md`](./mission-grade-presentation.model.md).
 
 ## Cas de test obligatoires
 
@@ -123,4 +126,4 @@ Label `Prioritaires {thr}+` → `Prioritaires` quand `threshold = 0`.
 - partial avec nouveaux + sources cassées
 - partial silencieux (0 nouveau, sources cassées)
 - bornage des entrées négatives / NaN → 0
-- libellé `Prioritaires` quand `threshold = 0`
+- libellé `Prioritaires` quel que soit le seuil interne
