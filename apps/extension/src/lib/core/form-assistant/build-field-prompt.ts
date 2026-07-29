@@ -1,5 +1,6 @@
 import type { FieldDescriptor, FieldKind } from './types';
 import type { UserProfile } from '../types/profile';
+import { AVAILABILITY_STATUS_LABELS } from '../types/availability';
 
 /** Longueur maximale d'une liste injectée dans le prompt (garde-fou). */
 const MAX_KEYWORDS = 16;
@@ -7,6 +8,23 @@ const MAX_KEYWORDS = 16;
 function joinList(items: readonly string[], max: number): string {
   const slice = items.slice(0, max).filter((item) => item.trim().length > 0);
   return slice.join(', ');
+}
+
+function availabilityLine(profile: UserProfile): string | null {
+  const availability = profile.availability;
+  if (!availability) {
+    return null;
+  }
+  const status = AVAILABILITY_STATUS_LABELS[availability.status];
+  const parts: string[] = [`Statut : ${status}`];
+  if (availability.date) {
+    parts.push(`À partir du : ${availability.date}`);
+  }
+  const note = (availability.note ?? '').trim();
+  if (note) {
+    parts.push(`Note : ${note}`);
+  }
+  return parts.join(' — ');
 }
 
 function profileLine(profile: UserProfile): string {
@@ -27,6 +45,10 @@ function profileLine(profile: UserProfile): string {
   const keywords = joinList(profile.keywords ?? [], MAX_KEYWORDS);
   if (keywords) {
     parts.push(`Compétences : ${keywords}`);
+  }
+  const availability = availabilityLine(profile);
+  if (availability) {
+    parts.push(`Disponibilité : ${availability}`);
   }
   return parts.join('\n');
 }

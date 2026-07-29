@@ -70,9 +70,21 @@ function resolveLabel(el: HTMLElement): string {
   }
   const labelledBy = el.getAttribute('aria-labelledby');
   if (labelledBy) {
-    const labeller = document.getElementById(labelledBy);
-    if (labeller?.textContent) {
-      return trimText(labeller.textContent);
+    // `aria-labelledby` peut référencer plusieurs IDs séparés par des espaces
+    // (ex : "field-label field-hint"). On concatène le texte de chacun.
+    const ids = labelledBy.trim().split(/\s+/);
+    const texts: string[] = [];
+    for (const id of ids) {
+      if (!id) {
+        continue;
+      }
+      const labeller = document.getElementById(id);
+      if (labeller?.textContent) {
+        texts.push(trimText(labeller.textContent));
+      }
+    }
+    if (texts.length > 0) {
+      return trimText(texts.join(' '));
     }
   }
   const wrapping = el.closest('label');
@@ -98,6 +110,15 @@ function resolveRequired(el: HTMLElement): boolean {
 export function detectFieldDescriptor(target: HTMLElement): FieldDescriptor | null {
   const inputType = resolveInputType(target);
   if (!inputType) {
+    return null;
+  }
+  // Champs non modifiables : rien à proposer.
+  if (
+    (target as HTMLInputElement).readOnly ||
+    (target as HTMLInputElement).disabled ||
+    target.getAttribute('aria-readonly') === 'true' ||
+    target.getAttribute('aria-disabled') === 'true'
+  ) {
     return null;
   }
 

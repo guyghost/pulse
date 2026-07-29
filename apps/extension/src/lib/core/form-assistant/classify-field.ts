@@ -19,6 +19,32 @@ interface KindRule {
 }
 
 /**
+ * Marqueurs indiquant un champ d'organisation ou de compte, pour lesquels une
+ * classification "nom de personne" serait une fausse positive. Évalués sur le
+ * texte normalisé (label + placeholder).
+ */
+const ORG_USER_MARKERS: readonly string[] = [
+  'company',
+  'societe',
+  'entreprise',
+  'organisation',
+  'organization',
+  'raison sociale',
+  'username',
+  'utilisateur',
+  'login',
+  'compte',
+  'account',
+  'user name',
+];
+
+const NAME_KINDS: readonly FieldKind[] = ['first-name', 'last-name', 'full-name'];
+
+function isNameKind(kind: FieldKind): boolean {
+  return NAME_KINDS.includes(kind);
+}
+
+/**
  * Règles ordonnées (du plus spécifique au plus générique).
  * L'ordre compte : "nom de famille" doit battre "nom".
  */
@@ -130,9 +156,16 @@ function detectKind(raw: RawFieldInput): FieldKind {
     return 'free-text';
   }
 
+  const isOrgOrUserContext = ORG_USER_MARKERS.some((marker) => text.includes(marker));
+
   for (const rule of KIND_RULES) {
     for (const keyword of rule.keywords) {
       if (text.includes(keyword)) {
+        // Évite de classer un champ d'organisation/compte comme un nom de personne.
+        // Ex : "Nom de l'entreprise", "Username", "Raison sociale".
+        if (isOrgOrUserContext && isNameKind(rule.kind)) {
+          continue;
+        }
         return rule.kind;
       }
     }

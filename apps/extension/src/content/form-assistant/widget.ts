@@ -118,12 +118,18 @@ export class FormAssistWidget {
   }
 
   private handleClick = (event: Event): void => {
-    const target = event.target as HTMLElement;
-    const action = target.dataset.action;
+    const target = event.target as HTMLElement | null;
+    // Les clics peuvent tomber sur un enfant (ex : <span class="mp-dot">) sans
+    // `data-action`. On remonte jusqu'à l'ancêtre portant l'action.
+    const actionable = target?.closest('[data-action]') as HTMLElement | null;
+    if (!actionable) {
+      return;
+    }
+    const action = actionable.dataset.action;
     if (action === 'trigger') {
       this.callbacks.onTrigger();
     } else if (action === 'accept') {
-      const text = target.dataset.text ?? '';
+      const text = actionable.dataset.text ?? '';
       this.callbacks.onAccept(text);
     } else if (action === 'dismiss') {
       this.callbacks.onDismiss();
@@ -135,15 +141,24 @@ export class FormAssistWidget {
     const rect = target.getBoundingClientRect();
     const margin = 8;
     const top = rect.bottom + margin;
-    // Aligné à gauche du champ, replié si débordement à droite.
+    const rootWidth = this.root.offsetWidth || 340;
+    const maxLeft = Math.max(margin, window.innerWidth - rootWidth - margin);
     const preferredLeft = rect.left;
     this.root.style.top = `${Math.round(top)}px`;
-    this.root.style.left = `${Math.round(Math.max(margin, preferredLeft))}px`;
+    this.root.style.left = `${Math.round(Math.min(Math.max(margin, preferredLeft), maxLeft))}px`;
     // Si débordement vertical (champ en bas de page), on passe au-dessus.
     const rootHeight = this.root.offsetHeight || 120;
     if (top + rootHeight > window.innerHeight - margin) {
       this.root.style.top = `${Math.round(Math.max(margin, rect.top - rootHeight - margin))}px`;
     }
+  }
+
+  /**
+   * Indique si un nœud DOM appartient au widget (host ou son shadow tree).
+   * Utilisé par l'orchestrateur pour ignorer les focus/clics internes au widget.
+   */
+  isHostElement(node: Node | null): boolean {
+    return node !== null && this.host.contains(node);
   }
 
   show(target: HTMLElement, state: WidgetViewState): void {

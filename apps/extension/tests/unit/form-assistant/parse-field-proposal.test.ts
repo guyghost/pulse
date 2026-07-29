@@ -29,4 +29,13 @@ describe('parseFieldProposal', () => {
     const raw = 'Bonjour,\n\nJe suis développeur.\nCordialement.';
     expect(parseFieldProposal(raw)?.text).toBe(raw);
   });
+  it('rejette une sentinel "" (quotes vides)', () => {
+    expect(parseFieldProposal('""')).toBeNull();
+    expect(parseFieldProposal("''")).toBeNull();
+    expect(parseFieldProposal('“”')).toBeNull();
+  });
+  it('débarrasse les quotes enveloppantes', () => {
+    expect(parseFieldProposal('"Disponible immédiatement"')?.text).toBe('Disponible immédiatement');
+    expect(parseFieldProposal('“550 €/jour”')?.text).toBe('550 €/jour');
+  });
 });

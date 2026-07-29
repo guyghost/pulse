@@ -1266,6 +1266,15 @@ void settingsReleaseCoordinator.boot().catch((error) => {
 });
 
 // Message handler — profile management + scan orchestration
+
+/**
+ * AbortControllers actifs pour les générations Form Assistant en cours, indexés
+ * par requestId. Permet au content script d'annuler une génération (transition
+ * `requesting CANCEL → armed` du modèle) via FORM_ASSIST_CANCEL. Un Map par
+ * requestId évite qu'un onglet n'annule la génération d'un autre.
+ */
+const formAssistRequestControllers = new Map<string, AbortController>();
+
 chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse) => {
   // ── Input validation ──────────────────────────────────────────────────────
   const validation = validateMessage(rawMessage);
@@ -2257,15 +2266,29 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       import('../lib/shell/form-assistant/settings')
         .then(({ setFormAssistEnabled }) => setFormAssistEnabled(enabled))
         .then((settings) => {
-          // Broadcast l'état à tous les contextes (panel + content scripts)
-          // pour que l'UI et les marqueurs de champ se resynchronisent.
-          chrome.runtime
-            .sendMessage({
-              type: 'FORM_ASSIST_ENABLED',
-              payload: { enabled: settings.enabled, engine: settings.engine },
+          const enabledMessage = {
+            type: 'FORM_ASSIST_ENABLED',
+            payload: { enabled: settings.enabled, engine: settings.engine },
+          };
+          // Broadcast au side panel (runtime) et aux content scripts (tabs).
+          // `runtime.sendMessage` depuis le SW ne touche que les pages de
+          // l'extension ; les content scripts écoutent sur `tabs`.
+          chrome.runtime.sendMessage(enabledMessage).catch(() => {
+            /* Panel fermé — ignore */
+          });
+          chrome.tabs
+            .query({})
+            .then((tabs) => {
+              for (const tab of tabs) {
+                if (typeof tab.id === 'number') {
+                  chrome.tabs.sendMessage(tab.id, enabledMessage).catch(() => {
+                    /* Pas de content script sur cet onglet — ignore */
+                  });
+                }
+              }
             })
             .catch(() => {
-              /* No listener available — ignore */
+              /* tabs API indisponible — ignore */
             });
           sendResponse({
             type: 'FORM_ASSIST_ENABLED',
@@ -2284,6 +2307,8 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
 
     if (message.type === 'FORM_ASSIST_REQUEST') {
       const { requestId, field } = message.payload;
+      const controller = new AbortController();
+      formAssistRequestControllers.set(requestId, controller);
 
       (async () => {
         try {
@@ -2320,7 +2345,7 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
           // Phase 1 : selectFormAssistEngine() est la source de vérité Core pour
           // le choix du moteur. Ici seul le chemin local est câblé ; le chemin
           // remote (Eve) est Phase 2 et renverra 'unavailable' tant que non impl.
-          const proposal = await generateFieldProposal(field, profile);
+          const proposal = await generateFieldProposal(field, profile, controller.signal);
           if (!proposal || proposal.text.length === 0) {
             sendResponse({
               type: 'FORM_ASSIST_ERROR',
@@ -2338,14 +2363,34 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
             payload: { requestId, text: proposal.text, engine: 'local' },
           });
         } catch (err) {
+          if (controller.signal.aborted) {
+            sendResponse({
+              type: 'FORM_ASSIST_ERROR',
+              payload: { requestId, code: 'cancelled', message: 'Génération annulée' },
+            });
+            return;
+          }
           console.warn('[MissionPulse] FORM_ASSIST_REQUEST error:', err);
           sendResponse({
             type: 'FORM_ASSIST_ERROR',
             payload: { requestId, code: 'failed', message: 'Échec de génération' },
           });
+        } finally {
+          formAssistRequestControllers.delete(requestId);
         }
       })();
       return true;
+    }
+
+    if (message.type === 'FORM_ASSIST_CANCEL') {
+      const { requestId } = message.payload;
+      const controller = formAssistRequestControllers.get(requestId);
+      if (controller) {
+        controller.abort();
+        formAssistRequestControllers.delete(requestId);
+      }
+      sendResponse({ type: 'FORM_ASSIST_CANCEL_ACK', payload: { requestId } });
+      return false;
     }
 
     // ── Toast handler (forward to side panel) ──

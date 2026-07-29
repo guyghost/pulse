@@ -346,15 +346,19 @@ export type BridgeMessage =
   // Content → SW : demander une proposition pour un champ (Machine B).
   // Le field est un FieldDescriptor canonical (sanit-isé, sans PII DOM).
   | { type: 'FORM_ASSIST_REQUEST'; payload: { requestId: string; field: FieldDescriptor } }
+  // Content → SW : annuler une requête en vol (changement de champ, fermeture widget).
+  | { type: 'FORM_ASSIST_CANCEL'; payload: { requestId: string } }
   // SW → Content : proposition prête (ACCEPT explicite requis pour appliquer).
   | {
       type: 'FORM_ASSIST_PROPOSAL';
       payload: { requestId: string; text: string; engine: 'local' | 'remote' };
     }
-  // SW → Content : échec (moteur indisponible ou génération en erreur).
+  // SW → Content : annulation prise en compte.
+  | { type: 'FORM_ASSIST_CANCEL_ACK'; payload: { requestId: string } }
+  // SW → Content : échec (moteur indisponible, génération en erreur, ou annulée).
   | {
       type: 'FORM_ASSIST_ERROR';
-      payload: { requestId: string; code: 'unavailable' | 'failed'; message: string };
+      payload: { requestId: string; code: 'unavailable' | 'failed' | 'cancelled'; message: string };
     };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {

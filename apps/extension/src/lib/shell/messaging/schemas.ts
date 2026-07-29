@@ -1435,6 +1435,13 @@ export const MessageSchemas = {
       field: FieldDescriptorSchema,
     }),
   }),
+  // Content → SW : annule une génération en cours (transition `requesting CANCEL`).
+  FORM_ASSIST_CANCEL: z.object({
+    type: z.literal('FORM_ASSIST_CANCEL'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+    }),
+  }),
   FORM_ASSIST_PROPOSAL: z.object({
     type: z.literal('FORM_ASSIST_PROPOSAL'),
     payload: z.object({
@@ -1443,11 +1450,18 @@ export const MessageSchemas = {
       engine: z.enum(['local', 'remote']),
     }),
   }),
+  // SW → Content : accuse réception de l'annulation (transition `cancelling → idle`).
+  FORM_ASSIST_CANCEL_ACK: z.object({
+    type: z.literal('FORM_ASSIST_CANCEL_ACK'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+    }),
+  }),
   FORM_ASSIST_ERROR: z.object({
     type: z.literal('FORM_ASSIST_ERROR'),
     payload: z.object({
       requestId: z.string().min(1).max(128),
-      code: z.enum(['unavailable', 'failed']),
+      code: z.enum(['unavailable', 'failed', 'cancelled']),
       message: z.string().min(1).max(280),
     }),
   }),
