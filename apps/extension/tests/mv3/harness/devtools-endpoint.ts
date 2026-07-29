@@ -34,6 +34,10 @@ class EndpointChangedDuringCaptureError extends Error {
   readonly code = 'DEVTOOLS_ENDPOINT_CHANGED';
 }
 
+class EndpointEmptyDuringCaptureError extends Error {
+  readonly code = 'DEVTOOLS_ENDPOINT_EMPTY';
+}
+
 function sha256(value: string): string {
   return createHash('sha256').update(value, 'utf8').digest('hex');
 }
@@ -133,6 +137,11 @@ export async function readDevToolsEndpointFile(
         'DevToolsActivePort changed while it was being captured.'
       );
     }
+    if (stat.size === 0) {
+      throw new EndpointEmptyDuringCaptureError(
+        'DevToolsActivePort is empty; the browser may still be writing it.'
+      );
+    }
     return parseDevToolsActivePort(raw, options);
   } finally {
     await handle.close();
@@ -188,7 +197,11 @@ export async function waitForDevToolsEndpoint(
       return outcome.endpoint;
     }
     const code = errorCode(outcome.error);
-    if (code !== 'ENOENT' && code !== 'DEVTOOLS_ENDPOINT_CHANGED') {
+    if (
+      code !== 'ENOENT' &&
+      code !== 'DEVTOOLS_ENDPOINT_CHANGED' &&
+      code !== 'DEVTOOLS_ENDPOINT_EMPTY'
+    ) {
       throw outcome.error;
     }
 

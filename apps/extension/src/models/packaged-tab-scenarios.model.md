@@ -1460,8 +1460,12 @@ The fixture is fresh. It contains no profile, mission, tracking, first-scan flag
 legacy onboarding key or confirmed consent. No seed operation writes business
 data.
 
-1. Open the packaged panel and require `page-onboarding`, `Premier lancement`
-   and no navigation bar.
+1. Open the packaged panel and require `page-onboarding`, the welcome hero
+   heading `Toutes vos missions freelance, centralisées et scorées.` and no
+   navigation bar. The hero is rendered only by `OnboardingWelcome` once the
+   lazily-imported `OnboardingPage` chunk resolves; the pre-hydration skeleton
+   renders a different placeholder (`Configurez votre premier scan`), so the
+   hero assertion also proves the real onboarding mounted (not the skeleton).
 2. Click `Configurer le radar`.
 3. Select the first visible connector from the build-filtered catalogue and
    click `Continuer avec <name>`. The selected connector ID/name are captured as

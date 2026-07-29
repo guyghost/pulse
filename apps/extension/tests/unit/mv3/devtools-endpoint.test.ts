@@ -1,4 +1,4 @@
-import { mkdir, mkdtemp, realpath, rm, symlink, writeFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, open, realpath, rm, symlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -156,6 +156,31 @@ describe('strict DevToolsActivePort capability', () => {
     await writeFile(endpointPath, `9333\n/devtools/browser/${BROWSER_UUID}\n`, 'utf8');
 
     await expect(pending).resolves.toMatchObject({ port: 9333, processGeneration: 4 });
+  });
+
+  it('waits through an empty mid-write file and resolves once content lands', async () => {
+    const profile = await mkdtemp(join(tmpdir(), 'missionpulse-endpoint-'));
+    cleanupPaths.push(profile);
+    const profileRealPath = await realpath(profile);
+    const endpointPath = join(profile, 'DevToolsActivePort');
+    const neverExits = new Promise<never>(() => undefined);
+
+    const pending = waitForDevToolsEndpoint({
+      childExited: neverExits,
+      endpointPath,
+      pollIntervalMs: 2,
+      processGeneration: 8,
+      profileRealPath,
+      timeoutMs: 500,
+    });
+    // Simulate the real Chromium open-then-write window: an empty regular file
+    // exists before the canonical bytes land. This must be retried, not fatal.
+    const empty = await open(endpointPath, 'w');
+    await empty.close();
+    await new Promise<void>((resolve) => setTimeout(resolve, 5));
+    await writeFile(endpointPath, `9444\n/devtools/browser/${BROWSER_UUID}\n`, 'utf8');
+
+    await expect(pending).resolves.toMatchObject({ port: 9444, processGeneration: 8 });
   });
 
   it('fails immediately when the owned child exits before endpoint admission', async () => {
