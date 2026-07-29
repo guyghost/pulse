@@ -2230,6 +2230,124 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
+    // ── Form Assistant (content script ↔ SW) ──
+    // Source de vérité : src/models/form-assistant.model.md (Machine B).
+    // Phase 1 : chemin local uniquement. Le moteur remote (Eve/Vercel) est Phase 2.
+    if (message.type === 'FORM_ASSIST_STATUS') {
+      import('../lib/shell/form-assistant/settings')
+        .then(({ getFormAssistSettings }) => getFormAssistSettings())
+        .then((settings) => {
+          sendResponse({
+            type: 'FORM_ASSIST_STATUS_RESULT',
+            payload: { enabled: settings.enabled, engine: settings.engine },
+          });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] FORM_ASSIST_STATUS error:', err);
+          sendResponse({
+            type: 'FORM_ASSIST_STATUS_RESULT',
+            payload: { enabled: false, engine: 'local' },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'FORM_ASSIST_ENABLE') {
+      const { enabled } = message.payload;
+      import('../lib/shell/form-assistant/settings')
+        .then(({ setFormAssistEnabled }) => setFormAssistEnabled(enabled))
+        .then((settings) => {
+          // Broadcast l'état à tous les contextes (panel + content scripts)
+          // pour que l'UI et les marqueurs de champ se resynchronisent.
+          chrome.runtime
+            .sendMessage({
+              type: 'FORM_ASSIST_ENABLED',
+              payload: { enabled: settings.enabled, engine: settings.engine },
+            })
+            .catch(() => {
+              /* No listener available — ignore */
+            });
+          sendResponse({
+            type: 'FORM_ASSIST_ENABLED',
+            payload: { enabled: settings.enabled, engine: settings.engine },
+          });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] FORM_ASSIST_ENABLE error:', err);
+          sendResponse({
+            type: 'FORM_ASSIST_ENABLED',
+            payload: { enabled: false, engine: 'local' },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'FORM_ASSIST_REQUEST') {
+      const { requestId, field } = message.payload;
+
+      (async () => {
+        try {
+          const { generateFieldProposal } =
+            await import('../lib/shell/form-assistant/local-generator');
+          const { getFormAssistSettings } = await import('../lib/shell/form-assistant/settings');
+          const profile = await getProfile();
+
+          const settings = await getFormAssistSettings();
+          if (!settings.enabled) {
+            sendResponse({
+              type: 'FORM_ASSIST_ERROR',
+              payload: {
+                requestId,
+                code: 'unavailable',
+                message: 'Form Assistant désactivé',
+              },
+            });
+            return;
+          }
+
+          if (!profile) {
+            sendResponse({
+              type: 'FORM_ASSIST_ERROR',
+              payload: {
+                requestId,
+                code: 'failed',
+                message: 'Profil indisponible',
+              },
+            });
+            return;
+          }
+
+          // Phase 1 : selectFormAssistEngine() est la source de vérité Core pour
+          // le choix du moteur. Ici seul le chemin local est câblé ; le chemin
+          // remote (Eve) est Phase 2 et renverra 'unavailable' tant que non impl.
+          const proposal = await generateFieldProposal(field, profile);
+          if (!proposal || proposal.text.length === 0) {
+            sendResponse({
+              type: 'FORM_ASSIST_ERROR',
+              payload: {
+                requestId,
+                code: 'unavailable',
+                message: 'Aucune proposition disponible',
+              },
+            });
+            return;
+          }
+
+          sendResponse({
+            type: 'FORM_ASSIST_PROPOSAL',
+            payload: { requestId, text: proposal.text, engine: 'local' },
+          });
+        } catch (err) {
+          console.warn('[MissionPulse] FORM_ASSIST_REQUEST error:', err);
+          sendResponse({
+            type: 'FORM_ASSIST_ERROR',
+            payload: { requestId, code: 'failed', message: 'Échec de génération' },
+          });
+        }
+      })();
+      return true;
+    }
+
     // ── Toast handler (forward to side panel) ──
 
     if (message.type === 'SHOW_TOAST') {

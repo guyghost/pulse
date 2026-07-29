@@ -13,6 +13,12 @@ export interface ConnectorMeta {
   icon: string;
   url: string;
   hostPermissions: readonly string[];
+  /**
+   * Active le Form Assistant (remplissage de champs type Grammarly) sur ce
+   * connecteur. Le content script est injecté uniquement sur les connecteurs
+   * `formAssist: true`. Source de vérité : src/models/form-assistant.model.md.
+   */
+  formAssist?: boolean;
 }
 
 /**
@@ -26,6 +32,8 @@ const CATALOG: readonly ConnectorMeta[] = [
     icon: 'https://www.google.com/s2/favicons?domain=free-work.com&sz=32',
     url: 'https://www.free-work.com',
     hostPermissions: ['https://www.free-work.com/*'],
+    // Pilote Form Assistant Phase 1 (Gemini Nano local uniquement).
+    formAssist: true,
   },
   {
     id: 'lehibou',
