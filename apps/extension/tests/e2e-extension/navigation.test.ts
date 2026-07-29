@@ -55,7 +55,13 @@ test(
 
     await expect(page).toHaveURL(extension.sidePanelUrl);
     await expect(page.getByTestId('page-onboarding')).toBeVisible();
-    await expect(page.getByText('Premier lancement', { exact: true })).toBeVisible();
+    // The welcome hero is rendered only by OnboardingWelcome once the lazily-
+    // imported OnboardingPage chunk resolves. The pre-hydration skeleton
+    // (App.svelte) renders a different placeholder, so this also proves the
+    // real onboarding mounted — not the skeleton.
+    await expect(
+      page.getByRole('heading', { name: /Toutes vos missions freelance/ })
+    ).toBeVisible();
     await assertNoBlankOrLoadError(page);
 
     const devState = await page.evaluate(() => ({

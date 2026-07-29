@@ -39,7 +39,7 @@ jobs:
 
     steps:
       - name: Checkout the sealed source commit
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.source_commit }}
           fetch-depth: 0
@@ -48,18 +48,18 @@ jobs:
         run: corepack enable
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v7
+        uses: actions/setup-node@820762786026740c76f36085b0efc47a31fe5020
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Setup pinned Python descriptor helper
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -81,7 +81,7 @@ jobs:
           pnpm --filter @pulse/extension verify-manifest --expected-version "$EXPECTED_VERSION"
 
       - name: Verify successful seal-candidate run provenance
-        uses: actions/github-script@v8
+        uses: actions/github-script@ed597411d8f924073f98dfc5c65a23a2325f34cd
         env:
           EVIDENCE_RUN_ID: ${{ inputs.evidence_run_id }}
           SOURCE_COMMIT: ${{ inputs.source_commit }}
@@ -106,7 +106,7 @@ jobs:
             }
 
       - name: Download sealed candidate evidence
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: missionpulse-sealed-candidate
           path: ${{ github.workspace }}/release-input
@@ -173,7 +173,7 @@ jobs:
           echo "artifact_name=missionpulse-package-validated-${VERSION}" >> "$GITHUB_OUTPUT"
 
       - name: Upload package_validated evidence
-        uses: actions/upload-artifact@v7
+        uses: actions/upload-artifact@043fb46d1a93c77aae656e7c1c64a875d1fc6a0a
         with:
           name: ${{ steps.package-metadata.outputs.artifact_name }}
           path: |
@@ -193,7 +193,7 @@ jobs:
 
     steps:
       - name: Checkout verifier at the sealed source commit
-        uses: actions/checkout@v7
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1
         with:
           ref: ${{ inputs.source_commit }}
 
@@ -201,18 +201,18 @@ jobs:
         run: corepack enable
 
       - name: Setup pnpm
-        uses: pnpm/action-setup@v6
+        uses: pnpm/action-setup@0ebf47130e4866e96fce0953f49152a61190b271
         with:
           version: ${{ env.PNPM_VERSION }}
 
       - name: Setup Node.js
-        uses: actions/setup-node@v6
+        uses: actions/setup-node@249970729cb0ef3589644e2896645e5dc5ba9c38
         with:
           node-version: ${{ env.NODE_VERSION }}
           cache: pnpm
 
       - name: Setup pinned Python descriptor helper
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@ece7cb06caefa5fff74198d8649806c4678c61a1
         with:
           python-version: ${{ env.PYTHON_VERSION }}
 
@@ -223,7 +223,7 @@ jobs:
         run: pnpm install --frozen-lockfile
 
       - name: Download package_validated evidence
-        uses: actions/download-artifact@v8
+        uses: actions/download-artifact@3e5f45b2cfb9172054b4087a40e8e0b5a5461e7c
         with:
           name: ${{ needs.package-validated.outputs.artifact_name }}
           path: ${{ github.workspace }}/consumer-input

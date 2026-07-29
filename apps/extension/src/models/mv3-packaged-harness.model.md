@@ -1009,6 +1009,13 @@ deadline:
 5. the derived endpoint is exactly
    `ws://127.0.0.1:<port><browser-path>`.
 
+While polling under that deadline, absence (`ENOENT`) and a zero-byte regular
+file are the same transient admission state: the child has not yet written the
+canonical bytes. A zero-byte file is retried exactly like absence and never
+parsed. A non-empty file whose bytes do not satisfy the canonical shape
+(one/three-line, invalid port/path, CR/NUL) is terminal. The deadline itself is
+terminal: a file that never admits within it fails closed.
+
 This parsing emits `ENDPOINT_PARSED`; it opens no socket and does not claim that
 the endpoint belongs to the child. The endpoint becomes verified only after the
 machine reserves a raw lease, enters `raw_connecting`, opens its sole tracked
@@ -1885,7 +1892,9 @@ Implementation is not reviewable as complete until deterministic tests prove:
    rejected before opening a transport;
 2. `DevToolsActivePort` absent, stale, symlinked, non-regular, one/three-line,
    whitespace/control-bearing, invalid port/path, wrong generation and child
-   exit before verification all fail closed;
+   exit before verification all fail closed; absence and a zero-byte regular
+   file during the polling window are retried until the deadline, then fail
+   closed;
 3. the manual argument allowlist contains one exact profile, loopback debugging,
    sealed extension paths and deterministic mode, with no shell or passthrough;
    raw initialization proves sentinel and zero pre-arm attachments, then
