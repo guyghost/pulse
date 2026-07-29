@@ -101,6 +101,37 @@ interface FieldDescriptor {
 // JAMAIS : id/name du champ, valeurs d'autres champs, URL, HTML voisin.
 ```
 
+## Machine D — Activation côté panel (side panel ↔ SW)
+
+Le toggle d'activation vit dans la page **Settings**. Il reflète l'état persisté
+dans le SW (`formAssist.enabled`, `chrome.storage.local`) et émet
+`FORM_ASSIST_ENABLE` sur action utilisateur explicite. **Aucun LLM dans cette
+machine** : la décision est purement un booléen user-owned persisté côté SW.
+
+```text
+unknown ──INIT──► loading
+loading ──STATUS_RESULT(enabled)──► on | off
+loading ──SW_UNREACHABLE──► error
+off      ──TOGGLE(on)──► loading        (optimiste, garde anti-double-clic)
+on       ──TOGGLE(off)──► loading
+on|off   ──ENABLED(enabled)──► on | off (raccolement via diffusion SW)
+error    ──RETRY──► loading
+```
+
+- `loading` après `TOGGLE` est **optimiste** : l'UI désactive le toggle
+  (`disabled`) jusqu'au `FORM_ASSIST_ENABLED` de confirmation pour interdire
+  tout double-envoi. L'échec (`SW_UNREACHABLE`) ramène à l'état précédent **et**
+  affiche un toast typé (jamais silencieux).
+- Le `FORM_ASSIST_ENABLED` diffusé par le SW (qui notifie aussi le content
+- script) racolette le toggle : le panel est une **source de vérité miroir**, pas
+  primaire. La source primaire reste le `chrome.storage.local` du SW.
+- Le moteur distant (Eve) reste **hors périmètre du toggle** : ce dernier
+  n'expose que le booléen `enabled`. La préférence `engine` et le consentement
+  (Machine C) sont gérés séparément.
+- Invariant : le toggle **n'écrit jamais** dans `chrome.storage` depuis le
+  panel — tout passe par le bridge typé vers le SW (règle « le panel n'appelle
+  jamais IndexedDB / chrome.storage directement »).
+
 ## Machine A — Widget (content script, par champ focalisé)
 
 ```text
@@ -171,8 +202,12 @@ denied ─PROMPT───► prompting
 
 ## Messages bridge (nouveaux)
 
-- `FORM_ASSIST_ENABLE` (panel → SW) — `{ enabled, enginePref, perSite? }`.
-- `FORM_ASSIST_STATUS` (SW → panel/content) — `{ armed, engineAvailability }`.
+- `FORM_ASSIST_ENABLE` (panel → SW) — `{ enabled }` (booléen user-owned ;
+  `enginePref`/`perSite` restent HORS périmètre du toggle v1, gérés par défaut).
+  Le SW persiste, puis **diffuse** `FORM_ASSIST_ENABLED` vers le panel (racolement)
+  ET vers le content script (arm/disarm).
+- `FORM_ASSIST_STATUS` (panel/content → SW) — lecture de l'état persisté.
+- `FORM_ASSIST_STATUS_RESULT` (SW → panel/content) — `{ enabled, engine }`.
 - `FORM_ASSIST_REQUEST` (content → SW) — `{ requestId, field: FieldDescriptor }`
   (le SW relit le profil canonique lui-même ; **pas de profil côté contenu**).
 - `FORM_ASSIST_PROPOSAL` (SW → content) — `{ requestId, proposal: { text, engine } }`.

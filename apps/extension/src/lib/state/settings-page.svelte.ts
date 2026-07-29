@@ -81,6 +81,7 @@ export class SettingsPageController {
   private readonly shippedConnectorCatalog: readonly ConnectorMeta[];
   private readonly resetAvailability: LocalDataResetRuntimeAvailability;
   private readonly unsubscribeProfileMessages = this.subscribeProfileMessages();
+  private readonly unsubscribeFormAssistMessages = this.subscribeFormAssistMessages();
   private readonly unsubscribeSettingsSnapshots: () => void;
 
   private readonly profileActor = createProfileStore({
@@ -126,6 +127,14 @@ export class SettingsPageController {
   connectedPendingUploads = $state(0);
   connectedPendingDownloads = $state(0);
   connectedSyncError = $state<string | null>(null);
+
+  /**
+   * Form Assistant activation (Machine D — src/models/form-assistant.model.md).
+   * Miroir de l'état persisté dans le SW (chrome.storage.local). Le toggle ne
+   * écrit JAMAIS directement en storage : il émet FORM_ASSIST_ENABLE via bridge.
+   */
+  formAssistEnabled = $state(false);
+  formAssistStatus = $state<'loading' | 'ready' | 'error'>('loading');
 
   showResetConfirm = $state(false);
   resetError = $state<string | null>(null);
@@ -173,8 +182,26 @@ export class SettingsPageController {
     }
   }
 
+  /**
+   * Racolement Machine D : le SW diffuse FORM_ASSIST_ENABLED après toute
+   * mutation persistée. Le panel est un miroir, jamais la source primaire.
+   */
+  private subscribeFormAssistMessages(): () => void {
+    try {
+      return subscribeMessages((message) => {
+        if (message.type === 'FORM_ASSIST_ENABLED') {
+          this.formAssistEnabled = Boolean(message.payload.enabled);
+          this.formAssistStatus = 'ready';
+        }
+      });
+    } catch {
+      return () => {};
+    }
+  }
+
   destroy(): void {
     this.unsubscribeProfileMessages();
+    this.unsubscribeFormAssistMessages();
     this.unsubscribeSettingsSnapshots();
   }
 
@@ -201,6 +228,7 @@ export class SettingsPageController {
       this.loadSettings(),
       this.loadConnectedAccount(),
       this.loadScanHistory(),
+      this.loadFormAssist(),
     ]);
   }
 
@@ -234,6 +262,51 @@ export class SettingsPageController {
       this.aiAvailability = await isPromptApiAvailable();
     } catch {
       this.aiAvailability = 'no';
+    }
+  }
+
+  /**
+   * Lit l'état persisté du Form Assistant auprès du SW (Machine D — INIT).
+   * Échec (SW injoignable) → état `error` mais la page reste utilisable.
+   */
+  async loadFormAssist(): Promise<void> {
+    this.formAssistStatus = 'loading';
+    try {
+      const result = (await sendMessage({ type: 'FORM_ASSIST_STATUS' })) as
+        { type: 'FORM_ASSIST_STATUS_RESULT'; payload: { enabled: boolean } } | undefined;
+      this.formAssistEnabled = Boolean(result?.payload.enabled);
+      this.formAssistStatus = 'ready';
+    } catch {
+      this.formAssistStatus = 'error';
+    }
+  }
+
+  /**
+   * Bascule l'activation du Form Assistant. Le SW persiste et diffuse
+   * FORM_ASSIST_ENABLED (racolement). L'UI reste optimiste : on met à jour
+   * immédiatement pour la réactivité, et le message SW confirme/rétablit.
+   */
+  async toggleFormAssist(): Promise<void> {
+    if (this.formAssistStatus === 'loading') {
+      return;
+    }
+    const next = !this.formAssistEnabled;
+    const previous = this.formAssistEnabled;
+    this.formAssistEnabled = next;
+    this.formAssistStatus = 'loading';
+    try {
+      const result = (await sendMessage({
+        type: 'FORM_ASSIST_ENABLE',
+        payload: { enabled: next },
+      })) as { type: 'FORM_ASSIST_ENABLED'; payload: { enabled: boolean } } | undefined;
+      // La réponse du SW est la source de vérité (elle peut différer de
+      // l'optimisme en cas d'erreur persistée côté SW).
+      this.formAssistEnabled = Boolean(result?.payload.enabled);
+      this.formAssistStatus = 'ready';
+    } catch {
+      this.formAssistEnabled = previous;
+      this.formAssistStatus = 'error';
+      await showToast("Impossible d'activer l'assistant de candidature", 'error');
     }
   }
 

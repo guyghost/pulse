@@ -912,6 +912,44 @@
           </div>
         </div>
       </div>
+
+      <!-- Form Assistant (Machine D — src/models/form-assistant.model.md) -->
+      <div class="section-card rounded-xl p-5 space-y-3">
+        <div class="flex items-start gap-3">
+          <div
+            class="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue/6"
+          >
+            <Icon name="file-text" size={14} class="text-blueprint-blue" />
+          </div>
+          <div class="min-w-0 flex-1">
+            <h3 class="text-body-lg font-medium text-text-primary">Assistant de candidature</h3>
+            <p class="mt-1 text-meta text-text-subtle">
+              Au focus sur un champ d'un formulaire de candidature, propose une valeur issue de
+              votre profil. Vous restez seul à valider l'insertion (rien n'est jamais rempli
+              automatiquement).
+            </p>
+          </div>
+          <Toggle
+            checked={settings.formAssistEnabled}
+            disabled={settings.formAssistStatus === 'loading'}
+            aria-label="Activer l'assistant de candidature"
+            onclick={() => settings.toggleFormAssist()}
+          />
+        </div>
+        <div class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-3">
+          <div class="flex items-start gap-2">
+            <Icon name="shield-check" size={14} class="mt-0.5 shrink-0 text-blueprint-blue" />
+            <div class="min-w-0">
+              <p class="text-meta font-medium text-text-primary">Périmètre et confidentialité</p>
+              <p class="mt-1 text-caption leading-5 text-text-subtle">
+                Actif uniquement sur les plateformes connecteurs compatibles (Free-Work pour la
+                phase pilote). La génération utilise Gemini Nano en local ; aucune donnée de page
+                n'est envoyée à un serveur.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
     </section>
 
     <section id="settings-data" class="scroll-mt-4 space-y-4" aria-labelledby="settings-data-title">
