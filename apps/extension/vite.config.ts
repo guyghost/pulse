@@ -58,6 +58,51 @@ function filterHostPermissions(
   });
 }
 
+/**
+ * Build the Form Assistant content_scripts entries.
+ *
+ * The content script is injected ONLY on connectors flagged `formAssist: true`
+ * (and included). Matches reuse the connector `hostPermissions` so the Form
+ * Assistant host surface stays in sync with least-privilege filtering above —
+ * there is no second hand-maintained match list.
+ *
+ * Returns an empty array when no Form-Assist connector ships, so the manifest
+ * stays minimal. Source de vérité : src/models/form-assistant.model.md.
+ */
+function buildFormAssistContentScripts(includedIds: readonly string[]): Array<{
+  matches: string[];
+  js: string[];
+  run_at: 'document_start' | 'document_end' | 'document_idle';
+}> {
+  if (includedIds.length === 0) {
+    return [];
+  }
+  const catalog = getAllConnectorsMeta();
+  const includedSet = new Set(includedIds);
+  const matches = new Set<string>();
+  for (const connector of catalog) {
+    if (!connector.formAssist) {
+      continue;
+    }
+    if (!includedSet.has(connector.id)) {
+      continue;
+    }
+    for (const pattern of connector.hostPermissions) {
+      matches.add(pattern);
+    }
+  }
+  if (matches.size === 0) {
+    return [];
+  }
+  return [
+    {
+      matches: [...matches],
+      js: ['src/content/form-assistant/index.ts'],
+      run_at: 'document_idle',
+    },
+  ];
+}
+
 export default defineConfig(({ command }) => {
   // Only the build reads connectors.config.json. Dev and test always ship
   // the full catalog so vitest assertions and `pnpm dev` stay deterministic.
@@ -85,6 +130,7 @@ export default defineConfig(({ command }) => {
     host_permissions: isBuild
       ? filterHostPermissions(manifest.host_permissions ?? [], INCLUDED_CONNECTOR_IDS)
       : manifest.host_permissions,
+    content_scripts: buildFormAssistContentScripts(INCLUDED_CONNECTOR_IDS),
   };
 
   return {

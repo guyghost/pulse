@@ -76,6 +76,42 @@ function maxBytes(maxB: number) {
 // Schémas par type de message
 // ============================================================================
 
+// ── Form Assistant (shared sub-schema) ───────────────────────────────────────
+
+const FieldKindSchema = z.enum([
+  'first-name',
+  'last-name',
+  'full-name',
+  'email',
+  'phone',
+  'linkedin',
+  'cover-letter',
+  'availability',
+  'tjm',
+  'skill',
+  'address',
+  'job-title',
+  'free-text',
+]);
+const FieldInputTypeSchema = z.enum([
+  'text',
+  'textarea',
+  'email',
+  'tel',
+  'url',
+  'search',
+  'contenteditable',
+]);
+const FieldDescriptorSchema = z
+  .object({
+    kind: FieldKindSchema,
+    label: z.string().max(120),
+    placeholder: z.string().max(200),
+    inputType: FieldInputTypeSchema,
+    required: z.boolean(),
+  })
+  .strict();
+
 // ── Missions ─────────────────────────────────────────────────────────────────
 
 const MissionSchema = z
@@ -1370,6 +1406,65 @@ export const MessageSchemas = {
   // SW → live panel broadcast: re-consume a pending deep-link intent after a
   // notification click on an already-open panel. No payload needed.
   NOTIFICATION_CLICKED: z.object({ type: z.literal('NOTIFICATION_CLICKED') }),
+
+  // ── Form Assistant (content script ↔ service worker) ───────────────────────
+  // Source de vérité : src/models/form-assistant.model.md.
+  FORM_ASSIST_STATUS: z.object({ type: z.literal('FORM_ASSIST_STATUS') }),
+  FORM_ASSIST_STATUS_RESULT: z.object({
+    type: z.literal('FORM_ASSIST_STATUS_RESULT'),
+    payload: z.object({
+      enabled: z.boolean(),
+      engine: z.enum(['local', 'remote']),
+    }),
+  }),
+  FORM_ASSIST_ENABLE: z.object({
+    type: z.literal('FORM_ASSIST_ENABLE'),
+    payload: z.object({ enabled: z.boolean() }),
+  }),
+  FORM_ASSIST_ENABLED: z.object({
+    type: z.literal('FORM_ASSIST_ENABLED'),
+    payload: z.object({
+      enabled: z.boolean(),
+      engine: z.enum(['local', 'remote']),
+    }),
+  }),
+  FORM_ASSIST_REQUEST: z.object({
+    type: z.literal('FORM_ASSIST_REQUEST'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+      field: FieldDescriptorSchema,
+    }),
+  }),
+  // Content → SW : annule une génération en cours (transition `requesting CANCEL`).
+  FORM_ASSIST_CANCEL: z.object({
+    type: z.literal('FORM_ASSIST_CANCEL'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+    }),
+  }),
+  FORM_ASSIST_PROPOSAL: z.object({
+    type: z.literal('FORM_ASSIST_PROPOSAL'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+      text: z.string().min(1).max(4000),
+      engine: z.enum(['local', 'remote']),
+    }),
+  }),
+  // SW → Content : accuse réception de l'annulation (transition `cancelling → idle`).
+  FORM_ASSIST_CANCEL_ACK: z.object({
+    type: z.literal('FORM_ASSIST_CANCEL_ACK'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+    }),
+  }),
+  FORM_ASSIST_ERROR: z.object({
+    type: z.literal('FORM_ASSIST_ERROR'),
+    payload: z.object({
+      requestId: z.string().min(1).max(128),
+      code: z.enum(['unavailable', 'failed', 'cancelled']),
+      message: z.string().min(1).max(280),
+    }),
+  }),
 } as const;
 
 export type MessageType = keyof typeof MessageSchemas;

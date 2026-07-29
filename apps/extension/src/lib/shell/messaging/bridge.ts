@@ -35,6 +35,7 @@ import type {
   CopilotJobResultPayload,
   CopilotLinkResultPayload,
 } from '../copilot/contracts';
+import type { FieldDescriptor } from '../../core/form-assistant/types';
 
 /**
  * Progression d'un connecteur individuel pendant le scan
@@ -330,7 +331,35 @@ export type BridgeMessage =
   // to re-consume a freshly-written deep-link intent. sidePanel.open() is a
   // no-op when the panel is already open, so without this the mount effect
   // would not re-fire and the intent would stay pending.
-  | { type: 'NOTIFICATION_CLICKED' };
+  | { type: 'NOTIFICATION_CLICKED' }
+  // Form Assistant (Grammarly-like field fill, content script ↔ service worker).
+  // Source de vérité : src/models/form-assistant.model.md.
+  // Content → SW : la feature est-elle active pour cette origine ?
+  | { type: 'FORM_ASSIST_STATUS' }
+  | {
+      type: 'FORM_ASSIST_STATUS_RESULT';
+      payload: { enabled: boolean; engine: 'local' | 'remote' };
+    }
+  // Side panel → SW : activer/désactiver la feature (persisté).
+  | { type: 'FORM_ASSIST_ENABLE'; payload: { enabled: boolean } }
+  | { type: 'FORM_ASSIST_ENABLED'; payload: { enabled: boolean; engine: 'local' | 'remote' } }
+  // Content → SW : demander une proposition pour un champ (Machine B).
+  // Le field est un FieldDescriptor canonical (sanit-isé, sans PII DOM).
+  | { type: 'FORM_ASSIST_REQUEST'; payload: { requestId: string; field: FieldDescriptor } }
+  // Content → SW : annuler une requête en vol (changement de champ, fermeture widget).
+  | { type: 'FORM_ASSIST_CANCEL'; payload: { requestId: string } }
+  // SW → Content : proposition prête (ACCEPT explicite requis pour appliquer).
+  | {
+      type: 'FORM_ASSIST_PROPOSAL';
+      payload: { requestId: string; text: string; engine: 'local' | 'remote' };
+    }
+  // SW → Content : annulation prise en compte.
+  | { type: 'FORM_ASSIST_CANCEL_ACK'; payload: { requestId: string } }
+  // SW → Content : échec (moteur indisponible, génération en erreur, ou annulée).
+  | {
+      type: 'FORM_ASSIST_ERROR';
+      payload: { requestId: string; code: 'unavailable' | 'failed' | 'cancelled'; message: string };
+    };
 
 function devLog(direction: '→' | '←', type: string, payload?: unknown): void {
   if (import.meta.env.DEV) {

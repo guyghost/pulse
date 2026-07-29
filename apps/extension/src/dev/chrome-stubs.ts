@@ -55,6 +55,7 @@ const DEV_FIRST_SCAN_DONE_KEY = '__missionpulse_dev_first_scan_done';
 const DEV_COPILOT_JOBS_STORAGE_KEY = '__missionpulse_dev_copilot_jobs';
 const DEV_COPILOT_DOSSIERS_STORAGE_KEY = '__missionpulse_dev_copilot_dossiers';
 const DEV_COPILOT_DELETION_RECEIPTS_STORAGE_KEY = '__missionpulse_dev_copilot_deletion_receipts';
+const DEV_FORM_ASSIST_STORAGE_KEY = '__missionpulse_dev_form_assist';
 
 type RuntimeMessage = { type: string; payload?: unknown };
 type RuntimeMessageListener = (
@@ -482,6 +483,12 @@ const storage: Record<string, unknown> = {
   deepLinkIntent: null as import('$lib/core/deep-link/deep-link-intent').DeepLinkIntent | null,
   feedSortBy: 'score',
   profile: readDevStorage<UserProfile>(DEV_PROFILE_STORAGE_KEY, mockProfile),
+  // Form Assistant — default disabled (mirrors production default in
+  // lib/shell/form-assistant/settings.ts). Isolated chrome.storage.local key.
+  formAssist: readDevStorage<{ enabled: boolean; engine: 'local' | 'remote' }>(
+    DEV_FORM_ASSIST_STORAGE_KEY,
+    { enabled: false, engine: 'local' }
+  ),
   premium_enabled: readDevStorage<boolean>(DEV_PREMIUM_ENABLED_STORAGE_KEY, true),
   premium_feature_enabled: readDevStorage<boolean>(DEV_PREMIUM_FEATURE_STORAGE_KEY, false),
   first_scan_done: readDevStorage<boolean>(DEV_FIRST_SCAN_DONE_KEY, true),
@@ -520,6 +527,48 @@ function getDevConnectorHealthSnapshots(): ConnectorHealthSnapshot[] {
       recentLatenciesMs: connectorId === 'free-work' ? [420, 510, 460] : [780],
     })
   );
+}
+
+/**
+ * Dev stub — canned Form Assistant proposal mirroring what Gemini Nano would
+ * produce. Lets the bridge contract + widget UX be exercised without the
+ * built-in AI (unavailable in a normal browser tab).
+ */
+function devFormAssistProposal(kind: string, label: string, profile: UserProfile): string {
+  const name = profile.firstName?.trim() || 'Candidat';
+  const job = profile.jobTitle?.trim() || 'Freelance';
+  switch (kind) {
+    case 'first-name':
+      return name;
+    case 'last-name':
+      // UserProfile ne persiste pas de nom de famille (local-first).
+      return '';
+    case 'full-name':
+      return name;
+    case 'email':
+    case 'phone':
+      // UserProfile ne persiste pas ces coordonnées (local-first,
+      // pas de credentials). Cohérent avec le prompt production.
+      return '';
+    case 'linkedin':
+      // Aucune URL LinkedIn dans le profil de ce modèle.
+      return '';
+    case 'cover-letter':
+      return `Bonjour,\n\nFort de ${profile.seniority ?? 'plusieurs'} années en tant que ${job}, je suis intéressé par cette mission. Mon TJM se situe entre ${profile.tjmMin ?? 0}€ et ${profile.tjmMax ?? 0}€.\n\nCordialement,\n${name}`;
+    case 'availability':
+      return 'Disponible immédiatement';
+    case 'tjm':
+      return String(profile.tjmMin ?? 0);
+    case 'skill':
+      return profile.keywords?.slice(0, 5).join(', ') || '';
+    case 'address':
+      return profile.location || '';
+    case 'job-title':
+      return job;
+    case 'free-text':
+    default:
+      return label ? `Proposition pour « ${label} »` : '';
+  }
 }
 
 function createChromeStubs() {
@@ -658,6 +707,42 @@ function createChromeStubs() {
 
             emitRuntimeMessage({ type: 'PROFILE_UPDATED', payload: message.payload });
             return { type: 'PROFILE_RESULT', payload: message.payload };
+          case 'FORM_ASSIST_STATUS': {
+            const formAssist = storage.formAssist as {
+              enabled: boolean;
+              engine: 'local' | 'remote';
+            };
+            return {
+              type: 'FORM_ASSIST_STATUS_RESULT',
+              payload: { enabled: formAssist.enabled, engine: formAssist.engine },
+            };
+          }
+          case 'FORM_ASSIST_ENABLE': {
+            const payload = message.payload as { enabled: boolean };
+            const current = storage.formAssist as { enabled: boolean; engine: 'local' | 'remote' };
+            const next = { ...current, enabled: payload.enabled };
+            storage.formAssist = next;
+            writeDevStorage(DEV_FORM_ASSIST_STORAGE_KEY, next);
+            return {
+              type: 'FORM_ASSIST_ENABLED',
+              payload: { enabled: next.enabled, engine: next.engine },
+            };
+          }
+          case 'FORM_ASSIST_REQUEST': {
+            // Dev stub : Gemini Nano n'est pas disponible dans un onglet navigateur
+            // normal. On renvoie une proposition câblée pour valider le contrat
+            // bridge et l'UX du widget (lorsque le content script est injecté).
+            const payload = message.payload as {
+              requestId: string;
+              field: { kind: string; label: string };
+            };
+            const profile = (storage.profile as UserProfile | null) ?? mockProfile;
+            const canned = devFormAssistProposal(payload.field.kind, payload.field.label, profile);
+            return {
+              type: 'FORM_ASSIST_PROPOSAL',
+              payload: { requestId: payload.requestId, text: canned, engine: 'local' },
+            };
+          }
           case 'GET_PREMIUM_STATUS':
             return {
               type: 'PREMIUM_STATUS_RESULT',
