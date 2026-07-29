@@ -691,13 +691,13 @@
       />
     </div>
   {:else}
-    <div class="mt-5 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+    <div class="mt-5 grid items-start gap-4 lg:grid-cols-[0.85fr_1.15fr]">
       <section class="section-card rounded-xl p-3">
         <div class="flex items-center justify-between px-2 pb-2">
           <h3 class="text-body-lg font-medium text-text-primary">Missions</h3>
           <span class="text-meta text-text-muted">{trackedMissions.length} suivies</span>
         </div>
-        <div class="space-y-2 pr-1 lg:max-h-[32rem] lg:overflow-y-auto">
+        <div class="max-h-[min(50vh,28rem)] space-y-2 overflow-y-auto pr-1">
           {#each trackedMissions.length > 0 ? trackedMissions : missions
                 .slice(0, 20)
                 .map( (mission) => ({ mission, record: tracking.getTrackingForMission(mission.id) ?? null }) ) as item (item.mission.id)}
