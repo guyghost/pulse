@@ -313,16 +313,25 @@ export interface FeedController {
  * Creates a feed controller that manages scan orchestration and data loading.
  *
  * @param feedStore - The feed store to update with missions
+ * @param options - Optional configuration.
+ *   - `autoLoad` (default `true`): when `false`, skips the automatic
+ *     `smartLoad()` (which scans when storage is empty) on mount. Used by hosts
+ *     that only need to trigger scans explicitly (e.g. onboarding), so a scan
+ *     is not fired before the user consents.
  * @returns FeedController API with reactive state and methods
  */
-export function createFeedController(feedStore: {
-  readonly state?: FeedState;
-  readonly missions?: Mission[];
-  load(): void;
-  reset?(): void;
-  setMissions(missions: Mission[]): void;
-  setError(msg: string): void;
-}): FeedController {
+export function createFeedController(
+  feedStore: {
+    readonly state?: FeedState;
+    readonly missions?: Mission[];
+    load(): void;
+    reset?(): void;
+    setMissions(missions: Mission[]): void;
+    setError(msg: string): void;
+  },
+  options: { autoLoad?: boolean } = {}
+): FeedController {
+  const { autoLoad = true } = options;
   // ============================================================
   // Reactive state
   // ============================================================
@@ -978,8 +987,11 @@ export function createFeedController(feedStore: {
     // Check source sessions on mount
     checkSourceSessions();
 
-    // Smart load initial data
-    smartLoad();
+    // Smart load initial data (skipped when autoLoad is disabled — e.g. the
+    // onboarding host triggers its first scan explicitly via START_SCAN).
+    if (autoLoad) {
+      smartLoad();
+    }
   }
 
   // Run initialization — surface errors instead of swallowing them.

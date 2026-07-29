@@ -798,7 +798,7 @@ async function executeAcceptedScanOperation(
       }
 
       try {
-        await persistPostCommitEffects(result);
+        await persistPostCommitEffects(result, settingsSnapshot);
       } catch (error) {
         console.warn('[MissionPulse] Post-commit scan effects failed:', error);
       }
@@ -1097,7 +1097,8 @@ async function recheckConnectorHealth(
 }
 
 async function persistPostCommitEffects(
-  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>
+  result: Pick<ScanResult, 'missions' | 'sourceMissions' | 'duplicateRelations' | 'errors'>,
+  settingsSnapshot: import('../lib/shell/settings-release/settings-release.contract').SettingsReleaseSnapshot
 ): Promise<void> {
   const { missions, errors } = result;
   const now = Date.now();
