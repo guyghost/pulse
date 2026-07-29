@@ -241,6 +241,11 @@ rollout (même exigence que le Copilot dossier).
   qui déclarent `formAssist: true` dans le catalogue (`meta.ts`). Un connecteur
   exclu au build (cf. `connector-build-config.model.md`) exclut aussi
   l'assistant — cohérence de moindre privilège.
+- **Tous les connecteurs du catalogue** déclarent `formAssist: true` par défaut
+  (Free-Work, LeHibou, Hiway, Collective, Cherry Pick, Malt) — conformément à
+  la portée produit ci-dessus. Le content script étant **générique**
+  (détection de champ conservatrice, aucun parsing spécifique à une plateforme),
+  l'activation ne dépend que du flag catalogue, pas d'une logique par site.
 - Aucune nouvelle permission large : on réutilise `host_permissions` +
   `scripting` + `storage`.
 - En **dev**, le content script se charge mais les `chrome.*` sont stubés
