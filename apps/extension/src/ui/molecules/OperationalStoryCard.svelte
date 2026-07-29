@@ -136,7 +136,7 @@
       <div class="min-w-0 flex-1">
         <div class="flex flex-wrap items-center gap-2">
           {#if eyebrow}
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
               {eyebrow}
             </p>
           {/if}
@@ -156,7 +156,7 @@
         {#each evidence as item, i (i)}
           <div class="rounded-lg border border-border-light bg-surface-white/70 px-3 py-2">
             <p
-              class="flex items-center gap-1 text-micro uppercase tracking-[0.13em] text-text-muted"
+              class="flex items-center gap-1 text-caption uppercase tracking-[0.13em] text-text-subtle"
             >
               {#if item.icon}
                 <Icon name={item.icon} size={10} />

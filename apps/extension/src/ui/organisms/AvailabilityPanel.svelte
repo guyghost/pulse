@@ -187,7 +187,7 @@
             class="rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg text-text-primary focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
           />
           {#if dateMissing}
-            <span class="text-micro text-status-red">La date est requise pour ce statut.</span>
+            <span class="text-caption text-status-red">La date est requise pour ce statut.</span>
           {/if}
         </label>
       {/if}
@@ -201,7 +201,7 @@
           placeholder="Précisions : rythme, remote, foursquare…"
           class="resize-y rounded-lg border border-border-light bg-surface-white px-3 py-2 text-body-lg leading-relaxed text-text-primary placeholder:text-text-muted focus:border-blueprint-blue focus:outline-none focus:ring-2 focus:ring-blueprint-blue/20"
         ></textarea>
-        <span class="text-right text-micro text-text-muted"
+        <span class="text-right text-caption text-text-subtle"
           >{noteLen}/{AVAILABILITY_NOTE_MAX_LENGTH}</span
         >
       </label>

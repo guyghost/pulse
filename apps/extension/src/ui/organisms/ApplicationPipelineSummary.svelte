@@ -91,7 +91,7 @@
       >
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle">
               {card.label}
             </p>
             <p class="mt-1 text-heading font-semibold tabular-nums text-text-primary">
@@ -112,17 +112,19 @@
             <Icon name={card.icon} size={13} />
           </span>
         </div>
-        <p class="mt-1 text-micro font-medium text-text-primary">{card.stateLabel}</p>
-        <p class="mt-0.5 min-h-7 text-micro leading-4 text-text-subtle">{card.hint}</p>
+        <p class="mt-1 text-caption font-medium text-text-primary">{card.stateLabel}</p>
+        <p class="mt-0.5 min-h-9 text-caption leading-[1.15rem] text-text-subtle">{card.hint}</p>
       </div>
     {/each}
   </div>
 
   <div class="rounded-xl border border-border-light bg-surface-white p-3">
     <div class="mb-2 flex items-center justify-between gap-3">
-      <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">Avancement</p>
+      <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
+        Avancement
+      </p>
       {#if summary.bottleneck}
-        <p class="flex items-center gap-1 text-micro text-text-subtle">
+        <p class="flex items-center gap-1 text-caption text-text-subtle">
           <Icon name="traffic-cone" size={11} />
           Goulot: {summary.bottleneck.label}
         </p>

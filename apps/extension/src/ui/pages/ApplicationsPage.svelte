@@ -519,14 +519,14 @@
 <div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
   <AvailabilityPanel store={availabilityStore} platforms={availabilityPlatforms} />
 
-  <section class="section-card-strong rounded-2xl px-5 py-4">
+  <section class="section-card-strong mt-5 rounded-2xl px-5 py-5">
     <div class="flex items-start justify-between gap-4">
       <div>
         <p class="eyebrow text-blueprint-blue">Pipeline</p>
         <div class="mt-1 flex flex-wrap items-center gap-2">
           <h1 class="text-subheading font-semibold text-text-primary">Candidatures</h1>
           <span
-            class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
+            class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-caption font-medium text-text-subtle"
           >
             Local uniquement
           </span>
@@ -534,7 +534,7 @@
         <p class="mt-1 text-meta leading-5 text-text-subtle">
           Suivre les missions qualifiées, préparer les messages et faire avancer chaque dossier.
         </p>
-        <p class="mt-2 text-caption leading-5 text-text-muted">
+        <p class="mt-2 text-caption leading-5 text-text-subtle">
           Ces statuts restent dans l'extension tant que le compte MissionPulse n'est pas connecté.
         </p>
       </div>
@@ -544,7 +544,7 @@
         <Icon name="mail" size={18} class="text-blueprint-blue" />
       </div>
     </div>
-    <div class="mt-4">
+    <div class="mt-5">
       <OperationalStoryCard
         eyebrow="Priorité"
         variant="compact"
@@ -559,7 +559,7 @@
       />
     </div>
     {#if isOffline}
-      <div class="mt-3">
+      <div class="mt-4">
         <OfflineNotice
           description="Le pipeline local reste modifiable. Les ouvertures de mission et générations de messages peuvent attendre le retour réseau."
           action="Prochaine action : mettre à jour les relances dues et préparer les prochaines actions."
@@ -568,13 +568,10 @@
     {/if}
 
     {#if !isLoading}
-      <section
-        class="mt-3 rounded-xl border border-blueprint-blue/15 bg-surface-white p-3"
-        aria-label="Dossier recommandé"
-      >
+      <section class="mt-5 rounded-xl bg-blueprint-blue/5 p-4" aria-label="Dossier recommandé">
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
-            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
+            <p class="text-caption font-semibold uppercase tracking-[0.15em] text-blueprint-blue">
               Dossier recommandé
             </p>
             {#if recommendedTrackedMission}
@@ -586,12 +583,12 @@
               </p>
               <div class="mt-2 flex flex-wrap items-center gap-2">
                 <span
-                  class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-micro font-medium text-blueprint-blue"
+                  class="rounded-md bg-blueprint-blue/8 px-2 py-0.5 text-caption font-medium text-blueprint-blue"
                 >
                   {STATUS_LABELS[recommendedTrackedMission.record.currentStatus]}
                 </span>
                 {#if formatNextAction(recommendedTrackedMission.record.nextActionAt)}
-                  <span class="text-micro text-text-muted">
+                  <span class="text-caption text-text-subtle">
                     Action {formatNextAction(recommendedTrackedMission.record.nextActionAt)}
                   </span>
                 {/if}
@@ -620,10 +617,10 @@
   </section>
 
   {#if isLoading}
-    <div class="mt-4 section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
+    <div class="mt-5 section-card rounded-xl p-5" aria-busy="true" role="status" aria-live="polite">
       <div class="flex items-start justify-between gap-3">
         <div>
-          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
+          <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
             Chargement candidatures
           </p>
           <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
@@ -661,7 +658,7 @@
       </div>
     </div>
   {:else if loadError}
-    <div class="mt-4">
+    <div class="mt-5">
       <OperationalEmptyState
         title="Le pipeline candidatures ne peut pas être chargé"
         description="Les statuts locaux sont indisponibles pour le moment. Réessayez avant de modifier un dossier ou de générer un kit."
@@ -678,7 +675,7 @@
       />
     </div>
   {:else if missions.length === 0}
-    <div class="mt-4">
+    <div class="mt-5">
       <OperationalEmptyState
         title="Aucune mission ne peut encore devenir candidature"
         description="Le pipeline démarre quand une mission existe dans le feed. Lancez ou consultez le radar, puis revenez préparer un dossier."
@@ -693,13 +690,13 @@
       />
     </div>
   {:else}
-    <div class="mt-4 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
+    <div class="mt-5 grid gap-4 lg:grid-cols-[0.85fr_1.15fr]">
       <section class="section-card rounded-xl p-3">
         <div class="flex items-center justify-between px-2 pb-2">
           <h3 class="text-body-lg font-medium text-text-primary">Missions</h3>
           <span class="text-meta text-text-muted">{trackedMissions.length} suivies</span>
         </div>
-        <div class="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
+        <div class="space-y-2 pr-1 lg:max-h-[32rem] lg:overflow-y-auto">
           {#each trackedMissions.length > 0 ? trackedMissions : missions
                 .slice(0, 20)
                 .map( (mission) => ({ mission, record: tracking.getTrackingForMission(mission.id) ?? null }) ) as item (item.mission.id)}
@@ -725,11 +722,11 @@
               </div>
               <div class="mt-2 flex items-center justify-between gap-2">
                 <span
-                  class="rounded-md bg-surface-white px-2 py-0.5 text-micro font-medium text-text-subtle"
+                  class="rounded-md bg-surface-white px-2 py-0.5 text-caption font-medium text-text-subtle"
                 >
                   {STATUS_LABELS[item.record?.currentStatus ?? 'detected']}
                 </span>
-                <span class="text-micro text-text-muted">
+                <span class="text-caption text-text-subtle">
                   {formatNextAction(item.record?.nextActionAt) ??
                     formatDate(getLastActivity(item.record))}
                 </span>
@@ -744,7 +741,7 @@
           <div class="section-card rounded-xl p-5">
             <div class="flex items-start justify-between gap-4">
               <div class="min-w-0">
-                <p class="text-micro font-medium uppercase tracking-[0.15em] text-blueprint-blue">
+                <p class="text-caption font-medium uppercase tracking-[0.15em] text-blueprint-blue">
                   {STATUS_LABELS[selectedStatus]}
                 </p>
                 <h3 class="mt-1 text-subheading font-semibold text-text-primary">
@@ -793,7 +790,7 @@
               {:else}
                 <label
                   for="application-next-action"
-                  class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted"
+                  class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle"
                 >
                   Prochaine action
                 </label>
@@ -831,10 +828,10 @@
                 aria-label="Historique des décisions"
               >
                 <div class="flex items-center justify-between gap-3">
-                  <p class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted">
+                  <p class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle">
                     Historique des décisions
                   </p>
-                  <span class="text-micro text-text-muted">
+                  <span class="text-caption text-text-subtle">
                     {selectedTracking?.history.length ?? 0} événement{(selectedTracking?.history
                       .length ?? 0) > 1
                       ? 's'
