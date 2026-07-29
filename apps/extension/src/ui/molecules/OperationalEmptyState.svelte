@@ -66,7 +66,9 @@
     </div>
     <div class="min-w-0 flex-1">
       <div class="flex flex-wrap items-center gap-2">
-        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">Décision</p>
+        <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
+          Décision
+        </p>
         {#if statusLabel}
           <OperationalStatusBadge label={statusLabel} {severity} />
         {/if}
@@ -78,7 +80,7 @@
 
   {#if proofLabel && proofValue !== null}
     <div class="mt-4 rounded-lg border border-border-light bg-surface-white/70 px-3 py-2">
-      <p class="text-micro font-semibold uppercase tracking-[0.13em] text-text-muted">
+      <p class="text-caption font-semibold uppercase tracking-[0.13em] text-text-subtle">
         {proofLabel}
       </p>
       <p class="mt-1 font-mono text-body-lg font-semibold tabular-nums text-text-primary">

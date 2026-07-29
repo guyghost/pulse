@@ -268,7 +268,7 @@
           Copilot Premium
         </h3>
         <span
-          class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/6 px-2 py-0.5 text-micro font-medium text-blueprint-blue"
+          class="rounded-md border border-blueprint-blue/20 bg-blueprint-blue/6 px-2 py-0.5 text-caption font-medium text-blueprint-blue"
         >
           Eve · distant
         </span>
@@ -285,7 +285,7 @@
     <div class="mt-4 rounded-lg border border-border-light bg-page-canvas p-3" role="status">
       <p class="text-meta font-medium text-text-primary">Issue de la demande de suppression</p>
       <p class="mt-1 text-caption leading-5 text-text-subtle">{deletionReceiptMessage()}</p>
-      <p class="mt-1 text-micro text-text-muted">Confirmé le {deletionReceiptDate()}.</p>
+      <p class="mt-1 text-caption text-text-subtle">Confirmé le {deletionReceiptDate()}.</p>
     </div>
   {/if}
 
@@ -299,12 +299,12 @@
           <p id="living-dossier-title" class="text-meta font-medium text-text-primary">
             Dossier vivant
           </p>
-          <p class="mt-1 text-micro leading-4 text-text-muted">
+          <p class="mt-1 text-caption leading-4 text-text-subtle">
             Contenus explicitement conservés · état serveur {store.dossier.state}
           </p>
         </div>
         {#if store.dossier.activeJob}
-          <span class="rounded-md bg-surface-white px-2 py-1 text-micro text-text-subtle">
+          <span class="rounded-md bg-surface-white px-2 py-1 text-caption text-text-subtle">
             Traitement actif · {store.dossier.activeJob.kind}
           </span>
         {/if}
@@ -314,7 +314,7 @@
         <article class="mt-3 rounded-lg border border-border-light bg-surface-white p-3">
           <div class="flex items-center justify-between gap-2">
             <p class="text-caption font-medium text-text-primary">Analyse approuvée</p>
-            <span class="text-micro text-text-muted">
+            <span class="text-caption text-text-subtle">
               {approvedAt(store.dossier.analysis.approvedAtMs)}
             </span>
           </div>
@@ -323,7 +323,7 @@
               {#each store.dossier.analysis.result.evidenceClaims as claim (`${claim.text}:${claim.evidenceIds.join(',')}`)}
                 <li class="text-caption leading-5 text-text-secondary">
                   {claim.text}
-                  <span class="block text-micro text-text-muted">
+                  <span class="block text-caption text-text-subtle">
                     Preuves : {claim.evidenceIds.join(' · ')}
                   </span>
                 </li>
@@ -353,7 +353,7 @@
 
       {#if store.dossier.approvedArtifacts.length > 0}
         <div class="mt-3 space-y-2">
-          <p class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
+          <p class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
             Brouillons approuvés ({store.dossier.approvedArtifacts.length})
           </p>
           {#each store.dossier.approvedArtifacts as artifact (artifact.artifactId)}
@@ -362,7 +362,9 @@
                 <p class="text-caption font-medium text-text-primary">
                   {artifactLabels[artifact.kind]}
                 </p>
-                <span class="text-micro text-text-muted">{approvedAt(artifact.approvedAtMs)}</span>
+                <span class="text-caption text-text-subtle"
+                  >{approvedAt(artifact.approvedAtMs)}</span
+                >
               </div>
               <p class="mt-2 whitespace-pre-wrap text-meta leading-5 text-text-primary">
                 {artifact.draft}
@@ -445,7 +447,7 @@
       </summary>
       <div class="border-t border-border-light p-3">
         <fieldset>
-          <legend class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
+          <legend class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
             Mission
           </legend>
           <div class="mt-2 grid grid-cols-2 gap-2">
@@ -464,7 +466,7 @@
         </fieldset>
 
         <fieldset class="mt-4">
-          <legend class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
+          <legend class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
             Profil
           </legend>
           <div class="mt-2 grid grid-cols-2 gap-2">
@@ -484,7 +486,7 @@
 
         {#if store.availableEvidence.length > 0}
           <fieldset class="mt-4">
-            <legend class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
+            <legend class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
               Expériences comme sources
             </legend>
             <div class="mt-2 space-y-2">
@@ -515,15 +517,15 @@
           />
           Je consens à transmettre uniquement les champs cochés à MissionPulse Copilot pour ce job.
         </label>
-        <p class="mt-2 text-micro leading-4 text-text-muted">
+        <p class="mt-2 text-caption leading-4 text-text-subtle">
           Coach TJM transmet aussi des repères de marché numériques agrégés : stacks rapprochées,
           volumes, fourchette, tendance et date. Aucun relevé de mission individuel n’est transmis.
         </p>
-        <p class="mt-1 text-micro leading-4 text-text-muted">
+        <p class="mt-1 text-caption leading-4 text-text-subtle">
           Pitch, message et résumé CV exigent au moins une expérience cochée afin que chaque segment
           généré cite sa source.
         </p>
-        <p class="mt-1 text-micro leading-4 text-text-muted">
+        <p class="mt-1 text-caption leading-4 text-text-subtle">
           Décocher limite le job courant. Les données déjà consenties restent dans le dossier
           Copilot jusqu’à sa suppression confirmée.
         </p>
@@ -542,7 +544,7 @@
             <Icon name={operation.icon} size={13} class="text-blueprint-blue" />
             {operation.label}
           </span>
-          <span class="text-micro text-text-muted">{operation.detail}</span>
+          <span class="text-caption text-text-subtle">{operation.detail}</span>
         </button>
       {/each}
     </div>
@@ -552,7 +554,7 @@
         <div class="flex items-center justify-between gap-3">
           <div>
             <p class="text-meta font-medium text-text-primary">{statusLabel(store.job.status)}</p>
-            <p class="mt-0.5 text-micro text-text-muted">
+            <p class="mt-0.5 text-caption text-text-subtle">
               {store.job.kind === 'analysis' ? 'Analyse incluse' : `${store.job.creditCost} crédit`}
             </p>
           </div>
@@ -571,7 +573,7 @@
 
         {#if store.job.tjmFacts}
           <div class="mt-3 rounded-lg border border-border-light bg-surface-white p-3">
-            <p class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
+            <p class="text-caption font-medium uppercase tracking-[0.14em] text-text-subtle">
               Repères locaux déterministes
             </p>
             <div class="mt-2 grid grid-cols-2 gap-2 text-caption text-text-secondary">
@@ -580,7 +582,7 @@
               <span>Marché : {formatEur(store.job.tjmFacts.market.weightedAverage)}</span>
               <span>Confiance : {store.job.tjmFacts.confidence}</span>
             </div>
-            <p class="mt-2 text-micro text-text-muted">
+            <p class="mt-2 text-caption text-text-subtle">
               {store.job.tjmFacts.market.sampleCount} observation{store.job.tjmFacts.market
                 .sampleCount > 1
                 ? 's'
@@ -591,7 +593,7 @@
 
         {#if store.job.result && store.job.status === 'review'}
           <div class="mt-3 rounded-lg border border-border-light bg-surface-white p-3">
-            <p class="text-micro font-medium uppercase tracking-[0.14em] text-blueprint-blue">
+            <p class="text-caption font-medium uppercase tracking-[0.14em] text-blueprint-blue">
               Proposition IA non vérifiée
             </p>
             {#if groundedDraftText}
@@ -601,7 +603,7 @@
                   {#each groundedDraftSegments as segment, index (`${index}:${segment.text}`)}
                     <li class="text-meta leading-5 text-text-primary">
                       <span class="whitespace-pre-wrap">{segment.text}</span>
-                      <span class="mt-1 block space-y-1 text-micro leading-4 text-text-muted">
+                      <span class="mt-1 block space-y-1 text-caption leading-4 text-text-subtle">
                         {#each segment.sourceRefs as sourceRef (`${sourceRef.kind}:${sourceRef.id}`)}
                           <span class="block">
                             {sourceRefLabel(sourceRef)} — « {sourceRefExcerpt(sourceRef)} »
@@ -625,7 +627,7 @@
                 role="alert"
               >
                 <p class="text-caption font-medium text-text-primary">Proposition non vérifiée</p>
-                <p class="mt-1 text-micro leading-4 text-text-subtle">
+                <p class="mt-1 text-caption leading-4 text-text-subtle">
                   Les segments ne disposent pas tous de sources consenties valides. Le contenu est
                   masqué et ne peut être ni copié ni conservé.
                 </p>
@@ -640,7 +642,7 @@
                   {#each supportedEvidenceClaims as claim (claim.text)}
                     <li class="text-caption leading-5 text-text-secondary">
                       <span>{claim.text}</span>
-                      <span class="block text-micro text-text-muted">
+                      <span class="block text-caption text-text-subtle">
                         {claim.evidenceIds
                           .map((id) => `${evidenceLabel(id)} — « ${evidenceExcerpt(id)} »`)
                           .join(' · ')}
@@ -743,7 +745,7 @@
       {:else}
         <button
           type="button"
-          class="text-caption font-medium text-text-muted hover:text-status-red"
+          class="text-caption font-medium text-text-subtle hover:text-status-red"
           onclick={() => (deleteConfirmation = true)}>Supprimer le dossier Copilot</button
         >
       {/if}
