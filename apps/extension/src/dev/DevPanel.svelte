@@ -459,12 +459,14 @@
 {/if}
 
 {#if !isOpen}
-  <div class="fixed bottom-2 right-2 z-[60]">
+  <div class="fixed right-2 top-14 z-[60]">
     <button
-      class="px-2 py-1 text-micro font-mono rounded bg-surface-white/80 text-text-muted hover:text-blueprint-blue transition-colors border border-border-light"
+      class="h-8 rounded border border-border-light bg-surface-white/85 px-2 text-micro font-mono text-text-muted opacity-55 shadow-sm transition-all hover:text-blueprint-blue hover:opacity-100"
       onclick={() => (isOpen = true)}
+      aria-label="Ouvrir le centre de contrôle développement"
+      title="Centre de contrôle (Ctrl+Shift+D)"
     >
-      Ctrl+Shift+D
+      DEV
     </button>
   </div>
 {/if}

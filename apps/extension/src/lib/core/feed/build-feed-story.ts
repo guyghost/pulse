@@ -45,10 +45,22 @@ export interface FeedStoryInput {
   hasCompletedScan: boolean;
   filterActive: boolean;
   totalMissionCount: number;
+  searchQuery: string;
 }
 
 function formatStoryMissionCount(count: number): string {
   return `${count} mission${count > 1 ? 's' : ''}`;
+}
+
+function formatMissionAction(
+  count: number,
+  adjectiveSingular?: string,
+  adjectivePlural = adjectiveSingular
+): string {
+  if (count === 1) {
+    return `Voir la mission${adjectiveSingular ? ` ${adjectiveSingular}` : ''}`;
+  }
+  return `Voir les ${formatStoryMissionCount(count)}${adjectivePlural ? ` ${adjectivePlural}` : ''}`;
 }
 
 export function buildFeedStory(input: FeedStoryInput): FeedStory {
@@ -65,6 +77,7 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
     hasCompletedScan,
     filterActive,
     totalMissionCount,
+    searchQuery,
   } = input;
 
   const evidence: OperationalEvidence[] = [
@@ -100,7 +113,10 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
         severity: 'incident',
         statusLabel: 'Données en cache',
         title: 'Récupération interrompue — affichage en cache',
-        description: `Les ${formatStoryMissionCount(visibleCount)} déjà récupérées restent disponibles. Réessayez le scan ou vérifiez vos sources.`,
+        description:
+          visibleCount === 1
+            ? 'La mission déjà récupérée reste disponible. Réessayez le scan ou vérifiez vos sources.'
+            : `Les ${formatStoryMissionCount(visibleCount)} déjà récupérées restent disponibles. Réessayez le scan ou vérifiez vos sources.`,
         evidence,
         primaryActionLabel: 'Réessayer le scan',
         primaryActionIcon: 'refresh-cw',
@@ -126,9 +142,7 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
         'Le scan est suspendu. Vous pouvez encore qualifier, filtrer et ouvrir les missions déjà stockées.',
       evidence,
       primaryActionLabel:
-        visibleCount > 0
-          ? `Voir les ${formatStoryMissionCount(visibleCount)} en cache`
-          : 'Hors ligne',
+        visibleCount > 0 ? formatMissionAction(visibleCount, 'en cache', 'en cache') : 'Hors ligne',
       primaryActionIcon: visibleCount > 0 ? 'chevron-down' : 'database',
     };
   }
@@ -160,8 +174,10 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
       evidence,
       primaryActionLabel:
         highScoreCount > 0
-          ? `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaires`
-          : `Voir les ${formatStoryMissionCount(newCount)} nouvelles`,
+          ? formatMissionAction(highScoreCount, 'prioritaire', 'prioritaires')
+          : newCount === 1
+            ? 'Voir la nouvelle mission'
+            : `Voir les ${newCount} nouvelles missions`,
       primaryActionIcon: 'chevron-down',
     };
   }
@@ -173,10 +189,7 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
       title: `${highScoreCount} opportunité${highScoreCount > 1 ? 's' : ''} prioritaire${highScoreCount > 1 ? 's' : ''} prête${highScoreCount > 1 ? 's' : ''}`,
       description: `Elles dépassent votre seuil ${alertScoreThreshold}+. Comparez-les avant de mettre une mission en suivi.`,
       evidence,
-      primaryActionLabel:
-        alertScoreThreshold >= 80
-          ? `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaire${highScoreCount > 1 ? 's' : ''}`
-          : `Voir les ${formatStoryMissionCount(highScoreCount)} prioritaires`,
+      primaryActionLabel: formatMissionAction(highScoreCount, 'prioritaire', 'prioritaires'),
       primaryActionIcon: 'chevron-down',
     };
   }
@@ -186,6 +199,19 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
     // Cached missions exist but active filters hide them all — clear filters,
     // do not route to Profile or invite a redundant scan.
     if (filterActive && totalMissionCount > 0) {
+      const normalizedQuery = searchQuery.trim();
+      if (normalizedQuery) {
+        return {
+          severity: 'attention' as const,
+          statusLabel: 'Recherche sans résultat',
+          title: `Aucune mission pour « ${normalizedQuery} »`,
+          description:
+            'Des missions sont disponibles, mais aucune ne correspond à cette recherche.',
+          evidence,
+          primaryActionLabel: 'Effacer la recherche',
+          primaryActionIcon: 'filter-x',
+        };
+      }
       return {
         severity: 'attention' as const,
         statusLabel: 'Filtres sans résultat',
@@ -233,7 +259,7 @@ export function buildFeedStory(input: FeedStoryInput): FeedStory {
     description:
       'Le système est stable. Continuez par les favoris ou relancez un scan si la veille doit être rafraîchie.',
     evidence,
-    primaryActionLabel: `Voir les ${formatStoryMissionCount(visibleCount)}`,
+    primaryActionLabel: formatMissionAction(visibleCount),
     primaryActionIcon: 'chevron-down',
   };
 }

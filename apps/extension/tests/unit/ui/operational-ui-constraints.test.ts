@@ -167,7 +167,7 @@ describe('operational UI constraints', () => {
     expect(source).toContain('Missions proposées');
     // buildFeedStory was extracted to the functional core (pure presentation
     // logic); the new-mission cue string now lives there, not in FeedPage.
-    expect(storySource).toContain('Voir les ${formatStoryMissionCount(newCount)} nouvelles');
+    expect(storySource).toContain('Voir les ${newCount} nouvelles missions');
     expect(source).toContain('visibleFeedMissionLabel');
     expect(source).toContain('missionFeedReached = sectionRect.top <= containerRect.bottom - 48');
   });

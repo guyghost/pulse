@@ -170,9 +170,9 @@
     <div class="flex items-start justify-between gap-4">
       <div class="min-w-0">
         <p class="eyebrow text-blueprint-blue">Profil freelance</p>
-        <h2 class="mt-1 text-subheading font-semibold text-text-primary">
+        <h1 class="mt-1 text-subheading font-semibold text-text-primary">
           {settings.firstName ? `Bonjour ${settings.firstName}` : 'Votre profil MissionPulse'}
-        </h2>
+        </h1>
         <p class="mt-1 text-meta leading-5 text-text-subtle">{targetSummary}</p>
       </div>
       <div
@@ -183,7 +183,14 @@
     </div>
 
     <div class="mt-4 grid grid-cols-[1fr_auto] items-center gap-3">
-      <div class="h-2 overflow-hidden rounded-full bg-subtle-gray">
+      <div
+        class="h-2 overflow-hidden rounded-full bg-subtle-gray"
+        role="progressbar"
+        aria-label="Complétude du profil"
+        aria-valuemin="0"
+        aria-valuemax="100"
+        aria-valuenow={profileCompleteness}
+      >
         <div
           class="h-full rounded-full bg-blueprint-blue transition-all duration-300"
           style={`width: ${profileCompleteness}%`}

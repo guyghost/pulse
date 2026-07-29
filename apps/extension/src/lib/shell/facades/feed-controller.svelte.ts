@@ -649,16 +649,49 @@ export function createFeedController(
   // Smart loading
   // ============================================================
 
+  function applyDevFeedStateOverride(): boolean {
+    if (!import.meta.env.DEV || typeof window === 'undefined') {
+      return false;
+    }
+
+    try {
+      const devState = window.sessionStorage.getItem('__missionpulse_dev_feed_state');
+      if (devState === 'empty') {
+        feedStore.setMissions([]);
+        return true;
+      }
+      if (devState === 'loading') {
+        feedStore.load();
+        return true;
+      }
+      if (devState === 'error') {
+        feedStore.setError('[Dev] Simulated error');
+        return true;
+      }
+    } catch {
+      // Session storage is optional in the development shell.
+    }
+
+    return false;
+  }
+
   /**
    * Smart load: use persisted data if fresh, scan only if stale
    */
   async function smartLoad(): Promise<void> {
+    if (applyDevFeedStateOverride()) {
+      return;
+    }
+
     try {
       const [stored, statuses, settings] = await Promise.all([
         getMissions(),
         getConnectorStatuses(),
         getSettings(),
       ]);
+      if (applyDevFeedStateOverride()) {
+        return;
+      }
       if (stored.length > 0) {
         feedStore.setMissions(
           deduplicateEnabledSources(stored, new SvelteSet(settings.enabledConnectors))

@@ -298,25 +298,22 @@
       {/if}
     </div>
     <div class="flex shrink-0 items-center gap-2">
-      {#if mission.scoreBreakdown}
+      {#if scoreDisplayValue !== null && scoreDisplayValue !== undefined}
         <span
-          class="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg px-2.5 py-1 text-center text-body font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
+          class="inline-flex min-w-[3.5rem] items-baseline justify-center gap-0.5 rounded-lg px-2 py-1 text-center font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
           'score'
             ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
             : ''}"
-          >{mission.scoreBreakdown.grade}{#if mission.scoreBreakdown.semantic !== null}+{/if}</span
+          aria-label={`Score ${scoreDisplayValue} sur 100${mission.scoreBreakdown ? `, grade ${mission.scoreBreakdown.grade}` : ''}`}
+          title={mission.scoreBreakdown ? `Grade ${mission.scoreBreakdown.grade}` : undefined}
         >
-      {:else if mission.score !== null}
-        <span
-          class="inline-flex min-w-[2.25rem] items-center justify-center rounded-lg px-2.5 py-1 text-center text-body font-mono font-bold tabular-nums leading-none {scoreColor} {tourHighlight ===
-          'score'
-            ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
-            : ''}">{mission.score}</span
-        >
+          <span class="text-body">{scoreDisplayValue}</span>
+          <span class="text-micro font-medium opacity-70">/100</span>
+        </span>
       {/if}
       <button
         type="button"
-        class="flex h-7 w-7 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
+        class="flex h-8 w-8 items-center justify-center rounded-md text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary {tourHighlight ===
         'expand'
           ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas'
           : ''}"
@@ -535,7 +532,7 @@
           : 'Gardez cette mission dans les opportunités à suivre.'}
       >
         <button
-          class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary {isFavorite
             ? 'text-blueprint-blue hover:text-blueprint-blue'
             : ''}"
           onclick={handleToggleFavorite}
@@ -555,7 +552,7 @@
           : 'Retirez cette opportunité du flux décisionnel.'}
       >
         <button
-          class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-status-red"
           onclick={handleHide}
           aria-label={isHidden ? 'Restaurer la mission masquée' : 'Masquer la mission'}
         >
@@ -569,7 +566,7 @@
           : 'Ajoutez cette mission à la sélection pour départager les opportunités.'}
       >
         <button
-          class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-blueprint-blue disabled:cursor-not-allowed disabled:opacity-40 {isCompared
             ? 'bg-blueprint-blue/8 text-blueprint-blue'
             : ''}"
           onclick={handleToggleCompare}
@@ -587,7 +584,7 @@
         description="Partagez ou archivez la mission sans ouvrir la plateforme."
       >
         <button
-          class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
           onclick={handleCopyLink}
           aria-label={copied ? 'Lien copié' : 'Copier le lien de la mission'}
         >
@@ -603,7 +600,7 @@
         description="Passez à la plateforme source pour vérifier ou postuler."
       >
         <button
-          class="inline-flex h-7 w-7 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
+          class="inline-flex h-8 w-8 items-center justify-center rounded-lg text-text-muted transition-colors duration-150 hover:bg-subtle-gray hover:text-text-primary"
           onclick={handleOpenLink}
           aria-label="Ouvrir la mission sur la plateforme source"
         >

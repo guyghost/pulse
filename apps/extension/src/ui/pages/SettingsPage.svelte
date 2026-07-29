@@ -29,7 +29,8 @@
   const {
     onBack,
     onNavigateToOnboarding,
-  }: { onBack?: () => void; onNavigateToOnboarding?: () => void } = $props();
+    active = true,
+  }: { onBack?: () => void; onNavigateToOnboarding?: () => void; active?: boolean } = $props();
 
   const settings = new SettingsPageController({
     onNavigateToOnboarding: () => {
@@ -40,6 +41,7 @@
   const isOffline = $derived(connection.status === 'offline');
 
   type SettingsSectionId = 'sources' | 'alerts' | 'account' | 'data';
+  type SettingsDataStatus = 'inactive' | 'refreshing' | 'ready' | 'refresh-error';
 
   type SettingsSectionLink = {
     id: SettingsSectionId;
@@ -118,22 +120,57 @@
   let alertPreviewSeenIds = $state<string[]>([]);
   let alertHistory = $state<AlertHistoryEntry[]>([]);
   let aiSettingsSection: HTMLElement | null = $state(null);
+  let dataStatus = $state<SettingsDataStatus>('inactive');
+  let previousActive = false;
+  let refreshPromise: Promise<void> | null = null;
 
-  (async () => {
-    const [storedAlertPreferences, favorites, missions, seenIds, storedAlertHistory] =
-      await Promise.all([
-        getAlertPreferences(),
-        getFavorites(),
-        getMissions(),
-        getSeenIds(),
-        getAlertHistory(),
-      ]);
-    alertPreferences = storedAlertPreferences;
-    favoriteExportCount = Object.keys(favorites).length;
-    alertPreviewMissions = missions;
-    alertPreviewSeenIds = seenIds;
-    alertHistory = storedAlertHistory;
-  })().catch(() => {});
+  async function refreshPageData(): Promise<void> {
+    if (refreshPromise) {
+      return refreshPromise;
+    }
+
+    refreshPromise = (async () => {
+      dataStatus = 'refreshing';
+      try {
+        const [storedAlertPreferences, favorites, missions, seenIds, storedAlertHistory] =
+          await Promise.all([
+            getAlertPreferences(),
+            getFavorites(),
+            getMissions(),
+            getSeenIds(),
+            getAlertHistory(),
+          ]);
+        alertPreferences = storedAlertPreferences;
+        favoriteExportCount = Object.keys(favorites).length;
+        alertPreviewMissions = missions;
+        alertPreviewSeenIds = seenIds;
+        alertHistory = storedAlertHistory;
+        dataStatus = 'ready';
+      } catch (error) {
+        dataStatus = 'refresh-error';
+        throw error;
+      }
+    })().finally(() => {
+      refreshPromise = null;
+    });
+
+    return refreshPromise;
+  }
+
+  $effect(() => {
+    const becameActive = active && !previousActive;
+    const becameInactive = !active && previousActive;
+    previousActive = active;
+    if (becameInactive) {
+      dataStatus = 'inactive';
+    }
+    if (becameActive) {
+      void refreshPageData().catch(() => {
+        // Keep the last known values. The page remains usable and retries on
+        // the next activation.
+      });
+    }
+  });
 
   async function handleExportFavorites(format: ExportFormat) {
     const result = await settings.exportFavorites(format);
@@ -478,7 +515,10 @@
   });
 </script>
 
-<div class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4">
+<div
+  class="flex h-full flex-col overflow-y-auto px-4 pb-5 pt-4"
+  aria-busy={dataStatus === 'refreshing'}
+>
   <!-- Hero -->
   <section class="section-card-strong rounded-2xl px-5 py-4">
     <div class="flex items-center gap-3">
@@ -489,7 +529,7 @@
       </div>
       <div>
         <p class="eyebrow text-blueprint-blue">Configuration</p>
-        <h2 class="mt-1 text-subheading font-semibold text-text-primary">Paramètres</h2>
+        <h1 class="mt-1 text-subheading font-semibold text-text-primary">Paramètres</h1>
       </div>
     </div>
 

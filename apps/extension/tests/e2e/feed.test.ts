@@ -279,6 +279,27 @@ test.describe('Feed', () => {
     await expect(page.getByText(/React/).first()).toBeVisible();
   });
 
+  test('search with no result stays a filtered state and can be cleared', async ({ page }) => {
+    await mockUserWithProfile(page);
+    await page.goto(SIDE_PANEL);
+    await expect(feedSearchInput(page)).toBeVisible({ timeout: 10000 });
+    await injectMissions(page, 5);
+    await expectMissionCount(page, 5);
+
+    await feedSearchInput(page).fill('zzzz-introuvable');
+
+    await expect(
+      page.getByRole('heading', { name: 'Aucune mission pour « zzzz-introuvable »' }).first()
+    ).toBeVisible({ timeout: 3000 });
+    await expect(
+      page.getByRole('heading', { name: /Lancez un premier scan|profil actuel/ })
+    ).toHaveCount(0);
+
+    await page.getByRole('button', { name: 'Effacer la recherche' }).first().click();
+    await expect(feedSearchInput(page)).toHaveValue('');
+    await expectMissionCount(page, 5);
+  });
+
   test('error state shows error message', async ({ page }) => {
     await mockUserWithProfile(page);
     await page.goto(SIDE_PANEL);
@@ -530,5 +551,16 @@ test.describe('Feed', () => {
     // Filter panel uses role="group" with aria-label "Options de filtrage"
     const filterPanel = page.getByRole('group', { name: /Options de filtrage/ });
     await expect(filterPanel).toBeVisible();
+
+    const panelIsTopmost = await filterPanel.evaluate((panel) => {
+      const rect = panel.getBoundingClientRect();
+      const hit = document.elementFromPoint(rect.left + rect.width / 2, rect.top + 24);
+      return hit === panel || (hit !== null && panel.contains(hit));
+    });
+    expect(panelIsTopmost).toBe(true);
+
+    const remoteFilter = filterPanel.getByRole('button', { name: 'Full remote', exact: true });
+    await remoteFilter.click();
+    await expect(remoteFilter).toHaveAttribute('aria-pressed', 'true');
   });
 });

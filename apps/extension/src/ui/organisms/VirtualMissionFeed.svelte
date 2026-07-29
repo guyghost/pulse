@@ -24,6 +24,7 @@
     sortBy = 'score',
     resetKey = '',
     filterActive = false,
+    searchQuery = '',
     stableQueueActive = false,
     tourStep = null,
     onMissionSeen,
@@ -52,6 +53,7 @@
     sortBy?: 'score' | 'date' | 'tjm';
     resetKey?: string;
     filterActive?: boolean;
+    searchQuery?: string;
     stableQueueActive?: boolean;
     tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onMissionSeen?: (id: string) => void;
@@ -176,14 +178,20 @@
   {:else if sortedMissions.length === 0}
     {#if filterActive}
       <OperationalEmptyState
-        title="Aucune mission ne correspond à cette décision"
-        description="Aucune mission ne correspond aux filtres actuels. Élargissez les critères avant de relancer un scan."
+        title={searchQuery.trim()
+          ? `Aucune mission pour « ${searchQuery.trim()} »`
+          : 'Aucune mission ne correspond à cette décision'}
+        description={searchQuery.trim()
+          ? 'Des missions sont disponibles, mais aucune ne correspond à cette recherche.'
+          : 'Aucune mission ne correspond aux filtres actuels. Élargissez les critères avant de relancer un scan.'}
         severity="attention"
-        statusLabel="Filtre trop strict"
+        statusLabel={searchQuery.trim() ? 'Recherche sans résultat' : 'Filtre trop strict'}
         icon="filter-x"
         proofLabel="Résultat filtré"
         proofValue="0 mission"
-        primaryActionLabel="Réinitialiser les filtres"
+        primaryActionLabel={searchQuery.trim()
+          ? 'Effacer la recherche'
+          : 'Réinitialiser les filtres'}
         primaryActionIcon="filter-x"
         secondaryActionLabel="Relancer le scan"
         secondaryActionIcon="refresh-cw"

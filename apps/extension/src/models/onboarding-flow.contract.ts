@@ -25,7 +25,7 @@
 
 import type { UserProfile } from '$lib/core/types/profile';
 
-export const ONBOARDING_FLOW_MODEL_VERSION = 1;
+export const ONBOARDING_FLOW_MODEL_VERSION = 2;
 
 /** Wizard step, in strict order. */
 export const ONBOARDING_WIZARD_STEPS = ['identity', 'preferences', 'skills'] as const;
@@ -194,23 +194,22 @@ export function projectOnboardingFlow(
   ctx: OnboardingFlowContext,
   phase: OnboardingFlowPhase
 ): OnboardingFlowSnapshot {
-  const order: OnboardingFlowPhase[] = [
-    'welcome',
-    'connecting',
-    'wizard',
-    'notifying',
-    'persisting',
-    'scanning',
-    'completed',
-  ];
-  const current = order.indexOf(phase) + 1;
+  const total = 5;
+  const current =
+    phase === 'welcome'
+      ? 0
+      : phase === 'connecting'
+        ? 1
+        : phase === 'wizard'
+          ? ONBOARDING_WIZARD_STEPS.indexOf(ctx.wizardStep) + 2
+          : total;
   return {
     phase,
     wizardStep: ctx.wizardStep,
     profile: ctx.profile,
     connectedSources: ctx.connectedSources,
     notifyEnabled: ctx.notifyEnabled,
-    progress: { current: current < 0 ? 0 : current, total: order.length },
+    progress: { current, total },
     pendingEffect: ctx.pendingEffect,
     error: ctx.error,
     terminal: phase === 'completed',

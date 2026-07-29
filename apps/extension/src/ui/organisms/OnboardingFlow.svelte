@@ -5,7 +5,7 @@
    * and NEVER decides a transition — the flow machine (via the page controller)
    * is the single source of truth. "The model decides."
    */
-  import { SegmentedControl, ChipGroup, Toggle, Icon, type IconName } from '@pulse/ui';
+  import { SegmentedControl, ChipGroup, Toggle, Icon } from '@pulse/ui';
   import { fade } from 'svelte/transition';
   import OnboardingWelcome from './OnboardingWelcome.svelte';
   import type {
@@ -33,11 +33,11 @@
   // These exist only so <input bind:> can update the DOM immediately; every
   // change is also pushed to the machine via UPDATE_PROFILE so the guard stays
   // authoritative.
-  let firstName = $state(snapshot.profile.firstName);
-  let jobTitle = $state(snapshot.profile.jobTitle);
-  let location = $state(snapshot.profile.location);
-  let tjmMin = $state(String(snapshot.profile.tjmMin));
-  let tjmMax = $state(String(snapshot.profile.tjmMax));
+  let firstName = $state('');
+  let jobTitle = $state('');
+  let location = $state('');
+  let tjmMin = $state('');
+  let tjmMax = $state('');
   let keywordsInput = $state('');
 
   // Re-sync when the snapshot profile changes externally (e.g. back-nav).
@@ -107,6 +107,9 @@
 
   const scanningPartial = $derived(
     snapshot.pendingEffect?.kind === 'START_SCAN' && snapshot.pendingEffect.partial
+  );
+  const progressPercent = $derived(
+    Math.round((snapshot.progress.current / snapshot.progress.total) * 100)
   );
 </script>
 
@@ -181,20 +184,24 @@
   </section>
 {:else if snapshot.phase === 'wizard'}
   <section class="flex h-full flex-col" transition:fade={{ duration: 120 }}>
-    <!-- 2px progress -->
-    <div class="h-0.5 w-full overflow-hidden rounded-full bg-subtle-gray">
+    <div
+      class="h-0.5 w-full overflow-hidden rounded-full bg-subtle-gray"
+      role="progressbar"
+      aria-label={`Progression de la configuration : étape ${snapshot.progress.current} sur ${snapshot.progress.total}`}
+      aria-valuemin="0"
+      aria-valuemax={snapshot.progress.total}
+      aria-valuenow={snapshot.progress.current}
+    >
       <div
         class="h-full rounded-full bg-blueprint-blue transition-all duration-300 ease-out"
-        style="width: {snapshot.wizardStep === 'identity'
-          ? '33%'
-          : snapshot.wizardStep === 'preferences'
-            ? '66%'
-            : '100%'}"
+        style={`width: ${progressPercent}%`}
       ></div>
     </div>
 
     <div class="flex-1 pt-5">
-      <p class="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">{stepLabel}</p>
+      <p class="text-xs font-medium uppercase tracking-[0.18em] text-text-muted">
+        Étape {snapshot.progress.current}/{snapshot.progress.total} · {stepLabel}
+      </p>
       <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">
         {snapshot.wizardStep === 'identity'
           ? 'Qui êtes-vous ?'
@@ -284,9 +291,12 @@
           </div>
         {:else}
           <div>
-            <span class="text-xs font-medium text-text-secondary">Compétences</span>
+            <label for="onboarding-skill-input" class="text-xs font-medium text-text-secondary"
+              >Compétences</label
+            >
             <div class="mt-2 flex gap-2">
               <input
+                id="onboarding-skill-input"
                 type="text"
                 bind:value={keywordsInput}
                 onkeydown={(e) =>
@@ -297,6 +307,7 @@
               <button
                 type="button"
                 onclick={() => addKeyword(keywordsInput)}
+                aria-label="Ajouter la compétence"
                 class="h-11 rounded-xl border border-border-light bg-surface-white px-4 text-sm font-medium text-text-secondary hover:bg-subtle-gray"
               >
                 <Icon name="plus" class="h-4 w-4" />
@@ -308,6 +319,7 @@
                   <button
                     type="button"
                     onclick={() => removeKeyword(k)}
+                    aria-label={`Retirer ${k}`}
                     class="inline-flex h-8 items-center gap-1 rounded-full border border-blueprint-blue/30 bg-blueprint-blue/10 px-3 text-xs font-medium text-blueprint-blue"
                   >
                     {k}<Icon name="minus" class="h-3 w-3" />
@@ -347,7 +359,7 @@
         onclick={() => onEvent({ type: 'NEXT' })}
         class="h-12 flex-[2] rounded-2xl bg-blueprint-blue text-sm font-semibold text-white transition-transform active:scale-[0.99] enabled:hover:brightness-105 disabled:cursor-not-allowed disabled:opacity-40"
       >
-        {snapshot.wizardStep === 'skills' ? 'Terminer' : 'Continuer'}
+        Continuer
       </button>
     </div>
   </section>
@@ -375,6 +387,9 @@
           </div>
           <Toggle
             checked={snapshot.notifyEnabled}
+            aria-label={snapshot.notifyEnabled
+              ? 'Désactiver les notifications de missions'
+              : 'Activer les notifications de missions'}
             onclick={() => onEvent({ type: 'SET_NOTIFY', enabled: !snapshot.notifyEnabled })}
           />
         </div>

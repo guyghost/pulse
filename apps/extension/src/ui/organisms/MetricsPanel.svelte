@@ -794,16 +794,17 @@
     </div>
   </div>
 {:else}
-  <div class="fixed bottom-2 left-2 z-50">
+  <div class="fixed left-2 top-14 z-50">
     <button
-      class="rounded border border-border-light bg-surface-white/80 px-2 py-1 text-micro font-mono text-text-muted transition-colors hover:text-blueprint-blue"
+      class="h-8 rounded border border-border-light bg-surface-white/85 px-2 text-micro font-mono text-text-muted opacity-55 shadow-sm transition-all hover:text-blueprint-blue hover:opacity-100"
       onclick={() => {
         isOpen = true;
         refresh();
       }}
       title="Ouvrir le diagnostic opérationnel"
+      aria-label="Ouvrir le diagnostic opérationnel"
     >
-      Ctrl+Shift+M
+      QA
     </button>
   </div>
 {/if}

@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import type { TJMHistory, TJMRecord } from '$lib/core/types/tjm';
-import { analyzeTJMHistory } from '$lib/core/tjm-history/index';
+import { analyzeTJMHistory, getTJMDataFreshness } from '$lib/core/tjm-history/index';
 
 const makeRecord = (overrides: Partial<TJMRecord> = {}): TJMRecord => ({
   stack: 'react',
@@ -141,5 +141,51 @@ describe('analyzeTJMHistory', () => {
 
     const otherInsight = analysis!.regionInsights.find((r) => r.region === 'other');
     expect(otherInsight).toBeUndefined();
+  });
+
+  it('reduces confidence when the newest market data is stale', () => {
+    const records = Array.from({ length: 30 }, (_, index) =>
+      makeRecord({
+        stack: `stack-${index % 9}`,
+        date: '2026-04-01',
+        sampleCount: 4,
+      })
+    );
+
+    const fresh = analyzeTJMHistory(makeHistory(records), new Date('2026-04-20T12:00:00.000Z'));
+    const stale = analyzeTJMHistory(makeHistory(records), new Date('2026-07-29T12:00:00.000Z'));
+
+    expect(fresh).not.toBeNull();
+    expect(stale).not.toBeNull();
+    expect(fresh!.confidence).toBe(1);
+    expect(stale!.confidence).toBe(0.4);
+  });
+});
+
+describe('getTJMDataFreshness', () => {
+  const now = new Date('2026-07-29T12:00:00.000Z');
+
+  it('classifies freshness at the model boundaries', () => {
+    expect(getTJMDataFreshness('2026-07-10', now).level).toBe('fresh');
+    expect(getTJMDataFreshness('2026-06-01', now).level).toBe('aging');
+    expect(getTJMDataFreshness('2026-04-01', now)).toMatchObject({
+      level: 'stale',
+      ageDays: 119,
+      confidenceMultiplier: 0.4,
+    });
+    expect(getTJMDataFreshness('2025-12-01', now).level).toBe('obsolete');
+  });
+
+  it('does not invent negative age or a penalty for invalid/future dates', () => {
+    expect(getTJMDataFreshness('invalid', now)).toEqual({
+      level: 'unknown',
+      ageDays: null,
+      confidenceMultiplier: 1,
+    });
+    expect(getTJMDataFreshness('2026-08-01', now)).toEqual({
+      level: 'unknown',
+      ageDays: null,
+      confidenceMultiplier: 1,
+    });
   });
 });

@@ -40,6 +40,30 @@ function fullProfileEvents(): OnboardingFlowEvent[] {
 
 describe('onboarding-flow machine', () => {
   describe('nominal path', () => {
+    it('projects five monotonic user decisions without counting technical states', () => {
+      const c = makeController();
+      expect(c.getSnapshot().progress).toEqual({ current: 0, total: 5 });
+
+      c.send({ type: 'START' });
+      expect(c.getSnapshot().progress).toEqual({ current: 1, total: 5 });
+      c.send({ type: 'CONNECT_SOURCE', sourceId: 'free-work' });
+      c.send({ type: 'NEXT' });
+      expect(c.getSnapshot().progress).toEqual({ current: 2, total: 5 });
+      c.send({ type: 'UPDATE_PROFILE', partial: { firstName: 'Alex', jobTitle: 'Dev' } });
+      c.send({ type: 'NEXT' });
+      expect(c.getSnapshot().progress).toEqual({ current: 3, total: 5 });
+      c.send({ type: 'UPDATE_PROFILE', partial: { tjmMin: 600, tjmMax: 800 } });
+      c.send({ type: 'NEXT' });
+      expect(c.getSnapshot().progress).toEqual({ current: 4, total: 5 });
+      c.send({ type: 'UPDATE_PROFILE', partial: { keywords: ['TypeScript'] } });
+      c.send({ type: 'NEXT' });
+      expect(c.getSnapshot().progress).toEqual({ current: 5, total: 5 });
+      c.send({ type: 'NEXT' });
+      expect(c.getSnapshot().progress).toEqual({ current: 5, total: 5 });
+      c.send({ type: 'PERSISTED' });
+      expect(c.getSnapshot().progress).toEqual({ current: 5, total: 5 });
+    });
+
     it('reaches completed via welcome→connect→wizard→notify→persist→scan', () => {
       const c = makeController();
       const final = run(c, [

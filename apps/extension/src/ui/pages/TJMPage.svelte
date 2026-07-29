@@ -7,6 +7,8 @@
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
+  import { getTJMDataFreshness } from '$lib/core/tjm-history';
+  import { formatAbsoluteDate } from '$lib/core/utils/format';
 
   const {
     onNavigateToProfile,
@@ -24,6 +26,7 @@
   let profileStacks = $state<string[]>([]);
   let userSeniority = $state<SeniorityLevel | null>(null);
   let selectedRegion = $state<TJMRegion | null>(null);
+  let analysisReferenceTime = $state(Date.now());
   // Region options are snapshotted from the unfiltered analysis so the dropdown
   // keeps showing every available region even after a region filter is applied
   // (the filtered analysis would otherwise shrink to a single region).
@@ -38,6 +41,7 @@
         profileStacks.length > 0 ? profileStacks : undefined,
         selectedRegion ?? undefined
       );
+      analysisReferenceTime = Date.now();
       if (!selectedRegion && analysis?.regionInsights) {
         regionOptions = analysis.regionInsights.map(({ region, label }) => ({ region, label }));
       }
@@ -71,6 +75,21 @@
 
   const isOffline = $derived(connection.status === 'offline');
   const profileCalibrated = $derived(userTjmMin > 0 || userTjmMax > 0);
+  const dataFreshness = $derived(
+    analysis ? getTJMDataFreshness(analysis.lastUpdated, new Date(analysisReferenceTime)) : null
+  );
+  const lastUpdatedLabel = $derived.by(() => {
+    if (!analysis?.lastUpdated) {
+      return '—';
+    }
+    const timestamp = Date.parse(analysis.lastUpdated);
+    return Number.isFinite(timestamp)
+      ? (formatAbsoluteDate(timestamp, { style: 'medium' }) ?? '—')
+      : '—';
+  });
+  const dataIsStale = $derived(
+    dataFreshness?.level === 'stale' || dataFreshness?.level === 'obsolete'
+  );
 
   let dashboardSection: HTMLElement | undefined = $state(undefined);
 
@@ -109,7 +128,7 @@
         <div>
           <p class="eyebrow text-blueprint-blue">Marché</p>
           <div class="mt-1 flex flex-wrap items-center gap-2">
-            <h2 class="text-subheading font-semibold text-text-primary">Analyse TJM</h2>
+            <h1 class="text-subheading font-semibold text-text-primary">Analyse TJM</h1>
             <span
               class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
             >
@@ -132,7 +151,11 @@
     </div>
 
     {#if analysis && !isLoading}
-      <p class="mt-3 text-caption text-text-muted">Mis à jour le {analysis.lastUpdated ?? '—'}</p>
+      <p class="mt-3 text-caption text-text-muted" class:text-status-orange={dataIsStale}>
+        Mis à jour le {lastUpdatedLabel}{#if dataIsStale && dataFreshness?.ageDays !== null}
+          · Données anciennes ({dataFreshness.ageDays} jour{dataFreshness.ageDays > 1 ? 's' : ''})
+        {/if}
+      </p>
     {:else if isLoading}
       <p class="mt-3 text-caption text-text-muted">Chargement…</p>
     {/if}

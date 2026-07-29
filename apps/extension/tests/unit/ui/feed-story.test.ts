@@ -10,6 +10,7 @@ const baseInput = {
   hasCompletedScan: false,
   filterActive: false,
   totalMissionCount: 0,
+  searchQuery: '',
 };
 
 describe('buildFeedStory', () => {

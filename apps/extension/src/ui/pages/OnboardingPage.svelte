@@ -84,24 +84,28 @@
   const feedStore = createFeedStore();
   const feedController = createFeedController(feedStore, { autoLoad: false });
 
-  const unsubscribe = controller.subscribe((next) => {
+  const subscription = controller.subscribe((next) => {
     snapshot = next;
   });
   controller.start();
-  onDestroy(unsubscribe);
+  onDestroy(() => subscription.unsubscribe());
   onDestroy(() => controller.stop());
   onDestroy(() => feedController.dispose());
 
   // ── Effect executor ──────────────────────────────────────────────────────
   // Fires once per emitted effect (ref-equality guard prevents re-runs).
-  let lastHandled: OnboardingFlowEffect | null = null;
+  let lastHandledEffectKey: string | null = null;
 
   $effect(() => {
     const effect = snapshot.pendingEffect;
-    if (!effect || effect === lastHandled) {
+    if (!effect) {
       return;
     }
-    lastHandled = effect;
+    const effectKey = `${effect.attemptId}:${effect.kind}`;
+    if (effectKey === lastHandledEffectKey) {
+      return;
+    }
+    lastHandledEffectKey = effectKey;
     void runEffect(effect);
   });
 
@@ -218,4 +222,4 @@
   <OnboardingFlow {snapshot} {sources} onEvent={handleEvent} onRetry={retryFinalize} {navFailed} />
 {/snippet}
 
-<OnboardingLayout content={wizardContent} />
+<OnboardingLayout content={wizardContent} showHeader={snapshot.phase !== 'welcome'} />

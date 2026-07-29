@@ -472,6 +472,7 @@
       hasCompletedScan: controller.lastScanAt !== null,
       filterActive: page.filterActive,
       totalMissionCount: page.totalMissions,
+      searchQuery: page.searchQuery,
     })
   );
 
@@ -911,6 +912,7 @@
   use:pullToRefresh={{ onRefresh: () => handleMissionFeedScanAction(), threshold: 60 }}
   onscroll={handleMissionScroll}
 >
+  <h1 class="sr-only">Feed de missions MissionPulse</h1>
   {#if showMissionScrollCue}
     <div
       class="pointer-events-none sticky top-[calc(100%-5.5rem)] z-40 px-4"
@@ -953,9 +955,9 @@
            ═══════════════════════════════════════════ -->
       <section
         data-testid="feed-hero-card"
-        class="section-card-strong relative isolate overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {feedChromeCompact
-          ? 'border-blueprint-blue/10 shadow-subtle-3'
-          : ''}"
+        class="section-card-strong relative overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {page.showFilters
+          ? 'z-40'
+          : ''} {feedChromeCompact ? 'border-blueprint-blue/10 shadow-subtle-3' : ''}"
       >
         <!-- ── Hero header ── -->
         <div class="px-5 {page.heroCompact ? 'pt-2.5 pb-1.5' : 'pt-4 pb-0'}">
@@ -971,12 +973,14 @@
                   </p>
                   <div
                     class="mt-1 flex items-baseline gap-3"
-                    aria-label={`${page.visibleCount} missions visibles`}
+                    aria-label={`${formatMissionCount(page.visibleCount)} visible${page.visibleCount > 1 ? 's' : ''}`}
                   >
                     <span class="text-heading font-semibold text-text-primary"
                       >{page.visibleCount}</span
                     >
-                    <span class="text-micro text-text-muted">missions</span>
+                    <span class="text-micro text-text-muted"
+                      >{page.visibleCount > 1 ? 'missions' : 'mission'}</span
+                    >
                     {#if page.favoriteCount > 0}
                       <span class="flex items-center gap-1 text-micro text-blueprint-blue">
                         <Icon name="star" size={10} class="fill-blueprint-blue" />
@@ -1001,9 +1005,11 @@
                     : page.isOffline
                       ? 'Scan indisponible hors ligne'
                       : 'Lancer le scan'}
-                  description={page.isOffline
-                    ? 'Pulse utilise les données en cache jusqu’au retour réseau.'
-                    : 'Raccourci clavier: r. Relance les sources connectées.'}
+                  description={page.feedPresentation.primaryAction === 'cancel'
+                    ? 'Interrompt le scan en cours et conserve les données déjà chargées.'
+                    : page.isOffline
+                      ? 'Pulse utilise les données en cache jusqu’au retour réseau.'
+                      : 'Raccourci clavier: r. Relance les sources connectées.'}
                 >
                   <button
                     class="soft-ring relative inline-flex h-8 w-8 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-primary transition-all duration-200 hover:bg-subtle-gray"
@@ -1575,7 +1581,7 @@
         </div>
         <span
           class="shrink-0 rounded-lg border border-border-light bg-surface-white px-2 py-1 font-mono text-meta font-semibold tabular-nums text-text-primary"
-          aria-label={`${visibleFeedMissionCount} missions dans la liste`}
+          aria-label={`${formatMissionCount(visibleFeedMissionCount)} dans la liste`}
         >
           {visibleFeedMissionCount}
         </span>
@@ -1606,6 +1612,7 @@
           sortBy={page.sortBy}
           resetKey={missionFeedResetKey}
           filterActive={page.filterActive || showAlertOnly}
+          searchQuery={page.searchQuery}
           stableQueueActive={page.stableQueueActive}
           onMissionReadSignal={page.handleMissionReadSignal}
           onToggleFavorite={page.handleToggleFavorite}

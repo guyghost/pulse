@@ -303,6 +303,12 @@ describe('MissionCard', () => {
     });
     await tick();
 
+    const scoreBadge = target.querySelector('[aria-label="Score 82 sur 100, grade A"]');
+    expect(scoreBadge).not.toBeNull();
+    expect(scoreBadge?.textContent).toContain('82');
+    expect(scoreBadge?.textContent).toContain('/100');
+    expect(scoreBadge?.textContent).not.toBe('A');
+
     const detailsButton = target.querySelector(
       'button[aria-controls^="mission-score-details-"]'
     ) as HTMLButtonElement;

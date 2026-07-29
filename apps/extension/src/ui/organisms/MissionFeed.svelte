@@ -16,6 +16,7 @@
     hidden = {},
     sortBy = 'score',
     filterActive = false,
+    searchQuery = '',
     onMissionSeen,
     onToggleFavorite,
     onHide,
@@ -33,6 +34,7 @@
     hidden?: Record<string, number>;
     sortBy?: 'score' | 'date' | 'tjm';
     filterActive?: boolean;
+    searchQuery?: string;
     onMissionSeen?: (id: string) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
@@ -106,14 +108,20 @@
   {:else if sortedMissions.length === 0}
     {#if filterActive}
       <OperationalEmptyState
-        title="Aucune mission ne correspond à cette décision"
-        description="Le système n’a pas trouvé d’opportunité dans le périmètre courant. La prochaine action utile est d’élargir les critères avant de rescanner."
+        title={searchQuery.trim()
+          ? `Aucune mission pour « ${searchQuery.trim()} »`
+          : 'Aucune mission ne correspond à cette décision'}
+        description={searchQuery.trim()
+          ? 'Des missions sont disponibles, mais aucune ne correspond à cette recherche.'
+          : 'Le système n’a pas trouvé d’opportunité dans le périmètre courant. La prochaine action utile est d’élargir les critères avant de rescanner.'}
         severity="attention"
-        statusLabel="Filtre trop strict"
+        statusLabel={searchQuery.trim() ? 'Recherche sans résultat' : 'Filtre trop strict'}
         icon="filter-x"
         proofLabel="Résultat filtré"
         proofValue="0 mission"
-        primaryActionLabel="Réinitialiser les filtres"
+        primaryActionLabel={searchQuery.trim()
+          ? 'Effacer la recherche'
+          : 'Réinitialiser les filtres'}
         primaryActionIcon="filter-x"
         secondaryActionLabel="Relancer le scan"
         secondaryActionIcon="refresh-cw"

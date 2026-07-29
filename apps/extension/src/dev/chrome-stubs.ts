@@ -412,7 +412,12 @@ function defaultDevTrackings(now: number): MissionTracking[] {
 
 function readDevTrackings(now: number): MissionTracking[] {
   const stored = readDevStorage<MissionTracking[] | null>(DEV_TRACKINGS_STORAGE_KEY, null);
-  return stored !== null ? stored : defaultDevTrackings(now);
+  if (stored !== null) {
+    return stored;
+  }
+  const seeded = defaultDevTrackings(now);
+  writeDevTrackings(seeded);
+  return seeded;
 }
 
 function writeDevTrackings(trackings: MissionTracking[]): void {
@@ -1021,6 +1026,8 @@ function createChromeStubs() {
               type: 'CONNECTED_ALERT_PREFERENCES_SAVED',
               payload: { saved: true, preferences: storage.connectedAlertPreferences },
             };
+          case 'GET_ALERT_HISTORY':
+            return { type: 'ALERT_HISTORY_RESULT', payload: [] };
           case 'GET_CONNECTOR_HEALTH':
             return {
               type: 'CONNECTOR_HEALTH_RESULT',
@@ -1053,7 +1060,7 @@ function createChromeStubs() {
             return {
               type: 'TJM_ANALYSIS_RESULT',
               payload: {
-                analysis: analyzeTJMHistory({ records: filteredRecords }),
+                analysis: analyzeTJMHistory({ records: filteredRecords }, new Date()),
               },
             };
           }

@@ -1,5 +1,11 @@
 import { test, expect } from './fixtures';
-import { expectFeedReady, navButton } from './helpers';
+import {
+  expectFeedReady,
+  favoriteButton,
+  missionCards,
+  navButton,
+  unfavoriteButton,
+} from './helpers';
 
 test.describe('Settings Flow', () => {
   test('navigates to settings without the profile editor section', async ({ page }) => {
@@ -32,9 +38,12 @@ test.describe('Settings Flow', () => {
     await expect(editBtn).toBeVisible({ timeout: 3000 });
     await editBtn.click();
 
-    await expect(page.locator('input[placeholder="Prénom"]')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Prénom' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Prénom' })).toBeFocused();
     await expect(page.locator('input[placeholder*="Poste"]')).toBeVisible();
     await expect(page.locator('input[placeholder="Localisation"]')).toBeVisible();
+    await expect(page.getByRole('spinbutton', { name: 'TJM minimum' })).toBeVisible();
+    await expect(page.getByRole('spinbutton', { name: 'TJM maximum' })).toBeVisible();
   });
 
   test('canceling profile edit returns to read-only mode', async ({ page }) => {
@@ -200,6 +209,26 @@ test.describe('Settings Flow', () => {
     await expect(page.getByRole('button', { name: 'JSON' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'CSV' })).toBeVisible();
     await expect(page.getByRole('button', { name: 'Markdown' })).toBeVisible();
+  });
+
+  test('refreshes the favorite export count when settings becomes active', async ({ page }) => {
+    await navButton(page, 'Feed').click();
+    const firstCard = missionCards(page).first();
+    await expect(firstCard).toBeVisible();
+
+    const alreadyFavorite = await unfavoriteButton(firstCard)
+      .isVisible()
+      .catch(() => false);
+    if (!alreadyFavorite) {
+      await favoriteButton(firstCard).click();
+      await expect(unfavoriteButton(firstCard)).toBeVisible();
+    }
+
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByText('1 mission prête à partager', { exact: true })).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(page.getByText('Rien à exporter', { exact: true })).toHaveCount(0);
   });
 
   test('settings page shows backup section', async ({ page }) => {

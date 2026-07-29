@@ -8,6 +8,7 @@
   import Tooltip from '../atoms/Tooltip.svelte';
   import { REMOTE_OPTIONS as remoteOptions } from '../constants/remote-options';
   import { LOCATION_LABELS } from '$lib/core/locations/location-catalog';
+  import { tick } from 'svelte';
 
   /* eslint-disable prefer-const */
   let {
@@ -54,6 +55,20 @@
     { value: 'confirmed', label: 'Confirmé' },
     { value: 'senior', label: 'Senior' },
   ];
+
+  let firstNameInput: HTMLInputElement | undefined = $state(undefined);
+  let wasEditing = false;
+
+  $effect(() => {
+    const enteredEditing = editing && !wasEditing;
+    wasEditing = editing;
+    if (enteredEditing) {
+      void tick().then(() => {
+        firstNameInput?.focus({ preventScroll: true });
+        firstNameInput?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+      });
+    }
+  });
 </script>
 
 <div class="section-card rounded-xl p-5">
@@ -87,19 +102,23 @@
   {#if editing}
     <div class="mt-4 space-y-2.5">
       <input
+        bind:this={firstNameInput}
         type="text"
+        aria-label="Prénom"
         placeholder="Prénom"
         class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={firstName}
       />
       <input
         type="text"
+        aria-label="Poste recherché"
         placeholder="Poste (ex: Développeur React Senior)"
         class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         bind:value={jobTitle}
       />
       <input
         type="text"
+        aria-label="Localisation"
         placeholder="Localisation"
         class="w-full rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
         list="profile-location-catalog"
@@ -141,12 +160,14 @@
       <div class="flex gap-2">
         <input
           type="number"
+          aria-label="TJM minimum"
           placeholder="TJM min"
           class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
           bind:value={tjmMin}
         />
         <input
           type="number"
+          aria-label="TJM maximum"
           placeholder="TJM max"
           class="flex-1 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-body-lg text-text-primary placeholder:text-text-muted outline-none transition-colors focus:border-blueprint-blue/30"
           bind:value={tjmMax}

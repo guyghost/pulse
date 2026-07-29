@@ -23,6 +23,7 @@ import type { AiAvailability } from '$lib/shell/ai/capabilities';
 import type { PanelSide } from '$lib/shell/ui/panel-layout';
 import {
   getSeenIds,
+  getMissions,
   saveSeenIds,
   getFavorites,
   saveFavorites,
@@ -355,7 +356,7 @@ export function createFeedPageState(
   const isLoading = $derived(feedStore.state === 'loading');
   const error = $derived(feedStore.error);
   const searchQuery = $derived(feedStore.searchQuery);
-  const totalMissions = $derived(missions.length);
+  const totalMissions = $derived(allMissions.length);
 
   // ============================================================
   // Derived — UI computations
@@ -374,7 +375,8 @@ export function createFeedPageState(
   const profileNeedsCompletion = $derived(missingProfileItems.length > 0);
 
   const filterActive = $derived(
-    selectedSource !== null ||
+    searchQuery.trim().length > 0 ||
+      selectedSource !== null ||
       selectedRemote !== null ||
       selectedStacks.length > 0 ||
       selectedSeniority !== null ||
@@ -976,6 +978,11 @@ export function createFeedPageState(
   }
 
   function clearAllFilters(): void {
+    if (searchDebounceTimer) {
+      clearTimeout(searchDebounceTimer);
+      searchDebounceTimer = null;
+    }
+    feedStore.clearSearch();
     activeSavedViewId = null;
     selectedStacks = [];
     selectedSource = null;
@@ -984,6 +991,7 @@ export function createFeedPageState(
     selectedScoreBucket = null;
     decisionPreset = null;
     showNewOnly = false;
+    showFilters = false;
     exitStableNewQueue();
   }
 
@@ -1395,6 +1403,10 @@ export function createFeedPageState(
             feedStore.load();
           } else if (devState === 'error') {
             feedStore.setError('[Dev] Simulated error');
+          } else if (devState === 'loaded') {
+            void getMissions()
+              .then((missions) => feedStore.setMissions(missions))
+              .catch(() => feedStore.setError('[Dev] Unable to restore missions'));
           }
         }
         window.addEventListener('dev:missions', handleMissions);

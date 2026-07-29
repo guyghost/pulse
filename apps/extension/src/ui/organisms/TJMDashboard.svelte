@@ -1,7 +1,7 @@
 <script lang="ts">
   import type { TJMAnalysis } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
-  import { formatTJMValue } from '$lib/core/utils/format';
+  import { formatStackLabel, formatTJMValue } from '$lib/core/utils/format';
   import TrendBadge from '../molecules/TrendBadge.svelte';
   import { Skeleton } from '@pulse/ui';
   import { Icon, type IconName } from '@pulse/ui';
@@ -415,8 +415,8 @@
             <div>
               <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="truncate text-meta font-medium capitalize text-text-primary">
-                    {stack.stack}
+                  <p class="truncate text-meta font-medium text-text-primary">
+                    {formatStackLabel(stack.stack)}
                   </p>
                   <p class="text-micro text-text-muted">
                     {stack.sampleCount} point{stack.sampleCount > 1 ? 's' : ''}

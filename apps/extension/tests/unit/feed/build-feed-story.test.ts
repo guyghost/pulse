@@ -23,6 +23,7 @@ const DEFAULT_INPUT: FeedStoryInput = {
   hasCompletedScan: false,
   filterActive: false,
   totalMissionCount: 0,
+  searchQuery: '',
 };
 
 describe('buildFeedStory', () => {
@@ -139,7 +140,7 @@ describe('buildFeedStory', () => {
       expect(result.severity).toBe('attention');
       expect(result.title).toContain('5 nouvelles missions');
       expect(result.description).toContain('Aucune urgence détectée');
-      expect(result.primaryActionLabel).toContain('Voir les 5 missions nouvelles');
+      expect(result.primaryActionLabel).toBe('Voir les 5 nouvelles missions');
     });
 
     it('uses singular form when newCount is 1', () => {
@@ -150,7 +151,7 @@ describe('buildFeedStory', () => {
       });
 
       expect(result.title).toContain('1 nouvelle mission');
-      expect(result.primaryActionLabel).toContain('1 mission');
+      expect(result.primaryActionLabel).toBe('Voir la nouvelle mission');
     });
   });
 
@@ -242,6 +243,22 @@ describe('buildFeedStory', () => {
       expect(result.primaryActionLabel).toBe('Effacer les filtres');
     });
 
+    it('projects a dedicated empty state for a search with no result', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        visibleCount: 0,
+        filterActive: true,
+        totalMissionCount: 10,
+        searchQuery: 'Rust introuvable',
+        hasCompletedScan: true,
+      });
+
+      expect(result.statusLabel).toBe('Recherche sans résultat');
+      expect(result.title).toBe('Aucune mission pour « Rust introuvable »');
+      expect(result.description).toContain('cette recherche');
+      expect(result.primaryActionLabel).toBe('Effacer la recherche');
+    });
+
     it('does not show filtered-empty when no filter is active even if missions cached', () => {
       const result = buildFeedStory({
         ...DEFAULT_INPUT,
@@ -307,6 +324,20 @@ describe('buildFeedStory', () => {
 
       expect(result.severity).toBe('attention');
       expect(result.title).toContain('Aucune mission ne correspond');
+    });
+  });
+
+  describe('French action inflection', () => {
+    it('uses singular labels for one priority mission', () => {
+      const result = buildFeedStory({
+        ...DEFAULT_INPUT,
+        newCount: 1,
+        highScoreCount: 1,
+        visibleCount: 1,
+      });
+
+      expect(result.primaryActionLabel).toBe('Voir la mission prioritaire');
+      expect(result.primaryActionLabel).not.toContain('1 missions');
     });
   });
 

@@ -62,9 +62,20 @@ Invariant : `lastScanAt` est monotone (uniquement mis à jour sur succès scan),
 donc `hasCompletedScan` est un edge-detector fiable. Cf. `scan-lifecycle.model.md`
 et `scan-completion-delight.model.md` pour le contrat de `lastScanAt`.
 
-**Note** : `totalMissionCount` est le count **non filtré** (`missions.length`),
-distinct de `visibleCount` (post-filtres). `filterActive` reflète la présence
-d'au moins un filtre source/remote/stack/seniority sélectionné.
+**Note** : `totalMissionCount` est le count **non filtré**
+(`allMissions.length`), distinct de `visibleCount` (post-recherche et
+post-filtres). `filterActive` reflète la présence d'une recherche non vide ou
+d'au moins un filtre source/remote/stack/seniority/score/preset/nouveau
+sélectionné.
+
+Quand `searchQuery.trim() !== ''`, la copy de `filtered-empty` devient :
+
+- **title** : `Aucune mission pour « <requête> »`
+- **description** :
+  `Des missions sont disponibles, mais aucune ne correspond à cette recherche.`
+- **primaryActionLabel** : `Effacer la recherche`
+
+La requête est une entrée de projection, jamais interprétée comme une transition.
 
 ## Entrées (pures)
 
@@ -81,7 +92,8 @@ interface FeedStoryInput {
   alertScoreThreshold: number;
   hasCompletedScan: boolean; // ← discriminant scanned-empty vs never-scanned
   filterActive: boolean; // ← au moins un filtre sélectionné
-  totalMissionCount: number; // ← count non filtré (missions.length)
+  totalMissionCount: number; // ← count non filtré (allMissions.length)
+  searchQuery: string; // ← texte de recherche normalisé par la projection
 }
 ```
 
@@ -178,6 +190,10 @@ const feedStory = $derived(
 6. `hasCompletedScan` est monotone (une fois `true`, reste `true` sauf reset app).
 7. `filtered-empty` ne peut se produire que si `totalMissionCount > 0` (des
    missions en cache) ET `filterActive` (filtres qui les masquent).
+8. Une recherche sans résultat ne peut jamais produire `scanned-empty` ou
+   `never-scanned-empty`.
+9. La copy française est grammaticalement correcte pour 0, 1 et plusieurs
+   missions, y compris les adjectifs `nouvelle(s)` et `prioritaire(s)`.
 
 ## Cas de test obligatoires
 
@@ -188,6 +204,8 @@ const feedStory = $derived(
 - `newCount > 0` → `new-missions` (attention)
 - `alertEnabled && highScoreCount > 0 && newCount === 0` → `priority-ready` (success)
 - **`visibleCount === 0 && filterActive && totalMissionCount > 0`** → **`filtered-empty`** (attention, CTA « Effacer les filtres »)
+- **`visibleCount === 0 && searchQuery !== '' && totalMissionCount > 0`** →
+  **`filtered-empty`** avec copy de recherche et CTA « Effacer la recherche »
 - **`visibleCount === 0 && hasCompletedScan === true && !(filterActive && totalMissionCount > 0)`** → **`scanned-empty`** (attention)
 - **`visibleCount === 0 && hasCompletedScan === false`** → **`never-scanned-empty`** (neutral)
 - `visibleCount > 0 && newCount === 0 && highScoreCount === 0` → `feed-ready` (success)

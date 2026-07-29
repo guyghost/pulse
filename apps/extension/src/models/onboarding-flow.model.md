@@ -95,9 +95,52 @@ On `PERSIST_FAILED`, the machine still writes `START_SCAN` and transitions to
 (storage flag set by the shell once `completed` is reached), so the flow is
 never re-entered. The controller is created fresh each onboarding run.
 
+## Progression utilisateur (projection)
+
+La progression visible décrit uniquement les **cinq décisions de configuration**
+et ne compte jamais les états techniques transitoires :
+
+| Écran / phase              | Progression visible |
+| -------------------------- | ------------------- |
+| `welcome`                  | aucune              |
+| `connecting`               | 1 / 5               |
+| `wizard(identity)`         | 2 / 5               |
+| `wizard(preferences)`      | 3 / 5               |
+| `wizard(skills)`           | 4 / 5               |
+| `notifying`                | 5 / 5               |
+| `persisting/scanning/done` | 5 / 5               |
+
+Invariants de présentation :
+
+1. La progression est monotone sur le chemin nominal.
+2. `BACK` peut la décrémenter d'une seule décision utilisateur.
+3. Un état technique (`persisting`, `scanning`, `completed`) ne crée jamais une
+   nouvelle étape visible.
+4. Le libellé `Terminer` est réservé à la dernière décision. La sortie de
+   `wizard(skills)` reste libellée `Continuer`.
+5. Un seul `h1` est rendu par écran. L'introduction de layout est masquée sur
+   `welcome`, qui possède son propre titre principal.
+6. Les contrôles sans texte visible exposent un nom accessible stable :
+   `Ajouter la compétence`, `Retirer <compétence>` et
+   `Activer/Désactiver les notifications`.
+
 ## Snapshot (projection)
 
 `projectOnboardingFlow(ctx, phase)` exposes a stable `OnboardingFlowSnapshot`:
 `phase`, `wizardStep`, `profile`, `connectedSources`, `notifyEnabled`,
 `progress {current,total}`, `pendingEffect`, `error`, `terminal`, `canAdvance`.
 The UI consumes only this shape; it never touches context directly.
+
+## Cycle de vie de l'acteur
+
+`controller.subscribe()` retourne une `Subscription` XState. Le shell enregistre
+toujours un cleanup fonctionnel qui appelle `subscription.unsubscribe()`.
+L'identité d'un effet ne doit pas être comparée à un proxy Svelte : le shell
+déduplique les effets avec une clé stable `attemptId:kind`.
+
+Invariants :
+
+- démonter l'onboarding n'émet aucune erreur ;
+- un même effet n'est exécuté qu'une fois ;
+- un retry produit une nouvelle décision de la machine, jamais une transition
+  pilotée par le texte de l'erreur.

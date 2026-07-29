@@ -181,3 +181,27 @@ export function formatMissionCount(count: number): string {
   const safe = Number.isFinite(count) && count >= 0 ? Math.floor(count) : 0;
   return `${safe} mission${safe > 1 ? 's' : ''}`;
 }
+
+const STACK_LABELS: Readonly<Record<string, string>> = {
+  typescript: 'TypeScript',
+  javascript: 'JavaScript',
+  'node.js': 'Node.js',
+  nodejs: 'Node.js',
+  postgresql: 'PostgreSQL',
+  graphql: 'GraphQL',
+  'next.js': 'Next.js',
+  nextjs: 'Next.js',
+  aws: 'AWS',
+  gcp: 'GCP',
+};
+
+export function formatStackLabel(value: string): string {
+  const normalized = value.trim();
+  if (!normalized) {
+    return '';
+  }
+  return (
+    STACK_LABELS[normalized.toLowerCase()] ??
+    `${normalized.charAt(0).toUpperCase()}${normalized.slice(1)}`
+  );
+}

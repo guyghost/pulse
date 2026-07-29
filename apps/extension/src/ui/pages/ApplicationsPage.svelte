@@ -524,7 +524,7 @@
       <div>
         <p class="eyebrow text-blueprint-blue">Pipeline</p>
         <div class="mt-1 flex flex-wrap items-center gap-2">
-          <h2 class="text-subheading font-semibold text-text-primary">Candidatures</h2>
+          <h1 class="text-subheading font-semibold text-text-primary">Candidatures</h1>
           <span
             class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
           >

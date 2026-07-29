@@ -3,6 +3,7 @@ import {
   formatAbsoluteDate,
   formatMissionCount,
   formatRelativeTime,
+  formatStackLabel,
   formatTJM,
   formatTJMRange,
   formatTJMValue,
@@ -141,6 +142,19 @@ describe('formatMissionCount', () => {
   it('coerces non-finite or negative input to zero', () => {
     expect(formatMissionCount(Number.NaN)).toBe('0 mission');
     expect(formatMissionCount(-5)).toBe('0 mission');
+  });
+});
+
+describe('formatStackLabel', () => {
+  it('restores canonical casing for common technology names', () => {
+    expect(formatStackLabel('typescript')).toBe('TypeScript');
+    expect(formatStackLabel('nodejs')).toBe('Node.js');
+    expect(formatStackLabel('postgresql')).toBe('PostgreSQL');
+    expect(formatStackLabel('graphql')).toBe('GraphQL');
+  });
+
+  it('capitalizes an unknown normalized stack', () => {
+    expect(formatStackLabel('svelte')).toBe('Svelte');
   });
 });
 

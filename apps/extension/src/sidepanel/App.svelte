@@ -323,10 +323,21 @@
   }
 
   function devSetState(state: 'empty' | 'loading' | 'loaded' | 'error') {
+    const devStateStorageKey = '__missionpulse_dev_feed_state';
     if (state === 'empty') {
       window.localStorage.setItem('__missionpulse_dev_missions', JSON.stringify([]));
     }
-    window.dispatchEvent(new CustomEvent('dev:feed-state', { detail: state }));
+    if (state === 'loaded') {
+      window.localStorage.removeItem('__missionpulse_dev_missions');
+      window.sessionStorage.removeItem(devStateStorageKey);
+    } else {
+      window.sessionStorage.setItem(devStateStorageKey, state);
+    }
+    const dispatchState = () => {
+      window.dispatchEvent(new CustomEvent('dev:feed-state', { detail: state }));
+    };
+    dispatchState();
+    window.requestAnimationFrame(dispatchState);
   }
 
   function devToggleOnboarding() {
@@ -804,6 +815,7 @@
             <SettingsPage
               onBack={() => nav.navigate('feed')}
               onNavigateToOnboarding={nav.resetToOnboarding}
+              active={nav.currentPage === 'settings'}
             />
             {#snippet failed(error, reset)}
               <div class="p-4">

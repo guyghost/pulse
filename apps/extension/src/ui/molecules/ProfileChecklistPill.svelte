@@ -21,11 +21,11 @@
 
   const pct = $derived(Math.max(0, Math.min(100, Math.round(completion))));
   const label = $derived(pct >= 100 ? 'Profil complet' : `Profil à ${pct}%`);
-  const steps: { icon: IconName; filled: boolean; label: string }[] = [
+  const steps = $derived<{ icon: IconName; filled: boolean; label: string }[]>([
     { icon: 'check', filled: pct > 0, label: 'Identité' },
     { icon: 'star', filled: pct >= 40, label: 'Compétences' },
     { icon: 'briefcase', filled: pct >= 70, label: 'Expériences' },
-  ];
+  ]);
 </script>
 
 <div

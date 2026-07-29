@@ -150,30 +150,34 @@ function trackingFailureMessage(
 function buildTJMAnalysis(
   history: TJMHistory,
   profileStacks: string[] | undefined,
-  region: TJMRegion | undefined
+  region: TJMRegion | undefined,
+  now: Date
 ) {
   const hasStackFilter = profileStacks !== undefined && profileStacks.length > 0;
   const hasRegionFilter = region !== undefined;
 
   if (!hasStackFilter && !hasRegionFilter) {
-    return analyzeTJMHistory(history);
+    return analyzeTJMHistory(history, now);
   }
 
   const normalizedStacks = hasStackFilter
     ? new Set(profileStacks.map((stack) => stack.toLowerCase().trim()).filter(Boolean))
     : null;
 
-  return analyzeTJMHistory({
-    records: history.records.filter((record) => {
-      if (normalizedStacks && !normalizedStacks.has(record.stack)) {
-        return false;
-      }
-      if (hasRegionFilter && record.region !== region) {
-        return false;
-      }
-      return true;
-    }),
-  });
+  return analyzeTJMHistory(
+    {
+      records: history.records.filter((record) => {
+        if (normalizedStacks && !normalizedStacks.has(record.stack)) {
+          return false;
+        }
+        if (hasRegionFilter && record.region !== region) {
+          return false;
+        }
+        return true;
+      }),
+    },
+    now
+  );
 }
 
 function getBridgeErrorCode(error: import('../lib/core/errors/app-error').AppError): string {
@@ -1410,7 +1414,8 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
               analysis: buildTJMAnalysis(
                 history,
                 message.payload?.profileStacks,
-                message.payload?.region
+                message.payload?.region,
+                new Date()
               ),
             },
           });
