@@ -1,7 +1,7 @@
 /**
  * Content script — Form Assistant orchestrator (Machine A).
  *
- * Source de vérité : src/models/formassistant.model.md (Machine A).
+ * Source de vérité : src/models/form-assistant.model.md (Machine A).
  *
  * États : disabled → idle → armed → requesting → ready → applying → filled
  *
@@ -217,9 +217,13 @@ function init(): void {
 
   void chrome.runtime
     .sendMessage({ type: 'FORM_ASSIST_STATUS' })
-    .then((result: { enabled: boolean; engine: 'local' | 'remote' } | undefined) => {
-      applyEnabledState(Boolean(result?.enabled));
-    })
+    .then(
+      (
+        result: { type: 'FORM_ASSIST_STATUS_RESULT'; payload: { enabled: boolean } } | undefined
+      ) => {
+        applyEnabledState(Boolean(result?.payload.enabled));
+      }
+    )
     .catch(() => {
       // SW injoignable (rare) → reste désactivé par sécurité.
       applyEnabledState(false);

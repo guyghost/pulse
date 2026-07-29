@@ -94,7 +94,7 @@ fichier.
 interface FieldDescriptor {
   kind: FieldKind;
   label: string; // assaini, ≤ 120 chars
-  placeholder: string; // assaini, ≤ 120 chars
+  placeholder: string; // assaini, ≤ 200 chars
   inputType: 'text' | 'textarea' | 'email' | 'tel' | 'url' | 'search' | 'contenteditable';
   required: boolean;
 }

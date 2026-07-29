@@ -1,7 +1,7 @@
 /**
  * Content script — Form Assistant widget (Shadow DOM, closed).
  *
- * Floating UI anchored near the focused field. Isoled du CSS de la page hôte
+ * Floating UI anchored near the focused field. Isolé du CSS de la page hôte
  * via un shadow root closed. Aucune logique métier : se contente d'afficher des
  * états et d'émettre des callbacks (trigger / accept / dismiss).
  *

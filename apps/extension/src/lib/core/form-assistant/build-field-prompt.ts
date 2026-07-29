@@ -43,9 +43,9 @@ function instructionsForKind(kind: FieldKind): string {
     case 'phone':
       // Le profil local ne contient jamais d'email/téléphone (local-first,
       // pas de credentials). On refuse poliment plutôt que d'inventer.
-      return 'Ce champ nécessite une coordonnée personnelle absente du profil. Réponds par une chaîne vide : ""';
+      return 'Ce champ nécessite une coordonnée personnelle absente du profil. Réponds par une chaîne vide, sans aucun caractère ni guillemet.';
     case 'linkedin':
-      return 'Réponds uniquement par une URL LinkedIn neutre si le profil en indique une, sinon une chaîne vide : ""';
+      return 'Réponds uniquement par une URL LinkedIn neutre si le profil en indique une, sinon une chaîne vide, sans aucun caractère ni guillemet.';
     case 'availability':
       return 'Réponds en une phrase courte sur ta disponibilité (ex : « Disponible immédiatement » ou « Disponible sous 2 semaines »).';
     case 'tjm':

@@ -546,11 +546,13 @@ function devFormAssistProposal(kind: string, label: string, profile: UserProfile
     case 'full-name':
       return name;
     case 'email':
-      return 'exemple@domaine.fr';
     case 'phone':
-      return '+33 6 12 34 56 78';
+      // UserProfile ne persiste pas ces coordonnées (local-first,
+      // pas de credentials). Cohérent avec le prompt production.
+      return '';
     case 'linkedin':
-      return 'https://www.linkedin.com/in/votre-profil';
+      // Aucune URL LinkedIn dans le profil de ce modèle.
+      return '';
     case 'cover-letter':
       return `Bonjour,\n\nFort de ${profile.seniority ?? 'plusieurs'} années en tant que ${job}, je suis intéressé par cette mission. Mon TJM se situe entre ${profile.tjmMin ?? 0}€ et ${profile.tjmMax ?? 0}€.\n\nCordialement,\n${name}`;
     case 'availability':
