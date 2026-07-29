@@ -387,6 +387,141 @@ describe('SettingsPageController — confirmed settings projection', () => {
   });
 });
 
+describe('SettingsPageController — Form Assistant toggle (Machine D)', () => {
+  beforeEach(() => {
+    bridgeMock.sendMessage.mockReset();
+    toastMock.showToast.mockClear();
+  });
+
+  it('reads the persisted Form Assistant status from the SW on load', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'FORM_ASSIST_STATUS') {
+        return Promise.resolve({
+          type: 'FORM_ASSIST_STATUS_RESULT',
+          payload: { enabled: true, engine: 'local' as const },
+        });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadFormAssist();
+
+    expect(controller.formAssistEnabled).toBe(true);
+    expect(controller.formAssistStatus).toBe('ready');
+
+    controller.destroy();
+  });
+
+  it('falls back to error state when the SW is unreachable on load', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'FORM_ASSIST_STATUS') {
+        return Promise.reject(new Error('SW injoignable'));
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadFormAssist();
+
+    expect(controller.formAssistStatus).toBe('error');
+    controller.destroy();
+  });
+
+  it('emits FORM_ASSIST_ENABLE and projects the SW-confirmed value on toggle', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string; payload?: unknown }) => {
+      if (message.type === 'FORM_ASSIST_ENABLE') {
+        const enabled = (message.payload as { enabled: boolean }).enabled;
+        return Promise.resolve({
+          type: 'FORM_ASSIST_ENABLED',
+          payload: { enabled, engine: 'local' as const },
+        });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadFormAssist();
+    controller.formAssistEnabled = false;
+
+    await controller.toggleFormAssist();
+
+    expect(controller.formAssistEnabled).toBe(true);
+    expect(controller.formAssistStatus).toBe('ready');
+    expect(bridgeMock.sendMessage).toHaveBeenCalledWith({
+      type: 'FORM_ASSIST_ENABLE',
+      payload: { enabled: true },
+    });
+
+    controller.destroy();
+  });
+
+  it('reverts to the previous value and toasts on SW failure', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'FORM_ASSIST_ENABLE') {
+        return Promise.reject(new Error('persist failed'));
+      }
+      if (message.type === 'FORM_ASSIST_STATUS') {
+        return Promise.resolve({
+          type: 'FORM_ASSIST_STATUS_RESULT',
+          payload: { enabled: false, engine: 'local' as const },
+        });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    await controller.loadFormAssist();
+
+    await controller.toggleFormAssist();
+
+    expect(controller.formAssistEnabled).toBe(false);
+    expect(controller.formAssistStatus).toBe('error');
+    expect(toastMock.showToast).toHaveBeenCalledWith(expect.any(String), 'error');
+
+    controller.destroy();
+  });
+
+  it('racolements via the FORM_ASSIST_ENABLED broadcast', async () => {
+    const controller = new SettingsPageController();
+    controller.formAssistEnabled = false;
+
+    for (const listener of [...bridgeMock.listeners]) {
+      listener({
+        type: 'FORM_ASSIST_ENABLED',
+        payload: { enabled: true, engine: 'local' as const },
+      });
+    }
+
+    expect(controller.formAssistEnabled).toBe(true);
+    expect(controller.formAssistStatus).toBe('ready');
+    controller.destroy();
+  });
+
+  it('ignores a toggle while a request is in flight (double-clic guard)', async () => {
+    bridgeMock.sendMessage.mockImplementation((message: { type: string }) => {
+      if (message.type === 'FORM_ASSIST_ENABLE') {
+        return Promise.resolve({
+          type: 'FORM_ASSIST_ENABLED',
+          payload: { enabled: true, engine: 'local' as const },
+        });
+      }
+      return Promise.resolve({ type: 'SETTINGS_RESULT', payload: null });
+    });
+
+    const controller = new SettingsPageController();
+    // Force an in-flight state without awaiting the previous toggle.
+    controller.formAssistStatus = 'loading';
+
+    await controller.toggleFormAssist();
+
+    expect(bridgeMock.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: 'FORM_ASSIST_ENABLE' })
+    );
+    controller.destroy();
+  });
+});
+
 describe('SettingsPageController — shipped connector catalogue', () => {
   beforeEach(() => {
     bridgeMock.sendMessage.mockReset();
