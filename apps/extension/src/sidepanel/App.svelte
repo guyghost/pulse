@@ -101,11 +101,7 @@
   }
 
   function loadPage<CurrentPage extends Page>(page: CurrentPage, retry = false): void {
-    if (
-      !shellMounted ||
-      nav.bootStatus !== 'ready' ||
-      hasPageComponent(page)
-    ) {
+    if (!shellMounted || nav.bootStatus !== 'ready' || hasPageComponent(page)) {
       return;
     }
 
@@ -183,11 +179,7 @@
     if (!initialPageLoadScheduled) {
       initialPageLoadScheduled = true;
       const frameId = requestAnimationFrame(() => {
-        if (
-          !shellMounted ||
-          nav.bootStatus !== 'ready' ||
-          nav.currentPage !== page
-        ) {
+        if (!shellMounted || nav.bootStatus !== 'ready' || nav.currentPage !== page) {
           return;
         }
         loadPage(page);
@@ -222,7 +214,6 @@
     }, 80);
     return () => window.clearTimeout(preloadTimer);
   });
-
 
   // Initialize theme on mount
   theme.init();
@@ -407,7 +398,6 @@
                   ? 'max-w-0 opacity-0 -translate-x-1'
                   : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
               >
-
             </button>
           {/each}
         </nav>
