@@ -64,16 +64,25 @@ Mission Pulse exudes a focused, data-driven clarity, presenting complex financia
 
 ### Type Scale
 
-| Role            | Size  | Line Height | Letter Spacing | Token                    |
-| --------------- | ----- | ----------- | -------------- | ------------------------ |
-| caption         | 10px  | 1.3         | -0.03px        | `--text-caption`         |
-| body            | 14px  | 1.3         | -0.02px        | `--text-body`            |
-| heading         | 18px  | 1.3         | -0.02px        | `--text-heading`         |
-| heading-lg      | 20px  | 1.2         | -0.02px        | `--text-heading-lg`      |
-| display-sm      | 24px  | 1.2         | -0.02px        | `--text-display-sm`      |
-| display         | 28px  | 1.2         | -0.02px        | `--text-display`         |
-| hero-headline-1 | 106px | 0.8         | —              | `--text-hero-headline-1` |
-| hero-headline-2 | 183px | 0.8         | —              | `--text-hero-headline-2` |
+Rem-based, fixed (product register). Letter-spacing is intentionally **not** in text tokens —
+it's set per-element (uppercase labels tracked wide, body neutral). Tokens follow Tailwind v4's
+`--text-*` / `--text-*--line-height` namespace so `text-*` utilities are generated.
+
+| Role            | rem     | px  | Line Height | Absorbs                       | Token                    |
+| --------------- | ------- | --- | ----------- | ----------------------------- | ------------------------ |
+| micro           | 0.625   | 10  | 1.4         | 8–10px micro-labels           | `--text-micro`           |
+| caption         | 0.6875  | 11  | 1.45        | 11px secondary text           | `--text-caption`         |
+| meta            | 0.75    | 12  | 1.5         | `text-xs`, 12px metadata      | `--text-meta`            |
+| body            | 0.8125  | 13  | 1.55        | `text-[13px]`, body copy      | `--text-body`            |
+| body-lg         | 0.875   | 14  | 1.55        | `text-sm`, 14px               | `--text-body-lg`         |
+| subheading      | 1       | 16  | 1.4         | `text-base`, 16px             | `--text-subheading`      |
+| heading         | 1.125   | 18  | 1.3         | `text-lg`, 18px               | `--text-heading`         |
+| heading-lg      | 1.25    | 20  | 1.25        | `text-xl`, 20px               | `--text-heading-lg`      |
+| display-sm      | 1.5     | 24  | 1.2         | `text-2xl`, 24px              | `--text-display-sm`      |
+| display         | 1.75    | 28  | 1.15        | 28px                          | `--text-display`         |
+| display-lg      | 2.25    | 36  | 1.1         | empty-state / large display   | `--text-display-lg`      |
+| hero-headline-1 | 6.625   | 106 | 0.8         | landing hero (layered, tight) | `--text-hero-headline-1` |
+| hero-headline-2 | 11.4375 | 183 | 0.8         | landing hero (layered, tight) | `--text-hero-headline-2` |
 
 ## Tokens — Spacing & Shapes
 
@@ -260,29 +269,34 @@ The page primarily uses a max-width contained layout, likely centered, though sp
     'sans-serif', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     sans-serif;
 
-  /* Typography — Scale */
-  --text-caption: 10px;
-  --leading-caption: 1.3;
-  --tracking-caption: -0.03px;
-  --text-body: 14px;
-  --leading-body: 1.3;
-  --tracking-body: -0.02px;
-  --text-heading: 18px;
-  --leading-heading: 1.3;
-  --tracking-heading: -0.02px;
-  --text-heading-lg: 20px;
-  --leading-heading-lg: 1.2;
-  --tracking-heading-lg: -0.02px;
-  --text-display-sm: 24px;
-  --leading-display-sm: 1.2;
-  --tracking-display-sm: -0.02px;
-  --text-display: 28px;
-  --leading-display: 1.2;
-  --tracking-display: -0.02px;
-  --text-hero-headline-1: 106px;
-  --leading-hero-headline-1: 0.8;
-  --text-hero-headline-2: 183px;
-  --leading-hero-headline-2: 0.8;
+  /* Typography — Scale (rem-based; Tailwind v4 --text-* / --text-*--line-height namespace) */
+  --text-micro: 0.625rem;
+  --text-micro--line-height: 1.4;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1.45;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.5;
+  --text-body: 0.8125rem;
+  --text-body--line-height: 1.55;
+  --text-body-lg: 0.875rem;
+  --text-body-lg--line-height: 1.55;
+  --text-subheading: 1rem;
+  --text-subheading--line-height: 1.4;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.3;
+  --text-heading-lg: 1.25rem;
+  --text-heading-lg--line-height: 1.25;
+  --text-display-sm: 1.5rem;
+  --text-display-sm--line-height: 1.2;
+  --text-display: 1.75rem;
+  --text-display--line-height: 1.15;
+  --text-display-lg: 2.25rem;
+  --text-display-lg--line-height: 1.1;
+  /* Hero band (landing display). Kept as vars; converted px → rem. */
+  --text-hero-headline-1: 6.625rem;
+  --text-hero-headline-1--line-height: 0.8;
+  --text-hero-headline-2: 11.4375rem;
+  --text-hero-headline-2--line-height: 0.8;
 
   /* Typography — Weights */
   --font-weight-regular: 400;
@@ -368,29 +382,34 @@ The page primarily uses a max-width contained layout, likely centered, though sp
     'sans-serif', ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto,
     sans-serif;
 
-  /* Typography — Scale */
-  --text-caption: 10px;
-  --leading-caption: 1.3;
-  --tracking-caption: -0.03px;
-  --text-body: 14px;
-  --leading-body: 1.3;
-  --tracking-body: -0.02px;
-  --text-heading: 18px;
-  --leading-heading: 1.3;
-  --tracking-heading: -0.02px;
-  --text-heading-lg: 20px;
-  --leading-heading-lg: 1.2;
-  --tracking-heading-lg: -0.02px;
-  --text-display-sm: 24px;
-  --leading-display-sm: 1.2;
-  --tracking-display-sm: -0.02px;
-  --text-display: 28px;
-  --leading-display: 1.2;
-  --tracking-display: -0.02px;
-  --text-hero-headline-1: 106px;
-  --leading-hero-headline-1: 0.8;
-  --text-hero-headline-2: 183px;
-  --leading-hero-headline-2: 0.8;
+  /* Typography — Scale (rem-based; Tailwind v4 --text-* / --text-*--line-height namespace) */
+  --text-micro: 0.625rem;
+  --text-micro--line-height: 1.4;
+  --text-caption: 0.6875rem;
+  --text-caption--line-height: 1.45;
+  --text-meta: 0.75rem;
+  --text-meta--line-height: 1.5;
+  --text-body: 0.8125rem;
+  --text-body--line-height: 1.55;
+  --text-body-lg: 0.875rem;
+  --text-body-lg--line-height: 1.55;
+  --text-subheading: 1rem;
+  --text-subheading--line-height: 1.4;
+  --text-heading: 1.125rem;
+  --text-heading--line-height: 1.3;
+  --text-heading-lg: 1.25rem;
+  --text-heading-lg--line-height: 1.25;
+  --text-display-sm: 1.5rem;
+  --text-display-sm--line-height: 1.2;
+  --text-display: 1.75rem;
+  --text-display--line-height: 1.15;
+  --text-display-lg: 2.25rem;
+  --text-display-lg--line-height: 1.1;
+  /* Hero band (landing display). Kept as vars; converted px → rem. */
+  --text-hero-headline-1: 6.625rem;
+  --text-hero-headline-1--line-height: 0.8;
+  --text-hero-headline-2: 11.4375rem;
+  --text-hero-headline-2--line-height: 0.8;
 
   /* Spacing */
   --spacing-4: 4px;

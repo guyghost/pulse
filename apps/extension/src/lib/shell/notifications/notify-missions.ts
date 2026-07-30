@@ -1,14 +1,15 @@
 import type { Mission } from '../../core/types/mission';
-import type { AppSettings } from '../storage/chrome-storage';
+import type { AppSettings } from '../../core/types/app-settings';
 import { filterNotifiableMissions } from '../../core/scoring/notification-filter';
 import { filterSmartNotifications } from '../../core/scoring/smart-notification';
 import { canNotify } from '../../core/scoring/notification-rate-limit';
-import { getSettings } from '../storage/chrome-storage';
 import { getConnectedAlertPreferences } from '../storage/connected-alert-preferences';
 import { getSeenIds } from '../storage/seen-missions';
 import { recordAlertHistoryEntry } from '../storage/alert-history';
 import { createDeepLinkIntent } from '../../core/deep-link/deep-link-intent';
 import { setDeepLinkIntent, clearDeepLinkIntent } from '../storage/session-storage';
+import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
+import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
 // ---------------------------------------------------------------------------
 // Rate limit state (in-memory, reset on service worker restart)
@@ -72,8 +73,23 @@ const loadLastNotificationTime = async (): Promise<number | null> => {
 
 export interface NotificationResult {
   shown: boolean;
+  /** Mission IDs included in a Chrome notification that was actually shown. */
   notifiedMissionIds: string[];
+  /**
+   * Mission IDs that passed notification filters for this scan.
+   * Populated even when the Chrome notification was not shown (rate-limit or
+   * create failure). Empty when alerts are disabled/muted or nothing matches.
+   * The extension icon badge uses this so it matches the notification
+   * differential instead of counting every unseen mission from the scan.
+   */
+  notifiableMissionIds: string[];
 }
+
+const emptyNotificationResult = (): NotificationResult => ({
+  shown: false,
+  notifiedMissionIds: [],
+  notifiableMissionIds: [],
+});
 
 /**
  * Creates Chrome notifications for high-score missions.
@@ -85,34 +101,32 @@ export interface NotificationResult {
  * - Clicking the notification opens the side panel
  *
  * @param missions - All missions from the scan
- * @returns Whether a notification was shown, and which mission IDs were included
+ * @returns Whether a notification was shown, which mission IDs were included,
+ *   and which IDs passed filters (for the extension badge)
  */
-export const notifyHighScoreMissions = async (missions: Mission[]): Promise<NotificationResult> => {
+export const notifyHighScoreMissions = async (
+  missions: Mission[],
+  admittedSnapshot?: SettingsReleaseSnapshot
+): Promise<NotificationResult> => {
   if (missions.length === 0) {
-    return { shown: false, notifiedMissionIds: [] };
+    return emptyNotificationResult();
   }
 
   // Check if notifications are enabled
   let settings: AppSettings;
   try {
-    settings = await getSettings();
+    settings = (admittedSnapshot ?? (await readSettingsReleaseSnapshot())).settings;
   } catch {
-    return { shown: false, notifiedMissionIds: [] };
+    return emptyNotificationResult();
   }
 
   if (!settings.notifications) {
-    return { shown: false, notifiedMissionIds: [] };
+    return emptyNotificationResult();
   }
 
-  // Check rate limit
-  const lastTime = await loadLastNotificationTime();
-  const now = Date.now();
-
-  if (!canNotify(lastTime, now)) {
-    return { shown: false, notifiedMissionIds: [] };
-  }
-
-  // Filter missions above threshold that haven't been seen
+  // Filter missions above threshold that haven't been seen. Done before the
+  // rate-limit gate so the badge can still reflect the differential when a
+  // Chrome notification is skipped due to cooldown.
   let seenIds: string[] = [];
   try {
     seenIds = await getSeenIds();
@@ -120,14 +134,15 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
     // If we can't load seen IDs, proceed without filtering
   }
 
+  const now = Date.now();
   const connectedAlertPreferences = await getConnectedAlertPreferences();
 
   if (connectedAlertPreferences && !connectedAlertPreferences.enabled) {
-    return { shown: false, notifiedMissionIds: [] };
+    return emptyNotificationResult();
   }
 
   if (connectedAlertPreferences && isMutedUntilActive(connectedAlertPreferences.mutedUntil, now)) {
-    return { shown: false, notifiedMissionIds: [] };
+    return emptyNotificationResult();
   }
 
   const notifiableMissions = connectedAlertPreferences
@@ -139,8 +154,20 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
       })
     : filterNotifiableMissions(missions, seenIds, settings.notificationScoreThreshold);
 
-  if (notifiableMissions.length === 0) {
-    return { shown: false, notifiedMissionIds: [] };
+  const notifiableMissionIds = notifiableMissions.map((mission) => mission.id);
+
+  if (notifiableMissionIds.length === 0) {
+    return emptyNotificationResult();
+  }
+
+  // Check rate limit after filter so callers can still badge the differential.
+  const lastTime = await loadLastNotificationTime();
+  if (!canNotify(lastTime, now)) {
+    return {
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds,
+    };
   }
 
   // Build notification content based on count
@@ -170,11 +197,7 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
     // the most recent notification is what the user expects to land on. If the
     // notification creation fails below, we roll the intent back so a stale
     // intent doesn't hijack the next panel open.
-    const intent = createDeepLinkIntent(
-      notifiableMissions.map((mission) => mission.id),
-      'notification',
-      now
-    );
+    const intent = createDeepLinkIntent(notifiableMissionIds, 'notification', now);
     if (intent) {
       await setDeepLinkIntent(intent);
     }
@@ -195,7 +218,7 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
       id: buildAlertHistoryId(now, notifiableMissions),
       triggeredAt: now,
       missionCount,
-      missionIds: notifiableMissions.map((mission) => mission.id),
+      missionIds: notifiableMissionIds,
       missionTitles: notifiableMissions.map((mission) => mission.title),
       scoreThreshold:
         connectedAlertPreferences?.scoreThreshold ?? settings.notificationScoreThreshold,
@@ -206,14 +229,19 @@ export const notifyHighScoreMissions = async (missions: Mission[]): Promise<Noti
 
     return {
       shown: true,
-      notifiedMissionIds: notifiableMissions.map((mission) => mission.id),
+      notifiedMissionIds: notifiableMissionIds,
+      notifiableMissionIds,
     };
   } catch (err) {
     console.error('[MissionPulse] Failed to create notification:', err);
     // Rollback the intent we wrote optimistically above so the next panel open
     // doesn't land on missions the user was never actually notified about.
     await clearDeepLinkIntent().catch(() => {});
-    return { shown: false, notifiedMissionIds: [] };
+    return {
+      shown: false,
+      notifiedMissionIds: [],
+      notifiableMissionIds,
+    };
   }
 };
 

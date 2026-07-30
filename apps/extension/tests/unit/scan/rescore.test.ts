@@ -2,13 +2,24 @@ import { beforeEach, describe, expect, it, vi, type Mock } from 'vitest';
 import type { Mission } from '../../../src/lib/core/types/mission';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 
+const getSettingsMock = vi.hoisted(() => vi.fn());
+
 vi.mock('../../../src/lib/shell/storage/db', () => ({
   getMissions: vi.fn(),
   saveMissions: vi.fn(),
 }));
 
 vi.mock('../../../src/lib/shell/storage/chrome-storage', () => ({
-  getSettings: vi.fn(),
+  getSettings: getSettingsMock,
+}));
+
+vi.mock('../../../src/lib/shell/settings-release/settings-release-reader', () => ({
+  readSettingsReleaseSnapshot: vi.fn(async () => ({
+    settings: await getSettingsMock(),
+    onboardingCompleted: true,
+    revision: 0,
+    generation: 0,
+  })),
 }));
 
 vi.mock('../../../src/lib/core/scoring/relevance', () => ({

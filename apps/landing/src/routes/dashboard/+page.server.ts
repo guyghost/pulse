@@ -3,8 +3,10 @@ import { redirect } from '@sveltejs/kit';
 import { CREDIT_PACK_LIST } from '$lib/credits';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import { hasSupabaseAuthCookie } from '$lib/server/auth-cookie';
+import { NO_STORE_HEADERS } from '$lib/server/rate-limit';
 
-export const load: PageServerLoad = async ({ cookies, url }) => {
+export const load: PageServerLoad = async ({ cookies, url, setHeaders }) => {
+  setHeaders(NO_STORE_HEADERS);
   if (!hasSupabaseAuthCookie(cookies)) {
     redirect(303, '/login');
   }
@@ -47,7 +49,7 @@ export const load: PageServerLoad = async ({ cookies, url }) => {
     : { data: null };
 
   return {
-    session,
+    userEmail: user.email ?? null,
     profile: profile ?? {
       credit_balance: 0,
     },

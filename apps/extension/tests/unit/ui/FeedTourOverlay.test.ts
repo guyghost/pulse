@@ -32,7 +32,7 @@ describe('FeedTourOverlay CTA token', () => {
     document.body.innerHTML = '';
   });
 
-  it('uses a valid surface-white text token on the blue CTA for contrast', async () => {
+  it('uses a literal white text color on the blue CTA for dark-mode contrast', async () => {
     const target = mountOverlay();
     await tick();
 
@@ -41,9 +41,9 @@ describe('FeedTourOverlay CTA token', () => {
     );
 
     expect(cta).toBeTruthy();
-    // FEED-04: text-text-900 has no matching @theme token; the blue CTA needs
-    // an explicit, theme-valid light text color.
-    expect(cta!.className).toContain('text-surface-white');
+    // The CTA sits on a blue fill. text-surface-white flips to #1c1917 in dark
+    // mode, so we use literal text-white to stay legible in both themes.
+    expect(cta!.className).toContain('text-white');
     expect(cta!.className).not.toContain('text-text-900');
   });
 });

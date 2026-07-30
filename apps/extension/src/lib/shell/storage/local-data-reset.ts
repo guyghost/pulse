@@ -1,14 +1,23 @@
-import { MISSIONPULSE_DB_NAME } from './db';
+export class LocalDataResetUnavailableError extends Error {
+  readonly code = 'LOCAL_DATA_RESET_MODEL_PORTS_UNAVAILABLE' as const;
 
-function deleteMissionPulseDatabase(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    const request = globalThis.indexedDB.deleteDatabase(MISSIONPULSE_DB_NAME);
-    request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error);
-    request.onblocked = () => reject(new Error('MissionPulse IndexedDB deletion is blocked.'));
-  });
+  constructor() {
+    super(
+      'La réinitialisation locale est indisponible tant que les ports d’effet du modèle ne sont pas installés.'
+    );
+    this.name = 'LocalDataResetUnavailableError';
+  }
 }
 
-export async function resetLocalData(): Promise<void> {
-  await Promise.all([chrome.storage.local.clear(), deleteMissionPulseDatabase()]);
+/**
+ * Fail-closed production gate.
+ *
+ * The approved reset machine currently exports states and validated events,
+ * but no executable command/port protocol. Performing the former clear/delete
+ * sequence here would bypass its journal, epoch fence, handoff and completion
+ * receipt. Until that protocol is executable, no destructive effect is
+ * admitted and callers receive a truthful failure.
+ */
+export async function resetLocalData(): Promise<never> {
+  throw new LocalDataResetUnavailableError();
 }

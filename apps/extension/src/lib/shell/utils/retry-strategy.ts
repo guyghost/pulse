@@ -15,6 +15,11 @@ export interface RetryConfig {
   backoffMultiplier?: number;
 }
 
+export interface ResultRetryLifecycleObserver {
+  onRetryableFailure?(error: AppError, attempt: number): void;
+  onRetryTimerFired?(attempt: number): void;
+}
+
 export const DEFAULT_RETRY_CONFIG: RetryConfig = {
   maxAttempts: 3,
   baseDelayMs: 1000,
@@ -55,11 +60,34 @@ function isRetryableError(error: Error, retryableErrors: string[]): boolean {
   return retryableErrors.some((retryable) => errorMessage.includes(retryable.toUpperCase()));
 }
 
-/**
- * Attend un certain délai
- */
-function sleep(ms: number): Promise<void> {
-  return new Promise((resolve) => setTimeout(resolve, ms));
+function abortError(): DOMException {
+  return new DOMException('The operation was aborted.', 'AbortError');
+}
+
+function throwIfAborted(signal?: AbortSignal): void {
+  if (signal?.aborted) {
+    throw abortError();
+  }
+}
+
+/** Attend un délai et libère toujours timer/listener à la résolution ou l'abort. */
+export function abortableDelay(ms: number, signal?: AbortSignal): Promise<void> {
+  if (signal?.aborted) {
+    return Promise.reject(abortError());
+  }
+
+  return new Promise((resolve, reject) => {
+    const onAbort = (): void => {
+      clearTimeout(timer);
+      signal?.removeEventListener('abort', onAbort);
+      reject(abortError());
+    };
+    const timer = setTimeout(() => {
+      signal?.removeEventListener('abort', onAbort);
+      resolve();
+    }, ms);
+    signal?.addEventListener('abort', onAbort, { once: true });
+  });
 }
 
 /**
@@ -73,16 +101,18 @@ function sleep(ms: number): Promise<void> {
 export async function withRetry<T>(
   fn: () => Promise<T>,
   config: Partial<RetryConfig> = {},
-  isOnline: () => boolean = () => true
+  isOnline: () => boolean = () => true,
+  signal?: AbortSignal
 ): Promise<T> {
   const fullConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
 
   for (let attempt = 1; attempt <= fullConfig.maxAttempts; attempt++) {
+    throwIfAborted(signal);
     try {
       // Vérifier la connexion avant chaque tentative
       if (!isOnline() && attempt > 1) {
         // Attendre la reconnexion avant de réessayer
-        await waitForOnlineState(isOnline, fullConfig.maxDelayMs);
+        await waitForOnlineState(isOnline, fullConfig.maxDelayMs, signal);
       }
 
       return await fn();
@@ -106,7 +136,7 @@ export async function withRetry<T>(
       // Calculer et attendre le délai avant retry
       const delay = calculateDelay(attempt, fullConfig);
 
-      await sleep(delay);
+      await abortableDelay(delay, signal);
     }
   }
 
@@ -121,23 +151,40 @@ export async function withRetry<T>(
 /**
  * Attend que isOnline retourne true
  */
-function waitForOnlineState(isOnline: () => boolean, timeoutMs: number): Promise<void> {
+function waitForOnlineState(
+  isOnline: () => boolean,
+  timeoutMs: number,
+  signal?: AbortSignal
+): Promise<void> {
   return new Promise((resolve, reject) => {
+    if (signal?.aborted) {
+      reject(abortError());
+      return;
+    }
     if (isOnline()) {
       resolve();
       return;
     }
 
     const startTime = Date.now();
+    const cleanup = (): void => {
+      clearInterval(checkInterval);
+      signal?.removeEventListener('abort', onAbort);
+    };
+    const onAbort = (): void => {
+      cleanup();
+      reject(abortError());
+    };
     const checkInterval = setInterval(() => {
       if (isOnline()) {
-        clearInterval(checkInterval);
+        cleanup();
         resolve();
       } else if (Date.now() - startTime > timeoutMs) {
-        clearInterval(checkInterval);
+        cleanup();
         reject(new Error('Timeout waiting for online state'));
       }
     }, 500);
+    signal?.addEventListener('abort', onAbort, { once: true });
   });
 }
 
@@ -152,7 +199,8 @@ export async function fetchWithRetry(
   return withRetry(
     () => fetch(url, options),
     retryConfig,
-    () => navigator.onLine
+    () => navigator.onLine,
+    options?.signal ?? undefined
   );
 }
 
@@ -170,12 +218,16 @@ export async function fetchWithRetry(
  */
 export async function withResultRetry<T>(
   fn: () => Promise<Result<T, AppError>>,
-  config: Partial<RetryConfig> = {}
+  config: Partial<RetryConfig> = {},
+  signal?: AbortSignal,
+  lifecycle?: ResultRetryLifecycleObserver
 ): Promise<Result<T, AppError>> {
   const fullConfig = { ...DEFAULT_RETRY_CONFIG, ...config };
 
   for (let attempt = 1; attempt <= fullConfig.maxAttempts; attempt++) {
+    throwIfAborted(signal);
     const result = await fn();
+    throwIfAborted(signal);
 
     // Success - return immediately
     if (result.ok) {
@@ -193,10 +245,14 @@ export async function withResultRetry<T>(
       return result;
     }
 
+    lifecycle?.onRetryableFailure?.(result.error, attempt);
+
     // Calculate and wait for delay before retry
     const delay = calculateDelay(attempt, fullConfig);
 
-    await sleep(delay);
+    await abortableDelay(delay, signal);
+    throwIfAborted(signal);
+    lifecycle?.onRetryTimerFired?.(attempt);
   }
 
   // Should never reach here

@@ -1,5 +1,6 @@
 <script lang="ts">
   import type { Mission } from '$lib/core/types/mission';
+  import type { MissionDwellSignal } from '$lib/core/feed/mission-arrival-queue';
   import type { ApplicationStatus, MissionTracking } from '$lib/core/types/tracking';
   import { getLastTransitionTime } from '$lib/core/tracking';
   import MissionCard from '../molecules/MissionCard.svelte';
@@ -15,14 +16,19 @@
     error = null,
     seenIds = [],
     favorites = {},
+    favoritePendingIds = new Set<string>(),
     hidden = {},
     comparisonMissionIds = [],
     trackingByMissionId = new Map<string, MissionTracking>(),
+    statusPendingMissionIds = new Set<string>(),
     sortBy = 'score',
     resetKey = '',
     filterActive = false,
+    searchQuery = '',
+    stableQueueActive = false,
     tourStep = null,
     onMissionSeen,
+    onMissionReadSignal,
     onToggleFavorite,
     onHide,
     onToggleCompare,
@@ -39,14 +45,19 @@
     error?: string | null;
     seenIds?: string[];
     favorites?: Record<string, number>;
+    favoritePendingIds?: Set<string>;
     hidden?: Record<string, number>;
     comparisonMissionIds?: string[];
     trackingByMissionId?: Map<string, MissionTracking>;
+    statusPendingMissionIds?: Set<string>;
     sortBy?: 'score' | 'date' | 'tjm';
     resetKey?: string;
     filterActive?: boolean;
+    searchQuery?: string;
+    stableQueueActive?: boolean;
     tourStep?: 'score' | 'expand' | 'seen' | 'filters' | null;
     onMissionSeen?: (id: string) => void;
+    onMissionReadSignal?: (id: string, signal: MissionDwellSignal) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
     onToggleCompare?: (id: string) => void;
@@ -136,14 +147,14 @@
 
 <div class="flex flex-col gap-3">
   {#if isLoading && sortedMissions.length === 0}
-    {#each Array(3) as _}
+    {#each Array(3) as _, i (i)}
       <div class="section-card rounded-2xl p-4 space-y-3">
         <Skeleton width="58%" height="1.15rem" />
         <Skeleton width="34%" height="0.8rem" />
         <div class="flex gap-2">
-          <Skeleton width="3rem" height="1.25rem" rounded="full" />
-          <Skeleton width="4rem" height="1.25rem" rounded="full" />
-          <Skeleton width="3.5rem" height="1.25rem" rounded="full" />
+          <Skeleton width="3rem" height="1.25rem" variant="circle" />
+          <Skeleton width="4rem" height="1.25rem" variant="circle" />
+          <Skeleton width="3.5rem" height="1.25rem" variant="circle" />
         </div>
         <Skeleton width="100%" height="3rem" />
       </div>
@@ -167,14 +178,20 @@
   {:else if sortedMissions.length === 0}
     {#if filterActive}
       <OperationalEmptyState
-        title="Aucune mission ne correspond à cette décision"
-        description="Aucune mission ne correspond aux filtres actuels. Élargissez les critères avant de relancer un scan."
+        title={searchQuery.trim()
+          ? `Aucune mission pour « ${searchQuery.trim()} »`
+          : 'Aucune mission ne correspond à cette décision'}
+        description={searchQuery.trim()
+          ? 'Des missions sont disponibles, mais aucune ne correspond à cette recherche.'
+          : 'Aucune mission ne correspond aux filtres actuels. Élargissez les critères avant de relancer un scan.'}
         severity="attention"
-        statusLabel="Filtre trop strict"
+        statusLabel={searchQuery.trim() ? 'Recherche sans résultat' : 'Filtre trop strict'}
         icon="filter-x"
         proofLabel="Résultat filtré"
         proofValue="0 mission"
-        primaryActionLabel="Réinitialiser les filtres"
+        primaryActionLabel={searchQuery.trim()
+          ? 'Effacer la recherche'
+          : 'Réinitialiser les filtres'}
         primaryActionIcon="filter-x"
         secondaryActionLabel="Relancer le scan"
         secondaryActionIcon="refresh-cw"
@@ -201,7 +218,7 @@
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-status-red/10">
           <Icon name="x" size={14} class="text-status-red" />
         </div>
-        <p class="text-xs leading-relaxed text-text-secondary">{error}</p>
+        <p class="text-meta leading-relaxed text-text-secondary">{error}</p>
       </div>
     {/if}
 
@@ -213,13 +230,22 @@
           {mission}
           isSeen={seenSet.has(mission.id)}
           isFavorite={mission.id in (favorites ?? {})}
+          isFavoritePending={favoritePendingIds.has(mission.id)}
           isHidden={mission.id in (hidden ?? {})}
           isCompared={comparedIds.has(mission.id)}
           compareDisabled={comparisonLimitReached && !comparedIds.has(mission.id)}
           trackingStatus={missionTracking?.currentStatus ?? null}
           trackingUpdatedAt={missionTracking ? getLastTransitionTime(missionTracking) : null}
+          isStatusTransitionPending={statusPendingMissionIds.has(mission.id)}
           tourHighlight={visibleMissions[0]?.id === mission.id ? tourStep : null}
-          onVisible={() => onMissionSeen?.(mission.id)}
+          showSeenStatus={stableQueueActive}
+          onReadSignal={(signal) => {
+            if (onMissionReadSignal) {
+              onMissionReadSignal(mission.id, signal);
+            } else if (signal.type === 'elapsed') {
+              onMissionSeen?.(mission.id);
+            }
+          }}
           onToggleFavorite={() => onToggleFavorite?.(mission.id)}
           onHide={() => onHide?.(mission.id)}
           onToggleCompare={() => onToggleCompare?.(mission.id)}
@@ -235,7 +261,7 @@
     {#if hasMore}
       <div bind:this={sentinelEl} class="flex items-center justify-center py-4">
         <button
-          class="rounded-full border border-border-light bg-surface-white px-4 py-2 text-xs text-text-secondary transition-all hover:bg-subtle-gray hover:text-text-primary"
+          class="rounded-full border border-border-light bg-surface-white px-4 py-2 text-meta text-text-secondary transition-all hover:bg-subtle-gray hover:text-text-primary"
           onclick={loadMore}
         >
           Voir {Math.min(BATCH_SIZE, remainingCount)} missions de plus ({remainingCount} restantes)
@@ -243,7 +269,7 @@
       </div>
     {/if}
 
-    <p class="py-2 text-center text-[11px] text-text-muted shrink-0">
+    <p class="py-2 text-center text-caption text-text-muted shrink-0">
       {visibleMissions.length}/{sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length >
       1
         ? 's'

@@ -48,6 +48,12 @@ export function createFeedStore() {
       error = null;
     },
 
+    reset() {
+      missions = [];
+      error = null;
+      state = 'empty';
+    },
+
     setMissions(newMissions: Mission[]) {
       missions = newMissions;
       error = null;

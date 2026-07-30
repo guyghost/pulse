@@ -53,7 +53,7 @@
     bind:this={inputRef}
     type="text"
     placeholder="Rechercher une mission, une stack, un client..."
-    class="soft-ring w-full rounded-xl border border-border-light bg-surface-white pl-10 pr-10 py-3 text-[13px] text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
+    class="soft-ring w-full rounded-xl border border-border-light bg-surface-white pl-10 pr-10 py-3 text-body text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
     value={search.query}
     oninput={search.handleInput}
   />
@@ -67,7 +67,7 @@
     </button>
   {:else}
     <kbd
-      class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 select-none rounded-md border border-border-light bg-subtle-gray px-1.5 py-0.5 font-mono text-[10px] font-medium text-text-muted"
+      class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 select-none rounded-md border border-border-light bg-subtle-gray px-1.5 py-0.5 font-mono text-micro font-medium text-text-muted"
       aria-hidden="true"
       title="Appuyez sur / pour rechercher"
     >

@@ -8,6 +8,42 @@ export const creditPackVariantIds: Record<CreditPackId, string | undefined> = {
   power: env.LEMON_SQUEEZY_CREDITS_POWER_VARIANT_ID,
 };
 
+export function currentPremiumCreditPeriod(now = new Date()): string {
+  return `${now.getUTCFullYear()}-${String(now.getUTCMonth() + 1).padStart(2, '0')}`;
+}
+
+export function isPremiumProfileActive(profile: {
+  subscription_status?: string | null;
+  subscription_period_end?: string | null;
+}): boolean {
+  if (profile.subscription_status !== 'premium') {
+    return false;
+  }
+  if (!profile.subscription_period_end) {
+    return true;
+  }
+  return new Date(profile.subscription_period_end).getTime() > Date.now();
+}
+
+export async function grantPremiumMonthlyCredits(
+  supabase: SupabaseClient,
+  userId: string,
+  now = new Date()
+): Promise<number | null> {
+  const { data, error } = await supabase.rpc('grant_premium_monthly_credits', {
+    p_user_id: userId,
+    p_period: currentPremiumCreditPeriod(now),
+    p_amount: PREMIUM_MONTHLY_CREDITS,
+  });
+
+  if (error) {
+    console.error('Credit bonus grant failed:', error.message);
+    return null;
+  }
+
+  return typeof data === 'number' ? data : null;
+}
+
 export async function consumeGenerationCredit(
   supabase: SupabaseClient,
   userId: string,

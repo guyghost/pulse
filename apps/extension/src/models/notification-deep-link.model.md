@@ -121,8 +121,12 @@ at notify time. The legacy `showNewOnly` filter excludes seen missions, so
 toggling it after a notification would hide the very missions we want to show.
 The focus lens bypasses seen entirely (F2): focus is an explicit id allow-list
 applied after the normal pipeline, so seen-marking becomes harmless to the
-deep-link UX. We keep the seen-mark (it powers the badge/new-count correctly)
+deep-link UX. We keep the seen-mark (it prevents re-alerting the same missions)
 but it no longer dictates the focus surface.
+
+The extension icon badge is driven by `notifiableMissionIds` from
+`notifyHighScoreMissions` (same score/smart-alert filter as the Chrome
+notification), not by the raw unseen-mission count from the scan.
 
 ---
 

@@ -7,6 +7,8 @@
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { getProfile } from '$lib/shell/facades/settings.facade';
   import { subscribeMessages } from '$lib/shell/messaging/bridge';
+  import { getTJMDataFreshness } from '$lib/core/tjm-history';
+  import { formatAbsoluteDate } from '$lib/core/utils/format';
 
   const {
     onNavigateToProfile,
@@ -24,6 +26,7 @@
   let profileStacks = $state<string[]>([]);
   let userSeniority = $state<SeniorityLevel | null>(null);
   let selectedRegion = $state<TJMRegion | null>(null);
+  let analysisReferenceTime = $state(Date.now());
   // Region options are snapshotted from the unfiltered analysis so the dropdown
   // keeps showing every available region even after a region filter is applied
   // (the filtered analysis would otherwise shrink to a single region).
@@ -38,6 +41,7 @@
         profileStacks.length > 0 ? profileStacks : undefined,
         selectedRegion ?? undefined
       );
+      analysisReferenceTime = Date.now();
       if (!selectedRegion && analysis?.regionInsights) {
         regionOptions = analysis.regionInsights.map(({ region, label }) => ({ region, label }));
       }
@@ -71,6 +75,21 @@
 
   const isOffline = $derived(connection.status === 'offline');
   const profileCalibrated = $derived(userTjmMin > 0 || userTjmMax > 0);
+  const dataFreshness = $derived(
+    analysis ? getTJMDataFreshness(analysis.lastUpdated, new Date(analysisReferenceTime)) : null
+  );
+  const lastUpdatedLabel = $derived.by(() => {
+    if (!analysis?.lastUpdated) {
+      return '—';
+    }
+    const timestamp = Date.parse(analysis.lastUpdated);
+    return Number.isFinite(timestamp)
+      ? (formatAbsoluteDate(timestamp, { style: 'medium' }) ?? '—')
+      : '—';
+  });
+  const dataIsStale = $derived(
+    dataFreshness?.level === 'stale' || dataFreshness?.level === 'obsolete'
+  );
 
   let dashboardSection: HTMLElement | undefined = $state(undefined);
 
@@ -109,9 +128,9 @@
         <div>
           <p class="eyebrow text-blueprint-blue">Marché</p>
           <div class="mt-1 flex flex-wrap items-center gap-2">
-            <h2 class="text-base font-semibold text-text-primary">Analyse TJM</h2>
+            <h1 class="text-subheading font-semibold text-text-primary">Analyse TJM</h1>
             <span
-              class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+              class="rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
             >
               Local uniquement
             </span>
@@ -132,18 +151,22 @@
     </div>
 
     {#if analysis && !isLoading}
-      <p class="mt-3 text-[11px] text-text-muted">Mis à jour le {analysis.lastUpdated ?? '—'}</p>
+      <p class="mt-3 text-caption text-text-muted" class:text-status-orange={dataIsStale}>
+        Mis à jour le {lastUpdatedLabel}{#if dataIsStale && dataFreshness?.ageDays !== null}
+          · Données anciennes ({dataFreshness.ageDays} jour{dataFreshness.ageDays > 1 ? 's' : ''})
+        {/if}
+      </p>
     {:else if isLoading}
-      <p class="mt-3 text-[11px] text-text-muted">Chargement…</p>
+      <p class="mt-3 text-caption text-text-muted">Chargement…</p>
     {/if}
 
-    <p class="mt-2 text-[11px] leading-5 text-text-muted">
+    <p class="mt-2 text-caption leading-5 text-text-muted">
       Tendances tirées des missions stockées localement, croisées avec votre fourchette cible.
     </p>
 
     {#if isOffline}
       <div
-        class="mt-3 flex items-center gap-2 rounded-xl border border-status-orange/25 bg-status-orange/8 px-3 py-2 text-xs text-status-orange"
+        class="mt-3 flex items-center gap-2 rounded-xl border border-status-orange/25 bg-status-orange/8 px-3 py-2 text-meta text-status-orange"
       >
         <Icon name="triangle-alert" size={14} />
         <span><span>Mode hors ligne</span> — tendances calculées sur le cache local.</span>
@@ -152,7 +175,7 @@
 
     <div class="mt-4 flex flex-wrap items-center gap-2">
       <span
-        class="inline-flex items-center gap-1.5 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-[10px] font-medium text-text-subtle"
+        class="inline-flex items-center gap-1.5 rounded-md border border-border-light bg-page-canvas px-2 py-1 text-micro font-medium text-text-subtle"
       >
         <Icon
           name={isOffline ? 'database' : 'badge-euro'}
@@ -168,7 +191,7 @@
         <button
           type="button"
           onclick={inspectLocalSignals}
-          class="inline-flex items-center gap-1.5 rounded-lg border border-status-orange/25 bg-status-orange/8 px-3 py-1.5 text-[11px] font-medium text-status-orange transition-colors hover:bg-status-orange/14"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-status-orange/25 bg-status-orange/8 px-3 py-1.5 text-caption font-medium text-status-orange transition-colors hover:bg-status-orange/14"
         >
           <Icon name="search" size={12} />
           Inspecter les signaux locaux
@@ -178,7 +201,7 @@
         <button
           type="button"
           onclick={onNavigateToProfile}
-          class="inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/6 px-3 py-1.5 text-[11px] font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/12"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-blueprint-blue/20 bg-blueprint-blue/6 px-3 py-1.5 text-caption font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/12"
         >
           <Icon name="sliders-horizontal" size={12} />
           Ajuster mon TJM cible
@@ -188,7 +211,7 @@
         <button
           type="button"
           onclick={onNavigateToFeed}
-          class="inline-flex items-center gap-1.5 rounded-lg border border-border-light bg-surface-white px-3 py-1.5 text-[11px] font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
+          class="inline-flex items-center gap-1.5 rounded-lg border border-border-light bg-surface-white px-3 py-1.5 text-caption font-medium text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
         >
           <Icon name="radar" size={12} />
           Scanner le feed
@@ -199,19 +222,19 @@
     <div class="mt-3 flex items-center gap-2">
       <label
         for="tjm-region-filter"
-        class="text-[10px] font-medium uppercase tracking-[0.15em] text-text-muted"
+        class="text-micro font-medium uppercase tracking-[0.15em] text-text-muted"
       >
         Région
       </label>
       <select
         id="tjm-region-filter"
-        class="rounded-lg border border-border-light bg-surface-white px-2 py-1 text-xs text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
+        class="rounded-lg border border-border-light bg-surface-white px-2 py-1 text-meta text-text-primary outline-none transition-colors focus:border-blueprint-blue/30"
         value={selectedRegion ?? ''}
         onchange={handleRegionChange}
         aria-label="Filtrer les tendances TJM par région"
       >
         <option value="">Toutes les régions</option>
-        {#each regionOptions as option}
+        {#each regionOptions as option, i (i)}
           <option value={option.region}>{option.label}</option>
         {/each}
       </select>

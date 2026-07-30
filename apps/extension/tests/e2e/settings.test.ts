@@ -1,5 +1,11 @@
 import { test, expect } from './fixtures';
-import { expectFeedReady, navButton } from './helpers';
+import {
+  expectFeedReady,
+  favoriteButton,
+  missionCards,
+  navButton,
+  unfavoriteButton,
+} from './helpers';
 
 test.describe('Settings Flow', () => {
   test('navigates to settings without the profile editor section', async ({ page }) => {
@@ -32,9 +38,12 @@ test.describe('Settings Flow', () => {
     await expect(editBtn).toBeVisible({ timeout: 3000 });
     await editBtn.click();
 
-    await expect(page.locator('input[placeholder="Prénom"]')).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Prénom' })).toBeVisible();
+    await expect(page.getByRole('textbox', { name: 'Prénom' })).toBeFocused();
     await expect(page.locator('input[placeholder*="Poste"]')).toBeVisible();
     await expect(page.locator('input[placeholder="Localisation"]')).toBeVisible();
+    await expect(page.getByRole('spinbutton', { name: 'TJM minimum' })).toBeVisible();
+    await expect(page.getByRole('spinbutton', { name: 'TJM maximum' })).toBeVisible();
   });
 
   test('canceling profile edit returns to read-only mode', async ({ page }) => {
@@ -166,21 +175,14 @@ test.describe('Settings Flow', () => {
     await expect(page.getByText('Missions / scan')).toBeVisible();
   });
 
-  test('danger zone shows reset button', async ({ page }) => {
+  test('does not advertise reset while the safe runtime capability is unavailable', async ({
+    page,
+  }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
 
-    await expect(page.getByText('Zone dangereuse')).toBeVisible();
-    await expect(page.getByText('Réinitialiser tout')).toBeVisible();
-  });
-
-  test('clicking reset shows confirmation dialog', async ({ page }) => {
-    await page.getByRole('button', { name: 'Settings' }).click();
-
-    await page.getByText('Réinitialiser tout').click();
-    await expect(page.getByText('Suppression irréversible')).toBeVisible();
-    await expect(page.getByText('Annuler')).toBeVisible();
-    await page.getByText('Annuler').click();
-    await expect(page.getByText('Suppression irréversible')).not.toBeVisible();
+    await expect(page.getByText('Zone dangereuse')).toHaveCount(0);
+    await expect(page.getByText('Réinitialiser tout')).toHaveCount(0);
+    await expect(page.getByText('Réinitialisation indisponible')).toHaveCount(0);
   });
 
   test('settings page remains accessible after navigation', async ({ page }) => {
@@ -209,11 +211,33 @@ test.describe('Settings Flow', () => {
     await expect(page.getByRole('button', { name: 'Markdown' })).toBeVisible();
   });
 
+  test('refreshes the favorite export count when settings becomes active', async ({ page }) => {
+    await navButton(page, 'Feed').click();
+    const firstCard = missionCards(page).first();
+    await expect(firstCard).toBeVisible();
+
+    const alreadyFavorite = await unfavoriteButton(firstCard)
+      .isVisible()
+      .catch(() => false);
+    if (!alreadyFavorite) {
+      await favoriteButton(firstCard).click();
+      await expect(unfavoriteButton(firstCard)).toBeVisible();
+    }
+
+    await page.getByRole('button', { name: 'Settings' }).click();
+    await expect(page.getByText('1 mission prête à partager', { exact: true })).toBeVisible({
+      timeout: 3000,
+    });
+    await expect(page.getByText('Rien à exporter', { exact: true })).toHaveCount(0);
+  });
+
   test('settings page shows backup section', async ({ page }) => {
     await page.getByRole('button', { name: 'Settings' }).click();
 
     await expect(page.getByText('Sauvegarde').first()).toBeVisible({ timeout: 3000 });
     await expect(page.getByText('Créer une sauvegarde')).toBeVisible();
-    await expect(page.getByRole('button', { name: 'Restaurer' })).toBeVisible();
+    await expect(page.getByText('Import', { exact: true })).toBeVisible();
+    await expect(page.getByText('Non proposé', { exact: true })).toBeVisible();
+    await expect(page.getByRole('button', { name: 'Restaurer' })).toHaveCount(0);
   });
 });

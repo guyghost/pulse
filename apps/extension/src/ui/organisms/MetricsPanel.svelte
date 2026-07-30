@@ -1,5 +1,6 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { SvelteMap } from 'svelte/reactivity';
+  import { Icon, type IconName } from '@pulse/ui';
   import { metricsCollector, getWebVitals } from '../../lib/shell/metrics';
   import type { Metric } from '../../lib/core/metrics/types';
 
@@ -11,7 +12,7 @@
     value: string;
     state: string;
     hint: string;
-    icon: string;
+    icon: IconName;
     tone: DiagnosticTone;
   };
 
@@ -73,7 +74,7 @@
 
   const missionsByConnector = $derived.by(() => {
     const connectorMetrics = allMetrics.filter((m) => m.name === 'scan.missions.per_connector');
-    const latestByConnector = new Map<string, number>();
+    const latestByConnector = new SvelteMap<string, number>();
     for (const metric of connectorMetrics) {
       if (metric.tags?.connectorId) {
         latestByConnector.set(metric.tags.connectorId, metric.value);
@@ -112,7 +113,7 @@
 
   const avgTimings = $derived.by(() => {
     const timingMetrics = allMetrics.filter((m) => m.name.startsWith('timing.'));
-    const byOperation = new Map<string, number[]>();
+    const byOperation = new SvelteMap<string, number[]>();
 
     for (const metric of timingMetrics) {
       const operation = metric.name.replace('timing.', '');
@@ -120,7 +121,10 @@
       byOperation.set(operation, [...values, metric.value]);
     }
 
-    const result = new Map<string, { avg: number; count: number; min: number; max: number }>();
+    const result = new SvelteMap<
+      string,
+      { avg: number; count: number; min: number; max: number }
+    >();
     for (const [operation, values] of byOperation) {
       const avg = Math.round(values.reduce((a, b) => a + b, 0) / values.length);
       result.set(operation, {
@@ -379,14 +383,16 @@
             <Icon name="activity" size={15} />
           </div>
           <div class="min-w-0">
-            <p class="truncate text-sm font-semibold text-text-primary">Diagnostic opérationnel</p>
-            <p class="truncate text-[10px] text-text-subtle">Ctrl+Shift+M · métriques de session</p>
+            <p class="truncate text-body-lg font-semibold text-text-primary">
+              Diagnostic opérationnel
+            </p>
+            <p class="truncate text-micro text-text-subtle">Ctrl+Shift+M · métriques de session</p>
           </div>
         </div>
 
         <div class="flex items-center gap-2">
           <button
-            class="rounded-lg border px-2.5 py-1.5 text-[10px] font-medium transition-colors {autoRefresh
+            class="rounded-lg border px-2.5 py-1.5 text-micro font-medium transition-colors {autoRefresh
               ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
               : 'border-border-light bg-page-canvas text-text-secondary hover:bg-subtle-gray'}"
             onclick={toggleAutoRefresh}
@@ -417,30 +423,32 @@
       <section class="rounded-2xl border p-4 {toneClasses(operationalSummary.tone)}">
         <div class="flex flex-col gap-3 md:flex-row md:items-start md:justify-between">
           <div class="min-w-0">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em]">
+            <p class="text-micro font-semibold uppercase tracking-[0.16em]">
               {operationalSummary.statusLabel}
             </p>
-            <h2 class="mt-2 text-xl font-semibold leading-tight text-text-primary">
+            <h2 class="mt-2 text-heading-lg font-semibold leading-tight text-text-primary">
               {operationalSummary.title}
             </h2>
-            <p class="mt-2 max-w-3xl text-sm leading-6 text-text-secondary">
+            <p class="mt-2 max-w-3xl text-body-lg leading-6 text-text-secondary">
               {operationalSummary.description}
             </p>
-            <p class="mt-2 text-sm font-medium text-text-primary">{operationalSummary.action}</p>
+            <p class="mt-2 text-body-lg font-medium text-text-primary">
+              {operationalSummary.action}
+            </p>
           </div>
           <div class="grid grid-cols-2 gap-2 md:w-80">
-            {#each prioritySignals as signal}
+            {#each prioritySignals as signal, i (i)}
               <div class="rounded-xl border border-surface-white/70 bg-surface-white/70 px-3 py-2">
                 <div class="flex items-center justify-between gap-2">
-                  <span class="text-[9px] font-medium uppercase tracking-[0.14em] text-text-muted">
+                  <span class="text-micro font-medium uppercase tracking-[0.14em] text-text-muted">
                     {signal.label}
                   </span>
                   <Icon name={signal.icon} size={12} class="shrink-0" />
                 </div>
-                <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-text-primary">
+                <p class="mt-1 font-mono text-heading font-semibold tabular-nums text-text-primary">
                   {signal.value}
                 </p>
-                <p class="text-[10px] font-medium text-text-secondary">
+                <p class="text-micro font-medium text-text-secondary">
                   {signal.state}
                 </p>
               </div>
@@ -452,11 +460,11 @@
       <nav
         class="flex gap-1 overflow-x-auto rounded-xl border border-border-light bg-surface-white p-1"
       >
-        {#each tabs as tab}
+        {#each tabs as tab (tab.id)}
           <button
-            class="shrink-0 rounded-lg px-3 py-2 text-xs font-medium transition-colors {activeTab ===
+            class="shrink-0 rounded-lg px-3 py-2 text-meta font-medium transition-colors {activeTab ===
             tab.id
-              ? 'bg-blueprint-blue text-surface-white'
+              ? 'bg-blueprint-blue-strong text-white'
               : 'text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
             onclick={() => (activeTab = tab.id)}
           >
@@ -468,18 +476,19 @@
       {#if activeTab === 'overview'}
         <div class="grid gap-3 md:grid-cols-2">
           <section class="rounded-xl border border-border-light bg-surface-white p-4">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+            <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
               Signaux prioritaires
             </p>
             <div class="mt-3 space-y-2">
-              {#each prioritySignals as signal}
+              {#each prioritySignals as signal, i (i)}
                 <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                   <div class="flex items-start justify-between gap-3">
                     <div class="min-w-0">
-                      <p class="text-sm font-semibold text-text-primary">{signal.state}</p>
-                      <p class="mt-1 text-xs leading-5 text-text-subtle">{signal.hint}</p>
+                      <p class="text-body-lg font-semibold text-text-primary">{signal.state}</p>
+                      <p class="mt-1 text-meta leading-5 text-text-subtle">{signal.hint}</p>
                     </div>
-                    <span class="font-mono text-sm font-semibold tabular-nums text-text-primary"
+                    <span
+                      class="font-mono text-body-lg font-semibold tabular-nums text-text-primary"
                       >{signal.value}</span
                     >
                   </div>
@@ -489,32 +498,36 @@
           </section>
 
           <section class="rounded-xl border border-border-light bg-surface-white p-4">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+            <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
               Couverture par source
             </p>
             {#if missionsByConnector.size === 0}
               <div class="mt-3 rounded-xl border border-status-orange/20 bg-status-orange/8 p-3">
-                <p class="text-sm font-medium text-text-primary">
+                <p class="text-body-lg font-medium text-text-primary">
                   Aucune source n’a encore produit de signal.
                 </p>
-                <p class="mt-1 text-xs leading-5 text-text-subtle">
+                <p class="mt-1 text-meta leading-5 text-text-subtle">
                   Lancez un scan pour savoir si le problème vient d’un connecteur ou d’un feed vide.
                 </p>
               </div>
             {:else}
               <div class="mt-3 space-y-2">
-                {#each [...missionsByConnector] as [connectorId, count]}
+                {#each [...missionsByConnector] as [connectorId, count] (connectorId)}
                   <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                     <div class="flex items-center justify-between gap-3">
                       <div class="min-w-0">
-                        <p class="truncate text-sm font-medium text-text-primary">{connectorId}</p>
-                        <p class="text-xs text-text-subtle">
+                        <p class="truncate text-body-lg font-medium text-text-primary">
+                          {connectorId}
+                        </p>
+                        <p class="text-meta text-text-subtle">
                           {count > 0
                             ? 'Source contributrice au dernier scan.'
                             : 'Source muette à investiguer.'}
                         </p>
                       </div>
-                      <span class="font-mono text-sm font-semibold tabular-nums text-text-primary">
+                      <span
+                        class="font-mono text-body-lg font-semibold tabular-nums text-text-primary"
+                      >
                         {count}
                       </span>
                     </div>
@@ -526,16 +539,16 @@
         </div>
       {:else if activeTab === 'scan'}
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
             Timeline des scans
           </p>
           <div class="mt-3 rounded-xl border border-border-light bg-page-canvas p-3">
-            <p class="text-sm font-semibold text-text-primary">
+            <p class="text-body-lg font-semibold text-text-primary">
               {scanStats.scanCount > 0
                 ? `Dernier scan traité en ${formatDuration(scanStats.lastScan)}`
                 : 'Aucun scan mesuré'}
             </p>
-            <p class="mt-1 text-xs leading-5 text-text-subtle">
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
               {scanStats.scanCount > 0
                 ? `Moyenne observée ${formatDuration(scanStats.avgScanTime)}, déduplication ${scanStats.avgDedup.toFixed(1)}%.`
                 : 'Déclenchez un scan pour créer une timeline exploitable.'}
@@ -543,30 +556,30 @@
           </div>
 
           <div class="mt-3 space-y-2">
-            {#each scanHistory as metric}
+            {#each scanHistory as metric, i (i)}
               {@const missions = allMetrics.find(
                 (m) => m.name === 'scan.missions.total' && m.timestamp === metric.timestamp
               )}
               <article class="rounded-xl border border-border-light bg-surface-white px-3 py-2.5">
                 <div class="flex items-center justify-between gap-3">
                   <div>
-                    <p class="text-xs font-medium text-text-primary">
+                    <p class="text-meta font-medium text-text-primary">
                       {formatTimestamp(metric.timestamp)}
                     </p>
-                    <p class="text-[11px] text-text-subtle">
+                    <p class="text-caption text-text-subtle">
                       {missions?.value
                         ? `${missions.value} mission(s) détectée(s)`
                         : 'Volume non renseigné'}
                     </p>
                   </div>
-                  <span class="font-mono text-xs font-semibold tabular-nums text-blueprint-blue">
+                  <span class="font-mono text-meta font-semibold tabular-nums text-blueprint-blue">
                     {formatDuration(metric.value)}
                   </span>
                 </div>
               </article>
             {:else}
               <p
-                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-meta text-text-subtle"
               >
                 Aucune entrée de timeline disponible.
               </p>
@@ -575,32 +588,32 @@
         </section>
 
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
             Incidents récents
           </p>
           <div class="mt-3 space-y-2">
-            {#each recentErrors as error}
+            {#each recentErrors as error, i (i)}
               <article class="rounded-xl border border-status-red/20 bg-status-red/8 px-3 py-2.5">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold text-text-primary">
+                    <p class="truncate text-body-lg font-semibold text-text-primary">
                       {error.tags?.connectorId ?? 'Source inconnue'}
                     </p>
-                    <p class="mt-1 text-xs text-text-subtle">
+                    <p class="mt-1 text-meta text-text-subtle">
                       Cause probable : {error.tags?.errorType ?? 'erreur non classée'}.
                     </p>
-                    <p class="mt-1 text-xs font-medium text-text-primary">
+                    <p class="mt-1 text-meta font-medium text-text-primary">
                       Action : relancer la source ou inspecter la session navigateur.
                     </p>
                   </div>
-                  <span class="font-mono text-[11px] text-text-muted"
+                  <span class="font-mono text-caption text-text-muted"
                     >{formatTimestamp(error.timestamp)}</span
                   >
                 </div>
               </article>
             {:else}
               <p
-                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-meta text-text-subtle"
               >
                 Aucun incident récent. Le scan peut être considéré normal sur cette session.
               </p>
@@ -609,7 +622,7 @@
         </section>
       {:else if activeTab === 'cache'}
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
             Diagnostic cache
           </p>
           <div
@@ -617,12 +630,12 @@
               ? 'border-blueprint-blue/20 bg-blueprint-blue/6'
               : 'border-status-orange/20 bg-status-orange/8'}"
           >
-            <p class="text-sm font-semibold text-text-primary">
+            <p class="text-body-lg font-semibold text-text-primary">
               {cacheStats.lastHitRate >= 70
                 ? 'Le cache accélère les parcours répétés'
                 : 'Le cache mérite une investigation'}
             </p>
-            <p class="mt-1 text-xs leading-5 text-text-subtle">
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
               Hit rate {cacheStats.lastHitRate.toFixed(1)}%, {cacheStats.lastSize} entrée(s) suivie(s).
               {cacheStats.lastHitRate >= 70
                 ? ' Continuez à surveiller après les scans longs.'
@@ -631,7 +644,7 @@
           </div>
 
           <div class="mt-3 space-y-2">
-            {#each cacheHistory as metric}
+            {#each cacheHistory as metric, i (i)}
               {@const hits = allMetrics.find(
                 (m) => m.name === 'cache.memory.hits' && m.timestamp === metric.timestamp
               )}
@@ -641,21 +654,21 @@
               <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                 <div class="flex items-center justify-between gap-3">
                   <div>
-                    <p class="text-xs font-medium text-text-primary">
+                    <p class="text-meta font-medium text-text-primary">
                       {formatTimestamp(metric.timestamp)}
                     </p>
-                    <p class="text-[11px] text-text-subtle">
+                    <p class="text-caption text-text-subtle">
                       {hits?.value ?? 0} hit(s), {misses?.value ?? 0} miss(es)
                     </p>
                   </div>
-                  <span class="font-mono text-xs font-semibold tabular-nums text-blueprint-blue">
+                  <span class="font-mono text-meta font-semibold tabular-nums text-blueprint-blue">
                     {metric.value.toFixed(1)}%
                   </span>
                 </div>
               </article>
             {:else}
               <p
-                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-meta text-text-subtle"
               >
                 Aucun historique cache disponible.
               </p>
@@ -664,29 +677,29 @@
         </section>
       {:else if activeTab === 'timings'}
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
             Latences à prioriser
           </p>
           <div class="mt-3 space-y-2">
-            {#each slowestTimings as [operation, stats]}
+            {#each slowestTimings as [operation, stats] (operation)}
               <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                 <div class="flex items-start justify-between gap-3">
                   <div class="min-w-0">
-                    <p class="truncate text-sm font-semibold text-text-primary">{operation}</p>
-                    <p class="mt-1 text-xs text-text-subtle">
+                    <p class="truncate text-body-lg font-semibold text-text-primary">{operation}</p>
+                    <p class="mt-1 text-meta text-text-subtle">
                       {stats.count} appel{stats.count > 1 ? 's' : ''}, plage {formatDuration(
                         stats.min
                       )}
                       → {formatDuration(stats.max)}.
                     </p>
-                    <p class="mt-1 text-xs font-medium text-text-primary">
+                    <p class="mt-1 text-meta font-medium text-text-primary">
                       {stats.avg > 1000
                         ? 'Action : profiler cette opération avant le prochain shipping.'
                         : 'État : pas de blocage opérationnel immédiat.'}
                     </p>
                   </div>
                   <span
-                    class="font-mono text-sm font-semibold tabular-nums {stats.avg > 1000
+                    class="font-mono text-body-lg font-semibold tabular-nums {stats.avg > 1000
                       ? 'text-status-orange'
                       : 'text-blueprint-blue'}"
                   >
@@ -696,7 +709,7 @@
               </article>
             {:else}
               <p
-                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-meta text-text-subtle"
               >
                 Aucune latence instrumentée. Ajoutez un timing autour du parcours à investiguer.
               </p>
@@ -705,11 +718,11 @@
         </section>
       {:else if activeTab === 'webvitals'}
         <section class="rounded-xl border border-border-light bg-surface-white p-4">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.16em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.16em] text-text-muted">
             Expérience perçue
           </p>
           <div class="mt-3 grid grid-cols-2 gap-2 md:grid-cols-4">
-            {#each [{ label: 'FCP', value: webVitals.fcp, limit: 1800, incident: 3000, help: 'Premier contenu visible' }, { label: 'LCP', value: webVitals.lcp, limit: 2500, incident: 4000, help: 'Contenu principal visible' }, { label: 'CLS', value: webVitals.cls, limit: 0.1, incident: 0.25, help: 'Stabilité visuelle' }, { label: 'FID', value: webVitals.fid ?? 0, limit: 100, incident: 300, help: 'Réactivité interaction' }] as vital}
+            {#each [{ label: 'FCP', value: webVitals.fcp, limit: 1800, incident: 3000, help: 'Premier contenu visible' }, { label: 'LCP', value: webVitals.lcp, limit: 2500, incident: 4000, help: 'Contenu principal visible' }, { label: 'CLS', value: webVitals.cls, limit: 0.1, incident: 0.25, help: 'Stabilité visuelle' }, { label: 'FID', value: webVitals.fid ?? 0, limit: 100, incident: 300, help: 'Réactivité interaction' }] as vital (vital.label)}
               {@const measured = vital.value > 0}
               {@const tone = !measured
                 ? 'attention'
@@ -719,37 +732,37 @@
                     ? 'attention'
                     : 'success'}
               <article class="rounded-xl border p-3 {toneClasses(tone)}">
-                <p class="text-[10px] font-semibold uppercase tracking-[0.14em]">{vital.label}</p>
-                <p class="mt-1 font-mono text-lg font-semibold tabular-nums text-text-primary">
+                <p class="text-micro font-semibold uppercase tracking-[0.14em]">{vital.label}</p>
+                <p class="mt-1 font-mono text-heading font-semibold tabular-nums text-text-primary">
                   {measured
                     ? vital.label === 'CLS'
                       ? vital.value.toFixed(3)
                       : formatDuration(vital.value)
                     : '—'}
                 </p>
-                <p class="mt-1 text-[11px] leading-4 text-text-subtle">{vital.help}</p>
+                <p class="mt-1 text-caption leading-4 text-text-subtle">{vital.help}</p>
               </article>
             {/each}
           </div>
 
           <div class="mt-3 space-y-2">
-            {#each webVitalsHistory as metric}
+            {#each webVitalsHistory as metric, i (i)}
               <article class="rounded-xl border border-border-light bg-page-canvas px-3 py-2.5">
                 <div class="flex items-center justify-between gap-3">
                   <div>
-                    <p class="text-xs font-medium text-text-primary">
+                    <p class="text-meta font-medium text-text-primary">
                       {metric.name.replace('webvital.', '').toUpperCase()}
                     </p>
-                    <p class="text-[11px] text-text-subtle">{formatTimestamp(metric.timestamp)}</p>
+                    <p class="text-caption text-text-subtle">{formatTimestamp(metric.timestamp)}</p>
                   </div>
-                  <span class="font-mono text-xs font-semibold tabular-nums text-text-primary">
+                  <span class="font-mono text-meta font-semibold tabular-nums text-text-primary">
                     {metricValue(metric)}
                   </span>
                 </div>
               </article>
             {:else}
               <p
-                class="rounded-xl border border-border-light bg-page-canvas p-3 text-xs text-text-subtle"
+                class="rounded-xl border border-border-light bg-page-canvas p-3 text-meta text-text-subtle"
               >
                 Aucune mesure historique. Rafraîchissez après avoir navigué dans l’interface.
               </p>
@@ -760,18 +773,18 @@
 
       <footer class="flex flex-wrap items-center gap-2 border-t border-border-light pt-4">
         <button
-          class="rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 py-1.5 text-xs font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/12"
+          class="rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 py-1.5 text-meta font-medium text-blueprint-blue transition-colors hover:bg-blueprint-blue/12"
           onclick={exportMetrics}
         >
           Exporter le contexte JSON
         </button>
         <button
-          class="rounded-lg border border-status-red/25 bg-status-red/8 px-3 py-1.5 text-xs font-medium text-text-primary transition-colors hover:bg-status-red/12"
+          class="rounded-lg border border-status-red/25 bg-status-red/8 px-3 py-1.5 text-meta font-medium text-text-primary transition-colors hover:bg-status-red/12"
           onclick={resetMetrics}
         >
           Vider la session
         </button>
-        <span class="ml-auto text-[10px] text-text-muted">
+        <span class="ml-auto text-micro text-text-muted">
           {allMetrics.length} signal{allMetrics.length > 1 ? 'aux' : ''} collecté{allMetrics.length >
           1
             ? 's'
@@ -781,16 +794,17 @@
     </div>
   </div>
 {:else}
-  <div class="fixed bottom-2 left-2 z-50">
+  <div class="fixed left-2 top-14 z-50">
     <button
-      class="rounded border border-border-light bg-surface-white/80 px-2 py-1 text-[9px] font-mono text-text-muted transition-colors hover:text-blueprint-blue"
+      class="h-8 rounded border border-border-light bg-surface-white/85 px-2 text-micro font-mono text-text-muted opacity-55 shadow-sm transition-all hover:text-blueprint-blue hover:opacity-100"
       onclick={() => {
         isOpen = true;
         refresh();
       }}
       title="Ouvrir le diagnostic opérationnel"
+      aria-label="Ouvrir le diagnostic opérationnel"
     >
-      Ctrl+Shift+M
+      QA
     </button>
   </div>
 {/if}

@@ -1,0 +1,26 @@
+[
+  {
+    "id": "health-malt-001",
+    "title": "Architecte plateforme cloud",
+    "name": null,
+    "description": "Concevoir une plateforme Kubernetes et accompagner les équipes.",
+    "company": { "name": "Client Malt" },
+    "client": null,
+    "clientName": null,
+    "skills": [{ "name": "Kubernetes" }, { "name": "TypeScript" }],
+    "dailyRate": 780,
+    "averageDailyRate": null,
+    "budget": null,
+    "location": "Paris",
+    "city": null,
+    "workingMode": "hybrid",
+    "remote": null,
+    "duration": "6 mois",
+    "missionLength": null,
+    "startDate": "2026-07-20",
+    "publishedAt": "2026-06-30T08:30:00.000Z",
+    "createdAt": null,
+    "slug": "architecte-plateforme-cloud",
+    "url": null
+  }
+]

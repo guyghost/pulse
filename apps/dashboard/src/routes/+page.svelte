@@ -1541,7 +1541,7 @@
               </div>
             </div>
             <a
-              class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue px-3 text-xs font-semibold text-surface-white hover:bg-blueprint-blue/90"
+              class="inline-flex h-9 shrink-0 items-center justify-center rounded-lg bg-blueprint-blue-strong px-3 text-xs font-semibold text-white hover:bg-blueprint-blue-strong/90"
               href={operationalStory.actionTarget === 'install'
                 ? chromeStoreUrl
                 : operationalStory.actionTarget === 'sync'
@@ -3340,7 +3340,7 @@
 
               <button
                 type="button"
-                class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-blueprint-blue bg-blueprint-blue px-4 text-sm font-medium text-surface-white shadow-subtle-2 hover:bg-blueprint-blue/90 disabled:cursor-not-allowed disabled:opacity-40"
+                class="mt-5 inline-flex h-10 w-full items-center justify-center rounded-lg border border-blueprint-blue-strong bg-blueprint-blue-strong px-4 text-sm font-medium text-white shadow-subtle-2 hover:bg-blueprint-blue-strong/90 disabled:cursor-not-allowed disabled:opacity-40"
                 disabled={!canPrepareCvSync}
                 onclick={() => {
                   syncPrepared = true;

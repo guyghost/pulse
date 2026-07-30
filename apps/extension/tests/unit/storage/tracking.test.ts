@@ -150,4 +150,40 @@ describe('tracking storage', () => {
     const selected = await getTrackingsByStatus('selected');
     expect(selected.map((t) => t.missionId)).toEqual(['alpha', 'mid', 'zeta']);
   });
+
+  it('rejects a corrupted stored record instead of normalizing it to absence or empty success', async () => {
+    const corrupted = {
+      ...makeTracking('mission-corrupted', 'applied'),
+      history: [{ from: null, to: 'selected', timestamp: 1779436800000, note: null }],
+    } as MissionTracking;
+    await saveTracking(corrupted);
+
+    await expect(getTracking('mission-corrupted')).rejects.toThrow(
+      'Invalid stored mission tracking'
+    );
+    await expect(getAllTrackings()).rejects.toThrow('Invalid stored mission tracking');
+    await expect(getTrackingsByStatus('applied')).rejects.toThrow(
+      'Invalid stored mission tracking'
+    );
+  });
+
+  it('rejects a record with an invalid internal history entry instead of repairing it silently', async () => {
+    const corrupted = {
+      ...makeTracking('mission-corrupted-history', 'applied'),
+      history: [
+        { from: null, to: 'selected', timestamp: 1779436800000, note: null },
+        { from: 'selected', to: 'unknown-stage', timestamp: 1779436850000, note: null },
+        { from: 'selected', to: 'applied', timestamp: 1779436900000, note: null },
+      ],
+    } as unknown as MissionTracking;
+    await saveTracking(corrupted);
+
+    await expect(getTracking('mission-corrupted-history')).rejects.toThrow(
+      'Invalid stored mission tracking'
+    );
+    await expect(getAllTrackings()).rejects.toThrow('Invalid stored mission tracking');
+    await expect(getTrackingsByStatus('applied')).rejects.toThrow(
+      'Invalid stored mission tracking'
+    );
+  });
 });

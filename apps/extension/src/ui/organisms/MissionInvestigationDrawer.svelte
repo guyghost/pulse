@@ -3,7 +3,10 @@
   import type { Mission } from '$lib/core/types/mission';
   import type { ApplicationStatus } from '$lib/core/types/tracking';
   import { STATUS_LABELS } from '$lib/core/types/tracking';
+  import { getMissionGrade, getMissionScore } from '$lib/core/scoring/mission-grade';
   import { scoreToGrade } from '$lib/core/types/score';
+  import { formatTJM } from '$lib/core/utils/format';
+  import { modalFocus, requestModalClose } from '$lib/shell/ui/modal-focus';
   import OperationalStoryCard, {
     type OperationalEvidence,
   } from '../molecules/OperationalStoryCard.svelte';
@@ -15,11 +18,14 @@
     isHidden = false,
     trackingStatus = null,
     trackingUpdatedAt = null,
+    trackingState = 'loading',
+    trackingError = null,
     onClose,
     onOpenLink,
     onToggleCompare,
     onHide,
     onSelectForTracking,
+    onRetryTracking,
   }: {
     mission: Mission;
     isCompared?: boolean;
@@ -27,12 +33,24 @@
     isHidden?: boolean;
     trackingStatus?: ApplicationStatus | null;
     trackingUpdatedAt?: number | null;
+    trackingState?: 'idle' | 'loading' | 'loaded' | 'error';
+    trackingError?: string | null;
     onClose?: () => void;
     onOpenLink?: (url: string) => void;
     onToggleCompare?: () => void;
     onHide?: () => void;
     onSelectForTracking?: () => void;
+    onRetryTracking?: () => void;
   } = $props();
+
+  let modalRoot = $state<HTMLElement | null>(null);
+  let dialogElement = $state<HTMLElement | null>(null);
+
+  function handleClose(): void {
+    if (!requestModalClose(modalRoot, 'explicit')) {
+      onClose?.();
+    }
+  }
 
   type MissionFact = {
     label: string;
@@ -40,7 +58,8 @@
     icon: IconName;
   };
 
-  const score = $derived(mission.scoreBreakdown?.total ?? mission.score ?? 0);
+  const score = $derived(getMissionScore(mission) ?? 0);
+  const missionGrade = $derived(getMissionGrade(mission));
   const criteria = $derived(mission.scoreBreakdown?.criteria ?? null);
   const formattedStartDate = $derived(formatMissionDate(mission.startDate));
   const formattedPublishedAt = $derived(formatMissionDate(mission.publishedAt));
@@ -69,14 +88,14 @@
   ]);
   const storyEvidence = $derived<OperationalEvidence[]>([
     {
-      label: 'Score',
-      value: score,
+      label: 'Note',
+      value: missionGrade ?? 'Non notée',
       icon: 'target',
       severity: score >= 80 ? 'success' : score >= 60 ? 'attention' : 'neutral',
     },
     {
       label: 'TJM',
-      value: mission.tjm !== null ? `${mission.tjm}€/j` : 'À vérifier',
+      value: mission.tjm !== null ? formatTJM(mission.tjm) : 'À vérifier',
       icon: 'badge-euro',
       severity: mission.tjm !== null ? 'success' : 'attention',
     },
@@ -95,7 +114,7 @@
         statusLabel: 'Prioritaire',
         title: 'Cette mission mérite une qualification rapide',
         description:
-          'Le score global indique un bon alignement. Vérifiez les points faibles ci-dessous avant de postuler.',
+          'La note globale indique un bon alignement. Vérifiez les points faibles ci-dessous avant de postuler.',
       };
     }
 
@@ -129,11 +148,27 @@
       : []
   );
 
-  const canSelectForTracking = $derived(trackingStatus === null || trackingStatus === 'detected');
+  const trackingReady = $derived(trackingState === 'loaded');
+  const canSelectForTracking = $derived(
+    trackingReady && (trackingStatus === null || trackingStatus === 'detected')
+  );
+  const trackingBadgeLabel = $derived(
+    trackingState === 'error'
+      ? 'Suivi indisponible'
+      : trackingState === 'loading'
+        ? 'Chargement du suivi'
+        : trackingStatus
+          ? STATUS_LABELS[trackingStatus]
+          : 'Non suivie'
+  );
   const trackingActionLabel = $derived(
-    canSelectForTracking
-      ? 'Mettre en suivi'
-      : `Suivi: ${STATUS_LABELS[trackingStatus ?? 'detected']}`
+    trackingState === 'error'
+      ? 'Réessayer le suivi'
+      : trackingState === 'loading'
+        ? 'Chargement du suivi'
+        : canSelectForTracking
+          ? 'Mettre en suivi'
+          : `Suivi: ${STATUS_LABELS[trackingStatus ?? 'detected']}`
   );
   const trackingUpdatedLabel = $derived(formatTrackingTimestamp(trackingUpdatedAt));
 
@@ -168,6 +203,10 @@
   }
 
   function handleSelectForTracking(): void {
+    if (trackingState === 'error') {
+      onRetryTracking?.();
+      return;
+    }
     if (!canSelectForTracking) {
       return;
     }
@@ -186,11 +225,26 @@
   }
 </script>
 
-<div class="fixed inset-0 z-50 bg-page-canvas" role="presentation">
+<div
+  bind:this={modalRoot}
+  use:modalFocus={{
+    surface: 'mission_investigation',
+    variant: 'investigation',
+    ownerScopePath: ['feed', 'mission_investigation'],
+    onBeforeClose: () => {
+      onClose?.();
+      return 'accepted';
+    },
+    onRejected: () => onClose?.(),
+  }}
+  class="fixed inset-0 z-50 bg-page-canvas"
+  role="presentation"
+>
   <div
+    bind:this={dialogElement}
     class="absolute inset-0 flex w-full flex-col bg-page-canvas"
     role="dialog"
-    aria-modal="true"
+    tabindex="-1"
     aria-label="Investigation mission"
   >
     <div
@@ -198,28 +252,28 @@
     >
       <div class="mx-auto flex w-full max-w-6xl items-start justify-between gap-4">
         <div class="min-w-0 flex-1">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
             Investigation
           </p>
-          <h2 class="mt-1 max-w-4xl text-xl font-semibold leading-tight text-text-primary">
+          <h2 class="mt-1 max-w-4xl text-heading-lg font-semibold leading-tight text-text-primary">
             {mission.title}
           </h2>
           <div class="mt-3 flex flex-wrap gap-2">
             <span
-              class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-[11px] font-medium text-text-secondary"
+              class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-caption font-medium text-text-secondary"
             >
               <Icon name="database" size={12} />
               {mission.source}
             </span>
             <span
-              class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-[11px] font-medium text-text-secondary"
+              class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-caption font-medium text-text-secondary"
             >
               <Icon name="badge-euro" size={12} />
-              {mission.tjm !== null ? `${mission.tjm}€/j` : 'TJM à vérifier'}
+              {mission.tjm !== null ? formatTJM(mission.tjm) : 'TJM à vérifier'}
             </span>
             {#if formattedPublishedAt}
               <span
-                class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-[11px] font-medium text-text-secondary"
+                class="inline-flex items-center gap-1 rounded-lg border border-border-light bg-page-canvas px-2.5 py-1 text-caption font-medium text-text-secondary"
               >
                 <Icon name="calendar-clock" size={12} />
                 Publiée {formattedPublishedAt}
@@ -230,8 +284,9 @@
         <button
           type="button"
           class="inline-flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-text-muted transition-colors hover:bg-subtle-gray hover:text-text-primary"
-          onclick={onClose}
+          onclick={handleClose}
           aria-label="Fermer l'investigation"
+          data-modal-close
         >
           <Icon name="x" size={18} />
         </button>
@@ -261,19 +316,21 @@
           >
             <div class="flex items-start justify-between gap-3">
               <div>
-                <h3 class="text-base font-semibold text-text-primary">Transformer la décision</h3>
-                <p class="mt-1 text-sm leading-6 text-text-subtle">
+                <h3 class="text-subheading font-semibold text-text-primary">
+                  Transformer la décision
+                </h3>
+                <p class="mt-1 text-body-lg leading-6 text-text-subtle">
                   Gardez le contrôle avant de sortir vers la plateforme source.
                 </p>
               </div>
               <div class="shrink-0 text-right">
                 <span
-                  class="inline-flex rounded-lg border border-border-light bg-page-canvas px-2.5 py-1.5 text-[11px] font-medium text-text-subtle"
+                  class="inline-flex rounded-lg border border-border-light bg-page-canvas px-2.5 py-1.5 text-caption font-medium text-text-subtle"
                 >
-                  {trackingStatus ? STATUS_LABELS[trackingStatus] : 'Non suivie'}
+                  {trackingBadgeLabel}
                 </span>
-                {#if trackingUpdatedLabel}
-                  <p class="mt-1 text-[10px] text-text-muted">Modifié {trackingUpdatedLabel}</p>
+                {#if trackingReady && trackingUpdatedLabel}
+                  <p class="mt-1 text-micro text-text-muted">Modifié {trackingUpdatedLabel}</p>
                 {/if}
               </div>
             </div>
@@ -281,9 +338,9 @@
             <div class="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-1 xl:grid-cols-2">
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-sm font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-blueprint-blue/25 bg-blueprint-blue/8 px-3 text-body-lg font-semibold text-blueprint-blue transition-colors hover:border-blueprint-blue/40 hover:bg-blueprint-blue/12 disabled:cursor-not-allowed disabled:opacity-45"
                 onclick={handleSelectForTracking}
-                disabled={!canSelectForTracking}
+                disabled={trackingState === 'loading' || (trackingReady && !canSelectForTracking)}
                 aria-label={trackingActionLabel}
               >
                 <Icon name="list-checks" size={14} />
@@ -291,7 +348,7 @@
               </button>
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-subtle-gray"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray"
                 onclick={handleOpenForTracking}
               >
                 <Icon name="external-link" size={14} />
@@ -299,7 +356,7 @@
               </button>
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-subtle-gray disabled:cursor-not-allowed disabled:opacity-45 {isCompared
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray disabled:cursor-not-allowed disabled:opacity-45 {isCompared
                   ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
                   : ''}"
                 onclick={handleToggleCompare}
@@ -311,7 +368,7 @@
               </button>
               <button
                 type="button"
-                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-sm font-semibold text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red"
+                class="inline-flex min-h-11 items-center justify-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 text-body-lg font-semibold text-text-primary transition-colors hover:bg-subtle-gray hover:text-status-red"
                 onclick={() => onHide?.()}
                 aria-pressed={isHidden}
               >
@@ -319,22 +376,25 @@
                 {isHidden ? 'Restaurer' : 'Masquer'}
               </button>
             </div>
+            {#if trackingState === 'error' && trackingError}
+              <p class="mt-2 text-meta leading-5 text-status-red" role="status">{trackingError}</p>
+            {/if}
           </section>
         </div>
 
         <div class="space-y-4">
           <section class="section-card-strong rounded-xl p-4 sm:p-5">
-            <h3 class="text-base font-semibold text-text-primary">Preuves principales</h3>
+            <h3 class="text-subheading font-semibold text-text-primary">Preuves principales</h3>
             <div class="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-              {#each missionFacts as fact}
+              {#each missionFacts as fact, i (i)}
                 <div class="rounded-lg bg-page-canvas px-3 py-3">
                   <p
-                    class="flex items-center gap-1.5 text-[10px] uppercase tracking-[0.13em] text-text-muted"
+                    class="flex items-center gap-1.5 text-micro uppercase tracking-[0.13em] text-text-muted"
                   >
                     <Icon name={fact.icon} size={11} />
                     {fact.label}
                   </p>
-                  <p class="mt-1.5 break-words text-sm font-medium text-text-primary">
+                  <p class="mt-1.5 break-words text-body-lg font-medium text-text-primary">
                     {fact.value}
                   </p>
                 </div>
@@ -344,11 +404,11 @@
 
           {#if visibleStack.length > 0}
             <section class="section-card rounded-xl p-4 sm:p-5">
-              <h3 class="text-base font-semibold text-text-primary">Compétences détectées</h3>
+              <h3 class="text-subheading font-semibold text-text-primary">Compétences détectées</h3>
               <div class="mt-3 flex flex-wrap gap-2">
-                {#each visibleStack as skill}
+                {#each visibleStack as skill (skill)}
                   <span
-                    class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-xs font-medium text-text-secondary"
+                    class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-meta font-medium text-text-secondary"
                   >
                     {skill}
                   </span>
@@ -362,35 +422,35 @@
               <details
                 class="rounded-lg border border-blueprint-blue/15 bg-blueprint-blue/5 px-3 py-2"
               >
-                <summary class="cursor-pointer text-sm font-semibold text-blueprint-blue">
-                  Pourquoi ce score ?
+                <summary class="cursor-pointer text-body-lg font-semibold text-blueprint-blue">
+                  Pourquoi cette note ?
                 </summary>
-                <p class="mt-2 text-sm leading-6 text-text-secondary">
-                  Score final {mission.scoreBreakdown?.total ?? score}/100, calculé depuis le
-                  profil, l’annonce et les critères ci-dessous.
+                <p class="mt-2 text-body-lg leading-6 text-text-secondary">
+                  Note finale {missionGrade ?? 'non notée'}, calculée depuis le profil, l’annonce et
+                  les critères ci-dessous.
                 </p>
                 {#if mission.scoreBreakdown}
-                  <p class="mt-2 text-xs leading-5 text-text-subtle">
-                    Base de score {mission.scoreBreakdown.deterministic}/100. L’analyse locale,
-                    quand elle existe, ajoute une hypothèse non bloquante.
+                  <p class="mt-2 text-meta leading-5 text-text-subtle">
+                    Note de base {scoreToGrade(mission.scoreBreakdown.deterministic)}. L’analyse
+                    locale, quand elle existe, ajoute une hypothèse non bloquante.
                   </p>
                   {#if mission.scoreBreakdown.semanticReason}
-                    <p class="mt-2 text-xs leading-5 text-blueprint-blue">
+                    <p class="mt-2 text-meta leading-5 text-blueprint-blue">
                       {mission.scoreBreakdown.semanticReason}
                     </p>
                   {/if}
                 {/if}
               </details>
-              <h3 class="mt-5 text-base font-semibold text-text-primary">Score par critère</h3>
+              <h3 class="mt-5 text-subheading font-semibold text-text-primary">Note par critère</h3>
               <div class="mt-3 grid gap-2 sm:grid-cols-2">
-                {#each scoreLines as line}
+                {#each scoreLines as line, i (i)}
                   {@const grade = scoreToGrade(line.value)}
                   <div
                     class="flex items-center justify-between gap-3 rounded-lg bg-page-canvas px-3 py-3"
                   >
-                    <span class="text-sm text-text-subtle">{line.label}</span>
-                    <span class="font-mono text-sm font-semibold text-text-primary">
-                      {grade} · {line.value}
+                    <span class="text-body-lg text-text-subtle">{line.label}</span>
+                    <span class="font-mono text-body-lg font-semibold text-text-primary">
+                      {grade}
                     </span>
                   </div>
                 {/each}
@@ -400,8 +460,8 @@
 
           {#if mission.description}
             <section class="section-card rounded-xl p-4 sm:p-5">
-              <h3 class="text-base font-semibold text-text-primary">Détails techniques</h3>
-              <p class="mt-3 whitespace-pre-wrap text-sm leading-6 text-text-subtle">
+              <h3 class="text-subheading font-semibold text-text-primary">Détails techniques</h3>
+              <p class="mt-3 whitespace-pre-wrap text-body-lg leading-6 text-text-subtle">
                 {mission.description}
               </p>
             </section>

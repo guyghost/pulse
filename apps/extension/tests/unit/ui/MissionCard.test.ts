@@ -21,7 +21,7 @@ function makeMission(overrides: Partial<Mission> = {}): Mission {
     seniority: 'senior',
     scoreBreakdown: null,
     score: 85,
-    semanticScore: 72,
+    semanticScore: null,
     semanticReason: 'Stack correspondant',
     ...overrides,
   };
@@ -61,12 +61,106 @@ describe('MissionCard', () => {
 
   it('affiche le TJM quand il est present', async () => {
     const target = mountCard();
-    // Expand the card to reveal TJM details
-    const card = target.querySelector('[role="button"]') as HTMLElement;
-    card?.click();
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    disclosure.click();
     await tick();
     expect(target.textContent).toContain('650');
     expect(target.textContent).toMatch(/650.*\/j/);
+  });
+
+  it('expose une carte article non interactive avec un nom stable', async () => {
+    const target = mountCard();
+    await tick();
+
+    const articles = target.querySelectorAll(
+      'article[aria-label="Mission Developpeur fullstack TypeScript chez Acme Corp"]'
+    );
+    expect(articles).toHaveLength(1);
+    expect(articles[0].getAttribute('role')).not.toBe('button');
+    expect(articles[0].hasAttribute('tabindex')).toBe(false);
+  });
+
+  it('contrôle les détails avec un identifiant borné et une région nommée', async () => {
+    const target = mountCard({ mission: makeMission({ id: '123/mission très longue' }) });
+    await tick();
+
+    const disclosure = target.querySelector(
+      'button[aria-label="Afficher les détails de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLButtonElement;
+    const detailsId = disclosure.getAttribute('aria-controls') ?? '';
+
+    expect(disclosure.getAttribute('aria-expanded')).toBe('false');
+    expect(detailsId).toMatch(/^mission-details-[A-Za-z][A-Za-z0-9-]{0,63}$/);
+    expect(detailsId.length).toBeGreaterThanOrEqual(17);
+    expect(detailsId.length).toBeLessThanOrEqual(80);
+    expect(document.querySelectorAll(`#${detailsId}`)).toHaveLength(0);
+
+    disclosure.click();
+    await tick();
+
+    expect(disclosure.getAttribute('aria-label')).toBe(
+      'Masquer les détails de la mission Developpeur fullstack TypeScript'
+    );
+    expect(disclosure.getAttribute('aria-expanded')).toBe('true');
+    const region = target.querySelector(`#${detailsId}`);
+    expect(region?.getAttribute('role')).toBe('region');
+    expect(region?.getAttribute('aria-label')).toBe(
+      'Détails de la mission Developpeur fullstack TypeScript'
+    );
+  });
+
+  it('évite les collisions entre identifiants de mission normalisés', async () => {
+    const first = mountCard({ mission: makeMission({ id: 'mission/a' }) });
+    const second = mountCard({ mission: makeMission({ id: 'mission a' }) });
+    await tick();
+
+    const firstId = first
+      .querySelector('button[aria-controls^="mission-details-"]')
+      ?.getAttribute('aria-controls');
+    const secondId = second
+      .querySelector('button[aria-controls^="mission-details-"]')
+      ?.getAttribute('aria-controls');
+
+    expect(firstId).not.toBe(secondId);
+  });
+
+  it('expose le statut courant et les transitions dans un groupe nommé', async () => {
+    const onStatusTransition = vi.fn();
+    const target = mountCard({ trackingStatus: 'detected', onStatusTransition });
+    await tick();
+
+    const group = target.querySelector(
+      '[role="group"][aria-label="Statut de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLElement;
+    expect(group).not.toBeNull();
+    expect(
+      group.querySelector('[role="status"][aria-label="Statut actuel : Détectée"]')
+    ).not.toBeNull();
+
+    const transition = group.querySelector(
+      'button[aria-label="Passer le statut à Sélectionnée"]'
+    ) as HTMLButtonElement;
+    transition.click();
+    expect(onStatusTransition).toHaveBeenCalledWith('selected');
+  });
+
+  it('fige les transitions pendant leur confirmation', async () => {
+    const target = mountCard({
+      trackingStatus: 'detected',
+      isStatusTransitionPending: true,
+      onStatusTransition: vi.fn(),
+    });
+    await tick();
+
+    const group = target.querySelector(
+      '[role="group"][aria-label="Statut de la mission Developpeur fullstack TypeScript"]'
+    ) as HTMLElement;
+    expect(group.getAttribute('aria-busy')).toBe('true');
+    expect(Array.from(group.querySelectorAll('button')).every((button) => button.disabled)).toBe(
+      true
+    );
   });
 
   it("n'affiche pas le TJM quand il est null", async () => {
@@ -84,6 +178,14 @@ describe('MissionCard', () => {
   it('n\'affiche pas "Nouveau" pour les missions deja vues', async () => {
     const target = mountCard({ isSeen: true });
     await tick();
+    expect(target.textContent).not.toContain('Nouveau');
+  });
+
+  it('affiche "Vu" pour une mission lue dans une file stable', async () => {
+    const target = mountCard({ isSeen: true, showSeenStatus: true });
+    await tick();
+
+    expect(target.textContent).toContain('Vu');
     expect(target.textContent).not.toContain('Nouveau');
   });
 
@@ -121,6 +223,17 @@ describe('MissionCard', () => {
     expect(starredBtn).not.toBeNull();
   });
 
+  it("conserve l'état favori confirmé pendant la persistance", async () => {
+    const target = mountCard({ isFavorite: false, isFavoritePending: true });
+    await tick();
+
+    const favoriteButton = target.querySelector(
+      'button[aria-label="Ajouter la mission aux favoris"]'
+    ) as HTMLButtonElement;
+    expect(favoriteButton.getAttribute('aria-pressed')).toBe('false');
+    expect(favoriteButton.disabled).toBe(true);
+  });
+
   it("affiche l'etat non-favori par defaut", async () => {
     const target = mountCard({ isFavorite: false });
     await tick();
@@ -133,24 +246,40 @@ describe('MissionCard', () => {
     expect(target.querySelector('button[aria-label="Retirer la mission des favoris"]')).toBeNull();
   });
 
-  it('affiche le score avec la bonne couleur pour score >= 80', async () => {
+  it('affiche la note A avec la couleur prioritaire', async () => {
     const target = mountCard({ mission: makeMission({ score: 85 }) });
     await tick();
     const scoreEl = target.querySelector('.font-mono.font-bold');
     expect(scoreEl).not.toBeNull();
-    expect(scoreEl!.textContent).toContain('85');
+    expect(scoreEl!.textContent?.trim()).toBe('A');
+    expect(scoreEl!.getAttribute('aria-label')).toBe('Note A');
     expect(scoreEl!.className).toContain('text-text-primary');
     expect(scoreEl!.className).toContain('bg-accent-green/15');
   });
 
-  it('affiche le score avec la bonne couleur pour score entre 50 et 79', async () => {
+  it('affiche la note B avec la couleur intermédiaire', async () => {
     const target = mountCard({ mission: makeMission({ score: 65 }) });
     await tick();
     const scoreEl = target.querySelector('.font-mono.font-bold');
     expect(scoreEl).not.toBeNull();
-    expect(scoreEl!.textContent).toContain('65');
+    expect(scoreEl!.textContent?.trim()).toBe('B');
+    expect(scoreEl!.getAttribute('aria-label')).toBe('Note B');
     expect(scoreEl!.className).toContain('text-text-primary');
     expect(scoreEl!.className).toContain('bg-accent-amber/15');
+  });
+
+  it("n'assimile pas une mission non notée à une note F", async () => {
+    const target = mountCard({
+      mission: makeMission({
+        scoreBreakdown: null,
+        score: null,
+        semanticScore: null,
+        semanticReason: null,
+      }),
+    });
+    await tick();
+
+    expect(target.querySelector('[aria-label^="Note "]')).toBeNull();
   });
 
   it('affiche le client quand il est present', async () => {
@@ -165,7 +294,7 @@ describe('MissionCard', () => {
     expect(target.textContent).toContain('free-work');
   });
 
-  it('explique le score depuis une disclosure accessible', async () => {
+  it('explique la note depuis une disclosure accessible sans afficher le score numérique', async () => {
     const target = mountCard({
       mission: makeMission({
         score: 82,
@@ -190,20 +319,28 @@ describe('MissionCard', () => {
     });
     await tick();
 
+    const scoreBadge = target.querySelector('[aria-label="Note A"]');
+    expect(scoreBadge).not.toBeNull();
+    expect(scoreBadge?.textContent?.trim()).toBe('A');
+    expect(scoreBadge?.textContent).not.toContain('82');
+    expect(scoreBadge?.textContent).not.toContain('/100');
+
     const detailsButton = target.querySelector(
       'button[aria-controls^="mission-score-details-"]'
     ) as HTMLButtonElement;
     expect(detailsButton).not.toBeNull();
-    expect(detailsButton.textContent).toContain('Pourquoi ce score ?');
+    expect(detailsButton.textContent).toContain('Pourquoi cette note ?');
     expect(detailsButton.getAttribute('aria-expanded')).toBe('false');
-    expect(target.textContent).not.toContain('Score final 82/100');
+    expect(target.textContent).not.toContain('Note finale A');
 
     detailsButton.click();
     await tick();
 
     expect(detailsButton.getAttribute('aria-expanded')).toBe('true');
-    expect(target.textContent).toContain('Score final 82/100');
-    expect(target.textContent).toContain('Base 84');
+    expect(target.textContent).toContain('Note finale A');
+    expect(target.textContent).toContain('Base A');
+    expect(target.textContent).not.toContain('82/100');
+    expect(target.textContent).not.toContain('84');
     expect(target.textContent).toContain('Compétences');
     expect(target.textContent).toContain('IA sémantique');
     expect(target.textContent).toContain('Stack TypeScript très proche du profil');

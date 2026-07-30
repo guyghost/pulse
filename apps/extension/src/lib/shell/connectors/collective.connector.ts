@@ -190,9 +190,13 @@ export class CollectiveConnector extends BaseConnector {
 
   async fetchMissions(
     now: number,
-    context?: ConnectorSearchContext
+    context?: ConnectorSearchContext,
+    signal?: AbortSignal
   ): Promise<Result<Mission[], AppError>> {
     try {
+      if (signal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
       const injectResult = await injectCookieRule(
         COOKIE_DOMAIN,
         URL_FILTER,
@@ -200,6 +204,9 @@ export class CollectiveConnector extends BaseConnector {
         [REQUEST_DOMAIN],
         COLLECTIVE_HEADERS
       );
+      if (signal?.aborted) {
+        throw new DOMException('The operation was aborted.', 'AbortError');
+      }
 
       // Log cookie state for diagnostics
       const cookieNames = await getCookieNames(COOKIE_DOMAIN);
@@ -269,6 +276,7 @@ export class CollectiveConnector extends BaseConnector {
         credentials: 'include',
         headers: { 'Content-Type': 'application/json' },
         body,
+        signal,
       });
 
       const contentType = response.headers.get('content-type') ?? '';

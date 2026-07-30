@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { getMissionScore } from '$lib/core/scoring/mission-grade';
   import type { Mission } from '$lib/core/types/mission';
   import MissionCard from '../molecules/MissionCard.svelte';
   import { Skeleton } from '@pulse/ui';
@@ -16,6 +17,7 @@
     hidden = {},
     sortBy = 'score',
     filterActive = false,
+    searchQuery = '',
     onMissionSeen,
     onToggleFavorite,
     onHide,
@@ -33,6 +35,7 @@
     hidden?: Record<string, number>;
     sortBy?: 'score' | 'date' | 'tjm';
     filterActive?: boolean;
+    searchQuery?: string;
     onMissionSeen?: (id: string) => void;
     onToggleFavorite?: (id: string) => void;
     onHide?: (id: string) => void;
@@ -57,7 +60,7 @@
       if (sortBy === 'tjm') {
         return (b.tjm ?? 0) - (a.tjm ?? 0);
       }
-      return (b.score ?? 0) - (a.score ?? 0);
+      return (getMissionScore(b) ?? 0) - (getMissionScore(a) ?? 0);
     });
   });
 
@@ -75,14 +78,14 @@
 
 <div class="flex flex-col gap-3 overflow-y-auto">
   {#if isLoading && sortedMissions.length === 0}
-    {#each Array(3) as _}
+    {#each Array(3) as _, i (i)}
       <div class="section-card rounded-xl p-4 space-y-3">
         <Skeleton width="58%" height="1.15rem" />
         <Skeleton width="34%" height="0.8rem" />
         <div class="flex gap-2">
-          <Skeleton width="3rem" height="1.25rem" rounded="full" />
-          <Skeleton width="4rem" height="1.25rem" rounded="full" />
-          <Skeleton width="3.5rem" height="1.25rem" rounded="full" />
+          <Skeleton width="3rem" height="1.25rem" variant="circle" />
+          <Skeleton width="4rem" height="1.25rem" variant="circle" />
+          <Skeleton width="3.5rem" height="1.25rem" variant="circle" />
         </div>
         <Skeleton width="100%" height="3rem" />
       </div>
@@ -106,14 +109,20 @@
   {:else if sortedMissions.length === 0}
     {#if filterActive}
       <OperationalEmptyState
-        title="Aucune mission ne correspond à cette décision"
-        description="Le système n’a pas trouvé d’opportunité dans le périmètre courant. La prochaine action utile est d’élargir les critères avant de rescanner."
+        title={searchQuery.trim()
+          ? `Aucune mission pour « ${searchQuery.trim()} »`
+          : 'Aucune mission ne correspond à cette décision'}
+        description={searchQuery.trim()
+          ? 'Des missions sont disponibles, mais aucune ne correspond à cette recherche.'
+          : 'Le système n’a pas trouvé d’opportunité dans le périmètre courant. La prochaine action utile est d’élargir les critères avant de rescanner.'}
         severity="attention"
-        statusLabel="Filtre trop strict"
+        statusLabel={searchQuery.trim() ? 'Recherche sans résultat' : 'Filtre trop strict'}
         icon="filter-x"
         proofLabel="Résultat filtré"
         proofValue="0 mission"
-        primaryActionLabel="Réinitialiser les filtres"
+        primaryActionLabel={searchQuery.trim()
+          ? 'Effacer la recherche'
+          : 'Réinitialiser les filtres'}
         primaryActionIcon="filter-x"
         secondaryActionLabel="Relancer le scan"
         secondaryActionIcon="refresh-cw"
@@ -140,7 +149,7 @@
         <div class="flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-status-red/12">
           <Icon name="x" size={14} class="text-status-red" />
         </div>
-        <p class="text-xs leading-relaxed text-text-secondary">{error}</p>
+        <p class="text-meta leading-relaxed text-text-secondary">{error}</p>
       </div>
     {/if}
     {#each sortedMissions as mission, i (mission.id)}
@@ -158,7 +167,7 @@
         />
       </div>
     {/each}
-    <p class="py-2 text-center text-[11px] text-text-muted">
+    <p class="py-2 text-center text-caption text-text-muted">
       {sortedMissions.length} mission{sortedMissions.length > 1 ? 's' : ''} triée{sortedMissions.length >
       1
         ? 's'

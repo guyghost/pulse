@@ -28,6 +28,35 @@ const MIN_DATA_POINTS_FOR_TREND = 2;
 
 /** Minimum percentage change to count as a trend (not "stable") */
 const TREND_THRESHOLD_PERCENT = 5;
+const MS_PER_DAY = 86_400_000;
+
+export type TJMDataFreshnessLevel = 'fresh' | 'aging' | 'stale' | 'obsolete' | 'unknown';
+
+export interface TJMDataFreshness {
+  level: TJMDataFreshnessLevel;
+  ageDays: number | null;
+  confidenceMultiplier: number;
+}
+
+export function getTJMDataFreshness(lastUpdated: string | null, now: Date): TJMDataFreshness {
+  const updatedAt = lastUpdated ? Date.parse(lastUpdated) : Number.NaN;
+  const nowMs = now.getTime();
+  if (!Number.isFinite(updatedAt) || !Number.isFinite(nowMs) || updatedAt > nowMs) {
+    return { level: 'unknown', ageDays: null, confidenceMultiplier: 1 };
+  }
+
+  const ageDays = Math.floor((nowMs - updatedAt) / MS_PER_DAY);
+  if (ageDays <= 30) {
+    return { level: 'fresh', ageDays, confidenceMultiplier: 1 };
+  }
+  if (ageDays <= 90) {
+    return { level: 'aging', ageDays, confidenceMultiplier: 0.75 };
+  }
+  if (ageDays <= 180) {
+    return { level: 'stale', ageDays, confidenceMultiplier: 0.4 };
+  }
+  return { level: 'obsolete', ageDays, confidenceMultiplier: 0.2 };
+}
 
 // ---------------------------------------------------------------------------
 // Record creation (pure — date injected)
@@ -573,7 +602,7 @@ const buildRegionInsights = (history: TJMHistory): TJMRegionInsight[] => {
  *
  * Pure function: no I/O, no async, deterministic from inputs only.
  */
-export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
+export const analyzeTJMHistory = (history: TJMHistory, now?: Date): TJMAnalysis | null => {
   if (history.records.length === 0) {
     return null;
   }
@@ -639,7 +668,7 @@ export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
         ? 'down'
         : 'stable';
 
-  const confidence = clampConfidence(
+  const sampleConfidence = clampConfidence(
     stats.length * 0.12 +
       Math.min(history.records.length, 30) * 0.02 +
       (stableCount === stats.length ? 0.1 : 0.18)
@@ -651,6 +680,10 @@ export const analyzeTJMHistory = (history: TJMHistory): TJMAnalysis | null => {
       .filter((date): date is string => date !== null)
       .sort()
       .at(-1) ?? null;
+  const freshness = now
+    ? getTJMDataFreshness(lastUpdated, now)
+    : { level: 'unknown' as const, ageDays: null, confidenceMultiplier: 1 };
+  const confidence = clampConfidence(sampleConfidence * freshness.confidenceMultiplier);
 
   return {
     trend,

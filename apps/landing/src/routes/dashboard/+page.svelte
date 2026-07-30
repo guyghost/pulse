@@ -182,7 +182,7 @@
       <!-- Account header -->
       <div class="dashboard-section">
         <h1>Mon compte</h1>
-        <p class="dashboard-email">{data.session?.user?.email ?? ''}</p>
+        <p class="dashboard-email">{data.userEmail ?? ''}</p>
       </div>
 
       <div class="dashboard-divider"></div>

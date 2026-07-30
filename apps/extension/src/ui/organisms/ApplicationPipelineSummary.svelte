@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { Icon } from '@pulse/ui';
+  import { Icon, type IconName } from '@pulse/ui';
   import type { ApplicationPipelineSummary } from '$lib/core/tracking/pipeline-summary';
 
   const {
@@ -16,7 +16,7 @@
   type PipelineInsightCard = {
     label: string;
     value: string | number;
-    icon: string;
+    icon: IconName;
     stateLabel: string;
     hint: string;
     severity: 'success' | 'attention' | 'incident' | 'neutral';
@@ -79,7 +79,7 @@
 
 <div class="mt-4 space-y-3">
   <div class="grid grid-cols-2 gap-2 lg:grid-cols-4">
-    {#each insightCards as card}
+    {#each insightCards as card, i (i)}
       <div
         class="rounded-lg border bg-surface-white px-3 py-2.5 {card.severity === 'attention'
           ? 'border-status-orange/25'
@@ -91,10 +91,10 @@
       >
         <div class="flex items-start justify-between gap-2">
           <div class="min-w-0">
-            <p class="text-[9px] font-medium uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-caption font-medium uppercase tracking-[0.15em] text-text-subtle">
               {card.label}
             </p>
-            <p class="mt-1 text-lg font-semibold tabular-nums text-text-primary">
+            <p class="mt-1 text-heading font-semibold tabular-nums text-text-primary">
               {card.value}
             </p>
           </div>
@@ -112,31 +112,31 @@
             <Icon name={card.icon} size={13} />
           </span>
         </div>
-        <p class="mt-1 text-[10px] font-medium text-text-primary">{card.stateLabel}</p>
-        <p class="mt-0.5 min-h-7 text-[10px] leading-4 text-text-subtle">{card.hint}</p>
+        <p class="mt-1 text-caption font-medium text-text-primary">{card.stateLabel}</p>
+        <p class="mt-0.5 min-h-9 text-caption leading-[1.15rem] text-text-subtle">{card.hint}</p>
       </div>
     {/each}
   </div>
 
   <div class="rounded-xl border border-border-light bg-surface-white p-3">
     <div class="mb-2 flex items-center justify-between gap-3">
-      <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+      <p class="text-caption font-semibold uppercase tracking-[0.15em] text-text-subtle">
         Avancement
       </p>
       {#if summary.bottleneck}
-        <p class="flex items-center gap-1 text-[10px] text-text-subtle">
+        <p class="flex items-center gap-1 text-caption text-text-subtle">
           <Icon name="traffic-cone" size={11} />
           Goulot: {summary.bottleneck.label}
         </p>
       {/if}
     </div>
     <div class="space-y-2">
-      {#each summary.stages as stage}
+      {#each summary.stages as stage, i (i)}
         {@const width = Math.max(3, Math.round((stage.count / maxStageCount) * 100))}
         <div>
           <div class="flex items-center justify-between gap-2">
-            <span class="truncate text-[11px] text-text-subtle">{stage.label}</span>
-            <span class="text-[11px] font-mono tabular-nums text-text-primary">{stage.count}</span>
+            <span class="truncate text-caption text-text-subtle">{stage.label}</span>
+            <span class="text-caption font-mono tabular-nums text-text-primary">{stage.count}</span>
           </div>
           <div class="mt-1 h-1.5 rounded-full bg-subtle-gray">
             <div

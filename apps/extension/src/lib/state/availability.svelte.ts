@@ -17,6 +17,7 @@
  * Svelte 5 runes only.
  */
 import type { Availability, AvailabilityStatus } from '$lib/core/types/availability';
+import { SvelteMap } from 'svelte/reactivity';
 import {
   blankAvailabilityDraft,
   buildAvailabilityPayloads,
@@ -75,7 +76,7 @@ export function createAvailabilityStore(deps: AvailabilityDeps): AvailabilitySto
   let editStatus = $state<EditStatus>('idle');
   let draft = $state<Availability | null>(null);
   let pushStatus = $state<PushStatus>('idle');
-  let platformStatuses = $state<Map<string, PlatformPushStatus>>(new Map());
+  const platformStatuses = new SvelteMap<string, PlatformPushStatus>();
   let lastPushedAt = $state<number | null>(null);
   let loadError = $state<string | null>(null);
   let editError = $state<string | null>(null);
@@ -93,24 +94,21 @@ export function createAvailabilityStore(deps: AvailabilityDeps): AvailabilitySto
   }
 
   function setPlatformStatus(id: string, status: PlatformPushStatus): void {
-    const next = new Map(platformStatuses);
-    next.set(id, status);
-    platformStatuses = next;
+    platformStatuses.set(id, status);
   }
 
   function resetPlatformStatuses(): void {
-    const next = new Map<string, PlatformPushStatus>();
+    platformStatuses.clear();
     for (const target of deps.platforms) {
-      next.set(target.id, 'pending');
+      platformStatuses.set(target.id, 'pending');
     }
-    platformStatuses = next;
   }
 
   function resetPushSnapshot(): void {
     pushStatus = 'idle';
     pushError = null;
     lastPushedAt = null;
-    platformStatuses = new Map();
+    platformStatuses.clear();
   }
 
   // ── Load/Edit machine ──────────────────────────────────────────────────

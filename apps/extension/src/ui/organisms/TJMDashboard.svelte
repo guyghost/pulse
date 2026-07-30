@@ -1,6 +1,7 @@
 <script lang="ts">
   import type { TJMAnalysis } from '$lib/core/types/tjm';
   import type { SeniorityLevel } from '$lib/core/types/profile';
+  import { formatStackLabel, formatTJMValue } from '$lib/core/utils/format';
   import TrendBadge from '../molecules/TrendBadge.svelte';
   import { Skeleton } from '@pulse/ui';
   import { Icon, type IconName } from '@pulse/ui';
@@ -42,7 +43,7 @@
   const levels: Array<{
     key: 'junior' | 'confirmed' | 'senior';
     label: string;
-    icon: string;
+    icon: IconName;
   }> = [
     { key: 'junior', label: 'Junior', icon: 'zap' },
     { key: 'confirmed', label: 'Confirmé', icon: 'shield' },
@@ -267,8 +268,8 @@
             <Icon name="bar-chart-3" size={14} class="text-blueprint-blue" />
           </div>
           <div>
-            <p class="text-sm font-medium text-text-primary">Vue d'ensemble</p>
-            <p class="text-[10px] text-text-muted">
+            <p class="text-body-lg font-medium text-text-primary">Vue d'ensemble</p>
+            <p class="text-micro text-text-muted">
               {analysis.dataPoints} missions · {analysis.topStacks.length} stacks
             </p>
           </div>
@@ -276,14 +277,14 @@
         <TrendBadge trend={analysis.trend} />
       </div>
       {#if analysis.trendDetail}
-        <p class="mt-3 text-xs leading-relaxed text-text-subtle">{analysis.trendDetail}</p>
+        <p class="mt-3 text-meta leading-relaxed text-text-subtle">{analysis.trendDetail}</p>
       {/if}
       <div class="mt-4">
         <div class="mb-1.5 flex items-center justify-between gap-3">
-          <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+          <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
             Confiance
           </p>
-          <p class="text-[10px] font-mono tabular-nums text-text-primary">{confidencePct}%</p>
+          <p class="text-micro font-mono tabular-nums text-text-primary">{confidencePct}%</p>
         </div>
         <div class="h-1.5 overflow-hidden rounded-full bg-subtle-gray">
           <div
@@ -299,10 +300,10 @@
       <div class="section-card rounded-xl p-5">
         <div class="flex items-start justify-between gap-4">
           <div class="min-w-0">
-            <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted">
+            <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
               Votre positionnement
             </p>
-            <p class="mt-1 text-xs leading-relaxed text-text-subtle">
+            <p class="mt-1 text-meta leading-relaxed text-text-subtle">
               Cible {userTjmMin}–{userTjmMax}€ ·
               {userSeniority
                 ? levels.find((level) => level.key === userSeniority)?.label
@@ -310,16 +311,16 @@
             </p>
           </div>
           <div class="text-right">
-            <p class="text-xl font-semibold tabular-nums text-text-primary">
+            <p class="text-heading-lg font-semibold tabular-nums text-text-primary">
               {formatDelta(userTargetDelta)}
             </p>
-            <p class="text-[10px] text-text-muted">vs médiane</p>
+            <p class="text-micro text-text-muted">vs médiane</p>
           </div>
         </div>
 
         <div class="mt-5 space-y-2.5">
           <div class="flex items-center gap-3">
-            <span class="w-16 shrink-0 text-[10px] text-text-muted">Marché</span>
+            <span class="w-16 shrink-0 text-micro text-text-muted">Marché</span>
             <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
               <div
                 class="absolute inset-y-0 rounded-full bg-text-muted/35 transition-all duration-500"
@@ -334,7 +335,7 @@
             </div>
           </div>
           <div class="flex items-center gap-3">
-            <span class="w-16 shrink-0 text-[10px] text-text-muted">Votre cible</span>
+            <span class="w-16 shrink-0 text-micro text-text-muted">Votre cible</span>
             <div class="relative h-2 flex-1 rounded-full bg-subtle-gray">
               <div
                 class="absolute inset-y-0 rounded-full bg-blueprint-blue transition-all duration-500"
@@ -347,10 +348,10 @@
 
         <div class="mt-2 flex items-center gap-3">
           <span class="w-16 shrink-0"></span>
-          <p class="flex-1 text-[10px] leading-relaxed text-text-muted">
+          <p class="flex-1 text-micro leading-relaxed text-text-muted">
             Trait plein : médiane marché
             <span class="font-mono tabular-nums text-text-subtle"
-              >{positioning.marketMedian}€/j</span
+              >{formatTJMValue(positioning.marketMedian)}/j</span
             >.
           </p>
         </div>
@@ -359,7 +360,7 @@
 
     <!-- Level cards -->
     <div class="space-y-3">
-      {#each levels as level}
+      {#each levels as level (level)}
         {@const range = analysis[level.key]}
         {@const isSelected = userSeniority === level.key}
         <div
@@ -378,23 +379,23 @@
               </div>
               <div>
                 <div class="flex items-center gap-2">
-                  <p class="text-xs font-medium text-text-primary">{level.label}</p>
+                  <p class="text-meta font-medium text-text-primary">{level.label}</p>
                   {#if isSelected}
                     <span
-                      class="rounded-full bg-blueprint-blue/12 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-[0.08em] text-blueprint-blue"
+                      class="rounded-full bg-blueprint-blue/12 px-1.5 py-0.5 text-micro font-semibold uppercase tracking-[0.08em] text-blueprint-blue"
                     >
                       Vous
                     </span>
                   {/if}
                 </div>
-                <p class="text-[10px] font-mono text-text-muted">{range.min}–{range.max}€</p>
+                <p class="text-micro font-mono text-text-muted">{range.min}–{range.max}€</p>
               </div>
             </div>
             <div class="text-right">
-              <p class="text-xl font-semibold tabular-nums text-text-primary">
-                {range.median}<span class="ml-0.5 text-sm font-normal text-text-muted">€</span>
+              <p class="text-heading-lg font-semibold tabular-nums text-text-primary">
+                {range.median}<span class="ml-0.5 text-body-lg font-normal text-text-muted">€</span>
               </p>
-              <p class="text-[10px] text-text-muted">/jour</p>
+              <p class="text-micro text-text-muted">/jour</p>
             </div>
           </div>
         </div>
@@ -404,26 +405,26 @@
     <!-- Top stacks -->
     {#if analysis.topStacks.length > 0}
       <div class="section-card rounded-xl p-5">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
+        <p class="text-micro font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
           Stacks suivies
         </p>
         <div class="space-y-3">
-          {#each analysis.topStacks as stack}
+          {#each analysis.topStacks as stack, i (i)}
             {@const maxAverage = Math.max(...analysis.topStacks.map((item) => item.average), 1)}
             {@const barWidth = Math.max(8, Math.round((stack.average / maxAverage) * 100))}
             <div>
               <div class="flex items-center justify-between gap-3">
                 <div class="min-w-0">
-                  <p class="truncate text-xs font-medium capitalize text-text-primary">
-                    {stack.stack}
+                  <p class="truncate text-meta font-medium text-text-primary">
+                    {formatStackLabel(stack.stack)}
                   </p>
-                  <p class="text-[10px] text-text-muted">
+                  <p class="text-micro text-text-muted">
                     {stack.sampleCount} point{stack.sampleCount > 1 ? 's' : ''}
                   </p>
                 </div>
                 <div class="flex shrink-0 items-center gap-2">
                   <TrendBadge trend={stack.trend} />
-                  <span class="text-[11px] font-mono tabular-nums text-text-primary"
+                  <span class="text-caption font-mono tabular-nums text-text-primary"
                     >{stack.average}€</span
                   >
                 </div>
@@ -442,24 +443,24 @@
 
     <!-- Region insights -->
     {#if analysis.regionInsights && analysis.regionInsights.length > 0}
-      <div class="section-card rounded-xl p-5">
-        <p class="text-[10px] font-semibold uppercase tracking-[0.15em] text-text-muted mb-4">
+      <section class="section-card rounded-xl p-5" aria-label="TJM par région">
+        <h3 class="mb-4 text-micro font-semibold uppercase tracking-[0.15em] text-text-muted">
           TJM par région
-        </p>
-        <div class="space-y-3">
-          {#each analysis.regionInsights.slice(0, 8) as region}
+        </h3>
+        <ul class="space-y-3" aria-label="Régions analysées">
+          {#each analysis.regionInsights.slice(0, 8) as region, i (i)}
             {@const barWidth = Math.max(
               15,
               Math.round((region.average / (analysis.regionInsights[0]?.average || 1)) * 100)
             )}
-            <div>
+            <li>
               <div class="flex items-center justify-between">
-                <span class="truncate text-xs text-text-primary">{region.label}</span>
+                <h4 class="truncate text-meta text-text-primary">{region.label}</h4>
                 <div class="flex shrink-0 items-center gap-2 pl-3">
-                  <span class="text-[10px] font-mono text-text-muted"
+                  <span class="text-micro font-mono text-text-muted"
                     >{region.min}–{region.max}€</span
                   >
-                  <span class="text-[11px] font-mono tabular-nums text-text-primary"
+                  <span class="text-caption font-mono tabular-nums text-text-primary"
                     >{region.average}€</span
                   >
                 </div>
@@ -475,10 +476,10 @@
                   style:width="{barWidth}%"
                 ></div>
               </div>
-            </div>
+            </li>
           {/each}
-        </div>
-      </div>
+        </ul>
+      </section>
     {/if}
   {:else}
     <div class="space-y-3">
@@ -502,8 +503,10 @@
         <div class="flex items-start justify-between gap-3">
           <div class="min-w-0">
             <p class="eyebrow text-blueprint-blue">3 étapes</p>
-            <h3 class="mt-1 text-sm font-semibold text-text-primary">Alimenter le radar TJM</h3>
-            <p class="mt-1 text-xs leading-5 text-text-subtle">
+            <h3 class="mt-1 text-body-lg font-semibold text-text-primary">
+              Alimenter le radar TJM
+            </h3>
+            <p class="mt-1 text-meta leading-5 text-text-subtle">
               L’analyse devient utile quand les missions scannées et votre fourchette cible se
               répondent.
             </p>
@@ -512,7 +515,7 @@
         </div>
 
         <div class="mt-4 space-y-2">
-          {#each tjmSetupSteps as step, index}
+          {#each tjmSetupSteps as step, index (index)}
             <button
               type="button"
               class="group flex w-full items-start gap-3 rounded-lg border border-border-light bg-page-canvas px-3 py-2.5 text-left transition-colors hover:border-blueprint-blue/20 hover:bg-surface-white disabled:cursor-not-allowed disabled:opacity-60"
@@ -526,14 +529,14 @@
               </span>
               <span class="min-w-0 flex-1">
                 <span class="flex items-center gap-2">
-                  <span class="font-mono text-[10px] text-text-muted">{index + 1}</span>
-                  <span class="text-xs font-semibold text-text-primary">{step.title}</span>
+                  <span class="font-mono text-micro text-text-muted">{index + 1}</span>
+                  <span class="text-meta font-semibold text-text-primary">{step.title}</span>
                 </span>
-                <span class="mt-0.5 block text-[11px] leading-4 text-text-subtle">
+                <span class="mt-0.5 block text-caption leading-4 text-text-subtle">
                   {step.description}
                 </span>
               </span>
-              <span class="mt-1.5 flex shrink-0 items-center gap-1 text-[10px] text-text-muted">
+              <span class="mt-1.5 flex shrink-0 items-center gap-1 text-micro text-text-muted">
                 {step.actionLabel}
                 <Icon
                   name="chevron-right"

@@ -167,8 +167,8 @@
       <h2>Accès aux plateformes tierces</h2>
 
       <p>
-        MissionPulse accède aux sites Free-Work, LeHibou, Hiway et Cherry Pick dans le package
-        distribué par défaut pour scrapper les missions disponibles. Ces accès sont effectués via <strong
+        MissionPulse accède aux sites Free-Work, LeHibou, Hiway et Cherry Pick pour scrapper les
+        missions disponibles. Ces accès sont effectués via <strong
           >votre session navigateur existante</strong
         > — vous devez être connecté à ces plateformes. Le package publié peut désactiver certains connecteurs
         : le multi-compte et l'assistance ne sont proposés que pour les plateformes effectivement incluses.

@@ -10,7 +10,7 @@ export const load: PageServerLoad = async ({ cookies, url, setHeaders }) => {
   setHeaders(NO_STORE_HEADERS);
   const linkId = LinkIdSchema.safeParse(url.searchParams.get('linkId'));
   if (!linkId.success) {
-    return { session: null, link: null, error: 'Lien de connexion invalide.' };
+    return { link: null, error: 'Lien de connexion invalide.' };
   }
 
   const supabase = createSupabaseServerClient(cookies);
@@ -36,11 +36,10 @@ export const load: PageServerLoad = async ({ cookies, url, setHeaders }) => {
     .maybeSingle();
 
   if (!link) {
-    return { session, link: null, error: 'Cette demande de connexion est introuvable.' };
+    return { link: null, error: 'Cette demande de connexion est introuvable.' };
   }
 
   return {
-    session,
     link: {
       id: link.id,
       installId: link.install_id,

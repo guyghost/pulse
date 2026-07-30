@@ -37,3 +37,8 @@ export const INCLUDED_CONNECTOR_IDS: readonly ConnectorId[] =
   typeof __PULSE_INCLUDED_CONNECTORS__ === 'undefined'
     ? FALLBACK_CONNECTOR_IDS
     : __PULSE_INCLUDED_CONNECTORS__;
+
+/** Canonical Settings protocol order: ascending UTF-8/ASCII connector ID. */
+export const CANONICAL_INCLUDED_CONNECTOR_IDS: readonly ConnectorId[] = [
+  ...INCLUDED_CONNECTOR_IDS,
+].sort((left, right) => (left < right ? -1 : left > right ? 1 : 0));

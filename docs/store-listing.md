@@ -100,12 +100,15 @@ le formulaire. Code source ouvert sur GitHub.
 
 ## Permissions justifiées
 
-| Permission              | Justification                                                         |
-| ----------------------- | --------------------------------------------------------------------- |
-| `sidePanel`             | Interface utilisateur dans le panneau latéral Chrome                  |
-| `storage`               | Stockage local du profil, paramètres et cache                         |
-| `cookies`               | Détection et vérification locale de la session plateforme             |
-| `alarms`                | Scan automatique programmé en arrière-plan                            |
-| `notifications`         | Alertes pour les missions à haut score                                |
-| `declarativeNetRequest` | Réécriture headers Origin/Referer pour les API cross-origin           |
-| `host_permissions`      | Accès aux 4 plateformes incluses dans le package distribué par défaut |
+| Permission                  | Justification                                                                                          |
+| --------------------------- | ------------------------------------------------------------------------------------------------------ |
+| `sidePanel`                 | Interface utilisateur dans le panneau latéral Chrome                                                   |
+| `storage`                   | Stockage local du profil, paramètres et cache                                                          |
+| `cookies`                   | Détection de session sur les plateformes (LeHibou et Cherry Pick)                                      |
+| `alarms`                    | Scan automatique programmé en arrière-plan                                                             |
+| `notifications`             | Alertes pour les missions à haut score                                                                 |
+| `declarativeNetRequest`     | Réécriture headers Origin/Referer pour les API cross-origin                                            |
+| `scripting`                 | Extraction DOM du profil LinkedIn après autorisation explicite                                         |
+| `activeTab`                 | Limite l'import LinkedIn à l'onglet actif choisi par l'utilisateur                                     |
+| `host_permissions`          | Accès aux 4 plateformes pour le scraping de missions                                                   |
+| `optional_host_permissions` | `https://www.linkedin.com/*`, demandé uniquement pendant le geste utilisateur d'import du profil actif |

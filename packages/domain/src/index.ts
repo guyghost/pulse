@@ -107,3 +107,8 @@ export function canonicalizeLegacyApplicationStage(value: string): ApplicationSt
 
 export * from './freemium';
 export * from './freemium-machines';
+export * from './release-cache-policy';
+export * from './models/copilot-contracts';
+export * from './models/copilot-dossier.machine';
+export * from './models/premium-entitlement-sync.machine';
+export * from './models/remote-copilot-job.machine';

@@ -5,6 +5,8 @@
  * Utilise un algorithme token bucket pour permettre des bursts contrôlés.
  */
 
+import { abortableDelay } from './retry-strategy';
+
 export interface RateLimitConfig {
   /** Nombre maximum de requêtes par seconde */
   requestsPerSecond: number;
@@ -99,7 +101,10 @@ export class RateLimiter {
    * Acquiert un token pour le domaine donné.
    * Attend si nécessaire selon la politique de rate limiting.
    */
-  async acquire(urlOrDomain: string): Promise<void> {
+  async acquire(urlOrDomain: string, signal?: AbortSignal): Promise<void> {
+    if (signal?.aborted) {
+      throw new DOMException('The operation was aborted.', 'AbortError');
+    }
     if (!this.enabled) {
       return;
     }
@@ -151,10 +156,10 @@ export class RateLimiter {
     }
 
     // Attendre le prochain token
-    await new Promise((resolve) => setTimeout(resolve, waitTimeMs));
+    await abortableDelay(waitTimeMs, signal);
 
     // Après l'attente, réessayer récursivement (pour gérer la queue)
-    return this.acquire(urlOrDomain);
+    return this.acquire(urlOrDomain, signal);
   }
 
   /**
@@ -214,7 +219,11 @@ export const DEFAULT_PAGE_DELAY_MS = 500;
 /**
  * Crée un délai entre les pages avec logging en mode dev
  */
-export async function delayBetweenPages(connectorId: string, pageNumber: number): Promise<void> {
+export async function delayBetweenPages(
+  connectorId: string,
+  pageNumber: number,
+  signal?: AbortSignal
+): Promise<void> {
   if (pageNumber <= 1) {
     return;
   } // Pas de délai pour la première page
@@ -225,5 +234,5 @@ export async function delayBetweenPages(connectorId: string, pageNumber: number)
     );
   }
 
-  await new Promise((resolve) => setTimeout(resolve, DEFAULT_PAGE_DELAY_MS));
+  await abortableDelay(DEFAULT_PAGE_DELAY_MS, signal);
 }

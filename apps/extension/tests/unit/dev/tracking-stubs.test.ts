@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest';
 import { installChromeStubs } from '../../../src/dev/chrome-stubs';
 import type { MissionTracking } from '../../../src/lib/core/types/tracking';
 
-type TrackingResponse = { type: string; payload: MissionTracking | MissionTracking[] | null };
+type TrackingResponse = { type: string; payload: unknown };
 
 async function send(message: unknown): Promise<TrackingResponse> {
   return (await chrome.runtime.sendMessage(message)) as TrackingResponse;
@@ -98,11 +98,14 @@ describe('dev chrome stub — tracking persistence', () => {
       nextActionAt: null,
     };
 
-    const saved = (await send({
+    const saved = await send({
       type: 'RESTORE_TRACKING',
       payload: { missionId: 'mission-restore', tracking: snapshot },
-    }).then((r) => r.payload)) as MissionTracking;
-    expect(saved).toEqual(snapshot);
+    });
+    expect(saved).toEqual({
+      type: 'TRACKING_RESTORED',
+      payload: { missionId: 'mission-restore', tracking: snapshot },
+    });
 
     const afterSave = await send({ type: 'GET_TRACKINGS' }).then(
       (r) => r.payload as MissionTracking[]
@@ -113,11 +116,108 @@ describe('dev chrome stub — tracking persistence', () => {
       type: 'RESTORE_TRACKING',
       payload: { missionId: 'mission-restore', tracking: null },
     });
-    expect(cleared.payload).toBeNull();
+    expect(cleared.payload).toEqual({ missionId: 'mission-restore', tracking: null });
 
     const afterClear = await send({ type: 'GET_TRACKINGS' }).then(
       (r) => r.payload as MissionTracking[]
     );
     expect(afterClear.find((t) => t.missionId === 'mission-restore')).toBeUndefined();
+  });
+
+  it('keeps a confirmed empty tracking collection empty instead of reseeding fixtures', async () => {
+    const initial = await send({ type: 'GET_TRACKINGS' }).then(
+      (response) => response.payload as MissionTracking[]
+    );
+    for (const record of initial) {
+      await send({
+        type: 'RESTORE_TRACKING',
+        payload: { missionId: record.missionId, tracking: null },
+      });
+    }
+
+    await expect(
+      send({ type: 'GET_TRACKINGS' }).then((response) => response.payload)
+    ).resolves.toEqual([]);
+  });
+
+  it.each(['accepted', 'rejected', 'archived'] as const)(
+    'rejects a non-null follow-up for terminal status %s without persisting it',
+    async (currentStatus) => {
+      const snapshot: MissionTracking = {
+        missionId: `terminal-${currentStatus}`,
+        currentStatus,
+        history: [{ from: 'offer', to: currentStatus, timestamp: 1, note: null }],
+        generatedAssetIds: [],
+        userRating: null,
+        notes: '',
+        nextActionAt: null,
+      };
+      await send({
+        type: 'RESTORE_TRACKING',
+        payload: { missionId: snapshot.missionId, tracking: snapshot },
+      });
+
+      const response = await send({
+        type: 'UPDATE_TRACKING_DETAILS',
+        payload: {
+          missionId: snapshot.missionId,
+          nextActionAt: '2026-08-01T00:00:00.000Z',
+        },
+      });
+
+      expect(response).toMatchObject({
+        type: 'TRACKING_FAILED',
+        payload: { code: 'INVALID_DETAILS', intent: 'details', missionId: snapshot.missionId },
+      });
+      const after = await send({ type: 'GET_TRACKINGS' }).then(
+        (result) => result.payload as MissionTracking[]
+      );
+      expect(
+        after.find((record) => record.missionId === snapshot.missionId)?.nextActionAt
+      ).toBeNull();
+    }
+  );
+
+  it('returns the same typed failure contract for an invalid transition', async () => {
+    const response = await send({
+      type: 'UPDATE_TRACKING',
+      payload: { missionId: 'mock-0', status: 'accepted' },
+    });
+
+    expect(response).toEqual({
+      type: 'TRACKING_FAILED',
+      payload: {
+        version: 1,
+        code: 'INVALID_TRANSITION',
+        intent: 'transition',
+        missionId: 'mock-0',
+        mutationId: null,
+        message: 'Ce changement de statut n’est pas autorisé.',
+        recoverable: false,
+      },
+    });
+  });
+
+  it('rejects a restore snapshot belonging to another mission', async () => {
+    const snapshot = (await send({ type: 'GET_TRACKINGS' }).then(
+      (response) => response.payload
+    )) as MissionTracking[];
+    const response = await send({
+      type: 'RESTORE_TRACKING',
+      payload: { missionId: 'mission-other', tracking: snapshot[0] },
+    });
+
+    expect(response).toEqual({
+      type: 'TRACKING_FAILED',
+      payload: {
+        version: 1,
+        code: 'INVALID_RESTORE',
+        intent: 'restore',
+        missionId: 'mission-other',
+        mutationId: null,
+        message: 'Cette annulation n’est pas valide.',
+        recoverable: false,
+      },
+    });
   });
 });
