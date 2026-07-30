@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { describe, expect, it } from 'vitest';
+import { hasPinnedChromium } from '../helpers/env-prerequisites';
 
 import {
   admitPinnedChromiumRuntime,
@@ -71,7 +72,7 @@ const commonArgs = [
   '--window-size=420,900',
 ] as const;
 
-describe('manually owned Chromium launch contract', () => {
+describe.skipIf(!hasPinnedChromium())('manually owned Chromium launch contract', () => {
   it('admits the exact installed Playwright 1.61.1 / Chromium 1228 runtime', async () => {
     const receipt = await admitPinnedChromiumRuntime();
 

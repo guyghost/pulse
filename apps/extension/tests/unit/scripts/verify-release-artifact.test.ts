@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { hasPinnedPython } from '../helpers/env-prerequisites';
 import { mkdir, mkdtemp, readFile, rm, symlink, truncate, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -84,7 +85,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { recursive: true, force: true })));
 });
 
-describe('release artifact consumer verification', () => {
+describe.skipIf(!hasPinnedPython())('release artifact consumer verification', () => {
   it('recomputes all digests and safely extracts the exact canonical tree', async () => {
     const value = await fixture();
     const extractDirectory = join(value.root, 'fresh-extraction');
