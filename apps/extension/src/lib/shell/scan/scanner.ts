@@ -22,6 +22,11 @@ import { isOnline } from '../utils/connection-monitor';
 import { trackParserHealth } from './parser-health';
 import { runWithCircuitBreaker } from '../health/circuit-breaker-runner';
 import { syncProbeAlarm } from '../health/probe-scheduler';
+import { scopeMissionToPlatformBinding } from '../../core/accounts/scope-mission';
+import {
+  currentSessionMatchesPlatformBinding,
+  listPlatformAccounts,
+} from '../account/platform-accounts';
 import type { SettingsReleaseSnapshot } from '../settings-release/settings-release.contract';
 import { readSettingsReleaseSnapshot } from '../settings-release/settings-release-reader';
 
@@ -207,6 +212,11 @@ async function _runScanInternal(
     ? [...options.connectorIdsOverride]
     : settings.enabledConnectors;
   const errors: ScanResult['errors'] = [];
+  const activeBindingByConnector = new Map(
+    (await listPlatformAccounts().catch(() => []))
+      .filter((binding) => binding.isActive && binding.status === 'ready')
+      .map((binding) => [binding.connectorId, binding] as const)
+  );
 
   try {
     await setScanState('scanning');
@@ -358,6 +368,22 @@ async function _runScanInternal(
       ? { ...baseSearchContext, lastSync: null }
       : undefined;
 
+    const activeBinding = activeBindingByConnector.get(connector.id);
+    if (
+      activeBinding &&
+      !(await currentSessionMatchesPlatformBinding(activeBinding).catch(() => false))
+    ) {
+      errors.push({
+        connectorId: connector.id,
+        message: 'La session plateforme ne correspond pas au compte actif.',
+      });
+      if (stateIdx >= 0) {
+        connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'error', error: null };
+      }
+      emitDetailed('scanning', index + 1, connectors.length);
+      return;
+    }
+
     // État: fetching
     if (stateIdx >= 0) {
       connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'fetching' };
@@ -494,9 +520,17 @@ async function _runScanInternal(
         };
       }
     } else {
-      trackParserHealth(connector.id, result.value.length, now).catch(() => {});
-      connectorResults.push({ connectorId: connector.id, missions: result.value });
-      const deterministicMissions = buildDeterministicMissions(result.value, new Date(now));
+      const scopedMissions = activeBinding
+        ? result.value.map((mission) =>
+            scopeMissionToPlatformBinding(mission, {
+              accountId: activeBinding.accountId,
+              bindingId: activeBinding.id,
+            })
+          )
+        : result.value;
+      trackParserHealth(connector.id, scopedMissions.length, now).catch(() => {});
+      connectorResults.push({ connectorId: connector.id, missions: scopedMissions });
+      const deterministicMissions = buildDeterministicMissions(scopedMissions, new Date(now));
       emitLifecycle({
         type: 'CONNECTOR_SUCCEEDED',
         connectorId: connector.id,
@@ -532,7 +566,7 @@ async function _runScanInternal(
         connectorStates[stateIdx] = {
           ...connectorStates[stateIdx],
           state: 'done',
-          missionsCount: result.value.length,
+          missionsCount: scopedMissions.length,
         };
       }
     }

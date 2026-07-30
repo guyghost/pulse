@@ -1,25 +1,18 @@
-import { APPLICATION_STAGES, APPLICATION_TRANSITIONS, type ApplicationStage } from '@pulse/domain';
+import {
+  APPLICATION_STAGES,
+  APPLICATION_TRANSITIONS,
+  canUsePremiumFeature,
+  type ApplicationStage,
+  type EntitlementSnapshot,
+} from '@pulse/domain';
 
 export type { ApplicationStage };
 
 export type ApplicationSource =
-  | 'linkedin'
-  | 'free-work'
-  | 'lehibou'
-  | 'hiway'
-  | 'collective'
-  | 'cherry-pick'
-  | 'malt'
-  | 'other';
-
-export type DashboardSubscriptionStatus = 'free' | 'premium' | 'expired';
+  'linkedin' | 'free-work' | 'lehibou' | 'hiway' | 'collective' | 'cherry-pick' | 'malt' | 'other';
 
 export type DashboardFeatureArea =
-  | 'missions'
-  | 'profile'
-  | 'applications'
-  | 'automation'
-  | 'account';
+  'missions' | 'profile' | 'applications' | 'automation' | 'account';
 
 export type DashboardFeatureRequirement = 'anonymous' | 'account' | 'credits' | 'premium';
 
@@ -36,12 +29,13 @@ export type DashboardFeatureId =
   | 'cv-sync'
   | 'exports-and-backups'
   | 'connector-health'
-  | 'account-billing';
+  | 'account-billing'
+  | 'multi-account'
+  | 'application-form-assist';
 
 export interface DashboardAccountEntitlements {
   isAuthenticated: boolean;
-  subscriptionStatus: DashboardSubscriptionStatus;
-  subscriptionPeriodEndMs: number | null;
+  entitlement: EntitlementSnapshot | null;
   creditBalance: number;
 }
 
@@ -103,10 +97,7 @@ export interface MissionComparisonSnapshot {
 }
 
 export type DashboardSuccessMilestoneId =
-  | 'qualified_mission'
-  | 'follow_up_handled'
-  | 'cv_ready'
-  | 'export_ready';
+  'qualified_mission' | 'follow_up_handled' | 'cv_ready' | 'export_ready';
 
 export type DashboardSuccessMilestoneState = 'complete' | 'ready' | 'pending';
 
@@ -330,11 +321,7 @@ export interface PlatformSyncStatus {
 }
 
 export type ConnectedSyncEntity =
-  | 'missions'
-  | 'applications'
-  | 'candidate_profile'
-  | 'connector_health'
-  | 'alert_preferences';
+  'missions' | 'applications' | 'candidate_profile' | 'connector_health' | 'alert_preferences';
 
 export type ConnectedSyncState = 'healthy' | 'pending' | 'error' | 'idle';
 
@@ -597,11 +584,7 @@ export interface ApplicationStageUpdatePatch {
 }
 
 export type DashboardPipelineClientEventAction =
-  | 'detect'
-  | 'select'
-  | 'archive'
-  | 'transition'
-  | 'conflict';
+  'detect' | 'select' | 'archive' | 'transition' | 'conflict';
 
 export interface DashboardPipelineClientEventIdInput {
   action: DashboardPipelineClientEventAction;
@@ -701,11 +684,7 @@ export interface SyncConflictResolutionPatch {
 }
 
 export type SyncConflictResolutionAction =
-  | 'applied'
-  | 'resolved'
-  | 'keep_remote'
-  | 'apply_local'
-  | 'dismissed';
+  'applied' | 'resolved' | 'keep_remote' | 'apply_local' | 'dismissed';
 
 export type ApplicationSyncConflictField = 'stage' | 'notes' | 'user_rating' | 'next_action_at';
 
@@ -2146,6 +2125,21 @@ export const DASHBOARD_FEATURES: readonly DashboardFeatureDefinition[] = [
     area: 'account',
     requirement: 'account',
   },
+  {
+    id: 'multi-account',
+    label: 'Multi-compte plateforme',
+    description: 'Plusieurs comptes par plateforme sous une même identité MissionPulse.',
+    area: 'account',
+    requirement: 'premium',
+  },
+  {
+    id: 'application-form-assist',
+    label: 'Assistance IA de formulaire',
+    description:
+      'Suggestions locales avec validation champ par champ, sans soumission automatique.',
+    area: 'automation',
+    requirement: 'premium',
+  },
 ];
 
 export const countApplicationsByStage = (applications: MissionApplication[]) =>
@@ -2736,15 +2730,18 @@ export const isDashboardPremiumActive = (
   entitlements: DashboardAccountEntitlements,
   now: Date
 ): boolean => {
-  if (!entitlements.isAuthenticated || entitlements.subscriptionStatus !== 'premium') {
-    return false;
-  }
-
-  if (entitlements.subscriptionPeriodEndMs === null) {
-    return true;
-  }
-
-  return entitlements.subscriptionPeriodEndMs > now.getTime();
+  const snapshot = entitlements.entitlement;
+  return (
+    entitlements.isAuthenticated &&
+    snapshot !== null &&
+    canUsePremiumFeature({
+      snapshot,
+      accountState: 'active',
+      accountId: snapshot.accountId,
+      feature: 'multi_account',
+      nowMs: now.getTime(),
+    })
+  );
 };
 
 export const getFeatureLockedReason = (

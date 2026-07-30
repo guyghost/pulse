@@ -1,12 +1,8 @@
 <script lang="ts">
   import { enhance } from '$app/forms';
   import { env } from '$env/dynamic/public';
-  import {
-    CREDIT_PACKS,
-    PREMIUM_MONTHLY_CREDITS,
-    formatPrice,
-    type CreditPackId,
-  } from '$lib/credits';
+  import { PREMIUM_YEARLY_OFFER } from '@pulse/domain';
+  import { CREDIT_PACKS, formatPrice, type CreditPackId } from '$lib/credits';
 
   let { data } = $props();
 
@@ -24,8 +20,15 @@
   }
 
   const chromeStoreUrl = env.PUBLIC_CHROME_STORE_URL || '#install';
-  const isPremium = $derived(data.profile?.subscription_status === 'premium');
+  const billingPortalUrl = env.PUBLIC_LEMON_SQUEEZY_BILLING_URL || null;
+  const isPremium = $derived(
+    (data.entitlement?.status === 'premium_active' ||
+      data.entitlement?.status === 'premium_cancel_at_period_end') &&
+      typeof data.entitlement?.valid_until === 'string' &&
+      Date.parse(data.entitlement.valid_until) > Date.now()
+  );
   const creditBalance = $derived(data.profile?.credit_balance ?? 0);
+  const premiumPriceLabel = `${formatPrice(PREMIUM_YEARLY_OFFER.amountMinor)} TTC/an`;
   const recommendedPackId = $derived<CreditPackId>(
     creditBalance < 3 ? 'pro' : creditBalance < 10 ? 'starter' : 'power'
   );
@@ -33,16 +36,46 @@
   const accountDecision = $derived(getAccountDecision(isPremium, creditBalance));
   let checkoutError = $state<string | null>(null);
   let checkoutLoadingPack = $state<CreditPackId | null>(null);
+  let premiumCheckoutLoading = $state(false);
+  let premiumCheckoutRequestId = $state(crypto.randomUUID());
 
   const formattedDate = $derived(
-    data.profile?.subscription_period_end
-      ? new Date(data.profile.subscription_period_end).toLocaleDateString('fr-FR', {
+    data.entitlement?.valid_until
+      ? new Date(data.entitlement.valid_until).toLocaleDateString('fr-FR', {
           day: 'numeric',
           month: 'long',
           year: 'numeric',
         })
       : null
   );
+
+  async function startPremiumCheckout() {
+    checkoutError = null;
+    premiumCheckoutLoading = true;
+
+    try {
+      const response = await fetch('/api/checkout/premium', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ requestId: premiumCheckoutRequestId }),
+      });
+      const result = await response.json();
+      if (!response.ok || typeof result.url !== 'string') {
+        checkoutError =
+          result.error === 'CHECKOUT_NOT_CONFIGURED'
+            ? "L'abonnement n'est pas encore disponible dans cet environnement."
+            : result.error === 'ALREADY_PREMIUM'
+              ? 'Premium est déjà actif sur ce compte.'
+              : 'Impossible de préparer le checkout Premium.';
+        return;
+      }
+      window.location.href = result.url;
+    } catch {
+      checkoutError = 'Impossible de préparer le checkout Premium.';
+    } finally {
+      premiumCheckoutLoading = false;
+    }
+  }
 
   async function startCreditCheckout(packId: CreditPackId) {
     checkoutError = null;
@@ -82,51 +115,28 @@
         badge: 'Action utile',
         title: "Le compte est actif, Premium n'est pas encore activé",
         impact:
-          'Le scan reste disponible gratuitement. Le suivi pipeline, le radar TJM et les générations restent limités.',
+          "Le premier scan, le feed et le scoring restent gratuits. Le multi-compte et l'assistance aux formulaires restent verrouillés.",
         action:
-          "Prochaine action: installer l'extension, puis passer à Premium si vous voulez piloter les candidatures ici.",
-        evidence: ['Plan gratuit', `${credits} crédits disponibles`, 'Extension à connecter'],
+          "Prochaine action: installer l'extension, puis activer Premium si vous gérez plusieurs comptes plateforme ou voulez préparer un formulaire.",
+        evidence: ['Plan gratuit utile', '1 compte par plateforme', `${credits} crédits séparés`],
         primaryAction: 'premium',
         primaryLabel: 'Passer à Premium',
-      };
-    }
-
-    if (credits === 0) {
-      return {
-        tone: 'incident',
-        badge: 'Blocage',
-        title: 'Aucun crédit disponible pour générer les prochaines actions',
-        impact:
-          "Les pitchs, messages recruteur et résumés CV seront bloqués jusqu'à la prochaine recharge.",
-        action: `Prochaine action: acheter le pack ${CREDIT_PACKS.pro.label} pour reprendre les générations.`,
-        evidence: ['Premium actif', '0 crédit disponible', 'Génération bloquée'],
-        primaryAction: 'credits',
-        primaryLabel: 'Recharger maintenant',
-      };
-    }
-
-    if (credits < 3) {
-      return {
-        tone: 'attention',
-        badge: 'Risque proche',
-        title: 'Crédits bas avant les prochaines candidatures',
-        impact:
-          'Votre solde peut suffire pour une action, mais pas pour traiter une série de missions qualifiées.',
-        action: `Prochaine action: ajouter le pack ${CREDIT_PACKS.pro.label} avant un scan complet.`,
-        evidence: ['Premium actif', `${credits} crédits disponibles`, 'Risque de friction'],
-        primaryAction: 'credits',
-        primaryLabel: 'Recharger',
       };
     }
 
     return {
       tone: 'success',
       badge: 'Normal',
-      title: 'Compte prêt pour les actions Premium',
+      title: 'Premium est actif',
       impact:
-        "Les crédits et l'abonnement sont disponibles. Le travail utile se passe maintenant dans l'extension.",
+        "Le multi-compte et l'assistance locale aux formulaires sont disponibles dans l'extension.",
       action: "Prochaine action: ouvrir l'extension, scanner, qualifier puis synchroniser.",
-      evidence: ['Premium actif', `${credits} crédits disponibles`, 'Pipeline exploitable'],
+      evidence: [
+        'Premium actif',
+        'Multi-compte disponible',
+        'Assistance IA local-first',
+        `${credits} crédits séparés`,
+      ],
       primaryAction: 'extension',
       primaryLabel: "Ouvrir l'extension",
     };
@@ -172,7 +182,7 @@
       <!-- Account header -->
       <div class="dashboard-section">
         <h1>Mon compte</h1>
-        <p class="dashboard-email">{data.session?.user?.email ?? ''}</p>
+        <p class="dashboard-email">{data.userEmail ?? ''}</p>
       </div>
 
       <div class="dashboard-divider"></div>
@@ -219,14 +229,14 @@
 
           <div class="ops-card__actions">
             {#if accountDecision.primaryAction === 'premium'}
-              <a
-                href="https://missionpulse.lemonsqueezy.com/checkout"
+              <button
+                type="button"
                 class="btn btn--primary btn--sm"
-                target="_blank"
-                rel="noopener noreferrer"
+                disabled={premiumCheckoutLoading}
+                onclick={startPremiumCheckout}
               >
-                {accountDecision.primaryLabel}
-              </a>
+                {premiumCheckoutLoading ? 'Préparation...' : accountDecision.primaryLabel}
+              </button>
             {:else if accountDecision.primaryAction === 'credits'}
               <button
                 type="button"
@@ -284,50 +294,65 @@
                 Votre abonnement est actif
                 {#if formattedDate}
                   jusqu'au {formattedDate}
-                {/if}. Bonus inclus: {PREMIUM_MONTHLY_CREDITS} crédits par mois.
+                {/if}. Multi-compte et assistance IA de formulaire inclus.
               </p>
-              <div class="subscription-actions">
-                <a
-                  href="https://missionpulse.lemonsqueezy.com/billing"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  class="btn btn--secondary btn--sm"
-                >
-                  Gérer via Lemon Squeezy
-                </a>
-              </div>
+              {#if billingPortalUrl}
+                <div class="subscription-actions">
+                  <a
+                    href={billingPortalUrl}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    class="btn btn--secondary btn--sm"
+                  >
+                    Gérer via Lemon Squeezy
+                  </a>
+                </div>
+              {/if}
             {:else}
               <p class="subscription-detail">
-                Achetez des crédits pour générer des pitchs, messages recruteur et résumés CV.
-                Premium ajoute {PREMIUM_MONTHLY_CREDITS} crédits par mois.
+                Le plan gratuit couvre le premier scan, le feed et le scoring. Premium ajoute le
+                multi-compte et l'assistance IA local-first pour remplir vos formulaires, sans
+                soumission automatique.
               </p>
-              <a
-                href="https://missionpulse.lemonsqueezy.com/checkout"
+              <button
+                type="button"
                 class="btn btn--primary"
-                target="_blank"
-                rel="noopener noreferrer"
+                disabled={premiumCheckoutLoading}
+                onclick={startPremiumCheckout}
               >
-                Passer à Premium — 10€/an
-              </a>
+                {premiumCheckoutLoading
+                  ? 'Préparation...'
+                  : `Passer à Premium — ${premiumPriceLabel}`}
+              </button>
             {/if}
           </div>
         </div>
 
-        {#if data.checkoutStatus === 'success'}
+        {#if data.checkoutStatus === 'awaiting' || data.checkoutIntent?.state === 'awaiting_payment'}
           <div class="checkout-status checkout-status--success">
-            Paiement reçu. Le solde sera mis à jour dès confirmation Lemon Squeezy.
+            Checkout terminé. Premium sera activé uniquement après confirmation signée du paiement.
+            Vous pouvez actualiser cette page dans quelques instants.
+          </div>
+        {:else if data.checkoutIntent?.state === 'provisioned'}
+          <div class="checkout-status checkout-status--success">
+            Premium est activé sur ce compte.
+          </div>
+        {:else if data.checkoutIntent?.state === 'provisioning_failed_retryable'}
+          <div class="checkout-status checkout-status--error">
+            Le paiement est confirmé mais l'activation doit être réessayée. Aucun achat
+            supplémentaire n'est nécessaire.
           </div>
         {:else if data.checkoutStatus === 'cancelled'}
-          <div class="checkout-status">Checkout annulé. Aucun crédit n'a été ajouté.</div>
+          <div class="checkout-status">Checkout annulé. Aucun droit Premium n'a été accordé.</div>
         {/if}
 
         {#if checkoutError}
           <div class="checkout-status checkout-status--error">{checkoutError}</div>
         {/if}
 
-        <details class="credit-drawer" open={!isPremium || creditBalance < 3}>
+        <details class="credit-drawer" open={creditBalance < 3}>
           <summary>
-            <span>Choisir un pack de crédits</span>
+            <span>Crédits de génération séparés</span>
             <small>Recommandation: {recommendedPack.label}</small>
           </summary>
 

@@ -4,20 +4,23 @@ import { env } from '$env/dynamic/private';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import { CREDIT_PACKS, isCreditPackId } from '$lib/credits';
 import { getCreditPackVariantId } from '$lib/server/credits';
+import { getCanonicalPublicOrigin } from '$lib/server/public-origin';
+import { readSecureCheckoutUrl } from '$lib/server/premium-billing';
+import { NO_STORE_HEADERS } from '$lib/server/rate-limit';
 
-export const POST: RequestHandler = async ({ request, cookies, url }) => {
+export const POST: RequestHandler = async ({ request, cookies }) => {
   const supabase = createSupabaseServerClient(cookies);
   const {
-    data: { session },
-  } = await supabase.auth.getSession();
+    data: { user },
+  } = await supabase.auth.getUser();
 
-  if (!session?.user) {
-    return json({ error: 'Unauthorized' }, { status: 401 });
+  if (!user) {
+    return json({ error: 'Unauthorized' }, { status: 401, headers: NO_STORE_HEADERS });
   }
 
   const body = (await request.json().catch(() => null)) as { packId?: unknown } | null;
   if (!isCreditPackId(body?.packId)) {
-    return json({ error: 'Invalid credit pack' }, { status: 400 });
+    return json({ error: 'Invalid credit pack' }, { status: 400, headers: NO_STORE_HEADERS });
   }
 
   const pack = CREDIT_PACKS[body.packId];
@@ -26,10 +29,19 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
   const apiKey = env.LEMON_SQUEEZY_API_KEY;
 
   if (!storeId || !variantId || !apiKey) {
-    return json({ error: 'Checkout is not configured' }, { status: 503 });
+    return json(
+      { error: 'Checkout is not configured' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
   }
 
-  const origin = `${url.protocol}//${url.host}`;
+  const origin = getCanonicalPublicOrigin();
+  if (origin === null) {
+    return json(
+      { error: 'PUBLIC_ORIGIN_NOT_CONFIGURED' },
+      { status: 503, headers: NO_STORE_HEADERS }
+    );
+  }
   const checkoutResponse = await fetch('https://api.lemonsqueezy.com/v1/checkouts', {
     method: 'POST',
     headers: {
@@ -45,10 +57,10 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
             redirect_url: `${origin}/dashboard?checkout=success`,
           },
           checkout_data: {
-            email: session.user.email,
+            email: user.email,
             custom: {
-              user_id: session.user.id,
-              user_email: session.user.email,
+              user_id: user.id,
+              user_email: user.email,
               pack_id: pack.id,
               credits: pack.credits,
             },
@@ -73,17 +85,15 @@ export const POST: RequestHandler = async ({ request, cookies, url }) => {
   });
 
   if (!checkoutResponse.ok) {
-    const errorText = await checkoutResponse.text();
-    console.error('Lemon checkout creation failed:', checkoutResponse.status, errorText);
-    return json({ error: 'Checkout creation failed' }, { status: 502 });
+    return json({ error: 'Checkout creation failed' }, { status: 502, headers: NO_STORE_HEADERS });
   }
 
   const checkout = await checkoutResponse.json();
-  const checkoutUrl = checkout.data?.attributes?.url;
+  const checkoutUrl = readSecureCheckoutUrl(checkout.data?.attributes?.url);
 
-  if (typeof checkoutUrl !== 'string') {
-    return json({ error: 'Checkout URL missing' }, { status: 502 });
+  if (checkoutUrl === null) {
+    return json({ error: 'Checkout URL missing' }, { status: 502, headers: NO_STORE_HEADERS });
   }
 
-  return json({ url: checkoutUrl });
+  return json({ url: checkoutUrl }, { headers: NO_STORE_HEADERS });
 };

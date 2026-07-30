@@ -82,7 +82,7 @@
 
   <g transform="translate(100, 750)">
     <text x="0" y="0" font-family="Inter,system-ui,sans-serif" font-size="13" fill="#64748B">
-      Mission<tspan fill="#22D3EE">Pulse</tspan> — Architecture 100% locale
+      Mission<tspan fill="#22D3EE">Pulse</tspan> — Architecture local-first
     </text>
   </g>
 </svg>

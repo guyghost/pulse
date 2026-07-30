@@ -43,4 +43,13 @@ describe('connected privacy copy', () => {
     expect(privacyPolicy).toContain('snapshots normalisés via Supabase');
     expect(privacyPolicy).toContain('Nous ne synchronisons pas les mots de passe');
   });
+
+  it('describes the Premium form-assistance privacy boundary consistently', () => {
+    expect(privacyPage).toContain('consentement explicite');
+    expect(privacyPage).toContain('MissionPulse ne soumet jamais le formulaire');
+    expect(storeListing).toContain('Premium à 10 € TTC/an');
+    expect(storeListing).toContain('ne soumet jamais');
+    expect(privacyPolicy).toContain('Worker local dedie');
+    expect(privacyPolicy).toContain('aucun fallback cloud');
+  });
 });

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { hasPinnedPython } from '../helpers/env-prerequisites';
 import {
   access,
   chmod,
@@ -48,7 +49,7 @@ afterEach(async () => {
   await Promise.all(roots.splice(0).map((root) => rm(root, { force: true, recursive: true })));
 });
 
-describe('canonical artifact tree v2', () => {
+describe.skipIf(!hasPinnedPython())('canonical artifact tree v2', () => {
   it('sorts by unsigned UTF-8 bytes and ignores source mode/mtime variation', async () => {
     const first = await temporaryRoot();
     const second = await temporaryRoot();

@@ -115,6 +115,23 @@ import { verifyProfilePage } from '../lib/shell/profile/profile-page-verificatio
 import { resetLocalData } from '../lib/shell/storage/local-data-reset';
 import { loadTJMHistory, recordTJMFromMissions } from '../lib/shell/storage/tjm-history';
 import { clearConnectorDynamicRules } from '../lib/shell/connectors/cookie-rules';
+import {
+  getExtensionAccountProjection,
+  pollExtensionAccountLink,
+  projectionHasPremiumFeature,
+  refreshExtensionEntitlement,
+  startExtensionAccountLink,
+  unlinkExtensionAccount,
+} from '../lib/shell/account/account-connection';
+import {
+  applyApplicationFormAssist,
+  requestApplicationFormAssist,
+} from '../lib/shell/ai/form-assist';
+import {
+  addCurrentPlatformAccount,
+  listPlatformAccounts,
+  switchCurrentPlatformAccount,
+} from '../lib/shell/account/platform-accounts';
 import { createSettingsReleaseCoordinator } from '../lib/shell/settings-release/settings-release.coordinator';
 import { createChromeSettingsReleasePorts } from '../lib/shell/settings-release/chrome-settings-release-ports';
 import {
@@ -2429,31 +2446,158 @@ chrome.runtime.onMessage.addListener((rawMessage: unknown, _sender, sendResponse
       return true;
     }
 
-    if (message.type === 'GET_PREMIUM_STATUS') {
-      chrome.storage.local
-        .get('premium_enabled')
+    if (message.type === 'GET_EXTENSION_ACCOUNT') {
+      getExtensionAccountProjection()
+        .then((projection) => {
+          sendResponse({ type: 'EXTENSION_ACCOUNT_RESULT', payload: projection });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_EXTENSION_ACCOUNT error:', err);
+          sendResponse({
+            type: 'EXTENSION_ACCOUNT_RESULT',
+            payload: {
+              state: 'error',
+              accountId: null,
+              entitlement: null,
+              premiumMaxBindingsPerConnector: 2,
+              lastError: 'ACCOUNT_READ_FAILED',
+            },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'START_EXTENSION_ACCOUNT_LINK') {
+      startExtensionAccountLink()
+        .then(async (result) => {
+          if (result.approvalUrl !== null) {
+            await chrome.tabs.create({ url: result.approvalUrl });
+          }
+          sendResponse({ type: 'EXTENSION_ACCOUNT_LINK_STARTED', payload: result });
+        })
+        .catch(async (err) => {
+          console.warn('[MissionPulse] START_EXTENSION_ACCOUNT_LINK error:', err);
+          sendResponse({
+            type: 'EXTENSION_ACCOUNT_LINK_STARTED',
+            payload: {
+              projection: await getExtensionAccountProjection(),
+              approvalUrl: null,
+            },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'POLL_EXTENSION_ACCOUNT_LINK') {
+      pollExtensionAccountLink().then((projection) => {
+        sendResponse({ type: 'EXTENSION_ACCOUNT_LINK_STATUS', payload: projection });
+      });
+      return true;
+    }
+
+    if (message.type === 'REFRESH_EXTENSION_ENTITLEMENT') {
+      refreshExtensionEntitlement().then((projection) => {
+        sendResponse({ type: 'EXTENSION_ENTITLEMENT_REFRESHED', payload: projection });
+      });
+      return true;
+    }
+
+    if (message.type === 'UNLINK_EXTENSION_ACCOUNT') {
+      unlinkExtensionAccount().then((projection) => {
+        sendResponse({ type: 'EXTENSION_ACCOUNT_UNLINKED', payload: projection });
+      });
+      return true;
+    }
+
+    if (message.type === 'GET_PLATFORM_ACCOUNTS') {
+      listPlatformAccounts()
+        .then((bindings) => {
+          sendResponse({ type: 'PLATFORM_ACCOUNTS_RESULT', payload: bindings });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] GET_PLATFORM_ACCOUNTS error:', err);
+          sendResponse({ type: 'PLATFORM_ACCOUNTS_RESULT', payload: [] });
+        });
+      return true;
+    }
+
+    if (message.type === 'ADD_CURRENT_PLATFORM_ACCOUNT') {
+      addCurrentPlatformAccount({
+        ...message.payload,
+        nowMs: Date.now(),
+      })
         .then((result) => {
+          sendResponse({ type: 'PLATFORM_ACCOUNT_ADDED', payload: result });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] ADD_CURRENT_PLATFORM_ACCOUNT error:', err);
+          sendResponse({
+            type: 'PLATFORM_ACCOUNT_ADDED',
+            payload: { ok: false, error: 'SERVER_ERROR', state: 'failed_terminal' },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'SWITCH_CURRENT_PLATFORM_ACCOUNT') {
+      switchCurrentPlatformAccount({
+        bindingId: message.payload.bindingId,
+        nowMs: Date.now(),
+      })
+        .then((result) => {
+          sendResponse({ type: 'PLATFORM_ACCOUNT_SWITCHED', payload: result });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] SWITCH_CURRENT_PLATFORM_ACCOUNT error:', err);
+          sendResponse({
+            type: 'PLATFORM_ACCOUNT_SWITCHED',
+            payload: { ok: false, error: 'SERVER_ERROR', state: 'failed_terminal' },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'REQUEST_FORM_ASSIST') {
+      requestApplicationFormAssist(message.payload.consentApproved, Date.now())
+        .then((result) => {
+          sendResponse({ type: 'FORM_ASSIST_RESULT', payload: result });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] REQUEST_FORM_ASSIST error:', err);
+          sendResponse({
+            type: 'FORM_ASSIST_RESULT',
+            payload: { ok: false, state: 'failed_terminal', error: 'CAPTURE_FAILED' },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'APPLY_FORM_ASSIST') {
+      applyApplicationFormAssist(message.payload.sessionId, message.payload.decisions)
+        .then((result) => {
+          sendResponse({ type: 'FORM_ASSIST_APPLIED', payload: result });
+        })
+        .catch((err) => {
+          console.warn('[MissionPulse] APPLY_FORM_ASSIST error:', err);
+          sendResponse({
+            type: 'FORM_ASSIST_APPLIED',
+            payload: { ok: false, state: 'failed_terminal', error: 'APPLY_FAILED' },
+          });
+        });
+      return true;
+    }
+
+    if (message.type === 'GET_PREMIUM_STATUS') {
+      refreshExtensionEntitlement()
+        .then((projection) => {
           sendResponse({
             type: 'PREMIUM_STATUS_RESULT',
-            payload: result.premium_enabled === true,
+            payload: projectionHasPremiumFeature(projection, 'multi_account', Date.now()),
           });
         })
         .catch((err) => {
           console.warn('[MissionPulse] GET_PREMIUM_STATUS error:', err);
           sendResponse({ type: 'PREMIUM_STATUS_RESULT', payload: false });
-        });
-      return true;
-    }
-
-    if (message.type === 'SET_PREMIUM') {
-      chrome.storage.local
-        .set({ premium_enabled: message.payload })
-        .then(() => {
-          sendResponse({ type: 'PREMIUM_SET', payload: { saved: true } });
-        })
-        .catch((err) => {
-          console.warn('[MissionPulse] SET_PREMIUM error:', err);
-          sendResponse({ type: 'PREMIUM_SET', payload: { saved: false } });
         });
       return true;
     }

@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { hasPinnedPython } from '../helpers/env-prerequisites';
 import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
@@ -23,7 +24,7 @@ afterEach(async () => {
   );
 });
 
-describe('packaged MV3 artifact evidence', () => {
+describe.skipIf(!hasPinnedPython())('packaged MV3 artifact evidence', () => {
   it('computes the same deterministic tree digest regardless of creation order', async () => {
     const first = await temporaryArtifact();
     const second = await temporaryArtifact();

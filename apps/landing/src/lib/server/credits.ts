@@ -1,6 +1,8 @@
 import { env } from '$env/dynamic/private';
 import type { SupabaseClient } from '@supabase/supabase-js';
-import { CREDIT_PACKS, PREMIUM_MONTHLY_CREDITS, type CreditPackId } from '$lib/credits';
+import { CREDIT_PACKS, type CreditPackId } from '$lib/credits';
+
+const PREMIUM_MONTHLY_CREDITS = 20;
 
 export const creditPackVariantIds: Record<CreditPackId, string | undefined> = {
   starter: env.LEMON_SQUEEZY_CREDITS_STARTER_VARIANT_ID,

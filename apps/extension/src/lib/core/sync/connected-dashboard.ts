@@ -25,6 +25,7 @@ export type ConnectorHealthSyncStatus =
 
 export interface MissionUpsertRow {
   user_id: string;
+  platform_account_binding_id: string | null;
   source: MissionSource;
   external_id: string;
   canonical_key: string;
@@ -494,8 +495,9 @@ export function buildMissionCanonicalKey(mission: Mission): string {
 export function buildMissionUpsertRow(mission: Mission, userId: string): MissionUpsertRow {
   return {
     user_id: userId,
+    platform_account_binding_id: mission.bindingId ?? null,
     source: mission.source,
-    external_id: mission.id,
+    external_id: mission.externalId ?? mission.id,
     canonical_key: buildMissionCanonicalKey(mission),
     title: mission.title,
     client: mission.client,
@@ -512,6 +514,8 @@ export function buildMissionUpsertRow(mission: Mission, userId: string): Mission
     revision: 1,
     updated_by: 'extension',
     raw_snapshot: {
+      accountId: mission.accountId ?? null,
+      bindingId: mission.bindingId ?? null,
       seniority: mission.seniority,
       score: mission.scoreBreakdown?.total ?? mission.score,
       semanticScore: mission.scoreBreakdown?.semantic ?? mission.semanticScore,

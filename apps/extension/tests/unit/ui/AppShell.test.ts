@@ -238,21 +238,6 @@ describe('App shell recovery', () => {
     expect(profile.getAttribute('aria-current')).toBe('page');
   });
 
-  it('does not import a protected page while its Premium route is locked', async () => {
-    featureState.premiumFeatureActive = true;
-    const importers = createImporters();
-    const target = mountApp(importers);
-    await flushShell();
-
-    const cvButton = target.querySelector('button[aria-label="CV inclus dans Premium"]');
-    expect(cvButton).not.toBeNull();
-    (cvButton as HTMLButtonElement).click();
-    await flushShell();
-
-    expect(target.textContent).toContain('Premium verrouillé');
-    expect(importers.cv).not.toHaveBeenCalled();
-  });
-
   it('cancels and ignores the deferred initial frame after unmount', async () => {
     let deferredFrame: FrameRequestCallback | null = null;
     const requestFrame = vi.fn((callback: FrameRequestCallback) => {

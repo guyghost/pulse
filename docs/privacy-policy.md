@@ -1,6 +1,6 @@
 # Politique de confidentialite — MissionPulse
 
-**Date de derniere mise a jour** : 2026-05-22
+**Date de derniere mise a jour** : 2026-07-30
 
 ---
 
@@ -13,6 +13,11 @@ MissionPulse collecte et traite les donnees suivantes pour faire fonctionner l'e
 - **Preferences** : intervalle de scan, connecteurs actives, seuils de notification, parametres d'analyse locale.
 - **Donnees locales de fonctionnement** : favoris, missions masquees, missions deja vues, cache semantique local, historique TJM et etat des connecteurs.
 - **Donnees synchronisees du dashboard** : snapshots normalises de missions, scores, pipeline de candidature, assets generes, profil CV canonique, historique d'import et etat de synchronisation.
+- **Liaisons multi-compte** : plateforme, libelle choisi, compte actif et hash
+  pseudonymise de la session detectee. Aucun cookie brut n'est synchronise.
+- **Assistance de formulaire** : apres consentement explicite, les champs
+  autorises et suggestions restent dans une session ephemere locale le temps de
+  la revue. Ils ne sont pas envoyes au dashboard.
 
 L'execution plateforme reste locale dans votre navigateur. La synchronisation cloud est optionnelle et limitee aux donnees produit normalisees necessaires au dashboard connecte.
 
@@ -34,11 +39,18 @@ Le dashboard fournit aussi des controles d'export et de suppression des donnees 
 
 ## 3. IA locale
 
-MissionPulse peut utiliser les capacites d'IA **locales au navigateur**, notamment Gemini Nano via la Prompt API de Chrome, pour enrichir le scoring semantique des missions.
+MissionPulse peut utiliser les capacites d'IA **locales au navigateur**,
+notamment Gemini Nano via la Prompt API de Chrome, pour enrichir le scoring
+semantique des missions et proposer des valeurs pour les champs autorises d'un
+formulaire de candidature.
 
 - Aucune cle API externe n'est requise dans l'experience actuelle de l'application.
 - Les scores semantiques sont mis en cache localement pour limiter les recalculs.
 - Si l'IA locale n'est pas disponible, l'application continue de fonctionner avec son scoring de base.
+- L'assistance de formulaire s'execute dans un Worker local dedie, exige un
+  consentement explicite et une validation champ par champ.
+- MissionPulse ne soumet jamais le formulaire et n'utilise aucun fallback cloud
+  sans un nouveau consentement explicite.
 
 ---
 
@@ -61,15 +73,15 @@ Nous ne synchronisons pas les mots de passe, cookies, jetons de session des plat
 
 ## 5. Permissions
 
-| Permission                | Utilisation                                                                       |
-| ------------------------- | --------------------------------------------------------------------------------- |
-| `sidePanel`               | Affiche le panneau lateral contenant le feed, le dashboard TJM et les parametres. |
-| `storage`                 | Sauvegarde locale des preferences, caches et donnees de fonctionnement.           |
-| `cookies`                 | Detection de session sur les plateformes supportees lorsque c'est necessaire.     |
-| `scripting` / `activeTab` | Import LinkedIn declenche par l'utilisateur depuis un onglet de profil ouvert.    |
-| `alarms`                  | Planification des cycles de scan automatiques a intervalles reguliers.            |
-| `notifications`           | Alertes lors de la detection de nouvelles missions pertinentes.                   |
-| `declarativeNetRequest`   | Application de regles reseau temporaires necessaires a certains connecteurs.      |
+| Permission                | Utilisation                                                                             |
+| ------------------------- | --------------------------------------------------------------------------------------- |
+| `sidePanel`               | Affiche le panneau lateral contenant le feed, le dashboard TJM et les parametres.       |
+| `storage`                 | Sauvegarde locale des preferences, caches et donnees de fonctionnement.                 |
+| `cookies`                 | Detection de session sur les plateformes supportees lorsque c'est necessaire.           |
+| `scripting` / `activeTab` | Import LinkedIn et assistance de formulaire declenches explicitement par l'utilisateur. |
+| `alarms`                  | Planification des cycles de scan automatiques a intervalles reguliers.                  |
+| `notifications`           | Alertes lors de la detection de nouvelles missions pertinentes.                         |
+| `declarativeNetRequest`   | Application de regles reseau temporaires necessaires a certains connecteurs.            |
 
 ---
 

@@ -20,6 +20,20 @@ import type { ToastType } from '../../state/toast.svelte';
 import type { ConnectedAlertPreferences } from '../../core/types/alert-preferences';
 import type { AlertHistoryEntry } from '../../core/types/alert-history';
 import type { DeepLinkIntent } from '../../core/deep-link/deep-link-intent';
+import type {
+  ExtensionAccountProjection,
+  StartAccountLinkResult,
+} from '../account/account-connection';
+import type {
+  FormAssistApplyResult,
+  FormAssistDecision,
+  FormAssistRequestResult,
+} from '../ai/form-assist';
+import type {
+  PlatformAccountConnectorId,
+  PlatformAccountOperationResult,
+} from '../account/platform-accounts';
+import type { PlatformAccountBinding } from '@pulse/domain';
 import type { SerializedApplicationTrackingError } from '../../core/tracking/application-tracking-error';
 import type {
   SettingsReleaseMutationIntent,
@@ -290,11 +304,43 @@ export type BridgeMessage =
       type: 'CONNECTOR_SKIPPED';
       payload: { connectorId: string; connectorName: string; reason: 'circuit-open' };
     }
-  // Premium status
+  // Connected Pulse account and canonical Premium projection
+  | { type: 'GET_EXTENSION_ACCOUNT' }
+  | { type: 'EXTENSION_ACCOUNT_RESULT'; payload: ExtensionAccountProjection }
+  | { type: 'START_EXTENSION_ACCOUNT_LINK' }
+  | { type: 'EXTENSION_ACCOUNT_LINK_STARTED'; payload: StartAccountLinkResult }
+  | { type: 'POLL_EXTENSION_ACCOUNT_LINK' }
+  | { type: 'EXTENSION_ACCOUNT_LINK_STATUS'; payload: ExtensionAccountProjection }
+  | { type: 'REFRESH_EXTENSION_ENTITLEMENT' }
+  | { type: 'EXTENSION_ENTITLEMENT_REFRESHED'; payload: ExtensionAccountProjection }
+  | { type: 'UNLINK_EXTENSION_ACCOUNT' }
+  | { type: 'EXTENSION_ACCOUNT_UNLINKED'; payload: ExtensionAccountProjection }
+  | { type: 'GET_PLATFORM_ACCOUNTS' }
+  | { type: 'PLATFORM_ACCOUNTS_RESULT'; payload: PlatformAccountBinding[] }
+  | {
+      type: 'ADD_CURRENT_PLATFORM_ACCOUNT';
+      payload: {
+        connectorId: PlatformAccountConnectorId;
+        displayLabel: string;
+        confirmed: boolean;
+      };
+    }
+  | { type: 'PLATFORM_ACCOUNT_ADDED'; payload: PlatformAccountOperationResult }
+  | { type: 'SWITCH_CURRENT_PLATFORM_ACCOUNT'; payload: { bindingId: string } }
+  | { type: 'PLATFORM_ACCOUNT_SWITCHED'; payload: PlatformAccountOperationResult }
+  // Premium form assistance: local capture → local AI suggestions → explicit
+  // per-field review → freshness check → DOM write. Never submits the form.
+  | { type: 'REQUEST_FORM_ASSIST'; payload: { consentApproved: boolean } }
+  | { type: 'FORM_ASSIST_RESULT'; payload: FormAssistRequestResult }
+  | {
+      type: 'APPLY_FORM_ASSIST';
+      payload: { sessionId: string; decisions: FormAssistDecision[] };
+    }
+  | { type: 'FORM_ASSIST_APPLIED'; payload: FormAssistApplyResult }
+  // Read-only compatibility message for existing consumers. Production status
+  // is derived from the canonical entitlement; there is no SET_PREMIUM command.
   | { type: 'GET_PREMIUM_STATUS' }
   | { type: 'PREMIUM_STATUS_RESULT'; payload: boolean }
-  | { type: 'SET_PREMIUM'; payload: boolean }
-  | { type: 'PREMIUM_SET'; payload: { saved: boolean } }
   // Diagnostic export (privacy-first, local only)
   | { type: 'GET_DIAGNOSTIC_EXPORT' }
   | {

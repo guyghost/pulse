@@ -17,7 +17,7 @@ describe('landing account dashboard operational UI', () => {
 
   it('keeps credit purchase details behind progressive disclosure', () => {
     expect(source).toContain('<details class="credit-drawer"');
-    expect(source).toContain('Choisir un pack de crédits');
+    expect(source).toContain('Crédits de génération séparés');
     expect(source).toContain('Recommandation: {recommendedPack.label}');
     expect(source).toContain('credit-pack--recommended');
     expect(source).not.toContain('<table');
@@ -38,8 +38,10 @@ describe('landing account dashboard operational UI', () => {
     expect(homeSource).toContain('TJM 450-900€');
     expect(homeSource).toContain('Shortlist quotidienne');
     expect(homeSource).toContain('missions Java, Spring Boot et frontend senior');
-    expect(homeSource).toContain('Passer à Premium');
-    expect(homeSource).toContain('0,40€/jour');
-    expect(homeSource).toContain('12€<small>/mois</small>');
+    expect(homeSource).toContain('Créer mon compte Premium');
+    expect(homeSource).toContain('10€<small> TTC/an</small>');
+    expect(homeSource).toContain('Plusieurs comptes par plateforme');
+    expect(homeSource).toContain('Aucune soumission automatique');
+    expect(homeSource).not.toContain('/mois');
   });
 });

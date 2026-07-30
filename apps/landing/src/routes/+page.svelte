@@ -35,7 +35,7 @@
     {
       label: 'Génération pitch, message et résumé (IA distante)',
       tier: 'premium',
-      note: '1 crédit = 1 génération',
+      note: 'Suggestions locales, validation champ par champ, jamais de soumission automatique',
     },
     { label: 'Dashboard connecté (crédits, gestion de compte)', tier: 'premium' },
   ];
@@ -436,7 +436,7 @@
         <p class="showcase-caption">
           L'extension livre le scan, le scoring, le suivi de candidatures, le radar TJM et le
           profil/CV — gratuitement, en local. Le compte connecté ouvre les générations IA distantes
-          via crédits; la synchronisation multi-appareils est à venir.
+          via crédits; la synchronisation multi-appareils est à venir via Supabase.
         </p>
 
         <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -492,9 +492,9 @@
               {:else if activeShowcaseStep === 'qualifier'}
                 Score détaillé
               {:else if activeShowcaseStep === 'comparer'}
-                Premium
+                Gratuit
               {:else}
-                Crédits IA
+                Validation humaine
               {/if}
             </span>
             <span class="app-preview__pill">
@@ -505,7 +505,7 @@
               {:else if activeShowcaseStep === 'comparer'}
                 Pipeline
               {:else}
-                1 crédit
+                Local-first
               {/if}
             </span>
             <span class="app-preview__toggle">Auto</span>
@@ -704,7 +704,7 @@
                 <article class="score-card score-card--highlight">
                   <span class="score-card__label">Contact</span>
                   <strong>Prêt</strong>
-                  <span>pitch généré via crédit IA</span>
+                  <span>suggestion approuvée avant remplissage</span>
                 </article>
                 <article class="score-card">
                   <span class="score-card__label">CV</span>
@@ -890,7 +890,8 @@
         <h2 class="section-title fade-in">Gratuit ou Premium ?</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
           Commencez par scanner localement dans l'extension, puis connectez votre compte quand vous
-          voulez piloter la conversion dans le dashboard connecté.
+          voulez piloter la conversion. Le dashboard connecté optionnel synchronise votre shortlist;
+          les sessions plateforme restent dans le navigateur.
         </p>
       </div>
 
@@ -917,26 +918,24 @@
         <article class="plan-card plan-card--featured fade-in fade-in-delay-2">
           <div class="plan-card__header">
             <span class="plan-card__name">Premium</span>
-            <strong class="plan-card__price">12€<small>/mois</small></strong>
-            <p>
-              Le compte connecté: générations IA distantes via crédits. Synchronisation
-              multi-appareils à venir.
-            </p>
-            <p class="plan-card__anchor">≈ 0,40€/jour — moins qu'un café par semaine.</p>
+            <strong class="plan-card__price">10€<small> TTC/an</small></strong>
+            <p>Pour travailler avec plusieurs comptes et accélérer les formulaires répétitifs.</p>
+            <p class="plan-card__anchor">Une seule facturation annuelle, sans formule mensuelle.</p>
           </div>
           <ul class="plan-card__list">
-            <li>Synchronisation multi-appareils (profil, candidatures) à venir, via Supabase.</li>
-            <li>20 générations IA distantes par mois (pitch, message recruteur, résumé CV).</li>
-            <li>1 crédit = 1 contenu; packs à la demande si vous dépassez le quota.</li>
-            <li>Le scan local, le scoring et toutes les pages de l'extension restent gratuits.</li>
+            <li>Plusieurs comptes par plateforme sous la même identité MissionPulse.</li>
+            <li>
+              Suggestions IA local-first pour renseigner les champs autorisés des formulaires.
+            </li>
+            <li>Approbation ou refus explicite de chaque champ avant écriture.</li>
+            <li>Aucune soumission automatique et aucun envoi cloud sans consentement explicite.</li>
+            <li>Le feed, le scoring, le suivi, le profil/CV et le dashboard restent gratuits.</li>
           </ul>
           <a
-            href="https://missionpulse.lemonsqueezy.com/checkout"
+            href="/register?redirectTo=%2Fdashboard%3Fupgrade%3Dpremium"
             class="btn btn--primary btn--lg"
-            target="_blank"
-            rel="noopener noreferrer"
           >
-            Passer à Premium
+            Créer mon compte Premium
           </a>
         </article>
       </div>
@@ -946,7 +945,8 @@
           <span class="credits-strip__label">Crédits IA à la demande</span>
           <p>
             Besoin de générer plus de contenus ? Packs disponibles depuis votre compte: 5 crédits à
-            4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€.
+            4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€. Ces crédits restent séparés de
+            Premium et n'accordent aucun droit d'abonnement.
           </p>
         </div>
         <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>

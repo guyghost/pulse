@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
+import { hasPinnedPython } from '../helpers/env-prerequisites';
 import {
   access,
   lstat,
@@ -159,7 +160,7 @@ async function sealedFixture() {
   return { distPath, releasesPath, root, seal, tree };
 }
 
-describe('canonical package-only ZIP', () => {
+describe.skipIf(!hasPinnedPython())('canonical package-only ZIP', () => {
   it('builds two byte-identical STORE archives with exact canonical metadata', () => {
     const first = buildCanonicalStoreZip(entries);
     const second = buildCanonicalStoreZip(entries);

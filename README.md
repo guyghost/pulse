@@ -2,7 +2,7 @@
 
 **Extension Chrome pour freelances tech.** Feed de missions centralisé avec scoring IA et analyse TJM.
 
-> Votre radar freelance. 5 plateformes, un seul panneau, scoré pour vous.
+> Votre radar freelance. 4 plateformes distribuées par défaut, un seul panneau, scoré pour vous.
 
 ## Monorepo Structure
 
@@ -23,12 +23,14 @@ pulse/
 
 ## Features
 
-- **Feed centralisé** — Agrège les missions de 5 plateformes freelance
+- **Feed centralisé** — Agrège les missions des plateformes incluses au build
 - **Scoring IA** — Gemini Nano (Chrome built-in AI) analyse la pertinence sémantique
 - **Scoring multi-critères** — Stack, TJM, localisation, remote, séniorité, urgence (startDate)
 - **Dashboard TJM** — Tendances du taux journalier par stack et par source
 - **Déduplication intelligente** — Fusionne les missions en préférant les sources directes (CherryPick > LeHibou > Hiway/Collective > Free-Work), détecte les proxy clients, URL normalisée avec validation de chemin
-- **Scan parallèle** — 5 connecteurs lancés simultanément (pool de 3)
+- **Scan parallèle** — Connecteurs inclus lancés avec un pool de 3
+- **Freemium** — Socle gratuit; Premium à 10 € TTC/an pour le multi-compte et
+  l'assistance IA locale de formulaire
 - **Smart notifications** — Alertes configurables par stack + TJM + score
 - **Comparaison** — Comparez jusqu'à 3 missions côte à côte
 - **Export** — JSON, CSV, Markdown avec label de filtres appliqués
@@ -36,17 +38,19 @@ pulse/
 - **Offline** — Fonctionne sans réseau grâce au cache local (IndexedDB + chrome.storage)
 - **Raccourcis clavier** — Navigation rapide sans quitter le clavier
 - **Backup & Restore** — Export/import du profil et des données
-- **100% local** — Aucun serveur, aucun tracking, aucune collecte
+- **Local-first** — Scraping et IA dans Chrome; dashboard connecté optionnel et
+  autorité d'abonnement côté serveur
 
 ### Plateformes supportées
 
-| Plateforme                                | Status          | Notes                                             |
-| ----------------------------------------- | --------------- | ------------------------------------------------- |
-| [Free-Work](https://www.free-work.com)    | ✅ Opérationnel | API publique, header `Accept-Language: fr` requis |
-| [LeHibou](https://www.lehibou.com)        | ✅ Opérationnel | Session cookie requise                            |
-| [Hiway](https://hiway-missions.fr)        | ✅ Opérationnel | API Supabase publique                             |
-| [Collective](https://app.collective.work) | ✅ Opérationnel | GraphQL API, session requise, Cloudflare          |
-| [Cherry Pick](https://app.cherry-pick.io) | ✅ Opérationnel | Session cookie requise                            |
+| Plateforme                                | Status                       | Notes                                             |
+| ----------------------------------------- | ---------------------------- | ------------------------------------------------- |
+| [Free-Work](https://www.free-work.com)    | ✅ Opérationnel              | API publique, header `Accept-Language: fr` requis |
+| [LeHibou](https://www.lehibou.com)        | ✅ Opérationnel              | Session cookie requise                            |
+| [Hiway](https://hiway-missions.fr)        | ✅ Opérationnel              | API Supabase publique                             |
+| [Collective](https://app.collective.work) | ⏸️ Exclu du build par défaut | Connecteur disponible dans le catalogue           |
+| [Cherry Pick](https://app.cherry-pick.io) | ✅ Opérationnel              | Session cookie requise                            |
+| [Malt](https://www.malt.fr)               | ⏸️ Exclu du build par défaut | Connecteur disponible dans le catalogue           |
 
 ### Compatibilité navigateurs
 
@@ -127,7 +131,7 @@ apps/extension/src/lib/
 │   └── ...
 │
 └── shell/                 # I/O, async, orchestration
-    ├── connectors/        # 5 connecteurs (fetch + cookies + declarativeNetRequest)
+    ├── connectors/        # Catalogue filtré au build (fetch + cookies + declarativeNetRequest)
     ├── scan/              # Scanner parallèle (pool de 3)
     ├── ai/                # Gemini Nano scoring sémantique
     ├── storage/           # IndexedDB, chrome.storage, caches
@@ -205,14 +209,14 @@ injecte pas encore toutes depuis `apps/landing/supabase/config.toml`.
 apps/extension/store-assets/
 ├── screenshot-1-feed.png       # 1280×800 — Feed avec missions scorées
 ├── screenshot-2-tjm.png        # 1280×800 — Dashboard TJM
-├── screenshot-3-privacy.png    # 1280×800 — Architecture 100% locale
+├── screenshot-3-privacy.png    # 1280×800 — Architecture local-first
 ├── promo-tile-440x280.png      # 440×280 — Tile promotionnelle
 └── *.svg                       # Sources éditables
 ```
 
 ### Description courte (132 car.)
 
-> Radar freelance : 5 plateformes, scoring IA, analyse TJM. 100% local, zéro tracking. Gratuit et open source.
+> Radar freelance : 4 plateformes par défaut, scoring IA, analyse TJM. Local-first, gratuit avec Premium annuel optionnel.
 
 ### Landing page
 

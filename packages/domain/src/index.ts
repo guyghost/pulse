@@ -105,6 +105,8 @@ export function canonicalizeLegacyApplicationStage(value: string): ApplicationSt
   return LEGACY_STAGE_MAP[value] ?? null;
 }
 
+export * from './freemium';
+export * from './freemium-machines';
 export * from './release-cache-policy';
 export * from './models/copilot-contracts';
 export * from './models/copilot-dossier.machine';

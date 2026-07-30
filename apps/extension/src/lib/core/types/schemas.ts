@@ -70,6 +70,9 @@ export const ScoreBreakdownSchema = z.object({
 
 export const MissionSchema = z.object({
   id: z.string(),
+  externalId: z.string().optional(),
+  accountId: z.string().nullable().optional(),
+  bindingId: z.string().uuid().nullable().optional(),
   title: z.string(),
   client: z.string().nullable(),
   description: z.string(),
@@ -93,6 +96,9 @@ export const MissionSchema = z.object({
 // Schéma pour les missions sérialisées (dates en string depuis IndexedDB ou API)
 export const MissionSerializedSchema = z.object({
   id: z.string(),
+  externalId: z.string().optional(),
+  accountId: z.string().nullable().optional(),
+  bindingId: z.string().uuid().nullable().optional(),
   title: z.string(),
   client: z.string().nullable(),
   description: z.string(),

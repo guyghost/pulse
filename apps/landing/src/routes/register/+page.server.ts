@@ -3,7 +3,15 @@ import { redirect } from '@sveltejs/kit';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import { hasSupabaseAuthCookie } from '$lib/server/auth-cookie';
 
-export const load: PageServerLoad = async ({ cookies }) => {
+function normalizeRedirectPath(value: string | null): string {
+  if (!value || !value.startsWith('/') || value.startsWith('//')) {
+    return '/dashboard';
+  }
+  return value;
+}
+
+export const load: PageServerLoad = async ({ cookies, url }) => {
+  const redirectTo = normalizeRedirectPath(url.searchParams.get('redirectTo'));
   let hasSession = false;
 
   if (hasSupabaseAuthCookie(cookies)) {
@@ -17,8 +25,8 @@ export const load: PageServerLoad = async ({ cookies }) => {
   }
 
   if (hasSession) {
-    redirect(303, '/dashboard');
+    redirect(303, redirectTo);
   }
 
-  return { session: null };
+  return { session: null, redirectTo };
 };

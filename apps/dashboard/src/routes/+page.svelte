@@ -67,6 +67,14 @@
     actionLabel?: string;
     href?: string;
   }
+  interface DashboardPlatformAccount {
+    id: string;
+    connector_id: string;
+    display_label: string;
+    status: string;
+    is_active: boolean;
+    revision: number;
+  }
   interface SyncConflictResolutionStep {
     title: string;
     detail: string;
@@ -85,6 +93,7 @@
   const alertPreferences = $derived(data.alertPreferences as DashboardAlertPreferences);
   const entitlements = $derived(data.entitlements as DashboardAccountEntitlements);
   const featureAccess = $derived(data.featureAccess as DashboardFeatureAccess[]);
+  const platformAccounts = $derived(data.platformAccounts as DashboardPlatformAccount[]);
   const configurationMissing = $derived(Boolean(data.configurationMissing));
   const counts = $derived(countApplicationsByStage(applications));
   const readiness = $derived(getCvSyncReadiness(cv, syncStatuses));
@@ -909,7 +918,8 @@
           <div class="flex flex-wrap items-center gap-2">
             {#if isConnected}
               <Badge
-                label={entitlements.subscriptionStatus === 'premium'
+                label={entitlements.entitlement?.status === 'premium_active' ||
+                entitlements.entitlement?.status === 'premium_cancel_at_period_end'
                   ? 'Premium actif'
                   : 'Compte actif'}
                 variant="success"
@@ -1826,6 +1836,51 @@
                 </article>
               {/each}
             </div>
+
+            <article
+              class="mt-3 rounded-xl border border-border-light bg-surface-white p-4 shadow-subtle-2"
+            >
+              <div class="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                  <p class="text-[11px] font-medium uppercase text-text-muted">Premium</p>
+                  <h3 class="mt-1 text-sm font-semibold text-text-primary">
+                    Comptes plateforme sous cette identité Pulse
+                  </h3>
+                  <p class="mt-2 text-xs leading-5 text-text-subtle">
+                    Les sessions restent dans Chrome. Le dashboard affiche seulement les libellés,
+                    l’état et le compte actif enregistrés par l’extension.
+                  </p>
+                </div>
+                <Badge
+                  label={`${platformAccounts.length} enregistré${platformAccounts.length > 1 ? 's' : ''}`}
+                  variant={platformAccounts.length > 0 ? 'success' : 'status'}
+                />
+              </div>
+              {#if platformAccounts.length > 0}
+                <div class="mt-3 grid gap-2 md:grid-cols-2">
+                  {#each platformAccounts as account (account.id)}
+                    <div class="rounded-lg border border-border-light bg-page-canvas px-3 py-2">
+                      <div class="flex items-center justify-between gap-2">
+                        <p class="text-xs font-medium text-text-primary">{account.display_label}</p>
+                        <Badge
+                          label={account.is_active
+                            ? 'Actif'
+                            : account.status === 'locked_by_entitlement'
+                              ? 'Verrouillé'
+                              : 'Inactif'}
+                          variant={account.is_active ? 'success' : 'warning'}
+                        />
+                      </div>
+                      <p class="mt-1 text-[11px] text-text-muted">{account.connector_id}</p>
+                    </div>
+                  {/each}
+                </div>
+              {:else}
+                <p class="mt-3 text-xs text-text-muted">
+                  Ajoutez votre première session depuis les réglages de l’extension.
+                </p>
+              {/if}
+            </article>
           </section>
 
           <section id="comparison" class="mt-6" aria-labelledby="mission-comparison-title">

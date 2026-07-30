@@ -14,12 +14,13 @@
     "preview": "vite preview",
     "test": "vitest run",
     "test:db": "supabase test db --workdir .",
-    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error"
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error",
+    "validate:lemon-sandbox": "node scripts/validate-lemon-sandbox.mjs"
   },
   "dependencies": {
     "@pulse/domain": "workspace:*",
-    "@supabase/ssr": "^0.12.0",
-    "@supabase/supabase-js": "^2.110.0",
+    "@supabase/ssr": "^0.12.3",
+    "@supabase/supabase-js": "^2.110.7",
     "@vercel/microfrontends": "^2.3.6",
     "@vercel/oidc": "3.5.0",
     "ai": "7.0.26",

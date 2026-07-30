@@ -188,6 +188,20 @@ export default tseslint.config(
       'no-console': 'off',
     },
   },
+  {
+    files: ['scripts/validate-mv3-runtime.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.es2022,
+        ...globals.node,
+        chrome: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
 
   // ─── eslint-plugin-svelte v3: newly-promoted recommended rules ───────────
   // The codebase now fully adopts the v3 recommended rules: `require-each-key`,

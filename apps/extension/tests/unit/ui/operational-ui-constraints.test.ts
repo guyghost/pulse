@@ -179,36 +179,32 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain("label: 'Settings'");
   });
 
-  it('keeps premium destinations visible with an explanatory locked state', () => {
+  it('keeps the existing CV, application and TJM surfaces in the free product', () => {
     const source = readFileSync('src/sidepanel/App.svelte', 'utf8');
 
-    expect(source).toContain('const PREMIUM_LOCKS');
-    expect(source).toContain('Premium verrouillé');
-    expect(source).toContain('aria-label={itemLocked');
-    expect(source).toContain('primaryActionLabel="Voir les réglages"');
     expect(source).toContain('data-testid="page-profile"');
+    expect(source).toContain('{#if TJMPage}');
+    expect(source).toContain('{#if CvPage}');
+    expect(source).toContain('{#if ApplicationsPage}');
     expect(source).toContain("nav.currentPage !== 'profile'");
-    expect(source).not.toContain('Profil premium verrouillé');
-    expect(source).not.toContain("nav.currentPage === 'profile' && premium.isPremium");
+    expect(source).not.toContain('const PREMIUM_LOCKS');
+    expect(source).not.toContain('Premium verrouillé');
     expect(source).not.toContain('NAV_ITEMS.filter');
-    expect(source).not.toContain('Premium pages hidden');
   });
 
-  it('gates premium surfaces through the premium feature flag', () => {
+  it('limits Premium UI to multi-account and reviewed form assistance', () => {
     const appSource = readFileSync('src/sidepanel/App.svelte', 'utf8');
     const settingsSource = readFileSync('src/ui/pages/SettingsPage.svelte', 'utf8');
+    const applicationsSource = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
+    const assistSource = readFileSync('src/ui/organisms/FormAssistPanel.svelte', 'utf8');
 
-    // The pure decision + feature store are wired into the UI gating.
-    expect(appSource).toContain("from '$lib/core/features/flags'");
-    expect(appSource).toContain('canAccessPremium');
-    expect(appSource).toContain('features.premiumFeatureActive');
-    // Page rendering consults the combined access decision, not raw isPremium.
-    expect(appSource).toContain('TJMPage && premiumAccessible');
-    expect(appSource).toContain('CvPage && premiumAccessible');
-    expect(appSource).toContain('ApplicationsPage && premiumAccessible');
-    // Settings reflects the dormant vs active state.
-    expect(settingsSource).toContain('features.premiumFeatureActive');
-    expect(settingsSource).toContain('Premium désactivé');
+    expect(appSource).not.toContain("from '$lib/core/features/flags'");
+    expect(settingsSource).toContain('PlatformAccountsPanel');
+    expect(settingsSource).toContain('Premium — 10 € TTC/an');
+    expect(applicationsSource).toContain('FormAssistPanel');
+    expect(assistSource).toContain('Vous approuvez chaque champ');
+    expect(assistSource).toContain('Pulse ne');
+    expect(assistSource).toContain('soumet jamais le formulaire');
   });
 
   it('keeps onboarding focused with duration and minimal shell navigation', () => {
