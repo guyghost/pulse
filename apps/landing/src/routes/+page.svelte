@@ -21,7 +21,7 @@
 
   type FeatureTier = 'free' | 'premium';
   const featureMatrix: { label: string; tier: FeatureTier; note?: string }[] = [
-    { label: 'Feed unique, 5 plateformes dédupliquées', tier: 'free' },
+    { label: 'Feed unique, 4 plateformes dédupliquées', tier: 'free' },
     { label: 'Score stack, TJM, remote, séniorité', tier: 'free' },
     {
       label: 'Score sémantique (IA locale Chrome)',
@@ -29,22 +29,21 @@
       note: 'Quand Gemini Nano est disponible',
     },
     { label: 'Comparateur et shortlist quotidienne', tier: 'free' },
-    { label: 'Radar TJM marché par stack', tier: 'premium' },
-    { label: 'Suivi de candidatures (pipeline, notes, relances)', tier: 'premium' },
-    { label: 'Assistant profil et CV', tier: 'premium' },
+    { label: 'Radar TJM et suivi de candidatures', tier: 'free' },
+    { label: 'Profil, CV et dashboard connecté', tier: 'free' },
+    { label: 'Premier compte par plateforme', tier: 'free' },
+    { label: 'Plusieurs comptes par plateforme', tier: 'premium' },
     {
-      label: 'Génération pitch, message et résumé CV',
+      label: 'Assistance IA pour les formulaires de candidature',
       tier: 'premium',
-      note: '1 crédit = 1 génération',
+      note: 'Suggestions locales, validation champ par champ, jamais de soumission automatique',
     },
-    { label: 'Dashboard connecté (synchronisation optionnelle)', tier: 'premium' },
   ];
 
   const platforms: { name: string; logo: string }[] = [
     { name: 'Free-Work', logo: '/logos/free-work.png' },
     { name: 'LeHibou', logo: '/logos/lehibou.png' },
     { name: 'Hiway', logo: '/logos/hiway.png' },
-    { name: 'Collective', logo: '/logos/collective.png' },
     { name: 'Cherry Pick', logo: '/logos/cherry-pick.png' },
   ];
 
@@ -231,7 +230,7 @@
   <meta name="title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     name="description"
-    content="MissionPulse est le radar quotidien des freelances tech français: 5 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant."
+    content="MissionPulse est le radar quotidien des freelances tech français: 4 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant."
   />
   <meta
     name="keywords"
@@ -246,7 +245,7 @@
   <meta property="og:title" content="MissionPulse — Transformez votre veille mission en pipeline" />
   <meta
     property="og:description"
-    content="5 plateformes, 1 feed scoré, les meilleures missions à traiter maintenant. Gratuit pour scanner, Premium pour suivre, négocier et candidater."
+    content="4 plateformes, 1 feed scoré. Le premier scan est gratuit; Premium ajoute le multi-compte et l’assistance IA local-first pour vos formulaires."
   />
   <meta property="og:image" content="https://missionpulse.app/og-image.png" />
   <meta property="og:locale" content="fr_FR" />
@@ -261,7 +260,7 @@
   />
   <meta
     name="twitter:description"
-    content="Le radar quotidien des freelances tech français: Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans un feed scoré."
+    content="Le radar quotidien des freelances tech français: Free-Work, LeHibou, Hiway et Cherry Pick dans un feed scoré."
   />
   <meta name="twitter:image" content="https://missionpulse.app/og-image.png" />
 </svelte:head>
@@ -396,14 +395,13 @@
       </div>
 
       <h1 class="hero__title">
-        5 plateformes.<br />1 feed scoré.<br /><span class="light-text">Zéro doublon.</span>
+        4 plateformes.<br />1 feed scoré.<br /><span class="light-text">Zéro doublon.</span>
       </h1>
 
       <div class="hero__bottom-bar">
         <p class="hero__description">
-          Free-Work, LeHibou, Hiway, Collective et Cherry Pick dans un seul feed, scoré selon votre
-          stack, votre TJM et votre remote. Le dernier scan a remonté 42 missions, dont 8 à
-          contacter maintenant.
+          Free-Work, LeHibou, Hiway et Cherry Pick dans un seul feed, scoré selon votre stack, votre
+          TJM et votre remote. Le dernier scan a remonté 42 missions, dont 8 à contacter maintenant.
         </p>
 
         <div class="hero__actions">
@@ -432,14 +430,13 @@
           <img src="/logos/free-work.png" alt="Free-Work" width="112" height="40" />
           <img src="/logos/lehibou.png" alt="LeHibou" width="112" height="40" />
           <img src="/logos/hiway.png" alt="Hiway" width="112" height="40" />
-          <img src="/logos/collective.png" alt="Collective" width="112" height="40" />
           <img src="/logos/cherry-pick.png" alt="Cherry Pick" width="112" height="40" />
         </div>
 
         <p class="showcase-caption">
           Le feed gratuit prouve la valeur dès le premier scan: une mission 80+, un TJM compatible,
-          une action immédiate. Premium ajoute le suivi, le radar TJM, le profil/CV et les
-          générations par crédits.
+          une action immédiate. Premium ajoute plusieurs comptes par plateforme et une assistance IA
+          local-first pour préparer les formulaires de candidature.
         </p>
 
         <div class="showcase-tabs" aria-label="Étapes du workflow MissionPulse" role="tablist">
@@ -495,9 +492,9 @@
               {:else if activeShowcaseStep === 'qualifier'}
                 Score détaillé
               {:else if activeShowcaseStep === 'comparer'}
-                Premium
+                Gratuit
               {:else}
-                Crédits IA
+                Validation humaine
               {/if}
             </span>
             <span class="app-preview__pill">
@@ -508,7 +505,7 @@
               {:else if activeShowcaseStep === 'comparer'}
                 Pipeline
               {:else}
-                1 crédit
+                Local-first
               {/if}
             </span>
             <span class="app-preview__toggle">Auto</span>
@@ -567,7 +564,7 @@
                 <article class="mission-row">
                   <div>
                     <strong>Consultant Design System</strong>
-                    <span>Collective · Lyon</span>
+                    <span>Cherry Pick · Lyon</span>
                   </div>
                   <mark>B</mark>
                   <span>650€</span>
@@ -687,7 +684,8 @@
               <div class="decision-panel" aria-label="Aide à la décision">
                 <h3>Décision assistée</h3>
                 <p>
-                  Premium relie shortlist, TJM, profil et suivi pour arbitrer les meilleures pistes.
+                  Le socle gratuit relie shortlist, TJM, profil et suivi pour arbitrer les
+                  meilleures pistes.
                 </p>
                 <div class="decision-row">
                   <span>Meilleur fit profil</span><strong>Lead Svelte</strong>
@@ -706,7 +704,7 @@
                 <article class="score-card score-card--highlight">
                   <span class="score-card__label">Contact</span>
                   <strong>Prêt</strong>
-                  <span>pitch généré via crédit IA</span>
+                  <span>suggestion approuvée avant remplissage</span>
                 </article>
                 <article class="score-card">
                   <span class="score-card__label">CV</span>
@@ -809,8 +807,8 @@
       <div class="section-header">
         <h2 class="section-title fade-in">Ce que vous obtenez</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
-          Le gratuit couvre le scan et le scoring. Le premium ouvre la négociation, le suivi et la
-          candidature.
+          Le gratuit couvre la valeur métier de base. Premium ajoute le multi-compte et l'assistance
+          IA de formulaire, sans décider ni soumettre à votre place.
         </p>
       </div>
 
@@ -891,7 +889,8 @@
         <h2 class="section-title fade-in">Gratuit ou Premium ?</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
           Commencez par scanner localement dans l'extension, puis connectez votre compte quand vous
-          voulez piloter la conversion dans le dashboard connecté.
+          voulez piloter la conversion. Le dashboard connecté optionnel synchronise votre shortlist;
+          les sessions plateforme restent dans le navigateur.
         </p>
       </div>
 
@@ -903,7 +902,7 @@
             <p>Pour valider la valeur en quelques minutes depuis l'extension Chrome.</p>
           </div>
           <ul class="plan-card__list">
-            <li>Scan des 5 plateformes connectées depuis vos sessions navigateur.</li>
+            <li>Scan des 4 plateformes connectées depuis vos sessions navigateur.</li>
             <li>Feed centralisé avec recherche, filtres, tri, nouveautés et favoris.</li>
             <li>Scoring de pertinence, déduplication et comparaison des meilleures missions.</li>
             <li>Paramètres de profil, alertes, exports et sauvegarde locale.</li>
@@ -918,30 +917,24 @@
         <article class="plan-card plan-card--featured fade-in fade-in-delay-2">
           <div class="plan-card__header">
             <span class="plan-card__name">Premium</span>
-            <strong class="plan-card__price">12€<small>/mois</small></strong>
-            <p>Pour piloter votre prospection comme un pipeline et produire vos candidatures.</p>
-            <p class="plan-card__anchor">≈ 0,40€/jour — moins qu'un café par semaine.</p>
+            <strong class="plan-card__price">10€<small> TTC/an</small></strong>
+            <p>Pour travailler avec plusieurs comptes et accélérer les formulaires répétitifs.</p>
+            <p class="plan-card__anchor">Une seule facturation annuelle, sans formule mensuelle.</p>
           </div>
           <ul class="plan-card__list">
+            <li>Plusieurs comptes par plateforme sous la même identité MissionPulse.</li>
             <li>
-              Le dashboard connecté optionnel synchronise votre shortlist et vos candidatures entre
-              vos appareils.
+              Suggestions IA local-first pour renseigner les champs autorisés des formulaires.
             </li>
-            <li>Pages Premium dans l'extension: profil, CV, suivi de candidatures et radar TJM.</li>
-            <li>Pipeline de candidature avec statuts, notes, prochaine action et historique.</li>
-            <li>Assistant profil/CV pour garder vos informations cohérentes entre plateformes.</li>
-            <li>
-              20 contenus générés par mois (pitch, message recruteur ou résumé CV). 1 crédit = 1
-              contenu.
-            </li>
+            <li>Approbation ou refus explicite de chaque champ avant écriture.</li>
+            <li>Aucune soumission automatique et aucun envoi cloud sans consentement explicite.</li>
+            <li>Le feed, le scoring, le suivi, le profil/CV et le dashboard restent gratuits.</li>
           </ul>
           <a
-            href="https://missionpulse.lemonsqueezy.com/checkout"
+            href="/register?redirectTo=%2Fdashboard%3Fupgrade%3Dpremium"
             class="btn btn--primary btn--lg"
-            target="_blank"
-            rel="noopener noreferrer"
           >
-            Passer à Premium
+            Créer mon compte Premium
           </a>
         </article>
       </div>
@@ -951,7 +944,8 @@
           <span class="credits-strip__label">Crédits IA à la demande</span>
           <p>
             Besoin de générer plus de contenus ? Packs disponibles depuis votre compte: 5 crédits à
-            4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€.
+            4,90€, 15 crédits à 12,90€ ou 40 crédits à 29,90€. Ces crédits restent séparés de
+            Premium et n'accordent aucun droit d'abonnement.
           </p>
         </div>
         <a href="/dashboard" class="btn btn--secondary">Gérer mon compte et mes crédits</a>
@@ -963,7 +957,7 @@
   <section class="platforms section" id="platforms">
     <div class="container">
       <div class="section-header">
-        <h2 class="section-title fade-in">5 plateformes connectées</h2>
+        <h2 class="section-title fade-in">4 plateformes connectées</h2>
         <p class="section-subtitle fade-in fade-in-delay-1">
           Les principales sources de missions freelance tech en France, dans un seul feed.
         </p>
@@ -995,13 +989,13 @@
           <h2 class="cta__title">Prêt à installer votre radar mission ?</h2>
           <p class="cta__desc">
             Exécution navigateur, scan gratuit et zéro tracking publicitaire. Le compte sert au
-            dashboard connecté optionnel, au radar TJM, au suivi de candidature, au profil/CV et aux
-            crédits de génération; l'exécution plateforme reste dans votre navigateur.
+            dashboard connecté optionnel; Premium ajoute le multi-compte et l'assistance aux
+            formulaires. L'exécution plateforme reste dans votre navigateur.
           </p>
           <p class="cta__proof">
             <span class="cta__proof-dot" aria-hidden="true"></span>
             Le même classement à chaque scan — scoring déterministe, aucune opacité, aucun tirage aléatoire.
-            Vos 5 plateformes, scannées depuis vos sessions existantes.
+            Vos 4 plateformes, scannées depuis vos sessions existantes.
           </p>
           <a
             href={chromeStoreUrl}

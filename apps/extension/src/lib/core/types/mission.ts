@@ -8,6 +8,12 @@ export type RemoteType = 'full' | 'hybrid' | 'onsite';
 
 export interface Mission {
   id: string;
+  /** Connector identifier before local account scoping. */
+  externalId?: string;
+  /** Pulse identity that owns the platform binding, when connected. */
+  accountId?: string | null;
+  /** Active platform account binding used for this scan, when connected. */
+  bindingId?: string | null;
   title: string;
   client: string | null;
   description: string;

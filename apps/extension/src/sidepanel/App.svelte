@@ -11,9 +11,6 @@
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
   import { createAppNavigation, NAV_ITEMS, type Page } from '$lib/state/app-navigation.svelte';
   import { createThemeStore } from '$lib/state/theme.svelte';
-  import { premium } from '$lib/state/premium.svelte';
-  import { features } from '$lib/state/features.svelte';
-  import { canAccessPremium } from '$lib/core/features/flags';
   import { launchMarks, type PageId } from '$lib/shell/metrics/launch-marks';
   import { subscribeToNotificationClicked } from '$lib/shell/facades/feed-data.facade';
 
@@ -88,59 +85,14 @@
     }
   }
 
-  // Load premium status from storage on mount
-  $effect(() => {
-    premium.load();
-  });
-
-  type PremiumLockContent = {
-    title: string;
-    description: string;
-    proofLabel: string;
-    proofValue: string;
-  };
-
-  const PREMIUM_LOCKS: Partial<Record<Page, PremiumLockContent>> = {
-    cv: {
-      title: 'Profil de référence inclus dans Premium',
-      description:
-        'Cette vue prépare un profil candidat cohérent pour LinkedIn, dashboard et plateformes. Vos sessions restent dans Chrome.',
-      proofLabel: 'Surface',
-      proofValue: 'CV',
-    },
-    applications: {
-      title: 'Suivi des candidatures inclus dans Premium',
-      description:
-        'Le pipeline transforme les missions retenues en relances, statuts et prochaines actions. Le feed reste disponible pour qualifier les missions.',
-      proofLabel: 'Surface',
-      proofValue: 'Suivi',
-    },
-    tjm: {
-      title: 'Analyse TJM incluse dans Premium',
-      description:
-        'L’analyse tarifaire consolide les missions scannées pour estimer une fourchette de négociation exploitable.',
-      proofLabel: 'Surface',
-      proofValue: 'TJM',
-    },
-  };
-
   const visibleNavItems = NAV_ITEMS;
   const denseNav = $derived(visibleNavItems.length > 4);
-  // Premium access combines the feature flag with the user's premium status.
-  // When the feature is dormant (flag off), access is always granted and no
-  // surface is gated. See models/premium-feature-flag.model.md.
-  const premiumAccessible = $derived(
-    canAccessPremium(features.premiumFeatureActive, premium.isPremium)
-  );
-  const lockedPremiumPage = $derived(
-    premiumAccessible ? null : (PREMIUM_LOCKS[nav.currentPage] ?? null)
-  );
   let initialPageLoadScheduled = $state(false);
   let secondaryPagesPreloaded = $state(false);
-  let premiumPagesPreloaded = $state(false);
+  let deferredPagesPreloaded = $state(false);
 
   $effect(() => {
-    if (lockedPremiumPage || nav.bootStatus !== 'ready') {
+    if (nav.bootStatus !== 'ready') {
       return;
     }
 
@@ -167,21 +119,17 @@
   });
 
   $effect(() => {
-    if (nav.bootStatus !== 'ready' || !premiumAccessible || premiumPagesPreloaded) {
+    if (nav.bootStatus !== 'ready' || deferredPagesPreloaded) {
       return;
     }
 
-    premiumPagesPreloaded = true;
+    deferredPagesPreloaded = true;
     window.setTimeout(() => {
       loadPage('cv');
       loadPage('applications');
       loadPage('tjm');
     }, 80);
   });
-
-  function isPremiumLocked(page: Page): boolean {
-    return !premiumAccessible && page in PREMIUM_LOCKS;
-  }
 
   // Initialize theme on mount
   theme.init();
@@ -326,7 +274,6 @@
               : 'min-h-12 gap-1 p-1'}"
         >
           {#each visibleNavItems as item}
-            {@const itemLocked = isPremiumLocked(item.page)}
             <button
               class="relative flex min-w-0 items-center justify-center rounded-full text-[0.72rem] font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
           {feedNavCompact
@@ -340,14 +287,10 @@
                   : 'flex-1 basis-0 gap-2 px-3 py-3'}
           {nav.currentPage === item.page
                 ? 'bg-surface-white text-text-primary shadow-subtle-2'
-                : itemLocked
-                  ? 'text-text-muted hover:bg-surface-white hover:text-text-primary'
-                  : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
+                : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
               aria-current={nav.currentPage === item.page ? 'page' : undefined}
-              aria-label={itemLocked
-                ? `${item.label} inclus dans Premium`
-                : (item.ariaLabel ?? item.label)}
-              title={itemLocked ? `${item.label} inclus dans Premium` : item.label}
+              aria-label={item.ariaLabel ?? item.label}
+              title={item.label}
               onclick={() => nav.navigate(item.page)}
             >
               <span class="shrink-0 transition-transform duration-200 ease-out">
@@ -360,14 +303,6 @@
                   ? 'max-w-0 opacity-0 -translate-x-1'
                   : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
               >
-              {#if itemLocked}
-                <span
-                  class="absolute right-1 top-1 flex h-3 w-3 items-center justify-center rounded-full bg-surface-white text-text-muted ring-1 ring-border-light"
-                  aria-hidden="true"
-                >
-                  <Icon name="lock" size={8} />
-                </span>
-              {/if}
             </button>
           {/each}
         </nav>
@@ -487,30 +422,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if lockedPremiumPage}
-        <div
-          data-testid={`page-${nav.currentPage}`}
-          class="absolute inset-0 overflow-y-auto"
-          in:fly={{ x: 30, duration: 200, easing: cubicOut }}
-          out:fade={{ duration: 100 }}
-        >
-          <div class="p-4">
-            <OperationalEmptyState
-              title={lockedPremiumPage.title}
-              description={lockedPremiumPage.description}
-              severity="attention"
-              statusLabel="Premium verrouillé"
-              icon="lock"
-              proofLabel={lockedPremiumPage.proofLabel}
-              proofValue={lockedPremiumPage.proofValue}
-              primaryActionLabel="Voir les réglages"
-              primaryActionIcon="settings"
-              onPrimaryAction={() => nav.navigate('settings')}
-            />
-          </div>
-        </div>
-      {/if}
-      {#if TJMPage && premiumAccessible}
+      {#if TJMPage}
         <div
           data-testid="page-tjm"
           class="absolute inset-0 overflow-y-auto"
@@ -581,7 +493,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if CvPage && premiumAccessible}
+      {#if CvPage}
         <div
           data-testid="page-cv"
           class="absolute inset-0 overflow-y-auto"
@@ -615,7 +527,7 @@
           </svelte:boundary>
         </div>
       {/if}
-      {#if ApplicationsPage && premiumAccessible}
+      {#if ApplicationsPage}
         <div
           data-testid="page-applications"
           class="absolute inset-0 overflow-y-auto"

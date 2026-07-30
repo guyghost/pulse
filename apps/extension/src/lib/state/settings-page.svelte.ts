@@ -38,7 +38,15 @@ import { showToast } from '$lib/shell/notifications/toast-service';
 import { buildDiagnosticFilename } from '$lib/core/diagnostics/diagnostic-report';
 import type { UserProfile } from '$lib/core/types/profile';
 import { clearFeedTourSeen, clearOnboardingCompleted } from '$lib/shell/facades/app-flags.facade';
-import { getPremium } from '$lib/shell/facades/premium.facade';
+import {
+  getExtensionAccount,
+  pollExtensionAccountLink,
+  refreshExtensionEntitlement,
+  startExtensionAccountLink,
+  unlinkExtensionAccount,
+} from '$lib/shell/facades/premium.facade';
+import type { ExtensionAccountLinkState } from '$lib/shell/account/account-connection';
+import { canUsePremiumFeature } from '@pulse/domain';
 import {
   appendUniqueNormalized,
   normalizeDailyRate,
@@ -121,6 +129,7 @@ export class SettingsPageController {
   scanHistoryErrorCount = $state(0);
 
   premiumEnabled = $state(false);
+  extensionAccountState = $state<ExtensionAccountLinkState>('unlinked');
   connectedAccountEmail = $state<string | null>(null);
   connectedDeviceLabel = $state('Extension Chrome locale');
   connectedLastSyncAt = $state<string | null>(null);
@@ -232,20 +241,36 @@ export class SettingsPageController {
 
   async loadConnectedAccount(): Promise<void> {
     try {
-      this.premiumEnabled = await getPremium();
-      if (import.meta.env.DEV && this.premiumEnabled) {
-        this.connectedAccountEmail = 'demo@missionpulse.app';
-        this.connectedLastSyncAt = "à l'instant";
-        this.connectedPendingUploads = 0;
-        this.connectedPendingDownloads = 0;
-      }
+      const local = await getExtensionAccount();
+      const projection = local.state === 'linked' ? await refreshExtensionEntitlement() : local;
+      this.applyExtensionAccountProjection(projection);
     } catch {
       this.premiumEnabled = false;
+      this.extensionAccountState = 'error';
       this.connectedAccountEmail = null;
       this.connectedLastSyncAt = null;
       this.connectedPendingUploads = 0;
       this.connectedPendingDownloads = 0;
     }
+  }
+
+  private applyExtensionAccountProjection(
+    projection: Awaited<ReturnType<typeof getExtensionAccount>>
+  ): void {
+    this.extensionAccountState = projection.state;
+    this.connectedAccountEmail =
+      projection.accountId === null ? null : `Compte ${projection.accountId.slice(0, 8)}`;
+    this.connectedSyncError = projection.lastError;
+    this.premiumEnabled = canUsePremiumFeature({
+      snapshot: projection.entitlement,
+      accountState: projection.accountId === null ? 'anonymous' : 'active',
+      accountId: projection.accountId,
+      feature: 'multi_account',
+      nowMs: Date.now(),
+    });
+    this.connectedLastSyncAt = projection.state === 'linked' ? "à l'instant" : null;
+    this.connectedPendingUploads = 0;
+    this.connectedPendingDownloads = 0;
   }
 
   async loadScanHistory(): Promise<void> {
@@ -279,6 +304,9 @@ export class SettingsPageController {
     if (this.connectedSyncError) {
       return 'Action requise';
     }
+    if (this.extensionAccountState === 'awaiting_user_approval') {
+      return 'Autorisation en attente';
+    }
     return this.isConnectedAccount ? 'Connecté' : 'Local uniquement';
   }
 
@@ -290,6 +318,9 @@ export class SettingsPageController {
       return this.connectedLastSyncAt
         ? `Dernière synchro ${this.connectedLastSyncAt}`
         : 'Compte connecté, première synchronisation en attente.';
+    }
+    if (this.extensionAccountState === 'awaiting_user_approval') {
+      return "Autorisez cette installation dans l'onglet MissionPulse, puis vérifiez la connexion.";
     }
     return "Vos scans, favoris, CV et candidatures restent dans l'extension tant qu'aucun compte n'est connecté.";
   }
@@ -335,7 +366,20 @@ export class SettingsPageController {
   }
 
   async openAccountCenter(): Promise<void> {
-    await openExternalUrl('https://missionpulse.app/dashboard');
+    if (this.isConnectedAccount) {
+      await openExternalUrl('https://missionpulse.app/dashboard');
+      return;
+    }
+    if (this.extensionAccountState === 'awaiting_user_approval') {
+      this.applyExtensionAccountProjection(await pollExtensionAccountLink());
+      return;
+    }
+    const result = await startExtensionAccountLink();
+    this.applyExtensionAccountProjection(result.projection);
+  }
+
+  async disconnectExtensionAccount(): Promise<void> {
+    this.applyExtensionAccountProjection(await unlinkExtensionAccount());
   }
 
   async openConnectedDashboard(): Promise<void> {

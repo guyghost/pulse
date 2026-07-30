@@ -420,6 +420,93 @@ const ConnectorHealthSnapshotSchema = z.object({
   recentLatenciesMs: z.array(z.number()).max(200),
 });
 
+const EntitlementSnapshotSchema = z
+  .object({
+    accountId: z.string().min(1),
+    planId: z.enum(['free', 'premium_yearly']),
+    status: z.enum([
+      'free',
+      'premium_active',
+      'premium_cancel_at_period_end',
+      'premium_past_due',
+      'premium_expired',
+      'premium_revoked',
+    ]),
+    validFromMs: z.number().nullable(),
+    validUntilMs: z.number().nullable(),
+    features: z.array(z.enum(['multi_account', 'application_form_ai_assistance'])),
+    sourceSubscriptionId: z.string().nullable(),
+    sourceVersion: z.object({
+      providerUpdatedAt: z.string(),
+      eventPriority: z.number().int(),
+      providerEventId: z.string(),
+    }),
+    revision: z.number().int().positive(),
+    issuedAtMs: z.number(),
+    cacheExpiresAtMs: z.number(),
+  })
+  .strict();
+
+const ExtensionAccountProjectionSchema = z
+  .object({
+    state: z.enum([
+      'unlinked',
+      'creating_link',
+      'awaiting_user_approval',
+      'linked',
+      'refused',
+      'expired',
+      'cancelled',
+      'error',
+    ]),
+    accountId: z.string().nullable(),
+    entitlement: EntitlementSnapshotSchema.nullable(),
+    premiumMaxBindingsPerConnector: z.number().int().min(2).max(20),
+    lastError: z.string().nullable(),
+  })
+  .strict();
+
+const PlatformAccountBindingSchema = z
+  .object({
+    id: z.string().uuid(),
+    accountId: z.string(),
+    connectorId: z.string(),
+    externalAccountKeyHash: z.string().regex(/^[a-f0-9]{64}$/),
+    displayLabel: z.string(),
+    status: z.enum([
+      'ready',
+      'locked_by_entitlement',
+      'needs_session',
+      'needs_permission',
+      'error',
+      'removed',
+    ]),
+    isActive: z.boolean(),
+    createdAtMs: z.number(),
+    revision: z.number().int().positive(),
+  })
+  .strict();
+
+const PlatformAccountOperationResultSchema = z.union([
+  z.object({ ok: z.literal(true), binding: PlatformAccountBindingSchema }).strict(),
+  z
+    .object({
+      ok: z.literal(false),
+      error: z.enum([
+        'ACCOUNT_REQUIRED',
+        'PREMIUM_REQUIRED',
+        'LIMIT_REACHED',
+        'SESSION_REQUIRED',
+        'CONFIRMATION_REQUIRED',
+        'SESSION_MISMATCH',
+        'BINDING_NOT_FOUND',
+        'SERVER_ERROR',
+      ]),
+      state: z.string(),
+    })
+    .strict(),
+]);
+
 // ============================================================================
 // Registre des schémas par type de message
 // ============================================================================
@@ -828,19 +915,189 @@ export const MessageSchemas = {
     }),
   }),
 
-  // Premium status
+  // Connected Pulse account and canonical Premium projection
+  GET_EXTENSION_ACCOUNT: z.object({ type: z.literal('GET_EXTENSION_ACCOUNT') }),
+  EXTENSION_ACCOUNT_RESULT: z.object({
+    type: z.literal('EXTENSION_ACCOUNT_RESULT'),
+    payload: ExtensionAccountProjectionSchema,
+  }),
+  START_EXTENSION_ACCOUNT_LINK: z.object({ type: z.literal('START_EXTENSION_ACCOUNT_LINK') }),
+  EXTENSION_ACCOUNT_LINK_STARTED: z.object({
+    type: z.literal('EXTENSION_ACCOUNT_LINK_STARTED'),
+    payload: z.object({
+      projection: ExtensionAccountProjectionSchema,
+      approvalUrl: z.string().url().nullable(),
+    }),
+  }),
+  POLL_EXTENSION_ACCOUNT_LINK: z.object({ type: z.literal('POLL_EXTENSION_ACCOUNT_LINK') }),
+  EXTENSION_ACCOUNT_LINK_STATUS: z.object({
+    type: z.literal('EXTENSION_ACCOUNT_LINK_STATUS'),
+    payload: ExtensionAccountProjectionSchema,
+  }),
+  REFRESH_EXTENSION_ENTITLEMENT: z.object({
+    type: z.literal('REFRESH_EXTENSION_ENTITLEMENT'),
+  }),
+  EXTENSION_ENTITLEMENT_REFRESHED: z.object({
+    type: z.literal('EXTENSION_ENTITLEMENT_REFRESHED'),
+    payload: ExtensionAccountProjectionSchema,
+  }),
+  UNLINK_EXTENSION_ACCOUNT: z.object({ type: z.literal('UNLINK_EXTENSION_ACCOUNT') }),
+  EXTENSION_ACCOUNT_UNLINKED: z.object({
+    type: z.literal('EXTENSION_ACCOUNT_UNLINKED'),
+    payload: ExtensionAccountProjectionSchema,
+  }),
+  GET_PLATFORM_ACCOUNTS: z.object({ type: z.literal('GET_PLATFORM_ACCOUNTS') }),
+  PLATFORM_ACCOUNTS_RESULT: z.object({
+    type: z.literal('PLATFORM_ACCOUNTS_RESULT'),
+    payload: z.array(PlatformAccountBindingSchema).max(120),
+  }),
+  ADD_CURRENT_PLATFORM_ACCOUNT: z.object({
+    type: z.literal('ADD_CURRENT_PLATFORM_ACCOUNT'),
+    payload: z
+      .object({
+        connectorId: z.enum(['free-work', 'lehibou', 'hiway', 'collective', 'cherry-pick', 'malt']),
+        displayLabel: z.string().trim().min(1).max(80),
+        confirmed: z.boolean(),
+      })
+      .strict(),
+  }),
+  PLATFORM_ACCOUNT_ADDED: z.object({
+    type: z.literal('PLATFORM_ACCOUNT_ADDED'),
+    payload: PlatformAccountOperationResultSchema,
+  }),
+  SWITCH_CURRENT_PLATFORM_ACCOUNT: z.object({
+    type: z.literal('SWITCH_CURRENT_PLATFORM_ACCOUNT'),
+    payload: z.object({ bindingId: z.string().uuid() }).strict(),
+  }),
+  PLATFORM_ACCOUNT_SWITCHED: z.object({
+    type: z.literal('PLATFORM_ACCOUNT_SWITCHED'),
+    payload: PlatformAccountOperationResultSchema,
+  }),
+  REQUEST_FORM_ASSIST: z.object({
+    type: z.literal('REQUEST_FORM_ASSIST'),
+    payload: z.object({ consentApproved: z.boolean() }).strict(),
+  }),
+  FORM_ASSIST_RESULT: z.object({
+    type: z.literal('FORM_ASSIST_RESULT'),
+    payload: z.union([
+      z
+        .object({
+          ok: z.literal(true),
+          state: z.literal('reviewing'),
+          sessionId: z.string().uuid(),
+          origin: z.string().url(),
+          fields: z.array(
+            z
+              .object({
+                fieldId: z.string(),
+                kind: z.enum(['text', 'textarea', 'email', 'tel', 'url', 'select']),
+                label: z.string(),
+                value: z.string(),
+                autocomplete: z.string().nullable(),
+              })
+              .strict()
+          ),
+          suggestions: z.array(
+            z
+              .object({
+                suggestionId: z.string(),
+                fieldId: z.string(),
+                proposedValue: z.string(),
+                confidence: z.number().min(0).max(1),
+                rationale: z.string(),
+                sourceRefs: z.array(z.string()),
+              })
+              .strict()
+          ),
+        })
+        .strict(),
+      z
+        .object({
+          ok: z.literal(false),
+          state: z.string(),
+          error: z.enum([
+            'CONSENT_REQUIRED',
+            'ACCOUNT_REQUIRED',
+            'PREMIUM_REQUIRED',
+            'UNSUPPORTED_ORIGIN',
+            'PERMISSION_DENIED',
+            'NO_ACTIVE_TAB',
+            'NO_PROFILE',
+            'NO_SUPPORTED_FIELDS',
+            'CAPTURE_FAILED',
+            'AI_UNAVAILABLE',
+            'AI_FAILED',
+            'AI_OUTPUT_INVALID',
+            'SESSION_EXPIRED',
+            'FORM_CHANGED',
+            'APPLY_FAILED',
+            'MANUAL_REVIEW_REQUIRED',
+          ]),
+        })
+        .strict(),
+    ]),
+  }),
+  APPLY_FORM_ASSIST: z.object({
+    type: z.literal('APPLY_FORM_ASSIST'),
+    payload: z
+      .object({
+        sessionId: z.string().uuid(),
+        decisions: z
+          .array(
+            z
+              .object({
+                suggestionId: z.string().min(1).max(120),
+                decision: z.enum(['pending', 'approved', 'approved_edited', 'refused']),
+                editedValue: z.string().max(4_000).optional(),
+              })
+              .strict()
+          )
+          .max(40),
+      })
+      .strict(),
+  }),
+  FORM_ASSIST_APPLIED: z.object({
+    type: z.literal('FORM_ASSIST_APPLIED'),
+    payload: z.union([
+      z
+        .object({
+          ok: z.literal(true),
+          state: z.enum(['applied', 'refused']),
+          appliedCount: z.number().int().nonnegative(),
+        })
+        .strict(),
+      z
+        .object({
+          ok: z.literal(false),
+          state: z.string(),
+          error: z.enum([
+            'CONSENT_REQUIRED',
+            'ACCOUNT_REQUIRED',
+            'PREMIUM_REQUIRED',
+            'UNSUPPORTED_ORIGIN',
+            'PERMISSION_DENIED',
+            'NO_ACTIVE_TAB',
+            'NO_PROFILE',
+            'NO_SUPPORTED_FIELDS',
+            'CAPTURE_FAILED',
+            'AI_UNAVAILABLE',
+            'AI_FAILED',
+            'AI_OUTPUT_INVALID',
+            'SESSION_EXPIRED',
+            'FORM_CHANGED',
+            'APPLY_FAILED',
+            'MANUAL_REVIEW_REQUIRED',
+          ]),
+        })
+        .strict(),
+    ]),
+  }),
+
+  // Read-only compatibility status
   GET_PREMIUM_STATUS: z.object({ type: z.literal('GET_PREMIUM_STATUS') }),
   PREMIUM_STATUS_RESULT: z.object({
     type: z.literal('PREMIUM_STATUS_RESULT'),
     payload: z.boolean(),
-  }),
-  SET_PREMIUM: z.object({
-    type: z.literal('SET_PREMIUM'),
-    payload: z.boolean(),
-  }),
-  PREMIUM_SET: z.object({
-    type: z.literal('PREMIUM_SET'),
-    payload: z.object({ saved: z.boolean() }),
   }),
 
   // Diagnostic export

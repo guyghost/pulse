@@ -96,11 +96,16 @@
           de télétravail et niveau de seniorité que vous configurez lors de l'onboarding.
         </li>
         <li>
-          <strong>Missions scrapées</strong> — Les missions récupérées depuis Free-Work, LeHibou, Hiway,
-          Collective et Cherry Pick sont stockées dans IndexedDB sur votre machine.
+          <strong>Missions scrapées</strong> — Les missions récupérées depuis Free-Work, LeHibou, Hiway
+          et Cherry Pick sont stockées dans IndexedDB sur votre machine.
         </li>
         <li>
           <strong>États des connecteurs</strong> — Le statut de vos connexions aux différentes plateformes.
+        </li>
+        <li>
+          <strong>Assistance de formulaire</strong> — Après votre consentement explicite, les champs autorisés
+          et les suggestions restent dans une session éphémère de l'extension, le temps de votre revue.
+          Ils ne sont ni envoyés au dashboard, ni conservés comme historique.
         </li>
         <li>
           <strong>Cache de scoring sémantique</strong> — Les scores de pertinence calculés par Gemini
@@ -135,6 +140,10 @@
           <strong>État de synchronisation</strong> — statut des connecteurs, erreurs typées et dernière
           synchronisation par appareil.
         </li>
+        <li>
+          <strong>Liaisons multi-compte</strong> — libellé choisi, plateforme, compte actif et hash pseudonymisé
+          de la session détectée. Aucun cookie ou jeton de session n'est synchronisé.
+        </li>
       </ul>
 
       <p>
@@ -147,19 +156,23 @@
 
       <p>
         MissionPulse utilise <strong>Gemini Nano</strong>, l'IA intégrée de Chrome, pour le scoring
-        sémantique des missions. Cette IA fonctionne entièrement sur votre ordinateur (<em
+        sémantique des missions et, avec Premium, pour proposer des réponses aux champs autorisés
+        d'un formulaire de candidature. Cette IA fonctionne entièrement sur votre ordinateur (<em
           >on-device</em
-        >). Aucune donnée n'est envoyée à Google ou à des serveurs externes pour cette
-        fonctionnalité.
+        >). L'assistance requiert votre consentement explicite, chaque suggestion reste modifiable
+        ou refusable, et MissionPulse ne soumet jamais le formulaire. Aucun fallback cloud n'est
+        utilisé sans un nouveau consentement explicite.
       </p>
 
       <h2>Accès aux plateformes tierces</h2>
 
       <p>
-        MissionPulse accède aux sites Free-Work, LeHibou, Hiway, Collective et Cherry Pick pour
-        scrapper les missions disponibles. Ces accès sont effectués via <strong
+        MissionPulse accède aux sites Free-Work, LeHibou, Hiway et Cherry Pick dans le package
+        distribué par défaut pour scrapper les missions disponibles. Ces accès sont effectués via <strong
           >votre session navigateur existante</strong
-        > — vous devez être connecté à ces plateformes. Nous ne stockons jamais vos identifiants de connexion.
+        > — vous devez être connecté à ces plateformes. Le package publié peut désactiver certains connecteurs
+        : le multi-compte et l'assistance ne sont proposés que pour les plateformes effectivement incluses.
+        Nous ne stockons jamais vos identifiants de connexion.
       </p>
 
       <p>

@@ -9,9 +9,11 @@
     "build": "NODE_OPTIONS=--disable-warning=DEP0205 vite build",
     "preview": "vite preview",
     "test": "vitest run",
-    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error"
+    "typecheck": "svelte-kit sync && svelte-check --tsconfig ./tsconfig.json --threshold error",
+    "validate:lemon-sandbox": "node scripts/validate-lemon-sandbox.mjs"
   },
   "dependencies": {
+    "@pulse/domain": "workspace:*",
     "@supabase/ssr": "^0.12.3",
     "@supabase/supabase-js": "^2.110.7",
     "@vercel/microfrontends": "^2.3.6",

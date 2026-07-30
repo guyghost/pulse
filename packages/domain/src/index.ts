@@ -104,3 +104,6 @@ export function transitionApplicationStage(
 export function canonicalizeLegacyApplicationStage(value: string): ApplicationStage | null {
   return LEGACY_STAGE_MAP[value] ?? null;
 }
+
+export * from './freemium';
+export * from './freemium-machines';

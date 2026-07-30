@@ -29,7 +29,9 @@ describe('connected privacy copy', () => {
     expect(homePage).toContain('depuis vos sessions navigateur');
     expect(homePage).toContain('dashboard connecté optionnel');
     expect(homePage).toMatch(/Le compte sert au\s+dashboard connecté optionnel/);
-    expect(homePage).toContain("l'exécution plateforme reste dans votre navigateur");
+    expect(homePage.toLocaleLowerCase('fr')).toContain(
+      "l'exécution plateforme reste dans votre navigateur"
+    );
     expect(homePage).toContain('Le dashboard connecté optionnel synchronise votre shortlist');
     expect(privacyPage).toContain("L'exécution plateforme reste locale dans votre navigateur");
     expect(privacyPage).toContain('snapshots normalisés via Supabase');
@@ -38,5 +40,14 @@ describe('connected privacy copy', () => {
     expect(storeListing).toContain('snapshots normalisés via Supabase');
     expect(privacyPolicy).toContain('snapshots normalisés via Supabase');
     expect(privacyPolicy).toContain('Nous ne synchronisons pas les mots de passe');
+  });
+
+  it('describes the Premium form-assistance privacy boundary consistently', () => {
+    expect(privacyPage).toContain('consentement explicite');
+    expect(privacyPage).toContain('MissionPulse ne soumet jamais le formulaire');
+    expect(storeListing).toContain('Premium à 10 € TTC/an');
+    expect(storeListing).toContain('ne soumet jamais');
+    expect(privacyPolicy).toContain('Worker local dedie');
+    expect(privacyPolicy).toContain('aucun fallback cloud');
   });
 });

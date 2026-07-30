@@ -31,6 +31,7 @@
   import OperationalEmptyState from '../molecules/OperationalEmptyState.svelte';
   import OfflineNotice from '../molecules/OfflineNotice.svelte';
   import { getConnectionStore } from '$lib/state/connection-singleton.svelte';
+  import FormAssistPanel from '../organisms/FormAssistPanel.svelte';
 
   const { onNavigateToFeed }: { onNavigateToFeed?: () => void } = $props();
   const connection = getConnectionStore();
@@ -838,6 +839,8 @@
               {/each}
             </div>
           </div>
+
+          <FormAssistPanel />
 
           {#if assets.length === 0}
             <OperationalEmptyState

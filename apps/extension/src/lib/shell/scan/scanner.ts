@@ -25,6 +25,11 @@ import { isOnline } from '../utils/connection-monitor';
 import { trackParserHealth } from './parser-health';
 import { runWithCircuitBreaker } from '../health/circuit-breaker-runner';
 import { syncProbeAlarm } from '../health/probe-scheduler';
+import { scopeMissionToPlatformBinding } from '../../core/accounts/scope-mission';
+import {
+  currentSessionMatchesPlatformBinding,
+  listPlatformAccounts,
+} from '../account/platform-accounts';
 
 /** Mutex pour empêcher les scans concurrents */
 let scanInProgress = false;
@@ -168,6 +173,11 @@ async function _runScanInternal(
   const settings = await getSettings();
   const enabledIds = settings.enabledConnectors;
   const errors: ScanResult['errors'] = [];
+  const activeBindingByConnector = new Map(
+    (await listPlatformAccounts().catch(() => []))
+      .filter((binding) => binding.isActive && binding.status === 'ready')
+      .map((binding) => [binding.connectorId, binding] as const)
+  );
 
   try {
     await setScanState('scanning');
@@ -309,6 +319,22 @@ async function _runScanInternal(
       ? { ...baseSearchContext, lastSync: null }
       : undefined;
 
+    const activeBinding = activeBindingByConnector.get(connector.id);
+    if (
+      activeBinding &&
+      !(await currentSessionMatchesPlatformBinding(activeBinding).catch(() => false))
+    ) {
+      errors.push({
+        connectorId: connector.id,
+        message: 'La session plateforme ne correspond pas au compte actif.',
+      });
+      if (stateIdx >= 0) {
+        connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'error', error: null };
+      }
+      emitDetailed('scanning', index + 1, connectors.length);
+      return;
+    }
+
     // État: fetching
     if (stateIdx >= 0) {
       connectorStates[stateIdx] = { ...connectorStates[stateIdx], state: 'fetching' };
@@ -390,13 +416,21 @@ async function _runScanInternal(
         };
       }
     } else {
-      trackParserHealth(connector.id, result.value.length, now).catch(() => {});
-      connectorResults.push({ connectorId: connector.id, missions: result.value });
+      const scopedMissions = activeBinding
+        ? result.value.map((mission) =>
+            scopeMissionToPlatformBinding(mission, {
+              accountId: activeBinding.accountId,
+              bindingId: activeBinding.id,
+            })
+          )
+        : result.value;
+      trackParserHealth(connector.id, scopedMissions.length, now).catch(() => {});
+      connectorResults.push({ connectorId: connector.id, missions: scopedMissions });
       try {
         options?.onConnectorResult?.({
           connectorId: connector.id,
           connectorName: connector.name,
-          missions: buildDeterministicMissions(result.value, new Date(now)),
+          missions: buildDeterministicMissions(scopedMissions, new Date(now)),
         });
       } catch {
         // Partial UI updates are best-effort; the final scan result remains canonical.
@@ -422,7 +456,7 @@ async function _runScanInternal(
         connectorStates[stateIdx] = {
           ...connectorStates[stateIdx],
           state: 'done',
-          missionsCount: result.value.length,
+          missionsCount: scopedMissions.length,
         };
       }
     }

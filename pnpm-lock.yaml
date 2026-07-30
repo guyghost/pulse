@@ -99,6 +99,9 @@ importers:
       svelte:
         specifier: ^5.56.6
         version: 5.56.6(@typescript-eslint/types@8.64.0)
+      xstate:
+        specifier: ^5.32.5
+        version: 5.32.5
       zod:
         specifier: ^3.23.0
         version: 3.25.76
@@ -172,6 +175,9 @@ importers:
 
   apps/landing:
     dependencies:
+      '@pulse/domain':
+        specifier: workspace:*
+        version: link:../../packages/domain
       '@supabase/ssr':
         specifier: ^0.12.3
         version: 0.12.3(@supabase/supabase-js@2.110.7)
@@ -214,6 +220,10 @@ importers:
         version: 3.2.6(@types/node@26.1.1)(jiti@2.7.0)(jsdom@29.1.1(@noble/hashes@1.8.0))(lightningcss@1.32.0)(tsx@4.23.1)(yaml@2.9.0)
 
   packages/domain:
+    dependencies:
+      xstate:
+        specifier: ^5.32.5
+        version: 5.32.5
     devDependencies:
       '@pulse/tsconfig':
         specifier: workspace:*
@@ -2793,6 +2803,9 @@ packages:
   xmlchars@2.2.0:
     resolution: {integrity: sha512-JZnDKK8B0RCDw84FNdDAIpZK+JuJw+s7Lz8nksI7SIuU3UXJJslUthsi+uWBUYOwPFwW7W7PRLRfUKpxjtjFCw==}
 
+  xstate@5.32.5:
+    resolution: {integrity: sha512-ULazi1oe6wGrXl0Frb6otSlkm5HLifbbVTkMk5kkSKqz4TkxJaVpnl6jOJwKeid3ORPxYyZQgNLUSYX9q65SIA==}
+
   yallist@5.0.0:
     resolution: {integrity: sha512-YgvUTfwqyc7UXVMrB+SImsVYSmTS8X/tSrtdNZMImM+n7+QTriRXyXim0mBrTXNeqzVF0KWGgHPeiyViFFrNDw==}
     engines: {node: '>=18'}
@@ -5124,6 +5137,8 @@ snapshots:
   xml-name-validator@5.0.0: {}
 
   xmlchars@2.2.0: {}
+
+  xstate@5.32.5: {}
 
   yallist@5.0.0: {}
 

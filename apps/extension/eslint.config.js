@@ -188,6 +188,20 @@ export default tseslint.config(
       'no-console': 'off',
     },
   },
+  {
+    files: ['scripts/validate-mv3-runtime.mjs'],
+    languageOptions: {
+      globals: {
+        ...globals.browser,
+        ...globals.es2022,
+        ...globals.node,
+        chrome: 'readonly',
+      },
+    },
+    rules: {
+      'no-console': 'off',
+    },
+  },
 
   // ─── eslint-plugin-svelte v3: relax newly-promoted recommended rules ──
   // v3 promoted these rules to errors in the recommended set. The existing

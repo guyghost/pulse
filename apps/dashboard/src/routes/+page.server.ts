@@ -8,6 +8,8 @@ import {
   transitionApplicationStage,
   type ApplicationPipelineEvent,
   type ApplicationStage,
+  type EntitlementSnapshot,
+  type PremiumFeature,
 } from '@pulse/domain';
 import { createSupabaseServerClient } from '$lib/server/supabase';
 import {
@@ -59,16 +61,38 @@ import {
   type DashboardSyncStatusRow,
   type DashboardAccountEntitlements,
   type DashboardAlertPreferencesRow,
-  type DashboardSubscriptionStatus,
   type MissionApplication,
 } from '$lib/core/dashboard';
 import { markEntityPendingExtensionPull } from '$lib/server/sync-status';
 import { upsertDashboardPipelineEvent } from '$lib/server/pipeline-events';
 
 type DashboardProfileRow = {
-  subscription_status: string | null;
-  subscription_period_end: string | null;
   credit_balance: number | null;
+};
+
+type DashboardEntitlementRow = {
+  user_id: string;
+  plan_id: string;
+  status: string;
+  valid_from: string | null;
+  valid_until: string | null;
+  features: string[] | null;
+  source_subscription_id: string | null;
+  provider_updated_at: string;
+  event_priority: number;
+  provider_event_id: string;
+  revision: number;
+  issued_at: string;
+  cache_expires_at: string;
+};
+
+type DashboardPlatformAccountRow = {
+  id: string;
+  connector_id: string;
+  display_label: string;
+  status: string;
+  is_active: boolean;
+  revision: number;
 };
 
 type FavoriteMissionRow = {
@@ -141,13 +165,9 @@ type SyncConflictResolutionRow = {
   revision: number;
 };
 
-const normalizeSubscriptionStatus = (value: string | null): DashboardSubscriptionStatus =>
-  value === 'premium' ? 'premium' : value === 'expired' ? 'expired' : 'free';
-
 const getAnonymousEntitlements = (): DashboardAccountEntitlements => ({
   isAuthenticated: false,
-  subscriptionStatus: 'free',
-  subscriptionPeriodEndMs: null,
+  entitlement: null,
   creditBalance: 0,
 });
 
@@ -160,12 +180,56 @@ const parseOptionalDateMs = (value: string | null | undefined): number | null =>
   return Number.isFinite(timestamp) ? timestamp : null;
 };
 
+const toEntitlementSnapshot = (row: DashboardEntitlementRow | null): EntitlementSnapshot | null => {
+  if (!row || row.plan_id !== 'premium_yearly') {
+    return null;
+  }
+  if (
+    row.status !== 'premium_active' &&
+    row.status !== 'premium_cancel_at_period_end' &&
+    row.status !== 'premium_past_due' &&
+    row.status !== 'premium_expired' &&
+    row.status !== 'premium_revoked'
+  ) {
+    return null;
+  }
+
+  const features = (row.features ?? []).filter(
+    (feature): feature is PremiumFeature =>
+      feature === 'multi_account' || feature === 'application_form_ai_assistance'
+  );
+  const issuedAtMs = parseOptionalDateMs(row.issued_at);
+  const cacheExpiresAtMs = parseOptionalDateMs(row.cache_expires_at);
+  const providerUpdatedAtMs = parseOptionalDateMs(row.provider_updated_at);
+  if (issuedAtMs === null || cacheExpiresAtMs === null || providerUpdatedAtMs === null) {
+    return null;
+  }
+
+  return {
+    accountId: row.user_id,
+    planId: 'premium_yearly',
+    status: row.status,
+    validFromMs: parseOptionalDateMs(row.valid_from),
+    validUntilMs: parseOptionalDateMs(row.valid_until),
+    features,
+    sourceSubscriptionId: row.source_subscription_id,
+    sourceVersion: {
+      providerUpdatedAt: row.provider_updated_at,
+      eventPriority: row.event_priority,
+      providerEventId: row.provider_event_id,
+    },
+    revision: row.revision,
+    issuedAtMs,
+    cacheExpiresAtMs,
+  };
+};
+
 const getAuthenticatedEntitlements = (
-  profile: DashboardProfileRow | null
+  profile: DashboardProfileRow | null,
+  entitlement: DashboardEntitlementRow | null
 ): DashboardAccountEntitlements => ({
   isAuthenticated: true,
-  subscriptionStatus: normalizeSubscriptionStatus(profile?.subscription_status ?? null),
-  subscriptionPeriodEndMs: parseOptionalDateMs(profile?.subscription_period_end),
+  entitlement: toEntitlementSnapshot(entitlement),
   creditBalance: profile?.credit_balance ?? 0,
 });
 
@@ -257,6 +321,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
       cv: buildEmptyCvSnapshot({ updatedAt: new Date().toISOString() }),
       syncStatuses,
       connectedSyncStatuses: [],
+      platformAccounts: [],
       syncConflicts: [],
       alertPreferences: dashboardAlertPreferencesRowToSnapshot(null, new Date().toISOString()),
     };
@@ -272,13 +337,22 @@ export const load: PageServerLoad = async ({ cookies }) => {
 
   const supabase = createSupabaseServerClient(cookies);
 
-  const { data: profile } = await supabase
-    .from('profiles')
-    .select('subscription_status, subscription_period_end, credit_balance')
-    .eq('id', session.user.id)
-    .single<DashboardProfileRow>();
+  const [{ data: profile }, { data: entitlement }] = await Promise.all([
+    supabase
+      .from('profiles')
+      .select('credit_balance')
+      .eq('id', session.user.id)
+      .single<DashboardProfileRow>(),
+    supabase
+      .from('subscription_entitlements')
+      .select(
+        'user_id, plan_id, status, valid_from, valid_until, features, source_subscription_id, provider_updated_at, event_priority, provider_event_id, revision, issued_at, cache_expires_at'
+      )
+      .eq('user_id', session.user.id)
+      .maybeSingle<DashboardEntitlementRow>(),
+  ]);
 
-  const entitlements = getAuthenticatedEntitlements(profile ?? null);
+  const entitlements = getAuthenticatedEntitlements(profile ?? null, entitlement ?? null);
   const { data: missionFeedRows } = await supabase
     .from('missions')
     .select('id, title, client, source, stack, tjm, location, scraped_at, url')
@@ -490,6 +564,13 @@ export const load: PageServerLoad = async ({ cookies }) => {
     .limit(10)
     .returns<DashboardExtensionDeviceRow[]>();
 
+  const { data: platformAccounts } = await supabase
+    .from('platform_account_bindings')
+    .select('id, connector_id, display_label, status, is_active, revision')
+    .eq('user_id', session.user.id)
+    .order('connector_id', { ascending: true })
+    .returns<DashboardPlatformAccountRow[]>();
+
   const extensionDeviceIds = (extensionDeviceRows ?? []).map((device) => device.id);
   const { data: syncStatusRows } =
     extensionDeviceIds.length > 0
@@ -563,6 +644,7 @@ export const load: PageServerLoad = async ({ cookies }) => {
         }),
     syncStatuses,
     connectedSyncStatuses,
+    platformAccounts: (platformAccounts ?? []).filter((account) => account.status !== 'removed'),
     syncConflicts,
     alertPreferences: dashboardAlertPreferencesRowToSnapshot(
       alertPreferencesRow ?? null,

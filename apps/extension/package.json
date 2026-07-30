@@ -22,6 +22,7 @@
     "format:check": "prettier --check .",
     "typecheck": "tsc --noEmit",
     "verify-manifest": "tsx scripts/verify-manifest.ts",
+    "validate:mv3-runtime": "pnpm build && node scripts/validate-mv3-runtime.mjs",
     "bump-version": "tsx scripts/bump-version.ts",
     "build:extension": "bash scripts/build-extension.sh"
   },
@@ -31,6 +32,7 @@
     "@supabase/supabase-js": "^2.110.7",
     "lucide-svelte": "^1.0.1",
     "svelte": "^5.56.6",
+    "xstate": "^5.32.5",
     "zod": "^3.23.0"
   },
   "devDependencies": {
