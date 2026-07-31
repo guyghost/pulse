@@ -189,19 +189,18 @@ export default tseslint.config(
     },
   },
 
-  // ─── eslint-plugin-svelte v3: relax newly-promoted recommended rules ──
-  // v3 promoted these rules to errors in the recommended set. The existing
-  // codebase predates them; surface them as warnings so the v3 bump lands
-  // cleanly and they can be adopted incrementally without failing CI.
+  // ─── eslint-plugin-svelte v3: newly-promoted recommended rules ────────
   // prefer-svelte-reactivity also fires in .ts files, hence the dual scope.
   {
     files: ['**/*.ts', '**/*.svelte'],
     rules: {
-      'svelte/require-each-key': 'warn',
-      'svelte/prefer-writable-derived': 'warn',
-      'svelte/prefer-svelte-reactivity': 'warn',
-      'svelte/no-navigation-without-resolve': 'warn',
-      'svelte/no-useless-children-snippet': 'warn',
+      // The stores use non-reactive helper collections (timers, listeners) and
+      // copy-on-write Maps/Sets reassigned into `$state`, which are already
+      // reactive; SvelteMap/SvelteSet would only add proxy overhead.
+      'svelte/prefer-svelte-reactivity': 'off',
+      // SvelteKit-only rule: the extension links to external platform URLs and
+      // has no router to resolve them against.
+      'svelte/no-navigation-without-resolve': 'off',
     },
   }
 );

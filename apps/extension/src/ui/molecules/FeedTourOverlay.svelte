@@ -53,7 +53,7 @@
 
     <div class="mt-4 flex items-center justify-between gap-3">
       <div class="flex items-center gap-1.5">
-        {#each Array(totalSteps) as _, index}
+        {#each Array(totalSteps) as _, index (index)}
           <span
             class="h-1.5 rounded-full transition-all duration-200 {index === stepIndex
               ? 'w-6 bg-blueprint-blue'

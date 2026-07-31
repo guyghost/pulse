@@ -56,7 +56,6 @@
   let selectedMissionId = $state<string | null>(null);
   let assets = $state<GeneratedAsset[]>([]);
   let generatingType = $state<GenerationType | null>(null);
-  let nextActionInput = $state('');
   let loadError = $state<string | null>(null);
 
   const generationTypes: GenerationType[] = ['pitch', 'cover-message', 'cv-summary'];
@@ -117,9 +116,7 @@
     selectedTracking ? selectedTracking.history.slice().reverse().slice(0, 4) : []
   );
 
-  $effect(() => {
-    nextActionInput = isoToDateTimeLocal(selectedTracking?.nextActionAt ?? null);
-  });
+  let nextActionInput = $derived(isoToDateTimeLocal(selectedTracking?.nextActionAt ?? null));
 
   const pipelineSummary = $derived.by(() =>
     summarizeApplicationPipeline([...tracking.trackings.values()], Date.now())
@@ -597,7 +594,7 @@
         class="mt-4 grid gap-2 md:grid-cols-3"
         aria-label="Progression du chargement candidatures"
       >
-        {#each loadingProgressSteps as step}
+        {#each loadingProgressSteps as step (step)}
           <div class="rounded-lg border border-border-light bg-page-canvas p-3">
             <div
               class="flex h-7 w-7 items-center justify-center rounded-md bg-blueprint-blue/8 text-blueprint-blue"
@@ -658,7 +655,7 @@
         <div class="max-h-[32rem] space-y-2 overflow-y-auto pr-1">
           {#each trackedMissions.length > 0 ? trackedMissions : missions
                 .slice(0, 20)
-                .map( (mission) => ({ mission, record: tracking.getTrackingForMission(mission.id) ?? null }) ) as item}
+                .map( (mission) => ({ mission, record: tracking.getTrackingForMission(mission.id) ?? null }) ) as item (item.mission.id)}
             <button
               class="w-full rounded-lg border px-3 py-3 text-left transition-colors {selectedMissionId ===
               item.mission.id
@@ -728,7 +725,7 @@
             </div>
 
             <div class="mt-4 flex flex-wrap gap-2">
-              {#each nextStatuses as status}
+              {#each nextStatuses as status (status)}
                 <button
                   class="inline-flex items-center gap-2 rounded-lg border border-border-light bg-surface-white px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray"
                   onclick={() => transitionTo(status)}
@@ -790,7 +787,7 @@
                   </span>
                 </div>
                 <ol class="mt-3 space-y-2">
-                  {#each selectedDecisionHistory as transition}
+                  {#each selectedDecisionHistory as transition (transition)}
                     <li
                       class="flex gap-3 rounded-lg border border-border-light bg-surface-white p-2.5"
                     >
@@ -826,7 +823,7 @@
               </div>
             </div>
             <div class="mt-4 grid gap-2">
-              {#each generationTypes as type}
+              {#each generationTypes as type (type)}
                 <button
                   class="inline-flex items-center justify-center gap-2 rounded-lg border border-border-light bg-page-canvas px-3 py-2 text-xs font-medium text-text-primary transition-colors hover:bg-subtle-gray disabled:opacity-50"
                   onclick={() => generate(type)}
@@ -857,7 +854,7 @@
             />
           {/if}
 
-          {#each assets as asset}
+          {#each assets as asset (asset)}
             <article class="section-card rounded-xl p-5">
               <div class="flex items-center justify-between gap-3">
                 <div class="flex items-center gap-2">
