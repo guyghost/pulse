@@ -226,7 +226,7 @@ describe('App shell recovery', () => {
     const target = mountApp(createImporters());
     await flushShell();
 
-    const feed = target.querySelector('button[aria-label="Feed"]') as HTMLButtonElement;
+    const feed = target.querySelector('button[aria-label="Missions"]') as HTMLButtonElement;
     const profile = target.querySelector('button[aria-label="Profil"]') as HTMLButtonElement;
     expect(feed.getAttribute('aria-current')).toBe('page');
     expect(profile.hasAttribute('aria-current')).toBe(false);

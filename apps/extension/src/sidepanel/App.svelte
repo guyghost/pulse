@@ -1,6 +1,5 @@
 <script lang="ts">
   import { Icon, type IconName } from '@pulse/ui';
-  import ConnectionIndicator from '../ui/atoms/ConnectionIndicator.svelte';
   import ToastContainer from '../ui/organisms/ToastContainer.svelte';
   import OperationalEmptyState from '../ui/molecules/OperationalEmptyState.svelte';
   import { fly, fade } from 'svelte/transition';
@@ -163,11 +162,22 @@
   });
 
   const visibleNavItems = NAV_ITEMS;
-  const denseNav = $derived(visibleNavItems.length > 4);
   const currentPageLoad = $derived(pageLoads[nav.currentPage]);
   const currentPageLabel = $derived(
     NAV_ITEMS.find((item) => item.page === nav.currentPage)?.label ?? 'Onboarding'
   );
+
+  function pageSurfaceClass(page: Page): string {
+    const position = nav.pagePosition(page);
+
+    if (position === 'current') {
+      return 'translate-x-0 opacity-100 z-10';
+    }
+
+    return position === 'before'
+      ? '-translate-x-full opacity-0 z-0'
+      : 'translate-x-full opacity-0 z-0';
+  }
   let initialPageLoadScheduled = false;
 
   $effect(() => {
@@ -219,7 +229,6 @@
   theme.init();
   const connection = getConnectionStore();
   let showOfflineBanner = $state(false);
-  let feedNavCompact = $state(false);
 
   // Initialize toast service
   const toastActor = initToastService();
@@ -310,22 +319,6 @@
   });
 
   $effect(() => {
-    function handleFeedScrollState(event: Event) {
-      const detail = (event as CustomEvent<{ isScrolling: boolean; scrollTop: number }>).detail;
-      feedNavCompact = nav.currentPage === 'feed' && detail.scrollTop > 12;
-    }
-
-    window.addEventListener('feed:scroll-state', handleFeedScrollState);
-    return () => window.removeEventListener('feed:scroll-state', handleFeedScrollState);
-  });
-
-  $effect(() => {
-    if (nav.currentPage !== 'feed') {
-      feedNavCompact = false;
-    }
-  });
-
-  $effect(() => {
     const unsubscribe = subscribeToNotificationClicked(() => {
       nav.navigate('feed');
     });
@@ -359,58 +352,36 @@
     {/if}
 
     {#if nav.currentPage !== 'onboarding'}
-      <div class="px-4 pt-4 transition-all duration-200 ease-out">
+      <div class="px-4 pb-4 pt-4">
         <nav
           aria-label="Main navigation"
-          class="flex items-center rounded-full border border-border-light bg-subtle-gray transition-[padding,gap,min-height] duration-200 ease-out {feedNavCompact
-            ? 'min-h-11 gap-0.5 p-0.5'
-            : denseNav
-              ? 'min-h-11 gap-0.5 p-0.5'
-              : 'min-h-12 gap-1 p-1'}"
+          data-testid="expandable-navigation"
+          class="flex min-h-10 w-full items-center gap-[clamp(0.25rem,1.5vw,0.5rem)]"
         >
           {#each visibleNavItems as item}
             <button
-              class="relative flex min-w-0 items-center justify-center rounded-full text-caption font-medium tracking-[0.08em] transition-[flex-basis,flex-grow,padding,gap,background-color,color,box-shadow] duration-200 ease-out active:scale-[0.985]
-          {feedNavCompact
-                ? nav.currentPage === item.page
-                  ? 'flex-1 gap-1.5 px-3 py-1.5'
-                  : 'basis-9 flex-none gap-0 px-0 py-1.5'
-                : denseNav
-                  ? nav.currentPage === item.page
-                    ? 'flex-1 gap-1.5 px-3 py-2'
-                    : 'basis-10 flex-none gap-0 px-0 py-2'
-                  : 'flex-1 basis-0 gap-2 px-3 py-3'}
-          {nav.currentPage === item.page
-                ? 'bg-surface-white text-text-primary shadow-subtle-2'
-                : 'text-text-subtle hover:bg-surface-white hover:text-text-primary'}"
+              class="relative flex h-10 min-w-0 items-center justify-center overflow-hidden rounded-full text-caption font-medium transition-[flex-basis,flex-grow,padding,gap,background-color,color,transform] duration-[180ms] ease-out active:scale-[0.985] motion-reduce:duration-0
+              {nav.currentPage === item.page
+                ? 'flex-1 basis-0 gap-2 bg-disabled-gray/45 px-3 text-text-primary'
+                : 'w-[clamp(2.25rem,10vw,2.75rem)] basis-auto flex-none gap-0 bg-subtle-gray px-0 text-text-subtle hover:bg-disabled-gray/35 hover:text-text-primary'}"
               aria-current={nav.currentPage === item.page ? 'page' : undefined}
               aria-label={item.ariaLabel ?? item.label}
               title={item.label}
               onclick={() => nav.navigate(item.page)}
             >
               <span class="shrink-0 transition-transform duration-200 ease-out">
-                <Icon name={item.icon as IconName} size={feedNavCompact || denseNav ? 13 : 16} />
+                <Icon name={item.icon as IconName} size={16} />
               </span>
               <span
-                class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-200 ease-out {(feedNavCompact &&
-                  nav.currentPage !== item.page) ||
-                (denseNav && nav.currentPage !== item.page)
-                  ? 'max-w-0 opacity-0 -translate-x-1'
-                  : 'max-w-24 opacity-100 translate-x-0'}">{item.label}</span
+                aria-hidden="true"
+                class="min-w-0 overflow-hidden whitespace-nowrap transition-[max-width,opacity,transform] duration-[180ms] ease-out motion-reduce:duration-0 {nav.currentPage ===
+                item.page
+                  ? 'max-w-36 translate-x-0 opacity-100'
+                  : 'max-w-0 -translate-x-1 opacity-0'}">{item.label}</span
               >
             </button>
           {/each}
         </nav>
-
-        <div
-          class="grid transition-[opacity,margin] duration-200 ease-out {feedNavCompact
-            ? 'mt-2 opacity-0 pointer-events-none'
-            : 'mt-3 opacity-100'}"
-        >
-          <div class="min-h-0 overflow-hidden flex justify-end">
-            <ConnectionIndicator />
-          </div>
-        </div>
       </div>
     {/if}
     <main class="relative flex-1 overflow-hidden">
@@ -459,8 +430,10 @@
         </div>
       {/if}
       <div
-        class="absolute inset-0 overflow-hidden"
-        class:hidden={nav.currentPage !== 'feed'}
+        data-testid="page-feed"
+        class="absolute inset-0 overflow-hidden transition-[transform,opacity] duration-[220ms] ease-out motion-reduce:duration-0 {pageSurfaceClass(
+          'feed'
+        )}"
         aria-hidden={nav.currentPage !== 'feed'}
         inert={nav.currentPage !== 'feed'}
       >
@@ -473,6 +446,7 @@
             <FeedPage
               onNavigateToOnboarding={nav.resetToOnboarding}
               onNavigateToProfile={() => nav.navigate('profile')}
+              active={nav.currentPage === 'feed'}
             />
           {:else}
             <div
@@ -564,9 +538,9 @@
       {#if TJMPage}
         <div
           data-testid="page-tjm"
-          class="absolute inset-0 overflow-y-auto"
-          class:invisible={nav.currentPage !== 'tjm'}
-          class:pointer-events-none={nav.currentPage !== 'tjm'}
+          class="absolute inset-0 overflow-y-auto transition-[transform,opacity] duration-[220ms] ease-out motion-reduce:duration-0 {pageSurfaceClass(
+            'tjm'
+          )}"
           aria-hidden={nav.currentPage !== 'tjm'}
           inert={nav.currentPage !== 'tjm'}
         >
@@ -601,9 +575,9 @@
       {#if ProfilePage}
         <div
           data-testid="page-profile"
-          class="absolute inset-0 overflow-y-auto"
-          class:invisible={nav.currentPage !== 'profile'}
-          class:pointer-events-none={nav.currentPage !== 'profile'}
+          class="absolute inset-0 overflow-y-auto transition-[transform,opacity] duration-[220ms] ease-out motion-reduce:duration-0 {pageSurfaceClass(
+            'profile'
+          )}"
           aria-hidden={nav.currentPage !== 'profile'}
           inert={nav.currentPage !== 'profile'}
         >
@@ -635,9 +609,9 @@
       {#if CvPage}
         <div
           data-testid="page-cv"
-          class="absolute inset-0 overflow-y-auto"
-          class:invisible={nav.currentPage !== 'cv'}
-          class:pointer-events-none={nav.currentPage !== 'cv'}
+          class="absolute inset-0 overflow-y-auto transition-[transform,opacity] duration-[220ms] ease-out motion-reduce:duration-0 {pageSurfaceClass(
+            'cv'
+          )}"
           aria-hidden={nav.currentPage !== 'cv'}
           inert={nav.currentPage !== 'cv'}
         >
@@ -669,9 +643,9 @@
       {#if ApplicationsPage}
         <div
           data-testid="page-applications"
-          class="absolute inset-0 overflow-y-auto"
-          class:invisible={nav.currentPage !== 'applications'}
-          class:pointer-events-none={nav.currentPage !== 'applications'}
+          class="absolute inset-0 overflow-y-auto transition-[transform,opacity] duration-[220ms] ease-out motion-reduce:duration-0 {pageSurfaceClass(
+            'applications'
+          )}"
           aria-hidden={nav.currentPage !== 'applications'}
           inert={nav.currentPage !== 'applications'}
         >
@@ -703,9 +677,9 @@
       {#if SettingsPage}
         <div
           data-testid="page-settings"
-          class="absolute inset-0 overflow-y-auto"
-          class:invisible={nav.currentPage !== 'settings'}
-          class:pointer-events-none={nav.currentPage !== 'settings'}
+          class="absolute inset-0 overflow-y-auto transition-[transform,opacity] duration-[220ms] ease-out motion-reduce:duration-0 {pageSurfaceClass(
+            'settings'
+          )}"
           aria-hidden={nav.currentPage !== 'settings'}
           inert={nav.currentPage !== 'settings'}
         >

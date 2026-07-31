@@ -28,7 +28,7 @@ vi.mock('../../../src/lib/shell/messaging/bridge', () => ({
   subscribeMessages,
 }));
 
-import { createAppNavigation } from '../../../src/lib/state/app-navigation.svelte';
+import { createAppNavigation, getPagePosition } from '../../../src/lib/state/app-navigation.svelte';
 import type { UserProfile } from '../../../src/lib/core/types/profile';
 
 function deferred<T>() {
@@ -158,5 +158,34 @@ describe('createAppNavigation bootstrap recovery', () => {
 
     expect(navigation.currentPage).toBe('feed');
     expect(navigation.hasCompletedOnboarding).toBe(true);
+  });
+
+  it('projects every page before, at, or after the active route deterministically', () => {
+    expect(getPagePosition('feed', 'feed')).toBe('current');
+    expect(getPagePosition('feed', 'applications')).toBe('before');
+    expect(getPagePosition('settings', 'applications')).toBe('after');
+    expect(getPagePosition('onboarding', 'feed')).toBe('before');
+  });
+
+  it('keeps the current route stable when its active pill is selected again', async () => {
+    const navigation = createAppNavigation();
+    await vi.waitFor(() => {
+      expect(navigation.bootStatus).toBe('ready');
+    });
+
+    navigation.navigate('applications');
+    expect(navigation.currentPage).toBe('applications');
+    expect(navigation.previousPage).toBe('feed');
+    expect(navigation.transitionDirection).toBe(1);
+
+    navigation.navigate('applications');
+    expect(navigation.currentPage).toBe('applications');
+    expect(navigation.previousPage).toBe('feed');
+    expect(navigation.transitionDirection).toBe(1);
+
+    navigation.navigate('profile');
+    expect(navigation.currentPage).toBe('profile');
+    expect(navigation.previousPage).toBe('applications');
+    expect(navigation.transitionDirection).toBe(-1);
   });
 });

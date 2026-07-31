@@ -111,13 +111,14 @@ describe('operational UI constraints', () => {
       "class=\"px-4 pt-4 focus:outline-none {page.arrivalStackVisible ? 'pb-40' : 'pb-28'}\""
     );
     expect(feedSource).not.toContain('class="flex-1 overflow-y-auto px-4 pb-5 pt-4"');
-    expect(appSource).toContain('class="absolute inset-0 overflow-hidden"');
+    expect(appSource).toContain(
+      'class="absolute inset-0 overflow-hidden transition-[transform,opacity]'
+    );
     expect(appSource).not.toContain(
       'class="absolute inset-0 overflow-y-auto"\n        class:hidden={nav.currentPage !=='
     );
-    expect(appSource).toContain(
-      "feedNavCompact = nav.currentPage === 'feed' && detail.scrollTop > 12"
-    );
+    expect(appSource).not.toContain('feedNavCompact');
+    expect(feedSource).toContain('if (scrollingDown && nextScrollTop > 12)');
     expect(appSource).not.toContain('detail.isScrolling && detail.scrollTop > 12');
   });
 
@@ -190,6 +191,18 @@ describe('operational UI constraints', () => {
     expect(source).not.toContain('const PREMIUM_LOCKS');
     expect(source).not.toContain('Premium verrouillé');
     expect(source).not.toContain('NAV_ITEMS.filter');
+  });
+
+  it('keeps the selected Missions and Suivi overview content above the operational detail', () => {
+    const feedSource = readFileSync('src/ui/pages/FeedPage.svelte', 'utf8');
+    const applicationsSource = readFileSync('src/ui/pages/ApplicationsPage.svelte', 'utf8');
+
+    expect(feedSource).toContain('data-testid="mission-overview"');
+    expect(feedSource).toContain('À voir');
+    expect(feedSource).toContain('Pour vous');
+    expect(applicationsSource).toContain('data-testid="application-activity-overview"');
+    expect(applicationsSource).toContain('Aujourd’hui');
+    expect(applicationsSource).toContain('Cette semaine');
   });
 
   it('limits Premium UI to multi-account and reviewed form assistance', () => {

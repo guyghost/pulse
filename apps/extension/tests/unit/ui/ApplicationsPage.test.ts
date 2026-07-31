@@ -146,8 +146,8 @@ describe('ApplicationsPage next-action toast', () => {
     await tick();
     await flush();
 
-    const missionButton = [...target.querySelectorAll('button')].find((button) =>
-      button.textContent?.includes('Mission Svelte')
+    const missionButton = [...target.querySelectorAll('[data-testid="tracked-mission-row"]')].find(
+      (button) => button.textContent?.includes('Mission Svelte')
     );
     expect(missionButton?.textContent).toContain('A');
     expect(missionButton?.textContent).not.toMatch(/\b80\b/);
