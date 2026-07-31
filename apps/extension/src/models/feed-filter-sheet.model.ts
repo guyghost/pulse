@@ -5,6 +5,7 @@ import type { FeedDecisionPresetId, FeedScoreBucket } from '$lib/core/types/feed
 export interface FeedFilterDraft {
   decisionPreset: FeedDecisionPresetId | null;
   selectedScoreBucket: FeedScoreBucket | null;
+  selectedTjmMin: number | null;
   selectedSource: MissionSource | null;
   selectedRemote: RemoteType | null;
   selectedSeniority: SeniorityLevel | null;
@@ -12,9 +13,7 @@ export interface FeedFilterDraft {
 }
 
 export type FeedFilterSheetState =
-  | { value: 'closed' }
-  | { value: 'editing'; baseline: FeedFilterDraft; draft: FeedFilterDraft }
-  | { value: 'disposed' };
+  { value: 'closed' } | { value: 'open'; filters: FeedFilterDraft } | { value: 'disposed' };
 
 export type FeedFilterSheetDismissReason = 'button' | 'scrim' | 'escape' | 'page-hidden';
 
@@ -22,17 +21,17 @@ export type FeedFilterSheetEvent =
   | { type: 'OPEN'; committed: FeedFilterDraft }
   | { type: 'TOGGLE_PRESET'; preset: FeedDecisionPresetId }
   | { type: 'SET_SCORE_BUCKET'; bucket: FeedScoreBucket | null }
+  | { type: 'SET_TJM_MIN'; tjmMin: number | null }
   | { type: 'SET_SOURCE'; source: MissionSource | null }
   | { type: 'SET_REMOTE'; remote: RemoteType | null }
   | { type: 'SET_SENIORITY'; seniority: SeniorityLevel | null }
   | { type: 'TOGGLE_STACK'; stack: string }
-  | { type: 'RESET_DRAFT' }
+  | { type: 'RESET_FILTERS' }
   | { type: 'DISMISS'; reason: FeedFilterSheetDismissReason }
-  | { type: 'APPLY' }
   | { type: 'DISPOSE' };
 
 export type FeedFilterSheetCommand =
-  { type: 'NONE' } | { type: 'COMMIT_FILTERS'; filters: FeedFilterDraft };
+  { type: 'NONE' } | { type: 'SYNC_FILTERS'; filters: FeedFilterDraft };
 
 export interface FeedFilterSheetTransition {
   state: FeedFilterSheetState;
@@ -45,6 +44,7 @@ export function emptyFeedFilterDraft(): FeedFilterDraft {
   return {
     decisionPreset: null,
     selectedScoreBucket: null,
+    selectedTjmMin: null,
     selectedSource: null,
     selectedRemote: null,
     selectedSeniority: null,
@@ -65,12 +65,13 @@ function stay(state: FeedFilterSheetState): FeedFilterSheetTransition {
 }
 
 function updateDraft(
-  state: Extract<FeedFilterSheetState, { value: 'editing' }>,
+  state: Extract<FeedFilterSheetState, { value: 'open' }>,
   draft: FeedFilterDraft
 ): FeedFilterSheetTransition {
+  const filters = cloneFeedFilterDraft(draft);
   return {
-    state: { ...state, draft: cloneFeedFilterDraft(draft) },
-    command: NONE,
+    state: { value: 'open', filters },
+    command: { type: 'SYNC_FILTERS', filters: cloneFeedFilterDraft(filters) },
   };
 }
 
@@ -91,9 +92,9 @@ export function transitionFeedFilterSheet(
       return stay(state);
     }
 
-    const baseline = cloneFeedFilterDraft(event.committed);
+    const filters = cloneFeedFilterDraft(event.committed);
     return {
-      state: { value: 'editing', baseline, draft: cloneFeedFilterDraft(baseline) },
+      state: { value: 'open', filters },
       command: NONE,
     };
   }
@@ -102,56 +103,67 @@ export function transitionFeedFilterSheet(
     case 'OPEN':
       return stay(state);
     case 'TOGGLE_PRESET': {
-      const decisionPreset = state.draft.decisionPreset === event.preset ? null : event.preset;
-      const draft: FeedFilterDraft = { ...state.draft, decisionPreset };
+      const decisionPreset = state.filters.decisionPreset === event.preset ? null : event.preset;
+      const draft: FeedFilterDraft = { ...state.filters, decisionPreset };
       if (decisionPreset === 'priority') {
         draft.selectedScoreBucket = null;
       }
       if (decisionPreset === 'remote-compatible') {
         draft.selectedRemote = null;
       }
+      if (decisionPreset === 'tjm-negotiation') {
+        draft.selectedTjmMin = null;
+      }
       return updateDraft(state, draft);
     }
     case 'SET_SCORE_BUCKET':
       return updateDraft(state, {
-        ...state.draft,
+        ...state.filters,
         selectedScoreBucket: event.bucket,
         decisionPreset:
-          event.bucket !== null && state.draft.decisionPreset === 'priority'
+          event.bucket !== null && state.filters.decisionPreset === 'priority'
             ? null
-            : state.draft.decisionPreset,
+            : state.filters.decisionPreset,
       });
+    case 'SET_TJM_MIN': {
+      if (event.tjmMin !== null && (!Number.isFinite(event.tjmMin) || event.tjmMin <= 0)) {
+        return stay(state);
+      }
+      return updateDraft(state, {
+        ...state.filters,
+        selectedTjmMin: event.tjmMin === null ? null : Math.round(event.tjmMin),
+        decisionPreset:
+          event.tjmMin !== null && state.filters.decisionPreset === 'tjm-negotiation'
+            ? null
+            : state.filters.decisionPreset,
+      });
+    }
     case 'SET_SOURCE':
-      return updateDraft(state, { ...state.draft, selectedSource: event.source });
+      return updateDraft(state, { ...state.filters, selectedSource: event.source });
     case 'SET_REMOTE':
       return updateDraft(state, {
-        ...state.draft,
+        ...state.filters,
         selectedRemote: event.remote,
         decisionPreset:
-          event.remote !== null && state.draft.decisionPreset === 'remote-compatible'
+          event.remote !== null && state.filters.decisionPreset === 'remote-compatible'
             ? null
-            : state.draft.decisionPreset,
+            : state.filters.decisionPreset,
       });
     case 'SET_SENIORITY':
-      return updateDraft(state, { ...state.draft, selectedSeniority: event.seniority });
+      return updateDraft(state, { ...state.filters, selectedSeniority: event.seniority });
     case 'TOGGLE_STACK': {
       const stack = event.stack.trim();
       if (!stack) {
         return stay(state);
       }
-      const selectedStacks = state.draft.selectedStacks.includes(stack)
-        ? state.draft.selectedStacks.filter((candidate) => candidate !== stack)
-        : [...state.draft.selectedStacks, stack];
-      return updateDraft(state, { ...state.draft, selectedStacks });
+      const selectedStacks = state.filters.selectedStacks.includes(stack)
+        ? state.filters.selectedStacks.filter((candidate) => candidate !== stack)
+        : [...state.filters.selectedStacks, stack];
+      return updateDraft(state, { ...state.filters, selectedStacks });
     }
-    case 'RESET_DRAFT':
+    case 'RESET_FILTERS':
       return updateDraft(state, emptyFeedFilterDraft());
     case 'DISMISS':
       return { state: { value: 'closed' }, command: NONE };
-    case 'APPLY':
-      return {
-        state: { value: 'closed' },
-        command: { type: 'COMMIT_FILTERS', filters: cloneFeedFilterDraft(state.draft) },
-      };
   }
 }

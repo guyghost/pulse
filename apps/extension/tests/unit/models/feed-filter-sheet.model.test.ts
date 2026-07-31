@@ -7,64 +7,62 @@ import {
   type FeedFilterSheetState,
 } from '../../../src/models/feed-filter-sheet.model';
 
-function open(draft: FeedFilterDraft = emptyFeedFilterDraft()): FeedFilterSheetState {
+function open(filters: FeedFilterDraft = emptyFeedFilterDraft()): FeedFilterSheetState {
   return transitionFeedFilterSheet(createFeedFilterSheetState(), {
     type: 'OPEN',
-    committed: draft,
+    committed: filters,
   }).state;
 }
 
-describe('feed filter sheet model', () => {
-  it('copies committed filters into an isolated draft', () => {
+describe('feed filter grid model', () => {
+  it('copies committed filters into an isolated open snapshot', () => {
     const committed = { ...emptyFeedFilterDraft(), selectedStacks: ['Svelte'] };
     const state = open(committed);
 
-    expect(state.value).toBe('editing');
-    if (state.value !== 'editing') {
+    expect(state.value).toBe('open');
+    if (state.value !== 'open') {
       return;
     }
 
-    expect(state.draft).toEqual(committed);
-    expect(state.draft).not.toBe(committed);
-    expect(state.draft.selectedStacks).not.toBe(committed.selectedStacks);
-    expect(state.baseline.selectedStacks).not.toBe(state.draft.selectedStacks);
+    expect(state.filters).toEqual(committed);
+    expect(state.filters).not.toBe(committed);
+    expect(state.filters.selectedStacks).not.toBe(committed.selectedStacks);
   });
 
-  it('edits locally and emits exactly one copied commit on apply', () => {
-    let state = open();
-    state = transitionFeedFilterSheet(state, {
+  it('emits one copied live sync for every accepted filter edit', () => {
+    const sourceTransition = transitionFeedFilterSheet(open(), {
       type: 'SET_SOURCE',
       source: 'free-work',
-    }).state;
-    state = transitionFeedFilterSheet(state, { type: 'TOGGLE_STACK', stack: 'Java' }).state;
-
-    const applied = transitionFeedFilterSheet(state, { type: 'APPLY' });
-    expect(applied.state).toEqual({ value: 'closed' });
-    expect(applied.command).toEqual({
-      type: 'COMMIT_FILTERS',
-      filters: {
-        ...emptyFeedFilterDraft(),
-        selectedSource: 'free-work',
-        selectedStacks: ['Java'],
-      },
     });
-    if (applied.command.type === 'COMMIT_FILTERS' && state.value === 'editing') {
-      expect(applied.command.filters.selectedStacks).not.toBe(state.draft.selectedStacks);
+
+    expect(sourceTransition.state).toEqual({
+      value: 'open',
+      filters: { ...emptyFeedFilterDraft(), selectedSource: 'free-work' },
+    });
+    expect(sourceTransition.command).toEqual({
+      type: 'SYNC_FILTERS',
+      filters: { ...emptyFeedFilterDraft(), selectedSource: 'free-work' },
+    });
+
+    if (
+      sourceTransition.state.value === 'open' &&
+      sourceTransition.command.type === 'SYNC_FILTERS'
+    ) {
+      expect(sourceTransition.command.filters).not.toBe(sourceTransition.state.filters);
+      expect(sourceTransition.command.filters.selectedStacks).not.toBe(
+        sourceTransition.state.filters.selectedStacks
+      );
     }
-
-    expect(transitionFeedFilterSheet(applied.state, { type: 'APPLY' }).command).toEqual({
-      type: 'NONE',
-    });
   });
 
   it.each(['button', 'scrim', 'escape', 'page-hidden'] as const)(
-    'discards the draft when dismissed by %s',
+    'closes without a duplicate sync when dismissed by %s',
     (reason) => {
-      const editing = transitionFeedFilterSheet(open(), {
+      const edited = transitionFeedFilterSheet(open(), {
         type: 'SET_REMOTE',
         remote: 'full',
       }).state;
-      const dismissed = transitionFeedFilterSheet(editing, { type: 'DISMISS', reason });
+      const dismissed = transitionFeedFilterSheet(edited, { type: 'DISMISS', reason });
 
       expect(dismissed.state).toEqual({ value: 'closed' });
       expect(dismissed.command).toEqual({ type: 'NONE' });
@@ -72,8 +70,7 @@ describe('feed filter sheet model', () => {
   );
 
   it('normalizes conflicting preset and explicit filter authorities', () => {
-    let state = open();
-    state = transitionFeedFilterSheet(state, {
+    let state = transitionFeedFilterSheet(open(), {
       type: 'TOGGLE_PRESET',
       preset: 'priority',
     }).state;
@@ -82,7 +79,7 @@ describe('feed filter sheet model', () => {
       bucket: 'strong',
     }).state;
 
-    expect(state.value === 'editing' ? state.draft.decisionPreset : 'closed').toBeNull();
+    expect(state.value === 'open' ? state.filters.decisionPreset : 'closed').toBeNull();
 
     state = transitionFeedFilterSheet(state, {
       type: 'TOGGLE_PRESET',
@@ -90,36 +87,70 @@ describe('feed filter sheet model', () => {
     }).state;
     state = transitionFeedFilterSheet(state, { type: 'SET_REMOTE', remote: 'hybrid' }).state;
 
-    if (state.value !== 'editing') {
-      throw new Error('expected editing');
+    if (state.value !== 'open') {
+      throw new Error('expected open');
     }
-    expect(state.draft.decisionPreset).toBeNull();
-    expect(state.draft.selectedRemote).toBe('hybrid');
+    expect(state.filters.decisionPreset).toBeNull();
+    expect(state.filters.selectedRemote).toBe('hybrid');
+
+    state = transitionFeedFilterSheet(state, {
+      type: 'TOGGLE_PRESET',
+      preset: 'tjm-negotiation',
+    }).state;
+    state = transitionFeedFilterSheet(state, { type: 'SET_TJM_MIN', tjmMin: 500 }).state;
+
+    if (state.value !== 'open') {
+      throw new Error('expected open');
+    }
+    expect(state.filters.decisionPreset).toBeNull();
+    expect(state.filters.selectedTjmMin).toBe(500);
   });
 
-  it('keeps stacks unique, ignores blank values, and resets only the draft', () => {
+  it('rejects invalid TJM minimum values and rounds accepted values', () => {
+    const invalid = transitionFeedFilterSheet(open(), { type: 'SET_TJM_MIN', tjmMin: -1 });
+    const accepted = transitionFeedFilterSheet(invalid.state, {
+      type: 'SET_TJM_MIN',
+      tjmMin: 499.6,
+    });
+
+    expect(invalid.command).toEqual({ type: 'NONE' });
+    expect(accepted.state.value === 'open' ? accepted.state.filters.selectedTjmMin : null).toBe(
+      500
+    );
+    expect(accepted.command).toEqual({
+      type: 'SYNC_FILTERS',
+      filters: { ...emptyFeedFilterDraft(), selectedTjmMin: 500 },
+    });
+  });
+
+  it('keeps stacks unique, ignores blank values, and syncs reset', () => {
     let state = open({ ...emptyFeedFilterDraft(), selectedSource: 'free-work' });
     state = transitionFeedFilterSheet(state, { type: 'TOGGLE_STACK', stack: ' Java ' }).state;
     state = transitionFeedFilterSheet(state, { type: 'TOGGLE_STACK', stack: 'Java' }).state;
-    state = transitionFeedFilterSheet(state, { type: 'TOGGLE_STACK', stack: '   ' }).state;
-    state = transitionFeedFilterSheet(state, { type: 'RESET_DRAFT' }).state;
+    const blank = transitionFeedFilterSheet(state, { type: 'TOGGLE_STACK', stack: '   ' });
+    const reset = transitionFeedFilterSheet(blank.state, { type: 'RESET_FILTERS' });
 
-    if (state.value !== 'editing') {
-      throw new Error('expected editing');
-    }
-    expect(state.draft).toEqual(emptyFeedFilterDraft());
-    expect(state.baseline.selectedSource).toBe('free-work');
+    expect(blank.command).toEqual({ type: 'NONE' });
+    expect(reset.state).toEqual({ value: 'open', filters: emptyFeedFilterDraft() });
+    expect(reset.command).toEqual({ type: 'SYNC_FILTERS', filters: emptyFeedFilterDraft() });
   });
 
-  it('ignores duplicate opens and becomes terminal after disposal', () => {
-    const editing = open({ ...emptyFeedFilterDraft(), selectedSource: 'free-work' });
-    const duplicate = transitionFeedFilterSheet(editing, {
+  it('ignores edits while closed, ignores duplicate opens, and becomes terminal after disposal', () => {
+    const closedEdit = transitionFeedFilterSheet(createFeedFilterSheetState(), {
+      type: 'SET_SOURCE',
+      source: 'free-work',
+    });
+    expect(closedEdit.state).toEqual({ value: 'closed' });
+    expect(closedEdit.command).toEqual({ type: 'NONE' });
+
+    const opened = open({ ...emptyFeedFilterDraft(), selectedSource: 'free-work' });
+    const duplicate = transitionFeedFilterSheet(opened, {
       type: 'OPEN',
       committed: { ...emptyFeedFilterDraft(), selectedSource: 'malt' },
     });
-    expect(duplicate.state).toEqual(editing);
+    expect(duplicate.state).toEqual(opened);
 
-    const disposed = transitionFeedFilterSheet(editing, { type: 'DISPOSE' });
+    const disposed = transitionFeedFilterSheet(opened, { type: 'DISPOSE' });
     expect(disposed.state).toEqual({ value: 'disposed' });
     expect(
       transitionFeedFilterSheet(disposed.state, {

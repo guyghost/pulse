@@ -1,10 +1,9 @@
 <script lang="ts">
   import { tick } from 'svelte';
-  import { fade, fly } from 'svelte/transition';
+  import { fade } from 'svelte/transition';
   import { cubicOut } from 'svelte/easing';
   import { Icon, type IconName } from '@pulse/ui';
-  import type { MissionSource, RemoteType } from '$lib/core/types/mission';
-  import type { SeniorityLevel } from '$lib/core/types/profile';
+  import type { MissionSource } from '$lib/core/types/mission';
   import type { FeedDecisionPresetId, FeedScoreBucket } from '$lib/core/types/feed-view';
   import type {
     FeedFilterDraft,
@@ -12,365 +11,301 @@
     FeedFilterSheetEvent,
   } from '../../models/feed-filter-sheet.model';
 
-  type DraftEvent = Exclude<
-    FeedFilterSheetEvent,
-    { type: 'OPEN' | 'DISMISS' | 'APPLY' | 'DISPOSE' }
-  >;
+  type FilterEvent = Exclude<FeedFilterSheetEvent, { type: 'OPEN' | 'DISMISS' | 'DISPOSE' }>;
 
   type SourceOption = { value: MissionSource; label: string };
-  type PresetOption = {
-    value: FeedDecisionPresetId;
+  type QuickFilter = {
+    id: 'priority' | 'remote' | 'new';
     label: string;
     icon: IconName;
+    active: boolean;
+    onSelect: () => void;
   };
-
-  const presets: PresetOption[] = [
-    { value: 'priority', label: 'Prioritaires', icon: 'target' },
-    { value: 'remote-compatible', label: 'Remote', icon: 'wifi' },
-    { value: 'new', label: 'Nouvelles', icon: 'sparkles' },
-  ];
-
-  const scoreOptions: { value: FeedScoreBucket | null; label: string }[] = [
-    { value: null, label: 'Toutes' },
-    { value: 'strong', label: 'A' },
-    { value: 'good', label: 'B' },
-    { value: 'weak', label: 'C' },
-  ];
-
-  const remoteOptions: { value: RemoteType | null; label: string }[] = [
-    { value: null, label: 'Tous' },
-    { value: 'full', label: 'Remote' },
-    { value: 'hybrid', label: 'Hybride' },
-    { value: 'onsite', label: 'Sur site' },
-  ];
-
-  const seniorityOptions: { value: SeniorityLevel | null; label: string }[] = [
-    { value: null, label: 'Tous' },
-    { value: 'junior', label: 'Junior' },
-    { value: 'confirmed', label: 'Confirmé' },
-    { value: 'senior', label: 'Senior' },
-  ];
 
   const {
     draft,
     visibleCount,
-    availableStacks = [],
     sources = [],
+    tjmTarget = null,
     onEdit,
     onDismiss,
-    onApply,
   }: {
     draft: FeedFilterDraft;
     visibleCount: number;
-    availableStacks?: string[];
     sources?: SourceOption[];
-    onEdit: (event: DraftEvent) => void;
+    tjmTarget?: number | null;
+    onEdit: (event: FilterEvent) => void;
     onDismiss: (reason: FeedFilterSheetDismissReason) => void;
-    onApply: () => void;
   } = $props();
 
-  let closeButton = $state<HTMLButtonElement | null>(null);
-  let expandedSection = $state<'score' | 'source' | 'advanced' | null>(null);
-  const visibleStacks = $derived.by(() => {
-    const pinned = draft.selectedStacks.filter((stack) => availableStacks.includes(stack));
-    return [...new Set([...pinned, ...availableStacks])].slice(0, 8);
+  let panel = $state<HTMLElement | null>(null);
+  const prefersReducedMotion =
+    typeof window !== 'undefined' && window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+  const motionDuration = prefersReducedMotion ? 0 : 360;
+  const scrimDuration = prefersReducedMotion ? 0 : 150;
+
+  const tjmOptions = $derived.by(() => {
+    const target = tjmTarget && tjmTarget > 0 ? Math.round(tjmTarget / 50) * 50 : 500;
+    return [
+      ...new Set([500, Math.max(300, target - 100), target, target + 100, target + 200]),
+    ].sort((left, right) => left - right);
   });
-  const scoreLabel = $derived(
-    draft.selectedScoreBucket === 'strong'
-      ? '80 % et plus'
-      : draft.selectedScoreBucket === 'good'
-        ? '60 % et plus'
-        : draft.selectedScoreBucket === 'weak'
-          ? 'Toutes les notes'
-          : 'Toutes'
-  );
-  const sourceLabel = $derived(
-    sources.find((source) => source.value === draft.selectedSource)?.label ?? 'Toutes'
-  );
-  const advancedCount = $derived(
-    Number(draft.selectedRemote !== null) +
-      Number(draft.selectedSeniority !== null) +
-      draft.selectedStacks.length
-  );
+  const quickFilters = $derived.by<QuickFilter[]>(() => [
+    {
+      id: 'priority',
+      label: 'Prioritaires',
+      icon: 'star',
+      active: draft.decisionPreset === 'priority',
+      onSelect: () => togglePreset('priority'),
+    },
+    {
+      id: 'remote',
+      label: 'Remote',
+      icon: 'wifi',
+      active: draft.decisionPreset === 'remote-compatible',
+      onSelect: () => togglePreset('remote-compatible'),
+    },
+    {
+      id: 'new',
+      label: 'Nouvelles',
+      icon: 'sparkles',
+      active: draft.decisionPreset === 'new',
+      onSelect: () => togglePreset('new'),
+    },
+  ]);
 
   $effect(() => {
-    void tick().then(() => closeButton?.focus());
+    void tick().then(() => panel?.focus());
   });
+
+  function genie(
+    _node: Element,
+    { duration = motionDuration }: { duration?: number } = {}
+  ): {
+    duration: number;
+    easing: typeof cubicOut;
+    css: (t: number, u: number) => string;
+  } {
+    return {
+      duration,
+      easing: cubicOut,
+      css: (t, u) => {
+        const scaleX = 0.18 + 0.82 * t;
+        const scaleY = 0.06 + 0.94 * t;
+        const translateY = u * 54;
+        const translateX = u * -8;
+        const blur = u * 1.2;
+        return `opacity:${Math.min(1, t * 1.35)};transform:translate3d(${translateX}px,${translateY}px,0) scale(${scaleX},${scaleY});filter:blur(${blur}px);`;
+      },
+    };
+  }
 
   function togglePreset(preset: FeedDecisionPresetId): void {
     onEdit({ type: 'TOGGLE_PRESET', preset });
   }
 
-  function setScoreBucket(bucket: FeedScoreBucket | null): void {
+  function handleScoreChange(event: Event): void {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    const bucket: FeedScoreBucket | null =
+      value === 'strong' || value === 'good' || value === 'weak' ? value : null;
     onEdit({ type: 'SET_SCORE_BUCKET', bucket });
   }
 
-  function setRemote(remote: RemoteType | null): void {
-    onEdit({ type: 'SET_REMOTE', remote });
+  function handleTjmChange(event: Event): void {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    onEdit({ type: 'SET_TJM_MIN', tjmMin: value ? Number(value) : null });
   }
 
-  function setSource(source: MissionSource | null): void {
+  function handleSourceChange(event: Event): void {
+    const value = (event.currentTarget as HTMLSelectElement).value;
+    const source = sources.find((option) => option.value === value)?.value ?? null;
     onEdit({ type: 'SET_SOURCE', source });
-  }
-
-  function setSeniority(seniority: SeniorityLevel | null): void {
-    onEdit({ type: 'SET_SENIORITY', seniority });
-  }
-
-  function toggleSection(section: 'score' | 'source' | 'advanced'): void {
-    expandedSection = expandedSection === section ? null : section;
   }
 </script>
 
-<div class="absolute inset-0 z-50" data-testid="feed-filter-sheet-layer">
+<div class="pointer-events-none absolute inset-0 z-50" data-testid="feed-filter-sheet-layer">
   <button
     type="button"
-    class="absolute inset-0 cursor-default bg-text-primary/18 backdrop-blur-[1px]"
-    aria-label="Fermer les filtres sans appliquer"
+    class="pointer-events-auto absolute inset-x-0 bottom-[5.75rem] top-0 cursor-default bg-text-primary/16 backdrop-blur-[1px]"
+    aria-label="Fermer les filtres"
     onclick={() => onDismiss('scrim')}
-    transition:fade={{ duration: 150 }}
+    transition:fade={{ duration: scrimDuration }}
   ></button>
 
   <section
+    bind:this={panel}
     id="filter-panel"
-    class="absolute inset-x-0 bottom-0 flex max-h-[35%] flex-col overflow-hidden rounded-t-[1.5rem] border border-border-light bg-surface-white shadow-2xl"
+    class="genie-panel pointer-events-auto absolute inset-x-9 bottom-[6.75rem] flex max-h-[calc(100%-8rem)] origin-[2.3rem_calc(100%+5rem)] flex-col overflow-visible rounded-[1.5rem] border border-border-light bg-surface-white/98 px-5 pb-4 pt-4 outline-none shadow-[0_22px_58px_rgba(28,25,23,0.24)] backdrop-blur-xl"
     role="group"
-    aria-label="Options de filtrage"
+    aria-label="Options de filtrage en direct"
     aria-labelledby="filter-sheet-title"
-    transition:fly={{ y: 28, duration: 190, easing: cubicOut }}
+    tabindex="-1"
+    transition:genie={{ duration: motionDuration }}
   >
-    <div class="shrink-0 px-4 pb-1.5 pt-1.5">
-      <div class="mx-auto h-1 w-9 rounded-full bg-disabled-gray" aria-hidden="true"></div>
-      <div class="mt-1 flex items-center justify-between gap-3">
-        <h2 id="filter-sheet-title" class="text-heading font-semibold text-text-primary">
-          Filtrer les missions
-        </h2>
-        <button
-          bind:this={closeButton}
-          type="button"
-          class="inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full border border-border-light bg-surface-white text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
-          aria-label="Masquer les filtres"
-          onclick={() => onDismiss('button')}
-        >
-          <Icon name="x" size={16} />
-        </button>
-      </div>
+    <span class="genie-tail" aria-hidden="true"></span>
 
-      <div class="mt-1.5 grid grid-cols-3 gap-2" aria-label="Filtres rapides">
-        {#each presets as preset (preset.value)}
-          <button
-            type="button"
-            class="inline-flex min-h-8 items-center justify-center gap-1.5 rounded-xl border px-2 text-caption font-medium transition-colors {draft.decisionPreset ===
-            preset.value
-              ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-              : 'border-border-light bg-page-canvas text-text-secondary hover:bg-subtle-gray'}"
-            aria-pressed={draft.decisionPreset === preset.value}
-            onclick={() => togglePreset(preset.value)}
-          >
-            <Icon name={preset.icon} size={13} />
-            <span class="truncate">{preset.label}</span>
-          </button>
-        {/each}
-      </div>
-    </div>
-
-    <div
-      class="min-h-0 flex-1 overflow-y-auto border-t border-border-light bg-page-canvas/55 px-4 py-1"
-    >
-      <div class="overflow-hidden rounded-2xl border border-border-light bg-surface-white">
-        <button
-          type="button"
-          class="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left text-body font-medium text-text-secondary transition-colors hover:bg-subtle-gray/60"
-          aria-expanded={expandedSection === 'score'}
-          onclick={() => toggleSection('score')}
-        >
-          <span class="flex items-center gap-2">
-            <Icon name="star" size={14} />
-            Note minimale
-          </span>
-          <span class="flex items-center gap-2 text-text-muted">
-            {scoreLabel}
-            <Icon
-              name="chevron-down"
-              size={13}
-              class={expandedSection === 'score' ? 'rotate-180' : ''}
-            />
-          </span>
-        </button>
-
-        {#if expandedSection === 'score'}
-          <fieldset class="border-t border-border-light bg-page-canvas/60 px-3 py-2.5">
-            <legend class="sr-only">Filtrer par note</legend>
-            <div class="flex flex-wrap gap-1.5">
-              {#each scoreOptions as option (option.label)}
-                <button
-                  type="button"
-                  class="min-w-12 rounded-lg border px-2.5 py-1.5 text-caption font-medium transition-colors {draft.selectedScoreBucket ===
-                  option.value
-                    ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                    : 'border-border-light bg-page-canvas text-text-subtle hover:text-text-primary'}"
-                  aria-pressed={draft.selectedScoreBucket === option.value}
-                  onclick={() => setScoreBucket(option.value)}>{option.label}</button
-                >
-              {/each}
-            </div>
-          </fieldset>
-        {/if}
-
-        <div class="h-px bg-border-light"></div>
-        <button
-          type="button"
-          class="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left text-body font-medium text-text-secondary transition-colors hover:bg-subtle-gray/60"
-          aria-pressed={draft.decisionPreset === 'tjm-negotiation'}
-          onclick={() => togglePreset('tjm-negotiation')}
-        >
-          <span class="flex items-center gap-2">
-            <Icon name="badge-euro" size={14} />
-            TJM minimum
-          </span>
-          <span class="flex items-center gap-2 text-text-muted">
-            {draft.decisionPreset === 'tjm-negotiation' ? 'À négocier' : 'Tous'}
-            <Icon name="chevron-down" size={13} />
-          </span>
-        </button>
-
-        <div class="h-px bg-border-light"></div>
-        <button
-          type="button"
-          class="flex min-h-10 w-full items-center justify-between gap-3 px-3 py-2 text-left text-body font-medium text-text-secondary transition-colors hover:bg-subtle-gray/60"
-          aria-expanded={expandedSection === 'source'}
-          onclick={() => toggleSection('source')}
-        >
-          <span class="flex items-center gap-2">
-            <Icon name="database" size={14} />
-            Sources
-          </span>
-          <span class="flex items-center gap-2 text-text-muted">
-            {sourceLabel}
-            <Icon
-              name="chevron-down"
-              size={13}
-              class={expandedSection === 'source' ? 'rotate-180' : ''}
-            />
-          </span>
-        </button>
-
-        {#if expandedSection === 'source'}
-          <fieldset class="border-t border-border-light bg-page-canvas/60 px-3 py-2.5">
-            <legend class="sr-only">Choisir les sources</legend>
-            <div class="flex flex-wrap gap-1.5">
-              <button
-                type="button"
-                class="rounded-lg border px-2.5 py-1.5 text-caption font-medium transition-colors {draft.selectedSource ===
-                null
-                  ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                  : 'border-border-light bg-page-canvas text-text-subtle hover:text-text-primary'}"
-                aria-pressed={draft.selectedSource === null}
-                onclick={() => setSource(null)}>Toutes</button
-              >
-              {#each sources as source (source.value)}
-                <button
-                  type="button"
-                  class="rounded-lg border px-2.5 py-1.5 text-caption font-medium transition-colors {draft.selectedSource ===
-                  source.value
-                    ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                    : 'border-border-light bg-page-canvas text-text-subtle hover:text-text-primary'}"
-                  aria-pressed={draft.selectedSource === source.value}
-                  onclick={() => setSource(source.value)}>{source.label}</button
-                >
-              {/each}
-            </div>
-          </fieldset>
-        {/if}
-
-        {#if expandedSection === 'advanced'}
-          <div class="space-y-3 border-t border-border-light bg-page-canvas/60 px-3 py-3">
-            <fieldset>
-              <legend class="mb-2 text-caption font-medium text-text-secondary"
-                >Mode de travail</legend
-              >
-              <div class="flex flex-wrap gap-1.5">
-                {#each remoteOptions as option (option.label)}
-                  <button
-                    type="button"
-                    class="rounded-lg border px-2.5 py-1.5 text-caption font-medium transition-colors {draft.selectedRemote ===
-                    option.value
-                      ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                      : 'border-border-light bg-page-canvas text-text-subtle hover:text-text-primary'}"
-                    aria-pressed={draft.selectedRemote === option.value}
-                    onclick={() => setRemote(option.value)}>{option.label}</button
-                  >
-                {/each}
-              </div>
-            </fieldset>
-
-            <fieldset>
-              <legend class="mb-2 text-caption font-medium text-text-secondary">Séniorité</legend>
-              <div class="flex flex-wrap gap-1.5">
-                {#each seniorityOptions as option (option.label)}
-                  <button
-                    type="button"
-                    class="rounded-lg border px-2.5 py-1.5 text-caption font-medium transition-colors {draft.selectedSeniority ===
-                    option.value
-                      ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                      : 'border-border-light bg-page-canvas text-text-subtle hover:text-text-primary'}"
-                    aria-pressed={draft.selectedSeniority === option.value}
-                    onclick={() => setSeniority(option.value)}>{option.label}</button
-                  >
-                {/each}
-              </div>
-            </fieldset>
-
-            {#if visibleStacks.length > 0}
-              <fieldset>
-                <legend class="mb-2 text-caption font-medium text-text-secondary"
-                  >Technologies</legend
-                >
-                <div class="flex flex-wrap gap-1.5">
-                  {#each visibleStacks as stack (stack)}
-                    <button
-                      type="button"
-                      class="rounded-lg border px-2.5 py-1.5 text-caption font-medium transition-colors {draft.selectedStacks.includes(
-                        stack
-                      )
-                        ? 'border-blueprint-blue/25 bg-blueprint-blue/8 text-blueprint-blue'
-                        : 'border-border-light bg-page-canvas text-text-subtle hover:text-text-primary'}"
-                      aria-pressed={draft.selectedStacks.includes(stack)}
-                      onclick={() => onEdit({ type: 'TOGGLE_STACK', stack })}>{stack}</button
-                    >
-                  {/each}
-                </div>
-              </fieldset>
-            {/if}
-          </div>
-        {/if}
-      </div>
-    </div>
-
-    <footer class="shrink-0 border-t border-border-light bg-surface-white px-4 pb-1.5 pt-1">
-      <div class="flex items-center justify-center gap-4">
-        <button
-          type="button"
-          class="py-1 text-caption font-medium text-text-subtle"
-          aria-expanded={expandedSection === 'advanced'}
-          onclick={() => toggleSection('advanced')}
-        >
-          Plus de critères{advancedCount > 0 ? ` (${advancedCount})` : ''}
-        </button>
-        <span class="h-3 w-px bg-border-light" aria-hidden="true"></span>
-        <button
-          type="button"
-          class="py-1 text-caption font-medium text-blueprint-blue"
-          onclick={() => onEdit({ type: 'RESET_DRAFT' })}>Réinitialiser</button
-        >
-      </div>
+    <div class="relative z-10 flex items-center justify-between gap-3">
+      <h2 id="filter-sheet-title" class="text-[1rem] font-semibold text-text-primary">
+        Filtrer les missions
+      </h2>
       <button
         type="button"
-        class="flex min-h-9 w-full items-center justify-center rounded-xl bg-blueprint-blue-strong px-4 py-1.5 text-body font-semibold text-white transition-colors hover:bg-blueprint-blue-strong/90"
-        onclick={onApply}
+        class="soft-ring inline-flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-text-subtle transition-colors hover:bg-subtle-gray hover:text-text-primary"
+        aria-label="Fermer les filtres"
+        onclick={() => onDismiss('button')}
       >
-        Afficher {visibleCount} mission{visibleCount > 1 ? 's' : ''}
+        <Icon name="x" size={20} />
+      </button>
+    </div>
+
+    <div class="relative z-10 mt-3 grid grid-cols-3 gap-2" aria-label="Filtres rapides">
+      {#each quickFilters as filter (filter.id)}
+        <button
+          type="button"
+          class="flex min-h-11 min-w-0 items-center justify-center gap-1 rounded-full border px-1 py-2 text-center outline-none transition-[background-color,border-color,color,transform] duration-200 focus-visible:ring-2 focus-visible:ring-blueprint-blue/35 focus-visible:ring-offset-2 active:scale-[0.97] {filter.active
+            ? 'border-blueprint-blue/45 bg-blueprint-blue/[0.08] text-blueprint-blue shadow-[inset_0_0_0_1px_rgba(11,100,233,0.08)]'
+            : 'border-border-light bg-page-canvas/65 text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+          aria-pressed={filter.active}
+          onclick={filter.onSelect}
+        >
+          <Icon name={filter.icon} size={15} class={filter.active ? 'text-blueprint-blue' : ''} />
+          <span
+            class="max-w-full truncate text-[0.5625rem] font-medium tracking-[-0.015em] min-[400px]:text-[0.625rem]"
+            >{filter.label}</span
+          >
+        </button>
+      {/each}
+    </div>
+
+    <div class="relative z-10 mt-4 divide-y divide-border-light border-y border-border-light">
+      <label class="grid min-h-14 grid-cols-[1.75rem_1fr_7.25rem] items-center gap-2 py-2">
+        <Icon name="star" size={20} class="text-text-subtle" />
+        <span class="text-caption font-medium text-text-primary">Note minimale</span>
+        <span class="relative min-w-0">
+          <select
+            class="soft-ring h-10 w-full appearance-none rounded-xl border border-border-light bg-surface-white px-3 pr-8 text-caption text-text-primary"
+            aria-label="Note minimale"
+            value={draft.selectedScoreBucket ?? ''}
+            onchange={handleScoreChange}
+          >
+            <option value="">Toutes</option>
+            <option value="strong">A</option>
+            <option value="good">B</option>
+            <option value="weak">C</option>
+          </select>
+          <Icon
+            name="chevron-down"
+            size={15}
+            class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+          />
+        </span>
+      </label>
+
+      <label class="grid min-h-14 grid-cols-[1.75rem_1fr_7.25rem] items-center gap-2 py-2">
+        <Icon name="badge-euro" size={20} class="text-text-subtle" />
+        <span class="text-caption font-medium text-text-primary">TJM minimum</span>
+        <span class="relative min-w-0">
+          <select
+            class="soft-ring h-10 w-full appearance-none rounded-xl border border-border-light bg-surface-white px-3 pr-8 text-caption text-text-primary"
+            aria-label="TJM minimum"
+            value={draft.selectedTjmMin?.toString() ?? ''}
+            onchange={handleTjmChange}
+          >
+            <option value="">Tous</option>
+            {#each tjmOptions as amount (amount)}
+              <option value={String(amount)}>{amount} € / j</option>
+            {/each}
+          </select>
+          <Icon
+            name="chevron-down"
+            size={15}
+            class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+          />
+        </span>
+      </label>
+
+      <label class="grid min-h-14 grid-cols-[1.75rem_1fr_7.25rem] items-center gap-2 py-2">
+        <Icon name="database" size={20} class="text-text-subtle" />
+        <span class="text-caption font-medium text-text-primary">Sources</span>
+        <span class="relative min-w-0">
+          <select
+            class="soft-ring h-10 w-full appearance-none rounded-xl border border-border-light bg-surface-white px-3 pr-8 text-caption text-text-primary"
+            aria-label="Sources"
+            value={draft.selectedSource ?? ''}
+            onchange={handleSourceChange}
+          >
+            <option value="">Toutes</option>
+            {#each sources as source (source.value)}
+              <option value={source.value}>{source.label}</option>
+            {/each}
+          </select>
+          <Icon
+            name="chevron-down"
+            size={15}
+            class="pointer-events-none absolute right-2.5 top-1/2 -translate-y-1/2 text-text-subtle"
+          />
+        </span>
+      </label>
+    </div>
+
+    <footer class="relative z-10 mt-3 flex items-center justify-between gap-3">
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 text-caption font-medium text-text-subtle transition-colors hover:text-text-primary"
+        onclick={() => onEdit({ type: 'RESET_FILTERS' })}
+      >
+        <Icon name="refresh-cw" size={16} />
+        Réinitialiser
+      </button>
+      <button
+        type="button"
+        class="inline-flex items-center gap-1.5 text-caption font-semibold text-blueprint-blue transition-colors hover:text-blueprint-blue/80"
+        onclick={() => onDismiss('button')}
+      >
+        <Icon name="check-circle" size={15} />
+        Terminer
       </button>
     </footer>
+
+    <span
+      class="relative z-10 mt-3 flex min-w-0 items-center justify-center gap-2 truncate text-caption text-text-subtle"
+      aria-live="polite"
+      aria-atomic="true"
+    >
+      <span class="h-2 w-2 shrink-0 rounded-full bg-accent-green" aria-hidden="true"></span>
+      {visibleCount} mission{visibleCount > 1 ? 's' : ''} affichée{visibleCount > 1 ? 's' : ''}
+    </span>
   </section>
 </div>
+
+<style>
+  .genie-panel {
+    transform-origin: 2.3rem calc(100% + 5rem);
+    isolation: isolate;
+  }
+
+  .genie-panel:focus,
+  .genie-panel:focus-visible {
+    outline: none !important;
+  }
+
+  .genie-tail {
+    position: absolute;
+    bottom: -3.45rem;
+    left: 0.75rem;
+    z-index: -1;
+    width: 2.35rem;
+    height: 4.1rem;
+    border-radius: 0 0 0 100%;
+    background: rgba(255, 255, 255, 0.94);
+    clip-path: polygon(0 0, 62% 0, 27% 78%, 0 100%);
+    filter: drop-shadow(-2px 6px 6px rgba(28, 25, 23, 0.035));
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .genie-panel {
+      transform: none !important;
+      filter: none !important;
+    }
+  }
+</style>

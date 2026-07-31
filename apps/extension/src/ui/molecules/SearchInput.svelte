@@ -6,10 +6,14 @@
   let {
     value = '',
     onSearch,
+    variant = 'default',
+    placeholder = 'Rechercher une mission, une stack, un client...',
     inputRef = $bindable<HTMLInputElement | null>(null),
   }: {
     value?: string;
     onSearch?: (query: string) => void;
+    variant?: 'default' | 'dock';
+    placeholder?: string;
     inputRef?: HTMLInputElement | null;
   } = $props();
   /* eslint-enable prefer-const */
@@ -47,13 +51,16 @@
 
 <div class="relative">
   <div class="pointer-events-none absolute left-3.5 top-1/2 -translate-y-1/2 text-text-muted">
-    <Icon name="search" size={14} />
+    <Icon name="search" size={variant === 'dock' ? 16 : 14} />
   </div>
   <input
     bind:this={inputRef}
     type="text"
-    placeholder="Rechercher une mission, une stack, un client..."
-    class="soft-ring w-full rounded-xl border border-border-light bg-surface-white pl-10 pr-10 py-3 text-body text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200"
+    {placeholder}
+    class="soft-ring w-full border border-border-light bg-surface-white pl-10 pr-10 text-body text-text-primary placeholder:text-text-muted focus:outline-none focus:border-blueprint-blue/30 focus:ring-2 focus:ring-blueprint-blue/15 transition-all duration-200 {variant ===
+    'dock'
+      ? 'h-12 rounded-full shadow-[0_6px_20px_rgba(28,25,23,0.08)]'
+      : 'rounded-xl py-3'}"
     value={search.query}
     oninput={search.handleInput}
   />
@@ -65,7 +72,7 @@
     >
       <Icon name="x" size={14} />
     </button>
-  {:else}
+  {:else if variant === 'default'}
     <kbd
       class="pointer-events-none absolute right-3 top-1/2 -translate-y-1/2 select-none rounded-md border border-border-light bg-subtle-gray px-1.5 py-0.5 font-mono text-micro font-medium text-text-muted"
       aria-hidden="true"

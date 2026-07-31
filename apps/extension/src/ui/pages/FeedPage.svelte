@@ -269,18 +269,12 @@
   let feedChromeCompact = $state(false);
   let feedScrollContainer = $state<HTMLDivElement | null>(null);
   let missionFeedSection = $state<HTMLDivElement | null>(null);
+  let feedHeroCard = $state<HTMLElement | null>(null);
   let missionFeedReached = $state(false);
   let alertPreferences = $state<ConnectedAlertPreferences>(DEFAULT_CONNECTED_ALERT_PREFERENCES);
   let showAlertOnly = $state(false);
   let showComparison = $state(false);
   let showAdvancedControls = $state(false);
-  // Tracks whether the advanced panel was opened by the user (vs. auto-expanded
-  // by a broken-connector state). Lets us auto-collapse only the auto-expand.
-  let advancedControlsUserOpened = $state(false);
-  // Tracks whether the user has interacted with the toggle at all. Once true,
-  // the broken-connector auto-expand stops fighting the user's explicit choice
-  // (e.g. they collapsed to "Vue simple" while a connector is broken).
-  let advancedControlsUserInteracted = $state(false);
   let investigationMission = $state<(typeof page.displayMissions)[number] | null>(null);
   let filterTrigger = $state<HTMLButtonElement | null>(null);
   let filterSheetWasOpen = false;
@@ -910,18 +904,6 @@
   });
 
   $effect(() => {
-    const hasBroken = brokenConnectors.length > 0;
-    if (hasBroken && !showAdvancedControls && !advancedControlsUserInteracted) {
-      // First time a connector breaks: surface it once. After the user has
-      // touched the toggle, respect their explicit choice (see "Vue simple").
-      showAdvancedControls = true;
-      advancedControlsUserOpened = false;
-    } else if (!hasBroken && showAdvancedControls && !advancedControlsUserOpened) {
-      showAdvancedControls = false;
-    }
-  });
-
-  $effect(() => {
     const container = feedScrollContainer;
     missionFeedSection;
     visibleFeedMissionCount;
@@ -942,6 +924,21 @@
     event.preventDefault();
     event.stopPropagation();
     page.dismissFilterSheet('escape');
+  }
+
+  function toggleOperationalDetails(): void {
+    if (page.showFilters) {
+      page.dismissFilterSheet('button');
+    }
+
+    const nextOpen = !showAdvancedControls;
+    showAdvancedControls = nextOpen;
+
+    if (nextOpen) {
+      void tick().then(() => {
+        feedHeroCard?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+      });
+    }
   }
 </script>
 
@@ -1112,6 +1109,7 @@
            Hero card — greeting + filters unified
            ═══════════════════════════════════════════ -->
       <section
+        bind:this={feedHeroCard}
         data-testid="feed-hero-card"
         class="section-card-strong relative overflow-visible rounded-2xl transition-[border-color,box-shadow] duration-200 ease-out {page.showFilters
           ? 'z-40'
@@ -1122,7 +1120,7 @@
           <div class="px-5 {page.heroCompact ? 'pt-2.5 pb-1.5' : 'pt-4 pb-0'}">
             {#if page.heroCompact}
               <!-- Compact: single row with stats and scan button -->
-              <div class="flex items-center justify-between gap-3">
+              <div class="flex items-center gap-3">
                 <div class="flex items-center gap-3 min-w-0">
                   <div>
                     <p
@@ -1149,32 +1147,6 @@
                     </div>
                   </div>
                 </div>
-                <Tooltip
-                  label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
-                  description={page.filterActive
-                    ? 'Des filtres sont actifs sur le feed.'
-                    : 'Affinez les missions sans quitter votre sélection.'}
-                >
-                  <button
-                    bind:this={filterTrigger}
-                    type="button"
-                    class="soft-ring relative inline-flex h-9 shrink-0 items-center gap-2 rounded-xl border px-3 text-caption font-medium transition-all duration-[180ms] {page.showFilters ||
-                    page.filterActive
-                      ? 'border-blueprint-blue/35 bg-blueprint-blue/8 text-blueprint-blue'
-                      : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                    onclick={() => page.setShowFilters(!page.showFilters)}
-                    aria-expanded={page.showFilters}
-                    aria-controls="filter-panel"
-                    aria-label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
-                  >
-                    <Icon name="sliders-horizontal" size={14} />
-                    <span>Filtrer</span>
-                    {#if page.filterActive}
-                      <span class="h-1.5 w-1.5 rounded-full bg-blueprint-blue" aria-hidden="true"
-                      ></span>
-                    {/if}
-                  </button>
-                </Tooltip>
               </div>
               <div class="mt-2">
                 <OperationalStoryCard
@@ -1441,7 +1413,6 @@
             </div>
           {/if}
 
-          <!-- Row 1: title + search -->
           {#if feedChromeBusy}
             <div class="flex items-center gap-2 text-meta text-text-muted">
               <span
@@ -1450,117 +1421,6 @@
               Collecte...
             </div>
           {/if}
-
-          <div class={feedChromeBusy ? 'mt-2' : ''}>
-            <SearchInput
-              value={page.searchQuery}
-              onSearch={page.handleSearch}
-              bind:inputRef={page.searchInputRef}
-            />
-          </div>
-
-          <!-- Row 2: filter pills -->
-          <div
-            class="mt-2 flex items-center gap-1.5 rounded-xl transition-all duration-200 {activeTourStep?.id ===
-            'filters'
-              ? 'ring-2 ring-blueprint-blue/40 ring-offset-2 ring-offset-page-canvas px-1 py-1'
-              : ''}"
-          >
-            <Tooltip
-              label={page.showFavoritesOnly ? 'Voir toutes les missions' : 'Filtrer les favoris'}
-              description={`Raccourci clavier: f. ${page.favoriteCount} mission${page.favoriteCount > 1 ? 's' : ''} en favori.`}
-            >
-              <button
-                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
-                {page.showFavoritesOnly
-                  ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                  : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                onclick={page.toggleFavoritesFilter}
-                aria-pressed={page.showFavoritesOnly}
-                aria-label={page.showFavoritesOnly
-                  ? 'Voir toutes les missions'
-                  : 'Filtrer les favoris'}
-              >
-                <Icon
-                  name="star"
-                  size={12}
-                  class={page.showFavoritesOnly ? 'fill-blueprint-blue' : ''}
-                />
-                <span class="hidden @[20rem]:inline text-micro font-medium">Favoris</span>
-                {#if page.favoriteCount > 0}
-                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-micro font-medium"
-                    >{page.favoriteCount}</span
-                  >
-                {/if}
-              </button>
-            </Tooltip>
-            <Tooltip
-              label={page.showHidden ? 'Masquer les missions ignorées' : 'Voir les ignorées'}
-              description={`Raccourci clavier : h. ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} ignorée${page.hiddenCount > 1 ? 's' : ''}.`}
-            >
-              <button
-                class="inline-flex h-7 shrink-0 items-center gap-1 rounded-lg border px-2 transition-all duration-150
-                {page.showHidden
-                  ? 'border-blueprint-blue/20 bg-blueprint-blue/8 text-blueprint-blue'
-                  : 'border-border-light bg-surface-white text-text-secondary hover:bg-subtle-gray hover:text-text-primary'}"
-                onclick={page.toggleHiddenFilter}
-                aria-pressed={page.showHidden}
-                aria-label={page.showHidden ? 'Masquer les missions ignorées' : 'Voir les ignorées'}
-              >
-                <Icon name={page.showHidden ? 'eye' : 'eye-off'} size={12} />
-                <span class="hidden @[20rem]:inline text-micro font-medium">Ignorées</span>
-                {#if page.hiddenCount > 0}
-                  <span class="rounded-md bg-subtle-gray px-1 py-0.5 text-micro font-medium"
-                    >{page.hiddenCount}</span
-                  >
-                {/if}
-              </button>
-            </Tooltip>
-
-            <div class="h-4 w-px shrink-0 bg-border-light"></div>
-
-            <label class="sr-only" for="sort-select">Trier par</label>
-            <select
-              id="sort-select"
-              class="h-7 min-w-0 cursor-pointer rounded-lg border border-border-light bg-surface-white px-2 text-micro text-text-secondary outline-none transition-colors focus:border-blueprint-blue/30"
-              bind:value={page.sortBy}
-            >
-              <option value="score">Pertinence</option>
-              <option value="date">Date</option>
-              <option value="tjm">TJM</option>
-            </select>
-            <Tooltip
-              label="Raccourcis clavier"
-              description="Ouvre la liste des commandes disponibles. Raccourci: ?."
-            >
-              <button
-                class="soft-ring inline-flex h-7 min-w-[1.75rem] shrink-0 items-center justify-center rounded-lg border border-border-light bg-surface-white px-1.5 font-mono text-meta font-semibold leading-none text-text-secondary transition-all duration-150 hover:bg-subtle-gray hover:text-text-primary"
-                onclick={() => (page.showShortcutsHelp = true)}
-                aria-label="Afficher l'aide des raccourcis clavier"
-                title="Raccourcis clavier (?)"
-              >
-                ?
-              </button>
-            </Tooltip>
-          </div>
-
-          <div class="mt-2 flex justify-end">
-            <button
-              type="button"
-              class="rounded-lg border border-border-light bg-surface-white px-2.5 py-1.5 text-micro font-medium text-text-secondary transition-colors hover:bg-subtle-gray hover:text-text-primary"
-              onclick={() => {
-                advancedControlsUserInteracted = true;
-                advancedControlsUserOpened = showAdvancedControls ? false : true;
-                showAdvancedControls = !showAdvancedControls;
-              }}
-              aria-expanded={showAdvancedControls}
-              aria-label={showAdvancedControls
-                ? 'Masquer les détails opérationnels'
-                : 'Afficher les détails opérationnels'}
-            >
-              {showAdvancedControls ? 'Vue simple' : 'Détails opérationnels'}
-            </button>
-          </div>
 
           {#if showAdvancedControls}
             <div class="mt-2" aria-label="Presets métier du feed">
@@ -1751,23 +1611,84 @@
         onclick={page.toggleHiddenFilter}
         aria-pressed={page.showHidden}
       >
-        {page.showHidden
-          ? 'Masquer les ignorées'
-          : `Voir les ${page.hiddenCount} mission${page.hiddenCount > 1 ? 's' : ''} masquée${page.hiddenCount > 1 ? 's' : ''}`}
+        {page.showHidden ? 'Masquer les ignorées' : `Voir les ignorées (${page.hiddenCount})`}
+        <span class="sr-only">Raccourci clavier : h.</span>
       </button>
     {/if}
   </div>
 </div>
 
+{#if active}
+  <div
+    class="absolute inset-x-0 bottom-0 z-40 border-t border-white/90 bg-surface-white/88 shadow-[0_-14px_36px_rgba(28,25,23,0.10),inset_0_1px_0_rgba(255,255,255,0.96)] backdrop-blur-2xl"
+    data-testid="feed-bottom-dock"
+    aria-label="Actions du feed"
+  >
+    <div class="grid grid-cols-[3rem_minmax(0,1fr)_3rem] items-center gap-3 px-6 py-4">
+      <Tooltip
+        label={page.showFilters ? 'Masquer les filtres' : 'Filtrer les missions'}
+        description="Ouvre la grille de filtres avec mise à jour immédiate du feed."
+      >
+        <button
+          bind:this={filterTrigger}
+          type="button"
+          class="soft-ring relative inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_6px_20px_rgba(28,25,23,0.08)] transition-[background-color,border-color,color,transform,box-shadow] duration-200 active:scale-95 {page.showFilters ||
+          page.filterActive
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/[0.10] text-blueprint-blue shadow-[0_8px_24px_rgba(11,100,233,0.16)]'
+            : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+          onclick={() => page.setShowFilters(!page.showFilters)}
+          aria-expanded={page.showFilters}
+          aria-controls="filter-panel"
+          aria-label={page.showFilters ? 'Masquer les filtres' : 'Afficher les filtres'}
+        >
+          <Icon name="sliders-horizontal" size={19} />
+          {#if page.filterActive && !page.showFilters}
+            <span
+              class="absolute right-0.5 top-0.5 h-2 w-2 rounded-full border-2 border-surface-white bg-blueprint-blue"
+              aria-hidden="true"
+            ></span>
+          {/if}
+        </button>
+      </Tooltip>
+
+      <SearchInput
+        variant="dock"
+        placeholder="Rechercher une mission…"
+        value={page.searchQuery}
+        onSearch={page.handleSearch}
+        bind:inputRef={page.searchInputRef}
+      />
+
+      <Tooltip
+        label={showAdvancedControls ? 'Masquer les détails' : 'Détails opérationnels'}
+        description="Affiche les sources, métriques et presets du feed."
+      >
+        <button
+          type="button"
+          class="soft-ring inline-flex h-12 w-12 items-center justify-center rounded-full border shadow-[0_6px_20px_rgba(28,25,23,0.08)] transition-[background-color,border-color,color,transform] duration-200 active:scale-95 {showAdvancedControls
+            ? 'border-blueprint-blue/35 bg-blueprint-blue/[0.10] text-blueprint-blue'
+            : 'border-border-light bg-surface-white text-text-secondary hover:border-disabled-gray hover:bg-subtle-gray'}"
+          onclick={toggleOperationalDetails}
+          aria-expanded={showAdvancedControls}
+          aria-label={showAdvancedControls
+            ? 'Masquer les détails opérationnels'
+            : 'Afficher les détails opérationnels'}
+        >
+          <Icon name="activity" size={19} />
+        </button>
+      </Tooltip>
+    </div>
+  </div>
+{/if}
+
 {#if page.showFilters && page.filterSheetDraft}
   <FeedFilterSheet
     draft={page.filterSheetDraft}
     visibleCount={page.filterSheetPreviewCount}
-    availableStacks={page.availableStacks}
     sources={filterSourceOptions}
+    tjmTarget={page.profileTjmMin}
     onEdit={page.editFilterSheet}
     onDismiss={page.dismissFilterSheet}
-    onApply={page.applyFilterSheet}
   />
 {/if}
 
@@ -1822,8 +1743,8 @@
 {#if page.comparisonMissionIds.length > 0 && !arrivalDrawerExpanded}
   <div
     class="fixed left-1/2 z-40 -translate-x-1/2 flex items-center gap-3 rounded-2xl border border-blueprint-blue/20 bg-surface-white/95 backdrop-blur-sm px-4 py-2.5 shadow-xl transition-[bottom] duration-200 {page.arrivalStackVisible
-      ? 'bottom-24'
-      : 'bottom-4'}"
+      ? 'bottom-40'
+      : 'bottom-24'}"
   >
     <span class="text-meta text-text-secondary">
       {page.comparisonMissionIds.length}/3 sélectionnée{page.comparisonMissionIds.length > 1

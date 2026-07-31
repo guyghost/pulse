@@ -232,6 +232,12 @@ export function countMissionsForFilterDraft(
       return false;
     }
     if (
+      draft.selectedTjmMin !== null &&
+      (mission.tjm === null || mission.tjm < draft.selectedTjmMin)
+    ) {
+      return false;
+    }
+    if (
       draft.decisionPreset !== null &&
       !matchesDecisionPreset(mission, draft.decisionPreset, seenSet, profileTjmMin)
     ) {
@@ -279,6 +285,7 @@ export function createFeedPageState(
   let selectedRemote = $state<RemoteType | null>(null);
   let selectedSeniority = $state<SeniorityLevel | null>(null);
   let selectedScoreBucket = $state<ScoreBucket | null>(null);
+  let selectedTjmMin = $state<number | null>(null);
   let decisionPreset = $state<DecisionPresetId | null>(null);
   let showNewOnly = $state(false);
   let firstName = $state('');
@@ -427,12 +434,13 @@ export function createFeedPageState(
       selectedStacks.length > 0 ||
       selectedSeniority !== null ||
       selectedScoreBucket !== null ||
+      selectedTjmMin !== null ||
       decisionPreset !== null ||
       showNewOnly
   );
-  const showFilters = $derived(filterSheetState.value === 'editing');
+  const showFilters = $derived(filterSheetState.value === 'open');
   const filterSheetDraft = $derived(
-    filterSheetState.value === 'editing' ? filterSheetState.draft : null
+    filterSheetState.value === 'open' ? filterSheetState.filters : null
   );
 
   const stackCounts = $derived.by(() => {
@@ -488,6 +496,10 @@ export function createFeedPageState(
     }
     if (selectedScoreBucket !== null) {
       result = result.filter((m) => getScoreBucket(getMissionScore(m)) === selectedScoreBucket);
+    }
+    const tjmFloor = selectedTjmMin;
+    if (tjmFloor !== null) {
+      result = result.filter((m) => m.tjm !== null && m.tjm >= tjmFloor);
     }
     if (decisionPreset !== null && decisionPreset !== 'new') {
       const activePreset = decisionPreset;
@@ -751,16 +763,7 @@ export function createFeedPageState(
   });
 
   const visibleCount = $derived(displayMissions.length);
-  const filterSheetPreviewCount = $derived.by(() =>
-    filterSheetState.value === 'editing'
-      ? countMissionsForFilterDraft(
-          baseFilteredMissions,
-          filterSheetState.draft,
-          seenIds,
-          profileTjmMin
-        )
-      : visibleCount
-  );
+  const filterSheetPreviewCount = $derived(visibleCount);
   const missionListResetKey = $derived(
     [
       searchQuery.trim(),
@@ -1013,6 +1016,9 @@ export function createFeedPageState(
     if (preset === 'remote-compatible') {
       selectedRemote = null;
     }
+    if (preset === 'tjm-negotiation') {
+      selectedTjmMin = null;
+    }
     if (preset === 'new') {
       showNewOnly = false;
     }
@@ -1041,6 +1047,7 @@ export function createFeedPageState(
     return {
       decisionPreset: decisionPreset ?? (showNewOnly ? 'new' : null),
       selectedScoreBucket,
+      selectedTjmMin,
       selectedSource,
       selectedRemote,
       selectedSeniority,
@@ -1052,6 +1059,7 @@ export function createFeedPageState(
     activeSavedViewId = null;
     decisionPreset = draft.decisionPreset;
     selectedScoreBucket = draft.selectedScoreBucket;
+    selectedTjmMin = draft.selectedTjmMin;
     selectedSource = draft.selectedSource;
     selectedRemote = draft.selectedRemote;
     selectedSeniority = draft.selectedSeniority;
@@ -1068,7 +1076,7 @@ export function createFeedPageState(
   function reduceFilterSheet(event: FeedFilterSheetEvent): void {
     const transition = transitionFeedFilterSheet(filterSheetState, event);
     filterSheetState = transition.state;
-    if (transition.command.type === 'COMMIT_FILTERS') {
+    if (transition.command.type === 'SYNC_FILTERS') {
       applyFilterDraft(transition.command.filters);
     }
   }
@@ -1078,17 +1086,13 @@ export function createFeedPageState(
   }
 
   function editFilterSheet(
-    event: Exclude<FeedFilterSheetEvent, { type: 'OPEN' | 'DISMISS' | 'APPLY' | 'DISPOSE' }>
+    event: Exclude<FeedFilterSheetEvent, { type: 'OPEN' | 'DISMISS' | 'DISPOSE' }>
   ): void {
     reduceFilterSheet(event);
   }
 
   function dismissFilterSheet(reason: FeedFilterSheetDismissReason): void {
     reduceFilterSheet({ type: 'DISMISS', reason });
-  }
-
-  function applyFilterSheet(): void {
-    reduceFilterSheet({ type: 'APPLY' });
   }
 
   function clearAllFilters(): void {
@@ -1103,6 +1107,7 @@ export function createFeedPageState(
     selectedRemote = null;
     selectedSeniority = null;
     selectedScoreBucket = null;
+    selectedTjmMin = null;
     decisionPreset = null;
     showNewOnly = false;
     dismissFilterSheet('button');
@@ -1198,6 +1203,7 @@ export function createFeedPageState(
     selectedRemote = filters.selectedRemote;
     selectedSeniority = filters.selectedSeniority;
     selectedScoreBucket = filters.selectedScoreBucket;
+    selectedTjmMin = null;
     decisionPreset = filters.decisionPreset ?? null;
     showNewOnly = filters.showNewOnly;
     showFavoritesOnly = filters.showFavoritesOnly;
@@ -1650,6 +1656,9 @@ export function createFeedPageState(
     get profileNeedsCompletion() {
       return profileNeedsCompletion;
     },
+    get profileTjmMin() {
+      return profileTjmMin;
+    },
     get panelSide() {
       return panelSide;
     },
@@ -1831,7 +1840,6 @@ export function createFeedPageState(
     openFilterSheet,
     editFilterSheet,
     dismissFilterSheet,
-    applyFilterSheet,
     saveCurrentView,
     applySavedView,
     deleteSavedView,

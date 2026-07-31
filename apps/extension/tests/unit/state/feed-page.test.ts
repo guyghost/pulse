@@ -702,6 +702,7 @@ describe('feed page state', () => {
     const draft: FeedFilterDraft = {
       decisionPreset: 'priority',
       selectedScoreBucket: null,
+      selectedTjmMin: null,
       selectedSource: 'free-work',
       selectedRemote: 'full',
       selectedSeniority: null,
